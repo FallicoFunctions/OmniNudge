@@ -14,13 +14,22 @@ import (
 	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
+	zlog "github.com/rs/zerolog/log"
 )
+
+// AuthEmailSender is the email-sending interface required by AuthHandler.
+// Using an interface (instead of the concrete *services.EmailService) allows
+// test doubles to be injected without making real network calls.
+type AuthEmailSender interface {
+	SendEmail(to []string, subject, body, htmlBody string) error
+	SendTemplatedEmail(to []string, template services.EmailTemplate, data map[string]string) error
+}
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
 	authService           *services.AuthService
 	userRepo              ports.UserRepository
-	emailService          *services.EmailService
+	emailService          AuthEmailSender
 	passwordResetRepo     ports.PasswordResetRepository
 	emailVerificationRepo ports.EmailVerificationRepository
 	frontendURL           string
@@ -49,7 +58,7 @@ func (h *AuthHandler) logAudit(ctx context.Context, userID *int, action, targetT
 func NewAuthHandler(
 	authService *services.AuthService,
 	userRepo ports.UserRepository,
-	emailService *services.EmailService,
+	emailService AuthEmailSender,
 	passwordResetRepo ports.PasswordResetRepository,
 	emailVerificationRepo ports.EmailVerificationRepository,
 	frontendURL string,
@@ -280,6 +289,23 @@ func (h *AuthHandler) Register(c *gin.Context) {
 				slog.Info("verification email sent", "email_masked", maskEmail(*req.Email))
 			}
 		}
+	}
+
+	// Send welcome email asynchronously so registration does not block on email delivery.
+	// Only sent when the user has an email address; welcome email does not require verification.
+	if req.Email != nil && *req.Email != "" && h.emailService != nil {
+		go func() {
+			if err := h.emailService.SendTemplatedEmail(
+				[]string{*req.Email},
+				services.WelcomeEmailTemplate,
+				map[string]string{
+					"username": user.Username,
+					"app_url":  h.frontendURL,
+				},
+			); err != nil {
+				zlog.Warn().Err(err).Str("username", user.Username).Msg("auth: failed to send welcome email")
+			}
+		}()
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
@@ -530,11 +556,16 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	// Find user by username
+	// Find user by username. GetByUsername returns (nil, nil) when not found.
 	user, err := h.userRepo.GetByUsername(c.Request.Context(), req.Username)
 	if err != nil {
 		// Don't reveal whether user exists (security best practice).
-		slog.Debug("GetByUsername not found during forgot-password", "error", err)
+		slog.Debug("GetByUsername error during forgot-password", "error", err)
+		c.JSON(http.StatusOK, gin.H{"message": "If an account exists with a verified email, a password reset link has been sent"})
+		return
+	}
+	if user == nil {
+		// User does not exist — return same generic response to prevent enumeration.
 		c.JSON(http.StatusOK, gin.H{"message": "If an account exists with a verified email, a password reset link has been sent"})
 		return
 	}
