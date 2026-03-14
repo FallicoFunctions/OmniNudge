@@ -2,18 +2,32 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/smtp"
 	"strings"
+	"time"
+
+	zlog "github.com/rs/zerolog/log"
 )
 
-// EmailService handles sending emails via Mailgun HTTP API or SMTP
+// httpClient is a shared HTTP client with a 15-second timeout used for all
+// outbound email/API provider calls. Using http.DefaultClient (which has no
+// timeout) would allow hung connections to block goroutines indefinitely.
+var httpClient = &http.Client{Timeout: 15 * time.Second}
+
+// EmailService handles sending emails via SendGrid, Mailgun HTTP API, or SMTP fallback.
+// Provider selection order: SendGrid > Mailgun > SMTP.
 type EmailService struct {
-	// Mailgun HTTP API (preferred)
+	// SendGrid REST API (highest priority)
+	sendgridAPIKey string
+
+	// Mailgun HTTP API (second priority)
 	mailgunAPIKey string
 	mailgunDomain string
 
@@ -23,130 +37,228 @@ type EmailService struct {
 	smtpUser     string
 	smtpPassword string
 
-	fromAddress  string
-	fromName     string
+	fromAddress string
+	fromName    string
+	frontendURL string // used to build default unsubscribe URLs
+
+	// cb protects outbound email calls; opens after 5 consecutive failures,
+	// half-opens after 60 seconds to probe service recovery.
+	cb *CircuitBreaker
 }
 
-// NewEmailService creates a new email service
-// For Mailgun HTTP API: pass apiKey as host, domain as user
-// For SMTP: pass host, port, user, password as usual
+// EmailServiceConfig holds all configuration needed to create an EmailService.
+type EmailServiceConfig struct {
+	SendGridAPIKey string
+	MailgunAPIKey  string
+	MailgunDomain  string
+	SMTPHost       string
+	SMTPPort       string
+	SMTPUser       string
+	SMTPPassword   string
+	FromAddress    string
+	FromName       string
+	FrontendURL    string
+}
+
+// NewEmailService creates a new email service with the given configuration.
+// For backward compatibility with existing call sites the original 6-parameter
+// signature is preserved via NewEmailServiceLegacy.
 func NewEmailService(host, port, user, password, fromAddress, fromName string) *EmailService {
 	return &EmailService{
-		mailgunAPIKey: host,     // Reuse host param for API key
-		mailgunDomain: user,     // Reuse user param for domain
-		smtpHost:      host,
-		smtpPort:      port,
-		smtpUser:      user,
-		smtpPassword:  password,
-		fromAddress:   fromAddress,
-		fromName:      fromName,
+		smtpHost:     host,
+		smtpPort:     port,
+		smtpUser:     user,
+		smtpPassword: password,
+		fromAddress:  fromAddress,
+		fromName:     fromName,
+		cb:           NewCircuitBreaker("email", 5, 60*time.Second),
 	}
 }
 
-// SendEmail sends an email using Mailgun HTTP API (preferred) or SMTP fallback
+// NewEmailServiceFull creates an EmailService with full provider configuration.
+func NewEmailServiceFull(cfg EmailServiceConfig) *EmailService {
+	return &EmailService{
+		sendgridAPIKey: cfg.SendGridAPIKey,
+		mailgunAPIKey:  cfg.MailgunAPIKey,
+		mailgunDomain:  cfg.MailgunDomain,
+		smtpHost:       cfg.SMTPHost,
+		smtpPort:       cfg.SMTPPort,
+		smtpUser:       cfg.SMTPUser,
+		smtpPassword:   cfg.SMTPPassword,
+		fromAddress:    cfg.FromAddress,
+		fromName:       cfg.FromName,
+		frontendURL:    cfg.FrontendURL,
+		cb:             NewCircuitBreaker("email", 5, 60*time.Second),
+	}
+}
+
+// SendEmail sends an email using the configured provider.
+// Selection order: SendGrid > Mailgun > SMTP.
+// All outbound calls are protected by the email circuit breaker; if the
+// breaker is open, ErrCircuitOpen is returned immediately without attempting
+// to contact the provider.
 func (s *EmailService) SendEmail(to []string, subject, body, htmlBody string) error {
-	// Try Mailgun HTTP API first (if configured)
+	return s.cb.Do(func() error {
+		return s.sendEmailDirect(to, subject, body, htmlBody)
+	})
+}
+
+// sendEmailDirect performs the actual provider dispatch without circuit-breaker
+// wrapping. Called by SendEmail via the circuit breaker.
+func (s *EmailService) sendEmailDirect(to []string, subject, body, htmlBody string) error {
+	// SendGrid (highest priority)
+	if s.sendgridAPIKey != "" {
+		return s.sendViaSendGrid(to, subject, body, htmlBody)
+	}
+
+	// Mailgun HTTP API (second priority)
 	if s.mailgunAPIKey != "" && s.mailgunDomain != "" {
 		return s.sendViaMailgunAPI(to, subject, body, htmlBody)
 	}
 
-	// Fallback to SMTP
+	// SMTP fallback
 	if s.smtpHost == "" || s.smtpPassword == "" {
-		fmt.Printf("[EMAIL] Skipping email send (not configured): to=%v subject=%s\n", to, subject)
+		zlog.Warn().Strs("to", to).Str("subject", subject).Msg("email: skipping send (no provider configured)")
 		return nil
 	}
 
 	return s.sendViaSMTP(to, subject, body, htmlBody)
 }
 
-// sendViaMailgunAPI sends email using Mailgun's HTTP API
-func (s *EmailService) sendViaMailgunAPI(to []string, subject, body, htmlBody string) error {
-	url := fmt.Sprintf("https://api.mailgun.net/v3/%s/messages", s.mailgunDomain)
-
-	// Prepare multipart form data
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-
-	// From
-	from := s.fromAddress
-	if s.fromName != "" {
-		from = fmt.Sprintf("%s <%s>", s.fromName, s.fromAddress)
+// sendViaSendGrid sends email using the SendGrid REST API.
+func (s *EmailService) sendViaSendGrid(to []string, subject, body, htmlBody string) error {
+	type sgAddress struct {
+		Email string `json:"email"`
 	}
-	writer.WriteField("from", from)
-
-	// To (multiple recipients)
-	for _, recipient := range to {
-		writer.WriteField("to", recipient)
+	type sgPersonalization struct {
+		To []sgAddress `json:"to"`
+	}
+	type sgContent struct {
+		Type  string `json:"type"`
+		Value string `json:"value"`
 	}
 
-	// Subject and body
-	writer.WriteField("subject", subject)
-	writer.WriteField("text", body)
+	toAddresses := make([]sgAddress, 0, len(to))
+	for _, addr := range to {
+		toAddresses = append(toAddresses, sgAddress{Email: addr})
+	}
+
+	content := []sgContent{
+		{Type: "text/plain", Value: body},
+	}
 	if htmlBody != "" {
-		writer.WriteField("html", htmlBody)
+		content = append(content, sgContent{Type: "text/html", Value: htmlBody})
 	}
 
-	writer.Close()
-
-	// Create HTTP request
-	req, err := http.NewRequest("POST", url, &buf)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+	payload := map[string]interface{}{
+		"personalizations": []sgPersonalization{
+			{To: toAddresses},
+		},
+		"from": map[string]string{
+			"email": s.fromAddress,
+			"name":  s.fromName,
+		},
+		"subject": subject,
+		"content": content,
 	}
 
-	req.SetBasicAuth("api", s.mailgunAPIKey)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	// Send request
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	rawBody, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("failed to send email via Mailgun API: %w", err)
+		return fmt.Errorf("email: sendgrid marshal payload: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://api.sendgrid.com/v3/mail/send", bytes.NewReader(rawBody))
+	if err != nil {
+		return fmt.Errorf("email: sendgrid create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+s.sendgridAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("email: sendgrid request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Check response
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("mailgun API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	// SendGrid returns 202 Accepted on success.
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("email: sendgrid error (status %d): %s", resp.StatusCode, string(respBody))
 	}
 
-	fmt.Printf("[EMAIL] Successfully sent email via Mailgun API: to=%v subject=%s\n", to, subject)
+	zlog.Info().Strs("to", to).Str("subject", subject).Msg("email: sent via SendGrid")
 	return nil
 }
 
-// sendViaSMTP sends email using SMTP (fallback)
+// sendViaMailgunAPI sends email using Mailgun's HTTP API.
+func (s *EmailService) sendViaMailgunAPI(to []string, subject, body, htmlBody string) error {
+	url := fmt.Sprintf("https://api.mailgun.net/v3/%s/messages", s.mailgunDomain)
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	from := s.fromAddress
+	if s.fromName != "" {
+		from = fmt.Sprintf("%s <%s>", s.fromName, s.fromAddress)
+	}
+	_ = writer.WriteField("from", from)
+
+	for _, recipient := range to {
+		_ = writer.WriteField("to", recipient)
+	}
+	_ = writer.WriteField("subject", subject)
+	_ = writer.WriteField("text", body)
+	if htmlBody != "" {
+		_ = writer.WriteField("html", htmlBody)
+	}
+	writer.Close()
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, &buf)
+	if err != nil {
+		return fmt.Errorf("email: mailgun create request: %w", err)
+	}
+	req.SetBasicAuth("api", s.mailgunAPIKey)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("email: mailgun request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("email: mailgun error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	zlog.Info().Strs("to", to).Str("subject", subject).Msg("email: sent via Mailgun")
+	return nil
+}
+
+// sendViaSMTP sends email using SMTP (fallback).
 func (s *EmailService) sendViaSMTP(to []string, subject, body, htmlBody string) error {
-	// Determine from header
 	from := s.fromAddress
 	if s.fromName != "" {
 		from = fmt.Sprintf("%s <%s>", s.fromName, s.fromAddress)
 	}
 
-	// Build email message
 	message := s.buildMessage(from, to, subject, body, htmlBody)
-
-	// Connect to SMTP server
 	auth := smtp.PlainAuth("", s.smtpUser, s.smtpPassword, s.smtpHost)
 	addr := fmt.Sprintf("%s:%s", s.smtpHost, s.smtpPort)
 
-	// For port 587, use STARTTLS; for port 465, use direct TLS
 	if s.smtpPort == "465" {
-		// Direct TLS connection
 		return s.sendWithTLS(addr, auth, message, to)
 	}
 
-	// Use standard SMTP with STARTTLS (port 587)
-	err := smtp.SendMail(addr, auth, s.fromAddress, to, []byte(message))
-	if err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
+	if err := smtp.SendMail(addr, auth, s.fromAddress, to, []byte(message)); err != nil {
+		return fmt.Errorf("email: smtp send: %w", err)
 	}
 
-	fmt.Printf("[EMAIL] Successfully sent email via SMTP: to=%v\n", to)
+	zlog.Info().Strs("to", to).Str("subject", subject).Msg("email: sent via SMTP")
 	return nil
 }
 
-// sendWithTLS sends email using direct TLS (for port 465)
+// sendWithTLS sends email using direct TLS (for port 465).
 func (s *EmailService) sendWithTLS(addr string, auth smtp.Auth, message string, to []string) error {
 	tlsConfig := &tls.Config{
 		ServerName: s.smtpHost,
@@ -154,54 +266,49 @@ func (s *EmailService) sendWithTLS(addr string, auth smtp.Auth, message string, 
 
 	conn, err := tls.Dial("tcp", addr, tlsConfig)
 	if err != nil {
-		return fmt.Errorf("failed to connect to SMTP server: %w", err)
+		return fmt.Errorf("email: tls dial: %w", err)
 	}
 	defer conn.Close()
 
 	client, err := smtp.NewClient(conn, s.smtpHost)
 	if err != nil {
-		return fmt.Errorf("failed to create SMTP client: %w", err)
+		return fmt.Errorf("email: smtp new client: %w", err)
 	}
 	defer client.Quit()
 
-	// Authenticate
 	if err := client.Auth(auth); err != nil {
-		return fmt.Errorf("SMTP authentication failed: %w", err)
+		return fmt.Errorf("email: smtp auth: %w", err)
 	}
 
-	// Set sender
 	if err := client.Mail(s.fromAddress); err != nil {
-		return fmt.Errorf("failed to set sender: %w", err)
+		return fmt.Errorf("email: smtp set sender: %w", err)
 	}
 
-	// Set recipients
 	for _, recipient := range to {
 		if err := client.Rcpt(recipient); err != nil {
-			return fmt.Errorf("failed to add recipient %s: %w", recipient, err)
+			return fmt.Errorf("email: smtp add recipient %s: %w", recipient, err)
 		}
 	}
 
-	// Send message
 	writer, err := client.Data()
 	if err != nil {
-		return fmt.Errorf("failed to send DATA command: %w", err)
+		return fmt.Errorf("email: smtp data command: %w", err)
 	}
 
-	_, err = writer.Write([]byte(message))
-	if err != nil {
+	if _, err = writer.Write([]byte(message)); err != nil {
 		writer.Close()
-		return fmt.Errorf("failed to write message: %w", err)
+		return fmt.Errorf("email: smtp write message: %w", err)
 	}
 
 	if err := writer.Close(); err != nil {
-		return fmt.Errorf("failed to close message: %w", err)
+		return fmt.Errorf("email: smtp close message: %w", err)
 	}
 
-	fmt.Printf("[EMAIL] Successfully sent email: to=%v\n", to)
+	zlog.Info().Strs("to", to).Msg("email: sent via SMTP/TLS")
 	return nil
 }
 
-// buildMessage constructs the email message with headers
+// buildMessage constructs the raw RFC 2822 email message with headers.
 func (s *EmailService) buildMessage(from string, to []string, subject, body, htmlBody string) string {
 	var msg strings.Builder
 
@@ -210,20 +317,17 @@ func (s *EmailService) buildMessage(from string, to []string, subject, body, htm
 	msg.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
 	msg.WriteString("MIME-Version: 1.0\r\n")
 
-	// If HTML body provided, use multipart/alternative
 	if htmlBody != "" {
 		boundary := "boundary-omninudge-email"
 		msg.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n", boundary))
 		msg.WriteString("\r\n")
 
-		// Plain text part
 		msg.WriteString(fmt.Sprintf("--%s\r\n", boundary))
 		msg.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
 		msg.WriteString("\r\n")
 		msg.WriteString(body)
 		msg.WriteString("\r\n\r\n")
 
-		// HTML part
 		msg.WriteString(fmt.Sprintf("--%s\r\n", boundary))
 		msg.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n")
 		msg.WriteString("\r\n")
@@ -232,7 +336,6 @@ func (s *EmailService) buildMessage(from string, to []string, subject, body, htm
 
 		msg.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
 	} else {
-		// Plain text only
 		msg.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
 		msg.WriteString("\r\n")
 		msg.WriteString(body)
@@ -241,8 +344,18 @@ func (s *EmailService) buildMessage(from string, to []string, subject, body, htm
 	return msg.String()
 }
 
-// SendTemplatedEmail sends an email using a template
+// SendTemplatedEmail sends an email using a template, automatically injecting
+// a default unsubscribe URL if the "unsubscribe_url" key is absent from data.
 func (s *EmailService) SendTemplatedEmail(to []string, template EmailTemplate, data map[string]string) error {
+	// Inject default unsubscribe URL if caller did not provide one.
+	if _, ok := data["unsubscribe_url"]; !ok {
+		baseURL := s.frontendURL
+		if baseURL == "" {
+			baseURL = "http://localhost:5176"
+		}
+		data["unsubscribe_url"] = baseURL + "/settings/notifications"
+	}
+
 	subject := s.fillTemplate(template.Subject, data)
 	body := s.fillTemplate(template.Body, data)
 	htmlBody := ""
@@ -253,9 +366,9 @@ func (s *EmailService) SendTemplatedEmail(to []string, template EmailTemplate, d
 	return s.SendEmail(to, subject, body, htmlBody)
 }
 
-// fillTemplate replaces {{key}} placeholders with values from data
-func (s *EmailService) fillTemplate(template string, data map[string]string) string {
-	result := template
+// fillTemplate replaces {{key}} placeholders with values from data.
+func (s *EmailService) fillTemplate(tmpl string, data map[string]string) string {
+	result := tmpl
 	for key, value := range data {
 		placeholder := fmt.Sprintf("{{%s}}", key)
 		result = strings.ReplaceAll(result, placeholder, value)
@@ -263,14 +376,20 @@ func (s *EmailService) fillTemplate(template string, data map[string]string) str
 	return result
 }
 
-// EmailTemplate represents an email template
+// EmailTemplate represents an email template with optional HTML body.
 type EmailTemplate struct {
 	Subject  string
 	Body     string
 	HTMLBody string
 }
 
-// Common email templates
+// unsubscribeFooterHTML is the standard unsubscribe footer appended to all HTML emails.
+const unsubscribeFooterHTML = `<p style="font-size:12px;color:#999;">To unsubscribe from these emails, <a href="{{unsubscribe_url}}">click here</a>.</p>`
+
+// unsubscribeFooterText is the standard unsubscribe footer appended to all plain-text emails.
+const unsubscribeFooterText = "\n\nTo unsubscribe from these emails, visit: {{unsubscribe_url}}"
+
+// Common email templates.
 var (
 	AccountDeletionTemplate = EmailTemplate{
 		Subject: "OmniNudge Account Deletion Confirmation",
@@ -295,7 +414,7 @@ If you did not request this deletion, please log in immediately to cancel it.
 
 ---
 OmniNudge Team
-This is an automated message. Please do not reply to this email.`,
+This is an automated message. Please do not reply to this email.` + unsubscribeFooterText,
 	}
 
 	AccountDeletionCancelledTemplate = EmailTemplate{
@@ -314,7 +433,7 @@ If you did not cancel this deletion, please contact support immediately.
 
 ---
 OmniNudge Team
-This is an automated message. Please do not reply to this email.`,
+This is an automated message. Please do not reply to this email.` + unsubscribeFooterText,
 	}
 
 	WelcomeEmailTemplate = EmailTemplate{
@@ -331,7 +450,34 @@ Get started:
 Need help? Check out our documentation or contact support.
 
 ---
-OmniNudge Team`,
+OmniNudge Team` + unsubscribeFooterText,
+		HTMLBody: `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to OmniNudge!</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
+        <h2 style="color: #3b82f6; margin-top: 0;">Welcome to OmniNudge!</h2>
+        <p>Hi <strong>{{username}}</strong>,</p>
+        <p>Your account has been successfully created. We're glad you're here!</p>
+        <h3 style="color: #555;">Get started:</h3>
+        <ul>
+            <li>Explore content from Reddit and other platforms</li>
+            <li>Create your own hubs to organize content</li>
+            <li>Connect with other users through messaging</li>
+        </ul>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{app_url}}" style="background-color: #3b82f6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Explore OmniNudge</a>
+        </div>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+        <p style="color: #999; font-size: 12px;">OmniNudge Team<br>This is an automated message. Please do not reply to this email.</p>
+        ` + unsubscribeFooterHTML + `
+    </div>
+</body>
+</html>`,
 	}
 
 	PasswordResetTemplate = EmailTemplate{
@@ -349,7 +495,7 @@ If you didn't request a password reset, you can safely ignore this email. Your p
 
 ---
 OmniNudge Team
-This is an automated message. Please do not reply to this email.`,
+This is an automated message. Please do not reply to this email.` + unsubscribeFooterText,
 		HTMLBody: `<!DOCTYPE html>
 <html>
 <head>
@@ -369,6 +515,7 @@ This is an automated message. Please do not reply to this email.`,
         <p style="color: #666; font-size: 14px;">If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.</p>
         <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
         <p style="color: #999; font-size: 12px;">OmniNudge Team<br>This is an automated message. Please do not reply to this email.</p>
+        ` + unsubscribeFooterHTML + `
     </div>
 </body>
 </html>`,
@@ -387,7 +534,7 @@ If you didn't create an OmniNudge account, you can safely ignore this email.
 
 ---
 OmniNudge Team
-This is an automated message. Please do not reply to this email.`,
+This is an automated message. Please do not reply to this email.` + unsubscribeFooterText,
 		HTMLBody: `<!DOCTYPE html>
 <html>
 <head>
@@ -407,6 +554,7 @@ This is an automated message. Please do not reply to this email.`,
         <p style="color: #666; font-size: 14px;">If you didn't create an OmniNudge account, you can safely ignore this email.</p>
         <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
         <p style="color: #999; font-size: 12px;">OmniNudge Team<br>This is an automated message. Please do not reply to this email.</p>
+        ` + unsubscribeFooterHTML + `
     </div>
 </body>
 </html>`,
@@ -425,7 +573,7 @@ If you didn't request this change, please contact support immediately.
 
 ---
 OmniNudge Team
-This is an automated message. Please do not reply to this email.`,
+This is an automated message. Please do not reply to this email.` + unsubscribeFooterText,
 		HTMLBody: `<!DOCTYPE html>
 <html>
 <head>
@@ -445,6 +593,7 @@ This is an automated message. Please do not reply to this email.`,
         <p style="color: #666; font-size: 14px;">If you didn't request this change, please contact support immediately.</p>
         <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
         <p style="color: #999; font-size: 12px;">OmniNudge Team<br>This is an automated message. Please do not reply to this email.</p>
+        ` + unsubscribeFooterHTML + `
     </div>
 </body>
 </html>`,
