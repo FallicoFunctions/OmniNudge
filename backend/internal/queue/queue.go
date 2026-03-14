@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/hibiken/asynq"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // JobType defines the type of background job
@@ -23,6 +23,7 @@ const (
 	JobTypeDataExport          JobType = "data_export"        // P0-016
 	JobTypeContentModeration   JobType = "content_moderation" // P0-043
 	JobTypeMessageReencrypt    JobType = "message_reencrypt"
+	JobTypeVideoTranscode      JobType = "video_transcode"
 )
 
 // QueueClient wraps the Asynq client for enqueuing jobs
@@ -82,7 +83,7 @@ func (q *QueueClient) EnqueueJob(
 		return nil, fmt.Errorf("failed to enqueue %s job: %w", jobType, err)
 	}
 
-	log.Printf("Enqueued job: type=%s id=%s queue=%s", jobType, info.ID, info.Queue)
+	zlog.Debug().Str("type", string(jobType)).Str("id", info.ID).Str("queue", info.Queue).Msg("job enqueued")
 	return info, nil
 }
 
@@ -225,6 +226,14 @@ type ContentModerationPayload struct {
 	ReportedBy  int    `json:"reported_by,omitempty"`
 }
 
+// VideoTranscodePayload for video transcoding jobs.
+type VideoTranscodePayload struct {
+	MediaID   int    `json:"media_id"`
+	InputKey  string `json:"input_key"`
+	OutputKey string `json:"output_key"`
+	Format    string `json:"format"` // e.g. "hls"
+}
+
 // MessageReencryptPayload for asynchronous message re-encryption jobs.
 type MessageReencryptPayload struct {
 	MessageID      int `json:"message_id"`
@@ -316,5 +325,12 @@ func (q *QueueClient) EnqueueDataExport(ctx context.Context, payload DataExportP
 // EnqueueMessageReencrypt enqueues a message re-encryption job.
 func (q *QueueClient) EnqueueMessageReencrypt(ctx context.Context, payload MessageReencryptPayload) error {
 	_, err := q.EnqueueJob(ctx, JobTypeMessageReencrypt, payload)
+	return err
+}
+
+// EnqueueVideoTranscode enqueues a video transcoding job.
+func (q *QueueClient) EnqueueVideoTranscode(ctx context.Context, payload VideoTranscodePayload) error {
+	// Low-priority; transcoding is CPU-intensive but not time-critical.
+	_, err := q.EnqueueJobWithPriority(ctx, JobTypeVideoTranscode, payload, 0)
 	return err
 }
