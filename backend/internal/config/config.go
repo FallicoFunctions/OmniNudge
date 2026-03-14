@@ -23,11 +23,42 @@ type Config struct {
 	Turnstile   TurnstileConfig
 	Firebase    FirebaseConfig
 	SMTP        SMTPConfig
+	Twilio      TwilioConfig
 	Retention   RetentionConfig
+	Storage     StorageConfig
 	FrontendURL  string
 	AppEnv       string
 	MetricsToken  string // Bearer token for /metrics endpoint; empty = unrestricted (dev only)
 	AsynqmonToken string // Bearer token for /admin/queues dashboard; empty = unrestricted (dev only)
+	TURN         TURNConfig
+}
+
+// TURNConfig holds coturn TURN server configuration for WebRTC relay
+type TURNConfig struct {
+	Host   string // e.g. "77.42.47.79" or "turn.omninudge.com"
+	Port   string // default "3478"
+	Secret string // HMAC secret shared with coturn static-auth-secret
+}
+
+// StorageConfig holds file storage and CDN configuration.
+// StorageBackend selects between "local" (default) and "s3".
+type StorageConfig struct {
+	// StorageBackend selects the storage provider: "local" or "s3"
+	StorageBackend string
+
+	// S3 credentials and bucket settings
+	S3Bucket    string
+	S3Region    string
+	S3AccessKey string
+	S3SecretKey string
+	// S3Endpoint is optional; set for S3-compatible providers (e.g. MinIO)
+	S3Endpoint string
+	// S3PathStyle enables path-style S3 addressing (required for MinIO/Ceph; set false for Cloudflare R2)
+	S3PathStyle bool
+
+	// CloudFrontURL is the CDN base URL, e.g. https://d1234.cloudfront.net.
+	// When set, all public asset URLs are rewritten to use this origin.
+	CloudFrontURL string
 }
 
 // RetentionConfig holds data retention settings
@@ -110,11 +141,15 @@ type FirebaseConfig struct {
 
 // SMTPConfig holds email delivery configuration.
 //
+// Provider selection order: SendGrid > Mailgun > SMTP.
+// When SendGridAPIKey is set the application uses the SendGrid REST API.
 // When MailgunAPIKey is set the application uses the Mailgun HTTP API.
 // Otherwise it falls back to direct SMTP using Host/Port/User/Password.
-// Never populate Host with an API key — they serve different purposes.
 type SMTPConfig struct {
-	// Mailgun HTTP API credentials (preferred when available)
+	// SendGrid REST API key (highest priority when set)
+	SendGridAPIKey string
+
+	// Mailgun HTTP API credentials (second priority when set)
 	MailgunAPIKey string
 	MailgunDomain string
 
@@ -127,6 +162,15 @@ type SMTPConfig struct {
 	// Shared sender identity
 	FromAddress string
 	FromName    string
+}
+
+// TwilioConfig holds Twilio SMS configuration.
+// When AccountSID/AuthToken/FromNumber are empty the SMS service runs in stub
+// mode (logs only — no real SMS is sent).
+type TwilioConfig struct {
+	AccountSID string
+	AuthToken  string
+	FromNumber string
 }
 
 // Load reads configuration from environment variables with sensible defaults
@@ -185,14 +229,20 @@ func Load() (*Config, error) {
 			CredentialsPath: getEnv("FIREBASE_CREDENTIALS_PATH", ""),
 		},
 		SMTP: SMTPConfig{
-			MailgunAPIKey: getEnv("MAILGUN_API_KEY", ""),
-			MailgunDomain: getEnv("MAILGUN_DOMAIN", ""),
-			Host:          getEnv("SMTP_HOST", ""),
-			Port:          getEnv("SMTP_PORT", "587"),
-			User:          getEnv("SMTP_USER", ""),
-			Password:      getEnv("SMTP_PASSWORD", ""),
-			FromAddress:   getEnv("SMTP_FROM_ADDRESS", "noreply@omninudge.com"),
-			FromName:      getEnv("SMTP_FROM_NAME", "OmniNudge"),
+			SendGridAPIKey: getEnv("SENDGRID_API_KEY", ""),
+			MailgunAPIKey:  getEnv("MAILGUN_API_KEY", ""),
+			MailgunDomain:  getEnv("MAILGUN_DOMAIN", ""),
+			Host:           getEnv("SMTP_HOST", ""),
+			Port:           getEnv("SMTP_PORT", "587"),
+			User:           getEnv("SMTP_USER", ""),
+			Password:       getEnv("SMTP_PASSWORD", ""),
+			FromAddress:    getEnv("SMTP_FROM_ADDRESS", "noreply@omninudge.com"),
+			FromName:       getEnv("SMTP_FROM_NAME", "OmniNudge"),
+		},
+		Twilio: TwilioConfig{
+			AccountSID: getEnv("TWILIO_ACCOUNT_SID", ""),
+			AuthToken:  getEnv("TWILIO_AUTH_TOKEN", ""),
+			FromNumber: getEnv("TWILIO_FROM_NUMBER", ""),
 		},
 		Retention: RetentionConfig{
 			MessageRetentionYears: getEnvAsInt("RETENTION_MESSAGE_YEARS", 3),
@@ -201,10 +251,25 @@ func Load() (*Config, error) {
 			DeletionGraceDays:     getEnvAsInt("RETENTION_GRACE_DAYS", 30),
 			DryRun:                getEnvAsBool("RETENTION_DRY_RUN", false),
 		},
+		Storage: StorageConfig{
+			StorageBackend: getEnv("STORAGE_BACKEND", "local"),
+			S3Bucket:       getEnv("S3_BUCKET", ""),
+			S3Region:       getEnv("S3_REGION", "us-east-1"),
+			S3AccessKey:    getEnv("S3_ACCESS_KEY", ""),
+			S3SecretKey:    getEnv("S3_SECRET_KEY", ""),
+			S3Endpoint:     getEnv("S3_ENDPOINT", ""),
+			S3PathStyle:    getEnvAsBool("S3_PATH_STYLE", true), // true for MinIO/Ceph, false for R2
+			CloudFrontURL:  getEnv("CLOUDFRONT_URL", ""),
+		},
 		FrontendURL:  getEnv("FRONTEND_URL", "http://localhost:5176"),
 		AppEnv:       getEnv("APP_ENV", "development"),
 		MetricsToken:  getEnv("METRICS_TOKEN", ""),
 		AsynqmonToken: getEnv("ASYNQMON_TOKEN", ""),
+		TURN: TURNConfig{
+			Host:   getEnv("TURN_HOST", ""),
+			Port:   getEnv("TURN_PORT", "3478"),
+			Secret: getEnv("TURN_SECRET", ""),
+		},
 	}
 
 	return cfg, nil
