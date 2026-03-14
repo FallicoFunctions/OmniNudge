@@ -76,7 +76,7 @@ func TestVirusScanHandler_MarksMediaClean(t *testing.T) {
 
 	handler := NewVirusScanHandler(mediaRepo, &mockVirusScanner{
 		result: services.VirusScanResult{Infected: false},
-	}, true)
+	}, true, nil)
 
 	task := asynq.NewTask(string(JobTypeVirusScan), []byte(`{"file_id":`+itoa(media.ID)+`,"file_path":"`+media.StoragePath+`","uploaded_by":1}`))
 	require.NoError(t, handler(context.Background(), task))
@@ -97,7 +97,7 @@ func TestVirusScanHandler_MarksMediaInfectedAndDeletesFile(t *testing.T) {
 			Infected:  true,
 			Signature: "Eicar-Test-Signature",
 		},
-	}, true)
+	}, true, nil)
 
 	task := asynq.NewTask(string(JobTypeVirusScan), []byte(`{"file_id":`+itoa(media.ID)+`,"file_path":"`+media.StoragePath+`","uploaded_by":1}`))
 	err := handler(context.Background(), task)
@@ -120,7 +120,7 @@ func TestVirusScanHandler_MarksScanErrorWhenScannerFails(t *testing.T) {
 
 	handler := NewVirusScanHandler(mediaRepo, &mockVirusScanner{
 		err: errors.New("scanner timeout"),
-	}, true)
+	}, true, nil)
 
 	task := asynq.NewTask(string(JobTypeVirusScan), []byte(`{"file_id":`+itoa(media.ID)+`,"file_path":"`+media.StoragePath+`","uploaded_by":1}`))
 	err := handler(context.Background(), task)
@@ -135,7 +135,7 @@ func TestVirusScanHandler_MarksScanErrorWhenScannerFails(t *testing.T) {
 
 func TestVirusScanHandler_SkipRetryWhenMediaRecordMissing(t *testing.T) {
 	_, mediaRepo, _ := setupVirusScanDB(t)
-	handler := NewVirusScanHandler(mediaRepo, &mockVirusScanner{}, true)
+	handler := NewVirusScanHandler(mediaRepo, &mockVirusScanner{}, true, nil)
 
 	task := asynq.NewTask(string(JobTypeVirusScan), []byte(`{"file_id":999999,"file_path":"/tmp/missing","uploaded_by":1}`))
 	err := handler(context.Background(), task)
