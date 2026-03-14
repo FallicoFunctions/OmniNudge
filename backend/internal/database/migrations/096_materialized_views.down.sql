@@ -1,0 +1,2 @@
+DROP MATERIALIZED VIEW IF EXISTS hub_activity_stats;
+DROP MATERIALIZED VIEW IF EXISTS user_post_stats;
