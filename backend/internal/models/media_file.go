@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"context"
 	"database/sql"
 	"errors"
@@ -195,6 +196,70 @@ func (r *MediaFileRepository) GetTrackedStorageByUserID(ctx context.Context, use
 		return 0, nil
 	}
 	return total.Int64, nil
+}
+
+
+// IncrementTrackedStorageByUserID atomically adds delta bytes to users.storage_used_bytes.
+// BUG-21: Reject negative delta values to prevent accidental decrement via this function.
+// BUG-20: Check RowsAffected to detect when no user row was updated.
+func (r *MediaFileRepository) IncrementTrackedStorageByUserID(ctx context.Context, userID int, delta int64) error {
+	if delta < 0 {
+		return fmt.Errorf("IncrementTrackedStorageByUserID: negative delta %d not allowed", delta)
+	}
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE users
+		SET storage_used_bytes = COALESCE(storage_used_bytes, 0) + $2
+		WHERE id = $1
+	`, userID, delta)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("IncrementTrackedStorageByUserID: user %d not found", userID)
+	}
+	return nil
+}
+
+// FindByStoragePath retrieves a media file by its storage_path column.
+// Returns (nil, nil) when no record is found.
+// BUG-6: Used by ConfirmUpload for idempotent replay detection.
+func (r *MediaFileRepository) FindByStoragePath(ctx context.Context, storagePath string) (*MediaFile, error) {
+	query := `
+		SELECT id, user_id, filename, original_filename, file_type, file_size,
+		       storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, uploaded_at,
+		       scan_status, scanned_at, scan_error, quarantined_at
+		FROM media_files
+		WHERE storage_path = $1
+		LIMIT 1
+	`
+	media := &MediaFile{}
+	err := r.pool.QueryRow(ctx, query, storagePath).Scan(
+		&media.ID,
+		&media.UserID,
+		&media.Filename,
+		&media.OriginalFilename,
+		&media.FileType,
+		&media.FileSize,
+		&media.StorageURL,
+		&media.ThumbnailURL,
+		&media.StoragePath,
+		&media.Width,
+		&media.Height,
+		&media.Duration,
+		&media.UsedInMessageID,
+		&media.UploadedAt,
+		&media.ScanStatus,
+		&media.ScannedAt,
+		&media.ScanError,
+		&media.QuarantinedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return media, nil
 }
 
 // UpdateThumbnailURL updates thumbnail_url for an existing media record.

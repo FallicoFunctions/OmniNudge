@@ -41,6 +41,10 @@ func (r *PostgresMediaFileRepository) GetTrackedStorageByUserID(ctx context.Cont
 	return r.inner.GetTrackedStorageByUserID(ctx, userID)
 }
 
+func (r *PostgresMediaFileRepository) IncrementTrackedStorageByUserID(ctx context.Context, userID int, delta int64) error {
+	return r.inner.IncrementTrackedStorageByUserID(ctx, userID, delta)
+}
+
 func (r *PostgresMediaFileRepository) UpdateThumbnailURL(ctx context.Context, mediaID int, thumbnailURL string) error {
 	return r.inner.UpdateThumbnailURL(ctx, mediaID, thumbnailURL)
 }
@@ -63,4 +67,8 @@ func (r *PostgresMediaFileRepository) MarkScanError(ctx context.Context, mediaID
 
 func (r *PostgresMediaFileRepository) MarkScanInfected(ctx context.Context, mediaID int, reason string) error {
 	return r.inner.MarkScanInfected(ctx, mediaID, reason)
+}
+
+func (r *PostgresMediaFileRepository) FindByStoragePath(ctx context.Context, storagePath string) (*domain.MediaFile, error) {
+	return r.inner.FindByStoragePath(ctx, storagePath)
 }
