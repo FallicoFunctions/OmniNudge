@@ -1290,12 +1290,21 @@ func isRedditNotFound(err error) bool {
 		return false
 	}
 	msg := err.Error()
-	return strings.Contains(msg, "status 403") ||
-		strings.Contains(msg, "status 404") ||
-		strings.Contains(msg, "status 400") ||
-		strings.Contains(msg, "unexpected status 403") ||
-		strings.Contains(msg, "unexpected status 404") ||
-		strings.Contains(msg, "unexpected status 400")
+	// Match the two Reddit service-layer error formats:
+	//   "reddit API returned status %d: ..."    (fetchJSON helper)
+	//   "reddit responded with status %d: ..."  (typed RedditError)
+	// 403 = private/banned subreddit or user
+	// 404 = not found
+	// 410 = permanently deleted
+	// 400 excluded: means bad request (malformed query) — should stay 500 to surface as a bug.
+	// Anchoring to "reddit" prefix prevents false positives from other services' errors.
+	if !strings.Contains(msg, "reddit") {
+		return false
+	}
+	// Match "status NNN:" to avoid partial matches (e.g. "status 4035")
+	return strings.Contains(msg, "status 403:") ||
+		strings.Contains(msg, "status 404:") ||
+		strings.Contains(msg, "status 410:")
 }
 
 func resolveWikiPagePath(c *gin.Context, primaryParam, restParam string) string {

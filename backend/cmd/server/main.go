@@ -1432,6 +1432,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	stopCtx, stopCancel := context.WithCancel(context.Background())
+	defer stopCancel()
 	go func() {
 		<-quit
 		stopCancel()
