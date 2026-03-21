@@ -20,7 +20,7 @@
 
 **Check everything at once:**
 ```bash
-ssh root@77.42.47.79 'systemctl is-active omninudge-backend nginx postgresql@16-main redis-server coturn clamav-daemon'
+ssh root@77.42.47.79 'systemctl is-active omninudge-backend nginx postgresql@16-main redis-server coturn clamav-daemon clamav-freshclam'
 ```
 
 ---
@@ -105,36 +105,52 @@ ssh root@77.42.47.79 '
 # Connect to psql
 ssh root@77.42.47.79 'su - postgres -c "psql omninudge"'
 
-# Or with credentials from .env
+# Connect directly as postgres superuser (no credentials needed — simplest)
+ssh root@77.42.47.79 'su - postgres -c "psql omninudge"'
+
+# NOTE: Do NOT use "source .env" — it breaks on special chars in REDDIT_USER_AGENT.
+# All commands below extract credentials with grep instead.
+
+# Connect as app user
 ssh root@77.42.47.79 '
-  source /var/www/omninudge/backend/.env
+  DB_USER=$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_PASSWORD=$(grep ^DB_PASSWORD= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_NAME=$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2)
   PGPASSWORD=$DB_PASSWORD psql -U $DB_USER -h localhost $DB_NAME
 '
 
 # Run a migration manually
 ssh root@77.42.47.79 '
-  source /var/www/omninudge/backend/.env
+  DB_USER=$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_PASSWORD=$(grep ^DB_PASSWORD= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_NAME=$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2)
   PGPASSWORD=$DB_PASSWORD psql -U $DB_USER -h localhost $DB_NAME \
     -f /var/www/omninudge/backend/internal/database/migrations/<migration>.sql
 '
 
 # Check current migration version
 ssh root@77.42.47.79 '
-  source /var/www/omninudge/backend/.env
+  DB_USER=$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_PASSWORD=$(grep ^DB_PASSWORD= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_NAME=$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2)
   PGPASSWORD=$DB_PASSWORD psql -U $DB_USER -h localhost $DB_NAME \
     -c "SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 5;"
 '
 
 # Check materialized views (refreshed every 5 min by background job)
 ssh root@77.42.47.79 '
-  source /var/www/omninudge/backend/.env
+  DB_USER=$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_PASSWORD=$(grep ^DB_PASSWORD= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_NAME=$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2)
   PGPASSWORD=$DB_PASSWORD psql -U $DB_USER -h localhost $DB_NAME \
     -c "SELECT schemaname, matviewname FROM pg_matviews;"
 '
 
 # Refresh materialized views manually (if job isn't running)
 ssh root@77.42.47.79 '
-  source /var/www/omninudge/backend/.env
+  DB_USER=$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_PASSWORD=$(grep ^DB_PASSWORD= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_NAME=$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2)
   PGPASSWORD=$DB_PASSWORD psql -U $DB_USER -h localhost $DB_NAME -c "
     REFRESH MATERIALIZED VIEW CONCURRENTLY user_post_stats;
     REFRESH MATERIALIZED VIEW CONCURRENTLY hub_activity_stats;
@@ -157,7 +173,7 @@ ssh root@77.42.47.79 'redis-cli keys "*"'
 ssh root@77.42.47.79 'redis-cli keys "sr:*"'
 
 # Flush Reddit cache (forces fresh fetch on next request)
-ssh root@77.42.47.79 'redis-cli keys "sr:*" | xargs redis-cli del'
+ssh root@77.42.47.79 'redis-cli --scan --pattern "sr:*" | xargs -r redis-cli del'
 
 # Check queue workers (Asynq)
 ssh root@77.42.47.79 'redis-cli keys "asynq:*"'
@@ -190,8 +206,8 @@ Used to scan user-uploaded files (images, audio, etc.) asynchronously after uplo
 # Check daemon is running
 ssh root@77.42.47.79 'systemctl status clamav-daemon'
 
-# Test the scanner is responding
-ssh root@77.42.47.79 'echo "ping" | nc -U /var/run/clamav/clamd.ctl'  # → PONG
+# Test the scanner is responding (must be uppercase PING)
+ssh root@77.42.47.79 'echo "PING" | nc -U /var/run/clamav/clamd.ctl'  # → PONG
 
 # Check virus definition age (should update daily)
 ssh root@77.42.47.79 'ls -lh /var/lib/clamav/'
@@ -200,7 +216,7 @@ ssh root@77.42.47.79 'ls -lh /var/lib/clamav/'
 ssh root@77.42.47.79 'systemctl stop clamav-freshclam && freshclam && systemctl start clamav-freshclam'
 ```
 
-**If clamd is down:** Uploads still work. The virus scan job will retry. If `VIRUS_SCAN_FAIL_CLOSED=true` in `.env`, unscanned files are blocked from serving. Current production setting: check `.env`.
+**If clamd is down:** Uploads still work. The virus scan job will retry. `VIRUS_SCAN_FAIL_CLOSED=false` in production — unscanned files are served rather than blocked, so a clamd outage is degraded (no scanning) not breaking.
 
 **Socket path:** `/var/run/clamav/clamd.ctl`
 
@@ -223,7 +239,7 @@ ssh root@77.42.47.79 'cat /etc/turnserver.conf'
 
 **Ports used:**
 - `3478` UDP/TCP — STUN/TURN
-- `5349` TCP — TURNS (TLS)
+- `5349` TCP/UDP — TURNS (TLS)
 - `49152–49300` UDP — media relay range
 
 **If calls fail:** The frontend falls back to STUN-only (Google's public STUN servers). Calls may fail on symmetric NATs. Check that UDP 49152–49300 is open in the firewall: `ufw status`.
@@ -238,7 +254,7 @@ ssh root@77.42.47.79 'cat /etc/turnserver.conf'
 # Check certificate expiry
 ssh root@77.42.47.79 'certbot certificates'
 
-# Renew (runs automatically via cron, but can be forced)
+# Renew (runs automatically via systemd certbot.timer, but can be forced)
 ssh root@77.42.47.79 'certbot renew --dry-run'  # test first
 ssh root@77.42.47.79 'certbot renew'
 ```
@@ -262,8 +278,8 @@ ssh root@77.42.47.79 'du -sh /var/www/omninudge/backups/ /var/lib/clamav/ /var/l
 # Clean old backups manually (deploy script auto-retains last 5/10)
 ssh root@77.42.47.79 'ls -lht /var/www/omninudge/backups/'
 
-# Trim systemd journal (currently capped at 500MB)
-ssh root@77.42.47.79 'journalctl --disk-usage && journalctl --vacuum-size=200M'
+# Trim systemd journal (capped at 500MB via /etc/systemd/journald.conf.d/size.conf)
+ssh root@77.42.47.79 'journalctl --disk-usage && journalctl --vacuum-size=300M'
 
 # Clean apt cache
 ssh root@77.42.47.79 'apt-get clean'
@@ -298,13 +314,16 @@ ssh root@77.42.47.79 'journalctl -u omninudge-backend -n 30 --no-pager'
 
 # 2. Check nginx
 ssh root@77.42.47.79 'systemctl status nginx'
-ssh root@77.42.47.79 'nginx -t'  # config test
+ssh root@77.42.47.79 'nginx -t'  # syntax check — runs on server
 
 # 3. Check postgres (backend won't start without it)
 ssh root@77.42.47.79 'systemctl status postgresql@16-main'
 
 # 4. Restart in order if needed
-ssh root@77.42.47.79 'systemctl restart postgresql@16-main redis-server omninudge-backend nginx'
+# Note: postgres must be up before backend (backend exits fatally without it)
+#       Redis failure is non-fatal — backend degrades to in-memory cache
+ssh root@77.42.47.79 'systemctl restart postgresql@16-main'
+ssh root@77.42.47.79 'systemctl restart redis-server omninudge-backend nginx'
 ```
 
 ### Backend crashed / won't start
@@ -319,10 +338,16 @@ ssh root@77.42.47.79 'journalctl -u omninudge-backend -n 50 --no-pager'
 # - Database unreachable → check postgresql@16-main
 # - Bad migration → check migration logs, may need to roll back
 
-# Roll back to last deploy
-# 1. Restore backend binary from backup (tar.gz)
-# 2. Or: re-deploy previous git SHA
-#   git checkout <previous-sha> -- backend/
+# Roll back to last backup (restores source; binary must be rebuilt)
+# 1. Restore files from backup
+ssh root@77.42.47.79 'cd /var/www/omninudge && tar -xzf backups/<backup-name>.tar.gz'
+# 2. Rebuild the binary (binary is excluded from backup)
+ssh root@77.42.47.79 'cd /var/www/omninudge/backend && export PATH=$PATH:/usr/local/go/bin && go build -o omninudge-server ./cmd/server'
+# 3. Restart
+ssh root@77.42.47.79 'systemctl restart omninudge-backend'
+
+# Or: roll back via git and re-deploy (cleaner)
+#   git checkout <previous-sha> -- backend/ frontend/
 #   bash scripts/deploy-on.sh
 ```
 
@@ -335,8 +360,8 @@ ssh root@77.42.47.79 'journalctl -u postgresql@16-main -n 50 --no-pager'
 # Check connections
 ssh root@77.42.47.79 'su - postgres -c "psql -c \"SELECT count(*) FROM pg_stat_activity;\""'
 
-# Kill idle connections if pool is exhausted
-ssh root@77.42.47.79 'su - postgres -c "psql -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE state = '\''idle'\'' AND query_start < now() - interval '\''5 minutes'\'';\""'
+# Kill idle connections if pool is exhausted (excludes current connection)
+ssh root@77.42.47.79 'su - postgres -c "psql -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE state = '\''idle'\'' AND query_start < now() - interval '\''5 minutes'\'' AND pid <> pg_backend_pid();\""'
 ```
 
 ### Home feed empty (no Reddit posts)
@@ -348,7 +373,7 @@ See **Reddit Proxy & Rate Limiting** section above. Almost always a transient 42
 ```bash
 # Check ClamAV
 ssh root@77.42.47.79 'systemctl status clamav-daemon'
-ssh root@77.42.47.79 'echo "ping" | nc -U /var/run/clamav/clamd.ctl'
+ssh root@77.42.47.79 'echo "PING" | nc -U /var/run/clamav/clamd.ctl'
 
 # Check R2 / storage — look for storage errors in backend logs
 ssh root@77.42.47.79 'journalctl -u omninudge-backend -n 50 --no-pager | grep -i "storage\|upload\|r2\|s3"'
@@ -363,8 +388,9 @@ ssh root@77.42.47.79 'systemctl status coturn'
 # Verify TURN ports are open
 ssh root@77.42.47.79 'ufw status | grep -E "3478|5349|49152"'
 
-# Check ICE server endpoint returns TURN credentials
-curl -s https://omninudge.com/api/v1/calls/ice-servers | python3 -m json.tool
+# Check ICE server endpoint returns TURN credentials (requires a valid JWT)
+# Easiest to verify via backend logs after a call attempt, or check coturn logs directly
+ssh root@77.42.47.79 'journalctl -u coturn -n 20 --no-pager'
 ```
 
 ### Disk space >80%
@@ -379,8 +405,8 @@ ssh root@77.42.47.79 'ls -lht /var/www/omninudge/backups/ | tail -20'
 # 2. Journal logs
 ssh root@77.42.47.79 'journalctl --vacuum-size=100M'
 
-# 3. Go module cache (can always be re-downloaded)
-ssh root@77.42.47.79 'du -sh /root/go/pkg/mod/ && go clean -modcache'  # rebuild will re-download
+# 3. Go module cache (can always be re-downloaded, go is at /usr/local/go/bin/)
+ssh root@77.42.47.79 'du -sh /root/go/pkg/mod/ && /usr/local/go/bin/go clean -modcache'
 
 # 4. Apt cache
 ssh root@77.42.47.79 'apt-get clean'
