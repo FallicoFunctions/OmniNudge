@@ -233,6 +233,10 @@ func (h *RedditHandler) GetFrontPage(c *gin.Context) {
 	// Fetch from Reddit
 	listing, err := h.redditClient.GetFrontPage(c.Request.Context(), sort, timeFilter, limit, after)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "Front page not found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch front page")
 		return
 	}
@@ -285,6 +289,10 @@ func (h *RedditHandler) GetPostComments(c *gin.Context) {
 	// Fetch from Reddit
 	result, err := h.redditClient.GetPostComments(c.Request.Context(), subreddit, postID, sort, limit)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "Post not found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch comments")
 		return
 	}
@@ -314,6 +322,10 @@ func (h *RedditHandler) GetPostGalleryImages(c *gin.Context) {
 	// Fetch post data from Reddit
 	result, err := h.redditClient.GetPostComments(c.Request.Context(), subreddit, postID, "", 0)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "Post not found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch post data")
 		return
 	}
@@ -446,6 +458,10 @@ func (h *RedditHandler) SearchPosts(c *gin.Context) {
 	// Fetch from Reddit
 	listing, err := h.redditClient.SearchPosts(c.Request.Context(), query, subreddit, sort, timeFilter, limit, after, includeNSFW)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "No results found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to search posts")
 		return
 	}
@@ -494,6 +510,10 @@ func (h *RedditHandler) SearchRedditUsers(c *gin.Context) {
 
 	listing, err := h.redditClient.SearchUsers(c.Request.Context(), query, limit, after, includeNSFW)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "No users found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to search users")
 		return
 	}
@@ -555,6 +575,10 @@ func (h *RedditHandler) AutocompleteSubreddits(c *gin.Context) {
 
 	suggestions, err := h.redditClient.AutocompleteSubreddits(c.Request.Context(), query, limit)
 	if err != nil {
+		if isRedditNotFound(err) {
+			c.JSON(http.StatusOK, gin.H{"suggestions": []interface{}{}})
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch subreddit suggestions")
 		return
 	}
@@ -590,6 +614,10 @@ func (h *RedditHandler) SearchSubreddits(c *gin.Context) {
 
 	results, nextAfter, err := h.redditClient.SearchSubreddits(c.Request.Context(), query, limit, after)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "No subreddits found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to search subreddits")
 		return
 	}
@@ -646,6 +674,10 @@ func (h *RedditHandler) GetRedditUserListing(c *gin.Context) {
 
 	listing, err := h.redditClient.GetUserListing(c.Request.Context(), username, section, sort, limit, after)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "User not found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch user activity")
 		return
 	}
@@ -677,6 +709,10 @@ func (h *RedditHandler) GetRedditUserAbout(c *gin.Context) {
 
 	about, err := h.redditClient.GetUserAbout(c.Request.Context(), username)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "User not found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch user")
 		return
 	}
@@ -701,6 +737,10 @@ func (h *RedditHandler) GetRedditUserTrophies(c *gin.Context) {
 
 	trophies, err := h.redditClient.GetUserTrophies(c.Request.Context(), username)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "User not found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch trophies")
 		return
 	}
@@ -725,6 +765,10 @@ func (h *RedditHandler) GetRedditUserModerated(c *gin.Context) {
 
 	subs, err := h.redditClient.GetUserModeratedSubreddits(c.Request.Context(), username)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "User not found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch moderated subreddits")
 		return
 	}
@@ -765,6 +809,10 @@ func (h *RedditHandler) GetSubredditMedia(c *gin.Context) {
 	// Fetch from Reddit - get more posts to ensure we have enough media
 	listing, err := h.redditClient.GetSubredditPosts(c.Request.Context(), subreddit, sort, timeFilter, 100, after)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "Subreddit not found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch subreddit posts")
 		return
 	}
