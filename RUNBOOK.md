@@ -346,6 +346,11 @@ ssh root@77.42.47.79 'journalctl -u omninudge-backend -n 50 --no-pager'
 # 1. Restore files from backup
 ssh root@77.42.47.79 'cd /var/www/omninudge && tar -xzf backups/<backup-name>.tar.gz'
 # 2. Restore database from the matching backup
+# WARNING: You must drop and recreate the database first, otherwise psql will fail with
+# duplicate key errors. Kill existing connections first, then drop and recreate.
+ssh root@77.42.47.79 'su - postgres -c "psql -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='"'"'omninudge'"'"' AND pid <> pg_backend_pid();\""'
+# Use DROP DATABASE WITH (FORCE) to handle any remaining connections (requires PG13+)
+ssh root@77.42.47.79 'DB_USER=$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2); DB_NAME=$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2); su - postgres -c "psql -c \"DROP DATABASE IF EXISTS ${DB_NAME} WITH (FORCE);\" && createdb -O ${DB_USER} ${DB_NAME}"'
 ssh root@77.42.47.79 'DB_USER=$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2); DB_PASSWORD=$(grep ^DB_PASSWORD= /var/www/omninudge/backend/.env | cut -d= -f2); DB_NAME=$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2); PGPASSWORD=$DB_PASSWORD gunzip -c /var/www/omninudge/backups/<backup-name>.sql.gz | psql -U $DB_USER -h localhost $DB_NAME'
 # 3. Rebuild the binary (binary is excluded from backup)
 ssh root@77.42.47.79 'cd /var/www/omninudge/backend && export PATH=$PATH:/usr/local/go/bin && go build -o omninudge-server ./cmd/server'
