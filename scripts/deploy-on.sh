@@ -46,6 +46,7 @@ ssh "$SERVER" bash << EOF
     --exclude='omninudge-server' \
     --exclude='*.test' \
     --exclude='dump.rdb' \
+    --exclude='uploads' \
     backend frontend
 
   # Database backup — load credentials from the .env file written by deploy-app.sh

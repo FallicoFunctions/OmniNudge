@@ -339,11 +339,17 @@ ssh root@77.42.47.79 'journalctl -u omninudge-backend -n 50 --no-pager'
 # - Bad migration → check migration logs, may need to roll back
 
 # Roll back to last backup (restores source; binary must be rebuilt)
+# IMPORTANT: The file backup (.tar.gz) and database backup (.sql.gz) must be from the
+# SAME backup name (same timestamp). Restoring mismatched backups (e.g., newer DB with
+# older code, or older DB with newer code) can cause schema/migration mismatches and
+# data corruption. Always restore both from the same <backup-name>.
 # 1. Restore files from backup
 ssh root@77.42.47.79 'cd /var/www/omninudge && tar -xzf backups/<backup-name>.tar.gz'
-# 2. Rebuild the binary (binary is excluded from backup)
+# 2. Restore database from the matching backup
+ssh root@77.42.47.79 'DB_USER=$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2); DB_PASSWORD=$(grep ^DB_PASSWORD= /var/www/omninudge/backend/.env | cut -d= -f2); DB_NAME=$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2); PGPASSWORD=$DB_PASSWORD gunzip -c /var/www/omninudge/backups/<backup-name>.sql.gz | psql -U $DB_USER -h localhost $DB_NAME'
+# 3. Rebuild the binary (binary is excluded from backup)
 ssh root@77.42.47.79 'cd /var/www/omninudge/backend && export PATH=$PATH:/usr/local/go/bin && go build -o omninudge-server ./cmd/server'
-# 3. Restart
+# 4. Restart
 ssh root@77.42.47.79 'systemctl restart omninudge-backend'
 
 # Or: roll back via git and re-deploy (cleaner)
