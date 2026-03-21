@@ -599,6 +599,10 @@ func main() {
 	themePreviewLimiter := middleware.ThemePreviewRateLimiter()
 	generalLimiter := middleware.GeneralAPIRateLimiter()
 	uploadRateLimiter := middleware.UploadRateLimiter()
+	// Auth rate limiters — Redis-backed so they work across restarts and are IP-keyed
+	// (no user_id exists at login/register time, so the Redis limiter falls back to ClientIP).
+	authRateLimiter := middleware.AuthRateLimiter(cache)
+	passwordResetRateLimiter := middleware.PasswordResetRateLimiter(cache)
 
 	// Check ffmpeg availability for iOS audio encoding (P0-003)
 	if err := handlers.CheckFFmpegAvailability(); err != nil {
@@ -656,8 +660,8 @@ func main() {
 	router.GET("/uploads/*filepath", uploadsHandler.ServeUpload)
 	router.HEAD("/uploads/*filepath", uploadsHandler.ServeUpload)
 
-	// Health check — used by load balancers; avoids DB hit on every LB ping by
-	// relying on a lightweight pool.Ping rather than a full query.
+	// Health check — used by load balancers and uptime monitors.
+	// Version is intentionally omitted to avoid exposing the exact commit hash publicly.
 	router.GET("/health", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 		defer cancel()
@@ -667,7 +671,6 @@ func main() {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
 				"status":   "unhealthy",
 				"database": "disconnected",
-				"version":  appVersion,
 			})
 			return
 		}
@@ -675,7 +678,6 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{
 			"status":   "healthy",
 			"database": "connected",
-			"version":  appVersion,
 		})
 	})
 
@@ -794,22 +796,22 @@ func main() {
 		// Auth routes (no auth required)
 		auth := api.Group("/auth")
 		{
-			// Username/password authentication
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
+			// Username/password authentication — 5 attempts per 15 min per IP
+			auth.POST("/register", authRateLimiter.Middleware(), authHandler.Register)
+			auth.POST("/login", authRateLimiter.Middleware(), authHandler.Login)
 
 			// Reddit OAuth (for future use)
 			auth.GET("/reddit", authHandler.RedditLogin)
 			auth.GET("/reddit/callback", authHandler.RedditCallback)
 
-			// Password reset
-			auth.POST("/forgot-password", authHandler.ForgotPassword)
-			auth.POST("/reset-password", authHandler.ResetPassword)
+			// Password reset — 3 requests per hour per IP
+			auth.POST("/forgot-password", passwordResetRateLimiter.Middleware(), authHandler.ForgotPassword)
+			auth.POST("/reset-password", passwordResetRateLimiter.Middleware(), authHandler.ResetPassword)
 			auth.GET("/validate-reset-token", authHandler.ValidateResetToken)
 
-			// Email verification
+			// Email verification — 3 requests per hour per IP
 			auth.GET("/verify-email", authHandler.VerifyEmail)
-			auth.POST("/resend-verification", authHandler.ResendVerification)
+			auth.POST("/resend-verification", passwordResetRateLimiter.Middleware(), authHandler.ResendVerification)
 		}
 
 		// Combined feed routes (optional auth)
