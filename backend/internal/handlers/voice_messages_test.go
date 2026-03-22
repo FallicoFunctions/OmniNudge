@@ -84,7 +84,7 @@ func setupVoiceHandlerTest(t *testing.T) (*VoiceMessagesHandler, *database.Datab
 	`, convID, sender.ID, recipient.ID).Scan(&msgID)
 	require.NoError(t, err)
 
-	handler := NewVoiceMessagesHandler(db.Pool, &mockStorage{}, nil, &mockHub{}, nil)
+	handler := NewVoiceMessagesHandler(db.Pool, &mockStorage{}, nil, &mockHub{}, nil, false)
 
 	return handler, db, sender.ID, recipient.ID, msgID, func() {}
 }
