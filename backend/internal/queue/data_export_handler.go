@@ -67,6 +67,11 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 					}
 				}
 			}
+			// Check for mid-iteration network or server errors. A partial read
+			// would silently truncate the session key list without this check.
+			if rowsErr := rows.Err(); rowsErr != nil {
+				zlog.Warn().Err(rowsErr).Str("export_id", payload.ExportID).Msg("data_export: partial read of session keys — some messages may be unreadable")
+			}
 		}
 
 		// 2. Export each data type to its own JSON file
@@ -100,7 +105,7 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 
 			if err != nil {
 				zlog.Warn().Err(err).Str("data_type", dataType).Str("export_id", payload.ExportID).Msg("data_export: failed to export data type")
-				data = map[string]string{"error": err.Error()}
+				data = map[string]string{"error": "data unavailable"}
 			}
 
 			// Save to JSON file
@@ -179,10 +184,16 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 			return fmt.Errorf("failed to update completion status: %w", err)
 		}
 
-		// 6. Purge temporary session keys
-		_, _ = db.Exec(context.Background(), `
+		// 6. Purge temporary session keys.
+		// Use a fresh context with a deadline — the job context may already be
+		// cancelled, but session keys must always be cleaned up regardless.
+		purgeCtx, purgeCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer purgeCancel()
+		if _, purgeErr := db.Exec(purgeCtx, `
 			DELETE FROM export_session_keys WHERE export_id = $1
-		`, payload.ExportID)
+		`, payload.ExportID); purgeErr != nil {
+			zlog.Warn().Err(purgeErr).Str("export_id", payload.ExportID).Msg("data_export: failed to purge session keys")
+		}
 
 		// 7. Send email notification
 		var userEmail string
