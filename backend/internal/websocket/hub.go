@@ -108,18 +108,20 @@ func (h *Hub) Run() {
 		case message := <-h.broadcast:
 			// RecipientID 0 is a reserved internal "broadcast to all clients" target.
 			if message.RecipientID == 0 {
-				h.mu.Lock()
-				for userID, client := range h.clients {
+				h.mu.RLock()
+				for _, client := range h.clients {
 					select {
 					case client.Send <- message:
-						// Message sent successfully
 					default:
-						// Client's send channel is full, close it
-						close(client.Send)
-						delete(h.clients, userID)
+						// Client's send buffer is full — drop this message for this client.
+						// The writePump will detect the dead connection on the next write
+						// and unregister via the unregister channel. We must never close
+						// client.Send here: closing outside the unregister path causes
+						// double-close panics.
+						zlog.Warn().Int("user_id", client.UserID).Msg("websocket: broadcast dropped (send buffer full)")
 					}
 				}
-				h.mu.Unlock()
+				h.mu.RUnlock()
 				continue
 			}
 
@@ -130,22 +132,25 @@ func (h *Hub) Run() {
 			if ok {
 				select {
 				case client.Send <- message:
-					// Message sent successfully
 				default:
-					// Client's send channel is full, close it
-					h.mu.Lock()
-					close(client.Send)
-					delete(h.clients, client.UserID)
-					h.mu.Unlock()
+					// Same rationale: drop, never close Send outside unregister.
+					zlog.Warn().Int("user_id", client.UserID).Msg("websocket: message dropped (send buffer full)")
 				}
 			}
 		}
 	}
 }
 
-// Broadcast sends a message to a specific user
+// Broadcast enqueues a message for delivery. It is non-blocking: if the hub's
+// internal broadcast channel is full the message is dropped and a warning is
+// logged. This prevents callers (e.g. the WebSocket readPump) from blocking
+// indefinitely when the hub is under load.
 func (h *Hub) Broadcast(message *Message) {
-	h.broadcast <- message
+	select {
+	case h.broadcast <- message:
+	default:
+		zlog.Warn().Msg("websocket: hub broadcast channel full — message dropped")
+	}
 }
 
 // IsUserOnline checks if a user is currently connected
