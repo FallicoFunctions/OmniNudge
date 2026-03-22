@@ -115,7 +115,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	)
 
 	// Handlers
-	authHandler := handlers.NewAuthHandler(authService, userRepo, nil, nil, nil, "http://test-frontend", nil, nil)
+	authHandler := handlers.NewAuthHandler(authService, userRepo, nil, nil, nil, "http://test-frontend", nil, nil, "")
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, modRepo, feedRepo, hubSettingsRepo)
 	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, modRepo)
 	redditHandler := handlers.NewRedditHandler(
