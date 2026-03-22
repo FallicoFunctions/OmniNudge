@@ -59,6 +59,7 @@ func setupAuthHandlerTest(t *testing.T) (*AuthHandler, *database.Database, func(
 		"http://localhost:3000",
 		nil, // auditLogger
 		nil, // lockoutService
+		"",  // appEnv — non-production
 	)
 
 	cleanup := func() {

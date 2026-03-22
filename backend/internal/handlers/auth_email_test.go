@@ -128,6 +128,7 @@ func setupAuthHandlerForEmailTest(t *testing.T) (
 		"http://localhost:5176",
 		nil, // auditLogger — nil safe
 		nil, // lockoutService — nil safe
+		"",  // appEnv — non-production
 	)
 
 	cleanup := func() { db.Close() }

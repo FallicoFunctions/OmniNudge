@@ -35,6 +35,7 @@ type AuthHandler struct {
 	frontendURL           string
 	auditLogger           *audit.AuditLogger
 	lockoutService        *services.AccountLockoutService
+	isProduction          bool // true when APP_ENV=production; gates Secure cookie flag
 }
 
 // logAudit writes a structured audit event. It is a nil-safe wrapper around
@@ -64,6 +65,7 @@ func NewAuthHandler(
 	frontendURL string,
 	auditLogger *audit.AuditLogger,
 	lockoutService *services.AccountLockoutService,
+	appEnv string,
 ) *AuthHandler {
 	return &AuthHandler{
 		authService:           authService,
@@ -74,6 +76,7 @@ func NewAuthHandler(
 		frontendURL:           frontendURL,
 		auditLogger:           auditLogger,
 		lockoutService:        lockoutService,
+		isProduction:          appEnv == "production",
 	}
 }
 
@@ -91,8 +94,9 @@ func (h *AuthHandler) RedditLogin(c *gin.Context) {
 		return
 	}
 
-	// Store state in cookie for validation (in production, use Redis)
-	c.SetCookie("oauth_state", state, 600, "/", "", false, true)
+	// Store state in cookie for validation (in production, use Redis).
+	// Secure flag is only set in production; local dev uses plain HTTP.
+	c.SetCookie("oauth_state", state, 600, "/", "", h.isProduction, true)
 
 	url := h.authService.GetAuthURL(state)
 	c.Redirect(http.StatusTemporaryRedirect, url)
@@ -135,14 +139,16 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 	// Exchange code for token
 	token, err := h.authService.ExchangeCode(c.Request.Context(), code)
 	if err != nil {
-		RespondError(c, http.StatusUnauthorized, "Failed to exchange code: "+err.Error())
+		zlog.Warn().Err(err).Msg("auth: reddit oauth code exchange failed")
+		RespondError(c, http.StatusUnauthorized, "Failed to complete Reddit authentication")
 		return
 	}
 
 	// Get Reddit user info
 	redditUser, err := h.authService.GetRedditUser(c.Request.Context(), token)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, "Failed to get Reddit user info: "+err.Error())
+		zlog.Warn().Err(err).Msg("auth: failed to fetch reddit user info")
+		RespondError(c, http.StatusInternalServerError, "Failed to retrieve Reddit user information")
 		return
 	}
 
@@ -181,7 +187,7 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 	}
 
 	// Clear the state cookie
-	c.SetCookie("oauth_state", "", -1, "/", "", false, true)
+	c.SetCookie("oauth_state", "", -1, "/", "", h.isProduction, true)
 
 	// Return JWT and user info
 	// In production, you might redirect to frontend with token in URL fragment
@@ -372,7 +378,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		h.logAudit(ctx, nil, "login_failed", "user", nil,
 			ipAddress, c.Request.UserAgent(),
 			map[string]any{"username": normalizedUsername})
-		RespondError(c, http.StatusUnauthorized, err.Error())
+		RespondError(c, http.StatusUnauthorized, "Invalid credentials")
 		return
 	}
 
@@ -450,9 +456,13 @@ func (h *AuthHandler) GetPublicKeys(c *gin.Context) {
 		return
 	}
 
-	// Parse comma-separated user IDs
+	// Parse comma-separated user IDs — cap at 100 to bound DB IN() clause size.
+	const maxPublicKeyLookup = 100
 	var userIDs []int
 	for _, idStr := range strings.Split(userIDsParam, ",") {
+		if len(userIDs) >= maxPublicKeyLookup {
+			break
+		}
 		var id int
 		if _, err := fmt.Sscanf(idStr, "%d", &id); err == nil {
 			userIDs = append(userIDs, id)
