@@ -493,7 +493,7 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 
 	for i, fileHeader := range files {
 		go func(idx int, header *multipart.FileHeader) {
-			media, err := h.processSingleUpload(c.Request.Context(), userID, header)
+			media, err := h.processSingleUpload(c.Request.Context(), userID, c.GetString("role"), header)
 			resultsChan <- uploadResult{media: media, err: err, index: idx}
 		}(i, fileHeader)
 	}
@@ -506,7 +506,10 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 	for i := 0; i < len(files); i++ {
 		result := <-resultsChan
 		if result.err != nil {
-			errs = append(errs, fmt.Sprintf("File %d: %v", result.index, result.err))
+			// Log the full error server-side; return only a generic message to
+			// the client to avoid leaking internal paths or OS error details.
+			zlog.Warn().Err(result.err).Int("file_index", result.index).Int("user_id", userID).Msg("batch upload: file processing failed")
+			errs = append(errs, fmt.Sprintf("File %d: upload failed", result.index))
 		} else {
 			results[result.index] = result.media
 			successCount++
@@ -528,7 +531,7 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 }
 
 // processSingleUpload handles uploading a single file (used by batch upload)
-func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, header *multipart.FileHeader) (*models.MediaFile, error) {
+func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, role string, header *multipart.FileHeader) (*models.MediaFile, error) {
 	// Check file size
 	if header.Size > maxUploadSize {
 		return nil, fmt.Errorf("file too large: %d bytes (max: %d)", header.Size, maxUploadSize)
@@ -591,7 +594,7 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 		return nil, fmt.Errorf("file too large for type %s: %d bytes (max: %d)", contentType, header.Size, maxSizeForType)
 	}
 
-	// Write file
+	// Write file — limit reader so a lying Content-Length cannot write beyond maxUploadSize.
 	if n > 0 {
 		if _, err := dst.Write(sniff[:n]); err != nil {
 			_ = os.Remove(storagePath)
@@ -599,9 +602,16 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 		}
 	}
 
-	if _, err := io.Copy(dst, file); err != nil {
+	// Re-use the already-consumed sniff bytes: remaining = maxUploadSize - n already read.
+	writtenRest, err := io.Copy(dst, io.LimitReader(file, maxUploadSize-int64(n)+1))
+	if err != nil {
 		_ = os.Remove(storagePath)
 		return nil, fmt.Errorf("failed to save file: %w", err)
+	}
+	totalWritten := int64(n) + writtenRest
+	if totalWritten > maxUploadSize {
+		_ = os.Remove(storagePath)
+		return nil, fmt.Errorf("file too large: %d bytes (max: %d)", totalWritten, maxUploadSize)
 	}
 
 	if err := middleware.ValidateStrictDocumentStructure(storagePath, safeName, contentType, sniff[:n]); err != nil {
@@ -628,12 +638,20 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 		}
 	}
 
+	// Use the actual on-disk size — header.Size is client-controlled and cannot
+	// be trusted for quota accounting.
+	actualInfo, statErr := os.Stat(storagePath)
+	actualSize := header.Size // fallback if stat fails (should not happen)
+	if statErr == nil {
+		actualSize = actualInfo.Size()
+	}
+
 	media := &models.MediaFile{
 		UserID:           userID,
 		Filename:         newName,
 		OriginalFilename: safeName,
 		FileType:         contentType,
-		FileSize:         header.Size,
+		FileSize:         actualSize,
 		StorageURL:       batchStorageURL,
 		StoragePath:      storagePath,
 	}
@@ -651,12 +669,23 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 		}
 	}
 
+	// Authoritative quota check using actual bytes written and a fresh DB read.
+	// This prevents concurrent batch requests from racing past the pre-check.
+	currentUsed, quotaErr := h.mediaRepo.GetTrackedStorageByUserID(ctx, userID)
+	if quotaErr == nil {
+		capBytes := resolveStorageCapForRole(role, h.quota)
+		if currentUsed+media.FileSize > capBytes {
+			_ = os.Remove(storagePath)
+			return nil, fmt.Errorf("storage quota exceeded")
+		}
+	}
+
 	if err := h.mediaRepo.Create(ctx, media); err != nil {
 		_ = os.Remove(storagePath)
 		return nil, fmt.Errorf("failed to save media record: %w", err)
 	}
 
-	// BUG-10: Track storage usage after successful Create in batch path.
+	// Track storage usage after successful Create.
 	if incrErr := h.mediaRepo.IncrementTrackedStorageByUserID(ctx, userID, media.FileSize); incrErr != nil {
 		zlog.Warn().Err(incrErr).Int("user_id", userID).Int64("size", media.FileSize).Msg("failed to increment storage quota after batch upload")
 	}
