@@ -31,13 +31,23 @@ type Config struct {
 	MetricsToken  string // Bearer token for /metrics endpoint; empty = unrestricted (dev only)
 	AsynqmonToken string // Bearer token for /admin/queues dashboard; empty = unrestricted (dev only)
 	TURN         TURNConfig
+	Qwen         QwenConfig
+}
+
+// QwenConfig holds Qwen AI (via OpenRouter) configuration for AI-powered Hub Page Designer.
+// When APIKey is empty the generate endpoint returns a 503.
+type QwenConfig struct {
+	APIKey  string // QWEN_API_KEY — OpenRouter API key
+	BaseURL string // QWEN_BASE_URL — defaults to https://openrouter.ai/api/v1
+	Model   string // QWEN_MODEL — defaults to qwen/qwen3-coder-480b-a35b-instruct:free
 }
 
 // TURNConfig holds coturn TURN server configuration for WebRTC relay
 type TURNConfig struct {
-	Host   string // e.g. "77.42.47.79" or "turn.omninudge.com"
-	Port   string // default "3478"
-	Secret string // HMAC secret shared with coturn static-auth-secret
+	Host    string // e.g. "77.42.47.79" or "turn.omninudge.com"
+	Port    string // default "3478"
+	TLSPort string // default "5349" (TURNS/TLS)
+	Secret  string // HMAC secret shared with coturn static-auth-secret
 }
 
 // StorageConfig holds file storage and CDN configuration.
@@ -266,9 +276,15 @@ func Load() (*Config, error) {
 		MetricsToken:  getEnv("METRICS_TOKEN", ""),
 		AsynqmonToken: getEnv("ASYNQMON_TOKEN", ""),
 		TURN: TURNConfig{
-			Host:   getEnv("TURN_HOST", ""),
-			Port:   getEnv("TURN_PORT", "3478"),
-			Secret: getEnv("TURN_SECRET", ""),
+			Host:    getEnv("TURN_HOST", ""),
+			Port:    getEnv("TURN_PORT", "3478"),
+			TLSPort: getEnv("TURN_TLS_PORT", "5349"),
+			Secret:  getEnv("TURN_SECRET", ""),
+		},
+		Qwen: QwenConfig{
+			APIKey:  getEnv("QWEN_API_KEY", ""),
+			BaseURL: getEnv("QWEN_BASE_URL", "https://openrouter.ai/api/v1"),
+			Model:   getEnv("QWEN_MODEL", "qwen/qwen3-coder-480b-a35b-instruct:free"),
 		},
 	}
 

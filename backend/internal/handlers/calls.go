@@ -479,7 +479,7 @@ func (h *CallsHandler) GetICEServers(c *gin.Context) {
 		password := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
 		turnURL := fmt.Sprintf("turn:%s:%s", h.turn.Host, h.turn.Port)
-		turnsURL := fmt.Sprintf("turns:%s:%s?transport=tcp", h.turn.Host, "5349")
+		turnsURL := fmt.Sprintf("turns:%s:%s?transport=tcp", h.turn.Host, h.turn.TLSPort)
 		iceServers = append(iceServers,
 			gin.H{"urls": turnURL, "username": username, "credential": password},
 			gin.H{"urls": turnsURL, "username": username, "credential": password},
