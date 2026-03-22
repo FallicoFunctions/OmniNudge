@@ -79,8 +79,12 @@ func (s *LocalStorageService) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
+// GetSignedURL returns a URL with an expiry timestamp appended as a query param.
+// WARNING: local storage does not enforce expiry — the timestamp is cosmetic only.
+// This method exists so local-dev code paths satisfy the StorageService interface;
+// it must never be relied upon for access control in any environment.
+// Use S3StorageService for real pre-signed URL enforcement.
 func (s *LocalStorageService) GetSignedURL(ctx context.Context, key string, expires time.Duration) (string, error) {
-	// For local storage, we just return the URL (could implement a temporary symlink strategy if needed)
 	return fmt.Sprintf("%s/%s?expires=%d", s.baseURL, key, time.Now().Add(expires).Unix()), nil
 }
 
