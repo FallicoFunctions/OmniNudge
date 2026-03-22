@@ -35,52 +35,54 @@ type ipLogLimiterEntry struct {
 // ipLogLimiters holds per-IP token-bucket limiters for the frontend log endpoint.
 // Allows 60 log submissions per minute per IP (1/second steady-state, burst 10).
 var (
-	ipLogLimitersMu sync.RWMutex
-	ipLogLimiters   = make(map[string]*ipLogLimiterEntry)
+	ipLogLimitersMu   sync.RWMutex
+	ipLogLimiters     = make(map[string]*ipLogLimiterEntry)
+	ipLogEvictStop    = make(chan struct{})
 )
 
 func init() {
 	// Background goroutine that evicts stale IP entries once per hour.
+	// Stopped by calling StopLogLimiterEviction() during server shutdown.
 	go func() {
 		ticker := time.NewTicker(time.Hour)
 		defer ticker.Stop()
-		for range ticker.C {
-			cutoff := time.Now().Add(-24 * time.Hour)
-			ipLogLimitersMu.Lock()
-			for ip, entry := range ipLogLimiters {
-				if entry.lastAccess.Before(cutoff) {
-					delete(ipLogLimiters, ip)
+		for {
+			select {
+			case <-ticker.C:
+				cutoff := time.Now().Add(-24 * time.Hour)
+				ipLogLimitersMu.Lock()
+				for ip, entry := range ipLogLimiters {
+					if entry.lastAccess.Before(cutoff) {
+						delete(ipLogLimiters, ip)
+					}
 				}
+				ipLogLimitersMu.Unlock()
+			case <-ipLogEvictStop:
+				return
 			}
-			ipLogLimitersMu.Unlock()
 		}
 	}()
 }
 
+// StopLogLimiterEviction stops the background IP limiter eviction goroutine.
+// Call once during graceful server shutdown.
+func StopLogLimiterEviction() {
+	close(ipLogEvictStop)
+}
+
 // getIPLogLimiter returns (or creates) a per-IP rate limiter for frontend log submissions.
 // Allows 60 logs/min per IP: rate=1/s, burst=10.
-// BUG-1 fix: lastAccess is updated on EVERY call, not just when stale.
+// Holds the write lock for the entire operation to eliminate TOCTOU races between
+// the read-check and the lastAccess update.
 func getIPLogLimiter(ip string) *rate.Limiter {
-	ipLogLimitersMu.RLock()
-	entry, exists := ipLogLimiters[ip]
-	ipLogLimitersMu.RUnlock()
-
-	if exists {
-		// Always update lastAccess on every access.
-		ipLogLimitersMu.Lock()
-		if e, ok := ipLogLimiters[ip]; ok {
-			e.lastAccess = time.Now()
-		}
-		ipLogLimitersMu.Unlock()
-		return entry.limiter
-	}
-
 	ipLogLimitersMu.Lock()
 	defer ipLogLimitersMu.Unlock()
+
 	if e, ok := ipLogLimiters[ip]; ok {
 		e.lastAccess = time.Now()
 		return e.limiter
 	}
+
 	e := &ipLogLimiterEntry{
 		// 60 logs/min = 1 per second steady-state; burst of 10 allows short bursts.
 		limiter:    rate.NewLimiter(rate.Limit(60.0/60.0), 10),
