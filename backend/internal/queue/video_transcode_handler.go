@@ -101,11 +101,17 @@ func (h *VideoTranscodeHandler) Handle(ctx context.Context, task *asynq.Task) er
 		rc.Close()
 		return fmt.Errorf("video_transcode: create input tmp: %w", createErr)
 	}
-	_, copyErr := io.Copy(inputFile, rc)
+	// Cap download at 10 GB to prevent a corrupted or malicious storage entry
+	// from exhausting disk space on the worker.
+	const maxInputBytes = 10 * 1024 * 1024 * 1024
+	written, copyErr := io.Copy(inputFile, io.LimitReader(rc, maxInputBytes+1))
 	inputFile.Close()
 	rc.Close()
 	if copyErr != nil {
 		return fmt.Errorf("video_transcode: write input tmp: %w", copyErr)
+	}
+	if written > maxInputBytes {
+		return fmt.Errorf("video_transcode: input file exceeds size cap (%d bytes): %w", maxInputBytes, asynq.SkipRetry)
 	}
 	inputPath := inputTmp
 
