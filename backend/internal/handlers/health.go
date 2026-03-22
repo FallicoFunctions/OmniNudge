@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"net/http"
-	"runtime/debug"
 	"strings"
 	"time"
 
@@ -26,22 +25,6 @@ func NewHealthHandler(db *pgxpool.Pool, redis *redis.Client) *HealthHandler {
 		db:    db,
 		redis: redis,
 	}
-}
-
-// getVersion returns the build version from runtime/debug build info.
-// Falls back to git short SHA if available, then "dev".
-func getVersion() string {
-	if info, ok := debug.ReadBuildInfo(); ok {
-		if info.Main.Version != "" && info.Main.Version != "(devel)" {
-			return info.Main.Version
-		}
-		for _, s := range info.Settings {
-			if s.Key == "vcs.revision" && len(s.Value) >= 7 {
-				return s.Value[:7]
-			}
-		}
-	}
-	return "dev"
 }
 
 // LivenessProbe checks if the application is running.
@@ -131,7 +114,6 @@ func (h *HealthHandler) HealthCheck(c *gin.Context) {
 	health := gin.H{
 		"status":    "healthy",
 		"timestamp": time.Now().Unix(),
-		"version":   getVersion(),
 		"services":  gin.H{},
 	}
 
