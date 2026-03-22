@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
 )
@@ -23,11 +24,12 @@ const maxVoiceFileSize = 10 * 1024 * 1024 // 10 MB
 
 // VoiceMessagesHandler handles HTTP requests for voice messages.
 type VoiceMessagesHandler struct {
-	pool         *pgxpool.Pool
-	storage      services.StorageService
-	virusScanner services.VirusScanner // may be nil
-	hub          HubInterface
-	queueClient  *queue.QueueClient // may be nil
+	pool                *pgxpool.Pool
+	storage             services.StorageService
+	virusScanner        services.VirusScanner // may be nil
+	hub                 HubInterface
+	queueClient         *queue.QueueClient // may be nil
+	virusScanFailClosed bool               // when true, reject uploads if scan errors
 }
 
 // NewVoiceMessagesHandler creates a new VoiceMessagesHandler.
@@ -37,13 +39,15 @@ func NewVoiceMessagesHandler(
 	virusScanner services.VirusScanner,
 	hub HubInterface,
 	queueClient *queue.QueueClient,
+	virusScanFailClosed bool,
 ) *VoiceMessagesHandler {
 	return &VoiceMessagesHandler{
-		pool:         pool,
-		storage:      storage,
-		virusScanner: virusScanner,
-		hub:          hub,
-		queueClient:  queueClient,
+		pool:                pool,
+		storage:             storage,
+		virusScanner:        virusScanner,
+		hub:                 hub,
+		queueClient:         queueClient,
+		virusScanFailClosed: virusScanFailClosed,
 	}
 }
 
@@ -84,7 +88,10 @@ func extFromMIME(mimeType string) string {
 // @Failure      500  {object}  gin.H
 // @Router       /messages/{id}/voice [post]
 func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
-	userID := c.GetInt("user_id")
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -119,18 +126,8 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	}
 	defer file.Close()
 
-	// Validate MIME type.
-	mimeType := header.Header.Get("Content-Type")
-	if mimeType == "" {
-		mimeType = "audio/webm"
-	}
-	baseMIME := strings.TrimSpace(strings.SplitN(mimeType, ";", 2)[0])
-	if !strings.HasPrefix(baseMIME, "audio/") {
-		RespondError(c, http.StatusBadRequest, "File must be an audio file")
-		return
-	}
-
-	// Validate file size.
+	// Validate file size against client-supplied header as an early DDoS guard.
+	// Authoritative size check is done after writing (below).
 	if header.Size > maxVoiceFileSize {
 		RespondError(c, http.StatusBadRequest, "File too large (max 10MB)")
 		return
@@ -163,13 +160,47 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	tmpPath := tmpFile.Name()
 	defer os.Remove(tmpPath)
 
-	if _, err := io.Copy(tmpFile, file); err != nil {
-		tmpFile.Close()
+	limited := io.LimitReader(file, maxVoiceFileSize+1)
+	written, err := io.Copy(tmpFile, limited)
+	tmpFile.Close()
+	if err != nil {
 		log.Printf("voice upload: write temp file: %v", err)
 		RespondError(c, http.StatusInternalServerError, "Internal error")
 		return
 	}
-	tmpFile.Close()
+	// Authoritative size check — client-supplied header.Size is untrusted.
+	if written > maxVoiceFileSize {
+		RespondError(c, http.StatusBadRequest, "File too large (max 10MB)")
+		return
+	}
+
+	// Detect MIME type from actual file bytes — never trust the client-supplied
+	// Content-Type header alone; it can be forged to bypass the audio-only check.
+	sniffBuf := make([]byte, 512)
+	sniffFile, err := os.Open(tmpPath)
+	if err != nil {
+		log.Printf("voice upload: open for sniff: %v", err)
+		RespondError(c, http.StatusInternalServerError, "Internal error")
+		return
+	}
+	n, _ := sniffFile.Read(sniffBuf)
+	sniffFile.Close()
+
+	detectedMIME := http.DetectContentType(sniffBuf[:n])
+	// Use the detected MIME; fall back to the client header only when the
+	// detector returns the generic "application/octet-stream" (i.e. unknown).
+	mimeType := detectedMIME
+	if detectedMIME == "application/octet-stream" {
+		clientMIME := header.Header.Get("Content-Type")
+		if clientMIME != "" {
+			mimeType = strings.TrimSpace(strings.SplitN(clientMIME, ";", 2)[0])
+		}
+	}
+	baseMIME := strings.TrimSpace(strings.SplitN(mimeType, ";", 2)[0])
+	if !strings.HasPrefix(baseMIME, "audio/") {
+		RespondError(c, http.StatusBadRequest, "File must be an audio file")
+		return
+	}
 
 	// Virus scan (optional).
 	scanStatus := "skipped"
@@ -177,6 +208,10 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 		result, scanErr := h.virusScanner.ScanFile(c.Request.Context(), tmpPath)
 		if scanErr != nil {
 			log.Printf("voice upload: virus scan error: %v", scanErr)
+			if h.virusScanFailClosed {
+				RespondError(c, http.StatusServiceUnavailable, "Upload temporarily unavailable while security scanning is offline")
+				return
+			}
 			// Fail open — treat as skipped.
 		} else if result.Infected {
 			RespondError(c, http.StatusBadRequest, "File rejected by virus scanner")
@@ -237,7 +272,6 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"voice_message_id": voiceMessageID,
-		"storage_key":      storageKey,
 		"duration_seconds": durationSeconds,
 	})
 }
@@ -254,7 +288,10 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 // @Failure      500  {object}  gin.H
 // @Router       /messages/{id}/voice [get]
 func (h *VoiceMessagesHandler) GetVoiceMessage(c *gin.Context) {
-	userID := c.GetInt("user_id")
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -332,7 +369,10 @@ func (h *VoiceMessagesHandler) GetVoiceMessage(c *gin.Context) {
 // @Failure      500  {object}  gin.H
 // @Router       /voice/{id}/download [get]
 func (h *VoiceMessagesHandler) DownloadVoice(c *gin.Context) {
-	userID := c.GetInt("user_id")
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	voiceID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
