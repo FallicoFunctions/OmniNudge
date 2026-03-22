@@ -1209,6 +1209,13 @@ func main() {
 			protected.DELETE("/hubs/:name/themes/:id", hubThemesHandler.DeleteTheme)
 			protected.POST("/hubs/:name/themes/preview", hubThemesHandler.PreviewTheme)
 
+			// Hub AI Designer routes (requires moderator permissions)
+			protected.POST("/hubs/:name/ai-design/generate", aiDesignRateLimiter.Middleware(), hubAIDesignerHandler.Generate)
+			protected.GET("/hubs/:name/ai-designs", hubAIDesignerHandler.ListDesigns)
+			protected.POST("/hubs/:name/ai-designs/:id/activate", hubAIDesignerHandler.Activate)
+			protected.POST("/hubs/:name/ai-design/deactivate", hubAIDesignerHandler.Deactivate)
+			protected.DELETE("/hubs/:name/ai-designs/:id", hubAIDesignerHandler.DeleteDesign)
+
 			// Voice/Video Call routes (F12)
 			protected.POST("/conversations/:id/calls", callsHandler.StartCall)
 			protected.GET("/conversations/:id/calls", callsHandler.GetCallHistory)
