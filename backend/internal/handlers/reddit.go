@@ -9,6 +9,7 @@ import (
 	"html"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -24,9 +25,21 @@ import (
 const redditCacheTTL = 15 * time.Minute
 
 // proxyHTTPClient is used exclusively by ProxyRedditMedia.
-// Separate from http.DefaultClient so we can enforce a response timeout
-// and avoid holding goroutines open on slow upstream connections.
-var proxyHTTPClient = &http.Client{Timeout: 30 * time.Second}
+// ResponseHeaderTimeout limits how long we wait for upstream to send headers
+// without cutting off in-progress body streaming (unlike the top-level Timeout).
+// DialContext and TLSHandshakeTimeout bound the connection setup phase.
+var proxyHTTPClient = &http.Client{
+	Transport: &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+		MaxIdleConns:          10,
+		IdleConnTimeout:       90 * time.Second,
+	},
+}
 
 // proxyMaxBytes caps the response body streamed through ProxyRedditMedia (50 MB).
 // Reddit audio/video segments are typically <10 MB; this prevents a runaway
@@ -1286,21 +1299,19 @@ func isRedditRateLimited(err error) bool {
 		strings.Contains(msg, "status 503:")
 }
 
-// handleRedditError writes the appropriate HTTP error response for a Reddit API error
-// and returns true so the caller can immediately return.
+// handleRedditError writes the appropriate HTTP error response for a Reddit API error.
 // Priority: not-found (403/404/410) → rate-limited (429/503) → internal error.
-func handleRedditError(c *gin.Context, err error, notFoundMsg, internalMsg string) bool {
+func handleRedditError(c *gin.Context, err error, notFoundMsg, internalMsg string) {
 	if isRedditNotFound(err) {
 		RespondError(c, http.StatusNotFound, notFoundMsg)
-		return true
+		return
 	}
 	if isRedditRateLimited(err) {
 		c.Header("Retry-After", "60")
 		RespondError(c, http.StatusServiceUnavailable, "Reddit is temporarily unavailable, please try again shortly")
-		return true
+		return
 	}
 	RespondError(c, http.StatusInternalServerError, internalMsg)
-	return true
 }
 
 func resolveWikiPagePath(c *gin.Context, primaryParam, restParam string) string {
