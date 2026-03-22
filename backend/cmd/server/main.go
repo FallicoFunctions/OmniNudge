@@ -507,7 +507,7 @@ func main() {
 	emailVerificationRepo := repository.NewPostgresEmailVerificationRepository(db.Pool)
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, lockoutService)
+	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, lockoutService, cfg.AppEnv)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo, hubSettingsRepo)
 	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, hubModRepo)
@@ -579,7 +579,7 @@ func main() {
 	accessRequestHandler := handlers.NewAccessRequestHandler(hubAccessRequestRepo, hubRepo, hubSettingsRepo, userRepo)
 	jobsHandler := handlers.NewJobsHandler(queueClient)
 	audioEncoderHandler := handlers.NewAudioEncoderHandler(mediaRepo, userSettingsRepo, queueClient)
-	voiceHandler := handlers.NewVoiceMessagesHandler(db.Pool, voiceStorage, virusScanner, hub, queueClient)
+	voiceHandler := handlers.NewVoiceMessagesHandler(db.Pool, voiceStorage, virusScanner, hub, queueClient, cfg.VirusScan.FailClosed)
 	featureFlagsHandler := handlers.NewFeatureFlagHandler(featureFlagService)
 	accountDeletionHandler := handlers.NewAccountDeletionHandler(db.Pool, queueClient)
 	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient, cfg.Encryption.Key)
@@ -589,6 +589,10 @@ func main() {
 	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
 	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, tokenRepo, firebaseService)
 	callsHandler := handlers.NewCallsHandler(db.Pool, hub, cfg.TURN)
+	hubAIDesignerHandler := handlers.NewHubAIDesignerHandler(
+		db.Pool, hubSettingsRepo,
+		cfg.Qwen.APIKey, cfg.Qwen.BaseURL, cfg.Qwen.Model,
+	)
 
 	// Feature 1: Message Reactions handler + rate limiter
 	reactionsHandler := handlers.NewReactionsHandler(reactionService)
@@ -599,6 +603,7 @@ func main() {
 	themePreviewLimiter := middleware.ThemePreviewRateLimiter()
 	generalLimiter := middleware.GeneralAPIRateLimiter()
 	uploadRateLimiter := middleware.UploadRateLimiter()
+	aiDesignRateLimiter := middleware.AIDesignRateLimiter()
 	// Auth rate limiters — Redis-backed so they work across restarts and are IP-keyed
 	// (no user_id exists at login/register time, so the Redis limiter falls back to ClientIP).
 	authRateLimiter := middleware.AuthRateLimiter(cache)
@@ -907,6 +912,9 @@ func main() {
 
 			// Hub theme (public)
 			hubs.GET("/:name/theme", hubThemesHandler.GetActiveTheme)
+
+			// Hub AI design (public — active design only)
+			hubs.GET("/:name/ai-design", hubAIDesignerHandler.GetActive)
 		}
 
 		// Hub subscription check (optional auth)
@@ -1504,6 +1512,7 @@ func main() {
 	themePreviewLimiter.Stop()
 	generalLimiter.Stop()
 	uploadRateLimiter.Stop()
+	handlers.StopLogLimiterEviction()
 
 	// Close Redis connection pool after all handlers have stopped.
 	if redisClient != nil {
