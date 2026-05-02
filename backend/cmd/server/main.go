@@ -24,25 +24,23 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/omninudge/backend/docs"
-	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/hibiken/asynq"
 	"github.com/hibiken/asynqmon"
-	ginSwagger "github.com/swaggo/gin-swagger"
-	swaggerFiles "github.com/swaggo/files"
+	_ "github.com/omninudge/backend/docs"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/audit"
 	"github.com/omninudge/backend/internal/config"
-	"github.com/omninudge/backend/internal/tracing"
 	"github.com/omninudge/backend/internal/database"
+	"github.com/omninudge/backend/internal/domain/events"
+	"github.com/omninudge/backend/internal/eventhandlers"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/jobs"
 	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/observability"
 	"github.com/omninudge/backend/internal/queue"
-	"github.com/omninudge/backend/internal/domain/events"
-	"github.com/omninudge/backend/internal/eventhandlers"
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/tracing"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/omninudge/backend/internal/websocket"
 	"github.com/omninudge/backend/internal/workers"
@@ -50,6 +48,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	zlog "github.com/rs/zerolog/log"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // serviceName is the OTel / log service identifier — single source of truth.
@@ -194,13 +194,11 @@ func main() {
 		zlog.Warn().Msg("Turnstile.Secret is not configured — CAPTCHA validation is disabled")
 	}
 	authService := services.NewAuthService(
-		cfg.Reddit.ClientID,
-		cfg.Reddit.ClientSecret,
-		cfg.Reddit.RedirectURI,
 		cfg.JWT.Secret,
 		cfg.Reddit.UserAgent,
 		cfg.Turnstile.Secret,
 	)
+	authService.SetUserRepository(userRepo)
 
 	// Redis is optional in dev. If it's configured but unreachable, fall back to in-memory cache and disable the job queue
 	// (otherwise Asynq will spam errors and unrelated endpoints can fail).
@@ -582,7 +580,7 @@ func main() {
 	voiceHandler := handlers.NewVoiceMessagesHandler(db.Pool, voiceStorage, virusScanner, hub, queueClient, cfg.VirusScan.FailClosed)
 	featureFlagsHandler := handlers.NewFeatureFlagHandler(featureFlagService)
 	accountDeletionHandler := handlers.NewAccountDeletionHandler(db.Pool, queueClient)
-	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient, cfg.Encryption.Key)
+	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient, storageService, cfg.Encryption.Key)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 	logHandler := handlers.NewLogHandler(analyticsService)
 	groupHandler := handlers.NewGroupHandler(db.Pool)
@@ -591,7 +589,7 @@ func main() {
 	callsHandler := handlers.NewCallsHandler(db.Pool, hub, cfg.TURN)
 	hubAIDesignerHandler := handlers.NewHubAIDesignerHandler(
 		db.Pool, hubSettingsRepo,
-		cfg.Qwen.APIKey, cfg.Qwen.BaseURL, cfg.Qwen.Model,
+		cfg.Qwen.APIKey, cfg.Qwen.Model,
 	)
 
 	// Feature 1: Message Reactions handler + rate limiter
@@ -687,16 +685,20 @@ func main() {
 	})
 
 	// Prometheus metrics endpoint — restricted to internal/admin traffic.
-	// In production, place this behind a firewall or use the METRICS_TOKEN env var.
-	router.GET("/metrics", func(c *gin.Context) {
-		if token := cfg.MetricsToken; token != "" {
-			if c.GetHeader("Authorization") != "Bearer "+token {
-				c.AbortWithStatus(http.StatusUnauthorized)
-				return
+	// In production, fail closed unless METRICS_TOKEN is configured.
+	if cfg.AppEnv == "production" && cfg.MetricsToken == "" {
+		zlog.Warn().Msg("METRICS_TOKEN is not set — /metrics endpoint disabled in production")
+	} else {
+		router.GET("/metrics", func(c *gin.Context) {
+			if token := cfg.MetricsToken; token != "" {
+				if c.GetHeader("Authorization") != "Bearer "+token {
+					c.AbortWithStatus(http.StatusUnauthorized)
+					return
+				}
 			}
-		}
-		promhttp.Handler().ServeHTTP(c.Writer, c.Request)
-	})
+			promhttp.Handler().ServeHTTP(c.Writer, c.Request)
+		})
+	}
 
 	// Swagger UI (disabled in production)
 	if cfg.AppEnv != "production" {
@@ -708,37 +710,37 @@ func main() {
 	// In production always set ASYNQMON_TOKEN to a strong random secret.
 	if redisAvailable {
 		if cfg.AsynqmonToken == "" && cfg.AppEnv == "production" {
-			zlog.Warn().Msg("ASYNQMON_TOKEN is not set — /admin/queues dashboard is publicly accessible in production")
-		}
+			zlog.Warn().Msg("ASYNQMON_TOKEN is not set — /admin/queues dashboard disabled in production")
+		} else {
+			mon := asynqmon.New(asynqmon.Options{
+				RootPath: "/admin/queues",
+				RedisConnOpt: asynq.RedisClientOpt{
+					Addr:     cfg.Redis.Addr,
+					Password: cfg.Redis.Password,
+				},
+			})
 
-		mon := asynqmon.New(asynqmon.Options{
-			RootPath: "/admin/queues",
-			RedisConnOpt: asynq.RedisClientOpt{
-				Addr:     cfg.Redis.Addr,
-				Password: cfg.Redis.Password,
-			},
-		})
-
-		// asynqmonAuth enforces bearer token protection for all queue dashboard routes.
-		asynqmonAuth := func(c *gin.Context) {
-			if token := cfg.AsynqmonToken; token != "" {
-				if c.GetHeader("Authorization") != "Bearer "+token {
-					c.AbortWithStatus(http.StatusUnauthorized)
-					return
+			// asynqmonAuth enforces bearer token protection for all queue dashboard routes.
+			asynqmonAuth := func(c *gin.Context) {
+				if token := cfg.AsynqmonToken; token != "" {
+					if c.GetHeader("Authorization") != "Bearer "+token {
+						c.AbortWithStatus(http.StatusUnauthorized)
+						return
+					}
 				}
+				c.Next()
 			}
-			c.Next()
-		}
 
-		// Asynqmon uses GET (UI), POST (pause/resume/run/archive/cancel), DELETE (delete tasks/queues).
-		// Confirmed from asynqmon v0.7.2 handler.go — no PATCH or PUT routes exist.
-		adminQueues := router.Group("/admin/queues", asynqmonAuth)
-		for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
-			adminQueues.Handle(method, "", func(c *gin.Context) { mon.ServeHTTP(c.Writer, c.Request) })
-			adminQueues.Handle(method, "/*path", func(c *gin.Context) { mon.ServeHTTP(c.Writer, c.Request) })
-		}
+			// Asynqmon uses GET (UI), POST (pause/resume/run/archive/cancel), DELETE (delete tasks/queues).
+			// Confirmed from asynqmon v0.7.2 handler.go — no PATCH or PUT routes exist.
+			adminQueues := router.Group("/admin/queues", asynqmonAuth)
+			for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
+				adminQueues.Handle(method, "", func(c *gin.Context) { mon.ServeHTTP(c.Writer, c.Request) })
+				adminQueues.Handle(method, "/*path", func(c *gin.Context) { mon.ServeHTTP(c.Writer, c.Request) })
+			}
 
-		zlog.Info().Str("path", "/admin/queues").Msg("Asynqmon queue dashboard enabled")
+			zlog.Info().Str("path", "/admin/queues").Msg("Asynqmon queue dashboard enabled")
+		}
 	}
 
 	// Liveness — process is running (used by Kubernetes liveness probe)
@@ -804,10 +806,6 @@ func main() {
 			// Username/password authentication — 5 attempts per 15 min per IP
 			auth.POST("/register", authRateLimiter.Middleware(), authHandler.Register)
 			auth.POST("/login", authRateLimiter.Middleware(), authHandler.Login)
-
-			// Reddit OAuth (for future use)
-			auth.GET("/reddit", authHandler.RedditLogin)
-			auth.GET("/reddit/callback", authHandler.RedditCallback)
 
 			// Password reset — 3 requests per hour per IP
 			auth.POST("/forgot-password", passwordResetRateLimiter.Middleware(), authHandler.ForgotPassword)
@@ -1007,6 +1005,7 @@ func main() {
 			// GDPR Data Export (P0-016: GDPR right to data portability)
 			protected.POST("/account/export", dataExportHandler.RequestDataExport)
 			protected.GET("/account/export/:export_id", dataExportHandler.GetExportStatus)
+			protected.GET("/account/export/:export_id/download", dataExportHandler.DownloadExport)
 			protected.GET("/account/exports", dataExportHandler.ListExportRequests)
 
 			// Push notifications (P0-042: device token registration)

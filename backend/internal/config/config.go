@@ -12,26 +12,26 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Server      ServerConfig
-	Database    DatabaseConfig
-	Reddit      RedditConfig
-	JWT         JWTConfig
-	Redis       RedisConfig
-	Media       MediaConfig
-	VirusScan   VirusScanConfig
-	Encryption  EncryptionConfig
-	Turnstile   TurnstileConfig
-	Firebase    FirebaseConfig
-	SMTP        SMTPConfig
-	Twilio      TwilioConfig
-	Retention   RetentionConfig
-	Storage     StorageConfig
-	FrontendURL  string
-	AppEnv       string
+	Server        ServerConfig
+	Database      DatabaseConfig
+	Reddit        RedditConfig
+	JWT           JWTConfig
+	Redis         RedisConfig
+	Media         MediaConfig
+	VirusScan     VirusScanConfig
+	Encryption    EncryptionConfig
+	Turnstile     TurnstileConfig
+	Firebase      FirebaseConfig
+	SMTP          SMTPConfig
+	Twilio        TwilioConfig
+	Retention     RetentionConfig
+	Storage       StorageConfig
+	FrontendURL   string
+	AppEnv        string
 	MetricsToken  string // Bearer token for /metrics endpoint; empty = unrestricted (dev only)
 	AsynqmonToken string // Bearer token for /admin/queues dashboard; empty = unrestricted (dev only)
-	TURN         TURNConfig
-	Qwen         QwenConfig
+	TURN          TURNConfig
+	Qwen          QwenConfig
 }
 
 // QwenConfig holds Qwen AI (via OpenRouter) configuration for AI-powered Hub Page Designer.
@@ -80,11 +80,10 @@ type RetentionConfig struct {
 	DryRun                bool
 }
 
-// RedditConfig holds Reddit OAuth configuration
+// RedditConfig holds Reddit API client configuration.
 type RedditConfig struct {
 	ClientID     string
 	ClientSecret string
-	RedirectURI  string
 	UserAgent    string
 }
 
@@ -198,8 +197,8 @@ func Load() (*Config, error) {
 		Database: DatabaseConfig{
 			Host:        getEnv("DB_HOST", "localhost"),
 			Port:        getEnvAsInt("DB_PORT", 5432),
-			User:        getEnv("DB_USER", "derrf"),
-			Password:    getEnv("DB_PASSWORD", "drummer"),
+			User:        requireEnv("DB_USER"),
+			Password:    requireEnv("DB_PASSWORD"),
 			DBName:      getEnv("DB_NAME", "omninudge_dev"),
 			SSLMode:     getEnv("DB_SSLMODE", "disable"),
 			AutoMigrate: getEnvAsBool("DB_AUTO_MIGRATE", true),
@@ -207,11 +206,10 @@ func Load() (*Config, error) {
 		Reddit: RedditConfig{
 			ClientID:     getEnv("REDDIT_CLIENT_ID", ""),
 			ClientSecret: getEnv("REDDIT_CLIENT_SECRET", ""),
-			RedirectURI:  getEnv("REDDIT_REDIRECT_URI", "http://localhost:8080/api/v1/auth/reddit/callback"),
 			UserAgent:    getEnv("REDDIT_USER_AGENT", "OmniNudge:v1.0"),
 		},
 		JWT: JWTConfig{
-			Secret: getEnv("JWT_SECRET", "dev-secret-change-in-production"),
+			Secret: requireEnv("JWT_SECRET"),
 		},
 		Redis: RedisConfig{
 			Addr:       getEnv("REDIS_ADDR", ""),
@@ -230,7 +228,7 @@ func Load() (*Config, error) {
 			TimeoutSeconds: getEnvAsInt("CLAMAV_TIMEOUT_SECONDS", 15),
 		},
 		Encryption: EncryptionConfig{
-			Key: getEnv("ENCRYPTION_KEY", "dev-encryption-key-change-me!!"),
+			Key: requireEnv("ENCRYPTION_KEY"),
 		},
 		Turnstile: TurnstileConfig{
 			Secret: getEnv("TURNSTILE_SECRET_KEY", ""),
@@ -271,8 +269,8 @@ func Load() (*Config, error) {
 			S3PathStyle:    getEnvAsBool("S3_PATH_STYLE", true), // true for MinIO/Ceph, false for R2
 			CloudFrontURL:  getEnv("CLOUDFRONT_URL", ""),
 		},
-		FrontendURL:  getEnv("FRONTEND_URL", "http://localhost:5176"),
-		AppEnv:       getEnv("APP_ENV", "development"),
+		FrontendURL:   getEnv("FRONTEND_URL", "http://localhost:5176"),
+		AppEnv:        getEnv("APP_ENV", "development"),
 		MetricsToken:  getEnv("METRICS_TOKEN", ""),
 		AsynqmonToken: getEnv("ASYNQMON_TOKEN", ""),
 		TURN: TURNConfig{
@@ -302,6 +300,16 @@ func (c *DatabaseConfig) DatabaseURL() string {
 		c.DBName,
 		c.SSLMode,
 	)
+}
+
+// requireEnv returns the value of the environment variable named by key.
+// It calls log.Fatalf if the variable is not set or empty.
+func requireEnv(key string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		log.Fatalf("required environment variable %s is not set", key)
+	}
+	return v
 }
 
 // getEnv reads an environment variable or returns a default value

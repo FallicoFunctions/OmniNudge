@@ -127,7 +127,7 @@ func cleanUploadPath(rawPath string) (string, bool) {
 }
 
 func isUntrackedUploadPathAllowed(cleanRelPath string) bool {
-	return strings.HasPrefix(cleanRelPath, "avatars/") || strings.HasPrefix(cleanRelPath, "exports/")
+	return strings.HasPrefix(cleanRelPath, "avatars/")
 }
 
 func isThumbnailPath(cleanRelPath string) bool {
