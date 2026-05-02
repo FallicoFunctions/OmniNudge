@@ -4,8 +4,8 @@
 
 -- First, create a system user (user_id = 0) to own predefined themes
 -- This is a special system account that owns all predefined themes
-INSERT INTO users (id, username, password_hash, reddit_id, created_at, last_seen, karma)
-VALUES (0, 'system', '', 'system', NOW(), NOW(), 0)
+INSERT INTO users (id, username, username_normalized, password_hash, created_at, last_seen, karma)
+VALUES (0, 'system', 'system', '', NOW(), NOW(), 0)
 ON CONFLICT (id) DO NOTHING;
 
 -- Delete existing predefined themes to allow re-running this script

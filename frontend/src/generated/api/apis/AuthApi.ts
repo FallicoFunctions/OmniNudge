@@ -36,11 +36,6 @@ export interface AuthPublicKeysGetRequest {
     userIds: string;
 }
 
-export interface AuthRedditCallbackGetRequest {
-    code: string;
-    state: string;
-}
-
 export interface AuthRegisterPostRequest {
     body: GithubComOmninudgeBackendInternalServicesRegisterRequest;
 }
@@ -397,101 +392,6 @@ export class AuthApi extends runtime.BaseAPI {
     async authPublicKeysGet(requestParameters: AuthPublicKeysGetRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: object; }> {
         const response = await this.authPublicKeysGetRaw(requestParameters, initOverrides);
         return await response.value();
-    }
-
-    /**
-     * Creates request options for authRedditCallbackGet without sending the request
-     */
-    async authRedditCallbackGetRequestOpts(requestParameters: AuthRedditCallbackGetRequest): Promise<runtime.RequestOpts> {
-        if (requestParameters['code'] == null) {
-            throw new runtime.RequiredError(
-                'code',
-                'Required parameter "code" was null or undefined when calling authRedditCallbackGet().'
-            );
-        }
-
-        if (requestParameters['state'] == null) {
-            throw new runtime.RequiredError(
-                'state',
-                'Required parameter "state" was null or undefined when calling authRedditCallbackGet().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        if (requestParameters['code'] != null) {
-            queryParameters['code'] = requestParameters['code'];
-        }
-
-        if (requestParameters['state'] != null) {
-            queryParameters['state'] = requestParameters['state'];
-        }
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/auth/reddit/callback`;
-
-        return {
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        };
-    }
-
-    /**
-     * Reddit OAuth callback
-     */
-    async authRedditCallbackGetRaw(requestParameters: AuthRedditCallbackGetRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: object; }>> {
-        const requestOptions = await this.authRedditCallbackGetRequestOpts(requestParameters);
-        const response = await this.request(requestOptions, initOverrides);
-
-        return new runtime.JSONApiResponse<any>(response);
-    }
-
-    /**
-     * Reddit OAuth callback
-     */
-    async authRedditCallbackGet(requestParameters: AuthRedditCallbackGetRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: object; }> {
-        const response = await this.authRedditCallbackGetRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * Creates request options for authRedditGet without sending the request
-     */
-    async authRedditGetRequestOpts(): Promise<runtime.RequestOpts> {
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/auth/reddit`;
-
-        return {
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        };
-    }
-
-    /**
-     * Initiate Reddit OAuth
-     */
-    async authRedditGetRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
-        const requestOptions = await this.authRedditGetRequestOpts();
-        const response = await this.request(requestOptions, initOverrides);
-
-        return new runtime.VoidApiResponse(response);
-    }
-
-    /**
-     * Initiate Reddit OAuth
-     */
-    async authRedditGet(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.authRedditGetRaw(initOverrides);
     }
 
     /**

@@ -323,7 +323,7 @@ func (u *UserAggregate) ToEntity() *User {
 // Intentional leniency for legacy/OAuth compatibility: validation rules applied
 // by NewUserAggregate are NOT re-enforced here so that users created under old
 // rules can still load and operate without errors. The aggregate accepts:
-//   - nil / empty email  (Reddit OAuth accounts that never set an email)
+//   - nil / empty email
 //   - short usernames    (pre-dates the 3-char minimum)
 //   - malformed emails   (legacy rows; a WARN is logged and the raw value used)
 //
@@ -346,21 +346,21 @@ func UserAggregateFromEntity(user *User) (*UserAggregate, error) {
 	}
 
 	return &UserAggregate{
-		id:            user.ID,
-		username:      username,
-		email:         email,
-		password:      valueobjects.PasswordFromHash(user.PasswordHash),
-		bio:           user.Bio,
-		avatarURL:     user.AvatarURL,
-		nsfw:          user.NSFW,
-		role:          user.Role,
-		shadowBanned:  user.ShadowBanned,
-		banned:        user.Banned,
-		banReason:     user.BanReason,
-		bannedAt:      user.BannedAt,
-		deleted:       user.Deleted,
-		createdAt:     user.CreatedAt,
-		lastSeen:      user.LastSeen,
+		id:           user.ID,
+		username:     username,
+		email:        email,
+		password:     valueobjects.PasswordFromHash(user.PasswordHash),
+		bio:          user.Bio,
+		avatarURL:    user.AvatarURL,
+		nsfw:         user.NSFW,
+		role:         user.Role,
+		shadowBanned: user.ShadowBanned,
+		banned:       user.Banned,
+		banReason:    user.BanReason,
+		bannedAt:     user.BannedAt,
+		deleted:      user.Deleted,
+		createdAt:    user.CreatedAt,
+		lastSeen:     user.LastSeen,
 		// Any user that exists in the DB has already been registered.
 		// Setting registered=true prevents RecordRegistration from
 		// re-publishing a UserRegistered event on a reloaded aggregate.

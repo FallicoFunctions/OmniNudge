@@ -47,7 +47,7 @@ func TestWebSocketReconnectsAfterDrop(t *testing.T) {
 	defer ts.Close()
 
 	user := createUser(t, deps.UserRepo, uniqueWSRUsername("reconnect"), "user")
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	// First connection
@@ -146,7 +146,7 @@ func TestWebSocketMessageRateLimit(t *testing.T) {
 	sender := createUser(t, deps.UserRepo, uniqueWSRUsername("rls"), "user")
 	receiver := createUser(t, deps.UserRepo, uniqueWSRUsername("rlrec"), "user")
 
-	senderToken, err := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	senderToken, err := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
 	require.NoError(t, err)
 
 	// Create a conversation
@@ -198,7 +198,7 @@ func TestWebSocketConcurrentConnections(t *testing.T) {
 	defer ts.Close()
 
 	user := createUser(t, deps.UserRepo, uniqueWSRUsername("concurrent"), "user")
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	// First connection

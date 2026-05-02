@@ -1916,11 +1916,6 @@ CREATE TABLE public.users (
     username character varying(50) NOT NULL,
     email character varying(512),
     password_hash character varying(255) NOT NULL,
-    reddit_id character varying(50),
-    reddit_username character varying(50),
-    access_token text,
-    refresh_token text,
-    token_expires_at timestamp with time zone,
     public_key text,
     avatar_url text,
     bio text,
@@ -2885,15 +2880,6 @@ ALTER TABLE ONLY public.users
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
-
-
---
--- Name: users users_reddit_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_reddit_id_key UNIQUE (reddit_id);
-
 
 --
 -- Name: vote_activity vote_activity_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -3881,14 +3867,6 @@ CREATE INDEX idx_users_last_seen ON public.users USING btree (last_seen DESC);
 --
 
 CREATE INDEX idx_users_public_key ON public.users USING btree (id) WHERE (public_key IS NOT NULL);
-
-
---
--- Name: idx_users_reddit_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_users_reddit_id ON public.users USING btree (reddit_id) WHERE (reddit_id IS NOT NULL);
-
 
 --
 -- Name: idx_users_search; Type: INDEX; Schema: public; Owner: -

@@ -573,12 +573,12 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     isCleanupRef.current = false;
 
     const connect = () => {
+      console.log('[WebSocket] Connecting...');
       const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
       if (!token) {
-        console.warn('[WebSocket] No auth token available for connection attempt');
+        console.warn('[WebSocket] Missing auth token; skipping connect');
         return;
       }
-      console.log('[WebSocket] Connecting...');
       const url = new URL(API_BASE_URL);
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
       url.pathname = `${url.pathname.replace(/\/$/, '')}/ws`;

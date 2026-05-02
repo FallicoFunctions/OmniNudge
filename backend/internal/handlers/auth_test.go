@@ -41,9 +41,6 @@ func setupAuthHandlerTest(t *testing.T) (*AuthHandler, *database.Database, func(
 
 	// AuthService with empty turnstile secret (skips captcha in tests)
 	authSvc := services.NewAuthService(
-		"",                                 // clientID
-		"",                                 // clientSecret
-		"",                                 // redirectURI
 		"test-jwt-secret-for-testing-only", // jwtSecret
 		"test-agent",                       // userAgent
 		"",                                 // turnstileSecret (empty = skip)
@@ -448,4 +445,38 @@ func TestLogout(t *testing.T) {
 			assert.Equal(t, tc.expectedStatus, w.Code)
 		})
 	}
+}
+
+func TestLogoutInvalidatesTokenVersion(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler, _, cleanup := setupAuthHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	user := &models.User{
+		Username:     uniqueAuthUsername("logout_user"),
+		PasswordHash: "hashed",
+	}
+	require.NoError(t, handler.userRepo.Create(ctx, user))
+
+	before, err := handler.userRepo.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	require.Equal(t, 0, before.TokenVersion)
+
+	router := gin.New()
+	router.POST("/auth/logout", func(c *gin.Context) {
+		c.Set("user_id", user.ID)
+		handler.Logout(c)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	after, err := handler.userRepo.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	require.Equal(t, 1, after.TokenVersion)
 }

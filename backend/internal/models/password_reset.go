@@ -3,7 +3,9 @@ package models
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -13,17 +15,22 @@ import (
 
 // PasswordReset represents a password reset token
 type PasswordReset struct {
-	ID        int       `json:"id"`
-	UserID    int       `json:"user_id"`
-	Token     string    `json:"token"`
-	ExpiresAt time.Time `json:"expires_at"`
+	ID        int        `json:"id"`
+	UserID    int        `json:"user_id"`
+	Token     string     `json:"token"`
+	ExpiresAt time.Time  `json:"expires_at"`
 	UsedAt    *time.Time `json:"used_at"`
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 // PasswordResetRepository handles password reset database operations
 type PasswordResetRepository struct {
 	db *pgxpool.Pool
+}
+
+func hashPasswordResetToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 // NewPasswordResetRepository creates a new password reset repository
@@ -38,7 +45,8 @@ func (r *PasswordResetRepository) GenerateToken(ctx context.Context, userID int)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return nil, fmt.Errorf("failed to generate token: %w", err)
 	}
-	token := base64.URLEncoding.EncodeToString(tokenBytes)
+	rawToken := base64.URLEncoding.EncodeToString(tokenBytes)
+	storedToken := hashPasswordResetToken(rawToken)
 
 	// Token expires in 1 hour
 	expiresAt := time.Now().UTC().Add(1 * time.Hour)
@@ -51,10 +59,10 @@ func (r *PasswordResetRepository) GenerateToken(ctx context.Context, userID int)
 	`
 
 	reset := &PasswordReset{}
-	err := r.db.QueryRow(ctx, query, userID, token, expiresAt).Scan(
+	err := r.db.QueryRow(ctx, query, userID, storedToken, expiresAt).Scan(
 		&reset.ID,
 		&reset.UserID,
-		&reset.Token,
+		&storedToken,
 		&reset.ExpiresAt,
 		&reset.UsedAt,
 		&reset.CreatedAt,
@@ -63,6 +71,7 @@ func (r *PasswordResetRepository) GenerateToken(ctx context.Context, userID int)
 		return nil, fmt.Errorf("failed to create password reset token: %w", err)
 	}
 
+	reset.Token = rawToken
 	return reset, nil
 }
 
@@ -75,7 +84,7 @@ func (r *PasswordResetRepository) GetByToken(ctx context.Context, token string) 
 	`
 
 	reset := &PasswordReset{}
-	err := r.db.QueryRow(ctx, query, token).Scan(
+	err := r.db.QueryRow(ctx, query, hashPasswordResetToken(token)).Scan(
 		&reset.ID,
 		&reset.UserID,
 		&reset.Token,
@@ -83,6 +92,16 @@ func (r *PasswordResetRepository) GetByToken(ctx context.Context, token string) 
 		&reset.UsedAt,
 		&reset.CreatedAt,
 	)
+	if err == pgx.ErrNoRows {
+		err = r.db.QueryRow(ctx, query, token).Scan(
+			&reset.ID,
+			&reset.UserID,
+			&reset.Token,
+			&reset.ExpiresAt,
+			&reset.UsedAt,
+			&reset.CreatedAt,
+		)
+	}
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -98,10 +117,10 @@ func (r *PasswordResetRepository) MarkAsUsed(ctx context.Context, token string) 
 	query := `
 		UPDATE password_resets
 		SET used_at = NOW()
-		WHERE token = $1 AND used_at IS NULL
+		WHERE token IN ($1, $2) AND used_at IS NULL
 	`
 
-	result, err := r.db.Exec(ctx, query, token)
+	result, err := r.db.Exec(ctx, query, hashPasswordResetToken(token), token)
 	if err != nil {
 		return fmt.Errorf("failed to mark token as used: %w", err)
 	}

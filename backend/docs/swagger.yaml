@@ -734,11 +734,6 @@ definitions:
       public_key:
         description: E2E encryption
         type: string
-      reddit_id:
-        description: Reddit integration (optional)
-        type: string
-      reddit_username:
-        type: string
       role:
         description: user, moderator, admin
         type: string
@@ -2845,57 +2840,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Get public keys
-      tags:
-      - Auth
-  /auth/reddit:
-    get:
-      produces:
-      - application/json
-      responses:
-        "307":
-          description: Redirect to Reddit
-          schema:
-            type: string
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/gin.H'
-      summary: Initiate Reddit OAuth
-      tags:
-      - Auth
-  /auth/reddit/callback:
-    get:
-      parameters:
-      - description: Authorization code
-        in: query
-        name: code
-        required: true
-        type: string
-      - description: State token
-        in: query
-        name: state
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/gin.H'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/gin.H'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/gin.H'
-      summary: Reddit OAuth callback
       tags:
       - Auth
   /auth/register:

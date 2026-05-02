@@ -102,7 +102,7 @@ func setupAuthHandlerForEmailTest(t *testing.T) (
 	t.Helper()
 
 	// Initialize encryption key so email encrypt/decrypt works in tests.
-	require.NoError(t, utils.SetEncryptionKey("test-encryption-key-for-auth!!"))
+	require.NoError(t, utils.SetEncryptionKey("test-encryption-key-for-auth!!!!"))
 
 	db, err := database.NewTest()
 	require.NoError(t, err)
@@ -115,7 +115,7 @@ func setupAuthHandlerForEmailTest(t *testing.T) (
 	passwordResetRepo := repository.NewPostgresPasswordResetRepository(db.Pool)
 	emailVerificationRepo := repository.NewPostgresEmailVerificationRepository(db.Pool)
 
-	authService := services.NewAuthService("", "", "", "test-jwt-secret", "ua", "")
+	authService := services.NewAuthService("test-jwt-secret", "ua", "")
 	mockEmail := &mockEmailService{}
 
 	handler := NewAuthHandler(

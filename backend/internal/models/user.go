@@ -23,22 +23,16 @@ type User struct {
 	EncryptedEmail     *string `json:"-"`               // Encrypted email (stored in DB)
 	PasswordHash       string  `json:"-"`               // Never expose password hash in JSON
 
-	// Reddit integration (optional)
-	RedditID       *string    `json:"reddit_id,omitempty"`
-	RedditUsername *string    `json:"reddit_username,omitempty"`
-	AccessToken    string     `json:"-"` // Never expose tokens in JSON
-	RefreshToken   string     `json:"-"`
-	TokenExpiresAt *time.Time `json:"-"`
-
 	// E2E encryption
 	PublicKey           *string `json:"public_key,omitempty"`
 	EncryptedPrivateKey *string `json:"encrypted_private_key,omitempty"` // For cross-browser sync
 
 	// Profile
-	AvatarURL *string `json:"avatar_url,omitempty"`
-	Bio       *string `json:"bio,omitempty"`
-	Karma     int     `json:"karma"`
-	Role      string  `json:"role"` // user, moderator, admin
+	AvatarURL    *string `json:"avatar_url,omitempty"`
+	Bio          *string `json:"bio,omitempty"`
+	Karma        int     `json:"karma"`
+	Role         string  `json:"role"` // user, moderator, admin
+	TokenVersion int     `json:"-"`
 
 	// Ban/moderation fields
 	ShadowBanned  bool       `json:"shadow_banned"`
@@ -123,42 +117,12 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW)
 }
 
-// CreateOrUpdateFromReddit creates or updates a user from Reddit OAuth (for future use)
-func (r *UserRepository) CreateOrUpdateFromReddit(ctx context.Context, user *User) error {
-	query := `
-		INSERT INTO users (username, reddit_id, reddit_username, access_token, refresh_token, token_expires_at, karma, avatar_url, password_hash, nsfw)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '', $9)
-		ON CONFLICT (reddit_id)
-		DO UPDATE SET
-			reddit_username = EXCLUDED.reddit_username,
-			access_token = EXCLUDED.access_token,
-			refresh_token = EXCLUDED.refresh_token,
-			token_expires_at = EXCLUDED.token_expires_at,
-			karma = EXCLUDED.karma,
-			avatar_url = EXCLUDED.avatar_url,
-			last_seen = CURRENT_TIMESTAMP
-		RETURNING id, created_at, last_seen, role, nsfw
-	`
-
-	return r.pool.QueryRow(ctx, query,
-		user.Username,
-		user.RedditID,
-		user.RedditUsername,
-		user.AccessToken,
-		user.RefreshToken,
-		user.TokenExpiresAt,
-		user.Karma,
-		user.AvatarURL,
-		user.NSFW,
-	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW)
-}
-
 // GetByID retrieves a user by their internal ID
 func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, email_encrypted, email_verified, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
+		SELECT id, username, email, email_encrypted, email_verified, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
 		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE id = $1
@@ -170,14 +134,13 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 		&user.EncryptedEmail,
 		&user.EmailEncrypted,
 		&user.EmailVerified,
-		&user.RedditID,
-		&user.RedditUsername,
 		&user.PublicKey,
 		&user.EncryptedPrivateKey,
 		&user.AvatarURL,
 		&user.Bio,
 		&user.Karma,
 		&user.Role,
+		&user.TokenVersion,
 		&user.ShadowBanned,
 		&user.Banned,
 		&user.Deleted,
@@ -332,7 +295,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 	normalizedUsername := strings.ToLower(strings.TrimSpace(username))
 
 	return r.queryUser(ctx, `
-		SELECT id, username, email, email_encrypted, email_verified, password_hash, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
+		SELECT id, username, email, email_encrypted, email_verified, password_hash, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
 		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE username_normalized = $1
@@ -349,79 +312,13 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 		&user.EmailEncrypted,
 		&user.EmailVerified,
 		&user.PasswordHash,
-		&user.RedditID,
-		&user.RedditUsername,
 		&user.PublicKey,
 		&user.EncryptedPrivateKey,
 		&user.AvatarURL,
 		&user.Bio,
 		&user.Karma,
 		&user.Role,
-		&user.ShadowBanned,
-		&user.Banned,
-		&user.Deleted,
-		&user.BanReason,
-		&user.ShowBanReason,
-		&user.BannedAt,
-		&user.BannedBy,
-		&user.CreatedAt,
-		&user.LastSeen,
-		&user.LastAgentPostAt,
-		&user.LastAgentBrowseAt,
-	)
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	// Decrypt email if it's encrypted
-	if user.EncryptedEmail != nil && user.EmailEncrypted {
-		decrypted, err := utils.DecryptEmail(*user.EncryptedEmail)
-		if err != nil {
-			// Log the error but don't block user operations
-			// This can happen if encryption key changed
-			log.Printf("WARNING: Failed to decrypt email for user_id=%d: %v (key mismatch?)", user.ID, err)
-			// Set email to nil - user can re-add it in settings
-			user.Email = nil
-		} else {
-			user.Email = &decrypted
-		}
-	} else if user.EncryptedEmail != nil {
-		// Email is not encrypted (legacy data)
-		user.Email = user.EncryptedEmail
-	}
-
-	return user, nil
-}
-
-// GetByRedditID retrieves a user by their Reddit ID (for future OAuth)
-func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*User, error) {
-	user := &User{}
-
-	query := `
-		SELECT id, username, email, email_encrypted, email_verified, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
-		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
-		       last_agent_post_at, last_agent_browse_at
-		FROM users WHERE reddit_id = $1
-	`
-
-	err := r.pool.QueryRow(ctx, query, redditID).Scan(
-		&user.ID,
-		&user.Username,
-		&user.EncryptedEmail,
-		&user.EmailEncrypted,
-		&user.EmailVerified,
-		&user.RedditID,
-		&user.RedditUsername,
-		&user.PublicKey,
-		&user.EncryptedPrivateKey,
-		&user.AvatarURL,
-		&user.Bio,
-		&user.Karma,
-		&user.Role,
+		&user.TokenVersion,
 		&user.ShadowBanned,
 		&user.Banned,
 		&user.Deleted,
@@ -470,7 +367,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, e
 	// TODO: Add an email_hash column for efficient lookups.
 
 	query := `
-		SELECT id, username, email, email_encrypted, email_verified, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
+		SELECT id, username, email, email_encrypted, email_verified, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
 		       last_agent_post_at, last_agent_browse_at, password_hash
 		FROM users WHERE email IS NOT NULL AND deleted = false
@@ -490,14 +387,13 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, e
 			&user.EncryptedEmail,
 			&user.EmailEncrypted,
 			&user.EmailVerified,
-			&user.RedditID,
-			&user.RedditUsername,
 			&user.PublicKey,
 			&user.EncryptedPrivateKey,
 			&user.AvatarURL,
 			&user.Bio,
 			&user.Karma,
 			&user.Role,
+			&user.TokenVersion,
 			&user.ShadowBanned,
 			&user.Banned,
 			&user.Deleted,
@@ -567,8 +463,13 @@ func (r *UserRepository) UpdateProfile(ctx context.Context, userID int, bio *str
 
 // UpdatePassword updates a user's password hash
 func (r *UserRepository) UpdatePassword(ctx context.Context, userID int, passwordHash string) error {
-	query := `UPDATE users SET password_hash = $1 WHERE id = $2`
+	query := `UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2`
 	_, err := r.pool.Exec(ctx, query, passwordHash, userID)
+	return err
+}
+
+func (r *UserRepository) IncrementTokenVersion(ctx context.Context, userID int) error {
+	_, err := r.pool.Exec(ctx, `UPDATE users SET token_version = token_version + 1 WHERE id = $1`, userID)
 	return err
 }
 

@@ -28,20 +28,12 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *domain.User) 
 	return r.inner.Create(ctx, user)
 }
 
-func (r *PostgresUserRepository) CreateOrUpdateFromReddit(ctx context.Context, user *domain.User) error {
-	return r.inner.CreateOrUpdateFromReddit(ctx, user)
-}
-
 func (r *PostgresUserRepository) GetByID(ctx context.Context, id int) (*domain.User, error) {
 	return r.inner.GetByID(ctx, id)
 }
 
 func (r *PostgresUserRepository) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
 	return r.inner.GetByUsername(ctx, username)
-}
-
-func (r *PostgresUserRepository) GetByRedditID(ctx context.Context, redditID string) (*domain.User, error) {
-	return r.inner.GetByRedditID(ctx, redditID)
 }
 
 func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
@@ -78,6 +70,10 @@ func (r *PostgresUserRepository) UpdateProfile(ctx context.Context, userID int, 
 
 func (r *PostgresUserRepository) UpdatePassword(ctx context.Context, userID int, passwordHash string) error {
 	return r.inner.UpdatePassword(ctx, userID, passwordHash)
+}
+
+func (r *PostgresUserRepository) IncrementTokenVersion(ctx context.Context, userID int) error {
+	return r.inner.IncrementTokenVersion(ctx, userID)
 }
 
 func (r *PostgresUserRepository) UpdateLastAgentPostAt(ctx context.Context, userID int, timestamp time.Time) error {

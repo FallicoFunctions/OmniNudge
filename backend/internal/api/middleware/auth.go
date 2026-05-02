@@ -25,7 +25,9 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 			tokenString = parts[1]
 		}
 
-		if tokenString == "" {
+		// WebSocket upgrade requests cannot send custom headers from the browser.
+		// Allow the token via query param exclusively for WS upgrades.
+		if tokenString == "" && c.GetHeader("Upgrade") == "websocket" {
 			tokenString = c.Query("token")
 		}
 
@@ -35,7 +37,7 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		claims, err := authService.ValidateJWT(tokenString)
+		claims, err := authService.ValidateJWTContext(c.Request.Context(), tokenString)
 		if err != nil {
 			apiresponse.WriteError(c, http.StatusUnauthorized, "Invalid or expired token")
 			c.Abort()
@@ -44,7 +46,6 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 
 		// Set user info in context for handlers to use
 		c.Set("user_id", claims.UserID)
-		c.Set("reddit_id", claims.RedditID)
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
 
@@ -105,9 +106,8 @@ func CORS() gin.HandlerFunc {
 
 		if allowed {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
-
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
 

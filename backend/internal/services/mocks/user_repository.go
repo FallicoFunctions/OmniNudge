@@ -26,12 +26,10 @@ type UserRepository struct {
 	nextID int
 
 	// Optional overrides — set in test cases to inject specific behaviour.
-	CreateFunc                  func(ctx context.Context, user *domain.User) error
-	CreateOrUpdateFromRedditFunc func(ctx context.Context, user *domain.User) error
-	GetByIDFunc                 func(ctx context.Context, id int) (*domain.User, error)
-	GetByUsernameFunc           func(ctx context.Context, username string) (*domain.User, error)
-	GetByRedditIDFunc           func(ctx context.Context, redditID string) (*domain.User, error)
-	GetByEmailFunc              func(ctx context.Context, email string) (*domain.User, error)
+	CreateFunc        func(ctx context.Context, user *domain.User) error
+	GetByIDFunc       func(ctx context.Context, id int) (*domain.User, error)
+	GetByUsernameFunc func(ctx context.Context, username string) (*domain.User, error)
+	GetByEmailFunc    func(ctx context.Context, email string) (*domain.User, error)
 }
 
 // NewUserRepository returns an empty UserRepository mock.
@@ -47,18 +45,6 @@ func (m *UserRepository) Create(ctx context.Context, user *domain.User) error {
 	m.nextID++
 	now := time.Now()
 	user.CreatedAt = now
-	copy := *user
-	m.users[copy.ID] = &copy
-	return nil
-}
-
-func (m *UserRepository) CreateOrUpdateFromReddit(ctx context.Context, user *domain.User) error {
-	if m.CreateOrUpdateFromRedditFunc != nil {
-		return m.CreateOrUpdateFromRedditFunc(ctx, user)
-	}
-	if user.ID == 0 {
-		return m.Create(ctx, user)
-	}
 	copy := *user
 	m.users[copy.ID] = &copy
 	return nil
@@ -82,19 +68,6 @@ func (m *UserRepository) GetByUsername(ctx context.Context, username string) (*d
 	}
 	for _, u := range m.users {
 		if u.Username == username {
-			copy := *u
-			return &copy, nil
-		}
-	}
-	return nil, nil
-}
-
-func (m *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*domain.User, error) {
-	if m.GetByRedditIDFunc != nil {
-		return m.GetByRedditIDFunc(ctx, redditID)
-	}
-	for _, u := range m.users {
-		if u.RedditID != nil && *u.RedditID == redditID {
 			copy := *u
 			return &copy, nil
 		}
@@ -177,6 +150,14 @@ func (m *UserRepository) UpdateProfile(_ context.Context, userID int, bio *strin
 func (m *UserRepository) UpdatePassword(_ context.Context, userID int, passwordHash string) error {
 	if u, ok := m.users[userID]; ok {
 		u.PasswordHash = passwordHash
+		u.TokenVersion++
+	}
+	return nil
+}
+
+func (m *UserRepository) IncrementTokenVersion(_ context.Context, userID int) error {
+	if u, ok := m.users[userID]; ok {
+		u.TokenVersion++
 	}
 	return nil
 }

@@ -61,8 +61,8 @@ func TestRequireRole_BlocksWhenRoleMismatch(t *testing.T) {
 
 func TestAuthRequired_SetsContextOnValidToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	authService := services.NewAuthService("", "", "", "test-secret", "ua", "")
-	token, err := authService.GenerateJWT(42, "rid", "alice", "user")
+	authService := services.NewAuthService("test-secret", "ua", "")
+	token, err := authService.GenerateJWT(42, "alice", "user")
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()
@@ -85,7 +85,7 @@ func TestAuthRequired_SetsContextOnValidToken(t *testing.T) {
 
 func TestAuthRequired_RejectsMissingHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	authService := services.NewAuthService("", "", "", "test-secret", "ua", "")
+	authService := services.NewAuthService("test-secret", "ua", "")
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -100,7 +100,7 @@ func TestAuthRequired_RejectsMissingHeader(t *testing.T) {
 
 func TestAuthRequired_RejectsInvalidToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	authService := services.NewAuthService("", "", "", "test-secret", "ua", "")
+	authService := services.NewAuthService("test-secret", "ua", "")
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -116,8 +116,8 @@ func TestAuthRequired_RejectsInvalidToken(t *testing.T) {
 
 func TestAuthRequired_RejectsExpiredToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	authService := services.NewAuthService("", "", "", "test-secret", "ua", "")
-	token, err := authService.GenerateJWTWithExpiry(42, "rid", "alice", "user", -1)
+	authService := services.NewAuthService("test-secret", "ua", "")
+	token, err := authService.GenerateJWTWithExpiry(42, "alice", "user", -1)
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()

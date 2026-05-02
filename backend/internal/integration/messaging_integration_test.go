@@ -33,8 +33,8 @@ func TestCompleteMessageFlow(t *testing.T) {
 	user1 := createUser(t, deps.UserRepo, uniqueMessagingUsername("alice"), "user")
 	user2 := createUser(t, deps.UserRepo, uniqueMessagingUsername("bob"), "user")
 
-	token1, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
-	token2, _ := deps.AuthService.GenerateJWT(user2.ID, "", user2.Username, user2.Role)
+	token1, _ := deps.AuthService.GenerateJWT(user1.ID, user1.Username, user1.Role)
+	token2, _ := deps.AuthService.GenerateJWT(user2.ID, user2.Username, user2.Role)
 
 	// STEP 1: User1 creates a conversation with User2
 	createConvBody := fmt.Sprintf(`{"recipient_username":"%s"}`, user2.Username)
@@ -148,8 +148,8 @@ func TestMessageBlocking(t *testing.T) {
 	user1 := createUser(t, deps.UserRepo, uniqueMessagingUsername("alice"), "user")
 	user2 := createUser(t, deps.UserRepo, uniqueMessagingUsername("bob"), "user")
 
-	token1, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
-	token2, _ := deps.AuthService.GenerateJWT(user2.ID, "", user2.Username, user2.Role)
+	token1, _ := deps.AuthService.GenerateJWT(user1.ID, user1.Username, user1.Role)
+	token2, _ := deps.AuthService.GenerateJWT(user2.ID, user2.Username, user2.Role)
 
 	// User1 creates conversation
 	createConvBody := fmt.Sprintf(`{"recipient_username":"%s"}`, user2.Username)
@@ -201,8 +201,8 @@ func TestMessageDeletion(t *testing.T) {
 	user1 := createUser(t, deps.UserRepo, uniqueMessagingUsername("alice"), "user")
 	user2 := createUser(t, deps.UserRepo, uniqueMessagingUsername("bob"), "user")
 
-	token1, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
-	token2, _ := deps.AuthService.GenerateJWT(user2.ID, "", user2.Username, user2.Role)
+	token1, _ := deps.AuthService.GenerateJWT(user1.ID, user1.Username, user1.Role)
+	token2, _ := deps.AuthService.GenerateJWT(user2.ID, user2.Username, user2.Role)
 
 	// Create conversation
 	createConvBody := fmt.Sprintf(`{"recipient_username":"%s"}`, user2.Username)

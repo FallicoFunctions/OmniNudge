@@ -25,8 +25,8 @@ func TestWebSocketTypingBroadcast(t *testing.T) {
 	// Ensure a conversation exists so delivered/read payloads have context
 	alice := createUser(t, deps.UserRepo, "ws_alice", "user")
 	bob := createUser(t, deps.UserRepo, "ws_bob", "user")
-	aliceToken, _ := deps.AuthService.GenerateJWT(alice.ID, "", alice.Username, alice.Role)
-	bobToken, _ := deps.AuthService.GenerateJWT(bob.ID, "", bob.Username, bob.Role)
+	aliceToken, _ := deps.AuthService.GenerateJWT(alice.ID, alice.Username, alice.Role)
+	bobToken, _ := deps.AuthService.GenerateJWT(bob.ID, bob.Username, bob.Role)
 
 	// Create a conversation
 	body := []byte(`{"other_user_id":` + fmt.Sprint(bob.ID) + `}`)
@@ -108,8 +108,8 @@ func TestWebSocketModerationReportEvents(t *testing.T) {
 	target := createUser(t, deps.UserRepo, "ws_target", "user")
 	moderator := createUser(t, deps.UserRepo, "ws_mod", "moderator")
 
-	reporterToken, _ := deps.AuthService.GenerateJWT(reporter.ID, "", reporter.Username, reporter.Role)
-	modToken, _ := deps.AuthService.GenerateJWT(moderator.ID, "", moderator.Username, moderator.Role)
+	reporterToken, _ := deps.AuthService.GenerateJWT(reporter.ID, reporter.Username, reporter.Role)
+	modToken, _ := deps.AuthService.GenerateJWT(moderator.ID, moderator.Username, moderator.Role)
 
 	dial := func(token string) *websocket.Conn {
 		wsURL := "ws" + ts.URL[len("http"):] + "/api/v1/ws"

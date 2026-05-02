@@ -2616,84 +2616,6 @@
                 }
             }
         },
-        "/auth/reddit": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "Initiate Reddit OAuth",
-                "responses": {
-                    "307": {
-                        "description": "Redirect to Reddit",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/reddit/callback": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "Reddit OAuth callback",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Authorization code",
-                        "name": "code",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "State token",
-                        "name": "state",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
         "/auth/register": {
             "post": {
                 "consumes": [
@@ -17157,13 +17079,6 @@
                 },
                 "public_key": {
                     "description": "E2E encryption",
-                    "type": "string"
-                },
-                "reddit_id": {
-                    "description": "Reddit integration (optional)",
-                    "type": "string"
-                },
-                "reddit_username": {
                     "type": "string"
                 },
                 "role": {

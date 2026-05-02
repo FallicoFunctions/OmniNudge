@@ -128,18 +128,6 @@ export interface GithubComOmninudgeBackendInternalModelsUser {
      */
     publicKey?: string;
     /**
-     * Reddit integration (optional)
-     * @type {string}
-     * @memberof GithubComOmninudgeBackendInternalModelsUser
-     */
-    redditId?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof GithubComOmninudgeBackendInternalModelsUser
-     */
-    redditUsername?: string;
-    /**
      * user, moderator, admin
      * @type {string}
      * @memberof GithubComOmninudgeBackendInternalModelsUser
@@ -200,8 +188,6 @@ export function GithubComOmninudgeBackendInternalModelsUserFromJSONTyped(json: a
         'lastSeen': json['last_seen'] == null ? undefined : json['last_seen'],
         'nsfw': json['nsfw'] == null ? undefined : json['nsfw'],
         'publicKey': json['public_key'] == null ? undefined : json['public_key'],
-        'redditId': json['reddit_id'] == null ? undefined : json['reddit_id'],
-        'redditUsername': json['reddit_username'] == null ? undefined : json['reddit_username'],
         'role': json['role'] == null ? undefined : json['role'],
         'shadowBanned': json['shadow_banned'] == null ? undefined : json['shadow_banned'],
         'showBanReason': json['show_ban_reason'] == null ? undefined : json['show_ban_reason'],
@@ -238,12 +224,9 @@ export function GithubComOmninudgeBackendInternalModelsUserToJSONTyped(value?: G
         'last_seen': value['lastSeen'],
         'nsfw': value['nsfw'],
         'public_key': value['publicKey'],
-        'reddit_id': value['redditId'],
-        'reddit_username': value['redditUsername'],
         'role': value['role'],
         'shadow_banned': value['shadowBanned'],
         'show_ban_reason': value['showBanReason'],
         'username': value['username'],
     };
 }
-

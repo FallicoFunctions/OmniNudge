@@ -92,8 +92,8 @@ func TestCreateGroupConversation(t *testing.T) {
 	member1 := createUser(t, deps.UserRepo, uniqueGrpUsername("m1"), "user")
 	member2 := createUser(t, deps.UserRepo, uniqueGrpUsername("m2"), "user")
 
-	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, "", owner.Username, owner.Role)
-	m1Token, _ := deps.AuthService.GenerateJWT(member1.ID, "", member1.Username, member1.Role)
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	m1Token, _ := deps.AuthService.GenerateJWT(member1.ID, member1.Username, member1.Role)
 
 	// Create group
 	body := createGroupBody("Test Group Alpha", []int{member1.ID, member2.ID})
@@ -133,8 +133,8 @@ func TestGroupMemberAdd(t *testing.T) {
 	member1 := createUser(t, deps.UserRepo, uniqueGrpUsername("m1b"), "user")
 	newMember := createUser(t, deps.UserRepo, uniqueGrpUsername("newm"), "user")
 
-	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, "", owner.Username, owner.Role)
-	newMemberToken, _ := deps.AuthService.GenerateJWT(newMember.ID, "", newMember.Username, newMember.Role)
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	newMemberToken, _ := deps.AuthService.GenerateJWT(newMember.ID, newMember.Username, newMember.Role)
 
 	// Create group with 2 initial members (owner + member1)
 	body := createGroupBody("Test Group Beta", []int{member1.ID})
@@ -178,8 +178,8 @@ func TestGroupMemberRemove(t *testing.T) {
 	toRemove := createUser(t, deps.UserRepo, uniqueGrpUsername("toremove"), "user")
 	member2 := createUser(t, deps.UserRepo, uniqueGrpUsername("m2c"), "user")
 
-	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, "", owner.Username, owner.Role)
-	removedToken, _ := deps.AuthService.GenerateJWT(toRemove.ID, "", toRemove.Username, toRemove.Role)
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	removedToken, _ := deps.AuthService.GenerateJWT(toRemove.ID, toRemove.Username, toRemove.Role)
 
 	// Create group
 	body := createGroupBody("Test Group Gamma", []int{toRemove.ID, member2.ID})
@@ -218,8 +218,8 @@ func TestGroupAdminPromote(t *testing.T) {
 	futureAdmin := createUser(t, deps.UserRepo, uniqueGrpUsername("fadmin"), "user")
 	member2 := createUser(t, deps.UserRepo, uniqueGrpUsername("m2d"), "user")
 
-	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, "", owner.Username, owner.Role)
-	adminToken, _ := deps.AuthService.GenerateJWT(futureAdmin.ID, "", futureAdmin.Username, futureAdmin.Role)
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	adminToken, _ := deps.AuthService.GenerateJWT(futureAdmin.ID, futureAdmin.Username, futureAdmin.Role)
 
 	// Create group
 	body := createGroupBody("Test Group Delta", []int{futureAdmin.ID, member2.ID})
@@ -274,8 +274,8 @@ func TestGroupMessageEncryption(t *testing.T) {
 	member1 := createUser(t, deps.UserRepo, uniqueGrpUsername("m1e"), "user")
 	member2 := createUser(t, deps.UserRepo, uniqueGrpUsername("m2e"), "user")
 
-	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, "", owner.Username, owner.Role)
-	m1Token, _ := deps.AuthService.GenerateJWT(member1.ID, "", member1.Username, member1.Role)
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	m1Token, _ := deps.AuthService.GenerateJWT(member1.ID, member1.Username, member1.Role)
 
 	// Create group
 	body := createGroupBody("Test Group Epsilon", []int{member1.ID, member2.ID})
@@ -328,7 +328,7 @@ func TestGroupConversationLimit(t *testing.T) {
 	defer deps.DB.Close()
 
 	owner := createUser(t, deps.UserRepo, uniqueGrpUsername("owner6"), "user")
-	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, "", owner.Username, owner.Role)
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
 
 	// Build a list of 251 participant IDs. We use fake non-existent IDs because
 	// the limit check happens before DB inserts in the handler.

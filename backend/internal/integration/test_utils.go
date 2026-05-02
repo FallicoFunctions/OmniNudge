@@ -106,9 +106,6 @@ func newTestDeps(t *testing.T) *TestDeps {
 	go hub.Run()
 
 	authService := services.NewAuthService(
-		cfg.Reddit.ClientID,
-		cfg.Reddit.ClientSecret,
-		cfg.Reddit.RedirectURI,
 		cfg.JWT.Secret,
 		cfg.Reddit.UserAgent,
 		cfg.Turnstile.Secret,

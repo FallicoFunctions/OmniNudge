@@ -63,7 +63,7 @@ func TestHubCreation(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "bob", "user")
-	userToken, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	userToken, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	body := []byte(`{"name":"cats","description":"all cats"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/hubs", bytes.NewReader(body))
@@ -78,7 +78,7 @@ func TestHubCreationAsAdminAllowed(t *testing.T) {
 	defer deps.DB.Close()
 
 	admin := createUser(t, deps.UserRepo, "adminuser", "admin")
-	adminToken, _ := deps.AuthService.GenerateJWT(admin.ID, "", admin.Username, admin.Role)
+	adminToken, _ := deps.AuthService.GenerateJWT(admin.ID, admin.Username, admin.Role)
 
 	body := []byte(`{"name":"dogs","description":"all dogs"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/hubs", bytes.NewReader(body))
@@ -93,7 +93,7 @@ func TestPostsAndCommentsFlow(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "carl", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	// Create post
 	postBody := []byte(`{"title":"hi","body":"body"}`)
@@ -121,8 +121,8 @@ func TestPostEditForbiddenForNonOwner(t *testing.T) {
 
 	owner := createUser(t, deps.UserRepo, "owner", "user")
 	other := createUser(t, deps.UserRepo, "other", "user")
-	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, "", owner.Username, owner.Role)
-	otherToken, _ := deps.AuthService.GenerateJWT(other.ID, "", other.Username, other.Role)
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	otherToken, _ := deps.AuthService.GenerateJWT(other.ID, other.Username, other.Role)
 
 	postBody := []byte(`{"title":"hi","body":"body"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/posts", bytes.NewReader(postBody))
@@ -147,8 +147,8 @@ func TestCommentEditForbiddenForNonOwner(t *testing.T) {
 
 	owner := createUser(t, deps.UserRepo, "comment_owner", "user")
 	other := createUser(t, deps.UserRepo, "comment_other", "user")
-	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, "", owner.Username, owner.Role)
-	otherToken, _ := deps.AuthService.GenerateJWT(other.ID, "", other.Username, other.Role)
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	otherToken, _ := deps.AuthService.GenerateJWT(other.ID, other.Username, other.Role)
 
 	postBody := []byte(`{"title":"hi","body":"body"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/posts", bytes.NewReader(postBody))
@@ -182,7 +182,7 @@ func TestAdminPromotionAndAddModerator(t *testing.T) {
 
 	admin := createUser(t, deps.UserRepo, "admin", "admin")
 	user := createUser(t, deps.UserRepo, "target", "user")
-	adminToken, _ := deps.AuthService.GenerateJWT(admin.ID, "", admin.Username, admin.Role)
+	adminToken, _ := deps.AuthService.GenerateJWT(admin.ID, admin.Username, admin.Role)
 
 	// Add as hub moderator
 	modBody := []byte(`{"user_id":` + fmt.Sprint(user.ID) + `}`)
@@ -202,7 +202,7 @@ func TestMediaUploadValidation(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "media", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
@@ -225,7 +225,7 @@ func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "media2", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	// Happy path small PNG
 	var b bytes.Buffer
@@ -263,7 +263,7 @@ func TestMediaUpload_AllowsPDFDocument(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "media_pdf", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
@@ -284,7 +284,7 @@ func TestMediaUpload_AllowsExpandedDocumentAndArchiveTypes(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "media_docs", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	cases := []struct {
 		name     string
@@ -341,7 +341,7 @@ func TestMediaUpload_RejectsRenamedZipAsDocx(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "media_bad_docx", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
@@ -389,8 +389,8 @@ func TestSendMessage_RespectsRecipientAutoUnarchiveSetting_Integration(t *testin
 
 	sender := createUser(t, deps.UserRepo, "msg_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "msg_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
-	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, recipient.Username, recipient.Role)
 
 	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -445,8 +445,8 @@ func TestSendMessage_AutoUnarchivesRecipientWhenEnabled_Integration(t *testing.T
 
 	sender := createUser(t, deps.UserRepo, "msg_sender_enabled", "user")
 	recipient := createUser(t, deps.UserRepo, "msg_recipient_enabled", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
-	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, recipient.Username, recipient.Role)
 
 	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -501,8 +501,8 @@ func TestSendMessage_ReplyToSetsThreadFieldsAndParentReplyCount_Integration(t *t
 
 	sender := createUser(t, deps.UserRepo, "thread_sender_api", "user")
 	recipient := createUser(t, deps.UserRepo, "thread_recipient_api", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
-	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, recipient.Username, recipient.Role)
 
 	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -552,8 +552,8 @@ func TestGetMessageThreadEndpoint_ReturnsRepliesWithPagination_Integration(t *te
 
 	sender := createUser(t, deps.UserRepo, "thread_page_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "thread_page_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
-	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, recipient.Username, recipient.Role)
 
 	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -631,8 +631,8 @@ func TestGetMessageThreadEndpoint_RejectsUnauthorizedAndOutsider_Integration(t *
 	sender := createUser(t, deps.UserRepo, "thread_auth_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "thread_auth_recipient", "user")
 	outsider := createUser(t, deps.UserRepo, "thread_auth_outsider", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
-	outsiderToken, _ := deps.AuthService.GenerateJWT(outsider.ID, "", outsider.Username, outsider.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
+	outsiderToken, _ := deps.AuthService.GenerateJWT(outsider.ID, outsider.Username, outsider.Role)
 
 	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -666,8 +666,8 @@ func TestDeleteRootMessageForBoth_PreservesThreadAsTombstone_Integration(t *test
 
 	sender := createUser(t, deps.UserRepo, "thread_delete_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "thread_delete_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
-	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, recipient.Username, recipient.Role)
 
 	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -745,8 +745,8 @@ func TestSendMessage_ThreadDepthLimitFlattensToRoot_Integration(t *testing.T) {
 
 	sender := createUser(t, deps.UserRepo, "thread_depth_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "thread_depth_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
-	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, recipient.Username, recipient.Role)
 
 	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -821,7 +821,7 @@ func TestEditMessageEndpoint_UpdatesMessageAndHistory(t *testing.T) {
 
 	sender := createUser(t, deps.UserRepo, "edit_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "edit_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
 
 	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -872,7 +872,7 @@ func TestForwardMessageEndpoint_Success(t *testing.T) {
 
 	sender := createUser(t, deps.UserRepo, "forward_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "forward_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
 
 	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -943,7 +943,7 @@ func TestForwardMessageEndpoint_RejectsMoreThanTenTargets(t *testing.T) {
 
 	sender := createUser(t, deps.UserRepo, "forward_limit_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "forward_limit_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
 
 	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -972,7 +972,7 @@ func TestForwardMessageEndpoint_RejectsEncryptedForwardWithoutNewPayload(t *test
 
 	sender := createUser(t, deps.UserRepo, "forward_payload_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "forward_payload_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
 
 	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -1005,7 +1005,7 @@ func TestForwardMessageEndpoint_RejectsEncryptedDMForwardWithoutSenderCopy(t *te
 
 	sender := createUser(t, deps.UserRepo, "forward_sender_copy_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "forward_sender_copy_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
 
 	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -1038,7 +1038,7 @@ func TestForwardMessageEndpoint_RejectsEncryptedForwardDowngrade(t *testing.T) {
 
 	sender := createUser(t, deps.UserRepo, "forward_downgrade_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "forward_downgrade_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
 
 	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -1071,7 +1071,7 @@ func TestForwardMessageEndpoint_RejectsDMForwardMarkedMultiRecipient(t *testing.
 
 	sender := createUser(t, deps.UserRepo, "forward_dm_multi_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "forward_dm_multi_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
 
 	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -1104,7 +1104,7 @@ func TestForwardMessageEndpoint_DeduplicatesBeforeLimit(t *testing.T) {
 
 	sender := createUser(t, deps.UserRepo, "forward_dedupe_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "forward_dedupe_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
 
 	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -1138,7 +1138,7 @@ func TestForwardMessageEndpoint_IsAtomicOnMixedAccessibleTargets(t *testing.T) {
 	sender := createUser(t, deps.UserRepo, "forward_atomic_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "forward_atomic_recipient", "user")
 	outsider := createUser(t, deps.UserRepo, "forward_atomic_outsider", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
 
 	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -1182,7 +1182,7 @@ func TestForwardInfoEndpoint_PrivacyAwareResponse(t *testing.T) {
 	user := createUser(t, deps.UserRepo, "forward_info_user", "user")
 	recipient := createUser(t, deps.UserRepo, "forward_info_recipient", "user")
 	outsider := createUser(t, deps.UserRepo, "forward_info_outsider", "user")
-	userToken, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	userToken, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	visibleConversation, err := deps.ConversationRepo.Create(context.Background(), user.ID, recipient.ID)
 	require.NoError(t, err)
@@ -1241,7 +1241,7 @@ func TestEditMessageEndpoint_RejectsModMailConversation(t *testing.T) {
 
 	sender := createUser(t, deps.UserRepo, "edit_modmail_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "edit_modmail_recipient", "user")
-	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, sender.Username, sender.Role)
 
 	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -1276,7 +1276,7 @@ func TestGetMessageHistoryEndpoint_ReturnsChronologicalHistory(t *testing.T) {
 
 	sender := createUser(t, deps.UserRepo, "history_sender", "user")
 	recipient := createUser(t, deps.UserRepo, "history_recipient", "user")
-	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, recipient.Username, recipient.Role)
 
 	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
 	require.NoError(t, err)
@@ -1323,7 +1323,7 @@ func TestSearchMessagesAuthAndResults(t *testing.T) {
 
 	user1 := createUser(t, deps.UserRepo, "searchmsg_user1", "user")
 	user2 := createUser(t, deps.UserRepo, "searchmsg_user2", "user")
-	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, user1.Username, user1.Role)
 
 	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
 	require.NoError(t, err)
@@ -1365,7 +1365,7 @@ func TestSearchMessagesFilterOnlyHasFiles(t *testing.T) {
 
 	user1 := createUser(t, deps.UserRepo, "searchmsg_filter_user1", "user")
 	user2 := createUser(t, deps.UserRepo, "searchmsg_filter_user2", "user")
-	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, user1.Username, user1.Role)
 
 	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
 	require.NoError(t, err)
@@ -1412,7 +1412,7 @@ func TestSearchMessagesSortOldIntegration(t *testing.T) {
 
 	user1 := createUser(t, deps.UserRepo, "searchmsg_sort_user1", "user")
 	user2 := createUser(t, deps.UserRepo, "searchmsg_sort_user2", "user")
-	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, user1.Username, user1.Role)
 
 	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
 	require.NoError(t, err)
@@ -1462,7 +1462,7 @@ func TestSearchMessagesHasLinksFilterIntegration(t *testing.T) {
 
 	user1 := createUser(t, deps.UserRepo, "searchmsg_links_user1", "user")
 	user2 := createUser(t, deps.UserRepo, "searchmsg_links_user2", "user")
-	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, user1.Username, user1.Role)
 
 	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
 	require.NoError(t, err)
@@ -1507,7 +1507,7 @@ func TestSearchMessagesDateRangeFilterIntegration(t *testing.T) {
 
 	user1 := createUser(t, deps.UserRepo, "searchmsg_date_user1", "user")
 	user2 := createUser(t, deps.UserRepo, "searchmsg_date_user2", "user")
-	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, user1.Username, user1.Role)
 
 	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
 	require.NoError(t, err)
@@ -1559,7 +1559,7 @@ func TestSearchMessagesConversationFilterIntegration(t *testing.T) {
 	user1 := createUser(t, deps.UserRepo, "searchmsg_conv_user1", "user")
 	user2 := createUser(t, deps.UserRepo, "searchmsg_conv_user2", "user")
 	user3 := createUser(t, deps.UserRepo, "searchmsg_conv_user3", "user")
-	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, user1.Username, user1.Role)
 
 	convA, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
 	require.NoError(t, err)
@@ -1611,7 +1611,7 @@ func TestSearchMessagesSenderFilterIntegration(t *testing.T) {
 	user1 := createUser(t, deps.UserRepo, "searchmsg_sender_user1", "user")
 	user2 := createUser(t, deps.UserRepo, "searchmsg_sender_user2", "user")
 	user3 := createUser(t, deps.UserRepo, "searchmsg_sender_user3", "user")
-	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, user1.Username, user1.Role)
 
 	convA, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
 	require.NoError(t, err)
@@ -1661,7 +1661,7 @@ func TestSearchMessagesInvalidDateRangeIntegration(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "searchmsg_invalid_range", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	startDate := time.Now().UTC().Format(time.RFC3339)
 	endDate := time.Now().Add(-24 * time.Hour).UTC().Format(time.RFC3339)
@@ -1683,8 +1683,8 @@ func TestSearchMessagesRespectsPerUserDeleteVisibilityIntegration(t *testing.T) 
 
 	user1 := createUser(t, deps.UserRepo, "searchmsg_delete_user1", "user")
 	user2 := createUser(t, deps.UserRepo, "searchmsg_delete_user2", "user")
-	tokenUser1, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
-	tokenUser2, _ := deps.AuthService.GenerateJWT(user2.ID, "", user2.Username, user2.Role)
+	tokenUser1, _ := deps.AuthService.GenerateJWT(user1.ID, user1.Username, user1.Role)
+	tokenUser2, _ := deps.AuthService.GenerateJWT(user2.ID, user2.Username, user2.Role)
 
 	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
 	require.NoError(t, err)
@@ -1744,8 +1744,8 @@ func TestSearchMessagesReflectsContentUpdatesIntegration(t *testing.T) {
 
 	user1 := createUser(t, deps.UserRepo, "searchmsg_update_user1", "user")
 	user2 := createUser(t, deps.UserRepo, "searchmsg_update_user2", "user")
-	recipientToken, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
-	senderToken, _ := deps.AuthService.GenerateJWT(user2.ID, "", user2.Username, user2.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(user1.ID, user1.Username, user1.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(user2.ID, user2.Username, user2.Role)
 
 	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
 	require.NoError(t, err)
@@ -1810,7 +1810,7 @@ func TestBatchMediaUpload_RejectsTooManyFiles(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "media_batch_limit", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
@@ -1836,7 +1836,7 @@ func TestMediaUpload_RejectsUnsupportedExtension(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "media_ext", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
@@ -1859,7 +1859,7 @@ func TestMediaUpload_RejectsEmptyFile(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "media_empty", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
@@ -1880,7 +1880,7 @@ func TestMediaUpload_RejectsExtensionMimeMismatch(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "media_mismatch", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
@@ -1903,7 +1903,7 @@ func TestMediaUpload_RejectsStorageQuotaExceeded(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "media_quota", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	// Pre-fill near default 1GB free-tier quota.
 	_, err := deps.DB.Pool.Exec(context.Background(), `
@@ -1931,7 +1931,7 @@ func TestUsersMeStorage_ReturnsTrackedUsageAndQuota(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "storage_user", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	_, err := deps.DB.Pool.Exec(context.Background(), `
 		INSERT INTO media_files (user_id, filename, original_filename, file_type, file_size, storage_url, storage_path)
@@ -1990,7 +1990,7 @@ func TestFilesThumbnailRedirect_ReturnsThumbnailURLForOwner(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "thumb_owner", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	var mediaID int
 	err := deps.DB.Pool.QueryRow(context.Background(), `
@@ -2014,7 +2014,7 @@ func TestFilesThumbnailRedirect_RejectsNonOwner(t *testing.T) {
 
 	owner := createUser(t, deps.UserRepo, "thumb_owner_2", "user")
 	other := createUser(t, deps.UserRepo, "thumb_other", "user")
-	token, _ := deps.AuthService.GenerateJWT(other.ID, "", other.Username, other.Role)
+	token, _ := deps.AuthService.GenerateJWT(other.ID, other.Username, other.Role)
 
 	var mediaID int
 	err := deps.DB.Pool.QueryRow(context.Background(), `
@@ -2036,7 +2036,7 @@ func TestFilesThumbnailRedirect_BlocksPendingScan(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "thumb_pending", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	var mediaID int
 	err := deps.DB.Pool.QueryRow(context.Background(), `
@@ -2059,7 +2059,7 @@ func TestMediaUpload_RejectsSuspiciousEmbeddedZipSignature(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "media_polyglot", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
@@ -2082,7 +2082,7 @@ func TestReportsRoleEnforcement(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "dana", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	// Create report
 	body := []byte(`{"target_type":"post","target_id":1,"reason":"spam"}`)
@@ -2100,7 +2100,7 @@ func TestReportsRoleEnforcement(t *testing.T) {
 
 	// Promote to admin and list
 	require.NoError(t, deps.UserRepo.UpdateRole(context.Background(), user.ID, "admin"))
-	adminToken, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, "admin")
+	adminToken, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, "admin")
 	req, _ = http.NewRequest("GET", "/api/v1/mod/reports", nil)
 	req.Header.Set("Authorization", "Bearer "+adminToken)
 	w = doRequest(t, deps.Router, req)
@@ -2116,9 +2116,9 @@ func TestReports_AutoSuspendAfterThreeDistinctUserReports(t *testing.T) {
 	reporterTwo := createUser(t, deps.UserRepo, "reporter_two_http", "user")
 	reporterThree := createUser(t, deps.UserRepo, "reporter_three_http", "user")
 
-	reporterOneToken, _ := deps.AuthService.GenerateJWT(reporterOne.ID, "", reporterOne.Username, reporterOne.Role)
-	reporterTwoToken, _ := deps.AuthService.GenerateJWT(reporterTwo.ID, "", reporterTwo.Username, reporterTwo.Role)
-	reporterThreeToken, _ := deps.AuthService.GenerateJWT(reporterThree.ID, "", reporterThree.Username, reporterThree.Role)
+	reporterOneToken, _ := deps.AuthService.GenerateJWT(reporterOne.ID, reporterOne.Username, reporterOne.Role)
+	reporterTwoToken, _ := deps.AuthService.GenerateJWT(reporterTwo.ID, reporterTwo.Username, reporterTwo.Role)
+	reporterThreeToken, _ := deps.AuthService.GenerateJWT(reporterThree.ID, reporterThree.Username, reporterThree.Role)
 
 	for _, token := range []string{reporterOneToken, reporterTwoToken, reporterThreeToken} {
 		body := []byte(`{"target_type":"user","target_id":` + fmt.Sprint(target.ID) + `,"reason":"harassment"}`)
@@ -2146,9 +2146,9 @@ func TestReports_HighPriorityCreatesModeratorNotifications(t *testing.T) {
 	admin := createUser(t, deps.UserRepo, "admin_hp_http", "admin")
 	moderator := createUser(t, deps.UserRepo, "moderator_hp_http", "moderator")
 
-	reporterToken, _ := deps.AuthService.GenerateJWT(reporter.ID, "", reporter.Username, reporter.Role)
-	adminToken, _ := deps.AuthService.GenerateJWT(admin.ID, "", admin.Username, admin.Role)
-	moderatorToken, _ := deps.AuthService.GenerateJWT(moderator.ID, "", moderator.Username, moderator.Role)
+	reporterToken, _ := deps.AuthService.GenerateJWT(reporter.ID, reporter.Username, reporter.Role)
+	adminToken, _ := deps.AuthService.GenerateJWT(admin.ID, admin.Username, admin.Role)
+	moderatorToken, _ := deps.AuthService.GenerateJWT(moderator.ID, moderator.Username, moderator.Role)
 
 	body := []byte(`{"target_type":"user","target_id":` + fmt.Sprint(target.ID) + `,"reason":"csam"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/reports", bytes.NewReader(body))
@@ -2176,8 +2176,8 @@ func TestMessagingFlow(t *testing.T) {
 
 	alice := createUser(t, deps.UserRepo, "alice_msg", "user")
 	bob := createUser(t, deps.UserRepo, "bob_msg", "user")
-	aliceToken, _ := deps.AuthService.GenerateJWT(alice.ID, "", alice.Username, alice.Role)
-	bobToken, _ := deps.AuthService.GenerateJWT(bob.ID, "", bob.Username, bob.Role)
+	aliceToken, _ := deps.AuthService.GenerateJWT(alice.ID, alice.Username, alice.Role)
+	bobToken, _ := deps.AuthService.GenerateJWT(bob.ID, bob.Username, bob.Role)
 
 	// Create conversation as alice
 	body := []byte(`{"other_user_id":` + fmt.Sprint(bob.ID) + `}`)
@@ -2215,7 +2215,7 @@ func TestPostVoteLifecycleHTTP(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "vote_user", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	postBody := []byte(`{"title":"vote","body":"body"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/posts", bytes.NewReader(postBody))
@@ -2259,7 +2259,7 @@ func TestCommentInvalidPostID(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "cid", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	body := []byte(`{"body":"comment"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/posts/99999/comments", bytes.NewReader(body))
@@ -2286,7 +2286,7 @@ func TestMessageSendInvalidConversation(t *testing.T) {
 	defer deps.DB.Close()
 
 	user := createUser(t, deps.UserRepo, "msender", "user")
-	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	body := []byte(`{"conversation_id":9999,"encrypted_content":"x","message_type":"text","encryption_version":"v1"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(body))
