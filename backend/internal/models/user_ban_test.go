@@ -16,7 +16,7 @@ func setupBanTestDB(t *testing.T) (*pgxpool.Pool, *UserRepository, func()) {
 	ctx := context.Background()
 
 	// Set up encryption key for tests
-	testKey := "test-encryption-key-32-bytes!"
+	testKey := "test-encryption-key-32-bytes!!!"
 	err := utils.SetEncryptionKey(testKey)
 	require.NoError(t, err)
 

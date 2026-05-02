@@ -48,7 +48,7 @@ func setupDataExportHandlerTest(t *testing.T) (*DataExportHandler, *database.Dat
 	require.NoError(t, userRepo.Create(ctx, user))
 
 	// nil queue — skips enqueue step; export is still inserted as pending.
-	handler := NewDataExportHandler(db.Pool, nil, "test-master-key-32-chars-padded!!")
+	handler := NewDataExportHandler(db.Pool, nil, nil, "test-master-key-32-chars-padded!!")
 
 	return handler, db, user.ID, func() {}
 }

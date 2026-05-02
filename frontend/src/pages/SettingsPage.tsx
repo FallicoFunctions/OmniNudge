@@ -149,6 +149,7 @@ export default function SettingsPage() {
   const [isRequestingExport, setIsRequestingExport] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
+  const [exportPassword, setExportPassword] = useState('');
 
   // Feature Flags (P0-012: Demonstrate feature flag integration)
   const voiceCallsEnabled = useFeatureFlag(FEATURE_FLAGS.VOICE_CALLS);
@@ -1767,7 +1768,20 @@ export default function SettingsPage() {
             {t('settings.dataExport.description')}
           </p>
 
-          <div className="mt-4">
+                  <div className="mt-4">
+            <label className="mb-2 block text-sm font-medium text-[var(--color-text-primary)]" htmlFor="export-password">
+              Confirm password
+            </label>
+            <input
+              id="export-password"
+              type="password"
+              autoComplete="current-password"
+              value={exportPassword}
+              onChange={(event) => setExportPassword(event.target.value)}
+              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            />
+
+            <div className="mt-4">
             <button
               type="button"
               onClick={async () => {
@@ -1777,6 +1791,7 @@ export default function SettingsPage() {
 
                 try {
                   const response = await accountService.requestDataExport({
+                    password: exportPassword,
                     data_types: [
                       'profile',
                       'messages',
@@ -1799,10 +1814,11 @@ export default function SettingsPage() {
                     error instanceof Error ? error.message : t('settings.dataExport.requestButton')
                   );
                 } finally {
+                  setExportPassword('');
                   setIsRequestingExport(false);
                 }
               }}
-              disabled={isRequestingExport}
+              disabled={isRequestingExport || !exportPassword.trim()}
               className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
             >
               {isRequestingExport
@@ -1836,6 +1852,7 @@ export default function SettingsPage() {
               <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
                 {t('settings.dataExport.availabilityNote')}
               </p>
+            </div>
             </div>
           </div>
           </Panel>
