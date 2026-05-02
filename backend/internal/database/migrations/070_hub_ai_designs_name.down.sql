@@ -1,0 +1,1 @@
+ALTER TABLE hub_ai_designs DROP COLUMN IF EXISTS name;
