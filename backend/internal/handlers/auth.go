@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/audit"
-	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
@@ -35,7 +34,6 @@ type AuthHandler struct {
 	frontendURL           string
 	auditLogger           *audit.AuditLogger
 	lockoutService        *services.AccountLockoutService
-	isProduction          bool // true when APP_ENV=production; gates Secure cookie flag
 }
 
 // logAudit writes a structured audit event. It is a nil-safe wrapper around
@@ -65,7 +63,7 @@ func NewAuthHandler(
 	frontendURL string,
 	auditLogger *audit.AuditLogger,
 	lockoutService *services.AccountLockoutService,
-	appEnv string,
+	_ string,
 ) *AuthHandler {
 	return &AuthHandler{
 		authService:           authService,
@@ -76,125 +74,7 @@ func NewAuthHandler(
 		frontendURL:           frontendURL,
 		auditLogger:           auditLogger,
 		lockoutService:        lockoutService,
-		isProduction:          appEnv == "production",
 	}
-}
-
-// RedditLogin initiates the Reddit OAuth flow.
-// @Summary      Initiate Reddit OAuth
-// @Tags         Auth
-// @Produce      json
-// @Success      307  {string}  string  "Redirect to Reddit"
-// @Failure      500  {object}  gin.H
-// @Router       /auth/reddit [get]
-func (h *AuthHandler) RedditLogin(c *gin.Context) {
-	state, err := h.authService.GenerateState()
-	if err != nil {
-		RespondError(c, http.StatusInternalServerError, "Failed to generate state")
-		return
-	}
-
-	// Store state in cookie for validation (in production, use Redis).
-	// Secure flag is only set in production; local dev uses plain HTTP.
-	c.SetCookie("oauth_state", state, 600, "/", "", h.isProduction, true)
-
-	url := h.authService.GetAuthURL(state)
-	c.Redirect(http.StatusTemporaryRedirect, url)
-}
-
-// RedditCallback handles the OAuth callback from Reddit.
-// @Summary      Reddit OAuth callback
-// @Tags         Auth
-// @Produce      json
-// @Param        code   query  string  true  "Authorization code"
-// @Param        state  query  string  true  "State token"
-// @Success      200  {object}  gin.H
-// @Failure      400  {object}  gin.H
-// @Failure      401  {object}  gin.H
-// @Failure      500  {object}  gin.H
-// @Router       /auth/reddit/callback [get]
-func (h *AuthHandler) RedditCallback(c *gin.Context) {
-	code := c.Query("code")
-	state := c.Query("state")
-	errorParam := c.Query("error")
-
-	// Check for OAuth errors
-	if errorParam != "" {
-		RespondError(c, http.StatusBadRequest, "OAuth error: "+errorParam)
-		return
-	}
-
-	if code == "" {
-		RespondError(c, http.StatusBadRequest, "No authorization code provided")
-		return
-	}
-
-	// Validate state (in production, compare with stored state)
-	storedState, _ := c.Cookie("oauth_state")
-	if state != storedState {
-		RespondError(c, http.StatusBadRequest, "Invalid state parameter")
-		return
-	}
-
-	// Exchange code for token
-	token, err := h.authService.ExchangeCode(c.Request.Context(), code)
-	if err != nil {
-		zlog.Warn().Err(err).Msg("auth: reddit oauth code exchange failed")
-		RespondError(c, http.StatusUnauthorized, "Failed to complete Reddit authentication")
-		return
-	}
-
-	// Get Reddit user info
-	redditUser, err := h.authService.GetRedditUser(c.Request.Context(), token)
-	if err != nil {
-		zlog.Warn().Err(err).Msg("auth: failed to fetch reddit user info")
-		RespondError(c, http.StatusInternalServerError, "Failed to retrieve Reddit user information")
-		return
-	}
-
-	// Determine avatar URL (prefer snoovatar, fall back to icon_img)
-	avatarURL := redditUser.Snoovatar
-	if avatarURL == "" {
-		avatarURL = redditUser.IconImg
-	}
-
-	// Create or update user in database
-	user := &models.User{
-		Username:       redditUser.Name,
-		RedditID:       &redditUser.ID,
-		RedditUsername: &redditUser.Name,
-		AccessToken:    token.AccessToken,
-		RefreshToken:   token.RefreshToken,
-		TokenExpiresAt: &token.Expiry,
-		Karma:          redditUser.Karma,
-		AvatarURL:      &avatarURL,
-	}
-
-	if err := h.userRepo.CreateOrUpdateFromReddit(c.Request.Context(), user); err != nil {
-		RespondError(c, http.StatusInternalServerError, "Failed to create/update user: "+err.Error())
-		return
-	}
-
-	// Generate JWT
-	redditID := ""
-	if user.RedditID != nil {
-		redditID = *user.RedditID
-	}
-	jwtToken, err := h.authService.GenerateJWT(user.ID, redditID, user.Username, user.Role)
-	if err != nil {
-		RespondError(c, http.StatusInternalServerError, "Failed to generate token")
-		return
-	}
-
-	// Clear the state cookie
-	c.SetCookie("oauth_state", "", -1, "/", "", h.isProduction, true)
-
-	// Return JWT and user info
-	// In production, you might redirect to frontend with token in URL fragment
-	c.JSON(http.StatusOK, gin.H{
-		"token": jwtToken,
-		"user":  user,
-	})
 }
 
 // GetMe returns the current authenticated user.
@@ -232,11 +112,17 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 // @Success      200  {object}  gin.H
 // @Router       /auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
-	// JWT tokens are stateless, so logout is handled client-side.
-	// In production, you might want to add the token to a blacklist in Redis.
-	if userID, ok := middleware.GetAuthenticatedUserID(c); ok {
-		h.logAudit(c.Request.Context(), &userID, "logout", "user", &userID,
-			c.ClientIP(), c.Request.UserAgent(), nil)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	h.logAudit(c.Request.Context(), &userID, "logout", "user", &userID,
+		c.ClientIP(), c.Request.UserAgent(), nil)
+	if err := h.userRepo.IncrementTokenVersion(c.Request.Context(), userID); err != nil {
+		slog.Error("failed to invalidate sessions on logout", "error", err, "user_id", userID)
+		RespondError(c, http.StatusInternalServerError, "Failed to log out")
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
@@ -261,7 +147,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	user, token, err := h.authService.Register(c.Request.Context(), h.userRepo, &req)
 	if err != nil {
-		RespondError(c, http.StatusBadRequest, err.Error())
+		zlog.Warn().Err(err).Msg("registration validation failed")
+		RespondError(c, http.StatusBadRequest, "Registration failed. Please check your input and try again.")
 		return
 	}
 
@@ -678,6 +565,9 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 
 	// Invalidate any other active reset tokens for this user
 	_ = h.passwordResetRepo.InvalidateUserTokens(c.Request.Context(), userID)
+	if err := h.userRepo.IncrementTokenVersion(c.Request.Context(), userID); err != nil {
+		slog.Error("failed to invalidate sessions after password reset", "error", err, "user_id", userID)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "Password successfully reset",

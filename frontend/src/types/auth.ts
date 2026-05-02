@@ -2,7 +2,6 @@ export interface User {
   id: number;
   username: string;
   email?: string;
-  reddit_id?: string;
   bio?: string;
   avatar_url?: string;
   role: 'user' | 'moderator' | 'admin';

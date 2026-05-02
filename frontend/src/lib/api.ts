@@ -56,6 +56,7 @@ class ApiClient {
       const errorText = `${error.message || ''} ${error.error || ''}`.toLowerCase();
       if (response.status === 401 && errorText.includes('ban')) {
         localStorage.removeItem('auth_token');
+        sessionStorage.removeItem('auth_token');
         localStorage.removeItem('user');
       }
 

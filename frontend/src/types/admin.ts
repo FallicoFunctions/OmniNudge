@@ -4,7 +4,6 @@ export interface AdminUser {
   id: number;
   username: string;
   email: string;
-  reddit_id?: string;
   role: 'user' | 'moderator' | 'admin';
   created_at: string;
   last_seen_at?: string;

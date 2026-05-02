@@ -14,7 +14,7 @@ func TestSettings_GetAndUpdate_AuthenticatedFlow(t *testing.T) {
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "settings_flow_user", "user")
 
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	getReq, err := http.NewRequest("GET", "/api/v1/settings", nil)
@@ -49,7 +49,7 @@ func TestSettings_Get_CreatesAndReturnsExpectedDefaults(t *testing.T) {
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "settings_default_values_user", "user")
 
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	getReq, err := http.NewRequest("GET", "/api/v1/settings", nil)
@@ -71,7 +71,7 @@ func TestSettings_Update_RejectsInvalidValues(t *testing.T) {
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "settings_invalid_user", "user")
 
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -156,7 +156,7 @@ func TestSettings_UpdateAndGet_PersistsNotificationPreferenceFields(t *testing.T
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "settings_notif_prefs_user", "user")
 
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	updateBody := map[string]any{
@@ -197,7 +197,7 @@ func TestSettings_Update_NormalizesEnumValuesCaseAndWhitespace(t *testing.T) {
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "settings_normalize_user", "user")
 
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	updateBody := map[string]any{

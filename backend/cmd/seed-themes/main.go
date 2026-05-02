@@ -32,8 +32,8 @@ func main() {
 
 	// Create system user (user_id = 0) if not exists
 	_, err = db.Pool.Exec(ctx, `
-		INSERT INTO users (id, username, username_normalized, password_hash, reddit_id, created_at, last_seen, karma)
-		VALUES (0, 'system', $1, '', 'system', NOW(), NOW(), 0)
+		INSERT INTO users (id, username, username_normalized, password_hash, created_at, last_seen, karma)
+		VALUES (0, 'system', $1, '', NOW(), NOW(), 0)
 		ON CONFLICT (id) DO NOTHING
 	`, strings.ToLower("system"))
 	if err != nil {

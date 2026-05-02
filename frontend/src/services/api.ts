@@ -9,10 +9,17 @@ const api = axios.create({
   },
 });
 
-// Request interceptor - add JWT token
+const getStoredAuthToken = (): string | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+};
+
+// Request interceptor — bearer token auth
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+    const token = getStoredAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -59,23 +66,12 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
-      const hadToken =
-        Boolean(localStorage.getItem('auth_token')) ||
-        Boolean(sessionStorage.getItem('auth_token'));
-
-      // Anonymous users should not be forced into login on public pages.
-      if (!hadToken) {
-        return Promise.reject(error);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+        sessionStorage.removeItem('auth_token');
       }
-
-      // Handle unauthorized without navigating to a non-existent /login route.
-      localStorage.removeItem('auth_token');
-      sessionStorage.removeItem('auth_token');
       if (typeof window !== 'undefined') {
         const redirectTo = window.location.pathname || '/';
-        if (window.location.pathname !== '/') {
-          window.location.href = '/';
-        }
         window.dispatchEvent(
           new CustomEvent('open-auth-modal', {
             detail: { mode: 'login', redirectTo },

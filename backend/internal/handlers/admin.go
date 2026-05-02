@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
 	"net/http"
 	"strconv"
 	"strings"
@@ -390,7 +390,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	// Build query dynamically with proper parameterization
 	baseQuery := `
-		SELECT id, username, email, reddit_id, role, created_at, last_seen, bio, avatar_url,
+		SELECT id, username, email, role, created_at, last_seen, bio, avatar_url,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by
 		FROM users
 		WHERE 1=1
@@ -462,7 +462,6 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 		ID            int
 		Username      string
 		Email         *string
-		RedditID      *string
 		Role          string
 		CreatedAt     time.Time
 		LastSeen      *time.Time
@@ -480,7 +479,6 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 		ID            int     `json:"id"`
 		Username      string  `json:"username"`
 		Email         *string `json:"email"`
-		RedditID      *string `json:"reddit_id"`
 		Role          string  `json:"role"`
 		CreatedAt     string  `json:"created_at"`
 		LastSeenAt    *string `json:"last_seen_at"`
@@ -498,7 +496,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	users := []UserResponse{}
 	for rows.Next() {
 		var row userRow
-		if err := rows.Scan(&row.ID, &row.Username, &row.Email, &row.RedditID, &row.Role, &row.CreatedAt, &row.LastSeen, &row.Bio, &row.AvatarURL,
+		if err := rows.Scan(&row.ID, &row.Username, &row.Email, &row.Role, &row.CreatedAt, &row.LastSeen, &row.Bio, &row.AvatarURL,
 			&row.ShadowBanned, &row.Banned, &row.Deleted, &row.BanReason, &row.ShowBanReason, &row.BannedAt, &row.BannedBy); err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to scan user")
 			return
@@ -517,7 +515,6 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 			ID:            row.ID,
 			Username:      row.Username,
 			Email:         row.Email,
-			RedditID:      row.RedditID,
 			Role:          row.Role,
 			CreatedAt:     row.CreatedAt.Format(time.RFC3339),
 			LastSeenAt:    lastSeenStr,

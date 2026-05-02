@@ -24,7 +24,7 @@ func AuthOptional(authService *services.AuthService) gin.HandlerFunc {
 		}
 
 		tokenString := parts[1]
-		claims, err := authService.ValidateJWT(tokenString)
+		claims, err := authService.ValidateJWTContext(c.Request.Context(), tokenString)
 		if err != nil {
 			// Ignore invalid tokens in optional mode
 			c.Next()
@@ -32,7 +32,6 @@ func AuthOptional(authService *services.AuthService) gin.HandlerFunc {
 		}
 
 		c.Set("user_id", claims.UserID)
-		c.Set("reddit_id", claims.RedditID)
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
 		c.Next()

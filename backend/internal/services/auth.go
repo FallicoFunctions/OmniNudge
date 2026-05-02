@@ -2,12 +2,9 @@ package services
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"regexp"
@@ -18,7 +15,6 @@ import (
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/utils"
-	"golang.org/x/oauth2"
 )
 
 // TurnstileResponse represents Cloudflare Turnstile verification response
@@ -29,29 +25,23 @@ type TurnstileResponse struct {
 
 // AuthService handles authentication operations
 type AuthService struct {
-	oauthConfig     *oauth2.Config
 	jwtSecret       []byte
 	userAgent       string
 	turnstileSecret string
+	userRepo        ports.UserRepository
 }
 
 // NewAuthService creates a new auth service
-func NewAuthService(clientID, clientSecret, redirectURI, jwtSecret, userAgent, turnstileSecret string) *AuthService {
+func NewAuthService(jwtSecret, userAgent, turnstileSecret string) *AuthService {
 	return &AuthService{
-		oauthConfig: &oauth2.Config{
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-			RedirectURL:  redirectURI,
-			Scopes:       []string{"identity", "read", "submit", "privatemessages"},
-			Endpoint: oauth2.Endpoint{
-				AuthURL:  "https://www.reddit.com/api/v1/authorize",
-				TokenURL: "https://www.reddit.com/api/v1/access_token",
-			},
-		},
 		jwtSecret:       []byte(jwtSecret),
 		userAgent:       userAgent,
 		turnstileSecret: turnstileSecret,
 	}
+}
+
+func (s *AuthService) SetUserRepository(userRepo ports.UserRepository) {
+	s.userRepo = userRepo
 }
 
 // VerifyTurnstileToken verifies a Cloudflare Turnstile token
@@ -97,90 +87,35 @@ func (s *AuthService) VerifyTurnstileToken(token, remoteIP string) error {
 	return nil
 }
 
-// GenerateState generates a random state string for OAuth
-func (s *AuthService) GenerateState() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(b), nil
-}
-
-// GetAuthURL returns the Reddit OAuth authorization URL
-func (s *AuthService) GetAuthURL(state string) string {
-	return s.oauthConfig.AuthCodeURL(state, oauth2.SetAuthURLParam("duration", "permanent"))
-}
-
-// ExchangeCode exchanges an authorization code for tokens
-func (s *AuthService) ExchangeCode(ctx context.Context, code string) (*oauth2.Token, error) {
-	return s.oauthConfig.Exchange(ctx, code)
-}
-
-// RedditUser represents user data from Reddit API
-type RedditUser struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Karma     int    `json:"total_karma"`
-	Created   int64  `json:"created_utc"`
-	IconImg   string `json:"icon_img"`
-	Snoovatar string `json:"snoovatar_img"`
-}
-
-// GetRedditUser fetches the authenticated user's info from Reddit
-func (s *AuthService) GetRedditUser(ctx context.Context, token *oauth2.Token) (*RedditUser, error) {
-	client := s.oauthConfig.Client(ctx, token)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://oauth.reddit.com/api/v1/me", nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", s.userAgent)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API error: %s - %s", resp.Status, string(body))
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var user RedditUser
-	if err := json.Unmarshal(body, &user); err != nil {
-		return nil, err
-	}
-
-	return &user, nil
-}
-
 // JWTClaims represents the claims stored in our JWT tokens
 type JWTClaims struct {
-	UserID   int    `json:"user_id"`
-	RedditID string `json:"reddit_id"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	UserID       int    `json:"user_id"`
+	Username     string `json:"username"`
+	Role         string `json:"role"`
+	TokenVersion int    `json:"token_version"`
 	jwt.RegisteredClaims
 }
 
 // GenerateJWT creates a new JWT token for a user
-func (s *AuthService) GenerateJWT(userID int, redditID, username, role string) (string, error) {
-	return s.GenerateJWTWithExpiry(userID, redditID, username, role, 7*24*time.Hour) // Default 7 days
+func (s *AuthService) GenerateJWT(userID int, username, role string) (string, error) {
+	return s.GenerateJWTWithExpiry(userID, username, role, 7*24*time.Hour) // Default 7 days
 }
 
 // GenerateJWTWithExpiry creates a new JWT token for a user with custom expiry
-func (s *AuthService) GenerateJWTWithExpiry(userID int, redditID, username, role string, expiry time.Duration) (string, error) {
+func (s *AuthService) GenerateJWTWithExpiry(userID int, username, role string, expiry time.Duration) (string, error) {
+	return s.GenerateJWTWithExpiryAndVersion(userID, username, role, 0, expiry)
+}
+
+func (s *AuthService) GenerateJWTWithVersion(userID int, username, role string, tokenVersion int) (string, error) {
+	return s.GenerateJWTWithExpiryAndVersion(userID, username, role, tokenVersion, 7*24*time.Hour)
+}
+
+func (s *AuthService) GenerateJWTWithExpiryAndVersion(userID int, username, role string, tokenVersion int, expiry time.Duration) (string, error) {
 	claims := JWTClaims{
-		UserID:   userID,
-		RedditID: redditID,
-		Username: username,
-		Role:     role,
+		UserID:       userID,
+		Username:     username,
+		Role:         role,
+		TokenVersion: tokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -194,6 +129,10 @@ func (s *AuthService) GenerateJWTWithExpiry(userID int, redditID, username, role
 
 // ValidateJWT validates a JWT token and returns the claims
 func (s *AuthService) ValidateJWT(tokenString string) (*JWTClaims, error) {
+	return s.ValidateJWTContext(context.Background(), tokenString)
+}
+
+func (s *AuthService) ValidateJWTContext(ctx context.Context, tokenString string) (*JWTClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -206,6 +145,15 @@ func (s *AuthService) ValidateJWT(tokenString string) (*JWTClaims, error) {
 	}
 
 	if claims, ok := token.Claims.(*JWTClaims); ok && token.Valid {
+		if s.userRepo != nil {
+			user, userErr := s.userRepo.GetByID(ctx, claims.UserID)
+			if userErr != nil {
+				return nil, userErr
+			}
+			if user == nil || user.TokenVersion != claims.TokenVersion {
+				return nil, fmt.Errorf("invalid token")
+			}
+		}
 		return claims, nil
 	}
 
@@ -277,8 +225,8 @@ func (s *AuthService) Register(ctx context.Context, userRepo ports.UserRepositor
 
 	// Create user with policy acceptance
 	currentTime := time.Now()
-	privacyVersion := "1.0"  // Current privacy policy version
-	termsVersion := "1.0"    // Current terms of service version
+	privacyVersion := "1.0" // Current privacy policy version
+	termsVersion := "1.0"   // Current terms of service version
 
 	user := &models.User{
 		Username:              username,
@@ -295,7 +243,7 @@ func (s *AuthService) Register(ctx context.Context, userRepo ports.UserRepositor
 	}
 
 	// Generate JWT
-	token, err := s.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := s.GenerateJWTWithVersion(user.ID, user.Username, user.Role, user.TokenVersion)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate token: %w", err)
 	}
@@ -328,11 +276,6 @@ func (s *AuthService) Login(ctx context.Context, userRepo ports.UserRepository, 
 	_ = userRepo.UpdateLastSeen(ctx, user.ID)
 
 	// Generate JWT with appropriate expiry
-	redditID := ""
-	if user.RedditID != nil {
-		redditID = *user.RedditID
-	}
-
 	var expiry time.Duration
 	if req.KeepLoggedIn {
 		expiry = 30 * 24 * time.Hour // 30 days
@@ -340,7 +283,7 @@ func (s *AuthService) Login(ctx context.Context, userRepo ports.UserRepository, 
 		expiry = 24 * time.Hour // 1 day
 	}
 
-	token, err := s.GenerateJWTWithExpiry(user.ID, redditID, user.Username, user.Role, expiry)
+	token, err := s.GenerateJWTWithExpiryAndVersion(user.ID, user.Username, user.Role, user.TokenVersion, expiry)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate token: %w", err)
 	}

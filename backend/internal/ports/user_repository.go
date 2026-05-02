@@ -10,10 +10,8 @@ import (
 // UserRepository defines persistence operations for users.
 type UserRepository interface {
 	Create(ctx context.Context, user *domain.User) error
-	CreateOrUpdateFromReddit(ctx context.Context, user *domain.User) error
 	GetByID(ctx context.Context, id int) (*domain.User, error)
 	GetByUsername(ctx context.Context, username string) (*domain.User, error)
-	GetByRedditID(ctx context.Context, redditID string) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 	GetPublicKeysByIDs(ctx context.Context, userIDs []int) (map[int]string, error)
 	ListUserIDsByRoles(ctx context.Context, roles []string) ([]int, error)
@@ -23,6 +21,7 @@ type UserRepository interface {
 	UpdatePublicKey(ctx context.Context, userID int, publicKey string) error
 	UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string, nsfw *bool) error
 	UpdatePassword(ctx context.Context, userID int, passwordHash string) error
+	IncrementTokenVersion(ctx context.Context, userID int) error
 	UpdateLastAgentPostAt(ctx context.Context, userID int, timestamp time.Time) error
 	UpdateLastAgentBrowseAt(ctx context.Context, userID int, timestamp time.Time) error
 	UpdateEncryptedPrivateKey(ctx context.Context, userID int, encryptedPrivateKey string) error

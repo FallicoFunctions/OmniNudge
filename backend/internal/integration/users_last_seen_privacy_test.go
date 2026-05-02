@@ -36,7 +36,7 @@ func TestUserProfile_LastSeenHiddenWhenDisabled(t *testing.T) {
 	require.False(t, ok)
 
 	// The user themselves should always see last_seen (AuthOptional sets viewer context).
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	req2, err := http.NewRequest("GET", "/api/v1/users/alice", nil)

@@ -815,12 +815,6 @@ function UsersTab() {
                     <div className="px-4 pb-4 pt-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] text-sm">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <span className="font-medium">
-                            {t('adminPage.users.details.redditId')}:
-                          </span>{' '}
-                          {user.reddit_id || t('common.na')}
-                        </div>
-                        <div>
                           <span className="font-medium">{t('adminPage.users.details.karma')}:</span>{' '}
                           {t('common.na')}
                         </div>

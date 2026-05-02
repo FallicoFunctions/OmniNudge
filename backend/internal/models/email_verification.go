@@ -3,7 +3,9 @@ package models
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -28,6 +30,11 @@ type EmailVerificationRepository struct {
 	pool *pgxpool.Pool
 }
 
+func hashEmailVerificationToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
 // NewEmailVerificationRepository creates a new email verification repository
 func NewEmailVerificationRepository(pool *pgxpool.Pool) *EmailVerificationRepository {
 	return &EmailVerificationRepository{pool: pool}
@@ -40,7 +47,8 @@ func (r *EmailVerificationRepository) GenerateToken(ctx context.Context, userID 
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return nil, fmt.Errorf("failed to generate token: %w", err)
 	}
-	token := base64.URLEncoding.EncodeToString(tokenBytes)
+	rawToken := base64.URLEncoding.EncodeToString(tokenBytes)
+	storedToken := hashEmailVerificationToken(rawToken)
 
 	// Token expires in 24 hours
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -48,7 +56,7 @@ func (r *EmailVerificationRepository) GenerateToken(ctx context.Context, userID 
 	verification := &EmailVerification{
 		UserID:    userID,
 		Email:     email,
-		Token:     token,
+		Token:     rawToken,
 		Purpose:   purpose,
 		ExpiresAt: expiresAt,
 		CreatedAt: time.Now(),
@@ -60,7 +68,7 @@ func (r *EmailVerificationRepository) GenerateToken(ctx context.Context, userID 
 		RETURNING id, created_at
 	`
 
-	err := r.pool.QueryRow(ctx, query, userID, email, token, purpose, expiresAt).Scan(
+	err := r.pool.QueryRow(ctx, query, userID, email, storedToken, purpose, expiresAt).Scan(
 		&verification.ID,
 		&verification.CreatedAt,
 	)
@@ -79,11 +87,11 @@ func (r *EmailVerificationRepository) Verify(ctx context.Context, token string) 
 	query := `
 		UPDATE email_verifications
 		SET verified_at = $1
-		WHERE token = $2 AND verified_at IS NULL AND expires_at > $1
+		WHERE token IN ($2, $3) AND verified_at IS NULL AND expires_at > $1
 		RETURNING id, user_id, email, token, purpose, expires_at, verified_at, created_at
 	`
 
-	err := r.pool.QueryRow(ctx, query, now, token).Scan(
+	err := r.pool.QueryRow(ctx, query, now, hashEmailVerificationToken(token), token).Scan(
 		&verification.ID,
 		&verification.UserID,
 		&verification.Email,
@@ -112,7 +120,10 @@ func (r *EmailVerificationRepository) IsValid(ctx context.Context, token string)
 		WHERE token = $1 AND verified_at IS NULL
 	`
 
-	err := r.pool.QueryRow(ctx, query, token).Scan(&userID, &purpose, &expiresAt)
+	err := r.pool.QueryRow(ctx, query, hashEmailVerificationToken(token)).Scan(&userID, &purpose, &expiresAt)
+	if err == pgx.ErrNoRows {
+		err = r.pool.QueryRow(ctx, query, token).Scan(&userID, &purpose, &expiresAt)
+	}
 	if err != nil {
 		return false, 0, "", err
 	}

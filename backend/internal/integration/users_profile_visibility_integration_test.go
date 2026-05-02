@@ -50,7 +50,7 @@ func TestUserProfile_PrivateVisibility_HiddenFromOthersAndVisibleToOwner(t *test
 	require.NoError(t, err)
 
 	// Different authenticated viewer should get 404 (fail-closed public shape).
-	viewerToken, err := deps.AuthService.GenerateJWT(viewer.ID, "", viewer.Username, viewer.Role)
+	viewerToken, err := deps.AuthService.GenerateJWT(viewer.ID, viewer.Username, viewer.Role)
 	require.NoError(t, err)
 	req, err := http.NewRequest("GET", "/api/v1/users/"+owner.Username, nil)
 	require.NoError(t, err)
@@ -59,7 +59,7 @@ func TestUserProfile_PrivateVisibility_HiddenFromOthersAndVisibleToOwner(t *test
 	require.Equal(t, http.StatusNotFound, resp.Code)
 
 	// Owner should still see own profile.
-	ownerToken, err := deps.AuthService.GenerateJWT(owner.ID, "", owner.Username, owner.Role)
+	ownerToken, err := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
 	require.NoError(t, err)
 	req2, err := http.NewRequest("GET", "/api/v1/users/"+owner.Username, nil)
 	require.NoError(t, err)
@@ -89,7 +89,7 @@ func TestUserProfile_FriendsOnly_VisibleToAcceptedFriendAndHiddenOtherwise(t *te
 	friendRepo := models.NewUserFriendshipRepository(deps.DB.Pool)
 	require.NoError(t, friendRepo.UpsertAccepted(context.Background(), owner.ID, friendViewer.ID))
 
-	friendToken, err := deps.AuthService.GenerateJWT(friendViewer.ID, "", friendViewer.Username, friendViewer.Role)
+	friendToken, err := deps.AuthService.GenerateJWT(friendViewer.ID, friendViewer.Username, friendViewer.Role)
 	require.NoError(t, err)
 	friendReq, err := http.NewRequest("GET", "/api/v1/users/"+owner.Username, nil)
 	require.NoError(t, err)
@@ -97,7 +97,7 @@ func TestUserProfile_FriendsOnly_VisibleToAcceptedFriendAndHiddenOtherwise(t *te
 	friendResp := doRequest(t, deps.Router, friendReq)
 	require.Equal(t, http.StatusOK, friendResp.Code)
 
-	otherToken, err := deps.AuthService.GenerateJWT(otherViewer.ID, "", otherViewer.Username, otherViewer.Role)
+	otherToken, err := deps.AuthService.GenerateJWT(otherViewer.ID, otherViewer.Username, otherViewer.Role)
 	require.NoError(t, err)
 	otherReq, err := http.NewRequest("GET", "/api/v1/users/"+owner.Username, nil)
 	require.NoError(t, err)
@@ -121,7 +121,7 @@ func TestUserProfile_MeUpdate_ValidatesAndPersists(t *testing.T) {
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "me_profile_user", "user")
 
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	updateBody := map[string]any{
@@ -154,7 +154,7 @@ func TestUserProfile_MeUpdate_StatusTextPersistsToPublicReads(t *testing.T) {
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "status_profile_user", "user")
 
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	updateBody := map[string]any{
@@ -184,7 +184,7 @@ func TestUserProfile_MeUpdate_InvalidAvatarRejected(t *testing.T) {
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "me_profile_invalid_avatar", "user")
 
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	updateBody := map[string]any{
@@ -205,7 +205,7 @@ func TestUserProfile_UploadAvatar_UpdatesProfileWithThumbnailURL(t *testing.T) {
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "me_profile_avatar_upload", "user")
 
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	var body bytes.Buffer
@@ -273,7 +273,7 @@ func TestUserProfile_LegacyUpdateAlias_RemainsFunctional(t *testing.T) {
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "legacy_profile_user", "user")
 
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	updateBody := map[string]any{
@@ -309,7 +309,7 @@ func TestUserProfile_MeUpdate_WithoutProfileRow_CreatesProfileEntry(t *testing.T
 	_, err := deps.DB.Pool.Exec(context.Background(), "DELETE FROM user_profiles WHERE user_id = $1", user.ID)
 	require.NoError(t, err)
 
-	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 	require.NoError(t, err)
 
 	updateBody := map[string]any{
