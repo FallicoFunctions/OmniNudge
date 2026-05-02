@@ -6,26 +6,31 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/queue"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // DataExportHandler handles GDPR data export requests
 type DataExportHandler struct {
 	db        *pgxpool.Pool
 	queue     *queue.QueueClient
+	storage   services.StorageService
 	masterKey []byte
 }
 
-func NewDataExportHandler(db *pgxpool.Pool, queueClient *queue.QueueClient, masterKey string) *DataExportHandler {
+func NewDataExportHandler(db *pgxpool.Pool, queueClient *queue.QueueClient, storage services.StorageService, masterKey string) *DataExportHandler {
 	return &DataExportHandler{
 		db:        db,
 		queue:     queueClient,
+		storage:   storage,
 		masterKey: []byte(masterKey),
 	}
 }
@@ -106,7 +111,7 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 		// NOTE: In production, a dedicated salt should be used.
 		privKeyPEM, err := utils.DecryptWithPassword(*encryptedPrivateKey, req.Password, base64.StdEncoding.EncodeToString([]byte(username)))
 		if err != nil {
-			fmt.Printf("[EXPORT] Private key decryption failed for user %d: %v\n", userID, err)
+			zlog.Warn().Int("user_id", userID).Err(err).Msg("private key decryption failed during data export")
 			RespondError(c, http.StatusInternalServerError, "Failed to decrypt encryption keys. Please update your security settings.")
 			return
 		}
@@ -119,7 +124,7 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 			WHERE gkm.user_id = $1
 		`, userID)
 		if err != nil {
-			fmt.Printf("[EXPORT] Failed to fetch group keys: %v\n", err)
+			zlog.Warn().Err(err).Msg("failed to fetch group keys during data export")
 		} else {
 			defer rows.Close()
 			for rows.Next() {
@@ -212,13 +217,11 @@ func (h *DataExportHandler) GetExportStatus(c *gin.Context) {
 
 	var status string
 	var createdAt, completedAt, expiresAt *time.Time
-	var downloadURL *string
-
 	err := h.db.QueryRow(context.Background(), `
-		SELECT status, created_at, completed_at, expires_at, download_url
+		SELECT status, created_at, completed_at, expires_at
 		FROM data_export_requests
 		WHERE export_id = $1 AND user_id = $2
-	`, exportID, userID).Scan(&status, &createdAt, &completedAt, &expiresAt, &downloadURL)
+	`, exportID, userID).Scan(&status, &createdAt, &completedAt, &expiresAt)
 
 	if err != nil {
 		RespondError(c, http.StatusNotFound, "Export request not found")
@@ -243,8 +246,8 @@ func (h *DataExportHandler) GetExportStatus(c *gin.Context) {
 		response["expires_at"] = expiresAt.Format(time.RFC3339)
 	}
 
-	if downloadURL != nil && !expired {
-		response["download_url"] = *downloadURL
+	if status == "completed" && !expired {
+		response["download_ready"] = true
 	}
 
 	if status == "completed" && expired {
@@ -267,7 +270,7 @@ func (h *DataExportHandler) ListExportRequests(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
 	rows, err := h.db.Query(context.Background(), `
-		SELECT export_id, status, created_at, completed_at, expires_at, download_url
+		SELECT export_id, status, created_at, completed_at, expires_at
 		FROM data_export_requests
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -281,13 +284,13 @@ func (h *DataExportHandler) ListExportRequests(c *gin.Context) {
 	defer rows.Close()
 
 	type ExportRequest struct {
-		ExportID    string  `json:"export_id"`
-		Status      string  `json:"status"`
-		CreatedAt   string  `json:"created_at"`
-		CompletedAt *string `json:"completed_at,omitempty"`
-		ExpiresAt   *string `json:"expires_at,omitempty"`
-		DownloadURL *string `json:"download_url,omitempty"`
-		Expired     bool    `json:"expired"`
+		ExportID      string  `json:"export_id"`
+		Status        string  `json:"status"`
+		CreatedAt     string  `json:"created_at"`
+		CompletedAt   *string `json:"completed_at,omitempty"`
+		ExpiresAt     *string `json:"expires_at,omitempty"`
+		Expired       bool    `json:"expired"`
+		DownloadReady bool    `json:"download_ready"`
 	}
 
 	exports := []ExportRequest{}
@@ -296,9 +299,8 @@ func (h *DataExportHandler) ListExportRequests(c *gin.Context) {
 	for rows.Next() {
 		var exportID, status string
 		var createdAt, completedAt, expiresAt *time.Time
-		var downloadURL *string
 
-		if err := rows.Scan(&exportID, &status, &createdAt, &completedAt, &expiresAt, &downloadURL); err != nil {
+		if err := rows.Scan(&exportID, &status, &createdAt, &completedAt, &expiresAt); err != nil {
 			continue
 		}
 
@@ -321,9 +323,7 @@ func (h *DataExportHandler) ListExportRequests(c *gin.Context) {
 			export.ExpiresAt = &expires
 		}
 
-		if downloadURL != nil && !expired {
-			export.DownloadURL = downloadURL
-		}
+		export.DownloadReady = status == "completed" && !expired
 
 		exports = append(exports, export)
 	}
@@ -332,6 +332,50 @@ func (h *DataExportHandler) ListExportRequests(c *gin.Context) {
 		"exports": exports,
 		"total":   len(exports),
 	})
+}
+
+// DownloadExport streams a completed export to its owner.
+func (h *DataExportHandler) DownloadExport(c *gin.Context) {
+	userID := c.GetInt("user_id")
+	exportID := c.Param("export_id")
+
+	var status string
+	var expiresAt time.Time
+	err := h.db.QueryRow(c.Request.Context(), `
+		SELECT status, expires_at
+		FROM data_export_requests
+		WHERE export_id = $1 AND user_id = $2
+	`, exportID, userID).Scan(&status, &expiresAt)
+	if err != nil {
+		RespondError(c, http.StatusNotFound, "Export request not found")
+		return
+	}
+	if status != "completed" {
+		RespondError(c, http.StatusConflict, "Export is not ready")
+		return
+	}
+	if time.Now().After(expiresAt) {
+		RespondError(c, http.StatusGone, "Export has expired")
+		return
+	}
+	if h.storage == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Export download unavailable")
+		return
+	}
+
+	storageKey := fmt.Sprintf("exports/%d/%s.zip", userID, exportID)
+	reader, err := h.storage.Download(c.Request.Context(), storageKey)
+	if err != nil {
+		RespondError(c, http.StatusNotFound, "Export file not found")
+		return
+	}
+	defer reader.Close()
+
+	c.Header("Content-Type", "application/zip")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.zip\"", exportID))
+	if _, err := io.Copy(c.Writer, reader); err != nil {
+		c.Error(err)
+	}
 }
 
 // generateExportID generates a unique ID for the export request

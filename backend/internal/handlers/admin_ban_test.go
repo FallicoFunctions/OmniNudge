@@ -22,7 +22,7 @@ func setupAdminBanTestEnv(t *testing.T) (*gin.Engine, *models.UserRepository, *p
 	gin.SetMode(gin.TestMode)
 
 	// Set up encryption key for tests
-	testKey := "test-encryption-key-32-bytes!"
+	testKey := "test-encryption-key-32-bytes!!!"
 	err := utils.SetEncryptionKey(testKey)
 	require.NoError(t, err)
 

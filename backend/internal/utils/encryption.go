@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -33,20 +34,12 @@ func SetEncryptionKey(key string) error {
 		return nil
 	}
 
-	// Otherwise use the key directly (pad or truncate to 32 bytes)
+	// Fall back to raw bytes — must be exactly 32 bytes
 	keyBytes := []byte(key)
-	if len(keyBytes) < 32 {
-		// Pad with zeros if too short
-		padded := make([]byte, 32)
-		copy(padded, keyBytes)
-		encryptionKey = padded
-	} else if len(keyBytes) > 32 {
-		// Truncate if too long
-		encryptionKey = keyBytes[:32]
-	} else {
-		encryptionKey = keyBytes
+	if len(keyBytes) != 32 {
+		return fmt.Errorf("encryption key must be exactly 32 bytes (or a base64-encoded 32-byte value), got %d bytes", len(keyBytes))
 	}
-
+	encryptionKey = keyBytes
 	return nil
 }
 

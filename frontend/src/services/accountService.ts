@@ -1,6 +1,7 @@
 import api from './api';
 
 interface DataExportRequest {
+  password: string;
   data_types: string[];
   include_deleted: boolean;
 }
@@ -19,7 +20,7 @@ interface ExportStatus {
   created_at: string;
   completed_at?: string;
   expires_at?: string;
-  download_url?: string;
+  download_ready?: boolean;
   expired: boolean;
   message?: string;
 }
@@ -53,6 +54,10 @@ class AccountService {
   async listExports(): Promise<ExportListResponse> {
     const response = await api.get('/account/exports');
     return response.data;
+  }
+
+  getExportDownloadUrl(exportId: string): string {
+    return `${api.defaults.baseURL}/account/export/${exportId}/download`;
   }
 
   /**

@@ -164,8 +164,7 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		fileSize := fileInfo.Size()
 
 		storageKey := fmt.Sprintf("exports/%d/%s.zip", payload.UserID, payload.ExportID)
-		downloadURL, err := storage.Upload(ctx, storageKey, finalZip, "application/zip")
-		if err != nil {
+		if _, err := storage.Upload(ctx, storageKey, finalZip, "application/zip"); err != nil {
 			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to upload to storage: %v", err))
 		}
 
@@ -175,10 +174,9 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 			SET
 				status = 'completed',
 				completed_at = NOW(),
-				file_size_bytes = $1,
-				download_url = $2
-			WHERE export_id = $3
-		`, fileSize, downloadURL, payload.ExportID)
+				file_size_bytes = $1
+			WHERE export_id = $2
+		`, fileSize, payload.ExportID)
 
 		if err != nil {
 			return fmt.Errorf("failed to update completion status: %w", err)
@@ -201,8 +199,8 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 
 		if userEmail != "" && email != nil {
 			subject := "Your OmniNudge Data Export is Ready"
-			body := fmt.Sprintf("Your data export request (%s) is complete.\nYou can download it here: %s\n\nThis link will expire in 7 days.",
-				payload.ExportID, downloadURL)
+			body := fmt.Sprintf("Your data export request (%s) is complete.\nLog in to OmniNudge to download it from your account exports page.\n\nThe export will expire in 7 days.",
+				payload.ExportID)
 
 			_ = email.SendEmail([]string{userEmail}, subject, body, "")
 		}
@@ -230,7 +228,6 @@ func exportProfileData(ctx context.Context, db *pgxpool.Pool, userID int) (inter
 		ID        int       `json:"id"`
 		Username  string    `json:"username"`
 		Email     *string   `json:"email"`
-		RedditID  *string   `json:"reddit_id"`
 		Bio       *string   `json:"bio"`
 		AvatarURL *string   `json:"avatar_url"`
 		Role      string    `json:"role"`
@@ -239,11 +236,11 @@ func exportProfileData(ctx context.Context, db *pgxpool.Pool, userID int) (inter
 	}
 
 	err := db.QueryRow(ctx, `
-		SELECT id, username, email, reddit_id, bio, avatar_url, role, created_at, last_seen
+		SELECT id, username, email, bio, avatar_url, role, created_at, last_seen
 		FROM users
 		WHERE id = $1
 	`, userID).Scan(
-		&profile.ID, &profile.Username, &profile.Email, &profile.RedditID,
+		&profile.ID, &profile.Username, &profile.Email,
 		&profile.Bio, &profile.AvatarURL, &profile.Role, &profile.CreatedAt, &profile.LastSeen,
 	)
 

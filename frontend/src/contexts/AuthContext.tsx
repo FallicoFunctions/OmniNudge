@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { api } from '../lib/api';
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '../types/auth';
 import { OMNI_FEED_STORAGE_KEY, SETTINGS_STORAGE_KEY } from '../constants/storageKeys';
-import { initializeKeys, getOwnPublicKeyBase64, getOwnKeys } from '../services/keyManagementService';
+import { initializeKeys, getOwnPublicKeyBase64, getOwnKeys, storeNonExtractablePrivateKey } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
 import { encryptPrivateKeyWithPassword, decryptPrivateKeyWithPassword } from '../services/keySyncService';
 import { exportKeyPair } from '../utils/encryption';
@@ -21,29 +21,17 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Helper functions for token storage
-const getAuthToken = (): string | null => {
-  return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-};
-
-const setAuthToken = (token: string, keepLoggedIn: boolean) => {
-  if (keepLoggedIn) {
-    localStorage.setItem('auth_token', token);
-    sessionStorage.removeItem('auth_token');
-  } else {
-    sessionStorage.setItem('auth_token', token);
-    localStorage.removeItem('auth_token');
-  }
-};
-
-const removeAuthToken = () => {
-  localStorage.removeItem('auth_token');
-  sessionStorage.removeItem('auth_token');
-};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const clearAuthState = () => {
+    localStorage.removeItem('auth_token');
+    sessionStorage.removeItem('auth_token');
+    localStorage.removeItem(OMNI_FEED_STORAGE_KEY);
+    setUser(null);
+  };
 
   const initializeEncryptionKeys = async (password?: string, publicKey?: string) => {
     try {
@@ -60,8 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const publicKeyBase64 = publicKey || getOwnPublicKeyBase64();
 
             if (publicKeyBase64) {
-              localStorage.setItem('omninudge_private_key', privateKeyBase64);
-              localStorage.setItem('omninudge_public_key', publicKeyBase64);
+              await storeNonExtractablePrivateKey(privateKeyBase64, publicKeyBase64);
               console.log('[AuthContext] Keys synced from server');
               return;
             }
@@ -100,39 +87,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Check if user is already authenticated on mount
+  // Check if user is already authenticated on mount — cookie is sent automatically
   useEffect(() => {
-    console.log('[AuthContext] Mounting, checking for token...', new Date().toISOString());
-    const token = getAuthToken();
-    if (token) {
-      console.log('[AuthContext] Token found, fetching user data...');
-      api
-        .get<User>('/auth/me')
-        .then((userData) => {
-          console.log('[AuthContext] User data received, setting user...', new Date().toISOString());
-          setUser(userData);
-          console.log('[AuthContext] User set, starting background key init...', new Date().toISOString());
-          // Initialize encryption keys in background without blocking
-          initializeEncryptionKeys().catch((err) => {
-            console.error('Background encryption key init failed:', err);
-          });
-        })
-        .catch(() => {
-          // Invalid token
-          removeAuthToken();
-        })
-        .finally(() => {
-          console.log('[AuthContext] Setting isLoading to false...', new Date().toISOString());
-          setIsLoading(false);
+    api
+      .get<User>('/auth/me')
+      .then((userData) => {
+        setUser(userData);
+        initializeEncryptionKeys().catch((err) => {
+          console.error('Background encryption key init failed:', err);
         });
-    } else {
-      setIsLoading(false);
-    }
+      })
+      .catch(() => {
+        // Not authenticated — cookie absent or expired
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   }, []);
 
   const login = async (credentials: LoginRequest) => {
     const response = await api.post<AuthResponse>('/auth/login', credentials);
-    setAuthToken(response.token, credentials.keep_logged_in ?? false);
+    if (credentials.keep_logged_in) {
+      localStorage.setItem('auth_token', response.token);
+      sessionStorage.removeItem('auth_token');
+    } else {
+      sessionStorage.setItem('auth_token', response.token);
+      localStorage.removeItem('auth_token');
+    }
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
@@ -155,8 +136,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (data: RegisterRequest) => {
     const response = await api.post<AuthResponse>('/auth/register', data);
-    // For registration, default to keeping logged in (can be customized)
-    setAuthToken(response.token, true);
+    localStorage.setItem('auth_token', response.token);
+    sessionStorage.removeItem('auth_token');
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
@@ -179,17 +160,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     analyticsService.track('user_logout');
     analyticsService.reset();
 
-    removeAuthToken();
-    localStorage.removeItem(OMNI_FEED_STORAGE_KEY);
-    setUser(null);
-
     // NOTE: We do NOT clear encryption keys on logout
     // This allows users to access their encrypted messages across sessions
     // Keys should only be cleared if the user explicitly requests to "forget this device"
 
-    // Optionally call backend logout endpoint
-    api.post('/auth/logout').catch(() => {
+    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+    void api.request('/auth/logout', { method: 'POST', headers }).catch(() => {
       // Ignore errors on logout
+    }).finally(() => {
+      clearAuthState();
     });
   };
 

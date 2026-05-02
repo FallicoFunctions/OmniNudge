@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS data_export_requests (
     data_types TEXT[] NOT NULL, -- Array of data types: profile, messages, posts, etc.
     include_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, processing, completed, failed
-    download_url TEXT, -- S3 URL for the export file
     file_size_bytes BIGINT, -- Size of the export file
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMPTZ,

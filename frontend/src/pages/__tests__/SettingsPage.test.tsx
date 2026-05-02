@@ -8,6 +8,9 @@ const setShowPushNotifications = vi.fn();
 const setAutoUnarchiveOnMessage = vi.fn();
 const enablePush = vi.fn();
 const disablePush = vi.fn();
+const { requestDataExport } = vi.hoisted(() => ({
+  requestDataExport: vi.fn(),
+}));
 
 const buildSettingsMock = (showPushNotifications: boolean) => ({
   useRelativeTime: true,
@@ -121,7 +124,7 @@ vi.mock('../../services/usersService', () => ({
 
 vi.mock('../../services/accountService', () => ({
   accountService: {
-    requestDataExport: vi.fn(),
+    requestDataExport,
   },
 }));
 
@@ -283,4 +286,40 @@ describe('SettingsPage messaging privacy toggles', () => {
     },
     10000
   );
+});
+
+describe('SettingsPage data export', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('submits export password with the request', async () => {
+    requestDataExport.mockResolvedValue({
+      export_id: 'export_123',
+      status: 'pending',
+      expires_at: new Date().toISOString(),
+      message: 'ok',
+      note: 'note',
+    });
+
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.privacy' }));
+    fireEvent.change(screen.getByLabelText('Confirm password'), {
+      target: { value: 'ValidPass123!' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'settings.dataExport.requestButton' }));
+
+    await waitFor(() => {
+      expect(requestDataExport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          password: 'ValidPass123!',
+        })
+      );
+    });
+  });
 });
