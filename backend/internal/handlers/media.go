@@ -271,11 +271,11 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 
 	if err := middleware.ValidateStrictDocumentStructure(storagePath, safeName, contentType, sniff[:n]); err != nil {
 		_ = os.Remove(storagePath)
+		zlog.Warn().Err(err).Str("name", safeName).Str("type", contentType).Msg("invalid document structure")
 		c.JSON(http.StatusUnsupportedMediaType, gin.H{
-			"error":   "Invalid document structure",
-			"name":    safeName,
-			"type":    contentType,
-			"details": err.Error(),
+			"error": "Invalid document structure",
+			"name":  safeName,
+			"type":  contentType,
 		})
 		return
 	}
@@ -835,7 +835,8 @@ func (h *MediaHandler) GetPresignedURL(c *gin.Context) {
 
 	var req presignedURLRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		RespondError(c, http.StatusBadRequest, "Invalid request body: "+err.Error())
+		zlog.Debug().Err(err).Msg("invalid request body")
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -986,7 +987,8 @@ func (h *MediaHandler) ConfirmUpload(c *gin.Context) {
 
 	var req confirmUploadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		RespondError(c, http.StatusBadRequest, "Invalid request body: "+err.Error())
+		zlog.Debug().Err(err).Msg("invalid request body")
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 

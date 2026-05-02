@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/monitoring"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // SearchHandler handles full-text search requests
@@ -107,10 +108,8 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 	args = append(args, cursorArgs...)
 	rows, err := h.pool.Query(c.Request.Context(), sql, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Search failed",
-			"details": err.Error(),
-		})
+		zlog.Error().Err(err).Msg("search posts query failed")
+		RespondError(c, http.StatusInternalServerError, "Search failed")
 		return
 	}
 	defer rows.Close()

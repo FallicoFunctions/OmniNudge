@@ -5,7 +5,6 @@ import (
 	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"errors"
-	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -18,6 +17,7 @@ import (
 	"github.com/omninudge/backend/internal/helpers"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/repository"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // HubsHandler handles hub CRUD
@@ -412,10 +412,8 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 		for i := 0; i < 2; i++ {
 			result := <-resultsChan
 			if result.err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error":   "Failed to fetch posts",
-					"details": result.err.Error(),
-				})
+				zlog.Error().Err(result.err).Msg("failed to fetch hub posts")
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts"})
 				return
 			}
 			if result.kind == "pinned" {
@@ -1145,13 +1143,8 @@ func (h *HubsHandler) UpdateHubNSFW(c *gin.Context) {
 		NSFW bool `json:"nsfw"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		// Read raw body for debugging
-		body, _ := io.ReadAll(c.Request.Body)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request body",
-			"details": err.Error(),
-			"body":    string(body),
-		})
+		zlog.Debug().Err(err).Msg("invalid request body for nsfw update")
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
