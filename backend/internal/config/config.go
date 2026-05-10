@@ -32,6 +32,7 @@ type Config struct {
 	AsynqmonToken string // Bearer token for /admin/queues dashboard; empty = unrestricted (dev only)
 	TURN          TURNConfig
 	Qwen          QwenConfig
+	Gemini        GeminiConfig
 }
 
 // QwenConfig holds Qwen AI (via OpenRouter) configuration for AI-powered Hub Page Designer.
@@ -40,6 +41,13 @@ type QwenConfig struct {
 	APIKey  string // QWEN_API_KEY — OpenRouter API key
 	BaseURL string // QWEN_BASE_URL — defaults to https://openrouter.ai/api/v1
 	Model   string // QWEN_MODEL — defaults to qwen/qwen3-coder-480b-a35b-instruct:free
+}
+
+// GeminiConfig holds Google Gemini API configuration for the Hub AI Designer.
+// When APIKey is empty the generate endpoint returns a 503.
+type GeminiConfig struct {
+	APIKey string // GEMINI_API_KEY
+	Model  string // GEMINI_MODEL — defaults to gemini-2.5-flash
 }
 
 // TURNConfig holds coturn TURN server configuration for WebRTC relay
@@ -198,7 +206,7 @@ func Load() (*Config, error) {
 			Host:        getEnv("DB_HOST", "localhost"),
 			Port:        getEnvAsInt("DB_PORT", 5432),
 			User:        requireEnv("DB_USER"),
-			Password:    requireEnv("DB_PASSWORD"),
+			Password:    getEnv("DB_PASSWORD", ""),
 			DBName:      getEnv("DB_NAME", "omninudge_dev"),
 			SSLMode:     getEnv("DB_SSLMODE", "disable"),
 			AutoMigrate: getEnvAsBool("DB_AUTO_MIGRATE", true),
@@ -283,6 +291,10 @@ func Load() (*Config, error) {
 			APIKey:  getEnv("QWEN_API_KEY", ""),
 			BaseURL: getEnv("QWEN_BASE_URL", "https://openrouter.ai/api/v1"),
 			Model:   getEnv("QWEN_MODEL", "qwen/qwen3-coder-480b-a35b-instruct:free"),
+		},
+		Gemini: GeminiConfig{
+			APIKey: getEnv("GEMINI_API_KEY", ""),
+			Model:  getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
 		},
 	}
 
