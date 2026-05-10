@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { hubAIDesignerService, type AIDesign } from '../../services/hubAIDesignerService';
@@ -19,6 +19,19 @@ export default function HubAIDesignerTab({ hubName }: Props) {
   const [pendingDesignId, setPendingDesignId] = useState<number | null>(null);
   const [pendingDesignName, setPendingDesignName] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    if (!previewHTML) { setPreviewBlobUrl(null); return; }
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><script src="https://cdn.tailwindcss.com"><\/script></head><body class="bg-white p-4">${previewHTML}</body></html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    blobUrlRef.current = url;
+    setPreviewBlobUrl(url);
+    return () => { URL.revokeObjectURL(url); };
+  }, [previewHTML]);
 
   const { data: designsData, isLoading: designsLoading } = useQuery({
     queryKey: ['hubAIDesigns', hubName],
@@ -81,7 +94,7 @@ export default function HubAIDesignerTab({ hubName }: Props) {
         <h2 className="text-xl font-bold text-[var(--color-text-primary)]">AI Hub Page Designer</h2>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
           Describe your ideal Hub page and AI will generate the HTML layout for you.
-          Designs are rendered in a secure sandbox — no scripts can run.
+          Designs are previewed in a sandboxed iframe and cannot access your account.
         </p>
       </div>
 
@@ -142,12 +155,11 @@ export default function HubAIDesignerTab({ hubName }: Props) {
               )}
             </div>
           </div>
-          <p className="text-xs text-[var(--color-text-secondary)]">Secure sandbox — scripts blocked.</p>
           <iframe
             className="w-full rounded border border-[var(--color-border)] bg-white"
             style={{ minHeight: 400 }}
-            sandbox="allow-same-origin"
-            srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-white p-4">${previewHTML}</body></html>`}
+            src={previewBlobUrl ?? undefined}
+            sandbox="allow-scripts allow-same-origin"
             title="AI Hub Design Preview"
           />
         </div>
@@ -212,7 +224,7 @@ export default function HubAIDesignerTab({ hubName }: Props) {
                 </div>
                 <div className="flex gap-3 shrink-0">
                   <button
-                    onClick={() => setPreviewHTML(design.html_content)}
+                    onClick={() => navigate(`/h/${hubName}/ai-design/preview/${design.id}`)}
                     className="text-xs text-[var(--color-primary)] hover:text-[var(--color-primary-strong)] font-medium transition-colors"
                   >
                     Preview

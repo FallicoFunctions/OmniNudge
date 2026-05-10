@@ -587,9 +587,10 @@ func main() {
 	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
 	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, tokenRepo, firebaseService)
 	callsHandler := handlers.NewCallsHandler(db.Pool, hub, cfg.TURN)
+	zlog.Info().Bool("gemini_key_set", cfg.Gemini.APIKey != "").Str("gemini_model", cfg.Gemini.Model).Msg("AI designer config")
 	hubAIDesignerHandler := handlers.NewHubAIDesignerHandler(
 		db.Pool, hubSettingsRepo,
-		cfg.Qwen.APIKey, cfg.Qwen.Model,
+		cfg.Gemini.APIKey, cfg.Gemini.Model,
 	)
 
 	// Feature 1: Message Reactions handler + rate limiter
@@ -1211,9 +1212,15 @@ func main() {
 			// Hub AI Designer routes (requires moderator permissions)
 			protected.POST("/hubs/:name/ai-design/generate", aiDesignRateLimiter.Middleware(), hubAIDesignerHandler.Generate)
 			protected.GET("/hubs/:name/ai-designs", hubAIDesignerHandler.ListDesigns)
+			protected.GET("/hubs/:name/ai-designs/:id", hubAIDesignerHandler.GetDesign)
 			protected.POST("/hubs/:name/ai-designs/:id/activate", hubAIDesignerHandler.Activate)
 			protected.POST("/hubs/:name/ai-design/deactivate", hubAIDesignerHandler.Deactivate)
 			protected.DELETE("/hubs/:name/ai-designs/:id", hubAIDesignerHandler.DeleteDesign)
+			protected.PUT("/hubs/:name/ai-designs/:id", hubAIDesignerHandler.UpdateDesign)
+			protected.POST("/hubs/:name/ai-designs/:id/copy", hubAIDesignerHandler.CopyDesign)
+			protected.GET("/hubs/:name/ai-designs/:id/versions", hubAIDesignerHandler.GetDesignVersions)
+			protected.POST("/hubs/:name/ai-designs/:id/versions", hubAIDesignerHandler.SaveDesignVersion)
+			protected.POST("/hubs/:name/ai-designs/:id/chat", hubAIDesignerHandler.ChatDesign)
 
 			// Voice/Video Call routes (F12)
 			protected.POST("/conversations/:id/calls", callsHandler.StartCall)

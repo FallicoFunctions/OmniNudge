@@ -68,6 +68,8 @@ export default function MainLayout() {
   // Enable notification sounds globally
   useNotificationSound();
 
+  const isAIPreview = /^\/h\/[^/]+\/ai-design\/preview\//.test(location.pathname);
+
   // Determine if slim mode
   const isSlimMode =
     multiColumnState.viewMode === 'omniscroll' || multiColumnState.viewMode === 'standard-scroll';
@@ -198,7 +200,7 @@ export default function MainLayout() {
 
       {/* Navigation Bar */}
       <nav
-        className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)] transition-all duration-200"
+        className={`sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)] transition-all duration-200${isAIPreview ? ' hidden' : ''}`}
         style={{ height: isSlimMode ? '36px' : '64px' }}
       >
         <div className="mx-auto max-w-7xl px-4 h-full">
@@ -539,8 +541,8 @@ export default function MainLayout() {
         <Outlet />
       </main>
 
-      {/* Mobile tab bar - only shows on mobile (<768px) */}
-      {isMobile && (
+      {/* Mobile tab bar - only shows on mobile (<768px), not on AI preview */}
+      {isMobile && !isAIPreview && (
         <ErrorBoundary
           fallback={
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800 text-center">

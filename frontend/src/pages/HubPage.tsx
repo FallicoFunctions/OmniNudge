@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef, Suspense } from 'react';
 import type { HTMLAttributes, PointerEvent as ReactPointerEvent } from 'react';
 import {
   keepPreviousData,
@@ -55,6 +55,8 @@ import { buildPostUpdateRequest } from '../utils/postUpdate';
 import { requiresModerator } from '../utils/permissions';
 import { useTimeRangeFilter } from '../hooks/useTimeRangeFilter';
 import { usePostSearch } from '../hooks/usePostSearch';
+import { hubAIDesignerService } from '../services/hubAIDesignerService';
+import HubAIDesignRenderer from '../components/hubDesign/HubAIDesignRenderer';
 
 const EMPTY_POSTS: LocalSubredditPost[] = [];
 
@@ -354,6 +356,15 @@ export default function HubsPage() {
   const isModerator = useMemo(() => {
     return isUserHubModerator(user, hubModerators, hubDetails);
   }, [user, hubModerators, hubDetails]);
+
+  // Fetch active AI design for this hub (if any)
+  const { data: aiDesignData } = useQuery({
+    queryKey: ['hub-ai-design-active', hubname],
+    queryFn: () => hubAIDesignerService.getActiveDesign(hubname),
+    enabled: !!hubname && hubname !== 'popular' && hubname !== 'all',
+    staleTime: 60_000,
+  });
+  const activeAIDesign = aiDesignData?.design ?? null;
 
   const isSearchActive = hubSearchResults !== null;
 
@@ -984,6 +995,20 @@ export default function HubsPage() {
     crosspostMutation.mutate();
   };
   const isCrosspostSubmitDisabled = (!selectedHub && !selectedSubreddit) || !crosspostTitle.trim();
+
+  // If an AI design is active, replace the entire page with it
+  if (activeAIDesign && hubname) {
+    return (
+      <Suspense fallback={null}>
+        <HubAIDesignRenderer
+          hubName={hubname}
+          htmlContent={activeAIDesign.html_content}
+          user={user}
+          isModerator={isModerator}
+        />
+      </Suspense>
+    );
+  }
 
   if (isLoading) {
     return (

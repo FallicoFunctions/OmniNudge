@@ -33,6 +33,12 @@ export interface UpdateDesignResponse {
   html_content: string;
 }
 
+export interface DesignVersion {
+  id: number;
+  html_content: string;
+  created_at: string;
+}
+
 export const hubAIDesignerService = {
   async generateDesign(hubName: string, prompt: string): Promise<GenerateDesignResponse> {
     const response = await api.post(`/hubs/${hubName}/ai-design/generate`, { prompt }, { timeout: 60000 });
@@ -72,6 +78,32 @@ export const hubAIDesignerService = {
     data: UpdateDesignRequest
   ): Promise<UpdateDesignResponse> {
     const response = await api.put(`/hubs/${hubName}/ai-designs/${designId}`, data);
+    return response.data;
+  },
+
+  async getDesign(hubName: string, designId: number): Promise<{ design: AIDesign }> {
+    const response = await api.get(`/hubs/${hubName}/ai-designs/${designId}`);
+    return response.data;
+  },
+
+  async getVersions(hubName: string, designId: number): Promise<{ versions: DesignVersion[] }> {
+    const response = await api.get(`/hubs/${hubName}/ai-designs/${designId}/versions`);
+    return response.data;
+  },
+
+  async saveVersion(hubName: string, designId: number, htmlContent: string): Promise<{ html_content: string }> {
+    const response = await api.post(`/hubs/${hubName}/ai-designs/${designId}/versions`, {
+      html_content: htmlContent,
+    });
+    return response.data;
+  },
+
+  async chatRefine(hubName: string, designId: number, currentHtml: string, message: string): Promise<{ html_content: string }> {
+    const response = await api.post(
+      `/hubs/${hubName}/ai-designs/${designId}/chat`,
+      { current_html: currentHtml, message },
+      { timeout: 120000 }
+    );
     return response.data;
   },
 };
