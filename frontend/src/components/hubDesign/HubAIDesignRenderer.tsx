@@ -180,7 +180,7 @@ export default function HubAIDesignRenderer({
   ]);
 
   return (
-    <>
+    <div style={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
       <AIDesignMarkup containerRef={containerRef} html={htmlWithoutStyles} />
       {Array.from(slotsByMarker.entries()).map(([marker, slot]) => {
         const target = markerElements.get(marker);
@@ -189,6 +189,6 @@ export default function HubAIDesignRenderer({
         }
         return createPortal(renderSlotContent(slot), target, marker);
       })}
-    </>
+    </div>
   );
 }
