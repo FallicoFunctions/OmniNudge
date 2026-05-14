@@ -2,86 +2,109 @@ export type SlotId = 'hub-feed' | 'hub-join' | 'hub-create' | 'hub-mod';
 
 export interface DesignSlot {
   id: SlotId;
+  tagName: string;
+  attributes: Array<{ name: string; value: string }>;
   style: string; // raw cssText from the slot element's style attribute
 }
 
 export interface SplitDesignResult {
-  // The AI HTML split into segments. Each segment is either a raw HTML string
-  // or a slot marker. Rendered in order they produce the full page.
-  segments: Array<{ type: 'html'; html: string } | { type: 'slot'; slot: DesignSlot }>;
-  // The extracted <style> block content (empty string if none).
+  htmlWithoutStyles: string;
   styleContent: string;
-  // Whether any slots were found.
   hasSlots: boolean;
+  slotsByMarker: Map<string, DesignSlot>;
 }
 
 const SLOT_IDS: SlotId[] = ['hub-feed', 'hub-join', 'hub-create', 'hub-mod'];
-const PLACEHOLDER_PREFIX = '__OMNINUDGE_SLOT_';
+const MARKER_PREFIX = 'hub-slot-marker-';
+const SAFE_SLOT_HOST_TAGS = new Set(['div', 'section', 'aside', 'article', 'header', 'footer', 'main']);
+const SAFE_SLOT_ATTR_NAMES = new Set([
+  'class',
+  'title',
+  'dir',
+  'lang',
+  'aria-label',
+  'aria-labelledby',
+  'aria-describedby',
+]);
+
+function isSafeSlotAttribute(attributeName: string): boolean {
+  if (attributeName.startsWith('data-')) {
+    return true;
+  }
+  return SAFE_SLOT_ATTR_NAMES.has(attributeName);
+}
+
+function sanitizeSlotHost(doc: Document, slotNode: HTMLElement, slotId: SlotId, marker: string): HTMLElement {
+  const normalizedTagName = SAFE_SLOT_HOST_TAGS.has(slotNode.tagName.toLowerCase())
+    ? slotNode.tagName.toLowerCase()
+    : 'div';
+  const safeAttributes = Array.from(slotNode.attributes)
+    .filter((attribute) => isSafeSlotAttribute(attribute.name))
+    .map((attribute) => ({ name: attribute.name, value: attribute.value }));
+  const style = slotNode.getAttribute('style') ?? '';
+  const sanitizedHost = normalizedTagName === slotNode.tagName.toLowerCase()
+    ? slotNode
+    : doc.createElement(normalizedTagName);
+
+  if (sanitizedHost !== slotNode) {
+    while (slotNode.firstChild) {
+      sanitizedHost.appendChild(slotNode.firstChild);
+    }
+    slotNode.replaceWith(sanitizedHost);
+  }
+
+  Array.from(sanitizedHost.attributes).forEach((attribute) => {
+    sanitizedHost.removeAttribute(attribute.name);
+  });
+  sanitizedHost.id = slotId;
+  sanitizedHost.setAttribute('data-hub-slot-marker', marker);
+  safeAttributes.forEach(({ name, value }) => {
+    sanitizedHost.setAttribute(name, value);
+  });
+  if (style) {
+    sanitizedHost.setAttribute('style', style);
+  }
+
+  return sanitizedHost;
+}
 
 export function splitAIDesignHTML(html: string): SplitDesignResult {
   if (!html) {
-    return { segments: [{ type: 'html', html: '' }], styleContent: '', hasSlots: false };
-  }
-
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-
-  // Extract <style> content — DOMParser moves style blocks to <head>.
-  const styleContent = Array.from(doc.querySelectorAll('style'))
-    .map(s => s.textContent ?? '')
-    .join('\n');
-
-  // Find all slot elements and record their styles, then replace with placeholders.
-  const slots = new Map<string, DesignSlot>();
-  for (const id of SLOT_IDS) {
-    const el = doc.getElementById(id);
-    if (!el) continue;
-    const slot: DesignSlot = { id: id as SlotId, style: el.getAttribute('style') ?? '' };
-    slots.set(id, slot);
-    const placeholder = doc.createElement('div');
-    placeholder.id = `${PLACEHOLDER_PREFIX}${id}`;
-    el.replaceWith(placeholder);
-  }
-
-  if (slots.size === 0) {
     return {
-      segments: [{ type: 'html', html: doc.body.innerHTML }],
-      styleContent,
+      htmlWithoutStyles: '',
+      styleContent: '',
       hasSlots: false,
+      slotsByMarker: new Map(),
     };
   }
 
-  // Split the serialized body HTML at each placeholder marker.
-  let remaining = doc.body.innerHTML;
-  const segments: SplitDesignResult['segments'] = [];
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const styleContent = Array.from(doc.querySelectorAll('style'))
+    .map((styleNode) => styleNode.textContent ?? '')
+    .join('\n');
+  doc.querySelectorAll('style').forEach((styleNode) => styleNode.remove());
 
-  // Process in document order by repeatedly finding the earliest placeholder.
-  while (remaining.length > 0) {
-    let earliest = -1;
-    let earliestId: SlotId | null = null;
+  const slotsByMarker = new Map<string, DesignSlot>();
+  for (const id of SLOT_IDS) {
+    const slotNode = doc.getElementById(id);
+    if (!slotNode) continue;
 
-    for (const id of slots.keys()) {
-      const marker = `<div id="${PLACEHOLDER_PREFIX}${id}"></div>`;
-      const idx = remaining.indexOf(marker);
-      if (idx !== -1 && (earliest === -1 || idx < earliest)) {
-        earliest = idx;
-        earliestId = id as SlotId;
-      }
-    }
-
-    if (earliest === -1 || !earliestId) {
-      // No more placeholders — rest is trailing HTML.
-      if (remaining) segments.push({ type: 'html', html: remaining });
-      break;
-    }
-
-    const marker = `<div id="${PLACEHOLDER_PREFIX}${earliestId}"></div>`;
-    if (earliest > 0) {
-      segments.push({ type: 'html', html: remaining.slice(0, earliest) });
-    }
-    segments.push({ type: 'slot', slot: slots.get(earliestId)! });
-    remaining = remaining.slice(earliest + marker.length);
-    slots.delete(earliestId); // each slot only appears once
+    const marker = `${MARKER_PREFIX}${id}`;
+    const sanitizedHost = sanitizeSlotHost(doc, slotNode, id, marker);
+    slotsByMarker.set(marker, {
+      id,
+      tagName: sanitizedHost.tagName.toLowerCase(),
+      attributes: Array.from(sanitizedHost.attributes)
+        .filter((attribute) => !['id', 'style', 'data-hub-slot-marker'].includes(attribute.name))
+        .map((attribute) => ({ name: attribute.name, value: attribute.value })),
+      style: sanitizedHost.getAttribute('style') ?? '',
+    });
   }
 
-  return { segments, styleContent, hasSlots: true };
+  return {
+    htmlWithoutStyles: doc.body.innerHTML,
+    styleContent,
+    hasSlots: slotsByMarker.size > 0,
+    slotsByMarker,
+  };
 }

@@ -1,16 +1,28 @@
-import { useEffect, useLayoutEffect, useRef, useMemo, useState, useCallback } from 'react';
-import * as ReactDOM from 'react-dom/client';
-import { createElement } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  HubJoinSlot, HubCreateSlot, HubModSlot,
-  HubFeedControls, StandalonePostFeed,
+  HubJoinSlot,
+  HubCreateSlot,
+  HubModSlot,
+  HubFeedControls,
+  StandalonePostFeed,
+  type FeedSlotPost,
   type SortOption,
 } from './HubDesignSlots';
 import { hubsService } from '../../services/hubsService';
 import { subscriptionService } from '../../services/subscriptionService';
 import type { User } from '../../types/auth';
-import type { PlatformPost } from '../../types/posts';
+import { splitAIDesignHTML, type DesignSlot } from '../../utils/splitAIDesignHTML';
 
 interface HubAIDesignRendererProps {
   hubName: string;
@@ -19,8 +31,19 @@ interface HubAIDesignRendererProps {
   isModerator: boolean;
 }
 
-const EMPTY_POSTS: PlatformPost[] = [];
-const SLOT_IDS = ['hub-join', 'hub-create', 'hub-mod', 'hub-feed'] as const;
+const EMPTY_POSTS: FeedSlotPost[] = [];
+
+interface AIDesignMarkupProps {
+  containerRef: RefObject<HTMLDivElement | null>;
+  html: string;
+}
+
+const AIDesignMarkup = memo(function AIDesignMarkup({
+  containerRef,
+  html,
+}: AIDesignMarkupProps) {
+  return <div ref={containerRef} dangerouslySetInnerHTML={{ __html: html }} />;
+});
 
 export default function HubAIDesignRenderer({
   hubName,
@@ -30,20 +53,17 @@ export default function HubAIDesignRenderer({
 }: HubAIDesignRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const styleElRef = useRef<HTMLStyleElement | null>(null);
-  const rootsRef = useRef<Partial<Record<string, ReactDOM.Root>>>({});
+  const [markerElements, setMarkerElements] = useState<Map<string, HTMLElement>>(new Map());
 
   const [sort, setSort] = useState<SortOption>('hot');
   const [search, setSearch] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const handleSearch = useCallback(() => setActiveSearch(search), [search]);
 
-  // ── HTML / style extraction ────────────────────────────────────────────────
-  const { cleanHtml, styleContent } = useMemo(() => {
-    const doc = new DOMParser().parseFromString(htmlContent, 'text/html');
-    const styles = Array.from(doc.querySelectorAll('style'))
-      .map(s => s.textContent ?? '').join('\n');
-    return { cleanHtml: doc.body.innerHTML, styleContent: styles };
-  }, [htmlContent]);
+  const { htmlWithoutStyles, styleContent, slotsByMarker } = useMemo(
+    () => splitAIDesignHTML(htmlContent),
+    [htmlContent],
+  );
 
   useEffect(() => {
     if (!styleContent) return;
@@ -67,89 +87,108 @@ export default function HubAIDesignRenderer({
     queryKey: ['hub-ai-posts', hubName, sort],
     queryFn: () => hubsService.getHubPosts(hubName, sort, 25),
   });
-  const allPosts: PlatformPost[] = postsData?.posts ?? EMPTY_POSTS;
+  const allPosts: FeedSlotPost[] = postsData?.posts ?? EMPTY_POSTS;
   const filteredPosts = useMemo(() => {
     if (!activeSearch) return allPosts;
     const q = activeSearch.toLowerCase();
     return allPosts.filter(p => p.title?.toLowerCase().includes(q));
   }, [allPosts, activeSearch]);
 
-  // ── Live refs — always hold latest values without triggering re-renders ────
-  // Effect 1 (useLayoutEffect) reads this synchronously so it always has current data.
-  const liveRef = useRef({ isSubscribed, user, isModerator, sort, search,
-                            handleSearch, postsLoading, filteredPosts });
-  useEffect(() => {
-    liveRef.current = { isSubscribed, user, isModerator, sort, search,
-                        handleSearch, postsLoading, filteredPosts };
-  });
-
-  // ── Shared render function — called by both effects ───────────────────────
-  const renderIntoRoots = useCallback((
-    iv: typeof liveRef.current,
-    roots: typeof rootsRef.current,
-  ) => {
-    roots['hub-join']?.render(
-      createElement(HubJoinSlot, { hubName, isSubscribed: iv.isSubscribed, userId: iv.user?.id ?? null })
-    );
-    roots['hub-create']?.render(
-      createElement(HubCreateSlot, { hubName, userId: iv.user?.id ?? null })
-    );
-    roots['hub-mod']?.render(
-      createElement(HubModSlot, { hubName, isModerator: iv.isModerator })
-    );
-    roots['hub-feed']?.render(
-      createElement('div', null,
-        createElement(HubFeedControls, {
-          sort: iv.sort, onSortChange: setSort,
-          searchValue: iv.search, onSearchChange: setSearch, onSearch: iv.handleSearch,
-        }),
-        createElement(StandalonePostFeed, {
-          posts: iv.filteredPosts, loading: iv.postsLoading, hubName,
-        })
-      )
-    );
-  }, [hubName]); // hubName only — rest comes through liveRef / args
-
-  // ── EFFECT 1: Create roots once per design ────────────────────────────────
-  // useLayoutEffect runs synchronously after DOM mutation, before paint.
-  // This guarantees the slot divs from dangerouslySetInnerHTML exist when
-  // we query them — no setTimeout race condition.
   useLayoutEffect(() => {
-    const c = containerRef.current;
-    if (!c) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    // Teardown any previous roots (design changed).
-    Object.values(rootsRef.current).forEach(r => { try { r?.unmount(); } catch { /**/ } });
-    rootsRef.current = {};
-
-    // Create one root per slot.
-    SLOT_IDS.forEach(slotId => {
-      const slot = c.querySelector(`#${slotId}`);
-      if (!slot) return;
-      slot.innerHTML = '';
-      const wrapper = document.createElement('div');
-      wrapper.style.cssText = 'display:contents';
-      slot.appendChild(wrapper);
-      rootsRef.current[slotId] = ReactDOM.createRoot(wrapper);
+    const next = new Map<string, HTMLElement>();
+    container.querySelectorAll<HTMLElement>('[data-hub-slot-marker]').forEach((node) => {
+      const marker = node.getAttribute('data-hub-slot-marker');
+      if (marker && slotsByMarker.has(marker)) {
+        node.replaceChildren();
+        next.set(marker, node);
+      }
     });
+    setMarkerElements(next);
+  }, [htmlWithoutStyles, slotsByMarker]);
 
-    // Render immediately with the CURRENT live values (via ref, not stale closure).
-    renderIntoRoots(liveRef.current, rootsRef.current);
+  useLayoutEffect(() => {
+    markerElements.forEach((node, marker) => {
+      const slot = slotsByMarker.get(marker);
+      if (!slot) return;
 
-    return () => {
-      Object.values(rootsRef.current).forEach(r => { try { r?.unmount(); } catch { /**/ } });
-      rootsRef.current = {};
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cleanHtml, hubName]); // intentionally minimal — liveRef provides current data
+      node.id = slot.id;
+      const expectedAttributes = new Set<string>(['id', 'style', 'data-hub-slot-marker']);
+      slot.attributes.forEach(({ name, value }) => {
+        node.setAttribute(name, value);
+        expectedAttributes.add(name);
+      });
+      Array.from(node.attributes).forEach(({ name }) => {
+        if (!expectedAttributes.has(name)) {
+          node.removeAttribute(name);
+        }
+      });
+      if (slot.style) {
+        node.setAttribute('style', slot.style);
+      } else {
+        node.removeAttribute('style');
+      }
+    });
+  }, [markerElements, slotsByMarker]);
 
-  // ── EFFECT 2: Update roots when data changes ──────────────────────────────
-  // Never unmounts roots — just re-renders into existing ones.
-  useEffect(() => {
-    if (!Object.keys(rootsRef.current).length) return; // roots not ready yet
-    renderIntoRoots(liveRef.current, rootsRef.current);
-  }, [isSubscribed, user, isModerator, sort, search, handleSearch,
-      postsLoading, filteredPosts, renderIntoRoots]);
+  const renderSlotContent = useCallback((slot: DesignSlot) => {
+    switch (slot.id) {
+      case 'hub-join':
+        return (
+          <HubJoinSlot
+            hubName={hubName}
+            isSubscribed={isSubscribed}
+            userId={user?.id ?? null}
+          />
+        );
+      case 'hub-create':
+        return <HubCreateSlot hubName={hubName} userId={user?.id ?? null} />;
+      case 'hub-mod':
+        return <HubModSlot hubName={hubName} isModerator={isModerator} />;
+      case 'hub-feed':
+        return (
+          <div className="hub-slot-feed">
+            <HubFeedControls
+              sort={sort}
+              onSortChange={setSort}
+              searchValue={search}
+              onSearchChange={setSearch}
+              onSearch={handleSearch}
+            />
+            <StandalonePostFeed
+              posts={filteredPosts}
+              loading={postsLoading}
+              hubName={hubName}
+            />
+          </div>
+        );
+      default:
+        return null;
+    }
+  }, [
+    filteredPosts,
+    handleSearch,
+    hubName,
+    isModerator,
+    isSubscribed,
+    postsLoading,
+    search,
+    sort,
+    user,
+  ]);
 
-  return <div ref={containerRef} dangerouslySetInnerHTML={{ __html: cleanHtml }} />;
+  return (
+    <>
+      <AIDesignMarkup containerRef={containerRef} html={htmlWithoutStyles} />
+      {Array.from(slotsByMarker.entries()).map(([marker, slot]) => {
+        const target = markerElements.get(marker);
+        if (!target || !target.isConnected) {
+          return null;
+        }
+        return createPortal(renderSlotContent(slot), target, marker);
+      })}
+    </>
+  );
 }

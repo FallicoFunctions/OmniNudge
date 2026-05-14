@@ -1,11 +1,10 @@
 /**
  * Standalone slot components — deliberately avoid all app-level context
- * (no useNavigate, no useMutation, no QueryClient) so they can be rendered
- * via ReactDOM.createRoot() without any provider wrappers.
+ * (no useNavigate, no useMutation, no QueryClient) so they stay easy to mount
+ * inside AI-authored layouts without depending on additional wrapper trees.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../../services/api';
-import type { PlatformPost } from '../../types/posts';
 
 // ─── Join / Subscribe slot ──────────────────────────────────────────────────
 
@@ -18,6 +17,10 @@ interface HubJoinSlotProps {
 export function HubJoinSlot({ hubName, isSubscribed: initialSubscribed, userId }: HubJoinSlotProps) {
   const [subscribed, setSubscribed] = useState(initialSubscribed);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setSubscribed(initialSubscribed);
+  }, [initialSubscribed]);
 
   const openAuth = () => {
     window.dispatchEvent(
@@ -121,6 +124,19 @@ const SORTS: { value: SortOption; label: string }[] = [
 
 // ─── Standalone Post Card ────────────────────────────────────────────────────
 
+export interface FeedSlotPost {
+  id: number;
+  title: string;
+  author_username?: string | null;
+  author?: {
+    username?: string | null;
+  } | null;
+  score?: number | null;
+  comment_count?: number | null;
+  num_comments?: number | null;
+  created_at: string;
+}
+
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -133,10 +149,11 @@ function relativeTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
-interface PostCardProps { post: PlatformPost; hubName: string; }
+interface PostCardProps { post: FeedSlotPost; hubName: string; }
 
 function StandalonePostCard({ post, hubName }: PostCardProps) {
   const href = `/h/${hubName}/comments/${post.id}`;
+  const authorName = post.author_username ?? post.author?.username ?? 'unknown';
   return (
     <div
       className="hub-slot-post-card"
@@ -147,7 +164,7 @@ function StandalonePostCard({ post, hubName }: PostCardProps) {
         {post.title}
       </div>
       <div className="hub-slot-post-meta" style={{ fontSize: '0.85rem', display: 'flex', gap: '12px', opacity: 0.7 }}>
-        <span>by {post.author_username}</span>
+        <span>by {authorName}</span>
         <span>↑ {post.score ?? 0}</span>
         <span>💬 {post.comment_count ?? post.num_comments ?? 0}</span>
         <span>{relativeTime(post.created_at)}</span>
@@ -157,16 +174,16 @@ function StandalonePostCard({ post, hubName }: PostCardProps) {
 }
 
 export interface StandalonePostFeedProps {
-  posts: PlatformPost[];
+  posts: FeedSlotPost[];
   loading: boolean;
   hubName: string;
 }
 
 export function StandalonePostFeed({ posts, loading, hubName }: StandalonePostFeedProps) {
-  if (loading) return <p style={{ color: 'inherit', padding: '16px' }}>Loading posts…</p>;
-  if (posts.length === 0) return <p style={{ color: 'inherit', padding: '16px' }}>No posts yet.</p>;
+  if (loading) return <p className="hub-slot-feed-empty" style={{ color: 'inherit', padding: '16px' }}>Loading posts…</p>;
+  if (posts.length === 0) return <p className="hub-slot-feed-empty" style={{ color: 'inherit', padding: '16px' }}>No posts yet.</p>;
   return (
-    <div className="hub-slot-post-list" style={{ display: 'flex', flexDirection: 'column' }}>
+    <div className="hub-slot-feed-list hub-slot-post-list" style={{ display: 'flex', flexDirection: 'column' }}>
       {posts.map(post => <StandalonePostCard key={post.id} post={post} hubName={hubName} />)}
     </div>
   );
@@ -176,8 +193,8 @@ export function StandalonePostFeed({ posts, loading, hubName }: StandalonePostFe
 
 export function HubFeedControls({ sort, onSortChange, searchValue, onSearchChange, onSearch }: HubFeedControlsProps) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
-      <div role="tablist" style={{ display: 'flex', gap: '4px' }}>
+    <div className="hub-slot-feed-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+      <div className="hub-slot-feed-tabs" role="tablist" style={{ display: 'flex', gap: '4px' }}>
         {SORTS.map(s => (
           <button
             key={s.value}
@@ -190,14 +207,16 @@ export function HubFeedControls({ sort, onSortChange, searchValue, onSearchChang
           </button>
         ))}
       </div>
-      <input
-        type="search"
-        className="hub-slot-search"
-        placeholder="Search posts…"
-        value={searchValue}
-        onChange={e => onSearchChange(e.target.value)}
-        onKeyDown={e => e.key === 'Enter' && onSearch()}
-      />
+      <div className="hub-slot-feed-search-wrap">
+        <input
+          type="search"
+          className="hub-slot-search"
+          placeholder="Search posts…"
+          value={searchValue}
+          onChange={e => onSearchChange(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && onSearch()}
+        />
+      </div>
     </div>
   );
 }

@@ -5,13 +5,14 @@ import type { TFunction } from 'i18next';
 
 export const isUserHubModerator = (
   user: User | null | undefined,
-  hubModerators: HubModerator[],
+  hubModerators: HubModerator[] | null | undefined,
   hubDetails?: Hub | null
 ): boolean => {
   if (!user) return false;
   if (user.role === 'admin') return true;
-  if (hubModerators.length > 0) {
-    return hubModerators.some((mod) => mod.user_id === user.id);
+  const moderators = hubModerators ?? [];
+  if (moderators.length > 0) {
+    return moderators.some((mod) => mod.user_id === user.id);
   }
   if (hubDetails?.moderators?.length) {
     return hubDetails.moderators.some((mod) => mod.id === user.id);
