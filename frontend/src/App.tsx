@@ -40,6 +40,7 @@ const ModToolsPage = lazy(() => import('./pages/ModToolsPage'));
 const ModerationReportsPage = lazy(() => import('./pages/ModerationReportsPage'));
 const HubSettingsPage = lazy(() => import('./pages/HubSettingsPage'));
 const HubAIDesignerPreviewPage = lazy(() => import('./pages/HubAIDesignerPreviewPage'));
+const HubThemePreviewPage = lazy(() => import('./pages/HubThemePreviewPage'));
 const ModMailConversationPage = lazy(() => import('./pages/ModMailConversationPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const FeatureFlagsAdminPage = lazy(() => import('./pages/FeatureFlagsAdminPage'));
@@ -236,6 +237,14 @@ function App() {
                             element={
                               <ProtectedRoute>
                                 <HubAIDesignerPreviewPage />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/h/:hubName/theme/preview"
+                            element={
+                              <ProtectedRoute>
+                                <HubThemePreviewPage />
                               </ProtectedRoute>
                             }
                           />
