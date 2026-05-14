@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/api/middleware"
-	"github.com/omninudge/backend/internal/ports"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,7 +8,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // AdminHandler handles admin-level actions
@@ -43,6 +44,11 @@ func NewAdminHandler(userRepo ports.UserRepository, hubModRepo ports.HubModerato
 // @Failure      500  {object}  gin.H
 // @Router       /admin/users/{id}/role [post]
 func (h *AdminHandler) PromoteUser(c *gin.Context) {
+	adminID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid user ID")
@@ -69,6 +75,7 @@ func (h *AdminHandler) PromoteUser(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to update role")
 		return
 	}
+	zlog.Info().Int("admin_id", adminID).Int("target_user_id", targetID).Str("new_role", req.Role).Msg("Admin promoted user role")
 
 	c.JSON(http.StatusOK, gin.H{"message": "Role updated", "user_id": targetID, "role": req.Role})
 }

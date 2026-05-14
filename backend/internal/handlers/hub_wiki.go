@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
 	"net/http"
 	"strings"
 
@@ -140,6 +140,10 @@ func (h *HubWikiHandler) UpdateHubWikiPage(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	if len(req.Content) > 500000 {
+		RespondError(c, http.StatusBadRequest, "Wiki content exceeds maximum allowed size")
 		return
 	}
 

@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
-	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
 	"log"
 	"net/http"
 	"strconv"
@@ -357,7 +357,7 @@ func (h *MessagesHandler) broadcastThreadReplyAddedEvent(
 // SendMessageRequest represents the request body for sending a message
 type SendMessageRequest struct {
 	ConversationID           int            `json:"conversation_id" binding:"required"`
-	EncryptedContent         string         `json:"encrypted_content,omitempty"` // Base64 encoded encrypted blob
+	EncryptedContent         string         `json:"encrypted_content,omitempty" binding:"omitempty,max=65536"` // Base64 encoded encrypted blob
 	SenderEncryptedContent   *string        `json:"sender_encrypted_content,omitempty"`
 	MessageType              string         `json:"message_type" binding:"required"` // "text", "image", "video", "audio", "file"
 	ReplyTo                  *int           `json:"reply_to,omitempty"`

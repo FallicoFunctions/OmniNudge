@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
-	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
 	"io"
 	"net/http"
 	"strconv"
@@ -17,6 +17,7 @@ import (
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // PostsHandler handles HTTP requests for platform posts
@@ -205,7 +206,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
-	fmt.Printf("[CreatePost] Parsed NSFW=%v hub_id=%v target_subreddit=%v\n", req.NSFW, req.HubID, req.TargetSubreddit)
+	zlog.Debug().Bool("nsfw", req.NSFW).Interface("hub_id", req.HubID).Interface("target_subreddit", req.TargetSubreddit).Msg("CreatePost request parsed")
 	if req.Body != nil && len(*req.Body) > maxPostBodyLength {
 		RespondError(c, http.StatusBadRequest, "Post body must be less than 10,000 characters")
 		return
@@ -302,24 +303,24 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	}
 
 	if err := h.postRepo.Create(c.Request.Context(), post); err != nil {
-		fmt.Printf("[CreatePost] Create failed: %v\n", err)
+		zlog.Error().Err(err).Msg("CreatePost create failed")
 		RespondError(c, http.StatusInternalServerError, "Failed to create post")
 		return
 	}
 
-	fmt.Printf("[CreatePost] Post created successfully with ID: %d\n", post.ID)
+	zlog.Debug().Int("post_id", post.ID).Msg("CreatePost created post")
 
 	// Default upvote by author
 	upvote := true
-	fmt.Printf("[CreatePost] Attempting to vote on post %d for user %d\n", post.ID, userID)
+	zlog.Debug().Int("post_id", post.ID).Int("user_id", userID).Msg("CreatePost applying author upvote")
 	voteErr := h.postRepo.Vote(c.Request.Context(), post.ID, userID, &upvote)
 	if voteErr != nil {
 		// Log the error but don't fail the post creation
 		// The post exists, just without the auto-upvote
-		fmt.Printf("[CreatePost] Vote failed for post %d: %v\n", post.ID, voteErr)
+		zlog.Debug().Err(voteErr).Int("post_id", post.ID).Msg("CreatePost author upvote failed")
 		c.Header("X-Upvote-Failed", "true")
 	} else {
-		fmt.Printf("[CreatePost] Vote succeeded for post %d\n", post.ID)
+		zlog.Debug().Int("post_id", post.ID).Msg("CreatePost author upvote succeeded")
 	}
 
 	// Re-fetch post to get updated vote counts from DB (with user's vote info)
@@ -328,7 +329,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	if err != nil {
 		// If we can't fetch, return the original post object
 		// It will have 0 score/upvotes but that's better than wrong counts
-		fmt.Printf("[CreatePost] GetByIDWithUser failed for post %d: %v\n", post.ID, err)
+		zlog.Debug().Err(err).Int("post_id", post.ID).Msg("CreatePost refetch failed")
 		if hub != nil {
 			post.HubName = hub.Name
 		}
@@ -340,7 +341,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	if hub != nil {
 		updatedPost.HubName = hub.Name
 	}
-	fmt.Printf("[CreatePost] Stored NSFW=%v for post %d\n", updatedPost.NSFW, updatedPost.ID)
+	zlog.Debug().Bool("nsfw", updatedPost.NSFW).Int("post_id", updatedPost.ID).Msg("CreatePost stored post")
 
 	c.JSON(http.StatusCreated, updatedPost)
 }

@@ -1,23 +1,29 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
-	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
+	zlog "github.com/rs/zerolog/log"
 )
 
 type ModerationHandlerV2 struct {
-	hubBanRepo           ports.HubBanRepository
-	removalReasonRepo    ports.RemovalReasonRepository
-	removedContentRepo   ports.RemovedContentRepository
-	modLogRepo           ports.ModLogRepository
-	postRepo             ports.PlatformPostRepository
-	commentRepo          ports.PostCommentRepository
+	hubBanRepo         ports.HubBanRepository
+	removalReasonRepo  ports.RemovalReasonRepository
+	removedContentRepo ports.RemovedContentRepository
+	modLogRepo         ports.ModLogRepository
+	postRepo           ports.PlatformPostRepository
+	commentRepo        ports.PostCommentRepository
+}
+
+func respondModerationInternalError(c *gin.Context, err error, msg string) {
+	zlog.Error().Err(err).Msg(msg)
+	RespondError(c, http.StatusInternalServerError, "Internal server error")
 }
 
 func NewModerationHandlerV2(
@@ -58,7 +64,6 @@ func (h *ModerationHandlerV2) BanUser(c *gin.Context) {
 	if !ok {
 		return
 	}
-
 	hubID, ok := getHubIDFromContext(c)
 	if !ok {
 		RespondError(c, http.StatusBadRequest, "Missing hub context")
@@ -94,7 +99,7 @@ func (h *ModerationHandlerV2) BanUser(c *gin.Context) {
 
 	ban, err := h.hubBanRepo.BanUser(c.Request.Context(), hubID, req.UserID, userID, req.Reason, req.Note, req.BanType, expiresAt)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -140,7 +145,7 @@ func (h *ModerationHandlerV2) UnbanUser(c *gin.Context) {
 
 	err = h.hubBanRepo.UnbanUser(c.Request.Context(), hubID, targetUserID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -170,7 +175,7 @@ func (h *ModerationHandlerV2) GetBannedUsers(c *gin.Context) {
 
 	bans, err := h.hubBanRepo.GetBannedUsers(c.Request.Context(), hubID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -197,6 +202,11 @@ func (h *ModerationHandlerV2) RemovePost(c *gin.Context) {
 	if !ok {
 		return
 	}
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
+		return
+	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -218,7 +228,7 @@ func (h *ModerationHandlerV2) RemovePost(c *gin.Context) {
 	// Get the post to verify hub and permissions
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 	if post == nil {
@@ -229,18 +239,22 @@ func (h *ModerationHandlerV2) RemovePost(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Cannot remove posts without a hub")
 		return
 	}
+	if *post.HubID != hubID {
+		RespondError(c, http.StatusForbidden, "Not a moderator of this post's hub")
+		return
+	}
 
 	// Mark post as removed
 	err = h.postRepo.MarkAsRemoved(c.Request.Context(), postID, userID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
 	// Track removal
 	_, err = h.removedContentRepo.RemoveContent(c.Request.Context(), "post", postID, post.HubID, userID, req.RemovalReasonID, req.CustomReason, req.ModNote)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -269,6 +283,11 @@ func (h *ModerationHandlerV2) ApprovePost(c *gin.Context) {
 	if !ok {
 		return
 	}
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
+		return
+	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -279,7 +298,7 @@ func (h *ModerationHandlerV2) ApprovePost(c *gin.Context) {
 	// Get the post
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 	if post == nil {
@@ -290,11 +309,15 @@ func (h *ModerationHandlerV2) ApprovePost(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Cannot approve posts without a hub")
 		return
 	}
+	if *post.HubID != hubID {
+		RespondError(c, http.StatusForbidden, "Not a moderator of this post's hub")
+		return
+	}
 
 	// Unmark as removed
 	err = h.postRepo.MarkAsApproved(c.Request.Context(), postID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -325,6 +348,11 @@ func (h *ModerationHandlerV2) RemoveComment(c *gin.Context) {
 	if !ok {
 		return
 	}
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
+		return
+	}
 
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -346,7 +374,7 @@ func (h *ModerationHandlerV2) RemoveComment(c *gin.Context) {
 	// Get the comment to verify post and hub
 	comment, err := h.commentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 	if comment == nil {
@@ -357,25 +385,29 @@ func (h *ModerationHandlerV2) RemoveComment(c *gin.Context) {
 	// Get the post to check hub
 	post, err := h.postRepo.GetByID(c.Request.Context(), comment.PostID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 	if post.HubID == nil {
 		RespondError(c, http.StatusBadRequest, "Cannot remove comments on posts without a hub")
 		return
 	}
+	if *post.HubID != hubID {
+		RespondError(c, http.StatusForbidden, "Not a moderator of this post's hub")
+		return
+	}
 
 	// Mark comment as removed
 	err = h.commentRepo.MarkAsRemoved(c.Request.Context(), commentID, userID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
 	// Track removal
 	_, err = h.removedContentRepo.RemoveContent(c.Request.Context(), "comment", commentID, post.HubID, userID, req.RemovalReasonID, req.CustomReason, req.ModNote)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -404,6 +436,11 @@ func (h *ModerationHandlerV2) ApproveComment(c *gin.Context) {
 	if !ok {
 		return
 	}
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
+		return
+	}
 
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -414,7 +451,7 @@ func (h *ModerationHandlerV2) ApproveComment(c *gin.Context) {
 	// Get the comment
 	comment, err := h.commentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 	if comment == nil {
@@ -425,18 +462,22 @@ func (h *ModerationHandlerV2) ApproveComment(c *gin.Context) {
 	// Get the post to check hub
 	post, err := h.postRepo.GetByID(c.Request.Context(), comment.PostID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 	if post.HubID == nil {
 		RespondError(c, http.StatusBadRequest, "Cannot approve comments on posts without a hub")
 		return
 	}
+	if *post.HubID != hubID {
+		RespondError(c, http.StatusForbidden, "Not a moderator of this post's hub")
+		return
+	}
 
 	// Unmark as removed
 	err = h.commentRepo.MarkAsApproved(c.Request.Context(), commentID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -467,6 +508,11 @@ func (h *ModerationHandlerV2) LockPost(c *gin.Context) {
 	if !ok {
 		return
 	}
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
+		return
+	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -476,7 +522,7 @@ func (h *ModerationHandlerV2) LockPost(c *gin.Context) {
 
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 	if post == nil {
@@ -487,10 +533,14 @@ func (h *ModerationHandlerV2) LockPost(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Cannot lock posts without a hub")
 		return
 	}
+	if *post.HubID != hubID {
+		RespondError(c, http.StatusForbidden, "Not a moderator of this post's hub")
+		return
+	}
 
 	err = h.postRepo.LockPost(c.Request.Context(), postID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -515,6 +565,11 @@ func (h *ModerationHandlerV2) UnlockPost(c *gin.Context) {
 	if !ok {
 		return
 	}
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
+		return
+	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -524,7 +579,7 @@ func (h *ModerationHandlerV2) UnlockPost(c *gin.Context) {
 
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 	if post == nil {
@@ -535,10 +590,14 @@ func (h *ModerationHandlerV2) UnlockPost(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Cannot unlock posts without a hub")
 		return
 	}
+	if *post.HubID != hubID {
+		RespondError(c, http.StatusForbidden, "Not a moderator of this post's hub")
+		return
+	}
 
 	err = h.postRepo.UnlockPost(c.Request.Context(), postID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -563,6 +622,11 @@ func (h *ModerationHandlerV2) PinPost(c *gin.Context) {
 	if !ok {
 		return
 	}
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
+		return
+	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -572,7 +636,7 @@ func (h *ModerationHandlerV2) PinPost(c *gin.Context) {
 
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 	if post == nil {
@@ -583,10 +647,14 @@ func (h *ModerationHandlerV2) PinPost(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Cannot pin posts without a hub")
 		return
 	}
+	if *post.HubID != hubID {
+		RespondError(c, http.StatusForbidden, "Not a moderator of this post's hub")
+		return
+	}
 
 	err = h.postRepo.PinPost(c.Request.Context(), postID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -611,6 +679,11 @@ func (h *ModerationHandlerV2) UnpinPost(c *gin.Context) {
 	if !ok {
 		return
 	}
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
+		return
+	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -620,7 +693,7 @@ func (h *ModerationHandlerV2) UnpinPost(c *gin.Context) {
 
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 	if post == nil {
@@ -631,10 +704,14 @@ func (h *ModerationHandlerV2) UnpinPost(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Cannot unpin posts without a hub")
 		return
 	}
+	if *post.HubID != hubID {
+		RespondError(c, http.StatusForbidden, "Not a moderator of this post's hub")
+		return
+	}
 
 	err = h.postRepo.UnpinPost(c.Request.Context(), postID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -767,7 +844,7 @@ func (h *ModerationHandlerV2) CreateRemovalReason(c *gin.Context) {
 
 	reason, err := h.removalReasonRepo.Create(c.Request.Context(), hubID, userID, req.Title, req.Message)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -806,7 +883,7 @@ func (h *ModerationHandlerV2) UpdateRemovalReason(c *gin.Context) {
 	// Get the removal reason to check hub
 	existingReason, err := h.removalReasonRepo.GetByID(c.Request.Context(), reasonID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 	if existingReason == nil {
@@ -826,7 +903,7 @@ func (h *ModerationHandlerV2) UpdateRemovalReason(c *gin.Context) {
 
 	reason, err := h.removalReasonRepo.Update(c.Request.Context(), reasonID, req.Title, req.Message)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -863,7 +940,7 @@ func (h *ModerationHandlerV2) DeleteRemovalReason(c *gin.Context) {
 	// Get the removal reason to check hub
 	existingReason, err := h.removalReasonRepo.GetByID(c.Request.Context(), reasonID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 	if existingReason == nil {
@@ -873,7 +950,7 @@ func (h *ModerationHandlerV2) DeleteRemovalReason(c *gin.Context) {
 
 	err = h.removalReasonRepo.Delete(c.Request.Context(), reasonID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -901,7 +978,7 @@ func (h *ModerationHandlerV2) GetRemovalReasons(c *gin.Context) {
 
 	reasons, err := h.removalReasonRepo.GetByHub(c.Request.Context(), hubID)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
@@ -968,7 +1045,7 @@ func (h *ModerationHandlerV2) GetModLog(c *gin.Context) {
 		logs, err = h.modLogRepo.GetByHub(c.Request.Context(), hubID, limitArg, offset)
 	}
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, err.Error())
+		respondModerationInternalError(c, err, "Moderation operation failed")
 		return
 	}
 
