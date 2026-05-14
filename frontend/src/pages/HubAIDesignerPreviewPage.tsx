@@ -37,7 +37,7 @@ export default function HubAIDesignerPreviewPage() {
   });
 
   // Moderator check for slot rendering
-  const { data: hubModerators } = useHubModerators(hubName);
+  const { moderators: hubModerators } = useHubModerators(hubName);
   const isModerator = useMemo(
     () => isUserHubModerator(user, hubModerators, null),
     [user, hubModerators]
@@ -105,8 +105,10 @@ export default function HubAIDesignerPreviewPage() {
       );
       setHtmlContent(result.html_content);
       setChatMessage('');
-    } catch {
-      setChatError('AI request failed. Please try again.');
+    } catch (err) {
+      setChatError(err instanceof Error && err.message
+        ? err.message
+        : 'AI design refinement could not be completed. Please try again.');
     } finally {
       setChatLoading(false);
     }
