@@ -80,7 +80,7 @@ func (h *HubThemesHandler) GetAllThemes(c *gin.Context) {
 	}
 
 	// Check permissions: must be at least a moderator
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
 	if err != nil || role == nil {
 		RespondError(c, http.StatusForbidden, "Not a moderator")
 		return
@@ -122,7 +122,7 @@ func (h *HubThemesHandler) CreateTheme(c *gin.Context) {
 	}
 
 	// Check permissions: must be full_moderator or owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
 	if err != nil || role == nil {
 		RespondError(c, http.StatusForbidden, "Not a moderator")
 		return
@@ -199,7 +199,7 @@ func (h *HubThemesHandler) UpdateTheme(c *gin.Context) {
 	}
 
 	// Check permissions: must be full_moderator or owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
 	if err != nil || role == nil {
 		RespondError(c, http.StatusForbidden, "Not a moderator")
 		return
@@ -273,7 +273,7 @@ func (h *HubThemesHandler) ActivateTheme(c *gin.Context) {
 	}
 
 	// Check permissions: must be full_moderator or owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
 	if err != nil || role == nil {
 		RespondError(c, http.StatusForbidden, "Not a moderator")
 		return
@@ -324,7 +324,7 @@ func (h *HubThemesHandler) DeleteTheme(c *gin.Context) {
 	}
 
 	// Check permissions: must be owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
 	if err != nil || role == nil || *role != models.ModeratorRoleOwner {
 		RespondError(c, http.StatusForbidden, "Requires owner role")
 		return
@@ -365,7 +365,7 @@ func (h *HubThemesHandler) PreviewTheme(c *gin.Context) {
 	}
 
 	// Check permissions: must be at least a moderator
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
 	if err != nil || role == nil {
 		RespondError(c, http.StatusForbidden, "Not a moderator")
 		return

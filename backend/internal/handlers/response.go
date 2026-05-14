@@ -7,6 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	apiresponse "github.com/omninudge/backend/internal/api/response"
+	"github.com/omninudge/backend/internal/helpers"
+	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
 )
 
@@ -81,4 +84,14 @@ func RespondCreated(c *gin.Context, data any) {
 // RespondNoContent writes a 204 response with no body.
 func RespondNoContent(c *gin.Context) {
 	c.Status(http.StatusNoContent)
+}
+
+// hubModeratorRole returns the caller's moderator role for the given hub.
+// Site admins always receive a synthetic owner role, bypassing the DB check.
+func hubModeratorRole(c *gin.Context, repo *repository.HubSettingsRepository, hubID int, userID int) (*models.ModeratorRole, error) {
+	if helpers.IsAdmin(c) {
+		owner := models.ModeratorRoleOwner
+		return &owner, nil
+	}
+	return repo.GetModeratorRole(c.Request.Context(), hubID, userID)
 }

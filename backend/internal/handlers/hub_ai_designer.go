@@ -17,7 +17,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/api/middleware"
-	"github.com/omninudge/backend/internal/helpers"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/repository"
 	zlog "github.com/rs/zerolog/log"
@@ -961,16 +960,14 @@ func (h *HubAIDesignerHandler) Generate(c *gin.Context) {
 		return
 	}
 
-	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		if err != nil || role == nil {
-			RespondError(c, http.StatusForbidden, "Not a moderator")
-			return
-		}
-		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
-			return
-		}
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
+	if err != nil || role == nil {
+		RespondError(c, http.StatusForbidden, "Not a moderator")
+		return
+	}
+	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
+		return
 	}
 
 	var req struct {
@@ -1139,12 +1136,9 @@ func (h *HubAIDesignerHandler) ListDesigns(c *gin.Context) {
 		return
 	}
 
-	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		if err != nil || role == nil {
-			RespondError(c, http.StatusForbidden, "Not a moderator")
-			return
-		}
+	if role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID); err != nil || role == nil {
+		RespondError(c, http.StatusForbidden, "Not a moderator")
+		return
 	}
 
 	rows, err := h.pool.Query(c.Request.Context(),
@@ -1210,16 +1204,14 @@ func (h *HubAIDesignerHandler) Activate(c *gin.Context) {
 		return
 	}
 
-	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		if err != nil || role == nil {
-			RespondError(c, http.StatusForbidden, "Not a moderator")
-			return
-		}
-		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
-			return
-		}
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
+	if err != nil || role == nil {
+		RespondError(c, http.StatusForbidden, "Not a moderator")
+		return
+	}
+	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
+		return
 	}
 
 	var htmlContent string
@@ -1294,16 +1286,14 @@ func (h *HubAIDesignerHandler) Deactivate(c *gin.Context) {
 		return
 	}
 
-	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		if err != nil || role == nil {
-			RespondError(c, http.StatusForbidden, "Not a moderator")
-			return
-		}
-		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
-			return
-		}
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
+	if err != nil || role == nil {
+		RespondError(c, http.StatusForbidden, "Not a moderator")
+		return
+	}
+	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
+		return
 	}
 
 	if _, err := h.pool.Exec(c.Request.Context(),
@@ -1346,12 +1336,9 @@ func (h *HubAIDesignerHandler) DeleteDesign(c *gin.Context) {
 		return
 	}
 
-	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		if err != nil || role == nil || *role != models.ModeratorRoleOwner {
-			RespondError(c, http.StatusForbidden, "Requires owner role")
-			return
-		}
+	if role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID); err != nil || role == nil || *role != models.ModeratorRoleOwner {
+		RespondError(c, http.StatusForbidden, "Requires owner role")
+		return
 	}
 
 	tag, err := h.pool.Exec(c.Request.Context(),
@@ -1395,16 +1382,14 @@ func (h *HubAIDesignerHandler) CopyDesign(c *gin.Context) {
 		return
 	}
 
-	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		if err != nil || role == nil {
-			RespondError(c, http.StatusForbidden, "Not a moderator")
-			return
-		}
-		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
-			return
-		}
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
+	if err != nil || role == nil {
+		RespondError(c, http.StatusForbidden, "Not a moderator")
+		return
+	}
+	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
+		return
 	}
 
 	// Fetch the original.
@@ -1478,16 +1463,14 @@ func (h *HubAIDesignerHandler) UpdateDesign(c *gin.Context) {
 		return
 	}
 
-	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		if err != nil || role == nil {
-			RespondError(c, http.StatusForbidden, "Not a moderator")
-			return
-		}
-		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
-			return
-		}
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
+	if err != nil || role == nil {
+		RespondError(c, http.StatusForbidden, "Not a moderator")
+		return
+	}
+	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
+		return
 	}
 
 	var req struct {
@@ -1538,16 +1521,14 @@ func (h *HubAIDesignerHandler) GetDesign(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Invalid design ID")
 		return
 	}
-	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		if err != nil || role == nil {
-			RespondError(c, http.StatusForbidden, "Not a moderator")
-			return
-		}
-		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
-			return
-		}
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
+	if err != nil || role == nil {
+		RespondError(c, http.StatusForbidden, "Not a moderator")
+		return
+	}
+	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
+		return
 	}
 	var design struct {
 		ID          int       `json:"id"`
@@ -1586,16 +1567,14 @@ func (h *HubAIDesignerHandler) GetDesignVersions(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Invalid design ID")
 		return
 	}
-	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		if err != nil || role == nil {
-			RespondError(c, http.StatusForbidden, "Not a moderator")
-			return
-		}
-		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
-			return
-		}
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
+	if err != nil || role == nil {
+		RespondError(c, http.StatusForbidden, "Not a moderator")
+		return
+	}
+	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
+		return
 	}
 	rows, err := h.pool.Query(c.Request.Context(),
 		`SELECT id, html_content, created_at FROM hub_ai_design_versions
@@ -1640,16 +1619,14 @@ func (h *HubAIDesignerHandler) SaveDesignVersion(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Invalid design ID")
 		return
 	}
-	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		if err != nil || role == nil {
-			RespondError(c, http.StatusForbidden, "Not a moderator")
-			return
-		}
-		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
-			return
-		}
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
+	if err != nil || role == nil {
+		RespondError(c, http.StatusForbidden, "Not a moderator")
+		return
+	}
+	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
+		return
 	}
 	var req struct {
 		HTMLContent string `json:"html_content" binding:"required"`
@@ -1765,16 +1742,14 @@ func (h *HubAIDesignerHandler) ChatDesign(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Invalid design ID")
 		return
 	}
-	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		if err != nil || role == nil {
-			RespondError(c, http.StatusForbidden, "Not a moderator")
-			return
-		}
-		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
-			return
-		}
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
+	if err != nil || role == nil {
+		RespondError(c, http.StatusForbidden, "Not a moderator")
+		return
+	}
+	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
+		return
 	}
 	var req struct {
 		CurrentHTML string `json:"current_html" binding:"required"`
