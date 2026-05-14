@@ -82,10 +82,6 @@ export default function HubAIDesignerTab({ hubName }: Props) {
     },
   });
 
-  const openEditor = (designId: number) => {
-    navigate(`/h/${hubName}/ai-designer?editId=${designId}`);
-  };
-
   const activeDesign = designsData?.designs?.find((d) => d.is_active);
 
   return (
@@ -140,7 +136,7 @@ export default function HubAIDesignerTab({ hubName }: Props) {
               {pendingDesignId && (
                 <>
                   <button
-                    onClick={() => openEditor(pendingDesignId)}
+                    onClick={() => navigate(`/h/${hubName}/ai-design/preview/${pendingDesignId}`)}
                     className="px-3 py-1 text-sm rounded border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-background)] transition-colors"
                   >
                     Edit
@@ -151,6 +147,12 @@ export default function HubAIDesignerTab({ hubName }: Props) {
                     className="px-3 py-1 text-sm rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
                   >
                     {activateMutation.isPending ? 'Publishing…' : 'Publish'}
+                  </button>
+                  <button
+                    onClick={() => { setPreviewHTML(null); setPendingDesignId(null); setPendingDesignName(''); }}
+                    className="px-3 py-1 text-sm rounded border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-background)] transition-colors"
+                  >
+                    Close
                   </button>
                 </>
               )}
@@ -227,12 +229,6 @@ export default function HubAIDesignerTab({ hubName }: Props) {
                   <button
                     onClick={() => navigate(`/h/${hubName}/ai-design/preview/${design.id}`)}
                     className="text-xs text-[var(--color-primary)] hover:text-[var(--color-primary-strong)] font-medium transition-colors"
-                  >
-                    Preview
-                  </button>
-                  <button
-                    onClick={() => openEditor(design.id)}
-                    className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] font-medium transition-colors"
                   >
                     Edit
                   </button>
