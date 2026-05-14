@@ -14,7 +14,7 @@ interface LogEntry {
   timestamp: string;
   level: LogLevel;
   message: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   user_id?: string;
   session_id: string;
   page_url: string;
@@ -53,7 +53,7 @@ class Logger {
   /**
    * Log debug message (console only, not shipped)
    */
-  debug(message: string, context?: Record<string, any>): void {
+  debug(message: string, context?: Record<string, unknown>): void {
     if (process.env.NODE_ENV === 'development') {
       console.debug(`[DEBUG] ${message}`, context);
     }
@@ -62,14 +62,14 @@ class Logger {
   /**
    * Log info message (console only, not shipped)
    */
-  info(message: string, context?: Record<string, any>): void {
+  info(message: string, context?: Record<string, unknown>): void {
     console.info(`[INFO] ${message}`, context);
   }
 
   /**
    * Log warning (shipped to backend)
    */
-  warn(message: string, context?: Record<string, any>): void {
+  warn(message: string, context?: Record<string, unknown>): void {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level: LogLevel.WARN,
@@ -88,7 +88,7 @@ class Logger {
   /**
    * Log error (shipped to backend)
    */
-  error(message: string, context?: Record<string, any>): void {
+  error(message: string, context?: Record<string, unknown>): void {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level: LogLevel.ERROR,
@@ -132,7 +132,7 @@ class Logger {
       if (!response.ok) {
         console.error('[Logger] Failed to ship log:', response.statusText);
       }
-    } catch (error) {
+    } catch {
       // Don't retry to avoid infinite loops
       console.error('[Logger] Failed to ship log:', error);
     }
@@ -148,7 +148,7 @@ class Logger {
 
       const user = JSON.parse(userStr);
       return user?.id;
-    } catch (error) {
+    } catch {
       return undefined;
     }
   }

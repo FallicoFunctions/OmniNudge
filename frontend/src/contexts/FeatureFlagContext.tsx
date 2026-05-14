@@ -24,7 +24,7 @@ export function FeatureFlagProvider({ children }: { children: ReactNode }) {
 
             // Sync with analytics service
             const enabledFlags = Object.entries(allFlags)
-                .filter(([_, enabled]) => enabled)
+                .filter(([, enabled]) => enabled)
                 .map(([key]) => key);
 
             import('../services/analyticsService').then(({ analyticsService }) => {

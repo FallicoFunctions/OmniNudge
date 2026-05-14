@@ -9,7 +9,7 @@ export interface CreateFeatureFlagRequest {
     percentage?: number;
     environment?: 'all' | 'dev' | 'staging' | 'prod';
     auto_rollback?: boolean;
-    rollback?: any; // RollbackTrigger - using any for flexibility in service interface
+    rollback?: unknown;
 }
 
 export interface UpdateFeatureFlagRequest {
@@ -17,7 +17,7 @@ export interface UpdateFeatureFlagRequest {
     enabled?: boolean;
     percentage?: number;
     auto_rollback?: boolean;
-    rollback?: any;
+    rollback?: unknown;
 }
 
 const featureFlagService = {

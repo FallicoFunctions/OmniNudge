@@ -12,8 +12,8 @@ const FORMATTING_EXAMPLES = [
   },
   { input: '> quoted text', output: '> quoted text' },
   {
-    input: '```\nconsole.log(\"Hello!\");\n```',
-    output: '```\nconsole.log(\"Hello!\");\n```',
+    input: '```\nconsole.log("Hello!");\n```',
+    output: '```\nconsole.log("Hello!");\n```',
   },
   {
     input: '| Feature | Works? |\n| --- | --- |\n| Tables | ✅ |\n| Inline code | ✅ |',

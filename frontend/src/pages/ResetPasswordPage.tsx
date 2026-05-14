@@ -38,7 +38,7 @@ export default function ResetPasswordPage() {
         const response = await api.get<{ valid: boolean; username?: string }>(`/auth/validate-reset-token?token=${token}`);
         setIsValid(response.valid);
         setUsername(response.username || '');
-      } catch (err) {
+      } catch {
         setIsValid(false);
         setError({ message: t('auth.resetPasswordPage.errors.linkInvalidOrExpiredRequestNew') });
       } finally {
@@ -77,8 +77,9 @@ export default function ResetPasswordPage() {
       setTimeout(() => {
         navigate('/', { replace: true });
       }, 3000);
-    } catch (err: any) {
-      setError({ message: err.response?.data?.error || t('auth.resetPasswordPage.errors.resetFailedTryAgain') });
+    } catch (err: unknown) {
+      const apiError = err as { response?: { data?: { error?: string } } };
+      setError({ message: apiError.response?.data?.error || t('auth.resetPasswordPage.errors.resetFailedTryAgain') });
     } finally {
       setIsSubmitting(false);
     }

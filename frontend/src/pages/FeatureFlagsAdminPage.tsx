@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import featureFlagService from '../services/featureFlagService';
+import featureFlagService, { type CreateFeatureFlagRequest } from '../services/featureFlagService';
 import { useFormat } from '../hooks/useFormat';
+import type { FeatureFlagAudit, FeatureFlag } from '../types/featureFlags';
 
 export default function AdminFeatureFlags() {
     const { t } = useTranslation();
@@ -26,7 +27,7 @@ export default function AdminFeatureFlags() {
 
     // Mutations
     const updateFlagMutation = useMutation({
-        mutationFn: ({ key, data }: { key: string; data: any }) =>
+        mutationFn: ({ key, data }: { key: string; data: Partial<FeatureFlag> }) =>
             featureFlagService.updateFlag(key, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-feature-flags'] });
@@ -272,7 +273,7 @@ export default function AdminFeatureFlags() {
                                 <h3 className="text-lg font-medium mb-2">{t('featureFlagsAdmin.auditLogTitle')}</h3>
                                 <div className="flow-root">
                                     <ul className="-mb-8">
-                                        {auditLog?.map((log: any, idx: number) => (
+                                        {auditLog?.map((log: FeatureFlagAudit, idx: number) => (
                                             <li key={log.id}>
                                                 <div className="relative pb-8">
                                                     {idx !== (auditLog.length - 1) && <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>}
@@ -339,7 +340,7 @@ export default function AdminFeatureFlags() {
                                         key: formData.get('key') as string,
                                         description: formData.get('description') as string,
                                         enabled: false,
-                                        environment: formData.get('environment') as any || 'all'
+                                        environment: (formData.get('environment') as CreateFeatureFlagRequest['environment']) || 'all'
                                     });
                                 }}>
                                     <div className="mt-4">

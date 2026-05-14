@@ -54,7 +54,9 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
     levelIntervalRef.current = null
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try { mediaRecorderRef.current.stop() } catch {}
+      try { mediaRecorderRef.current.stop() } catch {
+        // Ignore recorder cleanup errors.
+      }
     }
     mediaRecorderRef.current = null
 
@@ -64,7 +66,9 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
     }
 
     if (audioCtxRef.current) {
-      try { audioCtxRef.current.close() } catch {}
+      try { audioCtxRef.current.close() } catch {
+        // Ignore audio context cleanup errors.
+      }
       audioCtxRef.current = null
     }
     analyserRef.current = null
@@ -189,7 +193,9 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
     if (durationIntervalRef.current) clearInterval(durationIntervalRef.current)
     if (levelIntervalRef.current) clearInterval(levelIntervalRef.current)
     if (audioCtxRef.current) {
-      try { audioCtxRef.current.close() } catch {}
+      try { audioCtxRef.current.close() } catch {
+        // Ignore audio context cleanup errors.
+      }
       audioCtxRef.current = null
     }
     setState('stopped')

@@ -51,11 +51,13 @@ function CallRow({
   const rowColor =
     isMissed || isRejected ? 'text-[var(--color-error)]' : 'text-[var(--color-text-primary)]'
 
-  function DirectionIcon() {
-    if (isMissed) return <PhoneMissed className="w-4 h-4" aria-hidden="true" />
-    if (isOutgoing) return <PhoneOutgoing className="w-4 h-4" aria-hidden="true" />
-    return <PhoneIncoming className="w-4 h-4" aria-hidden="true" />
-  }
+  const directionIcon = isMissed ? (
+    <PhoneMissed className="w-4 h-4" aria-hidden="true" />
+  ) : isOutgoing ? (
+    <PhoneOutgoing className="w-4 h-4" aria-hidden="true" />
+  ) : (
+    <PhoneIncoming className="w-4 h-4" aria-hidden="true" />
+  )
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)] transition-colors">
@@ -71,7 +73,7 @@ function CallRow({
       {/* Direction + status */}
       <div className="flex-1 min-w-0">
         <div className={`flex items-center gap-1 text-sm font-medium ${rowColor}`}>
-          <DirectionIcon />
+          {directionIcon}
           <span className="truncate">
             {isOutgoing ? t('calls.outgoing') : t('calls.incoming')}
             {isMissed ? ` — ${t('calls.callMissed')}` : ''}
