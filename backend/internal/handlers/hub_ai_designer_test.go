@@ -155,8 +155,7 @@ func TestActivateAIDesign_RejectsLegacyInvalidDesign(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Code)
 	var body map[string]string
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
-	assert.Contains(t, body["message"], "Design is invalid under current validation rules")
-	assert.Contains(t, body["message"], "design must include each slot exactly once")
+	assert.Equal(t, "Design validation failed. Please try again.", body["message"])
 	assert.True(t, designActiveState(t, f, activeValidID))
 	assert.False(t, designActiveState(t, f, invalidID))
 }

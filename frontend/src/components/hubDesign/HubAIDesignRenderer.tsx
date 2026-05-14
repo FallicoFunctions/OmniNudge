@@ -107,6 +107,9 @@ export default function HubAIDesignRenderer({
       }
     });
     setMarkerElements(next);
+    return () => {
+      setMarkerElements(new Map());
+    };
   }, [htmlWithoutStyles, slotsByMarker]);
 
   useLayoutEffect(() => {
