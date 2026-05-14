@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import DOMPurify from 'dompurify';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
@@ -1548,68 +1549,47 @@ function sanitizeRedditSidebarHtml(content?: string | null): string | null {
   }
 
   const decoded = decodeSidebarHtml(content);
+  const sanitized = DOMPurify.sanitize(decoded, {
+    ALLOWED_TAGS: [
+      'a',
+      'p',
+      'strong',
+      'em',
+      'ul',
+      'ol',
+      'li',
+      'span',
+      'div',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'table',
+      'thead',
+      'tbody',
+      'tr',
+      'td',
+      'th',
+      'img',
+      'blockquote',
+      'code',
+      'pre',
+      'hr',
+      'br',
+    ],
+    ALLOWED_ATTR: ['href', 'title', 'src', 'alt', 'width', 'height', 'class', 'colspan', 'rowspan'],
+  });
   const template = document.createElement('template');
-  template.innerHTML = decoded;
-
-  const allowedTags = new Set([
-    'a',
-    'p',
-    'strong',
-    'em',
-    'ul',
-    'ol',
-    'li',
-    'span',
-    'div',
-    'h1',
-    'h2',
-    'h3',
-    'h4',
-    'h5',
-    'h6',
-    'table',
-    'thead',
-    'tbody',
-    'tr',
-    'td',
-    'th',
-    'img',
-    'blockquote',
-    'code',
-    'pre',
-    'hr',
-    'br',
-  ]);
-  const allowedAttrs: Record<string, Set<string>> = {
-    a: new Set(['href', 'title']),
-    img: new Set(['src', 'alt', 'title', 'width', 'height']),
-    span: new Set(['class']),
-    div: new Set(['class']),
-    td: new Set(['colspan', 'rowspan']),
-    th: new Set(['colspan', 'rowspan']),
-  };
+  template.innerHTML = sanitized;
 
   template.content.querySelectorAll('*').forEach((element) => {
     const el = element as HTMLElement;
     const tag = el.tagName.toLowerCase();
-    if (!allowedTags.has(tag)) {
-      const parent = el.parentNode;
-      if (parent) {
-        parent.replaceChild(document.createTextNode(el.textContent ?? ''), el);
-      } else {
-        el.remove();
-      }
-      return;
-    }
 
     Array.from(el.attributes).forEach((attr) => {
       const attrName = attr.name.toLowerCase();
-      const allowedForTag = allowedAttrs[tag];
-      if (!allowedForTag || !allowedForTag.has(attrName)) {
-        el.removeAttribute(attr.name);
-        return;
-      }
-
       if ((attrName === 'href' || attrName === 'src') && !isSafeSidebarUrl(attr.value)) {
         el.removeAttribute(attr.name);
         return;
