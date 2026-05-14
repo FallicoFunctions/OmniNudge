@@ -157,7 +157,7 @@ func (r *EmailVerificationRepository) GetByToken(ctx context.Context, token stri
 		WHERE token = $1
 	`
 
-	err := r.pool.QueryRow(ctx, query, token).Scan(
+	err := r.pool.QueryRow(ctx, query, hashEmailVerificationToken(token)).Scan(
 		&verification.ID,
 		&verification.UserID,
 		&verification.Email,
@@ -167,6 +167,18 @@ func (r *EmailVerificationRepository) GetByToken(ctx context.Context, token stri
 		&verification.VerifiedAt,
 		&verification.CreatedAt,
 	)
+	if err == pgx.ErrNoRows {
+		err = r.pool.QueryRow(ctx, query, token).Scan(
+			&verification.ID,
+			&verification.UserID,
+			&verification.Email,
+			&verification.Token,
+			&verification.Purpose,
+			&verification.ExpiresAt,
+			&verification.VerifiedAt,
+			&verification.CreatedAt,
+		)
+	}
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}

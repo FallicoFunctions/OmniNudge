@@ -94,6 +94,14 @@ func CORS() gin.HandlerFunc {
 			"http://localhost:5177",
 			"http://localhost:5178",
 			"http://localhost:5179",
+			"http://127.0.0.1:3000",
+			"http://127.0.0.1:5173",
+			"http://127.0.0.1:5174",
+			"http://127.0.0.1:5175",
+			"http://127.0.0.1:5176",
+			"http://127.0.0.1:5177",
+			"http://127.0.0.1:5178",
+			"http://127.0.0.1:5179",
 		}
 
 		allowed := false
