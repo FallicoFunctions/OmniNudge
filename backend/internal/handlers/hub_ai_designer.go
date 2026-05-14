@@ -716,6 +716,8 @@ Your job: apply the requested aesthetic with professional craft to produce a com
 OUTPUT RULES (non-negotiable)
 ════════════════════════════════════════
 - Return a single <div class="hub-custom-page"> containing the full page
+- .hub-custom-page root inline style MUST include: width:100%; max-width:100%; box-sizing:border-box; overflow-x:hidden — never set a fixed pixel width on the root element
+- All columns in multi-column layouts MUST use percentage, fr, or minmax() widths — never fixed pixel widths on columns (e.g. use grid-template-columns:2fr 1fr not grid-template-columns:900px 350px)
 - Use inline styles (style="...") for layout and structure — no Tailwind, no external stylesheets
 - You MAY include ONE <style> block to style the injected slot components (see SLOT STYLING below)
 - NO <script>, inline event handlers (onclick etc.), <iframe>, <form>, <input>, <link>
@@ -1703,6 +1705,8 @@ Return the COMPLETE updated HTML — not just the changed section, the entire th
 
 OUTPUT RULES (non-negotiable):
 - Return a single <div class="hub-custom-page"> containing the full updated page
+- .hub-custom-page root inline style MUST include: width:100%; max-width:100%; box-sizing:border-box; overflow-x:hidden — never set a fixed pixel width on the root element
+- All columns in multi-column layouts MUST use percentage, fr, or minmax() widths — never fixed pixel widths on columns
 - Use inline styles for layout and structure — no Tailwind, no external stylesheets
 - You MAY include ONE <style> block to style injected slot components
 - NO <script>, inline event handlers (onclick etc.), <iframe>, <form>, <input>, <link>
