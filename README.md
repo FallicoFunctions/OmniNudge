@@ -174,11 +174,11 @@ This ensures unit, service, and integration tests all connect cleanly without in
    cd frontend
    npm install
    ```
-2. Start the Vite dev server (listens on `http://localhost:5173` by default):
+2. Start the Vite dev server (configured for `http://localhost:5176` by default):
    ```bash
    npm run dev
    ```
-3. The frontend expects the backend at `http://localhost:8080/api/v1`; adjust `.env.development` if needed.
+3. Open the frontend through `http://localhost:5176` or `http://127.0.0.1:5176`. The backend CORS allowlist supports both local dev origins, and the frontend expects the backend at `http://localhost:8080/api/v1`; adjust `.env.development` if needed.
 
 ### Frontend Tests
 

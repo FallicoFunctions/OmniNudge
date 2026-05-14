@@ -286,7 +286,7 @@ Verify the navigation bar contains:
 ## Common Issues & Fixes
 
 ### Issue: "Load failed" or CORS errors
-**Solution**: Ensure backend middleware allows `localhost:5176` in CORS settings
+**Solution**: Ensure backend middleware allows the intended dev origin in CORS settings. Local development supports both `http://localhost:5176` and `http://127.0.0.1:5176`.
 
 ### Issue: Infinite 401 loops
 **Solution**: Verified fixed in `ThemeContext.tsx` - queries disabled when not authenticated
