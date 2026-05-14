@@ -36,6 +36,7 @@ var (
 	reDataURI        = regexp.MustCompile(`(?i)(src)\s*=\s*["']?\s*data:[^"'\s>]*["']?`)
 	reStyleBlock     = regexp.MustCompile(`(?is)<style[^>]*>(.*?)</style>`)
 	reCSSComment     = regexp.MustCompile(`(?s)/\*.*?\*/`)
+	reStyleDataURI   = regexp.MustCompile(`(?i)url\s*\(\s*(?:'data:[^']*'|"data:[^"]*"|data:[^)]*)\s*\)`)
 )
 
 var requiredHubDesignSlots = []string{"hub-join", "hub-create", "hub-mod", "hub-feed"}
@@ -54,6 +55,7 @@ func sanitizeHTML(raw string) string {
 	s = reOnEvent.ReplaceAllString(s, "")
 	s = reJavascriptURI.ReplaceAllString(s, `$1="#"`)
 	s = reDataURI.ReplaceAllString(s, `$1=""`)
+	s = reStyleDataURI.ReplaceAllString(s, "url()")
 	return s
 }
 
@@ -709,15 +711,16 @@ func NewHubAIDesignerHandler(
 // systemPrompt is the instruction sent to the AI for every generation request.
 const systemPrompt = `You are a senior web designer with mastery of modern web standards, building custom landing pages for online community hubs.
 
-The user describes the VISUAL AESTHETIC they want. A HUB CONTEXT block provides the real hub data.
-Your job: apply the requested aesthetic with professional craft to produce a complete, polished hub page.
+The user describes the VISUAL AESTHETIC they want. A HUB CONTEXT block provides real hub data to populate the layout.
+Your job: execute the AESTHETIC REQUEST exactly as described. The hub context is raw data only — it has zero influence on visual style, color palette, typography, or layout approach. Do not let the hub topic suggest or override any aesthetic choices.
 
 ════════════════════════════════════════
 OUTPUT RULES (non-negotiable)
 ════════════════════════════════════════
 - Return a single <div class="hub-custom-page"> containing the full page
 - .hub-custom-page root inline style MUST include: width:100%; max-width:100%; box-sizing:border-box; overflow-x:hidden — never set a fixed pixel width on the root element
-- All columns in multi-column layouts MUST use percentage, fr, or minmax() widths — never fixed pixel widths on columns (e.g. use grid-template-columns:2fr 1fr not grid-template-columns:900px 350px)
+- All columns in multi-column layouts MUST use percentage or fr widths. If using minmax(), the minimum value must be 0 or auto only — never a fixed px value or min-content/max-content as the minimum (e.g. minmax(0, 3fr) is correct, minmax(600px, 3fr) and minmax(min-content, 3fr) are both forbidden)
+- Do NOT use url() with data URIs (e.g. url('data:...')) in inline style attributes — data URIs inside inline styles corrupt the HTML parser
 - Use inline styles (style="...") for layout and structure — no Tailwind, no external stylesheets
 - You MAY include ONE <style> block to style the injected slot components (see SLOT STYLING below)
 - NO <script>, inline event handlers (onclick etc.), <iframe>, <form>, <input>, <link>
@@ -880,8 +883,8 @@ func (h *HubAIDesignerHandler) callAIAPI(ctx context.Context, userPrompt string)
 		},
 	}
 	reqBody.GenerationConfig.MaxOutputTokens = 32768
-	reqBody.GenerationConfig.Temperature = 0.7
-	reqBody.GenerationConfig.ThinkingConfig.ThinkingBudget = 15000
+	reqBody.GenerationConfig.Temperature = 1.0
+	reqBody.GenerationConfig.ThinkingConfig.ThinkingBudget = 0
 
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
@@ -1002,16 +1005,16 @@ func (h *HubAIDesignerHandler) Generate(c *gin.Context) {
 		`SELECT COUNT(*) FROM platform_posts WHERE hub_id = $1`, hubID,
 	).Scan(&hubPostCount)
 
-	hubContext := fmt.Sprintf(`HUB CONTEXT (use this data verbatim — do not invent hub-specific content):
+	hubContext := fmt.Sprintf(`AESTHETIC REQUEST (your primary creative mandate — execute this exactly):
+%s
+
+HUB CONTEXT (data only — use verbatim for content, ignore for visual style):
 Name: %s
 Description: %s
 Members: %d
 Posts: %d
 Sidebar:
-%s
-
-AESTHETIC REQUEST:
-%s`, hubDisplayName, hubDescription, hubMemberCount, hubPostCount, hubSidebarMD, req.Prompt)
+%s`, req.Prompt, hubDisplayName, hubDescription, hubMemberCount, hubPostCount, hubSidebarMD)
 
 	// Use a detached context so the global 30s request timeout doesn't kill the AI call.
 	aiCtx, aiCancel := context.WithTimeout(context.Background(), 120*time.Second)
@@ -1706,7 +1709,8 @@ Return the COMPLETE updated HTML — not just the changed section, the entire th
 OUTPUT RULES (non-negotiable):
 - Return a single <div class="hub-custom-page"> containing the full updated page
 - .hub-custom-page root inline style MUST include: width:100%; max-width:100%; box-sizing:border-box; overflow-x:hidden — never set a fixed pixel width on the root element
-- All columns in multi-column layouts MUST use percentage, fr, or minmax() widths — never fixed pixel widths on columns
+- All columns in multi-column layouts MUST use percentage or fr widths. If using minmax(), the minimum value must be 0 or auto only — never a fixed px value or min-content/max-content as the minimum (e.g. minmax(0, 3fr) is correct, minmax(600px, 3fr) and minmax(min-content, 3fr) are both forbidden)
+- Do NOT use url() with data URIs (e.g. url('data:...')) in inline style attributes — data URIs inside inline styles corrupt the HTML parser
 - Use inline styles for layout and structure — no Tailwind, no external stylesheets
 - You MAY include ONE <style> block to style injected slot components
 - NO <script>, inline event handlers (onclick etc.), <iframe>, <form>, <input>, <link>
@@ -1791,8 +1795,8 @@ func (h *HubAIDesignerHandler) ChatDesign(c *gin.Context) {
 		},
 	}
 	reqBody.GenerationConfig.MaxOutputTokens = 32768
-	reqBody.GenerationConfig.Temperature = 0.5
-	reqBody.GenerationConfig.ThinkingConfig.ThinkingBudget = 8000
+	reqBody.GenerationConfig.Temperature = 0.7
+	reqBody.GenerationConfig.ThinkingConfig.ThinkingBudget = 0
 
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
