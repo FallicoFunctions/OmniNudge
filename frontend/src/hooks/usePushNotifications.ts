@@ -33,8 +33,8 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       setIsPermissionGranted(Notification.permission === 'granted');
     }
 
-    // Check if already registered (token in localStorage)
-    const savedToken = localStorage.getItem('fcm_token');
+    // Check if already registered for this browser session.
+    const savedToken = sessionStorage.getItem('fcm_token');
     if (savedToken) {
       setIsRegistered(true);
       setCurrentToken(savedToken);
@@ -87,8 +87,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         device_name: getBrowserName(),
       });
 
-      // Save token to localStorage
-      localStorage.setItem('fcm_token', token);
+      sessionStorage.setItem('fcm_token', token);
 
       setIsPermissionGranted(true);
       setIsRegistered(true);
@@ -112,8 +111,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         data: { token: currentToken },
       });
 
-      // Remove from localStorage
-      localStorage.removeItem('fcm_token');
+      sessionStorage.removeItem('fcm_token');
 
       setIsRegistered(false);
       setCurrentToken(null);

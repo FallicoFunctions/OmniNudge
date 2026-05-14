@@ -2,6 +2,7 @@ import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import DOMPurify from 'dompurify';
 import { redditService } from '../services/redditService';
 import { sanitizeHttpUrl } from '../utils/crosspostHelpers';
 import { useFormat } from '../hooks/useFormat';
@@ -1091,83 +1092,47 @@ function sanitizeWikiHtml(content: string): string {
 
   // Remove HTML comments
   const cleaned = decoded.replace(/<!--[\s\S]*?-->/g, '');
-
+  const sanitized = DOMPurify.sanitize(cleaned, {
+    ALLOWED_TAGS: [
+      'a',
+      'p',
+      'strong',
+      'em',
+      'ul',
+      'ol',
+      'li',
+      'span',
+      'div',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'table',
+      'thead',
+      'tbody',
+      'tr',
+      'td',
+      'th',
+      'img',
+      'blockquote',
+      'code',
+      'pre',
+      'hr',
+      'br',
+    ],
+    ALLOWED_ATTR: ['href', 'title', 'id', 'name', 'src', 'alt', 'width', 'height', 'class', 'colspan', 'rowspan'],
+  });
   const template = document.createElement('template');
-  template.innerHTML = cleaned;
-
-  const allowedTags = new Set([
-    'a',
-    'p',
-    'strong',
-    'em',
-    'ul',
-    'ol',
-    'li',
-    'span',
-    'div',
-    'h1',
-    'h2',
-    'h3',
-    'h4',
-    'h5',
-    'h6',
-    'table',
-    'thead',
-    'tbody',
-    'tr',
-    'td',
-    'th',
-    'img',
-    'blockquote',
-    'code',
-    'pre',
-    'hr',
-    'br',
-  ]);
-  const allowedAttrs: Record<string, Set<string>> = {
-    a: new Set(['href', 'title', 'id', 'name']),
-    img: new Set(['src', 'alt', 'title', 'width', 'height']),
-    span: new Set(['class', 'id', 'name']),
-    div: new Set(['class', 'id', 'name']),
-    p: new Set(['id', 'name']),
-    ul: new Set(['id', 'name']),
-    ol: new Set(['id', 'name']),
-    li: new Set(['id', 'name']),
-    table: new Set(['id', 'name']),
-    thead: new Set(['id', 'name']),
-    tbody: new Set(['id', 'name']),
-    tr: new Set(['id', 'name']),
-    td: new Set(['colspan', 'rowspan', 'id', 'name']),
-    th: new Set(['colspan', 'rowspan', 'id', 'name']),
-    h1: new Set(['id', 'name']),
-    h2: new Set(['id', 'name']),
-    h3: new Set(['id', 'name']),
-    h4: new Set(['id', 'name']),
-    h5: new Set(['id', 'name']),
-    h6: new Set(['id', 'name']),
-  };
+  template.innerHTML = sanitized;
 
   template.content.querySelectorAll('*').forEach((element) => {
     const el = element as HTMLElement;
     const tag = el.tagName.toLowerCase();
 
-    if (!allowedTags.has(tag)) {
-      const parent = el.parentNode;
-      if (parent) {
-        parent.replaceChild(document.createTextNode(el.textContent ?? ''), el);
-      } else {
-        el.remove();
-      }
-      return;
-    }
-
     Array.from(el.attributes).forEach((attr) => {
       const attrName = attr.name.toLowerCase();
-      const allowedForTag = allowedAttrs[tag];
-      if (!allowedForTag || !allowedForTag.has(attrName)) {
-        el.removeAttribute(attr.name);
-        return;
-      }
 
       if ((attrName === 'href' || attrName === 'src') && !isSafeUrl(attr.value)) {
         el.removeAttribute(attr.name);

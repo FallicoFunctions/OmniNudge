@@ -35,13 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const initializeEncryptionKeys = async (password?: string, publicKey?: string) => {
     try {
-      console.log('[AuthContext] Initializing encryption keys...');
-
       // If password is provided, try to sync keys from server first
       if (password) {
         const encryptedPrivateKey = await encryptionService.getEncryptedPrivateKey();
         if (encryptedPrivateKey) {
-          console.log('[AuthContext] Found encrypted keys on server, syncing...');
           try {
             const privateKeyBase64 = await decryptPrivateKeyWithPassword(encryptedPrivateKey, password);
             // Use provided public key or get from local storage
@@ -49,7 +46,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             if (publicKeyBase64) {
               await storeNonExtractablePrivateKey(privateKeyBase64, publicKeyBase64);
-              console.log('[AuthContext] Keys synced from server');
               return;
             }
           } catch (error) {
@@ -60,15 +56,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Generate or retrieve encryption keys locally
-      const keys = await initializeKeys();
-      console.log('[AuthContext] Keys initialized:', { hasPrivateKey: !!keys.privateKey, hasPublicKey: !!keys.publicKey });
+      await initializeKeys();
 
       // Get public key and upload to server
       const publicKeyBase64 = getOwnPublicKeyBase64();
-      console.log('[AuthContext] Public key base64:', publicKeyBase64 ? 'present' : 'missing');
       if (publicKeyBase64) {
         await encryptionService.uploadPublicKey(publicKeyBase64);
-        console.log('[AuthContext] Public key uploaded to server');
 
         // If password is provided, encrypt and upload private key to server
         if (password) {
@@ -77,7 +70,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const exported = await exportKeyPair(keyPair);
             const encryptedPrivateKey = await encryptPrivateKeyWithPassword(exported.privateKey, password);
             await encryptionService.uploadEncryptedPrivateKey(encryptedPrivateKey);
-            console.log('[AuthContext] Encrypted private key uploaded to server');
           }
         }
       }

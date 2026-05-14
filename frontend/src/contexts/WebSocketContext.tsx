@@ -1,14 +1,14 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
-import { API_BASE_URL } from '../lib/api';
+import { API_BASE_URL, api } from '../lib/api';
 import type { InfiniteData } from '@tanstack/react-query';
 import type { Message, Conversation, WsMessagePinEvent, WsThreadUpdateEvent } from '../types/messages';
 import type { GetReactionsResponse, WsReactionAddedPayload, WsReactionRemovedPayload } from '../types/reactions';
 
 interface WebSocketMessage {
   type: string;
-  payload: any;
+  payload: unknown;
 }
 
 interface WebSocketContextType {
@@ -43,7 +43,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const recentMessageIdsRef = useRef<Set<number>>(new Set());
 
   // Send WebSocket message
-  const sendMessage = useCallback((type: string, payload: any) => {
+  const sendMessage = useCallback((type: string, payload: unknown) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type, payload }));
       console.log('[WebSocket] Sent:', type, payload);
@@ -572,17 +572,28 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     isCleanupRef.current = false;
 
-    const connect = () => {
+    const connect = async () => {
       console.log('[WebSocket] Connecting...');
-      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-      if (!token) {
-        console.warn('[WebSocket] Missing auth token; skipping connect');
+      let wsToken: string;
+      try {
+        const response = await api.post<{ ws_token: string }>('/auth/ws-token');
+        wsToken = response.ws_token;
+      } catch (error) {
+        console.warn('[WebSocket] Failed to fetch WebSocket token; skipping connect', error);
+        setIsConnected(false);
+        if (!isCleanupRef.current) {
+          reconnectAttemptsRef.current += 1;
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
+          reconnectTimerRef.current = setTimeout(connect, delay);
+        }
         return;
       }
+      if (isCleanupRef.current) return;
+
       const url = new URL(API_BASE_URL);
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
       url.pathname = `${url.pathname.replace(/\/$/, '')}/ws`;
-      url.searchParams.set('token', token);
+      url.searchParams.set('token', wsToken);
 
       const socket = new WebSocket(url.toString());
       wsRef.current = socket;

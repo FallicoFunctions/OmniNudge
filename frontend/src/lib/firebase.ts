@@ -1,14 +1,14 @@
 import { initializeApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage, type Messaging } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, type MessagePayload, type Messaging } from 'firebase/messaging';
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyCFMzmGkblIwDPEQexwSAjZ_YXyp1AH_5Y",
-  authDomain: "omninudge-f9d7d.firebaseapp.com",
-  projectId: "omninudge-f9d7d",
-  storageBucket: "omninudge-f9d7d.firebasestorage.app",
-  messagingSenderId: "450386878156",
-  appId: "1:450386878156:web:485214a0f70f0720d66c69"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 // Initialize Firebase
@@ -45,7 +45,6 @@ export async function requestNotificationPermission(): Promise<string | null> {
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
     const token = await getToken(messaging, { vapidKey });
 
-    console.log('FCM Token:', token);
     return token;
   } catch (error) {
     console.error('Error getting FCM token:', error);
@@ -54,7 +53,7 @@ export async function requestNotificationPermission(): Promise<string | null> {
 }
 
 // Listen for foreground messages
-export function onForegroundMessage(callback: (payload: any) => void) {
+export function onForegroundMessage(callback: (payload: MessagePayload) => void) {
   if (!messaging) {
     console.error('Firebase messaging not initialized');
     return () => {};
