@@ -104,6 +104,7 @@ export default function HubAIDesignerTab({ hubName }: Props) {
           Describe your Hub page
         </label>
         <textarea
+          aria-label="Describe your Hub page"
           className="w-full h-32 px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] text-sm"
           placeholder='e.g. "Dark-themed page for a Retro Gaming community with a hero banner, a grid of top posts, and a neon green accent sidebar."'
           maxLength={MAX_PROMPT_LENGTH}
