@@ -70,6 +70,7 @@ vi.mock('../../contexts/SettingsContext', () => ({
 }));
 
 import { postsService } from '../../services/postsService';
+import type { PlatformPost } from '../../types/posts';
 import PostDetailPage from '../PostDetailPage';
 
 const createWrapper = () => {
@@ -116,7 +117,7 @@ describe('PostDetailPage', () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       user_vote: 0,
-    } as any);
+    } as PlatformPost);
 
     renderWithPostId('1');
     expect(document.body).toBeTruthy();

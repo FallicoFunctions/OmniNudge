@@ -70,11 +70,11 @@ const createWrapper = () => {
 describe('UserProfilePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuth).mockReturnValue({ user: null, isAuthenticated: false } as any);
+    vi.mocked(useAuth).mockReturnValue({ user: null, isAuthenticated: false } as ReturnType<typeof useAuth>);
   });
 
   it('renders without crashing with username param', () => {
-    vi.mocked(usersService.getProfile).mockResolvedValue(mockProfile as any);
+    vi.mocked(usersService.getProfile).mockResolvedValue(mockProfile);
     const Wrapper = createWrapper();
     render(
       <Wrapper>
@@ -98,11 +98,11 @@ describe('UserProfilePage', () => {
   });
 
   it('shows Edit Profile button when viewing own profile', async () => {
-    vi.mocked(usersService.getProfile).mockResolvedValue(mockProfile as any);
+    vi.mocked(usersService.getProfile).mockResolvedValue(mockProfile);
     vi.mocked(useAuth).mockReturnValue({
       user: { id: 42, username: 'alice', role: 'user' },
       isAuthenticated: true,
-    } as any);
+    } as ReturnType<typeof useAuth>);
 
     const Wrapper = createWrapper();
     render(
@@ -117,11 +117,11 @@ describe('UserProfilePage', () => {
   });
 
   it('does not show Edit Profile button when viewing another user profile', async () => {
-    vi.mocked(usersService.getProfile).mockResolvedValue(mockProfile as any);
+    vi.mocked(usersService.getProfile).mockResolvedValue(mockProfile);
     vi.mocked(useAuth).mockReturnValue({
       user: { id: 99, username: 'bob', role: 'user' },
       isAuthenticated: true,
-    } as any);
+    } as ReturnType<typeof useAuth>);
 
     const Wrapper = createWrapper();
     render(

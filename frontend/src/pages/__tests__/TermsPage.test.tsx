@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, _opts?: object) => key,
+    t: (key: string) => key,
     i18n: { language: 'en' },
   }),
 }));
