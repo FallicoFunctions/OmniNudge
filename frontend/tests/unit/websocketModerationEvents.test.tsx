@@ -2,11 +2,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WebSocketProvider } from '../../src/contexts/WebSocketContext';
+import { api } from '../../src/lib/api';
 
 const useAuthMock = vi.fn();
 
 vi.mock('../../src/contexts/AuthContext', () => ({
   useAuth: () => useAuthMock(),
+}));
+
+vi.mock('../../src/lib/api', () => ({
+  API_BASE_URL: 'http://localhost:8080/api/v1',
+  api: {
+    post: vi.fn().mockResolvedValue({ ws_token: 'test-ws-token' }),
+  },
 }));
 
 class MockWebSocket {
@@ -19,14 +27,14 @@ class MockWebSocket {
   onclose: (() => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
 
-  constructor(_url: string) {
+  constructor() {
     MockWebSocket.instances.push(this);
     setTimeout(() => {
       this.onopen?.();
     }, 0);
   }
 
-  send(_data: string) {}
+  send() {}
 
   close() {
     this.onclose?.();
@@ -41,6 +49,7 @@ describe('WebSocket moderation report events', () => {
     useAuthMock.mockReturnValue({
       user: { id: 42, username: 'moderator', role: 'moderator' },
     });
+    vi.mocked(api.post).mockResolvedValue({ ws_token: 'test-ws-token' });
     localStorage.setItem('auth_token', 'test-token');
     // @ts-expect-error test mock assignment
     globalThis.WebSocket = MockWebSocket;

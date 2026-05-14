@@ -12,7 +12,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../hooks/useFormat', () => ({
   useFormat: () => ({
-    formatDate: (_date: Date) => 'February 2026',
+    formatDate: () => 'February 2026',
     formatNumber: (n: number) => String(n),
     formatRelativeTime: () => 'just now',
   }),

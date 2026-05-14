@@ -32,6 +32,7 @@ describe('usePushNotifications', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     Object.defineProperty(window, 'Notification', {
@@ -66,7 +67,8 @@ describe('usePushNotifications', () => {
     });
 
     expect(ok).toBe(true);
-    expect(localStorage.getItem('fcm_token')).toBe('token-123');
+    expect(sessionStorage.getItem('fcm_token')).toBe('token-123');
+    expect(localStorage.getItem('fcm_token')).toBeNull();
     expect(api.post).toHaveBeenCalledWith('/devices/register', {
       token: 'token-123',
       device_type: 'web',
@@ -91,13 +93,13 @@ describe('usePushNotifications', () => {
     });
 
     expect(ok).toBe(false);
-    expect(localStorage.getItem('fcm_token')).toBeNull();
+    expect(sessionStorage.getItem('fcm_token')).toBeNull();
     expect(toastError).toHaveBeenCalled();
   });
 
   it('returns false when unregister API call fails', async () => {
     const { api } = await import('../../src/lib/api');
-    localStorage.setItem('fcm_token', 'token-999');
+    sessionStorage.setItem('fcm_token', 'token-999');
     vi.mocked(api.delete).mockRejectedValue(new Error('network error'));
 
     const { result } = renderHook(() => usePushNotifications());
@@ -112,7 +114,7 @@ describe('usePushNotifications', () => {
     });
 
     expect(ok).toBe(false);
-    expect(localStorage.getItem('fcm_token')).toBe('token-999');
+    expect(sessionStorage.getItem('fcm_token')).toBe('token-999');
     expect(toastError).toHaveBeenCalled();
   });
 });
