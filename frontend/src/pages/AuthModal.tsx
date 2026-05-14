@@ -120,7 +120,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
         username: forgotUsername.trim(),
       });
       setForgotSuccess(true);
-    } catch (err) {
+    } catch {
       // Show generic message for security
       setForgotSuccess(true);
     } finally {

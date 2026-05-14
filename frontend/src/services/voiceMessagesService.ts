@@ -2,7 +2,7 @@ import type { VoiceMessage } from '../types/messages'
 
 const API_BASE = '/api/v1'
 
-export interface VoiceMessageResponse extends VoiceMessage {}
+export type VoiceMessageResponse = VoiceMessage;
 
 export interface UploadVoiceResponse {
   voice_message_id: number

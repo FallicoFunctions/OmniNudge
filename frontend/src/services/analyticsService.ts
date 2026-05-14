@@ -32,6 +32,8 @@ export type EventName =
   | 'notification_toggled'
   // Feature Rollout
   | 'feature_rollout_evaluated'
+  | 'user_properties_updated'
+  | 'page_view'
   // Errors
   | 'error_occurred';
 
@@ -181,14 +183,14 @@ class AnalyticsService {
    */
   setUserProperties(properties: EventProperties) {
     // For now, tracking as an event. Ideally, use a dedicated endpoint if needed.
-    this.track('user_properties_updated' as any, properties);
+    this.track('user_properties_updated', properties);
   }
 
   /**
    * Track page view
    */
   page(path: string, properties?: EventProperties) {
-    this.track('page_view' as any, { ...properties, path });
+    this.track('page_view', { ...properties, path });
   }
 
   // --- Session Management ---
@@ -220,7 +222,7 @@ class AnalyticsService {
       }).catch(err => {
         if (this.config.debug) console.warn('[Analytics] Failed to start session:', err);
       });
-    } catch (e) {
+    } catch {
       // Ignore
     }
   }

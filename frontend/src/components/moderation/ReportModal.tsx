@@ -60,7 +60,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
       setSubmitSuccess(true);
       autoCloseTimerRef.current = setTimeout(() => { handleClose(); }, 2000);
     } catch (error) {
-      const status = (error as any)?.status;
+      const status = (error as { status?: number })?.status;
       const message = error instanceof Error ? error.message : '';
       const isRateLimited =
         status === 429 ||

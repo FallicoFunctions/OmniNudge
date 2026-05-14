@@ -30,8 +30,8 @@ export interface FeatureFlagAudit {
   change_type: string;
   changed_by: number;
   changed_by_username?: string;
-  old_value?: any;
-  new_value?: any;
+  old_value?: unknown;
+  new_value?: unknown;
   changed_at: string;
 }
 

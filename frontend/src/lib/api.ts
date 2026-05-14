@@ -61,7 +61,7 @@ class ApiClient {
       }
 
       const err = new Error(error.message || error.error);
-      (err as any).status = response.status;
+      (err as Error & { status?: number }).status = response.status;
       throw err;
     }
 
