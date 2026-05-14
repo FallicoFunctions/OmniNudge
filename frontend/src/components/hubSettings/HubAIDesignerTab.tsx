@@ -25,7 +25,7 @@ export default function HubAIDesignerTab({ hubName }: Props) {
   useEffect(() => {
     if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
     if (!previewHTML) { setPreviewBlobUrl(null); return; }
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><script src="https://cdn.tailwindcss.com"><\/script></head><body class="bg-white p-4">${previewHTML}</body></html>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><script src="https://cdn.tailwindcss.com"></` + `script></head><body class="bg-white p-4">${previewHTML}</body></html>`;
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     blobUrlRef.current = url;
@@ -90,7 +90,7 @@ export default function HubAIDesignerTab({ hubName }: Props) {
         <h2 className="text-xl font-bold text-[var(--color-text-primary)]">AI Hub Page Designer</h2>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
           Describe your ideal Hub page and AI will generate the HTML layout for you.
-          Designs are previewed in a sandboxed iframe and cannot access your account.
+          Designs are previewed in a sandboxed iframe with script isolation.
         </p>
       </div>
 
@@ -162,7 +162,7 @@ export default function HubAIDesignerTab({ hubName }: Props) {
             className="w-full rounded border border-[var(--color-border)] bg-white"
             style={{ minHeight: 400 }}
             src={previewBlobUrl ?? undefined}
-            sandbox="allow-scripts allow-same-origin"
+            sandbox="allow-scripts"
             title="AI Hub Design Preview"
           />
         </div>
