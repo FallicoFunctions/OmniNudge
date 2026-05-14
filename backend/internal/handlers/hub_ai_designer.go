@@ -12,26 +12,38 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/helpers"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/repository"
 	zlog "github.com/rs/zerolog/log"
+	htmlnode "golang.org/x/net/html"
 )
 
 // ─── HTML sanitization regexps ─────────────────────────────────────────────
 // These strip the most dangerous HTML constructs from AI-generated content.
 // The frontend additionally renders the result inside a sandboxed iframe.
 var (
-	reScriptBlock     = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
-	reDangerousOpen   = regexp.MustCompile(`(?i)<(iframe|object|embed|form|input|select|textarea|link|meta|base|applet|frameset|frame|noscript|style\s+type\s*=\s*["']text/javascript["'])[^>]*>`)
-	reDangerousClose  = regexp.MustCompile(`(?i)</(iframe|object|embed|form|select|textarea|applet|frameset|frame)>`)
-	reOnEvent         = regexp.MustCompile(`(?i)\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)`)
-	reJavascriptURI   = regexp.MustCompile(`(?i)(href|src|action)\s*=\s*["']?\s*javascript:[^"'\s>]*["']?`)
-	reDataURI         = regexp.MustCompile(`(?i)(src)\s*=\s*["']?\s*data:[^"'\s>]*["']?`)
+	reScriptBlock    = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	reDangerousOpen  = regexp.MustCompile(`(?i)<(iframe|object|embed|form|input|select|textarea|link|meta|base|applet|frameset|frame|noscript|style\s+type\s*=\s*["']text/javascript["'])[^>]*>`)
+	reDangerousClose = regexp.MustCompile(`(?i)</(iframe|object|embed|form|select|textarea|applet|frameset|frame)>`)
+	reOnEvent        = regexp.MustCompile(`(?i)\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)`)
+	reJavascriptURI  = regexp.MustCompile(`(?i)(href|src|action)\s*=\s*["']?\s*javascript:[^"'\s>]*["']?`)
+	reDataURI        = regexp.MustCompile(`(?i)(src)\s*=\s*["']?\s*data:[^"'\s>]*["']?`)
+	reStyleBlock     = regexp.MustCompile(`(?is)<style[^>]*>(.*?)</style>`)
+	reCSSComment     = regexp.MustCompile(`(?s)/\*.*?\*/`)
 )
+
+var requiredHubDesignSlots = []string{"hub-join", "hub-create", "hub-mod", "hub-feed"}
+var allowedCSSScopes = []string{".hub-custom-page", "#hub-join", "#hub-create", "#hub-mod", "#hub-feed"}
+
+type designHTMLValidationOptions struct {
+	requireAllSlots bool
+}
 
 // sanitizeHTML removes dangerous constructs from AI-generated HTML.
 // It is intentionally conservative: it strips rather than escapes.
@@ -48,6 +60,7 @@ func sanitizeHTML(raw string) string {
 // codeBlockRe matches a markdown fenced code block with an optional language
 // tag (e.g. ```html or just ```) and captures the inner content.
 var codeBlockRe = regexp.MustCompile("(?is)^```(?:html)?\r?\n(.*?)\r?\n?```\\s*$")
+var codeBlockFindRe = regexp.MustCompile("(?is)```(?:html)?\r?\n(.*?)\r?\n?```")
 
 // extractCodeBlock pulls the content out of a markdown fenced code block if
 // the model wrapped the HTML in one (```html ... ``` or ``` ... ```),
@@ -55,6 +68,9 @@ var codeBlockRe = regexp.MustCompile("(?is)^```(?:html)?\r?\n(.*?)\r?\n?```\\s*$
 func extractCodeBlock(content string) string {
 	content = strings.TrimSpace(content)
 	if m := codeBlockRe.FindStringSubmatch(content); len(m) == 2 {
+		return strings.TrimSpace(m[1])
+	}
+	if m := codeBlockFindRe.FindStringSubmatch(content); len(m) == 2 {
 		return strings.TrimSpace(m[1])
 	}
 	// Fallback: strip any leading/trailing fence lines manually to handle
@@ -68,6 +84,564 @@ func extractCodeBlock(content string) string {
 		end--
 	}
 	return strings.TrimSpace(strings.Join(lines[start:end], "\n"))
+}
+
+func sanitizeAndValidateDesignHTML(raw string, opts designHTMLValidationOptions) (string, error) {
+	clean := sanitizeHTML(extractCodeBlock(raw))
+	if err := validateDesignHTML(clean, opts); err != nil {
+		return "", err
+	}
+	return clean, nil
+}
+
+func validateAIDesignHTML(clean string) error {
+	return validateDesignHTML(clean, designHTMLValidationOptions{requireAllSlots: true})
+}
+
+func ValidateAIDesignHTMLForAudit(clean string) error {
+	return validateAIDesignHTML(clean)
+}
+
+func validateManualDesignHTML(clean string) error {
+	return validateDesignHTML(clean, designHTMLValidationOptions{})
+}
+
+func validateDesignHTML(clean string, opts designHTMLValidationOptions) error {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(clean))
+	if err != nil {
+		return fmt.Errorf("design must be valid HTML")
+	}
+
+	bodyContents := doc.Find("body").Contents()
+	rootElements := make([]*htmlnode.Node, 0, 1)
+	for _, node := range bodyContents.Nodes {
+		switch node.Type {
+		case htmlnode.TextNode:
+			if strings.TrimSpace(node.Data) != "" {
+				return fmt.Errorf("design must contain a single top-level .hub-custom-page root")
+			}
+		case htmlnode.ElementNode:
+			if strings.EqualFold(node.Data, "style") {
+				continue
+			}
+			rootElements = append(rootElements, node)
+		}
+	}
+
+	if len(rootElements) != 1 {
+		return fmt.Errorf("design must contain a single top-level .hub-custom-page root")
+	}
+	root := goquery.NewDocumentFromNode(rootElements[0]).Selection
+	if !root.HasClass("hub-custom-page") {
+		return fmt.Errorf("design must contain a single top-level .hub-custom-page root")
+	}
+	if doc.Find("nav").Length() > 0 {
+		return fmt.Errorf("design may not contain nav elements")
+	}
+
+	for _, slotID := range requiredHubDesignSlots {
+		slotCount := doc.Find("#" + slotID).Length()
+		if slotCount > 1 {
+			if opts.requireAllSlots {
+				return fmt.Errorf("design must include each slot exactly once")
+			}
+			return fmt.Errorf("design may not contain duplicate slots")
+		}
+		if opts.requireAllSlots && slotCount != 1 {
+			return fmt.Errorf("design must include each slot exactly once")
+		}
+	}
+	if err := validateInlineHubFeedHostStyles(doc); err != nil {
+		return err
+	}
+
+	var hasDeadLink bool
+	doc.Find("a").Each(func(_ int, selection *goquery.Selection) {
+		if hasDeadLink {
+			return
+		}
+
+		href, exists := selection.Attr("href")
+		if !exists {
+			return
+		}
+
+		trimmedHref := strings.TrimSpace(href)
+		if trimmedHref == "" || trimmedHref == "#" {
+			hasDeadLink = true
+		}
+	})
+	if hasDeadLink {
+		return fmt.Errorf("design may not contain dead links")
+	}
+
+	return validateDesignCSS(clean)
+}
+
+func validateInlineHubFeedHostStyles(doc *goquery.Document) error {
+	var validationErr error
+	doc.Find("#hub-feed").Each(func(_ int, selection *goquery.Selection) {
+		if validationErr != nil {
+			return
+		}
+		style, exists := selection.Attr("style")
+		if !exists {
+			return
+		}
+		validationErr = validateHubFeedHostDeclarationBlock(style)
+	})
+	return validationErr
+}
+
+func validateDesignCSS(clean string) error {
+	matches := reStyleBlock.FindAllStringSubmatch(clean, -1)
+	for _, match := range matches {
+		css := reCSSComment.ReplaceAllString(match[1], "")
+		if err := validateCSSRuleBlock(css); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateCSSRuleBlock(css string) error {
+	remaining := css
+	for {
+		prelude, blockBody, rest, isBlock, ok := nextCSSChunk(remaining)
+		if !ok {
+			return nil
+		}
+
+		trimmedPrelude := strings.TrimSpace(prelude)
+		if trimmedPrelude == "" {
+			remaining = rest
+			continue
+		}
+
+		if !isBlock {
+			if err := validateCSSStatement(trimmedPrelude); err != nil {
+				return err
+			}
+		} else if isAllowedKeyframesAtRule(trimmedPrelude) {
+			remaining = rest
+			continue
+		} else if strings.HasPrefix(trimmedPrelude, "@") {
+			if err := validateCSSRuleBlock(blockBody); err != nil {
+				return err
+			}
+		} else {
+			if err := validateCSSSelectorList(trimmedPrelude); err != nil {
+				return err
+			}
+			if err := validateHubFeedHostDeclarations(trimmedPrelude, blockBody); err != nil {
+				return err
+			}
+		}
+
+		remaining = rest
+	}
+}
+
+func validateCSSSelectorList(prelude string) error {
+	for _, selector := range splitCSSSelectors(prelude) {
+		switch forbiddenCSSSelectorKind(selector) {
+		case "wrapped-global":
+			return fmt.Errorf("global wrapper selectors are not allowed")
+		case "root":
+			return fmt.Errorf("global :root CSS is not allowed")
+		case "namespace":
+			return fmt.Errorf("namespace-qualified CSS selectors are not allowed")
+		case "unscoped":
+			return fmt.Errorf("ordinary CSS selectors must be scoped to the AI hub root or slot containers")
+		}
+	}
+
+	return nil
+}
+
+func validateHubFeedHostDeclarations(prelude string, blockBody string) error {
+	for _, selector := range splitCSSSelectors(prelude) {
+		if !targetsHubFeedHost(selector) {
+			continue
+		}
+
+		if err := validateHubFeedHostDeclarationBlock(blockBody); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func targetsHubFeedHost(selector string) bool {
+	trimmed := strings.ToLower(strings.TrimSpace(selector))
+	if !strings.HasPrefix(trimmed, "#hub-feed") {
+		return false
+	}
+	if len(trimmed) == len("#hub-feed") {
+		return true
+	}
+
+	switch trimmed[len("#hub-feed")] {
+	case '.', ':', '[', '#':
+		return true
+	default:
+		return false
+	}
+}
+
+func validateHubFeedHostDeclarationBlock(blockBody string) error {
+	declarations, err := parseCSSDeclarations(blockBody)
+	if err != nil {
+		return err
+	}
+
+	hasFixedHeight := false
+	hasClippingOverflow := false
+	for _, declaration := range declarations {
+		property := strings.ToLower(strings.TrimSpace(declaration.property))
+		value := normalizeCSSDeclarationValue(declaration.value)
+
+		if isForbiddenHubFeedHostDeclaration(property, value) {
+			return fmt.Errorf("#hub-feed is a passive runtime mount host; host-level layout rule %s is not allowed", property)
+		}
+		if isFixedHeightDeclaration(property, value) {
+			hasFixedHeight = true
+		}
+		if isClippingOverflowDeclaration(property, value) {
+			hasClippingOverflow = true
+		}
+	}
+
+	if hasFixedHeight && hasClippingOverflow {
+		return fmt.Errorf("#hub-feed is a passive runtime mount host; fixed height with clipping overflow is not allowed")
+	}
+
+	return nil
+}
+
+type cssDeclaration struct {
+	property string
+	value    string
+}
+
+func parseCSSDeclarations(blockBody string) ([]cssDeclaration, error) {
+	declarations := make([]cssDeclaration, 0, 8)
+	remaining := blockBody
+	for {
+		statement, _, rest, isBlock, ok := nextCSSChunk(remaining)
+		if !ok {
+			return declarations, nil
+		}
+		if isBlock {
+			return nil, fmt.Errorf("nested CSS declaration blocks are not allowed")
+		}
+
+		trimmed := strings.TrimSpace(statement)
+		if trimmed == "" {
+			remaining = rest
+			continue
+		}
+
+		property, value, found := strings.Cut(trimmed, ":")
+		if !found {
+			return nil, fmt.Errorf("CSS declarations must be property-value pairs")
+		}
+		declarations = append(declarations, cssDeclaration{property: property, value: value})
+		remaining = rest
+	}
+}
+
+func normalizeCSSDeclarationValue(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.TrimSpace(strings.TrimSuffix(normalized, "!important"))
+	return strings.Join(strings.Fields(normalized), " ")
+}
+
+func isForbiddenHubFeedHostDeclaration(property string, value string) bool {
+	switch {
+	case property == "display" && (value == "grid" || value == "inline-grid" || value == "flex" || value == "inline-flex"):
+		return true
+	case property == "grid-template" || strings.HasPrefix(property, "grid-template-"):
+		return true
+	case strings.HasPrefix(property, "grid-auto-"):
+		return true
+	case property == "flex-direction" || property == "flex-wrap":
+		return true
+	case strings.HasPrefix(property, "place-"):
+		return true
+	case property == "align-items" || property == "justify-content":
+		return true
+	case property == "column-count":
+		return true
+	case property == "position" && (value == "absolute" || value == "fixed"):
+		return true
+	default:
+		return false
+	}
+}
+
+func isFixedHeightDeclaration(property string, value string) bool {
+	if property != "height" && property != "max-height" {
+		return false
+	}
+	if value == "auto" || value == "none" || strings.HasPrefix(value, "min(") || strings.HasPrefix(value, "max(") || strings.HasPrefix(value, "fit-content") {
+		return false
+	}
+	return true
+}
+
+func isClippingOverflowDeclaration(property string, value string) bool {
+	if property != "overflow" && property != "overflow-y" && property != "overflow-x" {
+		return false
+	}
+	return value == "hidden" || value == "clip" || value == "scroll" || value == "auto"
+}
+
+func isAllowedKeyframesAtRule(prelude string) bool {
+	trimmed := strings.ToLower(strings.TrimSpace(prelude))
+	return strings.HasPrefix(trimmed, "@keyframes") ||
+		strings.HasPrefix(trimmed, "@-webkit-keyframes") ||
+		strings.HasPrefix(trimmed, "@-moz-keyframes")
+}
+
+func validateCSSStatement(statement string) error {
+	trimmed := strings.ToLower(strings.TrimSpace(statement))
+	switch {
+	case strings.HasPrefix(trimmed, "@import"):
+		return fmt.Errorf("blockless at-rules are not allowed: @import")
+	case strings.HasPrefix(trimmed, "@charset"):
+		return fmt.Errorf("blockless at-rules are not allowed: @charset")
+	case strings.HasPrefix(trimmed, "@namespace"):
+		return fmt.Errorf("blockless at-rules are not allowed: @namespace")
+	case strings.HasPrefix(trimmed, "@"):
+		return fmt.Errorf("blockless at-rules are not allowed")
+	default:
+		return fmt.Errorf("top-level CSS statements are not allowed")
+	}
+}
+
+func nextCSSChunk(css string) (prelude string, body string, rest string, isBlock bool, ok bool) {
+	openIndex := -1
+	statementIndex := -1
+	var quote rune
+	parenDepth := 0
+	bracketDepth := 0
+
+	for i, char := range css {
+		if quote != 0 {
+			if char == quote && !isEscapedCSSChar(css, i) {
+				quote = 0
+			}
+			continue
+		}
+
+		switch char {
+		case '\'', '"':
+			quote = char
+		case '(':
+			parenDepth++
+		case ')':
+			if parenDepth > 0 {
+				parenDepth--
+			}
+		case '[':
+			bracketDepth++
+		case ']':
+			if bracketDepth > 0 {
+				bracketDepth--
+			}
+		case '{':
+			if parenDepth == 0 && bracketDepth == 0 {
+				openIndex = i
+				goto foundOpen
+			}
+		case ';':
+			if parenDepth == 0 && bracketDepth == 0 {
+				statementIndex = i
+				goto foundStatement
+			}
+		}
+	}
+
+	if strings.TrimSpace(css) != "" {
+		return css, "", "", false, true
+	}
+
+	return "", "", "", false, false
+
+foundStatement:
+	return css[:statementIndex], "", css[statementIndex+1:], false, true
+
+foundOpen:
+	quote = 0
+	parenDepth = 0
+	bracketDepth = 0
+	braceDepth := 1
+
+	for i := openIndex + 1; i < len(css); i++ {
+		char := rune(css[i])
+		if quote != 0 {
+			if char == quote && !isEscapedCSSChar(css, i) {
+				quote = 0
+			}
+			continue
+		}
+
+		switch char {
+		case '\'', '"':
+			quote = char
+		case '(':
+			parenDepth++
+		case ')':
+			if parenDepth > 0 {
+				parenDepth--
+			}
+		case '[':
+			bracketDepth++
+		case ']':
+			if bracketDepth > 0 {
+				bracketDepth--
+			}
+		case '{':
+			if parenDepth == 0 && bracketDepth == 0 {
+				braceDepth++
+			}
+		case '}':
+			if parenDepth == 0 && bracketDepth == 0 {
+				braceDepth--
+				if braceDepth == 0 {
+					return css[:openIndex], css[openIndex+1 : i], css[i+1:], true, true
+				}
+			}
+		}
+	}
+
+	return css[:openIndex], css[openIndex+1:], "", true, true
+}
+
+func splitCSSSelectors(prelude string) []string {
+	selectors := make([]string, 0, 4)
+	start := 0
+	var quote rune
+	parenDepth := 0
+	bracketDepth := 0
+
+	for i, char := range prelude {
+		if quote != 0 {
+			if char == quote && !isEscapedCSSChar(prelude, i) {
+				quote = 0
+			}
+			continue
+		}
+
+		switch char {
+		case '\'', '"':
+			quote = char
+		case '(':
+			parenDepth++
+		case ')':
+			if parenDepth > 0 {
+				parenDepth--
+			}
+		case '[':
+			bracketDepth++
+		case ']':
+			if bracketDepth > 0 {
+				bracketDepth--
+			}
+		case ',':
+			if parenDepth == 0 && bracketDepth == 0 {
+				selectors = append(selectors, prelude[start:i])
+				start = i + 1
+			}
+		}
+	}
+
+	selectors = append(selectors, prelude[start:])
+	return selectors
+}
+
+func forbiddenCSSSelectorKind(selector string) string {
+	trimmed := strings.ToLower(strings.TrimSpace(selector))
+	switch {
+	case strings.Contains(trimmed, ":is("), strings.Contains(trimmed, ":where("):
+		return "wrapped-global"
+	case strings.Contains(trimmed, ":root"):
+		return "root"
+	case hasNamespaceSelector(trimmed):
+		return "namespace"
+	case !hasAllowedScopePrefix(trimmed):
+		return "unscoped"
+	default:
+		return ""
+	}
+}
+
+func hasAllowedScopePrefix(selector string) bool {
+	for _, prefix := range allowedCSSScopes {
+		normalizedPrefix := strings.ToLower(prefix)
+		if !strings.HasPrefix(selector, normalizedPrefix) {
+			continue
+		}
+		if len(selector) == len(normalizedPrefix) {
+			return true
+		}
+
+		switch selector[len(normalizedPrefix)] {
+		case ' ', '\n', '\r', '\t', '>', '+', '~', '.', '#', ':', '[':
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasNamespaceSelector(selector string) bool {
+	var quote rune
+	parenDepth := 0
+	bracketDepth := 0
+
+	for i, char := range selector {
+		if quote != 0 {
+			if char == quote && !isEscapedCSSChar(selector, i) {
+				quote = 0
+			}
+			continue
+		}
+
+		switch char {
+		case '\'', '"':
+			quote = char
+		case '(':
+			parenDepth++
+		case ')':
+			if parenDepth > 0 {
+				parenDepth--
+			}
+		case '[':
+			bracketDepth++
+		case ']':
+			if bracketDepth > 0 {
+				bracketDepth--
+			}
+		case '|':
+			if bracketDepth == 0 && parenDepth == 0 {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func isEscapedCSSChar(source string, index int) bool {
+	backslashCount := 0
+	for i := index - 1; i >= 0 && source[i] == '\\'; i-- {
+		backslashCount++
+	}
+	return backslashCount%2 == 1
 }
 
 // ─── Gemini native API types ────────────────────────────────────────────────
@@ -174,11 +748,32 @@ Four divs will have real UI injected into them at runtime. Place them where they
    → Mod Tools link. Only visible to moderators. Place in sidebar or navigation.
 
 4. <div id="hub-feed"></div>
-   → Full post feed with sort tabs and search. Place as the main content area.
+   → Passive runtime mount host for the real post feed. Place this host as the main content area,
+   but do not treat it as the post grid, controls row, or multi-column layout surface.
    MUST set CSS custom properties on this element so injected posts inherit your design colors:
    --color-background, --color-surface, --color-surface-elevated, --color-border,
    --color-text-primary, --color-text-secondary, --color-text-muted, --color-primary, --color-primary-dark
    Example: <div id="hub-feed" style="--color-background:#0d0d1a; --color-surface:#1a1a2e; --color-border:#3a3a5c; --color-text-primary:#e0e0ff; --color-primary:#7070ff; padding:2rem;">
+   Runtime injects one subtree inside this host:
+   .hub-slot-feed
+   .hub-slot-feed-controls
+   .hub-slot-feed-tabs
+   .hub-slot-feed-search-wrap
+   .hub-slot-search
+   .hub-slot-feed-list
+   .hub-slot-post-card
+   .hub-slot-post-title
+   .hub-slot-post-meta
+
+Feed slot contract:
+- #hub-feed is a passive runtime mount host, not an owned layout container.
+- Do NOT assume direct child placement inside #hub-feed; the app injects its own subtree.
+- Do NOT create fake internal placeholders, scaffolding, search inputs, tabs, or post cards inside #hub-feed.
+- Surrounding layout around #hub-feed is allowed and encouraged.
+- Host-level child-placement styling on bare #hub-feed is not allowed: do not put display:grid/flex,
+  grid-template-*, grid-auto-*, flex-direction, flex-wrap, place-*, align-items,
+  justify-content, column-count, position:absolute/fixed, or clipping fixed-height layout on #hub-feed.
+- If you need to style feed internals, target the stable descendant hooks listed above.
 
 ════════════════════════════════════════
 SLOT STYLING (design the injected UI to match your aesthetic)
@@ -193,15 +788,41 @@ Buttons:
   .hub-slot-btn--mod      — mod tools button
 
 Post feed controls:
+  .hub-slot-feed          — wrapper around the injected controls and post list
+  .hub-slot-feed-controls — controls row
+  .hub-slot-feed-tabs     — sort tabs row
+  .hub-slot-feed-search-wrap — search input wrapper
   .hub-slot-tab           — sort tab (Hot / New / Top / Rising)
   .hub-slot-tab--active   — currently selected sort tab
   .hub-slot-search        — search input field
+  .hub-slot-feed-list     — real post list
+  .hub-slot-post-card     — real post card
+  .hub-slot-post-title    — post title
+  .hub-slot-post-meta     — author, score, comment count, and time metadata
 
 Always scope your CSS to the slot IDs to avoid conflicts:
   #hub-join .hub-slot-btn--primary { background: #00FFFF; color: #000; border-radius: 8px; padding: 10px 24px; font-weight: 700; border: none; cursor: pointer; }
+  #hub-feed .hub-slot-feed { display: grid; gap: 18px; }
+  #hub-feed .hub-slot-feed-controls { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
   #hub-feed .hub-slot-tab { background: transparent; color: #aaa; border: none; cursor: pointer; padding: 8px 16px; }
   #hub-feed .hub-slot-tab--active { color: #00FFFF; border-bottom: 2px solid #00FFFF; }
   #hub-feed .hub-slot-search { background: #222; color: #eee; border: 1px solid #444; border-radius: 6px; padding: 8px 12px; }
+  #hub-feed .hub-slot-post-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 16px; }
+
+CSS selector scoping contract:
+- Every selector in the <style> block must start with one of: .hub-custom-page, #hub-join, #hub-create, #hub-mod, #hub-feed
+- Do NOT use bare element selectors like body, h1, h2, p, section, button, input, a, or div
+- Do NOT use unscoped class selectors like .hero, .card, .layout, or .stats
+- If styling a class, scope it like .hub-custom-page .hero, not .hero
+- Grouped selectors are allowed only when every selector in the group is scoped.
+Bad: h1 { ... }
+Bad: .hero { ... }
+Bad: section.stats { ... }
+Bad: .hub-custom-page .hero, h2 { ... }
+Good: .hub-custom-page h1 { ... }
+Good: .hub-custom-page .hero { ... }
+Good: #hub-feed .hub-slot-post-card { ... }
+Good: #hub-create .hub-slot-btn--create { ... }
 
 ════════════════════════════════════════
 REQUIRED SECTIONS
@@ -357,11 +978,11 @@ func (h *HubAIDesignerHandler) Generate(c *gin.Context) {
 
 	// Fetch real hub data to ground the AI in actual content.
 	var (
-		hubDisplayName   string
-		hubDescription   string
-		hubSidebarMD     string
-		hubMemberCount   int
-		hubPostCount     int
+		hubDisplayName string
+		hubDescription string
+		hubSidebarMD   string
+		hubMemberCount int
+		hubPostCount   int
 	)
 	_ = h.pool.QueryRow(c.Request.Context(), `
 		SELECT
@@ -407,7 +1028,12 @@ AESTHETIC REQUEST:
 		return rawHTML
 	}()).Msg("AI raw response")
 
-	clean := sanitizeHTML(extractCodeBlock(rawHTML))
+	clean, err := sanitizeAndValidateDesignHTML(rawHTML, designHTMLValidationOptions{requireAllSlots: true})
+	if err != nil {
+		zlog.Error().Err(err).Str("hub", hubName).Msg("AI returned invalid design")
+		RespondError(c, http.StatusBadGateway, err.Error())
+		return
+	}
 
 	if len(clean) < 1000 {
 		zlog.Error().Str("hub", hubName).Int("len", len(clean)).Msg("AI returned incomplete design")
@@ -589,6 +1215,22 @@ func (h *HubAIDesignerHandler) Activate(c *gin.Context) {
 			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
 			return
 		}
+	}
+
+	var htmlContent string
+	if err := h.pool.QueryRow(c.Request.Context(),
+		`SELECT html_content FROM hub_ai_designs WHERE id = $1 AND hub_id = $2`,
+		designID, hubID).Scan(&htmlContent); err != nil {
+		if err == pgx.ErrNoRows {
+			RespondError(c, http.StatusNotFound, "Design not found")
+			return
+		}
+		RespondError(c, http.StatusInternalServerError, "Database error")
+		return
+	}
+	if err := validateAIDesignHTML(htmlContent); err != nil {
+		RespondError(c, http.StatusBadRequest, "Design is invalid under current validation rules: "+err.Error())
+		return
 	}
 
 	tx, err := h.pool.Begin(c.Request.Context())
@@ -852,7 +1494,11 @@ func (h *HubAIDesignerHandler) UpdateDesign(c *gin.Context) {
 		return
 	}
 
-	clean := sanitizeHTML(req.HTMLContent)
+	clean, err := sanitizeAndValidateDesignHTML(req.HTMLContent, designHTMLValidationOptions{})
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	tag, err := h.pool.Exec(c.Request.Context(),
 		`UPDATE hub_ai_designs SET name = $1, html_content = $2 WHERE id = $3 AND hub_id = $4`,
@@ -1007,7 +1653,11 @@ func (h *HubAIDesignerHandler) SaveDesignVersion(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "html_content is required")
 		return
 	}
-	clean := sanitizeHTML(req.HTMLContent)
+	clean, err := sanitizeAndValidateDesignHTML(req.HTMLContent, designHTMLValidationOptions{})
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	tx, err := h.pool.Begin(c.Request.Context())
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to save version")
@@ -1061,11 +1711,33 @@ OUTPUT RULES (non-negotiable):
 - Preserve all existing hub content (name, description, sidebar text, stats) verbatim
 - Preserve all four slot divs: #hub-feed, #hub-join, #hub-create, #hub-mod
 - Apply the user's requested change while keeping everything else intact
+- #hub-feed is a passive runtime mount host for one injected subtree; it is not the post grid,
+  controls row, or multi-column layout surface. Do not put fake search inputs, tabs, post cards,
+  placeholders, or internal scaffolding inside it.
+- Do not apply host-level child-placement styling to bare #hub-feed (display:grid/flex,
+  grid-template-*, grid-auto-*, flex-direction, flex-wrap, place-*, align-items,
+  justify-content, column-count, position:absolute/fixed, or clipping fixed-height layout).
+  Style approved descendant hooks instead.
 
 SLOT CLASS NAMES (use in your <style> block to style injected UI):
 Buttons: .hub-slot-btn, .hub-slot-btn--primary, .hub-slot-btn--secondary, .hub-slot-btn--create, .hub-slot-btn--mod
-Feed controls: .hub-slot-tab, .hub-slot-tab--active, .hub-slot-search
-Always scope CSS rules to slot IDs (e.g. #hub-join .hub-slot-btn--primary { ... })`
+Feed internals: .hub-slot-feed, .hub-slot-feed-controls, .hub-slot-feed-tabs, .hub-slot-feed-search-wrap, .hub-slot-tab, .hub-slot-tab--active, .hub-slot-search, .hub-slot-feed-list, .hub-slot-post-card, .hub-slot-post-title, .hub-slot-post-meta
+Always scope CSS rules to slot IDs (e.g. #hub-join .hub-slot-btn--primary { ... })
+
+CSS selector scoping contract:
+- Every selector in the <style> block must start with one of: .hub-custom-page, #hub-join, #hub-create, #hub-mod, #hub-feed
+- Do NOT use bare element selectors like body, h1, h2, p, section, button, input, a, or div
+- Do NOT use unscoped class selectors like .hero, .card, .layout, or .stats
+- If styling a class, scope it like .hub-custom-page .hero, not .hero
+- Grouped selectors are allowed only when every selector in the group is scoped.
+Bad: h1 { ... }
+Bad: .hero { ... }
+Bad: section.stats { ... }
+Bad: .hub-custom-page .hero, h2 { ... }
+Good: .hub-custom-page h1 { ... }
+Good: .hub-custom-page .hero { ... }
+Good: #hub-feed .hub-slot-post-card { ... }
+Good: #hub-create .hub-slot-btn--create { ... }`
 
 // ChatDesign handles POST /api/v1/hubs/:name/ai-designs/:id/chat.
 // Sends the current HTML and a user message to Gemini and returns refined HTML.
@@ -1137,13 +1809,20 @@ func (h *HubAIDesignerHandler) ChatDesign(c *gin.Context) {
 	httpReq.Header.Set("Content-Type", "application/json")
 	resp, err := h.httpClient.Do(httpReq)
 	if err != nil {
+		zlog.Error().Err(err).Str("hub", hubName).Msg("AI refinement API call failed")
 		RespondError(c, http.StatusBadGateway, "AI request failed")
 		return
 	}
 	defer resp.Body.Close()
 	respBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	var geminiResp geminiResponse
-	if err := json.Unmarshal(respBytes, &geminiResp); err != nil || geminiResp.Error != nil {
+	if err := json.Unmarshal(respBytes, &geminiResp); err != nil {
+		zlog.Error().Err(err).Str("hub", hubName).Msg("AI refinement returned invalid JSON")
+		RespondError(c, http.StatusBadGateway, "AI returned an error")
+		return
+	}
+	if geminiResp.Error != nil {
+		zlog.Error().Str("hub", hubName).Str("gemini_error", geminiResp.Error.Message).Msg("AI refinement returned an error")
 		RespondError(c, http.StatusBadGateway, "AI returned an error")
 		return
 	}
@@ -1152,7 +1831,12 @@ func (h *HubAIDesignerHandler) ChatDesign(c *gin.Context) {
 		return
 	}
 	rawHTML := geminiResp.Candidates[0].Content.Parts[0].Text
-	clean := sanitizeHTML(extractCodeBlock(rawHTML))
+	clean, err := sanitizeAndValidateDesignHTML(rawHTML, designHTMLValidationOptions{requireAllSlots: true})
+	if err != nil {
+		zlog.Error().Err(err).Str("hub", hubName).Msg("AI returned invalid refined design")
+		RespondError(c, http.StatusBadGateway, err.Error())
+		return
+	}
 	if len(clean) < 500 {
 		RespondError(c, http.StatusBadGateway, "AI returned an incomplete response; please try again")
 		return
