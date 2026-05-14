@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { hubSettingsService } from '../../services/hubSettingsService';
@@ -10,6 +11,7 @@ interface Props {
 
 export default function ThemeTab({ hubName }: Props) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { formatDate } = useFormat();
   const [themeName, setThemeName] = useState('');
@@ -20,8 +22,6 @@ export default function ThemeTab({ hubName }: Props) {
   const [applyToSidebar, setApplyToSidebar] = useState(false);
   const [applyToPostList, setApplyToPostList] = useState(false);
   const [applyToPostDetail, setApplyToPostDetail] = useState(false);
-  const [previewCSS, setPreviewCSS] = useState('');
-  const [showPreview, setShowPreview] = useState(false);
 
   // Fetch active theme
   const { data: activeTheme } = useQuery({
@@ -64,7 +64,7 @@ export default function ThemeTab({ hubName }: Props) {
     },
   });
 
-  // Preview mutation
+  // Preview mutation — sanitizes CSS then navigates to the live preview page
   const previewMutation = useMutation({
     mutationFn: () =>
       hubSettingsService.previewTheme(hubName, {
@@ -76,8 +76,18 @@ export default function ThemeTab({ hubName }: Props) {
         apply_to_post_detail: applyToPostDetail,
       }),
     onSuccess: (data) => {
-      setPreviewCSS(data.scoped_css);
-      setShowPreview(true);
+      navigate(`/h/${hubName}/theme/preview`, {
+        state: {
+          scopedCSS: data.scoped_css,
+          rawCSS: cssContent,
+          themeName,
+          applyToWholePage,
+          applyToHeader,
+          applyToSidebar,
+          applyToPostList,
+          applyToPostDetail,
+        },
+      });
     },
   });
 
@@ -241,12 +251,10 @@ export default function ThemeTab({ hubName }: Props) {
           <div className="flex space-x-3">
             <button
               onClick={() => previewMutation.mutate()}
-              disabled={!cssContent || previewMutation.isPending}
+              disabled={!cssContent || !themeName || previewMutation.isPending}
               className="px-4 py-2 rounded border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-background)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {previewMutation.isPending
-                ? t('hubSettings.theme.create.actions.previewing')
-                : t('hubSettings.theme.create.actions.previewCss')}
+              {previewMutation.isPending ? 'Previewing…' : 'Preview'}
             </button>
             <button
               onClick={() => createMutation.mutate()}
@@ -267,28 +275,6 @@ export default function ThemeTab({ hubName }: Props) {
           )}
         </div>
       </div>
-
-      {/* Preview Modal */}
-      {showPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--color-surface)] rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-auto">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-bold text-[var(--color-text-primary)]">
-                {t('hubSettings.theme.preview.title')}
-              </h3>
-              <button
-                onClick={() => setShowPreview(false)}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-              >
-                ✕
-              </button>
-            </div>
-            <pre className="bg-[var(--color-background)] p-4 rounded overflow-auto text-xs border border-[var(--color-border)]">
-              <code className="text-[var(--color-text-primary)]">{previewCSS}</code>
-            </pre>
-          </div>
-        </div>
-      )}
 
       {/* Theme History */}
       {themes.length > 0 && (
