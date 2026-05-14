@@ -8,13 +8,12 @@ import GeneralSettingsTab from '../components/hubSettings/GeneralSettingsTab';
 import ContentSettingsTab from '../components/hubSettings/ContentSettingsTab';
 import ModerationSettingsTab from '../components/hubSettings/ModerationSettingsTab';
 import ModeratorsTab from '../components/hubSettings/ModeratorsTab';
-import ThemeTab from '../components/hubSettings/ThemeTab';
 import HubAIDesignerTab from '../components/hubSettings/HubAIDesignerTab';
 import { LoadingMessage } from '../components/common/StatusMessage';
 import { EmptyState, PermissionDenied } from '../components/empty';
 import { isAdmin } from '../utils/permissions';
 
-type TabType = 'general' | 'content' | 'moderation' | 'moderators' | 'theme' | 'ai-designer';
+type TabType = 'general' | 'content' | 'moderation' | 'moderators' | 'ai-designer';
 
 export default function HubSettingsPage() {
   const { hubName } = useParams<{ hubName: string }>();
@@ -104,7 +103,6 @@ export default function HubSettingsPage() {
       label: t('hubSettingsPage.tabs.moderators', { count: moderatorCount }),
       group: 'team',
     },
-    { id: 'theme', label: t('hubSettingsPage.tabs.theme'), group: 'appearance' },
     { id: 'ai-designer', label: 'AI Designer', group: 'appearance' },
   ];
 
@@ -218,7 +216,6 @@ export default function HubSettingsPage() {
           {activeTab === 'moderators' && (
             <ModeratorsTab hubName={hubName} isOwner={userMod?.role === 'owner'} />
           )}
-          {activeTab === 'theme' && <ThemeTab hubName={hubName} />}
           {activeTab === 'ai-designer' && <HubAIDesignerTab hubName={hubName} />}
         </div>
       </div>
