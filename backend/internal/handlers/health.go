@@ -114,6 +114,7 @@ func (h *HealthHandler) HealthCheck(c *gin.Context) {
 	health := gin.H{
 		"status":    "healthy",
 		"timestamp": time.Now().Unix(),
+		"version":   "dev",
 		"services":  gin.H{},
 	}
 
