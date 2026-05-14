@@ -38,7 +38,8 @@ func TestPostgresPasswordResetRepository_GetByToken(t *testing.T) {
 	got, err := repo.GetByToken(ctx, pr.Token)
 	require.NoError(t, err)
 	require.NotNil(t, got)
-	assert.Equal(t, pr.Token, got.Token)
+	assert.NotEqual(t, pr.Token, got.Token, "stored password reset tokens should remain hashed")
+	assert.Len(t, got.Token, 64)
 
 	// Non-existent token — repo returns (nil, nil).
 	got2, err2 := repo.GetByToken(ctx, "no-such-token-xyz")

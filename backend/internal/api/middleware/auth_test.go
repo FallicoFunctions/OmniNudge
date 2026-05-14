@@ -30,6 +30,32 @@ func TestRequireRole_AllowsMatchingRole(t *testing.T) {
 	require.True(t, allowed, "handler should run for allowed role")
 }
 
+func TestCORS_AllowsLocalhostAndLoopbackDevOrigins(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, origin := range []string{
+		"http://localhost:5176",
+		"http://127.0.0.1:5176",
+	} {
+		t.Run(origin, func(t *testing.T) {
+			router := gin.New()
+			router.Use(CORS())
+			router.OPTIONS("/", func(c *gin.Context) {
+				c.Status(http.StatusOK)
+			})
+
+			w := httptest.NewRecorder()
+			req, _ := http.NewRequest("OPTIONS", "/", nil)
+			req.Header.Set("Origin", origin)
+			router.ServeHTTP(w, req)
+
+			require.Equal(t, http.StatusNoContent, w.Code)
+			require.Equal(t, origin, w.Header().Get("Access-Control-Allow-Origin"))
+			require.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
+		})
+	}
+}
+
 func TestRequireRole_BlocksWhenRoleMissing(t *testing.T) {
 	router := gin.New()
 	router.Use(RequireRole("admin"))

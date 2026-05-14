@@ -6,7 +6,7 @@ import (
 
 func TestEncryptDecryptEmail(t *testing.T) {
 	// Set up a test encryption key
-	testKey := "test-encryption-key-32-bytes!!!"
+	testKey := "12345678901234567890123456789012"
 	if err := SetEncryptionKey(testKey); err != nil {
 		t.Fatalf("Failed to set encryption key: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestDecryptEmailWithoutKey(t *testing.T) {
 }
 
 func TestDecryptInvalidCiphertext(t *testing.T) {
-	testKey := "test-encryption-key-32-bytes!!!"
+	testKey := "12345678901234567890123456789012"
 	if err := SetEncryptionKey(testKey); err != nil {
 		t.Fatalf("Failed to set encryption key: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestDecryptInvalidCiphertext(t *testing.T) {
 		ciphertext string
 	}{
 		{"invalid base64", "not-valid-base64!!!"},
-		{"too short", "YWJj"}, // "abc" in base64
+		{"too short", "YWJj"},              // "abc" in base64
 		{"wrong data", "SGVsbG8gV29ybGQh"}, // "Hello World!" in base64
 	}
 
@@ -130,7 +130,7 @@ func TestSetEncryptionKeyFormats(t *testing.T) {
 }
 
 func TestEncryptionIsNonDeterministic(t *testing.T) {
-	testKey := "test-encryption-key-32-bytes!!!"
+	testKey := "12345678901234567890123456789012"
 	if err := SetEncryptionKey(testKey); err != nil {
 		t.Fatalf("Failed to set encryption key: %v", err)
 	}
