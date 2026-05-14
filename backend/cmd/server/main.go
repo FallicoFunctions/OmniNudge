@@ -162,7 +162,6 @@ func main() {
 
 	// Hub Settings and Themes repositories (from repository package)
 	hubSettingsRepo := repository.NewHubSettingsRepository(db.Pool)
-	hubThemesRepo := repository.NewHubThemesRepository(db.Pool)
 	hubWikiRepo := repository.NewHubWikiRepository(db.Pool)
 
 	// Access request repository
@@ -572,7 +571,6 @@ func main() {
 	bugReportsHandler := handlers.NewBugReportsHandler(bugReportRepo, knownBugRepo, mediaRepo)
 	modMailHandler := handlers.NewModMailHandler(db.Pool, conversationRepo, messageRepo, userRepo, hubModRepo, hubRepo)
 	hubSettingsHandler := handlers.NewHubSettingsHandler(hubRepo, hubSettingsRepo, userRepo)
-	hubThemesHandler := handlers.NewHubThemesHandler(hubThemesRepo, hubSettingsRepo)
 	hubWikiHandler := handlers.NewHubWikiHandler(hubRepo, hubSettingsRepo, hubWikiRepo)
 	accessRequestHandler := handlers.NewAccessRequestHandler(hubAccessRequestRepo, hubRepo, hubSettingsRepo, userRepo)
 	jobsHandler := handlers.NewJobsHandler(queueClient)
@@ -909,8 +907,7 @@ func main() {
 			// Hub moderators list (public)
 			hubs.GET("/:name/moderators", hubSettingsHandler.GetHubModerators)
 
-			// Hub theme (public)
-			hubs.GET("/:name/theme", hubThemesHandler.GetActiveTheme)
+
 
 			// Hub AI design (public — active design only)
 			hubs.GET("/:name/ai-design", hubAIDesignerHandler.GetActive)
@@ -1200,14 +1197,6 @@ func main() {
 			protected.DELETE("/hubs/:name/moderators/:user_id", hubSettingsHandler.RemoveHubModerator)
 			protected.PUT("/hubs/:name/wiki", hubWikiHandler.UpdateHubWikiPage)
 			protected.PUT("/hubs/:name/wiki/:pagePath", hubWikiHandler.UpdateHubWikiPage)
-
-			// Hub Theme routes (requires moderator permissions)
-			protected.GET("/hubs/:name/themes", hubThemesHandler.GetAllThemes)
-			protected.POST("/hubs/:name/themes", hubThemesHandler.CreateTheme)
-			protected.PUT("/hubs/:name/themes/:id", hubThemesHandler.UpdateTheme)
-			protected.POST("/hubs/:name/themes/:id/activate", hubThemesHandler.ActivateTheme)
-			protected.DELETE("/hubs/:name/themes/:id", hubThemesHandler.DeleteTheme)
-			protected.POST("/hubs/:name/themes/preview", hubThemesHandler.PreviewTheme)
 
 			// Hub AI Designer routes (requires moderator permissions)
 			protected.POST("/hubs/:name/ai-design/generate", aiDesignRateLimiter.Middleware(), hubAIDesignerHandler.Generate)

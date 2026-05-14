@@ -55,31 +55,6 @@ export interface HubModerator {
   avatar_url?: string;
 }
 
-export interface HubTheme {
-  id: number;
-  hub_id: number;
-  name: string;
-  description?: string;
-  is_active: boolean;
-  css_content?: string;
-
-  // Application scope
-  apply_to_whole_page: boolean;
-  apply_to_header: boolean;
-  apply_to_sidebar: boolean;
-  apply_to_post_list: boolean;
-  apply_to_post_detail: boolean;
-
-  // Version control
-  version: number;
-  parent_version_id?: number;
-
-  // Timestamps
-  created_at: string;
-  created_by: number;
-  updated_at?: string;
-}
-
 export interface UpdateHubSettingsRequest {
   display_title?: string;
   sidebar_markdown?: string;
@@ -110,28 +85,3 @@ export interface UpdateModeratorRoleRequest {
   role: ModeratorRole;
 }
 
-export interface CreateThemeRequest {
-  name: string;
-  description?: string;
-  is_active: boolean;
-  css_content?: string;
-  apply_to_whole_page: boolean;
-  apply_to_header: boolean;
-  apply_to_sidebar: boolean;
-  apply_to_post_list: boolean;
-  apply_to_post_detail: boolean;
-}
-
-export interface PreviewThemeRequest {
-  css_content: string;
-  apply_to_whole_page: boolean;
-  apply_to_header: boolean;
-  apply_to_sidebar: boolean;
-  apply_to_post_list: boolean;
-  apply_to_post_detail: boolean;
-}
-
-export interface PreviewThemeResponse {
-  sanitized_css: string;
-  scoped_css: string;
-}

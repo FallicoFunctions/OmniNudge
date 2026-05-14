@@ -3,12 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import CodeMirror from '@uiw/react-codemirror';
 import { html } from '@codemirror/lang-html';
+import { css } from '@codemirror/lang-css';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { hubAIDesignerService, type DesignVersion } from '../services/hubAIDesignerService';
 import { useAuth } from '../contexts/AuthContext';
 import { useHubModerators } from '../hooks/useHubModerators';
 import { isUserHubModerator } from '../utils/moderation';
 import HubAIDesignRenderer from '../components/hubDesign/HubAIDesignRenderer';
+import { splitAIDesignHTML } from '../utils/splitAIDesignHTML';
 
 export default function HubAIDesignerPreviewPage() {
   const { hubName, designId } = useParams<{ hubName: string; designId: string }>();
@@ -18,9 +20,11 @@ export default function HubAIDesignerPreviewPage() {
   const numericDesignId = parseInt(designId ?? '0', 10);
 
   const [htmlContent, setHtmlContent] = useState('');
+  const [cssContent, setCssContent] = useState('');
   const [savedHtml, setSavedHtml] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [editorOpen, setEditorOpen] = useState(true);
+  const [activeEditor, setActiveEditor] = useState<'html' | 'css'>('html');
   const [chatOpen, setChatOpen] = useState(true);
   const [chatMessage, setChatMessage] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
@@ -50,25 +54,35 @@ export default function HubAIDesignerPreviewPage() {
     enabled: !!hubName && !!numericDesignId,
   });
 
-  // Init state once design loads
+  // Combines HTML body and CSS into a single design string for backend/preview
+  const buildCombinedHtml = useCallback((htmlBody: string, cssStr: string) =>
+    cssStr.trim() ? `<style>${cssStr}</style>\n${htmlBody}` : htmlBody,
+  []);
+
+  // Init state once design loads — split style block from HTML body
   useEffect(() => {
     if (designData?.design?.html_content) {
-      setHtmlContent(designData.design.html_content);
+      const { htmlWithoutStyles, styleContent } = splitAIDesignHTML(designData.design.html_content);
+      setHtmlContent(htmlWithoutStyles);
+      setCssContent(styleContent);
       setSavedHtml(designData.design.html_content);
       setPreviewHtml(designData.design.html_content);
     }
   }, [designData]);
 
-  // Debounced preview update
+  // Debounced preview update — rebuild combined HTML from both states
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setPreviewHtml(htmlContent), 400);
+    debounceRef.current = setTimeout(
+      () => setPreviewHtml(buildCombinedHtml(htmlContent, cssContent)), 400
+    );
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [htmlContent]);
-
+  }, [htmlContent, cssContent, buildCombinedHtml]);
 
   const saveMutation = useMutation({
-    mutationFn: () => hubAIDesignerService.saveVersion(hubName!, numericDesignId, htmlContent),
+    mutationFn: () => hubAIDesignerService.saveVersion(
+      hubName!, numericDesignId, buildCombinedHtml(htmlContent, cssContent)
+    ),
     onSuccess: (data) => {
       setSavedHtml(data.html_content);
       setSaveError(null);
@@ -84,11 +98,15 @@ export default function HubAIDesignerPreviewPage() {
   });
 
   const handleCancel = useCallback(() => {
-    setHtmlContent(savedHtml);
+    const { htmlWithoutStyles, styleContent } = splitAIDesignHTML(savedHtml);
+    setHtmlContent(htmlWithoutStyles);
+    setCssContent(styleContent);
   }, [savedHtml]);
 
   const handleRestoreVersion = useCallback((version: DesignVersion) => {
-    setHtmlContent(version.html_content);
+    const { htmlWithoutStyles, styleContent } = splitAIDesignHTML(version.html_content);
+    setHtmlContent(htmlWithoutStyles);
+    setCssContent(styleContent);
     setVersionPanelOpen(false);
   }, []);
 
@@ -100,10 +118,12 @@ export default function HubAIDesignerPreviewPage() {
       const result = await hubAIDesignerService.chatRefine(
         hubName!,
         numericDesignId,
-        htmlContent,
+        buildCombinedHtml(htmlContent, cssContent),
         chatMessage.trim()
       );
-      setHtmlContent(result.html_content);
+      const { htmlWithoutStyles, styleContent } = splitAIDesignHTML(result.html_content);
+      setHtmlContent(htmlWithoutStyles);
+      setCssContent(styleContent);
       setChatMessage('');
     } catch (err) {
       setChatError(err instanceof Error && err.message
@@ -112,9 +132,9 @@ export default function HubAIDesignerPreviewPage() {
     } finally {
       setChatLoading(false);
     }
-  }, [chatMessage, chatLoading, hubName, numericDesignId, htmlContent]);
+  }, [chatMessage, chatLoading, hubName, numericDesignId, htmlContent, cssContent, buildCombinedHtml]);
 
-  const isDirty = htmlContent !== savedHtml;
+  const isDirty = buildCombinedHtml(htmlContent, cssContent) !== savedHtml;
 
   if (designLoading) {
     return (
@@ -214,9 +234,23 @@ export default function HubAIDesignerPreviewPage() {
             onClick={() => setEditorOpen(o => !o)}
             className="flex items-center gap-2 text-sm font-semibold text-gray-300 hover:text-white transition-colors"
           >
-            <span>{'</>'} HTML Editor</span>
+            <span>{'</>'} Editor</span>
             <span className="text-xs">{editorOpen ? '▼' : '▲'}</span>
           </button>
+          <div className="flex rounded overflow-hidden border border-gray-600">
+            <button
+              onClick={() => setActiveEditor('html')}
+              className={`px-3 py-1 text-xs transition-colors ${activeEditor === 'html' ? 'bg-[var(--color-primary)] text-white' : 'text-gray-300 hover:text-white'}`}
+            >
+              HTML
+            </button>
+            <button
+              onClick={() => setActiveEditor('css')}
+              className={`px-3 py-1 text-xs transition-colors ${activeEditor === 'css' ? 'bg-[var(--color-primary)] text-white' : 'text-gray-300 hover:text-white'}`}
+            >
+              CSS
+            </button>
+          </div>
 
           <div className="flex items-center gap-2">
             {versionsData?.versions && versionsData.versions.length > 0 && (
@@ -268,7 +302,7 @@ export default function HubAIDesignerPreviewPage() {
           <p className="px-4 py-1 text-xs text-red-400 bg-[#21252b]">{saveError}</p>
         )}
 
-        {editorOpen && (
+        {editorOpen && activeEditor === 'html' && (
           <CodeMirror
             value={htmlContent}
             height="300px"
@@ -299,6 +333,29 @@ export default function HubAIDesignerPreviewPage() {
               foldKeymap: true,
               completionKeymap: true,
               lintKeymap: true,
+            }}
+          />
+        )}
+        {editorOpen && activeEditor === 'css' && (
+          <CodeMirror
+            value={cssContent}
+            height="300px"
+            extensions={[css()]}
+            theme={oneDark}
+            onChange={val => setCssContent(val)}
+            basicSetup={{
+              lineNumbers: true,
+              foldGutter: true,
+              syntaxHighlighting: true,
+              bracketMatching: true,
+              closeBrackets: true,
+              autocompletion: true,
+              highlightActiveLine: true,
+              highlightSelectionMatches: true,
+              defaultKeymap: true,
+              searchKeymap: true,
+              historyKeymap: true,
+              completionKeymap: true,
             }}
           />
         )}
