@@ -93,6 +93,7 @@ type JWTClaims struct {
 	Username     string `json:"username"`
 	Role         string `json:"role"`
 	TokenVersion int    `json:"token_version"`
+	Use          string `json:"use,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -111,11 +112,21 @@ func (s *AuthService) GenerateJWTWithVersion(userID int, username, role string, 
 }
 
 func (s *AuthService) GenerateJWTWithExpiryAndVersion(userID int, username, role string, tokenVersion int, expiry time.Duration) (string, error) {
+	return s.generateJWT(userID, username, role, tokenVersion, expiry, "")
+}
+
+// GenerateWebSocketJWT creates a short-lived token intended only for WebSocket upgrades.
+func (s *AuthService) GenerateWebSocketJWT(userID int, username, role string, tokenVersion int) (string, error) {
+	return s.generateJWT(userID, username, role, tokenVersion, 5*time.Minute, "ws")
+}
+
+func (s *AuthService) generateJWT(userID int, username, role string, tokenVersion int, expiry time.Duration, use string) (string, error) {
 	claims := JWTClaims{
 		UserID:       userID,
 		Username:     username,
 		Role:         role,
 		TokenVersion: tokenVersion,
+		Use:          use,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

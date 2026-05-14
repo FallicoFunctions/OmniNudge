@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	apiresponse "github.com/omninudge/backend/internal/api/response"
@@ -25,9 +26,10 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 			tokenString = parts[1]
 		}
 
+		isWebSocketUpgrade := strings.EqualFold(c.GetHeader("Upgrade"), "websocket")
 		// WebSocket upgrade requests cannot send custom headers from the browser.
 		// Allow the token via query param exclusively for WS upgrades.
-		if tokenString == "" && c.GetHeader("Upgrade") == "websocket" {
+		if tokenString == "" && isWebSocketUpgrade {
 			tokenString = c.Query("token")
 		}
 
@@ -43,6 +45,11 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		if isWebSocketUpgrade && !isValidWebSocketToken(claims) {
+			apiresponse.WriteError(c, http.StatusUnauthorized, "Invalid WebSocket token")
+			c.Abort()
+			return
+		}
 
 		// Set user info in context for handlers to use
 		c.Set("user_id", claims.UserID)
@@ -51,6 +58,16 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func isValidWebSocketToken(claims *services.JWTClaims) bool {
+	if claims.Use == "ws" {
+		return true
+	}
+	if claims.ExpiresAt == nil || claims.IssuedAt == nil {
+		return false
+	}
+	return claims.ExpiresAt.Time.Sub(claims.IssuedAt.Time) <= 5*time.Minute
 }
 
 // RequireRole enforces that a user has one of the allowed roles

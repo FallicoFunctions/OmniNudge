@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/omninudge/backend/internal/ports"
 	"io"
 	"net/http"
 	"os"
@@ -19,6 +19,7 @@ import (
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/services"
+	zlog "github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -164,7 +165,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 
 	var viewerID int
 	if v, _ := middleware.GetOptionalUserID(c); v != 0 {
-			viewerID = v
+		viewerID = v
 	}
 
 	showLastSeen := true
@@ -481,7 +482,10 @@ func isRequestBodyTooLarge(err error) bool {
 // @Failure      500  {object}  gin.H
 // @Router       /users/me/profile [put]
 func (h *UsersHandler) UpdateProfile(c *gin.Context) {
-	userID := c.GetInt("user_id")
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	var req updateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -593,7 +597,10 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 // @Failure      500  {object}  gin.H
 // @Router       /users/me/avatar [post]
 func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
-	userID := c.GetInt("user_id")
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAvatarUploadSize+1024)
 	file, header, err := c.Request.FormFile("avatar")
@@ -766,7 +773,10 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 // @Failure      500  {object}  gin.H
 // @Router       /users/me/profile [get]
 func (h *UsersHandler) GetMyProfile(c *gin.Context) {
-	userID := c.GetInt("user_id")
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 	h.getUserProfileResponse(c, func() (*models.User, error) {
 		return h.userRepo.GetByID(c.Request.Context(), userID)
 	})
@@ -789,7 +799,10 @@ type changePasswordRequest struct {
 // @Failure      500  {object}  gin.H
 // @Router       /users/change-password [post]
 func (h *UsersHandler) ChangePassword(c *gin.Context) {
-	userID := c.GetInt("user_id")
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	var req changePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -815,7 +828,7 @@ func (h *UsersHandler) ChangePassword(c *gin.Context) {
 	}
 
 	// Hash new password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to hash password")
 		return
@@ -825,6 +838,9 @@ func (h *UsersHandler) ChangePassword(c *gin.Context) {
 	if err := h.userRepo.UpdatePassword(c.Request.Context(), user.ID, string(hashedPassword)); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update password")
 		return
+	}
+	if err := h.userRepo.IncrementTokenVersion(c.Request.Context(), userID); err != nil {
+		zlog.Error().Err(err).Msg("Failed to increment token version after password change")
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
@@ -839,7 +855,10 @@ type updateEmailRequest struct {
 // NOTE: this legacy path is not registered in main router; the active
 // /users/email endpoint is served by AuthHandler.UpdateEmail.
 func (h *UsersHandler) UpdateEmail(c *gin.Context) {
-	userID := c.GetInt("user_id")
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	var req updateEmailRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
