@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -153,19 +154,15 @@ func getOrCreateSessionID(c *gin.Context) uuid.UUID {
 	// Create new session ID
 	sessionID := uuid.New()
 
-	// Determine if HTTPS is being used
-	isSecure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
-
-	// Set cookie (30 minute session)
-	c.SetCookie(
-		"session_id",       // name
-		sessionID.String(), // value
-		1800,               // maxAge (30 minutes)
-		"/",                // path
-		"",                 // domain
-		isSecure,           // secure (true if HTTPS)
-		true,               // httpOnly
-	)
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "session_id",
+		Value:    sessionID.String(),
+		MaxAge:   86400 * 30,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   c.Request.TLS != nil,
+		SameSite: http.SameSiteStrictMode,
+	})
 
 	return sessionID
 }
