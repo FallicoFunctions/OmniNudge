@@ -773,6 +773,42 @@ func maskEmail(email string) string {
 	return masked + "@" + domain
 }
 
+// GenerateWSToken returns a short-lived token for browser WebSocket upgrades.
+// @Summary      Generate WebSocket token
+// @Tags         Auth
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /auth/ws-token [post]
+func (h *AuthHandler) GenerateWSToken(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		zlog.Error().Err(err).Int("user_id", userID).Msg("Failed to load user for websocket token")
+		RespondError(c, http.StatusInternalServerError, "Failed to generate WebSocket token")
+		return
+	}
+	if user == nil {
+		RespondError(c, http.StatusUnauthorized, "Invalid user")
+		return
+	}
+
+	token, err := h.authService.GenerateWebSocketJWT(user.ID, user.Username, user.Role, user.TokenVersion)
+	if err != nil {
+		zlog.Error().Err(err).Int("user_id", userID).Msg("Failed to generate websocket token")
+		RespondError(c, http.StatusInternalServerError, "Failed to generate WebSocket token")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ws_token": token})
+}
+
 // UpdateEmail updates user's email address (requires verification).
 // @Summary      Update email address
 // @Tags         Auth
