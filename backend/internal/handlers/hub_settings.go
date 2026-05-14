@@ -79,10 +79,12 @@ func (h *HubSettingsHandler) GetHubSettings(c *gin.Context) {
 	}
 
 	// Check if user is a moderator
-	isModerator := false
-	if userID, ok := middleware.GetOptionalUserID(c); ok {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		isModerator = (err == nil && role != nil)
+	isModerator := helpers.IsAdmin(c)
+	if !isModerator {
+		if userID, ok := middleware.GetOptionalUserID(c); ok {
+			role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
+			isModerator = (err == nil && role != nil)
+		}
 	}
 
 	// If not a moderator, hide sensitive settings
@@ -128,18 +130,16 @@ func (h *HubSettingsHandler) UpdateHubSettings(c *gin.Context) {
 		return
 	}
 
-	if !helpers.IsAdmin(c) {
-		// Check permissions: must be owner or full_moderator
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
-		if err != nil || role == nil {
-			RespondError(c, http.StatusForbidden, "Not a moderator")
-			return
-		}
+	// Check permissions: must be owner or full_moderator
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
+	if err != nil || role == nil {
+		RespondError(c, http.StatusForbidden, "Not a moderator")
+		return
+	}
 
-		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
-			return
-		}
+	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
+		return
 	}
 
 	var settings models.HubSettings
@@ -215,7 +215,7 @@ func (h *HubSettingsHandler) AddHubModerator(c *gin.Context) {
 	}
 
 	// Check permissions: must be owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
 	if err != nil || role == nil || *role != models.ModeratorRoleOwner {
 		RespondError(c, http.StatusForbidden, "Requires owner role")
 		return
@@ -289,7 +289,7 @@ func (h *HubSettingsHandler) UpdateModeratorRole(c *gin.Context) {
 	}
 
 	// Check permissions: must be owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
 	if err != nil || role == nil || *role != models.ModeratorRoleOwner {
 		RespondError(c, http.StatusForbidden, "Requires owner role")
 		return
@@ -349,7 +349,7 @@ func (h *HubSettingsHandler) RemoveHubModerator(c *gin.Context) {
 	}
 
 	// Check permissions: must be owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
+	role, err := hubModeratorRole(c, h.settingsRepo, hubID, userID)
 	if err != nil || role == nil || *role != models.ModeratorRoleOwner {
 		RespondError(c, http.StatusForbidden, "Requires owner role")
 		return
