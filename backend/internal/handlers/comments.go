@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
-	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
 	"io"
 	"net/http"
 	"strconv"
@@ -46,13 +46,13 @@ func (h *CommentsHandler) SetNotificationService(notifService *services.Notifica
 
 // CreateCommentRequest represents the request body for creating a comment
 type CreateCommentRequest struct {
-	Body            string `json:"body" binding:"required,min=1"`
+	Body            string `json:"body" binding:"required,min=1,max=10000"`
 	ParentCommentID *int   `json:"parent_comment_id"`
 }
 
 // UpdateCommentRequest represents the request body for updating a comment
 type UpdateCommentRequest struct {
-	Body string `json:"body" binding:"required,min=1"`
+	Body string `json:"body" binding:"required,min=1,max=10000"`
 }
 
 // CreateComment adds a comment to a post.
@@ -191,7 +191,7 @@ func (h *CommentsHandler) GetComments(c *gin.Context) {
 
 	var userIDPtr *int
 	if userID, _ := middleware.GetOptionalUserID(c); userID != 0 {
-			userIDPtr = &userID
+		userIDPtr = &userID
 	}
 
 	comments, err := h.commentRepo.GetByPostID(c.Request.Context(), postID, sortBy, limit, offset, userIDPtr)
@@ -273,7 +273,7 @@ func (h *CommentsHandler) GetCommentReplies(c *gin.Context) {
 
 	var userIDPtr *int
 	if userID, _ := middleware.GetOptionalUserID(c); userID != 0 {
-			userIDPtr = &userID
+		userIDPtr = &userID
 	}
 
 	replies, err := h.commentRepo.GetReplies(c.Request.Context(), commentID, sortBy, limit, offset, userIDPtr)
