@@ -3,7 +3,7 @@
  * Tests the AuthContext login/register/logout methods against a mocked api.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
 
 // ---------------------------------------------------------------------------
@@ -16,16 +16,18 @@ const { mockApi } = vi.hoisted(() => ({
     put: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn(),
+    request: vi.fn(),
   },
 }));
 
 vi.mock('../../src/lib/api', () => ({ api: mockApi }));
 
 vi.mock('../../src/services/keyManagementService', () => ({
-  initializeKeys: vi.fn(async () => {}),
-  getOwnPublicKeyBase64: vi.fn(async () => 'base64key'),
-  getOwnKeys: vi.fn(async () => ({ publicKey: {} })),
+  initializeKeys: vi.fn(async () => ({ publicKey: {}, privateKey: {} })),
+  getOwnPublicKeyBase64: vi.fn(() => 'base64key'),
+  getOwnKeys: vi.fn(async () => ({ publicKey: {}, privateKey: {} })),
   getUserPublicKey: vi.fn(async () => ({})),
+  storeNonExtractablePrivateKey: vi.fn(async () => {}),
 }));
 
 vi.mock('../../src/utils/encryption', () => ({
@@ -173,6 +175,7 @@ describe('Auth flows', () => {
 
   it('TestLogout: logout clears user and auth state', async () => {
     mockApi.get.mockResolvedValue(null);
+    mockApi.request.mockResolvedValue({});
     mockApi.post
       .mockResolvedValueOnce({ token: 'tok_abc', user: makeUser() }) // login
       .mockResolvedValue({}); // logout endpoint
@@ -185,11 +188,17 @@ describe('Auth flows', () => {
 
     expect(result.current.isAuthenticated).toBe(true);
 
-    act(() => {
+    await act(async () => {
       result.current.logout();
     });
 
-    expect(result.current.user).toBeNull();
-    expect(result.current.isAuthenticated).toBe(false);
+    await waitFor(() => {
+      expect(result.current.user).toBeNull();
+      expect(result.current.isAuthenticated).toBe(false);
+    });
+    expect(mockApi.request).toHaveBeenCalledWith('/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer tok_abc' },
+    });
   });
 });

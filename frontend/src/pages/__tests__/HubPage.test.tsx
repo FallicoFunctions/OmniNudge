@@ -29,6 +29,11 @@ vi.mock('../../services/subscriptionService', () => ({
     unsubscribeFromHub: vi.fn(),
   },
 }));
+vi.mock('../../services/hubAIDesignerService', () => ({
+  hubAIDesignerService: {
+    getActiveDesign: vi.fn().mockResolvedValue({ design: null }),
+  },
+}));
 vi.mock('../../hooks/useHubModerators', () => ({
   useHubModerators: () => ({ moderators: [], isLoading: false }),
 }));
@@ -120,6 +125,7 @@ vi.mock('../../contexts/SettingsContext', () => ({
 }));
 
 import HubPage from '../HubPage';
+import { hubAIDesignerService } from '../../services/hubAIDesignerService';
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -177,6 +183,40 @@ describe('HubPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^subscribe$/i })).toBeInTheDocument();
+    });
+  });
+
+  it('renders the active AI design when one is configured for the hub', async () => {
+    vi.mocked(hubAIDesignerService.getActiveDesign).mockResolvedValueOnce({
+      design: {
+        id: 9,
+        name: 'Active design',
+        prompt: 'dark hero',
+        html_content: `
+          <div class="hub-custom-page">
+            <section class="hero-shell">
+              <h1>AI Layout</h1>
+              <div id="hub-join"></div>
+            </section>
+            <div id="hub-create"></div>
+            <div id="hub-feed" style="--color-background:#111"></div>
+          </div>
+        `,
+        created_at: '2026-05-10T00:00:00Z',
+      },
+    });
+
+    const Wrapper = createWrapper();
+    render(
+      <Wrapper>
+        <HubPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('AI Layout')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Join' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /\+ Create Post/i })).toBeInTheDocument();
     });
   });
 });

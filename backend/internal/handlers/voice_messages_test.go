@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -44,7 +45,7 @@ func (m *mockStorage) List(_ context.Context, _ string) ([]string, error) { retu
 func (m *mockStorage) GeneratePresignedPutURL(_ context.Context, _, _ string, _ time.Duration) (string, error) {
 	return "https://storage.test/presigned", nil
 }
-func (m *mockStorage) PublicURL(key string) string { return "https://storage.test/" + key }
+func (m *mockStorage) PublicURL(key string) string                              { return "https://storage.test/" + key }
 func (m *mockStorage) GetObjectSize(_ context.Context, _ string) (int64, error) { return 1024, nil }
 
 func setupVoiceHandlerTest(t *testing.T) (*VoiceMessagesHandler, *database.Database, int, int, int, func()) {
@@ -103,7 +104,11 @@ func buildVoiceUploadRequest(t *testing.T, url string, contentType string, durat
 	partHeader.Set("Content-Type", contentType)
 	part, err := writer.CreatePart(partHeader)
 	require.NoError(t, err)
-	_, err = part.Write([]byte("fake audio bytes"))
+	audioBytes := []byte("not an audio file")
+	if strings.HasPrefix(contentType, "audio/") {
+		audioBytes = []byte("RIFF$\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00@\x1f\x00\x00\x80>\x00\x00\x02\x00\x10\x00data\x00\x00\x00\x00")
+	}
+	_, err = part.Write(audioBytes)
 	require.NoError(t, err)
 	writer.Close()
 

@@ -50,7 +50,8 @@ func TestPostgresEmailVerificationRepository_GetByToken(t *testing.T) {
 				assert.Nil(t, got)
 			} else {
 				require.NotNil(t, got)
-				assert.Equal(t, ev.Token, got.Token)
+				assert.NotEqual(t, ev.Token, got.Token, "stored email verification tokens should remain hashed")
+				assert.Len(t, got.Token, 64)
 			}
 		})
 	}
