@@ -190,3 +190,15 @@ func AuthRateLimiter(cache services.Cache) *RedisRateLimiter {
 func PasswordResetRateLimiter(cache services.Cache) *RedisRateLimiter {
 	return NewRedisRateLimiter(cache, 3, time.Hour, "rate:password_reset")
 }
+
+// AIDesignRateLimiter creates a distributed rate limiter for AI design generation.
+// 30 generations per hour per user.
+func AIDesignRateLimiter(cache services.Cache) *RedisRateLimiter {
+	return NewRedisRateLimiter(cache, 30, time.Hour, "rate:ai_design")
+}
+
+// ChatDesignRateLimiter creates a distributed rate limiter for AI design chat refinements.
+// 60 refinements per hour per user, separate from the generation quota.
+func ChatDesignRateLimiter(cache services.Cache) *RedisRateLimiter {
+	return NewRedisRateLimiter(cache, 60, time.Hour, "rate:ai_design_chat")
+}

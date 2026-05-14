@@ -4,31 +4,41 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
+// CSRF is mitigated by the JWT Authorization header pattern — cross-origin
+// requests cannot set custom Authorization headers without CORS permission. If
+// cookie-based auth is ever introduced, implement double-submit cookie CSRF
+// protection at that time.
+
 // SecurityHeaders adds security headers to all responses
 // Implements OWASP security best practices
 func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		scriptSrc := "'self' 'unsafe-inline' 'unsafe-eval'"
+		if os.Getenv("APP_ENV") == "production" {
+			scriptSrc = "'self' 'unsafe-inline'"
+		}
 		// Content Security Policy (CSP)
 		// Prevents XSS attacks by controlling resource loading
 		csp := []string{
-			"default-src 'self'",                              // Only load from same origin by default
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Allow scripts (unsafe-inline needed for React, unsafe-eval for development)
-			"style-src 'self' 'unsafe-inline'",                // Allow styles (unsafe-inline needed for styled-components)
-			"img-src 'self' data: blob: https:",               // Allow images from self, data URLs, blobs, HTTPS
-			"font-src 'self' data:",                           // Allow fonts from self and data URLs
-			"connect-src 'self' ws: wss:",                     // Allow WebSocket connections
-			"media-src 'self' blob:",                          // Allow media from self and blobs
-			"object-src 'none'",                               // Block plugins (Flash, etc.)
-			"frame-ancestors 'none'",                          // Prevent clickjacking
-			"base-uri 'self'",                                 // Restrict <base> tag
-			"form-action 'self'",                              // Only submit forms to same origin
-			"upgrade-insecure-requests",                       // Upgrade HTTP to HTTPS
+			"default-src 'self'",                // Only load from same origin by default
+			"script-src " + scriptSrc,           // Allow eval only outside production for development tooling
+			"style-src 'self' 'unsafe-inline'",  // Allow styles (unsafe-inline needed for styled-components)
+			"img-src 'self' data: blob: https:", // Allow images from self, data URLs, blobs, HTTPS
+			"font-src 'self' data:",             // Allow fonts from self and data URLs
+			"connect-src 'self' ws: wss:",       // Allow WebSocket connections
+			"media-src 'self' blob:",            // Allow media from self and blobs
+			"object-src 'none'",                 // Block plugins (Flash, etc.)
+			"frame-ancestors 'none'",            // Prevent clickjacking
+			"base-uri 'self'",                   // Restrict <base> tag
+			"form-action 'self'",                // Only submit forms to same origin
+			"upgrade-insecure-requests",         // Upgrade HTTP to HTTPS
 		}
 		c.Header("Content-Security-Policy", strings.Join(csp, "; "))
 
@@ -67,52 +77,6 @@ func SecurityHeaders() gin.HandlerFunc {
 			"accelerometer=()",  // Disable accelerometer
 		}
 		c.Header("Permissions-Policy", strings.Join(permissions, ", "))
-
-		c.Next()
-	}
-}
-
-// CSRF token middleware
-// Validates CSRF tokens for state-changing operations (POST, PUT, DELETE, PATCH)
-func CSRFProtection() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Skip CSRF for safe methods (GET, HEAD, OPTIONS)
-		if c.Request.Method == "GET" || c.Request.Method == "HEAD" || c.Request.Method == "OPTIONS" {
-			c.Next()
-			return
-		}
-
-		// Skip CSRF for WebSocket upgrade requests
-		if c.GetHeader("Upgrade") == "websocket" {
-			c.Next()
-			return
-		}
-
-		// Get CSRF token from header
-		token := c.GetHeader("X-CSRF-Token")
-		if token == "" {
-			// Fallback to form field
-			token = c.PostForm("csrf_token")
-		}
-
-		// Validate token
-		// Note: This is a placeholder. In production, implement proper CSRF token validation
-		// using a library like gorilla/csrf or implement your own token generation/validation
-		if token == "" {
-			c.JSON(403, gin.H{
-				"error": "CSRF token missing",
-				"code":  "CSRF_TOKEN_MISSING",
-			})
-			c.Abort()
-			return
-		}
-
-		// TODO: Implement actual token validation
-		// For now, we'll accept any non-empty token
-		// In production:
-		// 1. Generate token on login (store in session)
-		// 2. Include token in responses (cookie or JSON)
-		// 3. Validate token matches session token
 
 		c.Next()
 	}

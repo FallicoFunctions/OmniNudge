@@ -600,7 +600,8 @@ func main() {
 	themePreviewLimiter := middleware.ThemePreviewRateLimiter()
 	generalLimiter := middleware.GeneralAPIRateLimiter()
 	uploadRateLimiter := middleware.UploadRateLimiter()
-	aiDesignRateLimiter := middleware.AIDesignRateLimiter()
+	aiDesignRateLimiter := middleware.AIDesignRateLimiter(cache)
+	aiChatRateLimiter := middleware.ChatDesignRateLimiter(cache)
 	// Auth rate limiters — Redis-backed so they work across restarts and are IP-keyed
 	// (no user_id exists at login/register time, so the Redis limiter falls back to ClientIP).
 	authRateLimiter := middleware.AuthRateLimiter(cache)
@@ -907,8 +908,6 @@ func main() {
 			// Hub moderators list (public)
 			hubs.GET("/:name/moderators", hubSettingsHandler.GetHubModerators)
 
-
-
 			// Hub AI design (public — active design only)
 			hubs.GET("/:name/ai-design", hubAIDesignerHandler.GetActive)
 		}
@@ -981,6 +980,7 @@ func main() {
 		{
 			protected.GET("/auth/me", authHandler.GetMe)
 			protected.POST("/auth/logout", authHandler.Logout)
+			protected.POST("/auth/ws-token", authHandler.GenerateWSToken)
 			protected.PUT("/auth/public-key", authHandler.UpdatePublicKey)
 			protected.GET("/auth/public-keys", authHandler.GetPublicKeys)
 			protected.PUT("/auth/encrypted-private-key", authHandler.UpdateEncryptedPrivateKey)
@@ -1209,7 +1209,7 @@ func main() {
 			protected.POST("/hubs/:name/ai-designs/:id/copy", hubAIDesignerHandler.CopyDesign)
 			protected.GET("/hubs/:name/ai-designs/:id/versions", hubAIDesignerHandler.GetDesignVersions)
 			protected.POST("/hubs/:name/ai-designs/:id/versions", hubAIDesignerHandler.SaveDesignVersion)
-			protected.POST("/hubs/:name/ai-designs/:id/chat", hubAIDesignerHandler.ChatDesign)
+			protected.POST("/hubs/:name/ai-designs/:id/chat", aiChatRateLimiter.Middleware(), hubAIDesignerHandler.ChatDesign)
 
 			// Voice/Video Call routes (F12)
 			protected.POST("/conversations/:id/calls", callsHandler.StartCall)

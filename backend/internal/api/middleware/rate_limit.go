@@ -224,9 +224,3 @@ func GeneralAPIRateLimiter() *RateLimiter {
 func ReactionRateLimiter() *RateLimiter {
 	return NewRateLimiter(rate.Limit(1.0), 10)
 }
-
-// AIDesignRateLimiter creates a rate limiter for the AI Hub Page Designer endpoint.
-// Allows 30 generations per hour with a burst of 5 (Tier 1 quota is 1,000 RPM / 10,000 RPD).
-func AIDesignRateLimiter() *RateLimiter {
-	return NewRateLimiter(rate.Limit(30.0/3600.0), 5)
-}
