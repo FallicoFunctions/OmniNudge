@@ -38,12 +38,19 @@ func setupAccountDeletionTest(t *testing.T) (*AccountDeletionHandler, *database.
 	userRepo := models.NewUserRepository(db.Pool)
 	hash, err := utils.HashPassword("correct-password")
 	require.NoError(t, err)
+	email := fmt.Sprintf("%s@example.com", uniqueAccountDeletionUsername("email"))
 
 	user := &models.User{
 		Username:     uniqueAccountDeletionUsername("deluser"),
 		PasswordHash: hash,
 	}
 	require.NoError(t, userRepo.Create(ctx, user))
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE users
+		SET email = $1, email_encrypted = false
+		WHERE id = $2
+	`, email, user.ID)
+	require.NoError(t, err)
 
 	handler := NewAccountDeletionHandler(db.Pool, nil) // nil queue — no email needed in tests
 
@@ -92,7 +99,7 @@ func TestRequestAccountDeletion(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			handler, _, userID, cleanup := setupAccountDeletionTest(t)
+			handler, db, userID, cleanup := setupAccountDeletionTest(t)
 			defer cleanup()
 
 			router := gin.New()
@@ -107,6 +114,29 @@ func TestRequestAccountDeletion(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			router.ServeHTTP(w, req)
 			assert.Equal(t, tc.expectedStatus, w.Code)
+
+			if tc.expectedStatus != http.StatusOK {
+				return
+			}
+
+			var tokenVersion int
+			err := db.Pool.QueryRow(context.Background(), `
+				SELECT token_version
+				FROM users
+				WHERE id = $1
+			`, userID).Scan(&tokenVersion)
+			require.NoError(t, err)
+			assert.Equal(t, 1, tokenVersion)
+
+			userRepo := models.NewUserRepository(db.Pool)
+			user, err := userRepo.GetByID(context.Background(), userID)
+			require.NoError(t, err)
+			require.NotNil(t, user)
+			require.NotNil(t, user.DeletedAt)
+			require.NotNil(t, user.PermanentDeletionAt)
+			assert.Contains(t, user.Username, "deluser_accdel_")
+			require.NotNil(t, user.Email)
+			assert.Contains(t, *user.Email, "@example.com")
 		})
 	}
 }
@@ -168,6 +198,16 @@ func TestCancelAccountDeletion(t *testing.T) {
 		var resp map[string]interface{}
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		assert.Contains(t, resp, "message")
+
+		userRepo := models.NewUserRepository(db.Pool)
+		user, err := userRepo.GetByID(context.Background(), userID)
+		require.NoError(t, err)
+		require.NotNil(t, user)
+		assert.Nil(t, user.DeletedAt)
+		assert.Nil(t, user.PermanentDeletionAt)
+		assert.Contains(t, user.Username, "deluser_accdel_")
+		require.NotNil(t, user.Email)
+		assert.Contains(t, *user.Email, "@example.com")
 	})
 
 	t.Run("cancel when not pending deletion returns 400", func(t *testing.T) {
@@ -185,6 +225,38 @@ func TestCancelAccountDeletion(t *testing.T) {
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
+}
+
+func TestRequestAccountDeletion_AlreadyPendingReturnsBadRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler, db, userID, cleanup := setupAccountDeletionTest(t)
+	defer cleanup()
+
+	_, err := db.Pool.Exec(context.Background(), `
+		UPDATE users
+		SET deleted_at = NOW(), permanent_deletion_at = NOW() + INTERVAL '30 days'
+		WHERE id = $1
+	`, userID)
+	require.NoError(t, err)
+
+	router := gin.New()
+	router.POST("/account/delete", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.RequestAccountDeletion(c)
+	})
+
+	body := map[string]interface{}{
+		"password": "correct-password",
+		"confirm":  "DELETE MY ACCOUNT",
+	}
+	bodyBytes, _ := json.Marshal(body)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/account/delete", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func TestGetAccountDeletionStatus(t *testing.T) {
