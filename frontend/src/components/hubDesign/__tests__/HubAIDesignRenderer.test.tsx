@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import HubAIDesignRenderer from '../HubAIDesignRenderer';
@@ -41,6 +41,17 @@ function renderRenderer(
   );
 }
 
+async function getFrameDocument(container: HTMLElement) {
+  let frameDocument: Document | null = null;
+  await waitFor(() => {
+    const iframe = container.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    frameDocument = iframe?.contentDocument ?? null;
+    expect(frameDocument?.body).not.toBeNull();
+  });
+  return frameDocument as Document;
+}
+
 describe('HubAIDesignRenderer', () => {
   beforeEach(() => {
     mockCheckHubSubscription.mockReset();
@@ -78,7 +89,8 @@ describe('HubAIDesignRenderer', () => {
       </div>
     `, { id: 7 }, true);
 
-    const heroSection = container.querySelector('.hero-shell');
+    const frameDocument = await getFrameDocument(container);
+    const heroSection = frameDocument.querySelector('.hero-shell');
     expect(heroSection).not.toBeNull();
     expect(within(heroSection as HTMLElement).getByText('Hero copy')).toBeInTheDocument();
 
@@ -86,9 +98,9 @@ describe('HubAIDesignRenderer', () => {
       expect(
         within(heroSection as HTMLElement).getByRole('button', { name: 'Join' }),
       ).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /\+ Create Post/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Mod Tools' })).toBeInTheDocument();
-      expect(screen.getByText('Rendered through slot')).toBeInTheDocument();
+      expect(within(frameDocument.body).getByRole('button', { name: /\+ Create Post/i })).toBeInTheDocument();
+      expect(within(frameDocument.body).getByRole('button', { name: 'Mod Tools' })).toBeInTheDocument();
+      expect(within(frameDocument.body).getByText('Rendered through slot')).toBeInTheDocument();
     });
   });
 
@@ -99,9 +111,10 @@ describe('HubAIDesignRenderer', () => {
       </div>
     `);
 
-    await screen.findByRole('tab', { name: 'Hot' });
+    const frameDocument = await getFrameDocument(container);
+    await within(frameDocument.body).findByRole('tab', { name: 'Hot' });
 
-    const feed = container.querySelector('#hub-feed');
+    const feed = frameDocument.querySelector('#hub-feed');
     expect(feed).toHaveAttribute('style');
     expect(feed?.getAttribute('style')).toContain('--color-background:#111');
     expect(feed?.getAttribute('style')).toContain('padding:24px');
@@ -126,15 +139,16 @@ describe('HubAIDesignRenderer', () => {
       </div>
     `);
 
-    await screen.findByRole('tab', { name: 'Hot' });
+    const frameDocument = await getFrameDocument(container);
+    await within(frameDocument.body).findByRole('tab', { name: 'Hot' });
 
-    const joinHost = container.querySelector('#hub-join');
+    const joinHost = frameDocument.querySelector('#hub-join');
     expect(joinHost?.tagName).toBe('ASIDE');
     expect(joinHost).toHaveClass('join-shell', 'promo-shell');
     expect(joinHost).toHaveAttribute('data-cta', 'join-now');
     expect(joinHost).toHaveAttribute('title', 'Join shell');
 
-    const feedHost = container.querySelector('#hub-feed');
+    const feedHost = frameDocument.querySelector('#hub-feed');
     expect(feedHost?.tagName).toBe('SECTION');
     expect(feedHost).toHaveClass('feed-shell', 'fancy-shell');
     expect(feedHost).toHaveAttribute('data-density', 'compact');
@@ -150,9 +164,10 @@ describe('HubAIDesignRenderer', () => {
       </div>
     `);
 
-    await screen.findByRole('button', { name: 'Join' });
+    const frameDocument = await getFrameDocument(container);
+    await within(frameDocument.body).findByRole('button', { name: 'Join' });
 
-    const joinHost = container.querySelector('#hub-join');
+    const joinHost = frameDocument.querySelector('#hub-join');
     expect(joinHost?.tagName).toBe('DIV');
     expect(joinHost).toHaveClass('join-shell');
     expect(joinHost).toHaveAttribute('data-cta', 'join-now');
@@ -173,9 +188,10 @@ describe('HubAIDesignRenderer', () => {
       </div>
     `);
 
-    await screen.findByRole('tab', { name: 'Hot' });
+    const frameDocument = await getFrameDocument(container);
+    await within(frameDocument.body).findByRole('tab', { name: 'Hot' });
 
-    const feedHost = container.querySelector('#hub-feed');
+    const feedHost = frameDocument.querySelector('#hub-feed');
     expect(feedHost?.tagName).toBe('SECTION');
     expect(feedHost).toHaveClass('feed-shell');
     expect(feedHost).toHaveAttribute('data-density', 'compact');
@@ -198,18 +214,19 @@ describe('HubAIDesignRenderer', () => {
       </div>
     `);
 
-    await screen.findByRole('tab', { name: 'Hot' });
+    const frameDocument = await getFrameDocument(container);
+    await within(frameDocument.body).findByRole('tab', { name: 'Hot' });
 
-    expect(screen.queryByText('Placeholder join copy')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('join-placeholder')).not.toBeInTheDocument();
-    expect(screen.queryByText('Loading fallback posts')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('feed-placeholder')).not.toBeInTheDocument();
+    expect(within(frameDocument.body).queryByText('Placeholder join copy')).not.toBeInTheDocument();
+    expect(within(frameDocument.body).queryByTestId('join-placeholder')).not.toBeInTheDocument();
+    expect(within(frameDocument.body).queryByText('Loading fallback posts')).not.toBeInTheDocument();
+    expect(within(frameDocument.body).queryByTestId('feed-placeholder')).not.toBeInTheDocument();
 
-    const joinHost = container.querySelector('#hub-join');
+    const joinHost = frameDocument.querySelector('#hub-join');
     expect(joinHost?.tagName).toBe('ASIDE');
     expect(within(joinHost as HTMLElement).getByRole('button', { name: 'Join' })).toBeInTheDocument();
 
-    const feedHost = container.querySelector('#hub-feed');
+    const feedHost = frameDocument.querySelector('#hub-feed');
     expect(feedHost?.tagName).toBe('SECTION');
     expect(within(feedHost as HTMLElement).getByRole('tab', { name: 'Hot' })).toBeInTheDocument();
     expect(within(feedHost as HTMLElement).getByPlaceholderText('Search posts…')).toBeInTheDocument();
@@ -222,9 +239,10 @@ describe('HubAIDesignRenderer', () => {
       </div>
     `);
 
-    await screen.findByText('Rendered through slot');
+    const frameDocument = await getFrameDocument(container);
+    await within(frameDocument.body).findByText('Rendered through slot');
 
-    const feedHost = container.querySelector('#hub-feed');
+    const feedHost = frameDocument.querySelector('#hub-feed');
     const feedWrapper = feedHost?.querySelector(':scope > .hub-slot-feed');
     expect(feedWrapper).toBeInTheDocument();
     expect(feedHost?.children).toHaveLength(1);
@@ -239,21 +257,23 @@ describe('HubAIDesignRenderer', () => {
   });
 
   it('mounts extracted styles into document head and removes them on unmount', async () => {
-    const { unmount } = renderRenderer(`
+    const { container, unmount } = renderRenderer(`
       <style>.hub-custom-page{color:red}</style>
       <div class="hub-custom-page">
         <div id="hub-feed"></div>
       </div>
     `);
 
-    await screen.findByRole('tab', { name: 'Hot' });
+    const frameDocument = await getFrameDocument(container);
+    await within(frameDocument.body).findByRole('tab', { name: 'Hot' });
 
-    const styleTag = document.head.querySelector('style[data-hub-ai-design="testHub"]');
+    const styleTags = frameDocument.head.querySelectorAll('style');
+    const styleTag = styleTags[styleTags.length - 1] ?? null;
     expect(styleTag?.textContent).toContain('.hub-custom-page{color:red}');
 
     unmount();
 
-    expect(document.head.querySelector('style[data-hub-ai-design="testHub"]')).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
   });
 
   it('keeps the feed interactive after first render', async () => {
@@ -265,10 +285,11 @@ describe('HubAIDesignRenderer', () => {
       </div>
     `);
 
-    await user.click(await screen.findByRole('tab', { name: 'New' }));
+    const frameDocument = await getFrameDocument(document.body);
+    await user.click(await within(frameDocument.body).findByRole('tab', { name: 'New' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('tab', { name: 'New' })).toHaveAttribute('aria-selected', 'true');
+      expect(within(frameDocument.body).getByRole('tab', { name: 'New' })).toHaveAttribute('aria-selected', 'true');
     });
   });
 });

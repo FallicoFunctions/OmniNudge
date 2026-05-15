@@ -31,6 +31,12 @@ vi.mock('../../hooks/useHubModerators', () => ({
   useHubModerators: () => ({ isLoading: true }),
 }));
 
+vi.mock('../../components/hubDesign/HubAIDesignRenderer', () => ({
+  default: ({ htmlContent }: { htmlContent: string }) => (
+    <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+  ),
+}));
+
 vi.mock('@uiw/react-codemirror', () => ({
   default: ({ value }: { value: string }) => <textarea readOnly value={value} />,
 }));
@@ -99,8 +105,6 @@ describe('HubAIDesignerPreviewPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Preview AI Layout')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Join' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /\+ Create Post/i })).toBeInTheDocument();
     });
   });
 
@@ -120,5 +124,8 @@ describe('HubAIDesignerPreviewPage', () => {
     expect(await screen.findByText('AI design refinement timed out. Please try again.')).toBeInTheDocument();
     expect(screen.queryByText(/AI request failed/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/check your connection/i)).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('Thinking…')).not.toBeInTheDocument();
+    });
   });
 });
