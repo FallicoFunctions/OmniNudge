@@ -167,6 +167,11 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	if v, _ := middleware.GetOptionalUserID(c); v != 0 {
 		viewerID = v
 	}
+	if isPendingDeletionHiddenFromViewer(user, viewerID) {
+		resultState = "not_found"
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
 
 	showLastSeen := true
 	profileVisibility := "public"
@@ -271,6 +276,13 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	c.JSON(http.StatusOK, response)
 }
 
+func isPendingDeletionHiddenFromViewer(user *models.User, viewerID int) bool {
+	if user == nil || user.DeletedAt == nil {
+		return false
+	}
+	return viewerID != user.ID
+}
+
 func canViewerSeeProfile(profileUserID, viewerID int, profileVisibility string, viewerIsFriend bool) bool {
 	if viewerID == profileUserID {
 		return true
@@ -310,6 +322,11 @@ func (h *UsersHandler) GetUserPosts(c *gin.Context) {
 		return
 	}
 	if user == nil {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+	viewerID, _ := middleware.GetOptionalUserID(c)
+	if isPendingDeletionHiddenFromViewer(user, viewerID) {
 		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
@@ -409,6 +426,11 @@ func (h *UsersHandler) GetUserComments(c *gin.Context) {
 		return
 	}
 	if user == nil {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+	viewerID, _ := middleware.GetOptionalUserID(c)
+	if isPendingDeletionHiddenFromViewer(user, viewerID) {
 		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}

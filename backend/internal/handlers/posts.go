@@ -365,8 +365,10 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 	hubNameParam := strings.TrimSpace(c.Query("hub"))
 
 	// Get optional user ID for vote information
+	var viewerID int
 	var userID *int
 	if uid, _ := middleware.GetOptionalUserID(c); uid != 0 {
+		viewerID = uid
 		uidInt := uid
 		userID = &uidInt
 	}
@@ -394,14 +396,18 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 		}
 	}
 
-	// Increment view count
-	_ = h.postRepo.IncrementViewCount(c.Request.Context(), postID)
-
-	// Fetch author username
+	// Hide posts from public viewers while the author has a pending account deletion.
 	author, err := h.userRepo.GetByID(c.Request.Context(), post.AuthorID)
 	if err == nil && author != nil {
+		if isPendingDeletionHiddenFromViewer(author, viewerID) {
+			RespondError(c, http.StatusNotFound, "Post not found")
+			return
+		}
 		post.Author = author
 	}
+
+	// Increment view count
+	_ = h.postRepo.IncrementViewCount(c.Request.Context(), postID)
 
 	// Fetch hub name (if post has a hub)
 	if post.HubID != nil {

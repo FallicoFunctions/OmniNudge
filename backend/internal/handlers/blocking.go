@@ -54,6 +54,10 @@ func (h *BlockingHandler) BlockUser(c *gin.Context) {
 		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
+	if blockedUser == nil || isPendingDeletionHiddenFromViewer(blockedUser, blockerID) {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
 
 	// Can't block yourself
 	if blockedUser.ID == blockerID {
@@ -95,6 +99,10 @@ func (h *BlockingHandler) UnblockUser(c *gin.Context) {
 	// Get user to unblock
 	blockedUser, err := h.userRepo.GetByUsername(c.Request.Context(), username)
 	if err != nil {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+	if blockedUser == nil || isPendingDeletionHiddenFromViewer(blockedUser, blockerID) {
 		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}

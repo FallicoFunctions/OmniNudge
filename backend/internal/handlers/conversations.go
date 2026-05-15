@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
 	"net/http"
 	"strconv"
 	"strings"
@@ -138,7 +138,7 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to get user")
 		return
 	}
-	if otherUser == nil {
+	if otherUser == nil || isPendingDeletionHiddenFromViewer(otherUser, userID) {
 		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
@@ -268,6 +268,11 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 				if otherUserID != 0 {
 					otherUser, err := h.userRepo.GetByID(ctx, otherUserID)
 					if err == nil && otherUser != nil {
+						if isPendingDeletionHiddenFromViewer(otherUser, userID) {
+							enriched[idx] = nil
+							resultsChan <- enrichResult{index: idx, err: nil}
+							return
+						}
 						details.OtherUser = &ConversationUser{
 							ID:        otherUser.ID,
 							Username:  otherUser.Username,
@@ -322,6 +327,14 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 	for i := 0; i < len(conversations); i++ {
 		<-resultsChan
 	}
+
+	filtered := enriched[:0]
+	for _, details := range enriched {
+		if details != nil {
+			filtered = append(filtered, details)
+		}
+	}
+	enriched = filtered
 
 	nextCursor := ""
 	if useCursorPagination && len(enriched) > limit {
@@ -473,6 +486,10 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 	otherUserID := conversation.GetOtherUserID(userID)
 	otherUser, err := h.userRepo.GetByID(c.Request.Context(), otherUserID)
 	if err == nil && otherUser != nil {
+		if isPendingDeletionHiddenFromViewer(otherUser, userID) {
+			RespondError(c, http.StatusNotFound, "Conversation not found")
+			return
+		}
 		details.OtherUser = &ConversationUser{
 			ID:        otherUser.ID,
 			Username:  otherUser.Username,

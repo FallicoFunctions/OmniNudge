@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
 	"net/http"
 	"strconv"
 	"time"
@@ -278,12 +278,13 @@ func (h *AccessRequestHandler) AddUserAccessByUsername(c *gin.Context) {
 		return
 	}
 
+	viewerID, _ := middleware.GetOptionalUserID(c)
 	user, err := h.userRepo.GetByUsername(c.Request.Context(), req.Username)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch user")
 		return
 	}
-	if user == nil {
+	if user == nil || isPendingDeletionHiddenFromViewer(user, viewerID) {
 		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
