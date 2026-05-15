@@ -227,6 +227,3 @@ export function clearKeys(): void {
     }
   });
 }
-
-// Temporary export to break Firefox cache - will be removed
-export const _cacheBreaker = Date.now();

@@ -56,7 +56,7 @@ import type {
   SendMessageRequest,
 } from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
-import { API_BASE_URL } from '../lib/api';
+import { API_BASE_URL, getStoredAuthToken } from '../lib/api';
 import {
   decryptMessage,
   encryptFile,
@@ -488,7 +488,7 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
         console.log('[Media Decryption] Starting decryption for:', originalUrl);
         console.log('[Media Decryption] Attempting fetch...');
 
-        const token = localStorage.getItem('auth_token');
+        const token = getStoredAuthToken();
         const response = await fetch(originalUrl, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
@@ -1087,7 +1087,7 @@ export default function MessagesPage() {
   const { data: modMailConversation } = useQuery<ModMailConversation>({
     queryKey: ['modMailConversation', selectedConversationId],
     queryFn: async () => {
-      const token = localStorage.getItem('auth_token');
+      const token = getStoredAuthToken();
       const response = await fetch(`${API_BASE_URL}/mod-mail/${selectedConversationId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1270,7 +1270,7 @@ export default function MessagesPage() {
       };
 
       const fetchModMailParticipantIDs = async (conversationId: number): Promise<number[]> => {
-        const token = localStorage.getItem('auth_token');
+        const token = getStoredAuthToken();
         const response = await fetch(`${API_BASE_URL}/mod-mail/${conversationId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1714,7 +1714,7 @@ export default function MessagesPage() {
             try {
               const user = await fetch(`${API_BASE_URL}/users/${recipient}`, {
                 headers: {
-                  Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+                  Authorization: `Bearer ${getStoredAuthToken()}`,
                 },
               }).then((res) => res.json());
               recipientId = user.id;
@@ -4355,8 +4355,8 @@ export default function MessagesPage() {
           }}
           searchUsers={async (query) => {
             const res = await fetch(
-              `${API_BASE_URL}/api/v1/users/search?q=${encodeURIComponent(query)}&limit=10`,
-              { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+              `${API_BASE_URL}/search/users?q=${encodeURIComponent(query)}&limit=10`,
+              { headers: { Authorization: `Bearer ${getStoredAuthToken()}` } }
             );
             if (!res.ok) return [];
             const data = await res.json() as { users?: { id: number; username: string; avatar_url?: string }[] };
