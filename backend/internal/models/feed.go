@@ -97,7 +97,7 @@ func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limi
 			FROM platform_posts p
 			JOIN users u ON p.author_id = u.id
 			JOIN hubs h ON p.hub_id = h.id
-			WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE
+			WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE AND u.deleted_at IS NULL
 
 			UNION ALL
 
@@ -256,7 +256,7 @@ func (r *FeedRepository) getPlatformOnlyFeed(ctx context.Context, sortBy string,
 		FROM platform_posts p
 		JOIN users u ON p.author_id = u.id
 		JOIN hubs h ON p.hub_id = h.id
-		WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE
+		WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE AND u.deleted_at IS NULL
 		ORDER BY %s
 		LIMIT $1 OFFSET $2
 	`, orderBy)

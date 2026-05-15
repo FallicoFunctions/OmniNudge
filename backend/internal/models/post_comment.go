@@ -267,7 +267,7 @@ func (r *PostCommentRepository) GetByPostID(ctx context.Context, postID int, sor
 			FROM post_comments pc
 			JOIN users u ON u.id = pc.user_id
 			LEFT JOIN comment_votes cv ON cv.comment_id = pc.id AND cv.user_id = $5
-			WHERE pc.post_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $4)
+			WHERE pc.post_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $4) AND u.deleted_at IS NULL
 			` + orderClause + `
 			LIMIT $2 OFFSET $3
 		`
@@ -281,7 +281,7 @@ func (r *PostCommentRepository) GetByPostID(ctx context.Context, postID int, sor
 			       0 AS user_vote
 		FROM post_comments pc
 		JOIN users u ON u.id = pc.user_id
-		WHERE pc.post_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $4) AND u.shadow_banned = FALSE
+		WHERE pc.post_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $4) AND u.shadow_banned = FALSE AND u.deleted_at IS NULL
 			` + orderClause + `
 			LIMIT $2 OFFSET $3
 		`
@@ -359,7 +359,7 @@ func (r *PostCommentRepository) GetReplies(ctx context.Context, parentCommentID 
 			FROM post_comments pc
 			JOIN users u ON u.id = pc.user_id
 			LEFT JOIN comment_votes cv ON cv.comment_id = pc.id AND cv.user_id = $5
-			WHERE pc.parent_comment_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $4)
+			WHERE pc.parent_comment_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $4) AND u.deleted_at IS NULL
 			` + orderClause + `
 			LIMIT $2 OFFSET $3
 		`
@@ -373,7 +373,7 @@ func (r *PostCommentRepository) GetReplies(ctx context.Context, parentCommentID 
 			       0 AS user_vote
 		FROM post_comments pc
 		JOIN users u ON u.id = pc.user_id
-		WHERE pc.parent_comment_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $4) AND u.shadow_banned = FALSE
+		WHERE pc.parent_comment_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $4) AND u.shadow_banned = FALSE AND u.deleted_at IS NULL
 			` + orderClause + `
 			LIMIT $2 OFFSET $3
 		`
