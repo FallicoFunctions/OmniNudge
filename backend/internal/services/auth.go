@@ -161,7 +161,7 @@ func (s *AuthService) ValidateJWTContext(ctx context.Context, tokenString string
 			if userErr != nil {
 				return nil, userErr
 			}
-			if user == nil || user.TokenVersion != claims.TokenVersion {
+			if user == nil || user.TokenVersion != claims.TokenVersion || user.Banned || user.Deleted {
 				return nil, fmt.Errorf("invalid token")
 			}
 		}
@@ -274,6 +274,10 @@ func (s *AuthService) Login(ctx context.Context, userRepo ports.UserRepository, 
 	}
 	if user == nil {
 		log.Printf("Login failed: user not found for username=%q", username)
+		return nil, "", errors.New("invalid username or password")
+	}
+	if user.Banned || user.Deleted {
+		log.Printf("Login failed: access revoked for user_id=%d username=%q banned=%t deleted=%t", user.ID, user.Username, user.Banned, user.Deleted)
 		return nil, "", errors.New("invalid username or password")
 	}
 
