@@ -35,13 +35,15 @@ type User struct {
 	TokenVersion int     `json:"-"`
 
 	// Ban/moderation fields
-	ShadowBanned  bool       `json:"shadow_banned"`
-	Banned        bool       `json:"banned"`
-	Deleted       bool       `json:"deleted"`
-	BanReason     *string    `json:"ban_reason,omitempty"`
-	ShowBanReason bool       `json:"show_ban_reason"`
-	BannedAt      *time.Time `json:"banned_at,omitempty"`
-	BannedBy      *int       `json:"banned_by,omitempty"`
+	ShadowBanned        bool       `json:"shadow_banned"`
+	Banned              bool       `json:"banned"`
+	Deleted             bool       `json:"deleted"`
+	DeletedAt           *time.Time `json:"-"`
+	PermanentDeletionAt *time.Time `json:"-"`
+	BanReason           *string    `json:"ban_reason,omitempty"`
+	ShowBanReason       bool       `json:"show_ban_reason"`
+	BannedAt            *time.Time `json:"banned_at,omitempty"`
+	BannedBy            *int       `json:"banned_by,omitempty"`
 
 	// Timestamps
 	CreatedAt time.Time `json:"created_at"`
@@ -123,7 +125,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 
 	query := `
 		SELECT id, username, email, email_encrypted, email_verified, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
-		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
+		       shadow_banned, banned, deleted, deleted_at, permanent_deletion_at, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
 		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE id = $1
 	`
@@ -144,6 +146,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 		&user.ShadowBanned,
 		&user.Banned,
 		&user.Deleted,
+		&user.DeletedAt,
+		&user.PermanentDeletionAt,
 		&user.BanReason,
 		&user.ShowBanReason,
 		&user.BannedAt,
@@ -296,7 +300,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 
 	return r.queryUser(ctx, `
 		SELECT id, username, email, email_encrypted, email_verified, password_hash, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
-		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
+		       shadow_banned, banned, deleted, deleted_at, permanent_deletion_at, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
 		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE username_normalized = $1
 	`, normalizedUsername)
@@ -322,6 +326,8 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 		&user.ShadowBanned,
 		&user.Banned,
 		&user.Deleted,
+		&user.DeletedAt,
+		&user.PermanentDeletionAt,
 		&user.BanReason,
 		&user.ShowBanReason,
 		&user.BannedAt,
@@ -562,7 +568,8 @@ func (r *UserRepository) BanUser(ctx context.Context, userID int, reason string,
 	// Update user
 	query := `
 		UPDATE users
-		SET banned = true, ban_reason = $2, show_ban_reason = $3, banned_at = NOW(), banned_by = $4
+		SET banned = true, ban_reason = $2, show_ban_reason = $3, banned_at = NOW(), banned_by = $4,
+		    token_version = token_version + 1
 		WHERE id = $1
 	`
 	_, err = tx.Exec(ctx, query, userID, reason, showReason, adminID)
@@ -592,7 +599,8 @@ func (r *UserRepository) AutoSuspendForReports(ctx context.Context, userID int, 
 		    ban_reason = $2,
 		    show_ban_reason = false,
 		    banned_at = NOW(),
-		    banned_by = NULL
+		    banned_by = NULL,
+		    token_version = token_version + 1
 		WHERE id = $1
 		  AND deleted = false
 		  AND banned = false
@@ -643,7 +651,8 @@ func (r *UserRepository) SoftDeleteUser(ctx context.Context, userID int, reason 
 	// Update user
 	query := `
 		UPDATE users
-		SET deleted = true, ban_reason = $2, banned_at = NOW(), banned_by = $3
+		SET deleted = true, ban_reason = $2, banned_at = NOW(), banned_by = $3,
+		    token_version = token_version + 1
 		WHERE id = $1
 	`
 	_, err = tx.Exec(ctx, query, userID, reason, adminID)

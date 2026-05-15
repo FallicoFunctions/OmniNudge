@@ -74,20 +74,25 @@ func (h *AccountDeletionHandler) RequestAccountDeletion(c *gin.Context) {
 		return
 	}
 
-	// Soft delete: set deleted_at timestamp (30-day grace period)
+	// Mark the account for deletion without mutating identity fields so it can be restored cleanly.
 	deletionDate := time.Now().Add(30 * 24 * time.Hour) // 30 days from now
-	_, err = h.db.Exec(context.Background(), `
+	result, err := h.db.Exec(context.Background(), `
 		UPDATE users
 		SET 
 			deleted_at = NOW(),
 			permanent_deletion_at = $1,
-			email = 'deleted_' || id || '@deleted.omninudge.com',
-			username = 'deleted_user_' || id
+			token_version = token_version + 1
 		WHERE id = $2 AND deleted_at IS NULL
 	`, deletionDate, userID)
 
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to delete account")
+		return
+	}
+	if result.RowsAffected() == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Account is already scheduled for deletion",
+		})
 		return
 	}
 
