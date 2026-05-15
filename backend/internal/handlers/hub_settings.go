@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
-	"github.com/omninudge/backend/internal/api/middleware"
 	"errors"
+	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
 	"net/http"
 	"strconv"
 
@@ -242,7 +242,7 @@ func (h *HubSettingsHandler) AddHubModerator(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to look up user")
 		return
 	}
-	if targetUser == nil {
+	if targetUser == nil || isPendingDeletionHiddenFromViewer(targetUser, userID) {
 		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
