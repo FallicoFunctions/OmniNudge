@@ -573,8 +573,7 @@ func forbiddenCSSSelectorKind(selector string) string {
 	switch {
 	case strings.Contains(trimmed, ":is("), strings.Contains(trimmed, ":where("):
 		return "wrapped-global"
-	case strings.Contains(trimmed, ":root"):
-		return "root"
+	// :root, body, html, * are sandboxed inside the iframe — allowed.
 	case hasNamespaceSelector(trimmed):
 		return "namespace"
 	case !hasAllowedScopePrefix(trimmed):
@@ -585,6 +584,13 @@ func forbiddenCSSSelectorKind(selector string) string {
 }
 
 func hasAllowedScopePrefix(selector string) bool {
+	// Global element selectors are safe: designs render in a sandboxed iframe so
+	// body/html/*/:root only affect the iframe document, not the host page.
+	switch strings.TrimSpace(selector) {
+	case "body", "html", "*", ":root":
+		return true
+	}
+
 	for _, prefix := range allowedCSSScopes {
 		normalizedPrefix := strings.ToLower(prefix)
 		if !strings.HasPrefix(selector, normalizedPrefix) {
@@ -818,15 +824,17 @@ Always scope your CSS to the slot IDs to avoid conflicts:
   #hub-feed .hub-slot-post-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 16px; }
 
 CSS selector scoping contract:
-- Every selector in the <style> block must start with one of: .hub-custom-page, #hub-join, #hub-create, #hub-mod, #hub-feed
-- Do NOT use bare element selectors like body, h1, h2, p, section, button, input, a, or div
+- You MAY use :root { } to define CSS custom properties for your palette
+- You MAY use body { } or * { } for global resets (background, box-sizing, font-family)
+- All class selectors MUST be scoped — start with .hub-custom-page, #hub-join, #hub-create, #hub-mod, or #hub-feed
 - Do NOT use unscoped class selectors like .hero, .card, .layout, or .stats
 - If styling a class, scope it like .hub-custom-page .hero, not .hero
-- Grouped selectors are allowed only when every selector in the group is scoped.
-Bad: h1 { ... }
+- Grouped selectors are allowed only when every selector in the group is valid.
 Bad: .hero { ... }
 Bad: section.stats { ... }
 Bad: .hub-custom-page .hero, h2 { ... }
+Good: :root { --brand: #00FFFF; }
+Good: body { background: var(--brand); }
 Good: .hub-custom-page h1 { ... }
 Good: .hub-custom-page .hero { ... }
 Good: #hub-feed .hub-slot-post-card { ... }
@@ -1717,15 +1725,17 @@ Feed internals: .hub-slot-feed, .hub-slot-feed-controls, .hub-slot-feed-tabs, .h
 Always scope CSS rules to slot IDs (e.g. #hub-join .hub-slot-btn--primary { ... })
 
 CSS selector scoping contract:
-- Every selector in the <style> block must start with one of: .hub-custom-page, #hub-join, #hub-create, #hub-mod, #hub-feed
-- Do NOT use bare element selectors like body, h1, h2, p, section, button, input, a, or div
+- You MAY use :root { } to define CSS custom properties for your palette
+- You MAY use body { } or * { } for global resets (background, box-sizing, font-family)
+- All class selectors MUST be scoped — start with .hub-custom-page, #hub-join, #hub-create, #hub-mod, or #hub-feed
 - Do NOT use unscoped class selectors like .hero, .card, .layout, or .stats
 - If styling a class, scope it like .hub-custom-page .hero, not .hero
-- Grouped selectors are allowed only when every selector in the group is scoped.
-Bad: h1 { ... }
+- Grouped selectors are allowed only when every selector in the group is valid.
 Bad: .hero { ... }
 Bad: section.stats { ... }
 Bad: .hub-custom-page .hero, h2 { ... }
+Good: :root { --brand: #00FFFF; }
+Good: body { background: var(--brand); }
 Good: .hub-custom-page h1 { ... }
 Good: .hub-custom-page .hero { ... }
 Good: #hub-feed .hub-slot-post-card { ... }

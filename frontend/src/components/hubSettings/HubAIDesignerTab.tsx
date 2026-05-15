@@ -40,6 +40,9 @@ export default function HubAIDesignerTab({ hubName }: Props) {
 
   const generateMutation = useMutation({
     mutationFn: () => hubAIDesignerService.generateDesign(hubName, prompt),
+    onMutate: () => {
+      setErrorMsg(null);
+    },
     onSuccess: (data) => {
       setPreviewHTML(data.html_content);
       setPendingDesignId(data.id);

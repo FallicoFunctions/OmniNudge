@@ -13,6 +13,7 @@
   /* Primary Colors */
   --color-primary: #3b82f6;
   --color-primary-dark: #2563eb;
+  --color-primary-strong: #2563eb; /* alias for primary-dark, used by hover states */
   --color-primary-light: #60a5fa;
 
   /* Background Colors */
