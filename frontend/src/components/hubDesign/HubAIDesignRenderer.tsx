@@ -228,6 +228,21 @@ export default function HubAIDesignRenderer({
 
   return (
     <div style={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
+      {/*
+       * Portals MUST be declared before the iframe. React processes sibling
+       * fibers left-to-right during deletion. If the iframe came first, React
+       * would remove it from the DOM (detaching iframe.contentDocument) before
+       * cleaning up the portals, causing removeChild to throw on the now-dead
+       * marker elements. Declaring portals first ensures their content is
+       * removed while the iframe — and its document — is still attached.
+       */}
+      {Array.from(slotsByMarker.entries()).map(([marker, slot]) => {
+        const target = markerElements.get(marker);
+        if (!target || !target.isConnected) {
+          return null;
+        }
+        return createPortal(renderSlotContent(slot), target, marker);
+      })}
       <iframe
         key={hubName}
         ref={iframeRef}
@@ -244,13 +259,6 @@ export default function HubAIDesignRenderer({
           height: `${frameHeight}px`,
         }}
       />
-      {Array.from(slotsByMarker.entries()).map(([marker, slot]) => {
-        const target = markerElements.get(marker);
-        if (!target || !target.isConnected) {
-          return null;
-        }
-        return createPortal(renderSlotContent(slot), target, marker);
-      })}
     </div>
   );
 }
