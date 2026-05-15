@@ -320,7 +320,7 @@ func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, lim
 		SELECT ` + platformPostSelectColumnsPrefixed + `
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
-		WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE
+		WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE AND u.deleted_at IS NULL
 		` + orderClause + `
 		LIMIT $1 OFFSET $2
 	`
@@ -404,7 +404,7 @@ func buildHubPostsBaseQuery(pinnedFilter *bool, userIDParamIndex int) string {
 		LEFT JOIN users u ON p.author_id = u.id
 		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = ` + userIDParam + `
 		LEFT JOIN post_comments pc ON pc.post_id = p.id AND pc.user_id = ` + userIDParam + ` AND pc.parent_comment_id IS NULL AND pc.is_deleted = FALSE
-		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE` + buildHubPinnedClause(pinnedFilter)
+		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE AND u.deleted_at IS NULL` + buildHubPinnedClause(pinnedFilter)
 }
 
 func (r *PlatformPostRepository) getByHubWithUser(
@@ -596,7 +596,7 @@ func (r *PlatformPostRepository) GetBySubredditWithUser(
 		LEFT JOIN users u ON p.author_id = u.id
 		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $4
 		LEFT JOIN post_comments pc ON pc.post_id = p.id AND pc.user_id = $4 AND pc.parent_comment_id IS NULL AND pc.is_deleted = FALSE
-		WHERE p.target_subreddit = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE` + timeClause + `
+		WHERE p.target_subreddit = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE AND u.deleted_at IS NULL` + timeClause + `
 		` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
@@ -656,7 +656,7 @@ func (r *PlatformPostRepository) GetBySubredditWithCursor(
 		LEFT JOIN users u ON p.author_id = u.id
 		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $3
 		LEFT JOIN post_comments pc ON pc.post_id = p.id AND pc.user_id = $3 AND pc.parent_comment_id IS NULL AND pc.is_deleted = FALSE
-		WHERE p.target_subreddit = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE` + timeClause + cursorClause + `
+		WHERE p.target_subreddit = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE AND u.deleted_at IS NULL` + timeClause + cursorClause + `
 		` + orderClause + `
 		LIMIT $2
 	`
@@ -694,7 +694,7 @@ func (r *PlatformPostRepository) GetByTags(ctx context.Context, tags []string, l
 		SELECT ` + platformPostSelectColumnsPrefixed + `
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
-		WHERE tags && $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE
+		WHERE tags && $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE AND u.deleted_at IS NULL
 		ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
@@ -1210,7 +1210,7 @@ func (r *PlatformPostRepository) GetAllFeed(
 		SELECT ` + platformPostSelectColumnsPrefixed + `
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
-		WHERE p.is_deleted = FALSE AND p.target_subreddit IS NULL AND u.shadow_banned = FALSE` + timeClause + `
+		WHERE p.is_deleted = FALSE AND p.target_subreddit IS NULL AND u.shadow_banned = FALSE AND u.deleted_at IS NULL` + timeClause + `
 		` + orderClause + `
 		LIMIT $1 OFFSET $2
 	`
@@ -1253,7 +1253,7 @@ func (r *PlatformPostRepository) GetAllFeedWithCursor(
 		SELECT ` + platformPostSelectColumnsPrefixed + `
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
-		WHERE p.is_deleted = FALSE AND p.target_subreddit IS NULL AND u.shadow_banned = FALSE` + timeClause + cursorClause + `
+		WHERE p.is_deleted = FALSE AND p.target_subreddit IS NULL AND u.shadow_banned = FALSE AND u.deleted_at IS NULL` + timeClause + cursorClause + `
 		` + orderClause + `
 		LIMIT $1
 	`
