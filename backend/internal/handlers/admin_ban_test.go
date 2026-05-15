@@ -90,6 +90,9 @@ func TestBanUserHandler(t *testing.T) {
 	targetUser := createAdminBanTestUser(t, userRepo, "adminbantest_target")
 
 	t.Run("successful ban", func(t *testing.T) {
+		var beforeTokenVersion int
+		require.NoError(t, pool.QueryRow(context.Background(), "SELECT token_version FROM users WHERE id = $1", targetUser.ID).Scan(&beforeTokenVersion))
+
 		payload := map[string]interface{}{
 			"reason":      "Spam posting",
 			"show_reason": true,
@@ -115,6 +118,11 @@ func TestBanUserHandler(t *testing.T) {
 		err = pool.QueryRow(context.Background(), "SELECT banned FROM users WHERE id = $1", targetUser.ID).Scan(&banned)
 		require.NoError(t, err)
 		assert.True(t, banned)
+
+		var afterTokenVersion int
+		err = pool.QueryRow(context.Background(), "SELECT token_version FROM users WHERE id = $1", targetUser.ID).Scan(&afterTokenVersion)
+		require.NoError(t, err)
+		assert.Equal(t, beforeTokenVersion+1, afterTokenVersion)
 	})
 
 	t.Run("ban without reason", func(t *testing.T) {
@@ -279,6 +287,9 @@ func TestSoftDeleteUserHandler(t *testing.T) {
 	targetUser := createAdminBanTestUser(t, userRepo, "adminbantest_target_delete")
 
 	t.Run("successful soft delete", func(t *testing.T) {
+		var beforeTokenVersion int
+		require.NoError(t, pool.QueryRow(context.Background(), "SELECT token_version FROM users WHERE id = $1", targetUser.ID).Scan(&beforeTokenVersion))
+
 		payload := map[string]interface{}{
 			"reason": "ToS violation",
 		}
@@ -298,6 +309,11 @@ func TestSoftDeleteUserHandler(t *testing.T) {
 		err := pool.QueryRow(context.Background(), "SELECT deleted FROM users WHERE id = $1", targetUser.ID).Scan(&deleted)
 		require.NoError(t, err)
 		assert.True(t, deleted)
+
+		var afterTokenVersion int
+		err = pool.QueryRow(context.Background(), "SELECT token_version FROM users WHERE id = $1", targetUser.ID).Scan(&afterTokenVersion)
+		require.NoError(t, err)
+		assert.Equal(t, beforeTokenVersion+1, afterTokenVersion)
 	})
 }
 

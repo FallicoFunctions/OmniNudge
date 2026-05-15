@@ -75,6 +75,22 @@ func newUsersVisibilityRouter(handler *UsersHandler) *gin.Engine {
 		}
 		handler.GetMyProfile(c)
 	})
+	router.GET("/users/:username/posts", func(c *gin.Context) {
+		if header := c.GetHeader("X-Viewer-ID"); header != "" {
+			if id, err := strconv.Atoi(header); err == nil {
+				c.Set("user_id", id)
+			}
+		}
+		handler.GetUserPosts(c)
+	})
+	router.GET("/users/:username/comments", func(c *gin.Context) {
+		if header := c.GetHeader("X-Viewer-ID"); header != "" {
+			if id, err := strconv.Atoi(header); err == nil {
+				c.Set("user_id", id)
+			}
+		}
+		handler.GetUserComments(c)
+	})
 	return router
 }
 
@@ -179,6 +195,60 @@ func TestGetMyProfile_ReturnsAuthenticatedUserProfile(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), owner.Username)
+}
+
+func TestGetUserProfile_PendingDeletion_HidesFromOtherUsers(t *testing.T) {
+	userRepo, settingsRepo, owner, viewer, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	_, err := userRepo.GetPool().Exec(context.Background(), `
+		UPDATE users
+		SET deleted_at = NOW(), permanent_deletion_at = NOW() + INTERVAL '30 days'
+		WHERE id = $1
+	`, owner.ID)
+	require.NoError(t, err)
+
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
+	router := newUsersVisibilityRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	req.Header.Set("X-Viewer-ID", strconv.Itoa(viewer.ID))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	reqSelf := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	reqSelf.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	wSelf := httptest.NewRecorder()
+	router.ServeHTTP(wSelf, reqSelf)
+	assert.Equal(t, http.StatusOK, wSelf.Code)
+}
+
+func TestGetUserPostsAndComments_PendingDeletion_HideFromOtherUsers(t *testing.T) {
+	userRepo, settingsRepo, owner, viewer, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	_, err := userRepo.GetPool().Exec(context.Background(), `
+		UPDATE users
+		SET deleted_at = NOW(), permanent_deletion_at = NOW() + INTERVAL '30 days'
+		WHERE id = $1
+	`, owner.ID)
+	require.NoError(t, err)
+
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
+	router := newUsersVisibilityRouter(handler)
+
+	reqPosts := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username+"/posts", nil)
+	reqPosts.Header.Set("X-Viewer-ID", strconv.Itoa(viewer.ID))
+	wPosts := httptest.NewRecorder()
+	router.ServeHTTP(wPosts, reqPosts)
+	assert.Equal(t, http.StatusNotFound, wPosts.Code)
+
+	reqComments := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username+"/comments", nil)
+	reqComments.Header.Set("X-Viewer-ID", strconv.Itoa(viewer.ID))
+	wComments := httptest.NewRecorder()
+	router.ServeHTTP(wComments, reqComments)
+	assert.Equal(t, http.StatusNotFound, wComments.Code)
 }
 
 func TestGetUserProfile_UsesCachedResponseUntilTTLExpiry(t *testing.T) {

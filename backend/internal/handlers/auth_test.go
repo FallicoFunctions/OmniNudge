@@ -15,6 +15,7 @@ import (
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,6 +48,7 @@ func setupAuthHandlerTest(t *testing.T) (*AuthHandler, *database.Database, func(
 	)
 
 	userRepo := models.NewUserRepository(db.Pool)
+	authSvc.SetUserRepository(userRepo)
 	handler := NewAuthHandler(
 		authSvc,
 		userRepo,
@@ -248,6 +250,60 @@ func TestLogin(t *testing.T) {
 			expectedStatus: http.StatusUnauthorized,
 			expectToken:    false,
 		},
+		{
+			name: "banned user",
+			setup: func(t *testing.T, handler *AuthHandler) string {
+				t.Helper()
+
+				ctx := context.Background()
+				passwordHash, err := utils.HashPassword("ValidPass123!")
+				require.NoError(t, err)
+
+				admin := &models.User{
+					Username:     uniqueAuthUsername("login_admin"),
+					PasswordHash: "hashed",
+				}
+				require.NoError(t, handler.userRepo.Create(ctx, admin))
+
+				user := &models.User{
+					Username:     uniqueAuthUsername("login_banned"),
+					PasswordHash: passwordHash,
+				}
+				require.NoError(t, handler.userRepo.Create(ctx, user))
+				require.NoError(t, handler.userRepo.BanUser(ctx, user.ID, "test ban", true, admin.ID))
+				return user.Username
+			},
+			password:       "ValidPass123!",
+			expectedStatus: http.StatusUnauthorized,
+			expectToken:    false,
+		},
+		{
+			name: "deleted user",
+			setup: func(t *testing.T, handler *AuthHandler) string {
+				t.Helper()
+
+				ctx := context.Background()
+				passwordHash, err := utils.HashPassword("ValidPass123!")
+				require.NoError(t, err)
+
+				admin := &models.User{
+					Username:     uniqueAuthUsername("login_admin_delete"),
+					PasswordHash: "hashed",
+				}
+				require.NoError(t, handler.userRepo.Create(ctx, admin))
+
+				user := &models.User{
+					Username:     uniqueAuthUsername("login_deleted"),
+					PasswordHash: passwordHash,
+				}
+				require.NoError(t, handler.userRepo.Create(ctx, user))
+				require.NoError(t, handler.userRepo.SoftDeleteUser(ctx, user.ID, "test delete", admin.ID))
+				return user.Username
+			},
+			password:       "ValidPass123!",
+			expectedStatus: http.StatusUnauthorized,
+			expectToken:    false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -309,6 +365,59 @@ func TestLogin(t *testing.T) {
 				require.NoError(t, err)
 				assert.NotContains(t, resp, "token")
 			}
+		})
+	}
+}
+
+func TestValidateJWTRejectsBannedOrDeletedUsers(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	testCases := []struct {
+		name       string
+		mutateUser func(t *testing.T, handler *AuthHandler, adminID int, userID int)
+	}{
+		{
+			name: "banned user token is rejected",
+			mutateUser: func(t *testing.T, handler *AuthHandler, adminID int, userID int) {
+				t.Helper()
+				require.NoError(t, handler.userRepo.BanUser(context.Background(), userID, "test ban", true, adminID))
+			},
+		},
+		{
+			name: "deleted user token is rejected",
+			mutateUser: func(t *testing.T, handler *AuthHandler, adminID int, userID int) {
+				t.Helper()
+				require.NoError(t, handler.userRepo.SoftDeleteUser(context.Background(), userID, "test delete", adminID))
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			handler, _, cleanup := setupAuthHandlerTest(t)
+			defer cleanup()
+
+			ctx := context.Background()
+			admin := &models.User{
+				Username:     uniqueAuthUsername("validate_admin"),
+				PasswordHash: "hashed",
+			}
+			require.NoError(t, handler.userRepo.Create(ctx, admin))
+
+			user := &models.User{
+				Username:     uniqueAuthUsername("validate_user"),
+				PasswordHash: "hashed",
+			}
+			require.NoError(t, handler.userRepo.Create(ctx, user))
+
+			token, err := handler.authService.GenerateJWTWithVersion(user.ID, user.Username, user.Role, user.TokenVersion)
+			require.NoError(t, err)
+
+			tc.mutateUser(t, handler, admin.ID, user.ID)
+
+			claims, err := handler.authService.ValidateJWTContext(ctx, token)
+			require.Error(t, err)
+			require.Nil(t, claims)
 		})
 	}
 }
