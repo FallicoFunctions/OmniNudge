@@ -1,12 +1,9 @@
 import {
-  memo,
   useCallback,
-  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -30,20 +27,7 @@ interface HubAIDesignRendererProps {
   user: User | null;
   isModerator: boolean;
 }
-
 const EMPTY_POSTS: FeedSlotPost[] = [];
-
-interface AIDesignMarkupProps {
-  containerRef: RefObject<HTMLDivElement | null>;
-  html: string;
-}
-
-const AIDesignMarkup = memo(function AIDesignMarkup({
-  containerRef,
-  html,
-}: AIDesignMarkupProps) {
-  return <div ref={containerRef} dangerouslySetInnerHTML={{ __html: html }} />;
-});
 
 export default function HubAIDesignRenderer({
   hubName,
@@ -51,8 +35,9 @@ export default function HubAIDesignRenderer({
   user,
   isModerator,
 }: HubAIDesignRendererProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const styleElRef = useRef<HTMLStyleElement | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [frameDocument, setFrameDocument] = useState<Document | null>(null);
+  const [frameHeight, setFrameHeight] = useState<number>(1);
   const [markerElements, setMarkerElements] = useState<Map<string, HTMLElement>>(new Map());
 
   const [sort, setSort] = useState<SortOption>('hot');
@@ -65,15 +50,42 @@ export default function HubAIDesignRenderer({
     [htmlContent],
   );
 
-  useEffect(() => {
-    if (!styleContent) return;
-    const el = document.createElement('style');
-    el.setAttribute('data-hub-ai-design', hubName);
-    el.textContent = styleContent;
-    document.head.appendChild(el);
-    styleElRef.current = el;
-    return () => { el.remove(); styleElRef.current = null; };
-  }, [styleContent, hubName]);
+  const frameSrcDoc = useMemo(() => {
+    const scopedStyles = styleContent ? `<style>${styleContent}</style>` : '';
+    return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>html, body { margin: 0; padding: 0; }</style>
+    ${scopedStyles}
+  </head>
+  <body>${htmlWithoutStyles}</body>
+</html>`;
+  }, [htmlWithoutStyles, styleContent]);
+
+  const syncFrameDocument = useCallback(() => {
+    const nextDoc = iframeRef.current?.contentDocument ?? null;
+    setFrameDocument(nextDoc);
+  }, []);
+
+  useLayoutEffect(() => {
+    const iframe = iframeRef.current;
+    const nextDoc = iframe?.contentDocument ?? null;
+    if (!nextDoc) {
+      setFrameDocument(null);
+      return;
+    }
+
+    // jsdom does not reliably populate iframe srcDoc content or dispatch load.
+    if (nextDoc.body && nextDoc.body.childNodes.length === 0) {
+      nextDoc.open();
+      nextDoc.write(frameSrcDoc);
+      nextDoc.close();
+    }
+
+    setFrameDocument(nextDoc);
+  }, [frameSrcDoc]);
 
   // ── Data queries ──────────────────────────────────────────────────────────
   const { data: subscriptionData } = useQuery({
@@ -95,11 +107,10 @@ export default function HubAIDesignRenderer({
   }, [allPosts, activeSearch]);
 
   useLayoutEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    if (!frameDocument) return;
 
     const next = new Map<string, HTMLElement>();
-    container.querySelectorAll<HTMLElement>('[data-hub-slot-marker]').forEach((node) => {
+    frameDocument.querySelectorAll<HTMLElement>('[data-hub-slot-marker]').forEach((node) => {
       const marker = node.getAttribute('data-hub-slot-marker');
       if (marker && slotsByMarker.has(marker)) {
         node.replaceChildren();
@@ -110,7 +121,40 @@ export default function HubAIDesignRenderer({
     return () => {
       setMarkerElements(new Map());
     };
-  }, [htmlWithoutStyles, slotsByMarker]);
+  }, [frameDocument, frameSrcDoc, slotsByMarker]);
+
+  useLayoutEffect(() => {
+    if (!frameDocument) return;
+
+    const root = frameDocument.documentElement;
+    const body = frameDocument.body;
+    if (!root || !body) return;
+
+    const updateHeight = () => {
+      const nextHeight = Math.max(
+        body.scrollHeight,
+        body.offsetHeight,
+        root.scrollHeight,
+        root.offsetHeight,
+      );
+      setFrameHeight(Math.max(1, nextHeight));
+    };
+
+    updateHeight();
+
+    const ResizeObserverCtor =
+      frameDocument.defaultView?.ResizeObserver ??
+      (typeof ResizeObserver !== 'undefined' ? ResizeObserver : undefined);
+    const observer = ResizeObserverCtor ? new ResizeObserverCtor(() => updateHeight()) : null;
+    observer?.observe(root);
+    observer?.observe(body);
+    frameDocument.defaultView?.addEventListener('load', updateHeight);
+
+    return () => {
+      observer?.disconnect();
+      frameDocument.defaultView?.removeEventListener('load', updateHeight);
+    };
+  }, [frameDocument, markerElements, filteredPosts, postsLoading, search, sort, isSubscribed, isModerator, user]);
 
   useLayoutEffect(() => {
     markerElements.forEach((node, marker) => {
@@ -184,7 +228,22 @@ export default function HubAIDesignRenderer({
 
   return (
     <div style={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
-      <AIDesignMarkup containerRef={containerRef} html={htmlWithoutStyles} />
+      <iframe
+        key={hubName}
+        ref={iframeRef}
+        title={`${hubName} custom page preview`}
+        srcDoc={frameSrcDoc}
+        sandbox="allow-same-origin"
+        onLoad={syncFrameDocument}
+        style={{
+          width: '100%',
+          maxWidth: '100%',
+          border: '0',
+          display: 'block',
+          overflow: 'hidden',
+          height: `${frameHeight}px`,
+        }}
+      />
       {Array.from(slotsByMarker.entries()).map(([marker, slot]) => {
         const target = markerElements.get(marker);
         if (!target || !target.isConnected) {
