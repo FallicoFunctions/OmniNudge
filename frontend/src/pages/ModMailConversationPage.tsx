@@ -8,6 +8,7 @@ import { messagesService } from '../services/messagesService';
 import { modMailService } from '../services/modMailService';
 import { hubsService } from '../services/hubsService';
 import { encryptionService } from '../services/encryptionService';
+import { API_BASE_URL, getStoredAuthToken } from '../lib/api';
 import type { Message } from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
 import { decryptMessage, encryptForMultipleRecipients, decryptMultiRecipientContent } from '../utils/encryption';
@@ -133,8 +134,8 @@ export default function ModMailConversationPage() {
   const { data: conversation } = useQuery<ModMailConversation>({
     queryKey: ['modMailConversation', convId],
     queryFn: async () => {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(`http://localhost:8080/api/v1/mod-mail/${convId}`, {
+      const token = getStoredAuthToken();
+      const response = await fetch(`${API_BASE_URL}/mod-mail/${convId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

@@ -132,7 +132,7 @@ class Logger {
       if (!response.ok) {
         console.error('[Logger] Failed to ship log:', response.statusText);
       }
-    } catch {
+    } catch (error) {
       // Don't retry to avoid infinite loops
       console.error('[Logger] Failed to ship log:', error);
     }

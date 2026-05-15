@@ -6,7 +6,7 @@ import { mediaService } from '../../services/mediaService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFormat } from '../../hooks/useFormat';
 import type { Conversation, Message, SendMessageRequest } from '../../types/messages';
-import { API_BASE_URL } from '../../lib/api';
+import { API_BASE_URL, getStoredAuthToken } from '../../lib/api';
 import {
   decryptMessage,
   encryptFile,
@@ -154,7 +154,7 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
           return;
         }
 
-        const token = localStorage.getItem('auth_token');
+        const token = getStoredAuthToken();
         const response = await fetch(originalUrl, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });

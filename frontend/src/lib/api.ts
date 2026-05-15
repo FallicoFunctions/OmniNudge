@@ -1,6 +1,9 @@
 // API client configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
+export const getStoredAuthToken = () =>
+  localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+
 interface ApiError {
   code?: string;
   error: string;
@@ -16,7 +19,7 @@ class ApiClient {
   }
 
   private getAuthHeader(): HeadersInit {
-    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+    const token = getStoredAuthToken();
     if (!token) return {};
     return { Authorization: `Bearer ${token}` };
   }
