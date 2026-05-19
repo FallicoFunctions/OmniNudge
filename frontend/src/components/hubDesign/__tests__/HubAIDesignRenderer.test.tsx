@@ -269,9 +269,9 @@ describe('HubAIDesignRenderer', () => {
     const frameDocument = await getFrameDocument(container);
     await within(frameDocument.body).findByRole('tab', { name: 'Hot' });
 
-    const styleTags = frameDocument.head.querySelectorAll('style');
-    const styleTag = styleTags[styleTags.length - 1] ?? null;
-    expect(styleTag?.textContent).toContain('.hub-custom-page{color:red}');
+    const styleTags = Array.from(frameDocument.head.querySelectorAll('style'));
+    const styleTag = styleTags.find(el => el.textContent?.includes('.hub-custom-page{color:red}')) ?? null;
+    expect(styleTag).not.toBeNull();
 
     unmount();
 

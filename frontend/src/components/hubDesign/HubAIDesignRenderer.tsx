@@ -60,6 +60,16 @@ export default function HubAIDesignRenderer({
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>html, body { margin: 0; padding: 0; overflow-x: hidden; }</style>
     ${scopedStyles}
+    <style>
+      /* Slot container reset — ensures React portal content is never clipped
+         by AI-generated height:0 or overflow:hidden on slot hosts. */
+      #hub-join, #hub-create, #hub-mod, #hub-feed {
+        overflow: visible !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+      }
+    </style>
   </head>
   <body>${htmlWithoutStyles}</body>
 </html>`;
