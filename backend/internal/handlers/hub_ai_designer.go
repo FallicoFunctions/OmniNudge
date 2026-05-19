@@ -160,25 +160,9 @@ func validateDesignHTML(clean string, opts designHTMLValidationOptions) error {
 		return err
 	}
 
-	var hasDeadLink bool
-	doc.Find("a").Each(func(_ int, selection *goquery.Selection) {
-		if hasDeadLink {
-			return
-		}
-
-		href, exists := selection.Attr("href")
-		if !exists {
-			return
-		}
-
-		trimmedHref := strings.TrimSpace(href)
-		if trimmedHref == "" || trimmedHref == "#" {
-			hasDeadLink = true
-		}
-	})
-	if hasDeadLink {
-		return fmt.Errorf("design may not contain dead links")
-	}
+	// Dead-link check intentionally removed: designs render inside a sandboxed
+	// iframe (no allow-top-navigation) so placeholder hrefs like "#" cannot
+	// navigate the parent window or cause any harm.
 
 	return validateDesignCSS(clean)
 }
@@ -583,11 +567,34 @@ func forbiddenCSSSelectorKind(selector string) string {
 	}
 }
 
+// isPlainElementSelector returns true for bare element selectors such as
+// h1, p, a, div, section, body, html, *, :root, ::before, etc.
+// These are safe in the sandboxed iframe and need no scope prefix.
+func isPlainElementSelector(s string) bool {
+	if s == "" {
+		return false
+	}
+	// Allow leading pseudo-element/pseudo-class prefix (::, :)
+	rest := strings.TrimLeft(s, ":")
+	if rest == "" {
+		return false
+	}
+	// Must consist only of letters, digits, hyphens, and * (for universal selector)
+	// No dots, hashes, spaces, brackets — those indicate class/ID/combinator/attr.
+	for _, ch := range rest {
+		if ch == '*' || ch == '-' || ch == '_' || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 func hasAllowedScopePrefix(selector string) bool {
-	// Global element selectors are safe: designs render in a sandboxed iframe so
-	// body/html/*/:root only affect the iframe document, not the host page.
-	switch strings.TrimSpace(selector) {
-	case "body", "html", "*", ":root":
+	// Plain element selectors (h1, p, a, body, html, *, :root, ::before, etc.)
+	// are safe because designs render inside a sandboxed iframe and can never
+	// affect the host page. Only class and ID selectors need explicit scoping.
+	if isPlainElementSelector(selector) {
 		return true
 	}
 
