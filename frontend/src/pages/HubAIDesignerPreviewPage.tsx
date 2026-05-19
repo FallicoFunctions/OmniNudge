@@ -219,6 +219,7 @@ export default function HubAIDesignerPreviewPage() {
       <div className="flex-1 overflow-auto">
         {previewHtml && (
           <HubAIDesignRenderer
+            key={numericDesignId}
             hubName={hubName!}
             htmlContent={previewHtml}
             user={user}

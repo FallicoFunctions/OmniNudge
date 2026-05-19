@@ -43,11 +43,13 @@ function renderRenderer(
 
 async function getFrameDocument(container: HTMLElement) {
   let frameDocument: Document | null = null;
+  // Wait until the iframe body has actual content written to it.
+  // jsdom always provides a non-null body, so we check childNodes instead.
   await waitFor(() => {
     const iframe = container.querySelector('iframe');
     expect(iframe).not.toBeNull();
     frameDocument = iframe?.contentDocument ?? null;
-    expect(frameDocument?.body).not.toBeNull();
+    expect(frameDocument?.body?.childNodes.length).toBeGreaterThan(0);
   });
   return frameDocument as Document;
 }

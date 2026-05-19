@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -57,35 +58,43 @@ export default function HubAIDesignRenderer({
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>html, body { margin: 0; padding: 0; }</style>
+    <style>html, body { margin: 0; padding: 0; overflow-x: hidden; }</style>
     ${scopedStyles}
   </head>
   <body>${htmlWithoutStyles}</body>
 </html>`;
   }, [htmlWithoutStyles, styleContent]);
 
+  // Called by onLoad once the browser has fully parsed the new srcDoc.
+  // This is the authoritative setter for frameDocument in real browsers.
   const syncFrameDocument = useCallback(() => {
     const nextDoc = iframeRef.current?.contentDocument ?? null;
     setFrameDocument(nextDoc);
   }, []);
 
+  // When srcDoc content changes, clear frameDocument immediately so React
+  // can detach portal content from the old marker elements WHILE those elements
+  // are still connected. If we waited for onLoad, the browser would have already
+  // replaced the iframe document, leaving portals pointing at disconnected nodes.
+  // syncFrameDocument (via onLoad) re-populates frameDocument once loading is done.
   useLayoutEffect(() => {
-    const iframe = iframeRef.current;
-    const nextDoc = iframe?.contentDocument ?? null;
-    if (!nextDoc) {
-      setFrameDocument(null);
-      return;
-    }
-
-    // jsdom does not reliably populate iframe srcDoc content or dispatch load.
-    if (nextDoc.body && nextDoc.body.childNodes.length === 0) {
-      nextDoc.open();
-      nextDoc.write(frameSrcDoc);
-      nextDoc.close();
-    }
-
-    setFrameDocument(nextDoc);
+    setFrameDocument(null);
   }, [frameSrcDoc]);
+
+  // Fallback for jsdom (tests) where iframe srcDoc doesn't fire a load event.
+  // In real browsers onLoad handles this; the body already has content so this
+  // is a no-op there.
+  useEffect(() => {
+    if (frameDocument !== null) return;
+    const iframe = iframeRef.current;
+    const doc = iframe?.contentDocument ?? null;
+    if (!doc || !doc.body || doc.body.childNodes.length > 0) return;
+
+    doc.open();
+    doc.write(frameSrcDoc);
+    doc.close();
+    setFrameDocument(doc);
+  }, [frameDocument, frameSrcDoc]);
 
   // ── Data queries ──────────────────────────────────────────────────────────
   const { data: subscriptionData } = useQuery({
