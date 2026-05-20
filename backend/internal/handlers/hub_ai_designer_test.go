@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,6 +35,12 @@ type hubAIDesignerTestFixture struct {
 	hubID   int
 	ownerID int
 	cleanup func()
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
 }
 
 func setupHubAIDesignerTest(t *testing.T) *hubAIDesignerTestFixture {
@@ -132,6 +140,44 @@ func performActivateAIDesignRequest(f *hubAIDesignerTestFixture, designID int) *
 	return w
 }
 
+func performGenerateAIDesignRequest(f *hubAIDesignerTestFixture, body string) *httptest.ResponseRecorder {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/hubs/:name/ai-design/generate", func(c *gin.Context) {
+		c.Set("user_id", f.ownerID)
+		f.handler.Generate(c)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("/hubs/%s/ai-design/generate", f.hubName), strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	return w
+}
+
+func geminiHTTPResponse(t *testing.T, text string) *http.Response {
+	t.Helper()
+
+	bodyBytes, err := json.Marshal(map[string]any{
+		"candidates": []any{
+			map[string]any{
+				"content": map[string]any{
+					"parts": []any{
+						map[string]any{"text": text},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
+	}
+}
+
 func designActiveState(t *testing.T, f *hubAIDesignerTestFixture, designID int) bool {
 	t.Helper()
 
@@ -175,6 +221,160 @@ func TestActivateAIDesign_SucceedsForValidDesign(t *testing.T) {
 	assert.Equal(t, "Design activated", body["message"])
 	assert.False(t, designActiveState(t, f, oldActiveID))
 	assert.True(t, designActiveState(t, f, newValidID))
+}
+
+func TestGenerateAIDesign_RetriesOnceAfterValidationFailure(t *testing.T) {
+	f := setupHubAIDesignerTest(t)
+	defer f.cleanup()
+
+	f.handler.aiAPIKey = "test-key"
+	validGeneratedHTML := `
+		<style>
+			.hub-custom-page .hero { color: white; }
+			.hub-custom-page .hero-copy { color: rgba(255,255,255,0.84); line-height: 1.6; }
+			.hub-custom-page .content-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px; }
+			.hub-custom-page .panel { background: rgba(20,20,24,0.82); border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; padding: 24px; }
+			.hub-custom-page .hero-stack { display: flex; flex-direction: column; gap: 16px; }
+			.hub-custom-page .stats-row { display: flex; gap: 12px; flex-wrap: wrap; }
+			#hub-feed .hub-slot-feed { background: rgba(20, 20, 32, 0.82); border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; padding: 18px; }
+			#hub-feed .hub-slot-feed-controls { gap: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.12); }
+			#hub-feed .hub-slot-tab { background: transparent; color: #aaa; border: none; cursor: pointer; padding: 8px 16px; }
+			#hub-feed .hub-slot-tab--active { color: #00FFFF; border-bottom: 2px solid #00FFFF; }
+			#hub-feed .hub-slot-search { background: #222; color: #eee; border: 1px solid #444; border-radius: 6px; padding: 8px 12px; }
+			#hub-feed .hub-slot-post-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 16px; }
+		</style>
+		<div class="hub-custom-page" style="width:100%; max-width:100%; box-sizing:border-box; overflow-x:hidden; background:#101014; color:#f5f5f5; padding:32px;">
+			<section class="hero hero-stack panel">
+				<h1>Welcome</h1>
+				<p class="hero-copy">A bold and high-contrast concept for the hub.</p>
+				<p class="hero-copy">This repair payload is intentionally long enough to satisfy the generation completeness guard.</p>
+				<div class="stats-row">
+					<span class="panel">Members: 12</span>
+					<span class="panel">Posts: 4</span>
+				</div>
+				<div id="hub-join"></div>
+			</section>
+			<div class="content-grid" style="margin-top:24px;">
+				<section class="panel">
+					<h2>About</h2>
+					<p class="hero-copy">Detailed context block one.</p>
+					<p class="hero-copy">Detailed context block two.</p>
+					<p class="hero-copy">Detailed context block three.</p>
+					<p class="hero-copy">Detailed context block four.</p>
+					<p class="hero-copy">Detailed context block five.</p>
+					<div id="hub-mod"></div>
+				</section>
+				<section class="panel">
+					<h2>Actions</h2>
+					<p class="hero-copy">Primary call to action area with ample spacing and contrast.</p>
+					<p class="hero-copy">Secondary explanation copy to keep the layout complete and intentional.</p>
+					<div id="hub-create"></div>
+				</section>
+			</div>
+			<section class="panel" style="margin-top:24px;">
+				<h2>Feed</h2>
+				<p class="hero-copy">This section reserves space for the runtime feed and keeps the design valid.</p>
+				<p class="hero-copy">Additional descriptive copy helps ensure the generated design is not treated as incomplete.</p>
+				<p class="hero-copy">The feed host below carries the runtime theme variables only.</p>
+				<div id="hub-feed" style="--color-background:#0d0d1a; --color-surface:#1a1a2e; --color-surface-elevated:#202038; --color-border:#3a3a5c; --color-text-primary:#e0e0ff; --color-text-secondary:#b8b8d8; --color-text-muted:#8d8da8; --color-primary:#66e3ff; --color-primary-dark:#1ab6db; padding:24px;"></div>
+			</section>
+			<footer class="panel" style="margin-top:24px;">
+				<p class="hero-copy">Footer copy one.</p>
+				<p class="hero-copy">Footer copy two.</p>
+				<p class="hero-copy">Footer copy three.</p>
+				<p class="hero-copy">Footer copy four.</p>
+			</footer>
+		</div>
+	`
+
+	requestCount := 0
+	prompts := make([]string, 0, 2)
+	temperatures := make([]float64, 0, 2)
+	f.handler.httpClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			requestCount++
+
+			payload, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+
+			var geminiReq geminiRequest
+			require.NoError(t, json.Unmarshal(payload, &geminiReq))
+			prompts = append(prompts, geminiReq.Contents[0].Parts[0].Text)
+			temperatures = append(temperatures, geminiReq.GenerationConfig.Temperature)
+
+			switch requestCount {
+			case 1:
+				return geminiHTTPResponse(t, `
+					<style>.hero { color: red; }</style>
+					<div class="hub-custom-page">
+						<div id="hub-join"></div>
+						<div id="hub-create"></div>
+						<div id="hub-mod"></div>
+						<div id="hub-feed"></div>
+					</div>
+				`), nil
+			case 2:
+				return geminiHTTPResponse(t, validGeneratedHTML), nil
+			default:
+				t.Fatalf("unexpected AI call count: %d", requestCount)
+				return nil, nil
+			}
+		}),
+	}
+
+	w := performGenerateAIDesignRequest(f, `{"prompt":"make it bold and high contrast"}`)
+
+	require.Equal(t, http.StatusCreated, w.Code)
+	assert.Equal(t, 2, requestCount)
+	require.Len(t, temperatures, 2)
+	assert.Equal(t, generateDesignTemperature, temperatures[0])
+	assert.Equal(t, repairDesignTemperature, temperatures[1])
+	require.Len(t, prompts, 2)
+	assert.Contains(t, prompts[1], "VALIDATION ERROR:")
+	assert.Contains(t, prompts[1], "ordinary CSS selectors must be scoped")
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	assert.Equal(t, "make it bold and high contrast", body["prompt"])
+	assert.Equal(t, "Design generated. Use the activate endpoint to publish it.", body["message"])
+}
+
+func TestGenerateAIDesign_ReturnsInvalidDesignWhenRepairAlsoFails(t *testing.T) {
+	f := setupHubAIDesignerTest(t)
+	defer f.cleanup()
+
+	f.handler.aiAPIKey = "test-key"
+
+	invalidHTML := `
+		<style>
+			#hub-feed .hub-slot-feed {
+				display grid;
+			}
+		</style>
+		<div class="hub-custom-page">
+			<div id="hub-join"></div>
+			<div id="hub-create"></div>
+			<div id="hub-mod"></div>
+			<div id="hub-feed"></div>
+		</div>
+	`
+
+	requestCount := 0
+	f.handler.httpClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			requestCount++
+			return geminiHTTPResponse(t, invalidHTML), nil
+		}),
+	}
+
+	w := performGenerateAIDesignRequest(f, `{"prompt":"make it dramatic"}`)
+
+	require.Equal(t, http.StatusBadGateway, w.Code)
+	assert.Equal(t, 2, requestCount)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	assert.Equal(t, "AI returned invalid design; please try again", body["message"])
 }
 
 func TestValidateAIDesignHTML_AllowsScopedSelectorsAndRequiredSlots(t *testing.T) {
@@ -396,6 +596,27 @@ func TestValidateAIDesignHTML_RejectsUnscopedSelectors(t *testing.T) {
 	err := validateAIDesignHTML(html)
 	require.Error(t, err)
 	assert.Contains(t, strings.ToLower(err.Error()), "scoped")
+}
+
+func TestValidateAIDesignHTML_ReportsMalformedCSSSnippet(t *testing.T) {
+	html := `
+		<style>
+			#hub-feed .hub-slot-feed {
+				display grid;
+			}
+		</style>
+		<div class="hub-custom-page">
+			<div id="hub-join"></div>
+			<div id="hub-create"></div>
+			<div id="hub-mod"></div>
+			<div id="hub-feed"></div>
+		</div>
+	`
+
+	err := validateAIDesignHTML(html)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "CSS declarations must be property-value pairs near")
+	assert.Contains(t, err.Error(), "display grid")
 }
 
 func TestValidateAIDesignHTML_RejectsNavAndDeadLinks(t *testing.T) {
