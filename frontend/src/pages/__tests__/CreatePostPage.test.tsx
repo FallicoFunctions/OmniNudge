@@ -14,6 +14,7 @@ vi.mock('../../services/postsService', () => ({
 vi.mock('../../services/hubsService', () => ({
   hubsService: {
     getHubs: vi.fn().mockResolvedValue([]),
+    getHub: vi.fn().mockImplementation(async (hubName: string) => ({ id: 99, name: hubName })),
     searchHubs: vi.fn().mockResolvedValue([]),
   },
 }));
@@ -55,12 +56,12 @@ vi.mock('../../components/common/StatusMessage', () => ({
 
 import CreatePostPage from '../CreatePostPage';
 
-const createWrapper = () => {
+const createWrapper = (initialEntry = '/posts/create') => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return ({ children }: { children: React.ReactNode }) => (
-    <MemoryRouter initialEntries={['/create-post']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </MemoryRouter>
   );
@@ -118,6 +119,19 @@ describe('CreatePostPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^link$/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /^text$/i })).toBeInTheDocument();
+    });
+  });
+
+  it('prefills the hub destination from the query string', async () => {
+    const Wrapper = createWrapper('/posts/create?hub=testHub');
+    render(
+      <Wrapper>
+        <CreatePostPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('testHub')).toBeInTheDocument();
     });
   });
 });
