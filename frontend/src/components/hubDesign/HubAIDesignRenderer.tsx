@@ -1,10 +1,12 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -28,7 +30,86 @@ interface HubAIDesignRendererProps {
   user: User | null;
   isModerator: boolean;
 }
+
 const EMPTY_POSTS: FeedSlotPost[] = [];
+const FEED_LAYOUT_GUARD_CSS = `
+#hub-feed > .hub-slot-feed {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+#hub-feed > .hub-slot-feed > .hub-slot-feed-controls {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+}
+
+#hub-feed > .hub-slot-feed > .hub-slot-feed-controls > .hub-slot-feed-tabs,
+#hub-feed > .hub-slot-feed > .hub-slot-feed-controls > .hub-slot-feed-search-wrap {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#hub-feed > .hub-slot-feed > .hub-slot-feed-controls .hub-slot-search {
+  width: min(250px, 100%);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+#hub-feed > .hub-slot-feed > .hub-slot-feed-list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+#hub-feed > .hub-slot-feed > .hub-slot-feed-list > .hub-slot-post-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  grid-column: auto;
+  grid-row: auto;
+}
+
+#hub-feed > .hub-slot-feed > .hub-slot-feed-list > .hub-slot-post-card .hub-slot-post-title {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#hub-feed > .hub-slot-feed > .hub-slot-feed-list > .hub-slot-post-card .hub-slot-post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+#hub-feed > .hub-slot-feed > .hub-slot-feed-list > .hub-slot-post-card .hub-slot-post-meta > * {
+  min-width: 0;
+}
+`;
+
+interface AIDesignMarkupProps {
+  containerRef: RefObject<HTMLDivElement | null>;
+  html: string;
+}
+
+const AIDesignMarkup = memo(function AIDesignMarkup({
+  containerRef,
+  html,
+}: AIDesignMarkupProps) {
+  return <div ref={containerRef} dangerouslySetInnerHTML={{ __html: html }} />;
+});
 
 export default function HubAIDesignRenderer({
   hubName,
@@ -36,9 +117,10 @@ export default function HubAIDesignRenderer({
   user,
   isModerator,
 }: HubAIDesignRendererProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [frameDocument, setFrameDocument] = useState<Document | null>(null);
-  const [frameHeight, setFrameHeight] = useState<number>(1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const styleElRef = useRef<HTMLStyleElement | null>(null);
+  const guardStyleElRef = useRef<HTMLStyleElement | null>(null);
+  const markerElementsRef = useRef<Map<string, HTMLElement>>(new Map());
   const [markerElements, setMarkerElements] = useState<Map<string, HTMLElement>>(new Map());
 
   const [sort, setSort] = useState<SortOption>('hot');
@@ -51,60 +133,31 @@ export default function HubAIDesignRenderer({
     [htmlContent],
   );
 
-  const frameSrcDoc = useMemo(() => {
-    const scopedStyles = styleContent ? `<style>${styleContent}</style>` : '';
-    return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>html, body { margin: 0; padding: 0; overflow-x: hidden; }</style>
-    ${scopedStyles}
-    <style>
-      /* Slot container reset — ensures React portal content is never clipped
-         by AI-generated height:0 or overflow:hidden on slot hosts. */
-      #hub-join, #hub-create, #hub-mod, #hub-feed {
-        overflow: visible !important;
-        min-height: 0 !important;
-        height: auto !important;
-        max-height: none !important;
-      }
-    </style>
-  </head>
-  <body>${htmlWithoutStyles}</body>
-</html>`;
-  }, [htmlWithoutStyles, styleContent]);
-
-  // Called by onLoad once the browser has fully parsed the new srcDoc.
-  // This is the authoritative setter for frameDocument in real browsers.
-  const syncFrameDocument = useCallback(() => {
-    const nextDoc = iframeRef.current?.contentDocument ?? null;
-    setFrameDocument(nextDoc);
-  }, []);
-
-  // When srcDoc content changes, clear frameDocument immediately so React
-  // can detach portal content from the old marker elements WHILE those elements
-  // are still connected. If we waited for onLoad, the browser would have already
-  // replaced the iframe document, leaving portals pointing at disconnected nodes.
-  // syncFrameDocument (via onLoad) re-populates frameDocument once loading is done.
-  useLayoutEffect(() => {
-    setFrameDocument(null);
-  }, [frameSrcDoc]);
-
-  // Fallback for jsdom (tests) where iframe srcDoc doesn't fire a load event.
-  // In real browsers onLoad handles this; the body already has content so this
-  // is a no-op there.
   useEffect(() => {
-    if (frameDocument !== null) return;
-    const iframe = iframeRef.current;
-    const doc = iframe?.contentDocument ?? null;
-    if (!doc || !doc.body || doc.body.childNodes.length > 0) return;
+    const head = document.head;
+    if (!head) return;
 
-    doc.open();
-    doc.write(frameSrcDoc);
-    doc.close();
-    setFrameDocument(doc);
-  }, [frameDocument, frameSrcDoc]);
+    if (styleContent) {
+      const el = document.createElement('style');
+      el.setAttribute('data-hub-ai-design', hubName);
+      el.textContent = styleContent;
+      head.appendChild(el);
+      styleElRef.current = el;
+    }
+
+    const guardEl = document.createElement('style');
+    guardEl.setAttribute('data-hub-ai-design-guard', hubName);
+    guardEl.textContent = FEED_LAYOUT_GUARD_CSS;
+    head.appendChild(guardEl);
+    guardStyleElRef.current = guardEl;
+
+    return () => {
+      styleElRef.current?.remove();
+      styleElRef.current = null;
+      guardStyleElRef.current?.remove();
+      guardStyleElRef.current = null;
+    };
+  }, [styleContent, hubName]);
 
   // ── Data queries ──────────────────────────────────────────────────────────
   const { data: subscriptionData } = useQuery({
@@ -126,54 +179,23 @@ export default function HubAIDesignRenderer({
   }, [allPosts, activeSearch]);
 
   useLayoutEffect(() => {
-    if (!frameDocument) return;
+    const container = containerRef.current;
+    if (!container) return;
 
+    const previousMarkers = markerElementsRef.current;
     const next = new Map<string, HTMLElement>();
-    frameDocument.querySelectorAll<HTMLElement>('[data-hub-slot-marker]').forEach((node) => {
+    container.querySelectorAll<HTMLElement>('[data-hub-slot-marker]').forEach((node) => {
       const marker = node.getAttribute('data-hub-slot-marker');
       if (marker && slotsByMarker.has(marker)) {
-        node.replaceChildren();
+        if (previousMarkers.get(marker) !== node) {
+          node.replaceChildren();
+        }
         next.set(marker, node);
       }
     });
+    markerElementsRef.current = next;
     setMarkerElements(next);
-    return () => {
-      setMarkerElements(new Map());
-    };
-  }, [frameDocument, frameSrcDoc, slotsByMarker]);
-
-  useLayoutEffect(() => {
-    if (!frameDocument) return;
-
-    const root = frameDocument.documentElement;
-    const body = frameDocument.body;
-    if (!root || !body) return;
-
-    const updateHeight = () => {
-      const nextHeight = Math.max(
-        body.scrollHeight,
-        body.offsetHeight,
-        root.scrollHeight,
-        root.offsetHeight,
-      );
-      setFrameHeight(Math.max(1, nextHeight));
-    };
-
-    updateHeight();
-
-    const ResizeObserverCtor =
-      frameDocument.defaultView?.ResizeObserver ??
-      (typeof ResizeObserver !== 'undefined' ? ResizeObserver : undefined);
-    const observer = ResizeObserverCtor ? new ResizeObserverCtor(() => updateHeight()) : null;
-    observer?.observe(root);
-    observer?.observe(body);
-    frameDocument.defaultView?.addEventListener('load', updateHeight);
-
-    return () => {
-      observer?.disconnect();
-      frameDocument.defaultView?.removeEventListener('load', updateHeight);
-    };
-  }, [frameDocument, markerElements, filteredPosts, postsLoading, search, sort, isSubscribed, isModerator, user]);
+  }, [htmlWithoutStyles, slotsByMarker]);
 
   useLayoutEffect(() => {
     markerElements.forEach((node, marker) => {
@@ -247,14 +269,7 @@ export default function HubAIDesignRenderer({
 
   return (
     <div style={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
-      {/*
-       * Portals MUST be declared before the iframe. React processes sibling
-       * fibers left-to-right during deletion. If the iframe came first, React
-       * would remove it from the DOM (detaching iframe.contentDocument) before
-       * cleaning up the portals, causing removeChild to throw on the now-dead
-       * marker elements. Declaring portals first ensures their content is
-       * removed while the iframe — and its document — is still attached.
-       */}
+      <AIDesignMarkup containerRef={containerRef} html={htmlWithoutStyles} />
       {Array.from(slotsByMarker.entries()).map(([marker, slot]) => {
         const target = markerElements.get(marker);
         if (!target || !target.isConnected) {
@@ -262,22 +277,6 @@ export default function HubAIDesignRenderer({
         }
         return createPortal(renderSlotContent(slot), target, marker);
       })}
-      <iframe
-        key={hubName}
-        ref={iframeRef}
-        title={`${hubName} custom page preview`}
-        srcDoc={frameSrcDoc}
-        sandbox="allow-same-origin"
-        onLoad={syncFrameDocument}
-        style={{
-          width: '100%',
-          maxWidth: '100%',
-          border: '0',
-          display: 'block',
-          overflow: 'hidden',
-          height: `${frameHeight}px`,
-        }}
-      />
     </div>
   );
 }
