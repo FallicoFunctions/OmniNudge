@@ -4,7 +4,7 @@
  * inside AI-authored layouts without depending on additional wrapper trees.
  */
 import { useEffect, useState } from 'react';
-import api from '../../services/api';
+import { subscriptionService } from '../../services/subscriptionService';
 
 // ─── Join / Subscribe slot ──────────────────────────────────────────────────
 
@@ -33,11 +33,11 @@ export function HubJoinSlot({ hubName, isSubscribed: initialSubscribed, userId }
     setLoading(true);
     try {
       if (subscribed) {
-        await api.delete(`/hubs/${hubName}/subscription`);
-        setSubscribed(false);
+        const data = await subscriptionService.unsubscribeFromHub(hubName);
+        setSubscribed(data.is_subscribed);
       } else {
-        await api.post(`/hubs/${hubName}/subscription`);
-        setSubscribed(true);
+        const data = await subscriptionService.subscribeToHub(hubName);
+        setSubscribed(data.is_subscribed);
       }
     } catch {
       // ignore
@@ -52,7 +52,7 @@ export function HubJoinSlot({ hubName, isSubscribed: initialSubscribed, userId }
       onClick={toggle}
       disabled={loading}
     >
-      {loading ? '…' : subscribed ? 'Leave' : 'Join'}
+      {loading ? '…' : subscribed ? 'Unsubscribe' : 'Join'}
     </button>
   );
 }
@@ -66,15 +66,16 @@ interface HubCreateSlotProps {
 
 export function HubCreateSlot({ hubName, userId }: HubCreateSlotProps) {
   const handle = () => {
+    const destination = `/posts/create?hub=${encodeURIComponent(hubName)}`;
     if (!userId) {
       window.dispatchEvent(
         new CustomEvent('open-auth-modal', {
-          detail: { mode: 'login', redirectTo: `/create-post?hub=${hubName}` },
+          detail: { mode: 'login', redirectTo: destination },
         })
       );
       return;
     }
-    window.location.href = `/create-post?hub=${hubName}`;
+    window.location.assign(destination);
   };
 
   return (

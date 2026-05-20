@@ -52,11 +52,14 @@ export default function CreatePostPage() {
   useEffect(() => {
     let isMounted = true;
     const state = location.state as { defaultHub?: string; defaultSubreddit?: string } | null;
+    const searchParams = new URLSearchParams(location.search);
+    const defaultHubFromQuery = searchParams.get('hub')?.trim();
+    const defaultSubredditFromQuery = searchParams.get('subreddit')?.trim();
 
     console.log('[useEffect] Running with location.state:', state);
 
-    if (state?.defaultHub) {
-      const hubName = state.defaultHub;
+    if (state?.defaultHub || defaultHubFromQuery) {
+      const hubName = state?.defaultHub ?? defaultHubFromQuery ?? '';
       console.log('[useEffect] Setting hub destination with hubName:', hubName);
       setDestination('hub');
       setHubInputValue(hubName);
@@ -79,9 +82,9 @@ export default function CreatePostPage() {
           }
         }
       })();
-    } else if (state?.defaultSubreddit) {
+    } else if (state?.defaultSubreddit || defaultSubredditFromQuery) {
       setDestination('subreddit');
-      setSubredditInputValue(state.defaultSubreddit);
+      setSubredditInputValue(state?.defaultSubreddit ?? defaultSubredditFromQuery ?? '');
     } else {
       console.log('[useEffect] No defaultHub or defaultSubreddit in state');
     }
@@ -90,7 +93,7 @@ export default function CreatePostPage() {
       console.log('[useEffect] Cleanup - setting isMounted = false');
       isMounted = false;
     };
-  }, [location.state]);
+  }, [location.search, location.state]);
 
   const trimmedHubInput = (hubInputValue ?? '').trim();
   const trimmedSubredditInput = (subredditInputValue ?? '').trim();
