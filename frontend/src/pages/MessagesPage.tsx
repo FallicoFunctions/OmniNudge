@@ -2186,6 +2186,19 @@ export default function MessagesPage() {
     }
   }, [selectedConversationId, isCreatingChat, markConversationAsRead]);
 
+  // Mark as read when a new message arrives in the currently open conversation so
+  // the backend unread count stays at 0 and doesn't resurface when switching chats.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const { conversationId } = (event as CustomEvent<{ conversationId: number; senderId: number }>).detail;
+      if (conversationId === selectedConversationId && !isCreatingChat) {
+        markConversationAsRead(conversationId);
+      }
+    };
+    window.addEventListener('new-message', handler);
+    return () => window.removeEventListener('new-message', handler);
+  }, [selectedConversationId, isCreatingChat, markConversationAsRead]);
+
   useEffect(() => {
     if (toUsernameParam) {
       setIsCreatingChat(true);

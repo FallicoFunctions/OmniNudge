@@ -109,35 +109,27 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             }
           }
 
-          // Update messages cache
-          queryClient.setQueryData<Message[] | undefined>(
+          // Update messages cache — must use InfiniteData shape since MessagesPage uses useInfiniteQuery
+          queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
             ['messages', message.conversation_id],
             (prev) => {
-              if (!prev) return [message];
-              if (prev.some((msg) => msg.id === message.id)) return prev;
-              return [message, ...prev];
+              if (!prev) return prev;
+              const alreadyExists = prev.pages.some((page) =>
+                page.messages.some((msg) => msg.id === message.id)
+              );
+              if (alreadyExists) return prev;
+              return {
+                ...prev,
+                pages: prev.pages.map((page, i) =>
+                  i === 0 ? { ...page, messages: [message, ...page.messages] } : page
+                ),
+              };
             }
           );
 
-          // Update conversation list
-          const updateConversations = (key: (string | number)[]) => {
-            queryClient.setQueryData<Conversation[] | undefined>(key, (prev) => {
-              if (!prev) return prev;
-              return prev.map((conv) => {
-                if (conv.id !== message.conversation_id) return conv;
-                const isRecipient = message.recipient_id === user?.id;
-                return {
-                  ...conv,
-                  latest_message: message,
-                  last_message_at: message.sent_at,
-                  unread_count: isRecipient ? conv.unread_count + 1 : conv.unread_count,
-                };
-              });
-            });
-          };
-
-          updateConversations(['conversations']);
-          updateConversations(['conversations', 'all']);
+          // Invalidate all conversation queries so every consumer (MainLayout badge,
+          // MessagesPage sidebar) refetches with accurate unread counts.
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
 
           // Dispatch custom event for notification sound
           window.dispatchEvent(new CustomEvent('new-message', {
@@ -153,16 +145,21 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           const { message_id, conversation_id, delivered_at } = data.payload;
           console.log('[WebSocket] Message delivered:', message_id);
 
-          // Update message to show delivered status
-          queryClient.setQueryData<Message[] | undefined>(
+          queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
             ['messages', conversation_id],
             (prev) => {
               if (!prev) return prev;
-              return prev.map((msg) =>
-                msg.id === message_id
-                  ? { ...msg, delivered_at: delivered_at || new Date().toISOString() }
-                  : msg
-              );
+              return {
+                ...prev,
+                pages: prev.pages.map((page) => ({
+                  ...page,
+                  messages: page.messages.map((msg) =>
+                    msg.id === message_id
+                      ? { ...msg, delivered_at: delivered_at || new Date().toISOString() }
+                      : msg
+                  ),
+                })),
+              };
             }
           );
           break;
@@ -172,16 +169,21 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           const { message_id, conversation_id, read_at } = data.payload;
           console.log('[WebSocket] Message read:', message_id);
 
-          // Update message to show read status
-          queryClient.setQueryData<Message[] | undefined>(
+          queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
             ['messages', conversation_id],
             (prev) => {
               if (!prev) return prev;
-              return prev.map((msg) =>
-                msg.id === message_id
-                  ? { ...msg, read_at: read_at || new Date().toISOString() }
-                  : msg
-              );
+              return {
+                ...prev,
+                pages: prev.pages.map((page) => ({
+                  ...page,
+                  messages: page.messages.map((msg) =>
+                    msg.id === message_id
+                      ? { ...msg, read_at: read_at || new Date().toISOString() }
+                      : msg
+                  ),
+                })),
+              };
             }
           );
           break;
@@ -191,16 +193,21 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           const { conversation_id } = data.payload;
           console.log('[WebSocket] Conversation read:', conversation_id);
 
-          // Mark all messages in conversation as read
           const now = new Date().toISOString();
-          queryClient.setQueryData<Message[] | undefined>(
+          queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
             ['messages', conversation_id],
             (prev) => {
               if (!prev) return prev;
-              return prev.map((msg) => ({
-                ...msg,
-                read_at: msg.read_at || now,
-              }));
+              return {
+                ...prev,
+                pages: prev.pages.map((page) => ({
+                  ...page,
+                  messages: page.messages.map((msg) => ({
+                    ...msg,
+                    read_at: msg.read_at || now,
+                  })),
+                })),
+              };
             }
           );
 

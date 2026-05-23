@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useMultiColumnFeed } from '../contexts/MultiColumnFeedContext';
+import { useMessagingContext } from '../contexts/MessagingContext';
 import { usersService } from '../services/usersService';
 import { messagesService } from '../services/messagesService';
 import type { UserProfile } from '../types/users';
@@ -31,7 +32,6 @@ const AboutContent = lazy(() =>
 
 const prefetchRoutes = {
   about: () => import('../pages/AboutPage'),
-  bugReporting: () => import('../pages/BugReportingPage'),
   createHub: () => import('../pages/CreateHubPage'),
   createPost: () => import('../pages/CreatePostPage'),
   hubs: () => import('../pages/HubsAndSubsPage'),
@@ -48,6 +48,7 @@ export default function MainLayout() {
   const { user, logout } = useAuth();
   const { notifyArchivedMessages } = useSettings();
   const { state: multiColumnState } = useMultiColumnFeed();
+  const { activeConversationId } = useMessagingContext();
   const [authModal, setAuthModal] = useState<'login' | 'signup' | 'forgot-password' | null>(null);
   const [pendingRedirect, setPendingRedirect] = useState<{ to: string; state?: unknown } | null>(
     null
@@ -96,9 +97,13 @@ export default function MainLayout() {
         if (!notifyArchivedMessages && conv.archived_at) {
           return total;
         }
+        // Don't count unread messages for the conversation the user currently has open
+        if (activeConversationId !== null && conv.id === activeConversationId) {
+          return total;
+        }
         return total + (conv.unread_count ?? 0);
       }, 0) ?? 0,
-    [conversations, notifyArchivedMessages]
+    [conversations, notifyArchivedMessages, activeConversationId]
   );
 
   // Reset iOS Safari scroll state on every route change.
@@ -388,7 +393,6 @@ export default function MainLayout() {
                           setBugReportUrl(window.location.href);
                           setShowBugReportModal(true);
                         }}
-                        onMouseEnter={() => prefetchRoutes.bugReporting()}
                         className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                       >
                         {t('mainLayout.bugReporting')}
@@ -512,10 +516,6 @@ export default function MainLayout() {
         isOpen={showBugReportModal}
         onClose={() => setShowBugReportModal(false)}
         initialUrl={bugReportUrl}
-        onNavigateToPage={() => {
-          setShowBugReportModal(false);
-          navigate('/bug-reporting');
-        }}
       />
 
       {authModal && (
