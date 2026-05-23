@@ -1273,9 +1273,7 @@ function BugReportsTab() {
   const [pageSize, setPageSize] = useState(50);
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'rating_desc' | 'rating_asc'>(
-    'newest'
-  );
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [expandedReportId, setExpandedReportId] = useState<number | null>(null);
 
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
@@ -1294,14 +1292,9 @@ function BugReportsTab() {
   const reports =
     sortBy === 'newest'
       ? data?.reports ?? []
-      : [...(data?.reports ?? [])].sort((a, b) => {
-          if (sortBy === 'oldest') {
-            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-          }
-          const ratingA = a.rating ?? 0;
-          const ratingB = b.rating ?? 0;
-          return sortBy === 'rating_desc' ? ratingB - ratingA : ratingA - ratingB;
-        });
+      : [...(data?.reports ?? [])].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
 
   return (
     <div className="space-y-6">
@@ -1338,20 +1331,14 @@ function BugReportsTab() {
           >
             <option value="">{t('adminPage.bugReports.filters.allCategories')}</option>
             <option value="bug">{t('adminPage.bugReports.categories.bug')}</option>
-            <option value="feature_request">{t('adminPage.bugReports.categories.featureRequest')}</option>
-            <option value="other">{t('adminPage.bugReports.categories.other')}</option>
           </select>
           <select
             value={sortBy}
-            onChange={(e) =>
-              setSortBy(e.target.value as 'newest' | 'oldest' | 'rating_desc' | 'rating_asc')
-            }
+            onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
             className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
           >
             <option value="newest">{t('adminPage.bugReports.filters.sortNewest')}</option>
             <option value="oldest">{t('adminPage.bugReports.filters.sortOldest')}</option>
-            <option value="rating_desc">{t('adminPage.bugReports.filters.sortRatingHigh')}</option>
-            <option value="rating_asc">{t('adminPage.bugReports.filters.sortRatingLow')}</option>
           </select>
           <select
             value={pageSize}
@@ -1396,9 +1383,6 @@ function BugReportsTab() {
                   {t('adminPage.bugReports.table.category')}
                 </th>
                 <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
-                  {t('adminPage.bugReports.table.rating')}
-                </th>
-                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
                   {t('adminPage.bugReports.table.user')}
                 </th>
                 <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
@@ -1434,9 +1418,6 @@ function BugReportsTab() {
                         {report.feedback_category.replace('_', ' ')}
                       </td>
                       <td className="p-3 text-[var(--color-text-secondary)]">
-                        {report.rating ? `${report.rating}/5` : '—'}
-                      </td>
-                      <td className="p-3 text-[var(--color-text-secondary)]">
                         {report.username ||
                           (report.user_id
                             ? t('common.userNumber', { id: report.user_id })
@@ -1460,7 +1441,7 @@ function BugReportsTab() {
                     </tr>
                     {isExpanded && (
                       <tr className="border-b border-[var(--color-border)]">
-                        <td colSpan={9} className="p-4 bg-[var(--color-surface-elevated)]">
+                        <td colSpan={8} className="p-4 bg-[var(--color-surface-elevated)]">
                           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
                             <div className="space-y-3 text-sm text-[var(--color-text-secondary)]">
                               <div>
@@ -1486,12 +1467,6 @@ function BugReportsTab() {
                                 <span className="capitalize">
                                   {report.feedback_category.replace('_', ' ')}
                                 </span>
-                              </div>
-                              <div>
-                                <span className="font-medium text-[var(--color-text-primary)]">
-                                  {t('adminPage.bugReports.details.rating')}:
-                                </span>{' '}
-                                {report.rating ? `${report.rating}/5` : '—'}
                               </div>
                               <div>
                                 <span className="font-medium text-[var(--color-text-primary)]">

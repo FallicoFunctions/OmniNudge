@@ -6,10 +6,8 @@ const (
 	// bug_reports.feedback_type — must be 'report'
 	FeedbackTypeReport = "report"
 
-	// bug_reports.feedback_category — must be one of: bug, feature_request, other
-	FeedbackCategoryBug            = "bug"
-	FeedbackCategoryFeatureRequest = "feature_request"
-	FeedbackCategoryOther          = "other"
+	// bug_reports.feedback_category — must be: bug
+	FeedbackCategoryBug = "bug"
 
 	// bug_reports.status — must be one of: new, investigating, fixed, wont_fix, duplicate
 	BugReportStatusNew           = "new"

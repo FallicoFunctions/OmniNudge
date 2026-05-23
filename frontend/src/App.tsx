@@ -44,7 +44,6 @@ const ModMailConversationPage = lazy(() => import('./pages/ModMailConversationPa
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const FeatureFlagsAdminPage = lazy(() => import('./pages/FeatureFlagsAdminPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
-const BugReportingPage = lazy(() => import('./pages/BugReportingPage'));
 const PrivateHubPage = lazy(() => import('./pages/PrivateHubPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
@@ -124,7 +123,6 @@ function App() {
                             <Route path="/terms" element={<TermsPage />} />
                             <Route path="/privacy" element={<PrivacyPage />} />
                             <Route path="/ccpa" element={<CCPAPage />} />
-                            <Route path="/bug-reporting" element={<BugReportingPage />} />
                             <Route path="/reset-password" element={<ResetPasswordPage />} />
                             <Route path="/verify-email" element={<VerifyEmailPage />} />
                             {import.meta.env.DEV && (
