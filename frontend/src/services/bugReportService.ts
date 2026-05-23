@@ -8,7 +8,6 @@ export interface BugReport {
   screenshot_url?: string;
   feedback_type: 'report';
   feedback_category: 'bug' | 'feature_request' | 'other';
-  rating?: number;
   context?: Record<string, unknown>;
   status: 'new' | 'investigating' | 'fixed' | 'wont_fix' | 'duplicate';
   admin_notes?: string;
@@ -36,8 +35,7 @@ export interface CreateBugReportRequest {
   description: string;
   screenshot_url?: string;
   feedback_type?: 'report';
-  feedback_category?: 'bug' | 'feature_request' | 'other';
-  rating?: number;
+  feedback_category?: 'bug';
   context?: Record<string, unknown>;
 }
 

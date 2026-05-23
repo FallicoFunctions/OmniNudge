@@ -18,7 +18,6 @@ type BugReport struct {
 	ScreenshotURL *string   `json:"screenshot_url"`
 	FeedbackType  string    `json:"feedback_type"`
 	Category      string    `json:"feedback_category"`
-	Rating        *int      `json:"rating,omitempty"`
 	Context       JSONB     `json:"context"`
 	Status        string    `json:"status"`
 	AdminNotes    *string   `json:"admin_notes,omitempty"`
@@ -55,8 +54,8 @@ func NewBugReportRepository(pool *pgxpool.Pool) *BugReportRepository {
 // Create inserts a new bug report
 func (r *BugReportRepository) Create(ctx context.Context, report *BugReport) error {
 	query := `
-		INSERT INTO bug_reports (user_id, page_url, description, screenshot_url, feedback_type, feedback_category, rating, context, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO bug_reports (user_id, page_url, description, screenshot_url, feedback_type, feedback_category, context, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at, updated_at
 	`
 	return r.pool.QueryRow(
@@ -68,7 +67,6 @@ func (r *BugReportRepository) Create(ctx context.Context, report *BugReport) err
 		report.ScreenshotURL,
 		report.FeedbackType,
 		report.Category,
-		report.Rating,
 		report.Context,
 		report.Status,
 	).Scan(&report.ID, &report.CreatedAt, &report.UpdatedAt)
@@ -89,7 +87,7 @@ func (r *BugReportRepository) GetAll(
 	paramIdx := 1
 
 	query = `
-		SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url, br.feedback_type, br.feedback_category, br.rating, br.context,
+		SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url, br.feedback_type, br.feedback_category, br.context,
 		       br.status, br.admin_notes, br.created_at, br.updated_at, u.username
 		FROM bug_reports br
 		LEFT JOIN users u ON br.user_id = u.id
@@ -135,7 +133,6 @@ func (r *BugReportRepository) GetAll(
 			&report.ScreenshotURL,
 			&report.FeedbackType,
 			&report.Category,
-			&report.Rating,
 			&report.Context,
 			&report.Status,
 			&report.AdminNotes,
@@ -166,7 +163,7 @@ func (r *BugReportRepository) GetAllWithCursor(
 	paramIdx := 1
 
 	query = `
-		SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url, br.feedback_type, br.feedback_category, br.rating, br.context,
+		SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url, br.feedback_type, br.feedback_category, br.context,
 		       br.status, br.admin_notes, br.created_at, br.updated_at, u.username
 		FROM bug_reports br
 		LEFT JOIN users u ON br.user_id = u.id
@@ -212,7 +209,6 @@ func (r *BugReportRepository) GetAllWithCursor(
 			&report.ScreenshotURL,
 			&report.FeedbackType,
 			&report.Category,
-			&report.Rating,
 			&report.Context,
 			&report.Status,
 			&report.AdminNotes,
@@ -232,7 +228,7 @@ func (r *BugReportRepository) GetAllWithCursor(
 // GetByID retrieves a single bug report by ID
 func (r *BugReportRepository) GetByID(ctx context.Context, id int) (*BugReport, error) {
 	query := `
-		SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url, br.feedback_type, br.feedback_category, br.rating, br.context,
+		SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url, br.feedback_type, br.feedback_category, br.context,
 		       br.status, br.admin_notes, br.created_at, br.updated_at, u.username
 		FROM bug_reports br
 		LEFT JOIN users u ON br.user_id = u.id
@@ -247,7 +243,6 @@ func (r *BugReportRepository) GetByID(ctx context.Context, id int) (*BugReport, 
 		&report.ScreenshotURL,
 		&report.FeedbackType,
 		&report.Category,
-		&report.Rating,
 		&report.Context,
 		&report.Status,
 		&report.AdminNotes,

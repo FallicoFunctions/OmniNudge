@@ -16,7 +16,7 @@ func bugReport(userID int) *domain.BugReport {
 		UserID:       &userID,
 		Description:  "Something broke",
 		FeedbackType: "report",
-		Category:     "other",
+		Category:     "bug",
 		Status:       "new",
 	}
 }

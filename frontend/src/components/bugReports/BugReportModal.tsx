@@ -9,22 +9,16 @@ type BugReportModalProps = {
   isOpen: boolean;
   onClose: () => void;
   initialUrl?: string;
-  onNavigateToPage?: () => void;
 };
 
 export default function BugReportModal({
   isOpen,
   onClose,
   initialUrl,
-  onNavigateToPage,
 }: BugReportModalProps) {
   const { t } = useTranslation();
   const [pageUrl, setPageUrl] = useState('');
   const [description, setDescription] = useState('');
-  const [feedbackCategory, setFeedbackCategory] = useState<'bug' | 'feature_request' | 'other'>(
-    'bug'
-  );
-  const [rating, setRating] = useState<number | ''>('');
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -33,8 +27,6 @@ export default function BugReportModal({
   useEffect(() => {
     if (!isOpen) return;
     setPageUrl(initialUrl ?? '');
-    setFeedbackCategory('bug');
-    setRating('');
     setDescription('');
     setScreenshot(null);
     setShowSuccess(false);
@@ -48,8 +40,7 @@ export default function BugReportModal({
         description,
         screenshot_url: screenshotUrl,
         feedback_type: 'report',
-        feedback_category: feedbackCategory,
-        rating: rating === '' ? undefined : rating,
+        feedback_category: 'bug',
         context: {
           page_title: typeof document !== 'undefined' ? document.title : '',
           user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
@@ -64,8 +55,6 @@ export default function BugReportModal({
     onSuccess: () => {
       setPageUrl(initialUrl ?? '');
       setDescription('');
-      setFeedbackCategory('bug');
-      setRating('');
       setScreenshot(null);
       setShowSuccess(true);
       setErrorMessage('');
@@ -83,11 +72,6 @@ export default function BugReportModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (rating !== '' && (rating < 1 || rating > 5)) {
-      setErrorMessage(t('bugReportModal.errors.ratingInvalid'));
-      return;
-    }
 
     let screenshotUrl: string | undefined;
 
@@ -145,16 +129,7 @@ export default function BugReportModal({
           <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
             {t('bugReportModal.success.message')}
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            {onNavigateToPage && (
-              <button
-                type="button"
-                onClick={onNavigateToPage}
-                className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-              >
-                {t('bugReportModal.success.goToPage')}
-              </button>
-            )}
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={onClose}
@@ -202,59 +177,6 @@ export default function BugReportModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-                {t('bugReportModal.form.category.label')}
-              </label>
-              <select
-                value={feedbackCategory}
-                onChange={(e) =>
-                  setFeedbackCategory(e.target.value as 'bug' | 'feature_request' | 'other')
-                }
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-              >
-                <option value="bug">{t('bugReportModal.form.category.options.bug')}</option>
-                <option value="feature_request">
-                  {t('bugReportModal.form.category.options.featureRequest')}
-                </option>
-                <option value="other">{t('bugReportModal.form.category.options.other')}</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              {t('bugReportModal.form.rating.label')}
-            </label>
-            <div className="flex items-center gap-2">
-              {[1, 2, 3, 4, 5].map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setRating(value)}
-                  className={`h-9 w-9 rounded-md border text-sm font-semibold ${
-                    rating === value
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                      : 'border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface)]'
-                  }`}
-                >
-                  {value}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setRating('')}
-                className="ml-2 rounded-md border border-[var(--color-border)] px-3 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
-              >
-                {t('bugReportModal.form.rating.clear')}
-              </button>
-            </div>
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-              {t('bugReportModal.form.rating.help')}
-            </p>
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
               {t('bugReportModal.form.screenshot.label')}
@@ -280,17 +202,7 @@ export default function BugReportModal({
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            {onNavigateToPage && (
-              <button
-                type="button"
-                onClick={onNavigateToPage}
-                className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-              >
-                {t('bugReportModal.success.goToPage')}
-              </button>
-            )}
-            <div className="flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-3 pt-4">
               <button
                 type="button"
                 onClick={onClose}
@@ -307,7 +219,6 @@ export default function BugReportModal({
                   ? t('bugReportModal.actions.submitting')
                   : t('bugReportModal.actions.submit')}
               </button>
-            </div>
           </div>
         </form>
       )}

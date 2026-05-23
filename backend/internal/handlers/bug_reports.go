@@ -48,7 +48,6 @@ type CreateBugReportRequest struct {
 	FeedbackType     string                 `json:"feedback_type"`
 	FeedbackCategory string                 `json:"feedback_category"`
 	LegacyCategory   string                 `json:"category"`
-	Rating           *int                   `json:"rating"`
 	Context          map[string]interface{} `json:"context"`
 }
 
@@ -86,11 +85,6 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 	}
 	if !isValidFeedbackCategory(category) {
 		RespondError(c, http.StatusBadRequest, "Invalid feedback category")
-		return
-	}
-
-	if req.Rating != nil && (*req.Rating < 1 || *req.Rating > 5) {
-		RespondError(c, http.StatusBadRequest, "Rating must be between 1 and 5")
 		return
 	}
 
@@ -137,7 +131,6 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 		ScreenshotURL: normalizedScreenshotURL,
 		FeedbackType:  feedbackType,
 		Category:      category,
-		Rating:        req.Rating,
 		Context:       models.JSONB(sanitizeFeedbackContext(req.Context)),
 		Status:        "new",
 	}
@@ -153,7 +146,6 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 		Description:  report.Description,
 		FeedbackType: report.FeedbackType,
 		Category:     report.Category,
-		Rating:       report.Rating,
 		UserID:       report.UserID,
 		CreatedAt:    report.CreatedAt,
 	})
@@ -494,7 +486,7 @@ func isValidFeedbackType(value string) bool {
 
 func isValidFeedbackCategory(value string) bool {
 	switch value {
-	case "bug", "feature_request", "other":
+	case "bug":
 		return true
 	default:
 		return false
@@ -540,7 +532,6 @@ type notifyFeedbackPayload struct {
 	Description  string
 	FeedbackType string
 	Category     string
-	Rating       *int
 	UserID       *int
 	CreatedAt    time.Time
 }
@@ -560,18 +551,12 @@ func notifyFeedbackWebhook(payload notifyFeedbackPayload) {
 		userText = fmt.Sprintf("user_id=%d", *payload.UserID)
 	}
 
-	ratingText := "n/a"
-	if payload.Rating != nil {
-		ratingText = fmt.Sprintf("%d/5", *payload.Rating)
-	}
-
 	body := map[string]interface{}{
 		"text": fmt.Sprintf(
-			"[Feedback] #%d type=%s category=%s rating=%s by=%s at=%s\nPage: %s\n%s",
+			"[Feedback] #%d type=%s category=%s by=%s at=%s\nPage: %s\n%s",
 			payload.ID,
 			payload.FeedbackType,
 			payload.Category,
-			ratingText,
 			userText,
 			payload.CreatedAt.Format(time.RFC3339),
 			payload.PageURL,
