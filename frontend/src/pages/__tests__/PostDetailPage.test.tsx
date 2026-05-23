@@ -31,6 +31,16 @@ vi.mock('../../services/subscriptionService', () => ({
     getUserSubredditSubscriptions: vi.fn().mockResolvedValue([]),
   },
 }));
+vi.mock('../../services/hubAIDesignerService', () => ({
+  hubAIDesignerService: {
+    getActiveDesign: vi.fn().mockResolvedValue({ design: null }),
+  },
+}));
+vi.mock('../../components/hubDesign/HubAIDesignLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="hub-ai-layout">{children}</div>
+  ),
+}));
 vi.mock('../../hooks/useSavedItems', () => ({
   useSavedItems: () => ({ savedItems: [], savedComments: [], isLoading: false }),
 }));
@@ -70,6 +80,7 @@ vi.mock('../../contexts/SettingsContext', () => ({
 }));
 
 import { postsService } from '../../services/postsService';
+import { hubAIDesignerService } from '../../services/hubAIDesignerService';
 import type { PlatformPost } from '../../types/posts';
 import PostDetailPage from '../PostDetailPage';
 
@@ -89,6 +100,19 @@ const renderWithPostId = (postId: string) => {
       <MemoryRouter initialEntries={[`/posts/${postId}`]}>
         <Routes>
           <Route path="/posts/:postId" element={<PostDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    </Wrapper>,
+  );
+};
+
+const renderWithHubPostId = (hubName: string, postId: string) => {
+  const Wrapper = createWrapper();
+  return render(
+    <Wrapper>
+      <MemoryRouter initialEntries={[`/h/${hubName}/comments/${postId}`]}>
+        <Routes>
+          <Route path="/h/:hubname/comments/:postId" element={<PostDetailPage />} />
         </Routes>
       </MemoryRouter>
     </Wrapper>,
@@ -139,6 +163,47 @@ describe('PostDetailPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('404')).toBeInTheDocument();
+    });
+  });
+
+  it('uses the AI hub layout for hub-scoped posts when a design is active', async () => {
+    vi.mocked(postsService.getPost).mockResolvedValue({
+      id: 1,
+      title: 'Test Post',
+      body: 'Test body',
+      author_id: 10,
+      author_username: 'author',
+      hub_id: 1,
+      hub_name: 'testHub',
+      score: 5,
+      upvotes: 5,
+      downvotes: 0,
+      comment_count: 0,
+      num_comments: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      user_vote: 0,
+    } as PlatformPost);
+    vi.mocked(hubAIDesignerService.getActiveDesign).mockResolvedValueOnce({
+      design: {
+        id: 3,
+        name: 'Hub shell',
+        prompt: 'shell',
+        html_content: `
+          <div class="hub-custom-page">
+            <section id="hub-feed"></section>
+            <div id="hub-join"></div>
+          </div>
+        `,
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    renderWithHubPostId('testHub', '1');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('hub-ai-layout')).toBeInTheDocument();
+      expect(screen.getByText('Test Post')).toBeInTheDocument();
     });
   });
 });

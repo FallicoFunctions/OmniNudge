@@ -14,15 +14,11 @@ import {
   HubJoinSlot,
   HubCreateSlot,
   HubModSlot,
-  HubFeedControls,
-  StandalonePostFeed,
-  type FeedSlotPost,
-  type SortOption,
 } from './HubDesignSlots';
-import { hubsService } from '../../services/hubsService';
 import { subscriptionService } from '../../services/subscriptionService';
 import type { User } from '../../types/auth';
 import { splitAIDesignHTML, type DesignSlot } from '../../utils/splitAIDesignHTML';
+import HubFeedSlotContent from './HubFeedSlotContent';
 
 interface HubAIDesignRendererProps {
   hubName: string;
@@ -31,7 +27,6 @@ interface HubAIDesignRendererProps {
   isModerator: boolean;
 }
 
-const EMPTY_POSTS: FeedSlotPost[] = [];
 const FEED_LAYOUT_GUARD_CSS = `
 #hub-feed > .hub-slot-feed {
   display: block;
@@ -123,11 +118,6 @@ export default function HubAIDesignRenderer({
   const markerElementsRef = useRef<Map<string, HTMLElement>>(new Map());
   const [markerElements, setMarkerElements] = useState<Map<string, HTMLElement>>(new Map());
 
-  const [sort, setSort] = useState<SortOption>('hot');
-  const [search, setSearch] = useState('');
-  const [activeSearch, setActiveSearch] = useState('');
-  const handleSearch = useCallback(() => setActiveSearch(search), [search]);
-
   const { htmlWithoutStyles, styleContent, slotsByMarker } = useMemo(
     () => splitAIDesignHTML(htmlContent),
     [htmlContent],
@@ -166,17 +156,6 @@ export default function HubAIDesignRenderer({
     enabled: !!user,
   });
   const isSubscribed = subscriptionData?.is_subscribed ?? false;
-
-  const { data: postsData, isLoading: postsLoading } = useQuery({
-    queryKey: ['hub-ai-posts', hubName, sort],
-    queryFn: () => hubsService.getHubPosts(hubName, sort, 25),
-  });
-  const allPosts: FeedSlotPost[] = postsData?.posts ?? EMPTY_POSTS;
-  const filteredPosts = useMemo(() => {
-    if (!activeSearch) return allPosts;
-    const q = activeSearch.toLowerCase();
-    return allPosts.filter(p => p.title?.toLowerCase().includes(q));
-  }, [allPosts, activeSearch]);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -236,36 +215,11 @@ export default function HubAIDesignRenderer({
       case 'hub-mod':
         return <HubModSlot hubName={hubName} isModerator={isModerator} />;
       case 'hub-feed':
-        return (
-          <div className="hub-slot-feed">
-            <HubFeedControls
-              sort={sort}
-              onSortChange={setSort}
-              searchValue={search}
-              onSearchChange={setSearch}
-              onSearch={handleSearch}
-            />
-            <StandalonePostFeed
-              posts={filteredPosts}
-              loading={postsLoading}
-              hubName={hubName}
-            />
-          </div>
-        );
+        return <HubFeedSlotContent hubName={hubName} />;
       default:
         return null;
     }
-  }, [
-    filteredPosts,
-    handleSearch,
-    hubName,
-    isModerator,
-    isSubscribed,
-    postsLoading,
-    search,
-    sort,
-    user,
-  ]);
+  }, [hubName, isModerator, isSubscribed, user]);
 
   return (
     <div style={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>

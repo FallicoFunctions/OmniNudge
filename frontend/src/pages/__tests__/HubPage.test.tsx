@@ -34,6 +34,17 @@ vi.mock('../../services/hubAIDesignerService', () => ({
     getActiveDesign: vi.fn().mockResolvedValue({ design: null }),
   },
 }));
+vi.mock('../../components/hubDesign/HubAIDesignRenderer', () => ({
+  default: () => <div data-testid="legacy-ai-renderer">Legacy AI renderer</div>,
+}));
+vi.mock('../../components/hubDesign/HubAIDesignLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="hub-ai-layout">{children}</div>
+  ),
+}));
+vi.mock('../../components/hubDesign/HubFeedSlotContent', () => ({
+  default: () => <div data-testid="hub-feed-slot-content">Feed slot content</div>,
+}));
 vi.mock('../../hooks/useHubModerators', () => ({
   useHubModerators: () => ({ moderators: [], isLoading: false }),
 }));
@@ -213,17 +224,37 @@ describe('HubPage', () => {
       </Wrapper>,
     );
 
-    let frameBody: HTMLBodyElement | null = null;
     await waitFor(() => {
-      const iframe = document.querySelector('iframe');
-      frameBody = iframe?.contentDocument?.body ?? null;
-      expect(frameBody).not.toBeNull();
+      expect(screen.getByTestId('legacy-ai-renderer')).toBeInTheDocument();
+    });
+  });
+
+  it('uses the shared AI layout when the design contains a hub-content slot', async () => {
+    vi.mocked(hubAIDesignerService.getActiveDesign).mockResolvedValueOnce({
+      design: {
+        id: 11,
+        name: 'Shell design',
+        prompt: 'hub shell',
+        html_content: `
+          <div class="hub-custom-page">
+            <section id="hub-content"></section>
+            <div id="hub-join"></div>
+          </div>
+        `,
+        created_at: '2026-05-10T00:00:00Z',
+      },
     });
 
+    const Wrapper = createWrapper();
+    render(
+      <Wrapper>
+        <HubPage />
+      </Wrapper>,
+    );
+
     await waitFor(() => {
-      expect(within(frameBody as HTMLBodyElement).getByText('AI Layout')).toBeInTheDocument();
-      expect(within(frameBody as HTMLBodyElement).getByRole('button', { name: 'Join' })).toBeInTheDocument();
-      expect(within(frameBody as HTMLBodyElement).getByRole('button', { name: /\+ Create Post/i })).toBeInTheDocument();
+      expect(screen.getByTestId('hub-ai-layout')).toBeInTheDocument();
+      expect(screen.getByTestId('hub-feed-slot-content')).toBeInTheDocument();
     });
   });
 });
