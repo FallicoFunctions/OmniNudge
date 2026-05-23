@@ -33,7 +33,7 @@
     "login": "Iniciar sesión",
     "register": "Registrarse",
     "go": "Ir",
-    "write": "Escribir",
+    "write": "Raw",
     "preview": "Vista previa",
     "username": "Nombre de usuario",
     "password": "Contraseña",
@@ -194,42 +194,10 @@
       "page": "Página {{formattedPage}}"
     }
   },
-  "bugReportingPage": {
-    "loginRequired": "Por favor, inicia sesión para acceder al reporte de errores.",
-    "reportButton": "Reportar un error",
-    "reportHelp": "¿Encontraste un error? Ayúdanos a mejorar OmniNudge reportándolo.",
-    "knownBugs": {
-      "title": "Errores conocidos",
-      "loading": "Cargando errores conocidos...",
-      "static": {
-        "emailPasswordReset": "El restablecimiento de contraseña por correo electrónico aún no está habilitado.",
-        "redditRateLimit": "El uso de la API de Reddit está sujeto a una limitación de tasa agresiva, lo que puede causar retrasos o contenido faltante en feeds, búsquedas y carga de comentarios.",
-        "hideButton": "El botón de ocultar mueve la publicación a tu lista de ocultos, pero no la elimina del feed."
-      }
-    },
-    "fields": {
-      "affectedPages": "Páginas afectadas:",
-      "workaround": "Solución alternativa:",
-      "fixedInVersion": "Corregido en la versión: {{version}}"
-    },
-    "status": {
-      "fixed": "Corregido",
-      "in_progress": "En progreso",
-      "investigating": "Investigando",
-      "wont_fix": "No se corregirá"
-    },
-    "severity": {
-      "critical": "Crítico",
-      "high": "Alto",
-      "medium": "Medio",
-      "low": "Bajo"
-    }
-  },
   "bugReportModal": {
     "title": "Reportar un bug",
     "success": {
       "message": "¡Reporte de bug enviado con éxito! Gracias por ayudar a mejorar OmniNudge.",
-      "goToPage": "Ir a la página de reporte de bugs",
       "ok": "OK"
     },
     "form": {
@@ -241,19 +209,6 @@
       "description": {
         "label": "Descripción",
         "placeholder": "Describe el bug en detalle. ¿Qué pasó? ¿Qué esperabas que pasara? Pasos para reproducirlo."
-      },
-      "category": {
-        "label": "Categoría",
-        "options": {
-          "bug": "Bug",
-          "featureRequest": "Solicitud de función",
-          "other": "Otro"
-        }
-      },
-      "rating": {
-        "label": "Calificación (opcional)",
-        "help": "Califica tu experiencia del 1 al 5.",
-        "clear": "Limpiar"
       },
       "screenshot": {
         "label": "Captura de pantalla",
@@ -269,8 +224,7 @@
       "submitFailed": "No se pudo enviar el reporte de bug: {{message}}",
       "uploadFailed": "No se pudo subir la captura de pantalla: {{message}}",
       "uploadMissingUrl": "La respuesta de carga no incluye la URL del archivo",
-      "screenshotMustBeImage": "La captura de pantalla debe ser un archivo de imagen.",
-      "ratingInvalid": "La calificación debe estar entre 1 y 5."
+      "screenshotMustBeImage": "La captura de pantalla debe ser un archivo de imagen."
     }
   },
   "searchPage": {
@@ -1361,6 +1315,10 @@
       "controversial": "Controvertido",
       "scroll": "Desplazar"
     },
+    "scope": {
+      "all": "Descubrir",
+      "subscribed": "Siguiendo"
+    },
     "filter": {
       "showLabel": "Mostrar:",
       "omniOnly": "Solo Omni",
@@ -2376,12 +2334,8 @@
     "title": "Enviar Feedback",
     "categoryLabel": "¿Qué tipo de feedback es este?",
     "categoryBug": "Reporte de Error",
-    "categoryFeature": "Solicitud de Función",
-    "categoryOther": "Feedback General",
     "messageLabel": "Mensaje",
     "messagePlaceholder": "Dinos qué tienes en mente...",
-    "ratingLabel": "Satisfacción general (opcional)",
-    "ratingHelp": "1 = Muy insatisfecho, 5 = Muy satisfecho",
     "sending": "Enviando...",
     "send": "Enviar Feedback",
     "successMessage": "¡Gracias por tu feedback!",
@@ -3383,7 +3337,6 @@
       "paragraph2": "No quieres complejidad? No hay problema. Valores predeterminados simples y ajustes intuitivos para todos."
     },
     "footer": {
-      "bugReporting": "Reporte de bugs",
       "termsOfService": "Terminos del servicio",
       "privacyPolicy": "Politica de privacidad"
     }
@@ -3626,14 +3579,10 @@
         "allCategories": "Todas las categorías",
         "sortNewest": "Más recientes",
         "sortOldest": "Más antiguos",
-        "sortRatingHigh": "Mayor calificación",
-        "sortRatingLow": "Menor calificación",
         "perPage": "{{count}} por pagina"
       },
       "categories": {
-        "bug": "Bug",
-        "featureRequest": "Solicitud de función",
-        "other": "Otro"
+        "bug": "Bug"
       },
       "status": {
         "new": "Nuevo",
@@ -3650,7 +3599,6 @@
         "status": "Estado",
         "type": "Tipo",
         "category": "Categoría",
-        "rating": "Calificación",
         "user": "Usuario",
         "page": "Pagina",
         "description": "Descripcion",
@@ -3660,7 +3608,6 @@
         "status": "Estado",
         "type": "Tipo",
         "category": "Categoría",
-        "rating": "Calificación",
         "reporter": "Reportante",
         "page": "Pagina",
         "description": "Descripcion",
