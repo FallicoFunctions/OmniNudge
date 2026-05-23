@@ -21,6 +21,16 @@ vi.mock('../../services/hubsService', () => ({
     updateHubWikiPage: vi.fn(),
   },
 }));
+vi.mock('../../services/hubAIDesignerService', () => ({
+  hubAIDesignerService: {
+    getActiveDesign: vi.fn().mockResolvedValue({ design: null }),
+  },
+}));
+vi.mock('../../components/hubDesign/HubAIDesignLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="hub-ai-layout">{children}</div>
+  ),
+}));
 
 vi.mock('../../hooks/useHubDetails', () => ({
   useHubDetails: () => ({
@@ -61,6 +71,7 @@ vi.mock('../../components/common/StatusMessage', () => ({
 }));
 
 import HubWikiPage from '../HubWikiPage';
+import { hubAIDesignerService } from '../../services/hubAIDesignerService';
 
 const createWrapper = (hubname = 'testHub') => {
   const queryClient = new QueryClient({
@@ -125,6 +136,35 @@ describe('HubWikiPage', () => {
     );
     await waitFor(() => {
       expect(document.body).toBeTruthy();
+    });
+  });
+
+  it('uses the AI hub layout when a hub design is active', async () => {
+    vi.mocked(hubAIDesignerService.getActiveDesign).mockResolvedValueOnce({
+      design: {
+        id: 4,
+        name: 'Hub shell',
+        prompt: 'shell',
+        html_content: `
+          <div class="hub-custom-page">
+            <section id="hub-feed"></section>
+            <div id="hub-join"></div>
+          </div>
+        `,
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    const Wrapper = createWrapper();
+    render(
+      <Wrapper>
+        <HubWikiPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('hub-ai-layout')).toBeInTheDocument();
+      expect(screen.getByTestId('markdown-renderer')).toBeInTheDocument();
     });
   });
 });

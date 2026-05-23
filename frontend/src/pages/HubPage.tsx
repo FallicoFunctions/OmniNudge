@@ -55,8 +55,11 @@ import { buildPostUpdateRequest } from '../utils/postUpdate';
 import { requiresModerator } from '../utils/permissions';
 import { useTimeRangeFilter } from '../hooks/useTimeRangeFilter';
 import { usePostSearch } from '../hooks/usePostSearch';
-import { hubAIDesignerService } from '../services/hubAIDesignerService';
 import HubAIDesignRenderer from '../components/hubDesign/HubAIDesignRenderer';
+import HubAIDesignLayout from '../components/hubDesign/HubAIDesignLayout';
+import HubFeedSlotContent from '../components/hubDesign/HubFeedSlotContent';
+import { useActiveHubAIDesign } from '../hooks/useActiveHubAIDesign';
+import { splitAIDesignHTML } from '../utils/splitAIDesignHTML';
 
 const EMPTY_POSTS: LocalSubredditPost[] = [];
 
@@ -358,13 +361,14 @@ export default function HubsPage() {
   }, [user, hubModerators, hubDetails]);
 
   // Fetch active AI design for this hub (if any)
-  const { data: aiDesignData } = useQuery({
-    queryKey: ['hub-ai-design-active', hubname],
-    queryFn: () => hubAIDesignerService.getActiveDesign(hubname),
-    enabled: !!hubname && hubname !== 'popular' && hubname !== 'all',
-    staleTime: 60_000,
-  });
+  const { data: aiDesignData } = useActiveHubAIDesign(hubname);
   const activeAIDesign = aiDesignData?.design ?? null;
+  const activeDesignHasShellSlot = useMemo(() => {
+    if (!activeAIDesign?.html_content) return false;
+    return Array.from(splitAIDesignHTML(activeAIDesign.html_content).slotsByMarker.values()).some(
+      (slot) => slot.id === 'hub-content',
+    );
+  }, [activeAIDesign?.html_content]);
 
   const isSearchActive = hubSearchResults !== null;
 
@@ -998,6 +1002,21 @@ export default function HubsPage() {
 
   // If an AI design is active, replace the entire page with it
   if (activeAIDesign && hubname) {
+    if (activeDesignHasShellSlot) {
+      return (
+        <Suspense fallback={null}>
+          <HubAIDesignLayout
+            hubName={hubname}
+            htmlContent={activeAIDesign.html_content}
+            user={user}
+            isModerator={isModerator}
+            routeVariant="index"
+          >
+            <HubFeedSlotContent hubName={hubname} />
+          </HubAIDesignLayout>
+        </Suspense>
+      );
+    }
     return (
       <Suspense fallback={null}>
         <HubAIDesignRenderer

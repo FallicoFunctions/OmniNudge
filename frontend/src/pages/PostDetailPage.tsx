@@ -48,6 +48,9 @@ import { useHubActiveUsers } from '../hooks/useHubActiveUsers';
 import { buildPostUpdateRequest } from '../utils/postUpdate';
 import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
+import HubAIDesignLayout from '../components/hubDesign/HubAIDesignLayout';
+import { useActiveHubAIDesign } from '../hooks/useActiveHubAIDesign';
+import { splitAIDesignHTML } from '../utils/splitAIDesignHTML';
 
 export default function PostDetailPage() {
   const { postId, commentId, hubname, subreddit } = useParams<{
@@ -141,6 +144,14 @@ export default function PostDetailPage() {
   const decodedTitle = postData ? decodeHtmlEntities(postData.title) : '';
   const hubName = useMemo(() => postData?.hub?.name ?? postData?.hub_name, [postData]);
   const isHubPost = Boolean(hubName);
+  const { data: aiDesignData } = useActiveHubAIDesign(hubName, Boolean(hubName));
+  const activeAIDesign = aiDesignData?.design ?? null;
+  const supportsHubAIDesignShell = useMemo(() => {
+    if (!hubName || !activeAIDesign?.html_content) return false;
+    return Array.from(splitAIDesignHTML(activeAIDesign.html_content).slotsByMarker.values()).some(
+      (slot) => slot.id === 'hub-content' || slot.id === 'hub-feed',
+    );
+  }, [activeAIDesign?.html_content, hubName]);
   const targetSubreddit = useMemo(
     () => postData?.target_subreddit ?? postData?.crosspost_origin_subreddit ?? null,
     [postData]
@@ -681,6 +692,487 @@ export default function PostDetailPage() {
 
   if (hubname && hubName && hubname.toLowerCase() !== hubName.toLowerCase()) {
     return <NotFoundPage />;
+  }
+
+  const postDetailMainContent = (
+    <div className="mt-4 grid gap-6 px-4 md:px-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="min-w-0 space-y-6">
+        {postData && (
+          <Panel>
+            <PostHeader
+              title={decodedTitle}
+              titleBadges={
+                postData?.nsfw ? (
+                  <span className="inline-flex items-center rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                    {t('posts.badges.nsfw')}
+                  </span>
+                ) : undefined
+              }
+              metadataItems={[
+                ...(hubName
+                  ? [
+                      <Link
+                        key="hub"
+                        to={`/h/${hubName}`}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        {hubDisplayTitle ?? t('common.format.hubPath', { name: hubName })}
+                      </Link>,
+                    ]
+                  : []),
+                ...(targetSubreddit
+                  ? [
+                      <Link
+                        key="subreddit"
+                        to={`/r/${targetSubreddit}`}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        {t('common.format.subredditPath', { name: targetSubreddit })}
+                      </Link>,
+                    ]
+                  : []),
+                <span key="author">
+                  {t('posts.postedByLabel')}{' '}
+                  <Link
+                    to={`/users/${postData?.author?.username ?? postData?.author_username}`}
+                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                  >
+                    {postData?.author?.username ?? postData?.author_username}
+                  </Link>
+                </span>,
+                <span key="submitted">
+                  {t('posts.submittedAt', {
+                    time: formatSubmittedAt(postData.crossposted_at ?? postData.created_at),
+                  })}
+                </span>,
+              ]}
+            />
+
+            <PostDetailMedia
+              mediaUrl={mediaUrl}
+              thumbnailUrl={thumbnailUrl}
+              galleryImages={postData?.gallery_images}
+              decodedTitle={decodedTitle}
+              isVideoMedia={isVideoMedia}
+              imageExpanded={imageExpanded}
+              onToggleExpanded={() => setImageExpanded((prev) => !prev)}
+            />
+
+            {bodyText && <PostBodyMarkdown content={bodyText} className="mb-4" />}
+
+            <div className="flex flex-wrap items-center gap-4">
+              <VoteButtons
+                postId={postData.id}
+                initialScore={postData.score}
+                initialUserVote={postData.user_vote}
+                layout="horizontal"
+                size="medium"
+              />
+              <div className="flex flex-wrap gap-4 text-xs text-[var(--color-text-secondary)]">
+                <span>
+                  {t('posts.comment', {
+                    count: postData.comment_count ?? postData.num_comments ?? 0,
+                    formattedCount: formatNumber(postData.comment_count ?? postData.num_comments ?? 0),
+                  })}
+                </span>
+                <span>•</span>
+                <button onClick={handleSharePost} className="hover:underline">
+                  {t('posts.actions.share')}
+                </button>
+                <span>•</span>
+                <button
+                  onClick={handleSavePost}
+                  disabled={savePostMutation.isPending}
+                  className="hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {savePostMutation.isPending
+                    ? t('posts.status.saving')
+                    : isPostSaved
+                      ? t('posts.actions.unsave')
+                      : t('posts.actions.save')}
+                </button>
+                <span>•</span>
+                <button onClick={handleHidePost} className="hover:underline">
+                  {t('posts.actions.hide')}
+                </button>
+                <span>•</span>
+                <button onClick={handleCrosspost} className="hover:underline">
+                  {t('posts.actions.crosspost')}
+                </button>
+                {canPinPost && postData && (
+                  <>
+                    <span>•</span>
+                    <button
+                      onClick={() =>
+                        togglePinMutation.mutate({
+                          postId: postData.id,
+                          isPinned: Boolean(postData.is_pinned),
+                        })
+                      }
+                      disabled={togglePinMutation.isPending}
+                      className="hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {togglePinMutation.isPending
+                        ? t('posts.status.updating')
+                        : postData.is_pinned
+                          ? t('posts.actions.unpin')
+                          : t('posts.actions.pin')}
+                    </button>
+                  </>
+                )}
+                {canEditPost && (
+                  <>
+                    <span>•</span>
+                    <button
+                      onClick={() => postData && setEditPostTarget(postData)}
+                      className="hover:underline"
+                    >
+                      {t('common.edit')}
+                    </button>
+                  </>
+                )}
+                {canDeletePost && (
+                  <>
+                    <span>•</span>
+                    <button onClick={handleDeletePost} className="text-red-600 hover:underline">
+                      {t('common.delete')}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </Panel>
+        )}
+
+        <Panel>
+          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            {t('comments.title')}
+          </h2>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!user) {
+                window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+                return;
+              }
+              if (!commentText.trim()) return;
+              handleCreateComment.mutate(commentText.trim());
+            }}
+            className="mb-6"
+          >
+            <MarkdownInput
+              label={t('comments.addComment')}
+              value={commentText}
+              onChange={setCommentText}
+              placeholder={t('comments.shareThoughts')}
+              rows={4}
+            />
+            <div className="mt-2 flex justify-start text-xs text-[var(--color-text-secondary)]">
+              <button
+                type="button"
+                onClick={() => setShowFormattingHelp((prev) => !prev)}
+                className="hover:text-[var(--color-primary)]"
+              >
+                {showFormattingHelp ? t('comments.formatting.hide') : t('comments.formatting.show')}
+              </button>
+            </div>
+            {showFormattingHelp && (
+              <div className="mt-2 w-[70%] rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[13px] text-[var(--color-text-primary)] shadow-sm">
+                <p className="text-sm text-[var(--color-text-primary)]">
+                  {t('comments.formatting.description')}{' '}
+                  <a
+                    href="https://www.markdownguide.org/basic-syntax/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[var(--color-primary)] underline"
+                  >
+                    {t('comments.formatting.markdownLinkText')}
+                  </a>{' '}
+                  {t('comments.formatting.descriptionSuffix')}
+                </p>
+                <div className="mt-2">
+                  <FormattingHelpTable />
+                </div>
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={handleCreateComment.isPending || !commentText.trim()}
+              className="mt-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+            >
+              {handleCreateComment.isPending ? t('comments.status.posting') : t('comments.addComment')}
+            </button>
+          </form>
+
+          {loadingComments && (
+            <div className="space-y-3">
+              <CommentSkeleton showReplies={true} />
+              <CommentSkeleton showReplies={true} />
+              <CommentSkeleton showReplies={false} />
+            </div>
+          )}
+
+          {commentNotFound && (
+            <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+              {t('comments.errors.notFound')}
+            </div>
+          )}
+
+          {focusedCommentId && !commentNotFound && (
+            <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+              <div>{t('posts.viewingThread')}</div>
+              <button
+                onClick={() => navigate(hubName ? `/h/${hubName}/comments/${postId}` : `/posts/${postId}`)}
+                className="mt-1 font-semibold text-[var(--color-primary)] hover:underline"
+              >
+                {t('comments.viewRest')}
+              </button>
+            </div>
+          )}
+
+          {commentsList.length === 0 && !loadingComments && (
+            <div className="text-sm text-[var(--color-text-secondary)]">
+              {t('comments.emptyBeFirstOnPost')}
+            </div>
+          )}
+
+          {topLevelComments.length > 0 && (
+            <div className="space-y-4">
+              {topLevelComments.map((comment) => (
+                <CommentItem
+                  key={comment.id}
+                  comment={comment}
+                  allComments={commentsList}
+                  replyingTo={replyingTo}
+                  onReplySelect={(commentId) => {
+                    if (!user) {
+                      window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+                      return;
+                    }
+                    setReplyingTo(commentId);
+                  }}
+                  onCancelReply={() => setReplyingTo(null)}
+                  handlers={commentHandlers}
+                  savedCommentIds={savedCommentIds}
+                  currentUsername={user?.username}
+                  currentUserRole={user?.role}
+                  isModerator={isModerator}
+                />
+              ))}
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      {(hubName || targetSubreddit) && (
+        <aside className="min-w-0 space-y-4">
+          {hubName && (
+            <>
+              <HubAboutPanel
+                hubDetails={hubDetails}
+                displayTitle={hubDisplayTitle}
+                sidebarMarkdown={hubSettings?.sidebar_markdown ?? null}
+                isLoading={loadingHubDetails}
+                isError={hubDetailsError}
+                showStats
+                activeOmniUsers={hubActiveUsersData?.active_users ?? null}
+              />
+
+              <HubModeratorsPanel
+                moderators={hubModerators}
+                isLoading={loadingHubModerators}
+                isError={hubModeratorsError}
+                hubName={hubName}
+                showMessageButton={Boolean(user && hubName)}
+                onMessageMods={() => setShowModMailModal(true)}
+              />
+            </>
+          )}
+
+          {targetSubreddit && (
+            <>
+              <SubredditAboutPanel
+                about={subredditAbout}
+                iconUrl={subredditIcon}
+                isLoading={loadingSubredditAbout}
+                isError={subredditAboutError}
+                activeOmniUsers={activeUsersData?.active_users ?? null}
+              />
+
+              <SubredditModeratorsPanel />
+            </>
+          )}
+        </aside>
+      )}
+    </div>
+  );
+
+  const postDetailOverlays = (
+    <>
+      {embedTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-lg rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+                {t('posts.embed.title')}
+              </h3>
+              <button
+                onClick={() => {
+                  setEmbedTarget(null);
+                  setEmbedCopied(false);
+                }}
+                className="text-xl text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                aria-label={t('posts.embed.closeLabel')}
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-sm text-[var(--color-text-secondary)]">{t('posts.embed.instruction')}</p>
+            <textarea
+              value={embedCode}
+              readOnly
+              rows={4}
+              className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={copyEmbedCode}
+                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              >
+                {embedCopied ? t('common.copied') : t('posts.actions.copyEmbed')}
+              </button>
+              <button
+                onClick={() => {
+                  setEmbedTarget(null);
+                  setEmbedCopied(false);
+                }}
+                className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+              >
+                {t('common.close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showModMailModal && hubName && (
+        <ModMailModal hubName={hubName} onClose={() => setShowModMailModal(false)} />
+      )}
+
+      <PostEditModal
+        isOpen={Boolean(editPostTarget)}
+        title={editPostTarget?.title ?? ''}
+        body={editPostTarget?.body ?? editPostTarget?.content ?? ''}
+        maxLength={10000}
+        isSaving={updatePostMutation.isPending}
+        onClose={() => setEditPostTarget(null)}
+        onSave={({ title, body }) => {
+          if (!editPostTarget) return;
+          updatePostMutation.mutate({ post: editPostTarget, title, body });
+        }}
+      />
+
+      {deleteCommentTarget && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {t('modals.delete.titleComm')}
+            </h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              {t('modals.delete.moderatorMessage')}
+            </p>
+            <div className="mt-4">
+              <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+                {t('moderation.deleteReason')} <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={deleteCommentReason}
+                onChange={(e) => setDeleteCommentReason(e.target.value)}
+                placeholder={t('moderation.deleteReasonPlaceholder')}
+                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                rows={4}
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setDeleteCommentTarget(null);
+                  setDeleteCommentReason('');
+                }}
+                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleConfirmDeleteComment}
+                disabled={!deleteCommentReason.trim()}
+                className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+              >
+                {t('comments.actions.delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deletePostTarget && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {t('modals.delete.title')}
+            </h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              {t('modals.delete.moderatorMessage')}
+            </p>
+            <div className="mt-4">
+              <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+                {t('moderation.deleteReason')} <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={deletePostReason}
+                onChange={(e) => setDeletePostReason(e.target.value)}
+                placeholder={t('moderation.deleteReasonPlaceholder')}
+                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                rows={4}
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setDeletePostTarget(null);
+                  setDeletePostReason('');
+                }}
+                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleConfirmDeletePost}
+                disabled={!deletePostReason.trim() || deletePostMutation.isPending}
+                className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+              >
+                {deletePostMutation.isPending ? t('posts.status.deleting') : t('posts.actions.delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  if (hubName && activeAIDesign && supportsHubAIDesignShell) {
+    return (
+      <>
+        <HubAIDesignLayout
+          hubName={hubName}
+          htmlContent={activeAIDesign.html_content}
+          user={user}
+          isModerator={isModerator}
+          routeVariant="post"
+        >
+          {postDetailMainContent}
+        </HubAIDesignLayout>
+        {postDetailOverlays}
+      </>
+    );
   }
 
   return (

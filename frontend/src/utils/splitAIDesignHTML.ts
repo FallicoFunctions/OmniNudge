@@ -1,4 +1,4 @@
-export type SlotId = 'hub-feed' | 'hub-join' | 'hub-create' | 'hub-mod';
+export type SlotId = 'hub-feed' | 'hub-join' | 'hub-create' | 'hub-mod' | 'hub-content';
 
 export interface DesignSlot {
   id: SlotId;
@@ -14,7 +14,7 @@ export interface SplitDesignResult {
   slotsByMarker: Map<string, DesignSlot>;
 }
 
-const SLOT_IDS: SlotId[] = ['hub-feed', 'hub-join', 'hub-create', 'hub-mod'];
+const SLOT_IDS: SlotId[] = ['hub-feed', 'hub-join', 'hub-create', 'hub-mod', 'hub-content'];
 const MARKER_PREFIX = 'hub-slot-marker-';
 const SAFE_SLOT_HOST_TAGS = new Set(['div', 'section', 'aside', 'article', 'header', 'footer', 'main']);
 const SAFE_SLOT_ATTR_NAMES = new Set([

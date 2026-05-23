@@ -11,6 +11,9 @@ import { isUserHubModerator } from '../utils/moderation';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { MarkdownInput } from '../components/common/MarkdownInput';
 import { LoadingMessage, ErrorMessage } from '../components/common/StatusMessage';
+import HubAIDesignLayout from '../components/hubDesign/HubAIDesignLayout';
+import { useActiveHubAIDesign } from '../hooks/useActiveHubAIDesign';
+import { splitAIDesignHTML } from '../utils/splitAIDesignHTML';
 
 export default function HubWikiPage() {
   const { t } = useTranslation();
@@ -23,11 +26,19 @@ export default function HubWikiPage() {
   const { data: hubDetails } = useHubDetails(hub, Boolean(hub));
   const { data: hubSettings } = useHubSettings(hub, Boolean(hub));
   const { moderators } = useHubModerators(hub, Boolean(hub));
+  const { data: aiDesignData } = useActiveHubAIDesign(hub, Boolean(hub));
+  const activeAIDesign = aiDesignData?.design ?? null;
 
   const isModerator = useMemo(
     () => isUserHubModerator(user, moderators, hubDetails),
     [user, moderators, hubDetails]
   );
+  const supportsHubAIDesignShell = useMemo(() => {
+    if (!hub || !activeAIDesign?.html_content) return false;
+    return Array.from(splitAIDesignHTML(activeAIDesign.html_content).slotsByMarker.values()).some(
+      (slot) => slot.id === 'hub-content' || slot.id === 'hub-feed',
+    );
+  }, [activeAIDesign?.html_content, hub]);
 
   const {
     data: wikiPage,
@@ -75,7 +86,7 @@ export default function HubWikiPage() {
     );
   }
 
-  return (
+  const wikiPageContent = (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
@@ -148,14 +159,30 @@ export default function HubWikiPage() {
               {wikiPage?.content?.trim() ? (
                 <MarkdownRenderer content={wikiPage.content} className="text-[var(--color-text-primary)]" />
               ) : (
-                <p className="text-sm text-[var(--color-text-secondary)]">
-                  {t('hubWikiPage.empty')}
-                </p>
+                <p className="text-sm text-[var(--color-text-secondary)]">{t('hubWikiPage.empty')}</p>
               )}
             </>
           )}
         </div>
       )}
     </div>
+  );
+
+  if (activeAIDesign && supportsHubAIDesignShell) {
+    return (
+      <HubAIDesignLayout
+        hubName={hub}
+        htmlContent={activeAIDesign.html_content}
+        user={user}
+        isModerator={isModerator}
+        routeVariant="wiki"
+      >
+        {wikiPageContent}
+      </HubAIDesignLayout>
+    );
+  }
+
+  return (
+    wikiPageContent
   );
 }
