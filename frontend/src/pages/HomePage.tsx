@@ -33,7 +33,7 @@ import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionI
 import { EmptyState } from '../components/empty';
 import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
-import { OMNI_FEED_STORAGE_KEY } from '../constants/storageKeys';
+import { OMNI_FEED_STORAGE_KEY, FEED_SCOPE_STORAGE_KEY } from '../constants/storageKeys';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
 import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
@@ -81,6 +81,35 @@ const persistOmniOnlyState = (userId: number | null | undefined, value: boolean)
   }
 };
 
+type FeedScope = 'all' | 'subscribed';
+
+const getStoredFeedScope = (userId: number | null | undefined): FeedScope => {
+  if (typeof window === 'undefined' || !window.localStorage) return 'subscribed';
+  try {
+    const raw = localStorage.getItem(FEED_SCOPE_STORAGE_KEY);
+    if (!raw) return 'subscribed';
+    const parsed = JSON.parse(raw) as { userId?: number | null; value?: string };
+    if (
+      (parsed.value === 'all' || parsed.value === 'subscribed') &&
+      (parsed.userId ?? null) === (userId ?? null)
+    ) {
+      return parsed.value;
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return 'subscribed';
+};
+
+const persistFeedScope = (userId: number | null | undefined, value: FeedScope) => {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    localStorage.setItem(FEED_SCOPE_STORAGE_KEY, JSON.stringify({ userId: userId ?? null, value }));
+  } catch {
+    // ignore quota errors
+  }
+};
+
 export default function HomePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -104,6 +133,9 @@ export default function HomePage() {
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
   const [omniOnly, setOmniOnly] = useState(() =>
     getStoredOmniOnlyState(user?.id ?? null, defaultOmniPostsOnly)
+  );
+  const [feedScope, setFeedScope] = useState<FeedScope>(() =>
+    user ? getStoredFeedScope(user?.id ?? null) : 'subscribed'
   );
   const [showPopularFallback, setShowPopularFallback] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -285,15 +317,24 @@ export default function HomePage() {
   }, [omniOnly, user?.id]);
 
   useEffect(() => {
+    setFeedScope(user ? getStoredFeedScope(user?.id ?? null) : 'subscribed');
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user) persistFeedScope(user?.id ?? null, feedScope);
+  }, [feedScope, user?.id]);
+
+  useEffect(() => {
     setIncludeNsfwSearch(!blockAllNsfw && searchIncludeNsfwByDefault);
   }, [blockAllNsfw, searchIncludeNsfwByDefault]);
 
   const [cursorStack, setCursorStack] = useState(['']);
   const pageSize = 50;
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
+  const useForcePopular = feedScope === 'all' || showPopularFallback;
   const homeFeedQueryKey = useMemo(
-    () => ['home-feed', sort, omniOnly, showPopularFallback, timeRangeKey, currentCursor] as const,
-    [sort, omniOnly, showPopularFallback, timeRangeKey, currentCursor]
+    () => ['home-feed', sort, omniOnly, feedScope, showPopularFallback, timeRangeKey, currentCursor] as const,
+    [sort, omniOnly, feedScope, showPopularFallback, timeRangeKey, currentCursor]
   );
   const {
     data: pagedData,
@@ -307,7 +348,7 @@ export default function HomePage() {
         pageSize,
         currentCursor,
         omniOnly,
-        showPopularFallback,
+        useForcePopular,
         timeOptions
       );
     },
@@ -323,14 +364,14 @@ export default function HomePage() {
     fetchNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery<HomeFeedResponse>({
-    queryKey: ['home-feed-infinite', sort, omniOnly, showPopularFallback, timeRangeKey],
+    queryKey: ['home-feed-infinite', sort, omniOnly, feedScope, showPopularFallback, timeRangeKey],
     queryFn: ({ pageParam }) =>
       feedService.getHomeFeed(
         sort,
         pageSize,
         typeof pageParam === 'string' ? pageParam : '',
         omniOnly,
-        showPopularFallback,
+        useForcePopular,
         timeOptions
       ),
     initialPageParam: '',
@@ -339,12 +380,12 @@ export default function HomePage() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // When sort/time toggles change, reset cursor
+  // When sort/scope/time toggles change, reset cursor
   useEffect(() => {
     if (!useInfiniteScrollHome) {
       setCursorStack(['']);
     }
-  }, [sort, omniOnly, showPopularFallback, timeRangeKey, useInfiniteScrollHome]);
+  }, [sort, omniOnly, feedScope, showPopularFallback, timeRangeKey, useInfiniteScrollHome]);
 
   const basePosts = useMemo(() => {
     if (useInfiniteScrollHome) {
@@ -407,7 +448,7 @@ export default function HomePage() {
         };
       });
       queryClient.setQueryData<InfiniteData<HomeFeedResponse>>(
-        ['home-feed-infinite', sort, omniOnly, showPopularFallback, timeRangeKey],
+        ['home-feed-infinite', sort, omniOnly, feedScope, showPopularFallback, timeRangeKey],
         (data) => {
           if (!data) return data;
           return {
@@ -796,6 +837,35 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+      {user && (
+        <div className="mt-4 flex">
+          <div className="inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-1">
+            <button
+              type="button"
+              onClick={() => setFeedScope('all')}
+              className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-colors ${
+                feedScope === 'all'
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              }`}
+            >
+              {t('home.scope.all')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFeedScope('subscribed')}
+              className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-colors ${
+                feedScope === 'subscribed'
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              }`}
+            >
+              {t('home.scope.subscribed')}
+            </button>
+          </div>
+        </div>
+      )}
+
       {user && showPopularFallback && !hasAnySubscriptions && (
         <div className="mb-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-secondary)]">
           {t('home.feed.showingPopular')}{' '}
@@ -886,8 +956,8 @@ export default function HomePage() {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm">
-            <span className="text-xs font-medium text-[var(--color-text-muted)]">
-              {t('home.filter.showLabel')}
+            <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
+              {t('home.filter.allPosts')}
             </span>
             <button
               type="button"
@@ -910,7 +980,7 @@ export default function HomePage() {
             <span
               className={`text-xs font-semibold transition-colors ${omniOnly ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}`}
             >
-              {omniOnly ? t('home.filter.omniOnly') : t('home.filter.allPosts')}
+              {t('home.filter.omniOnly')}
             </span>
           </div>
           <form onSubmit={handlePostSearchSubmit} className="flex w-full gap-2 md:w-96">
