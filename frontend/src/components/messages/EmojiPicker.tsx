@@ -63,7 +63,7 @@ export function EmojiPicker({ isOpen, isOwnMessage, onSelect, onClose }: EmojiPi
         aria-modal="true"
         aria-label={t('messages.reactions.emojiPickerLabel')}
         className={[
-          'fixed inset-0 z-30 flex flex-col bg-[var(--color-surface)] p-4 sm:inset-auto sm:bottom-full sm:mb-1 sm:w-[320px] sm:rounded-xl sm:border sm:border-[var(--color-border)] sm:bg-[var(--color-surface)] sm:p-2 sm:shadow-lg',
+          'fixed inset-0 z-30 flex flex-col bg-[var(--color-surface)] p-4 sm:absolute sm:inset-auto sm:bottom-full sm:mb-1 sm:w-[320px] sm:rounded-xl sm:border sm:border-[var(--color-border)] sm:bg-[var(--color-surface)] sm:p-2 sm:shadow-lg',
           isOwnMessage ? 'sm:right-0' : 'sm:left-0',
         ].join(' ')}
       >
