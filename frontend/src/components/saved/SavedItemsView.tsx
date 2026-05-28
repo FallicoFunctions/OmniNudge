@@ -19,6 +19,7 @@ import type { PlatformPost } from '../../types/posts';
 import { postsService } from '../../services/postsService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFormat } from '../../hooks/useFormat';
+import { useSavedItems } from '../../hooks/useSavedItems';
 
 type RedditListingData = {
   data?: {
@@ -113,10 +114,7 @@ export function SavedItemsView({
 
   const formatSavedTimestamp = (value: string | number | Date) =>
     formatDate(value, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['saved-items', 'all'],
-    queryFn: () => savedService.getSavedItems(),
-  });
+  const { data, isLoading, error } = useSavedItems('all', !!user);
   const { data: hiddenPostsData } = useQuery({
     queryKey: ['hidden-items', 'reddit_posts'],
     queryFn: () => savedService.getHiddenItems('reddit_posts'),

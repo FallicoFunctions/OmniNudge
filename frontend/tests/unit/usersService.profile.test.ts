@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { usersService } from '../../src/services/usersService';
 import { api } from '../../src/lib/api';
 
@@ -13,6 +13,10 @@ vi.mock('../../src/lib/api', () => ({
 }));
 
 describe('usersService profile methods', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('calls profile-by-id endpoint with canonical path', async () => {
     vi.mocked(api.get).mockResolvedValue({
       id: 7,
@@ -33,6 +37,20 @@ describe('usersService profile methods', () => {
     await usersService.getMyProfile();
 
     expect(api.get).toHaveBeenCalledWith('/users/me/profile');
+  });
+
+  it('calls user-posts endpoint with browser caching disabled', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      posts: [],
+      limit: 20,
+      offset: 0,
+    });
+
+    await usersService.getPosts('alice');
+
+    expect(api.get).toHaveBeenCalledWith('/users/alice/posts?limit=20&offset=0', {
+      cache: 'no-store',
+    });
   });
 
   it('calls update-my-profile endpoint with payload as-is', async () => {

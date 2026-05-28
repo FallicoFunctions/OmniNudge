@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { postsService } from '../services/postsService';
 import { hubsService, type Hub } from '../services/hubsService';
 import { redditService } from '../services/redditService';
@@ -14,6 +15,7 @@ import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage
 import { MarkdownInput } from '../components/common/MarkdownInput';
 import { useTranslation } from 'react-i18next';
 import { useFormat } from '../hooks/useFormat';
+import type { UserPostsResponse } from '../types/users';
 
 const HUB_AUTOCOMPLETE_MIN_LENGTH = 2;
 const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
@@ -23,6 +25,8 @@ export default function CreatePostPage() {
   const { formatNumber } = useFormat();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   console.log('[CreatePostPage] Component rendering, location:', location);
   console.log('[CreatePostPage] location.state:', location.state);
@@ -357,7 +361,33 @@ export default function CreatePostPage() {
   const createPostMutation = useMutation({
     mutationFn: (data: CreatePostRequest) => postsService.createPost(data),
     onSuccess: (post) => {
-      navigate(getPostUrl(post));
+      // Attach hub_name from selectedHub if the API didn't return it
+      const resolvedHubName =
+        post.hub_name || post.hub?.name || selectedHub?.name || '';
+      const enrichedPost = resolvedHubName !== post.hub_name
+        ? { ...post, hub_name: resolvedHubName }
+        : post;
+
+      if (user?.username) {
+        const profilePostsKey = ['user-profile-posts', user.username] as const;
+        queryClient.setQueryData<UserPostsResponse | undefined>(
+          profilePostsKey,
+          (old) => (old
+            ? { ...old, posts: [enrichedPost, ...old.posts] }
+            : old)
+        );
+        queryClient.invalidateQueries({
+          queryKey: profilePostsKey,
+          refetchType: 'none',
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['home-feed'] });
+      queryClient.invalidateQueries({ queryKey: ['home-feed-infinite'] });
+      if (enrichedPost.hub_name) {
+        queryClient.invalidateQueries({ queryKey: ['hub-posts', enrichedPost.hub_name] });
+      }
+
+      navigate(getPostUrl(enrichedPost));
     },
   });
 

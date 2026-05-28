@@ -11,6 +11,10 @@ import {
   getSavedRedditPostIdSet,
   getSavedRedditCommentIdSet,
   getHiddenRedditPostIdSet,
+  getRedditPostKey,
+  invalidateHiddenItemsQueries,
+  markRedditPostSaved,
+  markRedditPostUnsaved,
 } from '../utils/savedItems';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -149,8 +153,19 @@ export default function RedditUserPage() {
             created_utc: post.created_utc,
           })
         : savedService.unsaveRedditPost(post.subreddit, post.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['saved-items', 'reddit_posts'] });
+    onSuccess: (_data, { post, shouldSave }) => {
+      if (shouldSave) {
+        markRedditPostSaved(queryClient, post.subreddit, post.id, {
+          title: post.title,
+          author: post.author,
+          score: post.score,
+          num_comments: post.num_comments,
+          thumbnail: post.thumbnail ?? null,
+          created_utc: post.created_utc,
+        });
+      } else {
+        markRedditPostUnsaved(queryClient, post.subreddit, post.id);
+      }
     },
     onError: (err: Error) => {
       alert(t('alerts.saveFailed', { message: err.message }));
@@ -160,7 +175,7 @@ export default function RedditUserPage() {
   const hideRedditPostMutation = useMutation<void, Error, RedditApiPost>({
     mutationFn: (post: RedditApiPost) => savedService.hideRedditPost(post.subreddit, post.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hidden-items', 'reddit_posts'] });
+      invalidateHiddenItemsQueries(queryClient);
     },
     onError: (err: Error) => {
       alert(t('alerts.hideFailed', { message: err.message }));
@@ -239,7 +254,7 @@ export default function RedditUserPage() {
   }, [activeTab, activeSort]);
 
   const renderPostCard = (post: RedditApiPost) => {
-    const postKey = `${post.subreddit}-${post.id}`;
+    const postKey = getRedditPostKey(post.subreddit, post.id);
     if (hiddenPostIds.has(postKey)) {
       return null;
     }

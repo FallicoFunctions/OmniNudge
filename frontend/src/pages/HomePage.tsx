@@ -22,9 +22,17 @@ import { OffsetPaginationControls } from '../components/common/OffsetPaginationC
 import { useSavedItems } from '../hooks/useSavedItems';
 import { useHiddenItems } from '../hooks/useHiddenItems';
 import {
+  getHiddenPostIdSet,
   getHiddenRedditPostIdSet,
+  getRedditPostKey,
   getSavedPostIdSet,
   getSavedRedditPostIdSet,
+  invalidateHiddenItemsQueries,
+  markPlatformPostSaved,
+  markPlatformPostUnsaved,
+  markRedditPostSaved,
+  markRedditPostUnsaved,
+  normalizeRedditPostId,
 } from '../utils/savedItems';
 import { PostCardSkeleton } from '../components/common/LoadingStates';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
@@ -317,11 +325,11 @@ export default function HomePage() {
   }, [omniOnly, user?.id]);
 
   useEffect(() => {
-    setFeedScope(user ? getStoredFeedScope(user?.id ?? null) : 'subscribed');
+    setFeedScope(user?.id != null ? getStoredFeedScope(user.id) : 'subscribed');
   }, [user?.id]);
 
   useEffect(() => {
-    if (user) persistFeedScope(user?.id ?? null, feedScope);
+    if (user?.id != null) persistFeedScope(user.id, feedScope);
   }, [feedScope, user?.id]);
 
   useEffect(() => {
@@ -331,10 +339,10 @@ export default function HomePage() {
   const [cursorStack, setCursorStack] = useState(['']);
   const pageSize = 50;
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
-  const useForcePopular = feedScope === 'all' || showPopularFallback;
+  const useForcePopular = feedScope === 'all';
   const homeFeedQueryKey = useMemo(
-    () => ['home-feed', sort, omniOnly, feedScope, showPopularFallback, timeRangeKey, currentCursor] as const,
-    [sort, omniOnly, feedScope, showPopularFallback, timeRangeKey, currentCursor]
+    () => ['home-feed', sort, omniOnly, feedScope, timeRangeKey, currentCursor] as const,
+    [sort, omniOnly, feedScope, timeRangeKey, currentCursor]
   );
   const {
     data: pagedData,
@@ -364,7 +372,7 @@ export default function HomePage() {
     fetchNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery<HomeFeedResponse>({
-    queryKey: ['home-feed-infinite', sort, omniOnly, feedScope, showPopularFallback, timeRangeKey],
+    queryKey: ['home-feed-infinite', sort, omniOnly, feedScope, timeRangeKey],
     queryFn: ({ pageParam }) =>
       feedService.getHomeFeed(
         sort,
@@ -385,7 +393,7 @@ export default function HomePage() {
     if (!useInfiniteScrollHome) {
       setCursorStack(['']);
     }
-  }, [sort, omniOnly, feedScope, showPopularFallback, timeRangeKey, useInfiniteScrollHome]);
+  }, [sort, omniOnly, feedScope, timeRangeKey, useInfiniteScrollHome]);
 
   const basePosts = useMemo(() => {
     if (useInfiniteScrollHome) {
@@ -394,27 +402,31 @@ export default function HomePage() {
     return pagedData?.posts ?? [];
   }, [useInfiniteScrollHome, infiniteData?.pages, pagedData?.posts]);
 
-  // Hidden Reddit posts state
+  // Hidden posts state
+  const { data: hiddenPostsData } = useHiddenItems('posts', !!user);
+  const hiddenPostIds = useMemo(() => getHiddenPostIdSet(hiddenPostsData), [hiddenPostsData]);
   const { data: hiddenRedditPostsData } = useHiddenItems('reddit_posts', !!user);
   const hiddenRedditPostIds = useMemo(
     () => getHiddenRedditPostIdSet(hiddenRedditPostsData),
     [hiddenRedditPostsData]
   );
 
-  const normalizeRedditPostId = (postId: string) => postId.replace(/^t3_/, '');
-
   const displayedPosts = useMemo(() => {
     const baseItems = basePosts.filter((item) => {
+      if (item.source === 'hub') {
+        const platformPost = item.post as PlatformPost;
+        return !hiddenPostIds.has(platformPost.id);
+      }
       if (item.source !== 'reddit') return true;
       const redditPost = item.post as RedditPost;
-      const postKey = `${redditPost.subreddit}-${normalizeRedditPostId(redditPost.id)}`;
+      const postKey = getRedditPostKey(redditPost.subreddit, redditPost.id);
       return !hiddenRedditPostIds.has(postKey);
     });
     if (!omniOnly) {
       return baseItems;
     }
     return baseItems.filter((item) => item.source === 'hub');
-  }, [basePosts, hiddenRedditPostIds, omniOnly]);
+  }, [basePosts, hiddenPostIds, hiddenRedditPostIds, omniOnly]);
 
   const hasMore = useInfiniteScrollHome
     ? Boolean(hasNextPage)
@@ -428,27 +440,27 @@ export default function HomePage() {
     queryClient.invalidateQueries({ queryKey: ['home-feed-infinite'] });
   }, [queryClient]);
 
-  const removeRedditPostFromFeedCache = useCallback(
-    (post: RedditPost) => {
-      const targetId = normalizeRedditPostId(post.id);
+  const removePostFromFeedCache = useCallback(
+    (target: { type: 'platform'; postId: number } | { type: 'reddit'; post: RedditPost }) => {
       queryClient.setQueryData<HomeFeedResponse>(homeFeedQueryKey, (data) => {
         if (!data) return data;
         return {
           ...data,
           posts: data.posts.filter((item) => {
-            if (item.source !== 'reddit') {
-              return true;
+            if (target.type === 'platform') {
+              return item.source !== 'hub' || (item.post as PlatformPost).id !== target.postId;
             }
+            if (item.source !== 'reddit') return true;
             const redditItem = item.post as RedditPost;
             return (
-              normalizeRedditPostId(redditItem.id) !== targetId ||
-              redditItem.subreddit !== post.subreddit
+              normalizeRedditPostId(redditItem.id) !== normalizeRedditPostId(target.post.id) ||
+              redditItem.subreddit !== target.post.subreddit
             );
           }),
         };
       });
       queryClient.setQueryData<InfiniteData<HomeFeedResponse>>(
-        ['home-feed-infinite', sort, omniOnly, feedScope, showPopularFallback, timeRangeKey],
+        ['home-feed-infinite', sort, omniOnly, feedScope, timeRangeKey],
         (data) => {
           if (!data) return data;
           return {
@@ -456,13 +468,14 @@ export default function HomePage() {
             pages: data.pages.map((page) => ({
               ...page,
               posts: page.posts.filter((item) => {
-                if (item.source !== 'reddit') {
-                  return true;
+                if (target.type === 'platform') {
+                  return item.source !== 'hub' || (item.post as PlatformPost).id !== target.postId;
                 }
+                if (item.source !== 'reddit') return true;
                 const redditItem = item.post as RedditPost;
                 return (
-                  normalizeRedditPostId(redditItem.id) !== targetId ||
-                  redditItem.subreddit !== post.subreddit
+                  normalizeRedditPostId(redditItem.id) !== normalizeRedditPostId(target.post.id) ||
+                  redditItem.subreddit !== target.post.subreddit
                 );
               }),
             })),
@@ -470,17 +483,15 @@ export default function HomePage() {
         }
       );
     },
-    [homeFeedQueryKey, omniOnly, queryClient, showPopularFallback, sort, timeRangeKey]
+    [feedScope, homeFeedQueryKey, omniOnly, queryClient, sort, timeRangeKey]
   );
 
   // Saved posts state
-  const savedPostsKey = ['saved-items', 'posts'] as const;
   const { data: savedPostsData } = useSavedItems('posts', !!user);
 
   const savedPostIds = useMemo(() => getSavedPostIdSet(savedPostsData), [savedPostsData]);
 
   // Saved Reddit posts state
-  const savedRedditPostsKey = ['saved-items', 'reddit_posts'] as const;
   const { data: savedRedditPostsData } = useSavedItems('reddit_posts', !!user);
 
   const savedRedditPostIds = useMemo(
@@ -523,7 +534,7 @@ export default function HomePage() {
     },
   });
 
-  const savedToggleMutation = useMutation<void, Error, { postId: number; shouldSave: boolean }>({
+  const savedToggleMutation = useMutation<void, Error, { postId: number; shouldSave: boolean; post: PlatformPost }>({
     mutationFn: async ({ postId, shouldSave }) => {
       if (!user) {
         throw new Error(t('alerts.signInToSave'));
@@ -534,8 +545,12 @@ export default function HomePage() {
         await savedService.unsavePost(postId);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: savedPostsKey });
+    onSuccess: (_data, { postId, shouldSave, post }) => {
+      if (shouldSave) {
+        markPlatformPostSaved(queryClient, post);
+      } else {
+        markPlatformPostUnsaved(queryClient, postId);
+      }
     },
     onError: (err) => {
       alert(t('alerts.saveFailed', { message: err.message }));
@@ -549,7 +564,9 @@ export default function HomePage() {
       }
       await savedService.hidePost(postId);
     },
-    onSuccess: () => {
+    onSuccess: (_data, postId) => {
+      removePostFromFeedCache({ type: 'platform', postId });
+      invalidateHiddenItemsQueries(queryClient);
       invalidateHomeFeed();
       setHideTarget(null);
     },
@@ -569,13 +586,31 @@ export default function HomePage() {
         throw new Error(t('alerts.signInToSave'));
       }
       if (shouldSave) {
-        await savedService.saveRedditPost(post.subreddit, post.id);
+        await savedService.saveRedditPost(post.subreddit, post.id, {
+          title: post.title,
+          author: post.author,
+          score: post.score,
+          num_comments: post.num_comments,
+          thumbnail: post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : null,
+          created_utc: post.created_utc ?? null,
+        });
       } else {
         await savedService.unsaveRedditPost(post.subreddit, post.id);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: savedRedditPostsKey });
+    onSuccess: (_data, { post, shouldSave }) => {
+      if (shouldSave) {
+        markRedditPostSaved(queryClient, post.subreddit, post.id, {
+          title: post.title,
+          author: post.author,
+          score: post.score,
+          num_comments: post.num_comments,
+          thumbnail: post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : null,
+          created_utc: post.created_utc ?? null,
+        });
+      } else {
+        markRedditPostUnsaved(queryClient, post.subreddit, post.id);
+      }
     },
     onError: (err) => {
       alert(t('alerts.saveFailed', { message: err.message }));
@@ -590,7 +625,8 @@ export default function HomePage() {
       await savedService.hideRedditPost(post.subreddit, post.id);
     },
     onSuccess: (_data, post) => {
-      removeRedditPostFromFeedCache(post);
+      removePostFromFeedCache({ type: 'reddit', post });
+      invalidateHiddenItemsQueries(queryClient);
       invalidateHomeFeed();
       setHideTarget(null);
     },
@@ -664,12 +700,12 @@ export default function HomePage() {
       .catch(() => alert(t('alerts.linkCopyFailed')));
   };
 
-  const handleToggleSavePost = (postId: number, isCurrentlySaved: boolean) => {
+  const handleToggleSavePost = (postId: number, isCurrentlySaved: boolean, post: PlatformPost) => {
     if (!user) {
       alert(t('alerts.signInToSave'));
       return;
     }
-    savedToggleMutation.mutate({ postId, shouldSave: !isCurrentlySaved });
+    savedToggleMutation.mutate({ postId, shouldSave: !isCurrentlySaved, post });
   };
 
   const handleHidePost = (post: PlatformPost) => {
@@ -842,7 +878,10 @@ export default function HomePage() {
           <div className="inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-1">
             <button
               type="button"
-              onClick={() => setFeedScope('all')}
+              onClick={() => {
+                setFeedScope('all');
+                setShowPopularFallback(false);
+              }}
               className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-colors ${
                 feedScope === 'all'
                   ? 'bg-[var(--color-primary)] text-white'
@@ -853,7 +892,10 @@ export default function HomePage() {
             </button>
             <button
               type="button"
-              onClick={() => setFeedScope('subscribed')}
+              onClick={() => {
+                setFeedScope('subscribed');
+                setShowPopularFallback(false);
+              }}
               className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-colors ${
                 feedScope === 'subscribed'
                   ? 'bg-[var(--color-primary)] text-white'
@@ -871,7 +913,10 @@ export default function HomePage() {
           {t('home.feed.showingPopular')}{' '}
           <button
             type="button"
-            onClick={() => setShowPopularFallback(false)}
+            onClick={() => {
+              setFeedScope('subscribed');
+              setShowPopularFallback(false);
+            }}
             className="font-semibold text-[var(--color-primary)] hover:underline"
           >
             {t('home.feed.hidePopularButton')}
@@ -1094,7 +1139,10 @@ export default function HomePage() {
                 description={t('home.empty.subscribeMessage')}
                 action={{
                   label: t('home.empty.viewPopularButton'),
-                  onClick: () => setShowPopularFallback(true),
+                  onClick: () => {
+                    setFeedScope('all');
+                    setShowPopularFallback(true);
+                  },
                   disabled: requiresValidCustomRange,
                 }}
               />
@@ -1137,7 +1185,7 @@ export default function HomePage() {
                     isHiding={isHiding}
                     isDeleting={isDeleting}
                     onShare={() => handleSharePost(post.id)}
-                    onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
+                    onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave, post)}
                     onHide={() => handleHidePost(post)}
                     onDelete={() => handleDeletePost(post)}
                   />
@@ -1146,7 +1194,7 @@ export default function HomePage() {
             }
 
             const post = item.post as RedditPost;
-            const isSaved = savedRedditPostIds.has(`${post.subreddit}-${post.id}`);
+            const isSaved = savedRedditPostIds.has(getRedditPostKey(post.subreddit, post.id));
             const isSaveActionPending =
               toggleSaveRedditPostMutation.isPending &&
               toggleSaveRedditPostMutation.variables?.post.id === post.id;

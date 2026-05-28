@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { savedService } from '../services/savedService';
 import type { SavedItemsResponse } from '../types/saved';
 
-type SavedItemType = 'posts' | 'reddit_posts' | 'post_comments' | 'reddit_comments';
+type SavedItemType = 'all' | 'posts' | 'reddit_posts' | 'post_comments' | 'reddit_comments';
 
 export const useSavedItems = (
   itemType: SavedItemType,

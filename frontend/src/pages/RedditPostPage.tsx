@@ -35,7 +35,14 @@ import { useSubredditAutocomplete } from '../hooks/useSubredditAutocomplete';
 import { useSubredditActiveUsers } from '../hooks/useSubredditActiveUsers';
 import { CrosspostModal } from '../components/common/CrosspostModal';
 import { PostHeader } from '../components/posts/PostHeader';
-import { getSavedRedditCommentIdSetById, getSavedRedditAPICommentIdSet } from '../utils/savedItems';
+import {
+  getRedditPostKey,
+  getSavedRedditAPICommentIdSet,
+  getSavedRedditCommentIdSetById,
+  invalidateHiddenItemsQueries,
+  markRedditPostSaved,
+  markRedditPostUnsaved,
+} from '../utils/savedItems';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { loadHls } from '../utils/hlsLoader';
 import { RedditPostMedia } from '../components/reddit/RedditPostMedia';
@@ -1314,8 +1321,9 @@ export default function RedditPostPage() {
     if (!savedPostsData?.saved_reddit_posts || !subreddit || !postId) {
       return false;
     }
+    const targetKey = getRedditPostKey(subreddit, postId);
     return savedPostsData.saved_reddit_posts.some(
-      (p) => p.subreddit === subreddit && p.reddit_post_id === postId
+      (p) => getRedditPostKey(p.subreddit, p.reddit_post_id) === targetKey
     );
   }, [savedPostsData, subreddit, postId]);
 
@@ -1323,8 +1331,9 @@ export default function RedditPostPage() {
     if (!hiddenPostsData?.hidden_reddit_posts || !subreddit || !postId) {
       return false;
     }
+    const targetKey = getRedditPostKey(subreddit, postId);
     return hiddenPostsData.hidden_reddit_posts.some(
-      (p) => p.subreddit === subreddit && p.reddit_post_id === postId
+      (p) => getRedditPostKey(p.subreddit, p.reddit_post_id) === targetKey
     );
   }, [hiddenPostsData, subreddit, postId]);
   const isPostHiddenOverall = isPostHidden || isPostHiddenFromBackend;
@@ -1607,8 +1616,23 @@ export default function RedditPostPage() {
         await savedService.unsaveRedditPost(subreddit, postId);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['saved-items'] });
+    onSuccess: (_data, shouldSave) => {
+      if (subreddit && postId) {
+        if (shouldSave && post) {
+          const thumbnail =
+            post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : null;
+          markRedditPostSaved(queryClient, subreddit, postId, {
+            title: post.title,
+            author: post.author,
+            score: post.score,
+            num_comments: post.num_comments,
+            thumbnail,
+            created_utc: post.created_utc ?? null,
+          });
+        } else {
+          markRedditPostUnsaved(queryClient, subreddit, postId);
+        }
+      }
     },
     onError: (error) => {
       console.error('Failed to save/unsave post:', error);
@@ -1625,7 +1649,7 @@ export default function RedditPostPage() {
       await savedService.hideRedditPost(subreddit, postId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hidden-items', 'reddit_posts'] });
+      invalidateHiddenItemsQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['reddit'], exact: false });
       setIsPostHidden(true);
       setShowHideConfirm(false);
@@ -1641,7 +1665,7 @@ export default function RedditPostPage() {
       await savedService.unhideRedditPost(subreddit, postId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hidden-items', 'reddit_posts'] });
+      invalidateHiddenItemsQueries(queryClient);
       setIsPostHidden(false);
     },
   });

@@ -4,6 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { savedService } from '../../services/savedService';
 import type { HiddenItemsResponse, SavedPost, SavedRedditPost } from '../../types/saved';
+import {
+  invalidateHiddenItemsQueries,
+  removeFromHiddenCache,
+  removeRedditFromHiddenCache,
+} from '../../utils/savedItems';
 import { api } from '../../lib/api';
 import { usePagination } from '../../hooks/usePagination';
 import { PaginationControls } from '../common/PaginationControls';
@@ -279,8 +284,9 @@ export function HiddenItemsView({
   }, [hiddenPosts, omniPostDetails]);
 
   const invalidateHiddenQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['hidden-items', 'all'] });
-    queryClient.invalidateQueries({ queryKey: ['hidden-items', 'reddit_posts'] });
+    invalidateHiddenItemsQueries(queryClient);
+    queryClient.invalidateQueries({ queryKey: ['home-feed'] });
+    queryClient.invalidateQueries({ queryKey: ['home-feed-infinite'] });
   }, [queryClient]);
 
   useEffect(() => {
@@ -314,7 +320,10 @@ export function HiddenItemsView({
     mutationFn: async (postId: number) => {
       await savedService.unhidePost(postId);
     },
-    onSuccess: () => invalidateHiddenQueries(),
+    onSuccess: (_data, postId) => {
+      removeFromHiddenCache(queryClient, postId);
+      invalidateHiddenQueries();
+    },
     onError: (mutationError: Error) => {
       alert(t('alerts.unhideFailed', { message: mutationError.message }));
     },
@@ -324,7 +333,10 @@ export function HiddenItemsView({
     mutationFn: async ({ subreddit, reddit_post_id }: { subreddit: string; reddit_post_id: string }) => {
       await savedService.unhideRedditPost(subreddit, reddit_post_id);
     },
-    onSuccess: () => invalidateHiddenQueries(),
+    onSuccess: (_data, { subreddit, reddit_post_id }) => {
+      removeRedditFromHiddenCache(queryClient, subreddit, reddit_post_id);
+      invalidateHiddenQueries();
+    },
     onError: (mutationError: Error) => {
       alert(t('alerts.unhideFailed', { message: mutationError.message }));
     },

@@ -31,7 +31,9 @@ export const usersService = {
   },
 
   async getPosts(username: string, limit = 20, offset = 0): Promise<UserPostsResponse> {
-    return api.get<UserPostsResponse>(`/users/${username}/posts?limit=${limit}&offset=${offset}`);
+    return api.get<UserPostsResponse>(`/users/${username}/posts?limit=${limit}&offset=${offset}`, {
+      cache: 'no-store',
+    });
   },
 
   async getComments(username: string, limit = 20, offset = 0): Promise<UserCommentsResponse> {
