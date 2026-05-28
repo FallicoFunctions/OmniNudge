@@ -56,7 +56,7 @@ func (e *redditHTTPError) Error() string {
 }
 
 // NewRedditClient creates a new Reddit client
-func NewRedditClient(userAgent string, cache Cache, cacheTTL time.Duration, clientID, clientSecret string) *RedditClient {
+func NewRedditClient(userAgent string, cache Cache, cacheTTL time.Duration) *RedditClient {
 	if cache == nil {
 		cache = NoopCache{}
 	}
@@ -68,10 +68,8 @@ func NewRedditClient(userAgent string, cache Cache, cacheTTL time.Duration, clie
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		cache:        cache,
-		cacheTTL:     cacheTTL,
-		clientID:     clientID,
-		clientSecret: clientSecret,
+		cache:    cache,
+		cacheTTL: cacheTTL,
 	}
 }
 

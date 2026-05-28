@@ -252,8 +252,6 @@ func main() {
 		cfg.Reddit.UserAgent,
 		cache,
 		time.Duration(cfg.Redis.TTLSeconds)*time.Second,
-		cfg.Reddit.ClientID,
-		cfg.Reddit.ClientSecret,
 	)
 
 	// Initialize job queue client (P0-002)

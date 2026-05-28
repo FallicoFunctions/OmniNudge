@@ -45,7 +45,7 @@ func setupFeedHandlerTest(t *testing.T) (*FeedHandler, *database.Database, int, 
 	cache := services.NewMemoryCache()
 
 	// Use a no-op reddit client (no credentials needed - tests don't hit real Reddit)
-	redditClient := services.NewRedditClient("test-agent", cache, 5*time.Minute, "", "")
+	redditClient := services.NewRedditClient("test-agent", cache, 5*time.Minute)
 
 	handler := NewFeedHandler(postRepo, hubSubRepo, subRepo, savedRepo, redditClient, cache, 5*time.Minute)
 

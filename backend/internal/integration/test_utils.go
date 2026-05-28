@@ -88,7 +88,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 
 	cfg := &config.Config{
 		Reddit: config.RedditConfig{
-			UserAgent: "OmniNudgeTest:v1.0",
+			UserAgent: "OmniNudge/1.0 (+https://omninudge.com; contact support@omninudge.com)",
 		},
 		JWT: config.JWTConfig{
 			Secret: "test-jwt-secret",
@@ -128,7 +128,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, modRepo, feedRepo, hubSettingsRepo)
 	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, modRepo)
 	redditHandler := handlers.NewRedditHandler(
-		services.NewRedditClient(cfg.Reddit.UserAgent, services.NoopCache{}, 0, cfg.Reddit.ClientID, cfg.Reddit.ClientSecret),
+		services.NewRedditClient(cfg.Reddit.UserAgent, services.NoopCache{}, 0),
 		redditPostRepo,
 	)
 	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
