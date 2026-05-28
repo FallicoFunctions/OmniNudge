@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
-	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"errors"
 	"fmt"
@@ -12,7 +10,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/services"
 )
 
@@ -143,8 +143,8 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 		response["saved_reddit_api_comments"] = apiComments
 	}
 
-response["type"] = filterType
-c.JSON(http.StatusOK, response)
+	response["type"] = filterType
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *SavedItemsHandler) pruneRemovedRedditPosts(c *gin.Context, userID int, posts []*models.SavedRedditPost) ([]*models.SavedRedditPost, []removedRedditPost) {
@@ -316,7 +316,10 @@ func (h *SavedItemsHandler) SavePost(c *gin.Context) {
 		return
 	}
 	if alreadySaved {
-		RespondError(c, http.StatusConflict, "Post already saved")
+		c.JSON(http.StatusOK, gin.H{
+			"saved":   true,
+			"message": "Post already saved",
+		})
 		return
 	}
 

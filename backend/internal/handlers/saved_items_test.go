@@ -404,9 +404,9 @@ func TestSavePost(t *testing.T) {
 		{
 			name:           "save same post again (idempotent)",
 			postID:         fmt.Sprintf("%d", post.ID),
-			expectedStatus: http.StatusConflict,
+			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, body map[string]interface{}) {
-				assert.Contains(t, body["error"], "already saved")
+				assert.Equal(t, true, body["saved"])
 			},
 		},
 		{
