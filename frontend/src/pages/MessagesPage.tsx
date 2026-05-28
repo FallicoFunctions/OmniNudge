@@ -977,7 +977,7 @@ export default function MessagesPage() {
     };
     window.addEventListener('ws-group-event', handler);
     return () => window.removeEventListener('ws-group-event', handler);
-  }, [selectedConversation?.conversation_type, groupAdmin.handleWebSocketEvent]);
+  }, [groupAdmin, selectedConversation?.conversation_type]);
 
   // Fix 18: placed after selectedConversation so we can pass recipientId directly
   const {

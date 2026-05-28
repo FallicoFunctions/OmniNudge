@@ -11,6 +11,18 @@ interface WebSocketMessage {
   payload: unknown;
 }
 
+type InitialStatePayload = { online_users?: number[] };
+type MessageStatusPayload = {
+  message_id: number;
+  conversation_id: number;
+  delivered_at?: string;
+  read_at?: string;
+};
+type ConversationReadPayload = { conversation_id: number };
+type UserPresencePayload = { user_id: number };
+type TypingPayload = { conversation_id: number; user_id: number; is_typing: boolean };
+type FeatureFlagUpdatedPayload = { key: string; enabled: boolean; percentage?: number };
+
 interface WebSocketContextType {
   // Connection state
   isConnected: boolean;
@@ -83,14 +95,14 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
       switch (data.type) {
         case 'initial_state': {
-          const { online_users } = data.payload;
+          const { online_users } = data.payload as InitialStatePayload;
           console.log('[WebSocket] Initial state - online users:', online_users);
           setOnlineUsers(new Set(online_users || []));
           break;
         }
 
         case 'new_message': {
-          const message: Message = data.payload;
+          const message = data.payload as Message;
           console.log('[WebSocket] New message:', message.id);
 
           // Deduplicate: Check if we've already processed this message recently
@@ -142,7 +154,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         }
 
         case 'message_delivered': {
-          const { message_id, conversation_id, delivered_at } = data.payload;
+          const { message_id, conversation_id, delivered_at } = data.payload as MessageStatusPayload;
           console.log('[WebSocket] Message delivered:', message_id);
 
           queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
@@ -166,7 +178,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         }
 
         case 'message_read': {
-          const { message_id, conversation_id, read_at } = data.payload;
+          const { message_id, conversation_id, read_at } = data.payload as MessageStatusPayload;
           console.log('[WebSocket] Message read:', message_id);
 
           queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
@@ -190,7 +202,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         }
 
         case 'conversation_read': {
-          const { conversation_id } = data.payload;
+          const { conversation_id } = data.payload as ConversationReadPayload;
           console.log('[WebSocket] Conversation read:', conversation_id);
 
           const now = new Date().toISOString();
@@ -322,14 +334,14 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         }
 
         case 'user_online': {
-          const { user_id } = data.payload;
+          const { user_id } = data.payload as UserPresencePayload;
           console.log('[WebSocket] User online:', user_id);
           setOnlineUsers((prev) => new Set(prev).add(user_id));
           break;
         }
 
         case 'user_offline': {
-          const { user_id } = data.payload;
+          const { user_id } = data.payload as UserPresencePayload;
           console.log('[WebSocket] User offline:', user_id);
           setOnlineUsers((prev) => {
             const next = new Set(prev);
@@ -340,7 +352,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         }
 
         case 'typing': {
-          const { conversation_id, user_id, is_typing } = data.payload;
+          const { conversation_id, user_id, is_typing } = data.payload as TypingPayload;
           console.log('[WebSocket] Typing:', conversation_id, user_id, is_typing);
 
           // Create unique key for timeout tracking
@@ -403,7 +415,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         }
 
         case 'feature_flag_updated': {
-          const { key, enabled, percentage } = data.payload;
+          const { key, enabled, percentage } = data.payload as FeatureFlagUpdatedPayload;
           console.log('[WebSocket] Feature flag updated:', key, enabled, percentage);
           window.dispatchEvent(new CustomEvent('feature-flag-updated', {
             detail: { key, enabled, percentage }
@@ -578,6 +590,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     if (!user?.id) return;
 
     isCleanupRef.current = false;
+    const typingTimeouts = typingTimeoutsRef.current;
 
     const connect = async () => {
       console.log('[WebSocket] Connecting...');
@@ -653,8 +666,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         wsRef.current.close();
       }
       // Clear all typing timeouts
-      typingTimeoutsRef.current.forEach(clearTimeout);
-      typingTimeoutsRef.current.clear();
+      typingTimeouts.forEach(clearTimeout);
+      typingTimeouts.clear();
     };
   }, [user?.id, handleMessage, queryClient]);
 
