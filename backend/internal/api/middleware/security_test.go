@@ -3,10 +3,53 @@ package middleware
 import (
 	"archive/zip"
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 )
+
+func TestSecurityHeaders_ProductionCSPDisallowsUnsafeEval(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(SecurityHeaders())
+	router.GET("/", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	router.ServeHTTP(w, req)
+
+	csp := w.Header().Get("Content-Security-Policy")
+	if strings.Contains(csp, "'unsafe-eval'") {
+		t.Fatalf("production CSP must not allow unsafe-eval, got %q", csp)
+	}
+}
+
+func TestSecurityHeaders_DevelopmentCSPAllowsUnsafeEvalForTooling(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(SecurityHeaders())
+	router.GET("/", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	router.ServeHTTP(w, req)
+
+	csp := w.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "'unsafe-eval'") {
+		t.Fatalf("development CSP should allow unsafe-eval for tooling, got %q", csp)
+	}
+}
 
 func TestFileValidation_AllowsNewDocumentAndArchiveTypes(t *testing.T) {
 	t.Parallel()

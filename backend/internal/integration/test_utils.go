@@ -45,6 +45,7 @@ func getTestDB(t *testing.T) *database.DB {
 	}
 	db, err := database.New(dsn)
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 	require.NoError(t, db.Migrate(context.Background()))
 	return db
 }
@@ -53,9 +54,9 @@ func getTestDB(t *testing.T) *database.DB {
 func resetTables(t *testing.T, db *database.DB) {
 	t.Helper()
 	_, err := db.Pool.Exec(context.Background(), `
-		TRUNCATE TABLE reports, hub_moderators, post_votes, comment_votes, messages, conversations, post_comments, platform_posts, hubs, users RESTART IDENTITY CASCADE;
-		INSERT INTO hubs (name, description) VALUES ('general', 'Default community for all posts');
-	`)
+			TRUNCATE TABLE reports, hub_moderators, post_votes, comment_votes, messages, conversations, post_comments, platform_posts, hubs, users RESTART IDENTITY CASCADE;
+			INSERT INTO hubs (name, name_normalized, description) VALUES ('general', 'general', 'Default community for all posts');
+		`)
 	require.NoError(t, err)
 }
 
@@ -85,7 +86,18 @@ func newTestDeps(t *testing.T) *TestDeps {
 	db := getTestDB(t)
 	resetTables(t, db)
 
-	cfg, _ := config.Load()
+	cfg := &config.Config{
+		Reddit: config.RedditConfig{
+			UserAgent: "OmniNudgeTest:v1.0",
+		},
+		JWT: config.JWTConfig{
+			Secret: "test-jwt-secret",
+		},
+		Media: config.MediaConfig{
+			FreeTierQuotaBytes: 1 * 1024 * 1024 * 1024,
+			ProTierQuotaBytes:  50 * 1024 * 1024 * 1024,
+		},
+	}
 
 	userRepo := models.NewUserRepository(db.Pool)
 	userProfileRepo := models.NewUserProfileRepository(db.Pool)

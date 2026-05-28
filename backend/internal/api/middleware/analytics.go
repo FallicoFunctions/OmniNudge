@@ -153,6 +153,7 @@ func getOrCreateSessionID(c *gin.Context) uuid.UUID {
 
 	// Create new session ID
 	sessionID := uuid.New()
+	isSecure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "session_id",
@@ -160,7 +161,7 @@ func getOrCreateSessionID(c *gin.Context) uuid.UUID {
 		MaxAge:   86400 * 30,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   c.Request.TLS != nil,
+		Secure:   isSecure,
 		SameSite: http.SameSiteStrictMode,
 	})
 
