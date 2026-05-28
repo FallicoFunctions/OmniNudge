@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 // mapCache is a simple in-memory cache for testing
@@ -91,4 +93,41 @@ func TestRedditClientCachesFrontPage(t *testing.T) {
 	if atomic.LoadInt32(&handlerCalls) != 1 {
 		t.Fatalf("expected server still called once, got %d", handlerCalls)
 	}
+}
+
+func TestGetSubredditPostsSetsPublicRequestMetadata(t *testing.T) {
+	cache := &mapCache{store: make(map[string]string)}
+	client := NewRedditClient("OmniNudge/1.0 (+https://omninudge.com; contact support@omninudge.com)", cache, time.Minute)
+
+	ln, err := net.Listen("tcp4", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/r/golang/top.json", r.URL.Path)
+		require.Equal(t, "1", r.URL.Query().Get("raw_json"))
+		require.Equal(t, "day", r.URL.Query().Get("t"))
+		require.Equal(t, "25", r.URL.Query().Get("limit"))
+		require.Equal(t, "application/json", r.Header.Get("Accept"))
+		require.Contains(t, r.Header.Get("User-Agent"), "OmniNudge/")
+		_ = json.NewEncoder(w).Encode(RedditListing{Kind: "Listing"})
+	}))
+	ts.Listener = ln
+	ts.Start()
+	defer ts.Close()
+
+	client.httpClient.Transport = &hostRewriteTransport{target: ts}
+	_, err = client.GetSubredditPosts(context.Background(), "golang", "top", "day", 25, "")
+	require.NoError(t, err)
+}
+
+func TestRedditStatusCodeExtractsTypedHTTPError(t *testing.T) {
+	err := &redditHTTPError{statusCode: http.StatusForbidden, body: "blocked"}
+	code, ok := RedditStatusCode(err)
+	require.True(t, ok)
+	require.Equal(t, http.StatusForbidden, code)
+}
+
+func TestRedditHTTPErrorMatchesErrRedditNotFound(t *testing.T) {
+	err := &redditHTTPError{statusCode: http.StatusNotFound, body: "missing"}
+	require.ErrorIs(t, err, ErrRedditNotFound)
 }

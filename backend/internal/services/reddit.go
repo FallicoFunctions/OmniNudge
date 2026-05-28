@@ -12,33 +12,18 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
-
-	"github.com/PuerkitoBio/goquery"
 
 	"github.com/omninudge/backend/internal/metrics"
 )
 
 // RedditClient handles interactions with Reddit's public JSON API
 type RedditClient struct {
-	userAgent    string
-	httpClient   *http.Client
-	cache        Cache
-	cacheTTL     time.Duration
-	clientID     string
-	clientSecret string
-	tokenMu      sync.Mutex
-	appToken     *redditAppToken
+	userAgent  string
+	httpClient *http.Client
+	cache      Cache
+	cacheTTL   time.Duration
 }
-
-type redditAppToken struct {
-	value  string
-	expiry time.Time
-}
-
-// ErrRedditModeratorsUnavailable indicates Reddit refused to return the moderators list.
-var ErrRedditModeratorsUnavailable = errors.New("reddit moderators list unavailable without authentication")
 
 // ErrRedditNotFound indicates the requested Reddit resource was not found.
 var ErrRedditNotFound = errors.New("reddit resource not found")
@@ -53,6 +38,23 @@ func (e *redditHTTPError) Error() string {
 		return ""
 	}
 	return fmt.Sprintf("reddit responded with status %d: %s", e.statusCode, strings.TrimSpace(e.body))
+}
+
+func (e *redditHTTPError) Is(target error) bool {
+	return target == ErrRedditNotFound && e != nil && e.statusCode == http.StatusNotFound
+}
+
+func RedditStatusCode(err error) (int, bool) {
+	var httpErr *redditHTTPError
+	if errors.As(err, &httpErr) {
+		return httpErr.statusCode, true
+	}
+	return 0, false
+}
+
+func redditHTTPErrorFromResponse(resp *http.Response) error {
+	body, _ := io.ReadAll(resp.Body)
+	return &redditHTTPError{statusCode: resp.StatusCode, body: string(body)}
 }
 
 // NewRedditClient creates a new Reddit client
@@ -121,6 +123,19 @@ func (r *RedditClient) redditBaseURL() string {
 	return "https://www.reddit.com"
 }
 
+func (r *RedditClient) newPublicJSONRequest(ctx context.Context, method, rawURL string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, method, rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+	req.Header.Set("Accept", "application/json")
+	q := req.URL.Query()
+	q.Set("raw_json", "1")
+	req.URL.RawQuery = q.Encode()
+	return req, nil
+}
+
 // normalizeRemovedIndicator lowercases and trims markers used for removal/deletion.
 func normalizeRemovedIndicator(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
@@ -128,39 +143,39 @@ func normalizeRemovedIndicator(value string) string {
 
 // RedditPost represents a post from Reddit's API
 type RedditPost struct {
-	ID                       string                    `json:"id"`
-	Subreddit                string                    `json:"subreddit"`
-	Title                    string                    `json:"title"`
-	Author                   string                    `json:"author"`
-	RemovedByCategory        string                    `json:"removed_by_category"`
-	RemovedBy                *string                   `json:"removed_by"`
-	BannedBy                 *string                   `json:"banned_by"`
-	Selftext                 string                    `json:"selftext"`     // Post body text
-	URL                      string                    `json:"url"`          // Link or media URL
-	Permalink                string                    `json:"permalink"`    // Reddit URL
-	Thumbnail                string                    `json:"thumbnail"`    // Thumbnail URL
-	Score                    int                       `json:"score"`        // Upvotes - downvotes
-	NumComments              int                       `json:"num_comments"` // Comment count
-	CreatedUTC               float64                   `json:"created_utc"`  // Unix timestamp
-	Over18                   bool                      `json:"over18"`      // NSFW flag
-	PostHint                 string                    `json:"post_hint"`    // Type hint: image, video, link, gallery, etc.
-	IsVideo                  bool                      `json:"is_video"`     // Is it a video
-	IsSelf                   bool                      `json:"is_self"`      // Is it a text post
-	IsGallery                bool                      `json:"is_gallery"`   // Is it a gallery/album post
-	GalleryData              *RedditGalleryData        `json:"gallery_data"` // Gallery metadata
-	MediaMetadata            map[string]interface{}    `json:"media_metadata"` // Media metadata for gallery items
-	GalleryImages            []string                  `json:"gallery_images,omitempty"` // Ordered list of full-resolution gallery image URLs
-	LinkFlairText            string                    `json:"link_flair_text"`
-	LinkFlairBackgroundColor string                    `json:"link_flair_background_color"`
-	LinkFlairTextColor       string                    `json:"link_flair_text_color"`
-	Distinguished            *string                   `json:"distinguished"` // Mod/admin flag
-	Stickied                 bool                      `json:"stickied"`      // Pinned post
-	Domain                   string                    `json:"domain"`        // Source domain
-	MediaEmbed               MediaEmbed                `json:"media_embed"`   // Embedded media
-	SecureMediaEmbed         MediaEmbed                `json:"secure_media_embed"`
-	Media                    *RedditMedia              `json:"media"`        // Media container
-	SecureMedia              *RedditMedia              `json:"secure_media"` // Secure media container
-	Preview                  *RedditPreview            `json:"preview"`      // Preview images for link posts
+	ID                       string                 `json:"id"`
+	Subreddit                string                 `json:"subreddit"`
+	Title                    string                 `json:"title"`
+	Author                   string                 `json:"author"`
+	RemovedByCategory        string                 `json:"removed_by_category"`
+	RemovedBy                *string                `json:"removed_by"`
+	BannedBy                 *string                `json:"banned_by"`
+	Selftext                 string                 `json:"selftext"`                 // Post body text
+	URL                      string                 `json:"url"`                      // Link or media URL
+	Permalink                string                 `json:"permalink"`                // Reddit URL
+	Thumbnail                string                 `json:"thumbnail"`                // Thumbnail URL
+	Score                    int                    `json:"score"`                    // Upvotes - downvotes
+	NumComments              int                    `json:"num_comments"`             // Comment count
+	CreatedUTC               float64                `json:"created_utc"`              // Unix timestamp
+	Over18                   bool                   `json:"over18"`                   // NSFW flag
+	PostHint                 string                 `json:"post_hint"`                // Type hint: image, video, link, gallery, etc.
+	IsVideo                  bool                   `json:"is_video"`                 // Is it a video
+	IsSelf                   bool                   `json:"is_self"`                  // Is it a text post
+	IsGallery                bool                   `json:"is_gallery"`               // Is it a gallery/album post
+	GalleryData              *RedditGalleryData     `json:"gallery_data"`             // Gallery metadata
+	MediaMetadata            map[string]interface{} `json:"media_metadata"`           // Media metadata for gallery items
+	GalleryImages            []string               `json:"gallery_images,omitempty"` // Ordered list of full-resolution gallery image URLs
+	LinkFlairText            string                 `json:"link_flair_text"`
+	LinkFlairBackgroundColor string                 `json:"link_flair_background_color"`
+	LinkFlairTextColor       string                 `json:"link_flair_text_color"`
+	Distinguished            *string                `json:"distinguished"` // Mod/admin flag
+	Stickied                 bool                   `json:"stickied"`      // Pinned post
+	Domain                   string                 `json:"domain"`        // Source domain
+	MediaEmbed               MediaEmbed             `json:"media_embed"`   // Embedded media
+	SecureMediaEmbed         MediaEmbed             `json:"secure_media_embed"`
+	Media                    *RedditMedia           `json:"media"`        // Media container
+	SecureMedia              *RedditMedia           `json:"secure_media"` // Secure media container
+	Preview                  *RedditPreview         `json:"preview"`      // Preview images for link posts
 }
 
 func (r *RedditPost) UnmarshalJSON(data []byte) error {
@@ -363,14 +378,6 @@ type redditSubredditAboutPayload struct {
 	Over18              bool    `json:"over18"`
 }
 
-// RedditSubredditModerator represents a single moderator entry for a subreddit
-type RedditSubredditModerator struct {
-	ID              string   `json:"id"`
-	Name            string   `json:"name"`
-	AuthorFlairText string   `json:"author_flair_text"`
-	ModPermissions  []string `json:"mod_permissions"`
-}
-
 // RedditWikiAuthor captures author details on wiki revision entries.
 type RedditWikiAuthor struct {
 	Kind string               `json:"kind"`
@@ -456,13 +463,10 @@ func (r *RedditClient) GetSubredditPosts(ctx context.Context, subreddit string, 
 	url := fmt.Sprintf("%s/r/%s/%s.json", r.redditBaseURL(), subreddit, sort)
 
 	// Create request
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
-	// Set headers
-	req.Header.Set("User-Agent", r.userAgent)
 
 	// Add query parameters
 	q := req.URL.Query()
@@ -485,8 +489,7 @@ func (r *RedditClient) GetSubredditPosts(ctx context.Context, subreddit string, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	// Parse response
@@ -494,7 +497,6 @@ func (r *RedditClient) GetSubredditPosts(ctx context.Context, subreddit string, 
 	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
-
 
 	_ = r.setCachedListing(ctx, cacheKey, listing)
 	return &listing, nil
@@ -511,13 +513,10 @@ func (r *RedditClient) GetFrontPage(ctx context.Context, sort string, timeFilter
 	url := fmt.Sprintf("%s/%s.json", r.redditBaseURL(), sort)
 
 	// Create request
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
-	// Set headers
-	req.Header.Set("User-Agent", r.userAgent)
 
 	// Add query parameters
 	q := req.URL.Query()
@@ -540,8 +539,7 @@ func (r *RedditClient) GetFrontPage(ctx context.Context, sort string, timeFilter
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	// Parse response
@@ -562,11 +560,10 @@ func (r *RedditClient) GetPostInfo(ctx context.Context, subreddit string, reddit
 	_ = subreddit
 
 	url := fmt.Sprintf("%s/api/info.json?id=t3_%s", r.redditBaseURL(), redditPostID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create info request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", r.userAgent)
 
 	resp, err := r.doAPIRequest(req, "post_info")
 	if err != nil {
@@ -574,12 +571,8 @@ func (r *RedditClient) GetPostInfo(ctx context.Context, subreddit string, reddit
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, nil
-	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var listing redditGenericListing
@@ -611,13 +604,10 @@ func (r *RedditClient) GetPostComments(ctx context.Context, subreddit string, po
 	url := fmt.Sprintf("%s/r/%s/comments/%s.json", r.redditBaseURL(), subreddit, postID)
 
 	// Create request
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
-	// Set headers
-	req.Header.Set("User-Agent", r.userAgent)
 
 	// Add query parameters
 	q := req.URL.Query()
@@ -637,8 +627,7 @@ func (r *RedditClient) GetPostComments(ctx context.Context, subreddit string, po
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	// Parse response - Reddit returns array of [post_listing, comments_listing]
@@ -668,13 +657,10 @@ func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit 
 	}
 
 	// Create request
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
-	// Set headers
-	req.Header.Set("User-Agent", r.userAgent)
 
 	// Add query parameters
 	q := req.URL.Query()
@@ -705,8 +691,7 @@ func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	// Parse response
@@ -722,11 +707,10 @@ func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit 
 // SearchUsers searches Reddit users
 func (r *RedditClient) SearchUsers(ctx context.Context, query string, limit int, after string, includeNSFW bool) (*redditGenericListing, error) {
 	url := fmt.Sprintf("%s/users/search.json", r.redditBaseURL())
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", r.userAgent)
 
 	q := req.URL.Query()
 	q.Add("q", query)
@@ -746,8 +730,7 @@ func (r *RedditClient) SearchUsers(ctx context.Context, query string, limit int,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var listing redditGenericListing
@@ -797,12 +780,10 @@ func (r *RedditClient) AutocompleteSubreddits(ctx context.Context, query string,
 		limit = 10
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api/subreddit_autocomplete_v2.json", r.redditBaseURL()), nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, fmt.Sprintf("%s/api/subreddit_autocomplete_v2.json", r.redditBaseURL()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
-	req.Header.Set("User-Agent", r.userAgent)
 
 	q := req.URL.Query()
 	q.Set("query", query)
@@ -817,8 +798,7 @@ func (r *RedditClient) AutocompleteSubreddits(ctx context.Context, query string,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var listing subredditAutocompleteListing
@@ -857,11 +837,10 @@ func (r *RedditClient) SearchSubreddits(ctx context.Context, query string, limit
 		limit = 25
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/subreddits/search.json", r.redditBaseURL()), nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, fmt.Sprintf("%s/subreddits/search.json", r.redditBaseURL()))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", r.userAgent)
 
 	q := req.URL.Query()
 	q.Set("q", query)
@@ -878,8 +857,7 @@ func (r *RedditClient) SearchSubreddits(ctx context.Context, query string, limit
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var listing subredditSearchListing
@@ -933,11 +911,10 @@ func (r *RedditClient) GetUserListing(ctx context.Context, username, section, so
 	}
 
 	url := fmt.Sprintf("%s/user/%s/%s.json", r.redditBaseURL(), username, section)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", r.userAgent)
 	q := req.URL.Query()
 	if sort != "" {
 		q.Add("sort", sort)
@@ -957,8 +934,7 @@ func (r *RedditClient) GetUserListing(ctx context.Context, username, section, so
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var raw redditGenericListing
@@ -1010,11 +986,10 @@ func (r *RedditClient) GetUserAbout(ctx context.Context, username string) (*Redd
 	}
 
 	url := fmt.Sprintf("%s/user/%s/about.json", r.redditBaseURL(), username)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", r.userAgent)
 
 	resp, err := r.doAPIRequest(req, "user_about")
 	if err != nil {
@@ -1023,8 +998,7 @@ func (r *RedditClient) GetUserAbout(ctx context.Context, username string) (*Redd
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var raw struct {
@@ -1072,11 +1046,10 @@ func (r *RedditClient) GetUserTrophies(ctx context.Context, username string) ([]
 	}
 
 	url := fmt.Sprintf("%s/user/%s/trophies.json", r.redditBaseURL(), username)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", r.userAgent)
 
 	resp, err := r.doAPIRequest(req, "user_trophies")
 	if err != nil {
@@ -1085,8 +1058,7 @@ func (r *RedditClient) GetUserTrophies(ctx context.Context, username string) ([]
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var raw struct {
@@ -1141,11 +1113,10 @@ func (r *RedditClient) GetUserModeratedSubreddits(ctx context.Context, username 
 	}
 
 	url := fmt.Sprintf("%s/user/%s/moderated_subreddits.json", r.redditBaseURL(), username)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", r.userAgent)
 
 	resp, err := r.doAPIRequest(req, "user_moderated_subreddits")
 	if err != nil {
@@ -1154,8 +1125,7 @@ func (r *RedditClient) GetUserModeratedSubreddits(ctx context.Context, username 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var raw struct {
@@ -1201,11 +1171,10 @@ func (r *RedditClient) GetSubredditAbout(ctx context.Context, subreddit string) 
 	}
 
 	url := fmt.Sprintf("%s/r/%s/about.json", r.redditBaseURL(), subreddit)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create subreddit about request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", r.userAgent)
 
 	resp, err := r.doAPIRequest(req, "subreddit_about")
 	if err != nil {
@@ -1214,8 +1183,7 @@ func (r *RedditClient) GetSubredditAbout(ctx context.Context, subreddit string) 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var raw struct {
@@ -1243,249 +1211,11 @@ func (r *RedditClient) GetSubredditAbout(ctx context.Context, subreddit string) 
 		Over18:              raw.Data.Over18,
 	}
 
-
 	if data, err := json.Marshal(about); err == nil {
 		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
 	}
 
 	return &about, nil
-}
-
-// GetSubredditModerators fetches the moderators for a subreddit
-func (r *RedditClient) GetSubredditModerators(ctx context.Context, subreddit string) ([]RedditSubredditModerator, error) {
-	subreddit = strings.TrimSpace(subreddit)
-	if subreddit == "" {
-		return nil, fmt.Errorf("subreddit is required")
-	}
-
-	cacheKey := fmt.Sprintf("sr:mods:%s", strings.ToLower(subreddit))
-	if cached, ok, err := r.cache.Get(ctx, cacheKey); err == nil && ok {
-		var mods []RedditSubredditModerator
-		if err := json.Unmarshal([]byte(cached), &mods); err == nil {
-			return mods, nil
-		}
-	}
-
-	mods, err := r.fetchSubredditModeratorsAPI(ctx, subreddit)
-	if err != nil {
-		var httpErr *redditHTTPError
-		if errors.As(err, &httpErr) && httpErr.statusCode == http.StatusForbidden {
-			if fallbackMods, scrapeErr := r.fetchSubredditModeratorsFromHTML(ctx, subreddit); scrapeErr == nil {
-				mods = fallbackMods
-			} else {
-				if errors.Is(scrapeErr, ErrRedditModeratorsUnavailable) {
-					return nil, ErrRedditModeratorsUnavailable
-				}
-				return nil, scrapeErr
-			}
-		} else {
-			return nil, err
-		}
-	}
-
-	if data, err := json.Marshal(mods); err == nil {
-		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
-	}
-
-	return mods, nil
-}
-
-func (r *RedditClient) fetchSubredditModeratorsAPI(ctx context.Context, subreddit string) ([]RedditSubredditModerator, error) {
-	token := ""
-	if r.clientID != "" && r.clientSecret != "" {
-		var err error
-		token, err = r.getAppAccessToken(ctx)
-		if err != nil {
-			token = ""
-		}
-	}
-
-	var url string
-	if token != "" {
-		url = fmt.Sprintf("https://oauth.reddit.com/r/%s/about/moderators", subreddit)
-	} else {
-		url = fmt.Sprintf("%s/r/%s/about/moderators.json", r.redditBaseURL(), subreddit)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create subreddit moderators request: %w", err)
-	}
-	req.Header.Set("User-Agent", r.userAgent)
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	resp, err := r.doAPIRequest(req, "subreddit_moderators")
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch subreddit moderators: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, &redditHTTPError{statusCode: resp.StatusCode, body: string(body)}
-	}
-
-	var raw struct {
-		Data struct {
-			Children []struct {
-				ID              string   `json:"id"`
-				Name            string   `json:"name"`
-				AuthorFlairText string   `json:"author_flair_text"`
-				ModPermissions  []string `json:"mod_permissions"`
-			} `json:"children"`
-		} `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return nil, fmt.Errorf("failed to decode subreddit moderators: %w", err)
-	}
-
-	mods := make([]RedditSubredditModerator, 0, len(raw.Data.Children))
-	for _, mod := range raw.Data.Children {
-		mods = append(mods, RedditSubredditModerator{
-			ID:              mod.ID,
-			Name:            mod.Name,
-			AuthorFlairText: mod.AuthorFlairText,
-			ModPermissions:  mod.ModPermissions,
-		})
-	}
-	return mods, nil
-}
-
-func (r *RedditClient) fetchSubredditModeratorsFromHTML(ctx context.Context, subreddit string) ([]RedditSubredditModerator, error) {
-	url := fmt.Sprintf("%s/r/%s/about/moderators", r.redditBaseURL(), subreddit)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create moderators fallback request: %w", err)
-	}
-	req.Header.Set("User-Agent", r.userAgent)
-
-	resp, err := r.doAPIRequest(req, "subreddit_moderators_html")
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch moderators fallback: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusForbidden {
-		return nil, ErrRedditModeratorsUnavailable
-	}
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to scrape moderators: %w", &redditHTTPError{statusCode: resp.StatusCode, body: string(body)})
-	}
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse moderators page: %w", err)
-	}
-
-	extractName := func(href string) (string, bool) {
-		if href == "" {
-			return "", false
-		}
-		trimmed := href
-		trimmed = strings.TrimPrefix(trimmed, "https://www.reddit.com")
-		trimmed = strings.TrimPrefix(trimmed, "https://old.reddit.com")
-		if !strings.HasPrefix(trimmed, "/user/") {
-			return "", false
-		}
-		name := strings.TrimPrefix(trimmed, "/user/")
-		name = strings.Trim(name, "/")
-		if name == "" || strings.Contains(name, "/") {
-			return "", false
-		}
-		return name, true
-	}
-
-	mods := make([]RedditSubredditModerator, 0, 16)
-	seen := make(map[string]bool)
-
-	doc.Find("a[data-testid='moderator-name']").Each(func(_ int, sel *goquery.Selection) {
-		if name, ok := extractName(sel.AttrOr("href", "")); ok && !seen[name] {
-			seen[name] = true
-			mods = append(mods, RedditSubredditModerator{
-				Name:            name,
-				AuthorFlairText: strings.TrimSpace(sel.Text()),
-			})
-		}
-	})
-
-	if len(mods) == 0 {
-		doc.Find("a[href^='/user/'], a[href^='https://www.reddit.com/user/']").Each(func(_ int, sel *goquery.Selection) {
-			if name, ok := extractName(sel.AttrOr("href", "")); ok && !seen[name] {
-				seen[name] = true
-				mods = append(mods, RedditSubredditModerator{
-					Name:            name,
-					AuthorFlairText: strings.TrimSpace(sel.Text()),
-				})
-			}
-		})
-	}
-
-	if len(mods) == 0 {
-		return nil, ErrRedditModeratorsUnavailable
-	}
-
-	return mods, nil
-}
-
-func (r *RedditClient) getAppAccessToken(ctx context.Context) (string, error) {
-	if r.clientID == "" || r.clientSecret == "" {
-		return "", errors.New("reddit client credentials are not configured")
-	}
-
-	r.tokenMu.Lock()
-	defer r.tokenMu.Unlock()
-
-	if r.appToken != nil && time.Until(r.appToken.expiry) > 30*time.Second {
-		return r.appToken.value, nil
-	}
-
-	form := "grant_type=client_credentials"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://www.reddit.com/api/v1/access_token", strings.NewReader(form))
-	if err != nil {
-		return "", fmt.Errorf("failed to create reddit token request: %w", err)
-	}
-	req.SetBasicAuth(r.clientID, r.clientSecret)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("User-Agent", r.userAgent)
-
-	resp, err := r.doAPIRequest(req, "app_access_token")
-	if err != nil {
-		return "", fmt.Errorf("failed to request reddit token: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("reddit token endpoint returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	var tokenResp struct {
-		AccessToken string `json:"access_token"`
-		TokenType   string `json:"token_type"`
-		ExpiresIn   int    `json:"expires_in"`
-		Scope       string `json:"scope"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return "", fmt.Errorf("failed to decode reddit token response: %w", err)
-	}
-	if tokenResp.AccessToken == "" {
-		return "", errors.New("reddit token response missing access token")
-	}
-
-	expires := tokenResp.ExpiresIn
-	if expires <= 0 {
-		expires = 3600
-	}
-	if expires < 120 {
-		expires = 120
-	}
-	r.appToken = &redditAppToken{
-		value:  tokenResp.AccessToken,
-		expiry: time.Now().Add(time.Duration(expires-60) * time.Second),
-	}
-	return r.appToken.value, nil
 }
 
 func (r *RedditClient) getCachedListing(ctx context.Context, key string) (*RedditListing, bool, error) {
@@ -1516,25 +1246,19 @@ func (r *RedditClient) GetSubredditWikiPage(ctx context.Context, subreddit strin
 		params.Set("v", revision)
 		requestURL = fmt.Sprintf("%s?%s", requestURL, params.Encode())
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, requestURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", r.userAgent)
 
 	resp, err := r.doAPIRequest(req, "subreddit_wiki_page")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch subreddit wiki page: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrRedditNotFound
-	}
-
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, &redditHTTPError{statusCode: resp.StatusCode, body: string(body)}
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var result struct {
@@ -1550,25 +1274,19 @@ func (r *RedditClient) GetSubredditWikiPage(ctx context.Context, subreddit strin
 // GetWikiPage fetches a wiki page from Reddit's main wiki
 func (r *RedditClient) GetWikiPage(ctx context.Context, pagePath string) (map[string]interface{}, error) {
 	url := fmt.Sprintf("%s/wiki/%s.json", r.redditBaseURL(), pagePath)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, url)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", r.userAgent)
 
 	resp, err := r.doAPIRequest(req, "wiki_page")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch wiki page: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrRedditNotFound
-	}
-
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, &redditHTTPError{statusCode: resp.StatusCode, body: string(body)}
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var result struct {
@@ -1592,7 +1310,6 @@ func (r *RedditClient) GetSubredditWikiRevisions(ctx context.Context, subreddit,
 
 	params := url.Values{}
 	params.Set("limit", strconv.Itoa(limit))
-	params.Set("raw_json", "1")
 	if after != "" {
 		params.Set("after", after)
 	}
@@ -1602,24 +1319,18 @@ func (r *RedditClient) GetSubredditWikiRevisions(ctx context.Context, subreddit,
 		requestURL = fmt.Sprintf("%s?%s", requestURL, query)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, requestURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", r.userAgent)
 
 	resp, err := r.doAPIRequest(req, "subreddit_wiki_revisions")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch subreddit wiki revisions: %w", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrRedditNotFound
-	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, &redditHTTPError{statusCode: resp.StatusCode, body: string(body)}
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var listing struct {
@@ -1660,24 +1371,18 @@ func (r *RedditClient) GetSubredditWikiDiscussions(ctx context.Context, subreddi
 		requestURL = fmt.Sprintf("%s?%s", requestURL, query)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	req, err := r.newPublicJSONRequest(ctx, http.MethodGet, requestURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", r.userAgent)
 
 	resp, err := r.doAPIRequest(req, "subreddit_wiki_discussions")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch subreddit wiki discussions: %w", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrRedditNotFound
-	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, &redditHTTPError{statusCode: resp.StatusCode, body: string(body)}
+		return nil, redditHTTPErrorFromResponse(resp)
 	}
 
 	var listing RedditListing
