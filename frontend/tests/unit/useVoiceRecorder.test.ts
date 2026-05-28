@@ -16,9 +16,9 @@ class FakeMediaRecorder {
   onstop: (() => void) | null = null;
   private readonly chunk = new Blob(['voice-bytes'], { type: 'audio/webm' });
 
-  constructor(_stream: MediaStream, _options?: MediaRecorderOptions) {}
+  constructor() {}
 
-  start(_timeslice?: number) {
+  start() {
     this.state = 'recording';
   }
 
