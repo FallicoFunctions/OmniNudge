@@ -564,6 +564,7 @@ func main() {
 		postRepo,
 		hubSubRepo,
 		subredditSubRepo,
+		savedItemsRepo,
 		redditClient,
 		cache,
 		time.Duration(cfg.Redis.TTLSeconds)*time.Second,

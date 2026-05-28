@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/api/middleware"
-	"github.com/omninudge/backend/internal/ports"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -12,10 +10,13 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/services"
 )
 
@@ -24,6 +25,7 @@ type FeedHandler struct {
 	postRepo         ports.PlatformPostRepository
 	hubSubRepo       ports.HubSubscriptionRepository
 	subredditSubRepo ports.SubredditSubscriptionRepository
+	savedRepo        ports.SavedItemsRepository
 	redditClient     *services.RedditClient
 	cache            services.Cache
 	cacheTTL         time.Duration
@@ -34,6 +36,7 @@ func NewFeedHandler(
 	postRepo ports.PlatformPostRepository,
 	hubSubRepo ports.HubSubscriptionRepository,
 	subredditSubRepo ports.SubredditSubscriptionRepository,
+	savedRepo ports.SavedItemsRepository,
 	redditClient *services.RedditClient,
 	cache services.Cache,
 	cacheTTL time.Duration,
@@ -42,6 +45,7 @@ func NewFeedHandler(
 		postRepo:         postRepo,
 		hubSubRepo:       hubSubRepo,
 		subredditSubRepo: subredditSubRepo,
+		savedRepo:        savedRepo,
 		redditClient:     redditClient,
 		cache:            cache,
 		cacheTTL:         cacheTTL,
@@ -227,6 +231,14 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 		}
 	}
 
+	if authenticated && h.savedRepo != nil {
+		page, err = h.filterHiddenFeedItems(c.Request.Context(), userID, page)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to filter hidden posts")
+			return
+		}
+	}
+
 	// Build nextCursor string
 	var nextCursor string
 	var hasMore bool
@@ -264,6 +276,50 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+func (h *FeedHandler) filterHiddenFeedItems(ctx context.Context, userID int, items []CombinedFeedItem) ([]CombinedFeedItem, error) {
+	if len(items) == 0 {
+		return items, nil
+	}
+
+	hiddenPosts, err := h.savedRepo.GetHiddenPosts(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	hiddenPostIDs := make(map[int]struct{}, len(hiddenPosts))
+	for _, post := range hiddenPosts {
+		hiddenPostIDs[post.ID] = struct{}{}
+	}
+
+	hiddenRedditPosts, err := h.savedRepo.GetHiddenRedditPosts(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	hiddenRedditPostIDs := make(map[string]struct{}, len(hiddenRedditPosts))
+	for _, post := range hiddenRedditPosts {
+		hiddenRedditPostIDs[redditPostKey(post.Subreddit, post.RedditPostID)] = struct{}{}
+	}
+
+	filtered := make([]CombinedFeedItem, 0, len(items))
+	for _, item := range items {
+		switch post := item.Post.(type) {
+		case *models.PlatformPost:
+			if _, hidden := hiddenPostIDs[post.ID]; hidden {
+				continue
+			}
+		case services.RedditPost:
+			if _, hidden := hiddenRedditPostIDs[redditPostKey(post.Subreddit, post.ID)]; hidden {
+				continue
+			}
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered, nil
+}
+
+func redditPostKey(subreddit, postID string) string {
+	return subreddit + "-" + strings.TrimPrefix(postID, "t3_")
 }
 
 // fetchSubscribedFeeds fetches posts from subscribed hubs and subreddits

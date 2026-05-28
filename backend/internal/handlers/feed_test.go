@@ -41,12 +41,13 @@ func setupFeedHandlerTest(t *testing.T) (*FeedHandler, *database.Database, int, 
 	postRepo := models.NewPlatformPostRepository(db.Pool)
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
 	subRepo := models.NewSubredditSubscriptionRepository(db.Pool)
+	savedRepo := models.NewSavedItemsRepository(db.Pool)
 	cache := services.NewMemoryCache()
 
 	// Use a no-op reddit client (no credentials needed - tests don't hit real Reddit)
 	redditClient := services.NewRedditClient("test-agent", cache, 5*time.Minute, "", "")
 
-	handler := NewFeedHandler(postRepo, hubSubRepo, subRepo, redditClient, cache, 5*time.Minute)
+	handler := NewFeedHandler(postRepo, hubSubRepo, subRepo, savedRepo, redditClient, cache, 5*time.Minute)
 
 	cleanup := func() { db.Close() }
 	return handler, db, user.ID, cleanup
@@ -198,4 +199,44 @@ func TestGetHomeFeed_Empty(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	// Posts slice should be non-nil even if empty
 	// Posts slice may be nil when empty — 200 OK is sufficient assertion
+}
+
+func TestFeedHandlerFilterHiddenFeedItems(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler, db, userID, cleanup := setupFeedHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	hubRepo := models.NewHubRepository(db.Pool)
+	hubDesc := "Hidden feed test hub"
+	hub := &models.Hub{
+		Name:        fmt.Sprintf("hiddenfeed_%d", time.Now().UnixNano()),
+		Description: &hubDesc,
+		CreatedBy:   &userID,
+	}
+	require.NoError(t, hubRepo.Create(ctx, hub))
+
+	postRepo := models.NewPlatformPostRepository(db.Pool)
+	visiblePost := &models.PlatformPost{AuthorID: userID, HubID: &hub.ID, Title: "Visible platform post"}
+	hiddenPost := &models.PlatformPost{AuthorID: userID, HubID: &hub.ID, Title: "Hidden platform post"}
+	require.NoError(t, postRepo.Create(ctx, visiblePost))
+	require.NoError(t, postRepo.Create(ctx, hiddenPost))
+
+	savedRepo := models.NewSavedItemsRepository(db.Pool)
+	require.NoError(t, savedRepo.HidePost(ctx, userID, hiddenPost.ID))
+	require.NoError(t, savedRepo.HideRedditPost(ctx, userID, "golang", "abc123"))
+
+	items := []CombinedFeedItem{
+		{Source: "hub", Post: visiblePost, Score: 2},
+		{Source: "hub", Post: hiddenPost, Score: 1},
+		{Source: "reddit", Post: services.RedditPost{ID: "t3_abc123", Subreddit: "golang", Title: "Hidden reddit"}, Score: 3},
+		{Source: "reddit", Post: services.RedditPost{ID: "def456", Subreddit: "golang", Title: "Visible reddit"}, Score: 4},
+	}
+
+	filtered, err := handler.filterHiddenFeedItems(ctx, userID, items)
+	require.NoError(t, err)
+	require.Len(t, filtered, 2)
+	assert.Equal(t, visiblePost.ID, filtered[0].Post.(*models.PlatformPost).ID)
+	assert.Equal(t, "def456", filtered[1].Post.(services.RedditPost).ID)
 }
