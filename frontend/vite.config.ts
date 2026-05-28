@@ -16,11 +16,24 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'tanstack-query': ['@tanstack/react-query'],
-          diff: ['diff'],
-          'react-colorful': ['react-colorful'],
+        manualChunks(id) {
+          if (id.includes('/node_modules/react/') ||
+              id.includes('/node_modules/react-dom/') ||
+              id.includes('/node_modules/react-router-dom/')) {
+            return 'react-vendor';
+          }
+
+          if (id.includes('/node_modules/@tanstack/react-query/')) {
+            return 'tanstack-query';
+          }
+
+          if (id.includes('/node_modules/diff/')) {
+            return 'diff';
+          }
+
+          if (id.includes('/node_modules/react-colorful/')) {
+            return 'react-colorful';
+          }
         },
       },
     },

@@ -1,6 +1,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import featureFlagService from '../services/featureFlagService';
+import { analyticsService } from '../services/analyticsService';
 import { useAuth } from './AuthContext';
 
 interface FeatureFlagContextType {
@@ -27,9 +28,7 @@ export function FeatureFlagProvider({ children }: { children: ReactNode }) {
                 .filter(([, enabled]) => enabled)
                 .map(([key]) => key);
 
-            import('../services/analyticsService').then(({ analyticsService }) => {
-                analyticsService.setActiveFeatureFlags(enabledFlags);
-            });
+            analyticsService.setActiveFeatureFlags(enabledFlags);
         } catch (error) {
             console.error('Failed to fetch feature flags:', error);
         } finally {

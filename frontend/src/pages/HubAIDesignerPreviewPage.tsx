@@ -1,16 +1,14 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { lazy, Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import CodeMirror from '@uiw/react-codemirror';
-import { html } from '@codemirror/lang-html';
-import { css } from '@codemirror/lang-css';
-import { oneDark } from '@codemirror/theme-one-dark';
 import { hubAIDesignerService, type DesignVersion } from '../services/hubAIDesignerService';
 import { useAuth } from '../contexts/AuthContext';
 import { useHubModerators } from '../hooks/useHubModerators';
 import { isUserHubModerator } from '../utils/moderation';
 import HubAIDesignRenderer from '../components/hubDesign/HubAIDesignRenderer';
 import { splitAIDesignHTML } from '../utils/splitAIDesignHTML';
+
+const HubAIDesignCodeEditor = lazy(() => import('../components/hubDesign/HubAIDesignCodeEditor'));
 
 export default function HubAIDesignerPreviewPage() {
   const { hubName, designId } = useParams<{ hubName: string; designId: string }>();
@@ -94,7 +92,15 @@ export default function HubAIDesignerPreviewPage() {
 
   const activateMutation = useMutation({
     mutationFn: () => hubAIDesignerService.activateDesign(hubName!, numericDesignId),
-    onSuccess: () => navigate(`/h/${hubName}/settings?tab=ai-designer`),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['hubAIDesigns', hubName] }),
+        queryClient.invalidateQueries({ queryKey: ['hubAIActiveDesign', hubName] }),
+        queryClient.invalidateQueries({ queryKey: ['aiDesign', hubName, numericDesignId] }),
+        queryClient.invalidateQueries({ queryKey: ['aiDesignVersions', hubName, numericDesignId] }),
+      ]);
+      navigate(`/h/${hubName}/settings?tab=ai-designer`);
+    },
   });
 
   const handleCancel = useCallback(() => {
@@ -303,62 +309,22 @@ export default function HubAIDesignerPreviewPage() {
           <p className="px-4 py-1 text-xs text-red-400 bg-[#21252b]">{saveError}</p>
         )}
 
-        {editorOpen && activeEditor === 'html' && (
-          <CodeMirror
-            value={htmlContent}
-            height="300px"
-            extensions={[html()]}
-            theme={oneDark}
-            onChange={val => setHtmlContent(val)}
-            basicSetup={{
-              lineNumbers: true,
-              highlightActiveLineGutter: true,
-              highlightSpecialChars: true,
-              foldGutter: true,
-              drawSelection: true,
-              dropCursor: true,
-              allowMultipleSelections: true,
-              indentOnInput: true,
-              syntaxHighlighting: true,
-              bracketMatching: true,
-              closeBrackets: true,
-              autocompletion: true,
-              rectangularSelection: true,
-              crosshairCursor: false,
-              highlightActiveLine: true,
-              highlightSelectionMatches: true,
-              closeBracketsKeymap: true,
-              defaultKeymap: true,
-              searchKeymap: true,
-              historyKeymap: true,
-              foldKeymap: true,
-              completionKeymap: true,
-              lintKeymap: true,
-            }}
-          />
-        )}
-        {editorOpen && activeEditor === 'css' && (
-          <CodeMirror
-            value={cssContent}
-            height="300px"
-            extensions={[css()]}
-            theme={oneDark}
-            onChange={val => setCssContent(val)}
-            basicSetup={{
-              lineNumbers: true,
-              foldGutter: true,
-              syntaxHighlighting: true,
-              bracketMatching: true,
-              closeBrackets: true,
-              autocompletion: true,
-              highlightActiveLine: true,
-              highlightSelectionMatches: true,
-              defaultKeymap: true,
-              searchKeymap: true,
-              historyKeymap: true,
-              completionKeymap: true,
-            }}
-          />
+        {editorOpen && (
+          <Suspense
+            fallback={
+              <div className="px-4 py-6 text-sm text-gray-300">
+                Loading editor…
+              </div>
+            }
+          >
+            <HubAIDesignCodeEditor
+              activeEditor={activeEditor}
+              htmlContent={htmlContent}
+              cssContent={cssContent}
+              onHtmlChange={setHtmlContent}
+              onCssChange={setCssContent}
+            />
+          </Suspense>
         )}
       </div>
     </div>
