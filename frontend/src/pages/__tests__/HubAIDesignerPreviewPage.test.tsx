@@ -68,7 +68,7 @@ function renderPreviewPage() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
 
-  return render(
+  const renderResult = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/h/testHub/ai-design/preview/123']}>
         <Routes>
@@ -80,6 +80,8 @@ function renderPreviewPage() {
       </MemoryRouter>
     </QueryClientProvider>,
   );
+
+  return { ...renderResult, queryClient };
 }
 
 describe('HubAIDesignerPreviewPage', () => {
@@ -126,6 +128,26 @@ describe('HubAIDesignerPreviewPage', () => {
     expect(screen.queryByText(/check your connection/i)).not.toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByText('Thinking…')).not.toBeInTheDocument();
+    });
+  });
+
+  it('invalidates AI designer caches before returning to settings after publish', async () => {
+    const { queryClient } = renderPreviewPage();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    queryClient.setQueryData(['hubAIDesigns', 'testHub'], { designs: [] });
+    queryClient.setQueryData(['hubAIActiveDesign', 'testHub'], { design: null });
+    queryClient.setQueryData(['aiDesign', 'testHub', 123], { design: { id: 123 } });
+    queryClient.setQueryData(['aiDesignVersions', 'testHub', 123], { versions: [] });
+
+    await screen.findByText('Preview AI Layout');
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+
+    await waitFor(() => {
+      expect(mockActivateDesign).toHaveBeenCalledWith('testHub', 123);
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['hubAIDesigns', 'testHub'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['hubAIActiveDesign', 'testHub'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['aiDesign', 'testHub', 123] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['aiDesignVersions', 'testHub', 123] });
     });
   });
 });
