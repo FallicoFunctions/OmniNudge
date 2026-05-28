@@ -34,8 +34,14 @@ import { getOwnKeys } from '../services/keyManagementService';
 import {
   getHiddenPostIdSet,
   getHiddenRedditPostIdSet,
+  getRedditPostKey,
   getSavedPostIdSet,
   getSavedRedditPostIdSet,
+  invalidateHiddenItemsQueries,
+  markPlatformPostSaved,
+  markPlatformPostUnsaved,
+  markRedditPostSaved,
+  markRedditPostUnsaved,
 } from '../utils/savedItems';
 
 type Tab = 'posts' | 'communities' | 'users' | 'messages';
@@ -187,10 +193,6 @@ export default function SearchResultsPage() {
     return parsed.toISOString().slice(0, 16);
   };
 
-  const savedPostsKey = ['saved-items', 'posts'] as const;
-  const hiddenPostsKey = ['hidden-items', 'posts'] as const;
-  const savedRedditPostsKey = ['saved-items', 'reddit_posts'] as const;
-  const hiddenRedditPostsKey = ['hidden-items', 'reddit_posts'] as const;
   const { data: savedPostsData } = useSavedItems('posts', !!user);
   const { data: hiddenPostsData } = useHiddenItems('posts', !!user);
   const { data: savedRedditPostsData } = useSavedItems('reddit_posts', !!user);
@@ -206,7 +208,7 @@ export default function SearchResultsPage() {
     [hiddenRedditPostsData]
   );
 
-  const toggleSaveMutation = useMutation<void, Error, { postId: number; shouldSave: boolean }>({
+  const toggleSaveMutation = useMutation<void, Error, { postId: number; shouldSave: boolean; post: PlatformPost }>({
     mutationFn: async ({ postId, shouldSave }) => {
       if (shouldSave) {
         await savedService.savePost(postId);
@@ -214,8 +216,12 @@ export default function SearchResultsPage() {
         await savedService.unsavePost(postId);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: savedPostsKey });
+    onSuccess: (_data, { postId, shouldSave, post }) => {
+      if (shouldSave) {
+        markPlatformPostSaved(queryClient, post);
+      } else {
+        markPlatformPostUnsaved(queryClient, postId);
+      }
     },
     onError: (mutationError: Error) => {
       alert(t('alerts.saveFailed', { message: mutationError.message }));
@@ -227,7 +233,7 @@ export default function SearchResultsPage() {
       await savedService.hidePost(postId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: hiddenPostsKey });
+      invalidateHiddenItemsQueries(queryClient);
       setHideTarget(null);
     },
     onError: (mutationError: Error) => {
@@ -258,8 +264,19 @@ export default function SearchResultsPage() {
         await savedService.unsaveRedditPost(post.subreddit, post.id);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: savedRedditPostsKey });
+    onSuccess: (_data, { post, shouldSave }) => {
+      if (shouldSave) {
+        markRedditPostSaved(queryClient, post.subreddit, post.id, {
+          title: post.title,
+          author: post.author,
+          score: post.score,
+          num_comments: post.num_comments,
+          thumbnail: post.thumbnail ?? null,
+          created_utc: post.created_utc,
+        });
+      } else {
+        markRedditPostUnsaved(queryClient, post.subreddit, post.id);
+      }
     },
     onError: (mutationError: Error) => {
       alert(t('alerts.saveFailed', { message: mutationError.message }));
@@ -271,7 +288,7 @@ export default function SearchResultsPage() {
       await savedService.hideRedditPost(post.subreddit, post.id);
     },
     onSuccess: (_data, post) => {
-      queryClient.invalidateQueries({ queryKey: hiddenRedditPostsKey });
+      invalidateHiddenItemsQueries(queryClient);
       setPosts((prev) => ({
         ...prev,
         reddit: prev.reddit.filter(
@@ -693,7 +710,7 @@ export default function SearchResultsPage() {
     () =>
       filteredPosts.filter((item) => {
         if (item.type === 'reddit') {
-          const postKey = `${item.post.subreddit}-${item.post.id}`;
+          const postKey = getRedditPostKey(item.post.subreddit, item.post.id);
           if (hiddenRedditPostIds.has(postKey)) {
             return false;
           }
@@ -1063,7 +1080,7 @@ export default function SearchResultsPage() {
             {visiblePosts.map((item, idx) => {
               if (item.type === 'reddit') {
                 const post = item.post;
-                const postKey = `${post.subreddit}-${post.id}`;
+                const postKey = getRedditPostKey(post.subreddit, post.id);
                 const isSaved = savedRedditPostIds.has(postKey);
                 const isSaveActionPending =
                   toggleSaveRedditPostMutation.isPending &&
@@ -1132,7 +1149,7 @@ export default function SearchResultsPage() {
                         alert(t('alerts.signInToSave'));
                         return;
                       }
-                      toggleSaveMutation.mutate({ postId: post.id, shouldSave });
+                      toggleSaveMutation.mutate({ postId: post.id, shouldSave, post });
                     }}
                     onHide={() => {
                       if (!user) {

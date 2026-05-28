@@ -1,17 +1,16 @@
 import { api } from '../lib/api';
 import type { HiddenItemsResponse, SavedItemsResponse, SaveRedditPostPayload } from '../types/saved';
-
-const normalizeRedditPostId = (postId: string) => postId.replace(/^t3_/, '');
+import { normalizeRedditPostId } from '../utils/savedItems';
 
 export const savedService = {
   async getSavedItems(type: 'all' | 'posts' | 'reddit_posts' | 'post_comments' | 'reddit_comments' | 'reddit_api_comments' = 'all'): Promise<SavedItemsResponse> {
     const query = type ? `?type=${type}` : '';
-    return api.get<SavedItemsResponse>(`/users/me/saved${query}`);
+    return api.get<SavedItemsResponse>(`/users/me/saved${query}`, { cache: 'no-store' });
   },
 
   async getHiddenItems(type: 'all' | 'posts' | 'reddit_posts' = 'all'): Promise<HiddenItemsResponse> {
     const query = type ? `?type=${type}` : '';
-    return api.get<HiddenItemsResponse>(`/users/me/hidden${query}`);
+    return api.get<HiddenItemsResponse>(`/users/me/hidden${query}`, { cache: 'no-store' });
   },
 
   async savePost(postId: number): Promise<void> {

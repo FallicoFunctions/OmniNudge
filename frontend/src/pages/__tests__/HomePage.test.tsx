@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
 // --- Service mocks ---
+const mockAuthState = vi.hoisted(() => ({
+  user: null as null | { id: number; username: string; role: string },
+}));
+
 vi.mock('../../services/feedService', () => ({
   feedService: {
     getHomeFeed: vi.fn().mockResolvedValue({ posts: [], reddit_posts: [], next_cursor: null, total: 0 }),
@@ -51,11 +55,12 @@ vi.mock('../../components/slideshow/RedditPostSlideshow', () => ({
 
 // --- Context mocks ---
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: null, isAuthenticated: false }),
+  useAuth: () => ({ user: mockAuthState.user, isAuthenticated: Boolean(mockAuthState.user) }),
 }));
 vi.mock('../../contexts/SettingsContext', () => ({
   useSettings: () => ({
     useRelativeTime: true,
+    defaultOmniPostsOnly: false,
     useInfiniteScrollHome: false,
     searchIncludeNsfwByDefault: false,
     blockAllNsfw: false,
@@ -96,6 +101,8 @@ import HomePage from '../HomePage';
 describe('HomePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuthState.user = null;
+    localStorage.clear();
   });
 
   it('renders without crashing (smoke test)', () => {
@@ -144,5 +151,39 @@ describe('HomePage', () => {
 
     const topButton = screen.getByRole('button', { name: /^top$/i });
     expect(topButton).toBeInTheDocument();
+  });
+
+  it('requests subscribed feed without popular fallback after switching from Discover to Following', async () => {
+    const { feedService } = await import('../../services/feedService');
+    vi.mocked(feedService.getHomeFeed).mockResolvedValue({
+      posts: [],
+      sort: 'hot',
+      limit: 50,
+      offset: 0,
+      total: 0,
+      has_more: false,
+    });
+    mockAuthState.user = { id: 7, username: 'homeuser', role: 'user' };
+
+    const Wrapper = createWrapper();
+    render(
+      <Wrapper>
+        <HomePage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /view current popular content/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^discover$/i }));
+    await waitFor(() => {
+      expect(vi.mocked(feedService.getHomeFeed).mock.calls.some((call) => call[4] === true)).toBe(true);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^following$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^new$/i }));
+
+    await waitFor(() => {
+      const lastCall = vi.mocked(feedService.getHomeFeed).mock.calls.at(-1);
+      expect(lastCall?.[4]).toBe(false);
+    });
   });
 });

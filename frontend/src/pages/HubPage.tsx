@@ -43,7 +43,13 @@ import { useSavedItems } from '../hooks/useSavedItems';
 import { useHiddenItems } from '../hooks/useHiddenItems';
 import { CrosspostModal } from '../components/common/CrosspostModal';
 import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
-import { getHiddenPostIdSet, getSavedPostIdSet } from '../utils/savedItems';
+import {
+  getHiddenPostIdSet,
+  getSavedPostIdSet,
+  invalidateHiddenItemsQueries,
+  markPlatformPostSaved,
+  markPlatformPostUnsaved,
+} from '../utils/savedItems';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { EmptyState } from '../components/empty';
 import { PostCardSkeleton } from '../components/common/LoadingStates';
@@ -155,11 +161,9 @@ export default function HubsPage() {
     [subscribedSubreddits]
   );
 
-  const savedPostsKey = ['saved-items', 'posts'] as const;
   const { data: savedPostsData } = useSavedItems('posts', !!user);
   const savedPostIds = useMemo(() => getSavedPostIdSet(savedPostsData), [savedPostsData]);
 
-  const hiddenPostsKey = ['hidden-items', 'posts'] as const;
   const { data: hiddenPostsData } = useHiddenItems('posts', !!user);
   const hiddenPostIds = useMemo(() => getHiddenPostIdSet(hiddenPostsData), [hiddenPostsData]);
 
@@ -748,7 +752,7 @@ export default function HubsPage() {
     };
   }, [canReorderPinned, draggingPinnedId, setPinnedOrder, updatePinnedOrderMutation]);
 
-  const savedToggleMutation = useMutation<void, Error, { postId: number; shouldSave: boolean }>({
+  const savedToggleMutation = useMutation<void, Error, { postId: number; shouldSave: boolean; post: PlatformPost }>({
     mutationFn: async ({ postId, shouldSave }) => {
       if (!user) {
         throw new Error(t('alerts.signInToSave'));
@@ -759,8 +763,12 @@ export default function HubsPage() {
         await savedService.unsavePost(postId);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: savedPostsKey });
+    onSuccess: (_data, { postId, shouldSave, post }) => {
+      if (shouldSave) {
+        markPlatformPostSaved(queryClient, post);
+      } else {
+        markPlatformPostUnsaved(queryClient, postId);
+      }
     },
     onError: (err) => {
       alert(t('alerts.saveFailed', { message: err.message }));
@@ -775,7 +783,7 @@ export default function HubsPage() {
       await savedService.hidePost(postId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: hiddenPostsKey });
+      invalidateHiddenItemsQueries(queryClient);
     },
     onError: (err) => {
       alert(t('alerts.hideFailed', { message: err.message }));
@@ -783,12 +791,12 @@ export default function HubsPage() {
   });
 
   const handleToggleSavePost = useCallback(
-    (postId: number, isCurrentlySaved: boolean) => {
+    (postId: number, isCurrentlySaved: boolean, post: PlatformPost) => {
       if (!user) {
         alert(t('alerts.signInToSave'));
         return;
       }
-      savedToggleMutation.mutate({ postId, shouldSave: !isCurrentlySaved });
+      savedToggleMutation.mutate({ postId, shouldSave: !isCurrentlySaved, post });
     },
     [savedToggleMutation, t, user]
   );
@@ -892,7 +900,7 @@ export default function HubsPage() {
             onPinnedPointerDown={onPinnedPointerDown}
             onPinnedPointerUp={onPinnedPointerUp}
             onShare={() => handleSharePost(post.id)}
-            onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
+            onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave, normalizedPost)}
             onHide={() => handleHidePost(post.id)}
             onCrosspost={() => handleCrosspostSelection(post)}
             onEdit={() => setEditPostTarget(normalizedPost)}

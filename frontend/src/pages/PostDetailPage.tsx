@@ -29,7 +29,14 @@ import { Panel } from '../components/common/Panel';
 import SubredditAboutPanel from '../components/reddit/SubredditAboutPanel';
 import { useSubredditAbout } from '../hooks/useSubredditAbout';
 import { useSavedItems } from '../hooks/useSavedItems';
-import { getSavedCommentIdSet, getSavedPostIdSet } from '../utils/savedItems';
+import {
+  getSavedCommentIdSet,
+  getSavedPostIdSet,
+  invalidateHiddenItemsQueries,
+  invalidateSavedItemsQueries,
+  markPlatformPostSaved,
+  markPlatformPostUnsaved,
+} from '../utils/savedItems';
 import { PostCardSkeleton, CommentSkeleton } from '../components/common/LoadingStates';
 import { PostDetailMedia } from '../components/posts/PostDetailMedia';
 import { PostHeader } from '../components/posts/PostHeader';
@@ -300,8 +307,6 @@ export default function PostDetailPage() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const savedPostsKey = ['saved-items', 'posts'] as const;
-  const hiddenPostsKey = ['hidden-items', 'posts'] as const;
   const savedSiteCommentsKey = ['saved-items', 'post_comments'] as const;
   const { data: savedPostsData } = useSavedItems('posts', !!user);
   const { data: savedSiteCommentsData } = useSavedItems('post_comments', !!user, 1000 * 60 * 5);
@@ -340,8 +345,14 @@ export default function PostDetailPage() {
         await savedService.unsavePost(parsedPostId);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: savedPostsKey });
+    onSuccess: (_data, shouldSave) => {
+      if (postData) {
+        if (shouldSave) {
+          markPlatformPostSaved(queryClient, postData);
+        } else {
+          markPlatformPostUnsaved(queryClient, parsedPostId);
+        }
+      }
     },
   });
 
@@ -354,10 +365,10 @@ export default function PostDetailPage() {
         throw new Error(t('posts.errors.invalidPost'));
       }
       await savedService.hidePost(parsedPostId);
-      await queryClient.invalidateQueries({ queryKey: savedPostsKey });
+      await invalidateSavedItemsQueries(queryClient);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: hiddenPostsKey });
+      invalidateHiddenItemsQueries(queryClient);
     },
   });
 
@@ -580,8 +591,8 @@ export default function PostDetailPage() {
   const deletePostMutation = useMutation<void, Error, { postId: number; reason?: string }>({
     mutationFn: async ({ postId, reason }) => postsService.deletePost(postId, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: savedPostsKey });
-      queryClient.invalidateQueries({ queryKey: hiddenPostsKey });
+      invalidateSavedItemsQueries(queryClient);
+      invalidateHiddenItemsQueries(queryClient);
       setDeletePostTarget(null);
       setDeletePostReason('');
       navigate(originPathFromState ?? (hubName ? `/h/${hubName}` : '/'));
