@@ -62,24 +62,15 @@ function getExpandableImageUrl(post: RedditPostCardProps['post']): string | unde
     return undefined;
   }
 
-  // Check for regular image preview
-  const previewUrl = post.preview?.images?.[0]?.source?.url;
-  const sanitizedPreview = sanitizeHttpUrl(previewUrl);
-  if (sanitizedPreview) {
-    return sanitizedPreview;
-  }
-
   // Check direct image URL
   const sanitizedPostUrl = sanitizeHttpUrl(post.url);
-  if (!sanitizedPostUrl) {
-    return undefined;
-  }
-
-  if (post.post_hint === 'image' || IMAGE_URL_REGEX.test(sanitizedPostUrl.toLowerCase())) {
+  if (sanitizedPostUrl && (post.post_hint === 'image' || IMAGE_URL_REGEX.test(sanitizedPostUrl.toLowerCase()))) {
     return sanitizedPostUrl;
   }
 
-  return undefined;
+  // Fall back to Reddit preview images for non-direct-image posts.
+  const previewUrl = post.preview?.images?.[0]?.source?.url;
+  return sanitizeHttpUrl(previewUrl);
 }
 
 function getThumbnailUrl(post: RedditPostCardProps['post']): string | null {
