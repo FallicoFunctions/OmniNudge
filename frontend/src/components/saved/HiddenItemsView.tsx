@@ -21,6 +21,7 @@ import type { PlatformPost } from '../../types/posts';
 import { getPostUrl } from '../../utils/postUrl';
 import { postsService } from '../../services/postsService';
 import { useAuth } from '../../contexts/AuthContext';
+import { SavedItemFilters, type SourceFilter } from './SavedItemFilters';
 
 type RedditListingData = {
   data?: {
@@ -61,8 +62,6 @@ type RedditListingData = {
     }>;
   };
 };
-
-type TabKey = 'omni' | 'reddit';
 
 const PAGE_SIZE = 25;
 
@@ -124,7 +123,7 @@ export function HiddenItemsView({
   const { user } = useAuth();
   const emptyData: HiddenItemsResponse = { type: 'all', hidden_posts: [], hidden_reddit_posts: [] };
   const [loadError, setLoadError] = useState<Error | null>(null);
-  const [activeTab, setActiveTab] = useState<TabKey>('omni');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('omni');
   const { data = emptyData, isLoading } = useQuery<HiddenItemsResponse>({
     queryKey: ['hidden-items', 'all'],
     queryFn: async () => {
@@ -451,17 +450,6 @@ export function HiddenItemsView({
     }))
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  const {
-    currentItems: pagedOmniItems,
-    pageIndex: omniPageIndex,
-    totalPages: omniTotalPages,
-    canGoPrev: canOmniGoPrev,
-    canGoNext: canOmniGoNext,
-    goToPrev: goToPrevOmni,
-    goToNext: goToNextOmni,
-    resetPage: resetOmniPage,
-  } = usePagination(omniItems, PAGE_SIZE);
-
   const redditItems = visibleHiddenRedditPosts
     .map((post) => ({
       key: `hidden-reddit-post-${post.subreddit}-${post.reddit_post_id}`,
@@ -516,70 +504,53 @@ export function HiddenItemsView({
     }))
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  const {
-    currentItems: pagedRedditItems,
-    pageIndex: redditPageIndex,
-    totalPages: redditTotalPages,
-    canGoPrev: canRedditGoPrev,
-    canGoNext: canRedditGoNext,
-    goToPrev: goToPrevReddit,
-    goToNext: goToNextReddit,
-    resetPage: resetRedditPage,
-  } = usePagination(redditItems, PAGE_SIZE);
-
-  const renderActiveTab = () => {
-    if (activeTab === 'omni') {
-      if (omniItems.length === 0) {
-        return <p className="text-sm text-[var(--color-text-secondary)]">{t('hidden.empty.omni')}</p>;
-      }
-      return (
-        <>
-          <div className="space-y-3">
-            {pagedOmniItems.map((item) => (
-              <Fragment key={item.key}>{item.node}</Fragment>
-            ))}
-          </div>
-          <PaginationControls
-            pageIndex={omniPageIndex}
-            totalPages={omniTotalPages}
-            onPrev={goToPrevOmni}
-            onNext={goToNextOmni}
-            canGoPrev={canOmniGoPrev}
-            canGoNext={canOmniGoNext}
-          />
-        </>
-      );
+  const filteredItems = useMemo(() => {
+    if (sourceFilter === 'omni') {
+      return omniItems;
     }
+    if (sourceFilter === 'reddit') {
+      return redditItems;
+    }
+    return [...omniItems, ...redditItems].sort((a, b) => b.timestamp - a.timestamp);
+  }, [omniItems, redditItems, sourceFilter]);
 
-    if (redditItems.length === 0) {
-      return <p className="text-sm text-[var(--color-text-secondary)]">{t('hidden.empty.reddit')}</p>;
+  const {
+    currentItems,
+    pageIndex,
+    totalPages,
+    canGoPrev,
+    canGoNext,
+    goToPrev,
+    goToNext,
+    resetPage,
+  } = usePagination(filteredItems, PAGE_SIZE);
+
+  const emptyStateKey =
+    sourceFilter === 'reddit' ? 'hidden.empty.reddit' : 'hidden.empty.omni';
+
+  const renderContent = () => {
+    if (filteredItems.length === 0) {
+      return <p className="text-sm text-[var(--color-text-secondary)]">{t(emptyStateKey)}</p>;
     }
 
     return (
       <>
         <div className="space-y-3">
-          {pagedRedditItems.map((item) => (
+          {currentItems.map((item) => (
             <Fragment key={item.key}>{item.node}</Fragment>
           ))}
         </div>
         <PaginationControls
-          pageIndex={redditPageIndex}
-          totalPages={redditTotalPages}
-          onPrev={goToPrevReddit}
-          onNext={goToNextReddit}
-          canGoPrev={canRedditGoPrev}
-          canGoNext={canRedditGoNext}
+          pageIndex={pageIndex}
+          totalPages={totalPages}
+          onPrev={goToPrev}
+          onNext={goToNext}
+          canGoPrev={canGoPrev}
+          canGoNext={canGoNext}
         />
       </>
     );
   };
-
-  const tabButtonClass = (tab: TabKey) =>
-    `flex-1 rounded-md px-4 py-2 text-sm font-semibold transition ${
-      activeTab === tab
-        ? 'bg-[var(--color-primary)] text-white shadow'
-        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-    }`;
 
   const wrapperClassName = withContainer
     ? ['mx-auto max-w-4xl px-4 py-8', className].filter(Boolean).join(' ')
@@ -594,28 +565,14 @@ export function HiddenItemsView({
         </div>
       )}
 
-      <div className="mb-6 inline-flex w-full max-w-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-1">
-        <button
-          type="button"
-          className={tabButtonClass('omni')}
-          onClick={() => {
-            setActiveTab('omni');
-            resetOmniPage();
-          }}
-        >
-          {t('hidden.tabs.omni')}
-        </button>
-        <button
-          type="button"
-          className={tabButtonClass('reddit')}
-          onClick={() => {
-            setActiveTab('reddit');
-            resetRedditPage();
-          }}
-        >
-          {t('hidden.tabs.reddit')}
-        </button>
-      </div>
+      <SavedItemFilters
+        sourceFilter={sourceFilter}
+        showContentTypeFilter={false}
+        onSourceFilterChange={(next) => {
+          setSourceFilter(next);
+          resetPage();
+        }}
+      />
 
       {isLoading && (
         <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
@@ -631,7 +588,7 @@ export function HiddenItemsView({
         </div>
       )}
 
-      {!isLoading && renderActiveTab()}
+      {!isLoading && renderContent()}
 
       {saveConfirmTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
