@@ -346,8 +346,14 @@ func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, lim
 // GetByAuthor retrieves posts by a specific author
 func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, limit, offset int) ([]*PlatformPost, error) {
 	query := `
-		SELECT ` + platformPostSelectColumnsPrefixed + `
+		SELECT ` + platformPostSelectColumnsPrefixed + `,
+		       h.id as hub_id_val,
+		       h.name as hub_name,
+		       h.title as hub_title,
+		       COALESCE(hs.display_title, h.title) as hub_display_title
 		FROM platform_posts p
+		LEFT JOIN hubs h ON p.hub_id = h.id
+		LEFT JOIN hub_settings hs ON p.hub_id = hs.hub_id
 		LEFT JOIN users u ON p.author_id = u.id
 		WHERE p.author_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE
 		ORDER BY p.created_at DESC
@@ -363,8 +369,34 @@ func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, 
 	var posts []*PlatformPost
 	for rows.Next() {
 		post := &PlatformPost{}
-		if err := scanPlatformPost(rows, post); err != nil {
+		var hubID sql.NullInt64
+		var hubName sql.NullString
+		var hubTitle sql.NullString
+		var hubDisplayTitle sql.NullString
+		if err := scanPlatformPost(rows, post, &hubID, &hubName, &hubTitle, &hubDisplayTitle); err != nil {
 			return nil, err
+		}
+		if hubID.Valid {
+			id := int(hubID.Int64)
+			post.HubID = &id
+		}
+		if hubName.Valid {
+			post.HubName = hubName.String
+			if post.Hub == nil {
+				post.Hub = &Hub{}
+			}
+			if post.HubID != nil {
+				post.Hub.ID = *post.HubID
+			}
+			post.Hub.Name = hubName.String
+			if hubTitle.Valid {
+				titleStr := hubTitle.String
+				post.Hub.Title = &titleStr
+			}
+		}
+		if hubDisplayTitle.Valid {
+			titleStr := hubDisplayTitle.String
+			post.HubDisplayTitle = &titleStr
 		}
 		posts = append(posts, post)
 	}
