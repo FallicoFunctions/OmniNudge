@@ -70,6 +70,12 @@ vi.mock('../../../components/common/StatusMessage', () => ({
   LoadingMessage: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}));
+
 const hiddenOmniPost = {
   id: 1,
   title: 'Hidden Omni Post',
@@ -113,6 +119,30 @@ describe('HiddenItemsView — Omni unhide', () => {
     vi.clearAllMocks();
   });
 
+  it('renders only the shared source filter', async () => {
+    const Wrapper = createWrapper({
+      type: 'all',
+      hidden_posts: [hiddenOmniPost],
+      hidden_reddit_posts: [],
+    });
+
+    render(
+      <Wrapper>
+        <HiddenItemsView />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('hub-post-card')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('saved.filters.show')).not.toBeInTheDocument();
+    expect(screen.getByText('saved.filters.source')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /saved\.filters\.omni/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /saved\.filters\.reddit/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /saved\.filters\.both/i })).toBeEnabled();
+  });
+
   it('removes platform post from list immediately on successful unhide (no refetch needed)', async () => {
     // Make unhide succeed but invalidation never refetches
     mockUnhidePost.mockResolvedValue(undefined);
@@ -149,6 +179,33 @@ describe('HiddenItemsView — Omni unhide', () => {
 describe('HiddenItemsView — Reddit unhide', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('shows both omni and reddit hidden posts when source filter is set to both', async () => {
+    const Wrapper = createWrapper({
+      type: 'all',
+      hidden_posts: [hiddenOmniPost],
+      hidden_reddit_posts: [hiddenRedditPost],
+    });
+
+    render(
+      <Wrapper>
+        <HiddenItemsView />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('hub-post-card')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /saved\.filters\.both/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('hub-post-card')).toBeInTheDocument();
+      expect(
+        screen.getByTestId(`reddit-post-card-${hiddenRedditPost.subreddit}-${hiddenRedditPost.reddit_post_id}`)
+      ).toBeInTheDocument();
+    });
   });
 
   it('removes reddit post from list immediately on successful unhide', async () => {

@@ -20,6 +20,7 @@ import { postsService } from '../../services/postsService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFormat } from '../../hooks/useFormat';
 import { useSavedItems } from '../../hooks/useSavedItems';
+import { SavedItemFilters, type ContentType, type SourceFilter } from './SavedItemFilters';
 
 type RedditListingData = {
   data?: {
@@ -60,9 +61,6 @@ type RedditListingData = {
     }>;
   };
 };
-
-type ContentType = 'posts' | 'comments' | 'both';
-type SourceFilter = 'omni' | 'reddit' | 'both';
 
 const PAGE_SIZE = 25;
 
@@ -708,20 +706,6 @@ export function SavedItemsView({
     );
   };
 
-  const contentTypeButtonClass = (type: ContentType) =>
-    `flex-1 rounded-md px-4 py-2 text-sm font-semibold transition ${
-      contentType === type
-        ? 'bg-[var(--color-primary)] text-white border-2 border-[var(--color-primary)] shadow'
-        : 'border-2 border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-    }`;
-
-  const sourceFilterButtonClass = (filter: SourceFilter) =>
-    `flex-1 rounded-md px-4 py-2 text-sm font-semibold transition ${
-      sourceFilter === filter
-        ? 'bg-[var(--color-primary)] text-white border-2 border-[var(--color-primary)] shadow'
-        : 'border-2 border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-    }`;
-
   const wrapperClassName = withContainer
     ? ['mx-auto max-w-4xl px-4 py-8', className].filter(Boolean).join(' ')
     : className;
@@ -737,85 +721,18 @@ export function SavedItemsView({
         </div>
       )}
 
-      <div className="mb-6 space-y-4">
-        {/* Content Type Toggle */}
-        <div>
-          <label className="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]">
-            {t('saved.filters.show')}
-          </label>
-          <div className="inline-flex gap-2 rounded-lg bg-[var(--color-surface-elevated)] p-1">
-            <button
-              type="button"
-              className={contentTypeButtonClass('posts')}
-              onClick={() => {
-                setContentType('posts');
-                resetPage();
-              }}
-            >
-              {t('saved.filters.posts')}
-            </button>
-            <button
-              type="button"
-              className={contentTypeButtonClass('comments')}
-              onClick={() => {
-                setContentType('comments');
-                resetPage();
-              }}
-            >
-              {t('saved.filters.comments')}
-            </button>
-            <button
-              type="button"
-              className={contentTypeButtonClass('both')}
-              onClick={() => {
-                setContentType('both');
-                resetPage();
-              }}
-            >
-              {t('saved.filters.both')}
-            </button>
-          </div>
-        </div>
-
-        {/* Source Filter */}
-        <div>
-          <label className="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]">
-            {t('saved.filters.source')}
-          </label>
-          <div className="inline-flex gap-2 rounded-lg bg-[var(--color-surface-elevated)] p-1">
-            <button
-              type="button"
-              className={sourceFilterButtonClass('omni')}
-              onClick={() => {
-                setSourceFilter('omni');
-                resetPage();
-              }}
-            >
-              {t('saved.filters.omni')}
-            </button>
-            <button
-              type="button"
-              className={sourceFilterButtonClass('reddit')}
-              onClick={() => {
-                setSourceFilter('reddit');
-                resetPage();
-              }}
-            >
-              {t('saved.filters.reddit')}
-            </button>
-            <button
-              type="button"
-              className={sourceFilterButtonClass('both')}
-              onClick={() => {
-                setSourceFilter('both');
-                resetPage();
-              }}
-            >
-              {t('saved.filters.both')}
-            </button>
-          </div>
-        </div>
-      </div>
+      <SavedItemFilters
+        contentType={contentType}
+        sourceFilter={sourceFilter}
+        onContentTypeChange={(next) => {
+          setContentType(next);
+          resetPage();
+        }}
+        onSourceFilterChange={(next) => {
+          setSourceFilter(next);
+          resetPage();
+        }}
+      />
 
       {isLoading && (
         <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">

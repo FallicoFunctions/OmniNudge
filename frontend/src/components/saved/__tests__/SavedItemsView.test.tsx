@@ -102,6 +102,42 @@ describe('SavedItemsView', () => {
     vi.clearAllMocks();
   });
 
+  it('renders shared show and source filters with all options enabled', async () => {
+    const { Wrapper } = createWrapper({
+      type: 'all',
+      saved_posts: [
+        {
+          id: 42,
+          title: 'Cached Saved Post',
+          hub_name: 'testHub',
+          author_username: 'alice',
+          score: 10,
+          comment_count: 3,
+          crossposted_at: null,
+          created_at: '2024-01-01T00:00:00Z',
+        },
+      ],
+    });
+
+    render(
+      <Wrapper>
+        <SavedItemsView withContainer={false} showHeading={false} />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('hub-post-card')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('saved.filters.show')).toBeInTheDocument();
+    expect(screen.getByText('saved.filters.source')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'saved.filters.posts' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'saved.filters.comments' })).toBeEnabled();
+    expect(screen.getAllByRole('button', { name: 'saved.filters.both' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'saved.filters.omni' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'saved.filters.reddit' })).toBeEnabled();
+  });
+
   it('renders warm saved-items cache without immediately refetching saved items', async () => {
     const { Wrapper } = createWrapper({
       type: 'all',
