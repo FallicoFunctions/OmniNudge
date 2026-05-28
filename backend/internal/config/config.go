@@ -90,9 +90,7 @@ type RetentionConfig struct {
 
 // RedditConfig holds Reddit API client configuration.
 type RedditConfig struct {
-	ClientID     string
-	ClientSecret string
-	UserAgent    string
+	UserAgent string
 }
 
 // JWTConfig holds JWT configuration
@@ -212,9 +210,7 @@ func Load() (*Config, error) {
 			AutoMigrate: getEnvAsBool("DB_AUTO_MIGRATE", true),
 		},
 		Reddit: RedditConfig{
-			ClientID:     getEnv("REDDIT_CLIENT_ID", ""),
-			ClientSecret: getEnv("REDDIT_CLIENT_SECRET", ""),
-			UserAgent:    getEnv("REDDIT_USER_AGENT", "OmniNudge:v1.0"),
+			UserAgent: getEnv("REDDIT_USER_AGENT", "OmniNudge/1.0 (+https://omninudge.com; contact support@omninudge.com)"),
 		},
 		JWT: JWTConfig{
 			Secret: requireEnv("JWT_SECRET"),
