@@ -37,8 +37,7 @@ func TestCompleteMessageFlow(t *testing.T) {
 	token2, _ := deps.AuthService.GenerateJWT(user2.ID, user2.Username, user2.Role)
 
 	// STEP 1: User1 creates a conversation with User2
-	createConvBody := fmt.Sprintf(`{"recipient_username":"%s"}`, user2.Username)
-	req, _ := http.NewRequest("POST", "/api/v1/conversations", bytes.NewReader([]byte(createConvBody)))
+	req, _ := http.NewRequest("POST", "/api/v1/conversations", bytes.NewReader(directConversationRequestBody(user2.ID)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token1)
 	w := doRequest(t, deps.Router, req)
@@ -152,8 +151,7 @@ func TestMessageBlocking(t *testing.T) {
 	token2, _ := deps.AuthService.GenerateJWT(user2.ID, user2.Username, user2.Role)
 
 	// User1 creates conversation
-	createConvBody := fmt.Sprintf(`{"recipient_username":"%s"}`, user2.Username)
-	req, _ := http.NewRequest("POST", "/api/v1/conversations", bytes.NewReader([]byte(createConvBody)))
+	req, _ := http.NewRequest("POST", "/api/v1/conversations", bytes.NewReader(directConversationRequestBody(user2.ID)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token1)
 	w := doRequest(t, deps.Router, req)
@@ -187,7 +185,7 @@ func TestMessageBlocking(t *testing.T) {
 
 	var response map[string]interface{}
 	json.Unmarshal(w.Body.Bytes(), &response)
-	assert.Contains(t, response["error"], "cannot send messages")
+	assert.Contains(t, response["error"], "blocking settings")
 }
 
 // TestMessageDeletion tests soft and hard deletion of messages
@@ -205,8 +203,7 @@ func TestMessageDeletion(t *testing.T) {
 	token2, _ := deps.AuthService.GenerateJWT(user2.ID, user2.Username, user2.Role)
 
 	// Create conversation
-	createConvBody := fmt.Sprintf(`{"recipient_username":"%s"}`, user2.Username)
-	req, _ := http.NewRequest("POST", "/api/v1/conversations", bytes.NewReader([]byte(createConvBody)))
+	req, _ := http.NewRequest("POST", "/api/v1/conversations", bytes.NewReader(directConversationRequestBody(user2.ID)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token1)
 	w := doRequest(t, deps.Router, req)
@@ -266,7 +263,7 @@ func TestMessageDeletion(t *testing.T) {
 
 	// Message should be hard deleted from database
 	deletedMsg, err := deps.MessageRepo.GetByID(ctx, message.ID)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 	assert.Nil(t, deletedMsg)
 }
 

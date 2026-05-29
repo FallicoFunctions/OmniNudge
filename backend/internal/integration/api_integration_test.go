@@ -26,12 +26,23 @@ func stringPtr(value string) *string {
 	return &value
 }
 
+func registerRequestBody(username string) []byte {
+	return []byte(fmt.Sprintf(
+		`{"username":%q,"password":"password123","accept_privacy_policy":true,"accept_terms":true}`,
+		username,
+	))
+}
+
+func platformPostRequestBody(title, body string) []byte {
+	return []byte(fmt.Sprintf(`{"title":%q,"body":%q,"hub_id":1}`, title, body))
+}
+
 func TestAuthRegisterLoginMe(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
 	// Register
-	regBody := []byte(`{"username":"alice","password":"password123"}`)
+	regBody := registerRequestBody("alice")
 	req, _ := http.NewRequest("POST", "/api/v1/auth/register", bytes.NewReader(regBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := doRequest(t, deps.Router, req)
@@ -96,7 +107,7 @@ func TestPostsAndCommentsFlow(t *testing.T) {
 	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
 	// Create post
-	postBody := []byte(`{"title":"hi","body":"body"}`)
+	postBody := platformPostRequestBody("hi", "body")
 	req, _ := http.NewRequest("POST", "/api/v1/posts", bytes.NewReader(postBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -124,7 +135,7 @@ func TestPostEditForbiddenForNonOwner(t *testing.T) {
 	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
 	otherToken, _ := deps.AuthService.GenerateJWT(other.ID, other.Username, other.Role)
 
-	postBody := []byte(`{"title":"hi","body":"body"}`)
+	postBody := platformPostRequestBody("hi", "body")
 	req, _ := http.NewRequest("POST", "/api/v1/posts", bytes.NewReader(postBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+ownerToken)
@@ -150,7 +161,7 @@ func TestCommentEditForbiddenForNonOwner(t *testing.T) {
 	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
 	otherToken, _ := deps.AuthService.GenerateJWT(other.ID, other.Username, other.Role)
 
-	postBody := []byte(`{"title":"hi","body":"body"}`)
+	postBody := platformPostRequestBody("hi", "body")
 	req, _ := http.NewRequest("POST", "/api/v1/posts", bytes.NewReader(postBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+ownerToken)
@@ -206,8 +217,8 @@ func TestMediaUploadValidation(t *testing.T) {
 
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
-	part, _ := writer.CreateFormFile("file", "bad.txt")
-	part.Write([]byte("not an image"))
+	part, _ := writer.CreateFormFile("file", "bad.exe")
+	part.Write([]byte("MZ executable payload"))
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
@@ -216,7 +227,7 @@ func TestMediaUploadValidation(t *testing.T) {
 
 	w := doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusUnsupportedMediaType, w.Code)
-	require.True(t, strings.Contains(w.Body.String(), "Unsupported file type"))
+	require.True(t, strings.Contains(w.Body.String(), "Unsupported file extension"))
 }
 
 func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
@@ -254,7 +265,7 @@ func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
 	req.Header.Set("Content-Type", bw.FormDataContentType())
 	w = doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
-	require.True(t, strings.Contains(strings.ToLower(w.Body.String()), "too large"))
+	require.True(t, strings.Contains(strings.ToLower(w.Body.String()), "exceeds"))
 }
 
 func TestMediaUpload_AllowsPDFDocument(t *testing.T) {
@@ -1905,17 +1916,17 @@ func TestMediaUpload_RejectsStorageQuotaExceeded(t *testing.T) {
 	user := createUser(t, deps.UserRepo, "media_quota", "user")
 	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
-	// Pre-fill near default 1GB free-tier quota.
+	// Pre-fill close enough to the free-tier quota that any valid upload exceeds it.
 	_, err := deps.DB.Pool.Exec(context.Background(), `
 		INSERT INTO media_files (user_id, filename, original_filename, file_type, file_size, storage_url, storage_path)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, user.ID, "existing.bin", "existing.bin", "video/mp4", int64(1*1024*1024*1024-1024), "/uploads/existing.bin", "uploads/existing.bin")
+	`, user.ID, "existing.bin", "existing.bin", "application/pdf", int64(1*1024*1024*1024-8), "/uploads/existing.bin", "uploads/existing.bin")
 	require.NoError(t, err)
 
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
-	part, _ := writer.CreateFormFile("file", "clip.mp4")
-	part.Write([]byte{0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 'D', 'A', 'T', 'A'})
+	part, _ := writer.CreateFormFile("file", "clip.pdf")
+	part.Write([]byte("%PDF-1.4\nquota-test\n"))
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
@@ -2064,8 +2075,8 @@ func TestMediaUpload_RejectsSuspiciousEmbeddedZipSignature(t *testing.T) {
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "photo.png")
-	// PNG header + embedded ZIP local file header marker.
-	payload := []byte{0x89, 0x50, 0x4E, 0x47, 'D', 'A', 'T', 'A', 'P', 'K', 0x03, 0x04}
+	// Valid PNG signature + embedded ZIP local file header marker.
+	payload := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 'D', 'A', 'T', 'A', 'P', 'K', 0x03, 0x04}
 	part.Write(payload)
 	writer.Close()
 
@@ -2217,7 +2228,7 @@ func TestPostVoteLifecycleHTTP(t *testing.T) {
 	user := createUser(t, deps.UserRepo, "vote_user", "user")
 	token, _ := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
 
-	postBody := []byte(`{"title":"vote","body":"body"}`)
+	postBody := platformPostRequestBody("vote", "body")
 	req, _ := http.NewRequest("POST", "/api/v1/posts", bytes.NewReader(postBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)

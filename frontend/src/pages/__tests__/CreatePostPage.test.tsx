@@ -1,8 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, type InitialEntry } from 'react-router-dom';
+import i18n from 'i18next';
 
 // --- Context mocks ---
 vi.mock('../../contexts/AuthContext', () => ({
@@ -25,6 +27,7 @@ vi.mock('../../services/postsService', () => ({
     getPosts: vi.fn().mockResolvedValue([]),
   },
 }));
+import { postsService } from '../../services/postsService';
 vi.mock('../../services/hubsService', () => ({
   hubsService: {
     getHubs: vi.fn().mockResolvedValue([]),
@@ -42,11 +45,31 @@ vi.mock('../../services/hubSettingsService', () => ({
     getHubSettings: vi.fn().mockResolvedValue({}),
   },
 }));
+import { hubSettingsService } from '../../services/hubSettingsService';
 vi.mock('../../services/mediaService', () => ({
   mediaService: {
-    uploadMedia: vi.fn().mockResolvedValue({ url: 'http://example.com/img.jpg' }),
+    batchUploadMedia: vi.fn().mockResolvedValue({
+      uploads: [
+        {
+          id: 1,
+          user_id: 1,
+          filename: 'pic.png',
+          original_filename: 'pic.png',
+          storage_url: '/uploads/pic.png',
+          storage_path: 'uploads/pic.png',
+          file_type: 'image/png',
+          file_size: 123,
+          thumbnail_url: undefined,
+          uploaded_at: '2024-01-01T00:00:00Z',
+        },
+      ],
+      success_count: 1,
+      total_count: 1,
+      errors: [],
+    }),
   },
 }));
+import { mediaService } from '../../services/mediaService';
 
 // --- Hook mocks ---
 vi.mock('../../hooks/useFormat', () => ({
@@ -70,24 +93,27 @@ vi.mock('../../components/common/StatusMessage', () => ({
 
 import CreatePostPage from '../CreatePostPage';
 
-const createWrapper = (initialEntry = '/posts/create') => {
+const toInitialEntries = (initialEntry: InitialEntry | InitialEntry[] = '/posts/create') =>
+  Array.isArray(initialEntry) ? initialEntry : [initialEntry];
+
+const createWrapper = (initialEntry: InitialEntry | InitialEntry[] = '/posts/create') => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <MemoryRouter initialEntries={[initialEntry]}>
+    <MemoryRouter initialEntries={toInitialEntries(initialEntry)}>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </MemoryRouter>
   );
   return Wrapper;
 };
 
-const createWrapperWithClient = (initialEntry = '/posts/create') => {
+const createWrapperWithClient = (initialEntry: InitialEntry | InitialEntry[] = '/posts/create') => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <MemoryRouter initialEntries={[initialEntry]}>
+    <MemoryRouter initialEntries={toInitialEntries(initialEntry)}>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </MemoryRouter>
   );
@@ -95,8 +121,76 @@ const createWrapperWithClient = (initialEntry = '/posts/create') => {
 };
 
 describe('CreatePostPage', () => {
+  let originalCreateObjectURL: typeof URL.createObjectURL | undefined;
+  let originalRevokeObjectURL: typeof URL.revokeObjectURL | undefined;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(hubSettingsService.getHubSettings).mockResolvedValue({
+      id: 1,
+      hub_id: 99,
+      privacy_type: 'public',
+      allow_text_posts: true,
+      allow_link_posts: true,
+      allow_image_posts: true,
+      allow_video_posts: false,
+      allow_poll_posts: false,
+      allow_media_in_comments: true,
+      require_post_flair: false,
+      banned_words: [],
+      spam_filter_strength: 'low',
+      new_account_filter_days: 0,
+      min_account_karma: 0,
+      access_request_cooldown_days: 0,
+      allow_spoilers: true,
+      show_thumbnails: true,
+      enable_wiki: false,
+    });
+    vi.mocked(mediaService.batchUploadMedia).mockResolvedValue({
+      uploads: [
+        {
+          id: 1,
+          user_id: 1,
+          filename: 'pic.png',
+          original_filename: 'pic.png',
+          storage_url: '/uploads/pic.png',
+          storage_path: 'uploads/pic.png',
+          file_type: 'image/png',
+          file_size: 123,
+          thumbnail_url: undefined,
+          uploaded_at: '2024-01-01T00:00:00Z',
+        },
+      ],
+      success_count: 1,
+      total_count: 1,
+      errors: [],
+    });
+    originalCreateObjectURL = URL.createObjectURL;
+    originalRevokeObjectURL = URL.revokeObjectURL;
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      writable: true,
+      value: vi.fn(() => 'blob:preview'),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      writable: true,
+      value: vi.fn(),
+    });
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      writable: true,
+      value: originalCreateObjectURL,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      writable: true,
+      value: originalRevokeObjectURL,
+    });
   });
 
   it('renders post creation form', async () => {
@@ -160,6 +254,91 @@ describe('CreatePostPage', () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue('testHub')).toBeInTheDocument();
     });
+  });
+
+  it('submits using the resolved hub id when defaultHub is preset in navigation state', async () => {
+    const Wrapper = createWrapper([{ pathname: '/posts/create', state: { defaultHub: 'testHub' } }]);
+    render(
+      <Wrapper>
+        <CreatePostPage />
+      </Wrapper>,
+    );
+
+    await screen.findByDisplayValue('testHub');
+
+    const titleInput = screen.getByPlaceholderText(/enter post title/i);
+    await userEvent.type(titleInput, 'My first post');
+
+    await userEvent.click(screen.getByRole('button', { name: /create post/i }));
+
+    await waitFor(() => {
+      expect(postsService.createPost).toHaveBeenCalledTimes(1);
+    });
+
+    expect(vi.mocked(postsService.createPost).mock.calls[0][0]?.hub_id).toBe(99);
+  });
+
+  it('shows translated validation when uploaded files are disallowed by hub media settings', async () => {
+    const Wrapper = createWrapper([{ pathname: '/posts/create', state: { defaultHub: 'testHub' } }]);
+    render(
+      <Wrapper>
+        <CreatePostPage />
+      </Wrapper>,
+    );
+
+    await screen.findByDisplayValue('testHub');
+
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(fileInput).not.toBeNull();
+
+    const videoFile = new File(['video'], 'clip.mp4', { type: 'video/mp4' });
+    await userEvent.upload(fileInput!, videoFile);
+
+    expect(await screen.findByText('Please choose Images.')).toBeInTheDocument();
+  });
+
+  it('shows translated upload failure message when media upload fails', async () => {
+    vi.mocked(mediaService.batchUploadMedia).mockRejectedValue(new Error('boom'));
+
+    const Wrapper = createWrapper([{ pathname: '/posts/create', state: { defaultHub: 'testHub' } }]);
+    render(
+      <Wrapper>
+        <CreatePostPage />
+      </Wrapper>,
+    );
+
+    await screen.findByDisplayValue('testHub');
+
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(fileInput).not.toBeNull();
+
+    const imageFile = new File(['image'], 'pic.png', { type: 'image/png' });
+    await userEvent.upload(fileInput!, imageFile);
+
+    expect(
+      await screen.findByText('Failed to upload media. Please try again.'),
+    ).toBeInTheDocument();
+  });
+
+  it('preserves translated allowed-file label casing in Spanish', async () => {
+    await i18n.changeLanguage('es');
+
+    const Wrapper = createWrapper([{ pathname: '/posts/create', state: { defaultHub: 'testHub' } }]);
+    render(
+      <Wrapper>
+        <CreatePostPage />
+      </Wrapper>,
+    );
+
+    await screen.findByDisplayValue('testHub');
+
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(fileInput).not.toBeNull();
+
+    const videoFile = new File(['video'], 'clip.mp4', { type: 'video/mp4' });
+    await userEvent.upload(fileInput!, videoFile);
+
+    expect(await screen.findByText('Por favor elige Imagenes.')).toBeInTheDocument();
   });
 });
 

@@ -29,10 +29,10 @@ func uniqueWSRUsername(base string) string {
 // dialWS dials the WebSocket endpoint with the given Bearer token.
 func dialWS(ts *httptest.Server, token string) (*websocket.Conn, *http.Response, error) {
 	wsURL := "ws" + ts.URL[len("http"):] + "/api/v1/ws"
-	h := http.Header{}
 	if token != "" {
-		h.Set("Authorization", "Bearer "+token)
+		wsURL += "?token=" + token
 	}
+	h := http.Header{}
 	h.Set("Origin", "http://localhost:8080")
 	return websocket.DefaultDialer.Dial(wsURL, h)
 }
@@ -47,7 +47,7 @@ func TestWebSocketReconnectsAfterDrop(t *testing.T) {
 	defer ts.Close()
 
 	user := createUser(t, deps.UserRepo, uniqueWSRUsername("reconnect"), "user")
-	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
+	token, err := deps.AuthService.GenerateWebSocketJWT(user.ID, user.Username, user.Role, user.TokenVersion)
 	require.NoError(t, err)
 
 	// First connection
@@ -150,8 +150,7 @@ func TestWebSocketMessageRateLimit(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a conversation
-	convBody := []byte(fmt.Sprintf(`{"recipient_username":%q}`, receiver.Username))
-	req, _ := http.NewRequest(http.MethodPost, "/api/v1/conversations", bytes.NewReader(convBody))
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/conversations", bytes.NewReader(directConversationRequestBody(receiver.ID)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+senderToken)
 	w := doRequest(t, deps.Router, req)
@@ -198,7 +197,7 @@ func TestWebSocketConcurrentConnections(t *testing.T) {
 	defer ts.Close()
 
 	user := createUser(t, deps.UserRepo, uniqueWSRUsername("concurrent"), "user")
-	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
+	token, err := deps.AuthService.GenerateWebSocketJWT(user.ID, user.Username, user.Role, user.TokenVersion)
 	require.NoError(t, err)
 
 	// First connection

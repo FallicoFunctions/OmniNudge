@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { QuickReactButton } from '../../src/components/messages/QuickReactButton';
 import { reactionsService } from '../../src/services/reactionsService';
@@ -52,9 +52,10 @@ describe('QuickReactButton', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Add reaction' }));
-    expect(screen.getByRole('dialog', { name: 'Emoji picker' })).toBeInTheDocument();
+    const picker = screen.getByRole('dialog', { name: 'Emoji picker' });
+    expect(picker).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'React with 👍' }));
+    fireEvent.click(within(picker).getByRole('button', { name: 'React with 👍' }));
 
     await waitFor(() => {
       expect(reactionsService.addReaction).toHaveBeenCalledWith(7, '👍');
@@ -64,4 +65,3 @@ describe('QuickReactButton', () => {
     });
   });
 });
-

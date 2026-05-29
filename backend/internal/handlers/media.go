@@ -256,6 +256,18 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		return
 	}
 
+	if total > maxSizeForType {
+		_ = os.Remove(storagePath)
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error":       "File size exceeds limit for this file type",
+			"type":        contentType,
+			"file_size":   total,
+			"max_size":    maxSizeForType,
+			"max_size_mb": maxSizeForType / (1024 * 1024),
+		})
+		return
+	}
+
 	// BUG-11: Post-upload quota check using the actual written total (not client-reported header.Size).
 	// The pre-check above uses header.Size as a DDoS guard; this is the authoritative check.
 	if usedBytes+total > capBytes {

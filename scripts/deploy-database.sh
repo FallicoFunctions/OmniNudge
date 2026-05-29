@@ -10,7 +10,7 @@ echo ""
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
-    echo "Please run as root: sudo bash deploy-database.sh"
+    echo "Please run as root: sudo bash scripts/deploy-database.sh"
     exit 1
 fi
 
@@ -73,5 +73,7 @@ echo "$JWT_SECRET"
 echo ""
 echo "⚠️  SAVE THESE CREDENTIALS SECURELY!"
 echo ""
-echo "Next step: Upload your code and run deploy-app.sh"
+echo "Next step: finish initial bootstrap for the server."
+echo "Legacy/bootstrap-only path: run bash scripts/deploy-app.sh on the server if you still need first-time app provisioning."
+echo "Routine production deploys should use: bash scripts/deploy-on.sh"
 echo ""

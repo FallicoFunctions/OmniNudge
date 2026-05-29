@@ -51,8 +51,10 @@ ssh root@77.42.47.79 'journalctl -u <service-name> -f'
 
 ## Deployment
 
+This runbook is the authoritative production deployment guide. Archived deployment docs point here.
+
 ```bash
-# Normal deploy (builds frontend, backs up, uploads, builds backend, restarts)
+# Canonical production deploy
 bash scripts/deploy-on.sh
 ```
 
@@ -63,7 +65,22 @@ bash scripts/deploy-on.sh
 4. Rsyncs backend code to server (excludes `.env`, binary, `.git`)
 5. Builds backend on server with git version injected via ldflags
 6. Restarts `omninudge-backend`
-7. Curls `omninudge.com` — expects HTTP 200
+7. Verifies the canonical health contract:
+   - server-local backend `http://127.0.0.1:8080/health`
+   - public site `https://omninudge.com`
+   - public API ping `https://api.omninudge.com/api/v1/ping`
+   - public `index.html` boot asset set matches the local build
+   - every referenced public boot asset returns HTTP 200
+
+**If the deploy fails or the site regresses after deploy:**
+
+```bash
+# Roll back to the previous known-good release
+bash scripts/rollback.sh
+
+# Or roll back to a specific commit
+bash scripts/rollback.sh <commit_hash>
+```
 
 **After deploy, on startup the backend:**
 - Pre-warms Redis cache for `r/popular` (hot/new/top) to prevent Reddit rate-limit cold-start

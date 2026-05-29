@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestThreadingSchema_HardDeleteParent_SetsChildReferencesNull(t *testing.T) {
+func TestThreadingSchema_HardDeleteParent_PreservesTombstoneForChildren(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 	ctx := context.Background()
@@ -52,6 +52,11 @@ func TestThreadingSchema_HardDeleteParent_SetsChildReferencesNull(t *testing.T) 
 	require.NoError(t, deps.MessageRepo.SoftDeleteForBoth(ctx, parent.ID))
 	require.NoError(t, deps.MessageRepo.HardDelete(ctx, parent.ID))
 
+	tombstone, err := deps.MessageRepo.GetByID(ctx, parent.ID)
+	require.NoError(t, err)
+	require.NotNil(t, tombstone)
+	require.Equal(t, "[deleted]", tombstone.EncryptedContent)
+
 	var replyTo, threadRoot sql.NullInt32
 	err = deps.DB.Pool.QueryRow(ctx, `
 		SELECT reply_to, thread_root
@@ -59,8 +64,10 @@ func TestThreadingSchema_HardDeleteParent_SetsChildReferencesNull(t *testing.T) 
 		WHERE id = $1
 	`, child.ID).Scan(&replyTo, &threadRoot)
 	require.NoError(t, err)
-	require.False(t, replyTo.Valid, "reply_to should be NULL after parent deletion")
-	require.False(t, threadRoot.Valid, "thread_root should be NULL after parent deletion")
+	require.True(t, replyTo.Valid, "reply_to should continue pointing at the preserved tombstone")
+	require.True(t, threadRoot.Valid, "thread_root should continue pointing at the preserved tombstone")
+	require.Equal(t, int32(parent.ID), replyTo.Int32)
+	require.Equal(t, int32(parent.ID), threadRoot.Int32)
 }
 
 func TestThreadingSchema_HardDeleteMessagesBySender_SetsReferencesNull(t *testing.T) {

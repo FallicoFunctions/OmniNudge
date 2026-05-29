@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -34,6 +35,10 @@ type TestDeps struct {
 	AuthService      *services.AuthService
 	Hub              *websocket.Hub
 	Router           *gin.Engine
+}
+
+func directConversationRequestBody(otherUserID int) []byte {
+	return []byte(fmt.Sprintf(`{"other_user_id":%d}`, otherUserID))
 }
 
 // getTestDB creates a DB connection using TEST_DATABASE_URL or skips tests
@@ -134,6 +139,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, nil, services.NoopCache{})
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
+	notificationsHandler := handlers.NewNotificationsHandler(notifRepo)
 	thumbnailService := services.NewThumbnailService()
 	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, nil, modRepo, services.NoopCache{}, thumbnailService)
 	mediaQuota := handlers.MediaQuotaConfig{
@@ -147,6 +153,8 @@ func newTestDeps(t *testing.T) *TestDeps {
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo, hubSettingsRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, modRepo, userRepo, notifRepo, hub, nil)
 	adminHandler := handlers.NewAdminHandler(userRepo, modRepo, db.Pool)
+	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
+	userStatusHandler := handlers.NewUserStatusHandler(hub)
 	authorizer := websocket.NewAuthorizer(db.Pool)
 	wsHandler := handlers.NewWebSocketHandler(hub, authorizer, userSettingsRepo)
 	searchHandler := handlers.NewSearchHandler(db.Pool)
@@ -182,6 +190,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 		users := api.Group("/users")
 		users.Use(middleware.AuthOptional(authService))
 		{
+			users.GET("/status", userStatusHandler.GetUsersStatus)
 			users.GET("/id/:id/profile", usersHandler.GetUserProfileByID)
 			users.GET("/:username", usersHandler.GetUserProfile)
 		}
@@ -234,7 +243,9 @@ func newTestDeps(t *testing.T) *TestDeps {
 			protected.GET("/messages/:id/history", messagesHandler.GetMessageHistory)
 			protected.GET("/conversations/:id/pinned-messages", messagesHandler.GetPinnedMessages)
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
+			protected.POST("/messages/:id/read", messagesHandler.MarkSingleMessageAsRead)
 			protected.PATCH("/messages/:id", messagesHandler.EditMessage)
+			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
 			protected.PUT("/conversations/:id/archive", conversationsHandler.ArchiveConversation)
 			protected.PUT("/conversations/:id/unarchive", conversationsHandler.UnarchiveConversation)
 			protected.POST("/messages/:id/pin", messagesHandler.PinMessage)
@@ -245,12 +256,20 @@ func newTestDeps(t *testing.T) *TestDeps {
 			protected.GET("/users/me/storage", storageHandler.GetMyStorage)
 			protected.GET("/files/:id/thumbnail", mediaHandler.GetThumbnail)
 			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
+			protected.PUT("/users/profile", usersHandler.UpdateProfile)
 			protected.POST("/users/me/avatar", usersHandler.UploadMyAvatar)
+			protected.POST("/users/block", blockingHandler.BlockUser)
+			protected.DELETE("/users/block/:username", blockingHandler.UnblockUser)
+			protected.GET("/users/blocked", blockingHandler.GetBlockedUsers)
+			protected.GET("/notifications", notificationsHandler.GetNotifications)
+			protected.GET("/notifications/unread/count", notificationsHandler.GetUnreadCount)
+			protected.POST("/notifications/:id/read", notificationsHandler.MarkAsRead)
+			protected.POST("/notifications/read-all", notificationsHandler.MarkAllAsRead)
+			protected.DELETE("/notifications/:id", notificationsHandler.DeleteNotification)
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PUT("/settings", settingsHandler.UpdateSettings)
+			protected.GET("/ws", wsHandler.HandleWebSocket)
 		}
-
-		api.GET("/ws", middleware.AuthRequired(authService), wsHandler.HandleWebSocket)
 		api.POST("/media/upload", middleware.AuthRequired(authService), mediaHandler.UploadMedia)
 		api.POST("/media/batch-upload", middleware.AuthRequired(authService), mediaHandler.BatchUploadMedia)
 	}

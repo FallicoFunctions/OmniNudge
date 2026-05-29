@@ -9,6 +9,15 @@ set -e
 SERVER="root@77.42.47.79"
 SERVICE_NAME="omninudge-backend"
 REPO_PATH="/var/www/omninudge"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/deploy-health-contract.sh"
+
+# Canonical production health contract shared with scripts/deploy-on.sh:
+# - server-local backend check: http://127.0.0.1:8080/health
+# - public site check: https://omninudge.com
+# - public API smoke check: https://api.omninudge.com/api/v1/ping
+# - public asset check: fetched public index.html references the same boot
+#   asset set as the local build, and each referenced asset returns HTTP 200
 
 # Colors
 RED='\033[0;31m'
@@ -122,7 +131,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Upload frontend
-rsync -avz --delete dist/ $SERVER:/var/www/omninudge.com/
+rsync -avz --delete dist/ "$SERVER:$REPO_PATH/frontend/dist/"
 
 cd ..
 git checkout -
@@ -147,22 +156,40 @@ fi
 EOF
 
 if [ $? -eq 0 ]; then
+    # Health check
+    echo -e "\n${YELLOW}Running canonical rollback health check...${NC}"
+    echo "  - backend on server: http://127.0.0.1:8080/health"
+    echo "  - public site: https://omninudge.com"
+    echo "  - public API ping: https://api.omninudge.com/api/v1/ping"
+    echo "  - public index.html boot asset set matches the local build"
+    echo "  - every referenced public boot asset returns HTTP 200"
+    sleep 3
+    HTTP_CODE=$(ssh "$SERVER" 'code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/health 2>/dev/null) || code="000"; printf "%s" "$code"')
+
+    if [ "$HTTP_CODE" != "200" ]; then
+        echo -e "${RED}✗ Backend server-local /health check failed (HTTP $HTTP_CODE)${NC}"
+        echo -e "${YELLOW}Check logs: ssh $SERVER 'journalctl -u $SERVICE_NAME -n 50'${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✓ Backend server-local /health is responding${NC}"
+
+    HTTP_STATUS=$(curl -s -m 15 -o /dev/null -w "%{http_code}" "https://api.omninudge.com/api/v1/ping" 2>/dev/null || true)
+    if [ "${HTTP_STATUS:-0}" != "200" ]; then
+        if [ -z "$HTTP_STATUS" ] || [ "$HTTP_STATUS" = "000" ]; then
+            echo -e "${RED}✗ Public API ping check failed: https://api.omninudge.com/api/v1/ping was unreachable${NC}"
+        else
+            echo -e "${RED}✗ Public API ping check failed: https://api.omninudge.com/api/v1/ping returned HTTP $HTTP_STATUS${NC}"
+        fi
+        exit 1
+    fi
+    echo -e "${GREEN}✓ Public API ping returned HTTP 200${NC}"
+
+    verify_public_boot_asset_contract "frontend/dist/index.html" "https://omninudge.com" "https://omninudge.com"
+
     echo -e "\n${GREEN}========================================${NC}"
     echo -e "${GREEN}Rollback Successful!${NC}"
     echo -e "${GREEN}========================================${NC}"
-
-    # Health check
-    echo -e "\n${YELLOW}Running health check...${NC}"
-    sleep 3
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://api.omninudge.com/api/v1/health || echo "000")
-
-    if [ "$HTTP_CODE" == "200" ]; then
-        echo -e "${GREEN}✓ API is responding${NC}"
-        echo -e "\nRolled back to commit: $COMMIT_HASH"
-    else
-        echo -e "${RED}✗ API health check failed (HTTP $HTTP_CODE)${NC}"
-        echo -e "${YELLOW}Check logs: ssh $SERVER 'journalctl -u $SERVICE_NAME -n 50'${NC}"
-    fi
+    echo -e "\nRolled back to commit: $COMMIT_HASH"
 else
     echo -e "\n${RED}Rollback failed!${NC}"
     exit 1

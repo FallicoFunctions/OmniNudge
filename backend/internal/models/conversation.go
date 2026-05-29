@@ -824,9 +824,38 @@ func (r *ConversationRepository) SoftDeleteForUser(ctx context.Context, conversa
 
 // HardDeleteMessages deletes all messages from a user in a conversation
 func (r *ConversationRepository) HardDeleteMessages(ctx context.Context, conversationID int, senderID int) error {
-	query := `DELETE FROM messages WHERE conversation_id = $1 AND sender_id = $2`
-	_, err := r.pool.Exec(ctx, query, conversationID, senderID)
-	return err
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(ctx, `
+		UPDATE messages
+		SET reply_to = NULL,
+		    thread_root = NULL
+		WHERE conversation_id = $1
+		  AND (
+		    reply_to IN (
+		      SELECT id FROM messages
+		      WHERE conversation_id = $1 AND sender_id = $2
+		    )
+		    OR thread_root IN (
+		      SELECT id FROM messages
+		      WHERE conversation_id = $1 AND sender_id = $2
+		    )
+		  )
+	`, conversationID, senderID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, `DELETE FROM messages WHERE conversation_id = $1 AND sender_id = $2`, conversationID, senderID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 // HardDeleteIfBothDeleted permanently deletes a conversation if both users have soft-deleted it
