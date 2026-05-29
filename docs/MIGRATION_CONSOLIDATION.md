@@ -235,9 +235,9 @@ Run consolidation:
 - [ ] Test on fresh database (see "Testing" section above)
 - [ ] Verify all tables/indexes/constraints present
 
-Update deployment scripts:
+Update deployment docs/bootstrap scripts:
 
-- [ ] Update `deploy-app.sh` to use new migration path
+- [ ] Update bootstrap/deployment references so they match the current migration path and the canonical `RUNBOOK.md`
 - [ ] Remove references to old migration runner (if any)
 - [ ] Test full deployment on test server
 

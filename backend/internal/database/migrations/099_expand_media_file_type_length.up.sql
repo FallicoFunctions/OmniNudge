@@ -1,0 +1,2 @@
+ALTER TABLE media_files
+ALTER COLUMN file_type TYPE VARCHAR(128);

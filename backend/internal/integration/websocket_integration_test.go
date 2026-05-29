@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,23 @@ import (
 	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/require"
 )
+
+func readWebSocketEvent(t *testing.T, conn *websocket.Conn, timeout time.Duration, match func(map[string]interface{}) bool) map[string]interface{} {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		conn.SetReadDeadline(deadline)
+		var event map[string]interface{}
+		require.NoError(t, conn.ReadJSON(&event))
+		if match(event) {
+			return event
+		}
+	}
+
+	t.Fatalf("timed out waiting for expected websocket event")
+	return nil
+}
 
 func TestWebSocketTypingBroadcast(t *testing.T) {
 	deps := newTestDeps(t)
@@ -26,7 +44,8 @@ func TestWebSocketTypingBroadcast(t *testing.T) {
 	alice := createUser(t, deps.UserRepo, "ws_alice", "user")
 	bob := createUser(t, deps.UserRepo, "ws_bob", "user")
 	aliceToken, _ := deps.AuthService.GenerateJWT(alice.ID, alice.Username, alice.Role)
-	bobToken, _ := deps.AuthService.GenerateJWT(bob.ID, bob.Username, bob.Role)
+	aliceWSToken, _ := deps.AuthService.GenerateWebSocketJWT(alice.ID, alice.Username, alice.Role, alice.TokenVersion)
+	bobWSToken, _ := deps.AuthService.GenerateWebSocketJWT(bob.ID, bob.Username, bob.Role, bob.TokenVersion)
 
 	// Create a conversation
 	body := []byte(`{"other_user_id":` + fmt.Sprint(bob.ID) + `}`)
@@ -39,19 +58,28 @@ func TestWebSocketTypingBroadcast(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &conv))
 
 	dial := func(token string) *websocket.Conn {
-		wsURL := "ws" + ts.URL[len("http"):] + "/api/v1/ws"
+		wsURL := "ws" + ts.URL[len("http"):] + "/api/v1/ws?token=" + token
 		h := http.Header{}
-		h.Set("Authorization", "Bearer "+token)
 		h.Set("Origin", "http://localhost:8080")
 		conn, _, err := websocket.DefaultDialer.Dial(wsURL, h)
 		require.NoError(t, err)
 		return conn
 	}
 
-	aliceConn := dial(aliceToken)
+	aliceConn := dial(aliceWSToken)
 	defer aliceConn.Close()
-	bobConn := dial(bobToken)
+	bobConn := dial(bobWSToken)
 	defer bobConn.Close()
+
+	consumeInitialState := func(conn *websocket.Conn) {
+		conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		var initial map[string]interface{}
+		require.NoError(t, conn.ReadJSON(&initial))
+		require.Equal(t, "initial_state", initial["type"])
+	}
+
+	consumeInitialState(aliceConn)
+	consumeInitialState(bobConn)
 
 	// Send typing from alice to bob
 	msg := map[string]interface{}{
@@ -65,9 +93,9 @@ func TestWebSocketTypingBroadcast(t *testing.T) {
 	require.NoError(t, aliceConn.WriteJSON(msg))
 
 	// Expect typing event on bob side
-	bobConn.SetReadDeadline(time.Now().Add(2 * time.Second))
-	var incoming map[string]interface{}
-	require.NoError(t, bobConn.ReadJSON(&incoming))
+	incoming := readWebSocketEvent(t, bobConn, 2*time.Second, func(event map[string]interface{}) bool {
+		return event["type"] == "typing"
+	})
 	require.Equal(t, "typing", incoming["type"])
 
 	// Send a message to trigger new_message/delivered/read
@@ -85,15 +113,16 @@ func TestWebSocketTypingBroadcast(t *testing.T) {
 	require.Equal(t, http.StatusCreated, w.Code)
 
 	// Expect new_message
-	bobConn.SetReadDeadline(time.Now().Add(3 * time.Second))
-	var evt map[string]interface{}
-	require.NoError(t, bobConn.ReadJSON(&evt))
+	evt := readWebSocketEvent(t, bobConn, 3*time.Second, func(event map[string]interface{}) bool {
+		return event["type"] == "new_message"
+	})
 	require.Equal(t, "new_message", evt["type"])
 
 	// Expect delivered/read to sender or recipient (best-effort)
-	aliceConn.SetReadDeadline(time.Now().Add(3 * time.Second))
-	var evt2 map[string]interface{}
-	require.NoError(t, aliceConn.ReadJSON(&evt2))
+	evt2 := readWebSocketEvent(t, aliceConn, 3*time.Second, func(event map[string]interface{}) bool {
+		typeValue, _ := event["type"].(string)
+		return strings.Contains(typeValue, "delivered")
+	})
 	require.Contains(t, evt2["type"], "delivered")
 }
 
@@ -110,18 +139,18 @@ func TestWebSocketModerationReportEvents(t *testing.T) {
 
 	reporterToken, _ := deps.AuthService.GenerateJWT(reporter.ID, reporter.Username, reporter.Role)
 	modToken, _ := deps.AuthService.GenerateJWT(moderator.ID, moderator.Username, moderator.Role)
+	modWSToken, _ := deps.AuthService.GenerateWebSocketJWT(moderator.ID, moderator.Username, moderator.Role, moderator.TokenVersion)
 
 	dial := func(token string) *websocket.Conn {
-		wsURL := "ws" + ts.URL[len("http"):] + "/api/v1/ws"
+		wsURL := "ws" + ts.URL[len("http"):] + "/api/v1/ws?token=" + token
 		h := http.Header{}
-		h.Set("Authorization", "Bearer "+token)
 		h.Set("Origin", "http://localhost:8080")
 		conn, _, err := websocket.DefaultDialer.Dial(wsURL, h)
 		require.NoError(t, err)
 		return conn
 	}
 
-	modConn := dial(modToken)
+	modConn := dial(modWSToken)
 	defer modConn.Close()
 
 	// Consume initial_state first

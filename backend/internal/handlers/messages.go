@@ -1904,6 +1904,9 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to get messages")
 		return
 	}
+	if messages == nil {
+		messages = []*models.Message{}
+	}
 
 	// Mark undelivered messages as delivered for this recipient and notify senders (concurrent broadcasts)
 	if h.hub != nil {

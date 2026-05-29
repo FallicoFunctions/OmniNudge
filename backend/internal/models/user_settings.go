@@ -157,8 +157,8 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 // CreateDefault inserts default settings for a user if none exist.
 func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) (*UserSettings, error) {
 	query := `
-		INSERT INTO user_settings (user_id)
-		VALUES ($1)
+		INSERT INTO user_settings (user_id, theme)
+		VALUES ($1, 'system')
 		ON CONFLICT (user_id) DO NOTHING
 		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators, show_last_seen,
 		          profile_visibility,

@@ -20,16 +20,17 @@ func NewAuthorizer(db *pgxpool.Pool) *Authorizer {
 
 // CanAccessConversation checks if user is a member of the conversation
 func (a *Authorizer) CanAccessConversation(ctx context.Context, userID, conversationID int) (bool, error) {
-	var exists bool
-	err := a.db.QueryRow(ctx, `
-		SELECT EXISTS(
-			SELECT 1 FROM conversation_participants
-			WHERE conversation_id = $1 AND user_id = $2
-		)
-	`, conversationID, userID).Scan(&exists)
-
+	participantIDs, err := a.ListConversationParticipantIDs(ctx, conversationID)
 	if err != nil {
-		return false, fmt.Errorf("failed to check conversation access: %w", err)
+		return false, err
+	}
+
+	exists := false
+	for _, participantID := range participantIDs {
+		if participantID == userID {
+			exists = true
+			break
+		}
 	}
 
 	if !exists {
@@ -45,6 +46,29 @@ func (a *Authorizer) CanAccessConversation(ctx context.Context, userID, conversa
 
 // ListConversationParticipantIDs returns user IDs for all participants in a conversation.
 func (a *Authorizer) ListConversationParticipantIDs(ctx context.Context, conversationID int) ([]int, error) {
+	var conversationType string
+	var user1ID *int
+	var user2ID *int
+	err := a.db.QueryRow(ctx, `
+		SELECT COALESCE(conversation_type, 'dm'), user1_id, user2_id
+		FROM conversations
+		WHERE id = $1
+	`, conversationID).Scan(&conversationType, &user1ID, &user2ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load conversation participants: %w", err)
+	}
+
+	if conversationType == "dm" {
+		ids := make([]int, 0, 2)
+		if user1ID != nil {
+			ids = append(ids, *user1ID)
+		}
+		if user2ID != nil && (user1ID == nil || *user2ID != *user1ID) {
+			ids = append(ids, *user2ID)
+		}
+		return ids, nil
+	}
+
 	rows, err := a.db.Query(ctx, `
 		SELECT user_id
 		FROM conversation_participants
@@ -78,16 +102,21 @@ func (a *Authorizer) CanSendMessage(ctx context.Context, userID, conversationID 
 		return false, err
 	}
 
+	participantIDs, err := a.ListConversationParticipantIDs(ctx, conversationID)
+	if err != nil {
+		return false, err
+	}
+
 	// Check if user is blocked by any participant
 	var isBlocked bool
 	err = a.db.QueryRow(ctx, `
 		SELECT EXISTS(
-			SELECT 1 FROM blocked_users bu
-			JOIN conversation_participants cp ON bu.blocker_id = cp.user_id
-			WHERE cp.conversation_id = $1
-			  AND bu.blocked_id = $2
+			SELECT 1
+			FROM blocked_users
+			WHERE blocker_id = ANY($1)
+			  AND blocked_id = $2
 		)
-	`, conversationID, userID).Scan(&isBlocked)
+	`, participantIDs, userID).Scan(&isBlocked)
 
 	if err != nil {
 		return false, fmt.Errorf("failed to check blocked status: %w", err)

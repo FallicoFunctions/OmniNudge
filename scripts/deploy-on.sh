@@ -15,6 +15,15 @@ NC='\033[0m' # No Color
 SERVER="root@77.42.47.79"
 SERVER_PATH="/var/www/omninudge"
 PROJECT_ROOT="/Users/Nick_1/Documents/Personal_Projects/OmniNudge"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/deploy-health-contract.sh"
+
+# Canonical production deployment entrypoint and health contract:
+# - server-local backend check: http://127.0.0.1:8080/health
+# - public site check: https://omninudge.com
+# - public API smoke check: https://api.omninudge.com/api/v1/ping
+# - public asset check: fetched public index.html references the same boot
+#   asset set as the local build, and each referenced asset returns HTTP 200
 
 echo -e "${GREEN}Starting OmniNudge deployment...${NC}"
 echo ""
@@ -49,7 +58,7 @@ ssh "$SERVER" bash << EOF
     --exclude='uploads' \
     backend frontend
 
-  # Database backup — load credentials from the .env file written by deploy-app.sh
+  # Database backup — load credentials from the production backend .env on the server
   if [ -f /var/www/omninudge/backend/.env ]; then
     DB_USER=\$(grep '^DB_USER=' /var/www/omninudge/backend/.env | cut -d= -f2)
     DB_PASSWORD=\$(grep '^DB_PASSWORD=' /var/www/omninudge/backend/.env | cut -d= -f2)
@@ -120,15 +129,32 @@ echo -e "${GREEN}✓ Backend rebuilt and restarted${NC}"
 echo ""
 
 # Step 6: Verify deployment
-echo -e "${YELLOW}Step 6: Verifying deployment...${NC}"
-HTTP_STATUS=$(curl -s -m 15 -o /dev/null -w "%{http_code}" "https://omninudge.com" 2>/dev/null || true)
-if [ "${HTTP_STATUS:-0}" = "200" ]; then
-  echo -e "${GREEN}✓ Site is responding (HTTP $HTTP_STATUS)${NC}"
-elif [ -z "$HTTP_STATUS" ] || [ "$HTTP_STATUS" = "000" ]; then
-  echo -e "${RED}✗ Site unreachable (curl failed or timed out)${NC}"
-else
-  echo -e "${RED}✗ Site returned HTTP $HTTP_STATUS${NC}"
+echo -e "${YELLOW}Step 6: Verifying deployment against the canonical health contract...${NC}"
+echo "  - backend on server: http://127.0.0.1:8080/health"
+echo "  - public site: https://omninudge.com"
+echo "  - public API ping: https://api.omninudge.com/api/v1/ping"
+echo "  - public index.html boot asset set matches the local build"
+echo "  - every referenced public boot asset returns HTTP 200"
+
+ssh "$SERVER" bash << 'EOF'
+  set -eo pipefail
+  curl -fsS http://127.0.0.1:8080/health >/tmp/omninudge-health.json
+  systemctl is-active --quiet omninudge-backend
+EOF
+echo -e "${GREEN}✓ Backend service passed server-local /health and systemd checks${NC}"
+
+HTTP_STATUS=$(curl -s -m 15 -o /dev/null -w "%{http_code}" "https://api.omninudge.com/api/v1/ping" 2>/dev/null || true)
+if [ "${HTTP_STATUS:-0}" != "200" ]; then
+  if [ -z "$HTTP_STATUS" ] || [ "$HTTP_STATUS" = "000" ]; then
+    echo -e "${RED}✗ Public API ping check failed: https://api.omninudge.com/api/v1/ping was unreachable${NC}"
+  else
+    echo -e "${RED}✗ Public API ping check failed: https://api.omninudge.com/api/v1/ping returned HTTP $HTTP_STATUS${NC}"
+  fi
+  exit 1
 fi
+echo -e "${GREEN}✓ Public API ping returned HTTP 200${NC}"
+
+verify_public_boot_asset_contract "$PROJECT_ROOT/frontend/dist/index.html" "https://omninudge.com" "https://omninudge.com"
 echo ""
 
 echo -e "${GREEN}Deployment complete!${NC}"
