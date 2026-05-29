@@ -52,13 +52,6 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE,  -- Optional, NULL allowed
     password_hash VARCHAR(255) NOT NULL,
 
-    -- Reddit integration (optional)
-    reddit_id VARCHAR(50) UNIQUE,
-    reddit_username VARCHAR(50),
-    access_token TEXT,
-    refresh_token TEXT,
-    token_expires_at TIMESTAMP,
-
     -- Public key for E2E encryption
     public_key TEXT,
 
@@ -80,7 +73,6 @@ CREATE TABLE users (
 
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
-CREATE INDEX idx_users_reddit_id ON users(reddit_id) WHERE reddit_id IS NOT NULL;
 CREATE INDEX idx_users_last_seen ON users(last_seen DESC);
 ```
 
@@ -89,11 +81,6 @@ CREATE INDEX idx_users_last_seen ON users(last_seen DESC);
 - `username`: Platform username (unique, required, 3-50 characters)
 - `email`: Optional email address for password reset
 - `password_hash`: Bcrypt-hashed password
-- `reddit_id`: Reddit's unique user ID (optional, for future Reddit OAuth integration)
-- `reddit_username`: Reddit username (optional)
-- `access_token`: Reddit OAuth access token (optional, encrypted at rest in production)
-- `refresh_token`: Reddit OAuth refresh token (optional)
-- `token_expires_at`: When Reddit access token expires (optional)
 - `public_key`: RSA public key for E2E encryption (base64 encoded)
 - `avatar_url`: User's avatar URL (can be uploaded or default)
 - `bio`: User bio/description
@@ -106,7 +93,6 @@ CREATE INDEX idx_users_last_seen ON users(last_seen DESC);
 - Users register with username and password
 - Email is optional but recommended for password recovery
 - Password is hashed with bcrypt (cost factor 12)
-- Future Reddit OAuth integration will populate reddit_id and related fields
 
 ---
 
@@ -486,7 +472,7 @@ CREATE TABLE reddit_posts (
 );
 
 CREATE INDEX idx_reddit_posts_subreddit ON reddit_posts(subreddit, created_utc DESC);
-CREATE INDEX idx_reddit_posts_reddit_id ON reddit_posts(reddit_post_id);
+CREATE INDEX idx_reddit_posts_source_id ON reddit_posts(reddit_post_id);
 CREATE INDEX idx_reddit_posts_cache_key ON reddit_posts(cache_key, expires_at);
 CREATE INDEX idx_reddit_posts_expires ON reddit_posts(expires_at);
 ```

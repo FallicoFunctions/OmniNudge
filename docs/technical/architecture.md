@@ -56,10 +56,10 @@
 │                                                         │
 │  ┌─────────────────────────────────────────────────┐  │
 │  │            Business Logic Layer                 │  │
-│  │  - Authentication (Reddit OAuth)                │  │
+│  │  - Username/password + JWT authentication       │  │
 │  │  - Message handling                             │  │
 │  │  - Media processing                             │  │
-│  │  - Reddit API integration                       │  │
+│  │  - Reddit public JSON integration               │  │
 │  │  - Slideshow coordination                       │  │
 │  └─────────────────────────────────────────────────┘  │
 └───────┬──────────────┬──────────────┬─────────────────┘
@@ -141,8 +141,8 @@ frontend/
 **Key Responsibilities:**
 - API endpoint handling
 - WebSocket server for real-time messaging
-- Reddit OAuth authentication
-- Reddit API integration (posts, chat)
+- Username/password + JWT authentication
+- Reddit public JSON integration (browse, cache)
 - Message storage and retrieval
 - User session management
 - Media upload handling
@@ -340,24 +340,18 @@ bucket/
     }
 ```
 
-### Example 4: Reddit Chat to Platform Migration
+### Example 4: Anonymous Reddit Browsing in a Mixed Feed
 
 ```
-1. User A (on platform) messages User B (Reddit-only)
-2. Backend detects User B not on platform
-3. Sends message via Reddit Chat API
-4. Message appears in User B's Reddit inbox
-5. User B clicks invitation link in message
-6. Redirected to platform OAuth flow
-7. Authenticates with Reddit
-8. Platform creates account for User B
-9. Backend migration service:
-   - Fetches Reddit Chat history between A and B (last 100 msgs)
-   - Imports to PostgreSQL
-   - Marks conversation as "upgraded"
-10. Frontend shows merged history:
-    - Old messages: "Sent via Reddit" indicator
-    - New messages: Encrypted, full features
+1. Frontend requests `/api/v1/feed/home`
+2. Backend loads platform posts from PostgreSQL
+3. Backend fetches Reddit listings anonymously from public `.json` endpoints
+4. Redis caches the Reddit response for short TTL reuse
+5. Backend merges platform content with Reddit content into one feed payload
+6. Frontend renders the combined feed
+7. If Reddit returns `403`, `429`, or `503`, backend degrades gracefully:
+   - Reddit-specific endpoints return `503`
+   - mixed feeds return platform/hub content only
 ```
 
 ---
@@ -366,26 +360,21 @@ bucket/
 
 ### Authentication Flow
 
-**Reddit OAuth 2.0:**
+**Username/password + JWT:**
 ```
-1. User clicks "Login with Reddit"
-2. Frontend redirects to Reddit OAuth URL
-3. User authorizes on Reddit
-4. Reddit redirects back with code
-5. Backend exchanges code for access token
-6. Backend fetches Reddit user info
-7. Backend creates/updates user in database
-8. Backend generates JWT token
-9. Returns JWT to frontend
-10. Frontend stores JWT in localStorage
-11. All subsequent requests include JWT in Authorization header
+1. User submits username/email + password to `/api/v1/auth/login`
+2. Backend verifies credentials against PostgreSQL
+3. Backend generates JWT token
+4. Backend returns JWT + user profile to frontend
+5. Frontend stores JWT in localStorage or equivalent secure client storage
+6. All subsequent authenticated requests include JWT in Authorization header
+7. Reddit content is fetched server-side by the backend from public `.json` endpoints
 ```
 
 **JWT Token Structure:**
 ```json
 {
   "user_id": 123,
-  "reddit_id": "abc123",
   "username": "yorkielover42",
   "exp": 1234567890,
   "iat": 1234560000
@@ -415,14 +404,14 @@ bucket/
    encrypted blob -> decrypt(B's private key) -> plaintext
 ```
 
-**Note:** Reddit Chat messages are NOT encrypted (go through Reddit's servers).
+**Note:** Reddit browsing data is fetched read-only by the backend; user-to-user platform messages remain end-to-end encrypted.
 
 ### Data Security
 
 **Stored Data:**
 - Platform messages: Encrypted blobs in PostgreSQL
-- Reddit messages: Plain text (came through Reddit)
-- Passwords: N/A (OAuth only)
+- Reddit listing metadata: Cached public JSON responses
+- Passwords: Bcrypt password hashes in PostgreSQL
 - JWT secrets: Environment variables, never in code
 - API keys: Environment variables, never in code
 
@@ -508,7 +497,6 @@ bucket/
 **Indexing Strategy:**
 ```sql
 -- Users
-CREATE INDEX idx_users_reddit_id ON users(reddit_id);
 CREATE INDEX idx_users_username ON users(username);
 
 -- Messages
