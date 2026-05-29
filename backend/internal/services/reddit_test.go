@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -95,14 +96,25 @@ func TestRedditClientCachesFrontPage(t *testing.T) {
 	}
 }
 
+func newTCP4Server(t *testing.T, handler http.HandlerFunc) *httptest.Server {
+	t.Helper()
+	ln, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("tcp4 loopback unavailable in this environment: %v", err)
+	}
+
+	ts := httptest.NewUnstartedServer(handler)
+	ts.Listener = ln
+	ts.Start()
+	t.Cleanup(ts.Close)
+	return ts
+}
+
 func TestGetSubredditPostsSetsPublicRequestMetadata(t *testing.T) {
 	cache := &mapCache{store: make(map[string]string)}
 	client := NewRedditClient("OmniNudge/1.0 (+https://omninudge.com; contact support@omninudge.com)", cache, time.Minute)
 
-	ln, err := net.Listen("tcp4", "127.0.0.1:0")
-	require.NoError(t, err)
-
-	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := newTCP4Server(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/r/golang/top.json", r.URL.Path)
 		require.Equal(t, "1", r.URL.Query().Get("raw_json"))
 		require.Equal(t, "day", r.URL.Query().Get("t"))
@@ -111,23 +123,77 @@ func TestGetSubredditPostsSetsPublicRequestMetadata(t *testing.T) {
 		require.Contains(t, r.Header.Get("User-Agent"), "OmniNudge/")
 		_ = json.NewEncoder(w).Encode(RedditListing{Kind: "Listing"})
 	}))
-	ts.Listener = ln
-	ts.Start()
-	defer ts.Close()
 
 	client.httpClient.Transport = &hostRewriteTransport{target: ts}
-	_, err = client.GetSubredditPosts(context.Background(), "golang", "top", "day", 25, "")
+	_, err := client.GetSubredditPosts(context.Background(), "golang", "top", "day", 25, "")
 	require.NoError(t, err)
 }
 
-func TestRedditStatusCodeExtractsTypedHTTPError(t *testing.T) {
-	err := &redditHTTPError{statusCode: http.StatusForbidden, body: "blocked"}
+func TestGetSubredditPostsReturnsTypedHTTPError(t *testing.T) {
+	client := NewRedditClient("test-agent", &mapCache{store: make(map[string]string)}, time.Minute)
+
+	ts := newTCP4Server(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("blocked"))
+	}))
+
+	client.httpClient.Transport = &hostRewriteTransport{target: ts}
+	_, err := client.GetSubredditPosts(context.Background(), "golang", "top", "day", 25, "")
+	require.Error(t, err)
+
 	code, ok := RedditStatusCode(err)
 	require.True(t, ok)
 	require.Equal(t, http.StatusForbidden, code)
 }
 
-func TestRedditHTTPErrorMatchesErrRedditNotFound(t *testing.T) {
-	err := &redditHTTPError{statusCode: http.StatusNotFound, body: "missing"}
+func TestGetSubredditPosts404MatchesErrRedditNotFound(t *testing.T) {
+	client := NewRedditClient("test-agent", &mapCache{store: make(map[string]string)}, time.Minute)
+
+	ts := newTCP4Server(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("missing"))
+	}))
+
+	client.httpClient.Transport = &hostRewriteTransport{target: ts}
+	_, err := client.GetSubredditPosts(context.Background(), "golang", "top", "day", 25, "")
+	require.Error(t, err)
+
 	require.ErrorIs(t, err, ErrRedditNotFound)
+	code, ok := RedditStatusCode(err)
+	require.True(t, ok)
+	require.Equal(t, http.StatusNotFound, code)
+}
+
+func TestGetPostInfoReturnsNilOn404(t *testing.T) {
+	client := NewRedditClient("test-agent", &mapCache{store: make(map[string]string)}, time.Minute)
+
+	ts := newTCP4Server(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/info.json", r.URL.Path)
+		require.Equal(t, "t3_abc123", r.URL.Query().Get("id"))
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("missing"))
+	}))
+
+	client.httpClient.Transport = &hostRewriteTransport{target: ts}
+	post, err := client.GetPostInfo(context.Background(), "golang", "abc123")
+	require.NoError(t, err)
+	require.Nil(t, post)
+}
+
+func TestGetPostInfoReturnsTypedHTTPErrorForNon404(t *testing.T) {
+	client := NewRedditClient("test-agent", &mapCache{store: make(map[string]string)}, time.Minute)
+
+	ts := newTCP4Server(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("blocked"))
+	}))
+
+	client.httpClient.Transport = &hostRewriteTransport{target: ts}
+	post, err := client.GetPostInfo(context.Background(), "golang", "abc123")
+	require.Nil(t, post)
+	require.Error(t, err)
+	require.False(t, errors.Is(err, ErrRedditNotFound))
+	code, ok := RedditStatusCode(err)
+	require.True(t, ok)
+	require.Equal(t, http.StatusForbidden, code)
 }

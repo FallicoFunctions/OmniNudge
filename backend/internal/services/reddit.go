@@ -571,6 +571,9 @@ func (r *RedditClient) GetPostInfo(ctx context.Context, subreddit string, reddit
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
 	}
