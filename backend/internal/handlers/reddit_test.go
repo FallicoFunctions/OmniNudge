@@ -156,6 +156,47 @@ func TestGetSubredditPosts(t *testing.T) {
 	assert.Equal(t, 3, len(posts), "Should return all 3 posts")
 }
 
+func TestGetSubredditPostsReturnsServiceUnavailableWhenRedditBlocksRequest(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "You've been blocked by network security.", http.StatusForbidden)
+	}))
+	defer ts.Close()
+
+	client := services.NewRedditClient("test-agent", nil, time.Minute)
+	client.SetHTTPClient(&http.Client{Transport: &hostRewriteTransport{target: ts}})
+	handler := NewRedditHandlerForTest(client)
+
+	router := gin.Default()
+	router.GET("/r/:subreddit", handler.GetSubredditPosts)
+
+	req := httptest.NewRequest("GET", "/r/golang", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusServiceUnavailable, w.Code, "body=%s", w.Body.String())
+	assert.Equal(t, "60", w.Header().Get("Retry-After"))
+}
+
+func TestGetSubredditPostsReturnsNotFoundWhenSubredditMissing(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+
+	client := services.NewRedditClient("test-agent", nil, time.Minute)
+	client.SetHTTPClient(&http.Client{Transport: &hostRewriteTransport{target: ts}})
+	handler := NewRedditHandlerForTest(client)
+
+	router := gin.Default()
+	router.GET("/r/:subreddit", handler.GetSubredditPosts)
+
+	req := httptest.NewRequest("GET", "/r/doesnotexist", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusNotFound, w.Code, "body=%s", w.Body.String())
+}
+
 func TestGetSubredditPostsValidatesLimit(t *testing.T) {
 	handler, ts, _ := setupRedditHandlerTest(t)
 	defer ts.Close()

@@ -1449,25 +1449,6 @@ func main() {
 		stopCancel()
 	}()
 
-	// Pre-warm Reddit cache for r/popular before traffic hits.
-	// Runs in a goroutine so it never delays server startup.
-	// A single successful fetch populates the Redis cache (TTL = REDIS_TTL_SECONDS),
-	// preventing a cold-start burst of concurrent requests that would trigger Reddit's rate limit.
-	go func() {
-		ctx, cancel := context.WithTimeout(stopCtx, 30*time.Second)
-		defer cancel()
-		for _, sort := range []string{"hot", "new", "top"} {
-			if ctx.Err() != nil {
-				return
-			}
-			if _, err := redditClient.GetSubredditPosts(ctx, "popular", sort, "", 100, ""); err != nil {
-				zlog.Warn().Err(err).Str("sort", sort).Msg("Reddit cache pre-warm failed")
-			} else {
-				zlog.Info().Str("sort", sort).Msg("Reddit cache pre-warmed: r/popular")
-			}
-		}
-	}()
-
 	// Start server in a goroutine
 	go func() {
 		zlog.Info().Str("addr", addr).Msg("Server listening")
