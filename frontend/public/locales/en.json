@@ -3290,7 +3290,8 @@
         "createCommunities": "Create and manage communities (hubs)",
         "browseReddit": "Browse some Reddit content through the public free API when it is available",
         "encryptedMessaging": "Use end-to-end encrypted messaging and share files",
-        "postAndComment": "Post and comment inside OmniNudge communities"
+        "postAndComment": "Post and comment inside OmniNudge communities",
+        "aiHubDesigner": "Use the AI hub designer to generate and apply visual ideas for a hub"
       },
       "note": "<strong>Important:</strong> OmniNudge is not Reddit, does not connect to Reddit accounts, and cannot offer the full Reddit experience."
     },
@@ -3306,8 +3307,7 @@
         "financeCrypto": "To learn by shipping real product code",
         "aiIntegration": "To improve the app a little at a time",
         "mobileDesktop": "To work on something because I enjoy it"
-      },
-      "quote": "\"This is a personal project, not a claim that it replaces everything else.\""
+      }
     },
     "roadmap": {
       "title": "Things I may keep building",
