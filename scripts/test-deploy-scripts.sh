@@ -13,7 +13,6 @@ bash -n "$DEPLOY"
 bash -n "$ROLLBACK"
 bash -n "$SAFE"
 bash -n "$HEALTH"
-bash -n "$LIB"
 
 grep -Fq 'source "$SCRIPT_DIR/deploy-lib.sh"' "$DEPLOY"
 grep -Fq 'source "$SCRIPT_DIR/deploy-lib.sh"' "$ROLLBACK"
@@ -30,3 +29,6 @@ grep -Fq 'verify_production_contract' "$ROLLBACK"
 
 grep -Fq 'Use bash scripts/deploy-on.sh directly.' "$SAFE"
 ! grep -Fq 'Pre-warms Redis cache for `r/popular`' "$RUNBOOK"
+
+test -f "$LIB"
+bash -n "$LIB"
