@@ -11,7 +11,9 @@ main() {
   run_local_preflight
   run_remote_preflight
 
-  backup_name="$(create_server_backup)"
+  if ! backup_name="$(create_server_backup)"; then
+    exit 1
+  fi
   print_success "Backup created: ${backup_name}"
 
   if ! upload_frontend_build; then

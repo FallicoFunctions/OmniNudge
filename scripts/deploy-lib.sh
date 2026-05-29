@@ -156,9 +156,13 @@ run_remote_preflight() {
 }
 create_server_backup() {
   local backup_name
+  local file_prune_start
+  local db_prune_start
   backup_name="backup-$(date +%Y%m%d-%H%M%S)"
+  file_prune_start=$((BACKUP_KEEP_TAR + 1))
+  db_prune_start=$((BACKUP_KEEP_SQL + 1))
 
-  run_remote_capture "server backup" "set -eo pipefail
+  if ! run_remote_capture "server backup" "set -eo pipefail
 mkdir -p '$BACKUP_DIR'
 cd '$SERVER_PATH'
 tar -czf '$BACKUP_DIR/${backup_name}.tar.gz' \
@@ -178,14 +182,10 @@ DB_USER=\$(grep '^DB_USER=' '$SERVER_PATH/backend/.env' | cut -d= -f2)
 DB_PASSWORD=\$(grep '^DB_PASSWORD=' '$SERVER_PATH/backend/.env' | cut -d= -f2-)
 DB_NAME=\$(grep '^DB_NAME=' '$SERVER_PATH/backend/.env' | cut -d= -f2-)
 PGPASSWORD=\"\$DB_PASSWORD\" pg_dump --clean --if-exists -U \"\$DB_USER\" -h localhost \"\$DB_NAME\" | gzip > '$BACKUP_DIR/${backup_name}.sql.gz'
-mapfile -t file_backups < <(find '$BACKUP_DIR' -maxdepth 1 -type f -name 'backup-*.tar.gz' -printf '%T@ %p\n' | sort -nr | awk '{print \$2}')
-if [ \"\${#file_backups[@]}\" -gt '$BACKUP_KEEP_TAR' ]; then
-  printf '%s\0' \"\${file_backups[@]:'$BACKUP_KEEP_TAR'}\" | xargs -0r rm -f
-fi
-mapfile -t db_backups < <(find '$BACKUP_DIR' -maxdepth 1 -type f -name 'backup-*.sql.gz' -printf '%T@ %p\n' | sort -nr | awk '{print \$2}')
-if [ \"\${#db_backups[@]}\" -gt '$BACKUP_KEEP_SQL' ]; then
-  printf '%s\0' \"\${db_backups[@]:'$BACKUP_KEEP_SQL'}\" | xargs -0r rm -f
-fi"
+find '$BACKUP_DIR' -maxdepth 1 -type f -name 'backup-*.tar.gz' -printf '%T@ %p\n' | sort -nr | awk '{print \$2}' | tail -n +$file_prune_start | xargs -r rm -f
+find '$BACKUP_DIR' -maxdepth 1 -type f -name 'backup-*.sql.gz' -printf '%T@ %p\n' | sort -nr | awk '{print \$2}' | tail -n +$db_prune_start | xargs -r rm -f"; then
+    return 1
+  fi
 
   printf '%s' "$backup_name"
 }
