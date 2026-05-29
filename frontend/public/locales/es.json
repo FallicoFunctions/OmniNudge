@@ -3290,7 +3290,8 @@
         "createCommunities": "Crear y gestionar comunidades (hubs)",
         "browseReddit": "Ver algo de contenido de Reddit mediante la API publica gratuita cuando este disponible",
         "encryptedMessaging": "Usar mensajeria cifrada de extremo a extremo y compartir archivos",
-        "postAndComment": "Publicar y comentar dentro de las comunidades de OmniNudge"
+        "postAndComment": "Publicar y comentar dentro de las comunidades de OmniNudge",
+        "aiHubDesigner": "Usar el disenador de hubs con IA para generar y aplicar ideas visuales a un hub"
       },
       "note": "<strong>Importante:</strong> OmniNudge no es Reddit, no se conecta a cuentas de Reddit y no puede ofrecer la experiencia completa de Reddit."
     },
@@ -3306,8 +3307,7 @@
         "financeCrypto": "Para aprender publicando codigo de producto real",
         "aiIntegration": "Para mejorar la app poco a poco",
         "mobileDesktop": "Para trabajar en algo porque realmente lo disfruto"
-      },
-      "quote": "\"Este es un proyecto personal, no una afirmacion de que reemplaza a todo lo demas.\""
+      }
     },
     "roadmap": {
       "title": "Cosas que quiza siga construyendo",

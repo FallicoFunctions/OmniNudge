@@ -142,6 +142,23 @@ export function AboutContent({ className = '' }: { className?: string }) {
               </svg>
               <span>{t('aboutPage.availableToday.items.postAndComment')}</span>
             </li>
+            <li className="flex items-start gap-2">
+              <svg
+                className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              <span>{t('aboutPage.availableToday.items.aiHubDesigner')}</span>
+            </li>
           </ul>
           <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
             <p className="text-xs text-orange-700 bg-orange-50 rounded-lg p-3">
@@ -182,9 +199,6 @@ export function AboutContent({ className = '' }: { className?: string }) {
               </div>
             ))}
           </div>
-          <p className="mt-4 text-xs italic text-[var(--color-text-muted)]">
-            {t('aboutPage.vision.quote')}
-          </p>
         </div>
       </div>
 

@@ -184,15 +184,13 @@ export default function MainLayout() {
     return () => window.removeEventListener('open-auth-modal', handler as EventListener);
   }, []);
 
-  // ABOUT-2: Disabled auto-show modal - let users explore first
-  // Users can access about page via navigation instead
-  // useEffect(() => {
-  //   if (typeof window === 'undefined') return;
-  //   const dismissed = localStorage.getItem(aboutModalStorageKey) === 'true';
-  //   if (!dismissed) {
-  //     setShowAboutModal(true);
-  //   }
-  // }, [aboutModalStorageKey]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const dismissed = localStorage.getItem(aboutModalStorageKey) === 'true';
+    if (!dismissed) {
+      setShowAboutModal(true);
+    }
+  }, [aboutModalStorageKey]);
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
