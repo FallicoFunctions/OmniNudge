@@ -3313,6 +3313,12 @@
       "paragraph2": "El propietario de un hub puede describir el estilo que quiere y el agente genera HTML y CSS personalizados para ese hub. La idea es ir mas alla de los temas fijos y producir frontend real y editable dentro del propio producto.",
       "paragraph3": "Eso me parece importante porque conecta la IA con un flujo concreto: pedir, generar, revisar, ajustar y aplicar un diseno que cambia como se ve y funciona una parte real del sitio."
     },
+    "messagingEncryption": {
+      "title": "Mensajeria con cifrado real",
+      "paragraph1": "La mensajeria privada en OmniNudge no es solo una caja de comentarios movida a una barra lateral. Esta construida alrededor de mensajeria cifrada de extremo a extremo para que las conversaciones privadas sean una funcion real del producto y no solo un complemento del foro.",
+      "paragraph2": "Eso importa porque lleva el sitio mas alla de publicaciones e hilos y lo acerca a un producto social mas amplio donde la gente puede hablar directamente, compartir archivos y mantener algunas interacciones en privado.",
+      "paragraph3": "Tambien es el tipo de funcion que creo que destaca en un proyecto de portafolio porque muestra trabajo en diseno de producto, experiencia de mensajeria y funcionalidad real orientada a la seguridad dentro del mismo sistema."
+    },
     "roadmap": {
       "title": "Cosas que quiza siga construyendo",
       "social": {

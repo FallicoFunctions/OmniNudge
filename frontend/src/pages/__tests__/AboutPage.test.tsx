@@ -27,15 +27,26 @@ describe('AboutPage', () => {
     expect(document.body).toBeTruthy();
   });
 
-  it('highlights the AI designer and omits the old messaging roadmap section', () => {
+  it('places the AI designer ahead of the overview cards and shows the messaging encryption section', () => {
     render(
       <MemoryRouter>
         <AboutPage />
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('aboutPage.aiDesigner.title')).toBeInTheDocument();
-    expect(screen.getByText('aboutPage.aiDesigner.paragraph1')).toBeInTheDocument();
+    const body = document.body.textContent ?? '';
+    expect(body.indexOf('aboutPage.aiDesigner.title')).toBeGreaterThanOrEqual(0);
+    expect(body.indexOf('aboutPage.availableToday.title')).toBeGreaterThanOrEqual(0);
+    expect(body.indexOf('aboutPage.vision.title')).toBeGreaterThanOrEqual(0);
+    expect(body.indexOf('aboutPage.aiDesigner.title')).toBeLessThan(
+      body.indexOf('aboutPage.availableToday.title'),
+    );
+    expect(body.indexOf('aboutPage.aiDesigner.title')).toBeLessThan(
+      body.indexOf('aboutPage.vision.title'),
+    );
+
+    expect(screen.getByText('aboutPage.messagingEncryption.title')).toBeInTheDocument();
+    expect(screen.getByText('aboutPage.messagingEncryption.paragraph1')).toBeInTheDocument();
     expect(screen.queryByText('aboutPage.roadmap.messaging.title')).not.toBeInTheDocument();
   });
 });
