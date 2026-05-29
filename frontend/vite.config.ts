@@ -1,8 +1,20 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { execSync } from 'node:child_process'
+
+function getBuildId() {
+  try {
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim()
+  } catch {
+    return 'dev'
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_APP_BUILD_ID': JSON.stringify(getBuildId()),
+  },
   plugins: [react()],
   resolve: {
     dedupe: ['react', 'react-dom', 'react-router-dom'],
