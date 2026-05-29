@@ -21,13 +21,15 @@ grep -Fq 'run_remote_preflight' "$DEPLOY"
 grep -Fq 'run_explicit_migrations' "$DEPLOY"
 grep -Fq 'prompt_for_rollback' "$DEPLOY"
 
-grep -Fq 'restore_backup_bundle' "$ROLLBACK"
-grep -Fq 'rebuild_backend_after_restore' "$ROLLBACK"
-grep -Fq 'verify_production_contract' "$ROLLBACK"
+grep -Fq 'rollback_from_backup' "$ROLLBACK"
 ! grep -Fq 'git checkout' "$ROLLBACK"
+! grep -Fq 'git stash' "$ROLLBACK"
 ! grep -Fq 'npm install' "$ROLLBACK"
+! grep -Fq 'HEAD~1' "$ROLLBACK"
 
 grep -Fq 'Use bash scripts/deploy-on.sh directly.' "$SAFE"
+grep -Fq 'bash scripts/deploy-on.sh' "$RUNBOOK"
+grep -Fq 'bash scripts/rollback.sh' "$RUNBOOK"
 ! grep -Fq 'Pre-warms Redis cache for `r/popular`' "$RUNBOOK"
 
 test -f "$LIB"

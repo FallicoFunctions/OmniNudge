@@ -1,14 +1,12 @@
-# OmniNudge Deployment Guide for Beginners
+# Deployment Guide
 
-This document is archived and retained only as historical first-time bootstrap context.
+This document is archived.
 
-For any current production deploy, verification, or rollback work, use [RUNBOOK.md](../RUNBOOK.md).
+For current production deployment and rollback instructions, use [RUNBOOK.md](../RUNBOOK.md).
 
-Current production entrypoints:
+Canonical commands:
 
 ```bash
 bash scripts/deploy-on.sh
 bash scripts/rollback.sh
 ```
-
-If you are bringing up infrastructure from scratch, use the server bootstrap scripts only for initial provisioning, then switch to the runbook-managed deploy flow above.
