@@ -40,6 +40,42 @@ export function AboutContent({ className = '' }: { className?: string }) {
         </div>
       </div>
 
+      {/* AI Designer Highlight */}
+      <div className="rounded-xl border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-primary)]/10 via-[var(--color-primary)]/5 to-transparent p-6 md:p-8 mb-12">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0">
+            <svg
+              className="w-12 h-12 text-[var(--color-primary)]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.75 3v2.25m4.5-2.25v2.25M4.5 9.75h15M6.75 19.5h10.5A2.25 2.25 0 0019.5 17.25V8.25A2.25 2.25 0 0017.25 6H6.75A2.25 2.25 0 004.5 8.25v9A2.25 2.25 0 006.75 19.5zm1.5-6.75h7.5m-7.5 3h4.5"
+              />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-h2 font-semibold text-[var(--color-text-primary)] mb-3">
+              {t('aboutPage.aiDesigner.title')}
+            </h2>
+            <p className="text-small text-[var(--color-text-secondary)] mb-3">
+              {t('aboutPage.aiDesigner.paragraph1')}
+            </p>
+            <p className="text-small text-[var(--color-text-secondary)] mb-4">
+              {t('aboutPage.aiDesigner.paragraph2')}
+            </p>
+            <p className="text-small text-[var(--color-text-secondary)]">
+              {t('aboutPage.aiDesigner.paragraph3')}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Feature Cards */}
       <div className="grid md:grid-cols-2 gap-6 mb-12">
         {/* What It Is Now */}
@@ -192,7 +228,7 @@ export function AboutContent({ className = '' }: { className?: string }) {
         </div>
       </div>
 
-      {/* AI Designer Highlight */}
+      {/* Messaging Encryption Highlight */}
       <div className="rounded-xl border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-primary)]/10 via-[var(--color-primary)]/5 to-transparent p-6 md:p-8 mb-12">
         <div className="flex items-start gap-4">
           <div className="flex-shrink-0">
@@ -207,22 +243,22 @@ export function AboutContent({ className = '' }: { className?: string }) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M9.75 3v2.25m4.5-2.25v2.25M4.5 9.75h15M6.75 19.5h10.5A2.25 2.25 0 0019.5 17.25V8.25A2.25 2.25 0 0017.25 6H6.75A2.25 2.25 0 004.5 8.25v9A2.25 2.25 0 006.75 19.5zm1.5-6.75h7.5m-7.5 3h4.5"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 10-8 0v4h8z"
               />
             </svg>
           </div>
           <div className="flex-1">
             <h2 className="text-h2 font-semibold text-[var(--color-text-primary)] mb-3">
-              {t('aboutPage.aiDesigner.title')}
+              {t('aboutPage.messagingEncryption.title')}
             </h2>
             <p className="text-small text-[var(--color-text-secondary)] mb-3">
-              {t('aboutPage.aiDesigner.paragraph1')}
+              {t('aboutPage.messagingEncryption.paragraph1')}
             </p>
             <p className="text-small text-[var(--color-text-secondary)] mb-4">
-              {t('aboutPage.aiDesigner.paragraph2')}
+              {t('aboutPage.messagingEncryption.paragraph2')}
             </p>
             <p className="text-small text-[var(--color-text-secondary)]">
-              {t('aboutPage.aiDesigner.paragraph3')}
+              {t('aboutPage.messagingEncryption.paragraph3')}
             </p>
           </div>
         </div>
