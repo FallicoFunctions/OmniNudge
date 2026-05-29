@@ -5,7 +5,13 @@ import HttpBackend from 'i18next-http-backend';
 import { SUPPORTED_LANGUAGES, syncDocumentLanguageAttributes } from './languageUtils';
 
 const isDev = import.meta.env.DEV;
+const localeBuildVersion = import.meta.env.VITE_APP_BUILD_ID || 'dev';
 const loggedMissingTranslations = new Set<string>();
+
+export function buildLocaleLoadPath(language: string): string {
+  const params = new URLSearchParams({ v: localeBuildVersion });
+  return `/locales/${language}.json?${params.toString()}`;
+}
 
 function logMissingTranslation(key: string, language: string | readonly string[] | undefined): void {
   if (!isDev) {
@@ -44,7 +50,10 @@ i18n
       escapeValue: false, // React already escapes by default
     },
     backend: {
-      loadPath: '/locales/{{lng}}.json',
+      loadPath: (languages: string | readonly string[]) => {
+        const language = Array.isArray(languages) ? languages[0] : languages;
+        return buildLocaleLoadPath(language || 'en');
+      },
     },
     detection: {
       // Detection order
