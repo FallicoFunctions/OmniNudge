@@ -13,6 +13,8 @@ SERVER="${SERVER:-root@77.42.47.79}"
 SERVER_PATH="${SERVER_PATH:-/var/www/omninudge}"
 PROJECT_ROOT="${PROJECT_ROOT:-/Users/Nick_1/Documents/Personal_Projects/OmniNudge}"
 BACKUP_DIR="${BACKUP_DIR:-$SERVER_PATH/backups}"
+BACKUP_KEEP_TAR="${BACKUP_KEEP_TAR:-5}"
+BACKUP_KEEP_SQL="${BACKUP_KEEP_SQL:-10}"
 SERVICE_NAME="${SERVICE_NAME:-omninudge-backend}"
 LOCAL_FRONTEND_DIR="$PROJECT_ROOT/frontend"
 LOCAL_BACKEND_DIR="$PROJECT_ROOT/backend"
@@ -175,7 +177,15 @@ tar -czf '$BACKUP_DIR/${backup_name}.tar.gz' \
 DB_USER=\$(grep '^DB_USER=' '$SERVER_PATH/backend/.env' | cut -d= -f2)
 DB_PASSWORD=\$(grep '^DB_PASSWORD=' '$SERVER_PATH/backend/.env' | cut -d= -f2-)
 DB_NAME=\$(grep '^DB_NAME=' '$SERVER_PATH/backend/.env' | cut -d= -f2-)
-PGPASSWORD=\"\$DB_PASSWORD\" pg_dump --clean --if-exists -U \"\$DB_USER\" -h localhost \"\$DB_NAME\" | gzip > '$BACKUP_DIR/${backup_name}.sql.gz'"
+PGPASSWORD=\"\$DB_PASSWORD\" pg_dump --clean --if-exists -U \"\$DB_USER\" -h localhost \"\$DB_NAME\" | gzip > '$BACKUP_DIR/${backup_name}.sql.gz'
+mapfile -t file_backups < <(find '$BACKUP_DIR' -maxdepth 1 -type f -name 'backup-*.tar.gz' -printf '%T@ %p\n' | sort -nr | awk '{print \$2}')
+if [ \"\${#file_backups[@]}\" -gt '$BACKUP_KEEP_TAR' ]; then
+  printf '%s\0' \"\${file_backups[@]:'$BACKUP_KEEP_TAR'}\" | xargs -0r rm -f
+fi
+mapfile -t db_backups < <(find '$BACKUP_DIR' -maxdepth 1 -type f -name 'backup-*.sql.gz' -printf '%T@ %p\n' | sort -nr | awk '{print \$2}')
+if [ \"\${#db_backups[@]}\" -gt '$BACKUP_KEEP_SQL' ]; then
+  printf '%s\0' \"\${db_backups[@]:'$BACKUP_KEEP_SQL'}\" | xargs -0r rm -f
+fi"
 
   printf '%s' "$backup_name"
 }
