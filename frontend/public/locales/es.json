@@ -3315,9 +3315,7 @@
     },
     "messagingEncryption": {
       "title": "Mensajeria con cifrado real",
-      "paragraph1": "La mensajeria privada en OmniNudge no es solo una caja de comentarios movida a una barra lateral. Esta construida alrededor de mensajeria cifrada de extremo a extremo para que las conversaciones privadas sean una funcion real del producto y no solo un complemento del foro.",
-      "paragraph2": "Eso importa porque lleva el sitio mas alla de publicaciones e hilos y lo acerca a un producto social mas amplio donde la gente puede hablar directamente, compartir archivos y mantener algunas interacciones en privado.",
-      "paragraph3": "Tambien es el tipo de funcion que creo que destaca en un proyecto de portafolio porque muestra trabajo en diseno de producto, experiencia de mensajeria y funcionalidad real orientada a la seguridad dentro del mismo sistema."
+      "paragraph1": "La mensajeria privada en OmniNudge se cifra en el navegador antes de enviarse al servidor. La app usa RSA-OAEP para las claves de usuario y AES-256-GCM para el contenido del mensaje, y luego cifra la clave AES con la clave publica del destinatario. Eso significa que el backend almacena texto cifrado, no mensajes privados legibles."
     },
     "roadmap": {
       "title": "Cosas que quiza siga construyendo",
