@@ -346,8 +346,11 @@ func (h *FeedHandler) fetchPopularFeeds(
 	// Fetch r/popular
 	listing, err := h.redditClient.GetSubredditPosts(ctx, "popular", sortBy, redditTimeFilter, limit, "")
 	if err != nil {
-		// Log the error but continue with hub posts only
-		log.Printf("Warning: Failed to fetch Reddit posts: %v", err)
+		if code, ok := services.RedditStatusCode(err); ok {
+			log.Printf("Reddit unavailable for r/popular: status=%d err=%v", code, err)
+		} else {
+			log.Printf("Error fetching r/popular: %v", err)
+		}
 		return hubPosts, []services.RedditPost{}, nil
 	}
 
@@ -522,7 +525,11 @@ func (h *FeedHandler) fetchSubredditWithCache(
 
 	listing, err := h.redditClient.GetSubredditPosts(ctx, subreddit, sortBy, redditTimeFilter, limit, afterCursor)
 	if err != nil {
-		log.Printf("Error fetching r/%s: %v", subreddit, err)
+		if code, ok := services.RedditStatusCode(err); ok {
+			log.Printf("Reddit unavailable for r/%s: status=%d err=%v", subreddit, code, err)
+		} else {
+			log.Printf("Error fetching r/%s: %v", subreddit, err)
+		}
 		return []services.RedditPost{}
 	}
 

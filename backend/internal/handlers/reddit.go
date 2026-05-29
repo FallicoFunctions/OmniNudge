@@ -570,15 +570,14 @@ func (h *RedditHandler) AutocompleteSubreddits(c *gin.Context) {
 
 	suggestions, err := h.redditClient.AutocompleteSubreddits(c.Request.Context(), query, limit)
 	if err != nil {
-		if isRedditNotFound(err) {
-			// Partial input that matches nothing — return empty rather than 404
-			c.JSON(http.StatusOK, gin.H{"suggestions": []interface{}{}})
-			return
-		}
-		if isRedditRateLimited(err) {
-			// Return empty suggestions gracefully so typeahead doesn't break
-			c.JSON(http.StatusOK, gin.H{"suggestions": []interface{}{}})
-			return
+		if code, ok := services.RedditStatusCode(err); ok {
+			switch code {
+			case http.StatusNotFound, http.StatusGone, http.StatusForbidden, http.StatusTooManyRequests, http.StatusServiceUnavailable:
+				// Partial input that matches nothing or a temporarily blocked public API should degrade
+				// to empty suggestions so typeahead doesn't break.
+				c.JSON(http.StatusOK, gin.H{"suggestions": []interface{}{}})
+				return
+			}
 		}
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch subreddit suggestions")
 		return
@@ -1259,57 +1258,19 @@ func (h *RedditHandler) GetSubredditWikiDiscussions(c *gin.Context) {
 	})
 }
 
-// isRedditNotFound returns true when the Reddit API rejected the request with a
-// client-side error (4xx), which typically means the subreddit or resource does
-// not exist or is too short to be valid.
-func isRedditNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	// Match the two Reddit service-layer error formats:
-	//   "reddit API returned status %d: ..."    (fetchJSON helper)
-	//   "reddit responded with status %d: ..."  (typed RedditError)
-	// 403 = private/banned subreddit or user
-	// 404 = not found
-	// 410 = permanently deleted
-	// 400 excluded: means bad request (malformed query) — should stay 500 to surface as a bug.
-	// Anchoring to "reddit" prefix prevents false positives from other services' errors.
-	if !strings.Contains(msg, "reddit") {
-		return false
-	}
-	// Match "status NNN:" to avoid partial matches (e.g. "status 4035")
-	return strings.Contains(msg, "status 403:") ||
-		strings.Contains(msg, "status 404:") ||
-		strings.Contains(msg, "status 410:")
-}
-
-// isRedditRateLimited returns true when Reddit responded with 429 or 503,
-// meaning we are being rate-limited or temporarily blocked.
-// Callers should return 503 (not 500) so clients know to back off.
-func isRedditRateLimited(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	if !strings.Contains(msg, "reddit") {
-		return false
-	}
-	return strings.Contains(msg, "status 429:") ||
-		strings.Contains(msg, "status 503:")
-}
-
 // handleRedditError writes the appropriate HTTP error response for a Reddit API error.
-// Priority: not-found (403/404/410) → rate-limited (429/503) → internal error.
+// Priority: not-found (404/410) → temporarily unavailable (403/429/503) → internal error.
 func handleRedditError(c *gin.Context, err error, notFoundMsg, internalMsg string) {
-	if isRedditNotFound(err) {
-		RespondError(c, http.StatusNotFound, notFoundMsg)
-		return
-	}
-	if isRedditRateLimited(err) {
-		c.Header("Retry-After", "60")
-		RespondError(c, http.StatusServiceUnavailable, "Reddit is temporarily unavailable, please try again shortly")
-		return
+	if code, ok := services.RedditStatusCode(err); ok {
+		switch code {
+		case http.StatusNotFound, http.StatusGone:
+			RespondError(c, http.StatusNotFound, notFoundMsg)
+			return
+		case http.StatusForbidden, http.StatusTooManyRequests, http.StatusServiceUnavailable:
+			c.Header("Retry-After", "60")
+			RespondError(c, http.StatusServiceUnavailable, "Reddit is temporarily unavailable, please try again shortly")
+			return
+		}
 	}
 	RespondError(c, http.StatusInternalServerError, internalMsg)
 }
