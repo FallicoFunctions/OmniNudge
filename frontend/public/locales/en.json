@@ -3314,10 +3314,8 @@
       "paragraph3": "I created this agent because I wanted to bring back the MySpace-era of users designing their own social pages."
     },
     "messagingEncryption": {
-      "title": "Messaging with real encryption",
-      "paragraph1": "Private messaging on OmniNudge is not just a comment box moved into a sidebar. It is built around end-to-end encrypted messaging so private conversations are a real product feature, not just a forum add-on.",
-      "paragraph2": "That matters to me because it pushes the site beyond posts and threads into something closer to a broader social product where people can talk directly, share files, and keep some interactions private.",
-      "paragraph3": "It is also the kind of feature I think stands out in a portfolio project because it shows work on product design, messaging UX, and actual security-oriented functionality in the same system."
+      "title": "Encrypted Messaging",
+      "paragraph1": "OmniNudge encrypts messages in the browser before they are uploaded. The app uses RSA-OAEP for user key pairs and AES-256-GCM for the message payload, then encrypts the AES key with the recipient’s public key. That means the backend stores ciphertext, not readable private messages."
     },
     "roadmap": {
       "title": "Future enhancements I am currently working on",

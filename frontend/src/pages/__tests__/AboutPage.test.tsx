@@ -47,6 +47,8 @@ describe('AboutPage', () => {
 
     expect(screen.getByText('aboutPage.messagingEncryption.title')).toBeInTheDocument();
     expect(screen.getByText('aboutPage.messagingEncryption.paragraph1')).toBeInTheDocument();
+    expect(screen.queryByText('aboutPage.messagingEncryption.paragraph2')).not.toBeInTheDocument();
+    expect(screen.queryByText('aboutPage.messagingEncryption.paragraph3')).not.toBeInTheDocument();
     expect(screen.queryByText('aboutPage.roadmap.messaging.title')).not.toBeInTheDocument();
   });
 });

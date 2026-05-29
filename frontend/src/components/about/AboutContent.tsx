@@ -251,14 +251,8 @@ export function AboutContent({ className = '' }: { className?: string }) {
             <h2 className="text-h2 font-semibold text-[var(--color-text-primary)] mb-3">
               {t('aboutPage.messagingEncryption.title')}
             </h2>
-            <p className="text-small text-[var(--color-text-secondary)] mb-3">
-              {t('aboutPage.messagingEncryption.paragraph1')}
-            </p>
-            <p className="text-small text-[var(--color-text-secondary)] mb-4">
-              {t('aboutPage.messagingEncryption.paragraph2')}
-            </p>
             <p className="text-small text-[var(--color-text-secondary)]">
-              {t('aboutPage.messagingEncryption.paragraph3')}
+              {t('aboutPage.messagingEncryption.paragraph1')}
             </p>
           </div>
         </div>
