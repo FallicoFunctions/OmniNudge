@@ -3281,60 +3281,60 @@
   "aboutPage": {
     "betaLabel": "(beta)",
     "hero": {
-      "title": "La plataforma todo-en-uno para todo lo que haces en linea",
-      "description": "Una plataforma de comunidades tipo Reddit con mensajeria cifrada de extremo a extremo, construyendo hacia un ecosistema integrado de redes sociales, productividad y comunicacion."
+      "title": "Un proyecto personal que hice para mostrar lo que he construido y seguir mejorandolo por diversion",
+      "description": "OmniNudge es un sitio pequeno de comunidades y mensajeria que hice para experimentar, aprender y tener un lugar donde seguir publicando ideas. Es un proyecto real, pero tambien es un espacio de prueba."
     },
     "availableToday": {
-      "title": "Disponible hoy",
+      "title": "Lo que puedes hacer aqui hoy",
       "items": {
-        "createCommunities": "Crea y gestiona comunidades (hubs) como subreddits",
-        "browseReddit": "Explora posts de Reddit y suscribete a subreddits",
-        "encryptedMessaging": "Mensajeria cifrada de extremo a extremo con cualquier tipo de archivo",
-        "postAndComment": "Publica y comenta en comunidades (visible para usuarios de OmniNudge)"
+        "createCommunities": "Crear y gestionar comunidades (hubs)",
+        "browseReddit": "Ver algo de contenido de Reddit mediante la API publica gratuita cuando este disponible",
+        "encryptedMessaging": "Usar mensajeria cifrada de extremo a extremo y compartir archivos",
+        "postAndComment": "Publicar y comentar dentro de las comunidades de OmniNudge"
       },
-      "note": "<strong>Nota:</strong> El acceso a la API de Reddit puede restringirse en cualquier momento por politicas de apps de terceros."
+      "note": "<strong>Importante:</strong> OmniNudge no es Reddit, no se conecta a cuentas de Reddit y no puede ofrecer la experiencia completa de Reddit."
     },
     "vision": {
-      "title": "La vision",
-      "description": "Construyendo la ultima plataforma que necesitaras - un ecosistema digital integral que combina:",
+      "title": "Por que lo hice",
+      "description": "Este sitio existe por algunas razones simples:",
       "items": {
-        "socialMediaIntegration": "Integracion de redes sociales",
-        "officeSuite": "Suite ofimatica",
-        "gamingEcosystem": "Ecosistema de gaming",
-        "mediaHosting": "Alojamiento de medios",
-        "teamCommunication": "Comunicacion de equipo",
-        "financeCrypto": "Finanzas y cripto",
-        "aiIntegration": "Integracion de IA",
-        "mobileDesktop": "Movil y escritorio"
+        "socialMediaIntegration": "Para mostrar funciones que ya he construido",
+        "officeSuite": "Para mantener vivo un proyecto personal de largo plazo",
+        "gamingEcosystem": "Para experimentar con ideas sociales y de comunidad",
+        "mediaHosting": "Para construir herramientas de mensajeria y comparticion que me parecen interesantes",
+        "teamCommunication": "Para tener un lugar donde probar ideas futuras en publico",
+        "financeCrypto": "Para aprender publicando codigo de producto real",
+        "aiIntegration": "Para mejorar la app poco a poco",
+        "mobileDesktop": "Para trabajar en algo porque realmente lo disfruto"
       },
-      "quote": "\"Esta plataforma nunca estara terminada.\""
+      "quote": "\"Este es un proyecto personal, no una afirmacion de que reemplaza a todo lo demas.\""
     },
     "roadmap": {
-      "title": "Lo que sigue",
+      "title": "Cosas que quiza siga construyendo",
       "messaging": {
-        "title": "Mensajeria mejorada",
+        "title": "Mensajeria y comunicacion",
         "items": {
-          "timeActivatedAutoDeletion": "Autoborrado activado por tiempo",
+          "timeActivatedAutoDeletion": "Mejores controles para limpieza y retencion de mensajes",
           "voiceNotes": "Notas de voz",
           "voiceVideoCalls": "Llamadas de voz y video",
           "screenSharing": "Compartir pantalla",
-          "audioPlayer": "Reproductor de audio"
+          "audioPlayer": "Mejor reproduccion de audio y medios"
         }
       },
       "social": {
-        "title": "Mejoras de red social",
+        "title": "Funciones de comunidad y perfil",
         "items": {
           "friendsFollowers": "Amigos y seguidores",
-          "multipleProfiles": "Multiples perfiles para diferentes nichos",
-          "karmaPointSystem": "Sistema de puntos karma",
-          "awardsBadges": "Premios y insignias"
+          "multipleProfiles": "Multiples perfiles o identidades para diferentes usos",
+          "karmaPointSystem": "Senales simples de reputacion o actividad",
+          "awardsBadges": "Insignias, reacciones o reconocimiento ligero"
         }
       }
     },
     "customization": {
-      "title": "Personalizacion sin limites",
-      "paragraph1": "Recuerdas MySpace? Estamos trayendo ese nivel de personalizacion de vuelta. Personaliza todo, desde tu perfil hasta tu experiencia de navegacion, con temas avanzados y las configuraciones mas completas de cualquier plataforma.",
-      "paragraph2": "No quieres complejidad? No hay problema. Valores predeterminados simples y ajustes intuitivos para todos."
+      "title": "Sobre la integracion con Reddit",
+      "paragraph1": "OmniNudge no es Reddit y no puede conectarse a cuentas de Reddit. La integracion con Reddit solo usa la API publica gratuita de Reddit, y esa API cada vez es mas limitada y menos confiable.",
+      "paragraph2": "La razon principal por la que Reddit se agrego fue para ayudar a llenar el sitio con publicaciones mientras todavia no hay muchos usuarios reales de OmniNudge. A largo plazo, la meta es que el sitio se sostenga por su propio contenido y no dependa de Reddit."
     },
     "footer": {
       "termsOfService": "Terminos del servicio",
