@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../components/common/PageShell', () => ({
@@ -27,14 +27,15 @@ describe('AboutPage', () => {
     expect(document.body).toBeTruthy();
   });
 
-  it('contains about-related content', () => {
+  it('highlights the AI designer and omits the old messaging roadmap section', () => {
     render(
       <MemoryRouter>
         <AboutPage />
       </MemoryRouter>,
     );
-    // The page renders translation keys as-is in tests; check for about key text
-    const body = document.body.textContent ?? '';
-    expect(body.length).toBeGreaterThan(0);
+
+    expect(screen.getByText('aboutPage.aiDesigner.title')).toBeInTheDocument();
+    expect(screen.getByText('aboutPage.aiDesigner.paragraph1')).toBeInTheDocument();
+    expect(screen.queryByText('aboutPage.roadmap.messaging.title')).not.toBeInTheDocument();
   });
 });

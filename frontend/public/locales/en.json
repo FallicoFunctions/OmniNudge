@@ -3302,27 +3302,22 @@
         "socialMediaIntegration": "To showcase features I have already built",
         "officeSuite": "To keep a long-running hobby project alive",
         "gamingEcosystem": "To experiment with social and community ideas",
-        "mediaHosting": "To build messaging and sharing tools I find interesting",
         "teamCommunication": "To have a place where future ideas can be tested in public",
         "financeCrypto": "To learn by shipping real product code",
-        "aiIntegration": "To improve the app a little at a time",
         "mobileDesktop": "To work on something because I enjoy it"
       }
     },
+    "aiDesigner": {
+      "title": "Latest build: the AI hub designer",
+      "paragraph1": "The newest thing on the site is the AI hub designer. It is not just a chatbot bolted onto the side of the product. It is an AI agent built into OmniNudge to help create actual hub designs.",
+      "paragraph2": "A hub owner can describe the style they want, and the agent generates custom HTML and CSS for that hub. The goal is to move beyond fixed themes and let the site create real, editable frontend output inside the product itself.",
+      "paragraph3": "That stands out to me because it connects AI to a concrete workflow: prompt, generate, review, refine, and apply a design that changes how a real part of the site looks and behaves."
+    },
     "roadmap": {
-      "title": "Things I may keep building",
-      "messaging": {
-        "title": "Messaging and communication",
-        "items": {
-          "timeActivatedAutoDeletion": "Better controls for message cleanup and retention",
-          "voiceNotes": "Voice notes",
-          "voiceVideoCalls": "Voice and video calls",
-          "screenSharing": "Screen sharing",
-          "audioPlayer": "Better media and audio playback"
-        }
-      },
+      "title": "Future Enhancements",
       "social": {
-        "title": "Community and profile features",
+        "title": "Making it more like a social media site",
+        "description": "I am working to make OmniNudge feel more like a broader social media website and less like only a Reddit-style forum.",
         "items": {
           "friendsFollowers": "Friends and followers",
           "multipleProfiles": "Multiple profiles or identities for different uses",
