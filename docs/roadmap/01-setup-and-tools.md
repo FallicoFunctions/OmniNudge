@@ -1,5 +1,7 @@
 # Setup and Tools Installation Guide
 
+> Historical note: References to Reddit OAuth in this roadmap are obsolete. OmniNudge uses username/password auth and anonymous Reddit public API requests.
+
 **Estimated Time:** 2-4 hours
 **Prerequisites:** Computer with internet connection
 **Platforms:** Instructions for macOS, Windows, and Linux where applicable
@@ -733,9 +735,9 @@ brew install --cask docker
 
 **Not required for this project** - we'll install PostgreSQL and Redis natively.
 
-### Ngrok (For Testing Webhooks Later)
+### Ngrok (Optional)
 
-**Exposes localhost to internet (useful for testing Reddit OAuth callback).**
+**Exposes localhost to the internet for testing webhooks or sharing a local demo.**
 
 ```bash
 # macOS
@@ -747,7 +749,7 @@ choco install ngrok
 # Or download from https://ngrok.com/
 ```
 
-**Not needed initially** - we'll use this when deploying and testing OAuth.
+**Not needed initially** - install it only if you need external callbacks or temporary public access to your local environment.
 
 ---
 
@@ -1002,11 +1004,8 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
 
-# Reddit OAuth
-REDDIT_CLIENT_ID=your_client_id
-REDDIT_CLIENT_SECRET=your_client_secret
-REDDIT_REDIRECT_URI=http://localhost:3000/auth/reddit/callback
-REDDIT_USER_AGENT=yourplatform:v1.0
+# Reddit public API
+REDDIT_USER_AGENT=OmniNudge/1.0 (+https://omninudge.com; contact support@omninudge.com)
 
 # JWT Secret (generate a random string)
 JWT_SECRET=your_very_long_random_secret_key_here

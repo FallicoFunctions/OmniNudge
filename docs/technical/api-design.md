@@ -9,7 +9,19 @@
 
 ## Authentication
 
-All endpoints except `/auth/*` require authentication.
+Authentication uses username/password plus JWT bearer tokens.
+There is no Reddit sign-in redirect flow.
+Reddit browsing is fetched server-side from Reddit's public JSON API.
+
+Public endpoints include:
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/forgot-password`
+- `POST /auth/reset-password`
+- `GET /auth/verify-email`
+- Reddit browsing endpoints under `/reddit/*` (best effort, anonymous upstream access)
+
+All other user-specific endpoints require authentication.
 
 **Header:**
 ```
@@ -20,7 +32,6 @@ Authorization: Bearer <JWT_TOKEN>
 ```json
 {
   "user_id": 123,
-  "reddit_id": "t2_abc123",
   "username": "yorkielover42",
   "exp": 1234567890,
   "iat": 1234560000
@@ -33,31 +44,18 @@ Authorization: Bearer <JWT_TOKEN>
 
 ### Authentication
 
-#### `GET /auth/reddit`
+#### `POST /auth/register`
 
-Redirects to Reddit OAuth authorization page.
+Create a platform account with username/password authentication.
 
-**Query Parameters:**
-- None
-
-**Response:**
-- HTTP 302 Redirect to Reddit
-
-**Example:**
+**Request Body:**
+```json
+{
+  "username": "yorkielover42",
+  "email": "yorkie@example.com",
+  "password": "correct horse battery staple"
+}
 ```
-GET /api/v1/auth/reddit
-→ Redirects to: https://www.reddit.com/api/v1/authorize?client_id=...
-```
-
----
-
-#### `GET /auth/reddit/callback`
-
-Handles OAuth callback from Reddit.
-
-**Query Parameters:**
-- `code` (string, required): OAuth authorization code
-- `state` (string, required): CSRF protection state
 
 **Response:**
 ```json
@@ -65,8 +63,40 @@ Handles OAuth callback from Reddit.
   "token": "eyJhbGciOiJIUzI1NiIs...",
   "user": {
     "id": 1,
-    "reddit_id": "t2_abc123",
     "username": "yorkielover42",
+    "email": "yorkie@example.com",
+    "karma": 0,
+    "avatar_url": "https://..."
+  }
+}
+```
+
+**Errors:**
+- `400 Bad Request`: Validation failed
+- `409 Conflict`: Username or email already in use
+
+---
+
+#### `POST /auth/login`
+
+Authenticate with platform credentials and receive a JWT.
+
+**Request Body:**
+```json
+{
+  "identifier": "yorkielover42",
+  "password": "correct horse battery staple"
+}
+```
+
+**Response:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "user": {
+    "id": 1,
+    "username": "yorkielover42",
+    "email": "yorkie@example.com",
     "karma": 1543,
     "avatar_url": "https://..."
   }
@@ -74,8 +104,8 @@ Handles OAuth callback from Reddit.
 ```
 
 **Errors:**
-- `400 Bad Request`: Invalid code or state
-- `401 Unauthorized`: Reddit auth failed
+- `400 Bad Request`: Invalid request payload
+- `401 Unauthorized`: Invalid credentials
 
 ---
 
@@ -110,8 +140,8 @@ Authorization: Bearer <token>
 ```json
 {
   "id": 1,
-  "reddit_id": "t2_abc123",
   "username": "yorkielover42",
+  "email": "yorkie@example.com",
   "karma": 1543,
   "avatar_url": "https://...",
   "created_at": "2025-01-15T10:30:00Z",
@@ -127,6 +157,8 @@ Authorization: Bearer <token>
 ---
 
 ### Reddit Posts
+
+Reddit endpoints are read-only. OmniNudge does not create posts on Reddit.
 
 #### `GET /reddit/subreddit/:name/posts`
 
@@ -149,7 +181,6 @@ Fetch posts from a subreddit.
       "subreddit": "Yorkies",
       "title": "Who wants to chat about Yorkies?!",
       "author": "yorkielover42",
-      "author_reddit_id": "t2_def456",
       "body": "DM me to talk!",
       "url": "https://reddit.com/r/Yorkies/comments/...",
       "thumbnail_url": "https://...",
@@ -166,41 +197,6 @@ Fetch posts from a subreddit.
 }
 ```
 
----
-
-#### `POST /reddit/posts`
-
-Create a post on Reddit (via user's Reddit account).
-
-**Request Body:**
-```json
-{
-  "subreddit": "Yorkies",
-  "title": "Looking to chat about Yorkies!",
-  "body": "DM me if you want to chat!\n\n---\n💬 Posted from OmniNudge.com",
-  "append_signature": true
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "post": {
-    "id": "t3_newpost",
-    "url": "https://reddit.com/r/Yorkies/comments/...",
-    "title": "Looking to chat about Yorkies!",
-    "created_utc": "2025-11-14T15:30:00Z"
-  }
-}
-```
-
-**Errors:**
-- `403 Forbidden`: User doesn't have permission to post in subreddit
-- `429 Too Many Requests`: Reddit rate limit exceeded
-
----
-
 #### `GET /reddit/user/:username/profile`
 
 Get Reddit user profile (cached).
@@ -211,7 +207,6 @@ Get Reddit user profile (cached).
 **Response:**
 ```json
 {
-  "reddit_id": "t2_abc123",
   "username": "yorkielover42",
   "karma": 1543,
   "account_created": "2020-05-10T08:15:00Z",
@@ -1092,8 +1087,7 @@ Access-Control-Allow-Origin: https://yoursite.com
 ### Using cURL
 
 ```bash
-# Login (manual - use browser)
-# Get JWT token from localStorage after OAuth
+# Log in with platform credentials and capture the returned JWT
 
 # Set token
 TOKEN="your_jwt_token_here"
@@ -1190,4 +1184,4 @@ When making breaking changes:
 - **Rate Limiting:** Token bucket algorithm enforcing 100 req/min for authenticated users and 20 req/min for anonymous users.
 
 ### Authentication Note
-Current implementation uses username/password authentication with JWT tokens (not Reddit OAuth). Reddit integration features are planned for future phases.
+Current implementation uses username/password authentication with JWT tokens. Reddit browsing is fetched anonymously by the backend from public `.json` endpoints.

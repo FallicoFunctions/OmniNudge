@@ -1,5 +1,7 @@
 # Project Overview & Roadmap
 
+> Historical note: References to Reddit OAuth in this roadmap are obsolete. OmniNudge uses username/password auth and anonymous Reddit public API requests.
+
 **Project Name:** OmniNudge (working title)
 **Project Type:** Universal Social Platform - Starting with Reddit Browser + Encrypted Chat
 **Target Phase 1 Launch:** 12 months from start
@@ -94,14 +96,14 @@ This flexibility is a competitive advantage over platforms that force real ident
 ### What Changed
 
 **Original Plan:**
-- Reddit OAuth login
+- Reddit account login and posting
 - Post directly to Reddit
 - Reddit Chat API for messaging non-users
 - Seamless Reddit integration
 
 **Reality:**
 - Reddit denied API access
-- OAuth, posting, and Reddit Chat unavailable
+- Authenticated Reddit integration, posting, and Reddit Chat unavailable
 
 **New Strategy:**
 - Username/password authentication (email optional)
@@ -118,7 +120,7 @@ This flexibility is a competitive advantage over platforms that force real ident
 ✅ **User discovery** - Through your platform's posts
 ✅ **All chat features** - E2E encryption, multimedia, everything works
 
-❌ **Reddit OAuth** - Users register with username/password
+❌ **Reddit account login** - Users register with username/password
 ❌ **Post to Reddit** - Users post on your platform instead
 ❌ **Reddit Chat** - No automated invitation system
 
