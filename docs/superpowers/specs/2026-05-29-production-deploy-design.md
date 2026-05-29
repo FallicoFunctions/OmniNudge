@@ -195,9 +195,11 @@ Preflight should block deploy when any of the following fail.
 
 - production host is reachable over SSH
 - required services are currently active:
-  - `omninudge-backend`
   - `nginx`
   - `postgresql@16-main`
+- current `omninudge-backend` status is inspected and reported
+  - if inactive, this is a warning rather than a hard preflight failure
+  - deploy may continue so the script can be used to recover a broken release
 - required deployment paths exist:
   - `/var/www/omninudge/backend`
   - `/var/www/omninudge/frontend/dist`
@@ -242,11 +244,14 @@ Schema changes must be explicit. The production-safe rule is:
 
 The deploy path should not rely on implicit migration behavior during ordinary server startup. Instead, deployment should deliberately invoke the application’s embedded migration logic during the deploy sequence.
 
+To make that explicit and repeatable, the implementation should introduce a dedicated migration entrypoint in the backend, separate from normal server startup. The deploy script should call that entrypoint directly during the migration step, and the runbook should document it as an internal deployment primitive rather than a normal day-to-day command.
+
 The intended effect is:
 
 - migrations run once, intentionally
 - failure happens before the service restart is declared successful
 - migration logs are visible in the deploy output
+- the migration mechanism is the same every time instead of being inferred from startup side effects
 
 ### Rollback and schema
 
@@ -256,7 +261,8 @@ The primary rollback method should be:
 
 - restore files from the deploy backup
 - restore the matching database backup
-- rebuild or restart as needed
+- rebuild the backend binary from the restored backend source
+- restart backend
 - re-run health verification
 
 Down-migrations may still exist in the codebase, but the operator-facing rollback path should prefer backup restore because it is simpler and safer for a non-expert.
@@ -285,6 +291,7 @@ Expected behavior:
 - identify the backup to restore
 - restore backend/frontend files from that backup
 - restore the matching database backup
+- rebuild backend from the restored backend source
 - restart backend
 - verify the same canonical health contract used by deploy
 
@@ -320,11 +327,13 @@ This redesign is complete when all of the following are true:
 - `bash scripts/deploy-on.sh` is the single normal production deploy command
 - deploy aborts before touching production when preflight fails
 - deploy applies pending migrations explicitly
+- deploy uses a dedicated migration entrypoint instead of relying on ordinary server startup side effects
 - deploy prints both beginner-friendly summaries and raw technical failures
 - post-deploy verification failure prompts the user for rollback
 - answering `yes` performs rollback in the same flow
 - answering `no` exits cleanly without additional changes
 - `bash scripts/rollback.sh` is current and uses the same shared operational logic
+- rollback restores files and database, rebuilds the backend, and re-verifies health
 - runbook and deploy docs match the actual deploy behavior
 - there is no second live deploy implementation path drifting from the primary one
 
@@ -362,7 +371,7 @@ The implementation plan should focus on:
 
 - refactoring scripts into shared helpers without changing the user-facing command surface
 - adding robust output capture and error printing
-- validating migration execution strategy against the current embedded migration implementation
+- adding and validating a dedicated backend migration entrypoint that the scripts can call explicitly
 - updating docs and verifying them against the real script behavior
 
 No production deployment should be run until the updated scripts are implemented and reviewed.
