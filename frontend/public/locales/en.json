@@ -3281,60 +3281,60 @@
   "aboutPage": {
     "betaLabel": "(beta)",
     "hero": {
-      "title": "The all-in-one platform for everything you do online",
-      "description": "A Reddit-like community platform with end-to-end encrypted messaging, building toward an integrated ecosystem of social media, productivity, and communication tools."
+      "title": "A personal project I built to showcase what I've made and keep working on for fun",
+      "description": "OmniNudge is a small community and messaging site I built to experiment, learn, and have a place to keep shipping ideas. It is a real project, but it is also a playground."
     },
     "availableToday": {
-      "title": "Available Today",
+      "title": "What you can do here today",
       "items": {
-        "createCommunities": "Create and manage communities (hubs) like subreddits",
-        "browseReddit": "Browse Reddit posts and subscribe to subreddits",
-        "encryptedMessaging": "End-to-end encrypted messaging with any file type",
-        "postAndComment": "Post and comment in communities (visible to OmniNudge users)"
+        "createCommunities": "Create and manage communities (hubs)",
+        "browseReddit": "Browse some Reddit content through the public free API when it is available",
+        "encryptedMessaging": "Use end-to-end encrypted messaging and share files",
+        "postAndComment": "Post and comment inside OmniNudge communities"
       },
-      "note": "<strong>Note:</strong> Reddit API access may be restricted at any time due to third-party app policies."
+      "note": "<strong>Important:</strong> OmniNudge is not Reddit, does not connect to Reddit accounts, and cannot offer the full Reddit experience."
     },
     "vision": {
-      "title": "The Vision",
-      "description": "Building the last platform you'll ever need - an all-encompassing digital ecosystem that combines:",
+      "title": "Why I made it",
+      "description": "This site exists for a few straightforward reasons:",
       "items": {
-        "socialMediaIntegration": "Social media integration",
-        "officeSuite": "Office suite",
-        "gamingEcosystem": "Gaming ecosystem",
-        "mediaHosting": "Media hosting",
-        "teamCommunication": "Team communication",
-        "financeCrypto": "Finance & crypto",
-        "aiIntegration": "AI integration",
-        "mobileDesktop": "Mobile & desktop"
+        "socialMediaIntegration": "To showcase features I have already built",
+        "officeSuite": "To keep a long-running hobby project alive",
+        "gamingEcosystem": "To experiment with social and community ideas",
+        "mediaHosting": "To build messaging and sharing tools I find interesting",
+        "teamCommunication": "To have a place where future ideas can be tested in public",
+        "financeCrypto": "To learn by shipping real product code",
+        "aiIntegration": "To improve the app a little at a time",
+        "mobileDesktop": "To work on something because I enjoy it"
       },
-      "quote": "\"This platform will never be finished.\""
+      "quote": "\"This is a personal project, not a claim that it replaces everything else.\""
     },
     "roadmap": {
-      "title": "What's Next",
+      "title": "Things I may keep building",
       "messaging": {
-        "title": "Enhanced Messaging",
+        "title": "Messaging and communication",
         "items": {
-          "timeActivatedAutoDeletion": "Time-activated auto-deletion",
+          "timeActivatedAutoDeletion": "Better controls for message cleanup and retention",
           "voiceNotes": "Voice notes",
           "voiceVideoCalls": "Voice and video calls",
           "screenSharing": "Screen sharing",
-          "audioPlayer": "Audio player"
+          "audioPlayer": "Better media and audio playback"
         }
       },
       "social": {
-        "title": "Social Media Upgrades",
+        "title": "Community and profile features",
         "items": {
           "friendsFollowers": "Friends and followers",
-          "multipleProfiles": "Multiple profiles for different niches",
-          "karmaPointSystem": "Karma point system",
-          "awardsBadges": "Awards and badges"
+          "multipleProfiles": "Multiple profiles or identities for different uses",
+          "karmaPointSystem": "Simple reputation or activity signals",
+          "awardsBadges": "Lightweight badges, reactions, or recognition"
         }
       }
     },
     "customization": {
-      "title": "Unmatched Customization",
-      "paragraph1": "Remember MySpace? We're bringing that level of personalization back. Customize everything from your profile to your browsing experience with advanced theming and the most comprehensive settings of any platform.",
-      "paragraph2": "Don't want complexity? No problem. Simple defaults and intuitive settings for everyone."
+      "title": "About the Reddit integration",
+      "paragraph1": "OmniNudge is not Reddit and cannot connect to Reddit accounts. The Reddit integration only uses Reddit's public free API, and that API keeps getting more limited and less reliable over time.",
+      "paragraph2": "The main reason Reddit was added at all was to help fill the site with posts while there are not many real OmniNudge users yet. Long term, the goal is for the site to stand on its own content instead of depending on Reddit."
     },
     "footer": {
       "termsOfService": "Terms of Service",
