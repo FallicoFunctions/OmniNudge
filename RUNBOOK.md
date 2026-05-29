@@ -51,43 +51,29 @@ ssh root@77.42.47.79 'journalctl -u <service-name> -f'
 
 ## Deployment
 
-This runbook is the authoritative production deployment guide. Archived deployment docs point here.
+Canonical production deploy:
 
 ```bash
-# Canonical production deploy
 bash scripts/deploy-on.sh
 ```
 
-**What deploy-on.sh does:**
-1. Builds frontend locally (`npm run build`)
-2. Creates file + database backup on server (`/var/www/omninudge/backups/`)
-3. Rsyncs frontend dist to server
-4. Rsyncs backend code to server (excludes `.env`, binary, `.git`)
-5. Builds backend on server with git version injected via ldflags
-6. Restarts `omninudge-backend`
-7. Verifies the canonical health contract:
-   - server-local backend `http://127.0.0.1:8080/health`
-   - public site `https://omninudge.com`
-   - public API ping `https://api.omninudge.com/api/v1/ping`
-   - public `index.html` boot asset set matches the local build
-   - every referenced public boot asset returns HTTP 200
+What the script does:
+1. runs fail-closed local and remote preflight checks
+2. creates file and database backups on the server
+3. uploads frontend and backend code
+4. builds the backend on the server
+5. applies pending database migrations explicitly with `go run ./cmd/migrate -action=up`
+6. restarts `omninudge-backend`
+7. verifies server-local `/health`, public site, public API ping, and public boot assets
 
-**If the deploy fails or the site regresses after deploy:**
+If a production-changing step fails after backup creation, the script prints the raw error and asks whether to roll back immediately.
+
+Manual rollback:
 
 ```bash
-# Roll back to the previous known-good release
 bash scripts/rollback.sh
-
-# Or roll back to a specific commit
-bash scripts/rollback.sh <commit_hash>
+bash scripts/rollback.sh <backup-name>
 ```
-
-**After deploy, on startup the backend:**
-- Pre-warms Redis cache for `r/popular` (hot/new/top) to prevent Reddit rate-limit cold-start
-- Runs database migrations automatically
-- Connects to Redis, PostgreSQL, ClamAV
-
-**⚠️ Multiple deploys in quick succession (<10 min apart):** The Reddit pre-warm will get 429'd and log warnings. Not fatal — the site works, just shows hub posts only in the home feed until Reddit's rate limit window clears (~10 min).
 
 ---
 
@@ -374,9 +360,8 @@ ssh root@77.42.47.79 'cd /var/www/omninudge/backend && export PATH=$PATH:/usr/lo
 # 4. Restart
 ssh root@77.42.47.79 'systemctl restart omninudge-backend'
 
-# Or: roll back via git and re-deploy (cleaner)
-#   git checkout <previous-sha> -- backend/ frontend/
-#   bash scripts/deploy-on.sh
+# Preferred rollback path:
+#   bash scripts/rollback.sh <backup-name>
 ```
 
 ### Database issues
