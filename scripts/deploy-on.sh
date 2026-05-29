@@ -1,171 +1,47 @@
 #!/bin/bash
-# OmniNudge Production Deployment Script
-# Usage: deploy-on
-#   (Can be run from any directory)
+set -euo pipefail
 
-set -eo pipefail
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-# Configuration (absolute paths)
-SERVER="root@77.42.47.79"
-SERVER_PATH="/var/www/omninudge"
-PROJECT_ROOT="/Users/Nick_1/Documents/Personal_Projects/OmniNudge"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/deploy-health-contract.sh"
+source "$SCRIPT_DIR/deploy-lib.sh"
 
-# Canonical production deployment entrypoint and health contract:
-# - server-local backend check: http://127.0.0.1:8080/health
-# - public site check: https://omninudge.com
-# - public API smoke check: https://api.omninudge.com/api/v1/ping
-# - public asset check: fetched public index.html references the same boot
-#   asset set as the local build, and each referenced asset returns HTTP 200
+main() {
+  local backup_name=""
 
-echo -e "${GREEN}Starting OmniNudge deployment...${NC}"
-echo ""
+  print_info "Starting OmniNudge deployment..."
+  run_local_preflight
+  run_remote_preflight
 
-# Step 1: Build frontend locally
-echo -e "${YELLOW}Step 1: Building frontend locally...${NC}"
-cd "$PROJECT_ROOT/frontend"
-npm run build
-echo -e "${GREEN}✓ Frontend built${NC}"
-echo ""
+  backup_name="$(create_server_backup)"
+  print_success "Backup created: ${backup_name}"
 
-# Step 2: Create backup on server (files + database)
-echo -e "${YELLOW}Step 2: Creating backup on server...${NC}"
-BACKUP_NAME="backup-$(date +%Y%m%d-%H%M%S)"
-ssh "$SERVER" bash << EOF
-  set -eo pipefail
-  mkdir -p /var/www/omninudge/backups
-
-  echo "Creating file backup: ${BACKUP_NAME}.tar.gz"
-  cd /var/www/omninudge
-  tar -czf backups/${BACKUP_NAME}.tar.gz \
-    --exclude='backups' \
-    --exclude='*.log' \
-    --exclude='node_modules' \
-    --exclude='.git' \
-    --exclude='.gocache' \
-    --exclude='.cache' \
-    --exclude='bin' \
-    --exclude='omninudge-server' \
-    --exclude='*.test' \
-    --exclude='dump.rdb' \
-    --exclude='uploads' \
-    backend frontend
-
-  # Database backup — load credentials from the production backend .env on the server
-  if [ -f /var/www/omninudge/backend/.env ]; then
-    DB_USER=\$(grep '^DB_USER=' /var/www/omninudge/backend/.env | cut -d= -f2)
-    DB_PASSWORD=\$(grep '^DB_PASSWORD=' /var/www/omninudge/backend/.env | cut -d= -f2)
-    DB_NAME=\$(grep '^DB_NAME=' /var/www/omninudge/backend/.env | cut -d= -f2)
-    if [ -n "\$DB_USER" ] && [ -n "\$DB_NAME" ]; then
-      echo "Creating database backup: ${BACKUP_NAME}.sql.gz"
-      PGPASSWORD="\$DB_PASSWORD" pg_dump -U "\$DB_USER" -h localhost "\$DB_NAME" \
-        | gzip > /var/www/omninudge/backups/${BACKUP_NAME}.sql.gz
-      echo "✓ Database backed up (\$(du -sh /var/www/omninudge/backups/${BACKUP_NAME}.sql.gz | cut -f1))"
-    else
-      echo "❌ Could not read DB credentials — aborting deploy (no database backup)"
-      exit 1
+  if ! upload_frontend_build; then
+    print_follow_up_hint "Manual rollback: bash scripts/rollback.sh ${backup_name}"
+    if prompt_for_rollback "A deployment step failed after production was modified. Roll back now? (yes/no): "; then
+      rollback_from_backup "$backup_name"
     fi
-  else
-    echo "❌ No .env file found — aborting deploy (no database backup)"
     exit 1
   fi
 
-  echo "Recent backups:"
-  ls -lht /var/www/omninudge/backups/ 2>/dev/null | head -8 || echo "This is the first backup"
-
-  # Keep last 5 file backups, last 10 database backups
-  ls -t /var/www/omninudge/backups/*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm
-  ls -t /var/www/omninudge/backups/*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm
-EOF
-echo -e "${GREEN}✓ Backup created: ${BACKUP_NAME} (files + database)${NC}"
-echo ""
-
-# Step 3: Upload frontend build
-echo -e "${YELLOW}Step 3: Uploading frontend build to server...${NC}"
-rsync -avz --delete \
-  "$PROJECT_ROOT/frontend/dist/" \
-  "$SERVER:$SERVER_PATH/frontend/dist/"
-echo -e "${GREEN}✓ Frontend uploaded${NC}"
-echo ""
-
-# Step 4: Upload backend code (excluding locally-built binary)
-echo -e "${YELLOW}Step 4: Uploading backend code...${NC}"
-rsync -avz --exclude 'node_modules' --exclude '.git' --exclude '.gocache' --exclude 'dist' --exclude 'build' --exclude 'omninudge-server' --exclude '.env' \
-  "$PROJECT_ROOT/backend/" \
-  "$SERVER:$SERVER_PATH/backend/"
-echo -e "${GREEN}✓ Backend code uploaded${NC}"
-echo ""
-
-# Step 5: Build and restart backend on server
-echo -e "${YELLOW}Step 5: Building and restarting backend on server...${NC}"
-# Compute version locally (server has no .git — rsync excludes it)
-BUILD_VERSION=$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
-echo "Version: ${BUILD_VERSION}"
-ssh "$SERVER" BUILD_VERSION="$BUILD_VERSION" bash << 'EOF'
-set -eo pipefail
-cd /var/www/omninudge/backend
-export PATH=$PATH:/usr/local/go/bin
-
-# Build backend
-echo "Building backend..."
-go build -ldflags="-X main.appVersion=${BUILD_VERSION}" -o omninudge-server ./cmd/server
-
-# Restart backend service
-echo "Restarting backend service..."
-systemctl restart omninudge-backend
-
-# Check status
-sleep 2
-systemctl status omninudge-backend --no-pager -n 3
-EOF
-echo -e "${GREEN}✓ Backend rebuilt and restarted${NC}"
-echo ""
-
-# Step 6: Verify deployment
-echo -e "${YELLOW}Step 6: Verifying deployment against the canonical health contract...${NC}"
-echo "  - backend on server: http://127.0.0.1:8080/health"
-echo "  - public site: https://omninudge.com"
-echo "  - public API ping: https://api.omninudge.com/api/v1/ping"
-echo "  - public index.html boot asset set matches the local build"
-echo "  - every referenced public boot asset returns HTTP 200"
-
-ssh "$SERVER" bash << 'EOF'
-  set -eo pipefail
-  curl -fsS http://127.0.0.1:8080/health >/tmp/omninudge-health.json
-  systemctl is-active --quiet omninudge-backend
-EOF
-echo -e "${GREEN}✓ Backend service passed server-local /health and systemd checks${NC}"
-
-HTTP_STATUS=$(curl -s -m 15 -o /dev/null -w "%{http_code}" "https://api.omninudge.com/api/v1/ping" 2>/dev/null || true)
-if [ "${HTTP_STATUS:-0}" != "200" ]; then
-  if [ -z "$HTTP_STATUS" ] || [ "$HTTP_STATUS" = "000" ]; then
-    echo -e "${RED}✗ Public API ping check failed: https://api.omninudge.com/api/v1/ping was unreachable${NC}"
-  else
-    echo -e "${RED}✗ Public API ping check failed: https://api.omninudge.com/api/v1/ping returned HTTP $HTTP_STATUS${NC}"
+  if ! upload_backend_code || ! build_backend_release || ! run_explicit_migrations || ! restart_backend_service; then
+    print_follow_up_hint "Manual rollback: bash scripts/rollback.sh ${backup_name}"
+    if prompt_for_rollback "A deployment step failed after production was modified. Roll back now? (yes/no): "; then
+      rollback_from_backup "$backup_name"
+    fi
+    exit 1
   fi
-  exit 1
-fi
-echo -e "${GREEN}✓ Public API ping returned HTTP 200${NC}"
 
-verify_public_boot_asset_contract "$PROJECT_ROOT/frontend/dist/index.html" "https://omninudge.com" "https://omninudge.com"
-echo ""
+  if ! verify_production_contract "$LOCAL_FRONTEND_DIST/index.html"; then
+    print_follow_up_hint "Manual rollback: bash scripts/rollback.sh ${backup_name}"
+    if prompt_for_rollback "Deployment verification failed. Roll back now? (yes/no): "; then
+      rollback_from_backup "$backup_name"
+    fi
+    exit 1
+  fi
 
-echo -e "${GREEN}Deployment complete!${NC}"
-echo ""
-echo "Backup created: ${BACKUP_NAME} (.tar.gz + .sql.gz)"
-echo ""
-echo "Next steps:"
-echo "  1. Visit https://omninudge.com to verify the deployment"
-echo "  2. Check backend logs: ssh $SERVER 'journalctl -u omninudge-backend -f'"
-echo ""
-echo "To restore from backup if needed:"
-echo "  Files:    ssh $SERVER 'cd /var/www/omninudge && tar -xzf backups/${BACKUP_NAME}.tar.gz'"
-echo "  Database: ssh $SERVER 'DB_USER=\$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2); DB_PASSWORD=\$(grep ^DB_PASSWORD= /var/www/omninudge/backend/.env | cut -d= -f2); DB_NAME=\$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2); PGPASSWORD=\$DB_PASSWORD gunzip -c /var/www/omninudge/backups/${BACKUP_NAME}.sql.gz | psql -U \$DB_USER -h localhost \$DB_NAME'"
-echo ""
+  print_success "Deployment complete."
+  echo "Backup created: ${backup_name}"
+  echo "Manual rollback: bash scripts/rollback.sh ${backup_name}"
+  echo "Logs: ssh ${SERVER} 'journalctl -u ${SERVICE_NAME} -n 100 --no-pager'"
+}
+
+main "$@"
