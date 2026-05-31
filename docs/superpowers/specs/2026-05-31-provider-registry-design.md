@@ -57,9 +57,11 @@ This file is the source of truth for:
 
 - provider identity
 - URL matching rules
+- rule precedence
 - provider family
 - provider status
 - render kind
+- fallback behavior
 - whether preview extraction should be skipped
 - whether outbound title linking is allowed
 - which local embed-builder or renderer adapter should be used
@@ -106,6 +108,8 @@ Each provider entry should support at minimum:
 - `id`
 - `family`
 - `status`
+- `fallback_behavior`
+- `priority`
 - `match_rules`
 - `render_kind`
 - `skip_preview_extraction`
@@ -124,8 +128,17 @@ Each provider entry should support at minimum:
     - `supported_embed`
     - `supported_preview_only`
     - `recognized_but_disabled`
+- `fallback_behavior`
+  - one of:
+    - `none`
+    - `treat_as_plain_link`
+    - `render_no_media`
+    - `provider_preview_only`
+  - this is required for every provider so the registry itself defines what happens when the primary status path cannot render media
+- `priority`
+  - integer used as the final deterministic tiebreaker when more than one provider rule can match the same URL
 - `match_rules`
-  - structured matching rules, not a single free-form regex
+  - structured matching rules using the constrained DSL defined below, not a free-form implementation-specific regex blob
 - `render_kind`
   - one of:
     - `iframe`
@@ -145,13 +158,73 @@ Each provider entry should support at minimum:
 
 Provider matching should be structured, not regex-only in component code.
 
-Each `match_rule` should support:
+Each `match_rule` should support this constrained matching DSL:
 
-- host list
-- subdomain handling
-- path pattern list
-- optional query parameter requirements
-- optional alias or legacy-domain matching
+- `hosts`
+  - exact lowercase hostnames
+- `allow_subdomains`
+  - boolean
+- `path_match_type`
+  - one of:
+    - `exact`
+    - `prefix`
+    - `segment_template`
+- `path_patterns`
+  - list interpreted according to `path_match_type`
+- `query_requirements`
+  - optional map of query key rules
+- `aliases`
+  - optional legacy domains if provider-specific alias handling is needed
+
+### Portable Matching DSL
+
+The matching DSL must be intentionally portable between TypeScript and Go.
+
+Allowed path semantics:
+
+- `exact`
+  - exact normalized path match
+- `prefix`
+  - normalized path starts with the provided literal prefix
+- `segment_template`
+  - slash-delimited segment matcher with these tokens only:
+    - literal segment such as `watch`
+    - `*` to match exactly one non-empty segment
+    - `**` to match the remainder of the path
+
+Examples:
+
+- Instagram post:
+  - `segment_template` -> `/p/*`
+- Instagram reel:
+  - `segment_template` -> `/reel/*`
+- X/Twitter status:
+  - `segment_template` -> `/*/status/*`
+- YouTube short link:
+  - `prefix` or `segment_template` -> `/*`
+
+Allowed query requirement semantics:
+
+- `present`
+  - parameter must exist
+- `exact:<value>`
+  - parameter must equal the given value
+
+This DSL is deliberately narrower than arbitrary regex so frontend and backend implementations cannot drift on regex-engine differences.
+
+### Match Precedence
+
+When more than one rule matches a normalized URL, precedence must be deterministic:
+
+1. highest host specificity
+   - exact host beats subdomain wildcard handling
+2. highest path specificity
+   - `exact` beats `segment_template`, which beats `prefix`
+3. fewer wildcard tokens in `segment_template`
+4. explicit provider `priority`
+5. registry file order as the final tie-breaker
+
+The classifier implementation in every runtime must follow the same precedence rules.
 
 Examples:
 
@@ -192,7 +265,7 @@ Provider handling should follow this exact order:
 1. classify URL against the registry
 2. if provider status is `supported_embed`, use provider-specific embed or media behavior
 3. if provider status is `supported_preview_only`, skip generic article scraping and use provider-specific preview rules if defined later
-4. if provider is `recognized_but_disabled`, follow the declared fallback behavior for that provider
+4. if provider is `recognized_but_disabled`, follow the declared `fallback_behavior` from the registry entry
 5. if no provider matches, treat the URL as a plain external article-link candidate
 
 This model prevents a URL from being misclassified as a generic article page when it belongs to a known provider family.
@@ -242,6 +315,51 @@ The initial registry should deliberately cover a broad provider surface for plat
 
 Adult providers must be explicitly labeled with an `adult` family or equivalent classification. They must not be hidden as generic video providers.
 
+## Day-One Status Matrix
+
+The initial registry must declare an explicit day-one status for every provider entry. No provider may be added to the initial catalog without a status and fallback declaration.
+
+### Day-One `supported_embed`
+
+These providers must reproduce current known-good platform-post behavior before the registry expands support:
+
+- `youtube`
+- `vimeo`
+- `tiktok`
+- `twitch`
+- `dailymotion`
+- `streamable`
+- `redgifs`
+- `gfycat`
+- `giphy`
+- `tenor`
+- `imgur_gifv`
+
+### Day-One `recognized_but_disabled`
+
+These providers should be present in the initial registry for recognition coverage, but must not be advertised as working embeds until renderer support is actually implemented and verified:
+
+- `instagram_post`
+- `instagram_reel`
+- `facebook_video`
+- `x_twitter_status`
+- `loom`
+- `wistia`
+- `spotify`
+- `soundcloud`
+- `apple_music`
+- `mixcloud`
+- `bandcamp`
+- `pornhub`
+
+Each day-one `recognized_but_disabled` entry must explicitly declare one of these fallbacks:
+
+- `treat_as_plain_link`
+- `render_no_media`
+- `provider_preview_only`
+
+The chosen fallback must reflect real expected behavior for that provider, not a placeholder.
+
 ## Recognition Versus Embeddability
 
 Recognition and embeddability are not the same thing.
@@ -290,7 +408,8 @@ Backend steps:
 1. normalize and classify the outbound URL
 2. if provider status is `supported_embed`, skip generic article preview extraction
 3. if provider status is `supported_preview_only`, follow provider-specific preview policy if defined
-4. if provider is unknown, treat it as a plain external article link candidate
+4. if provider status is `recognized_but_disabled`, follow `fallback_behavior`
+5. if provider is unknown, treat it as a plain external article link candidate
 
 The backend classifier must stay aligned with the canonical catalog rather than maintaining an independent provider list.
 
@@ -320,11 +439,24 @@ Recommended rollout sequence:
 
 1. add the canonical provider catalog
 2. add frontend classifier utilities that consume it
-3. refactor current platform-post frontend components to use the classifier while preserving behavior
-4. add backend classifier utilities using the same catalog
-5. only after classification is unified, implement plain-link preview extraction based on unified provider skipping rules
+3. prove classifier parity with the current platform-post provider set and current embed outputs before enabling any expanded provider coverage
+4. refactor current platform-post frontend components to use the classifier while preserving behavior
+5. add backend classifier utilities using the same catalog
+6. add expanded provider entries with explicit statuses and fallbacks
+7. only after classification is unified, implement plain-link preview extraction based on unified provider skipping rules
 
 That order creates a stable definition of “known provider” before preview logic depends on it.
+
+### Parity Gate
+
+The registry rollout is blocked until it can reproduce current platform-post classification behavior for the existing supported set.
+
+The parity gate must prove:
+
+- the registry classifies every currently supported platform-post provider exactly as the current handwritten logic does
+- feed cards and post detail use the same provider result for the same URL
+- existing YouTube and other currently supported embeds render the same output before and after the refactor
+- no expanded provider is upgraded from `recognized_but_disabled` to `supported_embed` without dedicated renderer coverage
 
 ## Testing Requirements
 
@@ -334,6 +466,8 @@ That order creates a stable definition of “known provider” before preview lo
 - alias domains and legacy domains classify correctly
 - canonicalization strips junk params but preserves provider-critical params
 - unknown article URLs fall through to plain-link classification
+- conflicting provider rules resolve deterministically according to the precedence rules
+- every day-one provider entry has an explicit `status`, `fallback_behavior`, and expected classification result
 
 ### Frontend Tests
 
@@ -342,6 +476,7 @@ That order creates a stable definition of “known provider” before preview lo
 - newly added providers such as Instagram classify correctly
 - recognized-but-disabled providers do not trigger broken rendering
 - adult providers classify correctly under their explicit family and status
+- registry-backed classification preserves current platform-post embed behavior before any expanded provider renderer is enabled
 
 ### Backend Tests
 
@@ -349,6 +484,7 @@ That order creates a stable definition of “known provider” before preview lo
 - unknown article links remain eligible for preview extraction
 - recognized-but-disabled providers follow their declared fallback behavior
 - adult providers do not fall through into generic article handling
+- frontend and backend classifier fixtures produce the same provider id and status for the same canonical test URLs
 
 ## Open Implementation Notes
 

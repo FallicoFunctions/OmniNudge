@@ -41,7 +41,7 @@ OmniNudge should treat platform posts as one of these categories:
 
 Known embeddable external media posts must continue using the current frontend embed-detection path. They are not converted into static image-preview posts.
 
-Plain external link posts are external `http(s)` URLs that are not native uploaded media, not galleries, and not recognized by the existing embed renderer as known external media.
+Plain external link posts are external `http(s)` URLs that are not native uploaded media, not galleries, and not classified by the canonical platform provider registry as known external media that should bypass generic article preview extraction.
 
 ### Stored Data Contract
 
@@ -65,6 +65,8 @@ For known embeddable external media posts:
 - The post title remains a clickable outbound link
 - The media area continues to use the existing embed/video renderer derived from `media_url`
 
+The authoritative definition of a known provider comes from the platform provider registry and its shared classifier, not from ad hoc component heuristics.
+
 ### Preview Extraction Triggers
 
 Preview extraction runs only when:
@@ -75,7 +77,7 @@ Preview extraction runs only when:
 Preview extraction does not run when:
 
 - The post is an uploaded image/video/gallery post
-- The URL belongs to a known embeddable provider already handled by the current frontend path
+- The URL is classified by the provider registry as a provider whose status or fallback behavior skips generic article preview extraction
 - An edit changes only non-URL fields
 
 ## Backend Design
@@ -129,7 +131,7 @@ Selection should reject obvious low-value candidates such as:
 - tracking pixels
 - empty or malformed URLs
 
-Phase one does not need to extract external video previews for article pages. Known embeddable providers already remain on the existing embed path.
+Phase one does not need to extract external video previews for article pages. Known embeddable providers already remain on the existing embed path as defined by the provider registry.
 
 ### Preview Asset Ingest
 
@@ -160,7 +162,7 @@ Frontend rendering should become explicit rather than relying on broad URL heuri
 
 - Native uploaded image or video posts render their current media normally
 - Gallery posts render their current gallery UI normally
-- Known embeddable external media posts continue using the current embed/video renderer derived from `media_url`
+- Known embeddable external media posts continue using the current embed/video renderer derived from `media_url` and selected through the shared provider classifier
 - Plain external link posts with `media_type = link` and a valid `thumbnail_url` render the stored preview image
 - Plain external link posts with `media_type = link` and no `thumbnail_url` render no media block
 
@@ -182,18 +184,19 @@ The result of any preview load failure is the same as having no preview: no medi
 
 Current behavior for known sites must not regress.
 
-Examples include YouTube and other providers already recognized by the existing frontend embed logic. Those posts must continue to:
+Examples include YouTube and other providers whose `supported_embed` status is established by the provider registry parity gate. Those posts must continue to:
 
 - show the outbound title link
 - render their current iframe or video preview behavior
 - avoid being downgraded into static image previews
 
-The new stored preview extraction path applies only to plain article-style external links that are not already covered by the existing embeddable media logic.
+The new stored preview extraction path applies only to URLs that the provider registry does not classify as `supported_embed`, and only when the matched provider status or fallback behavior does not explicitly bypass generic preview extraction.
 
 ## Rollout
 
 The rollout is additive and forward-only.
 
+- Provider-registry rollout and parity verification must complete before link-preview extraction depends on provider classification
 - Existing old plain link posts are not backfilled
 - Existing old plain link posts with no preview remain valid and render with no media block
 - New plain link posts and edited plain link posts can gain stored previews
@@ -210,6 +213,7 @@ This behavior is intentional product scope, not an unfinished migration.
 - slow, oversized, or redirect-heavy targets fail closed without blocking post creation
 - chosen preview images go through validation and local-storage ingest
 - known embeddable providers are not misclassified into the plain link-preview path
+- provider-registry status and fallback behavior are honored consistently when deciding whether preview extraction should run
 
 ### Frontend Tests
 
@@ -218,9 +222,11 @@ This behavior is intentional product scope, not an unfinished migration.
 - preview image load failure hides the preview rather than showing a broken-image icon
 - known embeddable providers such as YouTube still render through the existing embed path
 - title link behavior remains correct for both plain external link posts and known embeddable external media posts
+- feed cards and post detail apply the same provider-registry classification outcome for the same URL
 
 ## Open Implementation Notes
 
 - If schema additions for preview title, description, and site name are deferred, the phase-one contract still needs `media_type = link` and stored `thumbnail_url`
 - If the current media pipeline has reusable helpers for download validation, storage, and scanning, the preview-ingest path should use them instead of creating a parallel weaker path
 - If preview assets become orphaned after a post URL change or deletion, cleanup can be handled by existing media lifecycle tooling if available
+- The link-preview feature must treat the provider registry as the source of truth for “known provider” classification once the registry parity gate has landed
