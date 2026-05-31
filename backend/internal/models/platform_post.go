@@ -40,10 +40,13 @@ type PlatformPost struct {
 	NSFW bool     `json:"nsfw"`
 
 	// Media (optional)
-	MediaURL      *string        `json:"media_url,omitempty"`
-	MediaType     *string        `json:"media_type,omitempty"`
-	ThumbnailURL  *string        `json:"thumbnail_url,omitempty"`
-	GalleryImages []GalleryImage `json:"gallery_images,omitempty"` // Array of gallery images
+	MediaURL               *string        `json:"media_url,omitempty"`
+	MediaType              *string        `json:"media_type,omitempty"`
+	ThumbnailURL           *string        `json:"thumbnail_url,omitempty"`
+	LinkPreviewTitle       *string        `json:"link_preview_title,omitempty"`
+	LinkPreviewDescription *string        `json:"link_preview_description,omitempty"`
+	LinkPreviewSiteName    *string        `json:"link_preview_site_name,omitempty"`
+	GalleryImages          []GalleryImage `json:"gallery_images,omitempty"` // Array of gallery images
 
 	// Engagement metrics
 	Score       int     `json:"score"`
@@ -170,6 +173,7 @@ const platformPostControversialScoreExpr = `
 
 const platformPostSelectColumnsPrefixed = `
 	p.id, p.author_id, u.username, p.hub_id, p.title, p.body, p.tags, p.media_url, p.media_type, p.thumbnail_url,
+	p.link_preview_title, p.link_preview_description, p.link_preview_site_name,
 	p.score, p.upvotes, p.downvotes, p.num_comments, p.view_count,
 	p.is_pinned, p.pinned_position, p.is_deleted, p.is_edited, p.edited_at,
 	p.crosspost_origin_type, p.crosspost_origin_subreddit, p.crosspost_origin_post_id, p.crosspost_original_title,
@@ -201,10 +205,11 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 	query := `
 		INSERT INTO platform_posts (
 			author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
+			link_preview_title, link_preview_description, link_preview_site_name,
 			crosspost_origin_type, crosspost_origin_subreddit, crosspost_origin_post_id, crosspost_original_title,
 			target_subreddit, nsfw, crossposted_at, gallery_images
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		RETURNING id, score, upvotes, downvotes, num_comments, view_count, is_pinned, pinned_position, is_deleted, is_edited, edited_at, crossposted_at, created_at
 	`
 
@@ -217,6 +222,9 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 		post.MediaURL,
 		post.MediaType,
 		post.ThumbnailURL,
+		post.LinkPreviewTitle,
+		post.LinkPreviewDescription,
+		post.LinkPreviewSiteName,
 		post.CrosspostOriginType,
 		post.CrosspostOriginSubreddit,
 		post.CrosspostOriginPostID,
@@ -754,8 +762,9 @@ func (r *PlatformPostRepository) Update(ctx context.Context, post *PlatformPost)
 	query := `
 		UPDATE platform_posts
 		SET title = $1, body = $2, tags = $3, media_url = $4, media_type = $5,
-		    thumbnail_url = $6, is_edited = TRUE, edited_at = CURRENT_TIMESTAMP
-		WHERE id = $7 AND is_deleted = FALSE
+		    thumbnail_url = $6, link_preview_title = $7, link_preview_description = $8,
+		    link_preview_site_name = $9, is_edited = TRUE, edited_at = CURRENT_TIMESTAMP
+		WHERE id = $10 AND is_deleted = FALSE
 		RETURNING edited_at
 	`
 
@@ -766,6 +775,9 @@ func (r *PlatformPostRepository) Update(ctx context.Context, post *PlatformPost)
 		post.MediaURL,
 		post.MediaType,
 		post.ThumbnailURL,
+		post.LinkPreviewTitle,
+		post.LinkPreviewDescription,
+		post.LinkPreviewSiteName,
 		post.ID,
 	).Scan(&post.EditedAt)
 }
@@ -831,6 +843,9 @@ func scanPlatformPost(row pgx.Row, post *PlatformPost, extraDest ...interface{})
 		&post.MediaURL,
 		&post.MediaType,
 		&post.ThumbnailURL,
+		&post.LinkPreviewTitle,
+		&post.LinkPreviewDescription,
+		&post.LinkPreviewSiteName,
 		&post.Score,
 		&post.Upvotes,
 		&post.Downvotes,
@@ -889,6 +904,9 @@ func scanPlatformPostWithUserInfo(row pgx.Row, post *PlatformPost, extraDest ...
 		&post.MediaURL,
 		&post.MediaType,
 		&post.ThumbnailURL,
+		&post.LinkPreviewTitle,
+		&post.LinkPreviewDescription,
+		&post.LinkPreviewSiteName,
 		&post.Score,
 		&post.Upvotes,
 		&post.Downvotes,

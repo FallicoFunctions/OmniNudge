@@ -40,6 +40,7 @@ import (
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
+	linkpreviewsvc "github.com/omninudge/backend/internal/services/linkpreview"
 	"github.com/omninudge/backend/internal/tracing"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/omninudge/backend/internal/websocket"
@@ -505,6 +506,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, lockoutService, cfg.AppEnv)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo, hubSettingsRepo)
+	postsHandler.SetLinkPreviewService(linkpreviewsvc.NewService(nil, storageService, virusScanner))
 	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, hubModRepo)
 	redditHandler := handlers.NewRedditHandler(redditClient, redditPostRepo)
 	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
