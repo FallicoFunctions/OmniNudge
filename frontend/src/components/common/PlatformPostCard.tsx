@@ -1,5 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useMemo, useState, useRef, useEffect, type CSSProperties } from 'react';
+import {
+  useMemo,
+  useState,
+  useRef,
+  useEffect,
+  type CSSProperties,
+  type SyntheticEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFormat } from '../../hooks/useFormat';
 import type { PointerEvent } from 'react';
@@ -11,123 +18,7 @@ import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
 import { PinnedBadge } from './PinnedBadge';
 import { getPostUrl } from '../../utils/postUrl';
 import { useSettings } from '../../contexts/SettingsContext';
-import { sanitizeHttpUrl } from '../../utils/crosspostHelpers';
-
-type ExternalMedia = { kind: 'iframe'; src: string } | { kind: 'video'; src: string };
-
-function getYouTubeEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match =
-    url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/) ||
-    url.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
-  if (!match?.[1]) return null;
-  const startMatch = url.match(/[?&]t=(\d+)/);
-  const start = startMatch ? parseInt(startMatch[1], 10) : null;
-  return `https://www.youtube-nocookie.com/embed/${match[1]}${start ? `?start=${start}` : ''}`;
-}
-
-function getVimeoEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/vimeo\.com\/(?:video\/)?([0-9]+)/i);
-  return match?.[1] ? `https://player.vimeo.com/video/${match[1]}` : null;
-}
-
-function getTiktokEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/tiktok\.com\/(?:@[^/]+\/video\/|v\/)([0-9]+)/i);
-  return match?.[1] ? `https://www.tiktok.com/embed/v2/${match[1]}` : null;
-}
-
-function getTwitchEmbed(url?: string | null): string | null {
-  if (!url || typeof window === 'undefined') return null;
-  const clipMatch = url.match(/twitch\.tv\/(?:[^/]+)\/clip\/([a-zA-Z0-9]+)/i);
-  if (clipMatch?.[1]) {
-    return `https://player.twitch.tv/?clip=${clipMatch[1]}&parent=${window.location.hostname}`;
-  }
-  const vodMatch = url.match(/twitch\.tv\/videos\/([0-9]+)/i);
-  if (vodMatch?.[1]) {
-    return `https://player.twitch.tv/?video=${vodMatch[1]}&parent=${window.location.hostname}`;
-  }
-  return null;
-}
-
-function getDailymotionEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/dailymotion\.com\/video\/([a-zA-Z0-9]+)/i);
-  return match?.[1] ? `https://www.dailymotion.com/embed/video/${match[1]}` : null;
-}
-
-function getStreamableEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/streamable\.com\/(?:e\/)?([a-z0-9]+)/i);
-  return match?.[1] ? `https://streamable.com/e/${match[1]}` : null;
-}
-
-function getRedgifsEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/redgifs\.com\/(?:watch|ifr)\/([a-zA-Z0-9_-]+)/i);
-  if (match?.[1]) return `https://www.redgifs.com/ifr/${match[1]}`;
-  const gfyMatch = url.match(/gfycat\.com\/([a-zA-Z0-9_-]+)/i);
-  return gfyMatch?.[1] ? `https://www.redgifs.com/ifr/${gfyMatch[1]}` : null;
-}
-
-function getGiphyEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const idMatch = url.match(/giphy\.com\/gifs\/[^/]*-?([a-zA-Z0-9]+)$/i);
-  return idMatch?.[1] ? `https://giphy.com/embed/${idMatch[1]}` : null;
-}
-
-function getTenorEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/tenor\.com\/view\/[^/-]+-([a-z0-9]+)$/i);
-  return match?.[1] ? `https://tenor.com/embed/${match[1]}` : null;
-}
-
-function getImgurMp4(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/i\.imgur\.com\/([a-zA-Z0-9]+)\.(?:gifv|gif)/i);
-  if (match?.[1]) {
-    return `https://i.imgur.com/${match[1]}.mp4`;
-  }
-  return null;
-}
-
-function getExternalVideoMedia(url?: string | null): ExternalMedia | null {
-  const sanitized = sanitizeHttpUrl(url);
-  if (!sanitized) return null;
-
-  const youtube = getYouTubeEmbed(sanitized);
-  if (youtube) return { kind: 'iframe', src: youtube };
-
-  const vimeo = getVimeoEmbed(sanitized);
-  if (vimeo) return { kind: 'iframe', src: vimeo };
-
-  const tiktok = getTiktokEmbed(sanitized);
-  if (tiktok) return { kind: 'iframe', src: tiktok };
-
-  const twitch = getTwitchEmbed(sanitized);
-  if (twitch) return { kind: 'iframe', src: twitch };
-
-  const dailymotion = getDailymotionEmbed(sanitized);
-  if (dailymotion) return { kind: 'iframe', src: dailymotion };
-
-  const streamable = getStreamableEmbed(sanitized);
-  if (streamable) return { kind: 'iframe', src: streamable };
-
-  const redgifs = getRedgifsEmbed(sanitized);
-  if (redgifs) return { kind: 'iframe', src: redgifs };
-
-  const giphy = getGiphyEmbed(sanitized);
-  if (giphy) return { kind: 'iframe', src: giphy };
-
-  const tenor = getTenorEmbed(sanitized);
-  if (tenor) return { kind: 'iframe', src: tenor };
-
-  const imgurMp4 = getImgurMp4(sanitized);
-  if (imgurMp4) return { kind: 'video', src: imgurMp4 };
-
-  return null;
-}
+import { getPlatformExternalEmbed } from '../../utils/platformExternalEmbeds';
 
 function withAutoplayParams(src: string, muted: boolean): string {
   try {
@@ -217,6 +108,7 @@ export function PlatformPostCard({
   const { t } = useTranslation();
   const { formatNumber, formatDate, formatRelativeTime } = useFormat();
   const [expandedTextMap, setExpandedTextMap] = useState<Record<number, boolean>>({});
+  const [failedImageSrcs, setFailedImageSrcs] = useState<string[]>([]);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const { blockNsfwThumbnails } = useSettings();
   const resolvedHideLabel = hideLabel || t('posts.hide');
@@ -264,6 +156,7 @@ export function PlatformPostCard({
     post.author?.username ||
     (post.author_id === currentUserId ? t('posts.you') : undefined) ||
     t('posts.unknownAuthor');
+  const authorProfileUsername = post.author_username || post.author?.username;
 
   const pointsLabel = t('posts.point', {
     count: post.score,
@@ -281,7 +174,7 @@ export function PlatformPostCard({
   const postUrl = getPostUrl(post);
 
   const hasBody = Boolean(post.body && post.body.trim());
-  const externalMedia = useMemo(() => getExternalVideoMedia(post.media_url), [post.media_url]);
+  const externalMedia = useMemo(() => getPlatformExternalEmbed(post.media_url), [post.media_url]);
   const hasInlinePreview = Boolean(
     post.thumbnail_url ||
     hasBody ||
@@ -298,6 +191,19 @@ export function PlatformPostCard({
     videoEl.volume = 1.0;
     videoEl.play().catch(() => {});
   }, [isInlinePreviewOpen, externalMedia, post.media_url]);
+
+  useEffect(() => {
+    setFailedImageSrcs([]);
+  }, [post.id, post.media_url, post.thumbnail_url]);
+
+  const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const failedSrc = event.currentTarget.currentSrc || event.currentTarget.src;
+    if (!failedSrc) return;
+    setFailedImageSrcs((prev) => (prev.includes(failedSrc) ? prev : [...prev, failedSrc]));
+  };
+
+  const isFailedImageSrc = (src?: string | null): boolean =>
+    Boolean(src && failedImageSrcs.includes(src));
 
   const getPreviewSizing = (src: string): { className: string; style?: CSSProperties } => {
     if (src.includes('tiktok.com')) {
@@ -318,6 +224,10 @@ export function PlatformPostCard({
   const thumbnailClass = 'h-24 w-24'; // 96px x 96px fixed size
   const shouldBlurThumbnail = Boolean(post.nsfw && blockNsfwThumbnails);
   const thumbnailOverlayClass = 'text-[32px]';
+  const resolvedThumbnailUrl = resolveMediaUrl(post.thumbnail_url);
+  const resolvedMediaUrl = resolveMediaUrl(post.media_url);
+  const showThumbnail = Boolean(resolvedThumbnailUrl && !isFailedImageSrc(resolvedThumbnailUrl));
+  const showExpandedImage = Boolean(resolvedMediaUrl && !isFailedImageSrc(resolvedMediaUrl));
 
   return (
     <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -330,13 +240,14 @@ export function PlatformPostCard({
           layout="vertical"
           size={voteButtonSize}
         />
-        {post.thumbnail_url && (
+        {showThumbnail && (
           <div className={`relative ${thumbnailClass} flex-shrink-0`}>
             <img
-              src={resolveMediaUrl(post.thumbnail_url)}
+              src={resolvedThumbnailUrl ?? undefined}
               alt={t('posts.media.previewImageAlt', { title: post.title })}
               loading="lazy"
               decoding="async"
+              onError={handleImageError}
               className={`h-full w-full rounded-lg object-cover ${shouldBlurThumbnail ? 'blur-sm' : ''}`}
             />
             {shouldBlurThumbnail && (
@@ -388,7 +299,16 @@ export function PlatformPostCard({
               </span>
             )}
             <span> · </span>
-            <span>{displayAuthor}</span>
+            {authorProfileUsername ? (
+              <Link
+                to={`/users/${encodeURIComponent(authorProfileUsername)}`}
+                className="hover:text-[var(--color-primary)]"
+              >
+                {displayAuthor}
+              </Link>
+            ) : (
+              <span>{displayAuthor}</span>
+            )}
             <span> · </span>
             <span>{pointsLabel}</span>
             <span> · </span>
@@ -617,20 +537,22 @@ export function PlatformPostCard({
                       playsInline
                       preload="metadata"
                     />
-                  ) : post.media_url && post.media_type?.startsWith('image') ? (
+                  ) : post.media_url && post.media_type?.startsWith('image') && showExpandedImage ? (
                     <img
-                      src={resolveMediaUrl(post.media_url)}
+                      src={resolvedMediaUrl ?? undefined}
                       alt={post.title}
                       loading="lazy"
                       decoding="async"
+                      onError={handleImageError}
                       className="max-h-[70vh] w-full object-contain"
                     />
-                  ) : post.thumbnail_url ? (
+                  ) : showThumbnail ? (
                     <img
-                      src={resolveMediaUrl(post.thumbnail_url)}
+                      src={resolvedThumbnailUrl ?? undefined}
                       alt={post.title}
                       loading="lazy"
                       decoding="async"
+                      onError={handleImageError}
                       className="max-h-[70vh] w-full object-contain"
                     />
                   ) : hasBody ? (

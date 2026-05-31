@@ -1,11 +1,13 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { GalleryImage } from '../../types/posts';
 import { HlsVideo } from '../common/HlsVideo';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { getPlatformExternalEmbed } from '../../utils/platformExternalEmbeds';
 
 type PostDetailMediaProps = {
   mediaUrl?: string | null;
+  mediaType?: string | null;
   thumbnailUrl?: string | null;
   galleryImages?: GalleryImage[];
   decodedTitle: string;
@@ -13,121 +15,6 @@ type PostDetailMediaProps = {
   imageExpanded: boolean;
   onToggleExpanded: () => void;
 };
-
-function getYouTubeEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match =
-    url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/) ||
-    url.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
-  if (!match?.[1]) return null;
-  const startMatch = url.match(/[?&]t=(\d+)/);
-  const start = startMatch ? parseInt(startMatch[1], 10) : null;
-  return `https://www.youtube-nocookie.com/embed/${match[1]}${start ? `?start=${start}` : ''}`;
-}
-
-function getVimeoEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/vimeo\.com\/(?:video\/)?([0-9]+)/i);
-  return match?.[1] ? `https://player.vimeo.com/video/${match[1]}` : null;
-}
-
-function getTiktokEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/tiktok\.com\/(?:@[^/]+\/video\/|v\/)([0-9]+)/i);
-  return match?.[1] ? `https://www.tiktok.com/embed/v2/${match[1]}` : null;
-}
-
-function getTwitchEmbed(url?: string | null): string | null {
-  if (!url || typeof window === 'undefined') return null;
-  const clipMatch = url.match(/twitch\.tv\/(?:[^/]+)\/clip\/([a-zA-Z0-9]+)/i);
-  if (clipMatch?.[1]) {
-    return `https://player.twitch.tv/?clip=${clipMatch[1]}&parent=${window.location.hostname}`;
-  }
-  const vodMatch = url.match(/twitch\.tv\/videos\/([0-9]+)/i);
-  if (vodMatch?.[1]) {
-    return `https://player.twitch.tv/?video=${vodMatch[1]}&parent=${window.location.hostname}`;
-  }
-  return null;
-}
-
-function getDailymotionEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/dailymotion\.com\/video\/([a-zA-Z0-9]+)/i);
-  return match?.[1] ? `https://www.dailymotion.com/embed/video/${match[1]}` : null;
-}
-
-function getStreamableEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/streamable\.com\/(?:e\/)?([a-z0-9]+)/i);
-  return match?.[1] ? `https://streamable.com/e/${match[1]}` : null;
-}
-
-function getRedgifsEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/redgifs\.com\/(?:watch|ifr)\/([a-zA-Z0-9_-]+)/i);
-  if (match?.[1]) return `https://www.redgifs.com/ifr/${match[1]}`;
-  const gfyMatch = url.match(/gfycat\.com\/([a-zA-Z0-9_-]+)/i);
-  return gfyMatch?.[1] ? `https://www.redgifs.com/ifr/${gfyMatch[1]}` : null;
-}
-
-function getGiphyEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const idMatch = url.match(/giphy\.com\/gifs\/[^/]*-?([a-zA-Z0-9]+)$/i);
-  return idMatch?.[1] ? `https://giphy.com/embed/${idMatch[1]}` : null;
-}
-
-function getTenorEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/tenor\.com\/view\/[^/-]+-([a-z0-9]+)$/i);
-  return match?.[1] ? `https://tenor.com/embed/${match[1]}` : null;
-}
-
-function getImgurMp4(url?: string | null): string | null {
-  if (!url) return null;
-  const match = url.match(/i\.imgur\.com\/([a-zA-Z0-9]+)\.(?:gifv|gif)/i);
-  if (match?.[1]) {
-    return `https://i.imgur.com/${match[1]}.mp4`;
-  }
-  return null;
-}
-
-type ExternalMedia = { kind: 'iframe'; src: string } | { kind: 'video'; src: string };
-
-function getExternalVideoMedia(url?: string | null): ExternalMedia | null {
-  if (!url) return null;
-
-  const youtube = getYouTubeEmbed(url);
-  if (youtube) return { kind: 'iframe', src: youtube };
-
-  const vimeo = getVimeoEmbed(url);
-  if (vimeo) return { kind: 'iframe', src: vimeo };
-
-  const tiktok = getTiktokEmbed(url);
-  if (tiktok) return { kind: 'iframe', src: tiktok };
-
-  const twitch = getTwitchEmbed(url);
-  if (twitch) return { kind: 'iframe', src: twitch };
-
-  const dailymotion = getDailymotionEmbed(url);
-  if (dailymotion) return { kind: 'iframe', src: dailymotion };
-
-  const streamable = getStreamableEmbed(url);
-  if (streamable) return { kind: 'iframe', src: streamable };
-
-  const redgifs = getRedgifsEmbed(url);
-  if (redgifs) return { kind: 'iframe', src: redgifs };
-
-  const giphy = getGiphyEmbed(url);
-  if (giphy) return { kind: 'iframe', src: giphy };
-
-  const tenor = getTenorEmbed(url);
-  if (tenor) return { kind: 'iframe', src: tenor };
-
-  const imgurMp4 = getImgurMp4(url);
-  if (imgurMp4) return { kind: 'video', src: imgurMp4 };
-
-  return null;
-}
 
 function getEmbedSizing(url?: string | null): { className: string; style?: CSSProperties } {
   if (!url) {
@@ -149,6 +36,7 @@ function getEmbedSizing(url?: string | null): { className: string; style?: CSSPr
 
 export function PostDetailMedia({
   mediaUrl,
+  mediaType,
   thumbnailUrl,
   galleryImages,
   decodedTitle,
@@ -158,14 +46,32 @@ export function PostDetailMedia({
 }: PostDetailMediaProps) {
   const { t } = useTranslation();
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [failedImageSrcs, setFailedImageSrcs] = useState<string[]>([]);
 
   const hasGallery = galleryImages && galleryImages.length > 0;
   const galleryItem = hasGallery ? galleryImages[galleryIndex] : undefined;
-  const displayImage = hasGallery ? resolveMediaUrl(galleryItem?.url) : resolveMediaUrl(mediaUrl);
-  const externalMedia = !hasGallery ? getExternalVideoMedia(mediaUrl ?? null) : null;
+  const resolvedMediaUrl = hasGallery ? resolveMediaUrl(galleryItem?.url) : resolveMediaUrl(mediaUrl);
+  const externalMedia = !hasGallery ? getPlatformExternalEmbed(mediaUrl ?? null) : null;
   const embedUrl = externalMedia?.kind === 'iframe' ? externalMedia.src : null;
   const externalVideoUrl = externalMedia?.kind === 'video' ? externalMedia.src : null;
   const resolvedThumbnailUrl = resolveMediaUrl(thumbnailUrl);
+  const normalizedMediaType = (mediaType ?? '').toLowerCase();
+  const isImageMedia = normalizedMediaType.startsWith('image/');
+  const isDirectImageUrl = /\.(avif|bmp|gif|jpe?g|png|svg|webp)(?:[?#].*)?$/i.test(mediaUrl ?? '');
+  const shouldUseMediaUrlAsImage = hasGallery || isImageMedia || isDirectImageUrl;
+  const shouldUseThumbnailAsImage =
+    !hasGallery &&
+    !externalMedia &&
+    !isVideoMedia &&
+    !shouldUseMediaUrlAsImage &&
+    Boolean(resolvedThumbnailUrl);
+  const displayImage = hasGallery
+    ? resolvedMediaUrl
+    : shouldUseMediaUrlAsImage
+      ? resolvedMediaUrl
+      : shouldUseThumbnailAsImage
+        ? resolvedThumbnailUrl
+        : null;
   const isEmbeddableVideo = Boolean(embedUrl || externalVideoUrl);
   const embedSizing = getEmbedSizing(embedUrl ?? externalVideoUrl ?? undefined);
   const isGalleryVideo =
@@ -173,14 +79,29 @@ export function PostDetailMedia({
     /\.(mp4|webm|mov|m4v|ogg)$/i.test(galleryItem?.url ?? '');
   const isPlayableVideo = isEmbeddableVideo || isVideoMedia || (hasGallery && isGalleryVideo);
   const isHlsVideo = Boolean(
-    (displayImage ?? resolvedThumbnailUrl)?.toLowerCase().includes('.m3u8') ||
+    (resolvedMediaUrl ?? resolvedThumbnailUrl)?.toLowerCase().includes('.m3u8') ||
     (mediaUrl ?? '').toLowerCase().includes('.m3u8')
   );
+  const inlineVideoSrc = isVideoMedia || (hasGallery && isGalleryVideo) ? resolvedMediaUrl : null;
+  const isFailedImageSrc = (src?: string | null): boolean =>
+    Boolean(src && failedImageSrcs.includes(src));
+  const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const failedSrc = event.currentTarget.currentSrc || event.currentTarget.src;
+    if (!failedSrc) return;
+    setFailedImageSrcs((prev) => (prev.includes(failedSrc) ? prev : [...prev, failedSrc]));
+  };
+  const visibleDisplayImage = displayImage && !isFailedImageSrc(displayImage) ? displayImage : null;
+  const visibleThumbnailImage =
+    resolvedThumbnailUrl && !isFailedImageSrc(resolvedThumbnailUrl) ? resolvedThumbnailUrl : null;
   const containerClasses = isEmbeddableVideo
     ? embedSizing.className
     : `w-full ${imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px]'}`;
 
-  if (!displayImage && !resolvedThumbnailUrl && !embedUrl && !externalVideoUrl) {
+  useEffect(() => {
+    setFailedImageSrcs([]);
+  }, [mediaUrl, thumbnailUrl, galleryIndex]);
+
+  if (!visibleDisplayImage && !inlineVideoSrc && !embedUrl && !externalVideoUrl) {
     return null;
   }
 
@@ -228,11 +149,11 @@ export function PostDetailMedia({
               preload="metadata"
               playsInline
             />
-          ) : displayImage ? (
+          ) : visibleDisplayImage ? (
             isVideoMedia || (hasGallery && isGalleryVideo) ? (
               isHlsVideo ? (
                 <HlsVideo
-                  src={displayImage ?? ''}
+                  src={inlineVideoSrc ?? ''}
                   className={containerClasses}
                   poster={resolvedThumbnailUrl ?? undefined}
                   preload="metadata"
@@ -243,14 +164,14 @@ export function PostDetailMedia({
                 <video
                   controls
                   className={containerClasses}
-                  src={displayImage}
+                  src={inlineVideoSrc ?? undefined}
                   preload="metadata"
                   playsInline
                 />
               )
             ) : (
               <img
-                src={displayImage}
+                src={visibleDisplayImage}
                 alt={
                   hasGallery
                     ? `${decodedTitle} (${galleryIndex + 1}/${galleryImages.length})`
@@ -258,22 +179,24 @@ export function PostDetailMedia({
                 }
                 loading="lazy"
                 decoding="async"
+                onError={handleImageError}
                 className={`w-full object-contain transition-transform duration-200 ${
                   imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
                 }`}
               />
             )
-          ) : (
+          ) : visibleThumbnailImage ? (
             <img
-              src={resolvedThumbnailUrl ?? ''}
+              src={visibleThumbnailImage}
               alt={decodedTitle}
               loading="lazy"
               decoding="async"
+              onError={handleImageError}
               className={`w-full object-contain transition-transform duration-200 ${
                 imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
               }`}
             />
-          )}
+          ) : null}
         </div>
         {hasGallery && galleryImages.length > 1 && (
           <>
