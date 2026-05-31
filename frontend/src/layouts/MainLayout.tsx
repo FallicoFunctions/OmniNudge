@@ -23,6 +23,7 @@ import { MobileTabBar } from '../components/mobile/MobileTabBar';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastContainer } from '../components/error';
 import { dismissToast, useToasts } from '../hooks/useToast';
+import { UpgradeModal } from '../components/payments/UpgradeModal';
 
 const AboutContent = lazy(() =>
   import('../components/about/AboutContent').then((module) => ({
@@ -65,6 +66,7 @@ export default function MainLayout() {
   const aboutModalStorageKey = 'omninudge_about_modal_dismissed';
   const [showBugReportModal, setShowBugReportModal] = useState(false);
   const [bugReportUrl, setBugReportUrl] = useState('');
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const toasts = useToasts();
 
   // Enable notification sounds globally
@@ -289,6 +291,9 @@ export default function MainLayout() {
                         setBugReportUrl(window.location.href);
                         setShowBugReportModal(true);
                       }}
+                      plan={user.plan ?? 'free'}
+                      planExpiresAt={user.plan_expires_at}
+                      onUpgrade={() => setShowUpgradeModal(true)}
                     />
                   )}
 
@@ -313,6 +318,15 @@ export default function MainLayout() {
                           label: 'Donate',
                           to: '/donate',
                         },
+                        ...(!user.plan || user.plan === 'free'
+                          ? [
+                              {
+                                label: 'Upgrade to Paid',
+                                onClick: () => setShowUpgradeModal(true),
+                                className: 'text-[var(--color-primary)] font-semibold',
+                              },
+                            ]
+                          : []),
                         {
                           label: t('mainLayout.bugReporting'),
                           onClick: () => {
@@ -460,6 +474,27 @@ export default function MainLayout() {
         </div>
       </nav>
 
+      {/* Plan expiry warning banner */}
+      {(() => {
+        if (user?.plan !== 'paid' || !user.plan_expires_at) return null;
+        const daysLeft = Math.ceil(
+          (new Date(user.plan_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        );
+        if (daysLeft > 3 || daysLeft <= 0) return null;
+        return (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 px-4 py-2 text-center text-sm text-amber-800 dark:text-amber-200">
+            Your paid plan expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''}.{' '}
+            <button
+              type="button"
+              onClick={() => setShowUpgradeModal(true)}
+              className="font-semibold underline hover:no-underline"
+            >
+              Renew now
+            </button>
+          </div>
+        );
+      })()}
+
       {/* Main Content */}
       <main
         id="main-content"
@@ -523,6 +558,12 @@ export default function MainLayout() {
           </div>
         </div>
       )}
+
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onUpgraded={() => setShowUpgradeModal(false)}
+      />
 
       <BugReportModal
         isOpen={showBugReportModal}
