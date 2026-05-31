@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/omninudge/backend/internal/api/middleware"
-	"github.com/omninudge/backend/internal/ports"
 	"io"
 	"net/http"
 	"strconv"
@@ -14,22 +12,31 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/services/externalproviders"
+	linkpreviewsvc "github.com/omninudge/backend/internal/services/linkpreview"
 	zlog "github.com/rs/zerolog/log"
 )
 
 // PostsHandler handles HTTP requests for platform posts
 type PostsHandler struct {
-	pool         *pgxpool.Pool
-	postRepo     ports.PlatformPostRepository
-	hubRepo      ports.HubRepository
-	userRepo     ports.UserRepository
-	modRepo      ports.HubModeratorRepository
-	feedRepo     ports.FeedRepository
-	settingsRepo *repository.HubSettingsRepository
-	notifService *services.NotificationService
+	pool               *pgxpool.Pool
+	postRepo           ports.PlatformPostRepository
+	hubRepo            ports.HubRepository
+	userRepo           ports.UserRepository
+	modRepo            ports.HubModeratorRepository
+	feedRepo           ports.FeedRepository
+	settingsRepo       *repository.HubSettingsRepository
+	notifService       *services.NotificationService
+	linkPreviewService linkPreviewExtractor
+}
+
+type linkPreviewExtractor interface {
+	Extract(ctx context.Context, rawURL string) (*linkpreviewsvc.PreviewMetadata, error)
 }
 
 // NewPostsHandler creates a new posts handler
@@ -48,6 +55,10 @@ func NewPostsHandler(pool *pgxpool.Pool, postRepo ports.PlatformPostRepository, 
 // SetNotificationService sets the notification service (called after initialization)
 func (h *PostsHandler) SetNotificationService(notifService *services.NotificationService) {
 	h.notifService = notifService
+}
+
+func (h *PostsHandler) SetLinkPreviewService(linkPreviewService linkPreviewExtractor) {
+	h.linkPreviewService = linkPreviewService
 }
 
 // GetSubredditPosts returns local platform posts crossposted to a subreddit.
@@ -302,6 +313,8 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		TargetSubreddit: req.TargetSubreddit,
 	}
 
+	h.enrichLinkPreview(c.Request.Context(), post)
+
 	if err := h.postRepo.Create(c.Request.Context(), post); err != nil {
 		zlog.Error().Err(err).Msg("CreatePost create failed")
 		RespondError(c, http.StatusInternalServerError, "Failed to create post")
@@ -440,6 +453,86 @@ func resolvePostContentType(req CreatePostRequest) string {
 	}
 
 	return "link"
+}
+
+func normalizeOptionalString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
+}
+
+func clearLinkPreview(post *models.PlatformPost, clearThumbnail bool) {
+	post.LinkPreviewTitle = nil
+	post.LinkPreviewDescription = nil
+	post.LinkPreviewSiteName = nil
+	if clearThumbnail {
+		post.ThumbnailURL = nil
+	}
+}
+
+func (h *PostsHandler) enrichLinkPreview(ctx context.Context, post *models.PlatformPost) {
+	if post == nil {
+		return
+	}
+
+	mediaURL := normalizeOptionalString(post.MediaURL)
+	if mediaURL == "" {
+		clearLinkPreview(post, true)
+		return
+	}
+
+	mediaType := strings.ToLower(normalizeOptionalString(post.MediaType))
+	if len(post.GalleryImages) > 0 || strings.HasPrefix(mediaType, "image/") || strings.HasPrefix(mediaType, "video/") {
+		clearLinkPreview(post, false)
+		return
+	}
+
+	linkMediaType := "link"
+	post.MediaType = &linkMediaType
+
+	provider, knownProvider := externalproviders.Classify(mediaURL)
+	if knownProvider {
+		switch {
+		case provider.Status == externalproviders.StatusSupportedEmbed:
+			clearLinkPreview(post, false)
+			return
+		case provider.Status == externalproviders.StatusRecognizedButDisabled &&
+			provider.FallbackBehavior == externalproviders.FallbackRenderNoMedia:
+			clearLinkPreview(post, true)
+			return
+		}
+	}
+
+	if h.linkPreviewService == nil {
+		clearLinkPreview(post, true)
+		return
+	}
+
+	meta, err := h.linkPreviewService.Extract(ctx, mediaURL)
+	if err != nil {
+		zlog.Debug().Err(err).Str("media_url", mediaURL).Msg("link preview extraction skipped")
+		clearLinkPreview(post, true)
+		return
+	}
+
+	post.LinkPreviewTitle = nil
+	post.LinkPreviewDescription = nil
+	post.LinkPreviewSiteName = nil
+	if meta.Title != "" {
+		post.LinkPreviewTitle = &meta.Title
+	}
+	if meta.Description != "" {
+		post.LinkPreviewDescription = &meta.Description
+	}
+	if meta.SiteName != "" {
+		post.LinkPreviewSiteName = &meta.SiteName
+	}
+	if meta.ThumbnailURL != "" {
+		post.ThumbnailURL = &meta.ThumbnailURL
+	} else {
+		post.ThumbnailURL = nil
+	}
 }
 
 // GetFeed returns a paginated feed of posts for a hub.
@@ -592,6 +685,9 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 		return
 	}
 
+	mediaChanged := normalizeOptionalString(existingPost.MediaURL) != normalizeOptionalString(req.MediaURL) ||
+		strings.ToLower(normalizeOptionalString(existingPost.MediaType)) != strings.ToLower(normalizeOptionalString(req.MediaType))
+
 	// Update post fields
 	existingPost.Title = req.Title
 	existingPost.Body = req.Body
@@ -599,6 +695,9 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 	existingPost.MediaURL = req.MediaURL
 	existingPost.MediaType = req.MediaType
 	existingPost.ThumbnailURL = req.ThumbnailURL
+	if mediaChanged {
+		h.enrichLinkPreview(c.Request.Context(), existingPost)
+	}
 
 	if err := h.postRepo.Update(c.Request.Context(), existingPost); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update post")

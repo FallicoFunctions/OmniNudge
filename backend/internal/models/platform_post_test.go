@@ -57,3 +57,41 @@ func TestPlatformPostRepositoryGetByAuthorIncludesHubMetadata(t *testing.T) {
 	require.NotNil(t, posts[0].HubDisplayTitle)
 	require.Equal(t, hubTitle, *posts[0].HubDisplayTitle)
 }
+
+func TestPlatformPostRepository_PersistsLinkPreviewFields(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	userRepo := NewUserRepository(db.Pool)
+	user := &User{
+		Username:     fmt.Sprintf("preview_%d", time.Now().UnixNano()),
+		PasswordHash: "hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user))
+
+	repo := NewPlatformPostRepository(db.Pool)
+	mediaURL := "https://example.com/article"
+	mediaType := "link"
+	thumbnailURL := "/uploads/link-preview.jpg"
+	siteName := "Example"
+	post := &PlatformPost{
+		AuthorID:            user.ID,
+		Title:               "Link",
+		MediaURL:            &mediaURL,
+		MediaType:           &mediaType,
+		ThumbnailURL:        &thumbnailURL,
+		LinkPreviewSiteName: &siteName,
+	}
+	require.NoError(t, repo.Create(ctx, post))
+
+	got, err := repo.GetByID(ctx, post.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Equal(t, thumbnailURL, *got.ThumbnailURL)
+	require.Equal(t, siteName, *got.LinkPreviewSiteName)
+}
