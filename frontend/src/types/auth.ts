@@ -7,6 +7,8 @@ export interface User {
   role: 'user' | 'moderator' | 'admin';
   created_at: string;
   public_key?: string;
+  plan?: 'free' | 'paid';
+  plan_expires_at?: string | null;
 }
 
 export interface LoginRequest {

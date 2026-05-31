@@ -8,9 +8,12 @@ interface AccountMenuProps {
   isModerator: boolean;
   onLogout: () => void;
   onBugReport: () => void;
+  plan?: 'free' | 'paid';
+  planExpiresAt?: string | null;
+  onUpgrade?: () => void;
 }
 
-export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugReport }: AccountMenuProps) {
+export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugReport, plan, planExpiresAt, onUpgrade }: AccountMenuProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -66,6 +69,31 @@ export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugRep
             </svg>
             {username}
           </Link>
+
+          {plan === 'free' && onUpgrade && (
+            <button
+              type="button"
+              onClick={() => { onUpgrade(); setIsOpen(false); }}
+              className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors"
+              role="menuitem"
+            >
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+              </svg>
+              Upgrade to Paid
+            </button>
+          )}
+
+          {plan === 'paid' && planExpiresAt && (
+            <div className="flex items-center gap-2 px-4 py-2" role="presentation">
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/20 px-2 py-0.5 text-xs font-semibold text-green-700 dark:text-green-400">
+                ✓ Paid
+              </span>
+              <span className="text-xs text-[var(--color-text-muted)]">
+                until {new Date(planExpiresAt).toLocaleDateString()}
+              </span>
+            </div>
+          )}
 
           <button
             type="button"
