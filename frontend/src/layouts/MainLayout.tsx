@@ -257,6 +257,12 @@ export default function MainLayout() {
                     >
                       {t('menu.about')}
                     </Link>
+                    <Link
+                      to="/donate"
+                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                    >
+                      Donate
+                    </Link>
                   </div>
 
                   {/* Divider */}
@@ -302,6 +308,10 @@ export default function MainLayout() {
                         {
                           label: t('menu.about'),
                           to: '/about',
+                        },
+                        {
+                          label: 'Donate',
+                          to: '/donate',
                         },
                         {
                           label: t('mainLayout.bugReporting'),
@@ -422,6 +432,10 @@ export default function MainLayout() {
                         {
                           label: t('menu.about'),
                           to: '/about',
+                        },
+                        {
+                          label: 'Donate',
+                          to: '/donate',
                         },
                         {
                           label: t('mainLayout.bugReporting'),
