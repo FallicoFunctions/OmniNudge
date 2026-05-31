@@ -33,6 +33,14 @@ type Config struct {
 	TURN          TURNConfig
 	Qwen          QwenConfig
 	Gemini        GeminiConfig
+	Crypto        CryptoConfig
+}
+
+// CryptoConfig holds wallet addresses for accepting crypto donations and payments.
+type CryptoConfig struct {
+	BTCWallet   string // Our BTC receiving address
+	ETHWallet   string // Our ETH receiving address
+	CAHContract string // CAH ERC-20 token contract address on Ethereum
 }
 
 // QwenConfig holds Qwen AI (via OpenRouter) configuration for AI-powered Hub Page Designer.
@@ -275,6 +283,11 @@ func Load() (*Config, error) {
 		},
 		FrontendURL:   getEnv("FRONTEND_URL", "http://localhost:5176"),
 		AppEnv:        getEnv("APP_ENV", "development"),
+		Crypto: CryptoConfig{
+			BTCWallet:   getEnv("CRYPTO_BTC_WALLET", "31yyvq2asepMEJLqtuka7oSoVCRrnoeG2K"),
+			ETHWallet:   getEnv("CRYPTO_ETH_WALLET", "0xc308f275a03bad6c3ba3b75e2d024d258cba586f"),
+			CAHContract: getEnv("CRYPTO_CAH_CONTRACT", "0x8e0E57DCb1ce8d9091dF38ec1BfC3b224529754A"),
+		},
 		MetricsToken:  getEnv("METRICS_TOKEN", ""),
 		AsynqmonToken: getEnv("ASYNQMON_TOKEN", ""),
 		TURN: TURNConfig{

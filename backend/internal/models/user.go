@@ -45,6 +45,10 @@ type User struct {
 	BannedAt            *time.Time `json:"banned_at,omitempty"`
 	BannedBy            *int       `json:"banned_by,omitempty"`
 
+	// Subscription plan
+	Plan          string     `json:"plan"`                     // "free" | "paid"
+	PlanExpiresAt *time.Time `json:"plan_expires_at,omitempty"` // nil for free tier
+
 	// Timestamps
 	CreatedAt time.Time `json:"created_at"`
 	LastSeen  time.Time `json:"last_seen"`
@@ -814,4 +818,56 @@ func (r *UserRepository) UpdateVerifiedEmail(ctx context.Context, userID int, en
 	query := `UPDATE users SET email = $1, email_verified = true, email_encrypted = true WHERE id = $2`
 	_, err := r.pool.Exec(ctx, query, encryptedEmail, userID)
 	return err
+}
+
+// UpdatePlan sets a user's plan and expiry. Pass nil for expiresAt when
+// downgrading to free (no expiry) or for a lifetime plan.
+func (r *UserRepository) UpdatePlan(ctx context.Context, userID int, plan string, expiresAt *time.Time) error {
+	query := `UPDATE users SET plan = $2, plan_expires_at = $3 WHERE id = $1`
+	_, err := r.pool.Exec(ctx, query, userID, plan, expiresAt)
+	if err != nil {
+		return fmt.Errorf("update user plan: %w", err)
+	}
+	return nil
+}
+
+// GetPlan returns the user's current plan and its expiry time.
+func (r *UserRepository) GetPlan(ctx context.Context, userID int) (string, *time.Time, error) {
+	var plan string
+	var expiresAt *time.Time
+	query := `SELECT plan, plan_expires_at FROM users WHERE id = $1`
+	err := r.pool.QueryRow(ctx, query, userID).Scan(&plan, &expiresAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", nil, fmt.Errorf("user not found: %d", userID)
+		}
+		return "", nil, fmt.Errorf("get user plan: %w", err)
+	}
+	return plan, expiresAt, nil
+}
+
+// ListUsersWithExpiredPlans returns IDs of paid users whose plan_expires_at
+// is in the past. The expiry worker uses this to downgrade accounts.
+func (r *UserRepository) ListUsersWithExpiredPlans(ctx context.Context) ([]int, error) {
+	query := `
+		SELECT id FROM users
+		WHERE plan != 'free'
+		  AND plan_expires_at IS NOT NULL
+		  AND plan_expires_at < NOW()
+	`
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list expired plans: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan expired plan user: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }

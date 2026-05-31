@@ -34,6 +34,7 @@ import (
 	"github.com/omninudge/backend/internal/domain/events"
 	"github.com/omninudge/backend/internal/eventhandlers"
 	"github.com/omninudge/backend/internal/handlers"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/jobs"
 	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/observability"
@@ -420,10 +421,10 @@ func main() {
 		jobWorker.RegisterAllHandlers(queue.JobHandlers{
 			EmailSend:           queue.NewEmailHandler(emailService),
 			DataExport:          queue.NewDataExportHandler(db.Pool, storageService, cfg.Encryption.Key, emailService),
-			VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed, storageService),
+			VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed, storageService, queueClient),
 			Transcription:       queue.NewUnsupportedHandler(queue.JobTypeTranscription, "transcription backend pipeline is not yet implemented"),
 			Notification:        queue.NewNotificationHandler(tokenRepo, firebaseService),
-			ThumbnailGeneration: queue.NewThumbnailGenerationHandler(mediaRepo, queueThumbnailService),
+			ThumbnailGeneration: queue.NewThumbnailGenerationHandler(mediaRepo, queueThumbnailService, storageService),
 			ContentModeration:   queue.NewUnsupportedHandler(queue.JobTypeContentModeration, "content moderation backend is not yet implemented"),
 			MessageReencrypt:    queue.NewUnsupportedHandler(queue.JobTypeMessageReencrypt, "message re-encryption backend pipeline is not yet implemented"),
 			WaveformGeneration:  queue.NewWaveformJobHandler(db.Pool, voiceStorage).Handle,
@@ -498,6 +499,20 @@ func main() {
 	// Start data retention worker (P0-034: automated data deletion per retention policy)
 	retentionWorker := workers.NewRetentionWorker(db.Pool, scrubberService, storageService, cfg.Retention)
 	go retentionWorker.Start(workerCtx)
+
+	// Crypto payment services
+	priceOracleSvc := services.NewPriceOracleService("")
+	cryptoVerifySvc := services.NewCryptoVerificationService(
+		cfg.Crypto.BTCWallet,
+		cfg.Crypto.ETHWallet,
+		cfg.Crypto.CAHContract,
+		"", "",
+	)
+	planSvc := services.NewPlanService(models.NewUserRepository(db.Pool))
+	cryptoPaymentRepo := models.NewCryptoPaymentRepository(db.Pool)
+
+	go workers.NewCryptoPaymentWorker(cryptoPaymentRepo, planSvc, cryptoVerifySvc).Start(workerCtx)
+	go workers.NewPlanExpiryWorker(planSvc).Start(workerCtx)
 
 	// Initialize repositories for email verification
 	emailVerificationRepo := repository.NewPostgresEmailVerificationRepository(db.Pool)
@@ -584,6 +599,7 @@ func main() {
 	logHandler := handlers.NewLogHandler(analyticsService)
 	groupHandler := handlers.NewGroupHandler(db.Pool)
 	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
+	paymentsHandler := handlers.NewPaymentsHandler(cryptoPaymentRepo, planSvc, cryptoVerifySvc, priceOracleSvc)
 	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, tokenRepo, firebaseService)
 	callsHandler := handlers.NewCallsHandler(db.Pool, hub, cfg.TURN)
 	zlog.Info().Bool("gemini_key_set", cfg.Gemini.APIKey != "").Str("gemini_model", cfg.Gemini.Model).Msg("AI designer config")
@@ -1262,6 +1278,10 @@ func main() {
 			protected.POST("/users/me/agent/post", usersHandler.UpdateLastAgentPostAt)
 			protected.POST("/users/me/agent/browse", usersHandler.UpdateLastAgentBrowseAt)
 			protected.POST("/users/me/agent/state", usersHandler.GetAgentState)
+
+			// Crypto payments
+			protected.POST("/payments/crypto/submit", paymentsHandler.SubmitCryptoPayment)
+			protected.GET("/payments/crypto/:txid/status", paymentsHandler.GetPaymentStatus)
 
 			// User blocking
 			protected.POST("/users/block", blockingHandler.BlockUser)
