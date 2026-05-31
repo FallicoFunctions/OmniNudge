@@ -62,7 +62,6 @@ This file is the source of truth for:
 - provider status
 - render kind
 - fallback behavior
-- whether preview extraction should be skipped
 - whether outbound title linking is allowed
 - which local embed-builder or renderer adapter should be used
 
@@ -112,10 +111,8 @@ Each provider entry should support at minimum:
 - `priority`
 - `match_rules`
 - `render_kind`
-- `skip_preview_extraction`
 - `allow_title_outbound_link`
 - `embed_builder_key`
-- `aliases` if needed
 
 ### Field Definitions
 
@@ -145,14 +142,36 @@ Each provider entry should support at minimum:
     - `direct_video`
     - `direct_image`
     - `link_preview_only`
-- `skip_preview_extraction`
-  - whether generic article preview extraction should be skipped for this provider
 - `allow_title_outbound_link`
   - whether the post title remains a clickable outbound link
 - `embed_builder_key`
   - key used by frontend typed code to construct embed URLs or choose renderer behavior
-- `aliases`
-  - optional legacy domains or alternate hostnames
+
+### Schema Invariants
+
+The registry schema must reject contradictory field combinations.
+
+Required invariants:
+
+- `supported_embed` requires:
+  - `fallback_behavior = none`
+  - `render_kind` must be one of:
+    - `iframe`
+    - `direct_video`
+    - `direct_image`
+  - `embed_builder_key` must be present
+- `supported_preview_only` requires:
+  - `fallback_behavior = none`
+  - `render_kind = link_preview_only`
+  - `embed_builder_key` must be absent
+- `recognized_but_disabled` requires:
+  - `fallback_behavior` must not be `none`
+  - `embed_builder_key` may be omitted
+  - `render_kind` may describe the provider's eventual renderer shape, but it must not by itself cause media rendering
+- `render_kind = link_preview_only` must not be paired with `supported_embed`
+- `fallback_behavior = provider_preview_only` must only be allowed once provider-specific preview handlers exist in code and tests
+
+Invalid registry entries must fail validation before either runtime consumes the catalog.
 
 ## Matching Model
 
@@ -174,7 +193,7 @@ Each `match_rule` should support this constrained matching DSL:
 - `query_requirements`
   - optional map of query key rules
 - `aliases`
-  - optional legacy domains if provider-specific alias handling is needed
+  - optional legacy domains or alternate hostnames
 
 ### Portable Matching DSL
 
@@ -211,6 +230,8 @@ Allowed query requirement semantics:
   - parameter must equal the given value
 
 This DSL is deliberately narrower than arbitrary regex so frontend and backend implementations cannot drift on regex-engine differences.
+
+Whether generic article preview extraction is skipped must be derived from `status` and `fallback_behavior`, not from a separate boolean field. The registry must not define a second independent flag for preview-skipping behavior.
 
 ### Match Precedence
 
@@ -253,10 +274,36 @@ Canonicalization rules should include:
 - require valid `http` or `https`
 - normalize host casing
 - normalize `www` handling
+- normalize repeated slashes in paths
+- normalize trailing slashes for path matching except where a provider rule explicitly depends on them
+- percent-decode path segments before matching where decoding is safe and deterministic
+- preserve path-segment order exactly
+- preserve query-key casing rules according to standard URL parsing, but compare canonicalized query keys consistently in both runtimes
 - strip known tracking parameters when they are not provider-critical
 - preserve provider-critical parameters such as YouTube start-time query parameters
 
 Canonicalization is required to keep classification stable and reduce duplicated edge-case handling.
+
+### Path Normalization Rules
+
+Path comparison must be deterministic across TypeScript and Go.
+
+Before matching:
+
+- collapse repeated `/` characters to a single `/`
+- remove a trailing `/` unless the normalized path would become empty, in which case use `/`
+- decode percent-encoded unreserved path characters
+- do not decode reserved path separators into new segments
+- preserve case for path matching unless a provider rule explicitly declares case-insensitive behavior
+
+### Query Normalization Rules
+
+Query comparison must also be deterministic:
+
+- preserve parameter order only when a provider rule explicitly depends on ordered repeated keys, otherwise order is ignored
+- compare query keys case-sensitively after URL parsing
+- compare query values exactly after URL decoding unless the provider rule declares otherwise
+- remove known tracking parameters before query-requirement checks if they are not provider-critical
 
 ## Fallback Model
 
@@ -356,9 +403,9 @@ Each day-one `recognized_but_disabled` entry must explicitly declare one of thes
 
 - `treat_as_plain_link`
 - `render_no_media`
-- `provider_preview_only`
 
 The chosen fallback must reflect real expected behavior for that provider, not a placeholder.
+`provider_preview_only` remains a valid future enum value in the general schema, but it must not be used in the initial rollout until provider-specific preview handlers actually exist.
 
 ## Recognition Versus Embeddability
 
