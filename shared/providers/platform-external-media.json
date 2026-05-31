@@ -1,0 +1,461 @@
+{
+  "schema_version": 1,
+  "providers": [
+    {
+      "id": "youtube",
+      "family": "video",
+      "status": "supported_embed",
+      "fallback_behavior": "none",
+      "priority": 100,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": "youtube",
+      "match_rules": [
+        {
+          "hosts": ["youtube.com", "www.youtube.com"],
+          "allow_subdomains": false,
+          "path_match_type": "prefix",
+          "path_patterns": ["/watch"],
+          "query_requirements": {
+            "v": "present"
+          }
+        },
+        {
+          "hosts": ["youtube.com", "www.youtube.com"],
+          "allow_subdomains": false,
+          "path_match_type": "prefix",
+          "path_patterns": ["/shorts", "/embed"]
+        },
+        {
+          "hosts": ["youtu.be"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/*"]
+        }
+      ]
+    },
+    {
+      "id": "vimeo",
+      "family": "video",
+      "status": "supported_embed",
+      "fallback_behavior": "none",
+      "priority": 100,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": "vimeo",
+      "match_rules": [
+        {
+          "hosts": ["vimeo.com", "www.vimeo.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/*"]
+        },
+        {
+          "hosts": ["player.vimeo.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/video/*"]
+        }
+      ]
+    },
+    {
+      "id": "tiktok",
+      "family": "social",
+      "status": "supported_embed",
+      "fallback_behavior": "none",
+      "priority": 100,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": "tiktok",
+      "match_rules": [
+        {
+          "hosts": ["tiktok.com", "www.tiktok.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/*/video/*", "/v/*", "/embed/v2/*"]
+        }
+      ]
+    },
+    {
+      "id": "twitch",
+      "family": "video",
+      "status": "supported_embed",
+      "fallback_behavior": "none",
+      "priority": 100,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": "twitch",
+      "match_rules": [
+        {
+          "hosts": ["twitch.tv", "www.twitch.tv"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/videos/*", "/*/clip/*"]
+        },
+        {
+          "hosts": ["clips.twitch.tv"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/*"]
+        }
+      ]
+    },
+    {
+      "id": "dailymotion",
+      "family": "video",
+      "status": "supported_embed",
+      "fallback_behavior": "none",
+      "priority": 100,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": "dailymotion",
+      "match_rules": [
+        {
+          "hosts": ["dailymotion.com", "www.dailymotion.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/video/*"]
+        },
+        {
+          "hosts": ["dai.ly"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/*"]
+        }
+      ]
+    },
+    {
+      "id": "streamable",
+      "family": "video",
+      "status": "supported_embed",
+      "fallback_behavior": "none",
+      "priority": 100,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": "streamable",
+      "match_rules": [
+        {
+          "hosts": ["streamable.com", "www.streamable.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/*", "/e/*"]
+        }
+      ]
+    },
+    {
+      "id": "redgifs",
+      "family": "adult",
+      "status": "supported_embed",
+      "fallback_behavior": "none",
+      "priority": 100,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": "redgifs",
+      "match_rules": [
+        {
+          "hosts": ["redgifs.com", "www.redgifs.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/watch/*", "/ifr/*"]
+        }
+      ]
+    },
+    {
+      "id": "gfycat",
+      "family": "gif",
+      "status": "supported_embed",
+      "fallback_behavior": "none",
+      "priority": 95,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": "gfycat",
+      "match_rules": [
+        {
+          "hosts": ["gfycat.com", "www.gfycat.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/*"]
+        }
+      ]
+    },
+    {
+      "id": "giphy",
+      "family": "gif",
+      "status": "supported_embed",
+      "fallback_behavior": "none",
+      "priority": 100,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": "giphy",
+      "match_rules": [
+        {
+          "hosts": ["giphy.com", "www.giphy.com"],
+          "allow_subdomains": false,
+          "path_match_type": "prefix",
+          "path_patterns": ["/gifs"]
+        }
+      ]
+    },
+    {
+      "id": "tenor",
+      "family": "gif",
+      "status": "supported_embed",
+      "fallback_behavior": "none",
+      "priority": 100,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": "tenor",
+      "match_rules": [
+        {
+          "hosts": ["tenor.com", "www.tenor.com"],
+          "allow_subdomains": false,
+          "path_match_type": "prefix",
+          "path_patterns": ["/view"]
+        }
+      ]
+    },
+    {
+      "id": "imgur_gifv",
+      "family": "gif",
+      "status": "supported_embed",
+      "fallback_behavior": "none",
+      "priority": 100,
+      "render_kind": "direct_video",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": "imgur_gifv",
+      "match_rules": [
+        {
+          "hosts": ["i.imgur.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/*"]
+        }
+      ]
+    },
+    {
+      "id": "instagram_post",
+      "family": "social",
+      "status": "recognized_but_disabled",
+      "fallback_behavior": "render_no_media",
+      "priority": 90,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": null,
+      "match_rules": [
+        {
+          "hosts": ["instagram.com", "www.instagram.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/p/*"]
+        }
+      ]
+    },
+    {
+      "id": "instagram_reel",
+      "family": "social",
+      "status": "recognized_but_disabled",
+      "fallback_behavior": "render_no_media",
+      "priority": 90,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": null,
+      "match_rules": [
+        {
+          "hosts": ["instagram.com", "www.instagram.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/reel/*"]
+        }
+      ]
+    },
+    {
+      "id": "facebook_video",
+      "family": "social",
+      "status": "recognized_but_disabled",
+      "fallback_behavior": "treat_as_plain_link",
+      "priority": 80,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": null,
+      "match_rules": [
+        {
+          "hosts": ["facebook.com", "www.facebook.com", "fb.watch"],
+          "allow_subdomains": false,
+          "path_match_type": "prefix",
+          "path_patterns": ["/watch", "/share/v", "/videos"]
+        }
+      ]
+    },
+    {
+      "id": "x_twitter_status",
+      "family": "social",
+      "status": "recognized_but_disabled",
+      "fallback_behavior": "treat_as_plain_link",
+      "priority": 80,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": null,
+      "match_rules": [
+        {
+          "hosts": ["twitter.com", "x.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/*/status/*"]
+        }
+      ]
+    },
+    {
+      "id": "loom",
+      "family": "video",
+      "status": "recognized_but_disabled",
+      "fallback_behavior": "treat_as_plain_link",
+      "priority": 70,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": null,
+      "match_rules": [
+        {
+          "hosts": ["loom.com", "www.loom.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/share/*"]
+        }
+      ]
+    },
+    {
+      "id": "wistia",
+      "family": "video",
+      "status": "recognized_but_disabled",
+      "fallback_behavior": "treat_as_plain_link",
+      "priority": 70,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": null,
+      "match_rules": [
+        {
+          "hosts": ["wistia.com", "wistia.net"],
+          "allow_subdomains": true,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/medias/*"]
+        }
+      ]
+    },
+    {
+      "id": "spotify",
+      "family": "audio",
+      "status": "recognized_but_disabled",
+      "fallback_behavior": "treat_as_plain_link",
+      "priority": 70,
+      "render_kind": "link_preview_only",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": null,
+      "match_rules": [
+        {
+          "hosts": ["open.spotify.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/track/*", "/album/*", "/playlist/*", "/episode/*", "/show/*"]
+        }
+      ]
+    },
+    {
+      "id": "soundcloud",
+      "family": "audio",
+      "status": "recognized_but_disabled",
+      "fallback_behavior": "treat_as_plain_link",
+      "priority": 70,
+      "render_kind": "link_preview_only",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": null,
+      "match_rules": [
+        {
+          "hosts": ["soundcloud.com", "www.soundcloud.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/*/*", "/*/*/*"]
+        }
+      ]
+    },
+    {
+      "id": "apple_music",
+      "family": "audio",
+      "status": "recognized_but_disabled",
+      "fallback_behavior": "treat_as_plain_link",
+      "priority": 70,
+      "render_kind": "link_preview_only",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": null,
+      "match_rules": [
+        {
+          "hosts": ["music.apple.com", "podcasts.apple.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/**"]
+        }
+      ]
+    },
+    {
+      "id": "mixcloud",
+      "family": "audio",
+      "status": "recognized_but_disabled",
+      "fallback_behavior": "treat_as_plain_link",
+      "priority": 70,
+      "render_kind": "link_preview_only",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": null,
+      "match_rules": [
+        {
+          "hosts": ["mixcloud.com", "www.mixcloud.com"],
+          "allow_subdomains": false,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/*/*"]
+        }
+      ]
+    },
+    {
+      "id": "bandcamp",
+      "family": "audio",
+      "status": "recognized_but_disabled",
+      "fallback_behavior": "treat_as_plain_link",
+      "priority": 70,
+      "render_kind": "link_preview_only",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": null,
+      "match_rules": [
+        {
+          "hosts": ["bandcamp.com"],
+          "allow_subdomains": true,
+          "path_match_type": "segment_template",
+          "path_patterns": ["/track/*", "/album/*"]
+        }
+      ]
+    },
+    {
+      "id": "pornhub",
+      "family": "adult",
+      "status": "recognized_but_disabled",
+      "fallback_behavior": "render_no_media",
+      "priority": 70,
+      "render_kind": "iframe",
+      "allow_title_outbound_link": true,
+      "embed_builder_key": null,
+      "match_rules": [
+        {
+          "hosts": ["pornhub.com", "www.pornhub.com"],
+          "allow_subdomains": false,
+          "path_match_type": "exact",
+          "path_patterns": ["/view_video.php"],
+          "query_requirements": {
+            "viewkey": "present"
+          }
+        },
+        {
+          "hosts": ["pornhub.com", "www.pornhub.com"],
+          "allow_subdomains": false,
+          "path_match_type": "prefix",
+          "path_patterns": ["/embed"]
+        }
+      ]
+    }
+  ]
+}
