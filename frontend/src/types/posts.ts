@@ -28,6 +28,9 @@ export interface PlatformPost {
   media_url?: string | null;
   media_type?: string | null;
   thumbnail_url?: string | null;
+  link_preview_title?: string | null;
+  link_preview_description?: string | null;
+  link_preview_site_name?: string | null;
   gallery_images?: GalleryImage[];
   nsfw?: boolean;
   tags?: string[] | null;

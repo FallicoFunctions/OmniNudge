@@ -58,6 +58,7 @@ import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionI
 import HubAIDesignLayout from '../components/hubDesign/HubAIDesignLayout';
 import { useActiveHubAIDesign } from '../hooks/useActiveHubAIDesign';
 import { splitAIDesignHTML } from '../utils/splitAIDesignHTML';
+import { sanitizeHttpUrl } from '../utils/crosspostHelpers';
 
 export default function PostDetailPage() {
   const { postId, commentId, hubname, subreddit } = useParams<{
@@ -287,11 +288,7 @@ export default function PostDetailPage() {
   const commentsQueryKey = ['posts', parsedPostId, 'comments'] as const;
   const { data: postComments, isLoading: loadingComments } = useQuery<PostComment[]>({
     queryKey: commentsQueryKey,
-    queryFn: async () => {
-      const response = await postsService.getComments(parsedPostId);
-      console.log('[PostDetailPage] Comments response:', response);
-      return response;
-    },
+    queryFn: () => postsService.getComments(parsedPostId),
     enabled: Number.isFinite(parsedPostId) && !postLoadError,
   });
   const commentsList = useMemo(() => postComments ?? [], [postComments]);
@@ -478,23 +475,13 @@ export default function PostDetailPage() {
   };
 
   const topLevelComments = useMemo(() => {
-    console.log('[PostDetailPage] Computing topLevelComments, commentsList:', commentsList);
-    console.log('[PostDetailPage] focusedCommentId:', focusedCommentId);
     if (focusedCommentId) {
       const target = commentsList.find((c) => c.id === focusedCommentId);
       return target ? [target] : [];
     }
-    const filtered = commentsList.filter((c) => {
-      console.log(
-        '[PostDetailPage] Filtering comment:',
-        c.id,
-        'parent_comment_id:',
-        c.parent_comment_id
-      );
-      return c.parent_comment_id === null || c.parent_comment_id === undefined;
-    });
-    console.log('[PostDetailPage] topLevelComments filtered result:', filtered);
-    return filtered;
+    return commentsList.filter(
+      (c) => c.parent_comment_id === null || c.parent_comment_id === undefined
+    );
   }, [commentsList, focusedCommentId]);
 
   const totalCommentsCount = commentsList.length;
@@ -554,8 +541,21 @@ export default function PostDetailPage() {
 
   const bodyText = postData?.body ?? postData?.content ?? undefined;
   const mediaUrl = postData?.media_url ?? undefined;
+  const normalizedMediaType = (postData?.media_type ?? '').toLowerCase();
   const thumbnailUrl = postData?.thumbnail_url ?? undefined;
-  const isVideoMedia = (postData?.media_type ?? '').toLowerCase() === 'video';
+  const isVideoMedia =
+    normalizedMediaType === 'video' || normalizedMediaType.startsWith('video/');
+  const sanitizedExternalLink = sanitizeHttpUrl(mediaUrl);
+  const isImageLikeExternalUrl = /\.(avif|bmp|gif|jpe?g|png|svg|webp)(?:[?#].*)?$/i.test(
+    sanitizedExternalLink ?? ''
+  );
+  const isExternalLinkPost = Boolean(
+    sanitizedExternalLink &&
+      !postData?.gallery_images?.length &&
+      !normalizedMediaType.startsWith('image/') &&
+      normalizedMediaType !== 'video' &&
+      !isImageLikeExternalUrl
+  );
 
   const copyEmbedCode = async () => {
     if (!embedCode) return;
@@ -711,7 +711,20 @@ export default function PostDetailPage() {
         {postData && (
           <Panel>
             <PostHeader
-              title={decodedTitle}
+              title={
+                isExternalLinkPost ? (
+                  <a
+                    href={sanitizedExternalLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-[var(--color-primary)]"
+                  >
+                    {decodedTitle}
+                  </a>
+                ) : (
+                  decodedTitle
+                )
+              }
               titleBadges={
                 postData?.nsfw ? (
                   <span className="inline-flex items-center rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
@@ -761,6 +774,7 @@ export default function PostDetailPage() {
 
             <PostDetailMedia
               mediaUrl={mediaUrl}
+              mediaType={postData?.media_type ?? null}
               thumbnailUrl={thumbnailUrl}
               galleryImages={postData?.gallery_images}
               decodedTitle={decodedTitle}
@@ -1524,7 +1538,20 @@ export default function PostDetailPage() {
           {postData && (
             <Panel>
               <PostHeader
-                title={decodedTitle}
+                title={
+                  isExternalLinkPost ? (
+                    <a
+                      href={sanitizedExternalLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-[var(--color-primary)]"
+                    >
+                      {decodedTitle}
+                    </a>
+                  ) : (
+                    decodedTitle
+                  )
+                }
                 titleBadges={
                   postData?.nsfw ? (
                     <span className="inline-flex items-center rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
@@ -1574,6 +1601,7 @@ export default function PostDetailPage() {
 
               <PostDetailMedia
                 mediaUrl={mediaUrl}
+                mediaType={postData?.media_type ?? null}
                 thumbnailUrl={thumbnailUrl}
                 galleryImages={postData?.gallery_images}
                 decodedTitle={decodedTitle}

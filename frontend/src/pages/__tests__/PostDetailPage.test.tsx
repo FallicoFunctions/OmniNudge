@@ -206,4 +206,34 @@ describe('PostDetailPage', () => {
       expect(screen.getByText('Test Post')).toBeInTheDocument();
     });
   });
+
+  it('renders the title as an external link for plain link posts', async () => {
+    vi.mocked(postsService.getPost).mockResolvedValue({
+      id: 113,
+      title: 'The anatomy of a football team',
+      author_id: 7,
+      author_username: 'DERRF',
+      hub_id: 3,
+      hub_name: 'testhub',
+      score: 1,
+      upvotes: 1,
+      downvotes: 0,
+      comment_count: 0,
+      num_comments: 0,
+      created_at: new Date().toISOString(),
+      media_url: 'https://thefootballromantic.blogspot.com/2026/05/the-anatomy-of-football-team.html',
+      user_vote: 1,
+    } as PlatformPost);
+
+    renderWithHubPostId('testhub', '113');
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('link', { name: 'The anatomy of a football team' })
+      ).toHaveAttribute(
+        'href',
+        'https://thefootballromantic.blogspot.com/2026/05/the-anatomy-of-football-team.html'
+      );
+    });
+  });
 });
