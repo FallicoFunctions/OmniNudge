@@ -1223,7 +1223,7 @@ Solution:
 
 **Next: Start learning Go!**
 
-Proceed to `02-month-0-learning-go.md` to begin your Go learning curriculum.
+Proceed to the remaining roadmap documents and current implementation docs as needed; the standalone Go learning curriculum file has been retired.
 
 ---
 

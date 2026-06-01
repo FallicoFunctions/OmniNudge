@@ -287,7 +287,7 @@ Once SMTP is configured:
 ✅ **Use app passwords** - Not your real password
 ✅ **Rotate credentials** - Every 90 days
 ✅ **Use dedicated send address** - Not your personal email
-✅ **Set up SPF/DKIM** - For production (see SMTP_SETUP_GUIDE.md)
+✅ **Set up SPF/DKIM** - For production, configure your DNS records with your provider
 
 ---
 
@@ -326,7 +326,7 @@ Once SMTP is configured:
 ---
 
 **Need More Help?**
-See `SMTP_SETUP_GUIDE.md` for detailed troubleshooting and advanced configuration.
+Use this guide together with the provider's official documentation for advanced troubleshooting.
 
 ---
 

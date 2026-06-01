@@ -1,325 +1,96 @@
 # OmniNudge
 
-A social platform combining Reddit browsing with encrypted multimedia chat, designed to be the foundation of a universal social media platform.
+OmniNudge is a social platform with native posts and comments, real-time messaging, media sharing, Reddit browsing, and theme customization.
 
-## Overview
+The repository includes a Go backend, a React frontend, background jobs, media processing, and operational tooling.
 
-OmniNudge allows users to browse Reddit content, discuss it with a growing community, and connect through end-to-end encrypted chat with multimedia features. Users can create their own posts and comments visible to the platform community while exploring Reddit's vast content library.
+## Product Scope
 
-## Core Features (Phase 1 MVP)
+- Platform-native posts, comments, hubs, subscriptions, voting, and search
+- Reddit browsing through Reddit's public JSON endpoints
+- Direct messaging with read receipts, typing indicators, and presence
+- Image, video, audio, and file uploads
+- Voice messages, WebRTC calls, and screen sharing
+- Shared slideshow sessions and conversation media galleries
+- Custom themes with installable themes, user overrides, and a visual editor
+- Moderation, feature flags, analytics, retention, data export, and account deletion flows
 
-### Reddit Integration
-- Browse posts from any subreddit using Reddit's public API
-- View posts with custom UI and sorting (hot, new, top, rising)
-- Filter by subreddit topics
-- View Reddit media in slideshows while chatting
+## Implemented Systems
 
-### OmniNudge Platform Social Layer
-- Create posts and comments in custom OmniNudge hubs
-- Upvote/downvote OmniNudge posts and comments
-- Unified feed showing both Reddit posts and OmniNudge posts
+### Social and Content
+
+- Native post and comment system with hub-specific access controls
+- Mixed content model for platform posts and Reddit content
 - Full-text search across posts, comments, users, and hubs
-- Real-time notifications for milestones, velocity, and replies
-- User blocking to filter unwanted content
-- Profile management (bio, avatar)
-- Username/password authentication (optional email)
+- Saved items, hidden items, subscriptions, and blocking
+- Notification pipeline for replies, milestones, and activity thresholds
 
-### Encrypted Messaging
-- End-to-end encrypted direct messages
-- Real-time delivery via WebSocket
-- Read receipts and typing indicators
-- Online/offline status
+### Messaging and Realtime
 
-### Multimedia Chat
-- Share images, videos, GIFs, and audio
-- Personal slideshows (upload and share your media)
-- Reddit slideshow (browse subreddit media together)
-- Synchronized slideshow with shared control
-- Media gallery navigation through conversation history
-- Filter media by sender (all/mine/theirs)
+- WebSocket-based realtime event delivery
+- Direct conversations, folders, reactions, and message editing
+- Presence tracking and online status
+- WebRTC call signaling with TURN-backed ICE server configuration
+- Screen sharing and synchronized slideshow coordination
 
-## Tech Stack
+### Media Pipeline
+
+- Upload handling for images, video, audio, and file attachments
+- Quota-aware media storage
+- S3-compatible object storage support with CDN URL handling
+- Background virus scanning and thumbnail generation
+- Voice-message processing and waveform generation
+- FFmpeg-based audio handling for iOS recording compatibility
+
+### Safety and Operations
+
+- Rate limiting across auth, upload, and general API paths
+- Moderation workflows, mod mail, removal reasons, and audit logs
+- Feature flag service with rollout monitoring
+- Retention worker and account deletion flows
+- Data export jobs
+- Structured logging, metrics, tracing, and error reporting hooks
+
+## Architecture
 
 ### Backend
-- **Language:** Go 1.21+
-- **Framework:** Gin
-- **Database:** PostgreSQL
-- **Real-time:** WebSocket (Gorilla)
-- **Authentication:** JWT
+
+- Go 1.26
+- Gin HTTP server
+- PostgreSQL with `pgx`
+- Redis for cache and queue coordination
+- Asynq for background jobs
+- Gorilla WebSocket
+- JWT authentication
+- S3-compatible storage integration
+- ClamAV for upload scanning
+- FFmpeg for audio processing
+- Firebase Cloud Messaging for push notifications
+- Prometheus, OpenTelemetry, Sentry, and Pyroscope integration points
+- Gemini-backed hub AI designer endpoint
 
 ### Frontend
-- **Framework:** React 19 + TypeScript
-- **Build Tool:** Vite 7
-- **Styling:** Tailwind CSS 3 + CSS variables bound to the theme system
-- **State/Data:** React Context + TanStack Query 5
-- **Testing:** Vitest 3 with Testing Library + jsdom
-- **Utilities:** react-hook-form, zod, zustand (editor helpers), react-colorful, clsx
 
-## Project Structure
+- React 19
+- TypeScript 5.9
+- Vite 7
+- React Router 7
+- TanStack Query 5
+- React Hook Form with Zod validation
+- Tailwind CSS 3
+- i18next localization
+- Storybook
+- Vitest, Testing Library, and Playwright
 
-```
-omninudge/
-├── backend/
-│   ├── cmd/server/          # Application entry point
-│   ├── internal/
-│   │   ├── api/
-│   │   │   ├── handlers/    # HTTP handlers
-│   │   │   └── middleware/  # Auth, CORS, etc.
-│   │   ├── models/          # Data models
-│   │   ├── services/        # Business logic
-│   │   ├── database/        # DB connection & migrations
-│   │   └── config/          # Configuration
-│   └── go.mod
-├── frontend/                # React + Vite app (Theme context, editor, selector, tests)
-└── docs/                    # Full documentation
-```
+## Repository Layout
 
-## Current Status
+- `backend/` contains the Go API, workers, migrations, and services
+- `frontend/` contains the React application, tests, and Storybook
+- `docs/` contains technical references and supporting documentation
 
-✅ **Backend - Phase 1 COMPLETE:**
-- PostgreSQL database with migrations
-- User authentication (JWT)
-- User settings endpoints
-- Database schema for messaging, posts, and comments
-- Platform posts and comments with voting
-- Real-time notifications with WebSocket support
-- Full-text search across posts, comments, users, and hubs
-- User blocking system
-- Profile management
-- Rate limiting
-- Reddit public API integration with caching
-- Synchronized slideshow coordination (personal & Reddit media)
-- Media gallery navigation with filtering
-- End-to-end encrypted messaging system
-- Media upload with thumbnail generation (images & videos)
-- Real-time WebSocket events (messages, read receipts, online/offline status)
-- Conversation management with read receipts
-- All 91 handler tests passing
+## Technical References
 
-✅ **Frontend - Recent Development:**
-
-**Theme System (Complete):**
-- Theme context + hooks hydrate CSS variables across the app with localStorage + server persistence
-- Theme selector modal lists predefined + custom themes, supports refresh, keyboard usage, and accessible announcements
-- Theme editor wizard covers base selection, metadata, CSS variable editing with debounce, preview, and WCAG contrast warnings
-- Theme preview + preview cards render responsive mock UI bound to CSS variables
-- 52 tests passing (unit, integration, e2e, visual snapshots)
-- Documentation under `docs/user/` and `docs/technical/` explains customization, APIs, and future extensibility
-
-**Reddit Integration (Implemented the below but still in progress overall):**
-- Reddit feed browsing with subreddit selection and sorting
-- Reddit post detail pages with comments
-- Saved and hidden items management
-- Crossposting from Reddit to platform hubs or subreddits
-- User settings for Reddit preferences
-- 40+ components and 7 major pages
-
-🚧 **Phase 1 - Still In Progress:**
-- E2E encrypted messaging UI (backend complete, frontend pending)
-- Personal slideshow creation and sharing UI
-- Reddit subreddit slideshow viewer UI
-- Full unified feed implementation
-- Additional core Phase 1 features from [phase-1-features.md](docs/phase-lists/phase-1-features.md)
-
-## Getting Started
-
-### Prerequisites
-- Go 1.21+
-- PostgreSQL 14+
-- Git
-
-### Setup
-
-1. Clone the repository
-```bash
-git clone <repository-url>
-cd omninudge
-```
-
-2. Set up PostgreSQL
-```bash
-createdb omninudge_dev
-```
-
-3. Run the backend
-```bash
-cd backend
-go run ./cmd/server/
-```
-
-The server will start on `http://localhost:8080`
-
-### Running Tests
-
-Several packages spin up their own PostgreSQL connection during tests, so make sure a **separate** database exists for them (recommended name: `omninudge_test`).
-
-```bash
-createdb omninudge_test
-```
-
-Then point the tests at that database using `TEST_DATABASE_URL` before running `go test`:
-
-```bash
-cd backend
-export TEST_DATABASE_URL="postgres://<db-user>@localhost:5432/omninudge_test?sslmode=disable"
-go test ./...
-```
-
-This ensures unit, service, and integration tests all connect cleanly without interfering with your dev data.
-
-### Frontend Development
-
-1. Install dependencies once:
-   ```bash
-   cd frontend
-   npm install
-   ```
-2. Start the Vite dev server (configured for `http://localhost:5176` by default):
-   ```bash
-   npm run dev
-   ```
-3. Open the frontend through `http://localhost:5176` or `http://127.0.0.1:5176`. The backend CORS allowlist supports both local dev origins, and the frontend expects the backend at `http://localhost:8080/api/v1`; adjust `.env.development` if needed.
-
-### Frontend Tests
-
-Vitest runs unit, integration, e2e, and visual regression suites:
-
-```bash
-cd frontend
-npm run test        # watch mode
-# or
-npm run test -- run # single run
-```
-
-Snapshot fixtures live under `frontend/tests/visual/__snapshots__`.
-
-### Configuration
-
-Environment variables (optional - defaults provided):
-```env
-# Server
-SERVER_PORT=8080
-SERVER_HOST=localhost
-
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=your_user
-DB_PASSWORD=your_password
-DB_NAME=omninudge_dev
-
-# JWT
-JWT_SECRET=your-secret-key-here
-```
-
-### Frontend Environment Files
-
-The React app reads configuration from `import.meta.env.*`. Copy the example file to get started:
-
-```bash
-cd frontend
-cp .env.example .env.development
-```
-
-Update the values to match your backend host. For production builds, create `.env.production` (already included) and set:
-
-```env
-VITE_API_URL=https://api.omninudge.com/api/v1
-VITE_WS_URL=wss://api.omninudge.com/ws
-```
-
-Vite automatically picks the correct file based on the `mode` you build with (`npm run dev`, `vite build --mode production`, etc.).
-
-Additional references:
-- `docs/user/how-to-customize-your-theme.md`
-- `docs/user/creating-your-first-custom-theme.md`
-- `docs/technical/theme-system-architecture.md`
-
-## API Features
-
-### Notifications
-- Real-time notifications via WebSocket
-- Post milestone notifications (10, 50, 100, 500, 1000+ upvotes)
-- Comment milestone notifications
-- Velocity-based notifications for viral content
-- Comment reply notifications
-- Adaptive baselines for experienced users
-- 15-minute batching to reduce spam
-- Configurable notification preferences
-
-### Search
-- Full-text search using PostgreSQL tsvector
-- Search posts by title and body
-- Search comments by content
-- Search users by username and bio
-- Search hubs by name and description
-- Pagination support with limit/offset
-- Relevance ranking with ts_rank
-
-### User Blocking
-- Block users to hide their content
-- Unblock users to restore visibility
-- List all blocked users with timestamps
-- Prevent self-blocking
-- Idempotent blocking operations
-
-### Profile Management
-- Update bio (max 500 characters)
-- Update avatar URL (HTTPS required)
-- Change password with current password verification
-- Secure password hashing with bcrypt
-
-### Rate Limiting
-- Token bucket algorithm
-- 100 requests/minute for authenticated users
-- 20 requests/minute for anonymous users
-- Per-user and per-IP tracking
-
-### Synchronized Slideshows
-- Create slideshow sessions for personal or Reddit media
-- Real-time navigation synchronized between users
-- Controller transfer for shared control
-- Auto-advance with configurable intervals
-- WebSocket-based state synchronization
-
-### Media Gallery
-- Navigate through all conversation media chronologically
-- Filter by sender (all media, mine only, theirs only)
-- Full-screen viewer with arrow key navigation
-- Find media position in filtered lists
-- Persistent user preference for filter setting
-
-## Documentation
-
-Comprehensive documentation available in `/docs`:
-- [API Documentation](backend/docs/API.md) - Complete REST API reference
-- [Testing Guide](backend/docs/TESTING.md) - Test suite and coverage
-- [Notifications](backend/docs/NOTIFICATIONS.md) - Notification system details
-- [Slideshows](backend/docs/SLIDESHOWS.md) - Synchronized slideshow coordination
-- [Media Gallery](backend/docs/MEDIA_GALLERY.md) - Media navigation feature
-- [Overview & Roadmap](docs/roadmap/00-overview.md) - Complete project vision
-- [Phase 1 Features](docs/phase-lists/phase-1-features.md) - MVP feature list
-- [Architecture](docs/technical/architecture.md) - System design
-- [Database Schema](docs/technical/database-schema.md) - Database structure
-- [Implementation Guide](docs/roadmap/03-implementation-guide.md) - Development guide
-
-## Long-Term Vision
-
-OmniNudge is designed to evolve into a comprehensive social platform:
-
-**Phase 1 (Year 1):** Reddit browser + encrypted chat + multimedia
-**Phase 2 (Year 2):** Content creation (videos, images, stories)
-**Phase 3 (Year 3):** Creator monetization (subscriptions, tipping, ads)
-**Phase 4 (Year 4):** Communities (groups, live streaming, forums)
-**Phase 5 (Year 5):** Professional network (portfolios, jobs, B2B)
-**Phase 6 (Year 6):** Omni Email + Productivity Cloud (native email addresses, unified multi-account inbox, folder rules, first-party editors + external document integrations)
-
-Core principle: **Anonymity-first** with optional professional identity
-
-## Contributing
-
-This is currently a personal project. Contributions guidelines will be added as the project matures.
-
-## License
-
-TBD
+- [Architecture](docs/technical/architecture.md)
+- [Database Schema](docs/technical/database-schema.md)
+- [Docs Index](docs/README.md)
+- [Runbook](RUNBOOK.md)

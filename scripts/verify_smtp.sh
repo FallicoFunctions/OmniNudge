@@ -77,7 +77,7 @@ if [ -z "$SMTP_HOST" ]; then
     echo -e "${BLUE}SMTP_FROM_ADDRESS=noreply@omninudge.com${NC}"
     echo -e "${BLUE}SMTP_FROM_NAME=OmniNudge${NC}"
     echo ""
-    echo "See SMTP_SETUP_GUIDE.md for detailed instructions"
+    echo "See docs/guides/SMTP_QUICK_START.md for detailed instructions"
     exit 1
 fi
 
@@ -243,7 +243,7 @@ else
     echo ""
     echo "3. Firewall: Ensure port 587 (or 465) is open"
     echo ""
-    echo "See SMTP_SETUP_GUIDE.md for troubleshooting"
+    echo "See docs/guides/SMTP_QUICK_START.md for troubleshooting"
     exit 1
 fi
 
