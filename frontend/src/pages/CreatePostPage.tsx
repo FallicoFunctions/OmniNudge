@@ -11,6 +11,7 @@ import type { CreatePostRequest, GalleryImage } from '../types/posts';
 import type { SubredditSuggestion } from '../types/reddit';
 import type { HubSettings } from '../types/hubSettings';
 import { getPostUrl } from '../utils/postUrl';
+import { normalizeUploadedMediaUrl } from '../utils/uploadedMediaUrl';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { MarkdownInput } from '../components/common/MarkdownInput';
 import { useTranslation } from 'react-i18next';
@@ -200,21 +201,6 @@ export default function CreatePostPage() {
       setMediaType(undefined);
     }
   }, [allowLinkPosts, destination, hubSettings, mediaUrl]);
-
-  const normalizeUploadedMediaUrl = (storageUrl?: string, storagePath?: string) => {
-    if (storageUrl) {
-      if (storageUrl.startsWith('http')) {
-        const urlObj = new URL(storageUrl);
-        return urlObj.pathname;
-      }
-      return storageUrl.startsWith('/') ? storageUrl : `/${storageUrl}`;
-    }
-    if (storagePath) {
-      const normalizedPath = storagePath.replace(/^\/?uploads\/?/, '');
-      return `/uploads/${normalizedPath}`;
-    }
-    return '';
-  };
 
   const handleMediaFiles = async (fileList: FileList) => {
     const files = Array.from(fileList);
