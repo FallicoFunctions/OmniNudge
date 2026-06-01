@@ -18,6 +18,7 @@ import (
 func NewThumbnailGenerationHandler(
 	mediaRepo ports.MediaFileRepository,
 	thumbnailService *services.ThumbnailService,
+	storageSvc services.StorageService,
 ) JobHandler {
 	return func(ctx context.Context, task *asynq.Task) error {
 		var payload ThumbnailGenerationPayload
@@ -47,20 +48,26 @@ func NewThumbnailGenerationHandler(
 		default:
 			return fmt.Errorf("media %d unknown scan status %q; skipping thumbnail generation: %w", media.ID, media.ScanStatus, asynq.SkipRetry)
 		}
+		sourcePath, cleanup, err := resolveMediaSource(ctx, media.StoragePath, resolveMediaRemoteKey(media.Filename, payload.SourceS3Key), storageSvc)
+		if err != nil {
+			return fmt.Errorf("failed to prepare source for media %d: %w", media.ID, err)
+		}
+		defer cleanup()
+
 		var thumbnailPath string
 		var thumbnailErr error
 		switch {
 		case services.IsImageType(media.FileType):
-			thumbSet, err := thumbnailService.GenerateImageThumbnails(media.StoragePath)
+			thumbSet, err := thumbnailService.GenerateImageThumbnails(sourcePath)
 			if err != nil {
 				thumbnailErr = err
 			} else {
 				thumbnailPath = thumbSet.PrimaryPath
 			}
 		case services.IsVideoType(media.FileType):
-			thumbnailPath, thumbnailErr = thumbnailService.GenerateVideoThumbnailSecure(media.StoragePath, 30*time.Second)
+			thumbnailPath, thumbnailErr = thumbnailService.GenerateVideoThumbnailSecure(sourcePath, 30*time.Second)
 		case services.IsPDFType(media.FileType):
-			thumbnailPath, thumbnailErr = thumbnailService.GeneratePDFThumbnailSecure(media.StoragePath, 30*time.Second)
+			thumbnailPath, thumbnailErr = thumbnailService.GeneratePDFThumbnailSecure(sourcePath, 30*time.Second)
 		default:
 			log.Printf("Skipping thumbnail generation for unsupported media %d (%s)", media.ID, media.FileType)
 			return nil

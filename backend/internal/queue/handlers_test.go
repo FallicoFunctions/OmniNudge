@@ -23,7 +23,7 @@ func TestNewUnsupportedHandler_SkipRetry(t *testing.T) {
 func TestNewVirusScanHandler_RequiresMediaRepository(t *testing.T) {
 	t.Parallel()
 
-	handler := NewVirusScanHandler(nil, nil, true, nil)
+	handler := NewVirusScanHandler(nil, nil, true, nil, nil)
 	task := asynq.NewTask(
 		string(JobTypeVirusScan),
 		[]byte(`{"file_id":13,"file_path":"/does/not/exist","uploaded_by":1}`),

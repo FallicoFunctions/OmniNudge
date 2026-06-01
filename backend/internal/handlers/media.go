@@ -46,7 +46,7 @@ type MediaQuotaConfig struct {
 type MediaHandler struct {
 	mediaRepo           ports.MediaFileRepository
 	thumbnailService    *services.ThumbnailService
-	queueClient         *queue.QueueClient
+	queueClient         queue.MediaJobEnqueuer
 	quota               MediaQuotaConfig
 	virusScanFailClosed bool
 	// s3Service is set only when STORAGE_BACKEND=s3; nil for local storage.
@@ -61,7 +61,7 @@ type MediaHandler struct {
 func NewMediaHandler(
 	mediaRepo ports.MediaFileRepository,
 	thumbnailService *services.ThumbnailService,
-	queueClient *queue.QueueClient,
+	queueClient queue.MediaJobEnqueuer,
 	quota MediaQuotaConfig,
 	virusScanFailClosed bool,
 ) *MediaHandler {
@@ -715,28 +715,13 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, role
 
 func (h *MediaHandler) schedulePostUploadJobs(ctx context.Context, media *models.MediaFile) error {
 	if h.queueClient != nil {
-		if err := h.queueClient.EnqueueVirusScan(ctx, media.ID, media.StoragePath, "", media.UserID); err != nil {
+		if err := h.queueClient.EnqueueVirusScan(ctx, media.ID, media.StoragePath, media.Filename, media.UserID); err != nil {
 			zlog.Warn().Err(err).Int("media_id", media.ID).Msg("failed to enqueue virus scan")
 			if markErr := h.mediaRepo.MarkScanError(ctx, media.ID, "virus scan queue unavailable"); markErr != nil {
 				zlog.Warn().Err(markErr).Int("media_id", media.ID).Msg("failed to mark media scan error")
 			}
 			if h.virusScanFailClosed {
 				return err
-			}
-		}
-
-		if services.IsImageType(media.FileType) || services.IsPDFType(media.FileType) || services.IsVideoType(media.FileType) {
-			thumbnailType := "image"
-			if services.IsPDFType(media.FileType) {
-				thumbnailType = "pdf"
-			} else if services.IsVideoType(media.FileType) {
-				thumbnailType = "video"
-			}
-			if err := h.queueClient.EnqueueThumbnailGeneration(ctx, media.ID, media.StorageURL, thumbnailType); err != nil {
-				zlog.Warn().Err(err).Int("media_id", media.ID).Msg("failed to enqueue thumbnail generation")
-				if services.IsImageType(media.FileType) {
-					h.generateAndStoreThumbnail(ctx, media)
-				}
 			}
 		}
 
