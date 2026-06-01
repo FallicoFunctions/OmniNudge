@@ -23,7 +23,6 @@ type Config struct {
 	Turnstile     TurnstileConfig
 	Firebase      FirebaseConfig
 	SMTP          SMTPConfig
-	Twilio        TwilioConfig
 	Retention     RetentionConfig
 	Storage       StorageConfig
 	FrontendURL   string
@@ -31,7 +30,6 @@ type Config struct {
 	MetricsToken  string // Bearer token for /metrics endpoint; empty = unrestricted (dev only)
 	AsynqmonToken string // Bearer token for /admin/queues dashboard; empty = unrestricted (dev only)
 	TURN          TURNConfig
-	Qwen          QwenConfig
 	Gemini        GeminiConfig
 	Crypto        CryptoConfig
 }
@@ -41,14 +39,6 @@ type CryptoConfig struct {
 	BTCWallet   string // Our BTC receiving address
 	ETHWallet   string // Our ETH receiving address
 	CAHContract string // CAH ERC-20 token contract address on Ethereum
-}
-
-// QwenConfig holds Qwen AI (via OpenRouter) configuration for AI-powered Hub Page Designer.
-// When APIKey is empty the generate endpoint returns a 503.
-type QwenConfig struct {
-	APIKey  string // QWEN_API_KEY — OpenRouter API key
-	BaseURL string // QWEN_BASE_URL — defaults to https://openrouter.ai/api/v1
-	Model   string // QWEN_MODEL — defaults to qwen/qwen3-coder-480b-a35b-instruct:free
 }
 
 // GeminiConfig holds Google Gemini API configuration for the Hub AI Designer.
@@ -92,7 +82,6 @@ type RetentionConfig struct {
 	MessageRetentionYears int
 	LogRetentionYears     int
 	ArchiveRetentionYears int
-	DeletionGraceDays     int
 	DryRun                bool
 }
 
@@ -187,15 +176,6 @@ type SMTPConfig struct {
 	FromName    string
 }
 
-// TwilioConfig holds Twilio SMS configuration.
-// When AccountSID/AuthToken/FromNumber are empty the SMS service runs in stub
-// mode (logs only — no real SMS is sent).
-type TwilioConfig struct {
-	AccountSID string
-	AuthToken  string
-	FromNumber string
-}
-
 // Load reads configuration from environment variables with sensible defaults
 func Load() (*Config, error) {
 	// Load .env file if it exists (ignore error if file doesn't exist)
@@ -259,16 +239,10 @@ func Load() (*Config, error) {
 			FromAddress:    getEnv("SMTP_FROM_ADDRESS", "noreply@omninudge.com"),
 			FromName:       getEnv("SMTP_FROM_NAME", "OmniNudge"),
 		},
-		Twilio: TwilioConfig{
-			AccountSID: getEnv("TWILIO_ACCOUNT_SID", ""),
-			AuthToken:  getEnv("TWILIO_AUTH_TOKEN", ""),
-			FromNumber: getEnv("TWILIO_FROM_NUMBER", ""),
-		},
 		Retention: RetentionConfig{
 			MessageRetentionYears: getEnvAsInt("RETENTION_MESSAGE_YEARS", 3),
 			LogRetentionYears:     getEnvAsInt("RETENTION_LOG_YEARS", 1),
 			ArchiveRetentionYears: getEnvAsInt("RETENTION_ARCHIVE_YEARS", 1),
-			DeletionGraceDays:     getEnvAsInt("RETENTION_GRACE_DAYS", 30),
 			DryRun:                getEnvAsBool("RETENTION_DRY_RUN", false),
 		},
 		Storage: StorageConfig{
@@ -281,8 +255,8 @@ func Load() (*Config, error) {
 			S3PathStyle:    getEnvAsBool("S3_PATH_STYLE", true), // true for MinIO/Ceph, false for R2
 			CloudFrontURL:  getEnv("CLOUDFRONT_URL", ""),
 		},
-		FrontendURL:   getEnv("FRONTEND_URL", "http://localhost:5176"),
-		AppEnv:        getEnv("APP_ENV", "development"),
+		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:5176"),
+		AppEnv:      getEnv("APP_ENV", "development"),
 		Crypto: CryptoConfig{
 			BTCWallet:   getEnv("CRYPTO_BTC_WALLET", "31yyvq2asepMEJLqtuka7oSoVCRrnoeG2K"),
 			ETHWallet:   getEnv("CRYPTO_ETH_WALLET", "0xc308f275a03bad6c3ba3b75e2d024d258cba586f"),
@@ -295,11 +269,6 @@ func Load() (*Config, error) {
 			Port:    getEnv("TURN_PORT", "3478"),
 			TLSPort: getEnv("TURN_TLS_PORT", "5349"),
 			Secret:  getEnv("TURN_SECRET", ""),
-		},
-		Qwen: QwenConfig{
-			APIKey:  getEnv("QWEN_API_KEY", ""),
-			BaseURL: getEnv("QWEN_BASE_URL", "https://openrouter.ai/api/v1"),
-			Model:   getEnv("QWEN_MODEL", "qwen/qwen3-coder-480b-a35b-instruct:free"),
 		},
 		Gemini: GeminiConfig{
 			APIKey: getEnv("GEMINI_API_KEY", ""),
