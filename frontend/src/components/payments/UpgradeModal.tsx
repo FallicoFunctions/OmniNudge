@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { paymentsService } from '../../services/paymentsService';
 import { COIN_META } from '../../types/payments';
-import type { Coin, PaymentStatus } from '../../types/payments';
+import type { Coin } from '../../types/payments';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface UpgradeModalProps {
