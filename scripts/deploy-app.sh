@@ -80,7 +80,7 @@ UPLOAD_DIR=/var/www/omninudge/uploads
 MAX_UPLOAD_SIZE=26214400
 
 # Redis (optional)
-REDIS_URL=redis://localhost:6379
+REDIS_ADDR=localhost:6379
 EOF
 
 chmod 600 backend/.env
