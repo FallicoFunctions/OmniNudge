@@ -33,6 +33,22 @@ type QueueClient struct {
 	redisPass string
 }
 
+// VirusScanEnqueuer enqueues virus scan jobs.
+type VirusScanEnqueuer interface {
+	EnqueueVirusScan(ctx context.Context, fileID int, filePath, s3Key string, uploadedBy int) error
+}
+
+// ThumbnailGenerationEnqueuer enqueues thumbnail generation jobs.
+type ThumbnailGenerationEnqueuer interface {
+	EnqueueThumbnailGeneration(ctx context.Context, fileID int, sourceURL, sourceS3Key, fileType string) error
+}
+
+// MediaJobEnqueuer covers the media processing jobs used by upload flows.
+type MediaJobEnqueuer interface {
+	VirusScanEnqueuer
+	ThumbnailGenerationEnqueuer
+}
+
 // NewQueueClient creates a new queue client for enqueuing jobs
 func NewQueueClient(redisAddr string, password string) *QueueClient {
 	client := asynq.NewClient(asynq.RedisClientOpt{
@@ -284,7 +300,7 @@ func (q *QueueClient) EnqueueNotification(ctx context.Context, userIDs []int, ti
 }
 
 // EnqueueThumbnailGeneration enqueues a thumbnail generation job
-func (q *QueueClient) EnqueueThumbnailGeneration(ctx context.Context, fileID int, sourceURL, fileType string) error {
+func (q *QueueClient) EnqueueThumbnailGeneration(ctx context.Context, fileID int, sourceURL, sourceS3Key, fileType string) error {
 	// Standard thumbnail sizes
 	sizes := []ThumbnailSize{
 		{Name: "small", Width: 200, Height: 200},
@@ -292,10 +308,11 @@ func (q *QueueClient) EnqueueThumbnailGeneration(ctx context.Context, fileID int
 	}
 
 	payload := ThumbnailGenerationPayload{
-		FileID:    fileID,
-		SourceURL: sourceURL,
-		FileType:  fileType,
-		Sizes:     sizes,
+		FileID:      fileID,
+		SourceURL:   sourceURL,
+		SourceS3Key: sourceS3Key,
+		FileType:    fileType,
+		Sizes:       sizes,
 	}
 
 	_, err := q.EnqueueJob(ctx, JobTypeThumbnailGeneration, payload)

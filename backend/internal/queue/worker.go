@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	zlog "github.com/rs/zerolog/log"
 	"time"
@@ -53,11 +54,7 @@ func NewWorker(redisAddr string, password string, concurrency int) *Worker {
 
 			// Error handler for logging
 			ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
-				retried := 0
-				if v := ctx.Value("retried"); v != nil {
-					retried = v.(int)
-				}
-				zlog.Error().Str("type", task.Type()).Str("id", task.ResultWriter().TaskID()).Err(err).Int("retried", retried).Msg("job failed permanently")
+				logJobFailure(ctx, task, err)
 			}),
 
 			// Shutdown timeout
@@ -71,6 +68,33 @@ func NewWorker(redisAddr string, password string, concurrency int) *Worker {
 		server: srv,
 		mux:    mux,
 	}
+}
+
+func logJobFailure(ctx context.Context, task *asynq.Task, err error) {
+	retried := 0
+	if attempts, ok := asynq.GetRetryCount(ctx); ok {
+		retried = attempts
+	}
+
+	taskType := "unknown"
+	taskID := "unknown"
+	if task != nil {
+		taskType = task.Type()
+		if id, ok := asynq.GetTaskID(ctx); ok {
+			taskID = id
+		} else if rw := task.ResultWriter(); rw != nil {
+			taskID = rw.TaskID()
+		}
+	}
+
+	logger := zlog.Warn()
+	message := "job execution failed"
+	if maxRetry, ok := asynq.GetMaxRetry(ctx); (ok && retried >= maxRetry) || errors.Is(err, asynq.SkipRetry) {
+		logger = zlog.Error()
+		message = "job failed permanently"
+	}
+
+	logger.Str("type", taskType).Str("id", taskID).Err(err).Int("retried", retried).Msg(message)
 }
 
 // RegisterHandler registers a handler for a specific job type

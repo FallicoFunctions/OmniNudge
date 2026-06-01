@@ -16,6 +16,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type mockThumbnailEnqueuer struct {
+	calls []ThumbnailGenerationPayload
+	err   error
+}
+
+func (m *mockThumbnailEnqueuer) EnqueueThumbnailGeneration(ctx context.Context, fileID int, sourceURL, sourceS3Key, fileType string) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.calls = append(m.calls, ThumbnailGenerationPayload{
+		FileID:      fileID,
+		SourceURL:   sourceURL,
+		SourceS3Key: sourceS3Key,
+		FileType:    fileType,
+	})
+	return nil
+}
+
 type mockVirusScanner struct {
 	result services.VirusScanResult
 	err    error
@@ -76,7 +94,7 @@ func TestVirusScanHandler_MarksMediaClean(t *testing.T) {
 
 	handler := NewVirusScanHandler(mediaRepo, &mockVirusScanner{
 		result: services.VirusScanResult{Infected: false},
-	}, true, nil)
+	}, true, nil, nil)
 
 	task := asynq.NewTask(string(JobTypeVirusScan), []byte(`{"file_id":`+itoa(media.ID)+`,"file_path":"`+media.StoragePath+`","uploaded_by":1}`))
 	require.NoError(t, handler(context.Background(), task))
@@ -97,7 +115,7 @@ func TestVirusScanHandler_MarksMediaInfectedAndDeletesFile(t *testing.T) {
 			Infected:  true,
 			Signature: "Eicar-Test-Signature",
 		},
-	}, true, nil)
+	}, true, nil, nil)
 
 	task := asynq.NewTask(string(JobTypeVirusScan), []byte(`{"file_id":`+itoa(media.ID)+`,"file_path":"`+media.StoragePath+`","uploaded_by":1}`))
 	err := handler(context.Background(), task)
@@ -120,7 +138,7 @@ func TestVirusScanHandler_MarksScanErrorWhenScannerFails(t *testing.T) {
 
 	handler := NewVirusScanHandler(mediaRepo, &mockVirusScanner{
 		err: errors.New("scanner timeout"),
-	}, true, nil)
+	}, true, nil, nil)
 
 	task := asynq.NewTask(string(JobTypeVirusScan), []byte(`{"file_id":`+itoa(media.ID)+`,"file_path":"`+media.StoragePath+`","uploaded_by":1}`))
 	err := handler(context.Background(), task)
@@ -135,12 +153,43 @@ func TestVirusScanHandler_MarksScanErrorWhenScannerFails(t *testing.T) {
 
 func TestVirusScanHandler_SkipRetryWhenMediaRecordMissing(t *testing.T) {
 	_, mediaRepo, _ := setupVirusScanDB(t)
-	handler := NewVirusScanHandler(mediaRepo, &mockVirusScanner{}, true, nil)
+	handler := NewVirusScanHandler(mediaRepo, &mockVirusScanner{}, true, nil, nil)
 
 	task := asynq.NewTask(string(JobTypeVirusScan), []byte(`{"file_id":999999,"file_path":"/tmp/missing","uploaded_by":1}`))
 	err := handler(context.Background(), task)
 	require.Error(t, err)
 	require.True(t, errors.Is(err, asynq.SkipRetry))
+}
+
+func TestVirusScanHandler_EnqueuesThumbnailAfterCleanScanForImage(t *testing.T) {
+	_, mediaRepo, userID := setupVirusScanDB(t)
+	dir := t.TempDir()
+	fullPath := filepath.Join(dir, "clean-image.png")
+	require.NoError(t, os.WriteFile(fullPath, []byte("image payload"), 0o644))
+	media := &models.MediaFile{
+		UserID:           userID,
+		Filename:         "clean-image.png",
+		OriginalFilename: "clean-image.png",
+		FileType:         "image/png",
+		FileSize:         13,
+		StorageURL:       "https://cdn.omninudge.local/clean-image.png",
+		StoragePath:      fullPath,
+	}
+	require.NoError(t, mediaRepo.Create(context.Background(), media))
+
+	enqueuer := &mockThumbnailEnqueuer{}
+	handler := NewVirusScanHandler(mediaRepo, &mockVirusScanner{
+		result: services.VirusScanResult{Infected: false},
+	}, true, nil, enqueuer)
+
+	task := asynq.NewTask(string(JobTypeVirusScan), []byte(`{"file_id":`+itoa(media.ID)+`,"file_path":"`+media.StoragePath+`","uploaded_by":1}`))
+	require.NoError(t, handler(context.Background(), task))
+
+	require.Len(t, enqueuer.calls, 1)
+	require.Equal(t, media.ID, enqueuer.calls[0].FileID)
+	require.Equal(t, media.StorageURL, enqueuer.calls[0].SourceURL)
+	require.Equal(t, media.Filename, enqueuer.calls[0].SourceS3Key)
+	require.Equal(t, "image", enqueuer.calls[0].FileType)
 }
 
 func itoa(v int) string {
