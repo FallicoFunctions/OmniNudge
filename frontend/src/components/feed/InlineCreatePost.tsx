@@ -6,6 +6,7 @@ import { postsService } from '../../services/postsService';
 import { mediaService, type MediaFile } from '../../services/mediaService';
 import type { CreatePostRequest, GalleryImage } from '../../types/posts';
 import { getPostUrl } from '../../utils/postUrl';
+import { normalizeUploadedMediaUrl } from '../../utils/uploadedMediaUrl';
 
 interface InlineCreatePostProps {
   feedType: 'hub' | 'subreddit';
@@ -33,17 +34,6 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
       mediaPreviews.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [mediaPreviews]);
-
-  const normalizeUploadedMediaUrl = (storageUrl?: string) => {
-    if (storageUrl) {
-      if (storageUrl.startsWith('http')) {
-        const urlObj = new URL(storageUrl);
-        return urlObj.pathname;
-      }
-      return storageUrl.startsWith('/') ? storageUrl : `/${storageUrl}`;
-    }
-    return '';
-  };
 
   const handleMediaFiles = async (fileList: FileList) => {
     const files = Array.from(fileList);
