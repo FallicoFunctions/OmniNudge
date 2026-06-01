@@ -11,7 +11,6 @@ func TestNewRetentionWorker(t *testing.T) {
 		MessageRetentionYears: 3,
 		LogRetentionYears:     1,
 		ArchiveRetentionYears: 1,
-		DeletionGraceDays:     30,
 		DryRun:                true,
 	}
 

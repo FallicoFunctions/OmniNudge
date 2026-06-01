@@ -392,14 +392,6 @@ func main() {
 		zlog.Warn().Msg("No email provider configured — emails will be logged but not sent")
 	}
 
-	// Initialize SMS service (stub mode unless Twilio credentials are configured).
-	smsService := services.NewSMSService(
-		cfg.Twilio.AccountSID,
-		cfg.Twilio.AuthToken,
-		cfg.Twilio.FromNumber,
-	)
-	_ = smsService // available for future use by handlers that need SMS
-
 	// Start job queue worker (P0-002: background job processing)
 	if queueClient != nil {
 		jobWorker := queue.NewWorker(cfg.Redis.Addr, cfg.Redis.Password, 10) // 10 concurrent workers

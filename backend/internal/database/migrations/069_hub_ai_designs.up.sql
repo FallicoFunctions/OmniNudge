@@ -1,4 +1,4 @@
--- Hub AI-generated page designs created by the Qwen AI Hub Page Designer.
+-- Hub AI-generated page designs created by the hub AI designer.
 -- Each row stores one generated design; only one can be active per hub.
 CREATE TABLE hub_ai_designs (
     id          SERIAL PRIMARY KEY,
