@@ -49,6 +49,8 @@ const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
 const LoadingStatesShowcasePage = lazy(() => import('./pages/LoadingStatesShowcasePage'));
 const DonatePage = lazy(() => import('./pages/DonatePage'));
+const GamesPage = lazy(() => import('./pages/GamesPage'));
+const GameDetailPage = lazy(() => import('./pages/GameDetailPage'));
 
 // Initialize analytics on app load
 function AnalyticsWrapper({ children }: { children: React.ReactNode }) {
@@ -120,6 +122,8 @@ function App() {
                             <Route path="/users/:username" element={<UserProfilePage />} />
                             <Route path="/search" element={<SearchResultsPage />} />
                             <Route path="/hubs" element={<HubsAndSubsPage />} />
+                            <Route path="/games" element={<GamesPage />} />
+                            <Route path="/games/omnirave" element={<GameDetailPage />} />
                             <Route path="/about" element={<AboutPage />} />
                             <Route path="/donate" element={<DonatePage />} />
                             <Route path="/terms" element={<TermsPage />} />
