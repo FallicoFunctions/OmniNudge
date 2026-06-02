@@ -875,7 +875,7 @@ func (r *MessageRepository) GetExpiredBefore(ctx context.Context, t time.Time, l
 		SELECT id, conversation_id, sender_id
 		FROM messages
 		WHERE delete_at <= $1
-		ORDER BY delete_at
+		ORDER BY delete_at, id
 		LIMIT $2
 	`, t, limit)
 	if err != nil {

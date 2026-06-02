@@ -22,6 +22,8 @@ var syntheticMsgSeq atomic.Int64
 type autoDeleteConvRepo interface {
 	GetByID(ctx context.Context, id int) (*models.Conversation, error)
 	GetEffectiveAutoDelete(ctx context.Context, userID, conversationID int) (*time.Duration, error)
+	// GetRawChatAutoDelete returns only the per-chat override; nil means no override is set.
+	GetRawChatAutoDelete(ctx context.Context, userID, conversationID int) (*time.Duration, error)
 }
 
 type autoDeleteMsgRepo interface {
@@ -62,6 +64,13 @@ func NewAutoDeleteService(
 // Per-chat override takes priority over the global setting; nil means Never.
 func (s *AutoDeleteService) GetEffectiveSetting(ctx context.Context, userID, conversationID int) (*time.Duration, error) {
 	return s.convRepo.GetEffectiveAutoDelete(ctx, userID, conversationID)
+}
+
+// GetRawChatSetting returns only the per-chat override for userID in conversationID,
+// with NO fallback to the global setting. Returns nil when no override is set,
+// letting the caller distinguish "no override" from "override equals global default".
+func (s *AutoDeleteService) GetRawChatSetting(ctx context.Context, userID, conversationID int) (*time.Duration, error) {
+	return s.convRepo.GetRawChatAutoDelete(ctx, userID, conversationID)
 }
 
 // ComputeDeleteAt resolves the effective auto-delete setting for senderID in conversationID

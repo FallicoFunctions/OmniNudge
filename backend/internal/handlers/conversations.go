@@ -867,7 +867,10 @@ func (h *ConversationsHandler) GetChatSettings(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Auto-delete service unavailable")
 		return
 	}
-	d, err := h.autoDeleteSvc.GetEffectiveSetting(c.Request.Context(), userID, conversationID)
+	// Use the raw per-chat setting (no global fallback) so the frontend can
+	// distinguish "no override" (nil → show 'Using global default') from
+	// "override equals global value" (non-nil with same duration).
+	d, err := h.autoDeleteSvc.GetRawChatSetting(c.Request.Context(), userID, conversationID)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to load chat settings")
 		return

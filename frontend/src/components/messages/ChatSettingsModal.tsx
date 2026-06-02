@@ -91,9 +91,14 @@ export function ChatSettingsModal({
         </p>
 
         <div className="mb-6">
-          <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+          <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1">
             {t('messages.autoDelete.label')}
           </label>
+          {currentAutoDelete === null && (
+            <p className="text-xs text-[var(--color-text-muted)] mb-2">
+              {t('messages.autoDelete.usingGlobalDefault')}
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-2">
             {AUTO_DELETE_OPTIONS.map((opt) => (
               <button
