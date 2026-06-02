@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AutoDeleteDuration } from '../../types/messages';
 import { isDurationNever } from '../../types/messages';
@@ -32,24 +33,34 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
     onChange(isNaN(n) ? 0 : Math.min(max, Math.max(0, n)));
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
-    if (disabled) return;
-    e.preventDefault();
-    if (e.deltaY < 0) increment();
-    else decrement();
-  };
+  // Attach a non-passive wheel listener so we can call preventDefault and
+  // prevent the modal from scrolling while the user is spinning a dial.
+  const pillRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = pillRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (disabled) return;
+      e.preventDefault();
+      if (e.deltaY < 0) increment();
+      else decrement();
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled, value, max]);
 
   return (
     <div className="flex flex-col items-center gap-2">
       {/* Unified pill: chevron + number + chevron */}
       <div
+        ref={pillRef}
         className={[
           'w-full rounded-2xl overflow-hidden transition-all duration-200',
           isActive
             ? 'bg-[var(--color-primary)]/10 ring-1 ring-[var(--color-primary)]/25 shadow-sm'
             : 'bg-[var(--color-surface-elevated)]',
         ].join(' ')}
-        onWheel={handleWheel}
       >
         {/* Increment */}
         <button
