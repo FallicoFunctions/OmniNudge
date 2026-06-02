@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AutoDeleteDuration } from '../../types/messages';
-import { isDurationNever } from '../../types/messages';
 
 interface AutoDeleteDurationPickerProps {
   value: AutoDeleteDuration;
@@ -42,6 +41,7 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
     const handler = (e: WheelEvent) => {
       if (disabled) return;
       e.preventDefault();
+      e.stopPropagation(); // prevent adjacent dials picking up the same event
       if (e.deltaY > 0) increment();
       else decrement();
     };
@@ -62,11 +62,11 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
             : 'bg-[var(--color-surface-elevated)]',
         ].join(' ')}
       >
-        {/* Increment */}
+        {/* Top button = decrement (matches scroll-up = lower value) */}
         <button
           type="button"
-          disabled={disabled || value >= max}
-          onClick={increment}
+          disabled={disabled || value <= 0}
+          onClick={decrement}
           tabIndex={-1}
           className={[
             'w-full flex items-center justify-center py-2.5 transition-colors duration-150',
@@ -75,7 +75,7 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
               ? 'hover:bg-[var(--color-primary)]/15 active:bg-[var(--color-primary)]/20'
               : 'hover:bg-[var(--color-border)]/60 active:bg-[var(--color-border)]',
           ].join(' ')}
-          aria-label={`Increase ${label}`}
+          aria-label={`Decrease ${label}`}
         >
           <svg
             className={`w-4 h-4 transition-colors ${isActive ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
@@ -113,11 +113,11 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
           ].join(' ')}
         />
 
-        {/* Decrement */}
+        {/* Bottom button = increment (matches scroll-down = higher value) */}
         <button
           type="button"
-          disabled={disabled || value <= 0}
-          onClick={decrement}
+          disabled={disabled || value >= max}
+          onClick={increment}
           tabIndex={-1}
           className={[
             'w-full flex items-center justify-center py-2.5 transition-colors duration-150',
@@ -126,7 +126,7 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
               ? 'hover:bg-[var(--color-primary)]/15 active:bg-[var(--color-primary)]/20'
               : 'hover:bg-[var(--color-border)]/60 active:bg-[var(--color-border)]',
           ].join(' ')}
-          aria-label={`Decrease ${label}`}
+          aria-label={`Increase ${label}`}
         >
           <svg
             className={`w-4 h-4 transition-colors ${isActive ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
@@ -156,7 +156,6 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
 
 export function AutoDeleteDurationPicker({ value, onChange, disabled }: AutoDeleteDurationPickerProps) {
   const { t } = useTranslation();
-  const isNever = isDurationNever(value);
 
   const set = (key: keyof AutoDeleteDuration) => (v: number) =>
     onChange({ ...value, [key]: v });
@@ -187,11 +186,9 @@ export function AutoDeleteDurationPicker({ value, onChange, disabled }: AutoDele
         />
       </div>
 
-      {isNever && (
-        <p className="text-center text-xs text-[var(--color-text-muted)]">
-          {t('messages.autoDelete.neverHint')}
-        </p>
-      )}
+      <p className="text-center text-xs text-[var(--color-text-muted)]">
+        {t('messages.autoDelete.neverHint')}
+      </p>
     </div>
   );
 }
