@@ -34,7 +34,10 @@ func TestCORS_AllowsLocalhostAndLoopbackDevOrigins(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	for _, origin := range []string{
+		"https://play.omninudge.com",
+		"http://localhost:4173",
 		"http://localhost:5176",
+		"http://127.0.0.1:4173",
 		"http://127.0.0.1:5176",
 	} {
 		t.Run(origin, func(t *testing.T) {
