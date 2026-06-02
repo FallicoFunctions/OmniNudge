@@ -937,27 +937,37 @@ func (r *MessageRepository) AutoDelete(ctx context.Context, messageID int) (tomb
 	}
 	tombstoned = tag.RowsAffected() > 0
 
-	// Hard-delete path: no replies, physically remove the row and decrement the
-	// parent's reply_count so the parent can eventually be hard-deleted too.
-	var hardDeleteTag interface{ RowsAffected() int64 }
-	hardDeleteTag, err = tx.Exec(ctx, `
-		WITH deleted AS (
-		    DELETE FROM messages
-		    WHERE id = $1 AND COALESCE(reply_count, 0) = 0
-		    RETURNING reply_to
-		)
-		UPDATE messages
-		SET reply_count = GREATEST(0, COALESCE(reply_count, 0) - 1)
-		WHERE id = (SELECT reply_to FROM deleted WHERE reply_to IS NOT NULL)
-	`, messageID)
-	if err != nil {
+	// Hard-delete path: DELETE and capture reply_to in one QueryRow so we can
+	// (a) detect whether the row actually existed, and (b) decrement the parent.
+	// Using a CTE here is wrong: pgx RowsAffected() reflects the outer UPDATE
+	// (0 when reply_to IS NULL), not the DELETE — causing ErrMessageAlreadyDeleted
+	// to be returned for every successful standalone-message deletion.
+	var replyTo *int
+	err = tx.QueryRow(ctx, `
+		DELETE FROM messages
+		WHERE id = $1 AND COALESCE(reply_count, 0) = 0
+		RETURNING reply_to
+	`, messageID).Scan(&replyTo)
+	if err != nil && err != pgx.ErrNoRows {
 		return false, err
 	}
+	hardDeleted := err == nil // nil means RETURNING produced a row → DELETE succeeded
 
-	if !tombstoned && hardDeleteTag.RowsAffected() == 0 {
+	if !tombstoned && !hardDeleted {
 		// Message was already deleted by another path; the deferred Rollback will
 		// clean up the transaction. Callers should skip the WS broadcast.
 		return false, ErrMessageAlreadyDeleted
+	}
+
+	// Decrement the parent's reply_count if this message was a reply.
+	if hardDeleted && replyTo != nil {
+		if _, err = tx.Exec(ctx, `
+			UPDATE messages
+			SET reply_count = GREATEST(0, COALESCE(reply_count, 0) - 1)
+			WHERE id = $1
+		`, *replyTo); err != nil {
+			return false, err
+		}
 	}
 
 	return tombstoned, tx.Commit(ctx)

@@ -217,15 +217,18 @@ func (j *CleanupJob) PurgeExpiredMessages(ctx context.Context) {
 
 			if tombstoned {
 				// Message had replies: content scrubbed but row preserved for thread context.
-				// Broadcast an update event so connected clients replace the bubble with a
-				// "[deleted]" placeholder. The sender's copy is gone; recipient keeps the stub.
-				// Only notify the sender to remove from their view; recipient gets the update.
+				// - Sender gets message_auto_deleted: removes their copy from the cache.
+				// - Non-senders get message_tombstoned: updates the bubble to "[deleted]"
+				//   in-place so the reply thread stays coherent.
+				// The two events must NOT overlap for the sender, otherwise message_tombstoned
+				// re-inserts the stub into the sender's cache after message_auto_deleted removed it.
 				senderOnly := filterIDs(participantIDs, msg.SenderID)
+				nonSenders := excludeID(participantIDs, msg.SenderID)
 				j.hub.BroadcastToUsers(senderOnly, "message_auto_deleted", map[string]interface{}{
 					"message_id":      msg.ID,
 					"conversation_id": msg.ConversationID,
 				})
-				j.hub.BroadcastToUsers(participantIDs, "message_tombstoned", map[string]interface{}{
+				j.hub.BroadcastToUsers(nonSenders, "message_tombstoned", map[string]interface{}{
 					"message_id":      msg.ID,
 					"conversation_id": msg.ConversationID,
 					"message_type":    "deleted",
@@ -294,11 +297,21 @@ func (j *CleanupJob) getParticipantIDs(ctx context.Context, conversationID int) 
 }
 
 // filterIDs returns only the IDs from the slice that match the target.
-// Used to target the sender specifically when broadcasting tombstone events.
 func filterIDs(ids []int, target int) []int {
 	var out []int
 	for _, id := range ids {
 		if id == target {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// excludeID returns all IDs from the slice except the target.
+func excludeID(ids []int, target int) []int {
+	var out []int
+	for _, id := range ids {
+		if id != target {
 			out = append(out, id)
 		}
 	}
