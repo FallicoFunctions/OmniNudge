@@ -346,8 +346,8 @@ export const messagesService = {
     await api.delete(`/conversations/${conversationId}${query}`);
   },
 
-  async getChatSettings(conversationId: number): Promise<{ auto_delete_after: string | null }> {
-    const { data } = await api.get<{ auto_delete_after: string | null }>(
+  async getChatSettings(conversationId: number): Promise<{ auto_delete_after_seconds: number | null }> {
+    const { data } = await api.get<{ auto_delete_after_seconds: number | null }>(
       `/conversations/${conversationId}/settings`
     );
     return data;
@@ -355,11 +355,11 @@ export const messagesService = {
 
   async updateChatSettings(
     conversationId: number,
-    autoDeleteAfter: string,
+    autoDeleteAfterSeconds: number, // 0 = never / clear override
     applyRetroactive: boolean
   ): Promise<void> {
     await api.patch(`/conversations/${conversationId}/settings`, {
-      auto_delete_after: autoDeleteAfter,
+      auto_delete_after_seconds: autoDeleteAfterSeconds,
       apply_retroactive: applyRetroactive,
     });
   },

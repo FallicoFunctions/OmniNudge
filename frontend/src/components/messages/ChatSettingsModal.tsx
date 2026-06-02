@@ -1,40 +1,38 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AutoDeleteInterval } from '../../types/messages';
+import type { AutoDeleteDuration } from '../../types/messages';
+import { durationToSeconds, isDurationNever } from '../../types/messages';
+import { AutoDeleteDurationPicker } from './AutoDeleteDurationPicker';
 
 interface ChatSettingsModalProps {
-  currentAutoDelete: AutoDeleteInterval | null;
-  onSave: (interval: AutoDeleteInterval, applyRetroactive: boolean) => void;
+  /** Current per-chat override as a duration, or null if no override is set. */
+  currentDuration: AutoDeleteDuration | null;
+  onSave: (totalSeconds: number, applyRetroactive: boolean) => void;
   onClose: () => void;
   isSaving?: boolean;
 }
 
-const AUTO_DELETE_OPTIONS: { labelKey: string; value: AutoDeleteInterval }[] = [
-  { labelKey: 'messages.autoDelete.never', value: 'never' },
-  { labelKey: 'messages.autoDelete.30m', value: '30m' },
-  { labelKey: 'messages.autoDelete.1h', value: '1h' },
-  { labelKey: 'messages.autoDelete.5h', value: '5h' },
-  { labelKey: 'messages.autoDelete.1d', value: '1d' },
-  { labelKey: 'messages.autoDelete.2d', value: '2d' },
-  { labelKey: 'messages.autoDelete.7d', value: '7d' },
-  { labelKey: 'messages.autoDelete.30d', value: '30d' },
-];
-
 export function ChatSettingsModal({
-  currentAutoDelete,
+  currentDuration,
   onSave,
   onClose,
   isSaving,
 }: ChatSettingsModalProps) {
   const { t } = useTranslation();
-  const [selected, setSelected] = useState<AutoDeleteInterval>(currentAutoDelete ?? 'never');
+
+  const [duration, setDuration] = useState<AutoDeleteDuration>(
+    currentDuration ?? { days: 0, hours: 0, minutes: 0 }
+  );
   const [showRetroConfirm, setShowRetroConfirm] = useState(false);
 
-  const isDirty = selected !== (currentAutoDelete ?? 'never');
+  const currentSeconds = currentDuration ? durationToSeconds(currentDuration) : 0;
+  const selectedSeconds = durationToSeconds(duration);
+  const isDirty = selectedSeconds !== currentSeconds;
+  const isNever = isDurationNever(duration);
 
   const handleSaveClick = () => {
-    if (selected === 'never') {
-      onSave(selected, false);
+    if (isNever) {
+      onSave(0, false);
       return;
     }
     setShowRetroConfirm(true);
@@ -53,7 +51,7 @@ export function ChatSettingsModal({
           <div className="flex flex-col gap-2">
             <button
               type="button"
-              onClick={() => onSave(selected, true)}
+              onClick={() => onSave(selectedSeconds, true)}
               disabled={isSaving}
               className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
             >
@@ -61,7 +59,7 @@ export function ChatSettingsModal({
             </button>
             <button
               type="button"
-              onClick={() => onSave(selected, false)}
+              onClick={() => onSave(selectedSeconds, false)}
               disabled={isSaving}
               className="w-full rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
             >
@@ -90,31 +88,21 @@ export function ChatSettingsModal({
           {t('messages.autoDelete.description')}
         </p>
 
+        {currentDuration === null && (
+          <p className="text-xs text-[var(--color-text-muted)] mb-3">
+            {t('messages.autoDelete.usingGlobalDefault')}
+          </p>
+        )}
+
         <div className="mb-6">
-          <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1">
+          <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-3">
             {t('messages.autoDelete.label')}
           </label>
-          {currentAutoDelete === null && (
-            <p className="text-xs text-[var(--color-text-muted)] mb-2">
-              {t('messages.autoDelete.usingGlobalDefault')}
-            </p>
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            {AUTO_DELETE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setSelected(opt.value)}
-                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                  selected === opt.value
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                    : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]'
-                }`}
-              >
-                {t(opt.labelKey)}
-              </button>
-            ))}
-          </div>
+          <AutoDeleteDurationPicker
+            value={duration}
+            onChange={setDuration}
+            disabled={isSaving}
+          />
         </div>
 
         <div className="flex gap-2">

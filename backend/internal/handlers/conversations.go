@@ -828,7 +828,10 @@ func (h *ConversationsHandler) UnmuteConversation(c *gin.Context) {
 }
 
 type chatSettingsResponse struct {
-	AutoDeleteAfter *string `json:"auto_delete_after"` // nil means "never"
+	// AutoDeleteAfterSeconds is the per-chat override in whole seconds.
+	// nil means no per-chat override is set (conversation inherits global default).
+	// 0 would mean "never" but is never returned — nil is used instead.
+	AutoDeleteAfterSeconds *int `json:"auto_delete_after_seconds"`
 }
 
 // GetChatSettings returns the requesting user's per-chat auto-delete setting.
@@ -878,15 +881,17 @@ func (h *ConversationsHandler) GetChatSettings(c *gin.Context) {
 
 	resp := chatSettingsResponse{}
 	if d != nil {
-		s := formatAutoDeleteInterval(*d)
-		resp.AutoDeleteAfter = &s
+		secs := int(d.Seconds())
+		resp.AutoDeleteAfterSeconds = &secs
 	}
 	c.JSON(http.StatusOK, resp)
 }
 
 type updateChatSettingsRequest struct {
-	AutoDeleteAfter    *string `json:"auto_delete_after"`
-	ApplyRetroactive   *bool   `json:"apply_retroactive"`
+	// AutoDeleteAfterSeconds is the desired duration in whole seconds.
+	// 0 or nil clears the per-chat override (reverts to global default).
+	AutoDeleteAfterSeconds *int  `json:"auto_delete_after_seconds"`
+	ApplyRetroactive       *bool `json:"apply_retroactive"`
 }
 
 // UpdateChatSettings sets the per-chat auto-delete override for the requesting user.
@@ -929,16 +934,11 @@ func (h *ConversationsHandler) UpdateChatSettings(c *gin.Context) {
 		return
 	}
 
-	// Treat omitted/null auto_delete_after as "never" so clients can clear the override.
-	autoDeleteStr := "never"
-	if req.AutoDeleteAfter != nil {
-		autoDeleteStr = *req.AutoDeleteAfter
-	}
-
-	interval, err := parseAutoDeleteInterval(autoDeleteStr)
-	if err != nil {
-		RespondError(c, http.StatusBadRequest, err.Error())
-		return
+	// 0 or nil seconds means "clear the override" (never).
+	var interval *time.Duration
+	if req.AutoDeleteAfterSeconds != nil && *req.AutoDeleteAfterSeconds > 0 {
+		d := time.Duration(*req.AutoDeleteAfterSeconds) * time.Second
+		interval = &d
 	}
 
 	if h.autoDeleteSvc == nil {
@@ -952,26 +952,4 @@ func (h *ConversationsHandler) UpdateChatSettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Chat settings updated"})
-}
-
-// formatAutoDeleteInterval converts a duration back to the canonical UI string.
-func formatAutoDeleteInterval(d time.Duration) string {
-	switch d {
-	case 30 * time.Minute:
-		return "30m"
-	case time.Hour:
-		return "1h"
-	case 5 * time.Hour:
-		return "5h"
-	case 24 * time.Hour:
-		return "1d"
-	case 48 * time.Hour:
-		return "2d"
-	case 7 * 24 * time.Hour:
-		return "7d"
-	case 30 * 24 * time.Hour:
-		return "30d"
-	default:
-		return "never"
-	}
 }

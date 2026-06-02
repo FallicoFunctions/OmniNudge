@@ -143,25 +143,15 @@
   "gamesPage": {
     "eyebrow": "OmniGame",
     "title": "OmniGame",
-    "description": "Descubre experiencias multijugador dedicadas dentro de OmniNudge, empezando por una rave compartida en el navegador para usuarios registrados e invitados.",
+    "description": "Explora mundos multijugador creados para OmniNudge.",
     "availableNow": "Disponible ahora",
     "viewGame": "Ver juego"
   },
   "gameDetailPage": {
     "eyebrow": "OmniGame / OmniRave",
-    "signedInTitle": "Inicio con cuenta",
-    "guestTitle": "Inicio como invitado",
-    "launchSignedIn": "Abrir OmniRave",
-    "launchGuest": "Entrar como invitado",
-    "launchingSignedIn": "Abriendo OmniRave...",
-    "launchingGuest": "Iniciando sesión invitada...",
-    "launchError": "No se puede abrir OmniRave ahora mismo.",
-    "zoneLabel": "Zonas",
-    "zoneValue": "main_stage, techno_room, neon_room",
-    "mediaLabel": "Medios",
-    "mediaValue": "Límites de audio por zona controlados por el servidor con reproducción sincronizada desde YouTube.",
-    "mobileLabel": "Móvil",
-    "mobileValue": "Desbloqueo explícito de medios antes de esperar audio del escenario."
+    "play": "Jugar",
+    "starting": "Iniciando...",
+    "launchError": "No se puede iniciar OmniRave ahora mismo."
   },
   "mainLayout": {
     "skipToMainContent": "Saltar al contenido principal",
@@ -1695,14 +1685,10 @@
     "autoDelete": {
       "label": "Eliminar automáticamente mis mensajes después de",
       "description": "Tus mensajes enviados se eliminarán permanentemente después de este tiempo. Los mensajes de otros participantes no se ven afectados.",
-      "never": "Nunca",
-      "30m": "30 minutos",
-      "1h": "1 hora",
-      "5h": "5 horas",
-      "1d": "1 día",
-      "2d": "2 días",
-      "7d": "7 días",
-      "30d": "30 días",
+      "days": "Días",
+      "hours": "Horas",
+      "minutes": "Minutos",
+      "neverHint": "Todos los diales en cero significa que los mensajes nunca se eliminan automáticamente.",
       "applyRetroTitle": "¿Aplicar a mensajes anteriores?",
       "applyRetroBody": "¿También deseas aplicar esta configuración a los mensajes que ya enviaste en esta conversación?",
       "applyToAll": "Sí, aplicar a todos mis mensajes",

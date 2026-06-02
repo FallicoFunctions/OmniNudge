@@ -43,9 +43,8 @@ export type UpdateUserSettingsRequest = Partial<
     | 'daily_digest'
   >
 > & {
-  // The backend expects the string label ("never" | "30m" | "1h" | ...) for the update,
-  // not the nanosecond integer returned by GET /settings.
-  default_auto_delete_after?: string;
+  // Total seconds for the global auto-delete duration. 0 means "never".
+  default_auto_delete_seconds?: number;
   auto_delete_apply_retroactive?: boolean;
 };
 
