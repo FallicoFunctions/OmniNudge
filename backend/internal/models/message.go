@@ -655,12 +655,14 @@ func (r *MessageRepository) MarkUndeliveredAsDelivered(ctx context.Context, conv
 	return delivered, rows.Err()
 }
 
-// MarkAsRead updates the read_at timestamp for a message
+// MarkAsRead updates the read_at timestamp for a message.
+// System messages are excluded — they are informational-only and should
+// not generate read-receipt WS events.
 func (r *MessageRepository) MarkAsRead(ctx context.Context, messageID int) error {
 	query := `
 		UPDATE messages
 		SET read_at = CURRENT_TIMESTAMP
-		WHERE id = $1 AND read_at IS NULL
+		WHERE id = $1 AND read_at IS NULL AND message_type != 'system'
 	`
 	_, err := r.pool.Exec(ctx, query, messageID)
 	return err
