@@ -196,6 +196,19 @@ func (j *CleanupJob) PurgeExpiredMessages(ctx context.Context) {
 			return
 		}
 
+		// Pre-fetch participants for all unique conversation IDs in the batch so we
+		// don't issue one GetByID + participant query per message when many messages
+		// share the same conversation (e.g. a group with 100 expiring messages).
+		convIDs := uniqueConvIDs(expired)
+		participantCache := make(map[int][]int, len(convIDs))
+		for _, cid := range convIDs {
+			ids, err := j.getParticipantIDs(ctx, cid)
+			if err != nil {
+				slog.Warn("cleanup: fetch participants for broadcast", "conversation_id", cid, "error", err)
+			}
+			participantCache[cid] = ids
+		}
+
 		for _, msg := range expired {
 			tombstoned, err := j.msgRepo.AutoDelete(ctx, msg.ID)
 			if err != nil {
@@ -209,11 +222,7 @@ func (j *CleanupJob) PurgeExpiredMessages(ctx context.Context) {
 
 			totalPurged++ // count only successful deletions
 
-			participantIDs, err := j.getParticipantIDs(ctx, msg.ConversationID)
-			if err != nil {
-				slog.Warn("cleanup: fetch participants for broadcast", "conversation_id", msg.ConversationID, "error", err)
-				continue
-			}
+			participantIDs := participantCache[msg.ConversationID]
 
 			if tombstoned {
 				// Message had replies: content scrubbed but row preserved for thread context.
@@ -294,6 +303,19 @@ func (j *CleanupJob) getParticipantIDs(ctx context.Context, conversationID int) 
 		ids = append(ids, *rows.User2ID)
 	}
 	return ids, nil
+}
+
+// uniqueConvIDs returns the deduplicated conversation IDs from a batch of expired messages.
+func uniqueConvIDs(msgs []models.ExpiredMessage) []int {
+	seen := make(map[int]struct{}, len(msgs))
+	var out []int
+	for _, m := range msgs {
+		if _, ok := seen[m.ConversationID]; !ok {
+			seen[m.ConversationID] = struct{}{}
+			out = append(out, m.ConversationID)
+		}
+	}
+	return out
 }
 
 // filterIDs returns only the IDs from the slice that match the target.

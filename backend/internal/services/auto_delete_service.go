@@ -151,8 +151,10 @@ func (s *AutoDeleteService) UpdateChatSetting(ctx context.Context, userID, conve
 		var col string
 		if conv.User1ID != nil && *conv.User1ID == userID {
 			col = "user1_auto_delete_after"
-		} else {
+		} else if conv.User2ID != nil && *conv.User2ID == userID {
 			col = "user2_auto_delete_after"
+		} else {
+			return fmt.Errorf("auto_delete: user %d is not a participant in dm conversation %d", userID, conversationID)
 		}
 		_, err = s.pool.Exec(ctx,
 			fmt.Sprintf(`UPDATE conversations SET %s = $1::interval WHERE id = $2`, col),

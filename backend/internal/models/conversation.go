@@ -914,9 +914,10 @@ func (r *ConversationRepository) GetRawChatAutoDelete(ctx context.Context, userI
 		SELECT CASE
 			WHEN c.conversation_type = 'mod_mail' THEN NULL
 			WHEN c.conversation_type = 'group'    THEN cp.auto_delete_after
-			-- DM or legacy NULL-type row:
-			WHEN c.user1_id = $1 THEN c.user1_auto_delete_after
-			WHEN c.user2_id = $1 THEN c.user2_auto_delete_after
+			-- DM or legacy NULL-type row: check type before user IDs so that a
+			-- group row with a coincidental user1_id match doesn't short-circuit here.
+			WHEN COALESCE(c.conversation_type, 'dm') = 'dm' AND c.user1_id = $1 THEN c.user1_auto_delete_after
+			WHEN COALESCE(c.conversation_type, 'dm') = 'dm' AND c.user2_id = $1 THEN c.user2_auto_delete_after
 			ELSE NULL
 		END
 		FROM conversations c
