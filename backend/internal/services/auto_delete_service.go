@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -10,6 +11,10 @@ import (
 	"github.com/omninudge/backend/internal/websocket"
 	"github.com/rs/zerolog"
 )
+
+// syntheticMsgSeq is a process-scoped counter for broadcast-only system message IDs.
+// Negative values are used so they never collide with real DB row IDs (always positive).
+var syntheticMsgSeq atomic.Int64
 
 // Narrow repository interfaces used by AutoDeleteService. The concrete
 // *models.ConversationRepository and *models.MessageRepository satisfy both.
@@ -177,7 +182,8 @@ func (s *AutoDeleteService) UpdateChatSetting(ctx context.Context, userID, conve
 
 	if interval != nil {
 		username, _ := s.fetchUsername(ctx, userID)
-		s.InjectAutoDeleteSystemMessage(ctx, conversationID, userID, username, *interval)
+		// Pass the already-fetched conv to avoid a second GetByID round-trip.
+		s.InjectAutoDeleteSystemMessage(ctx, conv, conversationID, userID, username, *interval)
 	}
 
 	return nil
@@ -187,17 +193,24 @@ func (s *AutoDeleteService) UpdateChatSetting(ctx context.Context, userID, conve
 // and broadcasts it to all connected participants. It does NOT trigger push notifications.
 // Call only when interval is non-nil ("Never" produces no system message).
 //
+// convHint may be non-nil when the caller already has the conversation object, avoiding
+// a redundant GetByID. Pass nil to let this function fetch it.
+//
 // For DMs the message is persisted with the other participant as RecipientID so both
 // users see it in conversation history. For group conversations it is broadcast-only
 // (no DB row) because the 1:1 recipient model doesn't support group history visibility.
-func (s *AutoDeleteService) InjectAutoDeleteSystemMessage(ctx context.Context, conversationID, senderID int, username string, interval time.Duration) {
+func (s *AutoDeleteService) InjectAutoDeleteSystemMessage(ctx context.Context, convHint *models.Conversation, conversationID, senderID int, username string, interval time.Duration) {
 	content := fmt.Sprintf("%s has messages set to auto-delete after %s", username, formatInterval(interval))
 
-	// Determine conversation type so we can choose the right recipient.
-	conv, err := s.convRepo.GetByID(ctx, conversationID)
-	if err != nil || conv == nil {
-		s.logger.Warn().Err(err).Int("conversation_id", conversationID).Msg("auto_delete: failed to fetch conversation for system message")
-		return
+	// Use the caller-supplied conversation if available; otherwise fetch it.
+	conv := convHint
+	if conv == nil {
+		var err error
+		conv, err = s.convRepo.GetByID(ctx, conversationID)
+		if err != nil || conv == nil {
+			s.logger.Warn().Err(err).Int("conversation_id", conversationID).Msg("auto_delete: failed to fetch conversation for system message")
+			return
+		}
 	}
 
 	participantIDs, err := s.getConversationParticipantIDs(ctx, conversationID)
@@ -238,8 +251,8 @@ func (s *AutoDeleteService) InjectAutoDeleteSystemMessage(ctx context.Context, c
 		broadcastSentAt = msg.SentAt
 	default:
 		// Group: broadcast-only — no DB row (1:1 recipient model doesn't address all members).
-		// Use a unique negative ID so the frontend can deduplicate without a DB lookup.
-		broadcastID = -int(time.Now().UnixMilli() % 2_147_483_647)
+		// Atomic counter guarantees uniqueness and is always negative (never zero).
+		broadcastID = -int(syntheticMsgSeq.Add(1))
 	}
 
 	// Payload field names mirror the frontend Message interface exactly so the WS
@@ -310,14 +323,18 @@ func (s *AutoDeleteService) applyGlobalRetroactiveAsync(userID int, interval tim
 
 // clearRetroactiveForChat clears delete_at on all messages sent by userID in conversationID.
 // Called when the user sets their per-chat override to Never with applyRetroactive=true.
+// Mod_mail conversations are excluded at the SQL level as a defence-in-depth guard.
 func (s *AutoDeleteService) clearRetroactiveForChat(ctx context.Context, userID, conversationID int) error {
 	_, err := s.pool.Exec(ctx, `
-		UPDATE messages
+		UPDATE messages m
 		SET delete_at = NULL
-		WHERE conversation_id = $1
-		  AND sender_id = $2
-		  AND deleted_for_sender = FALSE
-		  AND deleted_for_recipient = FALSE
+		FROM conversations c
+		WHERE m.conversation_id = c.id
+		  AND c.id = $1
+		  AND c.conversation_type != 'mod_mail'
+		  AND m.sender_id = $2
+		  AND m.deleted_for_sender = FALSE
+		  AND m.deleted_for_recipient = FALSE
 	`, conversationID, userID)
 	if err != nil {
 		return fmt.Errorf("auto_delete: retroactive chat clear: %w", err)
@@ -358,22 +375,27 @@ func (s *AutoDeleteService) clearGlobalDeleteAtAsync(userID int) {
 
 // injectGlobalSystemMessages fires InjectAutoDeleteSystemMessage for every conversation
 // where the user is a participant and has no per-chat override.
+// Uses conversations as the base table (not messages) so group conversations the user
+// joined but hasn't sent a message in are included.
 func (s *AutoDeleteService) injectGlobalSystemMessages(ctx context.Context, userID int, interval time.Duration) error {
 	rows, err := s.pool.Query(ctx, `
-		SELECT DISTINCT m.conversation_id
-		FROM messages m
-		JOIN conversations c ON c.id = m.conversation_id
+		SELECT DISTINCT c.id
+		FROM conversations c
 		LEFT JOIN conversation_participants cp
 			ON cp.conversation_id = c.id AND cp.user_id = $1
-		WHERE m.sender_id = $1
+		WHERE c.conversation_type != 'mod_mail'
 		  AND (
+		    -- DM: user is a participant with no per-chat override
 		    (COALESCE(c.conversation_type, 'dm') = 'dm'
+		     AND (c.user1_id = $1 OR c.user2_id = $1)
 		     AND CASE
 		           WHEN c.user1_id = $1 THEN c.user1_auto_delete_after
 		           WHEN c.user2_id = $1 THEN c.user2_auto_delete_after
 		           ELSE NULL
 		         END IS NULL)
-		    OR (c.conversation_type = 'group' AND cp.auto_delete_after IS NULL)
+		    OR
+		    -- Group: user is a participant with no per-chat override
+		    (c.conversation_type = 'group' AND cp.user_id IS NOT NULL AND cp.auto_delete_after IS NULL)
 		  )
 	`, userID)
 	if err != nil {
@@ -387,7 +409,9 @@ func (s *AutoDeleteService) injectGlobalSystemMessages(ctx context.Context, user
 		if err := rows.Scan(&convID); err != nil {
 			return err
 		}
-		s.InjectAutoDeleteSystemMessage(ctx, convID, userID, username, interval)
+		// Pass nil conv so InjectAutoDeleteSystemMessage fetches it; we don't have
+		// the full Conversation object from this query.
+		s.InjectAutoDeleteSystemMessage(ctx, nil, convID, userID, username, interval)
 	}
 	return rows.Err()
 }
