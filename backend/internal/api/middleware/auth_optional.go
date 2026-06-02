@@ -34,6 +34,7 @@ func AuthOptional(authService *services.AuthService) gin.HandlerFunc {
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
+		c.Set("token_version", claims.TokenVersion)
 		c.Next()
 	}
 }
