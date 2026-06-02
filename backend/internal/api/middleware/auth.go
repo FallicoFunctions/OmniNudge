@@ -55,6 +55,7 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
+		c.Set("token_version", claims.TokenVersion)
 
 		c.Next()
 	}
@@ -103,7 +104,9 @@ func CORS() gin.HandlerFunc {
 		allowedOrigins := []string{
 			"https://omninudge.com",
 			"https://www.omninudge.com",
+			"https://play.omninudge.com",
 			"http://localhost:3000",
+			"http://localhost:4173",
 			"http://localhost:5173",
 			"http://localhost:5174",
 			"http://localhost:5175",
@@ -112,6 +115,7 @@ func CORS() gin.HandlerFunc {
 			"http://localhost:5178",
 			"http://localhost:5179",
 			"http://127.0.0.1:3000",
+			"http://127.0.0.1:4173",
 			"http://127.0.0.1:5173",
 			"http://127.0.0.1:5174",
 			"http://127.0.0.1:5175",
