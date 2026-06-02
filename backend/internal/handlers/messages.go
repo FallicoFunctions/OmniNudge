@@ -2537,6 +2537,12 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 		return
 	}
 
+	// System messages are informational; read-receipt semantics don't apply.
+	if message.MessageType == "system" {
+		c.JSON(http.StatusOK, gin.H{"message": "System messages do not have read receipts"})
+		return
+	}
+
 	// Only the recipient can mark a message as read
 	if message.RecipientID != userID {
 		RespondError(c, http.StatusForbidden, "You can only mark your own received messages as read")

@@ -177,42 +177,54 @@ func (j *CleanupJob) PurgeAuditLogs(ctx context.Context) {
 // PurgeExpiredMessages sweeps messages whose delete_at is in the past and permanently
 // deletes them. Messages with replies are tombstoned; all others are hard-deleted.
 // A WebSocket event is broadcast to connected conversation participants for each deletion.
+// Loops in batches of 100 until no expired messages remain, so a large backlog is fully
+// drained within a single tick rather than being rate-limited to 100/minute.
 func (j *CleanupJob) PurgeExpiredMessages(ctx context.Context) {
 	const batchSize = 100
+	totalPurged := 0
 
-	expired, err := j.msgRepo.GetExpiredBefore(ctx, time.Now(), batchSize)
-	if err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	for {
+		expired, err := j.msgRepo.GetExpiredBefore(ctx, time.Now(), batchSize)
+		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return
+			}
+			slog.Error("cleanup: fetch expired messages", "error", err)
 			return
 		}
-		slog.Error("cleanup: fetch expired messages", "error", err)
-		return
-	}
 
-	for _, msg := range expired {
-		if err := j.msgRepo.AutoDelete(ctx, msg.ID); err != nil {
-			if errors.Is(err, models.ErrMessageAlreadyDeleted) {
-				// Race: already deleted by another path; skip broadcast silently.
+		for _, msg := range expired {
+			if err := j.msgRepo.AutoDelete(ctx, msg.ID); err != nil {
+				if errors.Is(err, models.ErrMessageAlreadyDeleted) {
+					// Race: already deleted by another path; skip broadcast silently.
+					continue
+				}
+				slog.Warn("cleanup: auto-delete message", "message_id", msg.ID, "error", err)
 				continue
 			}
-			slog.Warn("cleanup: auto-delete message", "message_id", msg.ID, "error", err)
-			continue
+
+			participantIDs, err := j.getParticipantIDs(ctx, msg.ConversationID)
+			if err != nil {
+				slog.Warn("cleanup: fetch participants for broadcast", "conversation_id", msg.ConversationID, "error", err)
+				continue
+			}
+
+			j.hub.BroadcastToUsers(participantIDs, "message_auto_deleted", map[string]interface{}{
+				"message_id":      msg.ID,
+				"conversation_id": msg.ConversationID,
+			})
 		}
 
-		participantIDs, err := j.getParticipantIDs(ctx, msg.ConversationID)
-		if err != nil {
-			slog.Warn("cleanup: fetch participants for broadcast", "conversation_id", msg.ConversationID, "error", err)
-			continue
-		}
+		totalPurged += len(expired)
 
-		j.hub.BroadcastToUsers(participantIDs, "message_auto_deleted", map[string]interface{}{
-			"message_id":      msg.ID,
-			"conversation_id": msg.ConversationID,
-		})
+		// Fewer than batchSize returned → no more expired messages.
+		if len(expired) < batchSize {
+			break
+		}
 	}
 
-	if len(expired) > 0 {
-		slog.Info("cleanup: purged expired messages", "count", len(expired))
+	if totalPurged > 0 {
+		slog.Info("cleanup: purged expired messages", "count", totalPurged)
 	}
 }
 

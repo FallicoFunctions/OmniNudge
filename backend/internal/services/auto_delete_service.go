@@ -163,20 +163,28 @@ func (s *AutoDeleteService) UpdateChatSetting(ctx context.Context, userID, conve
 	}
 
 	if applyRetroactive {
+		// Run retroactive recalculation in a goroutine — it issues an unbounded
+		// UPDATE that can take seconds on large histories. Use shutdownCtx so the
+		// work completes even after the HTTP request context is cancelled.
 		if interval != nil {
-			if err := s.applyRetroactiveForChat(ctx, userID, conversationID, *interval); err != nil {
-				s.logger.Warn().Err(err).
-					Int("user_id", userID).
-					Int("conversation_id", conversationID).
-					Msg("auto_delete: retroactive recalculation failed")
-			}
+			iv := *interval
+			go func() {
+				if err := s.applyRetroactiveForChat(s.shutdownCtx, userID, conversationID, iv); err != nil {
+					s.logger.Warn().Err(err).
+						Int("user_id", userID).
+						Int("conversation_id", conversationID).
+						Msg("auto_delete: retroactive recalculation failed")
+				}
+			}()
 		} else {
-			if err := s.clearRetroactiveForChat(ctx, userID, conversationID); err != nil {
-				s.logger.Warn().Err(err).
-					Int("user_id", userID).
-					Int("conversation_id", conversationID).
-					Msg("auto_delete: retroactive clear failed")
-			}
+			go func() {
+				if err := s.clearRetroactiveForChat(s.shutdownCtx, userID, conversationID); err != nil {
+					s.logger.Warn().Err(err).
+						Int("user_id", userID).
+						Int("conversation_id", conversationID).
+						Msg("auto_delete: retroactive clear failed")
+				}
+			}()
 		}
 	}
 
