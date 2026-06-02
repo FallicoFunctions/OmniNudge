@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -484,28 +485,32 @@ func (s *AutoDeleteService) fetchUsername(ctx context.Context, userID int) (stri
 	return username, nil
 }
 
-// formatInterval converts a duration to a human-readable string.
+// formatInterval converts an arbitrary duration to a human-readable string
+// for system messages. Expresses the duration in days, hours, and minutes.
 func formatInterval(d time.Duration) string {
-	switch {
-	case d == 30*time.Minute:
-		return "30 minutes"
-	case d == time.Hour:
-		return "1 hour"
-	case d == 5*time.Hour:
-		return "5 hours"
-	case d == 24*time.Hour:
-		return "1 day"
-	case d == 48*time.Hour:
-		return "2 days"
-	case d == 7*24*time.Hour:
-		return "7 days"
-	case d == 30*24*time.Hour:
-		return "30 days"
-	default:
-		hours := int(d.Hours())
-		if hours < 24 {
-			return fmt.Sprintf("%d hours", hours)
-		}
-		return fmt.Sprintf("%d days", hours/24)
+	total := int(d.Minutes())
+	days := total / (60 * 24)
+	hours := (total % (60 * 24)) / 60
+	minutes := total % 60
+
+	parts := make([]string, 0, 3)
+	if days == 1 {
+		parts = append(parts, "1 day")
+	} else if days > 1 {
+		parts = append(parts, fmt.Sprintf("%d days", days))
 	}
+	if hours == 1 {
+		parts = append(parts, "1 hour")
+	} else if hours > 1 {
+		parts = append(parts, fmt.Sprintf("%d hours", hours))
+	}
+	if minutes == 1 {
+		parts = append(parts, "1 minute")
+	} else if minutes > 1 {
+		parts = append(parts, fmt.Sprintf("%d minutes", minutes))
+	}
+	if len(parts) == 0 {
+		return "never"
+	}
+	return strings.Join(parts, ", ")
 }

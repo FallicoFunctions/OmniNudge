@@ -90,10 +90,37 @@ export interface ConversationFolder {
   conversation_count?: number;
 }
 
-export type AutoDeleteInterval = 'never' | '30m' | '1h' | '5h' | '1d' | '2d' | '7d' | '30d';
+/** Duration broken into days / hours / minutes for the UI dials. */
+export interface AutoDeleteDuration {
+  days: number;    // 0–99
+  hours: number;   // 0–23
+  minutes: number; // 0–59
+}
+
+/** Convert total seconds from the API to the dial values. */
+export function secondsToDuration(seconds: number | null | undefined): AutoDeleteDuration {
+  if (!seconds) return { days: 0, hours: 0, minutes: 0 };
+  const totalMinutes = Math.floor(seconds / 60);
+  return {
+    days: Math.floor(totalMinutes / 1440),
+    hours: Math.floor((totalMinutes % 1440) / 60),
+    minutes: totalMinutes % 60,
+  };
+}
+
+/** Convert dial values to total seconds for the API. 0 means "never". */
+export function durationToSeconds(d: AutoDeleteDuration): number {
+  return d.days * 86400 + d.hours * 3600 + d.minutes * 60;
+}
+
+/** True when all dials are zero (meaning "never"). */
+export function isDurationNever(d: AutoDeleteDuration): boolean {
+  return d.days === 0 && d.hours === 0 && d.minutes === 0;
+}
 
 export interface ChatSettings {
-  auto_delete_after: AutoDeleteInterval | null;
+  /** Total seconds of the per-chat override, or null if no override is set. */
+  auto_delete_after_seconds: number | null;
 }
 
 export interface WsAutoDeleteEvent {

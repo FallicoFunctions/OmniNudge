@@ -83,7 +83,7 @@ import type { RedditApiPost } from '../types/reddit';
 import { ReportModal } from '../components/moderation/ReportModal';
 import { ChatSettingsModal } from '../components/messages/ChatSettingsModal';
 import { searchMessages, type MessageSearchFilters, type MessageSearchResult } from '../utils/messageSearch';
-import type { AutoDeleteInterval } from '../types/messages';
+import { secondsToDuration } from '../types/messages';
 import { formatRedditSlideshowInput, parseRedditSlideshowInput } from '../utils/redditSlideshowInput';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
@@ -972,8 +972,8 @@ export default function MessagesPage() {
   });
 
   const saveChatSettingsMutation = useMutation({
-    mutationFn: ({ interval, retroactive }: { interval: AutoDeleteInterval; retroactive: boolean }) =>
-      messagesService.updateChatSettings(selectedConversationId!, interval, retroactive),
+    mutationFn: ({ seconds, retroactive }: { seconds: number; retroactive: boolean }) =>
+      messagesService.updateChatSettings(selectedConversationId!, seconds, retroactive),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['chat-settings', selectedConversationId] });
       setShowChatSettings(false);
@@ -4500,9 +4500,13 @@ export default function MessagesPage() {
 
       {showChatSettings && selectedConversationId && (
         <ChatSettingsModal
-          currentAutoDelete={(chatSettings?.auto_delete_after as AutoDeleteInterval | null) ?? null}
-          onSave={(interval, retroactive) =>
-            saveChatSettingsMutation.mutate({ interval, retroactive })
+          currentDuration={
+            chatSettings?.auto_delete_after_seconds != null
+              ? secondsToDuration(chatSettings.auto_delete_after_seconds)
+              : null
+          }
+          onSave={(seconds, retroactive) =>
+            saveChatSettingsMutation.mutate({ seconds, retroactive })
           }
           onClose={() => setShowChatSettings(false)}
           isSaving={saveChatSettingsMutation.isPending}

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/services"
@@ -94,9 +93,10 @@ type updateSettingsRequest struct {
 	NotifyCommentVelocity  *bool `json:"notify_comment_velocity"`
 	DailyDigest            *bool `json:"daily_digest"`
 
-	// Auto-delete: "never" | "30m" | "1h" | "5h" | "1d" | "2d" | "7d" | "30d"
-	DefaultAutoDeleteAfter    *string `json:"default_auto_delete_after"`
-	AutoDeleteApplyRetroactive *bool   `json:"auto_delete_apply_retroactive"`
+	// DefaultAutoDeleteSeconds: desired global auto-delete duration in whole seconds.
+	// 0 or nil means "never". Any positive value is accepted.
+	DefaultAutoDeleteSeconds   *int  `json:"default_auto_delete_seconds"`
+	AutoDeleteApplyRetroactive *bool `json:"auto_delete_apply_retroactive"`
 }
 
 // UpdateSettings updates the current user's settings.
@@ -325,11 +325,11 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		settings.DailyDigest = *req.DailyDigest
 	}
 
-	if req.DefaultAutoDeleteAfter != nil {
-		interval, err := parseAutoDeleteInterval(*req.DefaultAutoDeleteAfter)
-		if err != nil {
-			RespondError(c, http.StatusBadRequest, err.Error())
-			return
+	if req.DefaultAutoDeleteSeconds != nil {
+		var interval *time.Duration
+		if *req.DefaultAutoDeleteSeconds > 0 {
+			d := time.Duration(*req.DefaultAutoDeleteSeconds) * time.Second
+			interval = &d
 		}
 		retroactive := req.AutoDeleteApplyRetroactive != nil && *req.AutoDeleteApplyRetroactive
 		if h.autoDeleteSvc == nil {
@@ -352,37 +352,6 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, updated)
 }
 
-// parseAutoDeleteInterval converts a UI-supplied string to a duration pointer.
-// Returns nil for "never", an error for unrecognized values.
-func parseAutoDeleteInterval(s string) (*time.Duration, error) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "never", "":
-		return nil, nil
-	case "30m":
-		d := 30 * time.Minute
-		return &d, nil
-	case "1h":
-		d := time.Hour
-		return &d, nil
-	case "5h":
-		d := 5 * time.Hour
-		return &d, nil
-	case "1d":
-		d := 24 * time.Hour
-		return &d, nil
-	case "2d":
-		d := 48 * time.Hour
-		return &d, nil
-	case "7d":
-		d := 7 * 24 * time.Hour
-		return &d, nil
-	case "30d":
-		d := 30 * 24 * time.Hour
-		return &d, nil
-	default:
-		return nil, fmt.Errorf("invalid auto_delete interval %q; valid values: never, 30m, 1h, 5h, 1d, 2d, 7d, 30d", s)
-	}
-}
 
 func (h *SettingsHandler) getUserID(c *gin.Context) (int, bool) {
 	return middleware.GetAuthenticatedUserID(c)
