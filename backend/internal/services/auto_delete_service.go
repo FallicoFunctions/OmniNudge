@@ -206,14 +206,16 @@ func (s *AutoDeleteService) InjectAutoDeleteSystemMessage(ctx context.Context, c
 		return
 	}
 
-	var msgID int
-	var sentAt interface{}
+	// broadcastID and broadcastSentAt are used in the WS payload regardless of persistence.
+	// Field names must match the frontend Message interface: id, encrypted_content, sent_at.
+	var broadcastID int
+	broadcastSentAt := time.Now().UTC()
+	recipientID := senderID
 
 	switch conv.ConversationType {
 	case "dm", "":
 		// Persist the message with the other DM participant as RecipientID so both
 		// users can load it from conversation history.
-		recipientID := senderID // fallback: satisfies FK if participant lookup fails
 		if conv.User1ID != nil && *conv.User1ID == senderID && conv.User2ID != nil {
 			recipientID = *conv.User2ID
 		} else if conv.User2ID != nil && *conv.User2ID == senderID && conv.User1ID != nil {
@@ -226,28 +228,32 @@ func (s *AutoDeleteService) InjectAutoDeleteSystemMessage(ctx context.Context, c
 			RecipientID:       recipientID,
 			EncryptedContent:  content,
 			MessageType:       "system",
-			EncryptionVersion: "v1",
+			EncryptionVersion: "plaintext",
 		}
 		if err := s.msgRepo.Create(ctx, msg); err != nil {
 			s.logger.Warn().Err(err).Int("conversation_id", conversationID).Msg("auto_delete: failed to insert system message")
 			return
 		}
-		msgID = msg.ID
-		sentAt = msg.SentAt
+		broadcastID = msg.ID
+		broadcastSentAt = msg.SentAt
 	default:
-		// Group / mod_mail: broadcast only — no DB row (recipient model is 1:1).
+		// Group: broadcast-only — no DB row (1:1 recipient model doesn't address all members).
+		// Use a unique negative ID so the frontend can deduplicate without a DB lookup.
+		broadcastID = -int(time.Now().UnixMilli() % 2_147_483_647)
 	}
 
-	payload := map[string]interface{}{
-		"conversation_id": conversationID,
-		"message_type":    "system",
-		"content":         content,
-	}
-	if msgID != 0 {
-		payload["message_id"] = msgID
-		payload["sent_at"] = sentAt
-	}
-	s.hub.BroadcastToUsers(participantIDs, "new_message", payload)
+	// Payload field names mirror the frontend Message interface exactly so the WS
+	// handler can cast data.payload as Message without mapping.
+	s.hub.BroadcastToUsers(participantIDs, "new_message", map[string]interface{}{
+		"id":                 broadcastID,
+		"conversation_id":    conversationID,
+		"sender_id":          senderID,
+		"recipient_id":       recipientID,
+		"encrypted_content":  content,
+		"message_type":       "system",
+		"sent_at":            broadcastSentAt,
+		"encryption_version": "plaintext",
+	})
 }
 
 // applyRetroactiveForChat recalculates delete_at for all messages sent by userID
