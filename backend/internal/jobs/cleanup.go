@@ -16,7 +16,10 @@ import (
 
 type expiredMsgRepo interface {
 	GetExpiredBefore(ctx context.Context, before time.Time, limit int) ([]models.ExpiredMessage, error)
-	AutoDelete(ctx context.Context, messageID int) error
+	// AutoDelete returns (tombstoned, err). tombstoned=true means the message had
+	// replies and was scrubbed in-place (not removed); the recipient still sees the
+	// "[deleted]" placeholder. tombstoned=false means the message was hard-deleted.
+	AutoDelete(ctx context.Context, messageID int) (tombstoned bool, err error)
 }
 
 type expiredConvRepo interface {
@@ -194,7 +197,8 @@ func (j *CleanupJob) PurgeExpiredMessages(ctx context.Context) {
 		}
 
 		for _, msg := range expired {
-			if err := j.msgRepo.AutoDelete(ctx, msg.ID); err != nil {
+			tombstoned, err := j.msgRepo.AutoDelete(ctx, msg.ID)
+			if err != nil {
 				if errors.Is(err, models.ErrMessageAlreadyDeleted) {
 					// Race: already deleted by another path; skip broadcast silently.
 					continue
@@ -211,10 +215,29 @@ func (j *CleanupJob) PurgeExpiredMessages(ctx context.Context) {
 				continue
 			}
 
-			j.hub.BroadcastToUsers(participantIDs, "message_auto_deleted", map[string]interface{}{
-				"message_id":      msg.ID,
-				"conversation_id": msg.ConversationID,
-			})
+			if tombstoned {
+				// Message had replies: content scrubbed but row preserved for thread context.
+				// Broadcast an update event so connected clients replace the bubble with a
+				// "[deleted]" placeholder. The sender's copy is gone; recipient keeps the stub.
+				// Only notify the sender to remove from their view; recipient gets the update.
+				senderOnly := filterIDs(participantIDs, msg.SenderID)
+				j.hub.BroadcastToUsers(senderOnly, "message_auto_deleted", map[string]interface{}{
+					"message_id":      msg.ID,
+					"conversation_id": msg.ConversationID,
+				})
+				j.hub.BroadcastToUsers(participantIDs, "message_tombstoned", map[string]interface{}{
+					"message_id":      msg.ID,
+					"conversation_id": msg.ConversationID,
+					"message_type":    "deleted",
+					"content":         "[deleted]",
+				})
+			} else {
+				// Message was hard-deleted: both parties lose it.
+				j.hub.BroadcastToUsers(participantIDs, "message_auto_deleted", map[string]interface{}{
+					"message_id":      msg.ID,
+					"conversation_id": msg.ConversationID,
+				})
+			}
 		}
 
 		// Fewer than batchSize returned → no more expired messages.
@@ -268,4 +291,16 @@ func (j *CleanupJob) getParticipantIDs(ctx context.Context, conversationID int) 
 		ids = append(ids, *rows.User2ID)
 	}
 	return ids, nil
+}
+
+// filterIDs returns only the IDs from the slice that match the target.
+// Used to target the sender specifically when broadcasting tombstone events.
+func filterIDs(ids []int, target int) []int {
+	var out []int
+	for _, id := range ids {
+		if id == target {
+			out = append(out, id)
+		}
+	}
+	return out
 }

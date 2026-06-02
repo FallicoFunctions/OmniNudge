@@ -897,15 +897,22 @@ func (r *MessageRepository) GetExpiredBefore(ctx context.Context, t time.Time, l
 // AutoDelete permanently removes a message that has reached its auto-delete deadline.
 // Unlike HardDelete, this path does not require deleted_for_sender/recipient flags.
 // If the message has replies it is tombstoned instead of physically removed.
-func (r *MessageRepository) AutoDelete(ctx context.Context, messageID int) error {
+//
+// Returns (tombstoned, err):
+//   - tombstoned=true  → message had replies; content scrubbed, sender's copy hidden,
+//     but recipient still sees the "[deleted]" placeholder for thread continuity.
+//   - tombstoned=false → message was hard-deleted; both parties lose it.
+//   - ErrMessageAlreadyDeleted → nothing was done; caller should skip WS broadcast.
+func (r *MessageRepository) AutoDelete(ctx context.Context, messageID int) (tombstoned bool, err error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer tx.Rollback(ctx)
 
-	// Use the stored reply_count so that a child that was already auto-deleted
-	// doesn't cause the parent to be hard-deleted when it shouldn't be.
+	// Tombstone path: message has replies — scrub content and hide from sender, but
+	// leave deleted_for_recipient=FALSE so the recipient still sees the "[deleted]"
+	// placeholder, preserving thread context for the reply chain.
 	tag, err := tx.Exec(ctx, `
 		UPDATE messages
 		SET encrypted_content = '[deleted]',
@@ -921,32 +928,39 @@ func (r *MessageRepository) AutoDelete(ctx context.Context, messageID int) error
 		    is_multi_recipient = FALSE,
 		    shared_encryption_iv = NULL,
 		    deleted_for_sender = TRUE,
-		    deleted_for_recipient = TRUE,
 		    delete_at = NULL
 		WHERE id = $1
 		  AND COALESCE(reply_count, 0) > 0
 	`, messageID)
 	if err != nil {
-		return err
+		return false, err
 	}
-	tombstoned := tag.RowsAffected() > 0
+	tombstoned = tag.RowsAffected() > 0
 
-	tag, err = tx.Exec(ctx, `
-		DELETE FROM messages
-		WHERE id = $1
-		  AND COALESCE(reply_count, 0) = 0
+	// Hard-delete path: no replies, physically remove the row and decrement the
+	// parent's reply_count so the parent can eventually be hard-deleted too.
+	var hardDeleteTag interface{ RowsAffected() int64 }
+	hardDeleteTag, err = tx.Exec(ctx, `
+		WITH deleted AS (
+		    DELETE FROM messages
+		    WHERE id = $1 AND COALESCE(reply_count, 0) = 0
+		    RETURNING reply_to
+		)
+		UPDATE messages
+		SET reply_count = GREATEST(0, COALESCE(reply_count, 0) - 1)
+		WHERE id = (SELECT reply_to FROM deleted WHERE reply_to IS NOT NULL)
 	`, messageID)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	if !tombstoned && tag.RowsAffected() == 0 {
+	if !tombstoned && hardDeleteTag.RowsAffected() == 0 {
 		// Message was already deleted by another path; the deferred Rollback will
 		// clean up the transaction. Callers should skip the WS broadcast.
-		return ErrMessageAlreadyDeleted
+		return false, ErrMessageAlreadyDeleted
 	}
 
-	return tx.Commit(ctx)
+	return tombstoned, tx.Commit(ctx)
 }
 
 // IsParticipant checks if a user is a participant in the message
