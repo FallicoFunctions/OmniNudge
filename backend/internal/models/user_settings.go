@@ -179,7 +179,8 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		          batch_notifications,
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
-		          media_gallery_filter, active_theme_id, advanced_mode_enabled, updated_at
+		          media_gallery_filter, active_theme_id, advanced_mode_enabled,
+		          default_auto_delete_after, updated_at
 	`
 
 	settings := &UserSettings{}
@@ -227,6 +228,7 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		&settings.MediaGalleryFilter,
 		&settings.ActiveThemeID,
 		&settings.AdvancedModeEnabled,
+		&settings.DefaultAutoDeleteAfter,
 		&settings.UpdatedAt,
 	)
 
@@ -303,7 +305,8 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		          batch_notifications,
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
-		          media_gallery_filter, active_theme_id, advanced_mode_enabled, updated_at
+		          media_gallery_filter, active_theme_id, advanced_mode_enabled,
+		          default_auto_delete_after, updated_at
 	`
 
 	updated := &UserSettings{}
@@ -395,6 +398,7 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		&updated.MediaGalleryFilter,
 		&updated.ActiveThemeID,
 		&updated.AdvancedModeEnabled,
+		&updated.DefaultAutoDeleteAfter,
 		&updated.UpdatedAt,
 	)
 	if err != nil {
