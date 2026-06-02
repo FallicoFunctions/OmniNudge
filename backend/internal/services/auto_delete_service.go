@@ -186,22 +186,17 @@ func (s *AutoDeleteService) UpdateChatSetting(ctx context.Context, userID, conve
 // InjectAutoDeleteSystemMessage inserts a system message into the conversation timeline
 // and broadcasts it to all connected participants. It does NOT trigger push notifications.
 // Call only when interval is non-nil ("Never" produces no system message).
+//
+// For DMs the message is persisted with the other participant as RecipientID so both
+// users see it in conversation history. For group conversations it is broadcast-only
+// (no DB row) because the 1:1 recipient model doesn't support group history visibility.
 func (s *AutoDeleteService) InjectAutoDeleteSystemMessage(ctx context.Context, conversationID, senderID int, username string, interval time.Duration) {
 	content := fmt.Sprintf("%s has messages set to auto-delete after %s", username, formatInterval(interval))
 
-	msg := &models.Message{
-		ConversationID:    conversationID,
-		SenderID:          senderID,
-		RecipientID:       senderID, // system message — no single recipient; use sender to satisfy FK
-		EncryptedContent:  content,
-		MessageType:       "system",
-		EncryptionVersion: "v1",
-	}
-
-	if err := s.msgRepo.Create(ctx, msg); err != nil {
-		s.logger.Warn().Err(err).
-			Int("conversation_id", conversationID).
-			Msg("auto_delete: failed to insert system message")
+	// Determine conversation type so we can choose the right recipient.
+	conv, err := s.convRepo.GetByID(ctx, conversationID)
+	if err != nil || conv == nil {
+		s.logger.Warn().Err(err).Int("conversation_id", conversationID).Msg("auto_delete: failed to fetch conversation for system message")
 		return
 	}
 
@@ -211,13 +206,48 @@ func (s *AutoDeleteService) InjectAutoDeleteSystemMessage(ctx context.Context, c
 		return
 	}
 
-	s.hub.BroadcastToUsers(participantIDs, "new_message", map[string]interface{}{
-		"message_id":      msg.ID,
+	var msgID int
+	var sentAt interface{}
+
+	switch conv.ConversationType {
+	case "dm", "":
+		// Persist the message with the other DM participant as RecipientID so both
+		// users can load it from conversation history.
+		recipientID := senderID // fallback: satisfies FK if participant lookup fails
+		if conv.User1ID != nil && *conv.User1ID == senderID && conv.User2ID != nil {
+			recipientID = *conv.User2ID
+		} else if conv.User2ID != nil && *conv.User2ID == senderID && conv.User1ID != nil {
+			recipientID = *conv.User1ID
+		}
+
+		msg := &models.Message{
+			ConversationID:    conversationID,
+			SenderID:          senderID,
+			RecipientID:       recipientID,
+			EncryptedContent:  content,
+			MessageType:       "system",
+			EncryptionVersion: "v1",
+		}
+		if err := s.msgRepo.Create(ctx, msg); err != nil {
+			s.logger.Warn().Err(err).Int("conversation_id", conversationID).Msg("auto_delete: failed to insert system message")
+			return
+		}
+		msgID = msg.ID
+		sentAt = msg.SentAt
+	default:
+		// Group / mod_mail: broadcast only — no DB row (recipient model is 1:1).
+	}
+
+	payload := map[string]interface{}{
 		"conversation_id": conversationID,
 		"message_type":    "system",
 		"content":         content,
-		"sent_at":         msg.SentAt,
-	})
+	}
+	if msgID != 0 {
+		payload["message_id"] = msgID
+		payload["sent_at"] = sentAt
+	}
+	s.hub.BroadcastToUsers(participantIDs, "new_message", payload)
 }
 
 // applyRetroactiveForChat recalculates delete_at for all messages sent by userID
