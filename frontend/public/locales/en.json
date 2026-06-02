@@ -125,6 +125,7 @@
     "profile": "Profile",
     "admin": "Admin",
     "hubs": "Hubs",
+    "games": "Games",
     "search": "Search",
     "create": "Create",
     "menu": "Menu"
@@ -133,10 +134,34 @@
     "profile": "Profile",
     "settings": "Settings",
     "hubs": "Browse Hubs",
+    "games": "Games",
     "about": "About",
     "admin": "Admin Panel",
     "logout": "Log Out",
     "logoutConfirm": "Are you sure you want to log out?"
+  },
+  "gamesPage": {
+    "eyebrow": "OmniGame",
+    "title": "OmniGame",
+    "description": "Discover dedicated multiplayer experiences inside OmniNudge, starting with a shared-world browser rave built for signed-in and guest launches.",
+    "availableNow": "Available now",
+    "viewGame": "View game"
+  },
+  "gameDetailPage": {
+    "eyebrow": "OmniGame / OmniRave",
+    "signedInTitle": "Signed-in launch",
+    "guestTitle": "Guest launch",
+    "launchSignedIn": "Launch OmniRave",
+    "launchGuest": "Launch as Guest",
+    "launchingSignedIn": "Launching OmniRave...",
+    "launchingGuest": "Launching guest session...",
+    "launchError": "Unable to launch OmniRave right now.",
+    "zoneLabel": "Zones",
+    "zoneValue": "main_stage, techno_room, neon_room",
+    "mediaLabel": "Media",
+    "mediaValue": "Server-owned zone audio boundaries with synchronized YouTube-backed stage playback.",
+    "mobileLabel": "Mobile",
+    "mobileValue": "Explicit media unlock before stage audio is expected to work."
   },
   "mainLayout": {
     "skipToMainContent": "Skip to main content",
@@ -1665,6 +1690,23 @@
       "deleteError": "Failed to delete folder. Please try again.",
       "previewLabel": "Folder preview: {{name}}",
       "emptyHint": "No folders yet — press + to create one"
+    },
+    "chatSettings": "Chat Settings",
+    "autoDelete": {
+      "label": "Auto-delete my messages after",
+      "description": "Your sent messages will be permanently deleted after this time. Other participants' messages are not affected.",
+      "never": "Never",
+      "30m": "30 minutes",
+      "1h": "1 hour",
+      "5h": "5 hours",
+      "1d": "1 day",
+      "2d": "2 days",
+      "7d": "7 days",
+      "30d": "30 days",
+      "applyRetroTitle": "Apply to previous messages?",
+      "applyRetroBody": "Would you like to also apply this setting to messages you've already sent in this conversation?",
+      "applyToAll": "Yes, apply to all my messages",
+      "applyNewOnly": "No, new messages only"
     }
   },
   "posts": {

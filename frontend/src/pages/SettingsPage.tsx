@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import ThemeSelector from '../components/themes/ThemeSelector';
 import ThemeEditor from '../components/themes/ThemeEditor';
 import { LanguageSelector } from '../components/settings/LanguageSelector';
@@ -11,8 +12,10 @@ import { getOwnPublicKeyBase64 } from '../services/keyManagementService';
 import { usersService } from '../services/usersService';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { accountService } from '../services/accountService';
+import { userSettingsService } from '../services/userSettingsService';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { FEATURE_FLAGS } from '../config/featureFlags';
+import type { AutoDeleteInterval } from '../types/messages';
 import {
   getForcedDocumentDirection,
   setForcedDocumentDirection,
@@ -144,6 +147,49 @@ export default function SettingsPage() {
     const forcedDirection = getForcedDocumentDirection();
     return forcedDirection ?? 'auto';
   });
+
+  // Global auto-delete
+  const { data: rawSettings } = useQuery({
+    queryKey: ['user-settings-raw'],
+    queryFn: () => userSettingsService.get(),
+  });
+  const nsToInterval = (ns: number | null | undefined): AutoDeleteInterval => {
+    const map: Record<number, AutoDeleteInterval> = {
+      [30 * 60 * 1e9]: '30m',
+      [3600 * 1e9]: '1h',
+      [5 * 3600 * 1e9]: '5h',
+      [24 * 3600 * 1e9]: '1d',
+      [48 * 3600 * 1e9]: '2d',
+      [7 * 24 * 3600 * 1e9]: '7d',
+      [30 * 24 * 3600 * 1e9]: '30d',
+    };
+    return (ns != null ? map[ns] : undefined) ?? 'never';
+  };
+  const savedGlobalAutoDelete = nsToInterval(rawSettings?.default_auto_delete_after);
+  const [globalAutoDelete, setGlobalAutoDelete] = useState<AutoDeleteInterval>('never');
+  const [pendingGlobalAutoDelete, setPendingGlobalAutoDelete] = useState<AutoDeleteInterval | null>(null);
+  useEffect(() => {
+    setGlobalAutoDelete(savedGlobalAutoDelete);
+  }, [savedGlobalAutoDelete]);
+  const saveGlobalAutoDeleteMutation = useMutation({
+    mutationFn: ({ interval, retroactive }: { interval: AutoDeleteInterval; retroactive: boolean }) =>
+      userSettingsService.update({ default_auto_delete_after: interval, auto_delete_apply_retroactive: retroactive }),
+    onSuccess: (_, { interval }) => {
+      setGlobalAutoDelete(interval);
+      setPendingGlobalAutoDelete(null);
+    },
+    onError: () => {
+      setPendingGlobalAutoDelete(null);
+    },
+  });
+  const handleGlobalAutoDeleteSave = () => {
+    if (globalAutoDelete === savedGlobalAutoDelete) return;
+    if (globalAutoDelete === 'never') {
+      saveGlobalAutoDeleteMutation.mutate({ interval: 'never', retroactive: false });
+    } else {
+      setPendingGlobalAutoDelete(globalAutoDelete);
+    }
+  };
 
   // Data Export (P0-016)
   const [isRequestingExport, setIsRequestingExport] = useState(false);
@@ -795,9 +841,77 @@ export default function SettingsPage() {
                 </option>
               </select>
             </div>
+
+            {/* Global Auto-Delete */}
+            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                {t('messages.autoDelete.label')}
+              </p>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)] mb-3">
+                {t('messages.autoDelete.description')}
+              </p>
+              <div className="flex items-center gap-3">
+                <select
+                  value={globalAutoDelete}
+                  onChange={(e) => setGlobalAutoDelete(e.target.value as AutoDeleteInterval)}
+                  className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                >
+                  {(['never', '30m', '1h', '5h', '1d', '2d', '7d', '30d'] as AutoDeleteInterval[]).map((v) => (
+                    <option key={v} value={v}>{t(`messages.autoDelete.${v}`)}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleGlobalAutoDeleteSave}
+                  disabled={globalAutoDelete === savedGlobalAutoDelete || saveGlobalAutoDeleteMutation.isPending}
+                  className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
+                >
+                  {t('common.save')}
+                </button>
+              </div>
+            </div>
           </div>
           </Panel>
         </div>
+
+        {/* Global auto-delete retroactive confirm */}
+        {pendingGlobalAutoDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
+              <h3 className="text-base font-semibold text-[var(--color-text-primary)] mb-2">
+                {t('messages.autoDelete.applyRetroTitle')}
+              </h3>
+              <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+                {t('messages.autoDelete.applyRetroBody')}
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => saveGlobalAutoDeleteMutation.mutate({ interval: pendingGlobalAutoDelete, retroactive: true })}
+                  disabled={saveGlobalAutoDeleteMutation.isPending}
+                  className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                >
+                  {t('messages.autoDelete.applyToAll')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => saveGlobalAutoDeleteMutation.mutate({ interval: pendingGlobalAutoDelete, retroactive: false })}
+                  disabled={saveGlobalAutoDeleteMutation.isPending}
+                  className="w-full rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
+                >
+                  {t('messages.autoDelete.applyNewOnly')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingGlobalAutoDelete(null)}
+                  className="w-full rounded-md px-4 py-2 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-hover)]"
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div hidden={activeTab !== 'general'}>
           {/* SETTINGS-5: Category header for Preferences */}

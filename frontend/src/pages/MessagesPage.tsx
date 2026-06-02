@@ -81,7 +81,9 @@ import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplet
 import type { LocalSubredditPost } from '../services/hubsService';
 import type { RedditApiPost } from '../types/reddit';
 import { ReportModal } from '../components/moderation/ReportModal';
+import { ChatSettingsModal } from '../components/messages/ChatSettingsModal';
 import { searchMessages, type MessageSearchFilters, type MessageSearchResult } from '../utils/messageSearch';
+import type { AutoDeleteInterval } from '../types/messages';
 import { formatRedditSlideshowInput, parseRedditSlideshowInput } from '../utils/redditSlideshowInput';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
@@ -707,6 +709,7 @@ export default function MessagesPage() {
     messages: Message[];
     initialIndex: number;
   } | null>(null);
+  const [showChatSettings, setShowChatSettings] = useState(false);
   const [redditSlideshowModalOpen, setRedditSlideshowModalOpen] = useState(false);
   const [redditSlideshowInput, setRedditSlideshowInput] = useState('');
   const [redditSlideshowAutocompleteOpen, setRedditSlideshowAutocompleteOpen] = useState(false);
@@ -960,6 +963,21 @@ export default function MessagesPage() {
 
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
   const selectedConversationExists = Boolean(selectedConversation);
+
+  const { data: chatSettings } = useQuery({
+    queryKey: ['chat-settings', selectedConversationId],
+    queryFn: () => messagesService.getChatSettings(selectedConversationId!),
+    enabled: !!selectedConversationId,
+  });
+
+  const saveChatSettingsMutation = useMutation({
+    mutationFn: ({ interval, retroactive }: { interval: AutoDeleteInterval; retroactive: boolean }) =>
+      messagesService.updateChatSettings(selectedConversationId!, interval, retroactive),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['chat-settings', selectedConversationId] });
+      setShowChatSettings(false);
+    },
+  });
 
   // Group admin controls — wires real-time mute/ban/slow-mode WS events
   const groupAdmin = useGroupAdmin({
@@ -2856,6 +2874,17 @@ export default function MessagesPage() {
 
                   {/* Slideshow buttons */}
                   <div className="flex items-center gap-2">
+                    {/* Chat settings gear icon — all conversations */}
+                    {!isCreatingChat && selectedConversationId && (
+                      <button
+                        type="button"
+                        onClick={() => setShowChatSettings(true)}
+                        className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                        aria-label={t('messages.chatSettings')}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                      </button>
+                    )}
                     {/* Voice / Video call buttons — DM conversations only */}
                     {!isCreatingChat &&
                       selectedConversation?.conversation_type === 'dm' &&
@@ -4450,6 +4479,17 @@ export default function MessagesPage() {
           targetType="message"
           targetId={reportModalMessageId}
           defaultReason="harassment"
+        />
+      )}
+
+      {showChatSettings && selectedConversationId && (
+        <ChatSettingsModal
+          currentAutoDelete={(chatSettings?.auto_delete_after as AutoDeleteInterval | null) ?? null}
+          onSave={(interval, retroactive) =>
+            saveChatSettingsMutation.mutate({ interval, retroactive })
+          }
+          onClose={() => setShowChatSettings(false)}
+          isSaving={saveChatSettingsMutation.isPending}
         />
       )}
     </>

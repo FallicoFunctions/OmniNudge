@@ -43,6 +43,14 @@ type Message struct {
 	SharedEncryptionIV       *string        `json:"shared_encryption_iv,omitempty"` // Shared IV for multi-recipient messages
 	RecipientKeys            map[int]string `json:"recipient_keys,omitempty"`       // Map of user_id -> encrypted_key for multi-recipient
 	HasReactions             bool           `json:"has_reactions"`                  // True when ≥1 reaction exists — avoids N+1 fetches on the client
+	DeleteAt                 *time.Time     `json:"delete_at,omitempty"`            // Auto-delete timestamp; NULL means never
+}
+
+// ExpiredMessage is a lightweight projection used by the auto-delete cron sweep.
+type ExpiredMessage struct {
+	ID             int
+	ConversationID int
+	SenderID       int
 }
 
 // MessageRepository handles database operations for messages
@@ -75,9 +83,9 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 			conversation_id, sender_id, recipient_id, encrypted_content, sender_encrypted_content,
 			message_type, reply_to, thread_root, media_file_id, media_url, media_type, media_size, encryption_version,
 			media_encryption_key, media_encryption_iv, sender_media_encryption_key,
-			is_multi_recipient, shared_encryption_iv
+			is_multi_recipient, shared_encryption_iv, delete_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		RETURNING id, sent_at
 	`
 
@@ -101,6 +109,7 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 		message.SenderMediaEncryptionKey,
 		message.IsMultiRecipient,
 		message.SharedEncryptionIV,
+		message.DeleteAt,
 	).Scan(&message.ID, &message.SentAt)
 
 	if err != nil {
@@ -846,6 +855,80 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 	}
 
 	return message, nil
+}
+
+// GetExpiredBefore returns up to limit messages whose delete_at is at or before t.
+// Used by the auto-delete cron sweep.
+func (r *MessageRepository) GetExpiredBefore(ctx context.Context, t time.Time, limit int) ([]ExpiredMessage, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, conversation_id, sender_id
+		FROM messages
+		WHERE delete_at <= $1
+		ORDER BY delete_at
+		LIMIT $2
+	`, t, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var expired []ExpiredMessage
+	for rows.Next() {
+		var m ExpiredMessage
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.SenderID); err != nil {
+			return nil, err
+		}
+		expired = append(expired, m)
+	}
+	return expired, rows.Err()
+}
+
+// AutoDelete permanently removes a message that has reached its auto-delete deadline.
+// Unlike HardDelete, this path does not require deleted_for_sender/recipient flags.
+// If the message has replies it is tombstoned instead of physically removed.
+func (r *MessageRepository) AutoDelete(ctx context.Context, messageID int) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Use the stored reply_count so that a child that was already auto-deleted
+	// doesn't cause the parent to be hard-deleted when it shouldn't be.
+	_, err = tx.Exec(ctx, `
+		UPDATE messages
+		SET encrypted_content = '[deleted]',
+		    sender_encrypted_content = NULL,
+		    message_type = 'text',
+		    media_file_id = NULL,
+		    media_url = NULL,
+		    media_type = NULL,
+		    media_size = NULL,
+		    media_encryption_key = NULL,
+		    media_encryption_iv = NULL,
+		    sender_media_encryption_key = NULL,
+		    is_multi_recipient = FALSE,
+		    shared_encryption_iv = NULL,
+		    deleted_for_sender = TRUE,
+		    deleted_for_recipient = TRUE,
+		    delete_at = NULL
+		WHERE id = $1
+		  AND COALESCE(reply_count, 0) > 0
+	`, messageID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, `
+		DELETE FROM messages
+		WHERE id = $1
+		  AND COALESCE(reply_count, 0) = 0
+	`, messageID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 // IsParticipant checks if a user is a participant in the message

@@ -62,6 +62,9 @@ type UserSettings struct {
 	ActiveThemeID       *int `json:"active_theme_id,omitempty"`
 	AdvancedModeEnabled bool `json:"advanced_mode_enabled"`
 
+	// Auto-delete: nil means Never (default)
+	DefaultAutoDeleteAfter *time.Duration `json:"default_auto_delete_after,omitempty"`
+
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -92,7 +95,8 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		       batch_notifications,
 		       notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		       notify_comment_milestone, notify_comment_velocity, daily_digest,
-		       media_gallery_filter, active_theme_id, advanced_mode_enabled, updated_at
+		       media_gallery_filter, active_theme_id, advanced_mode_enabled,
+		       default_auto_delete_after, updated_at
 		FROM user_settings
 		WHERE user_id = $1
 	`
@@ -142,6 +146,7 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		&settings.MediaGalleryFilter,
 		&settings.ActiveThemeID,
 		&settings.AdvancedModeEnabled,
+		&settings.DefaultAutoDeleteAfter,
 		&settings.UpdatedAt,
 	)
 	if err != nil {

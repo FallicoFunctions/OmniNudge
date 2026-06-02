@@ -444,6 +444,10 @@ func main() {
 	// Initialize account lockout service (REFACTOR_05: brute-force protection)
 	lockoutService := services.NewAccountLockoutService(db.Pool)
 
+	// Concrete model repos for auto-delete (needed by cleanup job and auto-delete service).
+	convRepoModel := models.NewConversationRepository(db.Pool)
+	msgRepoModel := models.NewMessageRepository(db.Pool)
+
 	// Start security cleanup job (REFACTOR_05: purge stale failed_login_attempts and audit_logs).
 	// The context is derived from a cancel function that is called during graceful
 	// shutdown so the goroutine is not leaked after the HTTP server stops.
@@ -452,7 +456,9 @@ func main() {
 	// below during shutdown is kept for clarity but the defer is the safety net.
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
 	defer cleanupCancel()
-	go jobs.NewCleanupJob(db.Pool).Start(cleanupCtx)
+	go jobs.NewCleanupJob(db.Pool,
+		jobs.WithAutoDeleteSweep(msgRepoModel, convRepoModel, hub),
+	).Start(cleanupCtx)
 
 	// Start materialized view refresh job (refreshes analytics views every 5 minutes).
 	viewRefreshJob := jobs.NewRefreshMaterializedViewsJob(db.Pool, zlog.Logger)
@@ -476,6 +482,8 @@ func main() {
 	// they are cleanly cancelled on graceful shutdown.
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
+	autoDeleteSvc := services.NewAutoDeleteService(db.Pool, convRepoModel, msgRepoModel, hub, zlog.Logger, workerCtx)
+
 	workerManager := workers.NewWorkerManager(
 		notificationService,
 		baselineCalculatorService,
@@ -511,12 +519,12 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, lockoutService, cfg.AppEnv)
-	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
+	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo, autoDeleteSvc)
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo, hubSettingsRepo)
 	postsHandler.SetLinkPreviewService(linkpreviewsvc.NewService(nil, storageService, virusScanner))
 	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, hubModRepo)
 	redditHandler := handlers.NewRedditHandler(redditClient, redditPostRepo)
-	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
+	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo, autoDeleteSvc)
 	foldersHandler := handlers.NewFoldersHandler(db.Pool, conversationRepo)
 	// Initialize thumbnail service
 	thumbnailService := services.NewThumbnailService()
@@ -524,7 +532,7 @@ func main() {
 	// Initialize CSS sanitizer
 	cssSanitizer := services.NewCSSSanitizer()
 
-	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService, cache, queueClient)
+	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService, cache, queueClient).WithAutoDeleteService(autoDeleteSvc)
 	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache, thumbnailService)
 	mediaQuota := handlers.MediaQuotaConfig{
 		FreeTierBytes: cfg.Media.FreeTierQuotaBytes,
@@ -1124,6 +1132,8 @@ func main() {
 			protected.PUT("/conversations/:id/mute", conversationsHandler.MuteConversation)
 			protected.PUT("/conversations/:id/unmute", conversationsHandler.UnmuteConversation)
 			protected.DELETE("/conversations/:id", conversationsHandler.DeleteConversation)
+			protected.GET("/conversations/:id/settings", conversationsHandler.GetChatSettings)
+			protected.PATCH("/conversations/:id/settings", conversationsHandler.UpdateChatSettings)
 			protected.POST("/folders", foldersHandler.CreateFolder)
 			protected.GET("/folders", foldersHandler.ListFolders)
 			protected.PATCH("/folders/:id", foldersHandler.UpdateFolder)

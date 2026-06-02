@@ -125,6 +125,7 @@
     "profile": "الملف الشخصي",
     "admin": "الإدارة",
     "hubs": "المجموعات",
+    "games": "الألعاب",
     "search": "بحث",
     "create": "إنشاء",
     "menu": "القائمة"
@@ -133,10 +134,34 @@
     "profile": "الملف الشخصي",
     "settings": "الإعدادات",
     "hubs": "تصفح المجموعات",
+    "games": "الألعاب",
     "about": "حول",
     "admin": "لوحة الإدارة",
     "logout": "تسجيل الخروج",
     "logoutConfirm": "هل أنت متأكد أنك تريد تسجيل الخروج؟"
+  },
+  "gamesPage": {
+    "eyebrow": "OmniGame",
+    "title": "OmniGame",
+    "description": "اكتشف تجارب متعددة اللاعبين مخصصة داخل OmniNudge، بدءا من حفلة ريف مشتركة في المتصفح تدعم الإطلاق للمستخدمين والمسافرين كضيوف.",
+    "availableNow": "متاح الآن",
+    "viewGame": "عرض اللعبة"
+  },
+  "gameDetailPage": {
+    "eyebrow": "OmniGame / OmniRave",
+    "signedInTitle": "الدخول بالحساب",
+    "guestTitle": "الدخول كضيف",
+    "launchSignedIn": "تشغيل OmniRave",
+    "launchGuest": "الدخول كضيف",
+    "launchingSignedIn": "جارٍ تشغيل OmniRave...",
+    "launchingGuest": "جارٍ بدء جلسة الضيف...",
+    "launchError": "يتعذر تشغيل OmniRave حاليا.",
+    "zoneLabel": "المناطق",
+    "zoneValue": "main_stage, techno_room, neon_room",
+    "mediaLabel": "الوسائط",
+    "mediaValue": "حدود صوت المناطق مملوكة للخادم مع تشغيل مراحل متزامن مدعوم من YouTube.",
+    "mobileLabel": "الجوال",
+    "mobileValue": "فك قفل الوسائط صراحة قبل توقع عمل صوت المسرح."
   },
   "mainLayout": {
     "skipToMainContent": "تخطي إلى المحتوى الرئيسي",
@@ -1665,6 +1690,23 @@
       "deleteError": "فشل حذف المجلد. يرجى المحاولة مرة أخرى.",
       "previewLabel": "معاينة المجلد: {{name}}",
       "emptyHint": "لا توجد مجلدات بعد — اضغط على + لإنشاء مجلد"
+    },
+    "chatSettings": "إعدادات الدردشة",
+    "autoDelete": {
+      "label": "حذف رسائلي تلقائياً بعد",
+      "description": "ستُحذف رسائلك المُرسَلة نهائياً بعد هذه المدة. لا تتأثر رسائل المشاركين الآخرين.",
+      "never": "أبداً",
+      "30m": "٣٠ دقيقة",
+      "1h": "ساعة واحدة",
+      "5h": "٥ ساعات",
+      "1d": "يوم واحد",
+      "2d": "يومان",
+      "7d": "٧ أيام",
+      "30d": "٣٠ يوماً",
+      "applyRetroTitle": "تطبيق على الرسائل السابقة؟",
+      "applyRetroBody": "هل تريد أيضاً تطبيق هذا الإعداد على الرسائل التي أرسلتها بالفعل في هذه المحادثة؟",
+      "applyToAll": "نعم، طبّق على جميع رسائلي",
+      "applyNewOnly": "لا، للرسائل الجديدة فقط"
     }
   },
   "posts": {
