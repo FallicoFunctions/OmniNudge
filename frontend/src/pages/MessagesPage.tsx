@@ -3169,6 +3169,21 @@ export default function MessagesPage() {
                       </div>
                     )}
                     {filteredMessages.map((message) => {
+                      // System messages (auto-delete notices, etc.) render as
+                      // centred text with no bubble, avatar, or actions.
+                      if (message.message_type === 'system') {
+                        return (
+                          <div
+                            key={message.id}
+                            className="flex justify-center my-1 px-4"
+                          >
+                            <span className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 text-xs text-[var(--color-text-muted)] text-center max-w-[70%]">
+                              {message.encrypted_content}
+                            </span>
+                          </div>
+                        );
+                      }
+
                       const isOwnMessage = message.sender_id === user?.id;
                       const messagePinned = pinnedMessageIds.has(message.id);
                       const isPinningMessage = pinningMessageId === message.id;

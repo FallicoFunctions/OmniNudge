@@ -143,13 +143,15 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           // MessagesPage sidebar) refetches with accurate unread counts.
           queryClient.invalidateQueries({ queryKey: ['conversations'] });
 
-          // Dispatch custom event for notification sound
-          window.dispatchEvent(new CustomEvent('new-message', {
-            detail: {
-              conversationId: message.conversation_id,
-              senderId: message.sender_id
-            }
-          }));
+          // Dispatch custom event for notification sound — suppress for system messages.
+          if (message.message_type !== 'system') {
+            window.dispatchEvent(new CustomEvent('new-message', {
+              detail: {
+                conversationId: message.conversation_id,
+                senderId: message.sender_id
+              }
+            }));
+          }
           break;
         }
 
