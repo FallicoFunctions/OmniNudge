@@ -252,19 +252,6 @@ export default function MainLayout() {
                     >
                       {t('menu.hubs')}
                     </button>
-                    <Link
-                      to="/about"
-                      onMouseEnter={() => prefetchRoutes.about()}
-                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                    >
-                      {t('menu.about')}
-                    </Link>
-                    <Link
-                      to="/donate"
-                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                    >
-                      Donate
-                    </Link>
                   </div>
 
                   {/* Divider */}
@@ -409,16 +396,25 @@ export default function MainLayout() {
                   {/* Not logged in */}
                   {!isSlimMode && (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBugReportUrl(window.location.href);
-                          setShowBugReportModal(true);
-                        }}
-                        className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                      >
-                        {t('mainLayout.bugReporting')}
-                      </button>
+                      <HamburgerMenu
+                        items={[
+                          {
+                            label: t('menu.about'),
+                            to: '/about',
+                          },
+                          {
+                            label: 'Donate',
+                            to: '/donate',
+                          },
+                          {
+                            label: t('mainLayout.bugReporting'),
+                            onClick: () => {
+                              setBugReportUrl(window.location.href);
+                              setShowBugReportModal(true);
+                            },
+                          },
+                        ]}
+                      />
 
                       {/* Divider */}
                       <div className="h-6 w-px bg-[var(--color-border)]" />
