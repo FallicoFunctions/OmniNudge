@@ -93,8 +93,12 @@ func (s *AutoDeleteService) UpdateGlobalSetting(ctx context.Context, userID int,
 		return fmt.Errorf("auto_delete: update global setting: %w", err)
 	}
 
-	if applyRetroactive && interval != nil {
-		go s.applyGlobalRetroactiveAsync(userID, *interval)
+	if applyRetroactive {
+		if interval != nil {
+			go s.applyGlobalRetroactiveAsync(userID, *interval)
+		} else {
+			go s.clearGlobalDeleteAtAsync(userID)
+		}
 	}
 
 	// Inject a system message into every DM and group chat for this user that does
@@ -153,12 +157,21 @@ func (s *AutoDeleteService) UpdateChatSetting(ctx context.Context, userID, conve
 		return fmt.Errorf("auto_delete: persist per-chat setting: %w", err)
 	}
 
-	if applyRetroactive && interval != nil {
-		if err := s.applyRetroactiveForChat(ctx, userID, conversationID, *interval); err != nil {
-			s.logger.Warn().Err(err).
-				Int("user_id", userID).
-				Int("conversation_id", conversationID).
-				Msg("auto_delete: retroactive recalculation failed")
+	if applyRetroactive {
+		if interval != nil {
+			if err := s.applyRetroactiveForChat(ctx, userID, conversationID, *interval); err != nil {
+				s.logger.Warn().Err(err).
+					Int("user_id", userID).
+					Int("conversation_id", conversationID).
+					Msg("auto_delete: retroactive recalculation failed")
+			}
+		} else {
+			if err := s.clearRetroactiveForChat(ctx, userID, conversationID); err != nil {
+				s.logger.Warn().Err(err).
+					Int("user_id", userID).
+					Int("conversation_id", conversationID).
+					Msg("auto_delete: retroactive clear failed")
+			}
 		}
 	}
 
@@ -177,11 +190,11 @@ func (s *AutoDeleteService) InjectAutoDeleteSystemMessage(ctx context.Context, c
 	content := fmt.Sprintf("%s has messages set to auto-delete after %s", username, formatInterval(interval))
 
 	msg := &models.Message{
-		ConversationID:   conversationID,
-		SenderID:         senderID,
-		RecipientID:      0, // system message; recipient not applicable
-		EncryptedContent: content,
-		MessageType:      "system",
+		ConversationID:    conversationID,
+		SenderID:          senderID,
+		RecipientID:       senderID, // system message — no single recipient; use sender to satisfy FK
+		EncryptedContent:  content,
+		MessageType:       "system",
 		EncryptionVersion: "v1",
 	}
 
@@ -259,6 +272,54 @@ func (s *AutoDeleteService) applyGlobalRetroactiveAsync(userID int, interval tim
 	}
 }
 
+// clearRetroactiveForChat clears delete_at on all messages sent by userID in conversationID.
+// Called when the user sets their per-chat override to Never with applyRetroactive=true.
+func (s *AutoDeleteService) clearRetroactiveForChat(ctx context.Context, userID, conversationID int) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE messages
+		SET delete_at = NULL
+		WHERE conversation_id = $1
+		  AND sender_id = $2
+		  AND deleted_for_sender = FALSE
+		  AND deleted_for_recipient = FALSE
+	`, conversationID, userID)
+	if err != nil {
+		return fmt.Errorf("auto_delete: retroactive chat clear: %w", err)
+	}
+	return nil
+}
+
+// clearGlobalDeleteAtAsync runs in a goroutine and clears delete_at on all messages sent
+// by userID in conversations that have no per-chat override (i.e. those that were inheriting
+// the global setting that is now being set to Never).
+func (s *AutoDeleteService) clearGlobalDeleteAtAsync(userID int) {
+	ctx := s.shutdownCtx
+	_, err := s.pool.Exec(ctx, `
+		UPDATE messages m
+		SET delete_at = NULL
+		FROM conversations c
+		LEFT JOIN conversation_participants cp
+			ON cp.conversation_id = c.id AND cp.user_id = $1
+		WHERE m.sender_id = $1
+		  AND m.conversation_id = c.id
+		  AND m.deleted_for_sender = FALSE
+		  AND m.deleted_for_recipient = FALSE
+		  AND (
+		    (COALESCE(c.conversation_type, 'dm') = 'dm'
+		     AND CASE
+		           WHEN c.user1_id = $1 THEN c.user1_auto_delete_after
+		           WHEN c.user2_id = $1 THEN c.user2_auto_delete_after
+		           ELSE NULL
+		         END IS NULL)
+		    OR
+		    (c.conversation_type = 'group' AND cp.auto_delete_after IS NULL)
+		  )
+	`, userID)
+	if err != nil {
+		s.logger.Error().Err(err).Int("user_id", userID).Msg("auto_delete: global retroactive clear failed")
+	}
+}
+
 // injectGlobalSystemMessages fires InjectAutoDeleteSystemMessage for every conversation
 // where the user is a participant and has no per-chat override.
 func (s *AutoDeleteService) injectGlobalSystemMessages(ctx context.Context, userID int, interval time.Duration) error {
@@ -313,8 +374,11 @@ func (s *AutoDeleteService) getConversationParticipantIDs(ctx context.Context, c
 		}
 		ids = append(ids, uid)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	if len(ids) > 0 {
-		return ids, rows.Err()
+		return ids, nil
 	}
 
 	// DM: fall back to user1_id / user2_id on conversations table.

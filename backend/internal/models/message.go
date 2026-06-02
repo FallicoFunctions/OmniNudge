@@ -2,12 +2,18 @@ package models
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ErrMessageAlreadyDeleted is returned by AutoDelete when the message no longer
+// exists (already hard-deleted or tombstoned by a concurrent path). Callers
+// should skip the WS broadcast for this message_id.
+var ErrMessageAlreadyDeleted = errors.New("message already deleted")
 
 // Message represents an encrypted message in a conversation
 type Message struct {
@@ -895,11 +901,11 @@ func (r *MessageRepository) AutoDelete(ctx context.Context, messageID int) error
 
 	// Use the stored reply_count so that a child that was already auto-deleted
 	// doesn't cause the parent to be hard-deleted when it shouldn't be.
-	_, err = tx.Exec(ctx, `
+	tag, err := tx.Exec(ctx, `
 		UPDATE messages
 		SET encrypted_content = '[deleted]',
 		    sender_encrypted_content = NULL,
-		    message_type = 'text',
+		    message_type = 'deleted',
 		    media_file_id = NULL,
 		    media_url = NULL,
 		    media_type = NULL,
@@ -918,14 +924,22 @@ func (r *MessageRepository) AutoDelete(ctx context.Context, messageID int) error
 	if err != nil {
 		return err
 	}
+	tombstoned := tag.RowsAffected() > 0
 
-	_, err = tx.Exec(ctx, `
+	tag, err = tx.Exec(ctx, `
 		DELETE FROM messages
 		WHERE id = $1
 		  AND COALESCE(reply_count, 0) = 0
 	`, messageID)
 	if err != nil {
 		return err
+	}
+
+	if !tombstoned && tag.RowsAffected() == 0 {
+		// Message was already deleted by another path; commit is a no-op but
+		// callers should skip the WS broadcast for this message.
+		_ = tx.Rollback(ctx)
+		return ErrMessageAlreadyDeleted
 	}
 
 	return tx.Commit(ctx)

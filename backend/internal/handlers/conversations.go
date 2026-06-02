@@ -854,7 +854,12 @@ func (h *ConversationsHandler) GetChatSettings(c *gin.Context) {
 		return
 	}
 
-	if _, ok := h.ensureConversationParticipant(c, conversationID, userID); !ok {
+	conv, ok := h.ensureConversationParticipant(c, conversationID, userID)
+	if !ok {
+		return
+	}
+	if conv.ConversationType == "mod_mail" {
+		RespondError(c, http.StatusBadRequest, "Auto-delete is not available for mod mail conversations")
 		return
 	}
 
@@ -906,7 +911,12 @@ func (h *ConversationsHandler) UpdateChatSettings(c *gin.Context) {
 		return
 	}
 
-	if _, ok := h.ensureConversationParticipant(c, conversationID, userID); !ok {
+	conv, ok := h.ensureConversationParticipant(c, conversationID, userID)
+	if !ok {
+		return
+	}
+	if conv.ConversationType == "mod_mail" {
+		RespondError(c, http.StatusBadRequest, "Auto-delete is not available for mod mail conversations")
 		return
 	}
 

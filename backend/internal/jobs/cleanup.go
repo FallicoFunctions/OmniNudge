@@ -191,6 +191,10 @@ func (j *CleanupJob) PurgeExpiredMessages(ctx context.Context) {
 
 	for _, msg := range expired {
 		if err := j.msgRepo.AutoDelete(ctx, msg.ID); err != nil {
+			if errors.Is(err, models.ErrMessageAlreadyDeleted) {
+				// Race: already deleted by another path; skip broadcast silently.
+				continue
+			}
 			slog.Warn("cleanup: auto-delete message", "message_id", msg.ID, "error", err)
 			continue
 		}
