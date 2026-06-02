@@ -627,6 +627,7 @@ func (r *MessageRepository) MarkUndeliveredAsDelivered(ctx context.Context, conv
 		SET delivered_at = CURRENT_TIMESTAMP
 		WHERE conversation_id = $1
 		  AND recipient_id = $2
+		  AND message_type != 'system'
 		  AND delivered_at IS NULL
 		  AND NOT EXISTS (
 		    SELECT 1 FROM blocked_users bu
@@ -672,6 +673,7 @@ func (r *MessageRepository) MarkAllAsRead(ctx context.Context, conversationID in
 		SET read_at = CURRENT_TIMESTAMP
 		WHERE conversation_id = $1
 		  AND recipient_id = $2
+		  AND message_type != 'system'
 		  AND read_at IS NULL
 		  AND NOT EXISTS (
 		    SELECT 1 FROM blocked_users bu
@@ -779,6 +781,7 @@ func (r *MessageRepository) GetUnreadCount(ctx context.Context, conversationID i
 		FROM messages
 		WHERE conversation_id = $1
 		  AND recipient_id = $2
+		  AND message_type != 'system'
 		  AND read_at IS NULL
 		  AND deleted_for_recipient = false
 		  AND NOT EXISTS (
@@ -936,9 +939,8 @@ func (r *MessageRepository) AutoDelete(ctx context.Context, messageID int) error
 	}
 
 	if !tombstoned && tag.RowsAffected() == 0 {
-		// Message was already deleted by another path; commit is a no-op but
-		// callers should skip the WS broadcast for this message.
-		_ = tx.Rollback(ctx)
+		// Message was already deleted by another path; the deferred Rollback will
+		// clean up the transaction. Callers should skip the WS broadcast.
 		return ErrMessageAlreadyDeleted
 	}
 
