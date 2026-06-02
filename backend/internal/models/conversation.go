@@ -883,9 +883,10 @@ func (r *ConversationRepository) GetEffectiveAutoDelete(ctx context.Context, use
 			WHEN c.conversation_type = 'mod_mail' THEN NULL
 			ELSE COALESCE(
 				CASE
-					WHEN c.conversation_type = 'dm' AND c.user1_id = $1 THEN c.user1_auto_delete_after
-					WHEN c.conversation_type = 'dm' AND c.user2_id = $1 THEN c.user2_auto_delete_after
-					WHEN c.conversation_type = 'group'                   THEN cp.auto_delete_after
+					-- COALESCE handles legacy rows where conversation_type IS NULL (treated as 'dm').
+					WHEN COALESCE(c.conversation_type, 'dm') = 'dm' AND c.user1_id = $1 THEN c.user1_auto_delete_after
+					WHEN COALESCE(c.conversation_type, 'dm') = 'dm' AND c.user2_id = $1 THEN c.user2_auto_delete_after
+					WHEN c.conversation_type = 'group'                                   THEN cp.auto_delete_after
 					ELSE NULL
 				END,
 				us.default_auto_delete_after
@@ -895,6 +896,32 @@ func (r *ConversationRepository) GetEffectiveAutoDelete(ctx context.Context, use
 		LEFT JOIN conversation_participants cp
 			ON cp.conversation_id = c.id AND cp.user_id = $1
 		LEFT JOIN user_settings us ON us.user_id = $1
+		WHERE c.id = $2
+	`, userID, conversationID).Scan(&duration)
+	if err != nil {
+		return nil, err
+	}
+	return duration, nil
+}
+
+// GetRawChatAutoDelete returns the per-chat override set by userID in conversationID,
+// with NO fallback to the global user setting. Returns nil when no override has been
+// set (i.e. the conversation inherits the global default).
+// Used by GetChatSettings so the UI can distinguish "no override" from "override = global value".
+func (r *ConversationRepository) GetRawChatAutoDelete(ctx context.Context, userID, conversationID int) (*time.Duration, error) {
+	var duration *time.Duration
+	err := r.pool.QueryRow(ctx, `
+		SELECT CASE
+			WHEN c.conversation_type = 'mod_mail' THEN NULL
+			WHEN c.conversation_type = 'group'    THEN cp.auto_delete_after
+			-- DM or legacy NULL-type row:
+			WHEN c.user1_id = $1 THEN c.user1_auto_delete_after
+			WHEN c.user2_id = $1 THEN c.user2_auto_delete_after
+			ELSE NULL
+		END
+		FROM conversations c
+		LEFT JOIN conversation_participants cp
+			ON cp.conversation_id = c.id AND cp.user_id = $1
 		WHERE c.id = $2
 	`, userID, conversationID).Scan(&duration)
 	if err != nil {

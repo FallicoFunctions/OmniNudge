@@ -203,6 +203,8 @@ func (j *CleanupJob) PurgeExpiredMessages(ctx context.Context) {
 				continue
 			}
 
+			totalPurged++ // count only successful deletions
+
 			participantIDs, err := j.getParticipantIDs(ctx, msg.ConversationID)
 			if err != nil {
 				slog.Warn("cleanup: fetch participants for broadcast", "conversation_id", msg.ConversationID, "error", err)
@@ -214,8 +216,6 @@ func (j *CleanupJob) PurgeExpiredMessages(ctx context.Context) {
 				"conversation_id": msg.ConversationID,
 			})
 		}
-
-		totalPurged += len(expired)
 
 		// Fewer than batchSize returned → no more expired messages.
 		if len(expired) < batchSize {

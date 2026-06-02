@@ -1706,7 +1706,8 @@
       "applyRetroTitle": "¿Aplicar a mensajes anteriores?",
       "applyRetroBody": "¿También deseas aplicar esta configuración a los mensajes que ya enviaste en esta conversación?",
       "applyToAll": "Sí, aplicar a todos mis mensajes",
-      "applyNewOnly": "No, solo a mensajes nuevos"
+      "applyNewOnly": "No, solo a mensajes nuevos",
+      "usingGlobalDefault": "Sin ajuste por conversación — usando tu predeterminado global."
     }
   },
   "posts": {

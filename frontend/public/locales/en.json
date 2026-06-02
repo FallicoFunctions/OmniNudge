@@ -1706,7 +1706,8 @@
       "applyRetroTitle": "Apply to previous messages?",
       "applyRetroBody": "Would you like to also apply this setting to messages you've already sent in this conversation?",
       "applyToAll": "Yes, apply to all my messages",
-      "applyNewOnly": "No, new messages only"
+      "applyNewOnly": "No, new messages only",
+      "usingGlobalDefault": "No per-chat override — using your global default."
     }
   },
   "posts": {
