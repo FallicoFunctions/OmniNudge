@@ -90,6 +90,17 @@ export interface ConversationFolder {
   conversation_count?: number;
 }
 
+export type AutoDeleteInterval = 'never' | '30m' | '1h' | '5h' | '1d' | '2d' | '7d' | '30d';
+
+export interface ChatSettings {
+  auto_delete_after: AutoDeleteInterval | null;
+}
+
+export interface WsAutoDeleteEvent {
+  message_id: number;
+  conversation_id: number;
+}
+
 export interface Message {
   id: number;
   conversation_id: number;
@@ -125,6 +136,7 @@ export interface Message {
   /** Set by the server. True when ≥1 reaction exists. Avoids per-message reaction fetches. */
   has_reactions?: boolean;
   voice_message?: VoiceMessage;
+  delete_at?: string | null;
 }
 
 export interface PinnedMessagesResponse {

@@ -56,7 +56,7 @@ func setupConversationsHandlerTest(t *testing.T) (*ConversationsHandler, *databa
 	// Create handler
 	convRepo := models.NewConversationRepository(db.Pool)
 	messageRepo := models.NewMessageRepository(db.Pool)
-	handler := NewConversationsHandler(db.Pool, convRepo, messageRepo, userRepo)
+	handler := NewConversationsHandler(db.Pool, convRepo, messageRepo, userRepo, nil)
 
 	cleanup := func() {
 		db.Close()

@@ -345,4 +345,22 @@ export const messagesService = {
     const query = `?delete_for=${deleteFor}`;
     await api.delete(`/conversations/${conversationId}${query}`);
   },
+
+  async getChatSettings(conversationId: number): Promise<{ auto_delete_after: string | null }> {
+    const { data } = await api.get<{ auto_delete_after: string | null }>(
+      `/conversations/${conversationId}/settings`
+    );
+    return data;
+  },
+
+  async updateChatSettings(
+    conversationId: number,
+    autoDeleteAfter: string,
+    applyRetroactive: boolean
+  ): Promise<void> {
+    await api.patch(`/conversations/${conversationId}/settings`, {
+      auto_delete_after: autoDeleteAfter,
+      apply_retroactive: applyRetroactive,
+    });
+  },
 };

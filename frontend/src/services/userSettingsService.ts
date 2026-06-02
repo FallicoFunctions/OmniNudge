@@ -42,7 +42,12 @@ export type UpdateUserSettingsRequest = Partial<
     | 'notify_comment_velocity'
     | 'daily_digest'
   >
->;
+> & {
+  // The backend expects the string label ("never" | "30m" | "1h" | ...) for the update,
+  // not the nanosecond integer returned by GET /settings.
+  default_auto_delete_after?: string;
+  auto_delete_apply_retroactive?: boolean;
+};
 
 export const userSettingsService = {
   async get(): Promise<UserSettings> {

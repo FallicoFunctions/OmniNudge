@@ -548,6 +548,24 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           break;
         }
 
+        case 'message_auto_deleted': {
+          const { message_id, conversation_id } = data.payload as { message_id: number; conversation_id: number };
+          queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
+            ['messages', conversation_id],
+            (prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                pages: prev.pages.map((page) => ({
+                  ...page,
+                  messages: page.messages.filter((msg) => msg.id !== message_id),
+                })),
+              };
+            }
+          );
+          break;
+        }
+
         case 'message_pinned': {
           const payload = data.payload as WsMessagePinEvent;
           window.dispatchEvent(new CustomEvent<WsMessagePinEvent>('message-pinned', {

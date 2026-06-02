@@ -1,8 +1,10 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
+	"fmt"
 	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/services"
 	"net/http"
 	"strings"
 	"time"
@@ -13,13 +15,15 @@ import (
 
 // SettingsHandler handles user settings endpoints.
 type SettingsHandler struct {
-	settingsRepo ports.UserSettingsRepository
+	settingsRepo  ports.UserSettingsRepository
+	autoDeleteSvc *services.AutoDeleteService
 }
 
 // NewSettingsHandler constructs a settings handler.
-func NewSettingsHandler(settingsRepo ports.UserSettingsRepository) *SettingsHandler {
+func NewSettingsHandler(settingsRepo ports.UserSettingsRepository, autoDeleteSvc *services.AutoDeleteService) *SettingsHandler {
 	return &SettingsHandler{
-		settingsRepo: settingsRepo,
+		settingsRepo:  settingsRepo,
+		autoDeleteSvc: autoDeleteSvc,
 	}
 }
 
@@ -89,6 +93,10 @@ type updateSettingsRequest struct {
 	NotifyCommentMilestone *bool `json:"notify_comment_milestone"`
 	NotifyCommentVelocity  *bool `json:"notify_comment_velocity"`
 	DailyDigest            *bool `json:"daily_digest"`
+
+	// Auto-delete: "never" | "30m" | "1h" | "5h" | "1d" | "2d" | "7d" | "30d"
+	DefaultAutoDeleteAfter    *string `json:"default_auto_delete_after"`
+	AutoDeleteApplyRetroactive *bool   `json:"auto_delete_apply_retroactive"`
 }
 
 // UpdateSettings updates the current user's settings.
@@ -317,6 +325,24 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		settings.DailyDigest = *req.DailyDigest
 	}
 
+	if req.DefaultAutoDeleteAfter != nil {
+		interval, err := parseAutoDeleteInterval(*req.DefaultAutoDeleteAfter)
+		if err != nil {
+			RespondError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		retroactive := req.AutoDeleteApplyRetroactive != nil && *req.AutoDeleteApplyRetroactive
+		if h.autoDeleteSvc == nil {
+			RespondError(c, http.StatusInternalServerError, "Auto-delete service unavailable")
+			return
+		}
+		if err := h.autoDeleteSvc.UpdateGlobalSetting(c.Request.Context(), userID, interval, retroactive); err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to update auto-delete setting")
+			return
+		}
+		settings.DefaultAutoDeleteAfter = interval
+	}
+
 	updated, err := h.settingsRepo.Update(c.Request.Context(), settings)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update settings")
@@ -324,6 +350,38 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, updated)
+}
+
+// parseAutoDeleteInterval converts a UI-supplied string to a duration pointer.
+// Returns nil for "never", an error for unrecognized values.
+func parseAutoDeleteInterval(s string) (*time.Duration, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "never", "":
+		return nil, nil
+	case "30m":
+		d := 30 * time.Minute
+		return &d, nil
+	case "1h":
+		d := time.Hour
+		return &d, nil
+	case "5h":
+		d := 5 * time.Hour
+		return &d, nil
+	case "1d":
+		d := 24 * time.Hour
+		return &d, nil
+	case "2d":
+		d := 48 * time.Hour
+		return &d, nil
+	case "7d":
+		d := 7 * 24 * time.Hour
+		return &d, nil
+	case "30d":
+		d := 30 * 24 * time.Hour
+		return &d, nil
+	default:
+		return nil, fmt.Errorf("invalid auto_delete interval %q; valid values: never, 30m, 1h, 5h, 1d, 2d, 7d, 30d", s)
+	}
 }
 
 func (h *SettingsHandler) getUserID(c *gin.Context) (int, bool) {

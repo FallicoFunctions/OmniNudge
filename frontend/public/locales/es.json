@@ -125,6 +125,7 @@
     "profile": "Perfil",
     "admin": "Admin",
     "hubs": "Hubs",
+    "games": "Juegos",
     "search": "Buscar",
     "create": "Crear",
     "menu": "Menú"
@@ -133,10 +134,34 @@
     "profile": "Perfil",
     "settings": "Ajustes",
     "hubs": "Explorar Hubs",
+    "games": "Juegos",
     "about": "Acerca de",
     "admin": "Panel de Admin",
     "logout": "Cerrar Sesión",
     "logoutConfirm": "¿Estás seguro de que quieres cerrar sesión?"
+  },
+  "gamesPage": {
+    "eyebrow": "OmniGame",
+    "title": "OmniGame",
+    "description": "Descubre experiencias multijugador dedicadas dentro de OmniNudge, empezando por una rave compartida en el navegador para usuarios registrados e invitados.",
+    "availableNow": "Disponible ahora",
+    "viewGame": "Ver juego"
+  },
+  "gameDetailPage": {
+    "eyebrow": "OmniGame / OmniRave",
+    "signedInTitle": "Inicio con cuenta",
+    "guestTitle": "Inicio como invitado",
+    "launchSignedIn": "Abrir OmniRave",
+    "launchGuest": "Entrar como invitado",
+    "launchingSignedIn": "Abriendo OmniRave...",
+    "launchingGuest": "Iniciando sesión invitada...",
+    "launchError": "No se puede abrir OmniRave ahora mismo.",
+    "zoneLabel": "Zonas",
+    "zoneValue": "main_stage, techno_room, neon_room",
+    "mediaLabel": "Medios",
+    "mediaValue": "Límites de audio por zona controlados por el servidor con reproducción sincronizada desde YouTube.",
+    "mobileLabel": "Móvil",
+    "mobileValue": "Desbloqueo explícito de medios antes de esperar audio del escenario."
   },
   "mainLayout": {
     "skipToMainContent": "Saltar al contenido principal",
@@ -1665,6 +1690,23 @@
       "deleteError": "No se pudo eliminar la carpeta. Inténtalo de nuevo.",
       "previewLabel": "Vista previa de carpeta: {{name}}",
       "emptyHint": "Aún no hay carpetas — pulsa + para crear una"
+    },
+    "chatSettings": "Configuración del chat",
+    "autoDelete": {
+      "label": "Eliminar automáticamente mis mensajes después de",
+      "description": "Tus mensajes enviados se eliminarán permanentemente después de este tiempo. Los mensajes de otros participantes no se ven afectados.",
+      "never": "Nunca",
+      "30m": "30 minutos",
+      "1h": "1 hora",
+      "5h": "5 horas",
+      "1d": "1 día",
+      "2d": "2 días",
+      "7d": "7 días",
+      "30d": "30 días",
+      "applyRetroTitle": "¿Aplicar a mensajes anteriores?",
+      "applyRetroBody": "¿También deseas aplicar esta configuración a los mensajes que ya enviaste en esta conversación?",
+      "applyToAll": "Sí, aplicar a todos mis mensajes",
+      "applyNewOnly": "No, solo a mensajes nuevos"
     }
   },
   "posts": {
