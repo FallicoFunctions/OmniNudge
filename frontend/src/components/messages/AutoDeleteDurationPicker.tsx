@@ -42,7 +42,7 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
     const handler = (e: WheelEvent) => {
       if (disabled) return;
       e.preventDefault();
-      if (e.deltaY < 0) increment();
+      if (e.deltaY > 0) increment();
       else decrement();
     };
     el.addEventListener('wheel', handler, { passive: false });
