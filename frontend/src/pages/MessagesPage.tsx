@@ -968,6 +968,7 @@ export default function MessagesPage() {
     queryKey: ['chat-settings', selectedConversationId],
     queryFn: () => messagesService.getChatSettings(selectedConversationId!),
     enabled: !!selectedConversationId,
+    staleTime: 5 * 60 * 1000, // per-chat override rarely changes; avoid refetch on every switch
   });
 
   const saveChatSettingsMutation = useMutation({
