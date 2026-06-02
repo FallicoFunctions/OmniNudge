@@ -568,6 +568,36 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           break;
         }
 
+        case 'message_tombstoned': {
+          // The message had replies and was scrubbed in-place (not removed).
+          // Update the cached message to show the "[deleted]" placeholder so the
+          // reply thread stays coherent for the recipient.
+          const { message_id, conversation_id, message_type, content } = data.payload as {
+            message_id: number;
+            conversation_id: number;
+            message_type: string;
+            content: string;
+          };
+          queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
+            ['messages', conversation_id],
+            (prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                pages: prev.pages.map((page) => ({
+                  ...page,
+                  messages: page.messages.map((msg) =>
+                    msg.id === message_id
+                      ? { ...msg, message_type: message_type as Message['message_type'], encrypted_content: content, sender_encrypted_content: null }
+                      : msg
+                  ),
+                })),
+              };
+            }
+          );
+          break;
+        }
+
         case 'message_pinned': {
           const payload = data.payload as WsMessagePinEvent;
           window.dispatchEvent(new CustomEvent<WsMessagePinEvent>('message-pinned', {
