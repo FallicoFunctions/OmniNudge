@@ -8,9 +8,9 @@ const MAX_FOLDERS = 50;
 interface FolderListProps {
   folders: ConversationFolder[];
   selectedFolderId: number | null;
-  smartFolder: 'unread' | null;
+  smartFolder: 'unread' | 'mod_mail' | null;
   onSelectFolder: (folderId: number | null) => void;
-  onSelectSmartFolder: (smart: 'unread' | null) => void;
+  onSelectSmartFolder: (smart: 'unread' | 'mod_mail' | null) => void;
   onNewFolder: () => void;
   onEditFolder: (folder: ConversationFolder) => void;
   onDeleteFolder: (folder: ConversationFolder) => void;
@@ -60,6 +60,7 @@ export function FolderList({
 
   const allActive = selectedFolderId === null && smartFolder === null;
   const unreadActive = smartFolder === 'unread';
+  const modMailActive = smartFolder === 'mod_mail';
 
   return (
     <nav
@@ -154,6 +155,21 @@ export function FolderList({
           onClick={() => {
             onSelectFolder(null);
             onSelectSmartFolder('unread');
+          }}
+        />
+        <FolderRow
+          icon={
+            <svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="0.65" y="0.65" width="10.7" height="8.7" rx="1.2" />
+              <path d="M0.65 2.5l5.35 3.5 5.35-3.5" />
+            </svg>
+          }
+          label={t('messages.folders.modMail')}
+          active={modMailActive}
+          collapsed={collapsed}
+          onClick={() => {
+            onSelectFolder(null);
+            onSelectSmartFolder('mod_mail');
           }}
         />
       </div>

@@ -1679,7 +1679,8 @@
       "toggleError": "No se pudo actualizar la carpeta. Inténtalo de nuevo.",
       "deleteError": "No se pudo eliminar la carpeta. Inténtalo de nuevo.",
       "previewLabel": "Vista previa de carpeta: {{name}}",
-      "emptyHint": "Aún no hay carpetas — pulsa + para crear una"
+      "emptyHint": "Aún no hay carpetas — pulsa + para crear una",
+      "modMail": "Correo de moderación"
     },
     "chatSettings": "Configuración del chat",
     "autoDelete": {
