@@ -3398,7 +3398,7 @@ export default function MessagesPage() {
                                 )}
                               </div>
                             </div>
-                            <div className="relative">
+                            <div className={`relative opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 ${messageMenuOpen === message.id ? '!opacity-100' : ''}`}>
                               <button
                                 type="button"
                                 aria-label={t('messages.messageOptions.ariaLabel')}
