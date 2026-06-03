@@ -347,10 +347,9 @@ export const messagesService = {
   },
 
   async getChatSettings(conversationId: number): Promise<{ auto_delete_after_seconds: number | null }> {
-    const { data } = await api.get<{ auto_delete_after_seconds: number | null }>(
+    return api.get<{ auto_delete_after_seconds: number | null }>(
       `/conversations/${conversationId}/settings`
     );
-    return data;
   },
 
   async updateChatSettings(
