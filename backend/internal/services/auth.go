@@ -98,6 +98,30 @@ type JWTClaims struct {
 	jwt.RegisteredClaims
 }
 
+type OmniRaveWorldTokenInput struct {
+	UserID       *int                      `json:"user_id,omitempty"`
+	Username     string                    `json:"username,omitempty"`
+	TokenVersion int                       `json:"token_version,omitempty"`
+	PlayerID     string                    `json:"player_id"`
+	PlayerName   string                    `json:"player_name"`
+	Mode         string                    `json:"mode"`
+	Loadout      map[string]string         `json:"loadout,omitempty"`
+	ReturnPoint  *omnigamemodel.SavedPoint `json:"return_point,omitempty"`
+}
+
+type OmniRaveWorldJWTClaims struct {
+	UserID       *int                      `json:"user_id,omitempty"`
+	Username     string                    `json:"username,omitempty"`
+	TokenVersion int                       `json:"token_version,omitempty"`
+	Use          string                    `json:"use"`
+	PlayerID     string                    `json:"player_id"`
+	PlayerName   string                    `json:"player_name"`
+	Mode         string                    `json:"mode"`
+	Loadout      map[string]string         `json:"loadout,omitempty"`
+	ReturnPoint  *omnigamemodel.SavedPoint `json:"return_point,omitempty"`
+	jwt.RegisteredClaims
+}
+
 // GenerateJWT creates a new JWT token for a user
 func (s *AuthService) GenerateJWT(userID int, username, role string) (string, error) {
 	return s.GenerateJWTWithExpiry(userID, username, role, 7*24*time.Hour) // Default 7 days
@@ -148,32 +172,8 @@ func (s *AuthService) generateJWT(userID int, username, role string, tokenVersio
 	return token.SignedString(s.jwtSecret)
 }
 
-type OmniRaveWorldTokenInput struct {
-	UserID       *int
-	Username     string
-	TokenVersion int
-	PlayerID     string
-	PlayerName   string
-	Mode         string
-	Loadout      map[string]string
-	ReturnPoint  *omnigamemodel.SavedPoint
-}
-
-type OmniRaveWorldClaims struct {
-	UserID       *int                      `json:"user_id,omitempty"`
-	Username     string                    `json:"username,omitempty"`
-	TokenVersion int                       `json:"token_version,omitempty"`
-	Use          string                    `json:"use"`
-	PlayerID     string                    `json:"player_id"`
-	PlayerName   string                    `json:"player_name"`
-	Mode         string                    `json:"mode"`
-	Loadout      map[string]string         `json:"loadout,omitempty"`
-	ReturnPoint  *omnigamemodel.SavedPoint `json:"return_point,omitempty"`
-	jwt.RegisteredClaims
-}
-
 func (s *AuthService) GenerateOmniRaveWorldJWT(input OmniRaveWorldTokenInput) (string, error) {
-	claims := OmniRaveWorldClaims{
+	claims := OmniRaveWorldJWTClaims{
 		UserID:       input.UserID,
 		Username:     input.Username,
 		TokenVersion: input.TokenVersion,
@@ -184,7 +184,7 @@ func (s *AuthService) GenerateOmniRaveWorldJWT(input OmniRaveWorldTokenInput) (s
 		Loadout:      input.Loadout,
 		ReturnPoint:  input.ReturnPoint,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "OmniNudge",
 		},
@@ -221,8 +221,8 @@ func (s *AuthService) ValidateJWTContext(ctx context.Context, tokenString string
 	return nil, fmt.Errorf("invalid token")
 }
 
-func (s *AuthService) ValidateOmniRaveWorldJWTContext(ctx context.Context, tokenString string) (*OmniRaveWorldClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &OmniRaveWorldClaims{}, func(token *jwt.Token) (interface{}, error) {
+func (s *AuthService) ValidateOmniRaveWorldJWTContext(ctx context.Context, tokenString string) (*OmniRaveWorldJWTClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &OmniRaveWorldJWTClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
@@ -232,7 +232,7 @@ func (s *AuthService) ValidateOmniRaveWorldJWTContext(ctx context.Context, token
 		return nil, err
 	}
 
-	claims, ok := token.Claims.(*OmniRaveWorldClaims)
+	claims, ok := token.Claims.(*OmniRaveWorldJWTClaims)
 	if !ok || !token.Valid || claims.Use != "omnirave_world" || claims.PlayerID == "" || claims.PlayerName == "" || claims.Mode == "" {
 		return nil, fmt.Errorf("invalid token")
 	}

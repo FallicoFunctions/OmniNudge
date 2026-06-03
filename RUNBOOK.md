@@ -18,6 +18,22 @@
 | `clamav-daemon` | Virus scanner (clamd socket) | `systemctl status clamav-daemon` | `systemctl restart clamav-daemon` |
 | `clamav-freshclam` | Daily virus definition updater | `systemctl status clamav-freshclam` | `systemctl restart clamav-freshclam` |
 
+### OmniRave Services
+
+OmniRave introduces two additional processes that must eventually be promoted into production service management:
+
+| Service | What it does | Default local port |
+|---|---|---|
+| `omnigame-api` | OmniRave launch/bootstrap and signed-in profile APIs | `8091` |
+| `omnirave-world` | Authoritative world state and zone/media ownership | `8092` |
+
+Current repo-local start commands:
+
+```bash
+cd backend && DATABASE_URL=postgres://... go run ./cmd/omnigame-api
+cd backend && DATABASE_URL=postgres://... go run ./cmd/omnirave-world
+```
+
 **Check everything at once:**
 ```bash
 ssh root@77.42.47.79 'systemctl is-active omninudge-backend nginx postgresql@16-main redis-server coturn clamav-daemon clamav-freshclam'
@@ -67,6 +83,34 @@ What the script does:
 7. verifies server-local `/health`, public site, public API ping, and public boot assets
 
 If a production-changing step fails after backup creation, the script prints the raw error and asks whether to roll back immediately.
+
+OmniRave deployment wiring is available as an opt-in path. A production rollout still depends on these host-level prerequisites:
+
+1. `ENABLE_OMNIRAVE_DEPLOY=1` to activate the extra build/upload/restart path in `scripts/deploy-on.sh`
+2. a remote runtime artifact directory such as `/var/www/omninudge/omnirave-web/dist`
+3. systemd units for `omnigame-api` and `omnirave-world`
+4. reverse-proxy routes for the dedicated runtime and world socket
+5. production `DATABASE_URL` / migration execution for OmniRave profile and sanction tables
+6. production `DATABASE_URL` / migration execution for OmniRave curated stage setlist tables
+
+Recommended OmniRave deploy environment:
+
+```bash
+ENABLE_OMNIRAVE_DEPLOY=1
+OMNIRAVE_RUNTIME_REMOTE_PATH=/var/www/omninudge/omnirave-web
+OMNIGAME_API_SERVICE_NAME=omnigame-api
+OMNIRAVE_WORLD_SERVICE_NAME=omnirave-world
+OMNIGAME_API_HEALTH_URL=http://127.0.0.1:8091/health
+OMNIRAVE_WORLD_HEALTH_URL=http://127.0.0.1:8092/health
+OMNIGAME_TRUSTED_PROXIES=127.0.0.1/32,::1/128
+bash scripts/deploy-on.sh
+```
+
+For guest moderation to be durable across fresh guest bootstraps, `OMNIGAME_TRUSTED_PROXIES` must include only the real proxy hop CIDRs in front of `omnigame-api`. Do not trust public client ranges. The intended production shape is Cloudflare -> nginx -> `omnigame-api`, with nginx/loopback as the trusted hop and external forwarding headers stripped/rewritten before the request reaches Gin.
+
+Direct client `RemoteAddr` is no longer accepted as a durable guest sanction identity. If a request arrives through an untrusted hop, arrives directly, or passes through a trusted proxy that does not present a distinct forwarded client IP, OmniRave treats the guest identity as unresolved and falls back to bootstrap-token-only enforcement for that exchange.
+
+Keep `OMNIRAVE_RUNTIME_REMOTE_PATH` under `/var/www/omninudge` so the standard backup and rollback bundle includes the runtime artifacts.
 
 Manual rollback:
 
@@ -138,6 +182,57 @@ ssh root@77.42.47.79 '
   DB_NAME=$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2)
   PGPASSWORD=$DB_PASSWORD psql -U $DB_USER -h localhost $DB_NAME \
     -c "SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 5;"
+'
+
+# Inspect active OmniRave stage setlists
+ssh root@77.42.47.79 '
+  DB_USER=$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_PASSWORD=$(grep ^DB_PASSWORD= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_NAME=$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2)
+  PGPASSWORD=$DB_PASSWORD psql -U $DB_USER -h localhost $DB_NAME -c "
+    SELECT s.zone_id, s.name, s.is_active, e.position, e.video_id, e.duration_seconds
+    FROM omnirave_stage_setlists s
+    JOIN omnirave_stage_setlist_entries e ON e.setlist_id = s.id
+    WHERE s.is_active = true
+    ORDER BY s.zone_id, e.position;
+  "
+'
+
+# Create a new curated setlist for a stage and define its entry order
+ssh root@77.42.47.79 '
+  DB_USER=$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_PASSWORD=$(grep ^DB_PASSWORD= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_NAME=$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2)
+  PGPASSWORD=$DB_PASSWORD psql -U $DB_USER -h localhost $DB_NAME <<'\''SQL'\''
+    INSERT INTO omnirave_stage_setlists (zone_id, name, is_active)
+    VALUES ('techno_room', 'warehouse-friday', false);
+
+    INSERT INTO omnirave_stage_setlist_entries (setlist_id, position, video_id, duration_seconds)
+    SELECT id, 0, 'techno-room-youtube', 1440
+    FROM omnirave_stage_setlists
+    WHERE zone_id = 'techno_room' AND name = 'warehouse-friday';
+
+    INSERT INTO omnirave_stage_setlist_entries (setlist_id, position, video_id, duration_seconds)
+    SELECT id, 1, 'techno-room-youtube-2', 1560
+    FROM omnirave_stage_setlists
+    WHERE zone_id = 'techno_room' AND name = 'warehouse-friday';
+SQL
+'
+
+# Activate a curated setlist for a stage, advance the shared media anchor, then restart both OmniRave services
+ssh root@77.42.47.79 '
+  DB_USER=$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_PASSWORD=$(grep ^DB_PASSWORD= /var/www/omninudge/backend/.env | cut -d= -f2)
+  DB_NAME=$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2)
+  PGPASSWORD=$DB_PASSWORD psql -U $DB_USER -h localhost $DB_NAME <<'\''SQL'\''
+    UPDATE omnirave_stage_setlists
+    SET is_active = (name = 'warehouse-friday'),
+        activated_at = CASE WHEN name = 'warehouse-friday' THEN now() ELSE activated_at END,
+        updated_at = now()
+    WHERE zone_id = 'techno_room';
+SQL
+  systemctl restart omnigame-api
+  systemctl restart omnirave-world
 '
 
 # Check materialized views (refreshed every 5 min by background job)

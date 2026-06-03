@@ -1,7 +1,7 @@
 import { useMemo, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { User, Settings, Grid3x3, Info, Shield, LogOut, LogIn, UserPlus } from 'lucide-react';
+import { User, Settings, Grid3x3, Info, Shield, LogOut, LogIn, UserPlus, Gamepad2 } from 'lucide-react';
 import { BottomSheet } from './BottomSheet';
 import { ConfirmModal } from './ConfirmModal';
 import { useAuth } from '../../contexts/AuthContext';
@@ -73,6 +73,14 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
       show: true,
       section: 'nav',
       testId: 'menu-hubs-button'
+    },
+    {
+      icon: Gamepad2,
+      label: t('menu.games'),
+      onClick: () => handleNavigate('/games', 'Games'),
+      show: true,
+      section: 'nav',
+      testId: 'menu-games-button'
     },
     {
       icon: Info,
