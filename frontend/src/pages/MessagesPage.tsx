@@ -711,7 +711,7 @@ export default function MessagesPage() {
   } | null>(null);
   const [showChatSettings, setShowChatSettings] = useState(false);
   const [isFolderCollapsed, setIsFolderCollapsed] = useState(
-    () => localStorage.getItem('folder-panel-collapsed') === 'true'
+    () => localStorage.getItem('folder-panel-collapsed') !== 'false'
   );
   const toggleFolderCollapsed = () => {
     setIsFolderCollapsed((prev) => {
@@ -835,6 +835,18 @@ export default function MessagesPage() {
     setMessageSearchHasLinks(false);
     setMessageSearchPage(0);
   }, []);
+
+  useEffect(() => {
+    if (!showMessageSearch) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowMessageSearch(false);
+        resetMessageSearch();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showMessageSearch, resetMessageSearch]);
 
   const {
     data: conversationsData,
@@ -2251,8 +2263,9 @@ export default function MessagesPage() {
     setForwardDialogMessage(null);
     setForwardTargetConversationIDs(new Set());
     setShowMessageSearch(false);
+    resetMessageSearch();
     setExpandedPinnedMessages(false);
-  }, [selectedConversationId]);
+  }, [selectedConversationId, resetMessageSearch]);
 
   const handleJumpToPinnedMessage = useCallback((messageId: number) => {
     const target = document.getElementById(`message-${messageId}`);
@@ -2422,7 +2435,7 @@ export default function MessagesPage() {
           className={
             isMobile
               ? `absolute inset-0 flex overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)] will-change-transform transition-transform duration-[250ms] ease-in-out ${isInChat ? '-translate-x-full' : 'translate-x-0'}`
-              : 'flex w-[31rem] flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]'
+              : 'flex flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]'
           }
         >
           {/* Folder sidebar — desktop only */}
@@ -2445,7 +2458,7 @@ export default function MessagesPage() {
           )}
 
           {/* Conversation list panel */}
-          <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex w-[20rem] flex-shrink-0 flex-col overflow-hidden">
           <div className="border-b border-[var(--color-border)] p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
@@ -2832,8 +2845,8 @@ export default function MessagesPage() {
             <>
               {/* Chat Header */}
               <div className="border-b border-[var(--color-border)] p-3 md:p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-1 min-w-0 items-center gap-1 md:gap-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+                  <div className="flex min-w-0 items-center gap-1 md:gap-2" style={{ flex: '1 1 8rem' }}>
                     {/* Back button — mobile only */}
                     {isMobile && (
                       <button
@@ -2886,7 +2899,7 @@ export default function MessagesPage() {
                   </div>
 
                   {/* Slideshow buttons */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-shrink-0 flex-nowrap items-center gap-2">
                     {/* Chat settings gear icon — all conversations */}
                     {!isCreatingChat && selectedConversationId && (
                       <button
@@ -2952,15 +2965,14 @@ export default function MessagesPage() {
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                          />
+                          <circle cx="12" cy="12" r="10" />
+                          <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88" />
                         </svg>
-                        <span className="hidden md:inline">{t('messages.browseRedditHub')}</span>
+                        <span className="hidden md:inline whitespace-nowrap">{t('messages.browseRedditHub')}</span>
                       </button>
                     )}
 
@@ -2986,37 +2998,31 @@ export default function MessagesPage() {
                             d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                           />
                         </svg>
-                        <span className="hidden md:inline">
+                        <span className="hidden md:inline whitespace-nowrap">
                           {t('messages.mediaGallery')} ({conversationMediaMessages.length})
                         </span>
                       </button>
                     )}
                     {/* Search toggle — mobile only */}
-                    {isMobile && !isCreatingChat && (
+                    {!isCreatingChat && (
                       <button
                         type="button"
-                        onClick={() => setShowMessageSearch((prev) => !prev)}
-                        className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border transition-colors active:opacity-80 ${
+                        onClick={() => {
+                          setShowMessageSearch((prev) => {
+                            if (prev) resetMessageSearch();
+                            return !prev;
+                          });
+                        }}
+                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border transition-colors active:opacity-80 ${
                           showMessageSearch
                             ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                            : 'border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                            : 'border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]'
                         }`}
                         aria-label={t('messages.search.ariaToggle')}
                         aria-pressed={showMessageSearch}
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                          />
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                       </button>
                     )}
@@ -3024,8 +3030,10 @@ export default function MessagesPage() {
                 </div>
               </div>
 
-              {/* Message Search Bar */}
-              {!isCreatingChat && (!isMobile || showMessageSearch) && (
+              {/* Message Search Bar — slides in/out */}
+              {!isCreatingChat && (
+                <div className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${showMessageSearch ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+                <div className="overflow-hidden">
                 <div className="border-b border-[var(--color-border)] p-3 bg-[var(--color-surface-elevated)]">
                   <div className="relative flex items-center gap-2">
                     {/* Search Icon */}
@@ -3137,6 +3145,8 @@ export default function MessagesPage() {
                       {t('messages.search.filters.hasLinks')}
                     </label>
                   </div>
+                </div>
+                </div>
                 </div>
               )}
 
@@ -3720,7 +3730,7 @@ export default function MessagesPage() {
                       className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)] active:bg-[var(--color-surface)]"
                       title={t('messages.compose.attachMultiple')}
                     >
-                      📷+
+                      📷
                     </button>
                   )}
                   <input
