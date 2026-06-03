@@ -96,7 +96,9 @@ export default function MainLayout() {
   const unreadTotal = useMemo(
     () =>
       conversations?.reduce((total, conv) => {
-        if (!notifyArchivedMessages && conv.archived_at) {
+        // Exclude archived conversations unless the setting says otherwise.
+        // is_archived covers DMs (archived_for_user1/user2) and mod mail (archived_at).
+        if (!notifyArchivedMessages && conv.is_archived) {
           return total;
         }
         // Don't count unread messages for the conversation the user currently has open
