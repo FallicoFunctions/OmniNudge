@@ -2586,7 +2586,9 @@
     "closeLabel": "Cerrar presentación (Esc)",
     "previousLabel": "Anterior (←)",
     "nextLabel": "Siguiente (→)",
-    "counter": "{{current}} de {{total}}",
+    "counter": {
+      "imageOf": "{{current}} de {{total}}"
+    },
     "noMediaFound": "No se encontro contenido multimedia",
     "redditMedia": {
       "title": "Pase de diapositivas de medios de Reddit",

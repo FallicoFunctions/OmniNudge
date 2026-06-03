@@ -2586,7 +2586,9 @@
     "closeLabel": "إغلاق العرض (Esc)",
     "previousLabel": "السابق (←)",
     "nextLabel": "التالي (→)",
-    "counter": "{{current}} من {{total}}",
+    "counter": {
+      "imageOf": "{{current}} من {{total}}"
+    },
     "noMediaFound": "لم يتم العثور على وسائط",
     "redditMedia": {
       "title": "عرض شرائح وسائط Reddit",
