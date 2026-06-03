@@ -1679,7 +1679,8 @@
       "toggleError": "Failed to update folder. Please try again.",
       "deleteError": "Failed to delete folder. Please try again.",
       "previewLabel": "Folder preview: {{name}}",
-      "emptyHint": "No folders yet — press + to create one"
+      "emptyHint": "No folders yet — press + to create one",
+      "modMail": "Mod Mail"
     },
     "chatSettings": "Chat Settings",
     "autoDelete": {
