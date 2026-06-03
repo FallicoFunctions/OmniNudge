@@ -710,6 +710,16 @@ export default function MessagesPage() {
     initialIndex: number;
   } | null>(null);
   const [showChatSettings, setShowChatSettings] = useState(false);
+  const [isFolderCollapsed, setIsFolderCollapsed] = useState(
+    () => localStorage.getItem('folder-panel-collapsed') === 'true'
+  );
+  const toggleFolderCollapsed = () => {
+    setIsFolderCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('folder-panel-collapsed', String(next));
+      return next;
+    });
+  };
   const [redditSlideshowModalOpen, setRedditSlideshowModalOpen] = useState(false);
   const [redditSlideshowInput, setRedditSlideshowInput] = useState('');
   const [redditSlideshowAutocompleteOpen, setRedditSlideshowAutocompleteOpen] = useState(false);
@@ -2428,7 +2438,9 @@ export default function MessagesPage() {
               onDeleteFolder={(folder) => { setDeleteFolderTarget(folder); setDeleteFolderError(''); }}
               isLoading={isLoadingFolders}
               deletingFolderId={deletingFolderId}
-              className="w-44 flex-shrink-0 border-r border-[var(--color-border)]"
+              collapsed={isFolderCollapsed}
+              onToggleCollapsed={toggleFolderCollapsed}
+              className={`flex-shrink-0 border-r border-[var(--color-border)] overflow-hidden transition-[width] duration-200 ${isFolderCollapsed ? 'w-10' : 'w-44'}`}
             />
           )}
 
