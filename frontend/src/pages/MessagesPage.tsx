@@ -2173,6 +2173,7 @@ export default function MessagesPage() {
   }, [hasActiveMessageSearch, messageSearchOutput]);
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const slideshowChatScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollToLatestMessage = useCallback(() => {
     const container = messagesContainerRef.current;
     if (container) {
@@ -2250,12 +2251,69 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (!selectedConversationId || isCreatingChat || loadingMessages) return;
-    // Use setTimeout to ensure DOM has updated with new messages
-    const timer = setTimeout(() => {
-      scrollToLatestMessage();
-    }, 100);
-    return () => clearTimeout(timer);
+    // Immediate scroll after paint
+    const rAF = requestAnimationFrame(() => scrollToLatestMessage());
+    return () => cancelAnimationFrame(rAF);
   }, [selectedConversationId, isCreatingChat, loadingMessages, scrollToLatestMessage, messages]);
+
+  // MutationObserver scroll — fires when DecryptedMessageContent adds its <p>
+  // element to the DOM (going from null → rendered). The messages container has a
+  // fixed height (flex-1), so ResizeObserver would never fire here. MutationObserver
+  // with childList+subtree catches every bubble that fills in after async decryption.
+  // Disconnects after 500 ms of quiet so it never yanks users reading history.
+  useEffect(() => {
+    if (!selectedConversationId || isCreatingChat) return;
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    let stabiliseTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const observer = new MutationObserver(() => {
+      scrollToLatestMessage();
+      if (stabiliseTimer) clearTimeout(stabiliseTimer);
+      stabiliseTimer = setTimeout(() => observer.disconnect(), 500);
+    });
+
+    observer.observe(container, { subtree: true, childList: true });
+
+    return () => {
+      observer.disconnect();
+      if (stabiliseTimer) clearTimeout(stabiliseTimer);
+    };
+  }, [selectedConversationId, isCreatingChat, scrollToLatestMessage]);
+
+  // Slideshow mini-chat scroll. Observer setup is deferred into the rAF so the
+  // ref is guaranteed to be attached before we try to use it.
+  useEffect(() => {
+    if (!slideshowOpen && !redditSlideshowOpen) return;
+
+    const scrollEl = () => {
+      const el = slideshowChatScrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    };
+
+    let rAFId: number;
+    let observer: MutationObserver | null = null;
+    let stabiliseTimer: ReturnType<typeof setTimeout> | null = null;
+
+    rAFId = requestAnimationFrame(() => {
+      scrollEl();
+      const el = slideshowChatScrollRef.current;
+      if (!el) return;
+      observer = new MutationObserver(() => {
+        scrollEl();
+        if (stabiliseTimer) clearTimeout(stabiliseTimer);
+        stabiliseTimer = setTimeout(() => observer?.disconnect(), 500);
+      });
+      observer.observe(el, { subtree: true, childList: true });
+    });
+
+    return () => {
+      cancelAnimationFrame(rAFId);
+      observer?.disconnect();
+      if (stabiliseTimer) clearTimeout(stabiliseTimer);
+    };
+  }, [slideshowOpen, redditSlideshowOpen]);
 
   useEffect(() => {
     setMessageMenuOpen(null);
@@ -2419,6 +2477,58 @@ export default function MessagesPage() {
       return next;
     });
   }, [conversations]);
+
+  // Mini chat strip shown inside both full-screen slideshow modes
+  const slideshowMiniChat = (
+    <div className="border-t border-white/10 bg-black/70 backdrop-blur-sm">
+      <div
+        ref={slideshowChatScrollRef}
+        className="flex flex-col gap-1 px-4 pt-2 pb-1 max-h-24 overflow-y-auto"
+      >
+        {orderedMessages
+          .filter((m) => m.message_type !== 'system')
+          .map((m) => {
+            const own = m.sender_id === user?.id;
+            return (
+              <div key={m.id} className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
+                <span
+                  className={`max-w-[75%] truncate rounded-full px-3 py-1 text-xs ${
+                    own ? 'bg-[var(--color-primary)] text-white' : 'bg-white/20 text-white'
+                  }`}
+                >
+                  {m.media_url && !m.encrypted_content
+                    ? `[${t('messages.media.fallbackText')}]`
+                    : (
+                      <DecryptedMessageContent
+                        message={m}
+                        isOwnMessage={own}
+                        currentUserId={user?.id}
+                      />
+                    )
+                  }
+                </span>
+              </div>
+            );
+          })}
+      </div>
+      <form onSubmit={handleSendMessage} className="flex items-center gap-2 px-4 pb-3">
+        <input
+          type="text"
+          value={messageText}
+          onChange={(e) => setMessageText(e.target.value)}
+          placeholder={t('messages.compose.placeholder')}
+          className="flex-1 rounded-full bg-white/15 px-4 py-2 text-sm text-white placeholder-white/50 focus:outline-none focus:ring-1 focus:ring-white/40"
+        />
+        <button
+          type="submit"
+          disabled={!messageText.trim() || sendMessageMutation.isPending}
+          className="rounded-full bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 hover:bg-[var(--color-primary-dark)] transition-colors"
+        >
+          {t('messages.send')}
+        </button>
+      </form>
+    </div>
+  );
 
   return (
     <>
@@ -4168,6 +4278,7 @@ export default function MessagesPage() {
           })}
           initialIndex={0}
           onClose={() => setSlideshowOpen(false)}
+          chatContent={slideshowMiniChat}
         />
       )}
 
@@ -4231,7 +4342,7 @@ export default function MessagesPage() {
                               suggestion.data.name
                             );
                           }}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-hover)] flex items-center gap-2"
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-hover)] flex items-center"
                         >
                           <span
                             className={`font-medium ${suggestion.type === 'hub' ? 'text-blue-600' : 'text-orange-600'}`}
@@ -4283,6 +4394,7 @@ export default function MessagesPage() {
             setRedditSlideshowPosts([]);
           }}
           includeTextPosts={true}
+          chatContent={slideshowMiniChat}
         />
       )}
 
