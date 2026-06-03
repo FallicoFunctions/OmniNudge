@@ -2586,7 +2586,9 @@
     "closeLabel": "Close slideshow (Esc)",
     "previousLabel": "Previous (←)",
     "nextLabel": "Next (→)",
-    "counter": "{{current}} of {{total}}",
+    "counter": {
+      "imageOf": "{{current}} of {{total}}"
+    },
     "noMediaFound": "No media found",
     "redditMedia": {
       "title": "Reddit Media Slideshow",
