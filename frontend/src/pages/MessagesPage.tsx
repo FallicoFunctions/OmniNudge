@@ -768,7 +768,6 @@ export default function MessagesPage() {
   const [messageSearchHasLinks, setMessageSearchHasLinks] = useState(false);
   const [messageSearchPage, setMessageSearchPage] = useState(0);
   const [expandedPinnedMessages, setExpandedPinnedMessages] = useState(false);
-  const [selectedConversationIDs, setSelectedConversationIDs] = useState<Set<number>>(new Set());
   const touchStartRef = useRef<{ conversationID: number; x: number; y: number } | null>(null);
   const swipeHandledRef = useRef<number | null>(null);
   const debouncedMessageSearch = useDebounce(messageSearchQuery, 300);
@@ -783,7 +782,10 @@ export default function MessagesPage() {
   const isInChat = Boolean(selectedConversationId || isCreatingChat);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [threadRootMessageId, setThreadRootMessageId] = useState<number | null>(null);
-  const [smartFolder, setSmartFolder] = useState<'unread' | null>(null);
+  const [smartFolder, setSmartFolder] = useState<'unread' | 'mod_mail' | null>(null);
+  // Tracks the conversation that was opened while in the Unread folder so it
+  // stays visible until the user navigates away, even after it's been read.
+  const [unreadPinnedId, setUnreadPinnedId] = useState<number | null>(null);
   const {
     folders,
     selectedFolderId,
@@ -855,11 +857,15 @@ export default function MessagesPage() {
     fetchNextPage: fetchMoreConversations,
     isFetchingNextPage: isFetchingMoreConversations,
   } = useInfiniteQuery({
+    // The dedicated /conversations/archived endpoint has a backend bug where it
+    // omits DMs that were archived via archived_for_user1/user2 flags. Using
+    // include_archived=true on the standard endpoint works correctly; we then
+    // filter by is_archived on the frontend for the archived tab.
     queryKey: ['conversations', activeTab === 'archived' ? 'archived' : 'all'],
     queryFn: ({ pageParam }) => {
       const cursor = pageParam ? String(pageParam) : undefined;
       if (activeTab === 'archived') {
-        return messagesService.getArchivedConversationsPage(20, cursor);
+        return messagesService.getConversationsPage(true, 20, cursor);
       }
       return messagesService.getConversationsPage(false, 20, cursor);
     },
@@ -909,18 +915,35 @@ export default function MessagesPage() {
   // Filter conversations based on active tab
   const unfilteredConversations = useMemo(() => {
     if (!allConversations.length) return undefined;
-    const isArchived = (conversation: Conversation) =>
-      conversation.is_archived ?? conversation.archived_at !== null;
-    if (activeTab === 'archived') {
-      return allConversations.filter((c) => isArchived(c));
+    // Both tabs now use getConversationsPage — with include_archived=true for the
+    // archived tab (returns all conversations, both archived and active). We filter
+    // by is_archived here rather than relying on the broken /conversations/archived
+    // endpoint which omits DMs archived via per-user flags.
+    const isModMail = (c: Conversation) => c.conversation_type === 'mod_mail';
+
+    if (smartFolder === 'mod_mail') {
+      // Mod Mail folder: show only mod_mail for the current tab.
+      if (activeTab === 'archived') {
+        return allConversations.filter((c) => isModMail(c) && c.is_archived === true);
+      }
+      return allConversations.filter((c) => isModMail(c) && c.is_archived !== true);
     }
-    const activeConversations = allConversations.filter((c) => !isArchived(c));
-    const folderFiltered = filterConversationsBySelectedFolder(activeConversations);
+
+    // All other views (All, Unread, user folders): exclude mod mail.
+    if (activeTab === 'archived') {
+      return allConversations.filter((c) => c.is_archived === true && !isModMail(c));
+    }
+    // Active tab: exclude archived and mod mail.
+    const activeNonModMail = allConversations.filter((c) => c.is_archived !== true && !isModMail(c));
+    const folderFiltered = filterConversationsBySelectedFolder(activeNonModMail);
     if (smartFolder === 'unread') {
-      return folderFiltered.filter((c) => c.unread_count > 0);
+      // Keep a conversation that was opened FROM the Unread folder visible while
+      // it's still selected, even after it's been marked as read. It leaves Unread
+      // naturally when the user navigates away or changes folder.
+      return folderFiltered.filter((c) => c.unread_count > 0 || c.id === unreadPinnedId);
     }
     return folderFiltered;
-  }, [allConversations, activeTab, filterConversationsBySelectedFolder, smartFolder]);
+  }, [allConversations, activeTab, filterConversationsBySelectedFolder, smartFolder, unreadPinnedId]);
 
   // Apply search filter
   const conversations = useMemo(() => {
@@ -959,11 +982,14 @@ export default function MessagesPage() {
     });
   }, [allConversations, queryClient]);
 
-  // Auto-select the first available conversation if none is selected or the current selection no longer exists.
+  // Auto-select the first available conversation if none is selected or the
+  // current selection no longer exists in the visible list.
+  // Not applied when a smart folder is active (Unread, Mod Mail) because the
+  // user is browsing a filtered view — auto-opening would immediately mark
+  // messages as read and remove them from the filter.
   useEffect(() => {
     if (isCreatingChat) return;
     if (!conversations || conversations.length === 0) {
-      // Clear selection if there are no conversations
       if (selectedConversationId !== null) {
         setSelectedConversationId(null);
       }
@@ -973,15 +999,45 @@ export default function MessagesPage() {
       ? conversations.some((c) => c.id === selectedConversationId)
       : false;
 
-    if (!isMobile && (!selectedConversationId || !currentExists)) {
+    // Only auto-select on the default "All" view (no smart folder active)
+    const isSmartFolderActive = smartFolder !== null;
+
+    if (!isMobile && !isSmartFolderActive && (!selectedConversationId || !currentExists)) {
+      if (intentionalDeselectRef.current) {
+        // User explicitly deselected — honour it and don't re-select
+        intentionalDeselectRef.current = false;
+        return;
+      }
       setSelectedConversationId(conversations[0].id);
+    } else if (!isMobile && !currentExists) {
+      // Current selection disappeared from the list (e.g. archived) — clear it
+      intentionalDeselectRef.current = false;
+      setSelectedConversationId(null);
     }
-  }, [conversations, isCreatingChat, selectedConversationId, isMobile]);
+  }, [conversations, isCreatingChat, selectedConversationId, isMobile, smartFolder]);
 
   useEffect(() => {
     setThreadRootMessageId(null);
     setReplyTargetMessage(null);
   }, [selectedConversationId]);
+
+  // Pin a conversation to the Unread list only when it was opened while already
+  // in the Unread folder AND it had unread messages at that moment.
+  // Clear when leaving Unread or when the conversation is deselected.
+  useEffect(() => {
+    if (smartFolder !== 'unread') {
+      setUnreadPinnedId(null);
+      return;
+    }
+    if (!selectedConversationId) {
+      setUnreadPinnedId(null);
+      return;
+    }
+    const conv = conversations?.find((c) => c.id === selectedConversationId);
+    if (conv && (conv.unread_count ?? 0) > 0) {
+      setUnreadPinnedId(selectedConversationId);
+    }
+  }, [selectedConversationId, smartFolder, conversations]);
 
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
   const selectedConversationExists = Boolean(selectedConversation);
@@ -1147,10 +1203,8 @@ export default function MessagesPage() {
   });
   const {
     archiveConversation,
-    archiveConversationsBatch,
     unarchiveConversation,
     isArchiving,
-    isBatchArchiving,
     isUnarchiving,
   } = useArchive();
 
@@ -2174,6 +2228,9 @@ export default function MessagesPage() {
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const slideshowChatScrollRef = useRef<HTMLDivElement | null>(null);
+  // Set to true when the user explicitly clicks to deselect a conversation.
+  // The auto-select effect checks this flag and skips one re-selection cycle.
+  const intentionalDeselectRef = useRef(false);
   const scrollToLatestMessage = useCallback(() => {
     const container = messagesContainerRef.current;
     if (container) {
@@ -2426,34 +2483,19 @@ export default function MessagesPage() {
       swipeHandledRef.current = null;
       return;
     }
-    setSelectedConversationId(conversationID);
+    // Clicking the already-selected conversation deselects it
+    setSelectedConversationId((prev) => {
+      if (prev === conversationID) {
+        intentionalDeselectRef.current = true;
+        return null;
+      }
+      return conversationID;
+    });
     setIsCreatingChat(false);
     setNewChatUsername('');
     setSelectedFile(null);
   }, []);
 
-  const toggleConversationSelection = useCallback((conversationID: number) => {
-    setSelectedConversationIDs((prev) => {
-      const next = new Set(prev);
-      if (next.has(conversationID)) {
-        next.delete(conversationID);
-      } else {
-        next.add(conversationID);
-      }
-      return next;
-    });
-  }, []);
-
-  const handleArchiveSelected = useCallback(async () => {
-    if (selectedConversationIDs.size === 0) return;
-    const ids = Array.from(selectedConversationIDs);
-    try {
-      await archiveConversationsBatch(ids);
-      setSelectedConversationIDs(new Set());
-    } catch {
-      // Errors are surfaced by useArchive toast handling.
-    }
-  }, [archiveConversationsBatch, selectedConversationIDs]);
 
   // Cleanup typing timeout on unmount
   useEffect(() => {
@@ -2464,19 +2506,6 @@ export default function MessagesPage() {
     };
   }, []);
 
-  useEffect(() => {
-    setSelectedConversationIDs(new Set());
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (!conversations) return;
-    const visibleIDs = new Set(conversations.map((conversation) => conversation.id));
-    setSelectedConversationIDs((prev) => {
-      const next = new Set(Array.from(prev).filter((id) => visibleIDs.has(id)));
-      if (next.size === prev.size) return prev;
-      return next;
-    });
-  }, [conversations]);
 
   // Mini chat strip shown inside both full-screen slideshow modes
   const slideshowMiniChat = (
@@ -2575,16 +2604,6 @@ export default function MessagesPage() {
                 {t('messages.title')}
               </h2>
               <div className="flex items-center gap-2">
-                {activeTab === 'active' && selectedConversationIDs.size > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => void handleArchiveSelected()}
-                    disabled={isBatchArchiving}
-                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 md:py-1 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
-                  >
-                    {`${t('messages.archive')} (${selectedConversationIDs.size})`}
-                  </button>
-                )}
                 <button
                   onClick={() => {
                     setIsCreatingChat(true);
@@ -2603,9 +2622,12 @@ export default function MessagesPage() {
                   className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-                    <path d="M12 7H9V4a1 1 0 0 0-2 0v3H4a1 1 0 0 0 0 2h3v3a1 1 0 0 0 2 0V9h3a1 1 0 0 0 0-2z" fill="currentColor"/>
-                    <circle cx="3" cy="3" r="1.5" fill="currentColor" opacity="0.4"/>
-                    <circle cx="13" cy="3" r="1.5" fill="currentColor" opacity="0.4"/>
+                    {/* Two people silhouettes */}
+                    <circle cx="5.5" cy="4.5" r="2" fill="currentColor"/>
+                    <path d="M1 12c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+                    {/* Plus badge top-right */}
+                    <circle cx="12.5" cy="4.5" r="3" fill="var(--color-surface)" stroke="var(--color-border)" strokeWidth="1"/>
+                    <path d="M12.5 3v3M11 4.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                   </svg>
                 </button>
               </div>
@@ -2748,20 +2770,6 @@ export default function MessagesPage() {
                   onTouchEnd={(event) => handleConversationTouchEnd(conversation.id, event)}
                   className="w-full p-4 text-left"
                 >
-                  {activeTab === 'active' && (
-                    <label className="mb-2 inline-flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                      <input
-                        type="checkbox"
-                        checked={selectedConversationIDs.has(conversation.id)}
-                        onChange={() => toggleConversationSelection(conversation.id)}
-                        onClick={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => event.stopPropagation()}
-                        onTouchStart={(event) => event.stopPropagation()}
-                        onTouchEnd={(event) => event.stopPropagation()}
-                      />
-                      {t('messages.archive')}
-                    </label>
-                  )}
                   {/* MSG-2: Enhanced conversation preview with timestamp and better spacing */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
