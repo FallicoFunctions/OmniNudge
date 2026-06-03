@@ -32,8 +32,17 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
     onChange(isNaN(n) ? 0 : Math.min(max, Math.max(0, n)));
   };
 
-  // Attach a non-passive wheel listener so we can call preventDefault and
-  // prevent the modal from scrolling while the user is spinning a dial.
+  // Keep a ref to the latest increment/decrement so the wheel listener never
+  // holds a stale closure. Without this, scrolling dial A captures the old
+  // onChange for dial B (before A's value changed), causing A to reset when
+  // B is scrolled next.
+  const incrementRef = useRef(increment);
+  const decrementRef = useRef(decrement);
+  incrementRef.current = increment;
+  decrementRef.current = decrement;
+
+  // Attach once — non-passive so preventDefault() works to block page scroll.
+  // stopPropagation prevents the event reaching adjacent dials.
   const pillRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = pillRef.current;
@@ -41,14 +50,14 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
     const handler = (e: WheelEvent) => {
       if (disabled) return;
       e.preventDefault();
-      e.stopPropagation(); // prevent adjacent dials picking up the same event
-      if (e.deltaY > 0) increment();
-      else decrement();
+      e.stopPropagation();
+      if (e.deltaY > 0) incrementRef.current();
+      else decrementRef.current();
     };
     el.addEventListener('wheel', handler, { passive: false });
     return () => el.removeEventListener('wheel', handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [disabled, value, max]);
+  // Only re-register when disabled changes — refs handle the rest.
+  }, [disabled]);
 
   return (
     <div className="flex flex-col items-center gap-2">
