@@ -32,6 +32,14 @@ main() {
     exit 1
   fi
 
+  if ! deploy_omnirave_stack_if_enabled; then
+    print_follow_up_hint "Manual rollback: bash scripts/rollback.sh ${backup_name}"
+    if prompt_for_rollback "The OmniRave deployment step failed after production was modified. Roll back now? (yes/no): "; then
+      rollback_from_backup "$backup_name"
+    fi
+    exit 1
+  fi
+
   if ! verify_production_contract "$LOCAL_FRONTEND_DIST/index.html"; then
     print_follow_up_hint "Manual rollback: bash scripts/rollback.sh ${backup_name}"
     if prompt_for_rollback "Deployment verification failed. Roll back now? (yes/no): "; then

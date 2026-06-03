@@ -16,9 +16,18 @@ BACKUP_DIR="${BACKUP_DIR:-$SERVER_PATH/backups}"
 BACKUP_KEEP_TAR="${BACKUP_KEEP_TAR:-5}"
 BACKUP_KEEP_SQL="${BACKUP_KEEP_SQL:-10}"
 SERVICE_NAME="${SERVICE_NAME:-omninudge-backend}"
+ENABLE_OMNIRAVE_DEPLOY="${ENABLE_OMNIRAVE_DEPLOY:-0}"
+OMNIGAME_API_SERVICE_NAME="${OMNIGAME_API_SERVICE_NAME:-omnigame-api}"
+OMNIRAVE_WORLD_SERVICE_NAME="${OMNIRAVE_WORLD_SERVICE_NAME:-omnirave-world}"
+OMNIGAME_API_HEALTH_URL="${OMNIGAME_API_HEALTH_URL:-http://127.0.0.1:8091/health}"
+OMNIRAVE_WORLD_HEALTH_URL="${OMNIRAVE_WORLD_HEALTH_URL:-http://127.0.0.1:8092/health}"
 LOCAL_FRONTEND_DIR="$PROJECT_ROOT/frontend"
 LOCAL_BACKEND_DIR="$PROJECT_ROOT/backend"
 LOCAL_FRONTEND_DIST="$PROJECT_ROOT/frontend/dist"
+LOCAL_OMNIRAVE_DIR="$PROJECT_ROOT/omnirave-web"
+LOCAL_OMNIRAVE_DIST="$PROJECT_ROOT/omnirave-web/dist"
+OMNIRAVE_RUNTIME_REMOTE_PATH="${OMNIRAVE_RUNTIME_REMOTE_PATH:-$SERVER_PATH/omnirave-web}"
+OMNIRAVE_RUNTIME_REMOTE_DIST="${OMNIRAVE_RUNTIME_REMOTE_DIST:-$OMNIRAVE_RUNTIME_REMOTE_PATH/dist}"
 
 LAST_OUTPUT=""
 LAST_STATUS=0
@@ -125,6 +134,14 @@ build_backend_locally() {
   run_capture "backend build" /bin/zsh -lc "cd '$LOCAL_BACKEND_DIR' && GOCACHE=/private/tmp/omninudge-gocache GOTMPDIR=/private/tmp go build ./cmd/server ./cmd/migrate"
 }
 
+build_omnirave_locally() {
+  run_capture "omnirave-web build" /bin/zsh -lc "cd '$LOCAL_OMNIRAVE_DIR' && npm run build"
+}
+
+build_omnirave_backend_binaries_locally() {
+  run_capture "omnigame binaries build" /bin/zsh -lc "cd '$LOCAL_BACKEND_DIR' && GOCACHE=/private/tmp/omninudge-gocache GOTMPDIR=/private/tmp go build ./cmd/omnigame-api ./cmd/omnirave-world"
+}
+
 run_local_preflight() {
   print_info "Running local preflight..."
   require_tool ssh
@@ -137,6 +154,10 @@ run_local_preflight() {
   assert_clean_tree
   build_frontend_locally
   build_backend_locally
+  if [ "$ENABLE_OMNIRAVE_DEPLOY" = "1" ]; then
+    build_omnirave_locally
+    build_omnirave_backend_binaries_locally
+  fi
   print_success "Local preflight passed."
 }
 
@@ -152,6 +173,11 @@ run_remote_preflight() {
   run_remote_capture "production environment mode" "grep -E '^APP_ENV=production$' '$SERVER_PATH/backend/.env'"
   run_remote_capture "backup directory check" "mkdir -p '$BACKUP_DIR' && test -w '$BACKUP_DIR'"
   run_remote_capture "database backup prerequisites" "grep -E '^DB_USER=.+' '$SERVER_PATH/backend/.env' && grep -E '^DB_PASSWORD=.+' '$SERVER_PATH/backend/.env' && grep -E '^DB_NAME=.+' '$SERVER_PATH/backend/.env'"
+  if [ "$ENABLE_OMNIRAVE_DEPLOY" = "1" ]; then
+    run_remote_capture "omnirave deployment paths" "mkdir -p '$OMNIRAVE_RUNTIME_REMOTE_DIST' && test -d '$SERVER_PATH/backend' && test -f '$SERVER_PATH/backend/.env'"
+    run_remote_capture "omnigame-api service presence" "systemctl cat '$OMNIGAME_API_SERVICE_NAME' >/dev/null"
+    run_remote_capture "omnirave-world service presence" "systemctl cat '$OMNIRAVE_WORLD_SERVICE_NAME' >/dev/null"
+  fi
   print_success "Remote preflight passed."
 }
 create_server_backup() {
@@ -165,6 +191,10 @@ create_server_backup() {
   if ! run_remote_capture "server backup" "set -eo pipefail
 mkdir -p '$BACKUP_DIR'
 cd '$SERVER_PATH'
+paths=(backend frontend)
+if [ -d 'omnirave-web' ]; then
+  paths+=(omnirave-web)
+fi
 tar -czf '$BACKUP_DIR/${backup_name}.tar.gz' \
   --exclude='backups' \
   --exclude='*.log' \
@@ -177,7 +207,7 @@ tar -czf '$BACKUP_DIR/${backup_name}.tar.gz' \
   --exclude='*.test' \
   --exclude='dump.rdb' \
   --exclude='uploads' \
-  backend frontend
+  \"\${paths[@]}\"
 DB_USER=\$(grep '^DB_USER=' '$SERVER_PATH/backend/.env' | cut -d= -f2)
 DB_PASSWORD=\$(grep '^DB_PASSWORD=' '$SERVER_PATH/backend/.env' | cut -d= -f2-)
 DB_NAME=\$(grep '^DB_NAME=' '$SERVER_PATH/backend/.env' | cut -d= -f2-)
@@ -192,6 +222,10 @@ find '$BACKUP_DIR' -maxdepth 1 -type f -name 'backup-*.sql.gz' -printf '%T@ %p\n
 
 upload_frontend_build() {
   run_capture "frontend upload" rsync -avz --delete "$LOCAL_FRONTEND_DIST/" "$SERVER:$SERVER_PATH/frontend/dist/"
+}
+
+upload_omnirave_build() {
+  run_capture "omnirave-web upload" rsync -avz --delete "$LOCAL_OMNIRAVE_DIST/" "$SERVER:$OMNIRAVE_RUNTIME_REMOTE_DIST/"
 }
 
 upload_backend_code() {
@@ -216,6 +250,16 @@ export PATH=\$PATH:/usr/local/go/bin
 go build -ldflags='-X main.appVersion=${build_version}' -o omninudge-server ./cmd/server"
 }
 
+build_omnirave_backend_release() {
+  local build_version
+  build_version="$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  run_remote_capture "omnigame backend release build" "set -eo pipefail
+cd '$SERVER_PATH/backend'
+export PATH=\$PATH:/usr/local/go/bin
+go build -ldflags='-X main.appVersion=${build_version}' -o omnigame-api-server ./cmd/omnigame-api
+go build -ldflags='-X main.appVersion=${build_version}' -o omnirave-world-server ./cmd/omnirave-world"
+}
+
 run_explicit_migrations() {
   run_remote_capture "database migrations" "set -eo pipefail
 cd '$SERVER_PATH/backend'
@@ -229,6 +273,18 @@ systemctl restart '$SERVICE_NAME'
 sleep 2
 systemctl is-active --quiet '$SERVICE_NAME'
 curl -fsS http://127.0.0.1:8080/health >/tmp/omninudge-health.json"
+}
+
+restart_omnirave_services() {
+  run_remote_capture "omnirave service restart" "set -eo pipefail
+systemctl restart '$OMNIGAME_API_SERVICE_NAME'
+systemctl restart '$OMNIRAVE_WORLD_SERVICE_NAME'
+sleep 2
+systemctl is-active --quiet '$OMNIGAME_API_SERVICE_NAME'
+systemctl is-active --quiet '$OMNIRAVE_WORLD_SERVICE_NAME'
+curl -fsS '$OMNIGAME_API_HEALTH_URL' >/tmp/omnigame-api-health.json
+curl -fsS '$OMNIRAVE_WORLD_HEALTH_URL' >/tmp/omnirave-world-health.txt
+test -f '$OMNIRAVE_RUNTIME_REMOTE_DIST/index.html'"
 }
 
 verify_production_contract() {
@@ -245,15 +301,45 @@ verify_production_contract() {
   verify_public_boot_asset_contract "$local_html" "https://omninudge.com" "https://omninudge.com"
 }
 
+verify_omnirave_contract_if_enabled() {
+  if [ "$ENABLE_OMNIRAVE_DEPLOY" != "1" ]; then
+    return 0
+  fi
+
+  run_remote_capture "omnirave deploy verification" "set -eo pipefail
+test -f '$OMNIRAVE_RUNTIME_REMOTE_DIST/index.html'
+curl -fsS '$OMNIGAME_API_HEALTH_URL' >/tmp/omnigame-api-health.json
+curl -fsS '$OMNIRAVE_WORLD_HEALTH_URL' >/tmp/omnirave-world-health.txt"
+}
+
+deploy_omnirave_stack_if_enabled() {
+  if [ "$ENABLE_OMNIRAVE_DEPLOY" != "1" ]; then
+    return 0
+  fi
+
+  upload_omnirave_build &&
+    build_omnirave_backend_release &&
+    restart_omnirave_services &&
+    verify_omnirave_contract_if_enabled
+}
+
 stop_backend_service() {
   run_remote_capture "backend stop" "systemctl stop '$SERVICE_NAME'"
+}
+
+stop_omnirave_services_if_enabled() {
+  if [ "$ENABLE_OMNIRAVE_DEPLOY" != "1" ]; then
+    return 0
+  fi
+
+  run_remote_capture "omnirave services stop" "systemctl stop '$OMNIGAME_API_SERVICE_NAME' '$OMNIRAVE_WORLD_SERVICE_NAME' || true"
 }
 
 restore_backup_bundle() {
   local backup_name="$1"
   run_remote_capture "file restore" "set -eo pipefail
 cd '$SERVER_PATH'
-rm -rf '$SERVER_PATH/backend' '$SERVER_PATH/frontend'
+rm -rf '$SERVER_PATH/backend' '$SERVER_PATH/frontend' '$OMNIRAVE_RUNTIME_REMOTE_PATH'
 tar -xzf '$BACKUP_DIR/${backup_name}.tar.gz'"
   run_remote_capture "database restore" "set -eo pipefail
 DB_USER=\$(grep '^DB_USER=' '$SERVER_PATH/backend/.env' | cut -d= -f2-)
@@ -264,6 +350,9 @@ PGPASSWORD=\"\$DB_PASSWORD\" gunzip -c '$BACKUP_DIR/${backup_name}.sql.gz' | psq
 
 rebuild_backend_after_restore() {
   build_backend_release
+  if [ "$ENABLE_OMNIRAVE_DEPLOY" = "1" ]; then
+    build_omnirave_backend_release
+  fi
 }
 
 fetch_remote_reference_html() {
@@ -277,10 +366,15 @@ rollback_from_backup() {
   local restored_html
   restored_html="$(mktemp "${TMPDIR:-/tmp}/omninudge-restored-index.XXXXXX")"
   stop_backend_service
+  stop_omnirave_services_if_enabled
   restore_backup_bundle "$backup_name"
   rebuild_backend_after_restore
   restart_backend_service
+  if [ "$ENABLE_OMNIRAVE_DEPLOY" = "1" ]; then
+    restart_omnirave_services
+  fi
   fetch_remote_reference_html "$restored_html"
   verify_production_contract "$restored_html"
+  verify_omnirave_contract_if_enabled
   rm -f "$restored_html"
 }
