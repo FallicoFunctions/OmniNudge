@@ -13,6 +13,10 @@ type ProfileHandler struct {
 	profiles *service.ProfileService
 }
 
+type saveLastVenueRequest struct {
+	LastVenue string `json:"lastVenue"`
+}
+
 func NewProfileHandler(profiles *service.ProfileService) *ProfileHandler {
 	return &ProfileHandler{profiles: profiles}
 }
@@ -59,6 +63,48 @@ func (h *ProfileHandler) SaveReturnPoint(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+func (h *ProfileHandler) SaveRuntimeSettings(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		utils.RespondUnauthorized(c, "Unauthorized")
+		return
+	}
+
+	var payload model.OmniRaveSettings
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		utils.RespondBadRequest(c, "Invalid request body", err)
+		return
+	}
+
+	if err := h.profiles.SaveSettings(c.Request.Context(), userID.(int), payload); err != nil {
+		utils.RespondInternalError(c, "Internal Server Error", err)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+func (h *ProfileHandler) SaveLastVenue(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		utils.RespondUnauthorized(c, "Unauthorized")
+		return
+	}
+
+	var payload saveLastVenueRequest
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		utils.RespondBadRequest(c, "Invalid request body", err)
+		return
+	}
+
+	if err := h.profiles.SaveLastVenue(c.Request.Context(), userID.(int), payload.LastVenue); err != nil {
+		utils.RespondInternalError(c, "Internal Server Error", err)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
 func (h *ProfileHandler) GetProfile(c *gin.Context) {
 	userID, ok := c.Get("user_id")
 	if !ok {
@@ -69,13 +115,6 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
 	profile, err := h.profiles.GetProfile(c.Request.Context(), userID.(int))
 	if err != nil {
 		utils.RespondInternalError(c, "Internal Server Error", err)
-		return
-	}
-	if profile == nil {
-		utils.RespondSuccess(c, model.OmniRaveProfile{
-			UserID:  userID.(int),
-			Loadout: map[string]string{},
-		})
 		return
 	}
 

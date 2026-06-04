@@ -19,6 +19,8 @@ func NewPostgresProfileRepository(pool *pgxpool.Pool) *PostgresProfileRepository
 }
 
 func (r *PostgresProfileRepository) UpsertProfile(ctx context.Context, profile model.OmniRaveProfile) error {
+	profile = model.NormalizeOmniRaveProfile(profile)
+
 	loadoutJSON, err := json.Marshal(profile.Loadout)
 	if err != nil {
 		return err
@@ -32,26 +34,35 @@ func (r *PostgresProfileRepository) UpsertProfile(ctx context.Context, profile m
 		}
 	}
 
+	settingsJSON, err := json.Marshal(profile.Settings)
+	if err != nil {
+		return err
+	}
+
 	_, err = r.pool.Exec(ctx, `
-		INSERT INTO omnirave_profiles (user_id, loadout, return_point)
-		VALUES ($1, $2::jsonb, $3::jsonb)
+		INSERT INTO omnirave_profiles (user_id, loadout, return_point, settings, last_venue)
+		VALUES ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5)
 		ON CONFLICT (user_id) DO UPDATE
 		SET loadout = EXCLUDED.loadout,
 		    return_point = EXCLUDED.return_point,
+		    settings = EXCLUDED.settings,
+		    last_venue = EXCLUDED.last_venue,
 		    updated_at = now()
-	`, profile.UserID, string(loadoutJSON), nullableJSONB(returnPointJSON))
+	`, profile.UserID, string(loadoutJSON), nullableJSONB(returnPointJSON), string(settingsJSON), profile.LastVenue)
 	return err
 }
 
 func (r *PostgresProfileRepository) GetProfile(ctx context.Context, userID int) (*model.OmniRaveProfile, error) {
 	var loadoutJSON []byte
 	var returnPointJSON []byte
+	var settingsJSON []byte
+	var lastVenue string
 
 	err := r.pool.QueryRow(ctx, `
-		SELECT loadout, COALESCE(return_point::text, '')::bytea
+		SELECT loadout, COALESCE(return_point::text, '')::bytea, settings, last_venue
 		FROM omnirave_profiles
 		WHERE user_id = $1
-	`, userID).Scan(&loadoutJSON, &returnPointJSON)
+	`, userID).Scan(&loadoutJSON, &returnPointJSON, &settingsJSON, &lastVenue)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -59,10 +70,7 @@ func (r *PostgresProfileRepository) GetProfile(ctx context.Context, userID int) 
 		return nil, err
 	}
 
-	profile := &model.OmniRaveProfile{
-		UserID:  userID,
-		Loadout: map[string]string{},
-	}
+	profile := model.DefaultOmniRaveProfile(userID)
 	if len(loadoutJSON) > 0 {
 		if err := json.Unmarshal(loadoutJSON, &profile.Loadout); err != nil {
 			return nil, err
@@ -75,8 +83,21 @@ func (r *PostgresProfileRepository) GetProfile(ctx context.Context, userID int) 
 		}
 		profile.ReturnPoint = &point
 	}
+	if len(settingsJSON) > 0 {
+		var settings model.OmniRaveSettings
+		if err := json.Unmarshal(settingsJSON, &settings); err != nil {
+			return nil, err
+		}
+		if settings != (model.OmniRaveSettings{}) {
+			profile.Settings = settings
+		}
+	}
+	if lastVenue != "" {
+		profile.LastVenue = lastVenue
+	}
 
-	return profile, nil
+	normalized := model.NormalizeOmniRaveProfile(profile)
+	return &normalized, nil
 }
 
 func nullableJSONB(payload []byte) any {

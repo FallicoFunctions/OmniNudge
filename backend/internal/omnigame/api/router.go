@@ -39,6 +39,8 @@ func NewRouter(
 	protected.Use(middleware.AuthRequired(authService))
 	profileHandler := handlers.NewProfileHandler(sessionService.ProfileService())
 	protected.PUT("/omnirave/loadout", profileHandler.SaveLoadout)
+	protected.PUT("/omnirave/settings", profileHandler.SaveRuntimeSettings)
+	protected.PUT("/omnirave/last-venue", profileHandler.SaveLastVenue)
 	protected.PUT("/omnirave/return-point", profileHandler.SaveReturnPoint)
 	protected.GET("/omnirave", profileHandler.GetProfile)
 

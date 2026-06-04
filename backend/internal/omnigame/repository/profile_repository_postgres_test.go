@@ -27,6 +27,15 @@ func TestPostgresProfileRepository_UpsertAndGetProfile(t *testing.T) {
 			"top":  "black_mesh",
 		},
 		ReturnPoint: &model.SavedPoint{X: 12, Y: 0, Z: 8},
+		LastVenue:   "underground",
+		Settings: model.OmniRaveSettings{
+			UITheme:       "Luminous Panels",
+			GraphicsMode:  "auto",
+			DisplayNames:  true,
+			ChatCollapsed: false,
+			CrouchMode:    "hold",
+			CameraFollow:  "free",
+		},
 	})
 	require.NoError(t, err)
 
@@ -38,6 +47,13 @@ func TestPostgresProfileRepository_UpsertAndGetProfile(t *testing.T) {
 	require.NotNil(t, profile.ReturnPoint)
 	require.Equal(t, 12.0, profile.ReturnPoint.X)
 	require.Equal(t, 8.0, profile.ReturnPoint.Z)
+	require.Equal(t, "underground", profile.LastVenue)
+	require.Equal(t, "Luminous Panels", profile.Settings.UITheme)
+	require.Equal(t, "auto", profile.Settings.GraphicsMode)
+	require.True(t, profile.Settings.DisplayNames)
+	require.False(t, profile.Settings.ChatCollapsed)
+	require.Equal(t, "hold", profile.Settings.CrouchMode)
+	require.Equal(t, "free", profile.Settings.CameraFollow)
 }
 
 func TestPostgresProfileRepository_GetProfileReturnsNilWhenMissing(t *testing.T) {
