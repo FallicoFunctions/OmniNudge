@@ -17,6 +17,7 @@ type WSHandler struct {
 	world    *world.World
 	media    *world.MediaState
 	auth     *services.AuthService
+	now      func() time.Time
 	origins  map[string]struct{}
 	upgrader websocket.Upgrader
 	mu       sync.Mutex
@@ -28,6 +29,7 @@ func NewWSHandler(worldState *world.World, mediaState *world.MediaState, authSer
 		world:   worldState,
 		media:   mediaState,
 		auth:    authService,
+		now:     func() time.Time { return time.Now().UTC() },
 		origins: make(map[string]struct{}, len(allowedOrigins)),
 		conns:   make(map[string]*websocket.Conn),
 	}
@@ -121,9 +123,8 @@ func (h *WSHandler) unregisterConn(playerID string, conn *websocket.Conn) {
 	}
 }
 
-func (h *WSHandler) writeSnapshot(conn *websocket.Conn, playerID string) error {
-	now := time.Now()
-	snapshot := h.world.SnapshotForPlayer(playerID, currentZoneMedia(h.media, now), currentZoneEvents(now))
+func (h *WSHandler) writeSnapshot(conn *websocket.Conn, playerID string, zoneMedia []world.ZoneMediaState, zoneEvents []world.ZoneEventState) error {
+	snapshot := h.world.SnapshotForPlayer(playerID, zoneMedia, zoneEvents)
 	return conn.WriteJSON(map[string]any{
 		"type":            "world_snapshot",
 		"players":         snapshot.Players,
@@ -142,8 +143,12 @@ func (h *WSHandler) broadcastSnapshots() error {
 	}
 	h.mu.Unlock()
 
+	now := h.now()
+	zoneMedia := currentZoneMedia(h.media, now)
+	zoneEvents := currentZoneEvents(now)
+
 	for playerID, conn := range conns {
-		if err := h.writeSnapshot(conn, playerID); err != nil {
+		if err := h.writeSnapshot(conn, playerID, zoneMedia, zoneEvents); err != nil {
 			h.unregisterConn(playerID, conn)
 			return err
 		}
