@@ -21,3 +21,11 @@ Non-negotiable visual targets:
 - `Garden Basin` VIP/environmental depth
 - monumental integrated center screen
 - luxury outdoor festival feel
+
+Locked files now present:
+
+- `approved-concept-primary.png` = `mainstage-celestial-crown.png`
+- `approved-concept-spawn-view.png` = `outdoor-hub-overview-01.png`
+- `approved-concept-internal-view.png` = `mainstage-celestial-crown.png`
+- `approved-concept-side-route.png` = `mainstage-garden-basin.png`
+- `approved-concept-vip-view.png` = `mainstage-garden-basin.png`

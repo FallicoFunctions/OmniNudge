@@ -23,3 +23,11 @@ Non-negotiable visual targets:
 - `Kandi Korner`
 - `Cuddle Puddle`
 - dense hanging rave decor
+
+Locked files now present:
+
+- `approved-concept-primary.png` = `plurr-partay-stage-01.png`
+- `approved-concept-spawn-view.png` = `plurr-partay-arrival-01.png`
+- `approved-concept-internal-view.png` = `plurr-partay-stage-01.png`
+- `approved-concept-side-route.png` = `outdoor-hub-warehouse-01.png`
+- `approved-concept-vip-view.png` = `plurr-partay-social-01.png`
