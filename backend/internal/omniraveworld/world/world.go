@@ -1,6 +1,11 @@
 package world
 
-import "sync"
+import (
+	"math"
+	"sync"
+)
+
+const maxMoveStep = 2.25
 
 type World struct {
 	cfg     Config
@@ -47,10 +52,23 @@ func (w *World) ApplyInput(playerID string, frame InputFrame) {
 		return
 	}
 
-	next := w.cfg.Walkable.ResolveMove(player.Position, frame)
+	next := clampMoveTarget(player.Position, frame.MoveTo, maxMoveStep)
 	if w.cfg.Walkable.IsValid(next) {
 		player.Position = next
 	}
+	player.Zone = w.cfg.ZoneMap.ZoneFor(player.Position)
+}
+
+func (w *World) RespawnPlayer(playerID string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	player, ok := w.players[playerID]
+	if !ok {
+		return
+	}
+
+	player.Position = DefaultLayout().SpawnFor(player.Zone)
 	player.Zone = w.cfg.ZoneMap.ZoneFor(player.Position)
 }
 
@@ -98,4 +116,21 @@ func copyPlayers(players map[string]*Player) []*Player {
 		snapshotPlayers = append(snapshotPlayers, &copyPlayer)
 	}
 	return snapshotPlayers
+}
+
+func clampMoveTarget(current, target Vec3, maxStep float64) Vec3 {
+	deltaX := target.X - current.X
+	deltaY := target.Y - current.Y
+	deltaZ := target.Z - current.Z
+	distance := math.Sqrt((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ))
+	if distance == 0 || distance <= maxStep {
+		return target
+	}
+
+	scale := maxStep / distance
+	return Vec3{
+		X: current.X + (deltaX * scale),
+		Y: current.Y + (deltaY * scale),
+		Z: current.Z + (deltaZ * scale),
+	}
 }

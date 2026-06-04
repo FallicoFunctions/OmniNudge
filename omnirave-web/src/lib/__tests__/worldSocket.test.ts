@@ -95,6 +95,80 @@ describe('worldSocket', () => {
     );
   });
 
+  it('sends a respawn event through the world socket helper', () => {
+    const listeners = new Map<string, Array<(event: MessageEvent | Event) => void>>();
+    const socket = {
+      readyState: 1,
+      addEventListener(type: string, listener: (event: MessageEvent | Event) => void) {
+        const bucket = listeners.get(type) ?? [];
+        bucket.push(listener);
+        listeners.set(type, bucket);
+      },
+      send: vi.fn(),
+      close: vi.fn(),
+    };
+
+    const worldSocket = openWorldSocket({
+      session: {
+        playerId: 'guest-1',
+        playerName: 'Guest-1',
+        worldSocketUrl: 'ws://localhost:8092/ws',
+        worldSessionToken: 'world-token-1',
+        mode: 'guest',
+        activeZone: 'main_stage',
+      },
+      onSnapshot: vi.fn(),
+      onChat: vi.fn(),
+      onError: vi.fn(),
+      socketFactory: () => socket as unknown as WebSocket,
+    });
+
+    worldSocket.respawn();
+
+    expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: 'respawn' }));
+  });
+
+  it('sends continuous move updates and respawn events on the world socket', () => {
+    const socket = {
+      readyState: 1,
+      addEventListener: vi.fn(),
+      send: vi.fn(),
+      close: vi.fn(),
+    };
+
+    const worldSocket = openWorldSocket({
+      session: {
+        playerId: 'guest-1',
+        playerName: 'Guest-1',
+        worldSocketUrl: 'ws://localhost:8092/ws',
+        worldSessionToken: 'world-token-1',
+        mode: 'guest',
+        activeZone: 'main_stage',
+      },
+      onSnapshot: vi.fn(),
+      onChat: vi.fn(),
+      onError: vi.fn(),
+      socketFactory: () => socket as unknown as WebSocket,
+    });
+
+    worldSocket.moveTo({ x: 12, y: 0, z: -3 });
+    worldSocket.respawn();
+
+    expect(socket.send).toHaveBeenNthCalledWith(
+      1,
+      JSON.stringify({
+        type: 'move',
+        moveTo: { x: 12, y: 0, z: -3 },
+      }),
+    );
+    expect(socket.send).toHaveBeenNthCalledWith(
+      2,
+      JSON.stringify({
+        type: 'respawn',
+      }),
+    );
+  });
+
   it('uses the server-issued world session token instead of client identity query params', () => {
     const nextUrl = buildWorldSocketUrl({
       playerId: 'guest-1',

@@ -39,9 +39,23 @@ func TestWSHandler_JoinAndMoveUpdatesActiveZone(t *testing.T) {
 		},
 	}))
 
-	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	var second map[string]any
-	require.NoError(t, conn.ReadJSON(&second))
+	for i := 0; i < 20; i++ {
+		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		require.NoError(t, conn.ReadJSON(&second))
+		require.Equal(t, "world_snapshot", second["type"])
+		if second["activeZone"] == "underground" {
+			break
+		}
+		require.NoError(t, conn.WriteJSON(map[string]any{
+			"type": "move",
+			"moveTo": map[string]float64{
+				"x": 42,
+				"y": 0,
+				"z": 9,
+			},
+		}))
+	}
 	require.Equal(t, "world_snapshot", second["type"])
 	require.Equal(t, "underground", second["activeZone"])
 	require.NotEmpty(t, second["zoneMedia"])
@@ -78,28 +92,94 @@ func TestWSHandler_BroadcastsPlayerMovementToOtherConnections(t *testing.T) {
 		},
 	}))
 
-	_ = secondConn.SetReadDeadline(time.Now().Add(750 * time.Millisecond))
-
 	var secondSnapshot map[string]any
-	require.NoError(t, secondConn.ReadJSON(&secondSnapshot))
-	require.Equal(t, "world_snapshot", secondSnapshot["type"])
-	require.Len(t, secondSnapshot["players"], 2)
-
-	players, ok := secondSnapshot["players"].([]any)
-	require.True(t, ok)
-
-	var movedPlayer map[string]any
-	for _, rawPlayer := range players {
-		player, playerOK := rawPlayer.(map[string]any)
-		require.True(t, playerOK)
-		if player["id"] == "guest-1" {
-			movedPlayer = player
+	for i := 0; i < 20; i++ {
+		_ = secondConn.SetReadDeadline(time.Now().Add(750 * time.Millisecond))
+		require.NoError(t, secondConn.ReadJSON(&secondSnapshot))
+		require.Equal(t, "world_snapshot", secondSnapshot["type"])
+		if playerZoneForID(t, secondSnapshot, "guest-1") == "underground" {
 			break
 		}
+		require.NoError(t, firstConn.WriteJSON(map[string]any{
+			"type": "move",
+			"moveTo": map[string]float64{
+				"x": 42,
+				"y": 0,
+				"z": 9,
+			},
+		}))
 	}
+	require.Equal(t, "world_snapshot", secondSnapshot["type"])
+	require.Len(t, secondSnapshot["players"], 2)
+	require.Equal(t, "underground", playerZoneForID(t, secondSnapshot, "guest-1"))
+}
 
-	require.NotNil(t, movedPlayer)
-	require.Equal(t, "underground", movedPlayer["zone"])
+func TestWSHandler_RespawnEventRebroadcastsSnapshot(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	testServer := httptest.NewServer(New(worldState, mediaState, authService, []string{"https://play.omninudge.com"}))
+	defer testServer.Close()
+
+	wsURL := buildWorldWSURL(testServer.URL, newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), "")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer conn.Close()
+
+	var first map[string]any
+	require.NoError(t, conn.ReadJSON(&first))
+	require.Equal(t, "world_snapshot", first["type"])
+	require.Equal(t, "main_stage", first["activeZone"])
+
+	require.NoError(t, conn.WriteJSON(map[string]any{
+		"type": "move",
+		"moveTo": map[string]float64{
+			"x": 44,
+			"y": 0,
+			"z": 9,
+		},
+	}))
+
+	var moved map[string]any
+	for i := 0; i < 20; i++ {
+		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		require.NoError(t, conn.ReadJSON(&moved))
+		require.Equal(t, "world_snapshot", moved["type"])
+		if moved["activeZone"] == "underground" {
+			break
+		}
+		require.NoError(t, conn.WriteJSON(map[string]any{
+			"type": "move",
+			"moveTo": map[string]float64{
+				"x": 44,
+				"y": 0,
+				"z": 9,
+			},
+		}))
+	}
+	require.Equal(t, "world_snapshot", moved["type"])
+	require.Equal(t, "underground", moved["activeZone"])
+
+	require.NoError(t, conn.WriteJSON(map[string]any{
+		"type": "respawn",
+	}))
+
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var respawned map[string]any
+	require.NoError(t, conn.ReadJSON(&respawned))
+	require.Equal(t, "world_snapshot", respawned["type"])
+	require.Equal(t, "underground", respawned["activeZone"])
+
+	players, ok := respawned["players"].([]any)
+	require.True(t, ok)
+	require.Len(t, players, 1)
+
+	player, ok := players[0].(map[string]any)
+	require.True(t, ok)
+	position, ok := player["position"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, 42.0, position["x"])
+	require.Equal(t, 9.0, position["z"])
 }
 
 func TestWSHandler_BroadcastsDisconnectToOtherConnections(t *testing.T) {
@@ -281,4 +361,24 @@ func newGuestWorldSessionToken(t *testing.T, authService *services.AuthService, 
 	})
 	require.NoError(t, err)
 	return token
+}
+
+func playerZoneForID(t *testing.T, snapshot map[string]any, playerID string) string {
+	t.Helper()
+
+	players, ok := snapshot["players"].([]any)
+	require.True(t, ok)
+
+	for _, rawPlayer := range players {
+		player, playerOK := rawPlayer.(map[string]any)
+		require.True(t, playerOK)
+		if player["id"] == playerID {
+			zone, zoneOK := player["zone"].(string)
+			require.True(t, zoneOK)
+			return zone
+		}
+	}
+
+	t.Fatalf("player %s not found in snapshot", playerID)
+	return ""
 }
