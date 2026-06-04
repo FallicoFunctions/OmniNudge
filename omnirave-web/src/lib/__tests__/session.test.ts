@@ -90,6 +90,50 @@ describe('bootstrapSession', () => {
     expect(session.settings.cameraFollow).toBe('free');
   });
 
+  it('preserves authoritative player identity fields from bootstrap payloads', async () => {
+    const session = await bootstrapSession({
+      search: '?handoff=players&mode=guest',
+      fetcher: mockFetcher({
+        playerId: 'guest-1',
+        playerName: 'Guest Nova',
+        worldSocketUrl: 'ws://example',
+        mode: 'guest',
+        activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: {
+          uiTheme: 'Luminous Panels',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
+        players: [
+          {
+            id: 'guest-1',
+            playerName: 'Guest-4821',
+            mode: 'guest',
+            position: { x: 0, y: 0, z: 0 },
+            zone: 'main_stage',
+            loadout: { body: 'guest-default' },
+          },
+        ],
+      }),
+    });
+
+    expect(session.players).toEqual([
+      {
+        id: 'guest-1',
+        playerName: 'Guest-4821',
+        mode: 'guest',
+        position: { x: 0, y: 0, z: 0 },
+        zone: 'main_stage',
+        loadout: { body: 'guest-default' },
+      },
+    ]);
+  });
+
   it('persists signed-in loadouts with the exchanged game session token', async () => {
     const fetcher = vi.fn(async () => ({ ok: true }) as Response);
 
