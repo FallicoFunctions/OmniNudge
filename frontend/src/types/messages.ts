@@ -135,7 +135,7 @@ export interface Message {
   recipient_id: number;
   encrypted_content: string;
   sender_encrypted_content?: string | null;
-  message_type: 'text' | 'image' | 'video' | 'audio' | 'file';
+  message_type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'system';
   sent_at: string;
   delivered_at?: string;
   read_at?: string;
