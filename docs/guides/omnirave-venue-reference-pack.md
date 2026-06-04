@@ -67,6 +67,25 @@ Accepted image formats:
 - monumental luxury festival read
 - center screen as the overwhelming focal landmark
 
+### Locked Source Files
+
+The approved Main Stage direction uses:
+
+- hero / primary: [approved-concept-primary.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/main-stage/approved-concept-primary.png)
+  Source board: `mainstage-celestial-crown.png`
+- spawn / back plaza reveal: [approved-concept-spawn-view.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/main-stage/approved-concept-spawn-view.png)
+  Source board: `outdoor-hub-overview-01.png`
+- internal focal view: [approved-concept-internal-view.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/main-stage/approved-concept-internal-view.png)
+  Source board: `mainstage-celestial-crown.png`
+- side-route / environmental depth: [approved-concept-side-route.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/main-stage/approved-concept-side-route.png)
+  Source board: `mainstage-garden-basin.png`
+- VIP / basin read: [approved-concept-vip-view.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/main-stage/approved-concept-vip-view.png)
+  Source board: `mainstage-garden-basin.png`
+
+Selection logic already locked in the design discussion:
+- `Celestial Crown` is the hero silhouette
+- `Garden Basin` is the VIP/environmental depth language
+
 ### Required Match Views
 
 1. `Spawn / Back Plaza`
@@ -105,6 +124,27 @@ Accepted image formats:
 - dance floor on the tracks
 - railcar booth as the hero landmark
 - menacing hard-techno pressure
+
+### Locked Source Files
+
+The approved Underground direction uses the final corrected open-tunnel pass:
+
+- hero / primary: [approved-concept-primary.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/underground/approved-concept-primary.png)
+  Source board: `underground-track-floor-03.png`
+- spawn / arrival: [approved-concept-spawn-view.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/underground/approved-concept-spawn-view.png)
+  Source board: `underground-platform-arrival-03.png`
+- internal focal view: [approved-concept-internal-view.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/underground/approved-concept-internal-view.png)
+  Source board: `underground-track-floor-03.png`
+- side-route / exterior approach: [approved-concept-side-route.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/underground/approved-concept-side-route.png)
+  Source board: `outdoor-hub-underground-01.png`
+- VIP catwalk read: [approved-concept-vip-view.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/underground/approved-concept-vip-view.png)
+  Source board: `underground-vip-catwalk-03.png`
+
+Selection logic from the latest correction board:
+- use `A` for arrival
+- use `B` as the strongest single image of what the Underground actually is
+- use `C` for the VIP/catwalk system
+- preserve the open left/right tunnel correction and the centered broadside DJ setup
 
 ### Required Match Views
 
@@ -145,6 +185,26 @@ Accepted image formats:
 - far-wall DIY altar
 - glow-paint fantasy layered over believable industrial bones
 - hand-built, communal, ecstatic, not toy-like
+
+### Locked Source Files
+
+The approved P.L.U.R.R. direction uses the combined warehouse board:
+
+- hero / primary: [approved-concept-primary.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/plurr-partay/approved-concept-primary.png)
+  Source board: `plurr-partay-stage-01.png`
+- spawn / arrival: [approved-concept-spawn-view.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/plurr-partay/approved-concept-spawn-view.png)
+  Source board: `plurr-partay-arrival-01.png`
+- internal focal view: [approved-concept-internal-view.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/plurr-partay/approved-concept-internal-view.png)
+  Source board: `plurr-partay-stage-01.png`
+- side-route / exterior approach: [approved-concept-side-route.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/plurr-partay/approved-concept-side-route.png)
+  Source board: `outdoor-hub-warehouse-01.png`
+- social / subarea read: [approved-concept-vip-view.png](/Users/Nick_1/Documents/Personal_Projects/OmniNudge-omnirave/omnirave-web/src/assets/venues/plurr-partay/approved-concept-vip-view.png)
+  Source board: `plurr-partay-social-01.png`
+
+Selection logic from the board recommendation:
+- use `A` for overall room layout
+- use `B` for the DJ altar identity
+- use `C` for the social-life layer, including side spaces
 
 ### Required Match Views
 
