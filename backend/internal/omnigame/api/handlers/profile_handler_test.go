@@ -109,6 +109,37 @@ func TestProfileHandler_RuntimeSettingsRoundTrip(t *testing.T) {
 	require.Equal(t, "free", settings["cameraFollow"])
 }
 
+func TestProfileHandler_RuntimeSettingsRejectsIncompletePayload(t *testing.T) {
+	router := testProfileRouter()
+
+	saveReq := httptest.NewRequest(http.MethodPut, "/omnigame/profile/omnirave/settings", bytes.NewBufferString(`{"uiTheme":"Luminous Panels"}`))
+	saveReq.Header.Set("Content-Type", "application/json")
+	saveRec := httptest.NewRecorder()
+	router.ServeHTTP(saveRec, saveReq)
+	require.Equal(t, http.StatusBadRequest, saveRec.Code)
+
+	getReq := httptest.NewRequest(http.MethodGet, "/omnigame/profile/omnirave", nil)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+	require.Equal(t, http.StatusOK, getRec.Code)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(getRec.Body.Bytes(), &payload))
+	settings := payload["settings"].(map[string]any)
+	require.Equal(t, "Luminous Panels", settings["uiTheme"])
+	require.Equal(t, "auto", settings["graphicsMode"])
+}
+
+func TestProfileHandler_RuntimeSettingsRejectsInvalidPayload(t *testing.T) {
+	router := testProfileRouter()
+
+	saveReq := httptest.NewRequest(http.MethodPut, "/omnigame/profile/omnirave/settings", bytes.NewBufferString(`{"uiTheme":"Luminous Panels","graphicsMode":"potato","displayNames":true,"chatCollapsed":false,"crouchMode":"hold","cameraFollow":"free"}`))
+	saveReq.Header.Set("Content-Type", "application/json")
+	saveRec := httptest.NewRecorder()
+	router.ServeHTTP(saveRec, saveReq)
+	require.Equal(t, http.StatusBadRequest, saveRec.Code)
+}
+
 func TestProfileHandler_LastVenueRoundTrips(t *testing.T) {
 	router := testProfileRouter()
 
@@ -126,4 +157,23 @@ func TestProfileHandler_LastVenueRoundTrips(t *testing.T) {
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(getRec.Body.Bytes(), &payload))
 	require.Equal(t, "underground", payload["lastVenue"])
+}
+
+func TestProfileHandler_LastVenueRejectsInvalidVenue(t *testing.T) {
+	router := testProfileRouter()
+
+	saveReq := httptest.NewRequest(http.MethodPut, "/omnigame/profile/omnirave/last-venue", bytes.NewBufferString(`{"lastVenue":"warehouse"}`))
+	saveReq.Header.Set("Content-Type", "application/json")
+	saveRec := httptest.NewRecorder()
+	router.ServeHTTP(saveRec, saveReq)
+	require.Equal(t, http.StatusBadRequest, saveRec.Code)
+
+	getReq := httptest.NewRequest(http.MethodGet, "/omnigame/profile/omnirave", nil)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+	require.Equal(t, http.StatusOK, getRec.Code)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(getRec.Body.Bytes(), &payload))
+	require.Equal(t, "main_stage", payload["lastVenue"])
 }
