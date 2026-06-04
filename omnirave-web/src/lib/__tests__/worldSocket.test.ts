@@ -10,6 +10,12 @@ describe('worldSocket', () => {
         worldSocketUrl: 'ws://localhost:8092/ws',
         mode: 'guest',
         activeZone: 'main_stage',
+        venueStatus: {
+          currentTrackLabel: 'DJ Hyperbeam warming up',
+          totalPlayers: 84,
+          venuePlayers: 27,
+          audienceLabel: 'Front Rail',
+        },
         zoneMedia: [
           { zoneId: 'main_stage', videoId: 'main-stage-youtube', playlistIndex: 0, playheadSeconds: 10 },
         ],
@@ -30,6 +36,12 @@ describe('worldSocket', () => {
     expect(next.activeZone).toBe('underground');
     expect(next.zoneMedia?.[0].videoId).toBe('techno-room-youtube');
     expect(next.players?.[0].zone).toBe('underground');
+    expect(next.venueStatus).toEqual({
+      currentTrackLabel: 'DJ Hyperbeam warming up',
+      totalPlayers: 84,
+      venuePlayers: 27,
+      audienceLabel: 'Front Rail',
+    });
   });
 
   it('routes chat messages from the world socket to the chat callback', () => {
