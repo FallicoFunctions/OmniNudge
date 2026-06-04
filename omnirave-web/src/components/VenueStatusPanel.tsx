@@ -1,4 +1,4 @@
-import type { RuntimeSession } from '../lib/session';
+import type { RuntimeSession, RuntimeZoneID } from '../lib/session';
 import { zoneDisplayName } from '../lib/zones';
 
 function venueAudienceLabel(zone: RuntimeSession['activeZone']) {
@@ -13,10 +13,25 @@ function venueAudienceLabel(zone: RuntimeSession['activeZone']) {
   }
 }
 
-export function VenueStatusPanel({ session }: { session: RuntimeSession }) {
+function venuePlayersForZone(session: RuntimeSession, zone: RuntimeZoneID, pendingVenue?: RuntimeZoneID | null) {
+  const players = session.players ?? [];
+  const currentPlayer = players.find((player) => player.id === session.playerId);
+  const currentVenueCount = players.filter((player) => player.zone === zone).length;
+
+  if (!pendingVenue || pendingVenue === zone || currentPlayer?.zone !== pendingVenue) {
+    return currentVenueCount;
+  }
+
+  return currentVenueCount + 1;
+}
+
+export function VenueStatusPanel(props: { session: RuntimeSession; pendingVenue?: RuntimeZoneID | null }) {
+  const { session, pendingVenue = null } = props;
   const totalPlayers = session.venueStatus?.totalPlayers ?? session.players?.length ?? 0;
   const venuePlayers =
-    session.venueStatus?.venuePlayers ?? session.players?.filter((player) => player.zone === session.activeZone).length ?? 0;
+    pendingVenue === null
+      ? session.venueStatus?.venuePlayers ?? venuePlayersForZone(session, session.activeZone, pendingVenue)
+      : venuePlayersForZone(session, session.activeZone, pendingVenue);
   const audienceLabel = session.venueStatus?.audienceLabel ?? venueAudienceLabel(session.activeZone);
   const currentTrackLabel = session.venueStatus?.currentTrackLabel ?? 'Track metadata pending';
 
@@ -25,6 +40,7 @@ export function VenueStatusPanel({ session }: { session: RuntimeSession }) {
       <p className="venue-status-kicker">Current Venue</p>
       <h2>{zoneDisplayName(session.activeZone)}</h2>
       <p className="venue-status-track">{currentTrackLabel}</p>
+      {pendingVenue ? <p className="venue-status-transition">Crossing into {zoneDisplayName(pendingVenue)}</p> : null}
       <div className="venue-status-stats">
         <p>OmniRavers: {totalPlayers}</p>
         <p>

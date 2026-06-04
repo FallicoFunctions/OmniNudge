@@ -25,7 +25,9 @@ export default function App() {
     error,
     isLoading,
     hasJoinedWorld,
+    pendingVenue,
     moveToZone,
+    respawn,
     sendChatMessage,
   } =
     useWorldSession();
@@ -81,7 +83,7 @@ export default function App() {
           onToggleAvatar={() => setOpenTopLeftPanel((current) => (current === 'avatar' ? null : 'avatar'))}
         />
         {openTopLeftPanel === 'settings' ? (
-          <SettingsPanel settings={settings} onSettingsChange={updateSettings} />
+          <SettingsPanel settings={settings} onSettingsChange={updateSettings} onRespawn={respawn} />
         ) : null}
         {openTopLeftPanel === 'avatar' ? (
           <section className="settings-panel avatar-foundation-panel" aria-label="Avatar editor foundation">
@@ -113,7 +115,7 @@ export default function App() {
       </div>
 
       <div className="hud-anchor hud-bottom-right">
-        <VenueStatusPanel session={session} />
+        <VenueStatusPanel session={session} pendingVenue={pendingVenue} />
       </div>
 
       <main className="stage-shell">

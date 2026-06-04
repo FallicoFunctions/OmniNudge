@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   bootstrapSession,
   type RuntimeChatMessage,
+  type RuntimeVenueStatus,
   saveLoadout as persistLoadout,
   saveRuntimeSettings as persistRuntimeSettings,
   saveReturnPoint as persistReturnPoint,
   type RuntimeSession,
 } from '../lib/session';
+import { useVenueTransition } from './useVenueTransition';
 import { DEFAULT_RUNTIME_SETTINGS, type RuntimeSettings } from '../lib/settings';
 import { applyWorldSnapshot, openWorldSocket } from '../lib/worldSocket';
 import type { ZoneID } from '../lib/zones';
@@ -19,6 +21,7 @@ export function useWorldSession() {
   const [hasJoinedWorld, setHasJoinedWorld] = useState(false);
   const [isSavingLoadout, setIsSavingLoadout] = useState(false);
   const [chatMessages, setChatMessages] = useState<RuntimeChatMessage[]>([]);
+  const [displayedVenueStatus, setDisplayedVenueStatus] = useState<RuntimeVenueStatus | undefined>(undefined);
   const bootstrapPromiseRef = useRef<Promise<RuntimeSession> | null>(null);
   const worldSocketRef = useRef<ReturnType<typeof openWorldSocket> | null>(null);
   const lastSavedReturnPointRef = useRef('');
@@ -26,6 +29,7 @@ export function useWorldSession() {
   const lastPersistedSettingsRef = useRef<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
   const settingsSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const latestSettingsVersionRef = useRef(0);
+  const venueTransition = useVenueTransition('main_stage');
 
   function applySettingsLocally(nextSettings: RuntimeSettings) {
     baseSetSettings(nextSettings);
@@ -52,6 +56,8 @@ export function useWorldSession() {
         if (!cancelled) {
           sessionRef.current = nextSession;
           lastPersistedSettingsRef.current = nextSession.settings;
+          venueTransition.syncAuthoritativeVenue(nextSession.activeZone, { immediate: true });
+          setDisplayedVenueStatus(nextSession.venueStatus);
           setSession(nextSession);
           baseSetSettings(nextSession.settings);
         }
@@ -75,6 +81,24 @@ export function useWorldSession() {
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    venueTransition.syncAuthoritativeVenue(session.activeZone, { immediate: !hasJoinedWorld });
+  }, [hasJoinedWorld, session?.activeZone, session?.playerId]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    if (session.activeZone === venueTransition.committedVenue) {
+      setDisplayedVenueStatus(session.venueStatus);
+    }
+  }, [session, venueTransition.committedVenue]);
 
   useEffect(() => {
     if (!session) {
@@ -189,8 +213,25 @@ export function useWorldSession() {
     worldSocketRef.current?.sendChat(body);
   }
 
+  function respawn() {
+    worldSocketRef.current?.respawn();
+    setChatMessages([]);
+  }
+
+  const displayedSession = useMemo(() => {
+    if (!session) {
+      return null;
+    }
+
+    return {
+      ...session,
+      activeZone: venueTransition.committedVenue,
+      venueStatus: displayedVenueStatus ?? session.venueStatus,
+    };
+  }, [displayedVenueStatus, session, venueTransition.committedVenue]);
+
   return {
-    session,
+    session: displayedSession,
     settings,
     updateSettings,
     chatMessages,
@@ -198,7 +239,10 @@ export function useWorldSession() {
     isLoading,
     hasJoinedWorld,
     isSavingLoadout,
+    pendingVenue: venueTransition.pendingVenue,
+    isVenueTransitioning: venueTransition.isTransitioning,
     moveToZone,
+    respawn,
     saveLoadout,
     sendChatMessage,
   };
