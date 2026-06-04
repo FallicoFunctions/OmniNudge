@@ -13,8 +13,18 @@ type ProfileHandler struct {
 	profiles *service.ProfileService
 }
 
+type saveRuntimeSettingsRequest struct {
+	UITheme       *string `json:"uiTheme" binding:"required"`
+	GraphicsMode  *string `json:"graphicsMode" binding:"required,oneof=auto manual"`
+	GraphicsLevel *int    `json:"graphicsLevel,omitempty"`
+	DisplayNames  *bool   `json:"displayNames" binding:"required"`
+	ChatCollapsed *bool   `json:"chatCollapsed" binding:"required"`
+	CrouchMode    *string `json:"crouchMode" binding:"required,oneof=hold toggle"`
+	CameraFollow  *string `json:"cameraFollow" binding:"required,oneof=free auto-follow"`
+}
+
 type saveLastVenueRequest struct {
-	LastVenue string `json:"lastVenue"`
+	LastVenue string `json:"lastVenue" binding:"required,oneof=main_stage underground plurr_partay"`
 }
 
 func NewProfileHandler(profiles *service.ProfileService) *ProfileHandler {
@@ -70,13 +80,25 @@ func (h *ProfileHandler) SaveRuntimeSettings(c *gin.Context) {
 		return
 	}
 
-	var payload model.OmniRaveSettings
+	var payload saveRuntimeSettingsRequest
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		utils.RespondBadRequest(c, "Invalid request body", err)
 		return
 	}
 
-	if err := h.profiles.SaveSettings(c.Request.Context(), userID.(int), payload); err != nil {
+	settings := model.OmniRaveSettings{
+		UITheme:       *payload.UITheme,
+		GraphicsMode:  *payload.GraphicsMode,
+		DisplayNames:  *payload.DisplayNames,
+		ChatCollapsed: *payload.ChatCollapsed,
+		CrouchMode:    *payload.CrouchMode,
+		CameraFollow:  *payload.CameraFollow,
+	}
+	if payload.GraphicsLevel != nil {
+		settings.GraphicsLevel = *payload.GraphicsLevel
+	}
+
+	if err := h.profiles.SaveSettings(c.Request.Context(), userID.(int), settings); err != nil {
 		utils.RespondInternalError(c, "Internal Server Error", err)
 		return
 	}
