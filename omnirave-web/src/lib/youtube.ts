@@ -20,13 +20,13 @@ export function createPassiveYouTubeHandle(): YouTubePlayerHandle {
 
 export type StagePlayerMap = Record<RuntimeZoneID, YouTubePlayerHandle>;
 
-const STAGE_ZONES: RuntimeZoneID[] = ['main_stage', 'techno_room', 'neon_room'];
+const STAGE_ZONES: RuntimeZoneID[] = ['main_stage', 'underground', 'plurr_partay'];
 
 export function createPassiveStagePlayers(): StagePlayerMap {
   return {
     main_stage: createPassiveYouTubeHandle(),
-    techno_room: createPassiveYouTubeHandle(),
-    neon_room: createPassiveYouTubeHandle(),
+    underground: createPassiveYouTubeHandle(),
+    plurr_partay: createPassiveYouTubeHandle(),
   };
 }
 

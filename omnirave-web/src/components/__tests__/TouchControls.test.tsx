@@ -24,6 +24,6 @@ describe('TouchControls', () => {
     const view = render(<TouchControls unlocked={true} onUnlock={() => {}} onMoveToZone={onMoveToZone} />);
 
     fireEvent.click(within(view.container).getByRole('button', { name: /Touch Jump to The Underground/i }));
-    expect(onMoveToZone).toHaveBeenCalledWith('techno_room');
+    expect(onMoveToZone).toHaveBeenCalledWith('underground');
   });
 });

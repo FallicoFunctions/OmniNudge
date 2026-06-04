@@ -43,7 +43,7 @@ func TestWSHandler_JoinAndMoveUpdatesActiveZone(t *testing.T) {
 	var second map[string]any
 	require.NoError(t, conn.ReadJSON(&second))
 	require.Equal(t, "world_snapshot", second["type"])
-	require.Equal(t, "techno_room", second["activeZone"])
+	require.Equal(t, "underground", second["activeZone"])
 	require.NotEmpty(t, second["zoneMedia"])
 }
 
@@ -99,7 +99,7 @@ func TestWSHandler_BroadcastsPlayerMovementToOtherConnections(t *testing.T) {
 	}
 
 	require.NotNil(t, movedPlayer)
-	require.Equal(t, "techno_room", movedPlayer["zone"])
+	require.Equal(t, "underground", movedPlayer["zone"])
 }
 
 func TestWSHandler_BroadcastsDisconnectToOtherConnections(t *testing.T) {
@@ -231,7 +231,7 @@ func TestWSHandler_IgnoresForgedQueryIdentityAndRestoresOnlyServerApprovedState(
 	require.NoError(t, conn.ReadJSON(&snapshot))
 	require.Equal(t, "world_snapshot", snapshot["type"])
 	require.Equal(t, "guest-authoritative", snapshot["currentPlayerId"])
-	require.Equal(t, "techno_room", snapshot["activeZone"])
+	require.Equal(t, "underground", snapshot["activeZone"])
 
 	players, ok := snapshot["players"].([]any)
 	require.True(t, ok)

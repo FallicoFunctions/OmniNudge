@@ -5,23 +5,23 @@ export type ZoneID = RuntimeZoneID;
 
 const ZONE_LABELS: Record<ZoneID, string> = {
   main_stage: 'Main Stage',
-  techno_room: 'The Underground',
-  neon_room: 'P.L.U.R.R. Partay',
+  underground: 'The Underground',
+  plurr_partay: 'P.L.U.R.R. Partay',
 };
 
 const ZONE_TAGLINES: Record<ZoneID, string> = {
   main_stage: 'Big-room energy, open floor, and the loudest drop in the venue.',
-  techno_room: 'A darker room with tighter pressure, harder rhythm, and a relentless pulse.',
-  neon_room: 'A brighter late-night pocket for color, bounce, and playful chaos.',
+  underground: 'A darker room with tighter pressure, harder rhythm, and a relentless pulse.',
+  plurr_partay: 'A brighter late-night pocket for color, bounce, and playful chaos.',
 };
 
 const ZONE_MOVE_TARGETS: Record<ZoneID, RuntimePoint> = {
   main_stage: { x: 0, y: 0, z: 0 },
-  techno_room: { x: 42, y: 0, z: 9 },
-  neon_room: { x: -34, y: 0, z: 11 },
+  underground: { x: 42, y: 0, z: 9 },
+  plurr_partay: { x: -34, y: 0, z: 11 },
 };
 
-export const ZONE_ORDER: ZoneID[] = ['main_stage', 'techno_room', 'neon_room'];
+export const ZONE_ORDER: ZoneID[] = ['main_stage', 'underground', 'plurr_partay'];
 
 export function activeStageForZone(zone: ZoneID): ZoneID {
   return zone;

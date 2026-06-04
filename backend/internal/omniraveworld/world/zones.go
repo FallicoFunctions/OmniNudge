@@ -18,9 +18,9 @@ type ZoneMap struct {
 func DefaultZoneMap() ZoneMap {
 	return ZoneMap{
 		zones: map[ZoneID]Bounds{
-			ZoneMainStage:  {MinX: -20, MaxX: 20, MinZ: -20, MaxZ: 20},
-			ZoneTechnoRoom: {MinX: 30, MaxX: 60, MinZ: 0, MaxZ: 20},
-			ZoneNeonRoom:   {MinX: -50, MaxX: -20, MinZ: 0, MaxZ: 20},
+			ZoneMainStage:   {MinX: -20, MaxX: 20, MinZ: -20, MaxZ: 20},
+			ZoneUnderground: {MinX: 30, MaxX: 60, MinZ: 0, MaxZ: 20},
+			ZonePlurrPartay: {MinX: -50, MaxX: -20, MinZ: 0, MaxZ: 20},
 		},
 	}
 }
