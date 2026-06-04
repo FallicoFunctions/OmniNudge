@@ -194,8 +194,13 @@ export function useWorldSession() {
     setAuthPopupMode(mode);
   }
 
+  function switchAuthPopupMode(mode: AuthPopupMode) {
+    setError('');
+    setAuthPopupMode(mode);
+  }
+
   function closeAuthPopup() {
-    if (authPopupMode === 'signup' && authPopupReasonRef.current === 'guest_sprint_unlock') {
+    if (authPopupReasonRef.current === 'guest_sprint_unlock') {
       guestSprintUnlockDismissedAtRef.current = Date.now();
     }
     authPopupReasonRef.current = 'manual';
@@ -372,6 +377,7 @@ export function useWorldSession() {
     pendingVenue: venueTransition.pendingVenue,
     isVenueTransitioning: venueTransition.isTransitioning,
     openAuthPopup,
+    switchAuthPopupMode,
     closeAuthPopup,
     dismissWelcomeCard,
     requestGuestSprintUnlock,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { RuntimeLoginRequest, RuntimeSignupRequest } from '../lib/session';
 
 export function AuthPopup(props: {
@@ -17,14 +17,21 @@ export function AuthPopup(props: {
   const [turnstileToken, setTurnstileToken] = useState('');
   const [acceptPrivacyPolicy, setAcceptPrivacyPolicy] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const usernameInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!props.isOpen) {
+      setUsername('');
+      setEmail('');
+      setPassword('');
+      setTurnstileToken('');
+      setAcceptPrivacyPolicy(false);
+      setAcceptTerms(false);
       return;
     }
 
-    setPassword('');
-  }, [props.isOpen, props.mode]);
+    usernameInputRef.current?.focus();
+  }, [props.isOpen]);
 
   if (!props.isOpen) {
     return null;
@@ -69,6 +76,7 @@ export function AuthPopup(props: {
             <input
               id="runtime-auth-username"
               type="text"
+              ref={usernameInputRef}
               value={username}
               onChange={(event) => setUsername(event.target.value)}
             />

@@ -1,9 +1,25 @@
+import { useEffect, useRef } from 'react';
+
 export function WelcomeCard(props: {
   playerName: string;
   mode: 'login' | 'signup';
   onClose: () => void;
   onEditAvatar: () => void;
 }) {
+  const onCloseRef = useRef(props.onClose);
+
+  useEffect(() => {
+    onCloseRef.current = props.onClose;
+  }, [props.onClose]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      onCloseRef.current();
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
   return (
     <section className="settings-panel welcome-card-shell" aria-label="Welcome to OmniRave">
       <p className="settings-panel-kicker">Welcome</p>

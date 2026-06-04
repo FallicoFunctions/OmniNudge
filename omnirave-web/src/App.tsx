@@ -25,6 +25,7 @@ export default function App() {
     updateSettings,
     authPopupMode,
     openAuthPopup,
+    switchAuthPopupMode,
     closeAuthPopup,
     login,
     signup,
@@ -50,6 +51,14 @@ export default function App() {
 
   function closeTopLeftPanel() {
     setOpenTopLeftPanel(null);
+  }
+
+  function handleSettingsClick() {
+    if (welcomeCardState?.isOpen) {
+      dismissWelcomeCard();
+    }
+
+    setOpenTopLeftPanel((current) => (current === 'settings' ? null : 'settings'));
   }
 
   function handleRespawn() {
@@ -119,7 +128,7 @@ export default function App() {
       <div className="hud-anchor hud-top-left">
         <TopLeftControls
           openPanel={openTopLeftPanel}
-          onToggleSettings={() => setOpenTopLeftPanel((current) => (current === 'settings' ? null : 'settings'))}
+          onToggleSettings={handleSettingsClick}
           onAvatarClick={handleAvatarClick}
         />
         {welcomeCardState?.isOpen ? (
@@ -165,7 +174,7 @@ export default function App() {
           error={error}
           isSubmitting={isAuthSubmitting}
           onClose={closeAuthPopup}
-          onSwitchMode={openAuthPopup}
+          onSwitchMode={switchAuthPopupMode}
           onLogin={login}
           onSignup={signup}
         />

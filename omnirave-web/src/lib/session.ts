@@ -185,7 +185,7 @@ export async function saveRuntimeSettings(input: {
 async function exchangeRuntimeAuth(input: {
   endpoint: 'login' | 'signup' | 'logout';
   session: RuntimeSession;
-  payload: Record<string, unknown>;
+  payload: RuntimeLoginRequest | RuntimeSignupRequest | Record<string, never>;
   fetcher?: typeof fetch;
   apiBaseUrl?: string;
 }): Promise<RuntimeSession> {
