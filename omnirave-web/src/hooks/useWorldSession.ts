@@ -22,6 +22,23 @@ export function useWorldSession() {
   const bootstrapPromiseRef = useRef<Promise<RuntimeSession> | null>(null);
   const worldSocketRef = useRef<ReturnType<typeof openWorldSocket> | null>(null);
   const lastSavedReturnPointRef = useRef('');
+  const sessionRef = useRef<RuntimeSession | null>(null);
+  const lastPersistedSettingsRef = useRef<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
+  const settingsSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const latestSettingsVersionRef = useRef(0);
+
+  function applySettingsLocally(nextSettings: RuntimeSettings) {
+    baseSetSettings(nextSettings);
+    setSession((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextSession = { ...current, settings: nextSettings };
+      sessionRef.current = nextSession;
+      return nextSession;
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -33,8 +50,10 @@ export function useWorldSession() {
     void bootstrapPromiseRef.current
       .then((nextSession) => {
         if (!cancelled) {
+          sessionRef.current = nextSession;
+          lastPersistedSettingsRef.current = nextSession.settings;
           setSession(nextSession);
-          setSettings(nextSession.settings);
+          baseSetSettings(nextSession.settings);
         }
       })
       .catch((err) => {
@@ -52,6 +71,10 @@ export function useWorldSession() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   useEffect(() => {
     if (!session) {
@@ -87,17 +110,36 @@ export function useWorldSession() {
     worldSocketRef.current?.moveToZone(zone);
   }
 
-  function setSettings(nextSettings: RuntimeSettings) {
-    baseSetSettings(nextSettings);
-    setSession((current) => (current ? { ...current, settings: nextSettings } : current));
+  function updateSettings(nextSettings: RuntimeSettings) {
+    applySettingsLocally(nextSettings);
 
-    if (!session || session.mode !== 'account') {
+    const currentSession = sessionRef.current;
+    if (!currentSession || currentSession.mode !== 'account') {
       return;
     }
 
-    void persistRuntimeSettings({ session, settings: nextSettings }).catch((err) => {
-      setError(err instanceof Error ? err.message : 'Unable to save runtime settings');
-    });
+    const nextVersion = latestSettingsVersionRef.current + 1;
+    latestSettingsVersionRef.current = nextVersion;
+
+    settingsSaveQueueRef.current = settingsSaveQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          await persistRuntimeSettings({
+            session: currentSession,
+            settings: nextSettings,
+          });
+          lastPersistedSettingsRef.current = nextSettings;
+        } catch (err) {
+          if (latestSettingsVersionRef.current !== nextVersion) {
+            return;
+          }
+
+          const rollbackSettings = lastPersistedSettingsRef.current;
+          applySettingsLocally(rollbackSettings);
+          setError(err instanceof Error ? err.message : 'Unable to save runtime settings');
+        }
+      });
   }
 
   useEffect(() => {
@@ -150,7 +192,7 @@ export function useWorldSession() {
   return {
     session,
     settings,
-    setSettings,
+    updateSettings,
     chatMessages,
     error,
     isLoading,
