@@ -1,4 +1,4 @@
-import type { RuntimeChatMessage, RuntimePlayer, RuntimeZoneID, RuntimeZoneMedia } from './session';
+import type { RuntimeChatMessage, RuntimePlayer, RuntimeZoneEvent, RuntimeZoneID, RuntimeZoneMedia } from './session';
 
 export interface WorldSnapshotMessage {
   type: 'world_snapshot';
@@ -6,6 +6,7 @@ export interface WorldSnapshotMessage {
   activeZone: RuntimeZoneID;
   players: RuntimePlayer[];
   zoneMedia: RuntimeZoneMedia[];
+  zoneEvents: RuntimeZoneEvent[];
 }
 
 export interface WorldChatMessage extends RuntimeChatMessage {

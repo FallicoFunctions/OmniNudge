@@ -110,6 +110,7 @@ type SessionExchangeResponse struct {
 	LastVenue         string            `json:"lastVenue"`
 	Settings          OmniRaveSettings  `json:"settings"`
 	ZoneMedia         []ZoneMediaState  `json:"zoneMedia,omitempty"`
+	ZoneEvents        []ZoneEventState  `json:"zoneEvents,omitempty"`
 	ReturnPoint       *SavedPoint       `json:"returnPoint,omitempty"`
 }
 
@@ -132,4 +133,13 @@ type ZoneMediaState struct {
 	VideoID         string `json:"videoId"`
 	PlaylistIndex   int    `json:"playlistIndex"`
 	PlayheadSeconds int64  `json:"playheadSeconds"`
+}
+
+type ZoneEventState struct {
+	ZoneID           string `json:"zoneId"`
+	Phase            string `json:"phase"`
+	EventName        string `json:"eventName"`
+	CountdownSeconds int64  `json:"countdownSeconds,omitempty"`
+	RecoverySeconds  int64  `json:"recoverySeconds,omitempty"`
+	ActiveMinute     int    `json:"activeMinute,omitempty"`
 }

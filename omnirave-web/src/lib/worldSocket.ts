@@ -14,6 +14,7 @@ export function applyWorldSnapshot(
     activeZone: message.activeZone,
     players: message.players,
     zoneMedia: message.zoneMedia,
+    zoneEvents: message.zoneEvents,
   };
 }
 

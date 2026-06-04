@@ -273,6 +273,55 @@ func TestSessionService_ExchangeLaunchSessionReturnsInjectedZoneMedia(t *testing
 	require.Equal(t, "custom-neon-room", bootstrap.ZoneMedia[2].VideoID)
 }
 
+func TestSessionService_BuildRuntimeGuestLogoutIncludesZoneEvents(t *testing.T) {
+	svc := NewSessionService("http://localhost:4173/omnirave", "ws://localhost:8092/ws")
+	svc.now = func() time.Time {
+		return time.Date(2026, 6, 4, 15, 44, 50, 0, time.UTC)
+	}
+
+	response, err := svc.BuildRuntimeGuestLogout(context.Background(), "main_stage")
+	require.NoError(t, err)
+	require.Len(t, response.ZoneEvents, 3)
+	require.Equal(t, "main_stage", response.ZoneEvents[0].ZoneID)
+	require.Equal(t, "none", response.ZoneEvents[0].Phase)
+	require.Equal(t, "plurr_partay", response.ZoneEvents[2].ZoneID)
+	require.Equal(t, "lead_in", response.ZoneEvents[2].Phase)
+	require.Equal(t, "unity_peak", response.ZoneEvents[2].EventName)
+	require.EqualValues(t, 10, response.ZoneEvents[2].CountdownSeconds)
+}
+
+func TestSessionService_ExchangeLaunchSessionReturnsZoneEventsForAccountBootstrap(t *testing.T) {
+	userID := 42
+	svc := NewSessionServiceWithRepositories(
+		"http://localhost:4173/omnirave",
+		"ws://localhost:8092/ws",
+		repository.NewInMemoryProfileRepository(),
+		repository.NewInMemorySanctionRepository(),
+	)
+	svc.now = func() time.Time {
+		return time.Date(2026, 6, 4, 15, 30, 5, 0, time.UTC)
+	}
+
+	session, err := svc.CreateLaunchSession(context.Background(), model.LaunchRequest{
+		Mode: model.LaunchModeAccount,
+	}, model.PlayerIdentity{
+		UserID:   &userID,
+		Username: "alice",
+	})
+	require.NoError(t, err)
+
+	bootstrap, err := svc.ExchangeLaunchSession(context.Background(), model.SessionExchangeRequest{
+		Handoff: session.LaunchToken,
+		Mode:    model.LaunchModeAccount,
+	})
+	require.NoError(t, err)
+	require.Len(t, bootstrap.ZoneEvents, 3)
+	require.Equal(t, "underground", bootstrap.ZoneEvents[1].ZoneID)
+	require.Equal(t, "active", bootstrap.ZoneEvents[1].Phase)
+	require.Equal(t, "collapse", bootstrap.ZoneEvents[1].EventName)
+	require.EqualValues(t, 1, bootstrap.ZoneEvents[1].ActiveMinute)
+}
+
 func TestSessionService_ExchangeSignedInSessionReturnsPersistedDataAcrossServiceInstances(t *testing.T) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
