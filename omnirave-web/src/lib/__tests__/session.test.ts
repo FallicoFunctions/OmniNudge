@@ -19,6 +19,16 @@ describe('bootstrapSession', () => {
         playerName: 'Guest Nova',
         sessionToken: 'game-session-token',
         worldSessionToken: 'world-session-token',
+        lastVenue: 'main_stage',
+        settings: {
+          uiTheme: 'Luminous Panels',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
       }),
     });
 
@@ -27,6 +37,32 @@ describe('bootstrapSession', () => {
     expect(session.playerName).toBeDefined();
     expect(session.sessionToken).toBe('game-session-token');
     expect(session.worldSessionToken).toBe('world-session-token');
+  });
+
+  it('parses OmniRave settings and last venue from exchange payload', async () => {
+    const session = await bootstrapSession({
+      search: '?handoff=abc&mode=account',
+      fetcher: mockFetcher({
+        playerId: 'user-42',
+        playerName: 'nick',
+        worldSocketUrl: 'ws://example',
+        mode: 'account',
+        activeZone: 'main_stage',
+        lastVenue: 'underground',
+        settings: {
+          uiTheme: 'Hybrid Premium',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
+      }),
+    });
+
+    expect(session.lastVenue).toBe('underground');
+    expect(session.settings.uiTheme).toBe('Hybrid Premium');
   });
 
   it('persists signed-in loadouts with the exchanged game session token', async () => {
@@ -39,6 +75,16 @@ describe('bootstrapSession', () => {
         worldSocketUrl: 'ws://localhost:8092/ws',
         mode: 'account',
         activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: {
+          uiTheme: 'Luminous Panels',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
         sessionToken: 'runtime-token-1',
       },
       loadout: { hair: 'buzz', top: 'black_mesh' },
@@ -67,6 +113,16 @@ describe('bootstrapSession', () => {
         worldSocketUrl: 'ws://localhost:8092/ws',
         mode: 'account',
         activeZone: 'underground',
+        lastVenue: 'underground',
+        settings: {
+          uiTheme: 'Luminous Panels',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
         sessionToken: 'runtime-token-2',
       },
       point: { x: 42, y: 0, z: 9 },

@@ -1,6 +1,8 @@
 export type RuntimeMode = 'account' | 'guest';
 export type RuntimeZoneID = 'main_stage' | 'underground' | 'plurr_partay';
 
+import { DEFAULT_RUNTIME_SETTINGS, type RuntimeSettings } from './settings';
+
 export interface RuntimePoint {
   x: number;
   y: number;
@@ -36,6 +38,8 @@ export interface RuntimeSession {
   worldSocketUrl: string;
   mode: RuntimeMode;
   activeZone: RuntimeZoneID;
+  lastVenue: RuntimeZoneID;
+  settings: RuntimeSettings;
   loadout?: Record<string, string>;
   zoneMedia?: RuntimeZoneMedia[];
   returnPoint?: RuntimePoint;
@@ -67,7 +71,13 @@ export async function bootstrapSession(input: {
     throw new Error(`Session exchange failed with ${response.status}`);
   }
 
-  return (await response.json()) as RuntimeSession;
+  const payload = (await response.json()) as Partial<RuntimeSession>;
+  return {
+    ...payload,
+    activeZone: payload.activeZone ?? 'main_stage',
+    lastVenue: payload.lastVenue ?? 'main_stage',
+    settings: payload.settings ?? DEFAULT_RUNTIME_SETTINGS,
+  } as RuntimeSession;
 }
 
 export async function saveLoadout(input: {
