@@ -22,3 +22,11 @@ Non-negotiable visual targets:
 - abandoned railcar booth
 - catwalk + ladder read
 - hostile industrial pressure
+
+Locked files now present:
+
+- `approved-concept-primary.png` = `underground-track-floor-03.png`
+- `approved-concept-spawn-view.png` = `underground-platform-arrival-03.png`
+- `approved-concept-internal-view.png` = `underground-track-floor-03.png`
+- `approved-concept-side-route.png` = `outdoor-hub-underground-01.png`
+- `approved-concept-vip-view.png` = `underground-vip-catwalk-03.png`
