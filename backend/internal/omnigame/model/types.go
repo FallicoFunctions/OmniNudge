@@ -113,6 +113,17 @@ type SessionExchangeResponse struct {
 	ReturnPoint       *SavedPoint       `json:"returnPoint,omitempty"`
 }
 
+type RuntimeAuthRequest struct {
+	Username        string            `json:"username,omitempty"`
+	Email           string            `json:"email,omitempty"`
+	Password        string            `json:"password,omitempty"`
+	CurrentVenue    string            `json:"currentVenue"`
+	CurrentLoadout  map[string]string `json:"currentLoadout,omitempty"`
+	CurrentSettings OmniRaveSettings  `json:"currentSettings"`
+}
+
+type RuntimeAuthResponse = SessionExchangeResponse
+
 type ZoneMediaState struct {
 	ZoneID          string `json:"zoneId"`
 	VideoID         string `json:"videoId"`
