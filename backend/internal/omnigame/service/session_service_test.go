@@ -160,13 +160,13 @@ func TestSessionService_ExchangeLaunchSessionReturnsInjectedZoneMedia(t *testing
 			},
 		},
 		{
-			ZoneID: omniraveworld.ZoneTechnoRoom,
+			ZoneID: omniraveworld.ZoneUnderground,
 			Entries: []omniraveworld.PlaylistEntry{
 				{VideoID: "custom-techno-room", Duration: 30 * time.Minute},
 			},
 		},
 		{
-			ZoneID: omniraveworld.ZoneNeonRoom,
+			ZoneID: omniraveworld.ZonePlurrPartay,
 			Entries: []omniraveworld.PlaylistEntry{
 				{VideoID: "custom-neon-room", Duration: 30 * time.Minute},
 			},
@@ -444,14 +444,14 @@ func TestSessionService_ExchangeLaunchSessionMatchesWorldMediaAcrossSeparateServ
 			},
 		},
 		{
-			ZoneID:    omniraveworld.ZoneTechnoRoom,
+			ZoneID:    omniraveworld.ZoneUnderground,
 			StartedAt: fixedAnchor,
 			Entries: []omniraveworld.PlaylistEntry{
 				{VideoID: "shared-techno-room", Duration: 30 * time.Minute},
 			},
 		},
 		{
-			ZoneID:    omniraveworld.ZoneNeonRoom,
+			ZoneID:    omniraveworld.ZonePlurrPartay,
 			StartedAt: fixedAnchor,
 			Entries: []omniraveworld.PlaylistEntry{
 				{VideoID: "shared-neon-room", Duration: 30 * time.Minute},

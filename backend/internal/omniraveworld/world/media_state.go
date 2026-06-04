@@ -103,7 +103,7 @@ func (m *MediaState) Snapshots(now time.Time) []ZoneMediaSnapshot {
 	defer m.mu.RUnlock()
 
 	snapshots := make([]ZoneMediaSnapshot, 0, len(m.zones))
-	for _, zone := range []ZoneID{ZoneMainStage, ZoneTechnoRoom, ZoneNeonRoom} {
+	for _, zone := range []ZoneID{ZoneMainStage, ZoneUnderground, ZonePlurrPartay} {
 		current := m.zones[zone]
 		if resolved, ok := resolvePlaylistState(current, m.playlists[zone], now); ok {
 			snapshots = append(snapshots, resolved)
@@ -159,14 +159,14 @@ func DefaultStagePlaylists() []StagePlaylist {
 			},
 		},
 		{
-			ZoneID: ZoneTechnoRoom,
+			ZoneID: ZoneUnderground,
 			Entries: []PlaylistEntry{
 				{VideoID: "techno-room-youtube", Duration: 24 * time.Minute},
 				{VideoID: "techno-room-youtube-2", Duration: 26 * time.Minute},
 			},
 		},
 		{
-			ZoneID: ZoneNeonRoom,
+			ZoneID: ZonePlurrPartay,
 			Entries: []PlaylistEntry{
 				{VideoID: "neon-room-youtube", Duration: 22 * time.Minute},
 				{VideoID: "neon-room-youtube-2", Duration: 25 * time.Minute},

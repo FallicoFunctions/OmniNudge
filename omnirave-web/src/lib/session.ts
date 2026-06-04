@@ -1,5 +1,5 @@
 export type RuntimeMode = 'account' | 'guest';
-export type RuntimeZoneID = 'main_stage' | 'techno_room' | 'neon_room';
+export type RuntimeZoneID = 'main_stage' | 'underground' | 'plurr_partay';
 
 export interface RuntimePoint {
   x: number;

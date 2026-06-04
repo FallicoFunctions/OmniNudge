@@ -11,7 +11,7 @@ const ROOM_PALETTES = {
     floor: '#140c29',
     accent: '#ff6dd0',
   },
-  techno_room: {
+  underground: {
     skyTop: '#110d18',
     skyBottom: '#03060c',
     beamA: 'rgba(90, 255, 208, 0.18)',
@@ -19,7 +19,7 @@ const ROOM_PALETTES = {
     floor: '#0a0d13',
     accent: '#63f7d2',
   },
-  neon_room: {
+  plurr_partay: {
     skyTop: '#261038',
     skyBottom: '#09101e',
     beamA: 'rgba(255, 202, 85, 0.24)',
