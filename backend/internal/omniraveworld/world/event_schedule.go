@@ -24,6 +24,7 @@ type ZoneEventState struct {
 
 type EventSchedule struct {
 	rules map[ZoneID]eventScheduleRule
+	order []ZoneID
 }
 
 type eventScheduleRule struct {
@@ -58,6 +59,7 @@ func NewEventSchedule() EventSchedule {
 				recoveryDuration: 10,
 			},
 		},
+		order: []ZoneID{ZoneMainStage, ZoneUnderground, ZonePlurrPartay},
 	}
 }
 
@@ -78,23 +80,22 @@ func (s EventSchedule) StateFor(zone ZoneID, now time.Time) ZoneEventState {
 		}
 	}
 
-	activeEnd := rule.activeStart + rule.activeDuration
-	if secondOfHour >= rule.activeStart && secondOfHour < activeEnd {
+	if activeOffset, ok := windowOffset(secondOfHour, rule.activeStart, rule.activeDuration); ok {
 		return ZoneEventState{
-			ZoneID:        zone,
-			Phase:         EventPhaseActive,
-			EventName:     rule.eventName,
-			ActiveMinute:  int((secondOfHour-rule.activeStart)/60) + 1,
+			ZoneID:       zone,
+			Phase:        EventPhaseActive,
+			EventName:    rule.eventName,
+			ActiveMinute: int(activeOffset/60) + 1,
 		}
 	}
 
-	recoveryEnd := activeEnd + rule.recoveryDuration
-	if secondOfHour >= activeEnd && secondOfHour < recoveryEnd {
+	recoveryStart := (rule.activeStart + rule.activeDuration) % secondsPerHour
+	if recoveryOffset, ok := windowOffset(secondOfHour, recoveryStart, rule.recoveryDuration); ok {
 		return ZoneEventState{
 			ZoneID:          zone,
 			Phase:           EventPhaseRecovery,
 			EventName:       rule.eventName,
-			RecoverySeconds: recoveryEnd - secondOfHour,
+			RecoverySeconds: rule.recoveryDuration - recoveryOffset,
 		}
 	}
 
@@ -102,11 +103,11 @@ func (s EventSchedule) StateFor(zone ZoneID, now time.Time) ZoneEventState {
 }
 
 func (s EventSchedule) Snapshot(now time.Time) []ZoneEventState {
-	return []ZoneEventState{
-		s.StateFor(ZoneMainStage, now),
-		s.StateFor(ZoneUnderground, now),
-		s.StateFor(ZonePlurrPartay, now),
+	snapshot := make([]ZoneEventState, 0, len(s.order))
+	for _, zone := range s.order {
+		snapshot = append(snapshot, s.StateFor(zone, now))
 	}
+	return snapshot
 }
 
 func (r eventScheduleRule) countdown(secondOfHour int64) (int64, bool) {
@@ -114,20 +115,25 @@ func (r eventScheduleRule) countdown(secondOfHour int64) (int64, bool) {
 		return 0, false
 	}
 
-	leadInStart := r.activeStart - r.leadInDuration
-	if leadInStart >= 0 {
-		if secondOfHour >= leadInStart && secondOfHour < r.activeStart {
-			return r.activeStart - secondOfHour, true
-		}
-		return 0, false
-	}
-
-	if secondOfHour >= secondsPerHour+leadInStart {
-		return secondsPerHour - secondOfHour + r.activeStart, true
-	}
-	if secondOfHour < r.activeStart {
-		return r.activeStart - secondOfHour, true
+	leadInStart := (r.activeStart - r.leadInDuration + secondsPerHour) % secondsPerHour
+	if offset, ok := windowOffset(secondOfHour, leadInStart, r.leadInDuration); ok {
+		return r.leadInDuration - offset, true
 	}
 
 	return 0, false
+}
+
+func windowOffset(secondOfHour, start, duration int64) (int64, bool) {
+	if duration <= 0 {
+		return 0, false
+	}
+
+	offset := secondOfHour - start
+	if offset < 0 {
+		offset += secondsPerHour
+	}
+	if offset >= duration {
+		return 0, false
+	}
+	return offset, true
 }
