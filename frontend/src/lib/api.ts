@@ -38,6 +38,10 @@ class ApiClient {
     const response = await fetch(url, {
       ...options,
       headers,
+      // Bypass browser HTTP cache on every API call. React Query manages its own
+      // cache — browser-level caching causes stale responses after auth changes or
+      // route changes, where the old cached body is served instead of hitting the network.
+      cache: 'no-store',
     });
 
     const parseJson = async () => {
