@@ -22,3 +22,10 @@ export const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   crouchMode: 'hold',
   cameraFollow: 'free',
 };
+
+export function normalizeRuntimeSettings(settings?: Partial<RuntimeSettings> | null): RuntimeSettings {
+  return {
+    ...DEFAULT_RUNTIME_SETTINGS,
+    ...settings,
+  };
+}

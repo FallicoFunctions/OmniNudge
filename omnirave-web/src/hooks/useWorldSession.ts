@@ -12,7 +12,7 @@ import type { ZoneID } from '../lib/zones';
 
 export function useWorldSession() {
   const [session, setSession] = useState<RuntimeSession | null>(null);
-  const [settings, setSettings] = useState<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
+  const [settings, baseSetSettings] = useState<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [hasJoinedWorld, setHasJoinedWorld] = useState(false);
@@ -84,6 +84,11 @@ export function useWorldSession() {
 
   function moveToZone(zone: ZoneID) {
     worldSocketRef.current?.moveToZone(zone);
+  }
+
+  function setSettings(nextSettings: RuntimeSettings) {
+    baseSetSettings(nextSettings);
+    setSession((current) => (current ? { ...current, settings: nextSettings } : current));
   }
 
   useEffect(() => {
