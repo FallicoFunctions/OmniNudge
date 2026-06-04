@@ -147,7 +147,16 @@ Working total footprint targets:
 
 These are total venue footprints, not just dance-floor rectangles.
 
-### 4.4 World Layout
+### 4.4 Venue Height Targets
+
+Working venue height targets:
+- `Main Stage`: about `175 feet` tall
+- `The Underground`: average main hall height about `32 feet`, with crown sections up to about `38 feet`
+- `P.L.U.R.R. Partay`: main warehouse ceiling about `52 feet`, with some structure reaching about `60 feet`
+
+These are intended runtime scale targets, not decorative exaggerations.
+
+### 4.5 World Layout
 
 Default orientation from spawn:
 - player spawns at the back plaza of `Main Stage`
@@ -1259,6 +1268,13 @@ No in-game player media controls:
 ### 13.3 Stage Screens
 
 Each venue has one main screen system in v1.
+
+Working physical screen size targets:
+- `Main Stage`: about `300 feet` wide by `100 feet` tall
+- `The Underground`: about `40 feet` wide by `16 feet` tall
+- `P.L.U.R.R. Partay`: about `72 feet` wide by `28 feet` tall
+
+These screen sizes are part of the real-life scale target for the venues. The screen systems should feel physically integrated into the venue architecture rather than arbitrarily scaled UI billboards.
 
 Screen system rules:
 - modular
