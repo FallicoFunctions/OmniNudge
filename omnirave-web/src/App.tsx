@@ -123,7 +123,11 @@ export default function App() {
           stagePlayersRef.current = players;
         }}
       />
-      <WorldScene session={session} unlocked={mediaUnlock.unlocked} />
+      <WorldScene
+        session={session}
+        unlocked={mediaUnlock.unlocked}
+        onGuestSprintAttempt={requestGuestSprintUnlock}
+      />
 
       <div className="hud-anchor hud-top-left">
         <TopLeftControls

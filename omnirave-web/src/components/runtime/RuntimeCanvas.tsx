@@ -22,7 +22,11 @@ export function RuntimeCanvas(props: { session: RuntimeSession; unlocked: boolea
         <directionalLight position={[32, 42, 18]} intensity={1.35} />
         <Environment preset="night" />
         <FestivalBlockout activeZone={session.activeZone} unlocked={unlocked} />
-        <RemotePlayerMarkers players={session.players ?? []} currentPlayerId={session.playerId} />
+        <RemotePlayerMarkers
+          players={session.players ?? []}
+          currentPlayerId={session.playerId}
+          displayNames={session.settings.displayNames}
+        />
         <LocalPlayerRig session={session} />
       </Canvas>
     </div>
