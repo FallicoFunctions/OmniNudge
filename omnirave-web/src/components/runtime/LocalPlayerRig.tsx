@@ -1,10 +1,29 @@
+import { useEffect } from 'react';
 import type { RuntimeSession } from '../../lib/session';
 
-export function LocalPlayerRig(props: { session: RuntimeSession }) {
+export function LocalPlayerRig(props: {
+  session: RuntimeSession;
+  onGuestSprintAttempt?: () => void;
+}) {
   const self =
     props.session.players?.find((player) => player.id === props.session.playerId) ?? {
       position: { x: 0, y: 0, z: 0 },
     };
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Shift' || props.session.mode !== 'guest') {
+        return;
+      }
+
+      props.onGuestSprintAttempt?.();
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [props.onGuestSprintAttempt, props.session.mode]);
 
   return (
     <group position={[self.position.x, 0, self.position.z]}>
