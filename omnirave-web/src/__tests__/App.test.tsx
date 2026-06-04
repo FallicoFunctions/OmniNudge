@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
+import type { RuntimeZoneEvent } from '../lib/session';
 
 const mockWorldSession = {
   session: {
@@ -25,7 +26,7 @@ const mockWorldSession = {
       { zoneId: 'underground' as const, videoId: 'def', playlistIndex: 0, playheadSeconds: 4 },
       { zoneId: 'plurr_partay' as const, videoId: 'ghi', playlistIndex: 0, playheadSeconds: 8 },
     ],
-    zoneEvents: [],
+    zoneEvents: [] as RuntimeZoneEvent[],
     players: [
       {
         id: 'guest-42',
