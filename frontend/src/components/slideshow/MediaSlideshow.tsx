@@ -10,12 +10,15 @@ interface MediaSlideshowProps {
   }>;
   initialIndex?: number;
   onClose: () => void;
+  /** Optional mini chat strip rendered below the media. */
+  chatContent?: ReactNode;
 }
 
 export function MediaSlideshow({
   items,
   initialIndex = 0,
   onClose,
+  chatContent,
 }: MediaSlideshowProps) {
   const slideshowItems: SlideshowItem[] = items.map((item) => ({
     id: item.id,
@@ -30,6 +33,7 @@ export function MediaSlideshow({
       autoAdvance={false}
       autoAdvanceInterval={5000}
       showControls={true}
+      bottomContent={chatContent}
       renderControls={({
         autoAdvance,
         autoAdvanceInterval,

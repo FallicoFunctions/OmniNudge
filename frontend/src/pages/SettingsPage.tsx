@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import ThemeSelector from '../components/themes/ThemeSelector';
 import ThemeEditor from '../components/themes/ThemeEditor';
 import { LanguageSelector } from '../components/settings/LanguageSelector';
@@ -11,8 +12,12 @@ import { getOwnPublicKeyBase64 } from '../services/keyManagementService';
 import { usersService } from '../services/usersService';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { accountService } from '../services/accountService';
+import { userSettingsService } from '../services/userSettingsService';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { FEATURE_FLAGS } from '../config/featureFlags';
+import type { AutoDeleteDuration } from '../types/messages';
+import { secondsToDuration, durationToSeconds, isDurationNever } from '../types/messages';
+import { AutoDeleteDurationPicker } from '../components/messages/AutoDeleteDurationPicker';
 import {
   getForcedDocumentDirection,
   setForcedDocumentDirection,
@@ -144,6 +149,44 @@ export default function SettingsPage() {
     const forcedDirection = getForcedDocumentDirection();
     return forcedDirection ?? 'auto';
   });
+
+  // Global auto-delete
+  const { data: rawSettings } = useQuery({
+    queryKey: ['user-settings-raw'],
+    queryFn: () => userSettingsService.get(),
+  });
+  // Convert nanosecond integer (Go time.Duration JSON) to total seconds.
+  const nsToSeconds = (ns: number | null | undefined): number =>
+    ns != null ? Math.floor(ns / 1e9) : 0;
+
+  const savedGlobalSeconds = nsToSeconds(rawSettings?.default_auto_delete_after);
+  const savedGlobalDuration = secondsToDuration(savedGlobalSeconds);
+  const [globalDuration, setGlobalDuration] = useState<AutoDeleteDuration>({ days: 0, hours: 0, minutes: 0 });
+  const [pendingGlobalSeconds, setPendingGlobalSeconds] = useState<number | null>(null);
+  useEffect(() => {
+    setGlobalDuration(savedGlobalDuration);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedGlobalSeconds]);
+  const saveGlobalAutoDeleteMutation = useMutation({
+    mutationFn: ({ seconds, retroactive }: { seconds: number; retroactive: boolean }) =>
+      userSettingsService.update({ default_auto_delete_seconds: seconds, auto_delete_apply_retroactive: retroactive }),
+    onSuccess: () => {
+      setPendingGlobalSeconds(null);
+    },
+    onError: () => {
+      setPendingGlobalSeconds(null);
+    },
+  });
+  const selectedGlobalSeconds = durationToSeconds(globalDuration);
+  const globalIsDirty = selectedGlobalSeconds !== savedGlobalSeconds;
+  const handleGlobalAutoDeleteSave = () => {
+    if (!globalIsDirty) return;
+    if (isDurationNever(globalDuration)) {
+      saveGlobalAutoDeleteMutation.mutate({ seconds: 0, retroactive: false });
+    } else {
+      setPendingGlobalSeconds(selectedGlobalSeconds);
+    }
+  };
 
   // Data Export (P0-016)
   const [isRequestingExport, setIsRequestingExport] = useState(false);
@@ -795,9 +838,71 @@ export default function SettingsPage() {
                 </option>
               </select>
             </div>
+
+            {/* Global Auto-Delete */}
+            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                {t('messages.autoDelete.label')}
+              </p>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)] mb-4">
+                {t('messages.autoDelete.description')}
+              </p>
+              <AutoDeleteDurationPicker
+                value={globalDuration}
+                onChange={setGlobalDuration}
+                disabled={saveGlobalAutoDeleteMutation.isPending}
+              />
+              <button
+                type="button"
+                onClick={handleGlobalAutoDeleteSave}
+                disabled={!globalIsDirty || saveGlobalAutoDeleteMutation.isPending}
+                className="mt-4 w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
+              >
+                {t('common.save')}
+              </button>
+            </div>
           </div>
           </Panel>
         </div>
+
+        {/* Global auto-delete retroactive confirm */}
+        {pendingGlobalSeconds !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
+              <h3 className="text-base font-semibold text-[var(--color-text-primary)] mb-2">
+                {t('messages.autoDelete.applyRetroTitle')}
+              </h3>
+              <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+                {t('messages.autoDelete.applyRetroBody')}
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => saveGlobalAutoDeleteMutation.mutate({ seconds: pendingGlobalSeconds, retroactive: true })}
+                  disabled={saveGlobalAutoDeleteMutation.isPending}
+                  className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                >
+                  {t('messages.autoDelete.applyToAll')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => saveGlobalAutoDeleteMutation.mutate({ seconds: pendingGlobalSeconds, retroactive: false })}
+                  disabled={saveGlobalAutoDeleteMutation.isPending}
+                  className="w-full rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
+                >
+                  {t('messages.autoDelete.applyNewOnly')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingGlobalSeconds(null)}
+                  className="w-full rounded-md px-4 py-2 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-hover)]"
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div hidden={activeTab !== 'general'}>
           {/* SETTINGS-5: Category header for Preferences */}

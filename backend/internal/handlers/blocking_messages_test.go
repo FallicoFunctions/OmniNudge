@@ -53,7 +53,7 @@ func setupBlockingMessagesTest(t *testing.T) (
 	msgRepo := models.NewMessageRepository(db.Pool)
 
 	blockingHandler = NewBlockingHandler(db.Pool, userRepo)
-	convHandler = NewConversationsHandler(db.Pool, convRepo, msgRepo, userRepo)
+	convHandler = NewConversationsHandler(db.Pool, convRepo, msgRepo, userRepo, nil)
 
 	return blockingHandler, convHandler, blocker.ID, blocked.ID, blocker.Username, blocked.Username, func() { db.Close() }
 }

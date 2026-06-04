@@ -143,13 +143,15 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           // MessagesPage sidebar) refetches with accurate unread counts.
           queryClient.invalidateQueries({ queryKey: ['conversations'] });
 
-          // Dispatch custom event for notification sound
-          window.dispatchEvent(new CustomEvent('new-message', {
-            detail: {
-              conversationId: message.conversation_id,
-              senderId: message.sender_id
-            }
-          }));
+          // Dispatch custom event for notification sound — suppress for system messages.
+          if (message.message_type !== 'system') {
+            window.dispatchEvent(new CustomEvent('new-message', {
+              detail: {
+                conversationId: message.conversation_id,
+                senderId: message.sender_id
+              }
+            }));
+          }
           break;
         }
 
@@ -545,6 +547,54 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           window.dispatchEvent(new CustomEvent<WsReactionRemovedPayload>('reaction-removed', {
             detail: data.payload as WsReactionRemovedPayload,
           }));
+          break;
+        }
+
+        case 'message_auto_deleted': {
+          const { message_id, conversation_id } = data.payload as { message_id: number; conversation_id: number };
+          queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
+            ['messages', conversation_id],
+            (prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                pages: prev.pages.map((page) => ({
+                  ...page,
+                  messages: page.messages.filter((msg) => msg.id !== message_id),
+                })),
+              };
+            }
+          );
+          break;
+        }
+
+        case 'message_tombstoned': {
+          // The message had replies and was scrubbed in-place (not removed).
+          // Update the cached message to show the "[deleted]" placeholder so the
+          // reply thread stays coherent for the recipient.
+          const { message_id, conversation_id, message_type, content } = data.payload as {
+            message_id: number;
+            conversation_id: number;
+            message_type: string;
+            content: string;
+          };
+          queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
+            ['messages', conversation_id],
+            (prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                pages: prev.pages.map((page) => ({
+                  ...page,
+                  messages: page.messages.map((msg) =>
+                    msg.id === message_id
+                      ? { ...msg, message_type: message_type as Message['message_type'], encrypted_content: content, sender_encrypted_content: null }
+                      : msg
+                  ),
+                })),
+              };
+            }
+          );
           break;
         }
 

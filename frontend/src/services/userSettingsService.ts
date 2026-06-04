@@ -42,7 +42,11 @@ export type UpdateUserSettingsRequest = Partial<
     | 'notify_comment_velocity'
     | 'daily_digest'
   >
->;
+> & {
+  // Total seconds for the global auto-delete duration. 0 means "never".
+  default_auto_delete_seconds?: number;
+  auto_delete_apply_retroactive?: boolean;
+};
 
 export const userSettingsService = {
   async get(): Promise<UserSettings> {

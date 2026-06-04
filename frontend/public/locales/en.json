@@ -125,6 +125,7 @@
     "profile": "Profile",
     "admin": "Admin",
     "hubs": "Hubs",
+    "games": "Games",
     "search": "Search",
     "create": "Create",
     "menu": "Menu"
@@ -133,10 +134,24 @@
     "profile": "Profile",
     "settings": "Settings",
     "hubs": "Browse Hubs",
+    "games": "Games",
     "about": "About",
     "admin": "Admin Panel",
     "logout": "Log Out",
     "logoutConfirm": "Are you sure you want to log out?"
+  },
+  "gamesPage": {
+    "eyebrow": "OmniGame",
+    "title": "OmniGame",
+    "description": "Browse multiplayer worlds built for OmniNudge.",
+    "availableNow": "Available now",
+    "viewGame": "View game"
+  },
+  "gameDetailPage": {
+    "eyebrow": "OmniGame / OmniRave",
+    "play": "Play",
+    "starting": "Starting...",
+    "launchError": "Unable to start OmniRave right now."
   },
   "mainLayout": {
     "skipToMainContent": "Skip to main content",
@@ -1664,7 +1679,22 @@
       "toggleError": "Failed to update folder. Please try again.",
       "deleteError": "Failed to delete folder. Please try again.",
       "previewLabel": "Folder preview: {{name}}",
-      "emptyHint": "No folders yet — press + to create one"
+      "emptyHint": "No folders yet — press + to create one",
+      "modMail": "Mod Mail"
+    },
+    "chatSettings": "Chat Settings",
+    "autoDelete": {
+      "label": "Auto-delete my messages after",
+      "description": "Your sent messages will be permanently deleted after this time. Other participants' messages are not affected.",
+      "days": "Days",
+      "hours": "Hours",
+      "minutes": "Minutes",
+      "neverHint": "All dials at zero means messages are never auto-deleted.",
+      "applyRetroTitle": "Apply to previous messages?",
+      "applyRetroBody": "Would you like to also apply this setting to messages you've already sent in this conversation?",
+      "applyToAll": "Yes, apply to all my messages",
+      "applyNewOnly": "No, new messages only",
+      "usingGlobalDefault": "No per-chat override — using your global default."
     }
   },
   "posts": {
@@ -2557,7 +2587,9 @@
     "closeLabel": "Close slideshow (Esc)",
     "previousLabel": "Previous (←)",
     "nextLabel": "Next (→)",
-    "counter": "{{current}} of {{total}}",
+    "counter": {
+      "imageOf": "{{current}} of {{total}}"
+    },
     "noMediaFound": "No media found",
     "redditMedia": {
       "title": "Reddit Media Slideshow",
