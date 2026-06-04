@@ -7,6 +7,7 @@ import { WorldScene } from '../WorldScene';
 
 const markerPropsSpy = vi.hoisted(() => vi.fn());
 const localRigPropsSpy = vi.hoisted(() => vi.fn());
+const festivalBlockoutPropsSpy = vi.hoisted(() => vi.fn());
 
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children }: { children?: ReactNode }) => (
@@ -19,7 +20,10 @@ vi.mock('@react-three/drei', () => ({
 }));
 
 vi.mock('../runtime/FestivalBlockout', () => ({
-  FestivalBlockout: () => null,
+  FestivalBlockout: (props: unknown) => {
+    festivalBlockoutPropsSpy(props);
+    return null;
+  },
 }));
 
 vi.mock('../runtime/RemotePlayerMarkers', () => ({
@@ -38,6 +42,7 @@ vi.mock('../runtime/LocalPlayerRig', () => ({
 
 afterEach(() => {
   cleanup();
+  festivalBlockoutPropsSpy.mockClear();
 });
 
 describe('WorldScene', () => {
@@ -51,6 +56,7 @@ describe('WorldScene', () => {
       activeZone: 'main_stage' as const,
       lastVenue: 'main_stage' as const,
       settings: DEFAULT_RUNTIME_SETTINGS,
+      zoneEvents: [{ zoneId: 'main_stage', phase: 'lead_in', eventName: 'fireworks', countdownSeconds: 10 }],
       players: [
         {
           id: 'guest-42',
@@ -77,6 +83,11 @@ describe('WorldScene', () => {
       currentPlayerId: 'guest-42',
       displayNames: true,
       players: session.players,
+    });
+    expect(festivalBlockoutPropsSpy).toHaveBeenCalledWith({
+      activeZone: 'main_stage',
+      unlocked: true,
+      zoneEvent: session.zoneEvents?.[0],
     });
     expect(localRigPropsSpy).toHaveBeenCalledWith({
       onGuestSprintAttempt,

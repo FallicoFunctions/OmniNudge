@@ -1,5 +1,6 @@
 import { Environment } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
+import { activeZoneEvent } from '../lib/events';
 import type { RuntimeSession } from '../lib/session';
 import { FestivalBlockout } from './runtime/FestivalBlockout';
 import { LocalPlayerRig } from './runtime/LocalPlayerRig';
@@ -11,6 +12,7 @@ export function WorldScene(props: {
   onGuestSprintAttempt?: () => void;
 }) {
   const { session, unlocked, onGuestSprintAttempt } = props;
+  const zoneEvent = activeZoneEvent(session);
 
   return (
     <div aria-label="OmniRave 3D runtime" className="world-scene-canvas">
@@ -25,7 +27,7 @@ export function WorldScene(props: {
         <ambientLight intensity={0.95} />
         <directionalLight position={[32, 42, 18]} intensity={1.35} />
         <Environment preset="night" />
-        <FestivalBlockout activeZone={session.activeZone} unlocked={unlocked} />
+        <FestivalBlockout activeZone={session.activeZone} unlocked={unlocked} zoneEvent={zoneEvent} />
         <RemotePlayerMarkers
           players={session.players ?? []}
           currentPlayerId={session.playerId}
