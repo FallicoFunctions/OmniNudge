@@ -58,3 +58,40 @@ func TestPostgresStagePlaylistRepository_IgnoresInactiveSetlists(t *testing.T) {
 	require.Len(t, playlists, 3)
 	require.Equal(t, "main-stage-youtube", playlists[0].Entries[0].VideoID)
 }
+
+func TestPostgresStagePlaylistRepository_UpgradeRenamesLegacyZoneIDs(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, database.DropSchema(ctx, db))
+	require.NoError(t, db.Migrate(ctx))
+
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE omnirave_stage_setlists
+		SET zone_id = CASE
+			WHEN zone_id = 'underground' THEN 'techno_room'
+			WHEN zone_id = 'plurr_partay' THEN 'neon_room'
+			ELSE zone_id
+		END
+	`)
+	require.NoError(t, err)
+
+	_, err = db.Pool.Exec(ctx, `
+		DELETE FROM public.schema_migrations
+		WHERE version = '108_omnirave_stage_zone_id_rename'
+	`)
+	require.NoError(t, err)
+
+	require.NoError(t, db.Migrate(ctx))
+
+	repo := NewPostgresStagePlaylistRepository(db.Pool)
+
+	playlists, err := repo.LoadActiveStagePlaylists(ctx)
+	require.NoError(t, err)
+	require.Len(t, playlists, 3)
+	require.Equal(t, world.ZoneMainStage, playlists[0].ZoneID)
+	require.Equal(t, world.ZoneUnderground, playlists[1].ZoneID)
+	require.Equal(t, world.ZonePlurrPartay, playlists[2].ZoneID)
+}
