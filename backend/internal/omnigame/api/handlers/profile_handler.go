@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/omnigame/model"
 	"github.com/omninudge/backend/internal/omnigame/service"
+	omniraveworld "github.com/omninudge/backend/internal/omniraveworld/world"
 	"github.com/omninudge/backend/internal/utils"
 )
 
@@ -24,7 +26,7 @@ type saveRuntimeSettingsRequest struct {
 }
 
 type saveLastVenueRequest struct {
-	LastVenue string `json:"lastVenue" binding:"required,oneof=main_stage underground plurr_partay"`
+	LastVenue string `json:"lastVenue" binding:"required"`
 }
 
 func NewProfileHandler(profiles *service.ProfileService) *ProfileHandler {
@@ -118,6 +120,10 @@ func (h *ProfileHandler) SaveLastVenue(c *gin.Context) {
 		utils.RespondBadRequest(c, "Invalid request body", err)
 		return
 	}
+	if !isAuthoritativeVenueID(payload.LastVenue) {
+		utils.RespondBadRequest(c, "Invalid request body", fmt.Errorf("invalid lastVenue %q", payload.LastVenue))
+		return
+	}
 
 	if err := h.profiles.SaveLastVenue(c.Request.Context(), userID.(int), payload.LastVenue); err != nil {
 		utils.RespondInternalError(c, "Internal Server Error", err)
@@ -141,4 +147,13 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
 	}
 
 	utils.RespondSuccess(c, profile)
+}
+
+func isAuthoritativeVenueID(venue string) bool {
+	switch venue {
+	case string(omniraveworld.ZoneMainStage), string(omniraveworld.ZoneUnderground), string(omniraveworld.ZonePlurrPartay):
+		return true
+	default:
+		return false
+	}
 }
