@@ -212,7 +212,6 @@ export function FolderList({
                 <FolderRow
                   icon={folder.icon}
                   label={folder.name}
-                  count={folder.conversation_count}
                   active={isActive}
                   color={folder.color}
                   isDeleting={isDeleting}
