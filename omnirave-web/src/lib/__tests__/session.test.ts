@@ -66,7 +66,7 @@ describe('bootstrapSession', () => {
         playerName: 'alice',
         worldSocketUrl: 'ws://localhost:8092/ws',
         mode: 'account',
-        activeZone: 'techno_room',
+        activeZone: 'underground',
         sessionToken: 'runtime-token-2',
       },
       point: { x: 42, y: 0, z: 9 },

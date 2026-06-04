@@ -27,8 +27,8 @@ WITH inserted_setlists AS (
   INSERT INTO omnirave_stage_setlists (zone_id, name, is_active)
   VALUES
     ('main_stage', 'launch-default', true),
-    ('techno_room', 'launch-default', true),
-    ('neon_room', 'launch-default', true)
+    ('underground', 'launch-default', true),
+    ('plurr_partay', 'launch-default', true)
   RETURNING id, zone_id
 )
 INSERT INTO omnirave_stage_setlist_entries (setlist_id, position, video_id, duration_seconds)
@@ -44,17 +44,17 @@ FROM (
   UNION ALL
   SELECT id, zone_id, 0 AS position, 'techno-room-youtube' AS video_id, 1440 AS duration_seconds
   FROM inserted_setlists
-  WHERE zone_id = 'techno_room'
+  WHERE zone_id = 'underground'
   UNION ALL
   SELECT id, zone_id, 1 AS position, 'techno-room-youtube-2' AS video_id, 1560 AS duration_seconds
   FROM inserted_setlists
-  WHERE zone_id = 'techno_room'
+  WHERE zone_id = 'underground'
   UNION ALL
   SELECT id, zone_id, 0 AS position, 'neon-room-youtube' AS video_id, 1320 AS duration_seconds
   FROM inserted_setlists
-  WHERE zone_id = 'neon_room'
+  WHERE zone_id = 'plurr_partay'
   UNION ALL
   SELECT id, zone_id, 1 AS position, 'neon-room-youtube-2' AS video_id, 1500 AS duration_seconds
   FROM inserted_setlists
-  WHERE zone_id = 'neon_room'
+  WHERE zone_id = 'plurr_partay'
 ) seeded_entries;

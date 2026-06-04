@@ -8,7 +8,7 @@ import {
   type StagePlayerMap,
 } from '../lib/youtube';
 
-const ZONES: RuntimeZoneID[] = ['main_stage', 'techno_room', 'neon_room'];
+const ZONES: RuntimeZoneID[] = ['main_stage', 'underground', 'plurr_partay'];
 
 export function StageAudioDeck(props: {
   zoneMedia?: RuntimeZoneMedia[];
@@ -21,11 +21,11 @@ export function StageAudioDeck(props: {
       main_stage: iframeRefs.current.main_stage
         ? createIframeYouTubeHandle(iframeRefs.current.main_stage)
         : createPassiveYouTubeHandle(),
-      techno_room: iframeRefs.current.techno_room
-        ? createIframeYouTubeHandle(iframeRefs.current.techno_room)
+      underground: iframeRefs.current.underground
+        ? createIframeYouTubeHandle(iframeRefs.current.underground)
         : createPassiveYouTubeHandle(),
-      neon_room: iframeRefs.current.neon_room
-        ? createIframeYouTubeHandle(iframeRefs.current.neon_room)
+      plurr_partay: iframeRefs.current.plurr_partay
+        ? createIframeYouTubeHandle(iframeRefs.current.plurr_partay)
         : createPassiveYouTubeHandle(),
     };
 
@@ -57,9 +57,9 @@ export function StageAudioDeck(props: {
 
 function fallbackVideoId(zone: RuntimeZoneID) {
   switch (zone) {
-    case 'techno_room':
+    case 'underground':
       return 'techno-room-youtube';
-    case 'neon_room':
+    case 'plurr_partay':
       return 'neon-room-youtube';
     case 'main_stage':
     default:

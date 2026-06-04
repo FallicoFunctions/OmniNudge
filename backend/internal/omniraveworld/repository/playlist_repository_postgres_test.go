@@ -29,10 +29,10 @@ func TestPostgresStagePlaylistRepository_LoadActiveStagePlaylists(t *testing.T) 
 	require.Equal(t, "main-stage-youtube", playlists[0].Entries[0].VideoID)
 	require.Equal(t, "main-stage-youtube-2", playlists[0].Entries[1].VideoID)
 
-	require.Equal(t, world.ZoneTechnoRoom, playlists[1].ZoneID)
+	require.Equal(t, world.ZoneUnderground, playlists[1].ZoneID)
 	require.Equal(t, "techno-room-youtube", playlists[1].Entries[0].VideoID)
 
-	require.Equal(t, world.ZoneNeonRoom, playlists[2].ZoneID)
+	require.Equal(t, world.ZonePlurrPartay, playlists[2].ZoneID)
 	require.Equal(t, "neon-room-youtube", playlists[2].Entries[0].VideoID)
 }
 

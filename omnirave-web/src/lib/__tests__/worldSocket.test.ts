@@ -17,19 +17,19 @@ describe('worldSocket', () => {
       {
         type: 'world_snapshot',
         currentPlayerId: 'guest-1',
-        activeZone: 'techno_room',
+        activeZone: 'underground',
         players: [
-          { id: 'guest-1', position: { x: 42, y: 0, z: 9 }, zone: 'techno_room', loadout: {} },
+          { id: 'guest-1', position: { x: 42, y: 0, z: 9 }, zone: 'underground', loadout: {} },
         ],
         zoneMedia: [
-          { zoneId: 'techno_room', videoId: 'techno-room-youtube', playlistIndex: 0, playheadSeconds: 22 },
+          { zoneId: 'underground', videoId: 'techno-room-youtube', playlistIndex: 0, playheadSeconds: 22 },
         ],
       },
     );
 
-    expect(next.activeZone).toBe('techno_room');
+    expect(next.activeZone).toBe('underground');
     expect(next.zoneMedia?.[0].videoId).toBe('techno-room-youtube');
-    expect(next.players?.[0].zone).toBe('techno_room');
+    expect(next.players?.[0].zone).toBe('underground');
   });
 
   it('routes chat messages from the world socket to the chat callback', () => {

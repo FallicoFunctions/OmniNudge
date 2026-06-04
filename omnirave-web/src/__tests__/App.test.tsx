@@ -13,8 +13,8 @@ vi.mock('../hooks/useWorldSession', () => ({
       loadout: { hair: 'buzz', top: 'black_mesh' },
       zoneMedia: [
         { zoneId: 'main_stage', videoId: 'abc', playlistIndex: 0, playheadSeconds: 12 },
-        { zoneId: 'techno_room', videoId: 'def', playlistIndex: 0, playheadSeconds: 4 },
-        { zoneId: 'neon_room', videoId: 'ghi', playlistIndex: 0, playheadSeconds: 8 },
+        { zoneId: 'underground', videoId: 'def', playlistIndex: 0, playheadSeconds: 4 },
+        { zoneId: 'plurr_partay', videoId: 'ghi', playlistIndex: 0, playheadSeconds: 8 },
       ],
       players: [
         {

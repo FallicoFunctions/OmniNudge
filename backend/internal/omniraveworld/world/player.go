@@ -3,9 +3,9 @@ package world
 type ZoneID string
 
 const (
-	ZoneMainStage  ZoneID = "main_stage"
-	ZoneTechnoRoom ZoneID = "techno_room"
-	ZoneNeonRoom   ZoneID = "neon_room"
+	ZoneMainStage   ZoneID = "main_stage"
+	ZoneUnderground ZoneID = "underground"
+	ZonePlurrPartay ZoneID = "plurr_partay"
 )
 
 type Player struct {

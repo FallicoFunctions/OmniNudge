@@ -25,8 +25,8 @@ func (r *PostgresStagePlaylistRepository) LoadActiveStagePlaylists(ctx context.C
 		ORDER BY
 			CASE s.zone_id
 				WHEN 'main_stage' THEN 0
-				WHEN 'techno_room' THEN 1
-				WHEN 'neon_room' THEN 2
+				WHEN 'underground' THEN 1
+				WHEN 'plurr_partay' THEN 2
 				ELSE 99
 			END,
 			e.position ASC
@@ -63,7 +63,7 @@ func (r *PostgresStagePlaylistRepository) LoadActiveStagePlaylists(ctx context.C
 	}
 
 	playlists := make([]world.StagePlaylist, 0, len(grouped))
-	for _, zoneID := range []world.ZoneID{world.ZoneMainStage, world.ZoneTechnoRoom, world.ZoneNeonRoom} {
+	for _, zoneID := range []world.ZoneID{world.ZoneMainStage, world.ZoneUnderground, world.ZonePlurrPartay} {
 		if playlist, ok := grouped[zoneID]; ok {
 			playlists = append(playlists, *playlist)
 		}

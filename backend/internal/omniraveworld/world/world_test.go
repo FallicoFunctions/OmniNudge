@@ -24,5 +24,5 @@ func TestWorld_CrossingBoundaryChangesZone(t *testing.T) {
 
 	world.ApplyInput(player.ID, InputFrame{MoveTo: Vec3{X: 42, Y: 0, Z: 9}})
 
-	require.Equal(t, ZoneTechnoRoom, world.Player(player.ID).Zone)
+	require.Equal(t, ZoneUnderground, world.Player(player.ID).Zone)
 }
