@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { applyWorldSnapshot, buildWorldSocketUrl, openWorldSocket } from '../worldSocket';
+import { DEFAULT_RUNTIME_SETTINGS } from '../settings';
 
 describe('worldSocket', () => {
   it('applies authoritative zone and media updates for the current player', () => {
@@ -10,6 +11,8 @@ describe('worldSocket', () => {
         worldSocketUrl: 'ws://localhost:8092/ws',
         mode: 'guest',
         activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: DEFAULT_RUNTIME_SETTINGS,
         venueStatus: {
           currentTrackLabel: 'DJ Hyperbeam warming up',
           totalPlayers: 84,
@@ -66,6 +69,8 @@ describe('worldSocket', () => {
         worldSessionToken: 'world-token-1',
         mode: 'guest',
         activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: DEFAULT_RUNTIME_SETTINGS,
       },
       onSnapshot: vi.fn(),
       onChat,
@@ -116,6 +121,8 @@ describe('worldSocket', () => {
         worldSessionToken: 'world-token-1',
         mode: 'guest',
         activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: DEFAULT_RUNTIME_SETTINGS,
       },
       onSnapshot: vi.fn(),
       onChat: vi.fn(),
@@ -144,6 +151,8 @@ describe('worldSocket', () => {
         worldSessionToken: 'world-token-1',
         mode: 'guest',
         activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: DEFAULT_RUNTIME_SETTINGS,
       },
       onSnapshot: vi.fn(),
       onChat: vi.fn(),
@@ -177,6 +186,8 @@ describe('worldSocket', () => {
       worldSessionToken: 'world-token-2',
       mode: 'guest',
       activeZone: 'main_stage',
+      lastVenue: 'main_stage',
+      settings: DEFAULT_RUNTIME_SETTINGS,
       returnPoint: { x: 42, y: 0, z: 9 },
     });
 

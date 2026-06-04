@@ -76,6 +76,10 @@ vi.mock('../components/StageAudioDeck', () => ({
   StageAudioDeck: () => null,
 }));
 
+vi.mock('../components/WorldScene', () => ({
+  WorldScene: () => <div aria-label="OmniRave 3D runtime" />,
+}));
+
 describe('App', () => {
   it('renders the persistent OmniRave HUD anchors', async () => {
     mockWorldSession.settings.chatCollapsed = false;
@@ -92,6 +96,7 @@ describe('App', () => {
     expect(screen.getByText('DJ Hyperbeam warming up')).toBeInTheDocument();
     expect(screen.getByText('OmniRavers: 84')).toBeInTheDocument();
     expect(screen.getByText('Front Rail: 27')).toBeInTheDocument();
+    expect(screen.getByLabelText('OmniRave 3D runtime')).toBeInTheDocument();
   });
 
   it('initializes the chat shell from saved runtime settings', async () => {
