@@ -21,6 +21,9 @@ import { Skeleton } from '../components/common/LoadingStates';
 import { useFormat } from '../hooks/useFormat';
 import { ReportModal } from '../components/moderation/ReportModal';
 import EditProfileModal from '../components/profile/EditProfileModal';
+import { friendsService, friendsQueryKeys } from '../services/friendsService';
+import type { FriendshipStatus } from '../types/friends';
+import { useToast } from '../hooks/useToast';
 
 const BASE_TABS = [
   { key: 'overview', labelKey: 'userProfilePage.tabs.overview' },
@@ -226,6 +229,7 @@ export default function UserProfilePage() {
   const canViewPrivateTabs = user?.username === username;
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const { toast } = useToast();
   const originState = useMemo(
     () => ({ originPath: `${location.pathname}${location.search}` }),
     [location.pathname, location.search]
@@ -321,6 +325,83 @@ export default function UserProfilePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
+    },
+  });
+
+  // Friendship status — only load when viewing another logged-in user's profile
+  const friendshipStatusQuery = useQuery({
+    queryKey: friendsQueryKeys.status(username ?? ''),
+    queryFn: () => friendsService.getFriendshipStatus(username ?? ''),
+    enabled: Boolean(user && username && user.username !== username),
+    // Always refetch when the profile page is opened (fresh data on every navigation),
+    // but use a 60-second stale window so React Query does NOT immediately re-fire the
+    // query after setQueryData — that would race against the just-set optimistic state.
+    refetchOnMount: 'always',
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const friendshipStatus: FriendshipStatus = friendshipStatusQuery.data ?? 'none';
+  // Disable friend action buttons while the status is being fetched to prevent acting on stale data
+  const friendActionDisabled = friendshipStatusQuery.isFetching || friendshipStatusQuery.isLoading;
+
+  // Helper: immediately set the local status so the button updates without waiting for a re-fetch
+  const setFriendStatus = (status: FriendshipStatus) => {
+    queryClient.setQueryData(friendsQueryKeys.status(username ?? ''), status);
+  };
+
+  const friendRequestMutation = useMutation({
+    mutationFn: () => friendsService.sendFriendRequest(profile!.username),
+    onSuccess: (data) => {
+      toast.success(data.message);
+      // Use the machine-readable result field — never string-match a human-readable message
+      setFriendStatus(data.result === 'accepted' ? 'accepted' : 'pending_outgoing');
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
+    },
+    onError: () => {
+      // Re-fetch to correct any stale cached state
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.status(username ?? '') });
+      toast.error(t('friends.errors.sendFailed'));
+    },
+  });
+
+  const acceptFriendMutation = useMutation({
+    mutationFn: () => friendsService.acceptFriendRequest(profile!.username),
+    onSuccess: () => {
+      toast.success(t('friends.toast.accepted'));
+      setFriendStatus('accepted');
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.friends });
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.status(username ?? '') });
+      toast.error(t('friends.errors.acceptFailed'));
+    },
+  });
+
+  const cancelOrDeclineFriendMutation = useMutation({
+    mutationFn: () => friendsService.declineOrCancelFriendRequest(profile!.username),
+    onSuccess: () => {
+      setFriendStatus('none');
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
+    },
+    onError: () => {
+      // Re-fetch to snap button to the real server state
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.status(username ?? '') });
+      toast.error(t('friends.errors.cancelFailed'));
+    },
+  });
+
+  const removeFriendMutation = useMutation({
+    mutationFn: () => friendsService.removeFriend(profile!.username),
+    onSuccess: () => {
+      toast.success(t('friends.toast.removed'));
+      setFriendStatus('none');
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.friends });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.status(username ?? '') });
+      toast.error(t('friends.errors.removeFailed'));
     },
   });
 
@@ -610,6 +691,61 @@ export default function UserProfilePage() {
                   >
                     {t('userProfilePage.actions.message')}
                   </Link>
+                )}
+                {/* Friend button */}
+                {user && !isBlocked && (
+                  <>
+                    {friendshipStatus === 'accepted' && (
+                      <button
+                        type="button"
+                        disabled={removeFriendMutation.isPending || friendActionDisabled}
+                        onClick={() => removeFriendMutation.mutate()}
+                        className="inline-flex items-center justify-center rounded-md border border-[var(--color-success)] px-4 py-2 text-sm font-semibold text-[var(--color-success)] hover:opacity-80 disabled:opacity-50"
+                      >
+                        ✓ {t('friends.actions.friends')}
+                      </button>
+                    )}
+                    {friendshipStatus === 'pending_outgoing' && (
+                      <button
+                        type="button"
+                        disabled={cancelOrDeclineFriendMutation.isPending || friendActionDisabled}
+                        onClick={() => cancelOrDeclineFriendMutation.mutate()}
+                        className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50"
+                      >
+                        {t('friends.actions.cancelRequest')}
+                      </button>
+                    )}
+                    {friendshipStatus === 'pending_incoming' && (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={acceptFriendMutation.isPending || friendActionDisabled}
+                          onClick={() => acceptFriendMutation.mutate()}
+                          className="inline-flex items-center justify-center rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                        >
+                          {t('friends.actions.accept')}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={cancelOrDeclineFriendMutation.isPending || friendActionDisabled}
+                          onClick={() => cancelOrDeclineFriendMutation.mutate()}
+                          className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50"
+                        >
+                          {t('friends.actions.decline')}
+                        </button>
+                      </div>
+                    )}
+                    {friendshipStatus === 'none' && (
+                      <button
+                        type="button"
+                        disabled={friendRequestMutation.isPending || friendActionDisabled}
+                        onClick={() => friendRequestMutation.mutate()}
+                        className="inline-flex items-center justify-center rounded-md border border-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white disabled:opacity-50"
+                      >
+                        + {t('friends.actions.addFriend')}
+                      </button>
+                    )}
+                  </>
                 )}
                 <button
                   type="button"
