@@ -80,6 +80,11 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err := h.broadcastSnapshots(); err != nil {
 				return
 			}
+		case "respawn":
+			h.world.RespawnPlayer(session.PlayerID)
+			if err := h.broadcastSnapshots(); err != nil {
+				return
+			}
 		case "chat":
 			body := strings.TrimSpace(event.Body)
 			if body == "" {

@@ -83,6 +83,17 @@ export function openWorldSocket(args: {
       socket.close();
     },
     moveTo,
+    respawn() {
+      if (socket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
+      socket.send(
+        JSON.stringify({
+          type: 'respawn',
+        }),
+      );
+    },
     sendChat,
     moveToZone(zone: RuntimeZoneID) {
       moveTo(zoneMoveTarget(zone));
