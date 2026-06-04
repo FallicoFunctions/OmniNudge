@@ -2748,7 +2748,7 @@ export default function MessagesPage() {
             {conversations?.map((conversation) => (
               <div
                 key={conversation.id}
-                className={`relative w-full border-b border-[var(--color-border)] transition-colors ${
+                className={`group relative w-full border-b border-[var(--color-border)] transition-colors ${
                   selectedConversationId === conversation.id
                     ? 'bg-[var(--color-surface-elevated)]'
                     : 'hover:bg-[var(--color-surface-elevated)] active:bg-[var(--color-surface-elevated)]'
@@ -2837,7 +2837,7 @@ export default function MessagesPage() {
                         }}
                         onTouchStart={(e) => e.stopPropagation()}
                         onTouchEnd={(e) => e.stopPropagation()}
-                        className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
+                        className={`rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 ${conversationMenuOpen === conversation.id ? '!opacity-100' : ''}`}
                       >
                         ...
                       </button>
