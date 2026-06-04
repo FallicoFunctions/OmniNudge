@@ -5,6 +5,7 @@ import { API_BASE_URL, api } from '../lib/api';
 import type { InfiniteData } from '@tanstack/react-query';
 import type { Message, Conversation, WsMessagePinEvent, WsThreadUpdateEvent } from '../types/messages';
 import type { GetReactionsResponse, WsReactionAddedPayload, WsReactionRemovedPayload } from '../types/reactions';
+import { friendsQueryKeys } from '../services/friendsService';
 
 interface WebSocketMessage {
   type: string;
@@ -624,6 +625,20 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           window.dispatchEvent(new CustomEvent('ws-call-event', {
             detail: { type: data.type, payload: data.payload },
           }));
+          break;
+        }
+
+        case 'friend_request': {
+          // Someone sent us a friend request — invalidate so the badge and
+          // incoming list update immediately without waiting for the 30s poll.
+          queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
+          break;
+        }
+
+        case 'friend_request_accepted': {
+          // A pending request was accepted — update both requests and friends list.
+          queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
+          queryClient.invalidateQueries({ queryKey: friendsQueryKeys.friends });
           break;
         }
 
