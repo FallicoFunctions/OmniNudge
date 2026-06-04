@@ -45,6 +45,8 @@ const mockWorldSession = {
   isLoading: false,
   hasJoinedWorld: true,
   isSavingLoadout: false,
+  pendingVenue: null as 'main_stage' | 'underground' | 'plurr_partay' | null,
+  isVenueTransitioning: false,
   settings: {
     uiTheme: 'Luminous Panels',
     graphicsMode: 'auto' as const,
@@ -56,6 +58,7 @@ const mockWorldSession = {
   },
   updateSettings: vi.fn(),
   moveToZone: vi.fn(),
+  respawn: vi.fn(),
   saveLoadout: vi.fn(),
   sendChatMessage: vi.fn(),
 };
@@ -82,6 +85,7 @@ vi.mock('../components/WorldScene', () => ({
 
 describe('App', () => {
   it('renders the persistent OmniRave HUD anchors', async () => {
+    mockWorldSession.pendingVenue = null;
     mockWorldSession.settings.chatCollapsed = false;
     mockWorldSession.session.settings.chatCollapsed = false;
 
@@ -100,6 +104,7 @@ describe('App', () => {
   });
 
   it('initializes the chat shell from saved runtime settings', async () => {
+    mockWorldSession.pendingVenue = null;
     mockWorldSession.settings.chatCollapsed = true;
     mockWorldSession.session.settings.chatCollapsed = true;
 
@@ -116,6 +121,7 @@ describe('App', () => {
   });
 
   it('applies theme changes immediately through the settings panel', async () => {
+    mockWorldSession.pendingVenue = null;
     mockWorldSession.updateSettings.mockClear();
     const nextSettings = {
       ...mockWorldSession.settings,
@@ -130,5 +136,25 @@ describe('App', () => {
     });
 
     expect(mockWorldSession.updateSettings).toHaveBeenCalledWith(nextSettings);
+  });
+
+  it('shows pending venue copy during the one-second handoff', async () => {
+    mockWorldSession.pendingVenue = 'underground';
+
+    render(<App />);
+
+    expect(await screen.findByText('Crossing into The Underground')).toBeInTheDocument();
+
+    mockWorldSession.pendingVenue = null;
+  });
+
+  it('routes the settings respawn action through the runtime session hook', async () => {
+    mockWorldSession.respawn.mockClear();
+    const view = render(<App />);
+
+    fireEvent.click(await within(view.container).findByRole('button', { name: 'Settings' }));
+    fireEvent.click(within(view.container).getByRole('button', { name: 'Respawn' }));
+
+    expect(mockWorldSession.respawn).toHaveBeenCalledTimes(1);
   });
 });
