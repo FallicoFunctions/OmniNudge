@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { bootstrapSession, saveLoadout, saveReturnPoint } from '../session';
+import { bootstrapSession, saveLoadout, saveReturnPoint, saveRuntimeSettings } from '../session';
 
 function mockFetcher(response: unknown) {
   return async () =>
@@ -164,5 +164,97 @@ describe('bootstrapSession', () => {
         }),
       }),
     );
+  });
+
+  it('persists signed-in runtime settings with the exchanged game session token', async () => {
+    const fetcher = vi.fn(async () => ({ ok: true }) as Response);
+
+    await saveRuntimeSettings({
+      session: {
+        playerId: 'user-42',
+        playerName: 'alice',
+        worldSocketUrl: 'ws://localhost:8092/ws',
+        mode: 'account',
+        activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: {
+          uiTheme: 'Luminous Panels',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
+        sessionToken: 'runtime-token-3',
+      },
+      settings: {
+        uiTheme: 'Hybrid Premium',
+        graphicsMode: 'auto',
+        graphicsLevel: 7,
+        displayNames: true,
+        chatCollapsed: false,
+        crouchMode: 'hold',
+        cameraFollow: 'free',
+      },
+      fetcher,
+      apiBaseUrl: 'http://localhost:8091',
+    });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      'http://localhost:8091/api/v1/omnigame/profile/omnirave/settings',
+      expect.objectContaining({
+        method: 'PUT',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer runtime-token-3',
+        }),
+        body: JSON.stringify({
+          uiTheme: 'Hybrid Premium',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        }),
+      }),
+    );
+  });
+
+  it('skips runtime settings persistence for guest sessions', async () => {
+    const fetcher = vi.fn(async () => ({ ok: true }) as Response);
+
+    await saveRuntimeSettings({
+      session: {
+        playerId: 'guest-42',
+        playerName: 'Guest-42',
+        worldSocketUrl: 'ws://localhost:8092/ws',
+        mode: 'guest',
+        activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: {
+          uiTheme: 'Luminous Panels',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
+      },
+      settings: {
+        uiTheme: 'Obsidian Glass',
+        graphicsMode: 'auto',
+        graphicsLevel: 7,
+        displayNames: true,
+        chatCollapsed: false,
+        crouchMode: 'hold',
+        cameraFollow: 'free',
+      },
+      fetcher,
+      apiBaseUrl: 'http://localhost:8091',
+    });
+
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });

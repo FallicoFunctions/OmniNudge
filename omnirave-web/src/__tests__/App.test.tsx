@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import App from '../App';
 
@@ -108,5 +108,22 @@ describe('App', () => {
 
     mockWorldSession.settings.chatCollapsed = false;
     mockWorldSession.session.settings.chatCollapsed = false;
+  });
+
+  it('applies theme changes immediately through the settings panel', async () => {
+    mockWorldSession.setSettings.mockClear();
+    const nextSettings = {
+      ...mockWorldSession.settings,
+      uiTheme: 'Hybrid Premium' as const,
+    };
+
+    const view = render(<App />);
+
+    fireEvent.click(await within(view.container).findByRole('button', { name: 'Settings' }));
+    fireEvent.change(within(view.container).getByLabelText('Theme'), {
+      target: { value: 'Hybrid Premium' },
+    });
+
+    expect(mockWorldSession.setSettings).toHaveBeenCalledWith(nextSettings);
   });
 });

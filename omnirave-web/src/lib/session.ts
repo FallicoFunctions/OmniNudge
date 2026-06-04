@@ -139,3 +139,29 @@ export async function saveReturnPoint(input: {
     throw new Error(`Return point save failed with ${response.status}`);
   }
 }
+
+export async function saveRuntimeSettings(input: {
+  session: RuntimeSession;
+  settings: RuntimeSettings;
+  fetcher?: typeof fetch;
+  apiBaseUrl?: string;
+}): Promise<void> {
+  if (input.session.mode !== 'account' || !input.session.sessionToken) {
+    return;
+  }
+
+  const fetcher = input.fetcher ?? fetch;
+  const apiBaseUrl = input.apiBaseUrl ?? import.meta.env.VITE_OMNIGAME_API_URL ?? 'http://localhost:8091';
+  const response = await fetcher(`${apiBaseUrl}/api/v1/omnigame/profile/omnirave/settings`, {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      Authorization: `Bearer ${input.session.sessionToken}`,
+    },
+    body: JSON.stringify(input.settings),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Runtime settings save failed with ${response.status}`);
+  }
+}
