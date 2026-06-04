@@ -1,7 +1,7 @@
 import type { RuntimeSession, RuntimeZoneEvent } from './session';
 import { activeStageForZone, type ZoneID } from './zones';
 
-export function activeZoneEvent(session: Pick<RuntimeSession, 'activeZone' | 'zoneEvents'>): RuntimeZoneEvent | undefined {
+export function activeZoneEvent(session: RuntimeSession): RuntimeZoneEvent | undefined {
   const zone = activeStageForZone(session.activeZone as ZoneID);
   return session.zoneEvents?.find((event) => event.zoneId === zone && event.phase !== 'none');
 }

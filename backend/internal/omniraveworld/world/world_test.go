@@ -64,7 +64,7 @@ func TestSnapshotIncludesPlayerIdentityMetadata(t *testing.T) {
 		Loadout:    Loadout{"body": "guest-default"},
 	})
 
-	snapshot := world.SnapshotForPlayer("guest-1", nil)
+	snapshot := world.SnapshotForPlayer("guest-1", nil, nil)
 	require.Len(t, snapshot.Players, 1)
 	require.Equal(t, "Guest-4821", snapshot.Players[0].PlayerName)
 	require.Equal(t, SessionModeGuest, snapshot.Players[0].Mode)
