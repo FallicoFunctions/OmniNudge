@@ -25,6 +25,7 @@ const mockWorldSession = {
       { zoneId: 'underground' as const, videoId: 'def', playlistIndex: 0, playheadSeconds: 4 },
       { zoneId: 'plurr_partay' as const, videoId: 'ghi', playlistIndex: 0, playheadSeconds: 8 },
     ],
+    zoneEvents: [],
     players: [
       {
         id: 'guest-42',
@@ -100,6 +101,8 @@ describe('App', () => {
   beforeEach(() => {
     mockWorldSession.session.mode = 'guest';
     mockWorldSession.session.playerName = 'Guest-42';
+    mockWorldSession.session.activeZone = 'main_stage';
+    mockWorldSession.session.zoneEvents = [];
     mockWorldSession.authPopupMode = null;
     mockWorldSession.welcomeCardState = null;
     mockWorldSession.openAuthPopup.mockClear();
@@ -171,6 +174,17 @@ describe('App', () => {
     expect(await screen.findByText('Crossing into The Underground')).toBeInTheDocument();
 
     mockWorldSession.pendingVenue = null;
+  });
+
+  it('shows the fireworks countdown on the stage screen during main-stage lead-in', async () => {
+    mockWorldSession.session.zoneEvents = [
+      { zoneId: 'main_stage', phase: 'lead_in', eventName: 'fireworks', countdownSeconds: 10 },
+    ];
+
+    render(<App />);
+
+    expect(await screen.findByText('Fireworks begin in')).toBeInTheDocument();
+    expect(screen.getByText('10')).toBeInTheDocument();
   });
 
   it('routes the settings respawn action through the runtime session hook', async () => {
