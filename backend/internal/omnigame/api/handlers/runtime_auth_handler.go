@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +23,23 @@ type runtimeAuthService interface {
 
 type RuntimeAuthHandler struct {
 	runtimeAuth runtimeAuthService
+}
+
+type runtimeAuthFailure struct {
+	statusCode    int
+	clientMessage string
+	err           error
+}
+
+func (e *runtimeAuthFailure) Error() string {
+	if e.err != nil {
+		return e.err.Error()
+	}
+	return e.clientMessage
+}
+
+func (e *runtimeAuthFailure) Unwrap() error {
+	return e.err
 }
 
 func NewRuntimeAuthHandler(runtimeAuth runtimeAuthService) *RuntimeAuthHandler {
@@ -43,7 +62,7 @@ func (h *RuntimeAuthHandler) Login(c *gin.Context) {
 
 	response, err := h.runtimeAuth.Login(c.Request.Context(), input)
 	if err != nil {
-		utils.RespondUnauthorized(c, "invalid username or password")
+		respondRuntimeAuthError(c, err)
 		return
 	}
 
@@ -59,7 +78,7 @@ func (h *RuntimeAuthHandler) Signup(c *gin.Context) {
 
 	response, err := h.runtimeAuth.Signup(c.Request.Context(), input)
 	if err != nil {
-		utils.RespondBadRequest(c, err.Error(), err)
+		respondRuntimeAuthError(c, err)
 		return
 	}
 
@@ -82,6 +101,23 @@ func (h *RuntimeAuthHandler) Logout(c *gin.Context) {
 	utils.RespondSuccess(c, response)
 }
 
+func respondRuntimeAuthError(c *gin.Context, err error) {
+	var runtimeErr *runtimeAuthFailure
+	if errors.As(err, &runtimeErr) {
+		switch runtimeErr.statusCode {
+		case http.StatusUnauthorized:
+			utils.RespondUnauthorized(c, runtimeErr.clientMessage)
+		case http.StatusBadRequest:
+			utils.RespondBadRequest(c, runtimeErr.clientMessage, err)
+		default:
+			utils.RespondInternalError(c, runtimeErr.clientMessage, err)
+		}
+		return
+	}
+
+	utils.RespondInternalError(c, "unable to build omnirave runtime session", err)
+}
+
 type runtimeAuthAdapter struct {
 	sessionService *service.SessionService
 	authService    *services.AuthService
@@ -90,7 +126,7 @@ type runtimeAuthAdapter struct {
 func (a runtimeAuthAdapter) Login(ctx context.Context, input model.RuntimeAuthRequest) (*model.RuntimeAuthResponse, error) {
 	userRepo := a.authService.UserRepository()
 	if userRepo == nil {
-		return nil, fmt.Errorf("runtime auth user repository not configured")
+		return nil, newRuntimeBootstrapFailure(fmt.Errorf("runtime auth user repository not configured"))
 	}
 
 	user, _, err := a.authService.Login(ctx, userRepo, &services.LoginRequest{
@@ -98,16 +134,20 @@ func (a runtimeAuthAdapter) Login(ctx context.Context, input model.RuntimeAuthRe
 		Password: input.Password,
 	})
 	if err != nil {
-		return nil, err
+		return nil, newRuntimeAuthFailure(http.StatusUnauthorized, "invalid username or password", err)
 	}
 
-	return a.sessionService.BuildRuntimeAccountSession(ctx, input, runtimeIdentityFromUser(user))
+	response, err := a.sessionService.BuildRuntimeAccountSession(ctx, input, runtimeIdentityFromUser(user))
+	if err != nil {
+		return nil, newRuntimeBootstrapFailure(err)
+	}
+	return response, nil
 }
 
 func (a runtimeAuthAdapter) Signup(ctx context.Context, input model.RuntimeAuthRequest) (*model.RuntimeAuthResponse, error) {
 	userRepo := a.authService.UserRepository()
 	if userRepo == nil {
-		return nil, fmt.Errorf("runtime auth user repository not configured")
+		return nil, newRuntimeBootstrapFailure(fmt.Errorf("runtime auth user repository not configured"))
 	}
 
 	var email *string
@@ -124,10 +164,14 @@ func (a runtimeAuthAdapter) Signup(ctx context.Context, input model.RuntimeAuthR
 		AcceptTerms:         input.AcceptTerms,
 	})
 	if err != nil {
-		return nil, err
+		return nil, classifyRuntimeSignupFailure(err)
 	}
 
-	return a.sessionService.BuildRuntimeAccountSession(ctx, input, runtimeIdentityFromUser(user))
+	response, err := a.sessionService.BuildRuntimeAccountSession(ctx, input, runtimeIdentityFromUser(user))
+	if err != nil {
+		return nil, newRuntimeBootstrapFailure(err)
+	}
+	return response, nil
 }
 
 func (a runtimeAuthAdapter) Logout(ctx context.Context, input model.RuntimeAuthRequest) (*model.RuntimeAuthResponse, error) {
@@ -139,5 +183,46 @@ func runtimeIdentityFromUser(user *models.User) model.PlayerIdentity {
 		UserID:       &user.ID,
 		Username:     user.Username,
 		TokenVersion: user.TokenVersion,
+	}
+}
+
+func newRuntimeAuthFailure(statusCode int, clientMessage string, err error) *runtimeAuthFailure {
+	return &runtimeAuthFailure{
+		statusCode:    statusCode,
+		clientMessage: clientMessage,
+		err:           err,
+	}
+}
+
+func newRuntimeBootstrapFailure(err error) *runtimeAuthFailure {
+	return newRuntimeAuthFailure(http.StatusInternalServerError, "unable to build omnirave runtime session", err)
+}
+
+func classifyRuntimeSignupFailure(err error) error {
+	message := err.Error()
+	if isRuntimeSignupValidationError(message) {
+		return newRuntimeAuthFailure(http.StatusBadRequest, message, err)
+	}
+	return newRuntimeBootstrapFailure(err)
+}
+
+func isRuntimeSignupValidationError(message string) bool {
+	switch {
+	case strings.Contains(message, "username must be between"):
+		return true
+	case strings.Contains(message, "password must be at least"):
+		return true
+	case strings.Contains(message, "invalid email format"):
+		return true
+	case strings.Contains(message, "you must accept the Privacy Policy"):
+		return true
+	case strings.Contains(message, "you must accept the Terms of Service"):
+		return true
+	case strings.Contains(message, "captcha verification failed"):
+		return true
+	case strings.Contains(message, "username already taken"):
+		return true
+	default:
+		return false
 	}
 }
