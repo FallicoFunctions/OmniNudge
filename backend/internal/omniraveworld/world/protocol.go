@@ -30,6 +30,7 @@ type InputFrame struct {
 type Snapshot struct {
 	Players         []*Player        `json:"players"`
 	ZoneMedia       []ZoneMediaState `json:"zoneMedia,omitempty"`
+	ZoneEvents      []ZoneEventState `json:"zoneEvents,omitempty"`
 	CurrentPlayerID string           `json:"currentPlayerId,omitempty"`
 	ActiveZone      ZoneID           `json:"activeZone"`
 }
