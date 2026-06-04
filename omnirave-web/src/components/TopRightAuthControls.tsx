@@ -5,15 +5,15 @@ export function TopRightAuthControls({ session }: { session: RuntimeSession }) {
     <div className="top-right-auth-controls">
       {session.mode === 'guest' ? (
         <>
-          <button type="button" className="hud-button">
+          <button type="button" className="hud-button" disabled>
             Log In
           </button>
-          <button type="button" className="hud-button hud-button-accent">
+          <button type="button" className="hud-button hud-button-accent" disabled>
             Sign Up
           </button>
         </>
       ) : (
-        <button type="button" className="hud-button">
+        <button type="button" className="hud-button" disabled>
           Logout
         </button>
       )}

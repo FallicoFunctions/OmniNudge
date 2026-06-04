@@ -88,7 +88,12 @@ export default function App() {
 
       <div className="hud-anchor hud-bottom-left">
         <Hud session={session} />
-        <ChatPanel messages={chatMessages} onSendMessage={sendChatMessage} isSending={false} />
+        <ChatPanel
+          messages={chatMessages}
+          onSendMessage={sendChatMessage}
+          isSending={false}
+          initialHistoryCollapsed={settings.chatCollapsed}
+        />
       </div>
 
       <div className="hud-anchor hud-bottom-center">

@@ -30,6 +30,13 @@ export interface RuntimeZoneMedia {
   playheadSeconds: number;
 }
 
+export interface RuntimeVenueStatus {
+  audienceLabel?: string;
+  currentTrackLabel?: string;
+  totalPlayers?: number;
+  venuePlayers?: number;
+}
+
 export interface RuntimeSession {
   playerId: string;
   playerName: string;
@@ -44,6 +51,7 @@ export interface RuntimeSession {
   zoneMedia?: RuntimeZoneMedia[];
   returnPoint?: RuntimePoint;
   players?: RuntimePlayer[];
+  venueStatus?: RuntimeVenueStatus;
 }
 
 export async function bootstrapSession(input: {

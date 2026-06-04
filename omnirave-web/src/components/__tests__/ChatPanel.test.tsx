@@ -4,9 +4,12 @@ import { ChatPanel } from '../ChatPanel';
 
 describe('ChatPanel', () => {
   it('keeps the input line visible when the history shell is collapsed', () => {
-    render(<ChatPanel messages={[]} onSendMessage={() => {}} isSending={false} />);
+    render(<ChatPanel messages={[]} onSendMessage={() => {}} isSending={false} initialHistoryCollapsed />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Collapse chat history/i }));
+    const collapseButton = screen.getByRole('button', { name: /Expand chat history/i });
+
+    expect(collapseButton).toHaveAttribute('aria-expanded', 'false');
+    expect(collapseButton).toHaveAttribute('aria-controls');
 
     expect(screen.getByPlaceholderText('Type message...')).toBeVisible();
   });
@@ -30,6 +33,7 @@ describe('ChatPanel', () => {
     );
 
     expect(screen.getByText(/Warm up at the main stage/i)).toBeInTheDocument();
+    expect(within(view.container).getByRole('button', { name: /Collapse chat history/i })).toHaveAttribute('aria-expanded', 'true');
 
     fireEvent.change(within(view.container).getByPlaceholderText('Type message...'), {
       target: { value: 'Meet at techno room' },
