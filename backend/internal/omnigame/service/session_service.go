@@ -142,6 +142,7 @@ func (s *SessionService) ExchangeLaunchSession(ctx context.Context, req model.Se
 		return nil, fmt.Errorf("launch mode mismatch")
 	}
 
+	defaultProfile := model.DefaultOmniRaveProfile(0)
 	response := &model.SessionExchangeResponse{
 		PlayerID:       session.PlayerID,
 		PlayerName:     session.PlayerName,
@@ -149,6 +150,8 @@ func (s *SessionService) ExchangeLaunchSession(ctx context.Context, req model.Se
 		Mode:           session.Mode,
 		ActiveZone:     "main_stage",
 		Loadout:        map[string]string{},
+		LastVenue:      defaultProfile.LastVenue,
+		Settings:       defaultProfile.Settings,
 		ZoneMedia:      s.currentZoneMedia(),
 	}
 
@@ -179,6 +182,8 @@ func (s *SessionService) ExchangeLaunchSession(ctx context.Context, req model.Se
 		if profile != nil {
 			response.Loadout = profile.Loadout
 			response.ReturnPoint = profile.ReturnPoint
+			response.LastVenue = profile.LastVenue
+			response.Settings = profile.Settings
 		}
 	}
 

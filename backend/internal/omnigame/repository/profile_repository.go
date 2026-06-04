@@ -26,7 +26,7 @@ func NewInMemoryProfileRepository() *InMemoryProfileRepository {
 func (r *InMemoryProfileRepository) UpsertProfile(_ context.Context, profile model.OmniRaveProfile) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.profiles[profile.UserID] = profile
+	r.profiles[profile.UserID] = model.NormalizeOmniRaveProfile(profile)
 	return nil
 }
 
@@ -38,6 +38,6 @@ func (r *InMemoryProfileRepository) GetProfile(_ context.Context, userID int) (*
 	if !ok {
 		return nil, nil
 	}
-	copyProfile := profile
+	copyProfile := model.NormalizeOmniRaveProfile(profile)
 	return &copyProfile, nil
 }
