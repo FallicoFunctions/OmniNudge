@@ -28,7 +28,14 @@ describe('worldSocket', () => {
         currentPlayerId: 'guest-1',
         activeZone: 'underground',
         players: [
-          { id: 'guest-1', position: { x: 42, y: 0, z: 9 }, zone: 'underground', loadout: {} },
+          {
+            id: 'guest-1',
+            playerName: 'Guest-4821',
+            mode: 'guest',
+            position: { x: 42, y: 0, z: 9 },
+            zone: 'underground',
+            loadout: { body: 'guest-default' },
+          },
         ],
         zoneMedia: [
           { zoneId: 'underground', videoId: 'techno-room-youtube', playlistIndex: 0, playheadSeconds: 22 },
@@ -39,6 +46,9 @@ describe('worldSocket', () => {
     expect(next.activeZone).toBe('underground');
     expect(next.zoneMedia?.[0].videoId).toBe('techno-room-youtube');
     expect(next.players?.[0].zone).toBe('underground');
+    expect(next.players?.[0].playerName).toBe('Guest-4821');
+    expect(next.players?.[0].mode).toBe('guest');
+    expect(next.players?.[0].loadout).toEqual({ body: 'guest-default' });
     expect(next.venueStatus).toEqual({
       currentTrackLabel: 'DJ Hyperbeam warming up',
       totalPlayers: 84,
