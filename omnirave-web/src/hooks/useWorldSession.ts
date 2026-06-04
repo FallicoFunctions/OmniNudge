@@ -6,11 +6,13 @@ import {
   saveReturnPoint as persistReturnPoint,
   type RuntimeSession,
 } from '../lib/session';
+import { DEFAULT_RUNTIME_SETTINGS, type RuntimeSettings } from '../lib/settings';
 import { applyWorldSnapshot, openWorldSocket } from '../lib/worldSocket';
 import type { ZoneID } from '../lib/zones';
 
 export function useWorldSession() {
   const [session, setSession] = useState<RuntimeSession | null>(null);
+  const [settings, setSettings] = useState<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [hasJoinedWorld, setHasJoinedWorld] = useState(false);
@@ -31,6 +33,7 @@ export function useWorldSession() {
       .then((nextSession) => {
         if (!cancelled) {
           setSession(nextSession);
+          setSettings(nextSession.settings);
         }
       })
       .catch((err) => {
@@ -132,6 +135,8 @@ export function useWorldSession() {
 
   return {
     session,
+    settings,
+    setSettings,
     chatMessages,
     error,
     isLoading,
