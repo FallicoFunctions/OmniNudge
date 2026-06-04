@@ -6,9 +6,10 @@ import type { RuntimeSettings } from '../../lib/settings';
 
 const bootstrapSessionMock = vi.fn();
 const saveRuntimeSettingsMock = vi.fn();
-const openWorldSocketMock = vi.fn(() => ({
+const openWorldSocketMock = vi.fn((_args?: unknown) => ({
   close: vi.fn(),
   moveToZone: vi.fn(),
+  respawn: vi.fn(),
   sendChat: vi.fn(),
 }));
 

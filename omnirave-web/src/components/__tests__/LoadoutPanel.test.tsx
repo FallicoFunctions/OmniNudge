@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { LoadoutPanel } from '../LoadoutPanel';
+import { DEFAULT_RUNTIME_SETTINGS } from '../../lib/settings';
 
 describe('LoadoutPanel', () => {
   it('submits edited loadout values through the runtime save callback', async () => {
@@ -14,6 +15,8 @@ describe('LoadoutPanel', () => {
           worldSocketUrl: 'ws://localhost:8092/ws',
           mode: 'account',
           activeZone: 'main_stage',
+          lastVenue: 'main_stage',
+          settings: DEFAULT_RUNTIME_SETTINGS,
           loadout: { hair: 'buzz', top: 'black_mesh' },
         }}
         onSaveLoadout={onSave}
