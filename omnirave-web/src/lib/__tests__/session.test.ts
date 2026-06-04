@@ -134,6 +134,46 @@ describe('bootstrapSession', () => {
     ]);
   });
 
+  it('parses authoritative zone event state from bootstrap payloads', async () => {
+    const session = await bootstrapSession({
+      search: '?handoff=events&mode=guest',
+      fetcher: mockFetcher({
+        playerId: 'guest-1',
+        playerName: 'Guest Nova',
+        worldSocketUrl: 'ws://example',
+        mode: 'guest',
+        activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: {
+          uiTheme: 'Luminous Panels',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
+        zoneEvents: [
+          {
+            zoneId: 'main_stage',
+            phase: 'lead_in',
+            eventName: 'fireworks',
+            countdownSeconds: 9,
+          },
+        ],
+      }),
+    });
+
+    expect(session.zoneEvents).toEqual([
+      {
+        zoneId: 'main_stage',
+        phase: 'lead_in',
+        eventName: 'fireworks',
+        countdownSeconds: 9,
+      },
+    ]);
+  });
+
   it('persists signed-in loadouts with the exchanged game session token', async () => {
     const fetcher = vi.fn(async () => ({ ok: true }) as Response);
 
