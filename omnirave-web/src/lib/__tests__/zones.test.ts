@@ -1,5 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
-import { activeStageForZone, syncStagePlayers, zoneDisplayName, zoneMoveTarget, ZONE_ORDER } from '../zones';
+import {
+  activeStageForZone,
+  isPlurrBoundaryPoint,
+  isUndergroundBoundaryPoint,
+  MAIN_STAGE_SPAWN,
+  PLURR_PARTAY_SPAWN,
+  syncStagePlayers,
+  UNDERGROUND_SPAWN,
+  zoneDisplayName,
+  zoneForPoint,
+  zoneMoveTarget,
+  ZONE_ORDER,
+} from '../zones';
 
 function createPlayerDouble() {
   return {
@@ -17,6 +29,15 @@ describe('zones', () => {
     expect(zoneDisplayName('underground')).toBe('The Underground');
     expect(zoneDisplayName('plurr_partay')).toBe('P.L.U.R.R. Partay');
     expect(zoneMoveTarget('main_stage')).toEqual({ x: 0, y: 0, z: 0 });
+  });
+
+  it('mirrors the authored spawn points and transition checkpoints', () => {
+    expect(MAIN_STAGE_SPAWN).toEqual({ x: 0, y: 0, z: 0 });
+    expect(UNDERGROUND_SPAWN).toEqual({ x: 42, y: 0, z: 9 });
+    expect(PLURR_PARTAY_SPAWN).toEqual({ x: -34, y: 0, z: 11 });
+    expect(zoneForPoint({ x: 42, y: 0, z: 9 })).toBe('underground');
+    expect(isUndergroundBoundaryPoint({ x: 18, y: 0, z: 6 })).toBe(true);
+    expect(isPlurrBoundaryPoint({ x: -18, y: 0, z: 4 })).toBe(true);
   });
 
   it('returns the correct active stage for a confirmed zone', () => {

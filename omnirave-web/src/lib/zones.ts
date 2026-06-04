@@ -1,7 +1,31 @@
 import type { RuntimePoint, RuntimeSession, RuntimeZoneID, RuntimeZoneMedia } from './session';
 import type { YouTubePlayerHandle } from './youtube';
+import {
+  MAIN_STAGE_SPAWN,
+  PLURR_PARTAY_SPAWN,
+  UNDERGROUND_SPAWN,
+  isPlurrBoundaryPoint,
+  isUndergroundBoundaryPoint,
+  zoneBounds,
+  zoneForPoint,
+  zoneSpawn,
+  ZONE_BOUNDS,
+  ZONE_SPAWNS,
+} from './layout';
 
 export type ZoneID = RuntimeZoneID;
+export {
+  MAIN_STAGE_SPAWN,
+  PLURR_PARTAY_SPAWN,
+  UNDERGROUND_SPAWN,
+  isPlurrBoundaryPoint,
+  isUndergroundBoundaryPoint,
+  zoneBounds,
+  zoneForPoint,
+  zoneSpawn,
+  ZONE_BOUNDS,
+  ZONE_SPAWNS,
+};
 
 const ZONE_LABELS: Record<ZoneID, string> = {
   main_stage: 'Main Stage',
@@ -13,12 +37,6 @@ const ZONE_TAGLINES: Record<ZoneID, string> = {
   main_stage: 'Big-room energy, open floor, and the loudest drop in the venue.',
   underground: 'A darker room with tighter pressure, harder rhythm, and a relentless pulse.',
   plurr_partay: 'A brighter late-night pocket for color, bounce, and playful chaos.',
-};
-
-const ZONE_MOVE_TARGETS: Record<ZoneID, RuntimePoint> = {
-  main_stage: { x: 0, y: 0, z: 0 },
-  underground: { x: 42, y: 0, z: 9 },
-  plurr_partay: { x: -34, y: 0, z: 11 },
 };
 
 export const ZONE_ORDER: ZoneID[] = ['main_stage', 'underground', 'plurr_partay'];
@@ -43,7 +61,7 @@ export function zoneMediaForStage(session: RuntimeSession, zone: ZoneID): Runtim
 }
 
 export function zoneMoveTarget(zone: ZoneID): RuntimePoint {
-  return ZONE_MOVE_TARGETS[zone];
+  return zoneSpawn(zone);
 }
 
 export function zoneDisplayName(zone: ZoneID): string {
