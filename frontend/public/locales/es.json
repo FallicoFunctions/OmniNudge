@@ -3890,5 +3890,46 @@
       "medium": "Calidad media",
       "high": "Calidad alta"
     }
+  },
+  "friends": {
+    "title": "Amigos",
+    "subtitle": "Administra tus amigos y solicitudes de amistad.",
+    "loading": "Cargando...",
+    "empty": "Aún no tienes amigos.",
+    "emptyHint": "Visita el perfil de alguien y haz clic en Agregar amigo para empezar.",
+    "friendsSince": "Amigos desde {{date}}",
+    "tabs": {
+      "friends": "Amigos",
+      "incoming": "Recibidas",
+      "outgoing": "Enviadas"
+    },
+    "actions": {
+      "addFriend": "Agregar amigo",
+      "friends": "Amigos",
+      "accept": "Aceptar",
+      "decline": "Rechazar",
+      "cancelRequest": "Cancelar solicitud",
+      "unfriend": "Eliminar amigo"
+    },
+    "incoming": {
+      "empty": "No hay solicitudes de amistad pendientes.",
+      "sentAt": "Enviada el {{date}}"
+    },
+    "outgoing": {
+      "empty": "No has enviado ninguna solicitud de amistad.",
+      "sentAt": "Enviada el {{date}}"
+    },
+    "errors": {
+      "loadFailed": "No se pudieron cargar los amigos.",
+      "sendFailed": "No se pudo enviar la solicitud de amistad. Inténtalo de nuevo.",
+      "acceptFailed": "No se pudo aceptar la solicitud. Inténtalo de nuevo.",
+      "cancelFailed": "No se pudo cancelar la solicitud. Inténtalo de nuevo.",
+      "removeFailed": "No se pudo eliminar el amigo. Inténtalo de nuevo."
+    },
+    "toast": {
+      "sent": "Solicitud de amistad enviada",
+      "accepted": "¡Ahora son amigos!",
+      "removed": "Amigo eliminado"
+    }
   }
 }

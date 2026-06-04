@@ -3890,5 +3890,46 @@
       "medium": "Medium quality",
       "high": "High quality"
     }
+  },
+  "friends": {
+    "title": "Friends",
+    "subtitle": "Manage your friends and friend requests.",
+    "loading": "Loading...",
+    "empty": "You don't have any friends yet.",
+    "emptyHint": "Visit someone's profile and click Add Friend to get started.",
+    "friendsSince": "Friends since {{date}}",
+    "tabs": {
+      "friends": "Friends",
+      "incoming": "Incoming",
+      "outgoing": "Sent"
+    },
+    "actions": {
+      "addFriend": "Add Friend",
+      "friends": "Friends",
+      "accept": "Accept",
+      "decline": "Decline",
+      "cancelRequest": "Cancel Request",
+      "unfriend": "Unfriend"
+    },
+    "incoming": {
+      "empty": "No pending friend requests.",
+      "sentAt": "Sent on {{date}}"
+    },
+    "outgoing": {
+      "empty": "You haven't sent any friend requests.",
+      "sentAt": "Sent on {{date}}"
+    },
+    "errors": {
+      "loadFailed": "Failed to load friends.",
+      "sendFailed": "Could not send friend request. Please try again.",
+      "acceptFailed": "Could not accept request. Please try again.",
+      "cancelFailed": "Could not cancel request. Please try again.",
+      "removeFailed": "Could not remove friend. Please try again."
+    },
+    "toast": {
+      "sent": "Friend request sent",
+      "accepted": "You are now friends!",
+      "removed": "Friend removed"
+    }
   }
 }
