@@ -1,13 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { RuntimeChatMessage } from '../lib/session';
 
 export function ChatPanel(props: {
   messages: RuntimeChatMessage[];
   onSendMessage: (body: string) => void;
   isSending: boolean;
+  initialHistoryCollapsed?: boolean;
 }) {
   const [draft, setDraft] = useState('');
-  const [historyCollapsed, setHistoryCollapsed] = useState(false);
+  const [historyCollapsed, setHistoryCollapsed] = useState(props.initialHistoryCollapsed ?? false);
+  const chatLogId = useId();
+
+  useEffect(() => {
+    setHistoryCollapsed(props.initialHistoryCollapsed ?? false);
+  }, [props.initialHistoryCollapsed]);
 
   const handleSend = () => {
     const body = draft.trim();
@@ -26,12 +32,18 @@ export function ChatPanel(props: {
           <p className="hud-kicker">Room Chat</p>
           <h2>Chat</h2>
         </div>
-        <button type="button" className="chat-collapse-button" onClick={() => setHistoryCollapsed((current) => !current)}>
+        <button
+          type="button"
+          className="chat-collapse-button"
+          aria-expanded={!historyCollapsed}
+          aria-controls={chatLogId}
+          onClick={() => setHistoryCollapsed((current) => !current)}
+        >
           {historyCollapsed ? 'Expand chat history' : 'Collapse chat history'}
         </button>
       </div>
       {!historyCollapsed ? (
-        <div className="chat-log" aria-live="polite">
+        <div id={chatLogId} className="chat-log" aria-live="polite">
           {props.messages.length ? (
             props.messages.map((message, index) => (
               <p key={`${message.playerId}-${message.createdAt}-${index}`} className="chat-line">
@@ -43,7 +55,7 @@ export function ChatPanel(props: {
           )}
         </div>
       ) : (
-        <div className="chat-log chat-log-collapsed" aria-hidden="true" />
+        <div id={chatLogId} className="chat-log chat-log-collapsed" aria-hidden="true" />
       )}
       <label className="chat-composer">
         <span className="sr-only">Message</span>
