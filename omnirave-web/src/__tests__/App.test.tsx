@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 
 const mockWorldSession = {
@@ -28,6 +28,8 @@ const mockWorldSession = {
     players: [
       {
         id: 'guest-42',
+        playerName: 'Guest-42',
+        mode: 'guest' as const,
         zone: 'main_stage' as const,
         position: { x: 0, y: 0, z: 0 },
         loadout: { hair: 'buzz', top: 'black_mesh' },
@@ -57,6 +59,16 @@ const mockWorldSession = {
     cameraFollow: 'free' as const,
   },
   updateSettings: vi.fn(),
+  authPopupMode: null as 'login' | 'signup' | null,
+  openAuthPopup: vi.fn(),
+  closeAuthPopup: vi.fn(),
+  login: vi.fn(),
+  signup: vi.fn(),
+  logout: vi.fn(),
+  isAuthSubmitting: false,
+  welcomeCardState: null as null | { isOpen: boolean; variant: 'login' | 'signup' },
+  dismissWelcomeCard: vi.fn(),
+  requestGuestSprintUnlock: vi.fn(),
   moveToZone: vi.fn(),
   respawn: vi.fn(),
   saveLoadout: vi.fn(),
@@ -84,6 +96,17 @@ vi.mock('../components/WorldScene', () => ({
 }));
 
 describe('App', () => {
+  beforeEach(() => {
+    mockWorldSession.session.mode = 'guest';
+    mockWorldSession.session.playerName = 'Guest-42';
+    mockWorldSession.authPopupMode = null;
+    mockWorldSession.welcomeCardState = null;
+    mockWorldSession.openAuthPopup.mockClear();
+    mockWorldSession.closeAuthPopup.mockClear();
+    mockWorldSession.dismissWelcomeCard.mockClear();
+    mockWorldSession.logout.mockClear();
+  });
+
   it('renders the persistent OmniRave HUD anchors', async () => {
     mockWorldSession.pendingVenue = null;
     mockWorldSession.settings.chatCollapsed = false;
@@ -93,8 +116,8 @@ describe('App', () => {
 
     expect(await screen.findByRole('button', { name: 'Settings' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Avatar' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Log In' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Sign Up' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Log In' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Sign Up' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Chat' })).not.toBeInTheDocument();
     expect(screen.getByText('Current Venue')).toBeInTheDocument();
     expect(screen.getByText('DJ Hyperbeam warming up')).toBeInTheDocument();
@@ -166,5 +189,31 @@ describe('App', () => {
     fireEvent.click(within(view.container).getByRole('button', { name: 'Close settings' }));
 
     expect(within(view.container).queryByRole('button', { name: 'Respawn' })).not.toBeInTheDocument();
+  });
+
+  it('opens signup instead of the avatar shell when a guest clicks Avatar', async () => {
+    mockWorldSession.openAuthPopup.mockClear();
+    const view = render(<App />);
+
+    fireEvent.click(await within(view.container).findByRole('button', { name: 'Avatar' }));
+
+    expect(mockWorldSession.openAuthPopup).toHaveBeenCalledWith('signup', 'guest_avatar');
+    expect(within(view.container).queryByLabelText('Avatar editor foundation')).not.toBeInTheDocument();
+  });
+
+  it('closes the welcome card and opens the avatar shell from Edit Avatar', async () => {
+    mockWorldSession.session.mode = 'account';
+    mockWorldSession.welcomeCardState = { isOpen: true, variant: 'signup' };
+    mockWorldSession.dismissWelcomeCard.mockClear();
+
+    const view = render(<App />);
+
+    fireEvent.click(await within(view.container).findByRole('button', { name: 'Edit Avatar' }));
+
+    expect(mockWorldSession.dismissWelcomeCard).toHaveBeenCalledTimes(1);
+    expect(within(view.container).getByLabelText('Avatar editor foundation')).toBeInTheDocument();
+
+    mockWorldSession.session.mode = 'guest';
+    mockWorldSession.welcomeCardState = null;
   });
 });

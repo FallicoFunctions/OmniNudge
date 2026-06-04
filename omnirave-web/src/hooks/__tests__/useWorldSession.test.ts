@@ -6,6 +6,9 @@ import type { RuntimeSettings } from '../../lib/settings';
 
 const bootstrapSessionMock = vi.fn();
 const saveRuntimeSettingsMock = vi.fn();
+const runtimeLoginMock = vi.fn();
+const runtimeSignupMock = vi.fn();
+const runtimeLogoutMock = vi.fn();
 const openWorldSocketMock = vi.fn((_args?: unknown) => ({
   close: vi.fn(),
   moveToZone: vi.fn(),
@@ -19,6 +22,9 @@ vi.mock('../../lib/session', async () => {
     ...actual,
     bootstrapSession: (...args: Parameters<typeof actual.bootstrapSession>) => bootstrapSessionMock(...args),
     saveRuntimeSettings: (...args: Parameters<typeof actual.saveRuntimeSettings>) => saveRuntimeSettingsMock(...args),
+    runtimeLogin: (...args: unknown[]) => runtimeLoginMock(...args),
+    runtimeSignup: (...args: unknown[]) => runtimeSignupMock(...args),
+    runtimeLogout: (...args: unknown[]) => runtimeLogoutMock(...args),
     saveReturnPoint: vi.fn(),
     saveLoadout: vi.fn(),
   };
@@ -69,7 +75,47 @@ describe('useWorldSession', () => {
   beforeEach(() => {
     bootstrapSessionMock.mockReset();
     saveRuntimeSettingsMock.mockReset();
+    runtimeLoginMock.mockReset();
+    runtimeSignupMock.mockReset();
+    runtimeLogoutMock.mockReset();
     openWorldSocketMock.mockClear();
+  });
+
+  it('replaces the guest session in place after runtime login and exposes welcome-card state', async () => {
+    bootstrapSessionMock.mockResolvedValue(
+      createAccountSession({
+        playerId: 'guest-42',
+        playerName: 'Guest-42',
+        mode: 'guest',
+        sessionToken: undefined,
+      }),
+    );
+    runtimeLoginMock.mockResolvedValue(
+      createAccountSession({
+        playerId: 'user-42',
+        playerName: 'nick',
+        mode: 'account',
+        sessionToken: 'runtime-token-9',
+      }),
+    );
+
+    const { result } = renderHook(() => useWorldSession());
+
+    await waitFor(() => expect(result.current.session?.mode).toBe('guest'));
+
+    await act(async () => {
+      await (result.current as any).login({
+        username: 'nick',
+        password: 'correct-horse-battery-staple',
+      });
+    });
+
+    expect(result.current.session?.mode).toBe('account');
+    expect(result.current.session?.playerName).toBe('nick');
+    expect((result.current as any).welcomeCardState).toEqual({
+      isOpen: true,
+      variant: 'login',
+    });
   });
 
   it('serializes runtime settings saves so the latest choice persists last', async () => {
