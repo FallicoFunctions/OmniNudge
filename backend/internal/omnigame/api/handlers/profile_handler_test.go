@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/omnigame/repository"
 	"github.com/omninudge/backend/internal/omnigame/service"
+	omniraveworld "github.com/omninudge/backend/internal/omniraveworld/world"
 	"github.com/stretchr/testify/require"
 )
 
@@ -143,7 +144,7 @@ func TestProfileHandler_RuntimeSettingsRejectsInvalidPayload(t *testing.T) {
 func TestProfileHandler_LastVenueRoundTrips(t *testing.T) {
 	router := testProfileRouter()
 
-	saveReq := httptest.NewRequest(http.MethodPut, "/omnigame/profile/omnirave/last-venue", bytes.NewBufferString(`{"lastVenue":"underground"}`))
+	saveReq := httptest.NewRequest(http.MethodPut, "/omnigame/profile/omnirave/last-venue", bytes.NewBufferString(`{"lastVenue":"`+string(omniraveworld.ZoneUnderground)+`"}`))
 	saveReq.Header.Set("Content-Type", "application/json")
 	saveRec := httptest.NewRecorder()
 	router.ServeHTTP(saveRec, saveReq)
@@ -156,7 +157,7 @@ func TestProfileHandler_LastVenueRoundTrips(t *testing.T) {
 
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(getRec.Body.Bytes(), &payload))
-	require.Equal(t, "underground", payload["lastVenue"])
+	require.Equal(t, string(omniraveworld.ZoneUnderground), payload["lastVenue"])
 }
 
 func TestProfileHandler_LastVenueRejectsInvalidVenue(t *testing.T) {
