@@ -125,6 +125,7 @@
     "profile": "الملف الشخصي",
     "admin": "الإدارة",
     "hubs": "المجموعات",
+    "games": "الألعاب",
     "search": "بحث",
     "create": "إنشاء",
     "menu": "القائمة"
@@ -133,10 +134,24 @@
     "profile": "الملف الشخصي",
     "settings": "الإعدادات",
     "hubs": "تصفح المجموعات",
+    "games": "الألعاب",
     "about": "حول",
     "admin": "لوحة الإدارة",
     "logout": "تسجيل الخروج",
     "logoutConfirm": "هل أنت متأكد أنك تريد تسجيل الخروج؟"
+  },
+  "gamesPage": {
+    "eyebrow": "OmniGame",
+    "title": "OmniGame",
+    "description": "تصفح عوالم متعددة اللاعبين مصممة لـ OmniNudge.",
+    "availableNow": "متاح الآن",
+    "viewGame": "عرض اللعبة"
+  },
+  "gameDetailPage": {
+    "eyebrow": "OmniGame / OmniRave",
+    "play": "العب",
+    "starting": "جارٍ البدء...",
+    "launchError": "يتعذر بدء OmniRave الآن."
   },
   "mainLayout": {
     "skipToMainContent": "تخطي إلى المحتوى الرئيسي",
@@ -1664,7 +1679,22 @@
       "toggleError": "فشل تحديث المجلد. يرجى المحاولة مرة أخرى.",
       "deleteError": "فشل حذف المجلد. يرجى المحاولة مرة أخرى.",
       "previewLabel": "معاينة المجلد: {{name}}",
-      "emptyHint": "لا توجد مجلدات بعد — اضغط على + لإنشاء مجلد"
+      "emptyHint": "لا توجد مجلدات بعد — اضغط على + لإنشاء مجلد",
+      "modMail": "بريد الإشراف"
+    },
+    "chatSettings": "إعدادات الدردشة",
+    "autoDelete": {
+      "label": "حذف رسائلي تلقائياً بعد",
+      "description": "ستُحذف رسائلك المُرسَلة نهائياً بعد هذه المدة. لا تتأثر رسائل المشاركين الآخرين.",
+      "days": "أيام",
+      "hours": "ساعات",
+      "minutes": "دقائق",
+      "neverHint": "عندما تكون جميع الأرقام صفراً، لا تُحذف الرسائل تلقائياً.",
+      "applyRetroTitle": "تطبيق على الرسائل السابقة؟",
+      "applyRetroBody": "هل تريد أيضاً تطبيق هذا الإعداد على الرسائل التي أرسلتها بالفعل في هذه المحادثة؟",
+      "applyToAll": "نعم، طبّق على جميع رسائلي",
+      "applyNewOnly": "لا، للرسائل الجديدة فقط",
+      "usingGlobalDefault": "لا يوجد إعداد خاص بهذه المحادثة — يُستخدم إعدادك العام الافتراضي."
     }
   },
   "posts": {
@@ -2557,7 +2587,9 @@
     "closeLabel": "إغلاق العرض (Esc)",
     "previousLabel": "السابق (←)",
     "nextLabel": "التالي (→)",
-    "counter": "{{current}} من {{total}}",
+    "counter": {
+      "imageOf": "{{current}} من {{total}}"
+    },
     "noMediaFound": "لم يتم العثور على وسائط",
     "redditMedia": {
       "title": "عرض شرائح وسائط Reddit",

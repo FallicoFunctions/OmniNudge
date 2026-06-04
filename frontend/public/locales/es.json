@@ -125,6 +125,7 @@
     "profile": "Perfil",
     "admin": "Admin",
     "hubs": "Hubs",
+    "games": "Juegos",
     "search": "Buscar",
     "create": "Crear",
     "menu": "Menú"
@@ -133,10 +134,24 @@
     "profile": "Perfil",
     "settings": "Ajustes",
     "hubs": "Explorar Hubs",
+    "games": "Juegos",
     "about": "Acerca de",
     "admin": "Panel de Admin",
     "logout": "Cerrar Sesión",
     "logoutConfirm": "¿Estás seguro de que quieres cerrar sesión?"
+  },
+  "gamesPage": {
+    "eyebrow": "OmniGame",
+    "title": "OmniGame",
+    "description": "Explora mundos multijugador creados para OmniNudge.",
+    "availableNow": "Disponible ahora",
+    "viewGame": "Ver juego"
+  },
+  "gameDetailPage": {
+    "eyebrow": "OmniGame / OmniRave",
+    "play": "Jugar",
+    "starting": "Iniciando...",
+    "launchError": "No se puede iniciar OmniRave ahora mismo."
   },
   "mainLayout": {
     "skipToMainContent": "Saltar al contenido principal",
@@ -1664,7 +1679,22 @@
       "toggleError": "No se pudo actualizar la carpeta. Inténtalo de nuevo.",
       "deleteError": "No se pudo eliminar la carpeta. Inténtalo de nuevo.",
       "previewLabel": "Vista previa de carpeta: {{name}}",
-      "emptyHint": "Aún no hay carpetas — pulsa + para crear una"
+      "emptyHint": "Aún no hay carpetas — pulsa + para crear una",
+      "modMail": "Correo de moderación"
+    },
+    "chatSettings": "Configuración del chat",
+    "autoDelete": {
+      "label": "Eliminar automáticamente mis mensajes después de",
+      "description": "Tus mensajes enviados se eliminarán permanentemente después de este tiempo. Los mensajes de otros participantes no se ven afectados.",
+      "days": "Días",
+      "hours": "Horas",
+      "minutes": "Minutos",
+      "neverHint": "Todos los diales en cero significa que los mensajes nunca se eliminan automáticamente.",
+      "applyRetroTitle": "¿Aplicar a mensajes anteriores?",
+      "applyRetroBody": "¿También deseas aplicar esta configuración a los mensajes que ya enviaste en esta conversación?",
+      "applyToAll": "Sí, aplicar a todos mis mensajes",
+      "applyNewOnly": "No, solo a mensajes nuevos",
+      "usingGlobalDefault": "Sin ajuste por conversación — usando tu predeterminado global."
     }
   },
   "posts": {
@@ -2557,7 +2587,9 @@
     "closeLabel": "Cerrar presentación (Esc)",
     "previousLabel": "Anterior (←)",
     "nextLabel": "Siguiente (→)",
-    "counter": "{{current}} de {{total}}",
+    "counter": {
+      "imageOf": "{{current}} de {{total}}"
+    },
     "noMediaFound": "No se encontro contenido multimedia",
     "redditMedia": {
       "title": "Pase de diapositivas de medios de Reddit",

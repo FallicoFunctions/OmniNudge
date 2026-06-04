@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BaseSlideshow } from './BaseSlideshow';
 import type { SlideshowItem } from './BaseSlideshow';
@@ -59,6 +60,8 @@ interface RedditPostSlideshowProps {
   posts: PostType[];
   onClose: () => void;
   includeTextPosts?: boolean;
+  /** Optional mini chat strip rendered below the media. */
+  chatContent?: ReactNode;
 }
 
 interface SlideshowPost {
@@ -125,6 +128,7 @@ export function RedditPostSlideshow({
   posts,
   onClose,
   includeTextPosts = true,
+  chatContent,
 }: RedditPostSlideshowProps) {
   const { t } = useTranslation();
   const [galleryData, setGalleryData] = useState<Record<string, string[]>>({});
@@ -404,6 +408,7 @@ export function RedditPostSlideshow({
       autoAdvance={false}
       autoAdvanceInterval={5000}
       showControls={true}
+      bottomContent={chatContent}
       onSlideChange={handleSlideChange}
       renderControls={({
         autoAdvance,

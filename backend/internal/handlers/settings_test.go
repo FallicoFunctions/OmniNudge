@@ -33,7 +33,7 @@ func setupSettingsHandlerTest(t *testing.T) (*SettingsHandler, *models.UserSetti
 	require.NoError(t, userRepo.Create(ctx, user))
 
 	settingsRepo := models.NewUserSettingsRepository(db.Pool)
-	handler := NewSettingsHandler(settingsRepo)
+	handler := NewSettingsHandler(settingsRepo, nil)
 
 	cleanup := func() {
 		db.Close()

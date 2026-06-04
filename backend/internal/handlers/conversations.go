@@ -3,6 +3,7 @@ package handlers
 import (
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/services"
 	"net/http"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ type ConversationsHandler struct {
 	conversationRepo ports.ConversationRepository
 	messageRepo      ports.MessageRepository
 	userRepo         ports.UserRepository
+	autoDeleteSvc    *services.AutoDeleteService
 }
 
 // NewConversationsHandler creates a new conversations handler
@@ -28,12 +30,14 @@ func NewConversationsHandler(
 	conversationRepo ports.ConversationRepository,
 	messageRepo ports.MessageRepository,
 	userRepo ports.UserRepository,
+	autoDeleteSvc *services.AutoDeleteService,
 ) *ConversationsHandler {
 	return &ConversationsHandler{
 		pool:             pool,
 		conversationRepo: conversationRepo,
 		messageRepo:      messageRepo,
 		userRepo:         userRepo,
+		autoDeleteSvc:    autoDeleteSvc,
 	}
 }
 
@@ -83,7 +87,7 @@ func (h *ConversationsHandler) ensureConversationParticipant(c *gin.Context, con
 			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return nil, false
 		}
-	case "mod_mail":
+	case "group", "mod_mail":
 		var count int
 		err := h.pool.QueryRow(c.Request.Context(), `
 			SELECT COUNT(*) FROM conversation_participants
@@ -94,9 +98,12 @@ func (h *ConversationsHandler) ensureConversationParticipant(c *gin.Context, con
 			return nil, false
 		}
 		if count == 0 {
-			RespondError(c, http.StatusForbidden, "You are not a participant in this mod mail conversation")
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return nil, false
 		}
+	default:
+		RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
+		return nil, false
 	}
 
 	return conversation, true
@@ -818,4 +825,131 @@ func (h *ConversationsHandler) UnmuteConversation(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Conversation unmuted successfully"})
+}
+
+type chatSettingsResponse struct {
+	// AutoDeleteAfterSeconds is the per-chat override in whole seconds.
+	// nil means no per-chat override is set (conversation inherits global default).
+	// 0 would mean "never" but is never returned — nil is used instead.
+	AutoDeleteAfterSeconds *int `json:"auto_delete_after_seconds"`
+}
+
+// GetChatSettings returns the requesting user's per-chat auto-delete setting.
+// @Summary      Get chat settings
+// @Tags         Conversations
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  chatSettingsResponse
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/settings [get]
+func (h *ConversationsHandler) GetChatSettings(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
+		return
+	}
+
+	conv, ok := h.ensureConversationParticipant(c, conversationID, userID)
+	if !ok {
+		return
+	}
+	if conv.ConversationType == "mod_mail" {
+		RespondError(c, http.StatusBadRequest, "Auto-delete is not available for mod mail conversations")
+		return
+	}
+
+	if h.autoDeleteSvc == nil {
+		RespondError(c, http.StatusInternalServerError, "Auto-delete service unavailable")
+		return
+	}
+	// Use the raw per-chat setting (no global fallback) so the frontend can
+	// distinguish "no override" (nil → show 'Using global default') from
+	// "override equals global value" (non-nil with same duration).
+	d, err := h.autoDeleteSvc.GetRawChatSetting(c.Request.Context(), userID, conversationID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load chat settings")
+		return
+	}
+
+	resp := chatSettingsResponse{}
+	if d != nil {
+		secs := int(d.Seconds())
+		resp.AutoDeleteAfterSeconds = &secs
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+type updateChatSettingsRequest struct {
+	// AutoDeleteAfterSeconds is the desired duration in whole seconds.
+	// 0 or nil clears the per-chat override (reverts to global default).
+	AutoDeleteAfterSeconds *int  `json:"auto_delete_after_seconds"`
+	ApplyRetroactive       *bool `json:"apply_retroactive"`
+}
+
+// UpdateChatSettings sets the per-chat auto-delete override for the requesting user.
+// @Summary      Update chat settings
+// @Tags         Conversations
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/settings [patch]
+func (h *ConversationsHandler) UpdateChatSettings(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
+		return
+	}
+
+	conv, ok := h.ensureConversationParticipant(c, conversationID, userID)
+	if !ok {
+		return
+	}
+	if conv.ConversationType == "mod_mail" {
+		RespondError(c, http.StatusBadRequest, "Auto-delete is not available for mod mail conversations")
+		return
+	}
+
+	var req updateChatSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// 0 or nil seconds means "clear the override" (never).
+	var interval *time.Duration
+	if req.AutoDeleteAfterSeconds != nil && *req.AutoDeleteAfterSeconds > 0 {
+		d := time.Duration(*req.AutoDeleteAfterSeconds) * time.Second
+		interval = &d
+	}
+
+	if h.autoDeleteSvc == nil {
+		RespondError(c, http.StatusInternalServerError, "Auto-delete service unavailable")
+		return
+	}
+	retroactive := req.ApplyRetroactive != nil && *req.ApplyRetroactive
+	if err := h.autoDeleteSvc.UpdateChatSetting(c.Request.Context(), userID, conversationID, interval, retroactive); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to update chat settings")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Chat settings updated"})
 }

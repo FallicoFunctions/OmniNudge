@@ -27,8 +27,8 @@ type Conversation struct {
 	Muted            bool       `json:"muted"`             // Whether this conversation is muted for current user
 
 	// Phase 2 features
-	User1AutoDeleteAfter *string `json:"user1_auto_delete_after,omitempty"`
-	User2AutoDeleteAfter *string `json:"user2_auto_delete_after,omitempty"`
+	User1AutoDeleteAfter *time.Duration `json:"user1_auto_delete_after,omitempty"`
+	User2AutoDeleteAfter *time.Duration `json:"user2_auto_delete_after,omitempty"`
 	User1Pseudonym       *string `json:"user1_pseudonym,omitempty"`
 	User2Pseudonym       *string `json:"user2_pseudonym,omitempty"`
 
@@ -91,6 +91,7 @@ func (r *ConversationRepository) GetByID(ctx context.Context, id int) (*Conversa
 
 	query := `
 		SELECT id, user1_id, user2_id, created_at, last_message_at,
+		       conversation_type, is_group,
 		       user1_auto_delete_after, user2_auto_delete_after,
 		       user1_pseudonym, user2_pseudonym
 		FROM conversations
@@ -103,6 +104,8 @@ func (r *ConversationRepository) GetByID(ctx context.Context, id int) (*Conversa
 		&conversation.User2ID,
 		&conversation.CreatedAt,
 		&conversation.LastMessageAt,
+		&conversation.ConversationType,
+		&conversation.IsGroup,
 		&conversation.User1AutoDeleteAfter,
 		&conversation.User2AutoDeleteAfter,
 		&conversation.User1Pseudonym,
@@ -868,6 +871,64 @@ func (r *ConversationRepository) HardDeleteIfBothDeleted(ctx context.Context, co
 	`
 	_, err := r.pool.Exec(ctx, query, conversationID)
 	return err
+}
+
+// GetEffectiveAutoDelete returns the auto-delete interval that governs messages sent by userID
+// in conversationID. Resolution order: per-chat override → global user setting → nil (Never).
+func (r *ConversationRepository) GetEffectiveAutoDelete(ctx context.Context, userID, conversationID int) (*time.Duration, error) {
+	var duration *time.Duration
+	err := r.pool.QueryRow(ctx, `
+		SELECT CASE
+			-- mod_mail is moderation infrastructure; never auto-delete regardless of user settings.
+			WHEN c.conversation_type = 'mod_mail' THEN NULL
+			ELSE COALESCE(
+				CASE
+					-- COALESCE handles legacy rows where conversation_type IS NULL (treated as 'dm').
+					WHEN COALESCE(c.conversation_type, 'dm') = 'dm' AND c.user1_id = $1 THEN c.user1_auto_delete_after
+					WHEN COALESCE(c.conversation_type, 'dm') = 'dm' AND c.user2_id = $1 THEN c.user2_auto_delete_after
+					WHEN c.conversation_type = 'group'                                   THEN cp.auto_delete_after
+					ELSE NULL
+				END,
+				us.default_auto_delete_after
+			)
+		END
+		FROM conversations c
+		LEFT JOIN conversation_participants cp
+			ON cp.conversation_id = c.id AND cp.user_id = $1
+		LEFT JOIN user_settings us ON us.user_id = $1
+		WHERE c.id = $2
+	`, userID, conversationID).Scan(&duration)
+	if err != nil {
+		return nil, err
+	}
+	return duration, nil
+}
+
+// GetRawChatAutoDelete returns the per-chat override set by userID in conversationID,
+// with NO fallback to the global user setting. Returns nil when no override has been
+// set (i.e. the conversation inherits the global default).
+// Used by GetChatSettings so the UI can distinguish "no override" from "override = global value".
+func (r *ConversationRepository) GetRawChatAutoDelete(ctx context.Context, userID, conversationID int) (*time.Duration, error) {
+	var duration *time.Duration
+	err := r.pool.QueryRow(ctx, `
+		SELECT CASE
+			WHEN c.conversation_type = 'mod_mail' THEN NULL
+			WHEN c.conversation_type = 'group'    THEN cp.auto_delete_after
+			-- DM or legacy NULL-type row: check type before user IDs so that a
+			-- group row with a coincidental user1_id match doesn't short-circuit here.
+			WHEN COALESCE(c.conversation_type, 'dm') = 'dm' AND c.user1_id = $1 THEN c.user1_auto_delete_after
+			WHEN COALESCE(c.conversation_type, 'dm') = 'dm' AND c.user2_id = $1 THEN c.user2_auto_delete_after
+			ELSE NULL
+		END
+		FROM conversations c
+		LEFT JOIN conversation_participants cp
+			ON cp.conversation_id = c.id AND cp.user_id = $1
+		WHERE c.id = $2
+	`, userID, conversationID).Scan(&duration)
+	if err != nil {
+		return nil, err
+	}
+	return duration, nil
 }
 
 // SetMuted toggles per-conversation mute for a specific user.

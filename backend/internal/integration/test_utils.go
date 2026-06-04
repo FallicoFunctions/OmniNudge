@@ -18,6 +18,7 @@ import (
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/omninudge/backend/internal/websocket"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -136,9 +137,10 @@ func newTestDeps(t *testing.T) *TestDeps {
 		services.NewRedditClient(cfg.Reddit.UserAgent, services.NoopCache{}, 0),
 		redditPostRepo,
 	)
-	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
-	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, nil, services.NoopCache{})
-	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
+	autoDeleteSvc := services.NewAutoDeleteService(db.Pool, conversationRepo, messageRepo, hub, zerolog.Nop(), context.Background())
+	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo, autoDeleteSvc)
+	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, nil, services.NoopCache{}).WithAutoDeleteService(autoDeleteSvc)
+	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo, autoDeleteSvc)
 	notificationsHandler := handlers.NewNotificationsHandler(notifRepo)
 	thumbnailService := services.NewThumbnailService()
 	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, nil, modRepo, services.NoopCache{}, thumbnailService)
@@ -251,6 +253,8 @@ func newTestDeps(t *testing.T) *TestDeps {
 			protected.POST("/messages/:id/pin", messagesHandler.PinMessage)
 			protected.DELETE("/messages/:id/pin", messagesHandler.UnpinMessage)
 			protected.POST("/conversations", conversationsHandler.CreateConversation)
+			protected.GET("/conversations/:id/settings", conversationsHandler.GetChatSettings)
+			protected.PATCH("/conversations/:id/settings", conversationsHandler.UpdateChatSettings)
 			protected.GET("/search/messages", searchHandler.SearchMessages)
 			protected.GET("/users/me/profile", usersHandler.GetMyProfile)
 			protected.GET("/users/me/storage", storageHandler.GetMyStorage)

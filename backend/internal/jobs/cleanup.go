@@ -8,7 +8,23 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/websocket"
 )
+
+// Narrow interfaces satisfied by the concrete model repos.
+
+type expiredMsgRepo interface {
+	GetExpiredBefore(ctx context.Context, before time.Time, limit int) ([]models.ExpiredMessage, error)
+	// AutoDelete returns (tombstoned, err). tombstoned=true means the message had
+	// replies and was scrubbed in-place (not removed); the recipient still sees the
+	// "[deleted]" placeholder. tombstoned=false means the message was hard-deleted.
+	AutoDelete(ctx context.Context, messageID int) (tombstoned bool, err error)
+}
+
+type expiredConvRepo interface {
+	GetByID(ctx context.Context, id int) (*models.Conversation, error)
+}
 
 const (
 	// defaultFailedLoginRetention is how long failed_login_attempts rows are kept.
@@ -27,8 +43,14 @@ type CleanupJob struct {
 	pool                *pgxpool.Pool
 	failedLoginInterval time.Duration // how often to run the purge
 	auditLogInterval    time.Duration
+	autoDeleteInterval  time.Duration
 	failedLoginRetain   time.Duration // how old rows must be before deletion
 	auditLogRetain      time.Duration
+
+	// Set via WithAutoDeleteSweep to enable the expired-message purge.
+	msgRepo  expiredMsgRepo
+	convRepo expiredConvRepo
+	hub      *websocket.Hub
 }
 
 // WithFailedLoginInterval overrides the interval between failed-login-attempts purge runs.
@@ -41,6 +63,21 @@ func WithAuditLogInterval(d time.Duration) func(*CleanupJob) {
 	return func(j *CleanupJob) { j.auditLogInterval = d }
 }
 
+// WithAutoDeleteSweep enables the expired-message purge and sets the repositories
+// and hub needed to delete messages and broadcast WS events.
+func WithAutoDeleteSweep(msgRepo expiredMsgRepo, convRepo expiredConvRepo, hub *websocket.Hub) func(*CleanupJob) {
+	return func(j *CleanupJob) {
+		j.msgRepo = msgRepo
+		j.convRepo = convRepo
+		j.hub = hub
+	}
+}
+
+// WithAutoDeleteInterval overrides how often the expired-message sweep runs (default 1 minute).
+func WithAutoDeleteInterval(d time.Duration) func(*CleanupJob) {
+	return func(j *CleanupJob) { j.autoDeleteInterval = d }
+}
+
 // NewCleanupJob creates a CleanupJob with sensible defaults.
 // Call Start(ctx) to begin the background goroutines.
 func NewCleanupJob(pool *pgxpool.Pool, opts ...func(*CleanupJob)) *CleanupJob {
@@ -48,6 +85,7 @@ func NewCleanupJob(pool *pgxpool.Pool, opts ...func(*CleanupJob)) *CleanupJob {
 		pool:                pool,
 		failedLoginInterval: time.Hour,
 		auditLogInterval:    24 * time.Hour,
+		autoDeleteInterval:  time.Minute,
 		failedLoginRetain:   defaultFailedLoginRetention,
 		auditLogRetain:      defaultAuditLogRetention,
 	}
@@ -63,16 +101,22 @@ func (j *CleanupJob) Start(ctx context.Context) {
 	slog.Info("cleanup job started",
 		"failed_login_interval", j.failedLoginInterval,
 		"audit_log_interval", j.auditLogInterval,
+		"auto_delete_interval", j.autoDeleteInterval,
 	)
 
 	// Run immediately on startup, then on each tick.
 	j.PurgeFailedLogins(ctx)
 	j.PurgeAuditLogs(ctx)
+	if j.msgRepo != nil {
+		j.PurgeExpiredMessages(ctx)
+	}
 
 	failedLoginTicker := time.NewTicker(j.failedLoginInterval)
 	auditLogTicker := time.NewTicker(j.auditLogInterval)
+	autoDeleteTicker := time.NewTicker(j.autoDeleteInterval)
 	defer failedLoginTicker.Stop()
 	defer auditLogTicker.Stop()
+	defer autoDeleteTicker.Stop()
 
 	for {
 		select {
@@ -85,6 +129,11 @@ func (j *CleanupJob) Start(ctx context.Context) {
 
 		case <-auditLogTicker.C:
 			j.PurgeAuditLogs(ctx)
+
+		case <-autoDeleteTicker.C:
+			if j.msgRepo != nil {
+				j.PurgeExpiredMessages(ctx)
+			}
 		}
 	}
 }
@@ -126,4 +175,167 @@ func (j *CleanupJob) PurgeAuditLogs(ctx context.Context) {
 		return
 	}
 	slog.Info("cleanup: purged audit_logs", "rows_deleted", tag.RowsAffected())
+}
+
+// PurgeExpiredMessages sweeps messages whose delete_at is in the past and permanently
+// deletes them. Messages with replies are tombstoned; all others are hard-deleted.
+// A WebSocket event is broadcast to connected conversation participants for each deletion.
+// Loops in batches of 100 until no expired messages remain, so a large backlog is fully
+// drained within a single tick rather than being rate-limited to 100/minute.
+func (j *CleanupJob) PurgeExpiredMessages(ctx context.Context) {
+	const batchSize = 100
+	totalPurged := 0
+
+	for {
+		expired, err := j.msgRepo.GetExpiredBefore(ctx, time.Now(), batchSize)
+		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return
+			}
+			slog.Error("cleanup: fetch expired messages", "error", err)
+			return
+		}
+
+		// Pre-fetch participants for all unique conversation IDs in the batch so we
+		// don't issue one GetByID + participant query per message when many messages
+		// share the same conversation (e.g. a group with 100 expiring messages).
+		convIDs := uniqueConvIDs(expired)
+		participantCache := make(map[int][]int, len(convIDs))
+		for _, cid := range convIDs {
+			ids, err := j.getParticipantIDs(ctx, cid)
+			if err != nil {
+				slog.Warn("cleanup: fetch participants for broadcast", "conversation_id", cid, "error", err)
+			}
+			participantCache[cid] = ids
+		}
+
+		for _, msg := range expired {
+			tombstoned, err := j.msgRepo.AutoDelete(ctx, msg.ID)
+			if err != nil {
+				if errors.Is(err, models.ErrMessageAlreadyDeleted) {
+					// Race: already deleted by another path; skip broadcast silently.
+					continue
+				}
+				slog.Warn("cleanup: auto-delete message", "message_id", msg.ID, "error", err)
+				continue
+			}
+
+			totalPurged++ // count only successful deletions
+
+			participantIDs := participantCache[msg.ConversationID]
+
+			if tombstoned {
+				// Message had replies: content scrubbed but row preserved for thread context.
+				// - Sender gets message_auto_deleted: removes their copy from the cache.
+				// - Non-senders get message_tombstoned: updates the bubble to "[deleted]"
+				//   in-place so the reply thread stays coherent.
+				// The two events must NOT overlap for the sender, otherwise message_tombstoned
+				// re-inserts the stub into the sender's cache after message_auto_deleted removed it.
+				senderOnly := filterIDs(participantIDs, msg.SenderID)
+				nonSenders := excludeID(participantIDs, msg.SenderID)
+				j.hub.BroadcastToUsers(senderOnly, "message_auto_deleted", map[string]interface{}{
+					"message_id":      msg.ID,
+					"conversation_id": msg.ConversationID,
+				})
+				j.hub.BroadcastToUsers(nonSenders, "message_tombstoned", map[string]interface{}{
+					"message_id":      msg.ID,
+					"conversation_id": msg.ConversationID,
+					"message_type":    "deleted",
+					"content":         "[deleted]",
+				})
+			} else {
+				// Message was hard-deleted: both parties lose it.
+				j.hub.BroadcastToUsers(participantIDs, "message_auto_deleted", map[string]interface{}{
+					"message_id":      msg.ID,
+					"conversation_id": msg.ConversationID,
+				})
+			}
+		}
+
+		// Fewer than batchSize returned → no more expired messages.
+		if len(expired) < batchSize {
+			break
+		}
+	}
+
+	if totalPurged > 0 {
+		slog.Info("cleanup: purged expired messages", "count", totalPurged)
+	}
+}
+
+// getParticipantIDs returns all user IDs for a conversation (group or DM).
+func (j *CleanupJob) getParticipantIDs(ctx context.Context, conversationID int) ([]int, error) {
+	rows, err := j.convRepo.GetByID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if rows == nil {
+		return nil, nil
+	}
+
+	// Group / mod_mail: participants are in conversation_participants.
+	if rows.IsGroup || rows.ConversationType == "mod_mail" {
+		dbRows, err := j.pool.Query(ctx,
+			`SELECT user_id FROM conversation_participants WHERE conversation_id = $1`,
+			conversationID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		defer dbRows.Close()
+		var ids []int
+		for dbRows.Next() {
+			var uid int
+			if err := dbRows.Scan(&uid); err != nil {
+				return nil, err
+			}
+			ids = append(ids, uid)
+		}
+		return ids, dbRows.Err()
+	}
+
+	// DM: user1 and user2.
+	var ids []int
+	if rows.User1ID != nil {
+		ids = append(ids, *rows.User1ID)
+	}
+	if rows.User2ID != nil {
+		ids = append(ids, *rows.User2ID)
+	}
+	return ids, nil
+}
+
+// uniqueConvIDs returns the deduplicated conversation IDs from a batch of expired messages.
+func uniqueConvIDs(msgs []models.ExpiredMessage) []int {
+	seen := make(map[int]struct{}, len(msgs))
+	var out []int
+	for _, m := range msgs {
+		if _, ok := seen[m.ConversationID]; !ok {
+			seen[m.ConversationID] = struct{}{}
+			out = append(out, m.ConversationID)
+		}
+	}
+	return out
+}
+
+// filterIDs returns only the IDs from the slice that match the target.
+func filterIDs(ids []int, target int) []int {
+	var out []int
+	for _, id := range ids {
+		if id == target {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// excludeID returns all IDs from the slice except the target.
+func excludeID(ids []int, target int) []int {
+	var out []int
+	for _, id := range ids {
+		if id != target {
+			out = append(out, id)
+		}
+	}
+	return out
 }

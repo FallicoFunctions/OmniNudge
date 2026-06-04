@@ -2,12 +2,18 @@ package models
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ErrMessageAlreadyDeleted is returned by AutoDelete when the message no longer
+// exists (already hard-deleted or tombstoned by a concurrent path). Callers
+// should skip the WS broadcast for this message_id.
+var ErrMessageAlreadyDeleted = errors.New("message already deleted")
 
 // Message represents an encrypted message in a conversation
 type Message struct {
@@ -43,6 +49,14 @@ type Message struct {
 	SharedEncryptionIV       *string        `json:"shared_encryption_iv,omitempty"` // Shared IV for multi-recipient messages
 	RecipientKeys            map[int]string `json:"recipient_keys,omitempty"`       // Map of user_id -> encrypted_key for multi-recipient
 	HasReactions             bool           `json:"has_reactions"`                  // True when ≥1 reaction exists — avoids N+1 fetches on the client
+	DeleteAt                 *time.Time     `json:"delete_at,omitempty"`            // Auto-delete timestamp; NULL means never
+}
+
+// ExpiredMessage is a lightweight projection used by the auto-delete cron sweep.
+type ExpiredMessage struct {
+	ID             int
+	ConversationID int
+	SenderID       int
 }
 
 // MessageRepository handles database operations for messages
@@ -75,9 +89,9 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 			conversation_id, sender_id, recipient_id, encrypted_content, sender_encrypted_content,
 			message_type, reply_to, thread_root, media_file_id, media_url, media_type, media_size, encryption_version,
 			media_encryption_key, media_encryption_iv, sender_media_encryption_key,
-			is_multi_recipient, shared_encryption_iv
+			is_multi_recipient, shared_encryption_iv, delete_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		RETURNING id, sent_at
 	`
 
@@ -101,6 +115,7 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 		message.SenderMediaEncryptionKey,
 		message.IsMultiRecipient,
 		message.SharedEncryptionIV,
+		message.DeleteAt,
 	).Scan(&message.ID, &message.SentAt)
 
 	if err != nil {
@@ -612,6 +627,7 @@ func (r *MessageRepository) MarkUndeliveredAsDelivered(ctx context.Context, conv
 		SET delivered_at = CURRENT_TIMESTAMP
 		WHERE conversation_id = $1
 		  AND recipient_id = $2
+		  AND message_type != 'system'
 		  AND delivered_at IS NULL
 		  AND NOT EXISTS (
 		    SELECT 1 FROM blocked_users bu
@@ -639,12 +655,14 @@ func (r *MessageRepository) MarkUndeliveredAsDelivered(ctx context.Context, conv
 	return delivered, rows.Err()
 }
 
-// MarkAsRead updates the read_at timestamp for a message
+// MarkAsRead updates the read_at timestamp for a message.
+// System messages are excluded — they are informational-only and should
+// not generate read-receipt WS events.
 func (r *MessageRepository) MarkAsRead(ctx context.Context, messageID int) error {
 	query := `
 		UPDATE messages
 		SET read_at = CURRENT_TIMESTAMP
-		WHERE id = $1 AND read_at IS NULL
+		WHERE id = $1 AND read_at IS NULL AND message_type != 'system'
 	`
 	_, err := r.pool.Exec(ctx, query, messageID)
 	return err
@@ -657,6 +675,7 @@ func (r *MessageRepository) MarkAllAsRead(ctx context.Context, conversationID in
 		SET read_at = CURRENT_TIMESTAMP
 		WHERE conversation_id = $1
 		  AND recipient_id = $2
+		  AND message_type != 'system'
 		  AND read_at IS NULL
 		  AND NOT EXISTS (
 		    SELECT 1 FROM blocked_users bu
@@ -764,6 +783,7 @@ func (r *MessageRepository) GetUnreadCount(ctx context.Context, conversationID i
 		FROM messages
 		WHERE conversation_id = $1
 		  AND recipient_id = $2
+		  AND message_type != 'system'
 		  AND read_at IS NULL
 		  AND deleted_for_recipient = false
 		  AND NOT EXISTS (
@@ -846,6 +866,111 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 	}
 
 	return message, nil
+}
+
+// GetExpiredBefore returns up to limit messages whose delete_at is at or before t.
+// Used by the auto-delete cron sweep.
+func (r *MessageRepository) GetExpiredBefore(ctx context.Context, t time.Time, limit int) ([]ExpiredMessage, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, conversation_id, sender_id
+		FROM messages
+		WHERE delete_at <= $1
+		ORDER BY delete_at, id
+		LIMIT $2
+	`, t, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var expired []ExpiredMessage
+	for rows.Next() {
+		var m ExpiredMessage
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.SenderID); err != nil {
+			return nil, err
+		}
+		expired = append(expired, m)
+	}
+	return expired, rows.Err()
+}
+
+// AutoDelete permanently removes a message that has reached its auto-delete deadline.
+// Unlike HardDelete, this path does not require deleted_for_sender/recipient flags.
+// If the message has replies it is tombstoned instead of physically removed.
+//
+// Returns (tombstoned, err):
+//   - tombstoned=true  → message had replies; content scrubbed, sender's copy hidden,
+//     but recipient still sees the "[deleted]" placeholder for thread continuity.
+//   - tombstoned=false → message was hard-deleted; both parties lose it.
+//   - ErrMessageAlreadyDeleted → nothing was done; caller should skip WS broadcast.
+func (r *MessageRepository) AutoDelete(ctx context.Context, messageID int) (tombstoned bool, err error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Tombstone path: message has replies — scrub content and hide from sender, but
+	// leave deleted_for_recipient=FALSE so the recipient still sees the "[deleted]"
+	// placeholder, preserving thread context for the reply chain.
+	tag, err := tx.Exec(ctx, `
+		UPDATE messages
+		SET encrypted_content = '[deleted]',
+		    sender_encrypted_content = NULL,
+		    message_type = 'deleted',
+		    media_file_id = NULL,
+		    media_url = NULL,
+		    media_type = NULL,
+		    media_size = NULL,
+		    media_encryption_key = NULL,
+		    media_encryption_iv = NULL,
+		    sender_media_encryption_key = NULL,
+		    is_multi_recipient = FALSE,
+		    shared_encryption_iv = NULL,
+		    deleted_for_sender = TRUE,
+		    delete_at = NULL
+		WHERE id = $1
+		  AND COALESCE(reply_count, 0) > 0
+	`, messageID)
+	if err != nil {
+		return false, err
+	}
+	tombstoned = tag.RowsAffected() > 0
+
+	// Hard-delete path: DELETE and capture reply_to in one QueryRow so we can
+	// (a) detect whether the row actually existed, and (b) decrement the parent.
+	// Using a CTE here is wrong: pgx RowsAffected() reflects the outer UPDATE
+	// (0 when reply_to IS NULL), not the DELETE — causing ErrMessageAlreadyDeleted
+	// to be returned for every successful standalone-message deletion.
+	var replyTo *int
+	err = tx.QueryRow(ctx, `
+		DELETE FROM messages
+		WHERE id = $1 AND COALESCE(reply_count, 0) = 0
+		RETURNING reply_to
+	`, messageID).Scan(&replyTo)
+	if err != nil && err != pgx.ErrNoRows {
+		return false, err
+	}
+	hardDeleted := err == nil // nil means RETURNING produced a row → DELETE succeeded
+
+	if !tombstoned && !hardDeleted {
+		// Message was already deleted by another path; the deferred Rollback will
+		// clean up the transaction. Callers should skip the WS broadcast.
+		return false, ErrMessageAlreadyDeleted
+	}
+
+	// Decrement the parent's reply_count if this message was a reply.
+	if hardDeleted && replyTo != nil {
+		if _, err = tx.Exec(ctx, `
+			UPDATE messages
+			SET reply_count = GREATEST(0, COALESCE(reply_count, 0) - 1)
+			WHERE id = $1
+		`, *replyTo); err != nil {
+			return false, err
+		}
+	}
+
+	return tombstoned, tx.Commit(ctx)
 }
 
 // IsParticipant checks if a user is a participant in the message

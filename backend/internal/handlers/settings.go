@@ -1,8 +1,9 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/services"
 	"net/http"
 	"strings"
 	"time"
@@ -13,13 +14,15 @@ import (
 
 // SettingsHandler handles user settings endpoints.
 type SettingsHandler struct {
-	settingsRepo ports.UserSettingsRepository
+	settingsRepo  ports.UserSettingsRepository
+	autoDeleteSvc *services.AutoDeleteService
 }
 
 // NewSettingsHandler constructs a settings handler.
-func NewSettingsHandler(settingsRepo ports.UserSettingsRepository) *SettingsHandler {
+func NewSettingsHandler(settingsRepo ports.UserSettingsRepository, autoDeleteSvc *services.AutoDeleteService) *SettingsHandler {
 	return &SettingsHandler{
-		settingsRepo: settingsRepo,
+		settingsRepo:  settingsRepo,
+		autoDeleteSvc: autoDeleteSvc,
 	}
 }
 
@@ -89,6 +92,11 @@ type updateSettingsRequest struct {
 	NotifyCommentMilestone *bool `json:"notify_comment_milestone"`
 	NotifyCommentVelocity  *bool `json:"notify_comment_velocity"`
 	DailyDigest            *bool `json:"daily_digest"`
+
+	// DefaultAutoDeleteSeconds: desired global auto-delete duration in whole seconds.
+	// 0 or nil means "never". Any positive value is accepted.
+	DefaultAutoDeleteSeconds   *int  `json:"default_auto_delete_seconds"`
+	AutoDeleteApplyRetroactive *bool `json:"auto_delete_apply_retroactive"`
 }
 
 // UpdateSettings updates the current user's settings.
@@ -317,6 +325,24 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		settings.DailyDigest = *req.DailyDigest
 	}
 
+	if req.DefaultAutoDeleteSeconds != nil {
+		var interval *time.Duration
+		if *req.DefaultAutoDeleteSeconds > 0 {
+			d := time.Duration(*req.DefaultAutoDeleteSeconds) * time.Second
+			interval = &d
+		}
+		retroactive := req.AutoDeleteApplyRetroactive != nil && *req.AutoDeleteApplyRetroactive
+		if h.autoDeleteSvc == nil {
+			RespondError(c, http.StatusInternalServerError, "Auto-delete service unavailable")
+			return
+		}
+		if err := h.autoDeleteSvc.UpdateGlobalSetting(c.Request.Context(), userID, interval, retroactive); err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to update auto-delete setting")
+			return
+		}
+		settings.DefaultAutoDeleteAfter = interval
+	}
+
 	updated, err := h.settingsRepo.Update(c.Request.Context(), settings)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update settings")
@@ -325,6 +351,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 
 	c.JSON(http.StatusOK, updated)
 }
+
 
 func (h *SettingsHandler) getUserID(c *gin.Context) (int, bool) {
 	return middleware.GetAuthenticatedUserID(c)

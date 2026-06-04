@@ -33,6 +33,7 @@ type MessagesHandler struct {
 	notifService     *services.NotificationService
 	queueClient      *queue.QueueClient
 	cache            services.Cache
+	autoDeleteSvc    *services.AutoDeleteService
 }
 
 // HubInterface defines the methods we need from the WebSocket hub
@@ -66,6 +67,12 @@ func NewMessagesHandler(
 		queueClient:      qc,
 		cache:            cache,
 	}
+}
+
+// WithAutoDeleteService attaches the auto-delete service to the handler.
+func (h *MessagesHandler) WithAutoDeleteService(svc *services.AutoDeleteService) *MessagesHandler {
+	h.autoDeleteSvc = svc
+	return h
 }
 
 func (h *MessagesHandler) isAdmin(ctx context.Context, userID int) (bool, error) {
@@ -716,6 +723,15 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		IsMultiRecipient:         req.IsMultiRecipient,
 		SharedEncryptionIV:       req.SharedEncryptionIV,
 		RecipientKeys:            req.RecipientKeys,
+	}
+
+	if h.autoDeleteSvc != nil {
+		deleteAt, err := h.autoDeleteSvc.ComputeDeleteAt(c.Request.Context(), userID, req.ConversationID, time.Now())
+		if err != nil {
+			log.Printf("[SendMessage] Failed to compute delete_at: user_id=%d conversation_id=%d err=%v", userID, req.ConversationID, err)
+		} else {
+			message.DeleteAt = deleteAt
+		}
 	}
 
 	if err := h.messageRepo.Create(c.Request.Context(), message); err != nil {
@@ -2518,6 +2534,12 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 
 	if message == nil {
 		RespondError(c, http.StatusNotFound, "Message not found")
+		return
+	}
+
+	// System messages are informational; read-receipt semantics don't apply.
+	if message.MessageType == "system" {
+		c.JSON(http.StatusOK, gin.H{"message": "System messages do not have read receipts"})
 		return
 	}
 

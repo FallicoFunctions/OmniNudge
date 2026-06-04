@@ -81,7 +81,9 @@ import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplet
 import type { LocalSubredditPost } from '../services/hubsService';
 import type { RedditApiPost } from '../types/reddit';
 import { ReportModal } from '../components/moderation/ReportModal';
+import { ChatSettingsModal } from '../components/messages/ChatSettingsModal';
 import { searchMessages, type MessageSearchFilters, type MessageSearchResult } from '../utils/messageSearch';
+import { secondsToDuration } from '../types/messages';
 import { formatRedditSlideshowInput, parseRedditSlideshowInput } from '../utils/redditSlideshowInput';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
@@ -707,6 +709,17 @@ export default function MessagesPage() {
     messages: Message[];
     initialIndex: number;
   } | null>(null);
+  const [showChatSettings, setShowChatSettings] = useState(false);
+  const [isFolderCollapsed, setIsFolderCollapsed] = useState(
+    () => localStorage.getItem('folder-panel-collapsed') !== 'false'
+  );
+  const toggleFolderCollapsed = () => {
+    setIsFolderCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('folder-panel-collapsed', String(next));
+      return next;
+    });
+  };
   const [redditSlideshowModalOpen, setRedditSlideshowModalOpen] = useState(false);
   const [redditSlideshowInput, setRedditSlideshowInput] = useState('');
   const [redditSlideshowAutocompleteOpen, setRedditSlideshowAutocompleteOpen] = useState(false);
@@ -755,7 +768,6 @@ export default function MessagesPage() {
   const [messageSearchHasLinks, setMessageSearchHasLinks] = useState(false);
   const [messageSearchPage, setMessageSearchPage] = useState(0);
   const [expandedPinnedMessages, setExpandedPinnedMessages] = useState(false);
-  const [selectedConversationIDs, setSelectedConversationIDs] = useState<Set<number>>(new Set());
   const touchStartRef = useRef<{ conversationID: number; x: number; y: number } | null>(null);
   const swipeHandledRef = useRef<number | null>(null);
   const debouncedMessageSearch = useDebounce(messageSearchQuery, 300);
@@ -770,7 +782,10 @@ export default function MessagesPage() {
   const isInChat = Boolean(selectedConversationId || isCreatingChat);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [threadRootMessageId, setThreadRootMessageId] = useState<number | null>(null);
-  const [smartFolder, setSmartFolder] = useState<'unread' | null>(null);
+  const [smartFolder, setSmartFolder] = useState<'unread' | 'mod_mail' | null>(null);
+  // Tracks the conversation that was opened while in the Unread folder so it
+  // stays visible until the user navigates away, even after it's been read.
+  const [unreadPinnedId, setUnreadPinnedId] = useState<number | null>(null);
   const {
     folders,
     selectedFolderId,
@@ -823,6 +838,18 @@ export default function MessagesPage() {
     setMessageSearchPage(0);
   }, []);
 
+  useEffect(() => {
+    if (!showMessageSearch) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowMessageSearch(false);
+        resetMessageSearch();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showMessageSearch, resetMessageSearch]);
+
   const {
     data: conversationsData,
     isLoading: loadingConversations,
@@ -830,11 +857,15 @@ export default function MessagesPage() {
     fetchNextPage: fetchMoreConversations,
     isFetchingNextPage: isFetchingMoreConversations,
   } = useInfiniteQuery({
+    // The dedicated /conversations/archived endpoint has a backend bug where it
+    // omits DMs that were archived via archived_for_user1/user2 flags. Using
+    // include_archived=true on the standard endpoint works correctly; we then
+    // filter by is_archived on the frontend for the archived tab.
     queryKey: ['conversations', activeTab === 'archived' ? 'archived' : 'all'],
     queryFn: ({ pageParam }) => {
       const cursor = pageParam ? String(pageParam) : undefined;
       if (activeTab === 'archived') {
-        return messagesService.getArchivedConversationsPage(20, cursor);
+        return messagesService.getConversationsPage(true, 20, cursor);
       }
       return messagesService.getConversationsPage(false, 20, cursor);
     },
@@ -884,18 +915,35 @@ export default function MessagesPage() {
   // Filter conversations based on active tab
   const unfilteredConversations = useMemo(() => {
     if (!allConversations.length) return undefined;
-    const isArchived = (conversation: Conversation) =>
-      conversation.is_archived ?? conversation.archived_at !== null;
-    if (activeTab === 'archived') {
-      return allConversations.filter((c) => isArchived(c));
+    // Both tabs now use getConversationsPage — with include_archived=true for the
+    // archived tab (returns all conversations, both archived and active). We filter
+    // by is_archived here rather than relying on the broken /conversations/archived
+    // endpoint which omits DMs archived via per-user flags.
+    const isModMail = (c: Conversation) => c.conversation_type === 'mod_mail';
+
+    if (smartFolder === 'mod_mail') {
+      // Mod Mail folder: show only mod_mail for the current tab.
+      if (activeTab === 'archived') {
+        return allConversations.filter((c) => isModMail(c) && c.is_archived === true);
+      }
+      return allConversations.filter((c) => isModMail(c) && c.is_archived !== true);
     }
-    const activeConversations = allConversations.filter((c) => !isArchived(c));
-    const folderFiltered = filterConversationsBySelectedFolder(activeConversations);
+
+    // All other views (All, Unread, user folders): exclude mod mail.
+    if (activeTab === 'archived') {
+      return allConversations.filter((c) => c.is_archived === true && !isModMail(c));
+    }
+    // Active tab: exclude archived and mod mail.
+    const activeNonModMail = allConversations.filter((c) => c.is_archived !== true && !isModMail(c));
+    const folderFiltered = filterConversationsBySelectedFolder(activeNonModMail);
     if (smartFolder === 'unread') {
-      return folderFiltered.filter((c) => c.unread_count > 0);
+      // Keep a conversation that was opened FROM the Unread folder visible while
+      // it's still selected, even after it's been marked as read. It leaves Unread
+      // naturally when the user navigates away or changes folder.
+      return folderFiltered.filter((c) => c.unread_count > 0 || c.id === unreadPinnedId);
     }
     return folderFiltered;
-  }, [allConversations, activeTab, filterConversationsBySelectedFolder, smartFolder]);
+  }, [allConversations, activeTab, filterConversationsBySelectedFolder, smartFolder, unreadPinnedId]);
 
   // Apply search filter
   const conversations = useMemo(() => {
@@ -934,11 +982,14 @@ export default function MessagesPage() {
     });
   }, [allConversations, queryClient]);
 
-  // Auto-select the first available conversation if none is selected or the current selection no longer exists.
+  // Auto-select the first available conversation if none is selected or the
+  // current selection no longer exists in the visible list.
+  // Not applied when a smart folder is active (Unread, Mod Mail) because the
+  // user is browsing a filtered view — auto-opening would immediately mark
+  // messages as read and remove them from the filter.
   useEffect(() => {
     if (isCreatingChat) return;
     if (!conversations || conversations.length === 0) {
-      // Clear selection if there are no conversations
       if (selectedConversationId !== null) {
         setSelectedConversationId(null);
       }
@@ -948,18 +999,64 @@ export default function MessagesPage() {
       ? conversations.some((c) => c.id === selectedConversationId)
       : false;
 
-    if (!isMobile && (!selectedConversationId || !currentExists)) {
+    // Only auto-select on the default "All" view (no smart folder active)
+    const isSmartFolderActive = smartFolder !== null;
+
+    if (!isMobile && !isSmartFolderActive && (!selectedConversationId || !currentExists)) {
+      if (intentionalDeselectRef.current) {
+        // User explicitly deselected — honour it and don't re-select
+        intentionalDeselectRef.current = false;
+        return;
+      }
       setSelectedConversationId(conversations[0].id);
+    } else if (!isMobile && !currentExists) {
+      // Current selection disappeared from the list (e.g. archived) — clear it
+      intentionalDeselectRef.current = false;
+      setSelectedConversationId(null);
     }
-  }, [conversations, isCreatingChat, selectedConversationId, isMobile]);
+  }, [conversations, isCreatingChat, selectedConversationId, isMobile, smartFolder]);
 
   useEffect(() => {
     setThreadRootMessageId(null);
     setReplyTargetMessage(null);
   }, [selectedConversationId]);
 
+  // Pin a conversation to the Unread list only when it was opened while already
+  // in the Unread folder AND it had unread messages at that moment.
+  // Clear when leaving Unread or when the conversation is deselected.
+  useEffect(() => {
+    if (smartFolder !== 'unread') {
+      setUnreadPinnedId(null);
+      return;
+    }
+    if (!selectedConversationId) {
+      setUnreadPinnedId(null);
+      return;
+    }
+    const conv = conversations?.find((c) => c.id === selectedConversationId);
+    if (conv && (conv.unread_count ?? 0) > 0) {
+      setUnreadPinnedId(selectedConversationId);
+    }
+  }, [selectedConversationId, smartFolder, conversations]);
+
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
   const selectedConversationExists = Boolean(selectedConversation);
+
+  const { data: chatSettings } = useQuery({
+    queryKey: ['chat-settings', selectedConversationId],
+    queryFn: () => messagesService.getChatSettings(selectedConversationId!),
+    enabled: !!selectedConversationId,
+    staleTime: 5 * 60 * 1000, // per-chat override rarely changes; avoid refetch on every switch
+  });
+
+  const saveChatSettingsMutation = useMutation({
+    mutationFn: ({ seconds, retroactive }: { seconds: number; retroactive: boolean }) =>
+      messagesService.updateChatSettings(selectedConversationId!, seconds, retroactive),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['chat-settings', selectedConversationId] });
+      setShowChatSettings(false);
+    },
+  });
 
   // Group admin controls — wires real-time mute/ban/slow-mode WS events
   const groupAdmin = useGroupAdmin({
@@ -1106,10 +1203,8 @@ export default function MessagesPage() {
   });
   const {
     archiveConversation,
-    archiveConversationsBatch,
     unarchiveConversation,
     isArchiving,
-    isBatchArchiving,
     isUnarchiving,
   } = useArchive();
 
@@ -2132,6 +2227,10 @@ export default function MessagesPage() {
   }, [hasActiveMessageSearch, messageSearchOutput]);
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const slideshowChatScrollRef = useRef<HTMLDivElement | null>(null);
+  // Set to true when the user explicitly clicks to deselect a conversation.
+  // The auto-select effect checks this flag and skips one re-selection cycle.
+  const intentionalDeselectRef = useRef(false);
   const scrollToLatestMessage = useCallback(() => {
     const container = messagesContainerRef.current;
     if (container) {
@@ -2209,12 +2308,69 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (!selectedConversationId || isCreatingChat || loadingMessages) return;
-    // Use setTimeout to ensure DOM has updated with new messages
-    const timer = setTimeout(() => {
-      scrollToLatestMessage();
-    }, 100);
-    return () => clearTimeout(timer);
+    // Immediate scroll after paint
+    const rAF = requestAnimationFrame(() => scrollToLatestMessage());
+    return () => cancelAnimationFrame(rAF);
   }, [selectedConversationId, isCreatingChat, loadingMessages, scrollToLatestMessage, messages]);
+
+  // MutationObserver scroll — fires when DecryptedMessageContent adds its <p>
+  // element to the DOM (going from null → rendered). The messages container has a
+  // fixed height (flex-1), so ResizeObserver would never fire here. MutationObserver
+  // with childList+subtree catches every bubble that fills in after async decryption.
+  // Disconnects after 500 ms of quiet so it never yanks users reading history.
+  useEffect(() => {
+    if (!selectedConversationId || isCreatingChat) return;
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    let stabiliseTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const observer = new MutationObserver(() => {
+      scrollToLatestMessage();
+      if (stabiliseTimer) clearTimeout(stabiliseTimer);
+      stabiliseTimer = setTimeout(() => observer.disconnect(), 500);
+    });
+
+    observer.observe(container, { subtree: true, childList: true });
+
+    return () => {
+      observer.disconnect();
+      if (stabiliseTimer) clearTimeout(stabiliseTimer);
+    };
+  }, [selectedConversationId, isCreatingChat, scrollToLatestMessage]);
+
+  // Slideshow mini-chat scroll. Observer setup is deferred into the rAF so the
+  // ref is guaranteed to be attached before we try to use it.
+  useEffect(() => {
+    if (!slideshowOpen && !redditSlideshowOpen) return;
+
+    const scrollEl = () => {
+      const el = slideshowChatScrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    };
+
+    let rAFId: number;
+    let observer: MutationObserver | null = null;
+    let stabiliseTimer: ReturnType<typeof setTimeout> | null = null;
+
+    rAFId = requestAnimationFrame(() => {
+      scrollEl();
+      const el = slideshowChatScrollRef.current;
+      if (!el) return;
+      observer = new MutationObserver(() => {
+        scrollEl();
+        if (stabiliseTimer) clearTimeout(stabiliseTimer);
+        stabiliseTimer = setTimeout(() => observer?.disconnect(), 500);
+      });
+      observer.observe(el, { subtree: true, childList: true });
+    });
+
+    return () => {
+      cancelAnimationFrame(rAFId);
+      observer?.disconnect();
+      if (stabiliseTimer) clearTimeout(stabiliseTimer);
+    };
+  }, [slideshowOpen, redditSlideshowOpen]);
 
   useEffect(() => {
     setMessageMenuOpen(null);
@@ -2222,8 +2378,9 @@ export default function MessagesPage() {
     setForwardDialogMessage(null);
     setForwardTargetConversationIDs(new Set());
     setShowMessageSearch(false);
+    resetMessageSearch();
     setExpandedPinnedMessages(false);
-  }, [selectedConversationId]);
+  }, [selectedConversationId, resetMessageSearch]);
 
   const handleJumpToPinnedMessage = useCallback((messageId: number) => {
     const target = document.getElementById(`message-${messageId}`);
@@ -2326,34 +2483,19 @@ export default function MessagesPage() {
       swipeHandledRef.current = null;
       return;
     }
-    setSelectedConversationId(conversationID);
+    // Clicking the already-selected conversation deselects it
+    setSelectedConversationId((prev) => {
+      if (prev === conversationID) {
+        intentionalDeselectRef.current = true;
+        return null;
+      }
+      return conversationID;
+    });
     setIsCreatingChat(false);
     setNewChatUsername('');
     setSelectedFile(null);
   }, []);
 
-  const toggleConversationSelection = useCallback((conversationID: number) => {
-    setSelectedConversationIDs((prev) => {
-      const next = new Set(prev);
-      if (next.has(conversationID)) {
-        next.delete(conversationID);
-      } else {
-        next.add(conversationID);
-      }
-      return next;
-    });
-  }, []);
-
-  const handleArchiveSelected = useCallback(async () => {
-    if (selectedConversationIDs.size === 0) return;
-    const ids = Array.from(selectedConversationIDs);
-    try {
-      await archiveConversationsBatch(ids);
-      setSelectedConversationIDs(new Set());
-    } catch {
-      // Errors are surfaced by useArchive toast handling.
-    }
-  }, [archiveConversationsBatch, selectedConversationIDs]);
 
   // Cleanup typing timeout on unmount
   useEffect(() => {
@@ -2364,19 +2506,58 @@ export default function MessagesPage() {
     };
   }, []);
 
-  useEffect(() => {
-    setSelectedConversationIDs(new Set());
-  }, [activeTab]);
 
-  useEffect(() => {
-    if (!conversations) return;
-    const visibleIDs = new Set(conversations.map((conversation) => conversation.id));
-    setSelectedConversationIDs((prev) => {
-      const next = new Set(Array.from(prev).filter((id) => visibleIDs.has(id)));
-      if (next.size === prev.size) return prev;
-      return next;
-    });
-  }, [conversations]);
+  // Mini chat strip shown inside both full-screen slideshow modes
+  const slideshowMiniChat = (
+    <div className="border-t border-white/10 bg-black/70 backdrop-blur-sm">
+      <div
+        ref={slideshowChatScrollRef}
+        className="flex flex-col gap-1 px-4 pt-2 pb-1 max-h-24 overflow-y-auto"
+      >
+        {orderedMessages
+          .filter((m) => m.message_type !== 'system')
+          .map((m) => {
+            const own = m.sender_id === user?.id;
+            return (
+              <div key={m.id} className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
+                <span
+                  className={`max-w-[75%] truncate rounded-full px-3 py-1 text-xs ${
+                    own ? 'bg-[var(--color-primary)] text-white' : 'bg-white/20 text-white'
+                  }`}
+                >
+                  {m.media_url && !m.encrypted_content
+                    ? `[${t('messages.media.fallbackText')}]`
+                    : (
+                      <DecryptedMessageContent
+                        message={m}
+                        isOwnMessage={own}
+                        currentUserId={user?.id}
+                      />
+                    )
+                  }
+                </span>
+              </div>
+            );
+          })}
+      </div>
+      <form onSubmit={handleSendMessage} className="flex items-center gap-2 px-4 pb-3">
+        <input
+          type="text"
+          value={messageText}
+          onChange={(e) => setMessageText(e.target.value)}
+          placeholder={t('messages.compose.placeholder')}
+          className="flex-1 rounded-full bg-white/15 px-4 py-2 text-sm text-white placeholder-white/50 focus:outline-none focus:ring-1 focus:ring-white/40"
+        />
+        <button
+          type="submit"
+          disabled={!messageText.trim() || sendMessageMutation.isPending}
+          className="rounded-full bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 hover:bg-[var(--color-primary-dark)] transition-colors"
+        >
+          {t('messages.send')}
+        </button>
+      </form>
+    </div>
+  );
 
   return (
     <>
@@ -2393,7 +2574,7 @@ export default function MessagesPage() {
           className={
             isMobile
               ? `absolute inset-0 flex overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)] will-change-transform transition-transform duration-[250ms] ease-in-out ${isInChat ? '-translate-x-full' : 'translate-x-0'}`
-              : 'flex w-[31rem] flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]'
+              : 'flex flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]'
           }
         >
           {/* Folder sidebar — desktop only */}
@@ -2409,28 +2590,20 @@ export default function MessagesPage() {
               onDeleteFolder={(folder) => { setDeleteFolderTarget(folder); setDeleteFolderError(''); }}
               isLoading={isLoadingFolders}
               deletingFolderId={deletingFolderId}
-              className="w-44 flex-shrink-0 border-r border-[var(--color-border)]"
+              collapsed={isFolderCollapsed}
+              onToggleCollapsed={toggleFolderCollapsed}
+              className={`flex-shrink-0 border-r border-[var(--color-border)] overflow-hidden transition-[width] duration-200 ${isFolderCollapsed ? 'w-10' : 'w-44'}`}
             />
           )}
 
           {/* Conversation list panel */}
-          <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex w-[20rem] flex-shrink-0 flex-col overflow-hidden">
           <div className="border-b border-[var(--color-border)] p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
                 {t('messages.title')}
               </h2>
               <div className="flex items-center gap-2">
-                {activeTab === 'active' && selectedConversationIDs.size > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => void handleArchiveSelected()}
-                    disabled={isBatchArchiving}
-                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 md:py-1 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
-                  >
-                    {`${t('messages.archive')} (${selectedConversationIDs.size})`}
-                  </button>
-                )}
                 <button
                   onClick={() => {
                     setIsCreatingChat(true);
@@ -2449,9 +2622,12 @@ export default function MessagesPage() {
                   className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-                    <path d="M12 7H9V4a1 1 0 0 0-2 0v3H4a1 1 0 0 0 0 2h3v3a1 1 0 0 0 2 0V9h3a1 1 0 0 0 0-2z" fill="currentColor"/>
-                    <circle cx="3" cy="3" r="1.5" fill="currentColor" opacity="0.4"/>
-                    <circle cx="13" cy="3" r="1.5" fill="currentColor" opacity="0.4"/>
+                    {/* Two people silhouettes */}
+                    <circle cx="5.5" cy="4.5" r="2" fill="currentColor"/>
+                    <path d="M1 12c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+                    {/* Plus badge top-right */}
+                    <circle cx="12.5" cy="4.5" r="3" fill="var(--color-surface)" stroke="var(--color-border)" strokeWidth="1"/>
+                    <path d="M12.5 3v3M11 4.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                   </svg>
                 </button>
               </div>
@@ -2572,7 +2748,7 @@ export default function MessagesPage() {
             {conversations?.map((conversation) => (
               <div
                 key={conversation.id}
-                className={`relative w-full border-b border-[var(--color-border)] transition-colors ${
+                className={`group relative w-full border-b border-[var(--color-border)] transition-colors ${
                   selectedConversationId === conversation.id
                     ? 'bg-[var(--color-surface-elevated)]'
                     : 'hover:bg-[var(--color-surface-elevated)] active:bg-[var(--color-surface-elevated)]'
@@ -2594,20 +2770,6 @@ export default function MessagesPage() {
                   onTouchEnd={(event) => handleConversationTouchEnd(conversation.id, event)}
                   className="w-full p-4 text-left"
                 >
-                  {activeTab === 'active' && (
-                    <label className="mb-2 inline-flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                      <input
-                        type="checkbox"
-                        checked={selectedConversationIDs.has(conversation.id)}
-                        onChange={() => toggleConversationSelection(conversation.id)}
-                        onClick={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => event.stopPropagation()}
-                        onTouchStart={(event) => event.stopPropagation()}
-                        onTouchEnd={(event) => event.stopPropagation()}
-                      />
-                      {t('messages.archive')}
-                    </label>
-                  )}
                   {/* MSG-2: Enhanced conversation preview with timestamp and better spacing */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -2675,7 +2837,7 @@ export default function MessagesPage() {
                         }}
                         onTouchStart={(e) => e.stopPropagation()}
                         onTouchEnd={(e) => e.stopPropagation()}
-                        className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
+                        className={`rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 ${conversationMenuOpen === conversation.id ? '!opacity-100' : ''}`}
                       >
                         ...
                       </button>
@@ -2801,8 +2963,8 @@ export default function MessagesPage() {
             <>
               {/* Chat Header */}
               <div className="border-b border-[var(--color-border)] p-3 md:p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-1 min-w-0 items-center gap-1 md:gap-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+                  <div className="flex min-w-0 items-center gap-1 md:gap-2" style={{ flex: '1 1 8rem' }}>
                     {/* Back button — mobile only */}
                     {isMobile && (
                       <button
@@ -2855,7 +3017,18 @@ export default function MessagesPage() {
                   </div>
 
                   {/* Slideshow buttons */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-shrink-0 flex-nowrap items-center gap-2">
+                    {/* Chat settings gear icon — all conversations */}
+                    {!isCreatingChat && selectedConversationId && (
+                      <button
+                        type="button"
+                        onClick={() => setShowChatSettings(true)}
+                        className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                        aria-label={t('messages.chatSettings')}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                      </button>
+                    )}
                     {/* Voice / Video call buttons — DM conversations only */}
                     {!isCreatingChat &&
                       selectedConversation?.conversation_type === 'dm' &&
@@ -2910,15 +3083,14 @@ export default function MessagesPage() {
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                          />
+                          <circle cx="12" cy="12" r="10" />
+                          <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88" />
                         </svg>
-                        <span className="hidden md:inline">{t('messages.browseRedditHub')}</span>
+                        <span className="hidden md:inline whitespace-nowrap">{t('messages.browseRedditHub')}</span>
                       </button>
                     )}
 
@@ -2944,37 +3116,31 @@ export default function MessagesPage() {
                             d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                           />
                         </svg>
-                        <span className="hidden md:inline">
+                        <span className="hidden md:inline whitespace-nowrap">
                           {t('messages.mediaGallery')} ({conversationMediaMessages.length})
                         </span>
                       </button>
                     )}
                     {/* Search toggle — mobile only */}
-                    {isMobile && !isCreatingChat && (
+                    {!isCreatingChat && (
                       <button
                         type="button"
-                        onClick={() => setShowMessageSearch((prev) => !prev)}
-                        className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border transition-colors active:opacity-80 ${
+                        onClick={() => {
+                          setShowMessageSearch((prev) => {
+                            if (prev) resetMessageSearch();
+                            return !prev;
+                          });
+                        }}
+                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border transition-colors active:opacity-80 ${
                           showMessageSearch
                             ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                            : 'border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                            : 'border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]'
                         }`}
                         aria-label={t('messages.search.ariaToggle')}
                         aria-pressed={showMessageSearch}
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                          />
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                       </button>
                     )}
@@ -2982,8 +3148,10 @@ export default function MessagesPage() {
                 </div>
               </div>
 
-              {/* Message Search Bar */}
-              {!isCreatingChat && (!isMobile || showMessageSearch) && (
+              {/* Message Search Bar — slides in/out */}
+              {!isCreatingChat && (
+                <div className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${showMessageSearch ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+                <div className="overflow-hidden">
                 <div className="border-b border-[var(--color-border)] p-3 bg-[var(--color-surface-elevated)]">
                   <div className="relative flex items-center gap-2">
                     {/* Search Icon */}
@@ -3096,6 +3264,8 @@ export default function MessagesPage() {
                     </label>
                   </div>
                 </div>
+                </div>
+                </div>
               )}
 
               {!isCreatingChat && selectedConversationId && (
@@ -3140,6 +3310,21 @@ export default function MessagesPage() {
                       </div>
                     )}
                     {filteredMessages.map((message) => {
+                      // System messages (auto-delete notices, etc.) render as
+                      // centred text with no bubble, avatar, or actions.
+                      if (message.message_type === 'system') {
+                        return (
+                          <div
+                            key={message.id}
+                            className="flex justify-center my-1 px-4"
+                          >
+                            <span className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 text-xs text-[var(--color-text-muted)] text-center max-w-[70%]">
+                              {message.encrypted_content}
+                            </span>
+                          </div>
+                        );
+                      }
+
                       const isOwnMessage = message.sender_id === user?.id;
                       const messagePinned = pinnedMessageIds.has(message.id);
                       const isPinningMessage = pinningMessageId === message.id;
@@ -3331,7 +3516,7 @@ export default function MessagesPage() {
                                 )}
                               </div>
                             </div>
-                            <div className="relative">
+                            <div className={`relative opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 ${messageMenuOpen === message.id ? '!opacity-100' : ''}`}>
                               <button
                                 type="button"
                                 aria-label={t('messages.messageOptions.ariaLabel')}
@@ -3663,7 +3848,7 @@ export default function MessagesPage() {
                       className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)] active:bg-[var(--color-surface)]"
                       title={t('messages.compose.attachMultiple')}
                     >
-                      📷+
+                      📷
                     </button>
                   )}
                   <input
@@ -4101,6 +4286,7 @@ export default function MessagesPage() {
           })}
           initialIndex={0}
           onClose={() => setSlideshowOpen(false)}
+          chatContent={slideshowMiniChat}
         />
       )}
 
@@ -4164,7 +4350,7 @@ export default function MessagesPage() {
                               suggestion.data.name
                             );
                           }}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-hover)] flex items-center gap-2"
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-hover)] flex items-center"
                         >
                           <span
                             className={`font-medium ${suggestion.type === 'hub' ? 'text-blue-600' : 'text-orange-600'}`}
@@ -4216,6 +4402,7 @@ export default function MessagesPage() {
             setRedditSlideshowPosts([]);
           }}
           includeTextPosts={true}
+          chatContent={slideshowMiniChat}
         />
       )}
 
@@ -4450,6 +4637,21 @@ export default function MessagesPage() {
           targetType="message"
           targetId={reportModalMessageId}
           defaultReason="harassment"
+        />
+      )}
+
+      {showChatSettings && selectedConversationId && (
+        <ChatSettingsModal
+          currentDuration={
+            chatSettings?.auto_delete_after_seconds != null
+              ? secondsToDuration(chatSettings.auto_delete_after_seconds)
+              : null
+          }
+          onSave={(seconds, retroactive) =>
+            saveChatSettingsMutation.mutate({ seconds, retroactive })
+          }
+          onClose={() => setShowChatSettings(false)}
+          isSaving={saveChatSettingsMutation.isPending}
         />
       )}
     </>

@@ -94,6 +94,8 @@ export interface UserSettings {
   notify_comment_velocity: boolean;
   daily_digest: boolean;
   media_gallery_filter: string;
+  // nanoseconds (Go time.Duration); null / omitted means Never
+  default_auto_delete_after?: number | null;
   updated_at: string;
 }
 

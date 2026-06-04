@@ -24,6 +24,8 @@ interface BaseSlideshowProps {
     onToggleAutoAdvance: () => void;
     onChangeInterval: (interval: number) => void;
   }) => ReactNode;
+  /** Optional strip rendered below the media (e.g. a mini chat bar). */
+  bottomContent?: ReactNode;
 }
 
 export function BaseSlideshow({
@@ -35,6 +37,7 @@ export function BaseSlideshow({
   showControls = true,
   onSlideChange,
   renderControls,
+  bottomContent,
 }: BaseSlideshowProps) {
   const { t } = useTranslation();
   const { formatNumber } = useFormat();
@@ -211,6 +214,13 @@ export function BaseSlideshow({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
           </svg>
         </button>
+      )}
+
+      {/* Optional bottom strip (e.g. mini chat bar) */}
+      {bottomContent && (
+        <div onClick={(e) => e.stopPropagation()}>
+          {bottomContent}
+        </div>
       )}
     </div>
   );
