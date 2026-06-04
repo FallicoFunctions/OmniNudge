@@ -36,6 +36,7 @@ const CCPAPage = lazy(() => import('./pages/CCPAPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const BlockedUsersPage = lazy(() => import('./pages/BlockedUsersPage'));
+const FriendsPage = lazy(() => import('./pages/FriendsPage'));
 const ModToolsPage = lazy(() => import('./pages/ModToolsPage'));
 const ModerationReportsPage = lazy(() => import('./pages/ModerationReportsPage'));
 const HubSettingsPage = lazy(() => import('./pages/HubSettingsPage'));
@@ -201,6 +202,14 @@ function App() {
                               element={
                                 <ProtectedRoute>
                                   <BlockedUsersPage />
+                                </ProtectedRoute>
+                              }
+                            />
+                            <Route
+                              path="/friends"
+                              element={
+                                <ProtectedRoute>
+                                  <FriendsPage />
                                 </ProtectedRoute>
                               }
                             />
