@@ -3,10 +3,10 @@ import { zoneDisplayName } from '../lib/zones';
 
 export function Hud({ session }: { session: RuntimeSession }) {
   return (
-    <section className="hud-panel">
-      <p className="hud-kicker">In the crowd</p>
+    <section className="hud-panel identity-panel">
+      <p className="hud-kicker">{session.mode === 'guest' ? 'Guest pass' : 'OmniNudge account'}</p>
       <h1>{session.playerName}</h1>
-      <p>Current stage: {zoneDisplayName(session.activeZone)}</p>
+      <p>Live in {zoneDisplayName(session.activeZone)}</p>
     </section>
   );
 }
