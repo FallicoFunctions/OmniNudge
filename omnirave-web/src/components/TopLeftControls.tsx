@@ -1,7 +1,7 @@
 export function TopLeftControls(props: {
   openPanel: 'settings' | 'avatar' | null;
   onToggleSettings: () => void;
-  onToggleAvatar: () => void;
+  onAvatarClick: () => void;
 }) {
   return (
     <div className="top-left-controls">
@@ -17,7 +17,7 @@ export function TopLeftControls(props: {
         type="button"
         className="hud-button"
         aria-pressed={props.openPanel === 'avatar'}
-        onClick={props.onToggleAvatar}
+        onClick={props.onAvatarClick}
       >
         Avatar
       </button>

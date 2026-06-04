@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { bootstrapSession, saveLoadout, saveReturnPoint, saveRuntimeSettings } from '../session';
+import { bootstrapSession, runtimeLogin, runtimeLogout, runtimeSignup, saveLoadout, saveReturnPoint, saveRuntimeSettings } from '../session';
 
 function mockFetcher(response: unknown) {
   return async () =>
@@ -300,5 +300,224 @@ describe('bootstrapSession', () => {
     });
 
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('posts in-place runtime login with the current venue and session state', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        playerId: 'user-42',
+        playerName: 'nick',
+        worldSocketUrl: 'ws://localhost:8092/ws',
+        mode: 'account',
+        activeZone: 'underground',
+        lastVenue: 'underground',
+        settings: {
+          uiTheme: 'Luminous Panels',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
+      }),
+    }) as Response);
+
+    const session = await runtimeLogin({
+      session: {
+        playerId: 'guest-42',
+        playerName: 'Guest-42',
+        worldSocketUrl: 'ws://localhost:8092/ws',
+        mode: 'guest',
+        activeZone: 'underground',
+        lastVenue: 'main_stage',
+        settings: {
+          uiTheme: 'Luminous Panels',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
+        loadout: { body: 'guest-default' },
+      },
+      credentials: {
+        username: 'nick',
+        password: 'correct-horse-battery-staple',
+      },
+      fetcher,
+      apiBaseUrl: 'http://localhost:8091',
+    });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      'http://localhost:8091/api/v1/omnigame/runtime/auth/login',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          username: 'nick',
+          password: 'correct-horse-battery-staple',
+          currentVenue: 'underground',
+          currentLoadout: { body: 'guest-default' },
+          currentSettings: {
+            uiTheme: 'Luminous Panels',
+            graphicsMode: 'auto',
+            graphicsLevel: 7,
+            displayNames: true,
+            chatCollapsed: false,
+            crouchMode: 'hold',
+            cameraFollow: 'free',
+          },
+        }),
+      }),
+    );
+    expect(session.mode).toBe('account');
+  });
+
+  it('posts in-place runtime signup with consent fields and current guest state', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        playerId: 'user-42',
+        playerName: 'nick',
+        worldSocketUrl: 'ws://localhost:8092/ws',
+        mode: 'account',
+        activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: {
+          uiTheme: 'Hybrid Premium',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
+      }),
+    }) as Response);
+
+    await runtimeSignup({
+      session: {
+        playerId: 'guest-42',
+        playerName: 'Guest-42',
+        worldSocketUrl: 'ws://localhost:8092/ws',
+        mode: 'guest',
+        activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: {
+          uiTheme: 'Hybrid Premium',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
+        loadout: { body: 'guest-default' },
+      },
+      signup: {
+        username: 'nick',
+        email: 'nick@example.com',
+        password: 'correct-horse-battery-staple',
+        turnstileToken: 'cf-token-1',
+        acceptPrivacyPolicy: true,
+        acceptTerms: true,
+      },
+      fetcher,
+      apiBaseUrl: 'http://localhost:8091',
+    });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      'http://localhost:8091/api/v1/omnigame/runtime/auth/signup',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          username: 'nick',
+          email: 'nick@example.com',
+          password: 'correct-horse-battery-staple',
+          turnstileToken: 'cf-token-1',
+          acceptPrivacyPolicy: true,
+          acceptTerms: true,
+          currentVenue: 'main_stage',
+          currentLoadout: { body: 'guest-default' },
+          currentSettings: {
+            uiTheme: 'Hybrid Premium',
+            graphicsMode: 'auto',
+            graphicsLevel: 7,
+            displayNames: true,
+            chatCollapsed: false,
+            crouchMode: 'hold',
+            cameraFollow: 'free',
+          },
+        }),
+      }),
+    );
+  });
+
+  it('posts runtime logout and returns a fresh guest session', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        playerId: 'guest-77',
+        playerName: 'Guest-77',
+        worldSocketUrl: 'ws://localhost:8092/ws',
+        mode: 'guest',
+        activeZone: 'underground',
+        lastVenue: 'underground',
+        settings: {
+          uiTheme: 'Luminous Panels',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
+      }),
+    }) as Response);
+
+    const session = await runtimeLogout({
+      session: {
+        playerId: 'user-42',
+        playerName: 'nick',
+        worldSocketUrl: 'ws://localhost:8092/ws',
+        mode: 'account',
+        activeZone: 'underground',
+        lastVenue: 'underground',
+        settings: {
+          uiTheme: 'Luminous Panels',
+          graphicsMode: 'auto',
+          graphicsLevel: 7,
+          displayNames: true,
+          chatCollapsed: false,
+          crouchMode: 'hold',
+          cameraFollow: 'free',
+        },
+      },
+      fetcher,
+      apiBaseUrl: 'http://localhost:8091',
+    });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      'http://localhost:8091/api/v1/omnigame/runtime/auth/logout',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          currentVenue: 'underground',
+          currentLoadout: {},
+          currentSettings: {
+            uiTheme: 'Luminous Panels',
+            graphicsMode: 'auto',
+            graphicsLevel: 7,
+            displayNames: true,
+            chatCollapsed: false,
+            crouchMode: 'hold',
+            cameraFollow: 'free',
+          },
+        }),
+      }),
+    );
+    expect(session.mode).toBe('guest');
   });
 });

@@ -56,6 +56,20 @@ export interface RuntimeSession {
   venueStatus?: RuntimeVenueStatus;
 }
 
+export interface RuntimeLoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface RuntimeSignupRequest {
+  username: string;
+  email: string;
+  password: string;
+  turnstileToken: string;
+  acceptPrivacyPolicy: boolean;
+  acceptTerms: boolean;
+}
+
 export async function bootstrapSession(input: {
   search: string;
   fetcher?: typeof fetch;
@@ -166,4 +180,88 @@ export async function saveRuntimeSettings(input: {
   if (!response.ok) {
     throw new Error(`Runtime settings save failed with ${response.status}`);
   }
+}
+
+async function exchangeRuntimeAuth(input: {
+  endpoint: 'login' | 'signup' | 'logout';
+  session: RuntimeSession;
+  payload: Record<string, unknown>;
+  fetcher?: typeof fetch;
+  apiBaseUrl?: string;
+}): Promise<RuntimeSession> {
+  const fetcher = input.fetcher ?? fetch;
+  const apiBaseUrl = input.apiBaseUrl ?? import.meta.env.VITE_OMNIGAME_API_URL ?? 'http://localhost:8091';
+  const response = await fetcher(`${apiBaseUrl}/api/v1/omnigame/runtime/auth/${input.endpoint}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      ...input.payload,
+      currentVenue: input.session.activeZone,
+      currentLoadout: input.session.loadout ?? {},
+      currentSettings: input.session.settings,
+    }),
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Runtime ${input.endpoint} failed with ${response.status}`;
+    try {
+      const payload = (await response.json()) as { error?: { message?: string } };
+      errorMessage = payload.error?.message ?? errorMessage;
+    } catch {
+      // Response body may be empty or non-JSON; keep the default status-based message.
+    }
+    throw new Error(errorMessage);
+  }
+
+  const payload = (await response.json()) as Partial<RuntimeSession>;
+  return {
+    ...payload,
+    activeZone: payload.activeZone ?? input.session.activeZone,
+    lastVenue: payload.lastVenue ?? payload.activeZone ?? input.session.activeZone,
+    settings: normalizeRuntimeSettings(payload.settings),
+  } as RuntimeSession;
+}
+
+export async function runtimeLogin(input: {
+  session: RuntimeSession;
+  credentials: RuntimeLoginRequest;
+  fetcher?: typeof fetch;
+  apiBaseUrl?: string;
+}): Promise<RuntimeSession> {
+  return exchangeRuntimeAuth({
+    endpoint: 'login',
+    session: input.session,
+    payload: input.credentials,
+    fetcher: input.fetcher,
+    apiBaseUrl: input.apiBaseUrl,
+  });
+}
+
+export async function runtimeSignup(input: {
+  session: RuntimeSession;
+  signup: RuntimeSignupRequest;
+  fetcher?: typeof fetch;
+  apiBaseUrl?: string;
+}): Promise<RuntimeSession> {
+  return exchangeRuntimeAuth({
+    endpoint: 'signup',
+    session: input.session,
+    payload: input.signup,
+    fetcher: input.fetcher,
+    apiBaseUrl: input.apiBaseUrl,
+  });
+}
+
+export async function runtimeLogout(input: {
+  session: RuntimeSession;
+  fetcher?: typeof fetch;
+  apiBaseUrl?: string;
+}): Promise<RuntimeSession> {
+  return exchangeRuntimeAuth({
+    endpoint: 'logout',
+    session: input.session,
+    payload: {},
+    fetcher: input.fetcher,
+    apiBaseUrl: input.apiBaseUrl,
+  });
 }
