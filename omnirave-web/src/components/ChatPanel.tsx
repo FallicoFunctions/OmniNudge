@@ -6,6 +6,7 @@ export function ChatPanel(props: {
   onSendMessage: (body: string) => void;
   isSending: boolean;
   initialHistoryCollapsed?: boolean;
+  composerResetSignal?: number;
 }) {
   const [draft, setDraft] = useState('');
   const [historyCollapsed, setHistoryCollapsed] = useState(props.initialHistoryCollapsed ?? false);
@@ -14,6 +15,10 @@ export function ChatPanel(props: {
   useEffect(() => {
     setHistoryCollapsed(props.initialHistoryCollapsed ?? false);
   }, [props.initialHistoryCollapsed]);
+
+  useEffect(() => {
+    setDraft('');
+  }, [props.composerResetSignal]);
 
   const handleSend = () => {
     const body = draft.trim();
