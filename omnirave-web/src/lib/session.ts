@@ -1,7 +1,7 @@
 export type RuntimeMode = 'account' | 'guest';
 export type RuntimeZoneID = 'main_stage' | 'underground' | 'plurr_partay';
 
-import { DEFAULT_RUNTIME_SETTINGS, type RuntimeSettings } from './settings';
+import { normalizeRuntimeSettings, type RuntimeSettings } from './settings';
 
 export interface RuntimePoint {
   x: number;
@@ -76,7 +76,7 @@ export async function bootstrapSession(input: {
     ...payload,
     activeZone: payload.activeZone ?? 'main_stage',
     lastVenue: payload.lastVenue ?? 'main_stage',
-    settings: payload.settings ?? DEFAULT_RUNTIME_SETTINGS,
+    settings: normalizeRuntimeSettings(payload.settings),
   } as RuntimeSession;
 }
 

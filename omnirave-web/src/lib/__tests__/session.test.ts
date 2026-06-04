@@ -65,6 +65,31 @@ describe('bootstrapSession', () => {
     expect(session.settings.uiTheme).toBe('Hybrid Premium');
   });
 
+  it('fills missing runtime settings fields from defaults', async () => {
+    const session = await bootstrapSession({
+      search: '?handoff=partial&mode=account',
+      fetcher: mockFetcher({
+        playerId: 'user-7',
+        playerName: 'partial',
+        worldSocketUrl: 'ws://example',
+        mode: 'account',
+        activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: {
+          uiTheme: 'Hybrid Premium',
+        },
+      }),
+    });
+
+    expect(session.settings.uiTheme).toBe('Hybrid Premium');
+    expect(session.settings.graphicsMode).toBe('auto');
+    expect(session.settings.graphicsLevel).toBe(7);
+    expect(session.settings.displayNames).toBe(true);
+    expect(session.settings.chatCollapsed).toBe(false);
+    expect(session.settings.crouchMode).toBe('hold');
+    expect(session.settings.cameraFollow).toBe('free');
+  });
+
   it('persists signed-in loadouts with the exchanged game session token', async () => {
     const fetcher = vi.fn(async () => ({ ok: true }) as Response);
 
