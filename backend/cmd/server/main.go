@@ -565,6 +565,7 @@ func main() {
 	notificationsHandler := handlers.NewNotificationsHandler(notificationRepo)
 	searchHandler := handlers.NewSearchHandler(db.Pool)
 	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
+	friendsHandler := handlers.NewFriendsHandler(userFriendshipRepo, userRepo, hub)
 	slideshowHandler := handlers.NewSlideshowHandler(db.Pool, slideshowRepo, conversationRepo, hub)
 	mediaGalleryHandler := handlers.NewMediaGalleryHandler(db.Pool)
 	uploadsHandler := handlers.NewUploadsHandler(mediaRepo, "./uploads")
@@ -1289,6 +1290,17 @@ func main() {
 			protected.POST("/users/block", blockingHandler.BlockUser)
 			protected.DELETE("/users/block/:username", blockingHandler.UnblockUser)
 			protected.GET("/users/blocked", blockingHandler.GetBlockedUsers)
+
+			// Friends
+			protected.GET("/users/me/friends", friendsHandler.GetFriends)
+			protected.GET("/users/me/friends/requests", friendsHandler.GetFriendRequests)
+			protected.POST("/users/me/friends/requests", friendsHandler.SendFriendRequest)
+			protected.PUT("/users/me/friends/requests/:username/accept", friendsHandler.AcceptFriendRequest)
+			protected.DELETE("/users/me/friends/requests/:username", friendsHandler.DeclineOrCancelFriendRequest)
+			protected.DELETE("/users/me/friends/:username", friendsHandler.RemoveFriend)
+			// Friendship status — protected so it always runs through full Auth middleware,
+			// not AuthOptional which can silently drop valid tokens on transient DB errors.
+			protected.GET("/users/:username/friendship", friendsHandler.GetFriendshipStatus)
 
 			// Notifications
 			protected.GET("/notifications", notificationsHandler.GetNotifications)
