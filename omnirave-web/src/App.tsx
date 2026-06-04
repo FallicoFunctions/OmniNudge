@@ -17,7 +17,17 @@ import { syncAuthoritativeStagePlayback, type StagePlayerMap } from './lib/youtu
 type TopLeftPanel = 'settings' | 'avatar' | null;
 
 export default function App() {
-  const { session, settings, chatMessages, error, isLoading, hasJoinedWorld, moveToZone, sendChatMessage } =
+  const {
+    session,
+    settings,
+    updateSettings,
+    chatMessages,
+    error,
+    isLoading,
+    hasJoinedWorld,
+    moveToZone,
+    sendChatMessage,
+  } =
     useWorldSession();
   const mediaUnlock = useMobileMediaUnlock();
   const stagePlayersRef = useRef<StagePlayerMap | null>(null);
@@ -70,7 +80,9 @@ export default function App() {
           onToggleSettings={() => setOpenTopLeftPanel((current) => (current === 'settings' ? null : 'settings'))}
           onToggleAvatar={() => setOpenTopLeftPanel((current) => (current === 'avatar' ? null : 'avatar'))}
         />
-        {openTopLeftPanel === 'settings' ? <SettingsPanel settings={settings} /> : null}
+        {openTopLeftPanel === 'settings' ? (
+          <SettingsPanel settings={settings} onSettingsChange={updateSettings} />
+        ) : null}
         {openTopLeftPanel === 'avatar' ? (
           <section className="settings-panel avatar-foundation-panel" aria-label="Avatar editor foundation">
             <p className="settings-panel-kicker">Avatar</p>
