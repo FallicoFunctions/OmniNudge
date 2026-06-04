@@ -145,6 +145,39 @@ func TestSessionService_ExchangeSignedInSessionReturnsPersistedLoadoutAndReturnP
 	require.Equal(t, "session-token-1", bootstrap.SessionToken)
 }
 
+func TestSessionService_RuntimeLoginReturnsAccountBootstrapAndOverwritesVenue(t *testing.T) {
+	userID := 42
+	svc := NewSessionServiceWithDependencies(
+		"http://localhost:4173/omnirave",
+		"ws://localhost:8092/ws",
+		repository.NewInMemoryProfileRepository(),
+		repository.NewInMemorySanctionRepository(),
+		stubSessionTokenIssuer{
+			token:      "runtime-session-token-1",
+			worldToken: "runtime-world-token-1",
+		},
+	)
+	require.NoError(t, svc.ProfileService().SaveLastVenue(context.Background(), userID, "main_stage"))
+
+	response, err := svc.BuildRuntimeAccountSession(context.Background(), model.RuntimeAuthRequest{
+		CurrentVenue: "underground",
+	}, model.PlayerIdentity{
+		UserID:   &userID,
+		Username: "nick",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, model.LaunchModeAccount, response.Mode)
+	require.Equal(t, "underground", response.ActiveZone)
+	require.Equal(t, "underground", response.LastVenue)
+	require.NotEmpty(t, response.SessionToken)
+	require.NotEmpty(t, response.WorldSessionToken)
+
+	profile, err := svc.ProfileService().GetProfile(context.Background(), userID)
+	require.NoError(t, err)
+	require.Equal(t, "underground", profile.LastVenue)
+}
+
 func TestSessionService_ExchangeSignedInSessionUsesDefaultRuntimeStateWhenProfileMissing(t *testing.T) {
 	userID := 42
 	svc := NewSessionServiceWithRepositories(

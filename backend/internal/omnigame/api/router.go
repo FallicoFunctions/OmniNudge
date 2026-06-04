@@ -32,8 +32,12 @@ func NewRouter(
 		sessionService,
 		handlers.NewGuestIdentityResolver(trustedProxies),
 	)
+	runtimeAuthHandler := handlers.NewRuntimeAuthHandler(handlers.NewRuntimeAuthService(sessionService, authService))
 	v1.POST("/omnigame/launch/omnirave", launchHandler.CreateOmniRaveLaunch)
 	v1.POST("/omnigame/session/exchange", launchHandler.ExchangeSession)
+	v1.POST("/omnigame/runtime/auth/login", runtimeAuthHandler.Login)
+	v1.POST("/omnigame/runtime/auth/signup", runtimeAuthHandler.Signup)
+	v1.POST("/omnigame/runtime/auth/logout", runtimeAuthHandler.Logout)
 
 	protected := v1.Group("/omnigame/profile")
 	protected.Use(middleware.AuthRequired(authService))
