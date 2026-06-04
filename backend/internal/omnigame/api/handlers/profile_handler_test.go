@@ -24,6 +24,8 @@ func testProfileRouter() *gin.Engine {
 		c.Next()
 	})
 	router.PUT("/omnigame/profile/omnirave/loadout", handler.SaveLoadout)
+	router.PUT("/omnigame/profile/omnirave/settings", handler.SaveRuntimeSettings)
+	router.PUT("/omnigame/profile/omnirave/last-venue", handler.SaveLastVenue)
 	router.PUT("/omnigame/profile/omnirave/return-point", handler.SaveReturnPoint)
 	router.GET("/omnigame/profile/omnirave", handler.GetProfile)
 	return router
@@ -80,4 +82,48 @@ func TestProfileHandler_ReturnPointRoundTrips(t *testing.T) {
 	returnPoint := payload["returnPoint"].(map[string]any)
 	require.Equal(t, float64(12), returnPoint["x"])
 	require.Equal(t, float64(8), returnPoint["z"])
+}
+
+func TestProfileHandler_RuntimeSettingsRoundTrip(t *testing.T) {
+	router := testProfileRouter()
+
+	saveReq := httptest.NewRequest(http.MethodPut, "/omnigame/profile/omnirave/settings", bytes.NewBufferString(`{"uiTheme":"Luminous Panels","graphicsMode":"auto","displayNames":true,"chatCollapsed":false,"crouchMode":"hold","cameraFollow":"free"}`))
+	saveReq.Header.Set("Content-Type", "application/json")
+	saveRec := httptest.NewRecorder()
+	router.ServeHTTP(saveRec, saveReq)
+	require.Equal(t, http.StatusNoContent, saveRec.Code)
+
+	getReq := httptest.NewRequest(http.MethodGet, "/omnigame/profile/omnirave", nil)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+	require.Equal(t, http.StatusOK, getRec.Code)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(getRec.Body.Bytes(), &payload))
+	settings := payload["settings"].(map[string]any)
+	require.Equal(t, "Luminous Panels", settings["uiTheme"])
+	require.Equal(t, "auto", settings["graphicsMode"])
+	require.Equal(t, true, settings["displayNames"])
+	require.Equal(t, false, settings["chatCollapsed"])
+	require.Equal(t, "hold", settings["crouchMode"])
+	require.Equal(t, "free", settings["cameraFollow"])
+}
+
+func TestProfileHandler_LastVenueRoundTrips(t *testing.T) {
+	router := testProfileRouter()
+
+	saveReq := httptest.NewRequest(http.MethodPut, "/omnigame/profile/omnirave/last-venue", bytes.NewBufferString(`{"lastVenue":"underground"}`))
+	saveReq.Header.Set("Content-Type", "application/json")
+	saveRec := httptest.NewRecorder()
+	router.ServeHTTP(saveRec, saveReq)
+	require.Equal(t, http.StatusNoContent, saveRec.Code)
+
+	getReq := httptest.NewRequest(http.MethodGet, "/omnigame/profile/omnirave", nil)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+	require.Equal(t, http.StatusOK, getRec.Code)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(getRec.Body.Bytes(), &payload))
+	require.Equal(t, "underground", payload["lastVenue"])
 }

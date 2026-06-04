@@ -113,6 +113,15 @@ func TestSessionService_ExchangeSignedInSessionReturnsPersistedLoadoutAndReturnP
 		Y: 0,
 		Z: 8,
 	}))
+	require.NoError(t, svc.ProfileService().SaveSettings(context.Background(), userID, model.OmniRaveSettings{
+		UITheme:       "Luminous Panels",
+		GraphicsMode:  "auto",
+		DisplayNames:  true,
+		ChatCollapsed: false,
+		CrouchMode:    "hold",
+		CameraFollow:  "free",
+	}))
+	require.NoError(t, svc.ProfileService().SaveLastVenue(context.Background(), userID, "underground"))
 
 	session, err := svc.CreateLaunchSession(context.Background(), model.LaunchRequest{
 		Mode: model.LaunchModeAccount,
@@ -131,7 +140,40 @@ func TestSessionService_ExchangeSignedInSessionReturnsPersistedLoadoutAndReturnP
 	require.Equal(t, "black_mesh", bootstrap.Loadout["top"])
 	require.NotNil(t, bootstrap.ReturnPoint)
 	require.Equal(t, 12.0, bootstrap.ReturnPoint.X)
+	require.Equal(t, "underground", bootstrap.LastVenue)
+	require.Equal(t, "Luminous Panels", bootstrap.Settings.UITheme)
 	require.Equal(t, "session-token-1", bootstrap.SessionToken)
+}
+
+func TestSessionService_ExchangeSignedInSessionUsesDefaultRuntimeStateWhenProfileMissing(t *testing.T) {
+	userID := 42
+	svc := NewSessionServiceWithRepositories(
+		"http://localhost:4173/omnirave",
+		"ws://localhost:8092/ws",
+		repository.NewInMemoryProfileRepository(),
+		repository.NewInMemorySanctionRepository(),
+	)
+
+	session, err := svc.CreateLaunchSession(context.Background(), model.LaunchRequest{
+		Mode: model.LaunchModeAccount,
+	}, model.PlayerIdentity{
+		UserID:   &userID,
+		Username: "alice",
+	})
+	require.NoError(t, err)
+
+	bootstrap, err := svc.ExchangeLaunchSession(context.Background(), model.SessionExchangeRequest{
+		Handoff: session.LaunchToken,
+		Mode:    model.LaunchModeAccount,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "main_stage", bootstrap.LastVenue)
+	require.Equal(t, "Luminous Panels", bootstrap.Settings.UITheme)
+	require.Equal(t, "auto", bootstrap.Settings.GraphicsMode)
+	require.True(t, bootstrap.Settings.DisplayNames)
+	require.False(t, bootstrap.Settings.ChatCollapsed)
+	require.Equal(t, "hold", bootstrap.Settings.CrouchMode)
+	require.Equal(t, "free", bootstrap.Settings.CameraFollow)
 }
 
 func TestSessionService_ExchangeGuestSessionDoesNotReturnPersistedData(t *testing.T) {
@@ -219,6 +261,15 @@ func TestSessionService_ExchangeSignedInSessionReturnsPersistedDataAcrossService
 		Y: 0,
 		Z: 8,
 	}))
+	require.NoError(t, writer.ProfileService().SaveSettings(ctx, 42, model.OmniRaveSettings{
+		UITheme:       "Luminous Panels",
+		GraphicsMode:  "auto",
+		DisplayNames:  true,
+		ChatCollapsed: false,
+		CrouchMode:    "hold",
+		CameraFollow:  "free",
+	}))
+	require.NoError(t, writer.ProfileService().SaveLastVenue(ctx, 42, "underground"))
 
 	reader := NewSessionServiceWithRepositories(
 		"http://localhost:4173/omnirave",
@@ -243,6 +294,8 @@ func TestSessionService_ExchangeSignedInSessionReturnsPersistedDataAcrossService
 	require.NotNil(t, bootstrap.ReturnPoint)
 	require.Equal(t, 12.0, bootstrap.ReturnPoint.X)
 	require.Equal(t, 8.0, bootstrap.ReturnPoint.Z)
+	require.Equal(t, "underground", bootstrap.LastVenue)
+	require.Equal(t, "Luminous Panels", bootstrap.Settings.UITheme)
 }
 
 func TestSessionService_RejectsFreshGuestLaunchFromSanctionedNetworkIdentifier(t *testing.T) {
