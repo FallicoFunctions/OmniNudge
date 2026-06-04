@@ -120,6 +120,46 @@ func TestWSHandler_BroadcastsPlayerMovementToOtherConnections(t *testing.T) {
 	require.Equal(t, "underground", playerZoneForID(t, secondSnapshot, "guest-1"))
 }
 
+func TestWSHandler_BroadcastSnapshotsUseSingleAuthoritativeEventInstant(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	handler := NewWSHandler(worldState, mediaState, authService, []string{"https://play.omninudge.com"})
+	testServer := httptest.NewServer(handler)
+	defer testServer.Close()
+
+	baseURL := "ws" + testServer.URL[len("http"):]
+	firstConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer firstConn.Close()
+
+	var firstSnapshot map[string]any
+	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
+
+	boundary := time.Date(2026, 6, 4, 14, 59, 59, 0, time.UTC)
+	nowCalls := 0
+	handler.now = func() time.Time {
+		nowCalls++
+		if nowCalls == 1 {
+			return boundary
+		}
+		return boundary.Add(time.Second)
+	}
+
+	secondConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-2", "Guest-2", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer secondConn.Close()
+
+	var secondJoinSnapshot map[string]any
+	require.NoError(t, secondConn.ReadJSON(&secondJoinSnapshot))
+	_ = secondConn.SetReadDeadline(time.Now().Add(750 * time.Millisecond))
+
+	var firstJoinBroadcast map[string]any
+	require.NoError(t, firstConn.ReadJSON(&firstJoinBroadcast))
+	require.Equal(t, 1, nowCalls)
+	require.Equal(t, eventPhaseForZone(t, secondJoinSnapshot, "main_stage"), eventPhaseForZone(t, firstJoinBroadcast, "main_stage"))
+}
+
 func TestWSHandler_RespawnEventRebroadcastsSnapshot(t *testing.T) {
 	worldState := world.NewWorld(world.DefaultConfig())
 	mediaState := world.NewMediaState()
@@ -386,5 +426,25 @@ func playerZoneForID(t *testing.T, snapshot map[string]any, playerID string) str
 	}
 
 	t.Fatalf("player %s not found in snapshot", playerID)
+	return ""
+}
+
+func eventPhaseForZone(t *testing.T, snapshot map[string]any, zoneID string) string {
+	t.Helper()
+
+	rawEvents, ok := snapshot["zoneEvents"].([]any)
+	require.True(t, ok)
+
+	for _, rawEvent := range rawEvents {
+		event, eventOK := rawEvent.(map[string]any)
+		require.True(t, eventOK)
+		if event["zoneId"] == zoneID {
+			phase, phaseOK := event["phase"].(string)
+			require.True(t, phaseOK)
+			return phase
+		}
+	}
+
+	t.Fatalf("zone event %s not found in snapshot", zoneID)
 	return ""
 }

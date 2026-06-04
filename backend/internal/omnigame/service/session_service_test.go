@@ -290,6 +290,59 @@ func TestSessionService_BuildRuntimeGuestLogoutIncludesZoneEvents(t *testing.T) 
 	require.EqualValues(t, 10, response.ZoneEvents[2].CountdownSeconds)
 }
 
+func TestSessionService_BuildRuntimeGuestLogoutUsesSingleAuthoritativeInstant(t *testing.T) {
+	boundary := time.Date(2026, 6, 4, 14, 59, 59, 0, time.UTC)
+	mediaState := omniraveworld.NewMediaStateWithPlaylists([]omniraveworld.StagePlaylist{
+		{
+			ZoneID: omniraveworld.ZoneMainStage,
+			Entries: []omniraveworld.PlaylistEntry{
+				{VideoID: "boundary-before", Duration: time.Second},
+				{VideoID: "boundary-after", Duration: 30 * time.Minute},
+			},
+			StartedAt: boundary,
+		},
+		{
+			ZoneID: omniraveworld.ZoneUnderground,
+			Entries: []omniraveworld.PlaylistEntry{
+				{VideoID: "techno-room", Duration: 30 * time.Minute},
+			},
+			StartedAt: boundary,
+		},
+		{
+			ZoneID: omniraveworld.ZonePlurrPartay,
+			Entries: []omniraveworld.PlaylistEntry{
+				{VideoID: "neon-room", Duration: 30 * time.Minute},
+			},
+			StartedAt: boundary,
+		},
+	}, boundary)
+
+	svc := NewSessionServiceWithMediaState(
+		"http://localhost:4173/omnirave",
+		"ws://localhost:8092/ws",
+		repository.NewInMemoryProfileRepository(),
+		repository.NewInMemorySanctionRepository(),
+		mediaState,
+		nil,
+	)
+
+	nowCalls := 0
+	svc.now = func() time.Time {
+		nowCalls++
+		if nowCalls == 1 {
+			return boundary
+		}
+		return boundary.Add(time.Second)
+	}
+
+	response, err := svc.BuildRuntimeGuestLogout(context.Background(), "main_stage")
+	require.NoError(t, err)
+	require.Equal(t, 1, nowCalls)
+	require.Equal(t, "boundary-before", response.ZoneMedia[0].VideoID)
+	require.Equal(t, "lead_in", response.ZoneEvents[0].Phase)
+	require.EqualValues(t, 1, response.ZoneEvents[0].CountdownSeconds)
+}
+
 func TestSessionService_ExchangeLaunchSessionReturnsZoneEventsForAccountBootstrap(t *testing.T) {
 	userID := 42
 	svc := NewSessionServiceWithRepositories(
