@@ -54,7 +54,7 @@ const mockWorldSession = {
     crouchMode: 'hold' as const,
     cameraFollow: 'free' as const,
   },
-  setSettings: vi.fn(),
+  updateSettings: vi.fn(),
   moveToZone: vi.fn(),
   saveLoadout: vi.fn(),
   sendChatMessage: vi.fn(),
@@ -111,7 +111,7 @@ describe('App', () => {
   });
 
   it('applies theme changes immediately through the settings panel', async () => {
-    mockWorldSession.setSettings.mockClear();
+    mockWorldSession.updateSettings.mockClear();
     const nextSettings = {
       ...mockWorldSession.settings,
       uiTheme: 'Hybrid Premium' as const,
@@ -124,6 +124,6 @@ describe('App', () => {
       target: { value: 'Hybrid Premium' },
     });
 
-    expect(mockWorldSession.setSettings).toHaveBeenCalledWith(nextSettings);
+    expect(mockWorldSession.updateSettings).toHaveBeenCalledWith(nextSettings);
   });
 });
