@@ -40,6 +40,7 @@ describe('worldSocket', () => {
         zoneMedia: [
           { zoneId: 'underground', videoId: 'techno-room-youtube', playlistIndex: 0, playheadSeconds: 22 },
         ],
+        zoneEvents: [],
       },
     );
 
