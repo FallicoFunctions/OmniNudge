@@ -7,7 +7,7 @@ const mockWorldSession = {
     playerId: 'guest-42',
     playerName: 'Guest-42',
     worldSocketUrl: 'ws://localhost:8092/ws',
-    mode: 'guest' as const,
+    mode: 'guest' as 'guest' | 'account',
     activeZone: 'main_stage' as const,
     lastVenue: 'main_stage' as const,
     settings: {
@@ -29,7 +29,7 @@ const mockWorldSession = {
       {
         id: 'guest-42',
         playerName: 'Guest-42',
-        mode: 'guest' as const,
+        mode: 'guest' as 'guest' | 'account',
         zone: 'main_stage' as const,
         position: { x: 0, y: 0, z: 0 },
         loadout: { hair: 'buzz', top: 'black_mesh' },
@@ -61,6 +61,7 @@ const mockWorldSession = {
   updateSettings: vi.fn(),
   authPopupMode: null as 'login' | 'signup' | null,
   openAuthPopup: vi.fn(),
+  switchAuthPopupMode: vi.fn(),
   closeAuthPopup: vi.fn(),
   login: vi.fn(),
   signup: vi.fn(),
@@ -102,6 +103,7 @@ describe('App', () => {
     mockWorldSession.authPopupMode = null;
     mockWorldSession.welcomeCardState = null;
     mockWorldSession.openAuthPopup.mockClear();
+    mockWorldSession.switchAuthPopupMode.mockClear();
     mockWorldSession.closeAuthPopup.mockClear();
     mockWorldSession.dismissWelcomeCard.mockClear();
     mockWorldSession.logout.mockClear();
@@ -212,6 +214,22 @@ describe('App', () => {
 
     expect(mockWorldSession.dismissWelcomeCard).toHaveBeenCalledTimes(1);
     expect(within(view.container).getByLabelText('Avatar editor foundation')).toBeInTheDocument();
+
+    mockWorldSession.session.mode = 'guest';
+    mockWorldSession.welcomeCardState = null;
+  });
+
+  it('dismisses the welcome card before opening settings', async () => {
+    mockWorldSession.session.mode = 'account';
+    mockWorldSession.welcomeCardState = { isOpen: true, variant: 'login' };
+    mockWorldSession.dismissWelcomeCard.mockClear();
+
+    const view = render(<App />);
+
+    fireEvent.click(await within(view.container).findByRole('button', { name: 'Settings' }));
+
+    expect(mockWorldSession.dismissWelcomeCard).toHaveBeenCalledTimes(1);
+    expect(within(view.container).getByRole('button', { name: 'Respawn' })).toBeInTheDocument();
 
     mockWorldSession.session.mode = 'guest';
     mockWorldSession.welcomeCardState = null;

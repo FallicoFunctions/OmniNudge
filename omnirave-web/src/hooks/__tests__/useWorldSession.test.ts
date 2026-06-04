@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useWorldSession } from '../useWorldSession';
 import type { RuntimeSession } from '../../lib/session';
 import type { RuntimeSettings } from '../../lib/settings';
@@ -73,12 +73,17 @@ function deferred<T>() {
 
 describe('useWorldSession', () => {
   beforeEach(() => {
+    vi.useRealTimers();
     bootstrapSessionMock.mockReset();
     saveRuntimeSettingsMock.mockReset();
     runtimeLoginMock.mockReset();
     runtimeSignupMock.mockReset();
     runtimeLogoutMock.mockReset();
     openWorldSocketMock.mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('replaces the guest session in place after runtime login and exposes welcome-card state', async () => {
@@ -206,5 +211,42 @@ describe('useWorldSession', () => {
     await waitFor(() => expect(result.current.settings.uiTheme).toBe('Hybrid Premium'));
     expect(result.current.session?.settings.uiTheme).toBe('Hybrid Premium');
     expect(result.current.error).toBe('backend rejected settings');
+  });
+
+  it('keeps the sprint signup cooldown when the popup mode is switched before close', async () => {
+    bootstrapSessionMock.mockResolvedValue(
+      createAccountSession({
+        playerId: 'guest-42',
+        playerName: 'Guest-42',
+        mode: 'guest',
+        sessionToken: undefined,
+      }),
+    );
+    const now = { current: 100_000 };
+    const dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now.current);
+
+    const { result } = renderHook(() => useWorldSession());
+
+    await waitFor(() => expect(result.current.session?.mode).toBe('guest'));
+
+    act(() => {
+      result.current.requestGuestSprintUnlock();
+    });
+    expect(result.current.authPopupMode).toBe('signup');
+
+    act(() => {
+      result.current.switchAuthPopupMode('login');
+      result.current.closeAuthPopup();
+      result.current.requestGuestSprintUnlock();
+    });
+    expect(result.current.authPopupMode).toBeNull();
+
+    act(() => {
+      now.current += 60_000;
+      result.current.requestGuestSprintUnlock();
+    });
+    expect(result.current.authPopupMode).toBe('signup');
+
+    dateNowSpy.mockRestore();
   });
 });

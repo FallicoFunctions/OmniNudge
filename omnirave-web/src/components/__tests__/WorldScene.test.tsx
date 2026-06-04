@@ -27,6 +27,8 @@ describe('WorldScene', () => {
           players: [
             {
               id: 'guest-42',
+              playerName: 'Guest-42',
+              mode: 'guest',
               zone: 'main_stage',
               position: { x: 0, y: 0, z: 0 },
               loadout: null as unknown as Record<string, string>,
