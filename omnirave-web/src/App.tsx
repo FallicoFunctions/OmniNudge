@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChatPanel } from './components/ChatPanel';
 import { EmoteBar } from './components/EmoteBar';
 import { Hud } from './components/Hud';
+import { AuthPopup } from './components/AuthPopup';
 import { SettingsPanel } from './components/SettingsPanel';
 import { StageAudioDeck } from './components/StageAudioDeck';
 import { StageScreen } from './components/StageScreen';
@@ -9,6 +10,7 @@ import { TopLeftControls } from './components/TopLeftControls';
 import { TopRightAuthControls } from './components/TopRightAuthControls';
 import { TouchControls } from './components/TouchControls';
 import { VenueStatusPanel } from './components/VenueStatusPanel';
+import { WelcomeCard } from './components/WelcomeCard';
 import { WorldScene } from './components/WorldScene';
 import { useMobileMediaUnlock } from './hooks/useMobileMediaUnlock';
 import { useWorldSession } from './hooks/useWorldSession';
@@ -21,6 +23,16 @@ export default function App() {
     session,
     settings,
     updateSettings,
+    authPopupMode,
+    openAuthPopup,
+    closeAuthPopup,
+    login,
+    signup,
+    logout,
+    isAuthSubmitting,
+    welcomeCardState,
+    dismissWelcomeCard,
+    requestGuestSprintUnlock,
     chatMessages,
     error,
     isLoading,
@@ -43,6 +55,24 @@ export default function App() {
   function handleRespawn() {
     closeTopLeftPanel();
     respawn();
+  }
+
+  function handleAvatarClick() {
+    if (session?.mode === 'guest') {
+      openAuthPopup('signup', 'guest_avatar');
+      return;
+    }
+
+    if (welcomeCardState?.isOpen) {
+      dismissWelcomeCard();
+    }
+
+    setOpenTopLeftPanel((current) => (current === 'avatar' ? null : 'avatar'));
+  }
+
+  function handleEditAvatarFromWelcome() {
+    dismissWelcomeCard();
+    setOpenTopLeftPanel('avatar');
   }
 
   useEffect(() => {
@@ -90,8 +120,16 @@ export default function App() {
         <TopLeftControls
           openPanel={openTopLeftPanel}
           onToggleSettings={() => setOpenTopLeftPanel((current) => (current === 'settings' ? null : 'settings'))}
-          onToggleAvatar={() => setOpenTopLeftPanel((current) => (current === 'avatar' ? null : 'avatar'))}
+          onAvatarClick={handleAvatarClick}
         />
+        {welcomeCardState?.isOpen ? (
+          <WelcomeCard
+            playerName={session.playerName}
+            mode={welcomeCardState.variant}
+            onClose={dismissWelcomeCard}
+            onEditAvatar={handleEditAvatarFromWelcome}
+          />
+        ) : null}
         {openTopLeftPanel === 'settings' ? (
           <SettingsPanel
             settings={settings}
@@ -112,7 +150,25 @@ export default function App() {
       </div>
 
       <div className="hud-anchor hud-top-right">
-        <TopRightAuthControls session={session} />
+        <TopRightAuthControls
+          mode={session.mode}
+          onOpenLogin={() => openAuthPopup('login')}
+          onOpenSignup={() => openAuthPopup('signup')}
+          onLogout={() => {
+            closeTopLeftPanel();
+            void logout();
+          }}
+        />
+        <AuthPopup
+          mode={authPopupMode ?? 'login'}
+          isOpen={authPopupMode !== null}
+          error={error}
+          isSubmitting={isAuthSubmitting}
+          onClose={closeAuthPopup}
+          onSwitchMode={openAuthPopup}
+          onLogin={login}
+          onSignup={signup}
+        />
       </div>
 
       <div className="hud-anchor hud-bottom-left">
@@ -139,7 +195,7 @@ export default function App() {
         {mediaUnlock.isTouchDevice ? (
           <TouchControls
             unlocked={mediaUnlock.unlocked}
-            onUnlock={mediaUnlock.unlock}
+            onUnlock={session.mode === 'guest' ? requestGuestSprintUnlock : mediaUnlock.unlock}
             onMoveToZone={moveToZone}
           />
         ) : null}

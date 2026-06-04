@@ -2,6 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   bootstrapSession,
   type RuntimeChatMessage,
+  runtimeLogin as performRuntimeLogin,
+  runtimeLogout as performRuntimeLogout,
+  runtimeSignup as performRuntimeSignup,
+  type RuntimeLoginRequest,
+  type RuntimeSignupRequest,
   type RuntimeVenueStatus,
   saveLoadout as persistLoadout,
   saveRuntimeSettings as persistRuntimeSettings,
@@ -13,6 +18,12 @@ import { DEFAULT_RUNTIME_SETTINGS, type RuntimeSettings } from '../lib/settings'
 import { applyWorldSnapshot, openWorldSocket } from '../lib/worldSocket';
 import type { ZoneID } from '../lib/zones';
 
+type AuthPopupMode = 'login' | 'signup';
+type AuthPopupReason = 'manual' | 'guest_avatar' | 'guest_sprint_unlock';
+type WelcomeCardState = { isOpen: true; variant: 'login' | 'signup' } | null;
+
+const GUEST_SPRINT_AUTH_COOLDOWN_MS = 60_000;
+
 export function useWorldSession() {
   const [session, setSession] = useState<RuntimeSession | null>(null);
   const [settings, baseSetSettings] = useState<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
@@ -23,6 +34,9 @@ export function useWorldSession() {
   const [chatMessages, setChatMessages] = useState<RuntimeChatMessage[]>([]);
   const [chatComposerResetSignal, setChatComposerResetSignal] = useState(0);
   const [displayedVenueStatus, setDisplayedVenueStatus] = useState<RuntimeVenueStatus | undefined>(undefined);
+  const [authPopupMode, setAuthPopupMode] = useState<AuthPopupMode | null>(null);
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+  const [welcomeCardState, setWelcomeCardState] = useState<WelcomeCardState>(null);
   const bootstrapPromiseRef = useRef<Promise<RuntimeSession> | null>(null);
   const worldSocketRef = useRef<ReturnType<typeof openWorldSocket> | null>(null);
   const lastSavedReturnPointRef = useRef('');
@@ -30,6 +44,8 @@ export function useWorldSession() {
   const lastPersistedSettingsRef = useRef<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
   const settingsSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const latestSettingsVersionRef = useRef(0);
+  const authPopupReasonRef = useRef<AuthPopupReason>('manual');
+  const guestSprintUnlockDismissedAtRef = useRef(0);
   const venueTransition = useVenueTransition('main_stage');
 
   function applySettingsLocally(nextSettings: RuntimeSettings) {
@@ -45,6 +61,16 @@ export function useWorldSession() {
     });
   }
 
+  function applyRuntimeSession(nextSession: RuntimeSession) {
+    sessionRef.current = nextSession;
+    lastPersistedSettingsRef.current = nextSession.settings;
+    lastSavedReturnPointRef.current = '';
+    venueTransition.syncAuthoritativeVenue(nextSession.activeZone, { immediate: true });
+    setDisplayedVenueStatus(nextSession.venueStatus);
+    setSession(nextSession);
+    baseSetSettings(nextSession.settings);
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -55,12 +81,7 @@ export function useWorldSession() {
     void bootstrapPromiseRef.current
       .then((nextSession) => {
         if (!cancelled) {
-          sessionRef.current = nextSession;
-          lastPersistedSettingsRef.current = nextSession.settings;
-          venueTransition.syncAuthoritativeVenue(nextSession.activeZone, { immediate: true });
-          setDisplayedVenueStatus(nextSession.venueStatus);
-          setSession(nextSession);
-          baseSetSettings(nextSession.settings);
+          applyRuntimeSession(nextSession);
         }
       })
       .catch((err) => {
@@ -167,6 +188,109 @@ export function useWorldSession() {
       });
   }
 
+  function openAuthPopup(mode: AuthPopupMode, reason: AuthPopupReason = 'manual') {
+    authPopupReasonRef.current = reason;
+    setError('');
+    setAuthPopupMode(mode);
+  }
+
+  function closeAuthPopup() {
+    if (authPopupMode === 'signup' && authPopupReasonRef.current === 'guest_sprint_unlock') {
+      guestSprintUnlockDismissedAtRef.current = Date.now();
+    }
+    authPopupReasonRef.current = 'manual';
+    setAuthPopupMode(null);
+    setError('');
+  }
+
+  function dismissWelcomeCard() {
+    setWelcomeCardState(null);
+  }
+
+  function requestGuestSprintUnlock() {
+    const currentSession = sessionRef.current;
+    if (!currentSession || currentSession.mode !== 'guest') {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - guestSprintUnlockDismissedAtRef.current < GUEST_SPRINT_AUTH_COOLDOWN_MS) {
+      return;
+    }
+
+    openAuthPopup('signup', 'guest_sprint_unlock');
+  }
+
+  async function login(credentials: RuntimeLoginRequest) {
+    const currentSession = sessionRef.current;
+    if (!currentSession) {
+      return;
+    }
+
+    setIsAuthSubmitting(true);
+    setError('');
+    try {
+      const nextSession = await performRuntimeLogin({
+        session: currentSession,
+        credentials,
+      });
+      applyRuntimeSession(nextSession);
+      setAuthPopupMode(null);
+      setWelcomeCardState({ isOpen: true, variant: 'login' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to log in');
+      throw err;
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  }
+
+  async function signup(signup: RuntimeSignupRequest) {
+    const currentSession = sessionRef.current;
+    if (!currentSession) {
+      return;
+    }
+
+    setIsAuthSubmitting(true);
+    setError('');
+    try {
+      const nextSession = await performRuntimeSignup({
+        session: currentSession,
+        signup,
+      });
+      applyRuntimeSession(nextSession);
+      setAuthPopupMode(null);
+      authPopupReasonRef.current = 'manual';
+      setWelcomeCardState({ isOpen: true, variant: 'signup' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to create account');
+      throw err;
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  }
+
+  async function logout() {
+    const currentSession = sessionRef.current;
+    if (!currentSession) {
+      return;
+    }
+
+    setIsAuthSubmitting(true);
+    setError('');
+    try {
+      const nextSession = await performRuntimeLogout({ session: currentSession });
+      applyRuntimeSession(nextSession);
+      setAuthPopupMode(null);
+      setWelcomeCardState(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to log out');
+      throw err;
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  }
+
   useEffect(() => {
     if (!session || session.mode !== 'account' || !session.players?.length) {
       return;
@@ -236,6 +360,9 @@ export function useWorldSession() {
     session: displayedSession,
     settings,
     updateSettings,
+    authPopupMode,
+    isAuthSubmitting,
+    welcomeCardState,
     chatMessages,
     error,
     isLoading,
@@ -244,6 +371,13 @@ export function useWorldSession() {
     chatComposerResetSignal,
     pendingVenue: venueTransition.pendingVenue,
     isVenueTransitioning: venueTransition.isTransitioning,
+    openAuthPopup,
+    closeAuthPopup,
+    dismissWelcomeCard,
+    requestGuestSprintUnlock,
+    login,
+    signup,
+    logout,
     moveToZone,
     respawn,
     saveLoadout,
