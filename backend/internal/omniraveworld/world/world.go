@@ -94,7 +94,7 @@ func (w *World) Snapshot() Snapshot {
 	return Snapshot{Players: copyPlayers(w.players)}
 }
 
-func (w *World) SnapshotForPlayer(playerID string, zoneMedia []ZoneMediaState) Snapshot {
+func (w *World) SnapshotForPlayer(playerID string, zoneMedia []ZoneMediaState, zoneEvents []ZoneEventState) Snapshot {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
@@ -106,6 +106,7 @@ func (w *World) SnapshotForPlayer(playerID string, zoneMedia []ZoneMediaState) S
 	return Snapshot{
 		Players:         copyPlayers(w.players),
 		ZoneMedia:       zoneMedia,
+		ZoneEvents:      zoneEvents,
 		CurrentPlayerID: playerID,
 		ActiveZone:      activeZone,
 	}

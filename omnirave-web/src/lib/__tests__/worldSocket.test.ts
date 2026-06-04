@@ -57,6 +57,38 @@ describe('worldSocket', () => {
     });
   });
 
+  it('preserves authoritative zone event state from snapshots', () => {
+    const next = applyWorldSnapshot(
+      {
+        playerId: 'guest-42',
+        playerName: 'Guest-42',
+        worldSocketUrl: 'ws://localhost:8092/ws',
+        mode: 'guest',
+        activeZone: 'main_stage',
+        lastVenue: 'main_stage',
+        settings: DEFAULT_RUNTIME_SETTINGS,
+      },
+      {
+        type: 'world_snapshot',
+        currentPlayerId: 'guest-42',
+        activeZone: 'main_stage',
+        players: [],
+        zoneMedia: [],
+        zoneEvents: [
+          {
+            zoneId: 'main_stage',
+            phase: 'lead_in',
+            eventName: 'fireworks',
+            countdownSeconds: 9,
+          },
+        ],
+      },
+    );
+
+    expect(next.zoneEvents?.[0].phase).toBe('lead_in');
+    expect(next.zoneEvents?.[0].eventName).toBe('fireworks');
+  });
+
   it('routes chat messages from the world socket to the chat callback', () => {
     const listeners = new Map<string, Array<(event: MessageEvent | Event) => void>>();
     const socket = {

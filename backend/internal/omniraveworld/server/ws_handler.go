@@ -122,11 +122,13 @@ func (h *WSHandler) unregisterConn(playerID string, conn *websocket.Conn) {
 }
 
 func (h *WSHandler) writeSnapshot(conn *websocket.Conn, playerID string) error {
-	snapshot := h.world.SnapshotForPlayer(playerID, currentZoneMedia(h.media, time.Now()))
+	now := time.Now()
+	snapshot := h.world.SnapshotForPlayer(playerID, currentZoneMedia(h.media, now), currentZoneEvents(now))
 	return conn.WriteJSON(map[string]any{
 		"type":            "world_snapshot",
 		"players":         snapshot.Players,
 		"zoneMedia":       snapshot.ZoneMedia,
+		"zoneEvents":      snapshot.ZoneEvents,
 		"currentPlayerId": snapshot.CurrentPlayerID,
 		"activeZone":      snapshot.ActiveZone,
 	})
@@ -185,6 +187,10 @@ func currentZoneMedia(mediaState *world.MediaState, now time.Time) []world.ZoneM
 		})
 	}
 	return zoneMedia
+}
+
+func currentZoneEvents(now time.Time) []world.ZoneEventState {
+	return world.NewEventSchedule().Snapshot(now)
 }
 
 func (h *WSHandler) parsePlayerSession(ctx context.Context, r *http.Request) (world.PlayerSession, error) {

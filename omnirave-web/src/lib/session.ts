@@ -1,5 +1,6 @@
 export type RuntimeMode = 'account' | 'guest';
 export type RuntimeZoneID = 'main_stage' | 'underground' | 'plurr_partay';
+export type RuntimeEventPhase = 'none' | 'lead_in' | 'active' | 'recovery';
 
 import { normalizeRuntimeSettings, type RuntimeSettings } from './settings';
 
@@ -32,6 +33,15 @@ export interface RuntimeZoneMedia {
   playheadSeconds: number;
 }
 
+export interface RuntimeZoneEvent {
+  zoneId: RuntimeZoneID;
+  phase: RuntimeEventPhase;
+  eventName: string;
+  countdownSeconds?: number;
+  recoverySeconds?: number;
+  activeMinute?: number;
+}
+
 export interface RuntimeVenueStatus {
   audienceLabel?: string;
   currentTrackLabel?: string;
@@ -51,6 +61,7 @@ export interface RuntimeSession {
   settings: RuntimeSettings;
   loadout?: Record<string, string>;
   zoneMedia?: RuntimeZoneMedia[];
+  zoneEvents?: RuntimeZoneEvent[];
   returnPoint?: RuntimePoint;
   players?: RuntimePlayer[];
   venueStatus?: RuntimeVenueStatus;
@@ -101,6 +112,7 @@ export async function bootstrapSession(input: {
     activeZone: payload.activeZone ?? 'main_stage',
     lastVenue: payload.lastVenue ?? 'main_stage',
     settings: normalizeRuntimeSettings(payload.settings),
+    zoneEvents: payload.zoneEvents ?? [],
   } as RuntimeSession;
 }
 
@@ -219,6 +231,7 @@ async function exchangeRuntimeAuth(input: {
     activeZone: payload.activeZone ?? input.session.activeZone,
     lastVenue: payload.lastVenue ?? payload.activeZone ?? input.session.activeZone,
     settings: normalizeRuntimeSettings(payload.settings),
+    zoneEvents: payload.zoneEvents ?? [],
   } as RuntimeSession;
 }
 

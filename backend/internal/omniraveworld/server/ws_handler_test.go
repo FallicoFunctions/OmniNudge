@@ -29,6 +29,11 @@ func TestWSHandler_JoinAndMoveUpdatesActiveZone(t *testing.T) {
 	require.NoError(t, conn.ReadJSON(&first))
 	require.Equal(t, "world_snapshot", first["type"])
 	require.Equal(t, "main_stage", first["activeZone"])
+	require.NotEmpty(t, first["zoneEvents"])
+
+	firstZoneEvents, ok := first["zoneEvents"].([]any)
+	require.True(t, ok)
+	require.Len(t, firstZoneEvents, 3)
 
 	require.NoError(t, conn.WriteJSON(map[string]any{
 		"type": "move",
@@ -59,6 +64,7 @@ func TestWSHandler_JoinAndMoveUpdatesActiveZone(t *testing.T) {
 	require.Equal(t, "world_snapshot", second["type"])
 	require.Equal(t, "underground", second["activeZone"])
 	require.NotEmpty(t, second["zoneMedia"])
+	require.NotEmpty(t, second["zoneEvents"])
 }
 
 func TestWSHandler_BroadcastsPlayerMovementToOtherConnections(t *testing.T) {

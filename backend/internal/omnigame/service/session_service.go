@@ -226,6 +226,22 @@ func (s *SessionService) currentZoneMedia() []model.ZoneMediaState {
 	return zoneMedia
 }
 
+func (s *SessionService) currentZoneEvents() []model.ZoneEventState {
+	events := omniraveworld.NewEventSchedule().Snapshot(s.now())
+	zoneEvents := make([]model.ZoneEventState, 0, len(events))
+	for _, event := range events {
+		zoneEvents = append(zoneEvents, model.ZoneEventState{
+			ZoneID:           string(event.ZoneID),
+			Phase:            string(event.Phase),
+			EventName:        event.EventName,
+			CountdownSeconds: event.CountdownSeconds,
+			RecoverySeconds:  event.RecoverySeconds,
+			ActiveMinute:     event.ActiveMinute,
+		})
+	}
+	return zoneEvents
+}
+
 func (s *SessionService) ProfileService() *ProfileService {
 	return s.profileService
 }
@@ -255,6 +271,7 @@ func (s *SessionService) buildAccountRuntimeResponse(ctx context.Context, identi
 		LastVenue:      profile.LastVenue,
 		Settings:       profile.Settings,
 		ZoneMedia:      s.currentZoneMedia(),
+		ZoneEvents:     s.currentZoneEvents(),
 		ReturnPoint:    profile.ReturnPoint,
 	}
 
@@ -307,6 +324,7 @@ func (s *SessionService) hydrateGuestRuntimeResponse(session *model.LaunchSessio
 	bootstrap.LastVenue = nextActiveZone
 	bootstrap.Settings = defaultProfile.Settings
 	bootstrap.ZoneMedia = s.currentZoneMedia()
+	bootstrap.ZoneEvents = s.currentZoneEvents()
 	if bootstrap.Loadout == nil {
 		bootstrap.Loadout = map[string]string{}
 	}
