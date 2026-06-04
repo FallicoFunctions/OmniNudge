@@ -1,8 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthPopup } from '../AuthPopup';
 
 describe('AuthPopup', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it('submits signup fields through the in-place runtime auth shell', async () => {
     const onSignup = vi.fn().mockResolvedValue(undefined);
 
@@ -35,5 +39,57 @@ describe('AuthPopup', () => {
       acceptPrivacyPolicy: true,
       acceptTerms: true,
     });
+  });
+
+  it('auto-focuses username and clears fields after close and reopen', async () => {
+    const { rerender } = render(
+      <AuthPopup
+        mode="signup"
+        isOpen
+        error=""
+        isSubmitting={false}
+        onClose={vi.fn()}
+        onSwitchMode={vi.fn()}
+        onLogin={vi.fn()}
+        onSignup={vi.fn()}
+      />,
+    );
+
+    const username = screen.getByLabelText('Username');
+    await waitFor(() => expect(screen.getByLabelText('Username')).toHaveFocus());
+
+    fireEvent.change(username, { target: { value: 'nick' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'nick@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret1234' } });
+
+    rerender(
+      <AuthPopup
+        mode="signup"
+        isOpen={false}
+        error=""
+        isSubmitting={false}
+        onClose={vi.fn()}
+        onSwitchMode={vi.fn()}
+        onLogin={vi.fn()}
+        onSignup={vi.fn()}
+      />,
+    );
+
+    rerender(
+      <AuthPopup
+        mode="signup"
+        isOpen
+        error=""
+        isSubmitting={false}
+        onClose={vi.fn()}
+        onSwitchMode={vi.fn()}
+        onLogin={vi.fn()}
+        onSignup={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText('Username')).toHaveValue('');
+    expect(screen.getByLabelText('Email')).toHaveValue('');
+    expect(screen.getByLabelText('Password')).toHaveValue('');
   });
 });
