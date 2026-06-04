@@ -119,9 +119,9 @@ func (a runtimeAuthAdapter) Signup(ctx context.Context, input model.RuntimeAuthR
 		Username:            input.Username,
 		Password:            input.Password,
 		Email:               email,
-		TurnstileToken:      "",
-		AcceptPrivacyPolicy: true,
-		AcceptTerms:         true,
+		TurnstileToken:      input.TurnstileToken,
+		AcceptPrivacyPolicy: input.AcceptPrivacyPolicy,
+		AcceptTerms:         input.AcceptTerms,
 	})
 	if err != nil {
 		return nil, err

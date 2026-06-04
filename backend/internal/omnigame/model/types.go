@@ -114,12 +114,15 @@ type SessionExchangeResponse struct {
 }
 
 type RuntimeAuthRequest struct {
-	Username        string            `json:"username,omitempty"`
-	Email           string            `json:"email,omitempty"`
-	Password        string            `json:"password,omitempty"`
-	CurrentVenue    string            `json:"currentVenue"`
-	CurrentLoadout  map[string]string `json:"currentLoadout,omitempty"`
-	CurrentSettings OmniRaveSettings  `json:"currentSettings"`
+	Username            string            `json:"username,omitempty"`
+	Email               string            `json:"email,omitempty"`
+	Password            string            `json:"password,omitempty"`
+	TurnstileToken      string            `json:"turnstileToken,omitempty"`
+	AcceptPrivacyPolicy bool              `json:"acceptPrivacyPolicy"`
+	AcceptTerms         bool              `json:"acceptTerms"`
+	CurrentVenue        string            `json:"currentVenue"`
+	CurrentLoadout      map[string]string `json:"currentLoadout,omitempty"`
+	CurrentSettings     OmniRaveSettings  `json:"currentSettings"`
 }
 
 type RuntimeAuthResponse = SessionExchangeResponse
