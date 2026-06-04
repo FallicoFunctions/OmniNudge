@@ -42,4 +42,41 @@ describe('ChatPanel', () => {
 
     expect(onSendMessage).toHaveBeenCalledWith('Meet at techno room');
   }, 10000);
+
+  it('clears the draft when the runtime respawn reset signal changes without reopening history', () => {
+    const view = render(
+      <ChatPanel
+        messages={[]}
+        onSendMessage={() => {}}
+        isSending={false}
+        initialHistoryCollapsed
+        composerResetSignal={0}
+      />,
+    );
+
+    const toggle = within(view.container).getByRole('button', { name: /Expand chat history/i });
+    const input = within(view.container).getByPlaceholderText('Type message...');
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.change(input, {
+      target: { value: 'Keep this only until respawn' },
+    });
+
+    view.rerender(
+      <ChatPanel
+        messages={[]}
+        onSendMessage={() => {}}
+        isSending={false}
+        initialHistoryCollapsed
+        composerResetSignal={1}
+      />,
+    );
+
+    expect(within(view.container).getByPlaceholderText('Type message...')).toHaveValue('');
+    expect(within(view.container).getByRole('button', { name: /Expand chat history/i })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
 });

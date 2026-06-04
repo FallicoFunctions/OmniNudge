@@ -21,6 +21,7 @@ export function useWorldSession() {
   const [hasJoinedWorld, setHasJoinedWorld] = useState(false);
   const [isSavingLoadout, setIsSavingLoadout] = useState(false);
   const [chatMessages, setChatMessages] = useState<RuntimeChatMessage[]>([]);
+  const [chatComposerResetSignal, setChatComposerResetSignal] = useState(0);
   const [displayedVenueStatus, setDisplayedVenueStatus] = useState<RuntimeVenueStatus | undefined>(undefined);
   const bootstrapPromiseRef = useRef<Promise<RuntimeSession> | null>(null);
   const worldSocketRef = useRef<ReturnType<typeof openWorldSocket> | null>(null);
@@ -216,6 +217,7 @@ export function useWorldSession() {
   function respawn() {
     worldSocketRef.current?.respawn();
     setChatMessages([]);
+    setChatComposerResetSignal((current) => current + 1);
   }
 
   const displayedSession = useMemo(() => {
@@ -239,6 +241,7 @@ export function useWorldSession() {
     isLoading,
     hasJoinedWorld,
     isSavingLoadout,
+    chatComposerResetSignal,
     pendingVenue: venueTransition.pendingVenue,
     isVenueTransitioning: venueTransition.isTransitioning,
     moveToZone,

@@ -25,6 +25,7 @@ export default function App() {
     error,
     isLoading,
     hasJoinedWorld,
+    chatComposerResetSignal,
     pendingVenue,
     moveToZone,
     respawn,
@@ -34,6 +35,15 @@ export default function App() {
   const mediaUnlock = useMobileMediaUnlock();
   const stagePlayersRef = useRef<StagePlayerMap | null>(null);
   const [openTopLeftPanel, setOpenTopLeftPanel] = useState<TopLeftPanel>(null);
+
+  function closeTopLeftPanel() {
+    setOpenTopLeftPanel(null);
+  }
+
+  function handleRespawn() {
+    closeTopLeftPanel();
+    respawn();
+  }
 
   useEffect(() => {
     if (!session?.zoneMedia || !stagePlayersRef.current) {
@@ -83,7 +93,12 @@ export default function App() {
           onToggleAvatar={() => setOpenTopLeftPanel((current) => (current === 'avatar' ? null : 'avatar'))}
         />
         {openTopLeftPanel === 'settings' ? (
-          <SettingsPanel settings={settings} onSettingsChange={updateSettings} onRespawn={respawn} />
+          <SettingsPanel
+            settings={settings}
+            onSettingsChange={updateSettings}
+            onRespawn={handleRespawn}
+            onClose={closeTopLeftPanel}
+          />
         ) : null}
         {openTopLeftPanel === 'avatar' ? (
           <section className="settings-panel avatar-foundation-panel" aria-label="Avatar editor foundation">
@@ -107,6 +122,7 @@ export default function App() {
           onSendMessage={sendChatMessage}
           isSending={false}
           initialHistoryCollapsed={settings.chatCollapsed}
+          composerResetSignal={chatComposerResetSignal}
         />
       </div>
 

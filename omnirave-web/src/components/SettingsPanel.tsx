@@ -15,8 +15,9 @@ export function SettingsPanel(props: {
   settings: RuntimeSettings;
   onSettingsChange: (settings: RuntimeSettings) => void;
   onRespawn: () => void;
+  onClose: () => void;
 }) {
-  const { settings, onSettingsChange, onRespawn } = props;
+  const { settings, onSettingsChange, onRespawn, onClose } = props;
 
   return (
     <section className="settings-panel" aria-label="Runtime settings">
@@ -25,9 +26,14 @@ export function SettingsPanel(props: {
           <p className="settings-panel-kicker">Settings</p>
           <h2>Traversal runtime</h2>
         </div>
-        <button type="button" className="hud-button hud-button-accent" onClick={onRespawn}>
-          Respawn
-        </button>
+        <div className="settings-panel-actions">
+          <button type="button" className="hud-button" onClick={onClose}>
+            Close settings
+          </button>
+          <button type="button" className="hud-button hud-button-accent" onClick={onRespawn}>
+            Respawn
+          </button>
+        </div>
       </div>
 
       <dl className="settings-panel-grid">
@@ -179,6 +185,9 @@ export function SettingsPanel(props: {
       <p className="settings-panel-note">
         Runtime settings apply immediately. Respawn returns you to the current venue spawn and clears transient chat state.
       </p>
+      <button type="button" className="hud-button" onClick={onClose}>
+        Close
+      </button>
     </section>
   );
 }
