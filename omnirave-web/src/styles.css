@@ -178,6 +178,13 @@ body {
   background: rgba(0, 219, 222, 0.18);
 }
 
+.hud-button:disabled,
+.chat-send-button:disabled,
+.emote-slot:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
 .hud-panel,
 .settings-panel,
 .chat-panel,
@@ -463,31 +470,64 @@ body {
 }
 
 @media (max-width: 900px) {
+  .omnirave-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'top-left'
+      'top-right'
+      'stage'
+      'bottom-left'
+      'bottom-right'
+      'bottom-center';
+    gap: 0.85rem;
+    padding: 1rem;
+    box-sizing: border-box;
+  }
+
+  .world-scene-canvas {
+    grid-area: stage;
+    min-height: 54vh;
+  }
+
+  .stage-shell {
+    position: relative;
+    inset: auto;
+    grid-area: stage;
+    min-height: 54vh;
+  }
+
+  .hud-anchor {
+    position: static;
+  }
+
   .hud-top-left,
   .hud-top-right,
   .hud-bottom-left,
   .hud-bottom-center,
   .hud-bottom-right {
-    left: 1rem;
-    right: 1rem;
     width: auto;
     transform: none;
   }
 
+  .hud-top-left {
+    grid-area: top-left;
+  }
+
   .hud-top-right {
-    top: 5.5rem;
+    grid-area: top-right;
   }
 
   .hud-bottom-left {
-    bottom: 17rem;
+    grid-area: bottom-left;
   }
 
   .hud-bottom-center {
-    bottom: 9rem;
+    grid-area: bottom-center;
   }
 
   .hud-bottom-right {
-    bottom: 1rem;
+    grid-area: bottom-right;
   }
 
   .settings-panel-grid,
@@ -498,7 +538,7 @@ body {
   .stage-screen {
     left: 0.75rem;
     right: 0.75rem;
-    bottom: 20.5rem;
+    bottom: 0.75rem;
     flex-direction: column;
     align-items: stretch;
   }
