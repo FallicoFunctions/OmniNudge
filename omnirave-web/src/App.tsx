@@ -1,32 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChatPanel } from './components/ChatPanel';
+import { EmoteBar } from './components/EmoteBar';
 import { Hud } from './components/Hud';
-import { LoadoutPanel } from './components/LoadoutPanel';
+import { SettingsPanel } from './components/SettingsPanel';
 import { StageAudioDeck } from './components/StageAudioDeck';
 import { StageScreen } from './components/StageScreen';
+import { TopLeftControls } from './components/TopLeftControls';
+import { TopRightAuthControls } from './components/TopRightAuthControls';
 import { TouchControls } from './components/TouchControls';
+import { VenueStatusPanel } from './components/VenueStatusPanel';
 import { WorldScene } from './components/WorldScene';
 import { useMobileMediaUnlock } from './hooks/useMobileMediaUnlock';
 import { useWorldSession } from './hooks/useWorldSession';
 import { syncAuthoritativeStagePlayback, type StagePlayerMap } from './lib/youtube';
 
-type UtilityPanel = 'chat' | 'style' | null;
+type TopLeftPanel = 'settings' | 'avatar' | null;
 
 export default function App() {
-  const {
-    session,
-    chatMessages,
-    error,
-    isLoading,
-    hasJoinedWorld,
-    isSavingLoadout,
-    moveToZone,
-    saveLoadout,
-    sendChatMessage,
-  } = useWorldSession();
+  const { session, settings, chatMessages, error, isLoading, hasJoinedWorld, moveToZone, sendChatMessage } =
+    useWorldSession();
   const mediaUnlock = useMobileMediaUnlock();
   const stagePlayersRef = useRef<StagePlayerMap | null>(null);
-  const [openPanel, setOpenPanel] = useState<UtilityPanel>(null);
+  const [openTopLeftPanel, setOpenTopLeftPanel] = useState<TopLeftPanel>(null);
 
   useEffect(() => {
     if (!session?.zoneMedia || !stagePlayersRef.current) {
@@ -68,17 +63,42 @@ export default function App() {
         }}
       />
       <WorldScene session={session} unlocked={mediaUnlock.unlocked} />
-      <div className="world-topbar">
-        <Hud session={session} />
-        <div className="utility-dock" aria-label="OmniRave controls">
-          <button type="button" className="utility-button" onClick={() => setOpenPanel('chat')}>
-            Chat
-          </button>
-          <button type="button" className="utility-button" onClick={() => setOpenPanel('style')}>
-            Style
-          </button>
-        </div>
+
+      <div className="hud-anchor hud-top-left">
+        <TopLeftControls
+          openPanel={openTopLeftPanel}
+          onToggleSettings={() => setOpenTopLeftPanel((current) => (current === 'settings' ? null : 'settings'))}
+          onToggleAvatar={() => setOpenTopLeftPanel((current) => (current === 'avatar' ? null : 'avatar'))}
+        />
+        {openTopLeftPanel === 'settings' ? <SettingsPanel settings={settings} /> : null}
+        {openTopLeftPanel === 'avatar' ? (
+          <section className="settings-panel avatar-foundation-panel" aria-label="Avatar editor foundation">
+            <p className="settings-panel-kicker">Avatar</p>
+            <h2>Avatar shell</h2>
+            <p className="settings-panel-note">
+              Avatar editing stays out of scope for this task. This foundation reserves the anchor and interaction flow.
+            </p>
+          </section>
+        ) : null}
       </div>
+
+      <div className="hud-anchor hud-top-right">
+        <TopRightAuthControls session={session} />
+      </div>
+
+      <div className="hud-anchor hud-bottom-left">
+        <Hud session={session} />
+        <ChatPanel messages={chatMessages} onSendMessage={sendChatMessage} isSending={false} />
+      </div>
+
+      <div className="hud-anchor hud-bottom-center">
+        <EmoteBar />
+      </div>
+
+      <div className="hud-anchor hud-bottom-right">
+        <VenueStatusPanel session={session} />
+      </div>
+
       <main className="stage-shell">
         <StageScreen session={session} unlocked={mediaUnlock.unlocked} onMoveToZone={moveToZone} />
         {mediaUnlock.isTouchDevice ? (
@@ -89,26 +109,6 @@ export default function App() {
           />
         ) : null}
       </main>
-      {openPanel ? (
-        <div className="utility-sheet-backdrop" onClick={() => setOpenPanel(null)}>
-          <aside
-            className="utility-sheet"
-            aria-label={openPanel === 'chat' ? 'Chat panel' : 'Style panel'}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="utility-sheet-header">
-              <button type="button" className="utility-sheet-close" onClick={() => setOpenPanel(null)}>
-                Back to the room
-              </button>
-            </div>
-            {openPanel === 'chat' ? (
-              <ChatPanel messages={chatMessages} onSendMessage={sendChatMessage} isSending={false} />
-            ) : (
-              <LoadoutPanel session={session} onSaveLoadout={saveLoadout} isSaving={isSavingLoadout} />
-            )}
-          </aside>
-        </div>
-      ) : null}
     </div>
   );
 }
