@@ -34,10 +34,12 @@ func (w *World) AddPlayer(session PlayerSession) *Player {
 	}
 
 	player := &Player{
-		ID:       session.PlayerID,
-		Position: spawn,
-		Zone:     w.cfg.ZoneMap.ZoneFor(spawn),
-		Loadout:  session.Loadout,
+		ID:         session.PlayerID,
+		PlayerName: session.PlayerName,
+		Mode:       session.Mode,
+		Position:   spawn,
+		Zone:       w.cfg.ZoneMap.ZoneFor(spawn),
+		Loadout:    session.Loadout,
 	}
 	w.players[player.ID] = player
 	return player
