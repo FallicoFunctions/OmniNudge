@@ -156,5 +156,15 @@ describe('App', () => {
     fireEvent.click(within(view.container).getByRole('button', { name: 'Respawn' }));
 
     expect(mockWorldSession.respawn).toHaveBeenCalledTimes(1);
+    expect(within(view.container).queryByRole('button', { name: 'Respawn' })).not.toBeInTheDocument();
+  });
+
+  it('lets the settings panel close from its own close control', async () => {
+    const view = render(<App />);
+
+    fireEvent.click(await within(view.container).findByRole('button', { name: 'Settings' }));
+    fireEvent.click(within(view.container).getByRole('button', { name: 'Close settings' }));
+
+    expect(within(view.container).queryByRole('button', { name: 'Respawn' })).not.toBeInTheDocument();
   });
 });
