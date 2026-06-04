@@ -3,6 +3,7 @@ import {
   bootstrapSession,
   type RuntimeChatMessage,
   saveLoadout as persistLoadout,
+  saveRuntimeSettings as persistRuntimeSettings,
   saveReturnPoint as persistReturnPoint,
   type RuntimeSession,
 } from '../lib/session';
@@ -89,6 +90,14 @@ export function useWorldSession() {
   function setSettings(nextSettings: RuntimeSettings) {
     baseSetSettings(nextSettings);
     setSession((current) => (current ? { ...current, settings: nextSettings } : current));
+
+    if (!session || session.mode !== 'account') {
+      return;
+    }
+
+    void persistRuntimeSettings({ session, settings: nextSettings }).catch((err) => {
+      setError(err instanceof Error ? err.message : 'Unable to save runtime settings');
+    });
   }
 
   useEffect(() => {

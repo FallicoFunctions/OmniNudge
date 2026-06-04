@@ -1,7 +1,9 @@
-import type { RuntimeSettings } from '../lib/settings';
+import type { RuntimeSettings, UiThemeName } from '../lib/settings';
 
-export function SettingsPanel(props: { settings: RuntimeSettings }) {
-  const { settings } = props;
+const THEME_OPTIONS: UiThemeName[] = ['Obsidian Glass', 'Luminous Panels', 'Hybrid Premium'];
+
+export function SettingsPanel(props: { settings: RuntimeSettings; onSettingsChange: (settings: RuntimeSettings) => void }) {
+  const { settings, onSettingsChange } = props;
 
   return (
     <section className="settings-panel" aria-label="Runtime settings">
@@ -11,8 +13,27 @@ export function SettingsPanel(props: { settings: RuntimeSettings }) {
       </div>
       <dl className="settings-panel-grid">
         <div>
-          <dt>Theme</dt>
-          <dd>{settings.uiTheme}</dd>
+          <dt>
+            <label htmlFor="runtime-theme-select">Theme</label>
+          </dt>
+          <dd>
+            <select
+              id="runtime-theme-select"
+              value={settings.uiTheme}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  uiTheme: event.target.value as UiThemeName,
+                })
+              }
+            >
+              {THEME_OPTIONS.map((theme) => (
+                <option key={theme} value={theme}>
+                  {theme}
+                </option>
+              ))}
+            </select>
+          </dd>
         </div>
         <div>
           <dt>Graphics</dt>
@@ -35,7 +56,7 @@ export function SettingsPanel(props: { settings: RuntimeSettings }) {
           <dd>{settings.cameraFollow}</dd>
         </div>
       </dl>
-      <p className="settings-panel-note">Live settings controls land in the next task. This shell keeps the HUD anchors stable now.</p>
+      <p className="settings-panel-note">Theme changes apply immediately. The rest of the settings surface stays intentionally minimal in this task.</p>
     </section>
   );
 }
