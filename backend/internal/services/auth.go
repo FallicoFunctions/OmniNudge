@@ -45,6 +45,10 @@ func (s *AuthService) SetUserRepository(userRepo ports.UserRepository) {
 	s.userRepo = userRepo
 }
 
+func (s *AuthService) UserRepository() ports.UserRepository {
+	return s.userRepo
+}
+
 // VerifyTurnstileToken verifies a Cloudflare Turnstile token
 func (s *AuthService) VerifyTurnstileToken(token, remoteIP string) error {
 	if s.turnstileSecret == "" {
