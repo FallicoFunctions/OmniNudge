@@ -54,3 +54,19 @@ func TestWorld_RespawnPlayer_ReturnsToCurrentVenueSpawn(t *testing.T) {
 	require.Equal(t, Vec3{X: 42, Y: 0, Z: 9}, world.Player(player.ID).Position)
 	require.Equal(t, ZoneUnderground, world.Player(player.ID).Zone)
 }
+
+func TestSnapshotIncludesPlayerIdentityMetadata(t *testing.T) {
+	world := NewWorld(DefaultConfig())
+	world.AddPlayer(PlayerSession{
+		PlayerID:   "guest-1",
+		PlayerName: "Guest-4821",
+		Mode:       SessionModeGuest,
+		Loadout:    Loadout{"body": "guest-default"},
+	})
+
+	snapshot := world.SnapshotForPlayer("guest-1", nil)
+	require.Len(t, snapshot.Players, 1)
+	require.Equal(t, "Guest-4821", snapshot.Players[0].PlayerName)
+	require.Equal(t, SessionModeGuest, snapshot.Players[0].Mode)
+	require.Equal(t, "guest-default", snapshot.Players[0].Loadout["body"])
+}

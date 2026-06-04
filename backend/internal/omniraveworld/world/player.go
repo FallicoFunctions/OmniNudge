@@ -9,8 +9,10 @@ const (
 )
 
 type Player struct {
-	ID       string  `json:"id"`
-	Position Vec3    `json:"position"`
-	Zone     ZoneID  `json:"zone"`
-	Loadout  Loadout `json:"loadout"`
+	ID         string      `json:"id"`
+	PlayerName string      `json:"playerName"`
+	Mode       SessionMode `json:"mode"`
+	Position   Vec3        `json:"position"`
+	Zone       ZoneID      `json:"zone"`
+	Loadout    Loadout     `json:"loadout"`
 }

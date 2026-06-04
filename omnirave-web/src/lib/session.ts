@@ -11,6 +11,8 @@ export interface RuntimePoint {
 
 export interface RuntimePlayer {
   id: string;
+  playerName: string;
+  mode: RuntimeMode;
   position: RuntimePoint;
   zone: RuntimeZoneID;
   loadout: Record<string, string>;
