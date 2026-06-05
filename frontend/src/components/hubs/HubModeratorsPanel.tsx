@@ -50,10 +50,10 @@ export default function HubModeratorsPanel({
                   <img
                     src={moderator.avatar_url}
                     alt={displayName}
-                    className="h-8 w-8 rounded-full object-cover"
+                    className="h-8 w-8 rounded-lg object-cover"
                   />
                 ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-border)] text-sm font-semibold text-[var(--color-text-secondary)]">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-border)] text-sm font-semibold text-[var(--color-text-secondary)]">
                     {displayName.charAt(0).toUpperCase()}
                   </div>
                 )}
