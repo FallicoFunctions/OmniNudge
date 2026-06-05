@@ -18,10 +18,6 @@ vi.mock('../../services/hubsService', () => ({
 vi.mock('../../services/savedService', () => ({
   savedService: { getSavedItems: vi.fn().mockResolvedValue([]) },
 }));
-vi.mock('../../services/reportService', () => ({
-  reportService: { submitReport: vi.fn() },
-  buildUserReport: vi.fn(),
-}));
 vi.mock('../../services/moderationService', () => ({
   moderationService: { deletePost: vi.fn() },
 }));

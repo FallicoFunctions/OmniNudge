@@ -8,7 +8,6 @@ import { useSettings } from '../contexts/SettingsContext';
 import { postsService } from '../services/postsService';
 import { hubsService } from '../services/hubsService';
 import { savedService } from '../services/savedService';
-import { buildUserReport, reportService } from '../services/reportService';
 import { moderationService } from '../services/moderationService';
 import { subscriptionService } from '../services/subscriptionService';
 import type { PlatformPost, PostComment } from '../types/posts';
@@ -428,19 +427,6 @@ export default function PostDetailPage() {
         await savedService.unsavePostComment(comment.id);
       }
       await queryClient.invalidateQueries({ queryKey: savedSiteCommentsKey });
-    },
-    report: async (comment) => {
-      const reasonInput = window.prompt(t('reporting.reasonPrompt'));
-      if (reasonInput === null) return;
-      const detailsInput = window.prompt(t('reporting.detailsPrompt'));
-      const { reason, description } = buildUserReport(reasonInput, detailsInput);
-      await reportService.createReport({
-        targetType: 'comment',
-        targetId: comment.id,
-        reason,
-        description,
-      });
-      alert(t('reporting.success'));
     },
     permalink: (comment) => {
       const url = hubName

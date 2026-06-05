@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../../contexts/AuthContext';
 import { friendsService, friendsQueryKeys } from '../../services/friendsService';
 
 interface AccountMenuProps {
@@ -17,6 +18,7 @@ interface AccountMenuProps {
 
 export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugReport, plan, planExpiresAt, onUpgrade }: AccountMenuProps) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const incomingRequestsQuery = useQuery({
@@ -24,7 +26,9 @@ export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugRep
     queryFn: () => friendsService.getFriendRequests(),
     staleTime: 0, // Always fetch fresh so the badge count is accurate
     refetchInterval: 30_000, // Poll every 30s to catch new requests in real time
-    enabled: !!username, // Only fetch when a user is actually logged in
+    // Guard on the auth context user object, not the string prop, so the query
+    // stops immediately on logout rather than firing one more poll while props drain.
+    enabled: !!user,
   });
   const incomingCount = incomingRequestsQuery.data?.incoming?.length ?? 0;
   const menuRef = useRef<HTMLDivElement>(null);
@@ -193,19 +197,7 @@ export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugRep
             </Link>
           )}
 
-          {isModerator && (
-            <Link
-              to="/mod/reports"
-              onClick={() => setIsOpen(false)}
-              className={itemClass}
-              role="menuitem"
-            >
-              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              {t('common.modTools')}
-            </Link>
-          )}
+
 
           <hr className="border-[var(--color-border)] my-1" />
 

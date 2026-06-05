@@ -11,7 +11,6 @@ vi.mock('../../services/moderationService', () => ({
     banUser: vi.fn().mockResolvedValue({}),
     unbanUser: vi.fn().mockResolvedValue({}),
     getModLog: vi.fn().mockResolvedValue({ entries: [] }),
-    getReports: vi.fn().mockResolvedValue({ reports: [] }),
     getRemovalReasons: vi.fn().mockResolvedValue({ reasons: [] }),
     createRemovalReason: vi.fn().mockResolvedValue({}),
     deleteRemovalReason: vi.fn().mockResolvedValue({}),
@@ -56,11 +55,6 @@ vi.mock('../../components/empty', () => ({
 }));
 vi.mock('../../components/common/OffsetPaginationControls', () => ({
   OffsetPaginationControls: () => <div data-testid="pagination" />,
-}));
-vi.mock('../../components/moderation/ModerationDashboard', () => ({
-  ModerationDashboard: ({ hubName }: { hubName: string }) => (
-    <div data-testid="moderation-dashboard">{hubName}</div>
-  ),
 }));
 
 import ModToolsPage from '../ModToolsPage';

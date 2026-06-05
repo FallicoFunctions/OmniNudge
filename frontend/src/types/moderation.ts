@@ -83,24 +83,3 @@ export interface ModLogResponse {
   next_cursor?: string;
 }
 
-export type ReportStatus = 'open' | 'reviewed' | 'dismissed' | 'approved' | 'rejected' | 'no_action';
-
-export interface ModerationReport {
-  id: number;
-  reporter_id: number;
-  target_type: 'post' | 'comment' | 'user' | 'message' | 'reddit_comment' | string;
-  target_id: number;
-  reason?: string;
-  description?: string;
-  status: ReportStatus;
-  created_at: string;
-}
-
-export interface ModerationReportResponse {
-  reports: ModerationReport[];
-  limit: number;
-  offset: number;
-  status: ReportStatus | string;
-  sort: 'priority' | 'recent';
-  next_cursor?: string;
-}
