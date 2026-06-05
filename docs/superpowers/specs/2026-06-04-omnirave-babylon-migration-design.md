@@ -124,6 +124,17 @@ Tertiary compatibility target for later follow-up, not initial visual approval:
 
 - latest stable desktop `Safari`
 
+Before implementation begins, the project must capture and commit an approval-baseline record for the first review cycle that freezes:
+
+- exact browser version numbers for Chrome and Edge
+- the exact macOS review machine identity
+- the exact Windows verification machine identity, if available at kickoff
+- OS version numbers
+- GPU model
+- display resolution used for review
+
+This baseline record becomes the pass/fail reference for the first Main Stage approval cycle and must not silently drift during implementation.
+
 The Main Stage vertical slice is approved against the primary target first. Secondary and tertiary targets are validation targets, not blockers on the first visual approval pass unless they reveal an architectural flaw.
 
 ### Why Babylon.js
@@ -162,6 +173,19 @@ Repository-facing source artifacts should therefore include:
 
 This keeps the venue pipeline code-first and automatable without pretending that hero environment geometry should be modeled directly in Babylon scene code.
 
+### Binary Asset Management Policy
+
+The repository must not treat large binary assets casually.
+
+Policy for the first milestone:
+
+- DCC source files and committed runtime binaries must use a large-file strategy such as `Git LFS` if they exceed normal source-control-friendly size
+- implementation planning must define explicit thresholds for when source assets, exported assets, and baked textures are committed versus regenerated
+- generated runtime artifacts should only be committed when they are part of the reproducible runtime input set, not as incidental local exports
+- every committed binary asset class must have an authoritative source and regeneration path documented
+
+The goal is to preserve deterministic AI-agent workflows without allowing the repository to degrade into opaque binary churn.
+
 ### Authoring Principles
 
 `Main Stage` must be built as authored venue content, not primarily as primitive geometry assembled in code.
@@ -184,6 +208,21 @@ Use a browser-oriented asset pipeline centered on:
 - geometry compression where appropriate
 - authored LODs
 - optimized baked materials
+
+### Material Pipeline
+
+Main Stage materials must use a deliberate browser-grade PBR pipeline rather than default DCC placeholder shading.
+
+Required material rules:
+
+- use authored PBR materials appropriate for Babylon runtime delivery
+- define explicit texture-set conventions for albedo/base color, normal, roughness, metallic, ambient occlusion, opacity where needed, and emissive where justified
+- use baking and texture-generation workflows that produce stable exported maps rather than relying on non-exportable viewport-only shader tricks
+- validate materials under the actual runtime lighting stack, not only inside the DCC
+- define texture-resolution tiers and per-material memory budgets during implementation planning
+- reserve emissive usage for intentional stage lighting and display design, not as a substitute for missing material richness
+
+If separate texturing tools are not used in the first milestone, Blender-based baking and map authoring are acceptable only if the exported runtime materials meet the same fidelity and budget requirements.
 
 ### Main Stage Build Rules
 
@@ -216,6 +255,8 @@ Required systems:
 - scene loading and lifecycle
 - continuous zoom player camera
 - player locomotion
+- local review avatar rig
+- locomotion animation playback
 - collision and ground handling
 - lighting and environment stack
 - fog, atmosphere, and post-process tuning
@@ -249,6 +290,14 @@ This system must support:
 - correct near clip tuning
 - believable eye-level walk-through review
 - no avatar clipping into the camera when zoomed inward
+
+Minimum embodiment requirements for the first milestone:
+
+- one local review avatar with believable human scale
+- idle, walk, and run locomotion states sufficient to judge third-person scale and traversal feel
+- camera behavior tuned against the real avatar proportions, not a temporary proxy rig
+
+The review avatar does not need final customization or social features, but it must be good enough to truthfully validate scale, framing, and third-person-to-first-person transition behavior.
 
 ### Review Experience
 
