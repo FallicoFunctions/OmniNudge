@@ -8,10 +8,12 @@ interface EditProfileModalProps {
     bio?: string | null;
     avatar_url?: string | null;
     status_text?: string | null;
+    banner_url?: string | null;
   }) => Promise<void>;
   initialBio?: string | null;
   initialAvatarUrl?: string | null;
   initialStatusText?: string | null;
+  initialBannerUrl?: string | null;
   onUploadAvatar?: (file: File) => Promise<string>;
   isSaving?: boolean;
 }
@@ -23,6 +25,7 @@ export default function EditProfileModal({
   initialBio,
   initialAvatarUrl,
   initialStatusText,
+  initialBannerUrl,
   onUploadAvatar,
   isSaving = false,
 }: EditProfileModalProps) {
@@ -30,6 +33,7 @@ export default function EditProfileModal({
   const [bio, setBio] = useState(initialBio ?? '');
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? '');
   const [statusText, setStatusText] = useState(initialStatusText ?? '');
+  const [bannerUrl, setBannerUrl] = useState(initialBannerUrl ?? '');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,8 +42,9 @@ export default function EditProfileModal({
     setBio(initialBio ?? '');
     setAvatarUrl(initialAvatarUrl ?? '');
     setStatusText(initialStatusText ?? '');
+    setBannerUrl(initialBannerUrl ?? '');
     setError(null);
-  }, [initialAvatarUrl, initialBio, initialStatusText, isOpen]);
+  }, [initialAvatarUrl, initialBio, initialStatusText, initialBannerUrl, isOpen]);
 
   if (!isOpen) return null;
 
@@ -69,6 +74,7 @@ export default function EditProfileModal({
     const trimmedBio = bio.trim();
     const trimmedAvatarUrl = avatarUrl.trim();
     const trimmedStatusText = statusText.trim();
+    const trimmedBannerUrl = bannerUrl.trim();
 
     if (trimmedBio.length > 500) {
       setError(t('userProfilePage.edit.errors.bioTooLong'));
@@ -81,9 +87,18 @@ export default function EditProfileModal({
     if (
       trimmedAvatarUrl &&
       !trimmedAvatarUrl.startsWith('http://') &&
-      !trimmedAvatarUrl.startsWith('https://')
+      !trimmedAvatarUrl.startsWith('https://') &&
+      !trimmedAvatarUrl.startsWith('/')  // allow server-relative paths from file uploads
     ) {
       setError(t('userProfilePage.edit.errors.invalidAvatarUrl'));
+      return;
+    }
+    if (
+      trimmedBannerUrl &&
+      !trimmedBannerUrl.startsWith('http://') &&
+      !trimmedBannerUrl.startsWith('https://')
+    ) {
+      setError('Banner URL must start with http:// or https://');
       return;
     }
 
@@ -92,6 +107,7 @@ export default function EditProfileModal({
       bio: trimmedBio ? trimmedBio : null,
       avatar_url: trimmedAvatarUrl ? trimmedAvatarUrl : null,
       status_text: trimmedStatusText ? trimmedStatusText : null,
+      banner_url: trimmedBannerUrl ? trimmedBannerUrl : null,
     });
   };
 
@@ -150,6 +166,26 @@ export default function EditProfileModal({
 
           <div>
             <label
+              htmlFor="edit-profile-banner-url"
+              className="block text-sm font-medium text-[var(--color-text-primary)]"
+            >
+              Cover / Banner Image URL
+            </label>
+            <input
+              id="edit-profile-banner-url"
+              type="url"
+              value={bannerUrl}
+              onChange={(e) => setBannerUrl(e.target.value)}
+              placeholder="https://example.com/banner.jpg"
+              className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            />
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              Shown as the full-width banner behind your profile header.
+            </p>
+          </div>
+
+          <div>
+            <label
               htmlFor="edit-profile-status-text"
               className="block text-sm font-medium text-[var(--color-text-primary)]"
             >
@@ -201,7 +237,7 @@ export default function EditProfileModal({
           <button
             type="button"
             onClick={onClose}
-            disabled={isSaving}
+            disabled={isSaving || isUploadingAvatar}
             className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
           >
             {t('common.cancel')}
@@ -209,10 +245,10 @@ export default function EditProfileModal({
           <button
             type="button"
             onClick={() => void handleSave()}
-            disabled={isSaving}
+            disabled={isSaving || isUploadingAvatar}
             className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
-            {isSaving ? t('common.loading') : t('common.save')}
+            {isSaving ? t('common.loading') : isUploadingAvatar ? t('userProfilePage.edit.avatarUploading') : t('common.save')}
           </button>
         </div>
       </div>
