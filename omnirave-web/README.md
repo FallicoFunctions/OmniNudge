@@ -1,5 +1,12 @@
 # OmniRave Runtime
 
+## Runtime Status
+
+`omnirave-web` is superseded for new OmniRave runtime implementation work.
+
+The active cleanroom runtime for Main Stage visual-slice work is `../omnirave-babylon`.
+Do not add new venue implementation work here.
+
 This workspace contains the dedicated OmniRave runtime app. It is intentionally separate from the main OmniNudge SPA so launch/discovery and the full-screen multiplayer runtime can evolve independently.
 
 ## Local Development

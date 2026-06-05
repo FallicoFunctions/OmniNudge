@@ -7,7 +7,7 @@ export interface ZoomState {
 }
 
 export const MIN_ZOOM_DISTANCE = 0.1;
-export const MAX_ZOOM_DISTANCE = 8;
+export const MAX_ZOOM_DISTANCE = 140;
 export const FIRST_PERSON_DISTANCE = 0.75;
 export const OVER_SHOULDER_DISTANCE = 3;
 

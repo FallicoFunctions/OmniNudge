@@ -19,8 +19,11 @@ describe('createPlayerRig', () => {
 
     expect(rig.root.position.equals(spawn)).toBe(true);
     expect(rig.capsule.parent).toBe(rig.root);
+    expect(rig.avatarAnchor.parent).toBe(rig.root);
+    expect(rig.avatarAnchor.position.y).toBeCloseTo(-rig.eyeHeightMeters);
     expect(rig.capsule.isVisible).toBe(false);
     expect(rig.capsule.checkCollisions).toBe(true);
+    expect(rig.capsule.position.y).toBeCloseTo(-0.75);
     expect(rig.speedMetersPerSecond).toBe(4.5);
   });
 });

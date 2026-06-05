@@ -11,7 +11,7 @@ describe('resolveZoomState', () => {
 
   it('clamps distance into the supported zoom range', () => {
     expect(resolveZoomState(-10).distance).toBe(0.1);
-    expect(resolveZoomState(20).distance).toBe(8);
+    expect(resolveZoomState(500).distance).toBe(140);
   });
 
   it('fades the shoulder framing as the camera reaches first-person', () => {
