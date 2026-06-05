@@ -19,7 +19,11 @@ func NewUserFriendshipRepository(pool *pgxpool.Pool) *UserFriendshipRepository {
 	return &UserFriendshipRepository{pool: pool}
 }
 
-func canonicalFriendPair(a, b int) (int, int) {
+// CanonicalUserPair returns (lo, hi) such that lo <= hi, guaranteeing a stable
+// canonical ordering for any (userA, userB) pair regardless of argument order.
+// All friendship-table writes and the block-cleanup DELETE in BlockUser use this
+// so both always address the same row.
+func CanonicalUserPair(a, b int) (int, int) {
 	if a < b {
 		return a, b
 	}
@@ -51,7 +55,7 @@ type FriendshipStatus struct {
 
 // AreUsersFriends returns true when users have an accepted friendship.
 func (r *UserFriendshipRepository) AreUsersFriends(ctx context.Context, userID, otherUserID int) (bool, error) {
-	lo, hi := canonicalFriendPair(userID, otherUserID)
+	lo, hi := CanonicalUserPair(userID, otherUserID)
 	var exists bool
 	err := r.pool.QueryRow(ctx, `
 		SELECT EXISTS (
@@ -70,7 +74,7 @@ func (r *UserFriendshipRepository) AreUsersFriends(ctx context.Context, userID, 
 
 // GetFriendshipStatus returns the relationship status between two users from viewerID's perspective.
 func (r *UserFriendshipRepository) GetFriendshipStatus(ctx context.Context, viewerID, otherID int) (*FriendshipStatus, error) {
-	lo, hi := canonicalFriendPair(viewerID, otherID)
+	lo, hi := CanonicalUserPair(viewerID, otherID)
 	var status string
 	var requesterID *int
 	err := r.pool.QueryRow(ctx, `
@@ -104,7 +108,7 @@ func (r *UserFriendshipRepository) GetFriendshipStatus(ctx context.Context, view
 // exists (race between two tabs or a fast retry), ErrRequestAlreadyExists is returned
 // instead of a raw DB constraint error.
 func (r *UserFriendshipRepository) SendRequest(ctx context.Context, requesterID, recipientID int) error {
-	lo, hi := canonicalFriendPair(requesterID, recipientID)
+	lo, hi := CanonicalUserPair(requesterID, recipientID)
 	result, err := r.pool.Exec(ctx, `
 		INSERT INTO user_friendships (user_id, friend_user_id, status, requester_id, created_at, updated_at)
 		VALUES ($1, $2, 'pending', $3, NOW(), NOW())
@@ -121,7 +125,7 @@ func (r *UserFriendshipRepository) SendRequest(ctx context.Context, requesterID,
 
 // AcceptRequest accepts a pending friend request. The acceptorID must NOT be the original requester.
 func (r *UserFriendshipRepository) AcceptRequest(ctx context.Context, acceptorID, requesterID int) error {
-	lo, hi := canonicalFriendPair(acceptorID, requesterID)
+	lo, hi := CanonicalUserPair(acceptorID, requesterID)
 	result, err := r.pool.Exec(ctx, `
 		UPDATE user_friendships
 		SET status = 'accepted', updated_at = NOW()
@@ -141,7 +145,7 @@ func (r *UserFriendshipRepository) AcceptRequest(ctx context.Context, acceptorID
 
 // DeclineOrCancelRequest deletes a pending request (decline by recipient, cancel by sender).
 func (r *UserFriendshipRepository) DeclineOrCancelRequest(ctx context.Context, userA, userB int) error {
-	lo, hi := canonicalFriendPair(userA, userB)
+	lo, hi := CanonicalUserPair(userA, userB)
 	result, err := r.pool.Exec(ctx, `
 		DELETE FROM user_friendships
 		WHERE user_id = $1 AND friend_user_id = $2 AND status = 'pending'
@@ -157,7 +161,7 @@ func (r *UserFriendshipRepository) DeclineOrCancelRequest(ctx context.Context, u
 
 // RemoveFriend deletes an accepted friendship.
 func (r *UserFriendshipRepository) RemoveFriend(ctx context.Context, userA, userB int) error {
-	lo, hi := canonicalFriendPair(userA, userB)
+	lo, hi := CanonicalUserPair(userA, userB)
 	result, err := r.pool.Exec(ctx, `
 		DELETE FROM user_friendships
 		WHERE user_id = $1 AND friend_user_id = $2 AND status = 'accepted'
@@ -174,16 +178,16 @@ func (r *UserFriendshipRepository) RemoveFriend(ctx context.Context, userA, user
 // ListFriends returns all accepted friends for userID, ordered by username.
 func (r *UserFriendshipRepository) ListFriends(ctx context.Context, userID int) ([]FriendEntry, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT
-			CASE WHEN uf.user_id = $1 THEN uf.friend_user_id ELSE uf.user_id END AS friend_id,
-			u.username,
-			u.avatar_url,
-			uf.updated_at
+		SELECT uf.friend_user_id AS friend_id, u.username, u.avatar_url, uf.updated_at
 		FROM user_friendships uf
-		JOIN users u ON u.id = CASE WHEN uf.user_id = $1 THEN uf.friend_user_id ELSE uf.user_id END
-		WHERE (uf.user_id = $1 OR uf.friend_user_id = $1)
-		  AND uf.status = 'accepted'
-		ORDER BY u.username ASC
+		JOIN users u ON u.id = uf.friend_user_id
+		WHERE uf.user_id = $1 AND uf.status = 'accepted'
+		UNION ALL
+		SELECT uf.user_id AS friend_id, u.username, u.avatar_url, uf.updated_at
+		FROM user_friendships uf
+		JOIN users u ON u.id = uf.user_id
+		WHERE uf.friend_user_id = $1 AND uf.status = 'accepted'
+		ORDER BY username ASC
 		LIMIT 200
 	`, userID)
 	if err != nil {
@@ -205,17 +209,20 @@ func (r *UserFriendshipRepository) ListFriends(ctx context.Context, userID int) 
 // ListIncomingRequests returns pending requests sent TO userID by others.
 func (r *UserFriendshipRepository) ListIncomingRequests(ctx context.Context, userID int) ([]FriendRequestEntry, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT
-			CASE WHEN uf.user_id = $1 THEN uf.friend_user_id ELSE uf.user_id END AS sender_id,
-			u.username,
-			u.avatar_url,
-			uf.created_at
+		SELECT uf.friend_user_id AS sender_id, u.username, u.avatar_url, uf.created_at
 		FROM user_friendships uf
-		JOIN users u ON u.id = CASE WHEN uf.user_id = $1 THEN uf.friend_user_id ELSE uf.user_id END
-		WHERE (uf.user_id = $1 OR uf.friend_user_id = $1)
+		JOIN users u ON u.id = uf.friend_user_id
+		WHERE uf.user_id = $1
 		  AND uf.status = 'pending'
-		  AND uf.requester_id != $1
-		ORDER BY uf.created_at DESC
+		  AND uf.requester_id IS NOT NULL AND uf.requester_id != $1
+		UNION ALL
+		SELECT uf.user_id AS sender_id, u.username, u.avatar_url, uf.created_at
+		FROM user_friendships uf
+		JOIN users u ON u.id = uf.user_id
+		WHERE uf.friend_user_id = $1
+		  AND uf.status = 'pending'
+		  AND uf.requester_id IS NOT NULL AND uf.requester_id != $1
+		ORDER BY created_at DESC
 		LIMIT 100
 	`, userID)
 	if err != nil {
@@ -237,17 +244,20 @@ func (r *UserFriendshipRepository) ListIncomingRequests(ctx context.Context, use
 // ListOutgoingRequests returns pending requests sent BY userID to others.
 func (r *UserFriendshipRepository) ListOutgoingRequests(ctx context.Context, userID int) ([]FriendRequestEntry, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT
-			CASE WHEN uf.user_id = $1 THEN uf.friend_user_id ELSE uf.user_id END AS recipient_id,
-			u.username,
-			u.avatar_url,
-			uf.created_at
+		SELECT uf.friend_user_id AS recipient_id, u.username, u.avatar_url, uf.created_at
 		FROM user_friendships uf
-		JOIN users u ON u.id = CASE WHEN uf.user_id = $1 THEN uf.friend_user_id ELSE uf.user_id END
-		WHERE (uf.user_id = $1 OR uf.friend_user_id = $1)
+		JOIN users u ON u.id = uf.friend_user_id
+		WHERE uf.user_id = $1
 		  AND uf.status = 'pending'
 		  AND uf.requester_id = $1
-		ORDER BY uf.created_at DESC
+		UNION ALL
+		SELECT uf.user_id AS recipient_id, u.username, u.avatar_url, uf.created_at
+		FROM user_friendships uf
+		JOIN users u ON u.id = uf.user_id
+		WHERE uf.friend_user_id = $1
+		  AND uf.status = 'pending'
+		  AND uf.requester_id = $1
+		ORDER BY created_at DESC
 		LIMIT 100
 	`, userID)
 	if err != nil {
@@ -268,7 +278,7 @@ func (r *UserFriendshipRepository) ListOutgoingRequests(ctx context.Context, use
 
 // UpsertAccepted creates or updates an accepted friendship relation.
 func (r *UserFriendshipRepository) UpsertAccepted(ctx context.Context, userID, otherUserID int) error {
-	lo, hi := canonicalFriendPair(userID, otherUserID)
+	lo, hi := CanonicalUserPair(userID, otherUserID)
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO user_friendships (user_id, friend_user_id, status, created_at, updated_at)
 		VALUES ($1, $2, 'accepted', NOW(), NOW())

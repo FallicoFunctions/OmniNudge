@@ -479,7 +479,6 @@
       "userBans": "User Bans",
       "removalReasons": "Removal Reasons",
       "modLog": "Mod Log",
-      "reports": "Reports",
       "modMail": "Mod Mail",
       "requests": "Requests"
     },
@@ -578,44 +577,6 @@
         "create_removal_reason": "created removal reason",
         "update_removal_reason": "updated removal reason",
         "delete_removal_reason": "deleted removal reason"
-      }
-    },
-    "reports": {
-      "title": "Reports Queue",
-      "empty": "No reports in this queue.",
-      "meta": "Reporter #{{reporterId}} · Target #{{targetId}} · {{createdAt}}",
-      "sort": {
-        "priority": "Priority",
-        "recent": "Most Recent"
-      },
-      "status": {
-        "open": "Open",
-        "approved": "Approved",
-        "rejected": "Rejected",
-        "no_action": "No Action",
-        "reviewed": "Reviewed",
-        "dismissed": "Dismissed"
-      },
-      "actions": {
-        "approve": "Approve",
-        "reject": "Reject",
-        "noAction": "No Action"
-      },
-      "targetType": {
-        "post": "Post",
-        "comment": "Comment",
-        "user": "User",
-        "message": "Message",
-        "reddit_comment": "Reddit Comment"
-      },
-      "reason": {
-        "spam": "Spam",
-        "harassment": "Harassment",
-        "illegal_content": "Illegal Content",
-        "csam": "CSAM",
-        "violence": "Violence",
-        "hate_speech": "Hate Speech",
-        "other": "Other"
       }
     },
     "modMail": {
@@ -1232,9 +1193,7 @@
       "viewThread": "View thread",
       "block": "Block",
       "unblock": "Unblock",
-      "confirmBlock": "Block {{username}}? You won't see their messages.",
-      "report": "Report User",
-      "reportFailed": "Failed to submit report: {{message}}"
+      "confirmBlock": "Block {{username}}? You won't see their messages."
     },
     "posts": {
       "empty": "No posts yet."
@@ -1383,15 +1342,13 @@
     "send": "Send",
     "noMessages": "No messages yet",
     "status": {
-      "loadingMessages": "Loading messages...",
-      "reporting": "Reporting..."
+      "loadingMessages": "Loading messages..."
     },
     "empty": {
       "startConversation": "No messages yet. Start the conversation!"
     },
     "actions": {
       "loadOlder": "Load older messages",
-      "report": "Report",
       "viewProfile": "View Profile",
       "reply": "Reply",
       "edit": "Edit",
@@ -1539,7 +1496,7 @@
       "recipientKeyNotFound": "Recipient public key not found",
       "encryptionKeysMissing": "Your encryption keys are not set up",
       "sendFailed": "Failed to send message. Please try again.",
-      "reportFailed": "Failed to submit report: {{message}}"
+      "userUnavailable": "This user is not available."
     },
     "editing": {
       "ariaInput": "Edit message text",
@@ -1708,10 +1665,6 @@
     "share": "Share",
     "save": "Save",
     "hide": "Hide",
-    "report": {
-      "reasonPrompt": "Report reason (type one): spam, harassment, illegal_content, csam, violence, hate_speech, other",
-      "success": "Thanks! The moderation team has been notified."
-    },
     "delete": "Delete",
     "edit": "Edit",
     "editModal": {
@@ -1744,7 +1697,6 @@
       "hide": "Hide",
       "share": "Share",
       "crosspost": "Crosspost",
-      "report": "Report",
       "pin": "Pin",
       "unpin": "Unpin",
       "inbox": "Inbox",
@@ -1772,7 +1724,6 @@
       "unhiding": "Unhiding...",
       "deleting": "Deleting...",
       "pinning": "Pinning...",
-      "reporting": "Reporting...",
       "updating": "Updating...",
       "unsaving": "Unsaving..."
     },
@@ -1837,38 +1788,6 @@
       "unknownUser": "Unknown user"
     }
   },
-  "reporting": {
-    "reasonPrompt": "Report reason (type one): spam, harassment, illegal_content, csam, violence, hate_speech, other",
-    "detailsPrompt": "Additional details (optional):",
-    "invalidReason": "Invalid reason. Use one of: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
-    "success": "Thanks! The moderation team has been notified.",
-    "successDetail": "Our team will review your report and take action within 24 hours.",
-    "reasons": {
-      "spam": "Spam",
-      "harassment": "Harassment",
-      "illegalContent": "Illegal Content",
-      "csam": "CSAM",
-      "violence": "Violence",
-      "hateSpeech": "Hate Speech",
-      "other": "Other"
-    },
-    "modal": {
-      "title": "Submit a Report",
-      "titleWithName": "Report {{name}}",
-      "reasonLabel": "Reason",
-      "descriptionLabel": "Additional details",
-      "descriptionPlaceholder": "Provide any additional context that may help our moderation team...",
-      "submit": "Submit Report",
-      "submitting": "Submitting...",
-      "cancel": "Cancel",
-      "screenReaderDescription": "Use this form to report content that violates our community guidelines. Select a reason and optionally provide additional details.",
-      "characterCount": "{{current}} of {{max}} characters"
-    },
-    "errors": {
-      "rateLimited": "You have submitted too many reports recently. Please wait before submitting another.",
-      "failed": "Failed to submit report: {{message}}"
-    }
-  },
   "comments": {
     "title": "Comments",
     "loading": "Loading comments...",
@@ -1901,7 +1820,6 @@
       "delete": "Delete",
       "save": "Save",
       "unsave": "Unsave",
-      "report": "Report",
       "viewProfile": "View Profile",
       "permalink": "Permalink",
       "collapse": "Collapse",
@@ -1913,7 +1831,6 @@
     "status": {
       "saving": "Saving...",
       "deleting": "Deleting...",
-      "reporting": "Reporting...",
       "inboxPending": "Updating inbox...",
       "posting": "Posting..."
     },
@@ -1931,7 +1848,6 @@
       "deleteFailed": "Failed to delete comment.",
       "inboxFailed": "Failed to update inbox setting.",
       "saveFailed": "Failed to update save state.",
-      "reportFailed": "Failed to report comment.",
       "notFound": "We couldn't find that comment. It may have been removed."
     },
     "confirm": {
@@ -3923,13 +3839,15 @@
       "loadFailed": "Failed to load friends.",
       "sendFailed": "Could not send friend request. Please try again.",
       "acceptFailed": "Could not accept request. Please try again.",
+      "declineFailed": "Could not decline request. Please try again.",
       "cancelFailed": "Could not cancel request. Please try again.",
       "removeFailed": "Could not remove friend. Please try again."
     },
     "toast": {
       "sent": "Friend request sent",
       "accepted": "You are now friends!",
-      "removed": "Friend removed"
+      "removed": "Friend removed",
+      "declined": "Request declined"
     }
   }
 }

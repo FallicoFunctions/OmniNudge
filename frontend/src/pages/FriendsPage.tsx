@@ -32,7 +32,8 @@ export default function FriendsPage() {
     queryKey: friendsQueryKeys.requests,
     queryFn: () => friendsService.getFriendRequests(),
     staleTime: 0,
-    refetchInterval: 30_000, // Poll so sent requests disappear once accepted/declined
+    // No refetchInterval here — AccountMenu already polls this key every 30s.
+    // Two independent timers on the same key can desync and fire near-simultaneously.
   });
 
   // Helper: immediately remove a user from the incoming list in the cache
@@ -82,8 +83,8 @@ export default function FriendsPage() {
     },
     onSuccess: (_data, username, context) => {
       toast.success(t('friends.toast.accepted'));
-      // Use the pre-optimistic snapshot (captured in onMutate) to find the user's details.
-      // We can't read from the live cache here because removeFromIncoming already cleared it.
+      // Optimistic: add to friends list immediately using the pre-removal snapshot.
+      // Falls back to the refetch below when the snapshot is unavailable (cold load).
       const accepted = context?.snapshot?.incoming?.find((r) => r.username === username);
       if (accepted) {
         queryClient.setQueryData(friendsQueryKeys.friends, (old: typeof friendsQuery.data) => {
@@ -96,8 +97,13 @@ export default function FriendsPage() {
           return old ? [...old, newFriend] : [newFriend];
         });
       }
-      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.friends });
+      // Refetch (not just invalidate) the friends list so it's always up-to-date,
+      // even when the optimistic add was skipped due to a missing snapshot.
+      queryClient.refetchQueries({ queryKey: friendsQueryKeys.friends });
       queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
+      // Sync the per-user status cache so the accepted user's profile page
+      // shows "Friends ✓" immediately instead of stale Accept/Decline buttons.
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.status(username) });
     },
     onError: (_err, _username, context) => {
       if (context?.snapshot !== undefined) {
@@ -107,55 +113,46 @@ export default function FriendsPage() {
     },
   });
 
-  const declineMutation = useMutation({
-    mutationFn: (username: string) => friendsService.declineOrCancelFriendRequest(username),
-    onMutate: async (username) => {
-      await queryClient.cancelQueries({ queryKey: friendsQueryKeys.requests });
-      const snapshot = queryClient.getQueryData<typeof requestsQuery.data>(friendsQueryKeys.requests);
-      removeFromIncoming(username);
-      return { snapshot };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
-    },
-    onError: (_err, _username, context) => {
-      if (context?.snapshot !== undefined) {
-        queryClient.setQueryData(friendsQueryKeys.requests, context.snapshot);
-      }
-      toast.error(t('friends.errors.cancelFailed'));
-    },
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: (username: string) => friendsService.declineOrCancelFriendRequest(username),
-    onMutate: async (username) => {
+  // Single mutation handles both decline (incoming) and cancel (outgoing) — same
+  // API endpoint, same rollback logic, only the optimistic cache slice differs.
+  const declineOrCancelMutation = useMutation({
+    mutationFn: ({ username }: { username: string; direction: 'incoming' | 'outgoing' }) =>
+      friendsService.declineOrCancelFriendRequest(username),
+    onMutate: async ({ username, direction }) => {
       await queryClient.cancelQueries({ queryKey: friendsQueryKeys.requests });
       const snapshot = queryClient.getQueryData<typeof requestsQuery.data>(friendsQueryKeys.requests);
       queryClient.setQueryData(friendsQueryKeys.requests, (old: typeof requestsQuery.data) => {
         if (!old) return old;
-        return { ...old, outgoing: old.outgoing.filter((r) => r.username !== username) };
+        return { ...old, [direction]: old[direction].filter((r) => r.username !== username) };
       });
       return { snapshot };
     },
-    onSuccess: () => {
+    onSuccess: (_data, { username, direction }) => {
       queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
+      if (direction === 'incoming') {
+        // Bust the requester's per-profile status so their profile page shows
+        // "+ Add Friend" immediately instead of stale Accept/Decline buttons.
+        queryClient.invalidateQueries({ queryKey: friendsQueryKeys.status(username) });
+        toast.success(t('friends.toast.declined'));
+      }
     },
-    onError: (_err, _username, context) => {
+    onError: (_err, { direction }, context) => {
       if (context?.snapshot !== undefined) {
         queryClient.setQueryData(friendsQueryKeys.requests, context.snapshot);
       }
-      toast.error(t('friends.errors.cancelFailed'));
+      toast.error(t(direction === 'incoming' ? 'friends.errors.declineFailed' : 'friends.errors.cancelFailed'));
     },
   });
 
   const incomingCount = requestsQuery.data?.incoming?.length ?? 0;
   const outgoingCount = requestsQuery.data?.outgoing?.length ?? 0;
 
-  const tabs: { key: Tab; labelKey: string; badge?: number }[] = [
+  const tabs: { key: Tab; labelKey: string; badge?: number; badgePlain?: boolean }[] = [
     {
       key: 'friends',
       labelKey: 'friends.tabs.friends',
       badge: friendsQuery.data?.length,
+      badgePlain: true,
     },
     {
       key: 'incoming',
@@ -182,7 +179,7 @@ export default function FriendsPage() {
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 border-b border-[var(--color-border)]">
-        {tabs.map(({ key, labelKey, badge }) => (
+        {tabs.map(({ key, labelKey, badge, badgePlain }) => (
           <button
             key={key}
             type="button"
@@ -195,9 +192,9 @@ export default function FriendsPage() {
           >
             {t(labelKey)}
             {badge != null && badge > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1 text-xs font-bold text-white">
-                {badge}
-              </span>
+              badgePlain
+                ? <span className="text-xs font-bold">{badge}</span>
+                : <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1 text-xs font-bold text-white">{badge}</span>
             )}
           </button>
         ))}
@@ -229,10 +226,10 @@ export default function FriendsPage() {
                       <img
                         src={resolveMediaUrl(friend.avatar_url)}
                         alt={friend.username}
-                        className="h-10 w-10 rounded-full object-cover"
+                        className="h-10 w-10 rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-white">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary)] text-sm font-bold text-white">
                         {friend.username[0].toUpperCase()}
                       </div>
                     )}
@@ -256,7 +253,10 @@ export default function FriendsPage() {
                   </div>
                   <button
                     type="button"
-                    disabled={removeFriendMutation.isPending}
+                    disabled={
+                      removeFriendMutation.isPending &&
+                      removeFriendMutation.variables === friend.username
+                    }
                     onClick={() => removeFriendMutation.mutate(friend.username)}
                     className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50"
                   >
@@ -294,10 +294,10 @@ export default function FriendsPage() {
                       <img
                         src={resolveMediaUrl(req.avatar_url)}
                         alt={req.username}
-                        className="h-10 w-10 rounded-full object-cover"
+                        className="h-10 w-10 rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-white">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary)] text-sm font-bold text-white">
                         {req.username[0].toUpperCase()}
                       </div>
                     )}
@@ -330,8 +330,11 @@ export default function FriendsPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={declineMutation.isPending}
-                      onClick={() => declineMutation.mutate(req.username)}
+                      disabled={
+                        declineOrCancelMutation.isPending &&
+                        declineOrCancelMutation.variables?.username === req.username
+                      }
+                      onClick={() => declineOrCancelMutation.mutate({ username: req.username, direction: 'incoming' })}
                       className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50"
                     >
                       {t('friends.actions.decline')}
@@ -369,10 +372,10 @@ export default function FriendsPage() {
                       <img
                         src={resolveMediaUrl(req.avatar_url)}
                         alt={req.username}
-                        className="h-10 w-10 rounded-full object-cover"
+                        className="h-10 w-10 rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-white">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary)] text-sm font-bold text-white">
                         {req.username[0].toUpperCase()}
                       </div>
                     )}
@@ -396,8 +399,11 @@ export default function FriendsPage() {
                   </div>
                   <button
                     type="button"
-                    disabled={cancelMutation.isPending}
-                    onClick={() => cancelMutation.mutate(req.username)}
+                    disabled={
+                      declineOrCancelMutation.isPending &&
+                      declineOrCancelMutation.variables?.username === req.username
+                    }
+                    onClick={() => declineOrCancelMutation.mutate({ username: req.username, direction: 'outgoing' })}
                     className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50"
                   >
                     {t('friends.actions.cancelRequest')}

@@ -426,14 +426,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           break;
         }
 
-        case 'moderation_report_created':
-        case 'moderation_report_updated': {
-          console.log('[WebSocket] Moderation report event:', data.type, data.payload);
-          queryClient.invalidateQueries({ queryKey: ['modReports'] });
-          queryClient.invalidateQueries({ queryKey: ['adminStats'] });
-          break;
-        }
-
         case 'reaction_added': {
           const { message_id, conversation_id, reaction } = data.payload as WsReactionAddedPayload;
           console.log('[WebSocket] Reaction added:', message_id, reaction.emoji);
@@ -636,9 +628,12 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         }
 
         case 'friend_request_accepted': {
-          // A pending request was accepted — update both requests and friends list.
+          // A pending request was accepted — update requests, friends list, and
+          // all per-user status caches so profile pages reflect the new state
+          // immediately without waiting for the 60-second stale window to expire.
           queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
           queryClient.invalidateQueries({ queryKey: friendsQueryKeys.friends });
+          queryClient.invalidateQueries({ queryKey: ['friends', 'status'] });
           break;
         }
 
