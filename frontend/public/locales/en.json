@@ -3841,13 +3841,15 @@
       "acceptFailed": "Could not accept request. Please try again.",
       "declineFailed": "Could not decline request. Please try again.",
       "cancelFailed": "Could not cancel request. Please try again.",
-      "removeFailed": "Could not remove friend. Please try again."
+      "removeFailed": "Could not remove friend. Please try again.",
+      "topFriendsFailed": "Failed to save top friends"
     },
     "toast": {
       "sent": "Friend request sent",
       "accepted": "You are now friends!",
       "removed": "Friend removed",
-      "declined": "Request declined"
+      "declined": "Request declined",
+      "topFriendsUpdated": "Top friends updated"
     }
   }
 }

@@ -3841,13 +3841,15 @@
       "acceptFailed": "No se pudo aceptar la solicitud. Inténtalo de nuevo.",
       "declineFailed": "No se pudo rechazar la solicitud. Inténtalo de nuevo.",
       "cancelFailed": "No se pudo cancelar la solicitud. Inténtalo de nuevo.",
-      "removeFailed": "No se pudo eliminar el amigo. Inténtalo de nuevo."
+      "removeFailed": "No se pudo eliminar el amigo. Inténtalo de nuevo.",
+      "topFriendsFailed": "Failed to save top friends"
     },
     "toast": {
       "sent": "Solicitud de amistad enviada",
       "accepted": "¡Ahora son amigos!",
       "removed": "Amigo eliminado",
-      "declined": "Solicitud rechazada"
+      "declined": "Solicitud rechazada",
+      "topFriendsUpdated": "Top friends updated"
     }
   }
 }

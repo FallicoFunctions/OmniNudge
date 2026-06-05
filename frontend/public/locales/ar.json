@@ -3841,13 +3841,15 @@
       "acceptFailed": "تعذر قبول الطلب. حاول مرة أخرى.",
       "declineFailed": "تعذّر رفض الطلب. يرجى المحاولة مرة أخرى.",
       "cancelFailed": "تعذر إلغاء الطلب. حاول مرة أخرى.",
-      "removeFailed": "تعذر إزالة الصديق. حاول مرة أخرى."
+      "removeFailed": "تعذر إزالة الصديق. حاول مرة أخرى.",
+      "topFriendsFailed": "Failed to save top friends"
     },
     "toast": {
       "sent": "تم إرسال طلب الصداقة",
       "accepted": "أنتما أصدقاء الآن!",
       "removed": "تمت إزالة الصديق",
-      "declined": "تم رفض الطلب"
+      "declined": "تم رفض الطلب",
+      "topFriendsUpdated": "Top friends updated"
     }
   }
 }
