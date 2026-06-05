@@ -24,6 +24,10 @@ func (r *PostgresUserProfileRepository) GetByUserID(ctx context.Context, userID 
 	return r.inner.GetByUserID(ctx, userID)
 }
 
-func (r *PostgresUserProfileRepository) Upsert(ctx context.Context, userID int, bio, avatarURL, statusText *string) error {
-	return r.inner.Upsert(ctx, userID, bio, avatarURL, statusText)
+func (r *PostgresUserProfileRepository) Upsert(ctx context.Context, userID int, bio, avatarURL, statusText, bannerURL, topFriendsJSON *string) error {
+	return r.inner.Upsert(ctx, userID, bio, avatarURL, statusText, bannerURL, topFriendsJSON)
+}
+
+func (r *PostgresUserProfileRepository) UpdateTopFriends(ctx context.Context, userID int, topFriendsJSON *string) error {
+	return r.inner.UpdateTopFriends(ctx, userID, topFriendsJSON)
 }

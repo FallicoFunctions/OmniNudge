@@ -31,7 +31,7 @@ func TestUserProfileRepository_UpsertAndGetByUserID(t *testing.T) {
 	initialBio := "Profile repo bio"
 	initialAvatar := "https://example.com/profile.png"
 	initialStatus := "initial status"
-	require.NoError(t, profileRepo.Upsert(ctx, user.ID, &initialBio, &initialAvatar, &initialStatus))
+	require.NoError(t, profileRepo.Upsert(ctx, user.ID, &initialBio, &initialAvatar, &initialStatus, nil, nil))
 
 	profile, err := profileRepo.GetByUserID(ctx, user.ID)
 	require.NoError(t, err)
@@ -45,7 +45,7 @@ func TestUserProfileRepository_UpsertAndGetByUserID(t *testing.T) {
 
 	updatedBio := "Updated profile repo bio"
 	updatedStatus := "updated status"
-	require.NoError(t, profileRepo.Upsert(ctx, user.ID, &updatedBio, nil, &updatedStatus))
+	require.NoError(t, profileRepo.Upsert(ctx, user.ID, &updatedBio, nil, &updatedStatus, nil, nil))
 
 	updated, err := profileRepo.GetByUserID(ctx, user.ID)
 	require.NoError(t, err)
