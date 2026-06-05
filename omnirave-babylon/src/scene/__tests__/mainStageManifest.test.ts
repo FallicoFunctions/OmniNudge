@@ -1,10 +1,22 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MAIN_STAGE_MANIFEST } from '../mainStageManifest';
+
+const projectRoot = process.cwd();
+const exportScript = readFileSync(path.join(projectRoot, 'scripts/export-main-stage.py'), 'utf8');
+const optimizeScript = readFileSync(path.join(projectRoot, 'scripts/optimize-main-stage.mjs'), 'utf8');
 
 describe('MAIN_STAGE_MANIFEST', () => {
   it('declares the authored GLB, collision GLB, and review avatar runtime paths', () => {
     expect(MAIN_STAGE_MANIFEST.sceneGlb).toBe('/assets/venues/main-stage/main-stage.glb');
     expect(MAIN_STAGE_MANIFEST.collisionGlb).toBe('/assets/venues/main-stage/main-stage-collision.glb');
     expect(MAIN_STAGE_MANIFEST.reviewAvatarGlb).toBe('/assets/avatars/review-rig/review-rig.glb');
+  });
+
+  it('keeps the collision export contract wired through the export pipeline', () => {
+    expect(exportScript).toContain('main-stage-collision.glb');
+    expect(exportScript).toContain('Collision');
+    expect(optimizeScript).toContain('main-stage-collision.glb');
   });
 });
