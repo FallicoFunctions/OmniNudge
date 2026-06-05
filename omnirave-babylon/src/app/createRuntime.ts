@@ -1,5 +1,7 @@
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { createMainStageScene } from '../scene/createMainStageScene';
+import { createDebugPanel } from '../ui/createDebugPanel';
+import { createPerfOverlay } from '../ui/createPerfOverlay';
 import { createReviewHud } from '../ui/createReviewHud';
 import { RUNTIME_CONFIG } from './runtimeConfig';
 
@@ -20,10 +22,14 @@ export async function createRuntime(host: HTMLElement) {
   };
 
   let hud: HTMLElement | undefined;
+  let perfOverlay: HTMLElement | undefined;
+  let debugPanel: HTMLElement | undefined;
 
   try {
     hud = createReviewHud(host);
     const scene = await createMainStageScene(engine);
+    perfOverlay = createPerfOverlay(host);
+    debugPanel = createDebugPanel(host);
 
     engine.runRenderLoop(() => {
       scene.render();
@@ -31,10 +37,12 @@ export async function createRuntime(host: HTMLElement) {
 
     window.addEventListener('resize', handleResize);
 
-    return { engine, scene, canvas, hud, config: RUNTIME_CONFIG };
+    return { engine, scene, canvas, hud, perfOverlay, debugPanel, config: RUNTIME_CONFIG };
   } catch (error) {
     window.removeEventListener('resize', handleResize);
     engine.dispose();
+    debugPanel?.remove();
+    perfOverlay?.remove();
     hud?.remove();
     canvas.remove();
     throw error;
