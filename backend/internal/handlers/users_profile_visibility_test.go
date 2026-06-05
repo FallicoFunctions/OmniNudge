@@ -105,7 +105,7 @@ func TestGetUserProfile_PrivateVisibility_HidesFromOthers(t *testing.T) {
 	_, err = settingsRepo.Update(ctx, settings)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -132,7 +132,7 @@ func TestGetUserProfile_FriendsOnlyVisibility_HidesFromOthers(t *testing.T) {
 	_, err = settingsRepo.Update(ctx, settings)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -156,7 +156,7 @@ func TestGetUserProfile_FriendsOnlyVisibility_ShowsToAcceptedFriend(t *testing.T
 	friendRepo := models.NewUserFriendshipRepository(userRepo.GetPool())
 	require.NoError(t, friendRepo.UpsertAccepted(ctx, owner.ID, viewer.ID))
 
-	handler := NewUsersHandler(userRepo, nil, friendRepo, settingsRepo, nil, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, friendRepo, settingsRepo, nil, nil, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -170,7 +170,7 @@ func TestGetUserProfileByID_PublicVisibility_ReturnsProfile(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/id/"+strconv.Itoa(owner.ID)+"/profile", nil)
@@ -185,7 +185,7 @@ func TestGetMyProfile_ReturnsAuthenticatedUserProfile(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/me/profile", nil)
@@ -208,7 +208,7 @@ func TestGetUserProfile_PendingDeletion_HidesFromOtherUsers(t *testing.T) {
 	`, owner.ID)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -235,7 +235,7 @@ func TestGetUserPostsAndComments_PendingDeletion_HideFromOtherUsers(t *testing.T
 	`, owner.ID)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	reqPosts := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username+"/posts", nil)
@@ -258,7 +258,7 @@ func TestGetUserProfile_UsesCachedResponseUntilTTLExpiry(t *testing.T) {
 	initialBio := "cached bio"
 	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &initialBio, nil, nil))
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache(), nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache(), nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	firstReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -289,7 +289,7 @@ func TestGetUserProfile_CacheScope_DoesNotLeakOwnerLastSeen(t *testing.T) {
 	_, err = settingsRepo.Update(ctx, settings)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache(), nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache(), nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	// Owner request should include last_seen and populate owner-scoped cache.
@@ -326,9 +326,9 @@ func TestGetUserProfile_UsesDedicatedUserProfilesData(t *testing.T) {
 	profileRepo := models.NewUserProfileRepository(userRepo.GetPool())
 	profileBio := "bio from user_profiles"
 	profileAvatar := "https://example.com/user-profiles-avatar.png"
-	require.NoError(t, profileRepo.Upsert(ctx, owner.ID, &profileBio, &profileAvatar, nil))
+	require.NoError(t, profileRepo.Upsert(ctx, owner.ID, &profileBio, &profileAvatar, nil, nil, nil))
 
-	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -344,7 +344,7 @@ func TestGetUserProfile_CachedRead_Under200ms(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache(), nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache(), nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	// Warm cache.
@@ -367,7 +367,7 @@ func TestGetUserProfile_CacheHitRate_Exceeds80PercentOnWarmTraffic(t *testing.T)
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache(), nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache(), nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	beforeHit := testutil.ToFloat64(monitoring.ProfileCacheAccessTotal.WithLabelValues("hit", "public"))
