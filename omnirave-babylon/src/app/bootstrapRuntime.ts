@@ -1,4 +1,6 @@
-export function bootstrapRuntime() {
+import { createRuntime } from './createRuntime';
+
+export async function bootstrapRuntime() {
   const app = document.getElementById('app');
   if (!app) {
     throw new Error('Missing #app host');
@@ -10,5 +12,9 @@ export function bootstrapRuntime() {
     host.dataset.testid = 'babylon-runtime-host';
     host.className = 'babylon-runtime-host';
     app.appendChild(host);
+  }
+
+  if (!host.querySelector('canvas[data-testid="babylon-render-canvas"]')) {
+    await createRuntime(host);
   }
 }
