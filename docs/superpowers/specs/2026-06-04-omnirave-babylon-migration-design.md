@@ -106,6 +106,26 @@ The architecture should prefer plain TypeScript modules over hidden editor state
 - WebGPU-first renderer path
 - WebGL fallback path where required by browser support
 
+### Locked Review Targets
+
+The first milestone must optimize for a specific desktop review matrix rather than a vague "modern browser" target.
+
+Primary approval target:
+
+- latest stable `Google Chrome`
+- desktop-class macOS on the user's main review machine
+
+Secondary verification target:
+
+- latest stable `Microsoft Edge`
+- desktop-class Windows hardware of comparable performance tier
+
+Tertiary compatibility target for later follow-up, not initial visual approval:
+
+- latest stable desktop `Safari`
+
+The Main Stage vertical slice is approved against the primary target first. Secondary and tertiary targets are validation targets, not blockers on the first visual approval pass unless they reveal an architectural flaw.
+
 ### Why Babylon.js
 
 Babylon.js is the preferred fit because OmniRave is being built in a code-first repository by AI coding agents rather than by a human-driven browser-editor workflow.
@@ -121,6 +141,26 @@ Selection reasons:
 ## Content And Asset Pipeline
 
 The asset pipeline is the critical production decision. If it is weak, the project will not hit the desired quality bar regardless of engine choice.
+
+### Authoring Toolchain
+
+The hero-venue source-of-truth pipeline must be explicit.
+
+Locked authoring direction for the first milestone:
+
+- `Blender` is the primary DCC source of truth for Main Stage geometry, layout, modular pieces, and collision-authoring meshes
+- Babylon runtime assets are exported from DCC-authored sources into `glTF/GLB`
+- asset export, validation, optimization, and packaging should be scriptable and repo-driven so AI agents can operate the pipeline deterministically
+- generated concept imagery may support look development, but final runtime geometry must come from authored 3D assets
+
+Repository-facing source artifacts should therefore include:
+
+- DCC source files
+- export scripts or repeatable export instructions
+- optimization scripts
+- built runtime assets
+
+This keeps the venue pipeline code-first and automatable without pretending that hero environment geometry should be modeled directly in Babylon scene code.
 
 ### Authoring Principles
 
@@ -187,6 +227,15 @@ Required systems:
 
 The camera is a continuous player camera, not separate first-person and third-person products.
 
+The first milestone should use a single embodied player rig with one collision capsule and one camera system:
+
+- visible local avatar presentation in third-person and mid-zoom ranges
+- controlled hiding or fading of head and upper-body geometry as the camera approaches true first-person
+- no separate "fake review camera" that bypasses the real locomotion and camera rules
+- the same traversal rig must support both wide review and eye-level inspection
+
+This prevents the vertical slice from passing by using a detached cinematic camera that would not survive production gameplay.
+
 Expected behavior:
 
 - pulled back: third-person review
@@ -210,6 +259,20 @@ The Main Stage review harness should:
 - support audience, promenade, VIP, and stage-adjacent inspection
 - allow fast switching between wide composition review and eye-level inspection
 - expose debug controls for camera, collision, lighting, and performance
+
+### Production-Safe Slice Constraints
+
+Although the first milestone is single-player and backend-free, it must avoid one-off assumptions that would break later production integration.
+
+The vertical slice must therefore adopt these future-safe constraints from the start:
+
+- world scale uses real-world metric assumptions consistently
+- spawn locations and review paths are data-driven, not hardcoded throwaway camera hacks
+- traversal, collision, and zone boundaries are authored in a form that can later map to multiplayer/world data
+- scene organization should anticipate later streaming and zone partitioning even if the first slice loads as one scene
+- render features chosen for Main Stage must be supportable in a future live runtime, not only in a standalone showcase build
+
+Backend integration remains out of scope for this milestone, but the slice should be structured so that a later authoritative world does not force a foundational rebuild of camera scale, traversal assumptions, scene structure, or venue data boundaries.
 
 ## Quality Gates
 
@@ -255,7 +318,10 @@ Failure case: clipping, unstable obstruction behavior, unusable zoom transitions
 
 The desktop-first target must achieve an acceptable performance floor on the intended review machine. A visually correct venue that only runs at an unacceptable frame rate or memory cost fails the gate.
 
-Exact numeric budgets should be finalized during implementation planning, but the milestone must include explicit FPS, frame-time, and memory targets.
+Exact numeric budgets should be finalized during implementation planning, but the milestone must include explicit FPS, frame-time, and memory targets for:
+
+- the primary Chrome approval machine
+- the secondary Edge verification machine
 
 ### 7. User Approval
 
