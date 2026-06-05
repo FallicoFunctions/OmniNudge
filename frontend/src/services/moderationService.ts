@@ -7,8 +7,6 @@ import type {
   UpdateRemovalReasonRequest,
   RemoveContentRequest,
   ModLogResponse,
-  ModerationReportResponse,
-  ReportStatus,
 } from '../types/moderation';
 
 export const moderationService = {
@@ -99,28 +97,4 @@ export const moderationService = {
     return api.get<ModLogResponse>(`/mod/hubs/${hubName}/mod-log?${params.toString()}`);
   },
 
-  // ===== REPORTS QUEUE =====
-
-  async getReports(
-    status: ReportStatus | string = 'open',
-    sort: 'priority' | 'recent' = 'priority',
-    limit = 50,
-    offset = 0,
-    cursor?: string
-  ): Promise<ModerationReportResponse> {
-    const params = new URLSearchParams({
-      status,
-      sort,
-      limit: String(limit),
-      offset: String(offset),
-    });
-    if (cursor) {
-      params.set('cursor', cursor);
-    }
-    return api.get<ModerationReportResponse>(`/mod/reports?${params.toString()}`);
-  },
-
-  async updateReportStatus(reportId: number, status: ReportStatus): Promise<void> {
-    await api.post(`/mod/reports/${reportId}/status`, { status });
-  },
 };

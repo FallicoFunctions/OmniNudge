@@ -8,12 +8,6 @@ import (
 // ValidMessageTypes lists all valid message types
 var ValidMessageTypes = []string{"text", "image", "video", "audio", "file"}
 
-// ValidTargetTypes lists all valid target types for moderation
-var ValidTargetTypes = []string{"post", "comment", "user", "message", "reddit_comment"}
-
-// ValidReportTypes lists all valid report types
-var ValidReportTypes = []string{"spam", "harassment", "hate", "violence", "nsfw", "misinformation", "other"}
-
 // ValidSortOptions lists all valid sort options
 var ValidSortOptions = []string{"hot", "new", "top", "controversial"}
 
@@ -31,26 +25,6 @@ func ValidateMessageType(messageType string) error {
 		}
 	}
 	return fmt.Errorf("invalid message type: must be one of %v", ValidMessageTypes)
-}
-
-// ValidateTargetType checks if a target type is valid
-func ValidateTargetType(targetType string) error {
-	for _, valid := range ValidTargetTypes {
-		if targetType == valid {
-			return nil
-		}
-	}
-	return fmt.Errorf("invalid target type: must be one of %v", ValidTargetTypes)
-}
-
-// ValidateReportType checks if a report type is valid
-func ValidateReportType(reportType string) error {
-	for _, valid := range ValidReportTypes {
-		if reportType == valid {
-			return nil
-		}
-	}
-	return fmt.Errorf("invalid report type: must be one of %v", ValidReportTypes)
 }
 
 // ValidateSortOption checks if a sort option is valid

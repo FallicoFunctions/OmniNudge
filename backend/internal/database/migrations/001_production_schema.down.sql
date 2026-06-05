@@ -16,7 +16,6 @@ DROP TABLE IF EXISTS hidden_posts CASCADE;
 DROP TABLE IF EXISTS hidden_reddit_posts CASCADE;
 DROP TABLE IF EXISTS slideshow_media_items CASCADE;
 DROP TABLE IF EXISTS user_keys CASCADE;
-DROP TABLE IF EXISTS reports CASCADE;
 
 -- Drop main data tables
 DROP TABLE IF EXISTS slideshow_sessions CASCADE;

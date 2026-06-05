@@ -594,24 +594,6 @@ func (r *UserRepository) BanUser(ctx context.Context, userID int, reason string,
 	return tx.Commit(ctx)
 }
 
-// AutoSuspendForReports marks a user as banned when repeated reports exceed threshold.
-// This path is system-initiated, so banned_by remains NULL.
-func (r *UserRepository) AutoSuspendForReports(ctx context.Context, userID int, reason string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE users
-		SET banned = true,
-		    ban_reason = $2,
-		    show_ban_reason = false,
-		    banned_at = NOW(),
-		    banned_by = NULL,
-		    token_version = token_version + 1
-		WHERE id = $1
-		  AND deleted = false
-		  AND banned = false
-	`, userID, reason)
-	return err
-}
-
 // UnbanUser unbans a user (clears both shadow ban and regular ban)
 func (r *UserRepository) UnbanUser(ctx context.Context, userID int, reason string, adminID int) error {
 	tx, err := r.pool.Begin(ctx)

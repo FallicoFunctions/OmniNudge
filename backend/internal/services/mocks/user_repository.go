@@ -214,14 +214,6 @@ func (m *UserRepository) BanUser(_ context.Context, userID int, reason string, _
 	return nil
 }
 
-func (m *UserRepository) AutoSuspendForReports(_ context.Context, userID int, reason string) error {
-	if u, ok := m.users[userID]; ok {
-		u.Banned = true
-		u.BanReason = &reason
-	}
-	return nil
-}
-
 func (m *UserRepository) UnbanUser(_ context.Context, userID int, _ string, _ int) error {
 	if u, ok := m.users[userID]; ok {
 		u.Banned = false

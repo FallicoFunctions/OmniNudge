@@ -37,7 +37,4 @@ const (
 	ThemeScopeGlobal  = "global"
 	ThemeScopePerPage = "per_page"
 
-	// reports.status — DB default is 'open'
-	ReportStatusOpen     = "open"
-	ReportStatusResolved = "resolved"
 )

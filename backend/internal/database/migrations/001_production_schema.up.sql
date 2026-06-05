@@ -988,38 +988,10 @@ CREATE TABLE public.removed_content (
 
 
 --
--- Name: reports; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.reports (
-    id integer NOT NULL,
-    reporter_id integer NOT NULL,
-    target_type character varying(20) NOT NULL,
-    target_id integer NOT NULL,
-    reason text,
-    status character varying(20) DEFAULT 'open'::character varying NOT NULL,
-    created_at timestamp with time zone DEFAULT now()
-);
-
-
---
 -- Name: mod_queue; Type: VIEW; Schema: public; Owner: -
 --
 
 CREATE VIEW public.mod_queue AS
- SELECT 'report'::text AS queue_type,
-    r.id AS queue_id,
-    r.target_type,
-    r.target_id,
-    r.reason AS content,
-    r.status,
-    r.created_at,
-    NULL::integer AS hub_id,
-    r.reporter_id AS actor_id,
-    NULL::text AS mod_note
-   FROM public.reports r
-  WHERE ((r.status)::text = 'open'::text)
-UNION ALL
  SELECT 'removed_content'::text AS queue_type,
     rc.id AS queue_id,
     rc.content_type AS target_type,
@@ -1426,26 +1398,6 @@ CREATE SEQUENCE public.removed_content_id_seq
 --
 
 ALTER SEQUENCE public.removed_content_id_seq OWNED BY public.removed_content.id;
-
-
---
--- Name: reports_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.reports_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: reports_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.reports_id_seq OWNED BY public.reports.id;
 
 
 --
@@ -2208,13 +2160,6 @@ ALTER TABLE ONLY public.removed_content ALTER COLUMN id SET DEFAULT nextval('pub
 
 
 --
--- Name: reports id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.reports ALTER COLUMN id SET DEFAULT nextval('public.reports_id_seq'::regclass);
-
-
---
 -- Name: saved_post_comments id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -2616,14 +2561,6 @@ ALTER TABLE ONLY public.removed_content
 
 ALTER TABLE ONLY public.removed_content
     ADD CONSTRAINT removed_content_pkey PRIMARY KEY (id);
-
-
---
--- Name: reports reports_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.reports
-    ADD CONSTRAINT reports_pkey PRIMARY KEY (id);
 
 
 --
@@ -3639,20 +3576,6 @@ CREATE INDEX idx_removed_content_type_id ON public.removed_content USING btree (
 
 
 --
--- Name: idx_reports_status; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_reports_status ON public.reports USING btree (status);
-
-
---
--- Name: idx_reports_target; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_reports_target ON public.reports USING btree (target_type, target_id);
-
-
---
 -- Name: idx_saved_post_comments_user; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4443,14 +4366,6 @@ ALTER TABLE ONLY public.removed_content
 
 ALTER TABLE ONLY public.removed_content
     ADD CONSTRAINT removed_content_removed_by_fkey FOREIGN KEY (removed_by) REFERENCES public.users(id);
-
-
---
--- Name: reports reports_reporter_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.reports
-    ADD CONSTRAINT reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --

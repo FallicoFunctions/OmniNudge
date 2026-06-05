@@ -40,7 +40,6 @@ const prefetchRoutes = {
   settings: () => import('../pages/SettingsPage'),
   themes: () => import('../pages/ThemesPage'),
   admin: () => import('../pages/AdminPage'),
-  moderationReports: () => import('../pages/ModerationReportsPage'),
   profile: () => import('../pages/UserProfilePage'),
 };
 
@@ -373,14 +372,6 @@ export default function MainLayout() {
                                 label: t('nav.admin'),
                                 to: '/admin',
                                 className: 'bg-red-600 text-white hover:bg-red-700',
-                              },
-                            ]
-                          : []),
-                        ...(user.role === 'admin' || user.role === 'moderator'
-                          ? [
-                              {
-                                label: t('common.modTools'),
-                                to: '/mod/reports',
                               },
                             ]
                           : []),

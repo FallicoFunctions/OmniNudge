@@ -38,7 +38,6 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const BlockedUsersPage = lazy(() => import('./pages/BlockedUsersPage'));
 const FriendsPage = lazy(() => import('./pages/FriendsPage'));
 const ModToolsPage = lazy(() => import('./pages/ModToolsPage'));
-const ModerationReportsPage = lazy(() => import('./pages/ModerationReportsPage'));
 const HubSettingsPage = lazy(() => import('./pages/HubSettingsPage'));
 const HubAIDesignerPreviewPage = lazy(() => import('./pages/HubAIDesignerPreviewPage'));
 const ModMailConversationPage = lazy(() => import('./pages/ModMailConversationPage'));
@@ -133,14 +132,6 @@ function App() {
                             )}
 
                             {/* PROTECTED routes - require auth */}
-                            <Route
-                              path="/mod/reports"
-                              element={
-                                <ProtectedRoute>
-                                  <ModerationReportsPage />
-                                </ProtectedRoute>
-                              }
-                            />
                             <Route
                               path="/h/:hubName/mod"
                               element={
