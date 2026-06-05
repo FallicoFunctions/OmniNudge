@@ -8,6 +8,8 @@ import { createFollowCameraRig } from '../player/createFollowCameraRig';
 import { createInputMap } from '../player/createInputMap';
 import { createPlayerRig } from '../player/createPlayerRig';
 import { resolveMoveVector } from '../player/movementMath';
+import { loadMainStageAssets } from './loadMainStageAssets';
+import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from './reviewRouteData';
 
 export async function createMainStageScene(engine: AbstractEngine) {
   const scene = new Scene(engine);
@@ -17,8 +19,12 @@ export async function createMainStageScene(engine: AbstractEngine) {
   const light = new HemisphericLight('review-key-light', new Vector3(0, 1, 0), scene);
   light.intensity = 0.9;
 
+  const stageAssets = await loadMainStageAssets(scene);
   const input = createInputMap(window);
-  const playerRig = createPlayerRig(scene, new Vector3(0, 0, 0));
+  const playerRig = createPlayerRig(
+    scene,
+    new Vector3(BACK_PLAZA_SPAWN.x, BACK_PLAZA_SPAWN.y, BACK_PLAZA_SPAWN.z),
+  );
   const cameraRig = createFollowCameraRig(scene, playerRig.root);
 
   scene.activeCamera = cameraRig.camera;
@@ -46,10 +52,13 @@ export async function createMainStageScene(engine: AbstractEngine) {
   scene.metadata = {
     ...scene.metadata,
     reviewRuntime: {
+      checkpoints: MAIN_STAGE_REVIEW_ROUTE,
       cameraRig,
+      stageAssets,
       input,
       light,
       playerRig,
+      spawn: BACK_PLAZA_SPAWN,
     },
   };
 

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MAIN_STAGE_MANIFEST } from '../mainStageManifest';
+import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from '../reviewRouteData';
 
 const projectRoot = process.cwd();
 const exportScript = readFileSync(path.join(projectRoot, 'scripts/export-main-stage.py'), 'utf8');
@@ -18,5 +19,12 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(exportScript).toContain('main-stage-collision.glb');
     expect(exportScript).toContain('Collision');
     expect(optimizeScript).toContain('main-stage-collision.glb');
+  });
+});
+
+describe('reviewRouteData', () => {
+  it('starts from the back-plaza reveal and defines at least four review checkpoints', () => {
+    expect(BACK_PLAZA_SPAWN).toEqual({ x: 0, y: 1.7, z: 48 });
+    expect(MAIN_STAGE_REVIEW_ROUTE.length).toBeGreaterThanOrEqual(4);
   });
 });
