@@ -1,0 +1,25 @@
+{
+  "name": "omnirave-babylon",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 4175",
+    "build": "tsc -b && vite build",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^8.1.0",
+    "@babylonjs/gui": "^8.1.0",
+    "@babylonjs/inspector": "^8.1.0",
+    "@babylonjs/loaders": "^8.1.0",
+    "@babylonjs/materials": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "jsdom": "^27.0.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4",
+    "vitest": "^3.2.4"
+  }
+}
