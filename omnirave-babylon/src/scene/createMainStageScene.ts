@@ -1,12 +1,15 @@
 import { Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { Ray } from '@babylonjs/core/Culling/ray.js';
+import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import type { AbstractEngine } from '@babylonjs/core/Engines/abstractEngine';
 
 import { createFollowCameraRig } from '../player/createFollowCameraRig';
 import { createInputMap } from '../player/createInputMap';
 import { createPlayerRig } from '../player/createPlayerRig';
+import { createReviewAvatar } from '../player/createReviewAvatar';
 import { resolveMoveVector } from '../player/movementMath';
 import { createLightingRig } from './createLightingRig';
 import { loadMainStageAssets } from './loadMainStageAssets';
@@ -27,7 +30,12 @@ export async function createMainStageScene(engine: AbstractEngine) {
     scene,
     new Vector3(BACK_PLAZA_SPAWN.x, BACK_PLAZA_SPAWN.y, BACK_PLAZA_SPAWN.z),
   );
+  const reviewAvatar = await createReviewAvatar(scene);
+  reviewAvatar.root.parent = playerRig.avatarAnchor;
   const cameraRig = createFollowCameraRig(scene, playerRig.root);
+  cameraRig.camera.alpha = Math.PI / 2;
+  cameraRig.camera.beta = 1.22;
+  cameraRig.camera.radius = 72;
 
   scene.activeCamera = cameraRig.camera;
 
@@ -37,18 +45,25 @@ export async function createMainStageScene(engine: AbstractEngine) {
   }
 
   scene.onBeforeRenderObservable.add(() => {
-    cameraRig.syncZoomState();
-
-    const move = resolveMoveVector(input.state);
-    if (move.magnitude === 0) {
-      return;
+    const zoomState = cameraRig.syncZoomState();
+    const avatarVisibility = zoomState.mode === 'first_person' ? 0 : zoomState.shoulderOpacity;
+    for (const mesh of reviewAvatar.meshes) {
+      mesh.visibility = avatarVisibility;
     }
 
-    const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
-    const distance = playerRig.speedMetersPerSecond * deltaSeconds;
+    const move = resolveMoveVector(input.state);
+    if (move.magnitude > 0) {
+      const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
+      const distance = playerRig.speedMetersPerSecond * deltaSeconds;
 
-    playerRig.root.position.x += move.x * distance;
-    playerRig.root.position.z += move.z * distance;
+      playerRig.root.position.x += move.x * distance;
+      playerRig.root.position.z += move.z * distance;
+    }
+
+    const groundHeight = resolveGroundHeight(stageAssets.collisionMeshes, playerRig.root.position);
+    if (groundHeight !== null) {
+      playerRig.root.position.y = groundHeight + playerRig.eyeHeightMeters;
+    }
   });
 
   scene.metadata = {
@@ -57,6 +72,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
       checkpoints: MAIN_STAGE_REVIEW_ROUTE,
       cameraRig,
       lightingRig,
+      reviewAvatar,
       stageAssets,
       input,
       playerRig,
@@ -70,4 +86,25 @@ export async function createMainStageScene(engine: AbstractEngine) {
   });
 
   return scene;
+}
+
+function resolveGroundHeight(collisionMeshes: AbstractMesh[], position: Vector3) {
+  const ray = new Ray(new Vector3(position.x, 128, position.z), Vector3.Down(), 256);
+  let nearestHit: { distance: number; y: number } | null = null;
+
+  for (const mesh of collisionMeshes) {
+    const hit = ray.intersectsMesh(mesh, false);
+    if (!hit.hit || !hit.pickedPoint) {
+      continue;
+    }
+
+    if (!nearestHit || hit.distance < nearestHit.distance) {
+      nearestHit = {
+        distance: hit.distance,
+        y: hit.pickedPoint.y,
+      };
+    }
+  }
+
+  return nearestHit?.y ?? null;
 }
