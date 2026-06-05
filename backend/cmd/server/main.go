@@ -955,6 +955,7 @@ func main() {
 			users.GET("/:username", usersHandler.GetUserProfile)
 			users.GET("/:username/posts", usersHandler.GetUserPosts)
 			users.GET("/:username/comments", usersHandler.GetUserComments)
+			users.GET("/:username/top-friends", usersHandler.GetTopFriends)
 		}
 
 		// Public search routes
@@ -1270,6 +1271,7 @@ func main() {
 			protected.GET("/users/me/profile", usersHandler.GetMyProfile)
 			protected.GET("/users/me/storage", storageHandler.GetMyStorage)
 			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
+			protected.PUT("/users/me/top-friends", usersHandler.SetTopFriends)
 			protected.POST("/users/me/avatar", usersHandler.UploadMyAvatar)
 			protected.PUT("/users/profile", usersHandler.UpdateProfile)
 			protected.PUT("/users/email", authHandler.UpdateEmail)
