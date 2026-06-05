@@ -116,5 +116,42 @@ describe('createRuntime', () => {
     expect(engineRunRenderLoop).not.toHaveBeenCalled();
     expect(host.querySelector('canvas[data-testid="babylon-render-canvas"]')).toBeNull();
     expect(host.querySelector('[data-testid="review-hud"]')).toBeNull();
+    expect(host.querySelector('[data-testid="perf-overlay"]')).toBeNull();
+    expect(host.querySelector('[data-testid="debug-panel"]')).toBeNull();
+  });
+
+  it('renders review instrumentation after successful runtime creation', async () => {
+    const engineDispose = vi.fn();
+    const engineRunRenderLoop = vi.fn();
+    const engineResize = vi.fn();
+    const sceneRender = vi.fn();
+    const scene = { render: sceneRender };
+
+    vi.doMock('@babylonjs/core/Engines/engine', () => ({
+      Engine: vi.fn(() => ({
+        dispose: engineDispose,
+        runRenderLoop: engineRunRenderLoop,
+        resize: engineResize,
+      })),
+    }));
+
+    vi.doMock('../../scene/createMainStageScene', () => ({
+      createMainStageScene: vi.fn(async () => scene),
+    }));
+
+    const { createRuntime } = await import('../createRuntime');
+    const host = document.createElement('div');
+
+    await createRuntime(host);
+
+    expect(host.querySelector('canvas[data-testid="babylon-render-canvas"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="review-hud"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="perf-overlay"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="debug-panel"]')).not.toBeNull();
+    expect(host.querySelector('[data-debug-toggle="collision"]')).not.toBeNull();
+    expect(host.querySelector('[data-debug-toggle="routes"]')).not.toBeNull();
+    expect(host.querySelector('[data-debug-toggle="lighting"]')).not.toBeNull();
+    expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
+    expect(engineDispose).not.toHaveBeenCalled();
   });
 });

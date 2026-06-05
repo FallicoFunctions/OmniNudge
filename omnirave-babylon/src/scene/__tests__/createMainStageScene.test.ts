@@ -40,6 +40,10 @@ describe('createMainStageScene', () => {
     expect(scene.getTransformNodeByName('player-root')).not.toBeNull();
     expect(scene.getMeshByName('player-capsule')).not.toBeNull();
     expect(scene.metadata?.reviewRuntime?.stageAssets).toBe(stageAssets);
+    expect(scene.metadata?.reviewRuntime?.lightingRig).toBeDefined();
+    expect(scene.lights.map((light) => light.name)).toEqual(
+      expect.arrayContaining(['main-stage-hemi-light', 'main-stage-key-light']),
+    );
   });
 
   it('keeps zoom state synced even while the player is idle', async () => {

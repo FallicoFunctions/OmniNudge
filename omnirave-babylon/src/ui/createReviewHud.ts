@@ -5,7 +5,7 @@ export function createReviewHud(host: HTMLElement) {
   hud.innerHTML = `
     <p class="review-hud__eyebrow">Main Stage Review</p>
     <h1 class="review-hud__title">OmniRave Babylon Cleanroom</h1>
-    <p class="review-hud__copy">Bootstrapping review runtime.</p>
+    <p class="review-hud__copy">Review route, lighting, and performance instrumentation active.</p>
   `;
   host.appendChild(hud);
   return hud;
