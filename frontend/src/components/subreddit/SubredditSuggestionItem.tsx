@@ -25,10 +25,10 @@ export function SubredditSuggestionItem({ suggestion, onSelect }: SubredditSugge
             alt=""
             loading="lazy"
             decoding="async"
-            className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
+            className="h-6 w-6 flex-shrink-0 rounded-md object-cover"
           />
         ) : (
-          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
+          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
             {t('common.prefix.subreddit')}
           </div>
         )}

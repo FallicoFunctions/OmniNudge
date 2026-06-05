@@ -232,9 +232,9 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
                         className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-[var(--color-hover)]"
                       >
                         {user.avatar_url ? (
-                          <img src={user.avatar_url} alt="" className="h-6 w-6 rounded-full object-cover" />
+                          <img src={user.avatar_url} alt="" className="h-6 w-6 rounded-lg object-cover" />
                         ) : (
-                          <div className="h-6 w-6 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-xs text-white font-semibold">
+                          <div className="h-6 w-6 rounded-lg bg-[var(--color-primary)] flex items-center justify-center text-xs text-white font-semibold">
                             {user.username[0].toUpperCase()}
                           </div>
                         )}
