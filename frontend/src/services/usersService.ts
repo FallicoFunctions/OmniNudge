@@ -3,6 +3,8 @@ import type {
   UserProfile,
   UserPostsResponse,
   UserCommentsResponse,
+  TopFriendsResponse,
+  TopFriendsConfig,
 } from '../types/users';
 
 export const usersService = {
@@ -22,8 +24,17 @@ export const usersService = {
     bio?: string | null;
     avatar_url?: string | null;
     status_text?: string | null;
+    banner_url?: string | null;
   }): Promise<UserProfile> {
     return api.put<UserProfile>('/users/me/profile', payload);
+  },
+
+  async getTopFriends(username: string): Promise<TopFriendsResponse> {
+    return api.get<TopFriendsResponse>(`/users/${encodeURIComponent(username)}/top-friends`);
+  },
+
+  async setTopFriends(config: TopFriendsConfig): Promise<void> {
+    await api.put('/users/me/top-friends', config);
   },
 
   async uploadAvatar(file: File): Promise<{ avatar_url: string; thumbnail_size: number }> {
