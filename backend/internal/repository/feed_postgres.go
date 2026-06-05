@@ -23,6 +23,6 @@ func NewPostgresFeedRepository(pool *pgxpool.Pool) ports.FeedRepository {
 	return &PostgresFeedRepository{inner: models.NewFeedRepository(pool)}
 }
 
-func (r *PostgresFeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limit, offset int, sourceFilter string) ([]*domain.UnifiedFeedItem, error) {
-	return r.inner.GetUnifiedFeed(ctx, sortBy, limit, offset, sourceFilter)
+func (r *PostgresFeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limit, offset int, sourceFilter string, excludeAuthorIDs []int) ([]*domain.UnifiedFeedItem, error) {
+	return r.inner.GetUnifiedFeed(ctx, sortBy, limit, offset, sourceFilter, excludeAuthorIDs)
 }

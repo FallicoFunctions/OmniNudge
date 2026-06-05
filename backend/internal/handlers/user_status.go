@@ -6,17 +6,22 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/models"
 )
 
 // UserStatusHandler handles user online/offline status requests
 type UserStatusHandler struct {
-	hub HubInterface
+	hub  HubInterface
+	pool *pgxpool.Pool
 }
 
 // NewUserStatusHandler creates a new user status handler
-func NewUserStatusHandler(hub HubInterface) *UserStatusHandler {
+func NewUserStatusHandler(hub HubInterface, pool *pgxpool.Pool) *UserStatusHandler {
 	return &UserStatusHandler{
-		hub: hub,
+		hub:  hub,
+		pool: pool,
 	}
 }
 
@@ -69,9 +74,30 @@ func (h *UserStatusHandler) GetUsersStatus(c *gin.Context) {
 		return
 	}
 
-	// Check status for each user
+	// Point 9: resolve the requester and build a block-set so we never
+	// reveal online status to or from a user who has been blocked.
+	requesterID, _ := middleware.GetOptionalUserID(c)
+	var blockedByRequester map[int]struct{}
+	if requesterID != 0 && h.pool != nil {
+		var blockErr error
+		_, blockedByRequester, blockErr = models.GetAllBlockedIDs(c.Request.Context(), h.pool, requesterID)
+		if blockErr != nil {
+			// Fail closed on status: omit all requested IDs rather than leaking
+			// online presence during a DB error.
+			c.JSON(http.StatusOK, gin.H{"statuses": map[int]bool{}})
+			return
+		}
+	}
+
+	// Check status for each user, omitting blocked users entirely.
 	statuses := make(map[int]bool)
 	for _, userID := range userIDs {
+		if requesterID != 0 {
+			if _, blocked := blockedByRequester[userID]; blocked {
+				// Omit blocked user — absence is indistinguishable from offline.
+				continue
+			}
+		}
 		statuses[userID] = h.hub.IsUserOnline(userID)
 	}
 

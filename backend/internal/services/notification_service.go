@@ -600,8 +600,24 @@ func (s *NotificationService) deliverNotification(ctx context.Context, notificat
 	}
 }
 
-// sendNotification creates and delivers a notification
+// sendNotification creates and delivers a notification.
+// Point 8: if the actor (source of the event) has blocked the recipient
+// (or vice versa), the notification is silently dropped.
 func (s *NotificationService) sendNotification(ctx context.Context, notification *models.Notification) error {
+	if s.pool != nil && notification.ActorID != nil && *notification.ActorID != 0 {
+		blocked, err := models.IsBlockedBidirectional(ctx, s.pool, *notification.ActorID, notification.UserID)
+		if err != nil {
+			// Fail closed: uncertain block status → drop the notification.
+			// Log so the loss is observable in monitoring.
+			log.Printf("notification: block check failed for actor=%d recipient=%d type=%s err=%v; dropping notification",
+				*notification.ActorID, notification.UserID, notification.NotificationType, err)
+			return nil
+		}
+		if blocked {
+			return nil // drop silently — a blocked actor's action should not reach the recipient
+		}
+	}
+
 	// Save to database (persistent storage)
 	if err := s.notifRepo.Create(ctx, notification); err != nil {
 		return err

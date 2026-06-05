@@ -45,6 +45,10 @@ func (r *PostgresPlatformPostRepository) GetByHub(ctx context.Context, hubID int
 	return r.inner.GetByHub(ctx, hubID, sortBy, limit, offset)
 }
 
+func (r *PostgresPlatformPostRepository) GetByHubExcludingAuthors(ctx context.Context, hubID int, sortBy string, limit, offset int, viewerID *int, excludeAuthorIDs []int) ([]*domain.PlatformPost, error) {
+	return r.inner.GetByHubExcludingAuthors(ctx, hubID, sortBy, limit, offset, viewerID, excludeAuthorIDs)
+}
+
 func (r *PostgresPlatformPostRepository) GetByHubWithUser(ctx context.Context, hubID int, sortBy string, limit, offset int, userID *int, startTime, endTime *time.Time) ([]*domain.PlatformPost, error) {
 	return r.inner.GetByHubWithUser(ctx, hubID, sortBy, limit, offset, userID, startTime, endTime)
 }

@@ -592,7 +592,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 
 		if isBlocked {
-			RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
+			RespondError(c, http.StatusNotFound, blockingSettingsErrorMessage)
 			return
 		}
 	}
@@ -1054,7 +1054,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 				return
 			}
 			if isBlocked {
-				RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
+				RespondError(c, http.StatusNotFound, blockingSettingsErrorMessage)
 				return
 			}
 		} else {
