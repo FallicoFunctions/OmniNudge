@@ -19,7 +19,6 @@ import { Panel } from '../components/common/Panel';
 import { ErrorMessage } from '../components/common/StatusMessage';
 import { Skeleton } from '../components/common/LoadingStates';
 import { useFormat } from '../hooks/useFormat';
-import { ReportModal } from '../components/moderation/ReportModal';
 import EditProfileModal from '../components/profile/EditProfileModal';
 import { friendsService, friendsQueryKeys } from '../services/friendsService';
 import type { FriendshipStatus } from '../types/friends';
@@ -228,7 +227,6 @@ export default function UserProfilePage() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const canViewPrivateTabs = user?.username === username;
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const { toast } = useToast();
   const originState = useMemo(
     () => ({ originPath: `${location.pathname}${location.search}` }),
@@ -384,6 +382,9 @@ export default function UserProfilePage() {
     onSuccess: () => {
       setFriendStatus('none');
       queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
+      // Reconcile the status cache against server truth so a 60s stale window
+      // can't leave the button showing the wrong state if the server state differs.
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.status(username ?? '') });
     },
     onError: () => {
       // Re-fetch to snap button to the real server state
@@ -640,10 +641,10 @@ export default function UserProfilePage() {
               <img
                 src={profile.avatar_url}
                 alt={t('userProfilePage.aria.avatarAlt', { username: profile.username })}
-                className="h-16 w-16 rounded-full object-cover"
+                className="h-16 w-16 rounded-lg object-cover"
               />
             ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-border)] text-2xl font-semibold text-[var(--color-text-secondary)]">
+              <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-[var(--color-border)] text-2xl font-semibold text-[var(--color-text-secondary)]">
                 {profile.username.charAt(0).toUpperCase()}
               </div>
             )}
@@ -777,13 +778,6 @@ export default function UserProfilePage() {
                     {t('userProfilePage.labels.blocked')}
                   </span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setIsReportModalOpen(true)}
-                  className="inline-flex items-center justify-center rounded-md border border-[var(--color-error)] px-4 py-2 text-sm font-semibold text-[var(--color-error)] hover:opacity-80"
-                >
-                  {t('userProfilePage.actions.report')}
-                </button>
               </div>
             )}
           </div>
@@ -844,16 +838,6 @@ export default function UserProfilePage() {
       </div>
 
       <div className="mt-6">{renderActiveTab()}</div>
-
-      {profile && (
-        <ReportModal
-          isOpen={isReportModalOpen}
-          onClose={() => setIsReportModalOpen(false)}
-          targetType="user"
-          targetId={profile.id}
-          targetName={profile.username}
-        />
-      )}
 
       <EditProfileModal
         isOpen={isEditProfileOpen}

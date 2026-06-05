@@ -479,7 +479,6 @@
       "userBans": "الحظر",
       "removalReasons": "أسباب الإزالة",
       "modLog": "سجل الإشراف",
-      "reports": "البلاغات",
       "modMail": "بريد المشرفين",
       "requests": "الطلبات"
     },
@@ -578,44 +577,6 @@
         "create_removal_reason": "أنشأ سبب إزالة",
         "update_removal_reason": "حدّث سبب إزالة",
         "delete_removal_reason": "حذف سبب إزالة"
-      }
-    },
-    "reports": {
-      "title": "قائمة البلاغات",
-      "empty": "لا توجد بلاغات في هذه القائمة.",
-      "meta": "المبلّغ #{{reporterId}} · الهدف #{{targetId}} · {{createdAt}}",
-      "sort": {
-        "priority": "الأولوية",
-        "recent": "الأحدث"
-      },
-      "status": {
-        "open": "مفتوح",
-        "approved": "مقبول",
-        "rejected": "مرفوض",
-        "no_action": "بدون إجراء",
-        "reviewed": "تمت المراجعة",
-        "dismissed": "مغلق"
-      },
-      "actions": {
-        "approve": "قبول",
-        "reject": "رفض",
-        "noAction": "بدون إجراء"
-      },
-      "targetType": {
-        "post": "منشور",
-        "comment": "تعليق",
-        "user": "مستخدم",
-        "message": "رسالة",
-        "reddit_comment": "تعليق Reddit"
-      },
-      "reason": {
-        "spam": "رسائل مزعجة",
-        "harassment": "تحرش",
-        "illegal_content": "محتوى غير قانوني",
-        "csam": "CSAM",
-        "violence": "عنف",
-        "hate_speech": "خطاب كراهية",
-        "other": "أخرى"
       }
     },
     "modMail": {
@@ -1232,9 +1193,7 @@
       "viewThread": "عرض السلسلة",
       "block": "حظر",
       "unblock": "إلغاء الحظر",
-      "confirmBlock": "هل تريد حظر {{username}}؟ لن ترى رسائله.",
-      "report": "الإبلاغ عن المستخدم",
-      "reportFailed": "فشل إرسال البلاغ: {{message}}"
+      "confirmBlock": "هل تريد حظر {{username}}؟ لن ترى رسائله."
     },
     "posts": {
       "empty": "لا توجد منشورات بعد."
@@ -1383,15 +1342,13 @@
     "send": "إرسال",
     "noMessages": "لا توجد رسائل بعد",
     "status": {
-      "loadingMessages": "جارٍ تحميل الرسائل...",
-      "reporting": "جارٍ الإبلاغ..."
+      "loadingMessages": "جارٍ تحميل الرسائل..."
     },
     "empty": {
       "startConversation": "لا توجد رسائل بعد. ابدأ المحادثة!"
     },
     "actions": {
       "loadOlder": "تحميل الرسائل الأقدم",
-      "report": "إبلاغ",
       "viewProfile": "عرض الملف الشخصي",
       "reply": "رد",
       "edit": "تحرير",
@@ -1539,7 +1496,7 @@
       "recipientKeyNotFound": "لم يتم العثور على المفتاح العام للمستلم",
       "encryptionKeysMissing": "مفاتيح التشفير الخاصة بك غير مُعدّة",
       "sendFailed": "فشل في إرسال الرسالة. يرجى المحاولة مرة أخرى.",
-      "reportFailed": "فشل إرسال البلاغ: {{message}}"
+      "userUnavailable": "هذا المستخدم غير متاح."
     },
     "editing": {
       "ariaInput": "تحرير نص الرسالة",
@@ -1710,10 +1667,6 @@
     "share": "مشاركة",
     "save": "حفظ",
     "hide": "إخفاء",
-    "report": {
-      "reasonPrompt": "سبب الإبلاغ (اختر واحدًا): spam, harassment, illegal_content, csam, violence, hate_speech, other",
-      "success": "شكرًا! تم إبلاغ فريق الإشراف."
-    },
     "delete": "حذف",
     "edit": "تعديل",
     "editModal": {
@@ -1746,7 +1699,6 @@
       "hide": "إخفاء",
       "share": "مشاركة",
       "crosspost": "نشر في مكان آخر",
-      "report": "إبلاغ",
       "pin": "تثبيت",
       "unpin": "إلغاء التثبيت",
       "inbox": "صندوق الوارد",
@@ -1774,7 +1726,6 @@
       "unhiding": "جارٍ إلغاء الإخفاء...",
       "deleting": "جاري الحذف...",
       "pinning": "جاري التثبيت...",
-      "reporting": "جاري الإبلاغ...",
       "updating": "جارٍ التحديث...",
       "unsaving": "جارٍ الإزالة من المحفوظات..."
     },
@@ -1837,38 +1788,6 @@
       "unknownUser": "مستخدم غير معروف"
     }
   },
-  "reporting": {
-    "reasonPrompt": "سبب الإبلاغ (اختر واحدًا): spam, harassment, illegal_content, csam, violence, hate_speech, other",
-    "detailsPrompt": "تفاصيل إضافية (اختياري):",
-    "invalidReason": "سبب غير صالح. استخدم أحد القيم التالية: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
-    "success": "شكرًا! تم إبلاغ فريق الإشراف.",
-    "successDetail": "سيراجع فريقنا تقريرك ويتخذ إجراءات خلال 24 ساعة.",
-    "reasons": {
-      "spam": "بريد مزعج",
-      "harassment": "مضايقة",
-      "illegalContent": "محتوى غير قانوني",
-      "csam": "CSAM",
-      "violence": "عنف",
-      "hateSpeech": "خطاب كراهية",
-      "other": "أخرى"
-    },
-    "modal": {
-      "title": "إرسال بلاغ",
-      "titleWithName": "الإبلاغ عن {{name}}",
-      "reasonLabel": "السبب",
-      "descriptionLabel": "تفاصيل إضافية",
-      "descriptionPlaceholder": "قدم أي سياق إضافي قد يساعد فريق الإشراف لدينا...",
-      "submit": "إرسال البلاغ",
-      "submitting": "جارٍ الإرسال...",
-      "cancel": "إلغاء",
-      "screenReaderDescription": "استخدم هذا النموذج للإبلاغ عن المحتوى الذي ينتهك إرشادات مجتمعنا. حدد سببًا وقدم تفاصيل إضافية اختياريًا.",
-      "characterCount": "{{current}} من {{max}} حرف"
-    },
-    "errors": {
-      "rateLimited": "لقد أرسلت عددًا كبيرًا جدًا من البلاغات مؤخرًا. يرجى الانتظار قبل إرسال بلاغ آخر.",
-      "failed": "فشل إرسال البلاغ: {{message}}"
-    }
-  },
   "comments": {
     "title": "التعليقات",
     "loading": "جاري تحميل التعليقات...",
@@ -1901,7 +1820,6 @@
       "delete": "حذف",
       "save": "حفظ",
       "unsave": "إلغاء الحفظ",
-      "report": "إبلاغ",
       "viewProfile": "عرض الملف الشخصي",
       "permalink": "الرابط الدائم",
       "collapse": "طي",
@@ -1913,7 +1831,6 @@
     "status": {
       "saving": "جاري الحفظ...",
       "deleting": "جاري الحذف...",
-      "reporting": "جاري الإبلاغ...",
       "inboxPending": "جاري تحديث صندوق الوارد...",
       "posting": "جارٍ النشر..."
     },
@@ -1931,7 +1848,6 @@
       "deleteFailed": "فشل حذف التعليق.",
       "inboxFailed": "فشل تحديث إعدادات صندوق الوارد.",
       "saveFailed": "فشل تحديث حالة الحفظ.",
-      "reportFailed": "فشل الإبلاغ عن التعليق.",
       "notFound": "تعذر العثور على هذا التعليق. ربما تمت إزالته."
     },
     "confirm": {
@@ -3923,13 +3839,15 @@
       "loadFailed": "فشل تحميل الأصدقاء.",
       "sendFailed": "تعذر إرسال طلب الصداقة. حاول مرة أخرى.",
       "acceptFailed": "تعذر قبول الطلب. حاول مرة أخرى.",
+      "declineFailed": "تعذّر رفض الطلب. يرجى المحاولة مرة أخرى.",
       "cancelFailed": "تعذر إلغاء الطلب. حاول مرة أخرى.",
       "removeFailed": "تعذر إزالة الصديق. حاول مرة أخرى."
     },
     "toast": {
       "sent": "تم إرسال طلب الصداقة",
       "accepted": "أنتما أصدقاء الآن!",
-      "removed": "تمت إزالة الصديق"
+      "removed": "تمت إزالة الصديق",
+      "declined": "تم رفض الطلب"
     }
   }
 }

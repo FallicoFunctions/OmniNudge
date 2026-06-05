@@ -133,7 +133,6 @@ func main() {
 	messageRepo := repository.NewPostgresMessageRepository(db.Pool)
 	mediaRepo := repository.NewPostgresMediaFileRepository(db.Pool)
 	hubRepo := repository.NewPostgresHubRepository(db.Pool)
-	reportRepo := repository.NewPostgresReportRepository(db.Pool)
 	hubModRepo := repository.NewPostgresHubModeratorRepository(db.Pool)
 	notificationRepo := repository.NewPostgresNotificationRepository(db.Pool)
 	baselineRepo := repository.NewPostgresUserBaselineRepository(db.Pool)
@@ -533,7 +532,7 @@ func main() {
 	cssSanitizer := services.NewCSSSanitizer()
 
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService, cache, queueClient).WithAutoDeleteService(autoDeleteSvc)
-	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache, thumbnailService)
+	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache, thumbnailService, db.Pool)
 	mediaQuota := handlers.MediaQuotaConfig{
 		FreeTierBytes: cfg.Media.FreeTierQuotaBytes,
 		ProTierBytes:  cfg.Media.ProTierQuotaBytes,
@@ -549,7 +548,6 @@ func main() {
 	storageHandler := handlers.NewStorageHandler(mediaRepo, mediaQuota)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
-	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo, userRepo, notificationRepo, hub, emailService)
 	moderationHandlerV2 := handlers.NewModerationHandlerV2(
 		hubBanRepo,
 		removalReasonRepo,
@@ -565,11 +563,11 @@ func main() {
 	notificationsHandler := handlers.NewNotificationsHandler(notificationRepo)
 	searchHandler := handlers.NewSearchHandler(db.Pool)
 	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
-	friendsHandler := handlers.NewFriendsHandler(userFriendshipRepo, userRepo, hub)
+	friendsHandler := handlers.NewFriendsHandler(userFriendshipRepo, userRepo, hub, db.Pool)
 	slideshowHandler := handlers.NewSlideshowHandler(db.Pool, slideshowRepo, conversationRepo, hub)
 	mediaGalleryHandler := handlers.NewMediaGalleryHandler(db.Pool)
 	uploadsHandler := handlers.NewUploadsHandler(mediaRepo, "./uploads")
-	userStatusHandler := handlers.NewUserStatusHandler(hub)
+	userStatusHandler := handlers.NewUserStatusHandler(hub, db.Pool)
 	presenceStore := services.NewPresenceStore(10 * time.Minute)
 	subredditPresenceHandler := handlers.NewSubredditPresenceHandler(presenceStore)
 	hubPresenceHandler := handlers.NewHubPresenceHandler(presenceStore)
@@ -612,6 +610,7 @@ func main() {
 	// Feature 1: Message Reactions handler + rate limiter
 	reactionsHandler := handlers.NewReactionsHandler(reactionService)
 	reactionRateLimiter := middleware.ReactionRateLimiter()
+	friendRequestRateLimiter := middleware.FriendRequestRateLimiter()
 
 	// Rate limiters hoisted so they are accessible at graceful shutdown.
 	themeCreationLimiter := middleware.ThemeCreationRateLimiter()
@@ -1294,7 +1293,7 @@ func main() {
 			// Friends
 			protected.GET("/users/me/friends", friendsHandler.GetFriends)
 			protected.GET("/users/me/friends/requests", friendsHandler.GetFriendRequests)
-			protected.POST("/users/me/friends/requests", friendsHandler.SendFriendRequest)
+			protected.POST("/users/me/friends/requests", friendRequestRateLimiter.Middleware(), friendsHandler.SendFriendRequest)
 			protected.PUT("/users/me/friends/requests/:username/accept", friendsHandler.AcceptFriendRequest)
 			protected.DELETE("/users/me/friends/requests/:username", friendsHandler.DeclineOrCancelFriendRequest)
 			protected.DELETE("/users/me/friends/:username", friendsHandler.RemoveFriend)
@@ -1308,17 +1307,6 @@ func main() {
 			protected.POST("/notifications/:id/read", notificationsHandler.MarkAsRead)
 			protected.POST("/notifications/read-all", notificationsHandler.MarkAllAsRead)
 			protected.DELETE("/notifications/:id", notificationsHandler.DeleteNotification)
-
-			// Moderation reports
-			protected.POST("/reports", moderationHandler.CreateReport)
-
-			// Global moderation endpoints (require site-wide moderator/admin role)
-			globalMod := protected.Group("/mod")
-			globalMod.Use(middleware.RequireRole("moderator", "admin"))
-			{
-				globalMod.GET("/reports", moderationHandler.ListReports)
-				globalMod.POST("/reports/:id/status", moderationHandler.UpdateReportStatus)
-			}
 
 			// Hub-specific moderation endpoints (per-hub moderator check done in middleware)
 			hubMod := protected.Group("/mod")
@@ -1526,6 +1514,7 @@ func main() {
 	// workerCancel() are deferred and fire on return from main() — after this
 	// block. Do not move these Stop() calls into defers without careful ordering.
 	reactionRateLimiter.Stop()
+	friendRequestRateLimiter.Stop()
 	themeCreationLimiter.Stop()
 	themePreviewLimiter.Stop()
 	generalLimiter.Stop()

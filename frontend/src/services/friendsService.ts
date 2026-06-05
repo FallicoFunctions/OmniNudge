@@ -36,12 +36,6 @@ export const friendsService = {
     const res = await api.get<{ status: FriendshipStatus }>(`/users/${username}/friendship`);
     return res.status;
   },
-
-  /** Convenience: returns all incoming requests as a flat count */
-  async getIncomingRequestCount(): Promise<number> {
-    const res = await api.get<FriendRequestsResponse>('/users/me/friends/requests');
-    return res.incoming.length;
-  },
 };
 
 /** Shared React Query keys */

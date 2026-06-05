@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/websocket"
@@ -15,11 +16,12 @@ type FriendsHandler struct {
 	friendRepo ports.UserFriendshipRepository
 	userRepo   ports.UserRepository
 	hub        *websocket.Hub
+	pool       *pgxpool.Pool
 }
 
 // NewFriendsHandler creates a new FriendsHandler.
-func NewFriendsHandler(friendRepo ports.UserFriendshipRepository, userRepo ports.UserRepository, hub *websocket.Hub) *FriendsHandler {
-	return &FriendsHandler{friendRepo: friendRepo, userRepo: userRepo, hub: hub}
+func NewFriendsHandler(friendRepo ports.UserFriendshipRepository, userRepo ports.UserRepository, hub *websocket.Hub, pool *pgxpool.Pool) *FriendsHandler {
+	return &FriendsHandler{friendRepo: friendRepo, userRepo: userRepo, hub: hub, pool: pool}
 }
 
 // GetFriends returns the authenticated user's accepted friend list.
@@ -103,6 +105,7 @@ type sendFriendRequestBody struct {
 // @Router       /users/me/friends/requests [post]
 func (h *FriendsHandler) SendFriendRequest(c *gin.Context) {
 	myID := c.GetInt("user_id")
+	myUsername := c.GetString("username")
 	ctx := c.Request.Context()
 
 	var body sendFriendRequestBody
@@ -118,6 +121,23 @@ func (h *FriendsHandler) SendFriendRequest(c *gin.Context) {
 	}
 	if target.ID == myID {
 		RespondError(c, http.StatusBadRequest, "Cannot send a friend request to yourself")
+		return
+	}
+
+	// Reject if either party has blocked the other.
+	var isBlocked bool
+	if err := h.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM blocked_users
+			WHERE (blocker_id = $1 AND blocked_id = $2)
+			   OR (blocker_id = $2 AND blocked_id = $1)
+		)
+	`, myID, target.ID).Scan(&isBlocked); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to check block status")
+		return
+	}
+	if isBlocked {
+		RespondError(c, http.StatusForbidden, "Cannot send a friend request to this user")
 		return
 	}
 
@@ -165,7 +185,7 @@ func (h *FriendsHandler) SendFriendRequest(c *gin.Context) {
 	h.hub.Broadcast(&websocket.Message{
 		RecipientID: target.ID,
 		Type:        "friend_request",
-		Payload:     map[string]interface{}{"from_user_id": myID, "from_username": body.Username},
+		Payload:     map[string]interface{}{"from_user_id": myID, "from_username": myUsername},
 	})
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Friend request sent",
@@ -278,8 +298,8 @@ func (h *FriendsHandler) RemoveFriend(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Friend removed"})
 }
 
-// GetFriendshipStatus returns the friendship relationship between the viewer and a given user.
-// Works for authenticated users (full status) and guests (always "none").
+// GetFriendshipStatus returns the friendship relationship between the authenticated viewer
+// and the given user. Route is under the protected group so only authenticated users reach it.
 //
 // @Summary      Get friendship status with a user
 // @Tags         Friends
@@ -291,9 +311,18 @@ func (h *FriendsHandler) RemoveFriend(c *gin.Context) {
 // @Failure      500  {object}  gin.H
 // @Router       /users/{username}/friendship [get]
 func (h *FriendsHandler) GetFriendshipStatus(c *gin.Context) {
-	viewerID := c.GetInt("user_id") // 0 if not authenticated
+	viewerID := c.GetInt("user_id")
 	username := c.Param("username")
 	ctx := c.Request.Context()
+
+	// Short-circuit: no auth context means no relationship to report.
+	// This guard should never fire in production (route requires auth) but
+	// prevents an accidental DB query with user_id=0 if the route is ever
+	// moved to an optional-auth group.
+	if viewerID == 0 {
+		c.JSON(http.StatusOK, gin.H{"status": "none"})
+		return
+	}
 
 	other, err := h.userRepo.GetByUsername(ctx, username)
 	if err != nil || other == nil {
