@@ -1,0 +1,15 @@
+html,
+body,
+#app {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: #050711;
+}
+
+.babylon-runtime-host,
+.babylon-render-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
