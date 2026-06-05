@@ -29,6 +29,8 @@ export async function createMainStageScene(engine: AbstractEngine) {
   }
 
   scene.onBeforeRenderObservable.add(() => {
+    cameraRig.syncZoomState();
+
     const move = resolveMoveVector(input.state);
     if (move.magnitude === 0) {
       return;
@@ -39,7 +41,6 @@ export async function createMainStageScene(engine: AbstractEngine) {
 
     playerRig.root.position.x += move.x * distance;
     playerRig.root.position.z += move.z * distance;
-    cameraRig.syncZoomState();
   });
 
   scene.metadata = {
