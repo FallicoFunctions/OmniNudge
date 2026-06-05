@@ -30,7 +30,6 @@ type UserRepository interface {
 	GetBanStatus(ctx context.Context, userID int) (*domain.BanStatus, error)
 	ShadowBanUser(ctx context.Context, userID int, reason string, showReason bool, adminID int) error
 	BanUser(ctx context.Context, userID int, reason string, showReason bool, adminID int) error
-	AutoSuspendForReports(ctx context.Context, userID int, reason string) error
 	UnbanUser(ctx context.Context, userID int, reason string, adminID int) error
 	SoftDeleteUser(ctx context.Context, userID int, reason string, adminID int) error
 	GetBanHistory(ctx context.Context, userID int) ([]domain.BanHistory, error)

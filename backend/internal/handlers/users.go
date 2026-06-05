@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/monitoring"
@@ -35,6 +36,7 @@ type UsersHandler struct {
 	hubModRepo   ports.HubModeratorRepository
 	cache        services.Cache
 	thumbService *services.ThumbnailService
+	pool         *pgxpool.Pool
 }
 
 // NewUsersHandler creates a new UsersHandler
@@ -49,6 +51,7 @@ func NewUsersHandler(
 	hubModRepo ports.HubModeratorRepository,
 	cache services.Cache,
 	thumbService *services.ThumbnailService,
+	pool *pgxpool.Pool,
 ) *UsersHandler {
 	if cache == nil {
 		cache = services.NoopCache{}
@@ -67,6 +70,7 @@ func NewUsersHandler(
 		hubModRepo:   hubModRepo,
 		cache:        cache,
 		thumbService: thumbService,
+		pool:         pool,
 	}
 }
 
@@ -171,6 +175,22 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 		resultState = "not_found"
 		RespondError(c, http.StatusNotFound, "User not found")
 		return
+	}
+
+	// Point 1: if the profile owner has blocked the viewer, return 404 so the
+	// blocked party cannot confirm the account exists.
+	if viewerID != 0 && viewerID != user.ID && h.pool != nil {
+		blocked, err := models.IsBlockedBidirectional(c.Request.Context(), h.pool, user.ID, viewerID)
+		if err != nil {
+			resultState = "error"
+			RespondError(c, http.StatusInternalServerError, "Failed to load profile")
+			return
+		}
+		if blocked {
+			resultState = "not_found"
+			RespondError(c, http.StatusNotFound, "User not found")
+			return
+		}
 	}
 
 	showLastSeen := true

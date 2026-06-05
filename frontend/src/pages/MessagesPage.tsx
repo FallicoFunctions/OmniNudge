@@ -80,7 +80,6 @@ import { hubsService } from '../services/hubsService';
 import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import type { LocalSubredditPost } from '../services/hubsService';
 import type { RedditApiPost } from '../types/reddit';
-import { ReportModal } from '../components/moderation/ReportModal';
 import { ChatSettingsModal } from '../components/messages/ChatSettingsModal';
 import { searchMessages, type MessageSearchFilters, type MessageSearchResult } from '../utils/messageSearch';
 import { secondsToDuration } from '../types/messages';
@@ -687,7 +686,6 @@ export default function MessagesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [messageMenuOpen, setMessageMenuOpen] = useState<number | null>(null);
-  const [reportModalMessageId, setReportModalMessageId] = useState<number | null>(null);
   const [replyTargetMessage, setReplyTargetMessage] = useState<Message | null>(null);
   const [deleteDialogMessage, setDeleteDialogMessage] = useState<Message | null>(null);
   const [deleteScopeInFlight, setDeleteScopeInFlight] = useState<'self' | 'both' | null>(null);
@@ -1232,6 +1230,15 @@ export default function MessagesPage() {
         setSelectedConversationId(message.conversation_id);
         setIsCreatingChat(false);
         setNewChatUsername('');
+      }
+    },
+    onError: (error: unknown) => {
+      // Point 11 / 12: a 404 from the message endpoint means the recipient
+      // cannot be messaged (block relationship exists). Show a clear message
+      // without revealing that a block is in place.
+      const status = (error as Error & { status?: number }).status;
+      if (status === 404 || status === 403) {
+        alert(t('messages.errors.userUnavailable'));
       }
     },
   });
@@ -1807,15 +1814,28 @@ export default function MessagesPage() {
           console.log('[Media Encryption] New chat mode, fetching user:', recipient);
           if (recipient) {
             try {
-              const user = await fetch(`${API_BASE_URL}/users/${recipient}`, {
+              const res = await fetch(`${API_BASE_URL}/users/${recipient}`, {
                 headers: {
                   Authorization: `Bearer ${getStoredAuthToken()}`,
                 },
-              }).then((res) => res.json());
+              });
+              if (!res.ok) {
+                // 404 means user not found or has blocked the sender — abort the
+                // entire send so no file is uploaded and the user gets feedback.
+                setUploadingMedia(false);
+                alert(t('messages.errors.userUnavailable'));
+                return;
+              }
+              const user = await res.json();
               recipientId = user.id;
               console.log('[Media Encryption] Fetched recipient ID:', recipientId);
             } catch (error) {
+              // Network failure on the user lookup — abort cleanly so the UI
+              // doesn't get stuck in uploading state.
               console.warn('[Media Encryption] Failed to fetch recipient user:', error);
+              setUploadingMedia(false);
+              alert(t('messages.errors.userUnavailable'));
+              return;
             }
           }
         } else if (selectedConversationId) {
@@ -2003,11 +2023,6 @@ export default function MessagesPage() {
       conversationId: deleteDialogMessage.conversation_id,
       deleteFor,
     });
-  };
-
-  const handleReportMessage = (message: Message) => {
-    setMessageMenuOpen(null);
-    setReportModalMessageId(message.id);
   };
 
   const handleOpenForwardDialog = (message: Message) => {
@@ -3554,15 +3569,6 @@ export default function MessagesPage() {
                                       {t('messages.actions.viewProfile')}
                                     </button>
                                   )}
-                                  {!isOwnMessage && (
-                                    <button
-                                      type="button"
-                                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                                      onClick={() => handleReportMessage(message)}
-                                    >
-                                      {t('messages.actions.report')}
-                                    </button>
-                                  )}
                                   <button
                                     type="button"
                                     className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
@@ -4628,16 +4634,6 @@ export default function MessagesPage() {
             </button>
           </div>
         </div>
-      )}
-
-      {reportModalMessageId !== null && (
-        <ReportModal
-          isOpen={true}
-          onClose={() => setReportModalMessageId(null)}
-          targetType="message"
-          targetId={reportModalMessageId}
-          defaultReason="harassment"
-        />
       )}
 
       {showChatSettings && selectedConversationId && (

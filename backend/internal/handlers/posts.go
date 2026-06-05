@@ -409,12 +409,29 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 		}
 	}
 
-	// Hide posts from public viewers while the author has a pending account deletion.
+	// Hide posts from public viewers while the author has a pending account deletion,
+	// or when the author has blocked the viewer (Point 2).
+	// Fail closed: if the author lookup errors, log it and return 404 rather than
+	// serving the post without completing the visibility checks.
 	author, err := h.userRepo.GetByID(c.Request.Context(), post.AuthorID)
-	if err == nil && author != nil {
+	if err != nil {
+		zlog.Error().Err(err).Int("post_id", postID).Int("author_id", post.AuthorID).
+			Msg("posts: GetByID failed during visibility check; hiding post")
+		RespondError(c, http.StatusNotFound, "Post not found")
+		return
+	}
+	if author != nil {
 		if isPendingDeletionHiddenFromViewer(author, viewerID) {
 			RespondError(c, http.StatusNotFound, "Post not found")
 			return
+		}
+		if viewerID != 0 {
+			blocked, blockErr := models.IsBlockedBidirectional(c.Request.Context(), h.pool, post.AuthorID, viewerID)
+			if blockErr != nil || blocked {
+				// Fail closed on DB error: uncertain block status → hide the post.
+				RespondError(c, http.StatusNotFound, "Post not found")
+				return
+			}
 		}
 		post.Author = author
 	}
@@ -554,6 +571,25 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 	hubName := c.Query("hub") // optional filter by hub name
 	sourceFilter := c.Query("source")
 
+	// Point 4: resolve the viewer and load their complete block set once,
+	// before either branch executes, so the set is not loaded twice.
+	var feedViewerID int
+	if uid, _ := middleware.GetOptionalUserID(c); uid != 0 {
+		feedViewerID = uid
+	}
+	// Bidirectional block set for the viewer. Loaded once; passed to the DB
+	// queries so LIMIT/OFFSET are applied against the already-filtered set
+	// (post-fetch filtering breaks offset pagination by shrinking page sizes).
+	var feedExcludeIDs []int
+	if feedViewerID != 0 {
+		var blockErr error
+		feedExcludeIDs, _, blockErr = models.GetAllBlockedIDs(c.Request.Context(), h.pool, feedViewerID)
+		if blockErr != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to load feed")
+			return
+		}
+	}
+
 	// Validate limit
 	if limit < 1 || limit > 100 {
 		limit = 25
@@ -578,7 +614,11 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 			RespondError(c, http.StatusNotFound, "Hub not found")
 			return
 		}
-		posts, err := h.postRepo.GetByHub(c.Request.Context(), sr.ID, sortBy, limit, offset)
+		var feedViewerIDPtr *int
+		if feedViewerID != 0 {
+			feedViewerIDPtr = &feedViewerID
+		}
+		posts, err := h.postRepo.GetByHubExcludingAuthors(c.Request.Context(), sr.ID, sortBy, limit, offset, feedViewerIDPtr, feedExcludeIDs)
 		if err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to get feed")
 			return
@@ -593,7 +633,7 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 		return
 	}
 
-	items, err := h.feedRepo.GetUnifiedFeed(c.Request.Context(), sortBy, limit, offset, sourceFilter)
+	items, err := h.feedRepo.GetUnifiedFeed(c.Request.Context(), sortBy, limit, offset, sourceFilter, feedExcludeIDs)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to get feed")
 		return

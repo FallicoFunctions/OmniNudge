@@ -108,10 +108,6 @@ func (r *PostgresUserRepository) BanUser(ctx context.Context, userID int, reason
 	return r.inner.BanUser(ctx, userID, reason, showReason, adminID)
 }
 
-func (r *PostgresUserRepository) AutoSuspendForReports(ctx context.Context, userID int, reason string) error {
-	return r.inner.AutoSuspendForReports(ctx, userID, reason)
-}
-
 func (r *PostgresUserRepository) UnbanUser(ctx context.Context, userID int, reason string, adminID int) error {
 	return r.inner.UnbanUser(ctx, userID, reason, adminID)
 }
