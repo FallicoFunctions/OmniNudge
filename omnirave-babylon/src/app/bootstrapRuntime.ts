@@ -7,6 +7,7 @@ export async function bootstrapRuntime() {
   }
 
   let host = app.querySelector<HTMLElement>('[data-testid="babylon-runtime-host"]');
+  const hostCreated = !host;
   if (!host) {
     host = document.createElement('div');
     host.dataset.testid = 'babylon-runtime-host';
@@ -15,6 +16,14 @@ export async function bootstrapRuntime() {
   }
 
   if (!host.querySelector('canvas[data-testid="babylon-render-canvas"]')) {
-    await createRuntime(host);
+    try {
+      await createRuntime(host);
+    } catch (error) {
+      host.replaceChildren();
+      if (hostCreated) {
+        host.remove();
+      }
+      throw error;
+    }
   }
 }

@@ -1,29 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createRuntimeMock } = vi.hoisted(() => ({
-  createRuntimeMock: vi.fn(async (host: HTMLElement) => {
-    const canvas = document.createElement('canvas');
-    canvas.dataset.testid = 'babylon-render-canvas';
-    host.appendChild(canvas);
+async function loadBootstrapRuntime(
+  createRuntimeImpl: (host: HTMLElement) => Promise<unknown>,
+) {
+  vi.resetModules();
+  vi.doMock('../createRuntime', () => ({
+    createRuntime: vi.fn(createRuntimeImpl),
+  }));
 
-    const hud = document.createElement('aside');
-    hud.dataset.testid = 'review-hud';
-    host.appendChild(hud);
-  }),
-}));
+  const module = await import('../bootstrapRuntime');
+  const runtimeModule = await import('../createRuntime');
 
-vi.mock('../createRuntime', () => ({
-  createRuntime: createRuntimeMock,
-}));
-
-import { bootstrapRuntime } from '../bootstrapRuntime';
+  return {
+    bootstrapRuntime: module.bootstrapRuntime,
+    createRuntimeMock: vi.mocked(runtimeModule.createRuntime),
+  };
+}
 
 describe('bootstrapRuntime', () => {
   beforeEach(() => {
-    createRuntimeMock.mockClear();
+    document.body.innerHTML = '';
+    vi.resetModules();
+    vi.clearAllMocks();
   });
 
   it('creates a render canvas and review HUD once', async () => {
+    const { bootstrapRuntime, createRuntimeMock } = await loadBootstrapRuntime(async (host) => {
+      const canvas = document.createElement('canvas');
+      canvas.dataset.testid = 'babylon-render-canvas';
+      host.appendChild(canvas);
+
+      const hud = document.createElement('aside');
+      hud.dataset.testid = 'review-hud';
+      host.appendChild(hud);
+    });
+
     document.body.innerHTML = '<div id="app"></div>';
 
     await bootstrapRuntime();
@@ -32,5 +43,78 @@ describe('bootstrapRuntime', () => {
     expect(document.querySelector('canvas[data-testid="babylon-render-canvas"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="review-hud"]')).not.toBeNull();
     expect(createRuntimeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('cleans up failed initialization so bootstrap can retry', async () => {
+    let attempts = 0;
+    const { bootstrapRuntime, createRuntimeMock } = await loadBootstrapRuntime(async (host) => {
+      attempts += 1;
+
+      const canvas = document.createElement('canvas');
+      canvas.dataset.testid = 'babylon-render-canvas';
+      host.appendChild(canvas);
+
+      const hud = document.createElement('aside');
+      hud.dataset.testid = 'review-hud';
+      host.appendChild(hud);
+
+      if (attempts === 1) {
+        throw new Error('scene failed');
+      }
+    });
+
+    document.body.innerHTML = '<div id="app"></div>';
+
+    await expect(bootstrapRuntime()).rejects.toThrow('scene failed');
+    expect(document.querySelector('[data-testid="babylon-runtime-host"]')).toBeNull();
+    expect(document.querySelector('canvas[data-testid="babylon-render-canvas"]')).toBeNull();
+    expect(document.querySelector('[data-testid="review-hud"]')).toBeNull();
+
+    await bootstrapRuntime();
+
+    expect(document.querySelector('canvas[data-testid="babylon-render-canvas"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="review-hud"]')).not.toBeNull();
+    expect(createRuntimeMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('createRuntime', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    vi.resetModules();
+    vi.clearAllMocks();
+    vi.doUnmock('../createRuntime');
+    vi.doUnmock('../../scene/createMainStageScene');
+    vi.doUnmock('@babylonjs/core/Engines/engine');
+  });
+
+  it('disposes the engine and removes DOM nodes when scene creation fails', async () => {
+    const engineDispose = vi.fn();
+    const engineRunRenderLoop = vi.fn();
+    const engineResize = vi.fn();
+
+    vi.doMock('@babylonjs/core/Engines/engine', () => ({
+      Engine: vi.fn(() => ({
+        dispose: engineDispose,
+        runRenderLoop: engineRunRenderLoop,
+        resize: engineResize,
+      })),
+    }));
+
+    vi.doMock('../../scene/createMainStageScene', () => ({
+      createMainStageScene: vi.fn(async () => {
+        throw new Error('scene failed');
+      }),
+    }));
+
+    const { createRuntime } = await import('../createRuntime');
+    const host = document.createElement('div');
+
+    await expect(createRuntime(host)).rejects.toThrow('scene failed');
+
+    expect(engineDispose).toHaveBeenCalledTimes(1);
+    expect(engineRunRenderLoop).not.toHaveBeenCalled();
+    expect(host.querySelector('canvas[data-testid="babylon-render-canvas"]')).toBeNull();
+    expect(host.querySelector('[data-testid="review-hud"]')).toBeNull();
   });
 });

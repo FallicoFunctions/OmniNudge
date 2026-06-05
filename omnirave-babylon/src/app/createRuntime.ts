@@ -15,16 +15,28 @@ export async function createRuntime(host: HTMLElement) {
     stencil: true,
   });
 
-  const hud = createReviewHud(host);
-  const scene = await createMainStageScene(engine);
-
-  engine.runRenderLoop(() => {
-    scene.render();
-  });
-
-  window.addEventListener('resize', () => {
+  const handleResize = () => {
     engine.resize();
-  });
+  };
 
-  return { engine, scene, canvas, hud, config: RUNTIME_CONFIG };
+  let hud: HTMLElement | undefined;
+
+  try {
+    hud = createReviewHud(host);
+    const scene = await createMainStageScene(engine);
+
+    engine.runRenderLoop(() => {
+      scene.render();
+    });
+
+    window.addEventListener('resize', handleResize);
+
+    return { engine, scene, canvas, hud, config: RUNTIME_CONFIG };
+  } catch (error) {
+    window.removeEventListener('resize', handleResize);
+    engine.dispose();
+    hud?.remove();
+    canvas.remove();
+    throw error;
+  }
 }
