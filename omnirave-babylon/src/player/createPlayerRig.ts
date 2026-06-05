@@ -4,6 +4,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import type { Vector3 } from '@babylonjs/core/Maths/math.vector';
 
 export interface PlayerRig {
+  avatarAnchor: TransformNode;
   capsule: ReturnType<typeof MeshBuilder.CreateCapsule>;
   eyeHeightMeters: number;
   root: TransformNode;
@@ -14,6 +15,11 @@ export function createPlayerRig(scene: Scene, spawn: Vector3): PlayerRig {
   const root = new TransformNode('player-root', scene);
   root.position.copyFrom(spawn);
 
+  const eyeHeightMeters = 1.65;
+  const avatarAnchor = new TransformNode('player-avatar-anchor', scene);
+  avatarAnchor.parent = root;
+  avatarAnchor.position.y = -eyeHeightMeters;
+
   const capsule = MeshBuilder.CreateCapsule(
     'player-capsule',
     {
@@ -23,14 +29,15 @@ export function createPlayerRig(scene: Scene, spawn: Vector3): PlayerRig {
     scene,
   );
   capsule.parent = root;
-  capsule.position.y = 0.9;
+  capsule.position.y = -(eyeHeightMeters - 0.9);
   capsule.isVisible = false;
   capsule.checkCollisions = true;
 
   return {
+    avatarAnchor,
     root,
     capsule,
     speedMetersPerSecond: 4.5,
-    eyeHeightMeters: 1.65,
+    eyeHeightMeters,
   };
 }
