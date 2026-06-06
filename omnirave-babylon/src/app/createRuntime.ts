@@ -1,4 +1,7 @@
 import { Engine } from '@babylonjs/core/Engines/engine';
+import '@babylonjs/core/Shaders/pbr.fragment';
+import '@babylonjs/core/Shaders/pbr.vertex';
+import '@babylonjs/core/Shaders/rgbdDecode.fragment';
 import { createMainStageScene } from '../scene/createMainStageScene';
 import { createDebugPanel } from '../ui/createDebugPanel';
 import { createPerfOverlay } from '../ui/createPerfOverlay';

@@ -154,4 +154,26 @@ describe('createRuntime', () => {
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
     expect(engineDispose).not.toHaveBeenCalled();
   });
+
+  it('registers the Babylon PBR shaders required by imported GLB materials', async () => {
+    const { ShaderStore } = await import('@babylonjs/core/Engines/shaderStore.js');
+
+    vi.doMock('@babylonjs/core/Engines/engine', () => ({
+      Engine: vi.fn(() => ({
+        dispose: vi.fn(),
+        runRenderLoop: vi.fn(),
+        resize: vi.fn(),
+      })),
+    }));
+
+    vi.doMock('../../scene/createMainStageScene', () => ({
+      createMainStageScene: vi.fn(async () => ({ render: vi.fn() })),
+    }));
+
+    await import('../createRuntime');
+
+    expect(ShaderStore.ShadersStore.pbrVertexShader).toEqual(expect.any(String));
+    expect(ShaderStore.ShadersStore.pbrPixelShader).toEqual(expect.any(String));
+    expect(ShaderStore.ShadersStore.rgbdDecodePixelShader).toEqual(expect.any(String));
+  });
 });
