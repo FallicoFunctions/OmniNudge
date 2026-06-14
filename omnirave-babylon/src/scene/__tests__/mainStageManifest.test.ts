@@ -399,6 +399,34 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(materialNameFor('V26_VipTerraceGoldInlay_R')).toBe('V20_ChasedGoldFiligree');
   });
 
+  it('replaces the box portal stage with a layered performance dais', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    expect(exportedNodeNames).not.toContain('V5_PortalStage');
+
+    const requiredDaisNodes = [
+      'V27_PerformanceDaisLower',
+      'V27_PerformanceDaisMid',
+      'V27_PerformanceDaisUpper',
+    ];
+    for (const nodeName of requiredDaisNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const lower = readMeshGeometry('V27_PerformanceDaisLower');
+    const upper = readMeshGeometry('V27_PerformanceDaisUpper');
+    expect(lower.min[0]).toBeLessThan(-6);
+    expect(lower.max[0]).toBeGreaterThan(6);
+    expect(lower.max[2] - lower.min[2]).toBeGreaterThan(10);
+    expect(upper.min[0]).toBeLessThan(-4);
+    expect(upper.max[0]).toBeGreaterThan(4);
+    expect(upper.max[2] - upper.min[2]).toBeGreaterThan(6);
+
+    expect(materialNameFor('V27_PerformanceDaisLower')).toBe('V20_RecessedWarmShadow');
+    expect(materialNameFor('V27_PerformanceDaisMid')).toBe('V20_LayeredPearlShell');
+    expect(materialNameFor('V27_PerformanceDaisUpper')).toBe('V20_ChasedGoldFiligree');
+  });
+
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
     const requiredMeshNodes = [
       'V24_CelestialCrownFrontArch_L',
