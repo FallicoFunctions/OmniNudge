@@ -67,6 +67,15 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V18_BasinFountainJet_L_0');
     expectMainStageMarker('V18_WingFacadeArchInlay_L_0');
   });
+
+  it('exports named foreground arrival details for the far spawn reveal camera', () => {
+    expectMainStageMarker('V19_BackPlazaGatewayArch_L_0');
+    expectMainStageMarker('V19_LongApproachReflectivePanel_0');
+    expectMainStageMarker('V19_ApproachLightMast_L_0');
+    expectMainStageMarker('V19_ForegroundCrowdScaleSilhouette_0');
+    expectMainStageMarker('V19_WayfindingMonolith_L');
+    expectMainStageMarker('V19_ScreenConstellationStroke_0');
+  });
 });
 
 describe('reviewRouteData', () => {
