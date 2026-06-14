@@ -89,5 +89,9 @@ backend/cmd/worker/
 
 # Local runtime/build artifacts (do not commit)
 .claude/
+node_modules/
+**/node_modules/
+**/.vite/
+**/dist/
 backend/dump.rdb
 frontend/storybook-static/
