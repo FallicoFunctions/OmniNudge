@@ -74,6 +74,7 @@ describe('createMainStageScene', () => {
 
     expect(camera).not.toBeNull();
     expect(camera!.radius).toBe(72);
+    expect(camera!.alpha).toBeCloseTo(-Math.PI / 2);
 
     camera!.radius = 20;
     scene.render();

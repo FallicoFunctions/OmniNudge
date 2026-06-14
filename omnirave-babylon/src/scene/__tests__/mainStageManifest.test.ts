@@ -24,7 +24,15 @@ describe('MAIN_STAGE_MANIFEST', () => {
 
 describe('reviewRouteData', () => {
   it('starts from the back-plaza reveal and defines at least four review checkpoints', () => {
-    expect(BACK_PLAZA_SPAWN).toEqual({ x: 0, y: 1.7, z: 48 });
+    expect(BACK_PLAZA_SPAWN).toEqual({ x: 0, y: 1.7, z: -48 });
     expect(MAIN_STAGE_REVIEW_ROUTE.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('keeps the approval route aligned with forward traversal toward the stage', () => {
+    expect(MAIN_STAGE_REVIEW_ROUTE[0]).toMatchObject(BACK_PLAZA_SPAWN);
+
+    const zSteps = MAIN_STAGE_REVIEW_ROUTE.map((checkpoint) => checkpoint.z);
+    expect(zSteps).toEqual([...zSteps].sort((a, b) => a - b));
+    expect(zSteps.at(-1)).toBeGreaterThan(BACK_PLAZA_SPAWN.z);
   });
 });
