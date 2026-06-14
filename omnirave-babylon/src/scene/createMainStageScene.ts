@@ -14,6 +14,7 @@ import { resolveMoveVector } from '../player/movementMath';
 import { createAtmosphereRig } from './createAtmosphereRig';
 import { createLightingRig } from './createLightingRig';
 import { createMainStagePresentationRig } from './createMainStagePresentationRig';
+import { createMainStageProductionSurfaces } from './createMainStageProductionSurfaces';
 import { loadMainStageAssets } from './loadMainStageAssets';
 import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from './reviewRouteData';
 
@@ -42,6 +43,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
 
   scene.activeCamera = cameraRig.camera;
   const presentationRig = createMainStagePresentationRig(scene, cameraRig.camera);
+  const productionSurfaces = createMainStageProductionSurfaces(scene);
 
   const canvas = engine.getRenderingCanvas?.();
   if (canvas) {
@@ -82,6 +84,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
       stageAssets,
       input,
       playerRig,
+      productionSurfaces,
       spawn: BACK_PLAZA_SPAWN,
     },
   };
