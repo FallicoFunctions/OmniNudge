@@ -63,6 +63,8 @@ describe('createMainStageScene', () => {
     expect(scene.metadata?.reviewRuntime?.presentationRig.pipeline.name).toBe(
       'main-stage-presentation-pipeline',
     );
+    expect(scene.metadata?.reviewRuntime?.productionSurfaces).toBeDefined();
+    expect(scene.getMeshByName('main-stage-center-celestial-screen')).not.toBeNull();
     expect(scene.environmentTexture?.name).toBe('main-stage-night-reflection-env');
     expect(scene.metadata?.reviewRuntime?.reviewAvatar).toBeDefined();
     expect(scene.getTransformNodeByName('review-avatar-root')?.parent?.name).toBe('player-avatar-anchor');
