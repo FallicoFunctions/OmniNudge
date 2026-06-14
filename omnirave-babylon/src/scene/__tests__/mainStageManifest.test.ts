@@ -76,6 +76,15 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V19_WayfindingMonolith_L');
     expectMainStageMarker('V19_ScreenConstellationStroke_0');
   });
+
+  it('exports named facade refinement details for the Main Stage side-shell read', () => {
+    expectMainStageMarker('V20_RearShellPanel_L_0');
+    expectMainStageMarker('V20_OuterWingButtress_L_0');
+    expectMainStageMarker('V20_VipBalustradeFiligree_L_0');
+    expectMainStageMarker('V20_SideScreenOrbitalRing_L_0');
+    expectMainStageMarker('V20_CrownCrystalFacet_0');
+    expectMainStageMarker('V20_PearlSurfaceRelief_L_0');
+  });
 });
 
 describe('reviewRouteData', () => {
