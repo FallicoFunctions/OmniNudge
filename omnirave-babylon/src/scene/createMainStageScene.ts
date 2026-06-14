@@ -11,6 +11,7 @@ import { createInputMap } from '../player/createInputMap';
 import { createPlayerRig } from '../player/createPlayerRig';
 import { createReviewAvatar } from '../player/createReviewAvatar';
 import { resolveMoveVector } from '../player/movementMath';
+import { createAtmosphereRig } from './createAtmosphereRig';
 import { createLightingRig } from './createLightingRig';
 import { loadMainStageAssets } from './loadMainStageAssets';
 import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from './reviewRouteData';
@@ -25,6 +26,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
 
   const stageAssets = await loadMainStageAssets(scene);
   const lightingRig = createLightingRig(scene);
+  const atmosphereRig = createAtmosphereRig(scene);
   const input = createInputMap(window);
   const playerRig = createPlayerRig(
     scene,
@@ -70,6 +72,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
     ...scene.metadata,
     reviewRuntime: {
       checkpoints: MAIN_STAGE_REVIEW_ROUTE,
+      atmosphereRig,
       cameraRig,
       lightingRig,
       reviewAvatar,

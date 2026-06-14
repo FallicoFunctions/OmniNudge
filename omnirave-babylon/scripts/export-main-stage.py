@@ -59,17 +59,18 @@ if not collision_objects:
     raise RuntimeError('The "Collision" collection is empty; cannot export main-stage-collision.glb')
 
 bpy.context.view_layer.objects.active = collision_objects[0]
-bpy.ops.export_scene.gltf(
-    filepath=str(collision_output),
-    export_format="GLB",
-    use_selection=True,
-    export_yup=True,
-    export_apply=True,
-    export_texcoords=False,
-    export_normals=True,
-    export_materials="NONE",
-)
-
-for obj in collision_objects:
-    obj.hide_viewport = previous_hide_viewport[obj.name]
-    obj.hide_render = previous_hide_render[obj.name]
+try:
+    bpy.ops.export_scene.gltf(
+        filepath=str(collision_output),
+        export_format="GLB",
+        use_selection=True,
+        export_yup=True,
+        export_apply=True,
+        export_texcoords=False,
+        export_normals=True,
+        export_materials="NONE",
+    )
+finally:
+    for obj in collision_objects:
+        obj.hide_viewport = previous_hide_viewport[obj.name]
+        obj.hide_render = previous_hide_render[obj.name]
