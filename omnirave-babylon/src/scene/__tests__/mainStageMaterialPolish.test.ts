@@ -52,7 +52,12 @@ describe('polishMainStageMaterials', () => {
       untouched: 1,
       wet: 1,
     });
-    expect(screen.material.emissiveIntensity).toBeGreaterThan(1.5);
+    expect(screen.material.emissiveIntensity).toBeGreaterThanOrEqual(0.55);
+    expect(screen.material.emissiveIntensity).toBeLessThanOrEqual(1.05);
+    expect(screen.material.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(screen.material.roughness).toBeGreaterThanOrEqual(0.38);
+    expect(screen.material.clearCoat.intensity).toBeLessThanOrEqual(0.2);
+    expect(screen.material.environmentIntensity).toBeLessThanOrEqual(0.8);
     expect(cyanGlass.material.emissiveColor.b).toBeGreaterThan(cyanGlass.material.emissiveColor.r);
     expect(gold.material.metallic).toBeGreaterThan(0.85);
     expect(gold.material.roughness).toBeLessThan(0.42);

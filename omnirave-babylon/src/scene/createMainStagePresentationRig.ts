@@ -12,9 +12,9 @@ const rgb = (red: number, green: number, blue: number) => new Uint8Array([red, g
 export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   const environmentTexture = createEnvironmentTexture(scene);
   environmentTexture.name = 'main-stage-night-reflection-env';
-  environmentTexture.level = 0.92;
+  environmentTexture.level = 0.86;
   scene.environmentTexture = environmentTexture;
-  scene.environmentIntensity = 0.92;
+  scene.environmentIntensity = 0.86;
 
   const pipeline = new DefaultRenderingPipeline(
     'main-stage-presentation-pipeline',
@@ -25,9 +25,9 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   pipeline.imageProcessingEnabled = true;
   pipeline.fxaaEnabled = true;
   pipeline.bloomEnabled = true;
-  pipeline.bloomThreshold = 0.58;
-  pipeline.bloomWeight = 0.32;
-  pipeline.bloomKernel = 72;
+  pipeline.bloomThreshold = 0.88;
+  pipeline.bloomWeight = 0.07;
+  pipeline.bloomKernel = 24;
   pipeline.bloomScale = 0.5;
   pipeline.depthOfFieldEnabled = false;
   pipeline.chromaticAberrationEnabled = false;
