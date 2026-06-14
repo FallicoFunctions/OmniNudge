@@ -7,6 +7,12 @@ import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from '../reviewRouteData';
 const projectRoot = process.cwd();
 const exportScript = readFileSync(path.join(projectRoot, 'scripts/export-main-stage.py'), 'utf8');
 const optimizeScript = readFileSync(path.join(projectRoot, 'scripts/optimize-main-stage.mjs'), 'utf8');
+const mainStageGlbText = readFileSync(
+  path.join(projectRoot, 'public/assets/venues/main-stage/main-stage.glb'),
+).toString('utf8');
+const expectMainStageMarker = (marker: string) => {
+  expect(mainStageGlbText.includes(marker), `missing GLB marker: ${marker}`).toBe(true);
+};
 
 describe('MAIN_STAGE_MANIFEST', () => {
   it('declares the authored GLB, collision GLB, and review avatar runtime paths', () => {
@@ -35,6 +41,14 @@ describe('MAIN_STAGE_MANIFEST', () => {
   it('restores collision visibility even if the collision export fails', () => {
     expect(exportScript).toMatch(/try:[\s\S]*filepath=str\(collision_output\)[\s\S]*finally:/);
     expect(exportScript).toMatch(/finally:[\s\S]*obj\.hide_viewport = previous_hide_viewport\[obj\.name\]/);
+  });
+
+  it('exports named production and garden details for the Main Stage fidelity pass', () => {
+    expectMainStageMarker('V16_CrownRiggingSpan');
+    expectMainStageMarker('V16_ScreenServiceCatwalk');
+    expectMainStageMarker('V16_VipGardenBasin_L');
+    expectMainStageMarker('V16_BackPlazaSightlineRail_L');
+    expectMainStageMarker('V16_PlazaPaverInlay_0');
   });
 });
 
