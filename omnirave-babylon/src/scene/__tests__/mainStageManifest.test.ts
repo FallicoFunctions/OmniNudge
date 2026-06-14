@@ -20,6 +20,17 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(exportScript).toContain('Collision');
     expect(optimizeScript).toContain('main-stage-collision.glb');
   });
+
+  it('keeps collision-only objects out of the visible scene export', () => {
+    expect(exportScript).toContain('collision_object_names');
+    expect(exportScript).toContain('visible_objects');
+    expect(exportScript).toMatch(/filepath=str\(scene_output\)[\s\S]*use_selection=True/);
+  });
+
+  it('temporarily unhides collision objects for the collision-only export', () => {
+    expect(exportScript).toContain('previous_hide_viewport');
+    expect(exportScript).toMatch(/obj\.hide_viewport = False[\s\S]*filepath=str\(collision_output\)/);
+  });
 });
 
 describe('reviewRouteData', () => {
