@@ -13,6 +13,7 @@ import { createReviewAvatar } from '../player/createReviewAvatar';
 import { resolveMoveVector } from '../player/movementMath';
 import { createAtmosphereRig } from './createAtmosphereRig';
 import { createLightingRig } from './createLightingRig';
+import { createMainStagePresentationRig } from './createMainStagePresentationRig';
 import { loadMainStageAssets } from './loadMainStageAssets';
 import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from './reviewRouteData';
 
@@ -40,6 +41,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
   cameraRig.camera.radius = 72;
 
   scene.activeCamera = cameraRig.camera;
+  const presentationRig = createMainStagePresentationRig(scene, cameraRig.camera);
 
   const canvas = engine.getRenderingCanvas?.();
   if (canvas) {
@@ -75,6 +77,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
       atmosphereRig,
       cameraRig,
       lightingRig,
+      presentationRig,
       reviewAvatar,
       stageAssets,
       input,
