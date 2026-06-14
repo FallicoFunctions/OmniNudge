@@ -10,8 +10,19 @@ const optimizeScript = readFileSync(path.join(projectRoot, 'scripts/optimize-mai
 const mainStageGlbText = readFileSync(
   path.join(projectRoot, 'public/assets/venues/main-stage/main-stage.glb'),
 ).toString('utf8');
+const mainStageGlbBuffer = readFileSync(path.join(projectRoot, 'public/assets/venues/main-stage/main-stage.glb'));
 const expectMainStageMarker = (marker: string) => {
   expect(mainStageGlbText.includes(marker), `missing GLB marker: ${marker}`).toBe(true);
+};
+const readGlbJson = (buffer: Buffer) => {
+  const magic = buffer.toString('utf8', 0, 4);
+  expect(magic).toBe('glTF');
+
+  const jsonChunkLength = buffer.readUInt32LE(12);
+  const jsonChunkType = buffer.toString('utf8', 16, 20);
+  expect(jsonChunkType).toBe('JSON');
+
+  return JSON.parse(buffer.toString('utf8', 20, 20 + jsonChunkLength).trim());
 };
 
 describe('MAIN_STAGE_MANIFEST', () => {
@@ -84,6 +95,12 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V20_SideScreenOrbitalRing_L_0');
     expectMainStageMarker('V20_CrownCrystalFacet_0');
     expectMainStageMarker('V20_PearlSurfaceRelief_L_0');
+  });
+
+  it('keeps the visible GLB node count within the Main Stage browser budget', () => {
+    const glbJson = readGlbJson(mainStageGlbBuffer);
+
+    expect(glbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
 });
 
