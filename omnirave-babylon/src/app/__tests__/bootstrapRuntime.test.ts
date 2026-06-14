@@ -125,7 +125,22 @@ describe('createRuntime', () => {
     const engineRunRenderLoop = vi.fn();
     const engineResize = vi.fn();
     const sceneRender = vi.fn();
-    const scene = { render: sceneRender };
+    const playerPositionSet = vi.fn();
+    const scene = {
+      render: sceneRender,
+      metadata: {
+        reviewRuntime: {
+          checkpoints: [{ id: 'spawn_reveal', x: 0, y: 1.7, z: -48 }],
+          playerRig: {
+            root: {
+              position: {
+                set: playerPositionSet,
+              },
+            },
+          },
+        },
+      },
+    };
 
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: vi.fn(() => ({
@@ -151,6 +166,8 @@ describe('createRuntime', () => {
     expect(host.querySelector('[data-debug-toggle="collision"]')).not.toBeNull();
     expect(host.querySelector('[data-debug-toggle="routes"]')).not.toBeNull();
     expect(host.querySelector('[data-debug-toggle="lighting"]')).not.toBeNull();
+    host.querySelector<HTMLButtonElement>('[data-review-checkpoint="spawn_reveal"]')?.click();
+    expect(playerPositionSet).toHaveBeenCalledWith(0, 1.7, -48);
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
     expect(engineDispose).not.toHaveBeenCalled();
   });
