@@ -97,6 +97,13 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V20_PearlSurfaceRelief_L_0');
   });
 
+  it('exports physical screen depth baffles that break up flat emissive panels', () => {
+    expectMainStageMarker('V22_CenterScreenDepthBaffle_0');
+    expectMainStageMarker('V22_CenterScreenShadowCoffer_Top');
+    expectMainStageMarker('V22_WingScreenDepthBaffle_L_0');
+    expectMainStageMarker('V22_CrownScreenShadowCoffer');
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     const glbJson = readGlbJson(mainStageGlbBuffer);
 
