@@ -104,6 +104,13 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V22_CrownScreenShadowCoffer');
   });
 
+  it('exports authored arrival-threshold trim so the promenade foreground is not placeholder geometry', () => {
+    expectMainStageMarker('V23_ArrivalThresholdGoldRail_0');
+    expectMainStageMarker('V23_ArrivalSidePlinthPearlCap_L');
+    expectMainStageMarker('V23_ArrivalRunwayInsetRib_0');
+    expectMainStageMarker('V23_BackPlazaFramingPylon_L');
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     const glbJson = readGlbJson(mainStageGlbBuffer);
 
