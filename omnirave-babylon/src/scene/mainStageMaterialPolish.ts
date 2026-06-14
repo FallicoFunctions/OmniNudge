@@ -101,14 +101,15 @@ function applyMainStageMaterialFamily(material: PBRMaterial, family: MainStageMa
   };
 
   if (family === 'emissive') {
+    material.albedoColor = new Color3(0.015, 0.14, 0.24);
     material.metallic = Math.max(material.metallic ?? 0, 0.08);
-    material.roughness = 0.24;
-    material.emissiveColor = new Color3(0.1, 0.72, 1);
-    material.emissiveIntensity = 2.35;
+    material.roughness = 0.42;
+    material.emissiveColor = new Color3(0.04, 0.42, 0.62);
+    material.emissiveIntensity = 0.86;
     material.clearCoat.isEnabled = true;
-    material.clearCoat.intensity = 0.45;
-    material.clearCoat.roughness = 0.16;
-    material.environmentIntensity = 1.25;
+    material.clearCoat.intensity = 0.14;
+    material.clearCoat.roughness = 0.24;
+    material.environmentIntensity = 0.68;
     return;
   }
 

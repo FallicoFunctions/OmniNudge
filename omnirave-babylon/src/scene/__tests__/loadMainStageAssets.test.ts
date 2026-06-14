@@ -61,7 +61,8 @@ describe('loadMainStageAssets', () => {
 
     expect(importMeshAsync).toHaveBeenCalledTimes(2);
     expect(mainMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
-    expect(mainMaterial.emissiveIntensity).toBeGreaterThan(1.5);
+    expect(mainMaterial.emissiveIntensity).toBeLessThanOrEqual(1.05);
+    expect(mainMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
     expect(collisionMaterial.metadata?.mainStageMaterialPolish).toBeUndefined();
     expect(result.collisionMeshes[0].isVisible).toBe(false);
     expect(result.collisionMeshes[0].checkCollisions).toBe(true);
