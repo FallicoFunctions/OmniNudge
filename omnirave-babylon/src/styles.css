@@ -13,3 +13,95 @@ body,
   height: 100%;
   display: block;
 }
+
+.babylon-runtime-host {
+  position: relative;
+  overflow: hidden;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+}
+
+.review-hud,
+.debug-panel,
+.perf-overlay {
+  position: absolute;
+  color: #f4efe2;
+  z-index: 4;
+}
+
+.review-hud {
+  left: 24px;
+  top: 24px;
+  max-width: 320px;
+  padding: 18px;
+  border: 1px solid rgba(236, 193, 93, 0.35);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(6, 13, 24, 0.84), rgba(7, 32, 46, 0.68));
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(14px);
+}
+
+.review-hud__eyebrow {
+  margin: 0 0 8px;
+  color: #68d8ff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.review-hud__title {
+  margin: 0;
+  color: #fff8df;
+  font-size: 1.15rem;
+  letter-spacing: 0.015em;
+}
+
+.review-hud__copy {
+  margin: 10px 0 0;
+  color: rgba(244, 239, 226, 0.72);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.review-hud__route {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.review-hud__checkpoint {
+  border: 1px solid rgba(104, 216, 255, 0.42);
+  border-radius: 999px;
+  padding: 8px 10px;
+  color: #e8fbff;
+  background: rgba(6, 42, 58, 0.62);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+}
+
+.review-hud__checkpoint:hover,
+.review-hud__checkpoint:focus-visible {
+  border-color: rgba(236, 193, 93, 0.9);
+  background: rgba(15, 83, 106, 0.82);
+  outline: none;
+}
+
+.debug-panel {
+  right: 24px;
+  top: 24px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(5, 7, 17, 0.68);
+}
+
+.perf-overlay {
+  right: 24px;
+  bottom: 24px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(5, 7, 17, 0.72);
+}

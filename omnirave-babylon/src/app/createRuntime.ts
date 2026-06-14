@@ -29,8 +29,14 @@ export async function createRuntime(host: HTMLElement) {
   let debugPanel: HTMLElement | undefined;
 
   try {
-    hud = createReviewHud(host);
     const scene = await createMainStageScene(engine);
+    const reviewRuntime = scene.metadata?.reviewRuntime;
+    hud = createReviewHud(host, {
+      checkpoints: reviewRuntime?.checkpoints,
+      onSelectCheckpoint(checkpoint) {
+        reviewRuntime?.playerRig?.root.position.set(checkpoint.x, checkpoint.y, checkpoint.z);
+      },
+    });
     perfOverlay = createPerfOverlay(host);
     debugPanel = createDebugPanel(host);
 
