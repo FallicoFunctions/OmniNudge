@@ -50,6 +50,14 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V16_BackPlazaSightlineRail_L');
     expectMainStageMarker('V16_PlazaPaverInlay_0');
   });
+
+  it('exports named sculptural shell details for the Main Stage crown composition', () => {
+    expectMainStageMarker('V17_CelestialHaloRingOuter_0');
+    expectMainStageMarker('V17_CrownShellLamella_L_0');
+    expectMainStageMarker('V17_CenterScreenMullionRib_0');
+    expectMainStageMarker('V17_WingCanopyLamella_L_0');
+    expectMainStageMarker('V17_ProsceniumPearlReveal_L');
+  });
 });
 
 describe('reviewRouteData', () => {
