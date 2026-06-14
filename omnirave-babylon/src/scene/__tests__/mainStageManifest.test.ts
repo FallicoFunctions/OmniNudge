@@ -364,6 +364,41 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces stacked podium slabs with sculptural VIP terrace sweeps', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const prefix of ['V5_PodiumLow_', 'V5_PodiumMid_', 'V5_PodiumHigh_']) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `redundant podium slab still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredTerraceNodes = [
+      'V26_VipTerraceOuterSweep_L',
+      'V26_VipTerraceOuterSweep_R',
+      'V26_VipTerraceGoldInlay_L',
+      'V26_VipTerraceGoldInlay_R',
+    ];
+    for (const nodeName of requiredTerraceNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftSweep = readMeshGeometry('V26_VipTerraceOuterSweep_L');
+    const rightSweep = readMeshGeometry('V26_VipTerraceOuterSweep_R');
+    expect(leftSweep.max[0]).toBeLessThan(0);
+    expect(rightSweep.min[0]).toBeGreaterThan(0);
+    expect(leftSweep.max[1] - leftSweep.min[1]).toBeGreaterThan(3);
+    expect(rightSweep.max[1] - rightSweep.min[1]).toBeGreaterThan(3);
+    expect(leftSweep.max[2] - leftSweep.min[2]).toBeGreaterThan(35);
+    expect(rightSweep.max[2] - rightSweep.min[2]).toBeGreaterThan(35);
+
+    expect(materialNameFor('V26_VipTerraceOuterSweep_L')).toBe('V20_LayeredPearlShell');
+    expect(materialNameFor('V26_VipTerraceOuterSweep_R')).toBe('V20_LayeredPearlShell');
+    expect(materialNameFor('V26_VipTerraceGoldInlay_L')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V26_VipTerraceGoldInlay_R')).toBe('V20_ChasedGoldFiligree');
+  });
+
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
     const requiredMeshNodes = [
       'V24_CelestialCrownFrontArch_L',
