@@ -5,6 +5,7 @@ import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
 import type { Scene } from '@babylonjs/core/scene';
 
 import { MAIN_STAGE_MANIFEST } from './mainStageManifest';
+import { polishMainStageMaterials } from './mainStageMaterialPolish';
 
 export interface MainStageAssetLoadResult {
   collisionMeshes: AbstractMesh[];
@@ -13,6 +14,8 @@ export interface MainStageAssetLoadResult {
 
 export async function loadMainStageAssets(scene: Scene): Promise<MainStageAssetLoadResult> {
   const main = await SceneLoader.ImportMeshAsync('', '', MAIN_STAGE_MANIFEST.sceneGlb, scene);
+  polishMainStageMaterials(main.meshes);
+
   const collision = await SceneLoader.ImportMeshAsync('', '', MAIN_STAGE_MANIFEST.collisionGlb, scene);
 
   collision.meshes.forEach((mesh) => {
