@@ -59,6 +59,11 @@ describe('createMainStageScene', () => {
     expect(scene.metadata?.reviewRuntime?.stageAssets).toBe(stageAssets);
     expect(scene.metadata?.reviewRuntime?.lightingRig).toBeDefined();
     expect(scene.metadata?.reviewRuntime?.atmosphereRig).toBeDefined();
+    expect(scene.metadata?.reviewRuntime?.presentationRig).toBeDefined();
+    expect(scene.metadata?.reviewRuntime?.presentationRig.pipeline.name).toBe(
+      'main-stage-presentation-pipeline',
+    );
+    expect(scene.environmentTexture?.name).toBe('main-stage-night-reflection-env');
     expect(scene.metadata?.reviewRuntime?.reviewAvatar).toBeDefined();
     expect(scene.getTransformNodeByName('review-avatar-root')?.parent?.name).toBe('player-avatar-anchor');
     expect(scene.lights.map((light) => light.name)).toEqual(
