@@ -58,6 +58,15 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V17_WingCanopyLamella_L_0');
     expectMainStageMarker('V17_ProsceniumPearlReveal_L');
   });
+
+  it('exports named approach, production, and basin details for the Main Stage arrival read', () => {
+    expectMainStageMarker('V18_SpawnProcessionalPaver_0');
+    expectMainStageMarker('V18_ForegroundBarricadeRun_L_0');
+    expectMainStageMarker('V18_ProductionTrussTower_L');
+    expectMainStageMarker('V18_LineArraySpeaker_L_0');
+    expectMainStageMarker('V18_BasinFountainJet_L_0');
+    expectMainStageMarker('V18_WingFacadeArchInlay_L_0');
+  });
 });
 
 describe('reviewRouteData', () => {
