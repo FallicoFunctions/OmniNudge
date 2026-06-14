@@ -58,11 +58,13 @@ describe('createMainStageScene', () => {
     expect(scene.getMeshByName('player-capsule')).not.toBeNull();
     expect(scene.metadata?.reviewRuntime?.stageAssets).toBe(stageAssets);
     expect(scene.metadata?.reviewRuntime?.lightingRig).toBeDefined();
+    expect(scene.metadata?.reviewRuntime?.atmosphereRig).toBeDefined();
     expect(scene.metadata?.reviewRuntime?.reviewAvatar).toBeDefined();
     expect(scene.getTransformNodeByName('review-avatar-root')?.parent?.name).toBe('player-avatar-anchor');
     expect(scene.lights.map((light) => light.name)).toEqual(
       expect.arrayContaining(['main-stage-hemi-light', 'main-stage-key-light']),
     );
+    expect(scene.effectLayers.map((layer) => layer.name)).toContain('main-stage-emissive-glow');
   });
 
   it('keeps zoom state synced even while the player is idle', async () => {

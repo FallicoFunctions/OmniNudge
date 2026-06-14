@@ -31,6 +31,11 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(exportScript).toContain('previous_hide_viewport');
     expect(exportScript).toMatch(/obj\.hide_viewport = False[\s\S]*filepath=str\(collision_output\)/);
   });
+
+  it('restores collision visibility even if the collision export fails', () => {
+    expect(exportScript).toMatch(/try:[\s\S]*filepath=str\(collision_output\)[\s\S]*finally:/);
+    expect(exportScript).toMatch(/finally:[\s\S]*obj\.hide_viewport = previous_hide_viewport\[obj\.name\]/);
+  });
 });
 
 describe('reviewRouteData', () => {
