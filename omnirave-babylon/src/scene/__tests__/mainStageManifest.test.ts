@@ -273,7 +273,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V20_OuterWingButtress_L_0');
     expectMainStageMarker('V20_VipBalustradeFiligree_L_0');
     expectMainStageMarker('V20_SideScreenOrbitalRing_L_0');
-    expectMainStageMarker('V20_CrownCrystalFacet_0');
+    expectMainStageMarker('V25_CrownApexCrystal');
     expectMainStageMarker('V20_PearlSurfaceRelief_L_0');
   });
 
@@ -289,6 +289,79 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V23_ArrivalSidePlinthPearlCap_L');
     expectMainStageMarker('V23_ArrivalRunwayInsetRib_0');
     expectMainStageMarker('V23_BackPlazaFramingPylon_L');
+  });
+
+  it('replaces stacked legacy hero screens with one crown-integrated portal assembly', () => {
+    const forbiddenLegacyPrefixes = [
+      'V6_PortalScreen',
+      'V6_ScreenFrame',
+      'V7_HeroScreen',
+      'V7_ScreenHorizontalLight',
+      'V7_ScreenVerticalLight',
+      'V7_ScreenRecessShadow',
+      'V4_PortalScreenCrest',
+      'V11_WideScreenDepthFin_',
+      'V20_CrownCrystalFacet_',
+    ];
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+
+    for (const prefix of forbiddenLegacyPrefixes) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `redundant legacy screen assembly still exported: ${prefix}`,
+      ).toBe(false);
+    }
+    expect(exportedNodeNames).toContain('V10_WideHeroScreenGlass');
+
+    const requiredPortalNodes = [
+      'V25_HeroPortalOuterOgive_L',
+      'V25_HeroPortalOuterOgive_R',
+      'V25_HeroPortalGoldReveal_L',
+      'V25_HeroPortalGoldReveal_R',
+      'V25_HeroPortalShadowVault',
+      'V25_HeroPortalPearlApron_L',
+      'V25_HeroPortalPearlApron_R',
+      'V25_CrownApexCrystal',
+    ];
+
+    for (const nodeName of requiredPortalNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftOgive = readMeshGeometry('V25_HeroPortalOuterOgive_L');
+    const rightOgive = readMeshGeometry('V25_HeroPortalOuterOgive_R');
+    const shadowVault = readMeshGeometry('V25_HeroPortalShadowVault');
+    const leftApron = readMeshGeometry('V25_HeroPortalPearlApron_L');
+    const rightApron = readMeshGeometry('V25_HeroPortalPearlApron_R');
+    const apexCrystal = readMeshGeometry('V25_CrownApexCrystal');
+
+    expect(leftOgive.max[0]).toBeLessThan(0);
+    expect(rightOgive.min[0]).toBeGreaterThan(0);
+    expect(leftOgive.max[1]).toBeGreaterThan(36);
+    expect(rightOgive.max[1]).toBeGreaterThan(36);
+    expect(shadowVault.min[0]).toBeLessThan(-17);
+    expect(shadowVault.max[0]).toBeGreaterThan(17);
+    expect(shadowVault.max[2] - shadowVault.min[2]).toBeGreaterThan(2);
+    expect(leftApron.min[0]).toBeLessThan(-18);
+    expect(rightApron.max[0]).toBeGreaterThan(18);
+    expect(apexCrystal.min[0]).toBeLessThan(-3);
+    expect(apexCrystal.max[0]).toBeGreaterThan(3);
+    expect(apexCrystal.max[1] - apexCrystal.min[1]).toBeGreaterThan(9);
+
+    const expectedPortalMaterials = new Map([
+      ['V25_HeroPortalOuterOgive_L', 'V20_LayeredPearlShell'],
+      ['V25_HeroPortalOuterOgive_R', 'V20_LayeredPearlShell'],
+      ['V25_HeroPortalGoldReveal_L', 'V20_ChasedGoldFiligree'],
+      ['V25_HeroPortalGoldReveal_R', 'V20_ChasedGoldFiligree'],
+      ['V25_HeroPortalShadowVault', 'V20_RecessedWarmShadow'],
+      ['V25_HeroPortalPearlApron_L', 'V20_LayeredPearlShell'],
+      ['V25_HeroPortalPearlApron_R', 'V20_LayeredPearlShell'],
+      ['V25_CrownApexCrystal', 'V20_CelestialCyanGlass'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedPortalMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
