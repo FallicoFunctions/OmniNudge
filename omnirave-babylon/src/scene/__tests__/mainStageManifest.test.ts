@@ -339,7 +339,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V34_ApproachReflectionUnderlay');
     expectMainStageMarker('V40_ApproachLightStem_L');
     expectMainStageMarker('V32_CrowdCluster_L_Near');
-    expectMainStageMarker('V19_WayfindingMonolith_L');
+    expectMainStageMarker('V43_WayfindingPylonPearlShell');
     expectMainStageMarker('V19_ScreenConstellationStroke_0');
   });
 
@@ -1763,6 +1763,73 @@ describe('MAIN_STAGE_MANIFEST', () => {
     ).toBeLessThanOrEqual(1_400);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V42_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_260);
+  });
+
+  it('replaces proxy wayfinding monolith cubes with sculpted arrival pylons at the spawn reveal', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const prefix of ['V19_WayfindingMonolith', 'V19_WayfindingMonolithGlow']) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `legacy wayfinding monolith proxy still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredV43Nodes = [
+      'V43_WayfindingPylonPearlShell',
+      'V43_WayfindingPylonCyanGlyph',
+      'V43_WayfindingPylonGoldCrown',
+    ];
+    expect(nodeNamesWithPrefix('V43_')).toHaveLength(requiredV43Nodes.length);
+    expect(materialNameFor('V43_WayfindingPylonPearlShell')).toBe('V19_GatewayPearlIvory');
+    expect(materialNameFor('V43_WayfindingPylonCyanGlyph')).toBe('V19_ArrivalCyanGlow');
+    expect(materialNameFor('V43_WayfindingPylonGoldCrown')).toBe('V19_ArrivalBrushedGold');
+
+    for (const nodeName of requiredV43Nodes) {
+      expectMainStageMarker(nodeName);
+      const geometry = readMeshGeometry(nodeName);
+      const components = readConnectedComponents(nodeName);
+      expect(components).toHaveLength(2);
+      for (const component of components) {
+        expect(component.vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(48);
+        expect(component.triangleCount, `${nodeName} component lacks sculpted surface detail`).toBeGreaterThanOrEqual(80);
+      }
+    }
+
+    const pearlShell = readMeshGeometry('V43_WayfindingPylonPearlShell');
+    expect(pearlShell.min[1], 'pearl pylon shell should start near plaza grade').toBeLessThan(0.2);
+    expect(pearlShell.max[1], 'pearl pylon shell should read as tall wayfinding architecture').toBeGreaterThan(5.4);
+    expect(pearlShell.max[2] - pearlShell.min[2], 'pearl pylon shell should have real architectural depth').toBeGreaterThan(0.9);
+
+    const cyanGlyph = readMeshGeometry('V43_WayfindingPylonCyanGlyph');
+    expect(cyanGlyph.min[1], 'cyan glyph should be inset above the pylon base').toBeGreaterThan(0.8);
+    expect(cyanGlyph.max[1] - cyanGlyph.min[1], 'cyan glyph should read as vertical signage, not a light card').toBeGreaterThan(3.4);
+
+    const goldCrown = readMeshGeometry('V43_WayfindingPylonGoldCrown');
+    expect(goldCrown.min[1], 'gold crown should cap the top of the pylon').toBeGreaterThan(4.8);
+    expect(goldCrown.max[1], 'gold crown should crest above the pearl shell').toBeGreaterThan(5.7);
+
+    for (const nodeName of requiredV43Nodes) {
+      const expectedZ = nodeName === 'V43_WayfindingPylonCyanGlyph' ? -291.5 : -292;
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedX of [-11.8, 11.8]) {
+        expect(
+          centers.some(([x, , z]) => Math.abs(x - expectedX) < 0.12 && Math.abs(z - expectedZ) < 0.15),
+          `${nodeName} missing wayfinding pylon around x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    expect(
+      requiredV43Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(2_200);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V43_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_259);
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
