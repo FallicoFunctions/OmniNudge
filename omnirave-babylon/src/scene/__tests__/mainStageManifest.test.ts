@@ -2037,6 +2037,59 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_210);
   });
 
+  it('replaces repeated crown truss X sticks with batched rounded gold lattice bays', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const prefix of ['V16_CrownRiggingTrussX_A_', 'V16_CrownRiggingTrussX_B_']) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `legacy crown truss X stick still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredV47Nodes = ['V47_CrownGoldLatticeBraceA', 'V47_CrownGoldLatticeBraceB'];
+    expect(nodeNamesWithPrefix('V47_')).toHaveLength(requiredV47Nodes.length);
+    for (const nodeName of requiredV47Nodes) {
+      expectMainStageMarker(nodeName);
+      expect(materialNameFor(nodeName)).toBe('V16_BrushedProductionGold');
+      const geometry = readMeshGeometry(nodeName);
+      const components = readConnectedComponents(nodeName);
+      expect(components).toHaveLength(7);
+      expect(geometry.min[0], `${nodeName} should span the far-left crown rig bay`).toBeLessThan(-20.3);
+      expect(geometry.max[0], `${nodeName} should span the far-right crown rig bay`).toBeGreaterThan(20.3);
+      expect(geometry.min[1], `${nodeName} should sit on the lower crown chord`).toBeLessThan(36.25);
+      expect(geometry.max[1], `${nodeName} should reach the upper crown chord`).toBeGreaterThan(36.95);
+      expect(geometry.min[2], `${nodeName} should touch the front crown chord`).toBeLessThan(22.25);
+      expect(geometry.max[2], `${nodeName} should touch the rear crown chord`).toBeGreaterThan(24.15);
+      for (const component of components) {
+        expect(component.vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(48);
+        expect(component.triangleCount, `${nodeName} component lacks rounded truss-tube geometry`).toBeGreaterThanOrEqual(80);
+      }
+    }
+
+    const expectedBayCenters = [-18, -12, -6, 0, 6, 12, 18];
+    for (const nodeName of requiredV47Nodes) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedX of expectedBayCenters) {
+        expect(
+          centers.some(([x, y, z]) => Math.abs(x - expectedX) < 0.14 && Math.abs(y - 36.63) < 0.14 && Math.abs(z - 23.2) < 0.14),
+          `${nodeName} missing crown lattice bay around x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    expect(
+      requiredV47Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(1_600);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V47_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_198);
+  });
+
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
     const requiredMeshNodes = [
       'V24_CelestialCrownFrontArch_L',
