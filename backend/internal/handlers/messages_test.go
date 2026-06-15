@@ -815,13 +815,13 @@ func TestSendMessage_Blocked(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	// Should be forbidden
-	assert.Equal(t, http.StatusForbidden, w.Code)
+	// Should be reported as not found, to avoid revealing the block to the sender
+	assert.Equal(t, http.StatusNotFound, w.Code)
 
 	var response map[string]interface{}
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
-	assert.Contains(t, response["error"], "blocking settings")
+	assert.Contains(t, response["error"], "User not found")
 }
 
 func TestSendMessage_NotBlocked(t *testing.T) {
@@ -1960,8 +1960,8 @@ func TestForwardMessage_RejectsWhenTargetUserBlockedSender(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
-	require.Contains(t, w.Body.String(), "blocking settings")
+	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), "User not found")
 }
 
 func TestForwardMessage_RejectsMoreThanTenTargets(t *testing.T) {
