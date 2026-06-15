@@ -322,7 +322,6 @@ describe('MAIN_STAGE_MANIFEST', () => {
 
   it('exports named production and garden details for the Main Stage fidelity pass', () => {
     expectMainStageMarker('V16_CrownRiggingSpan');
-    expectMainStageMarker('V16_ScreenServiceCatwalk');
     expectMainStageMarker('V16_VipGardenBasin_L');
     expectMainStageMarker('V16_BackPlazaSightlineRail_L');
     expectMainStageMarker('V16_PlazaPaverInlay_0');
@@ -2233,6 +2232,114 @@ describe('MAIN_STAGE_MANIFEST', () => {
       'COL_VIPRamp_-1',
       'COL_VIPRamp_1',
     ]));
+  });
+
+  it('replaces the center-screen service proxies with one connected four-batch production catwalk', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const legacyV16Nodes = [
+      'V16_ScreenServiceCatwalk',
+      'V16_ScreenCatwalkGoldToeRail',
+      ...Array.from({ length: 11 }, (_, index) => `V16_ScreenCatwalkPost_${index}`),
+      ...Array.from({ length: 7 }, (_, index) => `V16_ScreenCableDrop_${index}`),
+    ];
+    for (const nodeName of legacyV16Nodes) {
+      expect(exportedNodeNames, `legacy center-screen service proxy still exported: ${nodeName}`)
+        .not.toContain(nodeName);
+    }
+
+    const requiredV49Nodes = [
+      'V49_ScreenServiceCatwalkBlackFrame',
+      'V49_ScreenServiceCatwalkGoldGuardrail',
+      'V49_ScreenServiceCatwalkCableLoom',
+      'V49_ScreenServiceCatwalkCyanPracticals',
+    ];
+    expect(nodeNamesWithPrefix('V49_')).toEqual(requiredV49Nodes);
+    expect(materialNameFor('V49_ScreenServiceCatwalkBlackFrame')).toBe(
+      'V16_MatteBlackStageHardware',
+    );
+    expect(materialNameFor('V49_ScreenServiceCatwalkGoldGuardrail')).toBe(
+      'V16_BrushedProductionGold',
+    );
+    expect(materialNameFor('V49_ScreenServiceCatwalkCableLoom')).toBe(
+      'V16_MatteBlackStageHardware',
+    );
+    expect(materialNameFor('V49_ScreenServiceCatwalkCyanPracticals')).toBe('V16_CyanLensGlow');
+
+    const frame = readMeshGeometry('V49_ScreenServiceCatwalkBlackFrame');
+    const guardrail = readMeshGeometry('V49_ScreenServiceCatwalkGoldGuardrail');
+    const loom = readMeshGeometry('V49_ScreenServiceCatwalkCableLoom');
+    const practicals = readMeshGeometry('V49_ScreenServiceCatwalkCyanPracticals');
+    expect(frame.min[0], 'service platform should span beyond the old left deck edge').toBeLessThanOrEqual(-10.8);
+    expect(frame.max[0], 'service platform should span beyond the old right deck edge').toBeGreaterThanOrEqual(10.8);
+    expect(frame.min[1], 'underside brackets should add structural depth below the deck').toBeLessThan(7.2);
+    expect(frame.max[1], 'walkable deck shell should retain the original service elevation').toBeGreaterThan(7.6);
+    expect(frame.min[2], 'platform should remain integrated in front of the hero screen').toBeGreaterThan(20.9);
+    expect(frame.max[2], 'platform should remain subordinate to the hero screen portal').toBeLessThan(22.2);
+    expect(guardrail.min[1], 'guardrail should overlap the deck shell').toBeLessThan(7.65);
+    expect(guardrail.max[1], 'guardrail should provide a dimensional top rail').toBeGreaterThan(8.75);
+    expect(loom.min[1], 'cable looms should attach at platform level').toBeLessThan(7.65);
+    expect(loom.max[1], 'cable looms should route to the screen service header').toBeGreaterThan(13.8);
+    expect(practicals.max[1], 'cyan practicals should remain tucked under the deck lip').toBeLessThan(7.55);
+
+    const overlapsByAtLeast = (
+      left: { max: number[]; min: number[] },
+      right: { max: number[]; min: number[] },
+      minimum: number,
+    ) => [0, 1, 2].every(
+      (axis) => Math.min(left.max[axis], right.max[axis])
+        - Math.max(left.min[axis], right.min[axis]) >= minimum,
+    );
+    for (const nodeName of requiredV49Nodes.slice(0, 3)) {
+      const components = readConnectedComponents(nodeName);
+      expect(components.length, `${nodeName} should contain production assembly detail`).toBeGreaterThan(12);
+      for (const [index, component] of components.entries()) {
+        expect(
+          components.some(
+            (candidate, candidateIndex) =>
+              candidateIndex !== index && overlapsByAtLeast(component, candidate, 0.005),
+          ),
+          `${nodeName} component ${index} is floating without a 5mm physical overlap`,
+        ).toBe(true);
+      }
+    }
+
+    const loomComponents = readConnectedComponents('V49_ScreenServiceCatwalkCableLoom');
+    for (const expectedX of [-9, -6, -3, 0, 3, 6, 9]) {
+      const routedComponents = loomComponents.filter(({ min, max }) => {
+        const centerX = (min[0] + max[0]) / 2;
+        return Math.abs(centerX - expectedX) < 0.24;
+      });
+      expect(
+        routedComponents.length,
+        `cable loom should include a bundled route and clamps around x=${expectedX}`,
+      ).toBeGreaterThanOrEqual(6);
+      expect(
+        routedComponents.some(({ min, max }) => min[1] < 7.65 && max[1] > 13.8),
+        `cable loom should span the full service route around x=${expectedX}`,
+      ).toBe(true);
+    }
+
+    const practicalComponents = readConnectedComponents('V49_ScreenServiceCatwalkCyanPracticals');
+    expect(practicalComponents).toHaveLength(6);
+    const practicalCenters = practicalComponents
+      .map(({ min, max }) => (min[0] + max[0]) / 2)
+      .sort((left, right) => left - right);
+    expect(practicalCenters).toEqual([
+      expect.closeTo(-8.5, 1),
+      expect.closeTo(-5.1, 1),
+      expect.closeTo(-1.7, 1),
+      expect.closeTo(1.7, 1),
+      expect.closeTo(5.1, 1),
+      expect.closeTo(8.5, 1),
+    ]);
+
+    expect(
+      requiredV49Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(5_000);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V49_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_167);
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
