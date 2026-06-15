@@ -206,6 +206,49 @@ func (r *UserFriendshipRepository) ListFriends(ctx context.Context, userID int) 
 	return friends, rows.Err()
 }
 
+// MutualFriendEntry describes a friend shared between two users.
+type MutualFriendEntry struct {
+	UserID    int     `json:"id"`
+	Username  string  `json:"username"`
+	AvatarURL *string `json:"avatar_url"`
+}
+
+// GetMutualFriends returns friends shared by both userID and otherUserID, ordered by username.
+func (r *UserFriendshipRepository) GetMutualFriends(ctx context.Context, userID, otherUserID int, limit int) ([]MutualFriendEntry, error) {
+	rows, err := r.pool.Query(ctx, `
+		WITH a_friends AS (
+			SELECT friend_user_id AS friend_id FROM user_friendships WHERE user_id = $1 AND status = 'accepted'
+			UNION
+			SELECT user_id AS friend_id FROM user_friendships WHERE friend_user_id = $1 AND status = 'accepted'
+		),
+		b_friends AS (
+			SELECT friend_user_id AS friend_id FROM user_friendships WHERE user_id = $2 AND status = 'accepted'
+			UNION
+			SELECT user_id AS friend_id FROM user_friendships WHERE friend_user_id = $2 AND status = 'accepted'
+		)
+		SELECT u.id, u.username, u.avatar_url
+		FROM a_friends af
+		JOIN b_friends bf ON af.friend_id = bf.friend_id
+		JOIN users u ON u.id = af.friend_id
+		ORDER BY u.username ASC
+		LIMIT $3
+	`, userID, otherUserID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	mutuals := []MutualFriendEntry{}
+	for rows.Next() {
+		var f MutualFriendEntry
+		if err := rows.Scan(&f.UserID, &f.Username, &f.AvatarURL); err != nil {
+			return nil, err
+		}
+		mutuals = append(mutuals, f)
+	}
+	return mutuals, rows.Err()
+}
+
 // ListIncomingRequests returns pending requests sent TO userID by others.
 func (r *UserFriendshipRepository) ListIncomingRequests(ctx context.Context, userID int) ([]FriendRequestEntry, error) {
 	rows, err := r.pool.Query(ctx, `

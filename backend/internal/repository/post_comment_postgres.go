@@ -53,6 +53,10 @@ func (r *PostgresPostCommentRepository) GetByUserID(ctx context.Context, userID 
 	return r.inner.GetByUserID(ctx, userID, limit, offset)
 }
 
+func (r *PostgresPostCommentRepository) CountByUserID(ctx context.Context, userID int) (int, error) {
+	return r.inner.CountByUserID(ctx, userID)
+}
+
 func (r *PostgresPostCommentRepository) Update(ctx context.Context, comment *domain.PostComment) error {
 	return r.inner.Update(ctx, comment)
 }

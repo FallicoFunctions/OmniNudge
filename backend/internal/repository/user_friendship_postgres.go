@@ -58,3 +58,7 @@ func (r *PostgresUserFriendshipRepository) ListIncomingRequests(ctx context.Cont
 func (r *PostgresUserFriendshipRepository) ListOutgoingRequests(ctx context.Context, userID int) ([]models.FriendRequestEntry, error) {
 	return r.inner.ListOutgoingRequests(ctx, userID)
 }
+
+func (r *PostgresUserFriendshipRepository) GetMutualFriends(ctx context.Context, userID, otherUserID int, limit int) ([]models.MutualFriendEntry, error) {
+	return r.inner.GetMutualFriends(ctx, userID, otherUserID, limit)
+}

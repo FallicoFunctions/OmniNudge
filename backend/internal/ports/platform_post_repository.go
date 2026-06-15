@@ -14,6 +14,7 @@ type PlatformPostRepository interface {
 	GetByIDWithUser(ctx context.Context, id int, userID *int) (*domain.PlatformPost, error)
 	GetFeed(ctx context.Context, sortBy string, limit, offset int) ([]*domain.PlatformPost, error)
 	GetByAuthor(ctx context.Context, authorID int, limit, offset int) ([]*domain.PlatformPost, error)
+	CountByAuthor(ctx context.Context, authorID int) (int, error)
 	GetByHub(ctx context.Context, hubID int, sortBy string, limit, offset int) ([]*domain.PlatformPost, error)
 	GetByHubExcludingAuthors(ctx context.Context, hubID int, sortBy string, limit, offset int, viewerID *int, excludeAuthorIDs []int) ([]*domain.PlatformPost, error)
 	GetByHubWithUser(ctx context.Context, hubID int, sortBy string, limit, offset int, userID *int, startTime, endTime *time.Time) ([]*domain.PlatformPost, error)
