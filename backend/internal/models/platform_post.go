@@ -412,6 +412,18 @@ func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, 
 	return posts, rows.Err()
 }
 
+// CountByAuthor returns the total number of non-deleted posts by an author,
+// regardless of pagination, for use in profile stats.
+func (r *PlatformPostRepository) CountByAuthor(ctx context.Context, authorID int) (int, error) {
+	var count int
+	err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
+		WHERE p.author_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE
+	`, authorID).Scan(&count)
+	return count, err
+}
+
 // GetByHub retrieves posts by hub
 func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy string, limit, offset int) ([]*PlatformPost, error) {
 	return r.GetByHubWithUser(ctx, hubID, sortBy, limit, offset, nil, nil, nil)

@@ -242,6 +242,69 @@ func (s *NotificationService) NotifyCommentReply(
 	return s.sendNotification(ctx, notification)
 }
 
+// NotifyWallPost notifies a profile owner that someone posted on their wall.
+func (s *NotificationService) NotifyWallPost(ctx context.Context, profileUserID, authorID, wallPostID int, authorUsername string) {
+	if profileUserID == authorID {
+		return
+	}
+
+	contentType := "wall_post"
+	notif := &models.Notification{
+		UserID:           profileUserID,
+		NotificationType: "wall_post",
+		ContentType:      &contentType,
+		ContentID:        &wallPostID,
+		ActorID:          &authorID,
+		Message:          fmt.Sprintf("%s posted on your wall", authorUsername),
+	}
+
+	if err := s.sendNotification(ctx, notif); err != nil {
+		log.Printf("[NotificationService] NotifyWallPost: failed for wall post %d actor %d: %v", wallPostID, authorID, err)
+	}
+}
+
+// NotifyWallComment notifies a wall post's author that someone commented on it.
+func (s *NotificationService) NotifyWallComment(ctx context.Context, postAuthorID, commenterID, wallPostID int, commenterUsername string) {
+	if postAuthorID == commenterID {
+		return
+	}
+
+	contentType := "wall_post"
+	notif := &models.Notification{
+		UserID:           postAuthorID,
+		NotificationType: "wall_comment",
+		ContentType:      &contentType,
+		ContentID:        &wallPostID,
+		ActorID:          &commenterID,
+		Message:          fmt.Sprintf("%s commented on your wall post", commenterUsername),
+	}
+
+	if err := s.sendNotification(ctx, notif); err != nil {
+		log.Printf("[NotificationService] NotifyWallComment: failed for wall post %d actor %d: %v", wallPostID, commenterID, err)
+	}
+}
+
+// NotifyWallLike notifies a wall post's author that someone liked it.
+func (s *NotificationService) NotifyWallLike(ctx context.Context, postAuthorID, likerID, wallPostID int, likerUsername string) {
+	if postAuthorID == likerID {
+		return
+	}
+
+	contentType := "wall_post"
+	notif := &models.Notification{
+		UserID:           postAuthorID,
+		NotificationType: "wall_like",
+		ContentType:      &contentType,
+		ContentID:        &wallPostID,
+		ActorID:          &likerID,
+		Message:          fmt.Sprintf("%s liked your wall post", likerUsername),
+	}
+
+	if err := s.sendNotification(ctx, notif); err != nil {
+		log.Printf("[NotificationService] NotifyWallLike: failed for wall post %d actor %d: %v", wallPostID, likerID, err)
+	}
+}
+
 // NotifyMessageReaction sends an in-app notification to the message author when
 // someone reacts to their message. The notification is always delivered in-app;
 // push delivery follows the user's ShowPushNotifications preference.

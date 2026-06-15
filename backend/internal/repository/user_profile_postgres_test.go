@@ -21,7 +21,7 @@ func TestPostgresUserProfileRepository_UpsertAndGet(t *testing.T) {
 	avatar := "https://example.com/avatar.png"
 	status := "online"
 
-	err := repo.Upsert(ctx, user.ID, &bio, &avatar, &status, nil, nil)
+	err := repo.Upsert(ctx, user.ID, &bio, &avatar, &status, nil, nil, nil)
 	require.NoError(t, err)
 
 	got, err := repo.GetByUserID(ctx, user.ID)
@@ -49,10 +49,10 @@ func TestPostgresUserProfileRepository_Upsert_UpdatesExisting(t *testing.T) {
 
 	user := fx.CreateUniqueUser("uprof_update_u")
 	bio1 := "First bio"
-	_ = repo.Upsert(ctx, user.ID, &bio1, nil, nil, nil, nil)
+	_ = repo.Upsert(ctx, user.ID, &bio1, nil, nil, nil, nil, nil)
 
 	bio2 := "Updated bio"
-	err := repo.Upsert(ctx, user.ID, &bio2, nil, nil, nil, nil)
+	err := repo.Upsert(ctx, user.ID, &bio2, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	got, err := repo.GetByUserID(ctx, user.ID)
