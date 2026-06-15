@@ -21,6 +21,7 @@
     "userNumber": "User #{{id}}",
     "user": "User",
     "unknownUser": "Unknown user",
+    "previous": "Previous",
     "next": "Next",
     "confirm": "Confirm",
     "search": "Search",
@@ -132,6 +133,7 @@
   },
   "menu": {
     "profile": "Profile",
+    "activity": "Activity",
     "settings": "Settings",
     "hubs": "Browse Hubs",
     "games": "Games",
@@ -1171,23 +1173,28 @@
       "overview": "Overview",
       "posts": "Posts",
       "comments": "Comments",
+      "communities": "Communities",
       "saved": "Saved",
       "hidden": "Hidden",
       "subscribed": "Subscribed"
     },
     "headings": {
-      "recentPosts": "Recent Posts",
-      "recentComments": "Recent Comments",
-      "moderatorOf": "Moderator of"
+      "info": "Info",
+      "photos": "Photos",
+      "mutualFriends": "Mutual Friends"
     },
     "labels": {
       "joined": "Joined {{time}}",
       "lastSeen": "Last seen {{time}}",
       "karma": "karma",
-      "blocked": "Blocked"
+      "blocked": "Blocked",
+      "location": "Location"
+    },
+    "mutualFriends": {
+      "count_one": "{{count}} mutual friend",
+      "count_other": "{{count}} mutual friends"
     },
     "actions": {
-      "viewAll": "View all",
       "message": "Message",
       "editProfile": "Edit Profile",
       "viewThread": "View thread",
@@ -1201,13 +1208,17 @@
     "comments": {
       "onPost": "On <link>post #{{id}}</link>"
     },
+    "communities": {
+      "empty": "Not a moderator of any communities yet."
+    },
     "private": {
       "saved": "Saved items are private.",
       "hidden": "Hidden items are private.",
       "subscribed": "Subscriptions are private."
     },
     "errors": {
-      "loadFailed": "Unable to load user profile."
+      "loadFailed": "Unable to load user profile.",
+      "friendsLoadFailed": "Unable to load this user's friends."
     },
     "aria": {
       "avatarAlt": "Avatar for {{username}}"
@@ -1223,16 +1234,63 @@
       "statusLabel": "Status text",
       "statusPlaceholder": "What are you up to?",
       "statusCount": "{{count}} / 500",
+      "locationLabel": "Location",
+      "locationPlaceholder": "City, Country",
+      "locationCount": "{{count}} / 100",
       "bioLabel": "Bio",
       "bioPlaceholder": "Tell people a little about yourself...",
       "bioCount": "{{count}} / 500",
       "errors": {
         "bioTooLong": "Bio must be 500 characters or less.",
         "statusTooLong": "Status text must be 500 characters or less.",
+        "locationTooLong": "Location must be 100 characters or less.",
         "invalidAvatarUrl": "Avatar URL must start with http:// or https://",
         "uploadFailed": "Failed to upload avatar: {{message}}",
         "saveFailed": "Failed to save profile: {{message}}"
       }
+    },
+    "friendsPage": {
+      "title": "{{username}}'s Friends",
+      "backToProfile": "Back to profile",
+      "empty": "No friends yet.",
+      "loading": "Loading friends…"
+    },
+    "activityPage": {
+      "title": "{{username}}'s Activity",
+      "backToProfile": "Back to profile"
+    },
+    "wall": {
+      "heading": "Wall",
+      "composerPlaceholder": "Write something on this wall...",
+      "commentPlaceholder": "Write a comment...",
+      "post": "Post",
+      "posting": "Posting…",
+      "comment": "Comment",
+      "commenting": "Commenting…",
+      "like": "Like",
+      "comments": "Comments",
+      "noComments": "No comments yet.",
+      "empty": "No posts on this wall yet.",
+      "emptyOwner": "No posts yet. Be the first to write something!",
+      "private": "This wall is private.",
+      "delete": "Delete",
+      "deletePostConfirm": "Delete this wall post?",
+      "deleteCommentConfirm": "Delete this comment?",
+      "visibilityPublic": "Public",
+      "visibilityFriends": "Friends only",
+      "visibilityPrivate": "Only me",
+      "visibilityUpdated": "Wall visibility updated.",
+      "visibilityUpdateFailed": "Failed to update wall visibility.",
+      "loadFailed": "Unable to load wall posts.",
+      "postFailed": "Failed to post to the wall.",
+      "commentFailed": "Failed to post comment.",
+      "likeFailed": "Failed to update like.",
+      "deleteFailed": "Failed to delete.",
+      "attachMedia": "Attach photo/video",
+      "uploadingMedia": "Uploading…",
+      "removeMedia": "Remove",
+      "mediaUploadFailed": "Failed to upload media.",
+      "tooManyMedia": "You can attach up to {{max}} files."
     }
   },
   "redditPostPage": {
@@ -3825,7 +3883,8 @@
       "accept": "Accept",
       "decline": "Decline",
       "cancelRequest": "Cancel Request",
-      "unfriend": "Unfriend"
+      "unfriend": "Unfriend",
+      "seeAll": "See all friends"
     },
     "incoming": {
       "empty": "No pending friend requests.",
