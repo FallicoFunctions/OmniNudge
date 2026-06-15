@@ -208,6 +208,68 @@ const materialNameFor = (nodeName: string) => {
   expect(primitive.material, `missing material assignment: ${nodeName}`).toEqual(expect.any(Number));
   return mainStageGlbJson.materials[primitive.material!]?.name;
 };
+const readConnectedComponents = (nodeName: string) => {
+  const geometry = readMeshGeometry(nodeName);
+  const indices = readAccessorValues(geometry.primitive.indices!).flat();
+  const weldedIdByKey = new Map<string, number>();
+  const weldedPositions: number[][] = [];
+  const weldedIds = geometry.positions.map((position) => {
+    const key = position.map((value) => Math.round(value * 10_000)).join(',');
+    const existingId = weldedIdByKey.get(key);
+    if (existingId !== undefined) {
+      return existingId;
+    }
+    const id = weldedPositions.length;
+    weldedIdByKey.set(key, id);
+    weldedPositions.push(position);
+    return id;
+  });
+  const parents = weldedPositions.map((_, index) => index);
+  const findRoot = (id: number): number => {
+    if (parents[id] !== id) {
+      parents[id] = findRoot(parents[id]);
+    }
+    return parents[id];
+  };
+  const union = (left: number, right: number) => {
+    const leftRoot = findRoot(left);
+    const rightRoot = findRoot(right);
+    if (leftRoot !== rightRoot) {
+      parents[rightRoot] = leftRoot;
+    }
+  };
+
+  for (let index = 0; index < indices.length; index += 3) {
+    const triangle = indices.slice(index, index + 3).map((positionIndex) => weldedIds[positionIndex]);
+    union(triangle[0], triangle[1]);
+    union(triangle[1], triangle[2]);
+  }
+
+  const componentVertexIds = new Map<number, Set<number>>();
+  for (const id of weldedPositions.keys()) {
+    const root = findRoot(id);
+    const vertices = componentVertexIds.get(root) ?? new Set<number>();
+    vertices.add(id);
+    componentVertexIds.set(root, vertices);
+  }
+  const triangleCountByRoot = new Map<number, number>();
+  for (let index = 0; index < indices.length; index += 3) {
+    const root = findRoot(weldedIds[indices[index]]);
+    triangleCountByRoot.set(root, (triangleCountByRoot.get(root) ?? 0) + 1);
+  }
+
+  return Array.from(componentVertexIds, ([root, ids]) => {
+    const positions = Array.from(ids, (id) => weldedPositions[id]);
+    const min = [0, 1, 2].map((axis) => Math.min(...positions.map((position) => position[axis])));
+    const max = [0, 1, 2].map((axis) => Math.max(...positions.map((position) => position[axis])));
+    return {
+      max,
+      min,
+      triangleCount: triangleCountByRoot.get(root) ?? 0,
+      vertexCount: ids.size,
+    };
+  }).filter(({ triangleCount }) => triangleCount > 0);
+};
 
 describe('MAIN_STAGE_MANIFEST', () => {
   it('declares the authored GLB, collision GLB, and review avatar runtime paths', () => {
@@ -267,7 +329,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V19_BackPlazaGatewayArch_L_0');
     expectMainStageMarker('V19_LongApproachReflectivePanel_0');
     expectMainStageMarker('V19_ApproachLightMast_L_0');
-    expectMainStageMarker('V19_ForegroundCrowdScaleSilhouette_0');
+    expectMainStageMarker('V32_CrowdCluster_L_Near');
     expectMainStageMarker('V19_WayfindingMonolith_L');
     expectMainStageMarker('V19_ScreenConstellationStroke_0');
   });
@@ -787,6 +849,82 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(materialNameFor('V31_SideParallaxOrbitalContent_R')).toBe('V17_CyanEdgeGlow');
     expect(materialNameFor('V31_SideParallaxGoldOrbit_L')).toBe('V20_ChasedGoldFiligree');
     expect(materialNameFor('V31_SideParallaxGoldOrbit_R')).toBe('V20_ChasedGoldFiligree');
+  });
+
+  it('replaces distant cutout crowd markers with sparse volumetric approach clusters', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenCrowdPrefixes = [
+      'V19_ForegroundCrowdScaleSilhouette_',
+      'V21_Merged_V19_ForegroundCrowdHead',
+      'V21_Merged_V19_ForegroundCrowdScaleSilhouette',
+    ];
+    for (const prefix of forbiddenCrowdPrefixes) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `proxy crowd cutout still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const crowdNodes = [
+      'V32_CrowdCluster_L_Near',
+      'V32_CrowdCluster_R_Near',
+      'V32_CrowdCluster_L_Mid',
+      'V32_CrowdCluster_R_Mid',
+    ];
+    const wearableNodes = [
+      'V32_CrowdWearableGlow_L_Near',
+      'V32_CrowdWearableGlow_R_Near',
+      'V32_CrowdWearableGlow_L_Mid',
+      'V32_CrowdWearableGlow_R_Mid',
+    ];
+    for (const nodeName of [...crowdNodes, ...wearableNodes]) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const crowdGeometry = crowdNodes.map(readMeshGeometry);
+    expect(crowdGeometry[0].max[0]).toBeLessThan(-3);
+    expect(crowdGeometry[1].min[0]).toBeGreaterThan(3);
+    expect(crowdGeometry[2].max[0]).toBeLessThan(-3);
+    expect(crowdGeometry[3].min[0]).toBeGreaterThan(3);
+    for (const geometry of crowdGeometry) {
+      expect(geometry.vertexCount).toBeGreaterThan(500);
+      expect(geometry.max[1] - geometry.min[1]).toBeGreaterThan(1.5);
+      expect(geometry.max[2] - geometry.min[2]).toBeGreaterThan(12);
+    }
+    expect(
+      new Set(crowdGeometry.map(({ min, max }) => (max[1] - min[1]).toFixed(2))).size,
+    ).toBeGreaterThan(2);
+
+    const expectedFigureCounts = [6, 6, 5, 5];
+    const figureComponents = crowdNodes.map(readConnectedComponents);
+    figureComponents.forEach((components, clusterIndex) => {
+      expect(components).toHaveLength(expectedFigureCounts[clusterIndex]);
+      for (const component of components) {
+        const width = component.max[0] - component.min[0];
+        const height = component.max[1] - component.min[1];
+        const depth = component.max[2] - component.min[2];
+        expect(height).toBeGreaterThanOrEqual(1.5);
+        expect(height).toBeLessThanOrEqual(2.1);
+        expect(width).toBeGreaterThanOrEqual(0.38);
+        expect(width).toBeLessThanOrEqual(1.35);
+        expect(depth).toBeGreaterThanOrEqual(0.24);
+        expect(depth).toBeLessThanOrEqual(0.9);
+        expect(component.vertexCount).toBeGreaterThanOrEqual(72);
+        expect(component.triangleCount).toBeGreaterThanOrEqual(100);
+      }
+    });
+
+    expect(crowdGeometry.reduce((sum, geometry) => sum + geometry.vertexCount, 0)).toBeLessThanOrEqual(4_800);
+    const wearableGeometry = wearableNodes.map(readMeshGeometry);
+    expect(wearableGeometry.reduce((sum, geometry) => sum + geometry.vertexCount, 0)).toBeLessThanOrEqual(800);
+
+    for (const nodeName of crowdNodes) {
+      expect(materialNameFor(nodeName)).toBe('V19_FestivalCrowdGraphite');
+    }
+    for (const nodeName of wearableNodes) {
+      expect(materialNameFor(nodeName)).toBe('V19_ArrivalCyanGlow');
+    }
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
