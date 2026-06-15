@@ -325,8 +325,8 @@ describe('MAIN_STAGE_MANIFEST', () => {
   });
 
   it('exports named approach, production, and basin details for the Main Stage arrival read', () => {
-    expectMainStageMarker('V18_SpawnProcessionalPaver_0');
-    expectMainStageMarker('V18_ForegroundBarricadeRun_L_0');
+    expectMainStageMarker('V34_ApproachPaverField');
+    expectMainStageMarker('V34_BarricadeAssembly_L');
     expectMainStageMarker('V18_ProductionTrussTower_L');
     expectMainStageMarker('V29_MainLineArrayCabinet_L_00');
     expectMainStageMarker('V18_BasinFountainJet_L_0');
@@ -334,8 +334,8 @@ describe('MAIN_STAGE_MANIFEST', () => {
   });
 
   it('exports named foreground arrival details for the far spawn reveal camera', () => {
-    expectMainStageMarker('V19_BackPlazaGatewayArch_L_0');
-    expectMainStageMarker('V19_LongApproachReflectivePanel_0');
+    expectMainStageMarker('V34_BackPlazaGatewayPearl_L');
+    expectMainStageMarker('V34_ApproachReflectionUnderlay');
     expectMainStageMarker('V19_ApproachLightMast_L_0');
     expectMainStageMarker('V32_CrowdCluster_L_Near');
     expectMainStageMarker('V19_WayfindingMonolith_L');
@@ -1116,6 +1116,110 @@ describe('MAIN_STAGE_MANIFEST', () => {
     ).toBeGreaterThanOrEqual(1.5);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V33_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_450);
+  });
+
+  it('replaces slabbed approach promenade and back-plaza gateway proxies with batched arrival architecture', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenApproachPrefixes = [
+      'V18_SpawnProcessionalPaver_',
+      'V18_SpawnGoldCenterInlay_',
+      'V18_SpawnGoldCrossInlay_',
+      'V18_SpawnProcessionalLeftEdgeRail',
+      'V18_SpawnProcessionalRightEdgeRail',
+      'V18_ForegroundBarricadePost_',
+      'V18_ForegroundBarricadeRun_',
+      'V19_LongApproachReflectivePanel_',
+      'V19_LongApproachGoldSpine_',
+      'V19_LongApproachLeftPinstripe_',
+      'V19_LongApproachRightPinstripe_',
+      'V19_BackPlazaGatewayColumn_',
+      'V19_BackPlazaGatewayCyanInset_',
+      'V19_BackPlazaGatewayTopRail_',
+      'V19_BackPlazaGatewayArch_',
+      'V21_Merged_V19_BackPlazaGatewayArch',
+      'V21_Merged_V19_ApproachGoldBannerRail',
+    ];
+    for (const prefix of forbiddenApproachPrefixes) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `approach or gateway proxy still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredV34Nodes = [
+      'V34_ApproachPaverField',
+      'V34_ApproachReflectionUnderlay',
+      'V34_ApproachGoldInlayNetwork',
+      'V34_ApproachEdgeRail_L',
+      'V34_ApproachEdgeRail_R',
+      'V34_BarricadeAssembly_L',
+      'V34_BarricadeAssembly_R',
+      'V34_BackPlazaGatewayPearl_L',
+      'V34_BackPlazaGatewayPearl_R',
+      'V34_BackPlazaGatewayCyanInlay_L',
+      'V34_BackPlazaGatewayCyanInlay_R',
+      'V34_BackPlazaGatewayGoldCrown_L',
+      'V34_BackPlazaGatewayGoldCrown_R',
+      'V34_BackPlazaBannerRail_L',
+      'V34_BackPlazaBannerRail_R',
+    ];
+    expect(nodeNamesWithPrefix('V34_')).toHaveLength(requiredV34Nodes.length);
+    for (const nodeName of requiredV34Nodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const paverField = readMeshGeometry('V34_ApproachPaverField');
+    const paverComponents = readConnectedComponents('V34_ApproachPaverField');
+    expect(paverComponents.length).toBeGreaterThanOrEqual(12);
+    expect(paverField.max[2] - paverField.min[2]).toBeGreaterThan(280);
+    expect(paverField.max[0] - paverField.min[0]).toBeGreaterThan(20);
+    for (const component of paverComponents) {
+      expect(component.vertexCount).toBeGreaterThanOrEqual(32);
+      expect(component.triangleCount).toBeGreaterThanOrEqual(40);
+    }
+
+    const inlayNetwork = readMeshGeometry('V34_ApproachGoldInlayNetwork');
+    const inlayComponents = readConnectedComponents('V34_ApproachGoldInlayNetwork');
+    expect(inlayComponents.length).toBeGreaterThanOrEqual(24);
+    expect(inlayNetwork.max[2] - inlayNetwork.min[2]).toBeGreaterThan(280);
+    expect(materialNameFor('V34_ApproachGoldInlayNetwork')).toBe('V19_ArrivalBrushedGold');
+
+    for (const side of ['L', 'R']) {
+      const rail = readMeshGeometry(`V34_ApproachEdgeRail_${side}`);
+      expect(rail.max[2] - rail.min[2]).toBeGreaterThan(285);
+      expect(rail.max[1] - rail.min[1]).toBeGreaterThan(0.25);
+      expect(materialNameFor(`V34_ApproachEdgeRail_${side}`)).toBe('V18_BrushedGoldTrim');
+
+      const barricade = readMeshGeometry(`V34_BarricadeAssembly_${side}`);
+      const barricadeComponents = readConnectedComponents(`V34_BarricadeAssembly_${side}`);
+      expect(barricadeComponents).toHaveLength(1);
+      expect(barricade.max[2] - barricade.min[2]).toBeGreaterThan(40);
+      expect(barricade.max[1] - barricade.min[1]).toBeGreaterThan(1.1);
+      expect(barricade.vertexCount).toBeGreaterThan(450);
+      expect(materialNameFor(`V34_BarricadeAssembly_${side}`)).toBe('V18_BlackPowderCoatTruss');
+
+      const pearl = readMeshGeometry(`V34_BackPlazaGatewayPearl_${side}`);
+      const cyan = readMeshGeometry(`V34_BackPlazaGatewayCyanInlay_${side}`);
+      const gold = readMeshGeometry(`V34_BackPlazaGatewayGoldCrown_${side}`);
+      const bannerRail = readMeshGeometry(`V34_BackPlazaBannerRail_${side}`);
+      expect(readConnectedComponents(`V34_BackPlazaGatewayPearl_${side}`)).toHaveLength(1);
+      expect(cyan.max[1] - cyan.min[1]).toBeGreaterThan(4.5);
+      expect(gold.max[1]).toBeGreaterThan(pearl.max[1] - 0.4);
+      expect(bannerRail.max[2] - bannerRail.min[2]).toBeGreaterThan(24);
+      expect(materialNameFor(`V34_BackPlazaGatewayPearl_${side}`)).toBe('V19_GatewayPearlIvory');
+      expect(materialNameFor(`V34_BackPlazaGatewayCyanInlay_${side}`)).toBe('V19_ArrivalCyanGlow');
+      expect(materialNameFor(`V34_BackPlazaGatewayGoldCrown_${side}`)).toBe('V19_ArrivalBrushedGold');
+      expect(materialNameFor(`V34_BackPlazaBannerRail_${side}`)).toBe('V19_ArrivalBrushedGold');
+    }
+
+    expect(
+      requiredV34Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(14_000);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V34_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_380);
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
