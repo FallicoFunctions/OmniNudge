@@ -1959,6 +1959,84 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_228);
   });
 
+  it('replaces suspended crown light proxies with batched sculpted moving-light fixtures', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const prefix of ['V16_CrownRiggingDrop_', 'V16_StageLightHead_', 'V16_StageLightLens_']) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `legacy crown light proxy still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredV46Nodes = [
+      'V46_CrownLightDropCableCluster',
+      'V46_CrownMovingLightHousingCluster',
+      'V46_CrownCyanLensCluster',
+    ];
+    expect(nodeNamesWithPrefix('V46_')).toHaveLength(requiredV46Nodes.length);
+    expect(materialNameFor('V46_CrownLightDropCableCluster')).toBe('V16_MatteBlackStageHardware');
+    expect(materialNameFor('V46_CrownMovingLightHousingCluster')).toBe('V16_MatteBlackStageHardware');
+    expect(materialNameFor('V46_CrownCyanLensCluster')).toBe('V16_CyanLensGlow');
+
+    for (const nodeName of requiredV46Nodes) {
+      expectMainStageMarker(nodeName);
+      const geometry = readMeshGeometry(nodeName);
+      const components = readConnectedComponents(nodeName);
+      expect(components).toHaveLength(7);
+      expect(geometry.min[0], `${nodeName} should cover the far-left crown light`).toBeLessThan(-18.3);
+      expect(geometry.max[0], `${nodeName} should cover the far-right crown light`).toBeGreaterThan(18.3);
+      for (const component of components) {
+        expect(component.vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(48);
+        expect(component.triangleCount, `${nodeName} component lacks rounded fixture geometry`).toBeGreaterThanOrEqual(80);
+      }
+    }
+
+    const drops = readMeshGeometry('V46_CrownLightDropCableCluster');
+    expect(drops.min[1], 'drop cables should reach down to the moving lights').toBeLessThan(29.5);
+    expect(drops.max[1], 'drop cables should connect back up into the crown rig').toBeGreaterThan(37.0);
+    expect(drops.min[2], 'drop cables should retain rigging depth').toBeLessThan(23.1);
+    expect(drops.max[2], 'drop cables should retain rigging depth').toBeGreaterThan(24.1);
+
+    const housings = readMeshGeometry('V46_CrownMovingLightHousingCluster');
+    expect(housings.min[1], 'moving-light housings should hang below the truss').toBeLessThan(29.2);
+    expect(housings.max[1], 'moving-light housings should have real vertical body volume').toBeGreaterThan(30.0);
+    expect(housings.min[2], 'moving-light housings should have real depth').toBeLessThan(23.7);
+    expect(housings.max[2], 'moving-light housings should aim toward the stage apron').toBeGreaterThan(24.5);
+
+    const lenses = readMeshGeometry('V46_CrownCyanLensCluster');
+    expect(lenses.min[1], 'cyan lenses should sit inside the moving-light faces').toBeLessThan(29.35);
+    expect(lenses.max[1], 'cyan lenses should sit inside the moving-light faces').toBeGreaterThan(29.75);
+    expect(lenses.min[2], 'cyan lenses should face forward of the housings').toBeGreaterThan(24.15);
+    expect(lenses.max[2], 'cyan lenses should have convex glass depth').toBeGreaterThan(24.7);
+
+    const expectedLightXs = [-18, -12, -6, 0, 6, 12, 18];
+    for (const [nodeName, expectedZ] of [
+      ['V46_CrownLightDropCableCluster', 23.6],
+      ['V46_CrownMovingLightHousingCluster', 24.15],
+      ['V46_CrownCyanLensCluster', 24.52],
+    ] as const) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedX of expectedLightXs) {
+        expect(
+          centers.some(([x, , z]) => Math.abs(x - expectedX) < 0.14 && Math.abs(z - expectedZ) < 0.18),
+          `${nodeName} missing crown light around x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    expect(
+      requiredV46Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(2_600);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V46_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_210);
+  });
+
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
     const requiredMeshNodes = [
       'V24_CelestialCrownFrontArch_L',
