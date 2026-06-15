@@ -427,6 +427,50 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(materialNameFor('V27_PerformanceDaisUpper')).toBe('V20_ChasedGoldFiligree');
   });
 
+  it('replaces flat side-wing screen grids with arched arcade portals', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const prefix of ['V7_ArcadeScreenBay_', 'V13_WingFacadeScreenBay_']) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `flat side-wing screen bay still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredWingNodes = [
+      'V28_WingArcadePearlArch_L',
+      'V28_WingArcadePearlArch_R',
+      'V28_WingArcadeGoldReveal_L',
+      'V28_WingArcadeGoldReveal_R',
+      'V28_WingArcadeCyanInlay_L',
+      'V28_WingArcadeCyanInlay_R',
+    ];
+    for (const nodeName of requiredWingNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftArch = readMeshGeometry('V28_WingArcadePearlArch_L');
+    const rightArch = readMeshGeometry('V28_WingArcadePearlArch_R');
+    const leftInlay = readMeshGeometry('V28_WingArcadeCyanInlay_L');
+    const rightInlay = readMeshGeometry('V28_WingArcadeCyanInlay_R');
+
+    expect(leftArch.max[0]).toBeLessThan(-25);
+    expect(rightArch.min[0]).toBeGreaterThan(25);
+    expect(leftArch.max[1] - leftArch.min[1]).toBeGreaterThan(7);
+    expect(rightArch.max[1] - rightArch.min[1]).toBeGreaterThan(7);
+    expect(leftInlay.min[0]).toBeLessThan(-55);
+    expect(rightInlay.max[0]).toBeGreaterThan(55);
+    expect(leftInlay.max[1] - leftInlay.min[1]).toBeGreaterThan(5);
+    expect(rightInlay.max[1] - rightInlay.min[1]).toBeGreaterThan(5);
+
+    expect(materialNameFor('V28_WingArcadePearlArch_L')).toBe('V20_LayeredPearlShell');
+    expect(materialNameFor('V28_WingArcadePearlArch_R')).toBe('V20_LayeredPearlShell');
+    expect(materialNameFor('V28_WingArcadeGoldReveal_L')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V28_WingArcadeGoldReveal_R')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V28_WingArcadeCyanInlay_L')).toBe('V20_CelestialCyanGlass');
+    expect(materialNameFor('V28_WingArcadeCyanInlay_R')).toBe('V20_CelestialCyanGlass');
+  });
+
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
     const requiredMeshNodes = [
       'V24_CelestialCrownFrontArch_L',
