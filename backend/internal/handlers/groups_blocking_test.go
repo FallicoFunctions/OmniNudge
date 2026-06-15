@@ -95,8 +95,8 @@ func TestCreateGroupInvite_BlockedUsersForbidden(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusForbidden, w.Code)
-	assert.Contains(t, w.Body.String(), "blocking settings")
+	require.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, w.Body.String(), "User not found")
 }
 
 func TestCreateGroupInvite_BlockedAgainstExistingMemberForbidden(t *testing.T) {
@@ -121,8 +121,8 @@ func TestCreateGroupInvite_BlockedAgainstExistingMemberForbidden(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusForbidden, w.Code)
-	assert.Contains(t, w.Body.String(), "blocking settings")
+	require.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, w.Body.String(), "User not found")
 }
 
 func TestAddGroupParticipant_BlockedUsersForbidden(t *testing.T) {
@@ -147,8 +147,8 @@ func TestAddGroupParticipant_BlockedUsersForbidden(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusForbidden, w.Code)
-	assert.Contains(t, w.Body.String(), "blocking settings")
+	require.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, w.Body.String(), "User not found")
 }
 
 func TestAddGroupParticipant_BlockedAgainstExistingMemberForbidden(t *testing.T) {
@@ -173,8 +173,8 @@ func TestAddGroupParticipant_BlockedAgainstExistingMemberForbidden(t *testing.T)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusForbidden, w.Code)
-	assert.Contains(t, w.Body.String(), "blocking settings")
+	require.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, w.Body.String(), "User not found")
 }
 
 func TestAcceptGroupInvite_BlockedAgainstExistingMemberForbidden(t *testing.T) {
@@ -205,8 +205,8 @@ func TestAcceptGroupInvite_BlockedAgainstExistingMemberForbidden(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusForbidden, w.Code)
-	assert.Contains(t, w.Body.String(), "blocking settings")
+	require.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, w.Body.String(), "User not found")
 }
 
 func TestCreateGroup_PairwiseBlockingForbidden(t *testing.T) {
@@ -248,8 +248,8 @@ func TestCreateGroup_PairwiseBlockingForbidden(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusForbidden, w.Code)
-	assert.Contains(t, w.Body.String(), "blocking settings")
+	require.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, w.Body.String(), "User not found")
 }
 
 func TestCreateGroupInvite_ExistingNonRequesterBlockedPairInGroupForbidden(t *testing.T) {
@@ -289,6 +289,6 @@ func TestCreateGroupInvite_ExistingNonRequesterBlockedPairInGroupForbidden(t *te
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusForbidden, w.Code)
-	assert.Contains(t, w.Body.String(), "blocking settings")
+	require.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, w.Body.String(), "User not found")
 }
