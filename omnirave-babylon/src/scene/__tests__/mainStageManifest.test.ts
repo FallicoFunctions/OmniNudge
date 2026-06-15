@@ -1705,6 +1705,66 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_280);
   });
 
+  it('replaces truss diagonal sticks with batched production cross-brace tubes', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const prefix of ['V14_TrussDiagonalA_', 'V14_TrussDiagonalB_']) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `legacy truss diagonal stick still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredV42Nodes = ['L', 'R'].flatMap((side) => [
+      `V42_TrussDiagonalBraceA_${side}`,
+      `V42_TrussDiagonalBraceB_${side}`,
+    ]);
+    expect(nodeNamesWithPrefix('V42_')).toHaveLength(requiredV42Nodes.length);
+    for (const nodeName of requiredV42Nodes) {
+      expectMainStageMarker(nodeName);
+      const geometry = readMeshGeometry(nodeName);
+      const components = readConnectedComponents(nodeName);
+      expect(components).toHaveLength(6);
+      expect(geometry.max[1]).toBeGreaterThan(33);
+      expect(geometry.min[1]).toBeLessThan(9);
+      expect(geometry.max[2] - geometry.min[2]).toBeGreaterThan(0.9);
+      expect(materialNameFor(nodeName)).toBe('V14_MatteBlackProductionRig');
+      for (const component of components) {
+        expect(component.vertexCount).toBeGreaterThanOrEqual(24);
+        expect(component.triangleCount).toBeGreaterThanOrEqual(40);
+      }
+    }
+
+    for (const side of ['L', 'R']) {
+      const expectedX = side === 'L' ? -21.5 : 21.5;
+      const components = [
+        ...readConnectedComponents(`V42_TrussDiagonalBraceA_${side}`),
+        ...readConnectedComponents(`V42_TrussDiagonalBraceB_${side}`),
+      ];
+      const centers = components.map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedY of [10.1, 14.5, 18.9, 23.3, 27.7, 32.1]) {
+        const matches = centers.filter(
+          ([x, y, z]) =>
+            Math.abs(x - expectedX) < 0.08
+            && Math.abs(y - expectedY) < 0.08
+            && Math.abs(z - 21.725) < 0.08,
+        );
+        expect(matches, `missing paired ${side} truss cross braces around ${expectedY}m`).toHaveLength(2);
+      }
+    }
+
+    expect(
+      requiredV42Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(1_400);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V42_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_260);
+  });
+
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
     const requiredMeshNodes = [
       'V24_CelestialCrownFrontArch_L',
