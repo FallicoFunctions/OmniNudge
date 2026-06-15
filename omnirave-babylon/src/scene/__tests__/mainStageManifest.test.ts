@@ -306,6 +306,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
       'V4_PortalScreenCrest',
       'V11_WideScreenDepthFin_',
       'V20_CrownCrystalFacet_',
+      'V10_WideHeroScreenGlass',
     ];
     const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
 
@@ -315,7 +316,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
         `redundant legacy screen assembly still exported: ${prefix}`,
       ).toBe(false);
     }
-    expect(exportedNodeNames).toContain('V10_WideHeroScreenGlass');
+    expect(exportedNodeNames).toContain('V31_CenterLedTileField');
 
     const requiredPortalNodes = [
       'V25_HeroPortalOuterOgive_L',
@@ -710,6 +711,82 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(materialNameFor('V30_WingUndersideRib_R_00')).toBe('V20_RecessedWarmShadow');
     expect(materialNameFor('V30_WingGoldBaluster_L_00')).toBe('V20_ChasedGoldFiligree');
     expect(materialNameFor('V30_WingGoldBaluster_R_00')).toBe('V20_ChasedGoldFiligree');
+  });
+
+  it('replaces flat screen cards with layered LED tile lenses and parallax depth', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenFlatScreenPrefixes = [
+      'V10_WideHeroScreenGlass',
+      'V9_OvalScreenGlass_',
+      'V13_OvalScreenGlowPatch_',
+      'V14_CenterScreenBlueScanLine_',
+      'V14_CenterScreenStar_',
+      'V14_CenterScreenRadialGold_',
+      'V14_OvalPortalRadial_',
+      'V14_OvalPortalStar_',
+      'V21_Merged_V19_ScreenConstellation',
+      'V21_Merged_V20_SideScreen',
+    ];
+    for (const prefix of forbiddenFlatScreenPrefixes) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `flat screen card still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredScreenNodes = [
+      'V31_CenterLedTileField',
+      'V31_CenterGlassLens',
+      'V31_CenterParallaxStarfield',
+      'V31_SideLedTileField_L',
+      'V31_SideLedTileField_R',
+      'V31_SideGlassLens_L',
+      'V31_SideGlassLens_R',
+      'V31_SideParallaxOrbitalContent_L',
+      'V31_SideParallaxOrbitalContent_R',
+      'V31_SideParallaxGoldOrbit_L',
+      'V31_SideParallaxGoldOrbit_R',
+    ];
+    for (const nodeName of requiredScreenNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const centerTiles = readMeshGeometry('V31_CenterLedTileField');
+    const centerLens = readMeshGeometry('V31_CenterGlassLens');
+    const centerStars = readMeshGeometry('V31_CenterParallaxStarfield');
+    const leftTiles = readMeshGeometry('V31_SideLedTileField_L');
+    const rightTiles = readMeshGeometry('V31_SideLedTileField_R');
+    const leftOrbitalContent = readMeshGeometry('V31_SideParallaxOrbitalContent_L');
+    const rightOrbitalContent = readMeshGeometry('V31_SideParallaxOrbitalContent_R');
+
+    expect(centerTiles.vertexCount).toBeGreaterThan(400);
+    expect(centerTiles.min[0]).toBeLessThan(-14);
+    expect(centerTiles.max[0]).toBeGreaterThan(14);
+    expect(centerTiles.max[2] - centerTiles.min[2]).toBeGreaterThan(9);
+    expect(centerTiles.max[1] - centerTiles.min[1]).toBeGreaterThan(0.4);
+    expect(centerLens.max[1] - centerLens.min[1]).toBeGreaterThan(0.5);
+    expect(centerStars.max[1] - centerStars.min[1]).toBeGreaterThan(0.7);
+    expect(leftTiles.max[0]).toBeLessThan(-24);
+    expect(rightTiles.min[0]).toBeGreaterThan(24);
+    expect(leftTiles.vertexCount).toBeGreaterThan(250);
+    expect(rightTiles.vertexCount).toBeGreaterThan(250);
+    expect(leftOrbitalContent.max[0]).toBeLessThan(-24);
+    expect(rightOrbitalContent.min[0]).toBeGreaterThan(24);
+    expect(leftOrbitalContent.max[1] - leftOrbitalContent.min[1]).toBeGreaterThan(0.7);
+    expect(rightOrbitalContent.max[1] - rightOrbitalContent.min[1]).toBeGreaterThan(0.7);
+
+    expect(materialNameFor('V31_CenterLedTileField')).toBe('V14_CosmicScreenEmission');
+    expect(materialNameFor('V31_CenterGlassLens')).toBe('V20_CelestialCyanGlass');
+    expect(materialNameFor('V31_CenterParallaxStarfield')).toBe('V17_CyanEdgeGlow');
+    expect(materialNameFor('V31_SideLedTileField_L')).toBe('V14_CosmicScreenEmission');
+    expect(materialNameFor('V31_SideLedTileField_R')).toBe('V14_CosmicScreenEmission');
+    expect(materialNameFor('V31_SideGlassLens_L')).toBe('V20_CelestialCyanGlass');
+    expect(materialNameFor('V31_SideGlassLens_R')).toBe('V20_CelestialCyanGlass');
+    expect(materialNameFor('V31_SideParallaxOrbitalContent_L')).toBe('V17_CyanEdgeGlow');
+    expect(materialNameFor('V31_SideParallaxOrbitalContent_R')).toBe('V17_CyanEdgeGlow');
+    expect(materialNameFor('V31_SideParallaxGoldOrbit_L')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V31_SideParallaxGoldOrbit_R')).toBe('V20_ChasedGoldFiligree');
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
