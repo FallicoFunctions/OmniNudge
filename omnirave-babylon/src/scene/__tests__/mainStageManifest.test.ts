@@ -2090,6 +2090,76 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_198);
   });
 
+  it('replaces spawn-route cable ramp strips with layered batched service troughs', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    expect(
+      exportedNodeNames.some((name) => name.startsWith('V15_SpawnCableRamp_')),
+      'legacy spawn cable ramp strips should not remain exported',
+    ).toBe(false);
+
+    const requiredV48Nodes = [
+      'V48_SpawnCableTroughBlackShell',
+      'V48_SpawnCableTroughGoldCollar',
+      'V48_SpawnCableTroughWetInset',
+    ];
+    expect(nodeNamesWithPrefix('V48_')).toHaveLength(requiredV48Nodes.length);
+    expect(materialNameFor('V48_SpawnCableTroughBlackShell')).toBe('V15_MatteProductionBlack');
+    expect(materialNameFor('V48_SpawnCableTroughGoldCollar')).toBe('V15_EngineeredGoldAnchors');
+    expect(materialNameFor('V48_SpawnCableTroughWetInset')).toBe('V15_WetPlazaInlay');
+
+    for (const nodeName of requiredV48Nodes) {
+      expectMainStageMarker(nodeName);
+      const geometry = readMeshGeometry(nodeName);
+      const components = readConnectedComponents(nodeName);
+      expect(components).toHaveLength(18);
+      expect(geometry.min[0], `${nodeName} should cover the left spawn-route troughs`).toBeLessThan(-5.65);
+      expect(geometry.max[0], `${nodeName} should cover the right spawn-route troughs`).toBeGreaterThan(5.65);
+      expect(geometry.min[2], `${nodeName} should reach the final approach trough row`).toBeLessThan(-10.25);
+      expect(geometry.max[2], `${nodeName} should reach the back-plaza trough row`).toBeGreaterThan(50.25);
+      for (const component of components) {
+        expect(component.vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(32);
+        expect(component.triangleCount, `${nodeName} component lacks chamfered trough geometry`).toBeGreaterThanOrEqual(56);
+      }
+    }
+
+    const shell = readMeshGeometry('V48_SpawnCableTroughBlackShell');
+    expect(shell.min[1], 'cable trough shells should sit on the plaza').toBeLessThan(0.06);
+    expect(shell.max[1], 'cable trough shells should have walk-over volume').toBeGreaterThan(0.3);
+
+    const collars = readMeshGeometry('V48_SpawnCableTroughGoldCollar');
+    expect(collars.min[1], 'gold service collars should sit above the shell base').toBeGreaterThan(0.12);
+    expect(collars.max[1], 'gold service collars should crown the cable troughs').toBeGreaterThan(0.34);
+
+    const insets = readMeshGeometry('V48_SpawnCableTroughWetInset');
+    expect(insets.min[1], 'wet insets should sit on top of the cable trough shell').toBeGreaterThan(0.24);
+    expect(insets.max[1], 'wet insets should add reflective top depth').toBeGreaterThan(0.34);
+
+    const expectedRows = [48, 41, 34, 27, 20, 13, 6, -1, -8];
+    for (const nodeName of requiredV48Nodes) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedX of [-5.4, 5.4]) {
+        for (const expectedZ of expectedRows) {
+          expect(
+            centers.some(([x, , z]) => Math.abs(x - expectedX) < 0.12 && Math.abs(z - expectedZ) < 0.12),
+            `${nodeName} missing spawn-route trough around x=${expectedX}, z=${expectedZ}`,
+          ).toBe(true);
+        }
+      }
+    }
+
+    expect(
+      requiredV48Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(2_000);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V48_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_183);
+  });
+
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
     const requiredMeshNodes = [
       'V24_CelestialCrownFrontArch_L',
