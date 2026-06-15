@@ -1455,6 +1455,55 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_310);
   });
 
+  it('replaces low-poly crown side ribs with layered celestial rib clusters', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    expect(
+      exportedNodeNames.some((name) => name.startsWith('V14_CrownSideRib_')),
+      'legacy crown side rib sticks still exported',
+    ).toBe(false);
+
+    const requiredV39Nodes = ['L', 'R'].flatMap((side) => [
+      `V39_CrownSideRibGoldCluster_${side}`,
+      `V39_CrownSideRibCyanInset_${side}`,
+    ]);
+    expect(nodeNamesWithPrefix('V39_')).toHaveLength(requiredV39Nodes.length);
+    for (const nodeName of requiredV39Nodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    for (const side of ['L', 'R']) {
+      const goldNode = `V39_CrownSideRibGoldCluster_${side}`;
+      const cyanNode = `V39_CrownSideRibCyanInset_${side}`;
+      const gold = readMeshGeometry(goldNode);
+      const cyan = readMeshGeometry(cyanNode);
+      expect(readConnectedComponents(goldNode)).toHaveLength(3);
+      expect(readConnectedComponents(cyanNode)).toHaveLength(3);
+      expect(gold.max[1]).toBeGreaterThan(69);
+      expect(gold.min[1]).toBeLessThan(50);
+      expect(gold.max[2] - gold.min[2]).toBeGreaterThan(0.35);
+      expect(cyan.max[1]).toBeLessThan(gold.max[1] + 0.01);
+      expect(cyan.min[1]).toBeGreaterThan(gold.min[1] - 0.01);
+      if (side === 'L') {
+        expect(gold.max[0]).toBeLessThan(-1);
+        expect(gold.min[0]).toBeLessThan(-8);
+      } else {
+        expect(gold.min[0]).toBeGreaterThan(1);
+        expect(gold.max[0]).toBeGreaterThan(8);
+      }
+      expect(materialNameFor(goldNode)).toBe('V20_ChasedGoldFiligree');
+      expect(materialNameFor(cyanNode)).toBe('V20_CelestialCyanGlass');
+    }
+
+    expect(
+      requiredV39Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(3_600);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V39_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_305);
+  });
+
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
     const requiredMeshNodes = [
       'V24_CelestialCrownFrontArch_L',
