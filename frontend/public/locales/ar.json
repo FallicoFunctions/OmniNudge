@@ -21,6 +21,7 @@
     "userNumber": "المستخدم رقم {{id}}",
     "user": "مستخدم",
     "unknownUser": "مستخدم غير معروف",
+    "previous": "السابق",
     "next": "التالي",
     "confirm": "تأكيد",
     "search": "بحث",
@@ -132,6 +133,7 @@
   },
   "menu": {
     "profile": "الملف الشخصي",
+    "activity": "النشاط",
     "settings": "الإعدادات",
     "hubs": "تصفح المجموعات",
     "games": "الألعاب",
@@ -1171,23 +1173,28 @@
       "overview": "نظرة عامة",
       "posts": "المنشورات",
       "comments": "التعليقات",
+      "communities": "المجتمعات",
       "saved": "المحفوظات",
       "hidden": "المخفي",
       "subscribed": "المشترك به"
     },
     "headings": {
-      "recentPosts": "أحدث المنشورات",
-      "recentComments": "أحدث التعليقات",
-      "moderatorOf": "مشرف في"
+      "info": "معلومات",
+      "photos": "الصور",
+      "mutualFriends": "الأصدقاء المشتركون"
     },
     "labels": {
       "joined": "انضم {{time}}",
       "lastSeen": "آخر ظهور {{time}}",
       "karma": "كارما",
-      "blocked": "محظور"
+      "blocked": "محظور",
+      "location": "الموقع"
+    },
+    "mutualFriends": {
+      "count_one": "{{count}} صديق مشترك",
+      "count_other": "{{count}} أصدقاء مشتركون"
     },
     "actions": {
-      "viewAll": "عرض الكل",
       "message": "رسالة",
       "editProfile": "تعديل الملف الشخصي",
       "viewThread": "عرض السلسلة",
@@ -1201,13 +1208,17 @@
     "comments": {
       "onPost": "على <link>منشور #{{id}}</link>"
     },
+    "communities": {
+      "empty": "لست مشرفًا على أي مجتمع حتى الآن."
+    },
     "private": {
       "saved": "العناصر المحفوظة خاصة.",
       "hidden": "العناصر المخفية خاصة.",
       "subscribed": "الاشتراكات خاصة."
     },
     "errors": {
-      "loadFailed": "تعذر تحميل ملف المستخدم."
+      "loadFailed": "تعذر تحميل ملف المستخدم.",
+      "friendsLoadFailed": "تعذر تحميل أصدقاء هذا المستخدم."
     },
     "aria": {
       "avatarAlt": "صورة {{username}}"
@@ -1223,16 +1234,63 @@
       "statusLabel": "نص الحالة",
       "statusPlaceholder": "بماذا تنشغل الآن؟",
       "statusCount": "{{count}} / 500",
+      "locationLabel": "الموقع",
+      "locationPlaceholder": "المدينة، البلد",
+      "locationCount": "{{count}} / 100",
       "bioLabel": "النبذة",
       "bioPlaceholder": "اكتب نبذة قصيرة عنك...",
       "bioCount": "{{count}} / 500",
       "errors": {
         "bioTooLong": "يجب ألا تتجاوز النبذة 500 حرف.",
         "statusTooLong": "يجب ألا يتجاوز نص الحالة 500 حرف.",
+        "locationTooLong": "يجب ألا يتجاوز الموقع 100 حرف.",
         "invalidAvatarUrl": "يجب أن يبدأ رابط الصورة بـ http:// أو https://",
         "uploadFailed": "فشل رفع الصورة الشخصية: {{message}}",
         "saveFailed": "فشل حفظ الملف الشخصي: {{message}}"
       }
+    },
+    "friendsPage": {
+      "title": "أصدقاء {{username}}",
+      "backToProfile": "العودة إلى الملف الشخصي",
+      "empty": "لا يوجد أصدقاء حتى الآن.",
+      "loading": "جارٍ تحميل الأصدقاء…"
+    },
+    "activityPage": {
+      "title": "نشاط {{username}}",
+      "backToProfile": "العودة إلى الملف الشخصي"
+    },
+    "wall": {
+      "heading": "الحائط",
+      "composerPlaceholder": "اكتب شيئًا على هذا الحائط...",
+      "commentPlaceholder": "اكتب تعليقًا...",
+      "post": "نشر",
+      "posting": "جارٍ النشر…",
+      "comment": "تعليق",
+      "commenting": "جارٍ التعليق…",
+      "like": "إعجاب",
+      "comments": "التعليقات",
+      "noComments": "لا توجد تعليقات بعد.",
+      "empty": "لا توجد منشورات على هذا الحائط بعد.",
+      "emptyOwner": "لا توجد منشورات بعد. كن أول من يكتب شيئًا!",
+      "private": "هذا الحائط خاص.",
+      "delete": "حذف",
+      "deletePostConfirm": "حذف هذا المنشور من الحائط؟",
+      "deleteCommentConfirm": "حذف هذا التعليق؟",
+      "visibilityPublic": "عام",
+      "visibilityFriends": "الأصدقاء فقط",
+      "visibilityPrivate": "أنا فقط",
+      "visibilityUpdated": "تم تحديث خصوصية الحائط.",
+      "visibilityUpdateFailed": "فشل تحديث خصوصية الحائط.",
+      "loadFailed": "تعذر تحميل منشورات الحائط.",
+      "postFailed": "فشل النشر على الحائط.",
+      "commentFailed": "فشل نشر التعليق.",
+      "likeFailed": "فشل تحديث الإعجاب.",
+      "deleteFailed": "فشل الحذف.",
+      "attachMedia": "إرفاق صورة/فيديو",
+      "uploadingMedia": "جارٍ التحميل…",
+      "removeMedia": "إزالة",
+      "mediaUploadFailed": "فشل تحميل الملف.",
+      "tooManyMedia": "يمكنك إرفاق ما يصل إلى {{max}} ملفات."
     }
   },
   "redditPostPage": {
@@ -3825,7 +3883,8 @@
       "accept": "قبول",
       "decline": "رفض",
       "cancelRequest": "إلغاء الطلب",
-      "unfriend": "إزالة الصداقة"
+      "unfriend": "إزالة الصداقة",
+      "seeAll": "عرض جميع الأصدقاء"
     },
     "incoming": {
       "empty": "لا توجد طلبات صداقة معلقة.",

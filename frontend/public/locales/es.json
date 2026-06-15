@@ -21,6 +21,7 @@
     "userNumber": "Usuario #{{id}}",
     "user": "Usuario",
     "unknownUser": "Usuario desconocido",
+    "previous": "Anterior",
     "next": "Siguiente",
     "confirm": "Confirmar",
     "search": "Buscar",
@@ -132,6 +133,7 @@
   },
   "menu": {
     "profile": "Perfil",
+    "activity": "Actividad",
     "settings": "Ajustes",
     "hubs": "Explorar Hubs",
     "games": "Juegos",
@@ -1171,23 +1173,28 @@
       "overview": "Resumen",
       "posts": "Posts",
       "comments": "Comentarios",
+      "communities": "Comunidades",
       "saved": "Guardados",
       "hidden": "Ocultos",
       "subscribed": "Suscrito"
     },
     "headings": {
-      "recentPosts": "Posts recientes",
-      "recentComments": "Comentarios recientes",
-      "moderatorOf": "Moderador de"
+      "info": "Información",
+      "photos": "Fotos",
+      "mutualFriends": "Amigos en común"
     },
     "labels": {
       "joined": "Se unió {{time}}",
       "lastSeen": "Visto por última vez {{time}}",
       "karma": "karma",
-      "blocked": "Bloqueado"
+      "blocked": "Bloqueado",
+      "location": "Ubicación"
+    },
+    "mutualFriends": {
+      "count_one": "{{count}} amigo en común",
+      "count_other": "{{count}} amigos en común"
     },
     "actions": {
-      "viewAll": "Ver todo",
       "message": "Mensaje",
       "editProfile": "Editar perfil",
       "viewThread": "Ver hilo",
@@ -1201,13 +1208,17 @@
     "comments": {
       "onPost": "En <link>post #{{id}}</link>"
     },
+    "communities": {
+      "empty": "No es moderador de ninguna comunidad todavía."
+    },
     "private": {
       "saved": "Los elementos guardados son privados.",
       "hidden": "Los elementos ocultos son privados.",
       "subscribed": "Las suscripciones son privadas."
     },
     "errors": {
-      "loadFailed": "No se pudo cargar el perfil del usuario."
+      "loadFailed": "No se pudo cargar el perfil del usuario.",
+      "friendsLoadFailed": "No se pudieron cargar los amigos de este usuario."
     },
     "aria": {
       "avatarAlt": "Avatar de {{username}}"
@@ -1223,16 +1234,63 @@
       "statusLabel": "Estado",
       "statusPlaceholder": "¿Qué estás haciendo?",
       "statusCount": "{{count}} / 500",
+      "locationLabel": "Ubicación",
+      "locationPlaceholder": "Ciudad, País",
+      "locationCount": "{{count}} / 100",
       "bioLabel": "Biografía",
       "bioPlaceholder": "Cuéntale a la gente un poco sobre ti...",
       "bioCount": "{{count}} / 500",
       "errors": {
         "bioTooLong": "La biografía debe tener 500 caracteres o menos.",
         "statusTooLong": "El estado debe tener 500 caracteres o menos.",
+        "locationTooLong": "La ubicación debe tener 100 caracteres o menos.",
         "invalidAvatarUrl": "La URL del avatar debe comenzar con http:// o https://",
         "uploadFailed": "No se pudo subir el avatar: {{message}}",
         "saveFailed": "No se pudo guardar el perfil: {{message}}"
       }
+    },
+    "friendsPage": {
+      "title": "Amigos de {{username}}",
+      "backToProfile": "Volver al perfil",
+      "empty": "Aún no hay amigos.",
+      "loading": "Cargando amigos…"
+    },
+    "activityPage": {
+      "title": "Actividad de {{username}}",
+      "backToProfile": "Volver al perfil"
+    },
+    "wall": {
+      "heading": "Muro",
+      "composerPlaceholder": "Escribe algo en este muro...",
+      "commentPlaceholder": "Escribe un comentario...",
+      "post": "Publicar",
+      "posting": "Publicando…",
+      "comment": "Comentar",
+      "commenting": "Comentando…",
+      "like": "Me gusta",
+      "comments": "Comentarios",
+      "noComments": "Aún no hay comentarios.",
+      "empty": "Aún no hay publicaciones en este muro.",
+      "emptyOwner": "Aún no hay publicaciones. ¡Sé el primero en escribir algo!",
+      "private": "Este muro es privado.",
+      "delete": "Eliminar",
+      "deletePostConfirm": "¿Eliminar esta publicación del muro?",
+      "deleteCommentConfirm": "¿Eliminar este comentario?",
+      "visibilityPublic": "Público",
+      "visibilityFriends": "Solo amigos",
+      "visibilityPrivate": "Solo yo",
+      "visibilityUpdated": "Visibilidad del muro actualizada.",
+      "visibilityUpdateFailed": "No se pudo actualizar la visibilidad del muro.",
+      "loadFailed": "No se pudieron cargar las publicaciones del muro.",
+      "postFailed": "No se pudo publicar en el muro.",
+      "commentFailed": "No se pudo publicar el comentario.",
+      "likeFailed": "No se pudo actualizar el me gusta.",
+      "deleteFailed": "No se pudo eliminar.",
+      "attachMedia": "Adjuntar foto/video",
+      "uploadingMedia": "Subiendo…",
+      "removeMedia": "Quitar",
+      "mediaUploadFailed": "No se pudo subir el archivo.",
+      "tooManyMedia": "Puedes adjuntar hasta {{max}} archivos."
     }
   },
   "redditPostPage": {
@@ -3825,7 +3883,8 @@
       "accept": "Aceptar",
       "decline": "Rechazar",
       "cancelRequest": "Cancelar solicitud",
-      "unfriend": "Eliminar amigo"
+      "unfriend": "Eliminar amigo",
+      "seeAll": "Ver todos los amigos"
     },
     "incoming": {
       "empty": "No hay solicitudes de amistad pendientes.",
