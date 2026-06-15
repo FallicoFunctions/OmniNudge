@@ -589,6 +589,129 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(materialNameFor('V29_FrontSubPort_R_00')).toBe('V14_MatteBlackProductionRig');
   });
 
+  it('retires legacy VIP slab decks behind sculpted terrace fascia and balustrades', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenVipPrefixes = [
+      'V4_VIPBridgeCap_',
+      'V4_VIPSpine_',
+      'V4_VIPUpper_',
+      'V4_WingBalcony_',
+      'V4_WingCanopy_',
+      'V4_WingRear_',
+      'V4_WingRoofRear_',
+      'V4_WingRoofSweep_',
+      'V5_PodiumDeck_',
+      'V5_PodiumParapetLow_',
+      'V5_PodiumParapetMid_',
+      'V5_PodiumParapetHigh_',
+      'V5_WingMid_',
+      'V5_WingMidCap_',
+      'V7_VIPCurvedTerrace',
+      'V7_VIPGoldFrontRail',
+      'V7_WingBalconyGoldRail_',
+      'V7_WingContinuousBalcony_',
+      'V7_WingRailPost_',
+      'V9_VIPLowerColumn_',
+      'V9_VIPLowerContinuousDeck_',
+      'V9_VIPLowerGoldRail_',
+      'V9_VIPUpperContinuousDeck_',
+      'V9_VIPUpperGoldRail_',
+    ];
+    for (const prefix of forbiddenVipPrefixes) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `legacy VIP slab/deck geometry still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    expect(nodeNamesWithPrefix('V30_VipUndersideRib_L_')).toHaveLength(8);
+    expect(nodeNamesWithPrefix('V30_VipUndersideRib_R_')).toHaveLength(8);
+    expect(nodeNamesWithPrefix('V30_VipGoldBaluster_L_')).toHaveLength(12);
+    expect(nodeNamesWithPrefix('V30_VipGoldBaluster_R_')).toHaveLength(12);
+    expect(nodeNamesWithPrefix('V30_WingUndersideRib_L_')).toHaveLength(10);
+    expect(nodeNamesWithPrefix('V30_WingUndersideRib_R_')).toHaveLength(10);
+    expect(nodeNamesWithPrefix('V30_WingGoldBaluster_L_')).toHaveLength(12);
+    expect(nodeNamesWithPrefix('V30_WingGoldBaluster_R_')).toHaveLength(12);
+
+    const requiredVipNodes = [
+      'V30_VipShellFascia_L',
+      'V30_VipShellFascia_R',
+      'V30_VipSoffitShadow_L',
+      'V30_VipSoffitShadow_R',
+      'V30_VipGlassBalustrade_L',
+      'V30_VipGlassBalustrade_R',
+      'V30_VipGoldHandrail_L',
+      'V30_VipGoldHandrail_R',
+      'V30_VipUndersideRib_L_00',
+      'V30_VipUndersideRib_R_00',
+      'V30_VipGoldBaluster_L_00',
+      'V30_VipGoldBaluster_R_00',
+      'V30_WingTerraceFascia_L',
+      'V30_WingTerraceFascia_R',
+      'V30_WingSoffitShadow_L',
+      'V30_WingSoffitShadow_R',
+      'V30_WingGlassBalustrade_L',
+      'V30_WingGlassBalustrade_R',
+      'V30_WingGoldHandrail_L',
+      'V30_WingGoldHandrail_R',
+      'V30_WingUndersideRib_L_00',
+      'V30_WingUndersideRib_R_00',
+      'V30_WingGoldBaluster_L_00',
+      'V30_WingGoldBaluster_R_00',
+    ];
+    for (const nodeName of requiredVipNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftFascia = readMeshGeometry('V30_VipShellFascia_L');
+    const rightFascia = readMeshGeometry('V30_VipShellFascia_R');
+    const leftBalustrade = readMeshGeometry('V30_VipGlassBalustrade_L');
+    const rightBalustrade = readMeshGeometry('V30_VipGlassBalustrade_R');
+    const leftWingFascia = readMeshGeometry('V30_WingTerraceFascia_L');
+    const rightWingFascia = readMeshGeometry('V30_WingTerraceFascia_R');
+
+    expect(leftFascia.max[0]).toBeLessThan(0);
+    expect(rightFascia.min[0]).toBeGreaterThan(0);
+    expect(leftFascia.vertexCount).toBeGreaterThan(400);
+    expect(rightFascia.vertexCount).toBeGreaterThan(400);
+    expect(leftFascia.max[2] - leftFascia.min[2]).toBeGreaterThan(36);
+    expect(rightFascia.max[2] - rightFascia.min[2]).toBeGreaterThan(36);
+    expect(leftFascia.max[1] - leftFascia.min[1]).toBeGreaterThan(3);
+    expect(rightFascia.max[1] - rightFascia.min[1]).toBeGreaterThan(3);
+    expect(leftBalustrade.max[1] - leftBalustrade.min[1]).toBeGreaterThan(1);
+    expect(rightBalustrade.max[1] - rightBalustrade.min[1]).toBeGreaterThan(1);
+    expect(leftWingFascia.max[0] - leftWingFascia.min[0]).toBeGreaterThan(30);
+    expect(rightWingFascia.max[0] - rightWingFascia.min[0]).toBeGreaterThan(30);
+    expect(leftWingFascia.max[1] - leftWingFascia.min[1]).toBeGreaterThan(2.5);
+    expect(rightWingFascia.max[1] - rightWingFascia.min[1]).toBeGreaterThan(2.5);
+
+    expect(materialNameFor('V30_VipShellFascia_L')).toBe('V20_LayeredPearlShell');
+    expect(materialNameFor('V30_VipShellFascia_R')).toBe('V20_LayeredPearlShell');
+    expect(materialNameFor('V30_VipSoffitShadow_L')).toBe('V20_RecessedWarmShadow');
+    expect(materialNameFor('V30_VipSoffitShadow_R')).toBe('V20_RecessedWarmShadow');
+    expect(materialNameFor('V30_VipGlassBalustrade_L')).toBe('V20_CelestialCyanGlass');
+    expect(materialNameFor('V30_VipGlassBalustrade_R')).toBe('V20_CelestialCyanGlass');
+    expect(materialNameFor('V30_VipGoldHandrail_L')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V30_VipGoldHandrail_R')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V30_VipUndersideRib_L_00')).toBe('V20_RecessedWarmShadow');
+    expect(materialNameFor('V30_VipUndersideRib_R_00')).toBe('V20_RecessedWarmShadow');
+    expect(materialNameFor('V30_VipGoldBaluster_L_00')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V30_VipGoldBaluster_R_00')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V30_WingTerraceFascia_L')).toBe('V20_LayeredPearlShell');
+    expect(materialNameFor('V30_WingTerraceFascia_R')).toBe('V20_LayeredPearlShell');
+    expect(materialNameFor('V30_WingSoffitShadow_L')).toBe('V20_RecessedWarmShadow');
+    expect(materialNameFor('V30_WingSoffitShadow_R')).toBe('V20_RecessedWarmShadow');
+    expect(materialNameFor('V30_WingGlassBalustrade_L')).toBe('V20_CelestialCyanGlass');
+    expect(materialNameFor('V30_WingGlassBalustrade_R')).toBe('V20_CelestialCyanGlass');
+    expect(materialNameFor('V30_WingGoldHandrail_L')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V30_WingGoldHandrail_R')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V30_WingUndersideRib_L_00')).toBe('V20_RecessedWarmShadow');
+    expect(materialNameFor('V30_WingUndersideRib_R_00')).toBe('V20_RecessedWarmShadow');
+    expect(materialNameFor('V30_WingGoldBaluster_L_00')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V30_WingGoldBaluster_R_00')).toBe('V20_ChasedGoldFiligree');
+  });
+
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
     const requiredMeshNodes = [
       'V24_CelestialCrownFrontArch_L',
