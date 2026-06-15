@@ -53,7 +53,15 @@ interface MainStageGlbJson {
   accessors: GlbAccessor[];
   buffers: GlbBuffer[];
   bufferViews: GlbBufferView[];
-  materials: Array<{ name?: string }>;
+  materials: Array<{
+    emissiveFactor?: number[];
+    extensions?: {
+      KHR_materials_emissive_strength?: {
+        emissiveStrength?: number;
+      };
+    };
+    name?: string;
+  }>;
   meshes: GlbMesh[];
   nodes: GlbNode[];
 }
@@ -925,6 +933,189 @@ describe('MAIN_STAGE_MANIFEST', () => {
     for (const nodeName of wearableNodes) {
       expect(materialNameFor(nodeName)).toBe('V19_ArrivalCyanGlow');
     }
+  });
+
+  it('replaces garden blobs and proxy lamps with varied foliage and layered basin practicals', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenProxyPrefixes = [
+      'V9_BasinIsland_',
+      'V13_BasinGardenVolume_',
+      'V14_GardenCanopy_',
+      'V16_VipGardenPlantMass_',
+      'V9_BasinIslandLanternHead_',
+      'V9_BasinIslandLanternPost_',
+      'V14_BasinLampHead_',
+      'V14_BasinLampPost_',
+    ];
+    for (const prefix of forbiddenProxyPrefixes) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `garden or practical-light proxy still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const basinFoliageNodes = ['L', 'R'].flatMap((side) => [
+      `V33_BasinFoliageUnderstory_${side}`,
+      `V33_BasinFoliageMidstory_${side}`,
+      `V33_BasinFoliageCanopy_${side}`,
+    ]);
+    const vipFoliageNodes = ['L', 'R'].flatMap((side) => [
+      `V33_VipFoliageUnderstory_${side}`,
+      `V33_VipFoliageCanopy_${side}`,
+    ]);
+    const lanternNodes = ['L', 'R'].flatMap((side) => [
+      `V33_BasinLanternStem_${side}`,
+      `V33_BasinLanternHousing_${side}`,
+      `V33_BasinLanternCore_${side}`,
+    ]);
+    const islandPositionsLeft = [
+      [-17.783, 0.764],
+      [-9.371, 1.092],
+      [-9.84, -13.946],
+      [-17.469, -13.408],
+      [-21.471, 20.875],
+      [-11.707, 21.281],
+      [-12.251, 2.662],
+      [-21.106, 3.328],
+      [-25.966, 38.731],
+      [-14.248, 39.106],
+      [-14.902, 21.918],
+      [-25.528, 22.534],
+    ];
+    const pathLanternYPositions = [-18, -10, 0, 11, 23, 36, 48];
+    const requiredV33Nodes = [...basinFoliageNodes, ...vipFoliageNodes, ...lanternNodes];
+    expect(nodeNamesWithPrefix('V33_')).toHaveLength(16);
+    for (const nodeName of requiredV33Nodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    for (const side of ['L', 'R']) {
+      const understoryNode = `V33_BasinFoliageUnderstory_${side}`;
+      const midstoryNode = `V33_BasinFoliageMidstory_${side}`;
+      const canopyNode = `V33_BasinFoliageCanopy_${side}`;
+      const understory = readMeshGeometry(understoryNode);
+      const midstory = readMeshGeometry(midstoryNode);
+      const canopy = readMeshGeometry(canopyNode);
+      expect(readConnectedComponents(understoryNode)).toHaveLength(6);
+      expect(readConnectedComponents(midstoryNode)).toHaveLength(6);
+      const canopyComponents = readConnectedComponents(canopyNode);
+      expect(canopyComponents).toHaveLength(6);
+      for (const component of [
+        ...readConnectedComponents(understoryNode),
+        ...readConnectedComponents(midstoryNode),
+        ...canopyComponents,
+      ]) {
+        expect(component.vertexCount).toBeGreaterThanOrEqual(32);
+        expect(component.triangleCount).toBeGreaterThanOrEqual(48);
+        expect(component.max.every((value, axis) => value - component.min[axis] > 0.25)).toBe(true);
+      }
+      expect(understory.max[1]).toBeLessThan(midstory.max[1]);
+      expect(midstory.max[1]).toBeLessThan(canopy.max[1]);
+      expect(understory.max[1]).toBeGreaterThan(midstory.min[1]);
+      expect(midstory.max[1]).toBeGreaterThan(canopy.min[1]);
+      expect(
+        new Set(
+          canopyComponents.map(({ min, max }) =>
+            max.map((value, axis) => (value - min[axis]).toFixed(2)).join(','),
+          ),
+        ).size,
+      ).toBeGreaterThanOrEqual(4);
+      if (side === 'L') {
+        expect(canopy.max[0]).toBeLessThan(-7);
+      } else {
+        expect(canopy.min[0]).toBeGreaterThan(7);
+      }
+
+      for (const layer of ['Understory', 'Canopy']) {
+        const vipNode = `V33_VipFoliage${layer}_${side}`;
+        expect(readConnectedComponents(vipNode)).toHaveLength(2);
+        expect(materialNameFor(vipNode)).toBe(
+          layer === 'Understory' ? 'V16_DeepGardenPlanting' : 'V14_LayeredGardenPlanting',
+        );
+      }
+
+      const stemNode = `V33_BasinLanternStem_${side}`;
+      const housingNode = `V33_BasinLanternHousing_${side}`;
+      const coreNode = `V33_BasinLanternCore_${side}`;
+      const stems = readConnectedComponents(stemNode);
+      const housings = readConnectedComponents(housingNode);
+      const cores = readConnectedComponents(coreNode);
+      expect(stems).toHaveLength(19);
+      expect(housings).toHaveLength(19);
+      expect(cores).toHaveLength(19);
+      const expectedPositions = [
+        ...islandPositionsLeft.map(([x, y]) => [side === 'L' ? x : -x, -y]),
+        ...pathLanternYPositions.map((y) => [side === 'L' ? -6.2 : 6.2, -y]),
+      ];
+      const remainingHousingCenters = housings.map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedPosition of expectedPositions) {
+        const matchIndex = remainingHousingCenters.findIndex(
+          (center) =>
+            Math.hypot(
+              center[0] - expectedPosition[0],
+              center[1] - expectedPosition[1],
+            ) <= 0.001,
+        );
+        expect(
+          matchIndex,
+          `missing preserved ${side} fixture at ${expectedPosition.join(',')}`,
+        ).toBeGreaterThanOrEqual(0);
+        remainingHousingCenters.splice(matchIndex, 1);
+      }
+      expect(remainingHousingCenters).toHaveLength(0);
+      for (const housing of housings) {
+        expect(housing.vertexCount).toBeGreaterThanOrEqual(50);
+        expect(housing.triangleCount).toBeGreaterThanOrEqual(70);
+      }
+      for (const core of cores) {
+        const coreCenter = core.min.map((value, axis) => (value + core.max[axis]) / 2);
+        const matchingHousing = housings.find((housing) => {
+          const housingCenter = housing.min.map(
+            (value, axis) => (value + housing.max[axis]) / 2,
+          );
+          return Math.hypot(
+            coreCenter[0] - housingCenter[0],
+            coreCenter[2] - housingCenter[2],
+          ) < 0.08;
+        });
+        expect(matchingHousing, `unpaired lantern core on ${side}`).toBeDefined();
+        for (const axis of [0, 1, 2]) {
+          expect(core.min[axis]).toBeGreaterThan(matchingHousing!.min[axis]);
+          expect(core.max[axis]).toBeLessThan(matchingHousing!.max[axis]);
+        }
+      }
+      expect(materialNameFor(stemNode)).toBe('V14_MatteBlackProductionRig');
+      expect(materialNameFor(housingNode)).toBe('V20_ChasedGoldFiligree');
+      expect(materialNameFor(coreNode)).toBe('V14_WarmBasinPractical');
+    }
+
+    expect(
+      [...basinFoliageNodes, ...vipFoliageNodes]
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(9_000);
+    expect(
+      lanternNodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(4_500);
+
+    expect(materialNameFor('V33_BasinFoliageUnderstory_L')).toBe('V16_DeepGardenPlanting');
+    expect(materialNameFor('V33_BasinFoliageMidstory_L')).toBe('V13_LushGardenPlanting');
+    expect(materialNameFor('V33_BasinFoliageCanopy_L')).toBe('V14_LayeredGardenPlanting');
+    const warmPractical = mainStageGlbJson.materials.find(
+      ({ name }) => name === 'V14_WarmBasinPractical',
+    );
+    expect(warmPractical?.emissiveFactor?.some((value) => value > 0)).toBe(true);
+    expect(
+      warmPractical?.extensions?.KHR_materials_emissive_strength?.emissiveStrength,
+    ).toBeGreaterThanOrEqual(1.5);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V33_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_450);
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
