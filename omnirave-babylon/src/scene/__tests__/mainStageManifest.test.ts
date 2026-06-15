@@ -329,7 +329,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V34_BarricadeAssembly_L');
     expectMainStageMarker('V18_ProductionTrussTower_L');
     expectMainStageMarker('V29_MainLineArrayCabinet_L_00');
-    expectMainStageMarker('V18_BasinFountainJet_L_0');
+    expectMainStageMarker('V35_BasinFountainMist_L');
     expectMainStageMarker('V18_WingFacadeArchInlay_L_0');
   });
 
@@ -1220,6 +1220,65 @@ describe('MAIN_STAGE_MANIFEST', () => {
     ).toBeLessThanOrEqual(14_000);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V34_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_380);
+  });
+
+  it('replaces box fountain jets and planting-island blocks with layered basin water features', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenBasinWaterPrefixes = [
+      'V18_BasinFountainJet_',
+      'V18_BasinFountainNozzle_',
+      'V18_BasinPlantingIsland_',
+    ];
+    for (const prefix of forbiddenBasinWaterPrefixes) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `basin water proxy still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredV35Nodes = ['L', 'R'].flatMap((side) => [
+      `V35_BasinFountainMist_${side}`,
+      `V35_BasinFountainNozzleArray_${side}`,
+      `V35_BasinPlantingIslandRim_${side}`,
+    ]);
+    expect(nodeNamesWithPrefix('V35_')).toHaveLength(requiredV35Nodes.length);
+    for (const nodeName of requiredV35Nodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    for (const side of ['L', 'R']) {
+      const mistNode = `V35_BasinFountainMist_${side}`;
+      const nozzleNode = `V35_BasinFountainNozzleArray_${side}`;
+      const islandNode = `V35_BasinPlantingIslandRim_${side}`;
+      const mist = readMeshGeometry(mistNode);
+      const nozzles = readMeshGeometry(nozzleNode);
+      const island = readMeshGeometry(islandNode);
+      expect(readConnectedComponents(mistNode)).toHaveLength(3);
+      expect(readConnectedComponents(nozzleNode)).toHaveLength(3);
+      expect(readConnectedComponents(islandNode)).toHaveLength(1);
+      expect(mist.max[1] - mist.min[1]).toBeGreaterThan(1.5);
+      expect(mist.max[0] - mist.min[0]).toBeGreaterThan(5);
+      expect(nozzles.max[1]).toBeLessThan(mist.max[1]);
+      expect(island.max[0] - island.min[0]).toBeGreaterThan(4);
+      expect(island.max[2] - island.min[2]).toBeGreaterThan(1.2);
+      if (side === 'L') {
+        expect(island.max[0]).toBeLessThan(-24);
+      } else {
+        expect(island.min[0]).toBeGreaterThan(24);
+      }
+      expect(materialNameFor(mistNode)).toBe('V18_CyanWaterMistGlow');
+      expect(materialNameFor(nozzleNode)).toBe('V18_BrushedGoldTrim');
+      expect(materialNameFor(islandNode)).toBe('V18_PearlFacadeInlay');
+    }
+
+    expect(
+      requiredV35Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(3_600);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V35_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_340);
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
