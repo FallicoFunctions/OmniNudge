@@ -336,7 +336,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
   it('exports named foreground arrival details for the far spawn reveal camera', () => {
     expectMainStageMarker('V34_BackPlazaGatewayPearl_L');
     expectMainStageMarker('V34_ApproachReflectionUnderlay');
-    expectMainStageMarker('V19_ApproachLightMast_L_0');
+    expectMainStageMarker('V40_ApproachLightStem_L');
     expectMainStageMarker('V32_CrowdCluster_L_Near');
     expectMainStageMarker('V19_WayfindingMonolith_L');
     expectMainStageMarker('V19_ScreenConstellationStroke_0');
@@ -1502,6 +1502,105 @@ describe('MAIN_STAGE_MANIFEST', () => {
     ).toBeLessThanOrEqual(3_600);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V39_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_305);
+  });
+
+  it('replaces proxy approach light poles with paired celestial promenade fixtures', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const prefix of ['V19_ApproachLightMast_', 'V19_ApproachLightCap_']) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `legacy approach-light proxy still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredV40Nodes = ['L', 'R'].flatMap((side) => [
+      `V40_ApproachLightStem_${side}`,
+      `V40_ApproachLightHousing_${side}`,
+      `V40_ApproachLightCore_${side}`,
+      `V40_ApproachLightHalo_${side}`,
+    ]);
+    expect(nodeNamesWithPrefix('V40_')).toHaveLength(requiredV40Nodes.length);
+    for (const nodeName of requiredV40Nodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const approachFixtureYPositions = [286, 260, 234, 208, 182, 156, 130, 104];
+    for (const side of ['L', 'R']) {
+      const stemNode = `V40_ApproachLightStem_${side}`;
+      const housingNode = `V40_ApproachLightHousing_${side}`;
+      const coreNode = `V40_ApproachLightCore_${side}`;
+      const haloNode = `V40_ApproachLightHalo_${side}`;
+      const stems = readConnectedComponents(stemNode);
+      const housings = readConnectedComponents(housingNode);
+      const cores = readConnectedComponents(coreNode);
+      const halos = readConnectedComponents(haloNode);
+      expect(stems).toHaveLength(8);
+      expect(housings).toHaveLength(8);
+      expect(cores).toHaveLength(8);
+      expect(halos).toHaveLength(8);
+
+      const expectedX = side === 'L' ? -12.2 : 12.2;
+      for (const [familyName, components] of [
+        ['stem', stems],
+        ['housing', housings],
+        ['core', cores],
+        ['halo', halos],
+      ] as const) {
+        const remainingCenters = components.map(({ min, max }) => [
+          (min[0] + max[0]) / 2,
+          (min[2] + max[2]) / 2,
+        ]);
+        for (const sourceY of approachFixtureYPositions) {
+          const expectedCenter = [expectedX, -sourceY];
+          const matchIndex = remainingCenters.findIndex(
+            ([x, z]) => Math.hypot(x - expectedCenter[0], z - expectedCenter[1]) <= 0.001,
+          );
+          expect(
+            matchIndex,
+            `missing aligned ${side} ${familyName} at ${expectedCenter.join(',')}`,
+          ).toBeGreaterThanOrEqual(0);
+          remainingCenters.splice(matchIndex, 1);
+        }
+        expect(remainingCenters).toHaveLength(0);
+      }
+
+      for (const stem of stems) {
+        expect(stem.max[1] - stem.min[1]).toBeGreaterThan(5);
+        expect(stem.vertexCount).toBeGreaterThanOrEqual(40);
+      }
+      for (const housing of housings) {
+        expect(housing.vertexCount).toBeGreaterThanOrEqual(60);
+        expect(housing.max[1]).toBeGreaterThan(5.3);
+      }
+      for (const core of cores) {
+        expect(core.vertexCount).toBeGreaterThanOrEqual(40);
+      }
+      const housingsByPosition = [...housings].sort(
+        (left, right) => left.min[2] - right.min[2],
+      );
+      const coresByPosition = [...cores].sort(
+        (left, right) => left.min[2] - right.min[2],
+      );
+      for (const [index, core] of coresByPosition.entries()) {
+        expect(
+          core.max[1] - housingsByPosition[index].max[1],
+          `${side} emissive crystal must visibly crown its opaque housing`,
+        ).toBeGreaterThan(0.1);
+      }
+      expect(materialNameFor(stemNode)).toBe('V19_FestivalCrowdGraphite');
+      expect(materialNameFor(housingNode)).toBe('V19_ArrivalBrushedGold');
+      expect(materialNameFor(coreNode)).toBe('V19_ArrivalCyanGlow');
+      expect(materialNameFor(haloNode)).toBe('V19_ArrivalBrushedGold');
+    }
+
+    expect(
+      requiredV40Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(6_000);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V40_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_280);
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
