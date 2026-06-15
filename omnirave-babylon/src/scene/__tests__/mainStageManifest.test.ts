@@ -1402,6 +1402,59 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_320);
   });
 
+  it('replaces side-wing arch pier sticks with batched dimensional arcade pier assemblies', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    expect(
+      exportedNodeNames.some((name) => name.startsWith('V18_WingFacadeArchPier_')),
+      'side-wing arch pier proxy sticks still exported',
+    ).toBe(false);
+
+    const requiredV38Nodes = ['L', 'R'].flatMap((side) => [
+      `V38_WingFacadeArcadePierCluster_${side}`,
+      `V38_WingFacadeGoldCapital_${side}`,
+      `V38_WingFacadeShadowReveal_${side}`,
+    ]);
+    expect(nodeNamesWithPrefix('V38_')).toHaveLength(requiredV38Nodes.length);
+    for (const nodeName of requiredV38Nodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    for (const side of ['L', 'R']) {
+      const pierNode = `V38_WingFacadeArcadePierCluster_${side}`;
+      const capitalNode = `V38_WingFacadeGoldCapital_${side}`;
+      const shadowNode = `V38_WingFacadeShadowReveal_${side}`;
+      const pier = readMeshGeometry(pierNode);
+      const capital = readMeshGeometry(capitalNode);
+      const shadow = readMeshGeometry(shadowNode);
+      expect(readConnectedComponents(pierNode)).toHaveLength(4);
+      expect(readConnectedComponents(capitalNode)).toHaveLength(8);
+      expect(readConnectedComponents(shadowNode)).toHaveLength(4);
+      expect(pier.max[1] - pier.min[1]).toBeGreaterThan(4.5);
+      expect(pier.max[2] - pier.min[2]).toBeGreaterThan(0.35);
+      expect(capital.max[1]).toBeGreaterThan(pier.max[1] - 0.45);
+      expect(shadow.max[1] - shadow.min[1]).toBeGreaterThan(3.5);
+      if (side === 'L') {
+        expect(pier.min[0]).toBeLessThan(-33);
+        expect(pier.max[0]).toBeLessThan(-16);
+      } else {
+        expect(pier.min[0]).toBeGreaterThan(16);
+        expect(pier.max[0]).toBeGreaterThan(33);
+      }
+      expect(materialNameFor(pierNode)).toBe('V20_LayeredPearlShell');
+      expect(materialNameFor(capitalNode)).toBe('V20_ChasedGoldFiligree');
+      expect(materialNameFor(shadowNode)).toBe('V20_RecessedWarmShadow');
+    }
+
+    expect(
+      requiredV38Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(5_500);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V38_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_310);
+  });
+
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
     const requiredMeshNodes = [
       'V24_CelestialCrownFrontArch_L',
