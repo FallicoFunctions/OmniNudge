@@ -273,6 +273,7 @@ const readConnectedComponents = (nodeName: string) => {
     return {
       max,
       min,
+      positions,
       triangleCount: triangleCountByRoot.get(root) ?? 0,
       vertexCount: ids.size,
     };
@@ -1600,6 +1601,107 @@ describe('MAIN_STAGE_MANIFEST', () => {
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
     ).toBeLessThanOrEqual(6_000);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V40_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_280);
+  });
+
+  it('replaces cuboid crown blades with curved layered celestial lamellae', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const prefix of ['V4_CrownBladeOuter_', 'V4_CrownBladeInner_']) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `legacy crown-blade cuboid still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredV41Nodes = ['L', 'R'].flatMap((side) => [
+      `V41_CrownBladePearlLamellaCluster_${side}`,
+      `V41_CrownBladeGoldRevealCluster_${side}`,
+      `V41_CrownBladeCyanInsetCluster_${side}`,
+    ]);
+    expect(nodeNamesWithPrefix('V41_')).toHaveLength(requiredV41Nodes.length);
+    for (const nodeName of requiredV41Nodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+      const components = readConnectedComponents(nodeName);
+      expect(components).toHaveLength(2);
+      for (const component of components) {
+        expect(component.vertexCount).toBeGreaterThanOrEqual(120);
+        expect(component.triangleCount).toBeGreaterThanOrEqual(200);
+        expect(new Set(component.positions.map((position) => position[1].toFixed(3))).size)
+          .toBeGreaterThan(10);
+      }
+    }
+
+    for (const side of ['L', 'R']) {
+      const pearlNode = `V41_CrownBladePearlLamellaCluster_${side}`;
+      const goldNode = `V41_CrownBladeGoldRevealCluster_${side}`;
+      const cyanNode = `V41_CrownBladeCyanInsetCluster_${side}`;
+      const pearl = readMeshGeometry(pearlNode);
+      const lamellae = readConnectedComponents(pearlNode);
+      expect(pearl.min[1]).toBeLessThan(28.5);
+      expect(pearl.max[1]).toBeGreaterThan(57.5);
+      expect(pearl.max[2] - pearl.min[2]).toBeGreaterThan(4);
+      if (side === 'L') {
+        expect(pearl.min[0]).toBeLessThan(-20);
+        expect(pearl.max[0]).toBeLessThan(-5);
+      } else {
+        expect(pearl.max[0]).toBeGreaterThan(20);
+        expect(pearl.min[0]).toBeGreaterThan(5);
+      }
+
+      for (const lamella of lamellae) {
+        const ySpan = lamella.max[1] - lamella.min[1];
+        const bands = Array.from({ length: 5 }, (_, bandIndex) => {
+          const targetY = lamella.min[1] + ySpan * bandIndex / 4;
+          const halfWindow = ySpan * 0.055;
+          const positions = lamella.positions.filter(
+            (position) => Math.abs(position[1] - targetY) <= halfWindow,
+          );
+          expect(positions.length, `${side} lamella band ${bandIndex} is empty`).toBeGreaterThan(0);
+          return {
+            center: [
+              positions.reduce((sum, position) => sum + position[0], 0) / positions.length,
+              positions.reduce((sum, position) => sum + position[2], 0) / positions.length,
+            ],
+            width: Math.max(...positions.map((position) => position[0]))
+              - Math.min(...positions.map((position) => position[0])),
+          };
+        });
+        const expectedMidpoint = [
+          (bands[0].center[0] + bands[4].center[0]) / 2,
+          (bands[0].center[1] + bands[4].center[1]) / 2,
+        ];
+        expect(
+          Math.hypot(
+            bands[2].center[0] - expectedMidpoint[0],
+            bands[2].center[1] - expectedMidpoint[1],
+          ),
+          `${side} lamella path is too linear`,
+        ).toBeGreaterThan(0.5);
+        expect(
+          bands[4].width,
+          `${side} lamella crown termination does not taper`,
+        ).toBeLessThan(Math.max(...bands.map(({ width }) => width)) * 0.7);
+      }
+
+      expect(materialNameFor(pearlNode)).toBe('V20_LayeredPearlShell');
+      expect(materialNameFor(goldNode)).toBe('V20_ChasedGoldFiligree');
+      expect(materialNameFor(cyanNode)).toBe('V20_CelestialCyanGlass');
+    }
+
+    const v41Geometry = requiredV41Nodes.map(readMeshGeometry);
+    const totalV41Vertices = v41Geometry.reduce(
+      (sum, geometry) => sum + geometry.vertexCount,
+      0,
+    );
+    const totalV41Triangles = v41Geometry.reduce(
+      (sum, geometry) => sum + readAccessorValues(geometry.primitive.indices!).flat().length / 3,
+      0,
+    );
+    expect(totalV41Vertices).toBeGreaterThanOrEqual(4_500);
+    expect(totalV41Vertices).toBeLessThanOrEqual(6_000);
+    expect(totalV41Triangles).toBeLessThanOrEqual(11_500);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V41_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_280);
   });
 
