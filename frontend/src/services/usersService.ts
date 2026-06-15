@@ -5,6 +5,8 @@ import type {
   UserCommentsResponse,
   TopFriendsResponse,
   TopFriendsConfig,
+  UserFriendsResponse,
+  MutualFriendsResponse,
 } from '../types/users';
 
 export const usersService = {
@@ -25,6 +27,7 @@ export const usersService = {
     avatar_url?: string | null;
     status_text?: string | null;
     banner_url?: string | null;
+    location?: string | null;
   }): Promise<UserProfile> {
     return api.put<UserProfile>('/users/me/profile', payload);
   },
@@ -35,6 +38,14 @@ export const usersService = {
 
   async setTopFriends(config: TopFriendsConfig): Promise<void> {
     await api.put('/users/me/top-friends', config);
+  },
+
+  async getUserFriends(username: string): Promise<UserFriendsResponse> {
+    return api.get<UserFriendsResponse>(`/users/${encodeURIComponent(username)}/friends`);
+  },
+
+  async getMutualFriends(username: string): Promise<MutualFriendsResponse> {
+    return api.get<MutualFriendsResponse>(`/users/${encodeURIComponent(username)}/mutual-friends`);
   },
 
   async uploadAvatar(file: File): Promise<{ avatar_url: string; thumbnail_size: number }> {
