@@ -91,7 +91,7 @@ func (r *ConversationRepository) GetByID(ctx context.Context, id int) (*Conversa
 
 	query := `
 		SELECT id, user1_id, user2_id, created_at, last_message_at,
-		       conversation_type, is_group,
+		       COALESCE(conversation_type, 'dm'), is_group,
 		       user1_auto_delete_after, user2_auto_delete_after,
 		       user1_pseudonym, user2_pseudonym
 		FROM conversations
