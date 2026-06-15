@@ -9,11 +9,13 @@ interface EditProfileModalProps {
     avatar_url?: string | null;
     status_text?: string | null;
     banner_url?: string | null;
+    location?: string | null;
   }) => Promise<void>;
   initialBio?: string | null;
   initialAvatarUrl?: string | null;
   initialStatusText?: string | null;
   initialBannerUrl?: string | null;
+  initialLocation?: string | null;
   onUploadAvatar?: (file: File) => Promise<string>;
   isSaving?: boolean;
 }
@@ -26,6 +28,7 @@ export default function EditProfileModal({
   initialAvatarUrl,
   initialStatusText,
   initialBannerUrl,
+  initialLocation,
   onUploadAvatar,
   isSaving = false,
 }: EditProfileModalProps) {
@@ -34,6 +37,7 @@ export default function EditProfileModal({
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? '');
   const [statusText, setStatusText] = useState(initialStatusText ?? '');
   const [bannerUrl, setBannerUrl] = useState(initialBannerUrl ?? '');
+  const [location, setLocation] = useState(initialLocation ?? '');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,8 +47,9 @@ export default function EditProfileModal({
     setAvatarUrl(initialAvatarUrl ?? '');
     setStatusText(initialStatusText ?? '');
     setBannerUrl(initialBannerUrl ?? '');
+    setLocation(initialLocation ?? '');
     setError(null);
-  }, [initialAvatarUrl, initialBio, initialStatusText, initialBannerUrl, isOpen]);
+  }, [initialAvatarUrl, initialBio, initialStatusText, initialBannerUrl, initialLocation, isOpen]);
 
   if (!isOpen) return null;
 
@@ -75,6 +80,7 @@ export default function EditProfileModal({
     const trimmedAvatarUrl = avatarUrl.trim();
     const trimmedStatusText = statusText.trim();
     const trimmedBannerUrl = bannerUrl.trim();
+    const trimmedLocation = location.trim();
 
     if (trimmedBio.length > 500) {
       setError(t('userProfilePage.edit.errors.bioTooLong'));
@@ -82,6 +88,10 @@ export default function EditProfileModal({
     }
     if (trimmedStatusText.length > 500) {
       setError(t('userProfilePage.edit.errors.statusTooLong'));
+      return;
+    }
+    if (trimmedLocation.length > 100) {
+      setError(t('userProfilePage.edit.errors.locationTooLong'));
       return;
     }
     if (
@@ -108,6 +118,7 @@ export default function EditProfileModal({
       avatar_url: trimmedAvatarUrl ? trimmedAvatarUrl : null,
       status_text: trimmedStatusText ? trimmedStatusText : null,
       banner_url: trimmedBannerUrl ? trimmedBannerUrl : null,
+      location: trimmedLocation ? trimmedLocation : null,
     });
   };
 
@@ -202,6 +213,27 @@ export default function EditProfileModal({
             />
             <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
               {t('userProfilePage.edit.statusCount', { count: statusText.length })}
+            </p>
+          </div>
+
+          <div>
+            <label
+              htmlFor="edit-profile-location"
+              className="block text-sm font-medium text-[var(--color-text-primary)]"
+            >
+              {t('userProfilePage.edit.locationLabel')}
+            </label>
+            <input
+              id="edit-profile-location"
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              maxLength={100}
+              placeholder={t('userProfilePage.edit.locationPlaceholder')}
+              className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            />
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              {t('userProfilePage.edit.locationCount', { count: location.length })}
             </p>
           </div>
 
