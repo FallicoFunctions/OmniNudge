@@ -1893,6 +1893,72 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_243);
   });
 
+  it('replaces scattered pyro tower proxies with batched sculpted stage-edge pyro pods', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const prefix of ['V13_PyroTower_', 'V13_PyroNozzle_', 'V13_PyroGlow_']) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `legacy pyro proxy still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredV45Nodes = [
+      'V45_PyroPodPearlShell',
+      'V45_PyroPodGoldNozzle',
+      'V45_PyroPodRedGlass',
+    ];
+    expect(nodeNamesWithPrefix('V45_')).toHaveLength(requiredV45Nodes.length);
+    expect(materialNameFor('V45_PyroPodPearlShell')).toBe('V15_PearlShellBeveled');
+    expect(materialNameFor('V45_PyroPodGoldNozzle')).toBe('V13_BrushedFestivalGold');
+    expect(materialNameFor('V45_PyroPodRedGlass')).toBe('V13_PyroRedGlass');
+
+    for (const nodeName of requiredV45Nodes) {
+      expectMainStageMarker(nodeName);
+      const geometry = readMeshGeometry(nodeName);
+      const components = readConnectedComponents(nodeName);
+      expect(components).toHaveLength(6);
+      expect(geometry.max[1], `${nodeName} should reach the stage-edge pyro height`).toBeGreaterThan(6.1);
+      expect(geometry.min[0], `${nodeName} should cover the far-left pyro pod`).toBeLessThan(-48.2);
+      expect(geometry.max[0], `${nodeName} should cover the far-right pyro pod`).toBeGreaterThan(48.2);
+      expect(geometry.min[2], `${nodeName} should cover the upstage pyro pod`).toBeLessThan(-15.2);
+      expect(geometry.max[2], `${nodeName} should cover the downstage pyro pod`).toBeGreaterThan(11.2);
+      for (const component of components) {
+        expect(component.vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(48);
+        expect(component.triangleCount, `${nodeName} component lacks rounded pod geometry`).toBeGreaterThanOrEqual(80);
+      }
+    }
+
+    const expectedCenters = [
+      [-24, 11],
+      [-34, -5],
+      [-48, -15],
+      [24, 11],
+      [34, -5],
+      [48, -15],
+    ];
+    for (const nodeName of requiredV45Nodes) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const [expectedX, expectedZ] of expectedCenters) {
+        expect(
+          centers.some(([x, , z]) => Math.abs(x - expectedX) < 0.14 && Math.abs(z - expectedZ) < 0.14),
+          `${nodeName} missing pyro pod around x=${expectedX}, z=${expectedZ}`,
+        ).toBe(true);
+      }
+    }
+
+    expect(
+      requiredV45Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(2_200);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V45_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_228);
+  });
+
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
     const requiredMeshNodes = [
       'V24_CelestialCrownFrontArch_L',
