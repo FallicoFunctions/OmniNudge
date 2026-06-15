@@ -327,7 +327,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
   it('exports named approach, production, and basin details for the Main Stage arrival read', () => {
     expectMainStageMarker('V34_ApproachPaverField');
     expectMainStageMarker('V34_BarricadeAssembly_L');
-    expectMainStageMarker('V18_ProductionTrussTower_L');
+    expectMainStageMarker('V37_ProductionTrussTowerFrame_L');
     expectMainStageMarker('V29_MainLineArrayCabinet_L_00');
     expectMainStageMarker('V35_BasinFountainMist_L');
     expectMainStageMarker('V18_WingFacadeArchInlay_L_0');
@@ -1331,6 +1331,75 @@ describe('MAIN_STAGE_MANIFEST', () => {
     ).toBeLessThanOrEqual(2_400);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V36_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_330);
+  });
+
+  it('replaces low-poly production truss towers with detailed serviceable rigging assemblies', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenProductionTowerPrefixes = [
+      'V18_ProductionTrussTower_',
+      'V18_ProductionTrussTower_L',
+      'V18_ProductionTrussTower_R',
+      'V18_ProductionTowerBeacon_',
+      'V21_Merged_V18_ProductionTrussTower_',
+    ];
+    for (const prefix of forbiddenProductionTowerPrefixes) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `production tower proxy still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredV37Nodes = ['L', 'R'].flatMap((side) => [
+      `V37_ProductionTrussTowerFrame_${side}`,
+      `V37_ProductionTrussCrossBrace_${side}`,
+      `V37_ProductionTowerServiceLadder_${side}`,
+      `V37_ProductionTowerBeaconArray_${side}`,
+    ]);
+    expect(nodeNamesWithPrefix('V37_')).toHaveLength(requiredV37Nodes.length);
+    for (const nodeName of requiredV37Nodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    for (const side of ['L', 'R']) {
+      const frameNode = `V37_ProductionTrussTowerFrame_${side}`;
+      const crossBraceNode = `V37_ProductionTrussCrossBrace_${side}`;
+      const ladderNode = `V37_ProductionTowerServiceLadder_${side}`;
+      const beaconNode = `V37_ProductionTowerBeaconArray_${side}`;
+      const frame = readMeshGeometry(frameNode);
+      const crossBrace = readMeshGeometry(crossBraceNode);
+      const ladder = readMeshGeometry(ladderNode);
+      const beacons = readMeshGeometry(beaconNode);
+      expect(readConnectedComponents(frameNode)).toHaveLength(1);
+      expect(readConnectedComponents(crossBraceNode)).toHaveLength(1);
+      expect(readConnectedComponents(ladderNode)).toHaveLength(1);
+      expect(readConnectedComponents(beaconNode)).toHaveLength(3);
+      expect(frame.max[1] - frame.min[1]).toBeGreaterThan(24);
+      expect(frame.max[0] - frame.min[0]).toBeGreaterThan(4.5);
+      expect(frame.max[2] - frame.min[2]).toBeGreaterThan(4.5);
+      expect(crossBrace.max[1] - crossBrace.min[1]).toBeGreaterThan(23);
+      expect(crossBrace.vertexCount).toBeGreaterThan(600);
+      expect(ladder.max[1] - ladder.min[1]).toBeGreaterThan(18);
+      expect(ladder.max[0] - ladder.min[0]).toBeGreaterThan(0.5);
+      expect(beacons.min[1]).toBeGreaterThan(frame.max[1] - 0.7);
+      if (side === 'L') {
+        expect(frame.max[0]).toBeLessThan(-12);
+      } else {
+        expect(frame.min[0]).toBeGreaterThan(12);
+      }
+      expect(materialNameFor(frameNode)).toBe('V18_BlackPowderCoatTruss');
+      expect(materialNameFor(crossBraceNode)).toBe('V14_MatteBlackProductionRig');
+      expect(materialNameFor(ladderNode)).toBe('V18_BrushedGoldTrim');
+      expect(materialNameFor(beaconNode)).toBe('V17_CyanEdgeGlow');
+    }
+
+    expect(
+      requiredV37Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(7_500);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V37_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_320);
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
