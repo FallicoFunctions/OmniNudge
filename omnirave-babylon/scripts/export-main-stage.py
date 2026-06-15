@@ -63,7 +63,10 @@ try:
     bpy.ops.export_scene.gltf(
         filepath=str(collision_output),
         export_format="GLB",
-        use_selection=True,
+        use_selection=False,
+        use_visible=False,
+        use_renderable=False,
+        collection=collision_collection.name,
         export_yup=True,
         export_apply=True,
         export_texcoords=False,

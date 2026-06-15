@@ -11,6 +11,9 @@ const mainStageGlbText = readFileSync(
   path.join(projectRoot, 'public/assets/venues/main-stage/main-stage.glb'),
 ).toString('utf8');
 const mainStageGlbBuffer = readFileSync(path.join(projectRoot, 'public/assets/venues/main-stage/main-stage.glb'));
+const mainStageCollisionGlbBuffer = readFileSync(
+  path.join(projectRoot, 'public/assets/venues/main-stage/main-stage-collision.glb'),
+);
 interface GlbAccessor {
   bufferView: number;
   byteOffset?: number;
@@ -108,8 +111,12 @@ const readGlb = (buffer: Buffer): ParsedGlb => {
 
   return { binaryChunk, json };
 };
-const { binaryChunk: mainStageGlbBinary, json: mainStageGlbJson } = readGlb(mainStageGlbBuffer);
+const mainStageGlb = readGlb(mainStageGlbBuffer);
+const mainStageCollisionGlb = readGlb(mainStageCollisionGlbBuffer);
+const { binaryChunk: mainStageGlbBinary, json: mainStageGlbJson } = mainStageGlb;
+const { json: mainStageCollisionGlbJson } = mainStageCollisionGlb;
 const nodesByName = new Map(mainStageGlbJson.nodes.map((node) => [node.name, node]));
+const collisionNodesByName = new Map(mainStageCollisionGlbJson.nodes.map((node) => [node.name, node]));
 const componentByteLengths = new Map([
   [5123, 2],
   [5125, 4],
@@ -119,9 +126,9 @@ const typeComponentCounts = new Map([
   ['SCALAR', 1],
   ['VEC3', 3],
 ]);
-const readAccessorValues = (accessorIndex: number) => {
-  const accessor = mainStageGlbJson.accessors[accessorIndex];
-  const bufferView = mainStageGlbJson.bufferViews[accessor.bufferView];
+const readAccessorValuesFrom = (glb: ParsedGlb, accessorIndex: number) => {
+  const accessor = glb.json.accessors[accessorIndex];
+  const bufferView = glb.json.bufferViews[accessor.bufferView];
   const componentByteLength = componentByteLengths.get(accessor.componentType);
   const componentCount = typeComponentCounts.get(accessor.type);
   expect(componentByteLength, `unsupported component type: ${accessor.componentType}`).toBeDefined();
@@ -132,22 +139,23 @@ const readAccessorValues = (accessorIndex: number) => {
   expect(byteStride).toBeGreaterThanOrEqual(packedByteLength);
   const baseOffset = (bufferView.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
   expect(baseOffset + (accessor.count - 1) * byteStride + packedByteLength).toBeLessThanOrEqual(
-    mainStageGlbBinary.length,
+    glb.binaryChunk.length,
   );
 
   return Array.from({ length: accessor.count }, (_, elementIndex) =>
     Array.from({ length: componentCount! }, (_, componentIndex) => {
       const offset = baseOffset + elementIndex * byteStride + componentIndex * componentByteLength!;
       if (accessor.componentType === 5123) {
-        return mainStageGlbBinary.readUInt16LE(offset);
+        return glb.binaryChunk.readUInt16LE(offset);
       }
       if (accessor.componentType === 5125) {
-        return mainStageGlbBinary.readUInt32LE(offset);
+        return glb.binaryChunk.readUInt32LE(offset);
       }
-      return mainStageGlbBinary.readFloatLE(offset);
+      return glb.binaryChunk.readFloatLE(offset);
     }),
   );
 };
+const readAccessorValues = (accessorIndex: number) => readAccessorValuesFrom(mainStageGlb, accessorIndex);
 const readMeshGeometry = (nodeName: string) => {
   const node = nodesByName.get(nodeName);
   expect(node?.mesh, `missing mesh payload: ${nodeName}`).toEqual(expect.any(Number));
@@ -216,12 +224,10 @@ const materialNameFor = (nodeName: string) => {
   expect(primitive.material, `missing material assignment: ${nodeName}`).toEqual(expect.any(Number));
   return mainStageGlbJson.materials[primitive.material!]?.name;
 };
-const readConnectedComponents = (nodeName: string) => {
-  const geometry = readMeshGeometry(nodeName);
-  const indices = readAccessorValues(geometry.primitive.indices!).flat();
+const resolveConnectedComponents = (positions: number[][], indices: number[]) => {
   const weldedIdByKey = new Map<string, number>();
   const weldedPositions: number[][] = [];
-  const weldedIds = geometry.positions.map((position) => {
+  const weldedIds = positions.map((position) => {
     const key = position.map((value) => Math.round(value * 10_000)).join(',');
     const existingId = weldedIdByKey.get(key);
     if (existingId !== undefined) {
@@ -278,6 +284,11 @@ const readConnectedComponents = (nodeName: string) => {
       vertexCount: ids.size,
     };
   }).filter(({ triangleCount }) => triangleCount > 0);
+};
+const readConnectedComponents = (nodeName: string) => {
+  const geometry = readMeshGeometry(nodeName);
+  const indices = readAccessorValues(geometry.primitive.indices!).flat();
+  return resolveConnectedComponents(geometry.positions, indices);
 };
 
 describe('MAIN_STAGE_MANIFEST', () => {
@@ -2158,6 +2169,70 @@ describe('MAIN_STAGE_MANIFEST', () => {
     ).toBeLessThanOrEqual(2_000);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V48_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_183);
+  });
+
+  it('keeps spawn-route trough collision aligned with the authored visible envelope', () => {
+    const collisionNode = collisionNodesByName.get('COL_V48_SpawnCableTroughs');
+    expect(collisionNode?.mesh, 'missing V48 spawn cable trough collision mesh').toEqual(expect.any(Number));
+    const collisionMesh = mainStageCollisionGlbJson.meshes[collisionNode!.mesh!];
+    expect(collisionMesh.primitives).toHaveLength(1);
+    const collisionAccessor =
+      mainStageCollisionGlbJson.accessors[collisionMesh.primitives[0].attributes.POSITION];
+    expect(collisionAccessor.count).toBeGreaterThanOrEqual(18 * 8);
+    expect(collisionAccessor.min).toHaveLength(3);
+    expect(collisionAccessor.max).toHaveLength(3);
+
+    const collisionPrimitive = collisionMesh.primitives[0];
+    expect(collisionPrimitive.indices).toEqual(expect.any(Number));
+    const collisionComponents = resolveConnectedComponents(
+      readAccessorValuesFrom(mainStageCollisionGlb, collisionPrimitive.attributes.POSITION),
+      readAccessorValuesFrom(mainStageCollisionGlb, collisionPrimitive.indices!).flat(),
+    );
+    const visibleComponents = readConnectedComponents('V48_SpawnCableTroughBlackShell');
+    expect(collisionComponents).toHaveLength(18);
+    expect(visibleComponents).toHaveLength(18);
+
+    const byRoutePosition = (
+      left: { max: number[]; min: number[] },
+      right: { max: number[]; min: number[] },
+    ) => {
+      const leftCenterX = (left.min[0] + left.max[0]) / 2;
+      const rightCenterX = (right.min[0] + right.max[0]) / 2;
+      if (Math.abs(leftCenterX - rightCenterX) > 0.01) {
+        return leftCenterX - rightCenterX;
+      }
+      return (left.min[2] + left.max[2]) / 2 - (right.min[2] + right.max[2]) / 2;
+    };
+    collisionComponents.sort(byRoutePosition);
+    visibleComponents.sort(byRoutePosition);
+
+    for (const [index, collisionComponent] of collisionComponents.entries()) {
+      const visibleComponent = visibleComponents[index];
+      for (const axis of [0, 1, 2]) {
+        expect(
+          collisionComponent.min[axis],
+          `V48 collision component ${index} minimum should cover visible shell axis ${axis}`,
+        ).toBeLessThanOrEqual(visibleComponent.min[axis] + 0.01);
+        expect(
+          collisionComponent.max[axis],
+          `V48 collision component ${index} maximum should cover visible shell axis ${axis}`,
+        ).toBeGreaterThanOrEqual(visibleComponent.max[axis] - 0.01);
+        expect(
+          collisionComponent.max[axis] - collisionComponent.min[axis],
+          `V48 collision component ${index} should not be oversized on axis ${axis}`,
+        ).toBeLessThanOrEqual(visibleComponent.max[axis] - visibleComponent.min[axis] + 0.05);
+      }
+    }
+
+    expect([...collisionNodesByName.keys()]).toEqual(expect.arrayContaining([
+      'COL_Ground',
+      'COL_Promenade',
+      'COL_V48_SpawnCableTroughs',
+      'COL_VIPDeck_-1',
+      'COL_VIPDeck_1',
+      'COL_VIPRamp_-1',
+      'COL_VIPRamp_1',
+    ]));
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
