@@ -91,6 +91,18 @@ export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugRep
           </Link>
 
           <Link
+            to={`/users/${username}/activity`}
+            onClick={() => setIsOpen(false)}
+            className={itemClass}
+            role="menuitem"
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            {t('menu.activity')}
+          </Link>
+
+          <Link
             to="/friends"
             onClick={() => setIsOpen(false)}
             className={itemClass}
