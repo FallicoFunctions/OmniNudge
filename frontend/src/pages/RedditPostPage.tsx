@@ -982,7 +982,7 @@ function LocalCommentView({
                     {t('comments.actions.delete')}
                   </button>
                 </>
-              )}
+              ) : null}
               <button
                 onClick={() => onReply(comment.id)}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
