@@ -38,6 +38,8 @@ interface GlbBufferView {
 interface GlbPrimitive {
   attributes: {
     POSITION: number;
+    TANGENT?: number;
+    TEXCOORD_0?: number;
   };
   indices?: number;
   material?: number;
@@ -52,21 +54,45 @@ interface GlbNode {
   name?: string;
 }
 
+interface GlbTextureInfo {
+  index: number;
+}
+
+interface GlbMaterial {
+  emissiveFactor?: number[];
+  extensions?: {
+    KHR_materials_emissive_strength?: {
+      emissiveStrength?: number;
+    };
+  };
+  name?: string;
+  normalTexture?: GlbTextureInfo;
+  occlusionTexture?: GlbTextureInfo;
+  pbrMetallicRoughness?: {
+    baseColorFactor?: number[];
+    baseColorTexture?: GlbTextureInfo;
+    metallicFactor?: number;
+    metallicRoughnessTexture?: GlbTextureInfo;
+    roughnessFactor?: number;
+  };
+}
+
 interface MainStageGlbJson {
   accessors: GlbAccessor[];
   buffers: GlbBuffer[];
   bufferViews: GlbBufferView[];
-  materials: Array<{
-    emissiveFactor?: number[];
-    extensions?: {
-      KHR_materials_emissive_strength?: {
-        emissiveStrength?: number;
-      };
-    };
+  images?: Array<{
+    bufferView?: number;
+    mimeType?: string;
     name?: string;
+    uri?: string;
   }>;
+  materials: GlbMaterial[];
   meshes: GlbMesh[];
   nodes: GlbNode[];
+  textures?: Array<{
+    source?: number;
+  }>;
 }
 
 interface ParsedGlb {
@@ -117,6 +143,7 @@ const { binaryChunk: mainStageGlbBinary, json: mainStageGlbJson } = mainStageGlb
 const { json: mainStageCollisionGlbJson } = mainStageCollisionGlb;
 const nodesByName = new Map(mainStageGlbJson.nodes.map((node) => [node.name, node]));
 const collisionNodesByName = new Map(mainStageCollisionGlbJson.nodes.map((node) => [node.name, node]));
+const materialsByName = new Map(mainStageGlbJson.materials.map((material) => [material.name, material]));
 const componentByteLengths = new Map([
   [5123, 2],
   [5125, 4],
@@ -125,6 +152,7 @@ const componentByteLengths = new Map([
 const typeComponentCounts = new Map([
   ['SCALAR', 1],
   ['VEC3', 3],
+  ['VEC4', 4],
 ]);
 const readAccessorValuesFrom = (glb: ParsedGlb, accessorIndex: number) => {
   const accessor = glb.json.accessors[accessorIndex];
@@ -2340,6 +2368,184 @@ describe('MAIN_STAGE_MANIFEST', () => {
     ).toBeLessThanOrEqual(5_000);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V49_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_167);
+  });
+
+  it('exports real PBR texture maps for the Main Stage material families', () => {
+    const images = mainStageGlbJson.images ?? [];
+    const textures = mainStageGlbJson.textures ?? [];
+    expect(images.length, 'Main Stage should embed venue texture images, not flat factors only').toBeGreaterThanOrEqual(9);
+    expect(textures.length, 'Main Stage should bind exported glTF textures').toBeGreaterThanOrEqual(9);
+    for (const image of images) {
+      expect(image.bufferView, `${image.name ?? 'unnamed image'} should be embedded in the GLB`).toEqual(
+        expect.any(Number),
+      );
+      expect(image.mimeType, `${image.name ?? 'unnamed image'} should export as a browser-supported image`).toBe(
+        'image/jpeg',
+      );
+    }
+    for (const texture of textures) {
+      expect(texture.source, 'exported glTF textures should point at embedded image sources').toEqual(
+        expect.any(Number),
+      );
+      expect(texture.source!).toBeGreaterThanOrEqual(0);
+      expect(texture.source!).toBeLessThan(images.length);
+    }
+
+    const materialTextureIndices = (material: GlbMaterial) =>
+      [
+        material.pbrMetallicRoughness?.baseColorTexture?.index,
+        material.pbrMetallicRoughness?.metallicRoughnessTexture?.index,
+        material.occlusionTexture?.index,
+        material.normalTexture?.index,
+      ].filter((index): index is number => typeof index === 'number');
+
+    for (const material of mainStageGlbJson.materials) {
+      for (const textureIndex of materialTextureIndices(material)) {
+        expect(textureIndex, `${material.name ?? 'unnamed material'} should reference an exported texture`).toBeGreaterThanOrEqual(
+          0,
+        );
+        expect(textureIndex, `${material.name ?? 'unnamed material'} should reference an exported texture`).toBeLessThan(
+          textures.length,
+        );
+      }
+    }
+
+    for (const mesh of mainStageGlbJson.meshes) {
+      for (const primitive of mesh.primitives) {
+        if (primitive.material === undefined) {
+          expect(primitive.attributes.TANGENT, 'unmaterialed primitives should not export unused tangents').toBeUndefined();
+          continue;
+        }
+        const material = mainStageGlbJson.materials[primitive.material];
+        if (!material.normalTexture) {
+          expect(
+            primitive.attributes.TANGENT,
+            `${material.name ?? 'non-normal-mapped material'} primitives should not export unused tangents`,
+          ).toBeUndefined();
+        }
+        if (materialTextureIndices(material).length === 0) {
+          continue;
+        }
+        expect(
+          primitive.attributes.TEXCOORD_0,
+          `${material.name ?? 'textured material'} primitives should export UV coordinates`,
+        ).toEqual(expect.any(Number));
+        if (material.normalTexture) {
+          expect(
+            primitive.attributes.TANGENT,
+            `${material.name ?? 'normal-mapped material'} primitives should export tangent space`,
+          ).toEqual(expect.any(Number));
+        }
+      }
+    }
+
+    const imageNames = images.flatMap(({ name, uri }) => [name, uri]).filter((value): value is string => Boolean(value));
+    for (const requiredSource of ['marble_01', 'concrete_floor_01', 'metal_plate']) {
+      expect(
+        imageNames.some((name) => name.includes(requiredSource)),
+        `missing Poly Haven texture source marker: ${requiredSource}`,
+      ).toBe(true);
+    }
+
+    const expectPbrMaterial = (materialName: string) => {
+      const material = materialsByName.get(materialName);
+      expect(material, `missing textured material: ${materialName}`).toBeDefined();
+      expect(
+        material!.pbrMetallicRoughness?.baseColorTexture?.index,
+        `${materialName} should export a base-color texture`,
+      ).toEqual(expect.any(Number));
+      expect(
+        material!.normalTexture?.index,
+        `${materialName} should export a normal texture`,
+      ).toEqual(expect.any(Number));
+      expect(
+        material!.pbrMetallicRoughness?.metallicRoughnessTexture?.index,
+        `${materialName} should export a roughness/metallic texture`,
+      ).toEqual(expect.any(Number));
+      expect(
+        material!.occlusionTexture?.index,
+        `${materialName} should export an occlusion texture from the ARM map`,
+      ).toEqual(expect.any(Number));
+    };
+
+    for (const materialName of [
+      'V14_PolishedMoonstoneShell',
+      'V20_LayeredPearlShell',
+      'V13_WetPlazaStone',
+      'V18_WetStonePaver',
+      'V16_MatteBlackStageHardware',
+      'V16_BrushedProductionGold',
+    ]) {
+      expectPbrMaterial(materialName);
+    }
+
+    expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
+      16 * 1024 * 1024,
+    );
+  });
+
+  it('keeps the legacy crown rigging spans out of the V50 normal-mapped metal contract', () => {
+    const legacyRiggingNodes = [
+      'V16_CrownRiggingSpan',
+      'V16_CrownRiggingFrontChord',
+      'V16_CrownRiggingRearChord',
+    ];
+    const texturedMaterialNames = new Set([
+      'V14_PolishedMoonstoneShell',
+      'V20_LayeredPearlShell',
+      'V13_WetPlazaStone',
+      'V18_WetStonePaver',
+      'V16_MatteBlackStageHardware',
+      'V16_BrushedProductionGold',
+    ]);
+
+    for (const nodeName of legacyRiggingNodes) {
+      const node = nodesByName.get(nodeName);
+      expect(node?.mesh, `missing legacy crown rigging mesh: ${nodeName}`).toEqual(expect.any(Number));
+
+      const primitive = mainStageGlbJson.meshes[node!.mesh!].primitives[0];
+      expect(primitive.material, `missing material assignment: ${nodeName}`).toEqual(expect.any(Number));
+      const material = mainStageGlbJson.materials[primitive.material!];
+      expect(
+        texturedMaterialNames.has(material.name ?? ''),
+        `${nodeName} should not use a V50 textured material family`,
+      ).toBe(false);
+      expect(
+        primitive.attributes.TEXCOORD_0,
+        `${nodeName} should not export textured UVs once reassigned to a flat rigging material`,
+      ).toBeUndefined();
+      expect(
+        primitive.attributes.TANGENT,
+        `${nodeName} should not export tangent data once reassigned to a non-normal-mapped rigging material`,
+      ).toBeUndefined();
+    }
+  });
+
+  it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
+    for (const mesh of mainStageGlbJson.meshes) {
+      for (const primitive of mesh.primitives) {
+        if (primitive.material === undefined || primitive.attributes.TANGENT === undefined) {
+          continue;
+        }
+        const material = mainStageGlbJson.materials[primitive.material];
+        if (!material.normalTexture) {
+          continue;
+        }
+
+        const tangents = readAccessorValues(primitive.attributes.TANGENT);
+        for (const tangent of tangents) {
+          const length = Math.hypot(tangent[0], tangent[1], tangent[2]);
+          expect(
+            length,
+            `${material.name ?? 'normal-mapped material'} exported a non-unit tangent`,
+          ).toBeGreaterThan(0.999);
+          expect(
+            length,
+            `${material.name ?? 'normal-mapped material'} exported a non-unit tangent`,
+          ).toBeLessThan(1.001);
+        }
+      }
+    }
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
