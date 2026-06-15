@@ -22,6 +22,7 @@ import (
 	"github.com/omninudge/backend/internal/services"
 	zlog "github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/sync/errgroup"
 )
 
 // UsersHandler serves public user profile data and profile management
@@ -82,6 +83,7 @@ type UserProfileResponse struct {
 	BannerURL *string                `json:"banner_url,omitempty"`
 	Bio       *string                `json:"bio,omitempty"`
 	Status    *string                `json:"status_text,omitempty"`
+	Location  *string                `json:"location,omitempty"`
 	Karma     int                    `json:"karma"`
 	PublicKey *string                `json:"public_key,omitempty"`
 	CreatedAt string                 `json:"created_at"`
@@ -231,6 +233,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	bio := user.Bio
 	var statusText *string
 	var bannerURL *string
+	var location *string
 	if h.userProfRepo != nil {
 		profile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
 		if err != nil {
@@ -243,6 +246,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 			bio = profile.Bio
 			statusText = profile.StatusText
 			bannerURL = profile.BannerURL
+			location = profile.Location
 		}
 	}
 
@@ -287,6 +291,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 		BannerURL: bannerURL,
 		Bio:       bio,
 		Status:    statusText,
+		Location:  location,
 		Karma:     user.Karma,
 		PublicKey: user.PublicKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
@@ -325,6 +330,39 @@ func canViewerSeeProfile(profileUserID, viewerID int, profileVisibility string, 
 	}
 }
 
+// viewerCanSeeProfile applies the profile-visibility rules used by the main profile
+// endpoint to secondary per-user endpoints (top friends, friends list, mutual
+// friends, etc.). It is a package-level helper (rather than a method) so any
+// handler with access to a settings and friendship repository can reuse it.
+func viewerCanSeeProfile(ctx context.Context, settingsRepo ports.UserSettingsRepository, friendRepo ports.UserFriendshipRepository, user *models.User, viewerID int) (bool, error) {
+	if viewerID == user.ID {
+		return true, nil
+	}
+
+	profileVisibility := "public"
+	if settingsRepo != nil {
+		settings, err := settingsRepo.GetByUserID(ctx, user.ID)
+		if err != nil {
+			return false, err
+		}
+		if settings != nil && strings.TrimSpace(settings.ProfileVisibility) != "" {
+			profileVisibility = settings.ProfileVisibility
+		}
+	}
+
+	viewerIsFriend := false
+	if strings.EqualFold(strings.TrimSpace(profileVisibility), "friends_only") &&
+		friendRepo != nil && viewerID > 0 {
+		isFriend, err := friendRepo.AreUsersFriends(ctx, user.ID, viewerID)
+		if err != nil {
+			return false, err
+		}
+		viewerIsFriend = isFriend
+	}
+
+	return canViewerSeeProfile(user.ID, viewerID, profileVisibility, viewerIsFriend), nil
+}
+
 // GetUserPosts returns posts by a user.
 // @Summary      Get user posts
 // @Tags         Users
@@ -361,14 +399,27 @@ func (h *UsersHandler) GetUserPosts(c *gin.Context) {
 		limit = 20
 	}
 
-	posts, err := h.postRepo.GetByAuthor(c.Request.Context(), user.ID, limit, offset)
-	if err != nil {
+	var posts []*models.PlatformPost
+	var total int
+	g, gCtx := errgroup.WithContext(c.Request.Context())
+	g.Go(func() error {
+		var err error
+		posts, err = h.postRepo.GetByAuthor(gCtx, user.ID, limit, offset)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		total, err = h.postRepo.CountByAuthor(gCtx, user.ID)
+		return err
+	})
+	if err := g.Wait(); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch posts")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"posts":  posts,
+		"total":  total,
 		"limit":  limit,
 		"offset": offset,
 	})
@@ -465,14 +516,27 @@ func (h *UsersHandler) GetUserComments(c *gin.Context) {
 		limit = 20
 	}
 
-	comments, err := h.commentRepo.GetByUserID(c.Request.Context(), user.ID, limit, offset)
-	if err != nil {
+	var comments []*models.PostComment
+	var total int
+	g, gCtx := errgroup.WithContext(c.Request.Context())
+	g.Go(func() error {
+		var err error
+		comments, err = h.commentRepo.GetByUserID(gCtx, user.ID, limit, offset)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		total, err = h.commentRepo.CountByUserID(gCtx, user.ID)
+		return err
+	})
+	if err := g.Wait(); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch comments")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"comments": comments,
+		"total":    total,
 		"limit":    limit,
 		"offset":   offset,
 	})
@@ -483,6 +547,7 @@ type updateProfileRequest struct {
 	AvatarURL *string `json:"avatar_url"`
 	Status    *string `json:"status_text"`
 	BannerURL *string `json:"banner_url"`
+	Location  *string `json:"location"`
 }
 
 const (
@@ -504,6 +569,20 @@ func localAvatarDiskPath(avatarURL string) (string, bool) {
 		return "", false
 	}
 	return cleaned, true
+}
+
+// normalizeOptionalText trims an optional profile text field and enforces a max
+// length. A blank result normalizes to nil so the field is cleared. ok is false
+// if the trimmed value exceeds maxLen.
+func normalizeOptionalText(raw string, maxLen int) (value *string, ok bool) {
+	trimmed := strings.TrimSpace(raw)
+	if len(trimmed) > maxLen {
+		return nil, false
+	}
+	if trimmed == "" {
+		return nil, true
+	}
+	return &trimmed, true
 }
 
 func isRequestBodyTooLarge(err error) bool {
@@ -553,21 +632,18 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 
 	// Validate bio length if provided
 	if req.Bio != nil {
-		bio := strings.TrimSpace(*req.Bio)
-		if len(bio) > 500 {
+		bio, ok := normalizeOptionalText(*req.Bio, 500)
+		if !ok {
 			RespondError(c, http.StatusBadRequest, "Bio must be 500 characters or less")
 			return
 		}
-		if bio == "" {
-			user.Bio = nil
-		} else {
-			user.Bio = &bio
-		}
+		user.Bio = bio
 	}
 
 	var statusText *string
 	var bannerURL *string
 	var topFriendsJSON *string
+	var location *string
 	if h.userProfRepo != nil {
 		existingProfile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
 		if err != nil {
@@ -578,19 +654,16 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 			statusText = existingProfile.StatusText
 			bannerURL = existingProfile.BannerURL
 			topFriendsJSON = existingProfile.TopFriendsJSON
+			location = existingProfile.Location
 		}
 	}
 	if req.Status != nil {
-		status := strings.TrimSpace(*req.Status)
-		if len(status) > 500 {
+		status, ok := normalizeOptionalText(*req.Status, 500)
+		if !ok {
 			RespondError(c, http.StatusBadRequest, "Status text must be 500 characters or less")
 			return
 		}
-		if status == "" {
-			statusText = nil
-		} else {
-			statusText = &status
-		}
+		statusText = status
 	}
 
 	// Validate avatar URL if provided
@@ -621,13 +694,23 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		}
 	}
 
+	// Validate location if provided
+	if req.Location != nil {
+		loc, ok := normalizeOptionalText(*req.Location, 100)
+		if !ok {
+			RespondError(c, http.StatusBadRequest, "Location must be 100 characters or less")
+			return
+		}
+		location = loc
+	}
+
 	// Update profile
 	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, nil); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update profile")
 		return
 	}
 	if h.userProfRepo != nil {
-		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, statusText, bannerURL, topFriendsJSON); err != nil {
+		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, statusText, bannerURL, topFriendsJSON, location); err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to update user profile")
 			return
 		}
@@ -641,6 +724,7 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		BannerURL: bannerURL,
 		Bio:       user.Bio,
 		Status:    statusText,
+		Location:  location,
 		Karma:     user.Karma,
 		PublicKey: user.PublicKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
@@ -802,6 +886,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 		var statusText *string
 		var bannerURL *string
 		var topFriendsJSON *string
+		var location *string
 		profile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
 		if err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to fetch user profile")
@@ -811,11 +896,12 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 			statusText = profile.StatusText
 			bannerURL = profile.BannerURL
 			topFriendsJSON = profile.TopFriendsJSON
+			location = profile.Location
 			if profile.Bio != nil {
 				user.Bio = profile.Bio
 			}
 		}
-		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, statusText, bannerURL, topFriendsJSON); err != nil {
+		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, statusText, bannerURL, topFriendsJSON, location); err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to persist user avatar")
 			return
 		}
@@ -1131,32 +1217,14 @@ func (h *UsersHandler) GetTopFriends(c *gin.Context) {
 	if v, _ := middleware.GetOptionalUserID(c); v != 0 {
 		viewerID = v
 	}
-	if viewerID != user.ID {
-		profileVisibility := "public"
-		if h.settingsRepo != nil {
-			settings, serr := h.settingsRepo.GetByUserID(c.Request.Context(), user.ID)
-			if serr != nil {
-				RespondError(c, http.StatusInternalServerError, "Failed to load profile")
-				return
-			}
-			if settings != nil && strings.TrimSpace(settings.ProfileVisibility) != "" {
-				profileVisibility = settings.ProfileVisibility
-			}
-		}
-		viewerIsFriend := false
-		if strings.EqualFold(strings.TrimSpace(profileVisibility), "friends_only") &&
-			h.friendRepo != nil && viewerID > 0 {
-			isFriend, ferr := h.friendRepo.AreUsersFriends(c.Request.Context(), user.ID, viewerID)
-			if ferr != nil {
-				RespondError(c, http.StatusInternalServerError, "Failed to load profile")
-				return
-			}
-			viewerIsFriend = isFriend
-		}
-		if !canViewerSeeProfile(user.ID, viewerID, profileVisibility, viewerIsFriend) {
-			RespondError(c, http.StatusNotFound, "User not found")
-			return
-		}
+	canSee, err := viewerCanSeeProfile(c.Request.Context(), h.settingsRepo, h.friendRepo, user, viewerID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load profile")
+		return
+	}
+	if !canSee {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
 	}
 
 	if h.userProfRepo == nil {
@@ -1326,4 +1394,75 @@ func (h *UsersHandler) SetTopFriends(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Top friends updated"})
+}
+
+// UserFriendsResponse is returned by GetUserFriends.
+type UserFriendsResponse struct {
+	Friends []models.FriendEntry `json:"friends"`
+}
+
+// GetUserFriends returns the accepted friends list for a user profile, subject to
+// the same visibility rules as the profile itself.
+// @Summary      Get user friends
+// @Tags         Users
+// @Produce      json
+// @Param        username  path  string  true  "Username"
+// @Success      200  {object}  UserFriendsResponse
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/{username}/friends [get]
+func (h *UsersHandler) GetUserFriends(c *gin.Context) {
+	username := c.Param("username")
+
+	user, err := h.userRepo.GetByUsername(c.Request.Context(), username)
+	if err != nil || user == nil {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+
+	var viewerID int
+	if v, _ := middleware.GetOptionalUserID(c); v != 0 {
+		viewerID = v
+	}
+	if isPendingDeletionHiddenFromViewer(user, viewerID) {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if viewerID != 0 && viewerID != user.ID && h.pool != nil {
+		blocked, err := models.IsBlockedBidirectional(c.Request.Context(), h.pool, user.ID, viewerID)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to load profile")
+			return
+		}
+		if blocked {
+			RespondError(c, http.StatusNotFound, "User not found")
+			return
+		}
+	}
+
+	canSee, err := viewerCanSeeProfile(c.Request.Context(), h.settingsRepo, h.friendRepo, user, viewerID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load profile")
+		return
+	}
+	if !canSee {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if h.friendRepo == nil {
+		c.JSON(http.StatusOK, UserFriendsResponse{Friends: []models.FriendEntry{}})
+		return
+	}
+
+	friends, err := h.friendRepo.ListFriends(c.Request.Context(), user.ID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load friends")
+		return
+	}
+	if friends == nil {
+		friends = []models.FriendEntry{}
+	}
+	c.JSON(http.StatusOK, UserFriendsResponse{Friends: friends})
 }

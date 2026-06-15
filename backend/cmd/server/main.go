@@ -533,6 +533,8 @@ func main() {
 
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService, cache, queueClient).WithAutoDeleteService(autoDeleteSvc)
 	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache, thumbnailService, db.Pool)
+	wallPostRepo := repository.NewPostgresWallPostRepository(db.Pool)
+	wallHandler := handlers.NewWallHandler(db.Pool, wallPostRepo, userRepo, userProfileRepo, userFriendshipRepo)
 	mediaQuota := handlers.MediaQuotaConfig{
 		FreeTierBytes: cfg.Media.FreeTierQuotaBytes,
 		ProTierBytes:  cfg.Media.ProTierQuotaBytes,
@@ -563,7 +565,7 @@ func main() {
 	notificationsHandler := handlers.NewNotificationsHandler(notificationRepo)
 	searchHandler := handlers.NewSearchHandler(db.Pool)
 	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
-	friendsHandler := handlers.NewFriendsHandler(userFriendshipRepo, userRepo, hub, db.Pool)
+	friendsHandler := handlers.NewFriendsHandler(userFriendshipRepo, userRepo, userSettingsRepo, hub, db.Pool)
 	slideshowHandler := handlers.NewSlideshowHandler(db.Pool, slideshowRepo, conversationRepo, hub)
 	mediaGalleryHandler := handlers.NewMediaGalleryHandler(db.Pool)
 	uploadsHandler := handlers.NewUploadsHandler(mediaRepo, "./uploads")
@@ -634,6 +636,7 @@ func main() {
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
 	commentsHandler.SetNotificationService(notificationService)
+	wallHandler.SetNotificationService(notificationService)
 
 	// ── Middleware stack ─────────────────────────────────────────────────────
 	// ORDER IS CRITICAL — do not rearrange without understanding the effects:
@@ -956,6 +959,15 @@ func main() {
 			users.GET("/:username/posts", usersHandler.GetUserPosts)
 			users.GET("/:username/comments", usersHandler.GetUserComments)
 			users.GET("/:username/top-friends", usersHandler.GetTopFriends)
+			users.GET("/:username/friends", usersHandler.GetUserFriends)
+			users.GET("/:username/wall", wallHandler.GetWallPosts)
+		}
+
+		// Wall post routes (AuthOptional - viewing comments depends on wall visibility)
+		wallPosts := api.Group("/wall-posts")
+		wallPosts.Use(middleware.AuthOptional(authService))
+		{
+			wallPosts.GET("/:id/comments", wallHandler.GetWallPostComments)
 		}
 
 		// Public search routes
@@ -1272,7 +1284,16 @@ func main() {
 			protected.GET("/users/me/storage", storageHandler.GetMyStorage)
 			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
 			protected.PUT("/users/me/top-friends", usersHandler.SetTopFriends)
+			protected.PUT("/users/me/wall-visibility", wallHandler.SetWallVisibility)
 			protected.POST("/users/me/avatar", usersHandler.UploadMyAvatar)
+
+			// Profile wall
+			protected.POST("/users/:username/wall", wallHandler.CreateWallPost)
+			protected.DELETE("/wall-posts/:id", wallHandler.DeleteWallPost)
+			protected.POST("/wall-posts/:id/reaction", wallHandler.SetWallPostReaction)
+			protected.POST("/wall-posts/:id/comments", wallHandler.CreateWallPostComment)
+			protected.DELETE("/wall-posts/:id/comments/:commentId", wallHandler.DeleteWallPostComment)
+			protected.POST("/wall-posts/:id/comments/:commentId/reaction", wallHandler.SetWallPostCommentReaction)
 			protected.PUT("/users/profile", usersHandler.UpdateProfile)
 			protected.PUT("/users/email", authHandler.UpdateEmail)
 			protected.POST("/users/change-password", usersHandler.ChangePassword)
@@ -1302,6 +1323,7 @@ func main() {
 			// Friendship status — protected so it always runs through full Auth middleware,
 			// not AuthOptional which can silently drop valid tokens on transient DB errors.
 			protected.GET("/users/:username/friendship", friendsHandler.GetFriendshipStatus)
+			protected.GET("/users/:username/mutual-friends", friendsHandler.GetMutualFriends)
 
 			// Notifications
 			protected.GET("/notifications", notificationsHandler.GetNotifications)

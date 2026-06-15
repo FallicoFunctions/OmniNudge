@@ -316,7 +316,7 @@ func TestUpdateProfile_PreservesExistingStatusTextWhenOmitted(t *testing.T) {
 
 	profileRepo := models.NewUserProfileRepository(userRepo.GetPool())
 	seedStatus := "Keep this status"
-	require.NoError(t, profileRepo.Upsert(context.Background(), owner.ID, nil, nil, &seedStatus, nil, nil))
+	require.NoError(t, profileRepo.Upsert(context.Background(), owner.ID, nil, nil, &seedStatus, nil, nil, nil))
 
 	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)

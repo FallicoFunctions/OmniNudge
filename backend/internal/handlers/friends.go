@@ -13,15 +13,16 @@ import (
 
 // FriendsHandler manages friend requests and friend lists.
 type FriendsHandler struct {
-	friendRepo ports.UserFriendshipRepository
-	userRepo   ports.UserRepository
-	hub        *websocket.Hub
-	pool       *pgxpool.Pool
+	friendRepo   ports.UserFriendshipRepository
+	userRepo     ports.UserRepository
+	settingsRepo ports.UserSettingsRepository
+	hub          *websocket.Hub
+	pool         *pgxpool.Pool
 }
 
 // NewFriendsHandler creates a new FriendsHandler.
-func NewFriendsHandler(friendRepo ports.UserFriendshipRepository, userRepo ports.UserRepository, hub *websocket.Hub, pool *pgxpool.Pool) *FriendsHandler {
-	return &FriendsHandler{friendRepo: friendRepo, userRepo: userRepo, hub: hub, pool: pool}
+func NewFriendsHandler(friendRepo ports.UserFriendshipRepository, userRepo ports.UserRepository, settingsRepo ports.UserSettingsRepository, hub *websocket.Hub, pool *pgxpool.Pool) *FriendsHandler {
+	return &FriendsHandler{friendRepo: friendRepo, userRepo: userRepo, settingsRepo: settingsRepo, hub: hub, pool: pool}
 }
 
 // GetFriends returns the authenticated user's accepted friend list.
@@ -342,4 +343,64 @@ func (h *FriendsHandler) GetFriendshipStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": status.Status})
+}
+
+// GetMutualFriends returns friends shared between the authenticated viewer and the given user.
+//
+// @Summary      Get mutual friends with a user
+// @Tags         Friends
+// @Security     BearerAuth
+// @Produce      json
+// @Param        username  path  string  true  "Username to compare"
+// @Success      200  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/{username}/mutual-friends [get]
+func (h *FriendsHandler) GetMutualFriends(c *gin.Context) {
+	viewerID := c.GetInt("user_id")
+	username := c.Param("username")
+	ctx := c.Request.Context()
+
+	other, err := h.userRepo.GetByUsername(ctx, username)
+	if err != nil || other == nil || isPendingDeletionHiddenFromViewer(other, viewerID) {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if viewerID == other.ID {
+		c.JSON(http.StatusOK, gin.H{"mutual_friends": []models.MutualFriendEntry{}})
+		return
+	}
+
+	if viewerID != 0 && h.pool != nil {
+		blocked, err := models.IsBlockedBidirectional(ctx, h.pool, other.ID, viewerID)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to load profile")
+			return
+		}
+		if blocked {
+			RespondError(c, http.StatusNotFound, "User not found")
+			return
+		}
+	}
+
+	// Apply the same profile-visibility rules as the main profile endpoint so a
+	// non-friend viewer can't use this endpoint to probe the social graph of a
+	// private or friends_only profile.
+	canSee, err := viewerCanSeeProfile(ctx, h.settingsRepo, h.friendRepo, other, viewerID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load profile")
+		return
+	}
+	if !canSee {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+
+	mutuals, err := h.friendRepo.GetMutualFriends(ctx, viewerID, other.ID, 10)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load mutual friends")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"mutual_friends": mutuals})
 }
