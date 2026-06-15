@@ -66,6 +66,8 @@ interface ParsedGlb {
 const expectMainStageMarker = (marker: string) => {
   expect(mainStageGlbText.includes(marker), `missing GLB marker: ${marker}`).toBe(true);
 };
+const nodeNamesWithPrefix = (prefix: string) =>
+  mainStageGlbJson.nodes.flatMap(({ name }) => (name?.startsWith(prefix) ? [name] : []));
 const readGlb = (buffer: Buffer): ParsedGlb => {
   const magic = buffer.toString('utf8', 0, 4);
   expect(magic).toBe('glTF');
@@ -196,7 +198,9 @@ const readMeshGeometry = (nodeName: string) => {
   return {
     max: accessor.max!,
     min: accessor.min!,
+    positions,
     primitive,
+    vertexCount: accessor.count,
   };
 };
 const materialNameFor = (nodeName: string) => {
@@ -254,7 +258,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V18_SpawnProcessionalPaver_0');
     expectMainStageMarker('V18_ForegroundBarricadeRun_L_0');
     expectMainStageMarker('V18_ProductionTrussTower_L');
-    expectMainStageMarker('V18_LineArraySpeaker_L_0');
+    expectMainStageMarker('V29_MainLineArrayCabinet_L_00');
     expectMainStageMarker('V18_BasinFountainJet_L_0');
     expectMainStageMarker('V18_WingFacadeArchInlay_L_0');
   });
@@ -469,6 +473,120 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(materialNameFor('V28_WingArcadeGoldReveal_R')).toBe('V20_ChasedGoldFiligree');
     expect(materialNameFor('V28_WingArcadeCyanInlay_L')).toBe('V20_CelestialCyanGlass');
     expect(materialNameFor('V28_WingArcadeCyanInlay_R')).toBe('V20_CelestialCyanGlass');
+  });
+
+  it('replaces proxy speaker stacks with detailed hanging line-array assemblies and sub ports', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenProxyPrefixes = [
+      'V7_SpeakerStack_',
+      'V9_MainPAStack',
+      'V13_LineArrayCabinet_',
+      'V13_LineArrayGoldYoke_',
+      'V14_LineArraySpeaker_',
+      'V18_LineArraySpeaker_',
+      'V21_Merged_V18_LineArrayYoke',
+      'V29_LineArrayCabinetShell_',
+      'V29_LineArrayGrilleFace_',
+      'V29_LineArrayGoldYoke_',
+      'V29_LineArraySignalCable_',
+    ];
+    for (const prefix of forbiddenProxyPrefixes) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `proxy speaker/PA geometry still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    expect(nodeNamesWithPrefix('V29_MainLineArrayCabinet_L_')).toHaveLength(8);
+    expect(nodeNamesWithPrefix('V29_MainLineArrayCabinet_R_')).toHaveLength(8);
+    expect(nodeNamesWithPrefix('V29_MainLineArrayGrille_L_')).toHaveLength(8);
+    expect(nodeNamesWithPrefix('V29_MainLineArrayGrille_R_')).toHaveLength(8);
+    expect(nodeNamesWithPrefix('V29_MainLineArrayHorn_L_')).toHaveLength(8);
+    expect(nodeNamesWithPrefix('V29_MainLineArrayHorn_R_')).toHaveLength(8);
+    expect(nodeNamesWithPrefix('V29_MainLineArrayDriver_L_')).toHaveLength(8);
+    expect(nodeNamesWithPrefix('V29_MainLineArrayDriver_R_')).toHaveLength(8);
+    expect(nodeNamesWithPrefix('V29_FrontSubCabinet_L_')).toHaveLength(4);
+    expect(nodeNamesWithPrefix('V29_FrontSubCabinet_R_')).toHaveLength(4);
+    expect(nodeNamesWithPrefix('V29_FrontSubPort_L_').length).toBeGreaterThanOrEqual(8);
+    expect(nodeNamesWithPrefix('V29_FrontSubPort_R_').length).toBeGreaterThanOrEqual(8);
+
+    const requiredLineArrayNodes = [
+      'V29_MainLineArrayCabinet_L_00',
+      'V29_MainLineArrayCabinet_R_00',
+      'V29_MainLineArrayGrille_L_00',
+      'V29_MainLineArrayGrille_R_00',
+      'V29_MainLineArrayHorn_L_00',
+      'V29_MainLineArrayHorn_R_00',
+      'V29_MainLineArrayDriver_L_00',
+      'V29_MainLineArrayDriver_R_00',
+      'V29_MainLineArrayYoke_L',
+      'V29_MainLineArrayYoke_R',
+      'V29_MainLineArraySideRail_L',
+      'V29_MainLineArraySideRail_R',
+      'V29_MainLineArrayPinBars_L',
+      'V29_MainLineArrayPinBars_R',
+      'V29_FrontSubCabinet_L_00',
+      'V29_FrontSubCabinet_R_00',
+      'V29_FrontSubPort_L_00',
+      'V29_FrontSubPort_R_00',
+    ];
+    for (const nodeName of requiredLineArrayNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftCabinet = readMeshGeometry('V29_MainLineArrayCabinet_L_00');
+    const rightCabinet = readMeshGeometry('V29_MainLineArrayCabinet_R_00');
+    const leftYoke = readMeshGeometry('V29_MainLineArrayYoke_L');
+    const rightYoke = readMeshGeometry('V29_MainLineArrayYoke_R');
+    const leftSub = readMeshGeometry('V29_FrontSubCabinet_L_00');
+    const rightSub = readMeshGeometry('V29_FrontSubCabinet_R_00');
+    const leftPort = readMeshGeometry('V29_FrontSubPort_L_00');
+    const rightPort = readMeshGeometry('V29_FrontSubPort_R_00');
+
+    const xSpanInVerticalBand = (nodeName: string, band: 'lower' | 'upper') => {
+      const geometry = readMeshGeometry(nodeName);
+      const [minY, maxY] = [geometry.min[1], geometry.max[1]];
+      const verticalSpan = maxY - minY;
+      const positions = geometry.positions.filter((position) =>
+        band === 'lower' ? position[1] <= minY + verticalSpan * 0.3 : position[1] >= maxY - verticalSpan * 0.3,
+      );
+      return Math.max(...positions.map((position) => position[0])) - Math.min(...positions.map((position) => position[0]));
+    };
+
+    expect(leftCabinet.vertexCount).toBeGreaterThan(160);
+    expect(rightCabinet.vertexCount).toBeGreaterThan(160);
+    expect(Math.abs(xSpanInVerticalBand('V29_MainLineArrayCabinet_L_00', 'lower') - xSpanInVerticalBand('V29_MainLineArrayCabinet_L_00', 'upper'))).toBeGreaterThan(0.15);
+    expect(Math.abs(xSpanInVerticalBand('V29_MainLineArrayCabinet_R_00', 'lower') - xSpanInVerticalBand('V29_MainLineArrayCabinet_R_00', 'upper'))).toBeGreaterThan(0.15);
+    expect(leftCabinet.max[0]).toBeLessThan(-10);
+    expect(rightCabinet.min[0]).toBeGreaterThan(10);
+    expect(leftYoke.max[1] - leftYoke.min[1]).toBeGreaterThan(2.5);
+    expect(rightYoke.max[1] - rightYoke.min[1]).toBeGreaterThan(2.5);
+    expect(leftSub.max[0]).toBeLessThan(-4);
+    expect(rightSub.min[0]).toBeGreaterThan(4);
+    expect(leftPort.max[0] - leftPort.min[0]).toBeGreaterThan(0.45);
+    expect(rightPort.max[0] - rightPort.min[0]).toBeGreaterThan(0.45);
+    expect(leftPort.max[1] - leftPort.min[1]).toBeGreaterThan(0.45);
+    expect(rightPort.max[1] - rightPort.min[1]).toBeGreaterThan(0.45);
+
+    expect(materialNameFor('V29_MainLineArrayCabinet_L_00')).toBe('V18_LineArrayGraphite');
+    expect(materialNameFor('V29_MainLineArrayCabinet_R_00')).toBe('V18_LineArrayGraphite');
+    expect(materialNameFor('V29_MainLineArrayGrille_L_00')).toBe('V14_MatteBlackProductionRig');
+    expect(materialNameFor('V29_MainLineArrayGrille_R_00')).toBe('V14_MatteBlackProductionRig');
+    expect(materialNameFor('V29_MainLineArrayHorn_L_00')).toBe('V16_MatteBlackStageHardware');
+    expect(materialNameFor('V29_MainLineArrayHorn_R_00')).toBe('V16_MatteBlackStageHardware');
+    expect(materialNameFor('V29_MainLineArrayDriver_L_00')).toBe('V18_LineArrayGraphite');
+    expect(materialNameFor('V29_MainLineArrayDriver_R_00')).toBe('V18_LineArrayGraphite');
+    expect(materialNameFor('V29_MainLineArrayYoke_L')).toBe('V18_BlackPowderCoatTruss');
+    expect(materialNameFor('V29_MainLineArrayYoke_R')).toBe('V18_BlackPowderCoatTruss');
+    expect(materialNameFor('V29_MainLineArraySideRail_L')).toBe('V18_BlackPowderCoatTruss');
+    expect(materialNameFor('V29_MainLineArraySideRail_R')).toBe('V18_BlackPowderCoatTruss');
+    expect(materialNameFor('V29_MainLineArrayPinBars_L')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V29_MainLineArrayPinBars_R')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V29_FrontSubCabinet_L_00')).toBe('V18_LineArrayGraphite');
+    expect(materialNameFor('V29_FrontSubCabinet_R_00')).toBe('V18_LineArrayGraphite');
+    expect(materialNameFor('V29_FrontSubPort_L_00')).toBe('V14_MatteBlackProductionRig');
+    expect(materialNameFor('V29_FrontSubPort_R_00')).toBe('V14_MatteBlackProductionRig');
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
