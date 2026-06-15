@@ -326,7 +326,7 @@ func TestGetUserProfile_UsesDedicatedUserProfilesData(t *testing.T) {
 	profileRepo := models.NewUserProfileRepository(userRepo.GetPool())
 	profileBio := "bio from user_profiles"
 	profileAvatar := "https://example.com/user-profiles-avatar.png"
-	require.NoError(t, profileRepo.Upsert(ctx, owner.ID, &profileBio, &profileAvatar, nil, nil, nil))
+	require.NoError(t, profileRepo.Upsert(ctx, owner.ID, &profileBio, &profileAvatar, nil, nil, nil, nil))
 
 	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
