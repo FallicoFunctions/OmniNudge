@@ -1832,6 +1832,67 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_259);
   });
 
+  it('replaces repeated plaza lamp proxies with batched celestial promenade lanterns', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const prefix of ['V13_PlazaLampPost_', 'V13_PlazaLampHead_']) {
+      expect(
+        exportedNodeNames.some((name) => name.startsWith(prefix)),
+        `legacy plaza lamp proxy still exported: ${prefix}`,
+      ).toBe(false);
+    }
+
+    const requiredV44Nodes = [
+      'V44_PlazaLanternStemCluster',
+      'V44_PlazaLanternGoldHardware',
+      'V44_PlazaLanternWarmCore',
+      'V44_PlazaLanternHaloRim',
+    ];
+    expect(nodeNamesWithPrefix('V44_')).toHaveLength(requiredV44Nodes.length);
+    expect(materialNameFor('V44_PlazaLanternStemCluster')).toBe('V13_BlackStageRigging');
+    expect(materialNameFor('V44_PlazaLanternGoldHardware')).toBe('V19_ArrivalBrushedGold');
+    expect(materialNameFor('V44_PlazaLanternWarmCore')).toBe('V13_WarmPracticalLight');
+    expect(materialNameFor('V44_PlazaLanternHaloRim')).toBe('V19_ArrivalBrushedGold');
+
+    for (const nodeName of requiredV44Nodes) {
+      expectMainStageMarker(nodeName);
+      const geometry = readMeshGeometry(nodeName);
+      const components = readConnectedComponents(nodeName);
+      expect(components).toHaveLength(10);
+      expect(geometry.max[1], `${nodeName} should reach above player height`).toBeGreaterThan(6.2);
+      expect(geometry.min[2], `${nodeName} should cover the forward plaza lamp row`).toBeLessThan(-38.2);
+      expect(geometry.max[2], `${nodeName} should cover the rear plaza lamp row`).toBeGreaterThan(41.8);
+      for (const component of components) {
+        expect(component.vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(24);
+        expect(component.triangleCount, `${nodeName} component lacks rounded lantern geometry`).toBeGreaterThanOrEqual(40);
+      }
+    }
+
+    const expectedRows = [42, 22, 2, -18, -38];
+    for (const nodeName of requiredV44Nodes) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedX of [-27, 27]) {
+        for (const expectedZ of expectedRows) {
+          expect(
+            centers.some(([x, , z]) => Math.abs(x - expectedX) < 0.12 && Math.abs(z - expectedZ) < 0.12),
+            `${nodeName} missing plaza lantern around x=${expectedX}, z=${expectedZ}`,
+          ).toBe(true);
+        }
+      }
+    }
+
+    expect(
+      requiredV44Nodes
+        .map(readMeshGeometry)
+        .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
+    ).toBeLessThanOrEqual(3_600);
+    expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V44_'))).toBe(false);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_243);
+  });
+
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {
     const requiredMeshNodes = [
       'V24_CelestialCrownFrontArch_L',
