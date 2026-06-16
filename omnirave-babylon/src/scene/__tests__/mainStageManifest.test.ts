@@ -2679,6 +2679,67 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the legacy crown jewel proxies with a layered apex jewel assembly', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const nodeName of ['V7_CrownBladeGemBase_L', 'V7_CrownBladeGemBase_R', 'V7_CrownTopJewel']) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V71_CrownBladePearlSocket_L',
+      'V71_CrownBladePearlSocket_R',
+      'V71_CrownJewelGoldCradle',
+      'V71_CrownJewelShadowCore',
+      'V71_CrownTopCyanJewel',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftSocket = readMeshGeometry('V71_CrownBladePearlSocket_L');
+    const rightSocket = readMeshGeometry('V71_CrownBladePearlSocket_R');
+    const goldCradle = readMeshGeometry('V71_CrownJewelGoldCradle');
+    const shadowCore = readMeshGeometry('V71_CrownJewelShadowCore');
+    const cyanJewel = readMeshGeometry('V71_CrownTopCyanJewel');
+
+    expect(leftSocket.max[0]).toBeLessThan(-1.2);
+    expect(rightSocket.min[0]).toBeGreaterThan(1.2);
+    expect(leftSocket.max[1]).toBeGreaterThan(68.2);
+    expect(rightSocket.max[1]).toBeGreaterThan(68.2);
+    expect(goldCradle.min[1]).toBeGreaterThan(68.2);
+    expect(goldCradle.max[1]).toBeGreaterThan(72.8);
+    expect(shadowCore.min[1]).toBeGreaterThan(68.2);
+    expect(shadowCore.max[1]).toBeGreaterThan(73.2);
+    expect(cyanJewel.max[1]).toBeGreaterThan(76.8);
+    expect(cyanJewel.max[1] - cyanJewel.min[1]).toBeGreaterThan(5.2);
+    expect(cyanJewel.max[0] - cyanJewel.min[0]).toBeGreaterThan(2.2);
+    expect(cyanJewel.max[2] - cyanJewel.min[2]).toBeGreaterThan(3.4);
+    expect(cyanJewel.min[2]).toBeLessThan(44.2);
+    expect(cyanJewel.max[2]).toBeGreaterThan(47.3);
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(900);
+    for (const nodeName of requiredReplacementNodes) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        72,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V71_CrownBladePearlSocket_L', 'V16_PearlArchitecturalShell'],
+      ['V71_CrownBladePearlSocket_R', 'V16_PearlArchitecturalShell'],
+      ['V71_CrownJewelGoldCradle', 'V20_ChasedGoldFiligree'],
+      ['V71_CrownJewelShadowCore', 'V20_RecessedWarmShadow'],
+      ['V71_CrownTopCyanJewel', 'V20_CelestialCyanGlass'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('replaces the legacy spawn-gallery proxy masses with a layered arrival arcade assembly', () => {
     const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
     const forbiddenLegacyNodes = [
