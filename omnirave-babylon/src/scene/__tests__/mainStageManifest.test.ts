@@ -2587,7 +2587,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
     ).toBeLessThanOrEqual(5_000);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V49_'))).toBe(false);
-    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_170);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_172);
   });
 
   it('replaces the legacy crown tower monolith with a layered celestial obelisk assembly', () => {
@@ -3379,6 +3379,99 @@ describe('MAIN_STAGE_MANIFEST', () => {
       ['V59_BackPlazaLanternWarmCore_R', 'V13_WarmPracticalLight'],
       ['V59_BackPlazaLanternHaloRim_L', 'V19_ArrivalBrushedGold'],
       ['V59_BackPlazaLanternHaloRim_R', 'V19_ArrivalBrushedGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
+  it('replaces the spawn-gate pylon proxies with jeweled threshold sentinels', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = ['V7_SpawnGatePylon_L', 'V7_SpawnGatePylon_R', 'V7_SpawnGateCap_L', 'V7_SpawnGateCap_R'];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V60_SpawnGateSentinelPearl_L',
+      'V60_SpawnGateSentinelPearl_R',
+      'V60_SpawnGateSentinelGoldCrown_L',
+      'V60_SpawnGateSentinelGoldCrown_R',
+      'V60_SpawnGateSentinelCyanCore_L',
+      'V60_SpawnGateSentinelCyanCore_R',
+      'V60_SpawnGateSentinelShadowKeel_L',
+      'V60_SpawnGateSentinelShadowKeel_R',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftPearl = readMeshGeometry('V60_SpawnGateSentinelPearl_L');
+    const rightPearl = readMeshGeometry('V60_SpawnGateSentinelPearl_R');
+    const leftGold = readMeshGeometry('V60_SpawnGateSentinelGoldCrown_L');
+    const rightGold = readMeshGeometry('V60_SpawnGateSentinelGoldCrown_R');
+    const leftCyan = readMeshGeometry('V60_SpawnGateSentinelCyanCore_L');
+    const rightCyan = readMeshGeometry('V60_SpawnGateSentinelCyanCore_R');
+    const leftShadow = readMeshGeometry('V60_SpawnGateSentinelShadowKeel_L');
+    const rightShadow = readMeshGeometry('V60_SpawnGateSentinelShadowKeel_R');
+
+    expect(leftPearl.min[0]).toBeLessThan(-20.0);
+    expect(leftPearl.max[0]).toBeLessThan(-16.6);
+    expect(rightPearl.min[0]).toBeGreaterThan(16.6);
+    expect(rightPearl.max[0]).toBeGreaterThan(20.0);
+    expect(leftPearl.min[1]).toBeGreaterThan(-0.2);
+    expect(leftPearl.max[1]).toBeGreaterThan(11.0);
+    expect(rightPearl.min[1]).toBeGreaterThan(-0.2);
+    expect(rightPearl.max[1]).toBeGreaterThan(11.0);
+    expect(leftPearl.min[2]).toBeLessThan(-83.0);
+    expect(leftPearl.max[2]).toBeLessThan(-80.0);
+    expect(rightPearl.min[2]).toBeLessThan(-83.0);
+    expect(rightPearl.max[2]).toBeLessThan(-80.0);
+
+    expect(leftGold.min[1]).toBeGreaterThan(0.15);
+    expect(leftGold.max[1]).toBeGreaterThan(11.2);
+    expect(rightGold.min[1]).toBeGreaterThan(0.15);
+    expect(rightGold.max[1]).toBeGreaterThan(11.2);
+
+    expect(leftCyan.min[1]).toBeGreaterThan(0.2);
+    expect(leftCyan.max[1]).toBeGreaterThan(9.5);
+    expect(rightCyan.min[1]).toBeGreaterThan(0.2);
+    expect(rightCyan.max[1]).toBeGreaterThan(9.5);
+
+    expect(leftShadow.min[1]).toBeGreaterThan(0.1);
+    expect(leftShadow.max[1]).toBeGreaterThan(10.4);
+    expect(rightShadow.min[1]).toBeGreaterThan(0.1);
+    expect(rightShadow.max[1]).toBeGreaterThan(10.4);
+
+    expect(readConnectedComponents('V60_SpawnGateSentinelPearl_L')).toHaveLength(1);
+    expect(readConnectedComponents('V60_SpawnGateSentinelPearl_R')).toHaveLength(1);
+    expect(readConnectedComponents('V60_SpawnGateSentinelGoldCrown_L')).toHaveLength(1);
+    expect(readConnectedComponents('V60_SpawnGateSentinelGoldCrown_R')).toHaveLength(1);
+    expect(readConnectedComponents('V60_SpawnGateSentinelCyanCore_L')).toHaveLength(1);
+    expect(readConnectedComponents('V60_SpawnGateSentinelCyanCore_R')).toHaveLength(1);
+    expect(readConnectedComponents('V60_SpawnGateSentinelShadowKeel_L')).toHaveLength(1);
+    expect(readConnectedComponents('V60_SpawnGateSentinelShadowKeel_R')).toHaveLength(1);
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(1_000);
+    for (const nodeName of requiredReplacementNodes) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        120,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V60_SpawnGateSentinelPearl_L', 'V19_GatewayPearlIvory'],
+      ['V60_SpawnGateSentinelPearl_R', 'V19_GatewayPearlIvory'],
+      ['V60_SpawnGateSentinelGoldCrown_L', 'V19_ArrivalBrushedGold'],
+      ['V60_SpawnGateSentinelGoldCrown_R', 'V19_ArrivalBrushedGold'],
+      ['V60_SpawnGateSentinelCyanCore_L', 'V19_ArrivalCyanGlow'],
+      ['V60_SpawnGateSentinelCyanCore_R', 'V19_ArrivalCyanGlow'],
+      ['V60_SpawnGateSentinelShadowKeel_L', 'V20_RecessedWarmShadow'],
+      ['V60_SpawnGateSentinelShadowKeel_R', 'V20_RecessedWarmShadow'],
     ]);
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
