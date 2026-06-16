@@ -143,7 +143,10 @@ export function MessageEditMode({
       </div>
 
       {error && (
-        <p className={`text-xs font-medium ${isOwnMessage ? 'text-white/90' : 'text-[var(--color-error)]'}`} role="alert">
+        <p
+          className={`text-xs font-medium ${isOwnMessage ? 'text-white/90' : 'text-[var(--color-error)]'}`}
+          role="alert"
+        >
           {error}
         </p>
       )}

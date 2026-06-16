@@ -229,11 +229,7 @@ interface MessageBubbleProps {
   currentUserId?: number;
 }
 
-function MessageBubble({
-  message,
-  isOwnMessage,
-  currentUserId,
-}: MessageBubbleProps) {
+function MessageBubble({ message, isOwnMessage, currentUserId }: MessageBubbleProps) {
   const { t } = useTranslation();
   const { formatRelativeTime } = useFormat();
   const decryptedText = useDecryptedContent(message, isOwnMessage, currentUserId);
@@ -598,7 +594,6 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
           </button>
         </div>
       </div>
-
     </div>
   );
 }

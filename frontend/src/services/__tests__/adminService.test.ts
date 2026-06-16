@@ -57,7 +57,9 @@ describe('adminService - Ban System', () => {
     it('fetches users with search and role filter', async () => {
       await adminService.listUsers('test', 'admin', '', 25, 10);
 
-      expect(api.get).toHaveBeenCalledWith('/admin/users?search=test&role=admin&limit=25&offset=10');
+      expect(api.get).toHaveBeenCalledWith(
+        '/admin/users?search=test&role=admin&limit=25&offset=10'
+      );
     });
   });
 

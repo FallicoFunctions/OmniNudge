@@ -1,12 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import {
-  ErrorModal,
-  ErrorPage,
-  InlineError,
-  NotFoundPage,
-  ServerErrorPage,
-  Toast,
-} from './index';
+import { ErrorModal, ErrorPage, InlineError, NotFoundPage, ServerErrorPage, Toast } from './index';
 import { getErrorPatternForSeverity } from '../../services/errorTrackingService';
 
 const meta: Meta = {
@@ -20,7 +13,9 @@ export default meta;
 type Story = StoryObj;
 
 export const ToastInfo: Story = {
-  render: () => <Toast type="info" message="Your profile was refreshed." description="No action needed." />,
+  render: () => (
+    <Toast type="info" message="Your profile was refreshed." description="No action needed." />
+  ),
 };
 
 export const ToastWarning: Story = {

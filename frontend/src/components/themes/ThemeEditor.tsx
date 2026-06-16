@@ -22,10 +22,26 @@ const ColorPicker = lazy(async () => {
 });
 
 const STEP_DEFS = [
-  { id: 'base', titleKey: 'themes.editor.steps.base.title', descriptionKey: 'themes.editor.steps.base.description' },
-  { id: 'info', titleKey: 'themes.editor.steps.info.title', descriptionKey: 'themes.editor.steps.info.description' },
-  { id: 'variables', titleKey: 'themes.editor.steps.variables.title', descriptionKey: 'themes.editor.steps.variables.description' },
-  { id: 'review', titleKey: 'themes.editor.steps.review.title', descriptionKey: 'themes.editor.steps.review.description' },
+  {
+    id: 'base',
+    titleKey: 'themes.editor.steps.base.title',
+    descriptionKey: 'themes.editor.steps.base.description',
+  },
+  {
+    id: 'info',
+    titleKey: 'themes.editor.steps.info.title',
+    descriptionKey: 'themes.editor.steps.info.description',
+  },
+  {
+    id: 'variables',
+    titleKey: 'themes.editor.steps.variables.title',
+    descriptionKey: 'themes.editor.steps.variables.description',
+  },
+  {
+    id: 'review',
+    titleKey: 'themes.editor.steps.review.title',
+    descriptionKey: 'themes.editor.steps.review.description',
+  },
 ];
 
 const SIZE_VALUE_REGEX = /^-?\d+(\.\d+)?(px|rem|em|%)$/i;
@@ -45,12 +61,7 @@ interface ThemeEditorProps {
 const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps) => {
   const { t } = useTranslation();
   const { formatNumber } = useFormat();
-  const {
-    predefinedThemes,
-    customThemes,
-    refreshThemes,
-    selectTheme,
-  } = useTheme();
+  const { predefinedThemes, customThemes, refreshThemes, selectTheme } = useTheme();
 
   const steps = useMemo(
     () =>
@@ -75,7 +86,9 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   const [setAsActive, setSetAsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success'; text: string } | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success'; text: string } | null>(
+    null
+  );
   const [infoErrors, setInfoErrors] = useState<{ name?: string; description?: string }>({});
   const [variableErrors, setVariableErrors] = useState<Record<string, string>>({});
   const cssVariableHistory = useRef<Record<string, string>[]>([]);
@@ -87,23 +100,32 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   const contrastWarnings = useMemo(() => {
     const background =
       cssVariables['--color-background'] ?? DEFAULT_THEME_VARIABLES['--color-background'];
-    const surface =
-      cssVariables['--color-surface'] ?? DEFAULT_THEME_VARIABLES['--color-surface'];
+    const surface = cssVariables['--color-surface'] ?? DEFAULT_THEME_VARIABLES['--color-surface'];
     const textPrimary =
       cssVariables['--color-text-primary'] ?? DEFAULT_THEME_VARIABLES['--color-text-primary'];
     const textSecondary =
       cssVariables['--color-text-secondary'] ?? DEFAULT_THEME_VARIABLES['--color-text-secondary'];
     const combos = [
-      { label: t('themes.editor.review.contrast.labels.primaryTextOnBackground'), fg: textPrimary, bg: background },
-      { label: t('themes.editor.review.contrast.labels.secondaryTextOnSurface'), fg: textSecondary, bg: surface },
-      { label: t('themes.editor.review.contrast.labels.primaryTextOnSurface'), fg: textPrimary, bg: surface },
+      {
+        label: t('themes.editor.review.contrast.labels.primaryTextOnBackground'),
+        fg: textPrimary,
+        bg: background,
+      },
+      {
+        label: t('themes.editor.review.contrast.labels.secondaryTextOnSurface'),
+        fg: textSecondary,
+        bg: surface,
+      },
+      {
+        label: t('themes.editor.review.contrast.labels.primaryTextOnSurface'),
+        fg: textPrimary,
+        bg: surface,
+      },
     ];
     return combos
       .map((combo) => {
         const ratio = getContrastRatio(combo.fg, combo.bg);
-        return ratio !== null && ratio < 4.5
-          ? { ...combo, ratio: Number(ratio.toFixed(2)) }
-          : null;
+        return ratio !== null && ratio < 4.5 ? { ...combo, ratio: Number(ratio.toFixed(2)) } : null;
       })
       .filter(Boolean) as { label: string; ratio: number }[];
   }, [cssVariables, t]);
@@ -189,66 +211,66 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     });
   }, []);
 
-  const validateVariableValue = useCallback((variableName: string, value: string) => {
-    const trimmed = value.trim();
-    const definition = getVariableDefinition(variableName);
-    const type = definition?.type ?? 'string';
+  const validateVariableValue = useCallback(
+    (variableName: string, value: string) => {
+      const trimmed = value.trim();
+      const definition = getVariableDefinition(variableName);
+      const type = definition?.type ?? 'string';
 
-    if (!trimmed) {
-      setVariableError(variableName, t('themes.editor.validation.valueRequired'));
-      return false;
-    }
-
-    if (type === 'color') {
-      const normalized = normalizeHexColor(trimmed);
-      if (!looksLikeHexColor(trimmed)) {
-        setVariableError(variableName, t('themes.editor.validation.hexExample'));
+      if (!trimmed) {
+        setVariableError(variableName, t('themes.editor.validation.valueRequired'));
         return false;
       }
-      if (!isValidHexColor(normalized)) {
-        setVariableError(variableName, t('themes.editor.validation.hexLength'));
+
+      if (type === 'color') {
+        const normalized = normalizeHexColor(trimmed);
+        if (!looksLikeHexColor(trimmed)) {
+          setVariableError(variableName, t('themes.editor.validation.hexExample'));
+          return false;
+        }
+        if (!isValidHexColor(normalized)) {
+          setVariableError(variableName, t('themes.editor.validation.hexLength'));
+          return false;
+        }
+        setVariableError(variableName, undefined);
+        return true;
+      }
+
+      if (type === 'size') {
+        if (!SIZE_VALUE_REGEX.test(trimmed)) {
+          setVariableError(variableName, t('themes.editor.validation.sizeUnits'));
+          return false;
+        }
+        setVariableError(variableName, undefined);
+        return true;
+      }
+
+      if (type === 'number') {
+        const numeric = Number(trimmed);
+        if (Number.isNaN(numeric)) {
+          setVariableError(variableName, t('themes.editor.validation.numberRequired'));
+          return false;
+        }
+        setVariableError(variableName, undefined);
+        return true;
+      }
+
+      if (trimmed.length > MAX_STRING_LENGTH) {
+        setVariableError(
+          variableName,
+          t('themes.editor.validation.maxLength', { max: MAX_STRING_LENGTH })
+        );
         return false;
       }
+
       setVariableError(variableName, undefined);
       return true;
-    }
-
-    if (type === 'size') {
-      if (!SIZE_VALUE_REGEX.test(trimmed)) {
-        setVariableError(variableName, t('themes.editor.validation.sizeUnits'));
-        return false;
-      }
-      setVariableError(variableName, undefined);
-      return true;
-    }
-
-    if (type === 'number') {
-      const numeric = Number(trimmed);
-      if (Number.isNaN(numeric)) {
-        setVariableError(variableName, t('themes.editor.validation.numberRequired'));
-        return false;
-      }
-      setVariableError(variableName, undefined);
-      return true;
-    }
-
-    if (trimmed.length > MAX_STRING_LENGTH) {
-      setVariableError(
-        variableName,
-        t('themes.editor.validation.maxLength', { max: MAX_STRING_LENGTH })
-      );
-      return false;
-    }
-
-    setVariableError(variableName, undefined);
-    return true;
-  }, [setVariableError, t]);
+    },
+    [setVariableError, t]
+  );
 
   const updateVariable = (variableName: string, value: string) => {
-    cssVariableHistory.current = [
-      ...cssVariableHistory.current.slice(-24),
-      { ...cssVariables },
-    ];
+    cssVariableHistory.current = [...cssVariableHistory.current.slice(-24), { ...cssVariables }];
     setCssVariables((prev) => ({
       ...prev,
       [variableName]: value,
@@ -413,9 +435,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       // MISC-2: Success feedback visible for at least 2 seconds before auto-close
       setStatusMessage({
         type: 'success',
-        text: initialTheme
-          ? t('themes.editor.status.updated')
-          : t('themes.editor.status.created'),
+        text: initialTheme ? t('themes.editor.status.updated') : t('themes.editor.status.created'),
       });
       if (autoCloseTimeoutId.current) {
         window.clearTimeout(autoCloseTimeoutId.current);
@@ -543,9 +563,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
               <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
                 {t('themes.editor.info.nameHelper')}
               </p>
-              {infoErrors.name && (
-                <p className="text-xs text-red-500">{infoErrors.name}</p>
-              )}
+              {infoErrors.name && <p className="text-xs text-red-500">{infoErrors.name}</p>}
             </div>
             <div>
               <label className="text-sm font-semibold text-[var(--color-text-primary)]">
@@ -661,25 +679,26 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                   {t('themes.editor.review.previewPaletteTitle')}
                 </h4>
                 <div className="mt-3 flex flex-wrap gap-3">
-                  {['--color-primary', '--color-background', '--color-surface', '--color-success'].map(
-                    (variable) => (
-                      <div key={variable} className="flex flex-col items-center gap-1 text-center">
-                        <span
-                          className="h-10 w-10 rounded-full border border-[var(--color-border)]"
-                          style={{ backgroundColor: cssVariables[variable] ?? '#000000' }}
-                        />
-                        <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-                          {variable.replace('--color-', '')}
-                        </span>
-                      </div>
-                    )
-                  )}
+                  {[
+                    '--color-primary',
+                    '--color-background',
+                    '--color-surface',
+                    '--color-success',
+                  ].map((variable) => (
+                    <div key={variable} className="flex flex-col items-center gap-1 text-center">
+                      <span
+                        className="h-10 w-10 rounded-full border border-[var(--color-border)]"
+                        style={{ backgroundColor: cssVariables[variable] ?? '#000000' }}
+                      />
+                      <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
+                        {variable.replace('--color-', '')}
+                      </span>
+                    </div>
+                  ))}
                 </div>
                 {contrastWarnings.length > 0 && (
                   <div className="mt-4 rounded-lg border border-yellow-400 bg-yellow-50 p-3 text-xs text-yellow-800">
-                    <p className="font-semibold">
-                      {t('themes.editor.review.contrast.title')}
-                    </p>
+                    <p className="font-semibold">{t('themes.editor.review.contrast.title')}</p>
                     <ul className="mt-1 list-disc pl-4">
                       {contrastWarnings.map((warning) => (
                         <li key={warning.label}>
@@ -734,8 +753,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
             onClick={onClose}
             disabled={isSubmitting}
           >
-            {t('themes.editor.actions.close')}{' '}
-            <span aria-hidden="true">✕</span>
+            {t('themes.editor.actions.close')} <span aria-hidden="true">✕</span>
           </button>
         </header>
 

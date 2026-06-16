@@ -1,18 +1,18 @@
-import { Phone, Video, PhoneOff } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-import type { Call } from '../../types/calls'
+import { Phone, Video, PhoneOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import type { Call } from '../../types/calls';
 
 interface IncomingCallModalProps {
-  call: Call
-  onAccept: () => void
-  onDecline: () => void
+  call: Call;
+  onAccept: () => void;
+  onDecline: () => void;
 }
 
 export function IncomingCallModal({ call, onAccept, onDecline }: IncomingCallModalProps) {
-  const { t } = useTranslation()
-  const isVideo = call.call_type === 'video'
-  const callerName = call.caller_username ?? t('common.unknown', 'Unknown')
-  const title = isVideo ? t('calls.incomingVideoCall') : t('calls.incomingVoiceCall')
+  const { t } = useTranslation();
+  const isVideo = call.call_type === 'video';
+  const callerName = call.caller_username ?? t('common.unknown', 'Unknown');
+  const title = isVideo ? t('calls.incomingVideoCall') : t('calls.incomingVoiceCall');
 
   return (
     <div
@@ -77,5 +77,5 @@ export function IncomingCallModal({ call, onAccept, onDecline }: IncomingCallMod
         </div>
       </div>
     </div>
-  )
+  );
 }

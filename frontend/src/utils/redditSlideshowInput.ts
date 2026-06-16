@@ -13,11 +13,13 @@ export function parseRedditSlideshowInput(
 
   const escapedHubPrefix = escapeRegExp(hubPrefix);
   const escapedSubredditPrefix = escapeRegExp(subredditPrefix);
-  const localizedPrefixPattern = new RegExp(`^(?:${escapedHubPrefix}|${escapedSubredditPrefix})`, 'i');
+  const localizedPrefixPattern = new RegExp(
+    `^(?:${escapedHubPrefix}|${escapedSubredditPrefix})`,
+    'i'
+  );
   const canonicalPrefixPattern = /^[hr]\//i;
 
-  const isHub =
-    normalized.startsWith(hubPrefixLower) || normalized.startsWith('h/');
+  const isHub = normalized.startsWith(hubPrefixLower) || normalized.startsWith('h/');
 
   const name = trimmed
     .replace(localizedPrefixPattern, '')
@@ -36,4 +38,3 @@ export function formatRedditSlideshowInput(
   const prefix = type === 'hub' ? hubPrefix : subredditPrefix;
   return `${prefix}${name}`;
 }
-

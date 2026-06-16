@@ -16,7 +16,10 @@ interface UseGroupConversationOptions {
   currentUserId: number | undefined;
 }
 
-export function useGroupConversation({ conversationId, currentUserId }: UseGroupConversationOptions) {
+export function useGroupConversation({
+  conversationId,
+  currentUserId,
+}: UseGroupConversationOptions) {
   const queryClient = useQueryClient();
 
   // ── Queries ──────────────────────────────────────────────────────────────
@@ -32,10 +35,7 @@ export function useGroupConversation({ conversationId, currentUserId }: UseGroup
     staleTime: 60_000,
   });
 
-  const {
-    data: settings,
-    isLoading: loadingSettings,
-  } = useQuery<GroupSettings>({
+  const { data: settings, isLoading: loadingSettings } = useQuery<GroupSettings>({
     queryKey: ['group-settings', conversationId],
     queryFn: () => groupsService.getSettings(conversationId!),
     enabled: !!conversationId,
@@ -52,18 +52,21 @@ export function useGroupConversation({ conversationId, currentUserId }: UseGroup
 
   const addParticipantMutation = useMutation({
     mutationFn: (userId: number) => groupsService.addParticipant(conversationId!, userId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['group-participants', conversationId] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['group-participants', conversationId] }),
   });
 
   const removeParticipantMutation = useMutation({
     mutationFn: (userId: number) => groupsService.removeParticipant(conversationId!, userId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['group-participants', conversationId] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['group-participants', conversationId] }),
   });
 
   const changeRoleMutation = useMutation({
     mutationFn: ({ userId, role }: { userId: number; role: 'admin' | 'member' }) =>
       groupsService.updateParticipantRole(conversationId!, userId, { role }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['group-participants', conversationId] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['group-participants', conversationId] }),
   });
 
   const updateGroupMutation = useMutation({
@@ -76,8 +79,10 @@ export function useGroupConversation({ conversationId, currentUserId }: UseGroup
   });
 
   const updateSettingsMutation = useMutation({
-    mutationFn: (data: Partial<GroupSettings>) => groupsService.updateSettings(conversationId!, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['group-settings', conversationId] }),
+    mutationFn: (data: Partial<GroupSettings>) =>
+      groupsService.updateSettings(conversationId!, data),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['group-settings', conversationId] }),
   });
 
   const leaveGroupMutation = useMutation({
@@ -92,7 +97,8 @@ export function useGroupConversation({ conversationId, currentUserId }: UseGroup
   const transferOwnershipMutation = useMutation({
     mutationFn: (data: TransferOwnershipRequest) =>
       groupsService.transferOwnership(conversationId!, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['group-participants', conversationId] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['group-participants', conversationId] }),
   });
 
   // ── Stable callbacks ─────────────────────────────────────────────────────
@@ -122,13 +128,11 @@ export function useGroupConversation({ conversationId, currentUserId }: UseGroup
     [updateSettingsMutation]
   );
 
-  const leaveGroup = useCallback(
-    () => leaveGroupMutation.mutateAsync(),
-    [leaveGroupMutation]
-  );
+  const leaveGroup = useCallback(() => leaveGroupMutation.mutateAsync(), [leaveGroupMutation]);
 
   const transferOwnership = useCallback(
-    (newOwnerId: number) => transferOwnershipMutation.mutateAsync({ new_owner_user_id: newOwnerId }),
+    (newOwnerId: number) =>
+      transferOwnershipMutation.mutateAsync({ new_owner_user_id: newOwnerId }),
     [transferOwnershipMutation]
   );
 

@@ -6,7 +6,7 @@
  */
 
 /* Apply RTL direction when html has dir="rtl" */
-html[dir="rtl"] {
+html[dir='rtl'] {
   direction: rtl;
 }
 
@@ -14,199 +14,261 @@ html[dir="rtl"] {
 /* These automatically flip for RTL */
 
 /* Margins - logical mappings for common utility classes used across the app */
-.ml-1 { margin-inline-start: 0.25rem; }
-.ml-2 { margin-inline-start: 0.5rem; }
-.ml-3 { margin-inline-start: 0.75rem; }
-.ml-4 { margin-inline-start: 1rem; }
-.ml-6 { margin-inline-start: 1.5rem; }
-.ml-7 { margin-inline-start: 1.75rem; }
-.ml-auto { margin-inline-start: auto; }
-.mr-1 { margin-inline-end: 0.25rem; }
-.mr-2 { margin-inline-end: 0.5rem; }
-.mr-3 { margin-inline-end: 0.75rem; }
-.mr-4 { margin-inline-end: 1rem; }
+.ml-1 {
+  margin-inline-start: 0.25rem;
+}
+.ml-2 {
+  margin-inline-start: 0.5rem;
+}
+.ml-3 {
+  margin-inline-start: 0.75rem;
+}
+.ml-4 {
+  margin-inline-start: 1rem;
+}
+.ml-6 {
+  margin-inline-start: 1.5rem;
+}
+.ml-7 {
+  margin-inline-start: 1.75rem;
+}
+.ml-auto {
+  margin-inline-start: auto;
+}
+.mr-1 {
+  margin-inline-end: 0.25rem;
+}
+.mr-2 {
+  margin-inline-end: 0.5rem;
+}
+.mr-3 {
+  margin-inline-end: 0.75rem;
+}
+.mr-4 {
+  margin-inline-end: 1rem;
+}
 
 /* Padding - logical mappings for common utility classes used across the app */
-.pl-1 { padding-inline-start: 0.25rem; }
-.pl-2 { padding-inline-start: 0.5rem; }
-.pl-3 { padding-inline-start: 0.75rem; }
-.pl-4 { padding-inline-start: 1rem; }
-.pl-6 { padding-inline-start: 1.5rem; }
-.pl-9 { padding-inline-start: 2.25rem; }
-.pr-1 { padding-inline-end: 0.25rem; }
-.pr-2 { padding-inline-end: 0.5rem; }
-.pr-3 { padding-inline-end: 0.75rem; }
-.pr-4 { padding-inline-end: 1rem; }
-.pr-12 { padding-inline-end: 3rem; }
-.pr-20 { padding-inline-end: 5rem; }
+.pl-1 {
+  padding-inline-start: 0.25rem;
+}
+.pl-2 {
+  padding-inline-start: 0.5rem;
+}
+.pl-3 {
+  padding-inline-start: 0.75rem;
+}
+.pl-4 {
+  padding-inline-start: 1rem;
+}
+.pl-6 {
+  padding-inline-start: 1.5rem;
+}
+.pl-9 {
+  padding-inline-start: 2.25rem;
+}
+.pr-1 {
+  padding-inline-end: 0.25rem;
+}
+.pr-2 {
+  padding-inline-end: 0.5rem;
+}
+.pr-3 {
+  padding-inline-end: 0.75rem;
+}
+.pr-4 {
+  padding-inline-end: 1rem;
+}
+.pr-12 {
+  padding-inline-end: 3rem;
+}
+.pr-20 {
+  padding-inline-end: 5rem;
+}
 
 /* Text alignment */
-.text-left { text-align: start; }
-.text-right { text-align: end; }
+.text-left {
+  text-align: start;
+}
+.text-right {
+  text-align: end;
+}
 
 /* Border radius - use logical properties */
-.rounded-l { border-start-start-radius: 0.25rem; border-end-start-radius: 0.25rem; }
-.rounded-r { border-start-end-radius: 0.25rem; border-end-end-radius: 0.25rem; }
-.rounded-bl-none { border-end-start-radius: 0; }
-.rounded-br-none { border-end-end-radius: 0; }
+.rounded-l {
+  border-start-start-radius: 0.25rem;
+  border-end-start-radius: 0.25rem;
+}
+.rounded-r {
+  border-start-end-radius: 0.25rem;
+  border-end-end-radius: 0.25rem;
+}
+.rounded-bl-none {
+  border-end-start-radius: 0;
+}
+.rounded-br-none {
+  border-end-end-radius: 0;
+}
 
 /* Border side mappings for common utility classes */
-html[dir="rtl"] .border-l {
+html[dir='rtl'] .border-l {
   border-left-width: 0;
   border-right-width: 1px;
 }
 
-html[dir="rtl"] .border-l-2 {
+html[dir='rtl'] .border-l-2 {
   border-left-width: 0;
   border-right-width: 2px;
 }
 
-html[dir="rtl"] .border-l-4 {
+html[dir='rtl'] .border-l-4 {
   border-left-width: 0;
   border-right-width: 4px;
 }
 
-html[dir="rtl"] .border-r {
+html[dir='rtl'] .border-r {
   border-right-width: 0;
   border-left-width: 1px;
 }
 
-html[dir="rtl"] .border-r-2 {
+html[dir='rtl'] .border-r-2 {
   border-right-width: 0;
   border-left-width: 2px;
 }
 
 /* Transforms for arrows and icons that should flip in RTL */
-html[dir="rtl"] .rtl-flip {
+html[dir='rtl'] .rtl-flip {
   transform: scaleX(-1);
 }
 
 /* Flexbox - row-reverse in RTL */
-html[dir="rtl"] .flex-row {
+html[dir='rtl'] .flex-row {
   flex-direction: row-reverse;
 }
 
 /* Grid - reverse column order in RTL */
-html[dir="rtl"] .grid {
+html[dir='rtl'] .grid {
   direction: rtl;
 }
 
 /* Float - swap left/right in RTL */
-html[dir="rtl"] .float-left {
+html[dir='rtl'] .float-left {
   float: right;
 }
 
-html[dir="rtl"] .float-right {
+html[dir='rtl'] .float-right {
   float: left;
 }
 
 /* Position - swap left/right in RTL */
-html[dir="rtl"] .left-0 {
+html[dir='rtl'] .left-0 {
   left: auto;
   right: 0;
 }
 
-html[dir="rtl"] .right-0 {
+html[dir='rtl'] .right-0 {
   right: auto;
   left: 0;
 }
 
-html[dir="rtl"] .left-2 {
+html[dir='rtl'] .left-2 {
   left: auto;
   right: 0.5rem;
 }
 
-html[dir="rtl"] .left-3 {
+html[dir='rtl'] .left-3 {
   left: auto;
   right: 0.75rem;
 }
 
-html[dir="rtl"] .left-4 {
+html[dir='rtl'] .left-4 {
   left: auto;
   right: 1rem;
 }
 
-html[dir="rtl"] .left-1\/2 {
+html[dir='rtl'] .left-1\/2 {
   left: auto;
   right: 50%;
 }
 
-html[dir="rtl"] .right-1 {
+html[dir='rtl'] .right-1 {
   right: auto;
   left: 0.25rem;
 }
 
-html[dir="rtl"] .right-2 {
+html[dir='rtl'] .right-2 {
   right: auto;
   left: 0.5rem;
 }
 
-html[dir="rtl"] .right-3 {
+html[dir='rtl'] .right-3 {
   right: auto;
   left: 0.75rem;
 }
 
-html[dir="rtl"] .right-4 {
+html[dir='rtl'] .right-4 {
   right: auto;
   left: 1rem;
 }
 
-html[dir="rtl"] .right-16 {
+html[dir='rtl'] .right-16 {
   right: auto;
   left: 4rem;
 }
 
 /* Chevrons and arrows should flip in RTL */
-html[dir="rtl"] .icon-chevron-right,
-html[dir="rtl"] .icon-chevron-left,
-html[dir="rtl"] .icon-arrow-right,
-html[dir="rtl"] .icon-arrow-left {
+html[dir='rtl'] .icon-chevron-right,
+html[dir='rtl'] .icon-chevron-left,
+html[dir='rtl'] .icon-arrow-right,
+html[dir='rtl'] .icon-arrow-left {
   transform: scaleX(-1);
 }
 
 /* Specific component adjustments for RTL */
-html[dir="rtl"] .sidebar {
+html[dir='rtl'] .sidebar {
   border-left: none;
   border-right: 1px solid var(--color-border);
 }
 
-html[dir="rtl"] .dropdown-menu {
+html[dir='rtl'] .dropdown-menu {
   left: auto;
   right: 0;
 }
 
 /* Navigation arrows */
-html[dir="rtl"] .nav-next::after {
-  content: "←";
+html[dir='rtl'] .nav-next::after {
+  content: '←';
 }
 
-html[dir="rtl"] .nav-prev::before {
-  content: "→";
+html[dir='rtl'] .nav-prev::before {
+  content: '→';
 }
 
 /* Ensure proper text rendering for RTL scripts */
-html[dir="rtl"] {
-  font-feature-settings: "liga" 1, "calt" 1;
+html[dir='rtl'] {
+  font-feature-settings:
+    'liga' 1,
+    'calt' 1;
   text-rendering: optimizeLegibility;
 }
 
 /* Fix for inputs in RTL */
-html[dir="rtl"] input[type="text"],
-html[dir="rtl"] input[type="email"],
-html[dir="rtl"] input[type="password"],
-html[dir="rtl"] input[type="search"],
-html[dir="rtl"] textarea {
+html[dir='rtl'] input[type='text'],
+html[dir='rtl'] input[type='email'],
+html[dir='rtl'] input[type='password'],
+html[dir='rtl'] input[type='search'],
+html[dir='rtl'] textarea {
   text-align: start;
 }
 
 /* Numbered lists should use RTL numbering */
-html[dir="rtl"] ol {
+html[dir='rtl'] ol {
   list-style-position: inside;
 }
 
 /* Fix for checkboxes and radio buttons in RTL */
-html[dir="rtl"] input[type="checkbox"],
-html[dir="rtl"] input[type="radio"] {
+html[dir='rtl'] input[type='checkbox'],
+html[dir='rtl'] input[type='radio'] {
   margin-inline-start: 0;
   margin-inline-end: 0.5rem;
 }

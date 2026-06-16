@@ -24,10 +24,7 @@ class ApiClient {
     return { Authorization: `Bearer ${token}` };
   }
 
-  async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+  async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const headers = {
       'Content-Type': 'application/json',
@@ -53,11 +50,13 @@ class ApiClient {
     };
 
     if (!response.ok) {
-      const error: ApiError =
-        (await parseJson().catch(() => ({ error: 'Unknown error', message: 'Unknown error' }))) || {
-          error: 'Unknown error',
-          message: 'Unknown error',
-        };
+      const error: ApiError = (await parseJson().catch(() => ({
+        error: 'Unknown error',
+        message: 'Unknown error',
+      }))) || {
+        error: 'Unknown error',
+        message: 'Unknown error',
+      };
 
       // If banned/deleted, clear auth and surface reason
       const errorText = `${error.message || ''} ${error.error || ''}`.toLowerCase();
@@ -111,7 +110,11 @@ class ApiClient {
     });
   }
 
-  async uploadFile<T>(endpoint: string, file: File, additionalData?: Record<string, string>): Promise<T> {
+  async uploadFile<T>(
+    endpoint: string,
+    file: File,
+    additionalData?: Record<string, string>
+  ): Promise<T> {
     const formData = new FormData();
     formData.append('file', file);
 

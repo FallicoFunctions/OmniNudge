@@ -62,7 +62,13 @@ export default function CreateHubPage() {
       return;
     }
 
-    if (!allowAllPosts && !allowTextPosts && !allowLinkPosts && !allowImagePosts && !allowVideoPosts) {
+    if (
+      !allowAllPosts &&
+      !allowTextPosts &&
+      !allowLinkPosts &&
+      !allowImagePosts &&
+      !allowVideoPosts
+    ) {
       setContentError(t('createHubPage.errors.selectAtLeastOnePostType'));
       return;
     }
@@ -118,8 +124,8 @@ export default function CreateHubPage() {
                     nameError
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                       : name.length >= 3
-                      ? 'border-green-300 focus:ring-green-500 focus:border-green-500'
-                      : 'border-[var(--color-border)] focus:ring-[var(--color-primary)]'
+                        ? 'border-green-300 focus:ring-green-500 focus:border-green-500'
+                        : 'border-[var(--color-border)] focus:ring-[var(--color-primary)]'
                   }`}
                   placeholder={t('createHubPage.fields.name.placeholder')}
                   required
@@ -129,8 +135,19 @@ export default function CreateHubPage() {
                 {/* Success indicator */}
                 {!nameError && name.length >= 3 && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <svg
+                      className="w-5 h-5 text-green-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                   </div>
                 )}
@@ -185,33 +202,35 @@ export default function CreateHubPage() {
               <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
                 {t('createHubPage.fields.type.label')} <span className="text-red-500 ml-1">*</span>
               </label>
-          <div className="space-y-2">
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="public"
-                checked={type === 'public'}
-                onChange={(e) => setType(e.target.value as 'public')}
-                className="mr-2"
-              />
-              <span className="font-medium">{t('createHubPage.fields.type.public.label')}</span>
-              <span className="ml-2 text-sm text-gray-600">
-                {t('createHubPage.fields.type.public.description')}
-              </span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="private"
-                checked={type === 'private'}
-                onChange={(e) => setType(e.target.value as 'private')}
-                className="mr-2"
-              />
-              <span className="font-medium">{t('createHubPage.fields.type.private.label')}</span>
-              <span className="ml-2 text-sm text-gray-600">
-                {t('createHubPage.fields.type.private.description')}
-              </span>
-            </label>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="public"
+                    checked={type === 'public'}
+                    onChange={(e) => setType(e.target.value as 'public')}
+                    className="mr-2"
+                  />
+                  <span className="font-medium">{t('createHubPage.fields.type.public.label')}</span>
+                  <span className="ml-2 text-sm text-gray-600">
+                    {t('createHubPage.fields.type.public.description')}
+                  </span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="private"
+                    checked={type === 'private'}
+                    onChange={(e) => setType(e.target.value as 'private')}
+                    className="mr-2"
+                  />
+                  <span className="font-medium">
+                    {t('createHubPage.fields.type.private.label')}
+                  </span>
+                  <span className="ml-2 text-sm text-gray-600">
+                    {t('createHubPage.fields.type.private.description')}
+                  </span>
+                </label>
               </div>
             </div>
 
@@ -252,102 +271,114 @@ export default function CreateHubPage() {
               {t('createHubPage.fields.allowedPostTypes.label')}{' '}
               <span className="text-red-500 ml-1">*</span>
             </label>
-          <div className="space-y-3">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={allowAllPosts}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setAllowAllPosts(checked);
-                  if (checked) {
-                    setAllowTextPosts(false);
-                    setAllowLinkPosts(false);
-                    setAllowImagePosts(false);
-                    setAllowVideoPosts(false);
-                  }
-                  setContentError('');
-                }}
-                className="mr-2"
-              />
-              <span className="font-medium">{t('createHubPage.fields.allowedPostTypes.options.all.label')}</span>
-              <span className="ml-2 text-sm text-gray-600">
-                {t('createHubPage.fields.allowedPostTypes.options.all.description')}
-              </span>
-            </label>
-            <div className="ml-7 text-sm text-gray-500">{t('createHubPage.fields.allowedPostTypes.or')}</div>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={allowLinkPosts}
-                onChange={(e) => {
-                  setAllowLinkPosts(e.target.checked);
-                  if (e.target.checked) {
-                    setAllowAllPosts(false);
-                  }
-                  setContentError('');
-                }}
-                className="mr-2"
-              />
-              <span className="font-medium">{t('createHubPage.fields.allowedPostTypes.options.links.label')}</span>
-              <span className="ml-2 text-sm text-gray-600">
-                {t('createHubPage.fields.allowedPostTypes.options.links.description')}
-              </span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={allowTextPosts}
-                onChange={(e) => {
-                  setAllowTextPosts(e.target.checked);
-                  if (e.target.checked) {
-                    setAllowAllPosts(false);
-                  }
-                  setContentError('');
-                }}
-                className="mr-2"
-              />
-              <span className="font-medium">{t('createHubPage.fields.allowedPostTypes.options.text.label')}</span>
-              <span className="ml-2 text-sm text-gray-600">
-                {t('createHubPage.fields.allowedPostTypes.options.text.description')}
-              </span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={allowImagePosts}
-                onChange={(e) => {
-                  setAllowImagePosts(e.target.checked);
-                  if (e.target.checked) {
-                    setAllowAllPosts(false);
-                  }
-                  setContentError('');
-                }}
-                className="mr-2"
-              />
-              <span className="font-medium">{t('createHubPage.fields.allowedPostTypes.options.images.label')}</span>
-              <span className="ml-2 text-sm text-gray-600">
-                {t('createHubPage.fields.allowedPostTypes.options.images.description')}
-              </span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={allowVideoPosts}
-                onChange={(e) => {
-                  setAllowVideoPosts(e.target.checked);
-                  if (e.target.checked) {
-                    setAllowAllPosts(false);
-                  }
-                  setContentError('');
-                }}
-                className="mr-2"
-              />
-              <span className="font-medium">{t('createHubPage.fields.allowedPostTypes.options.videos.label')}</span>
-              <span className="ml-2 text-sm text-gray-600">
-                {t('createHubPage.fields.allowedPostTypes.options.videos.description')}
-              </span>
-            </label>
+            <div className="space-y-3">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={allowAllPosts}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setAllowAllPosts(checked);
+                    if (checked) {
+                      setAllowTextPosts(false);
+                      setAllowLinkPosts(false);
+                      setAllowImagePosts(false);
+                      setAllowVideoPosts(false);
+                    }
+                    setContentError('');
+                  }}
+                  className="mr-2"
+                />
+                <span className="font-medium">
+                  {t('createHubPage.fields.allowedPostTypes.options.all.label')}
+                </span>
+                <span className="ml-2 text-sm text-gray-600">
+                  {t('createHubPage.fields.allowedPostTypes.options.all.description')}
+                </span>
+              </label>
+              <div className="ml-7 text-sm text-gray-500">
+                {t('createHubPage.fields.allowedPostTypes.or')}
+              </div>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={allowLinkPosts}
+                  onChange={(e) => {
+                    setAllowLinkPosts(e.target.checked);
+                    if (e.target.checked) {
+                      setAllowAllPosts(false);
+                    }
+                    setContentError('');
+                  }}
+                  className="mr-2"
+                />
+                <span className="font-medium">
+                  {t('createHubPage.fields.allowedPostTypes.options.links.label')}
+                </span>
+                <span className="ml-2 text-sm text-gray-600">
+                  {t('createHubPage.fields.allowedPostTypes.options.links.description')}
+                </span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={allowTextPosts}
+                  onChange={(e) => {
+                    setAllowTextPosts(e.target.checked);
+                    if (e.target.checked) {
+                      setAllowAllPosts(false);
+                    }
+                    setContentError('');
+                  }}
+                  className="mr-2"
+                />
+                <span className="font-medium">
+                  {t('createHubPage.fields.allowedPostTypes.options.text.label')}
+                </span>
+                <span className="ml-2 text-sm text-gray-600">
+                  {t('createHubPage.fields.allowedPostTypes.options.text.description')}
+                </span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={allowImagePosts}
+                  onChange={(e) => {
+                    setAllowImagePosts(e.target.checked);
+                    if (e.target.checked) {
+                      setAllowAllPosts(false);
+                    }
+                    setContentError('');
+                  }}
+                  className="mr-2"
+                />
+                <span className="font-medium">
+                  {t('createHubPage.fields.allowedPostTypes.options.images.label')}
+                </span>
+                <span className="ml-2 text-sm text-gray-600">
+                  {t('createHubPage.fields.allowedPostTypes.options.images.description')}
+                </span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={allowVideoPosts}
+                  onChange={(e) => {
+                    setAllowVideoPosts(e.target.checked);
+                    if (e.target.checked) {
+                      setAllowAllPosts(false);
+                    }
+                    setContentError('');
+                  }}
+                  className="mr-2"
+                />
+                <span className="font-medium">
+                  {t('createHubPage.fields.allowedPostTypes.options.videos.label')}
+                </span>
+                <span className="ml-2 text-sm text-gray-600">
+                  {t('createHubPage.fields.allowedPostTypes.options.videos.description')}
+                </span>
+              </label>
             </div>
             {contentError && <FieldError message={contentError} />}
           </div>

@@ -2,10 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import {
-  friendsService,
-  friendsQueryKeys,
-} from '../services/friendsService';
+import { friendsService, friendsQueryKeys } from '../services/friendsService';
 import { Panel } from '../components/common/Panel';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { resolveMediaUrl } from '../utils/mediaUrl';
@@ -77,7 +74,9 @@ export default function FriendsPage() {
     mutationFn: (username: string) => friendsService.acceptFriendRequest(username),
     onMutate: async (username) => {
       await queryClient.cancelQueries({ queryKey: friendsQueryKeys.requests });
-      const snapshot = queryClient.getQueryData<typeof requestsQuery.data>(friendsQueryKeys.requests);
+      const snapshot = queryClient.getQueryData<typeof requestsQuery.data>(
+        friendsQueryKeys.requests
+      );
       removeFromIncoming(username);
       return { snapshot };
     },
@@ -120,7 +119,9 @@ export default function FriendsPage() {
       friendsService.declineOrCancelFriendRequest(username),
     onMutate: async ({ username, direction }) => {
       await queryClient.cancelQueries({ queryKey: friendsQueryKeys.requests });
-      const snapshot = queryClient.getQueryData<typeof requestsQuery.data>(friendsQueryKeys.requests);
+      const snapshot = queryClient.getQueryData<typeof requestsQuery.data>(
+        friendsQueryKeys.requests
+      );
       queryClient.setQueryData(friendsQueryKeys.requests, (old: typeof requestsQuery.data) => {
         if (!old) return old;
         return { ...old, [direction]: old[direction].filter((r) => r.username !== username) };
@@ -140,7 +141,9 @@ export default function FriendsPage() {
       if (context?.snapshot !== undefined) {
         queryClient.setQueryData(friendsQueryKeys.requests, context.snapshot);
       }
-      toast.error(t(direction === 'incoming' ? 'friends.errors.declineFailed' : 'friends.errors.cancelFailed'));
+      toast.error(
+        t(direction === 'incoming' ? 'friends.errors.declineFailed' : 'friends.errors.cancelFailed')
+      );
     },
   });
 
@@ -172,9 +175,7 @@ export default function FriendsPage() {
         <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
           {t('friends.title')}
         </h1>
-        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-          {t('friends.subtitle')}
-        </p>
+        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{t('friends.subtitle')}</p>
       </div>
 
       {/* Tabs */}
@@ -191,11 +192,15 @@ export default function FriendsPage() {
             }`}
           >
             {t(labelKey)}
-            {badge != null && badge > 0 && (
-              badgePlain
-                ? <span className="text-xs font-bold">{badge}</span>
-                : <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1 text-xs font-bold text-white">{badge}</span>
-            )}
+            {badge != null &&
+              badge > 0 &&
+              (badgePlain ? (
+                <span className="text-xs font-bold">{badge}</span>
+              ) : (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1 text-xs font-bold text-white">
+                  {badge}
+                </span>
+              ))}
           </button>
         ))}
       </div>
@@ -334,7 +339,12 @@ export default function FriendsPage() {
                         declineOrCancelMutation.isPending &&
                         declineOrCancelMutation.variables?.username === req.username
                       }
-                      onClick={() => declineOrCancelMutation.mutate({ username: req.username, direction: 'incoming' })}
+                      onClick={() =>
+                        declineOrCancelMutation.mutate({
+                          username: req.username,
+                          direction: 'incoming',
+                        })
+                      }
                       className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50"
                     >
                       {t('friends.actions.decline')}
@@ -403,7 +413,12 @@ export default function FriendsPage() {
                       declineOrCancelMutation.isPending &&
                       declineOrCancelMutation.variables?.username === req.username
                     }
-                    onClick={() => declineOrCancelMutation.mutate({ username: req.username, direction: 'outgoing' })}
+                    onClick={() =>
+                      declineOrCancelMutation.mutate({
+                        username: req.username,
+                        direction: 'outgoing',
+                      })
+                    }
                     className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50"
                   >
                     {t('friends.actions.cancelRequest')}

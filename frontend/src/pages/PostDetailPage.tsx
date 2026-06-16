@@ -156,7 +156,7 @@ export default function PostDetailPage() {
   const supportsHubAIDesignShell = useMemo(() => {
     if (!hubName || !activeAIDesign?.html_content) return false;
     return Array.from(splitAIDesignHTML(activeAIDesign.html_content).slotsByMarker.values()).some(
-      (slot) => slot.id === 'hub-content' || slot.id === 'hub-feed',
+      (slot) => slot.id === 'hub-content' || slot.id === 'hub-feed'
     );
   }, [activeAIDesign?.html_content, hubName]);
   const targetSubreddit = useMemo(
@@ -529,18 +529,17 @@ export default function PostDetailPage() {
   const mediaUrl = postData?.media_url ?? undefined;
   const normalizedMediaType = (postData?.media_type ?? '').toLowerCase();
   const thumbnailUrl = postData?.thumbnail_url ?? undefined;
-  const isVideoMedia =
-    normalizedMediaType === 'video' || normalizedMediaType.startsWith('video/');
+  const isVideoMedia = normalizedMediaType === 'video' || normalizedMediaType.startsWith('video/');
   const sanitizedExternalLink = sanitizeHttpUrl(mediaUrl);
   const isImageLikeExternalUrl = /\.(avif|bmp|gif|jpe?g|png|svg|webp)(?:[?#].*)?$/i.test(
     sanitizedExternalLink ?? ''
   );
   const isExternalLinkPost = Boolean(
     sanitizedExternalLink &&
-      !postData?.gallery_images?.length &&
-      !normalizedMediaType.startsWith('image/') &&
-      normalizedMediaType !== 'video' &&
-      !isImageLikeExternalUrl
+    !postData?.gallery_images?.length &&
+    !normalizedMediaType.startsWith('image/') &&
+    normalizedMediaType !== 'video' &&
+    !isImageLikeExternalUrl
   );
 
   const copyEmbedCode = async () => {
@@ -783,7 +782,9 @@ export default function PostDetailPage() {
                 <span>
                   {t('posts.comment', {
                     count: postData.comment_count ?? postData.num_comments ?? 0,
-                    formattedCount: formatNumber(postData.comment_count ?? postData.num_comments ?? 0),
+                    formattedCount: formatNumber(
+                      postData.comment_count ?? postData.num_comments ?? 0
+                    ),
                   })}
                 </span>
                 <span>•</span>
@@ -911,7 +912,9 @@ export default function PostDetailPage() {
               disabled={handleCreateComment.isPending || !commentText.trim()}
               className="mt-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
             >
-              {handleCreateComment.isPending ? t('comments.status.posting') : t('comments.addComment')}
+              {handleCreateComment.isPending
+                ? t('comments.status.posting')
+                : t('comments.addComment')}
             </button>
           </form>
 
@@ -933,7 +936,9 @@ export default function PostDetailPage() {
             <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
               <div>{t('posts.viewingThread')}</div>
               <button
-                onClick={() => navigate(hubName ? `/h/${hubName}/comments/${postId}` : `/posts/${postId}`)}
+                onClick={() =>
+                  navigate(hubName ? `/h/${hubName}/comments/${postId}` : `/posts/${postId}`)
+                }
                 className="mt-1 font-semibold text-[var(--color-primary)] hover:underline"
               >
                 {t('comments.viewRest')}
@@ -1038,7 +1043,9 @@ export default function PostDetailPage() {
                 ×
               </button>
             </div>
-            <p className="text-sm text-[var(--color-text-secondary)]">{t('posts.embed.instruction')}</p>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('posts.embed.instruction')}
+            </p>
             <textarea
               value={embedCode}
               readOnly
@@ -1160,7 +1167,9 @@ export default function PostDetailPage() {
                 disabled={!deletePostReason.trim() || deletePostMutation.isPending}
                 className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
-                {deletePostMutation.isPending ? t('posts.status.deleting') : t('posts.actions.delete')}
+                {deletePostMutation.isPending
+                  ? t('posts.status.deleting')
+                  : t('posts.actions.delete')}
               </button>
             </div>
           </div>

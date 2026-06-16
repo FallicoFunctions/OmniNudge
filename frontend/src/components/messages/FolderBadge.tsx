@@ -5,8 +5,13 @@ import type { ConversationFolder } from '../../types/messages';
 export function hexToRgba(hex: string, alpha: number): string {
   let clean = hex.replace('#', '');
   // Expand 3-char shorthand (#f00 → #ff0000)
-  if (clean.length === 3) clean = clean.split('').map((c) => c + c).join('');
-  if (clean.length !== 6) return `color-mix(in srgb, ${hex} ${Math.round(alpha * 100)}%, transparent)`;
+  if (clean.length === 3)
+    clean = clean
+      .split('')
+      .map((c) => c + c)
+      .join('');
+  if (clean.length !== 6)
+    return `color-mix(in srgb, ${hex} ${Math.round(alpha * 100)}%, transparent)`;
   const r = parseInt(clean.slice(0, 2), 16);
   const g = parseInt(clean.slice(2, 4), 16);
   const b = parseInt(clean.slice(4, 6), 16);
@@ -19,9 +24,13 @@ export function hexToRgba(hex: string, alpha: number): string {
  */
 export function getContrastColor(hex: string): string {
   let clean = hex.replace('#', '');
-  if (clean.length === 3) clean = clean.split('').map((c) => c + c).join('');
+  if (clean.length === 3)
+    clean = clean
+      .split('')
+      .map((c) => c + c)
+      .join('');
   if (clean.length !== 6) return '#000000';
-  const toLinear = (c: number) => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
   const r = toLinear(parseInt(clean.slice(0, 2), 16) / 255);
   const g = toLinear(parseInt(clean.slice(2, 4), 16) / 255);
   const b = toLinear(parseInt(clean.slice(4, 6), 16) / 255);

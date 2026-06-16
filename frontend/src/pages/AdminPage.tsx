@@ -13,7 +13,14 @@ import { resolveMediaUrl } from '../utils/mediaUrl';
 import { useFormat } from '../hooks/useFormat';
 import { useTranslation } from 'react-i18next';
 
-type TabType = 'stats' | 'users' | 'moderators' | 'ban-activity' | 'bug-reports' | 'analytics' | 'retention';
+type TabType =
+  | 'stats'
+  | 'users'
+  | 'moderators'
+  | 'ban-activity'
+  | 'bug-reports'
+  | 'analytics'
+  | 'retention';
 
 export default function AdminPage() {
   const { t } = useTranslation();
@@ -1291,7 +1298,7 @@ function BugReportsTab() {
 
   const reports =
     sortBy === 'newest'
-      ? data?.reports ?? []
+      ? (data?.reports ?? [])
       : [...(data?.reports ?? [])].sort(
           (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
@@ -1838,8 +1845,18 @@ function AnalyticsTab() {
     },
   });
 
-  if (isLoading) return <div className="text-[var(--color-text-secondary)] py-8 text-center">Loading analytics...</div>;
-  if (error) return <div className="text-[var(--color-error)] py-8 text-center">Failed to load analytics dashboard.</div>;
+  if (isLoading)
+    return (
+      <div className="text-[var(--color-text-secondary)] py-8 text-center">
+        Loading analytics...
+      </div>
+    );
+  if (error)
+    return (
+      <div className="text-[var(--color-error)] py-8 text-center">
+        Failed to load analytics dashboard.
+      </div>
+    );
 
   const dau = data?.dau ?? [];
   const topEvents = data?.top_events ?? [];
@@ -1876,7 +1893,11 @@ function AnalyticsTab() {
         ) : (
           <div className="flex items-end gap-1 h-40">
             {dau.map((d) => (
-              <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group relative" title={`${d.date}: ${d.count} users`}>
+              <div
+                key={d.date}
+                className="flex-1 flex flex-col items-center gap-1 group relative"
+                title={`${d.date}: ${d.count} users`}
+              >
                 <div
                   className="w-full bg-[var(--color-primary)] rounded-t opacity-80 group-hover:opacity-100 transition-opacity"
                   style={{ height: `${Math.max((d.count / maxDau) * 100, 2)}%` }}
@@ -1909,7 +1930,9 @@ function AnalyticsTab() {
                       style={{ width: `${(ev.count / maxCount) * 100}%` }}
                     />
                   </div>
-                  <span className="text-sm text-[var(--color-text-secondary)] w-16 text-right">{ev.count.toLocaleString()}</span>
+                  <span className="text-sm text-[var(--color-text-secondary)] w-16 text-right">
+                    {ev.count.toLocaleString()}
+                  </span>
                 </div>
               );
             })}
@@ -1986,13 +2009,22 @@ function RetentionTab() {
               </thead>
               <tbody>
                 {status.map((s) => (
-                  <tr key={s.data_type} className="border-b border-[var(--color-border)] last:border-0">
+                  <tr
+                    key={s.data_type}
+                    className="border-b border-[var(--color-border)] last:border-0"
+                  >
                     <td className="py-2 pr-4 font-medium">{s.data_type}</td>
-                    <td className="py-2 pr-4 text-[var(--color-text-secondary)]">{s.retention_period}</td>
-                    <td className={`py-2 pr-4 text-right ${s.count > 0 ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}`}>
+                    <td className="py-2 pr-4 text-[var(--color-text-secondary)]">
+                      {s.retention_period}
+                    </td>
+                    <td
+                      className={`py-2 pr-4 text-right ${s.count > 0 ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}`}
+                    >
                       {s.count.toLocaleString()}
                     </td>
-                    <td className="py-2 text-right text-[var(--color-text-secondary)]">{s.size_estimate}</td>
+                    <td className="py-2 text-right text-[var(--color-text-secondary)]">
+                      {s.size_estimate}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -2016,19 +2048,26 @@ function RetentionTab() {
         ) : (
           <div className="space-y-3">
             {policies.map((p) => (
-              <div key={p.data_type} className="flex items-start gap-4 py-3 border-b border-[var(--color-border)] last:border-0">
+              <div
+                key={p.data_type}
+                className="flex items-start gap-4 py-3 border-b border-[var(--color-border)] last:border-0"
+              >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm">{p.data_type}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                      p.enabled
-                        ? 'text-[var(--color-success)] bg-[var(--color-success)]/10'
-                        : 'text-[var(--color-text-muted)] bg-[var(--color-border)]'
-                    }`}>
+                    <span
+                      className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                        p.enabled
+                          ? 'text-[var(--color-success)] bg-[var(--color-success)]/10'
+                          : 'text-[var(--color-text-muted)] bg-[var(--color-border)]'
+                      }`}
+                    >
                       {p.enabled ? 'Active' : 'Disabled'}
                     </span>
                   </div>
-                  <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">{p.description}</p>
+                  <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+                    {p.description}
+                  </p>
                   <p className="text-xs text-[var(--color-text-secondary)]">Action: {p.action}</p>
                 </div>
                 <div className="text-right shrink-0">
@@ -2051,18 +2090,34 @@ function RetentionTab() {
                           placeholder="Reason (optional)"
                         />
                         <button
-                          onClick={() => updateMutation.mutate({ dataType: p.data_type, days: Number(editDays), reason: editReason })}
-                          disabled={!editDays || Number(editDays) < 1 || isNaN(Number(editDays)) || updateMutation.isPending}
+                          onClick={() =>
+                            updateMutation.mutate({
+                              dataType: p.data_type,
+                              days: Number(editDays),
+                              reason: editReason,
+                            })
+                          }
+                          disabled={
+                            !editDays ||
+                            Number(editDays) < 1 ||
+                            isNaN(Number(editDays)) ||
+                            updateMutation.isPending
+                          }
                           className="px-3 py-1 bg-[var(--color-primary)] text-white text-sm rounded disabled:opacity-50"
                         >
                           {updateMutation.isPending ? 'Saving…' : 'Save'}
                         </button>
-                        <button onClick={() => setEditingPolicy(null)} className="px-3 py-1 text-sm text-[var(--color-text-secondary)]">
+                        <button
+                          onClick={() => setEditingPolicy(null)}
+                          className="px-3 py-1 text-sm text-[var(--color-text-secondary)]"
+                        >
                           Cancel
                         </button>
                       </div>
                       {updateMutation.isError && editingPolicy === p.data_type && (
-                        <p className="text-xs text-[var(--color-error)]">Failed to save. Please try again.</p>
+                        <p className="text-xs text-[var(--color-error)]">
+                          Failed to save. Please try again.
+                        </p>
                       )}
                     </div>
                   ) : (
@@ -2070,7 +2125,11 @@ function RetentionTab() {
                       <span className="text-sm font-medium">{p.retention_period}</span>
                       {p.data_type !== 'audit_logs' && (
                         <button
-                          onClick={() => { setEditingPolicy(p.data_type); setEditDays(String(p.retention_days)); setEditReason(''); }}
+                          onClick={() => {
+                            setEditingPolicy(p.data_type);
+                            setEditDays(String(p.retention_days));
+                            setEditReason('');
+                          }}
                           className="text-xs text-[var(--color-primary)] hover:underline"
                         >
                           Edit

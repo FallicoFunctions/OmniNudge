@@ -85,7 +85,7 @@ function DecryptedMessagePreview({
       return;
     }
     const cipherText = isOwnMessage
-      ? message.sender_encrypted_content ?? message.encrypted_content
+      ? (message.sender_encrypted_content ?? message.encrypted_content)
       : message.encrypted_content;
 
     if (!cipherText) {
@@ -117,7 +117,7 @@ function DecryptedMessagePreview({
 
       const shouldAttemptDecrypt = Boolean(
         (isOwnMessage && message.sender_encrypted_content) ||
-          (!isOwnMessage && message.encryption_version === 'v1')
+        (!isOwnMessage && message.encryption_version === 'v1')
       );
 
       if (!shouldAttemptDecrypt) {
@@ -259,7 +259,12 @@ export function CompactPostCard({
   }
 
   // Clean up invalid thumbnails
-  if (thumbnail === 'self' || thumbnail === 'default' || thumbnail === 'nsfw' || thumbnail === 'spoiler') {
+  if (
+    thumbnail === 'self' ||
+    thumbnail === 'default' ||
+    thumbnail === 'nsfw' ||
+    thumbnail === 'spoiler'
+  ) {
     thumbnail = null;
   }
 
@@ -268,15 +273,18 @@ export function CompactPostCard({
   const isGallery = Boolean(actualPost?.is_gallery || (galleryImages && galleryImages.length > 0));
 
   // Gallery navigation functions
-  const handleGalleryNavigate = useCallback((direction: 'prev' | 'next') => {
-    if (!galleryImages || galleryImages.length <= 1) return;
+  const handleGalleryNavigate = useCallback(
+    (direction: 'prev' | 'next') => {
+      if (!galleryImages || galleryImages.length <= 1) return;
 
-    if (direction === 'prev') {
-      setGalleryIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1));
-    } else {
-      setGalleryIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1));
-    }
-  }, [galleryImages]);
+      if (direction === 'prev') {
+        setGalleryIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1));
+      } else {
+        setGalleryIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1));
+      }
+    },
+    [galleryImages]
+  );
 
   // Keyboard navigation for gallery when hovering over image or title area
   useEffect(() => {
@@ -297,7 +305,14 @@ export function CompactPostCard({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isGallery, isGalleryHovered, isTitleAreaHovered, galleryImages, galleryIndex, handleGalleryNavigate]);
+  }, [
+    isGallery,
+    isGalleryHovered,
+    isTitleAreaHovered,
+    galleryImages,
+    galleryIndex,
+    handleGalleryNavigate,
+  ]);
 
   // For Reddit videos, get HLS URL (has audio+video in one stream)
   const redditVideo = actualPost?.secure_media?.reddit_video || actualPost?.media?.reddit_video;
@@ -305,7 +320,8 @@ export function CompactPostCard({
   const isRedditVideo = Boolean(redditHlsUrl);
 
   // Determine media type and URL
-  const isVideo = actualPost?.is_video ||
+  const isVideo =
+    actualPost?.is_video ||
     isRedditVideo ||
     mediaUrl?.includes('.mp4') ||
     mediaUrl?.includes('.webm') ||
@@ -313,13 +329,14 @@ export function CompactPostCard({
     mediaUrl?.includes('redgifs.com') ||
     mediaUrl?.includes('gfycat.com');
 
-  const isImage = !isVideo && !isGallery && (
-    mediaUrl?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ||
-    mediaUrl?.includes('i.redd.it') ||
-    mediaUrl?.includes('preview.redd.it') ||
-    thumbnail?.includes('i.redd.it') ||
-    thumbnail?.includes('preview.redd.it')
-  );
+  const isImage =
+    !isVideo &&
+    !isGallery &&
+    (mediaUrl?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ||
+      mediaUrl?.includes('i.redd.it') ||
+      mediaUrl?.includes('preview.redd.it') ||
+      thumbnail?.includes('i.redd.it') ||
+      thumbnail?.includes('preview.redd.it'));
 
   // Determine what media to display
   let displayMedia: string | null = null;
@@ -332,7 +349,12 @@ export function CompactPostCard({
     }
   } else if (isImage) {
     // For images, prefer the full media URL over thumbnail
-    if (mediaUrl && (mediaUrl.includes('i.redd.it') || mediaUrl.includes('preview.redd.it') || mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i))) {
+    if (
+      mediaUrl &&
+      (mediaUrl.includes('i.redd.it') ||
+        mediaUrl.includes('preview.redd.it') ||
+        mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i))
+    ) {
       displayMedia = mediaUrl;
     } else if (thumbnail) {
       displayMedia = thumbnail;
@@ -345,13 +367,9 @@ export function CompactPostCard({
   const previewDimensions = actualPost?.preview?.images?.[0]?.source;
   const oembedDimensions = actualPost?.secure_media?.oembed || actualPost?.media?.oembed;
   const explicitVideoWidth =
-    redditVideo?.width ||
-    previewDimensions?.width ||
-    oembedDimensions?.thumbnail_width;
+    redditVideo?.width || previewDimensions?.width || oembedDimensions?.thumbnail_width;
   const explicitVideoHeight =
-    redditVideo?.height ||
-    previewDimensions?.height ||
-    oembedDimensions?.thumbnail_height;
+    redditVideo?.height || previewDimensions?.height || oembedDimensions?.thumbnail_height;
   const videoAspectRatio =
     explicitVideoWidth && explicitVideoHeight
       ? explicitVideoWidth / explicitVideoHeight
@@ -486,7 +504,8 @@ export function CompactPostCard({
                   </p>
                 )}
                 <div className="text-xs text-[var(--color-text-muted)] mt-1">
-                  {conversation.last_message_at && formatRelativeTime(new Date(conversation.last_message_at))}
+                  {conversation.last_message_at &&
+                    formatRelativeTime(new Date(conversation.last_message_at))}
                 </div>
               </div>
             </div>
@@ -507,144 +526,170 @@ export function CompactPostCard({
       {/* Compact view - hide when expanded */}
       {!isExpanded && (
         <>
-      {/* Media (full width if available) */}
-      {isGallery && galleryImages && galleryImages.length > 0 ? (
-        <ImageCarousel
-          images={galleryImages}
-          title={title}
-          className="w-full"
-          currentIndex={galleryIndex}
-          onNavigate={handleGalleryNavigate}
-          onHoverChange={setIsGalleryHovered}
-        />
-      ) : displayMedia ? (
-        <div className="w-full">
-          {isVideo ? (
-            <div onMouseEnter={handleVideoMouseEnter} onMouseLeave={handleVideoMouseLeave}>
-              <div
-                ref={videoContainerRef}
-                className="relative w-full overflow-hidden bg-black/10"
-                style={{ aspectRatio: videoAspectRatio, maxHeight: 'calc(100vh - 200px)' }}
-              >
-                <HlsVideo
-                  ref={videoRef}
-                  src={(displayMedia ?? '').startsWith('http')
-                    ? (displayMedia ?? '')
-                    : resolveMediaUrl(displayMedia ?? '') ?? ''}
-                  className="absolute inset-0 w-full h-full object-contain"
-                  style={{ display: 'block' }}
-                  controls
-                  loop
-                  playsInline
-                  preload={shouldPreloadVideo ? 'auto' : 'metadata'}
-                  autoStartLoad={false}
-                  maxBufferLength={5}
+          {/* Media (full width if available) */}
+          {isGallery && galleryImages && galleryImages.length > 0 ? (
+            <ImageCarousel
+              images={galleryImages}
+              title={title}
+              className="w-full"
+              currentIndex={galleryIndex}
+              onNavigate={handleGalleryNavigate}
+              onHoverChange={setIsGalleryHovered}
+            />
+          ) : displayMedia ? (
+            <div className="w-full">
+              {isVideo ? (
+                <div onMouseEnter={handleVideoMouseEnter} onMouseLeave={handleVideoMouseLeave}>
+                  <div
+                    ref={videoContainerRef}
+                    className="relative w-full overflow-hidden bg-black/10"
+                    style={{ aspectRatio: videoAspectRatio, maxHeight: 'calc(100vh - 200px)' }}
+                  >
+                    <HlsVideo
+                      ref={videoRef}
+                      src={
+                        (displayMedia ?? '').startsWith('http')
+                          ? (displayMedia ?? '')
+                          : (resolveMediaUrl(displayMedia ?? '') ?? '')
+                      }
+                      className="absolute inset-0 w-full h-full object-contain"
+                      style={{ display: 'block' }}
+                      controls
+                      loop
+                      playsInline
+                      preload={shouldPreloadVideo ? 'auto' : 'metadata'}
+                      autoStartLoad={false}
+                      maxBufferLength={5}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <img
+                  src={
+                    displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)
+                  }
+                  alt={title}
+                  className="w-full h-auto"
+                  style={{
+                    display: 'block',
+                    maxHeight: 'calc(100vh - 200px)',
+                    objectFit: 'contain',
+                  }}
+                  loading="lazy"
                 />
+              )}
+            </div>
+          ) : null}
+
+          {/* Content below media */}
+          <div className="p-2 bg-[var(--color-surface)] flex gap-2">
+            {/* Left side - Text content */}
+            <div
+              ref={titleAreaRef}
+              className="flex-1 min-w-0"
+              onMouseEnter={() => setIsTitleAreaHovered(true)}
+              onMouseLeave={() => setIsTitleAreaHovered(false)}
+            >
+              {/* Title */}
+              <Link to={postUrl} onClick={handleTitleClick} className="hover:underline">
+                <h3
+                  className="text-sm font-medium leading-tight line-clamp-2"
+                  style={{ color: 'var(--ac-text, #e8e8f0)' }}
+                >
+                  {nsfw && (
+                    <span className="text-red-500 text-xs mr-1">{t('posts.badges.nsfw')}</span>
+                  )}
+                  {title}
+                </h3>
+              </Link>
+
+              {/* Source badge */}
+              {sourceBadge && (
+                <div className="mt-1 overflow-hidden">
+                  <span
+                    className="text-xs block"
+                    style={{ color: 'var(--ac-text-muted, #8a8a9a)' }}
+                  >
+                    {sourceBadge}
+                  </span>
+                </div>
+              )}
+
+              {/* Metadata */}
+              <div
+                className="flex items-center gap-1.5 mt-1 text-xs flex-wrap"
+                style={{ color: 'var(--ac-text-muted, #8a8a9a)' }}
+              >
+                <span className="truncate" style={{ maxWidth: '80px' }}>
+                  {author}
+                </span>
+                <span>•</span>
+                <span>{pointsLabel}</span>
+                <span>•</span>
+                <span>{commentsLabel}</span>
+                {timeAgo && (
+                  <>
+                    <span>•</span>
+                    <span className="whitespace-nowrap">{timeAgo}</span>
+                  </>
+                )}
               </div>
             </div>
-          ) : (
-            <img
-              src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}
-              alt={title}
-              className="w-full h-auto"
-              style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}
-              loading="lazy"
-            />
-          )}
-        </div>
-      ) : null}
 
-      {/* Content below media */}
-      <div className="p-2 bg-[var(--color-surface)] flex gap-2">
-        {/* Left side - Text content */}
-        <div
-          ref={titleAreaRef}
-          className="flex-1 min-w-0"
-          onMouseEnter={() => setIsTitleAreaHovered(true)}
-          onMouseLeave={() => setIsTitleAreaHovered(false)}
-        >
-          {/* Title */}
-          <Link to={postUrl} onClick={handleTitleClick} className="hover:underline">
-            <h3 className="text-sm font-medium leading-tight line-clamp-2" style={{ color: 'var(--ac-text, #e8e8f0)' }}>
-              {nsfw && <span className="text-red-500 text-xs mr-1">{t('posts.badges.nsfw')}</span>}
-              {title}
-            </h3>
-          </Link>
-
-          {/* Source badge */}
-          {sourceBadge && (
-            <div className="mt-1 overflow-hidden">
-              <span className="text-xs block" style={{ color: 'var(--ac-text-muted, #8a8a9a)' }}>{sourceBadge}</span>
-            </div>
-          )}
-
-          {/* Metadata */}
-          <div className="flex items-center gap-1.5 mt-1 text-xs flex-wrap" style={{ color: 'var(--ac-text-muted, #8a8a9a)' }}>
-            <span className="truncate" style={{ maxWidth: '80px' }}>{author}</span>
-            <span>•</span>
-            <span>{pointsLabel}</span>
-            <span>•</span>
-            <span>{commentsLabel}</span>
-            {timeAgo && (
-              <>
-                <span>•</span>
-                <span className="whitespace-nowrap">{timeAgo}</span>
-              </>
+            {/* Right side - Vote buttons (only for hub/omni posts) */}
+            {(isHubPost || source === 'hub') && (
+              <div className="flex flex-col items-center justify-center gap-1">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Upvote functionality placeholder
+                  }}
+                  className="text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors"
+                  aria-label={t('posts.actions.upvote')}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M12 19V5M5 12l7-7 7 7" />
+                  </svg>
+                </button>
+                <span
+                  className="text-xs font-semibold"
+                  style={{ color: 'var(--ac-text, #e8e8f0)' }}
+                >
+                  {formatNumber(score)}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Downvote functionality placeholder
+                  }}
+                  className="text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
+                  aria-label={t('posts.actions.downvote')}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M12 5v14M19 12l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Right side - Vote buttons (only for hub/omni posts) */}
-        {(isHubPost || source === 'hub') && (
-          <div className="flex flex-col items-center justify-center gap-1">
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                // Upvote functionality placeholder
-              }}
-              className="text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors"
-              aria-label={t('posts.actions.upvote')}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M12 19V5M5 12l7-7 7 7" />
-              </svg>
-            </button>
-            <span className="text-xs font-semibold" style={{ color: 'var(--ac-text, #e8e8f0)' }}>
-              {formatNumber(score)}
-            </span>
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                // Downvote functionality placeholder
-              }}
-              className="text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
-              aria-label={t('posts.actions.downvote')}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M12 5v14M19 12l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom border only (no rounded corners) */}
-      <div className="border-b border-[var(--color-border)]" />
-      </>
+          {/* Bottom border only (no rounded corners) */}
+          <div className="border-b border-[var(--color-border)]" />
+        </>
       )}
     </article>
   );

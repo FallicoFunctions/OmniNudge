@@ -66,7 +66,8 @@ interface GroupInvitesListProps {
 /** Displays all pending group invites for the current user */
 export function GroupInvitesList({ onConversationOpened }: GroupInvitesListProps) {
   const { t } = useTranslation();
-  const { invites, isLoading, acceptInvite, declineInvite, isAccepting, isDeclining } = useGroupInvites();
+  const { invites, isLoading, acceptInvite, declineInvite, isAccepting, isDeclining } =
+    useGroupInvites();
 
   const pending = invites.filter((i) => i.status === 'pending');
 

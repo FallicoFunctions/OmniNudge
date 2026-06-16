@@ -11,7 +11,9 @@ const mockUnhideRedditPost = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('../../../services/savedService', () => ({
   savedService: {
-    getHiddenItems: vi.fn().mockResolvedValue({ type: 'all', hidden_posts: [], hidden_reddit_posts: [] }),
+    getHiddenItems: vi
+      .fn()
+      .mockResolvedValue({ type: 'all', hidden_posts: [], hidden_reddit_posts: [] }),
     unhidePost: (...args: unknown[]) => mockUnhidePost(...args),
     unhideRedditPost: (...args: unknown[]) => mockUnhideRedditPost(...args),
     saveRedditPost: vi.fn().mockResolvedValue(undefined),
@@ -203,7 +205,9 @@ describe('HiddenItemsView — Reddit unhide', () => {
     await waitFor(() => {
       expect(screen.getByTestId('hub-post-card')).toBeInTheDocument();
       expect(
-        screen.getByTestId(`reddit-post-card-${hiddenRedditPost.subreddit}-${hiddenRedditPost.reddit_post_id}`)
+        screen.getByTestId(
+          `reddit-post-card-${hiddenRedditPost.subreddit}-${hiddenRedditPost.reddit_post_id}`
+        )
       ).toBeInTheDocument();
     });
   });
@@ -230,7 +234,9 @@ describe('HiddenItemsView — Reddit unhide', () => {
     // Card renders
     await waitFor(() => {
       expect(
-        screen.getByTestId(`reddit-post-card-${hiddenRedditPost.subreddit}-${hiddenRedditPost.reddit_post_id}`)
+        screen.getByTestId(
+          `reddit-post-card-${hiddenRedditPost.subreddit}-${hiddenRedditPost.reddit_post_id}`
+        )
       ).toBeInTheDocument();
     });
 
@@ -240,7 +246,9 @@ describe('HiddenItemsView — Reddit unhide', () => {
     // Card disappears
     await waitFor(() => {
       expect(
-        screen.queryByTestId(`reddit-post-card-${hiddenRedditPost.subreddit}-${hiddenRedditPost.reddit_post_id}`)
+        screen.queryByTestId(
+          `reddit-post-card-${hiddenRedditPost.subreddit}-${hiddenRedditPost.reddit_post_id}`
+        )
       ).not.toBeInTheDocument();
     });
 

@@ -1,3 +1,5 @@
+//go:build integration
+
 package integration
 
 import (
@@ -13,8 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/require"
+
+	"github.com/omninudge/backend/internal/models"
 )
 
 type authResp struct {
@@ -218,7 +221,7 @@ func TestMediaUploadValidation(t *testing.T) {
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "bad.exe")
-	part.Write([]byte("MZ executable payload"))
+	part.Write([]byte("MZ executable payload")) //nolint:errcheck // test helper; write error non-fatal
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
@@ -242,7 +245,7 @@ func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "image.png")
-	part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 'D', 'A', 'T', 'A'})
+	part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 'D', 'A', 'T', 'A'}) //nolint:errcheck // test helper; write error non-fatal
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
@@ -257,8 +260,8 @@ func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
 	p2, _ := bw.CreateFormFile("file", "big.png")
 	// Valid PNG header then large payload to trigger size limit
 	pngHeader := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 'D', 'A', 'T', 'A'}
-	p2.Write(pngHeader)
-	p2.Write(bytes.Repeat([]byte("A"), 26*1024*1024)) // >25MB
+	p2.Write(pngHeader)                               //nolint:errcheck // test helper; write error non-fatal
+	p2.Write(bytes.Repeat([]byte("A"), 26*1024*1024)) //nolint:errcheck // test helper; write error non-fatal — >25MB
 	bw.Close()
 	req, _ = http.NewRequest("POST", "/api/v1/media/upload", &big)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -279,7 +282,7 @@ func TestMediaUpload_AllowsPDFDocument(t *testing.T) {
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "doc.pdf")
-	part.Write([]byte("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n"))
+	part.Write([]byte("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n")) //nolint:errcheck // test helper; write error non-fatal
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
@@ -1853,7 +1856,7 @@ func TestMediaUpload_RejectsUnsupportedExtension(t *testing.T) {
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "photo.exe")
 	// PNG magic bytes with forbidden extension should still be rejected.
-	part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 'D', 'A', 'T', 'A'})
+	part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 'D', 'A', 'T', 'A'}) //nolint:errcheck // test helper; write error non-fatal
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
@@ -1897,7 +1900,7 @@ func TestMediaUpload_RejectsExtensionMimeMismatch(t *testing.T) {
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "image.jpg")
 	// PDF magic bytes with jpg extension.
-	part.Write([]byte("%PDF-1.4\n1 0 obj\n"))
+	part.Write([]byte("%PDF-1.4\n1 0 obj\n")) //nolint:errcheck // test helper; write error non-fatal
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
@@ -1926,7 +1929,7 @@ func TestMediaUpload_RejectsStorageQuotaExceeded(t *testing.T) {
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "clip.pdf")
-	part.Write([]byte("%PDF-1.4\nquota-test\n"))
+	part.Write([]byte("%PDF-1.4\nquota-test\n")) //nolint:errcheck // test helper; write error non-fatal
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)

@@ -483,7 +483,7 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 	// Check permission: admin/owner or anyone_can_invite setting
 	if role == "member" {
 		var anyoneCanInvite bool
-		h.pool.QueryRow(ctx, `
+		_ = h.pool.QueryRow(ctx, `
 			SELECT COALESCE(anyone_can_invite, false) FROM group_settings WHERE conversation_id = $1
 		`, conversationID).Scan(&anyoneCanInvite)
 		if !anyoneCanInvite {
@@ -494,7 +494,7 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 
 	// Check max participants
 	var count int
-	h.pool.QueryRow(ctx, `
+	_ = h.pool.QueryRow(ctx, `
 		SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = $1
 	`, conversationID).Scan(&count)
 	if count >= 250 {
@@ -883,7 +883,7 @@ func (h *GroupHandler) CreateGroupInvite(c *gin.Context) {
 	// Permission check
 	if role == "member" {
 		var anyoneCanInvite bool
-		h.pool.QueryRow(c.Request.Context(), `
+		_ = h.pool.QueryRow(c.Request.Context(), `
 			SELECT COALESCE(anyone_can_invite, false) FROM group_settings WHERE conversation_id = $1
 		`, conversationID).Scan(&anyoneCanInvite)
 		if !anyoneCanInvite {

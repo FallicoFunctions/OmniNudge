@@ -9,9 +9,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/omninudge/backend/internal/services"
 	zlog "github.com/rs/zerolog/log"
 	"golang.org/x/time/rate"
+
+	"github.com/omninudge/backend/internal/services"
 )
 
 // FrontendLogEntry represents a log entry from the frontend
@@ -35,9 +36,9 @@ type ipLogLimiterEntry struct {
 // ipLogLimiters holds per-IP token-bucket limiters for the frontend log endpoint.
 // Allows 60 log submissions per minute per IP (1/second steady-state, burst 10).
 var (
-	ipLogLimitersMu   sync.RWMutex
-	ipLogLimiters     = make(map[string]*ipLogLimiterEntry)
-	ipLogEvictStop    = make(chan struct{})
+	ipLogLimitersMu sync.RWMutex
+	ipLogLimiters   = make(map[string]*ipLogLimiterEntry)
+	ipLogEvictStop  = make(chan struct{})
 )
 
 func init() {
@@ -85,7 +86,7 @@ func getIPLogLimiter(ip string) *rate.Limiter {
 
 	e := &ipLogLimiterEntry{
 		// 60 logs/min = 1 per second steady-state; burst of 10 allows short bursts.
-		limiter:    rate.NewLimiter(rate.Limit(60.0/60.0), 10),
+		limiter:    rate.NewLimiter(rate.Limit(1.0), 10),
 		lastAccess: time.Now(),
 	}
 	ipLogLimiters[ip] = e
@@ -205,7 +206,7 @@ func (h *LogHandler) HandleFrontendLogs(c *gin.Context) {
 			event.SessionID = &sid
 		}
 
-		h.analytics.TrackEvent(c.Request.Context(), event)
+		_ = h.analytics.TrackEvent(c.Request.Context(), event)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "logged"})

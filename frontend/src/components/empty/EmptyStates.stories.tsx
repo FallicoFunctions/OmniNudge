@@ -1,5 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { EmptyState, EmptyConversations, EmptySearchResults, ErrorState, PermissionDenied } from './index';
+import {
+  EmptyState,
+  EmptyConversations,
+  EmptySearchResults,
+  ErrorState,
+  PermissionDenied,
+} from './index';
 import { Inbox } from 'lucide-react';
 
 const meta: Meta<typeof EmptyState> = {

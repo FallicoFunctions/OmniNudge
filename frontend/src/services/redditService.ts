@@ -15,7 +15,12 @@ import type {
 } from '../types/reddit';
 
 export const redditService = {
-  async getFrontPage(sort = 'hot', limit = 25, timeFilter?: string, after?: string): Promise<RedditPostsResponse> {
+  async getFrontPage(
+    sort = 'hot',
+    limit = 25,
+    timeFilter?: string,
+    after?: string
+  ): Promise<RedditPostsResponse> {
     const params = new URLSearchParams({ sort, limit: String(limit) });
     if (timeFilter) {
       params.append('t', timeFilter);
@@ -54,7 +59,10 @@ export const redditService = {
     return response.about;
   },
 
-  async searchPosts(query: string, options?: { subreddit?: string; limit?: number; includeNsfw?: boolean; after?: string | null }): Promise<RedditPostsResponse> {
+  async searchPosts(
+    query: string,
+    options?: { subreddit?: string; limit?: number; includeNsfw?: boolean; after?: string | null }
+  ): Promise<RedditPostsResponse> {
     const params = new URLSearchParams({ q: query });
     if (options?.limit) params.append('limit', String(options.limit));
     if (options?.subreddit) params.append('subreddit', options.subreddit);
@@ -108,7 +116,11 @@ export const redditService = {
     return response.moderated ?? [];
   },
 
-  async getSubredditWikiPage(subreddit: string, pagePath: string, revision?: string | null): Promise<RedditWikiPage> {
+  async getSubredditWikiPage(
+    subreddit: string,
+    pagePath: string,
+    revision?: string | null
+  ): Promise<RedditWikiPage> {
     const params = new URLSearchParams();
     if (revision) {
       params.append('revision', revision);
@@ -170,7 +182,9 @@ export const redditService = {
   },
 
   async getPostGalleryImages(subreddit: string, postId: string): Promise<string[]> {
-    const response = await api.get<{ images: string[] }>(`/reddit/r/${subreddit}/gallery/${postId}`);
+    const response = await api.get<{ images: string[] }>(
+      `/reddit/r/${subreddit}/gallery/${postId}`
+    );
     return response.images;
   },
 };

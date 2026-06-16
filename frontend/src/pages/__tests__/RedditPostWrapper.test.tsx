@@ -21,7 +21,7 @@ const renderWithRoute = (path: string, routePath = '/post/:postId') =>
         <Route path={routePath} element={<RedditPostWrapper />} />
         <Route path="/post/" element={<RedditPostWrapper />} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 
 describe('RedditPostWrapper', () => {
@@ -41,7 +41,7 @@ describe('RedditPostWrapper', () => {
         <Routes>
           <Route path="/post/" element={<RedditPostWrapper />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(screen.getByText('MockRedditPostPage')).toBeInTheDocument();
   });

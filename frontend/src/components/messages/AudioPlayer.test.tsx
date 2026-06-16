@@ -9,12 +9,16 @@ describe('AudioPlayer', () => {
   });
 
   it('supports play/pause, seek, speed, and download actions', async () => {
-    const playMock = vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function (this: HTMLMediaElement) {
+    const playMock = vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function (
+      this: HTMLMediaElement
+    ) {
       Object.defineProperty(this, 'paused', { configurable: true, get: () => false });
       this.dispatchEvent(new Event('play'));
       return Promise.resolve();
     });
-    const pauseMock = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (this: HTMLMediaElement) {
+    const pauseMock = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (
+      this: HTMLMediaElement
+    ) {
       Object.defineProperty(this, 'paused', { configurable: true, get: () => true });
       this.dispatchEvent(new Event('pause'));
     });
@@ -56,6 +60,9 @@ describe('AudioPlayer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
     expect(pauseMock).toHaveBeenCalledOnce();
 
-    expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('download', 'voice-note.mp3');
+    expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute(
+      'download',
+      'voice-note.mp3'
+    );
   });
 });

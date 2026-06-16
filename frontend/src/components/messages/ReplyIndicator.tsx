@@ -17,11 +17,11 @@ export function ReplyIndicator({
 
   const previewText = deleted
     ? t('messages.replyIndicator.deleted')
-    : (parentPreview?.trim() || t('messages.replyIndicator.originalMessage'));
+    : parentPreview?.trim() || t('messages.replyIndicator.originalMessage');
 
   const usernameText = deleted
     ? t('messages.replyIndicator.unknownUser')
-    : (parentUsername?.trim() || t('messages.replyIndicator.unknownUser'));
+    : parentUsername?.trim() || t('messages.replyIndicator.unknownUser');
 
   return (
     <button

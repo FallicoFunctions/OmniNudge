@@ -11,12 +11,17 @@ const mockAuthState = vi.hoisted(() => ({
 
 vi.mock('../../services/feedService', () => ({
   feedService: {
-    getHomeFeed: vi.fn().mockResolvedValue({ posts: [], reddit_posts: [], next_cursor: null, total: 0 }),
+    getHomeFeed: vi
+      .fn()
+      .mockResolvedValue({ posts: [], reddit_posts: [], next_cursor: null, total: 0 }),
     getInfiniteHomeFeed: vi.fn().mockResolvedValue({ pages: [], pageParams: [] }),
   },
 }));
 vi.mock('../../services/savedService', () => ({
-  savedService: { getSavedItems: vi.fn().mockResolvedValue([]), getSavedRedditItems: vi.fn().mockResolvedValue([]) },
+  savedService: {
+    getSavedItems: vi.fn().mockResolvedValue([]),
+    getSavedRedditItems: vi.fn().mockResolvedValue([]),
+  },
 }));
 vi.mock('../../services/postsService', () => ({
   postsService: { getPosts: vi.fn().mockResolvedValue([]) },
@@ -110,7 +115,7 @@ describe('HomePage', () => {
     render(
       <Wrapper>
         <HomePage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(document.body).toBeTruthy();
   });
@@ -124,7 +129,7 @@ describe('HomePage', () => {
     render(
       <Wrapper>
         <HomePage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     // Skeletons are rendered while isLoading is true
@@ -137,7 +142,7 @@ describe('HomePage', () => {
     render(
       <Wrapper>
         <HomePage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     // Sort buttons appear in the CommunityHeaderControlsRow / sort bar.
@@ -169,13 +174,15 @@ describe('HomePage', () => {
     render(
       <Wrapper>
         <HomePage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     fireEvent.click(await screen.findByRole('button', { name: /view current popular content/i }));
     fireEvent.click(await screen.findByRole('button', { name: /^discover$/i }));
     await waitFor(() => {
-      expect(vi.mocked(feedService.getHomeFeed).mock.calls.some((call) => call[4] === true)).toBe(true);
+      expect(vi.mocked(feedService.getHomeFeed).mock.calls.some((call) => call[4] === true)).toBe(
+        true
+      );
     });
 
     fireEvent.click(screen.getByRole('button', { name: /^following$/i }));

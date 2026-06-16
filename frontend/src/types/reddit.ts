@@ -48,21 +48,24 @@ export interface RedditApiPost {
       id: number;
     }>;
   };
-  media_metadata?: Record<string, {
-    status: string;
-    e: string;
-    m?: string;
-    s?: {
-      y: number;
-      x: number;
-      u?: string;
-    };
-    p?: Array<{
-      y: number;
-      x: number;
-      u?: string;
-    }>;
-  }>;
+  media_metadata?: Record<
+    string,
+    {
+      status: string;
+      e: string;
+      m?: string;
+      s?: {
+        y: number;
+        x: number;
+        u?: string;
+      };
+      p?: Array<{
+        y: number;
+        x: number;
+        u?: string;
+      }>;
+    }
+  >;
   media?: {
     reddit_video?: {
       fallback_url?: string;

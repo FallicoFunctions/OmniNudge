@@ -171,7 +171,7 @@ const getStoredSettings = (): StoredSettings => {
           profileVisibility:
             (parsed.profileVisibility as string) === 'friends_only'
               ? 'private'
-              : parsed.profileVisibility ?? 'public',
+              : (parsed.profileVisibility ?? 'public'),
           wallPostPermission: parsed.wallPostPermission ?? 'all_friends',
           notificationSound: parsed.notificationSound ?? true,
           notifyCommentReplies: parsed.notifyCommentReplies ?? true,
@@ -398,9 +398,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setReadReceiptsState(settings.show_read_receipts ?? true);
         setTypingIndicatorsState(settings.show_typing_indicators ?? true);
         setShowLastSeenState(settings.show_last_seen ?? true);
-        setProfileVisibilityState((settings.profile_visibility as 'public' | 'private') ?? 'public');
+        setProfileVisibilityState(
+          (settings.profile_visibility as 'public' | 'private') ?? 'public'
+        );
         setWallPostPermissionState(
-          (settings.wall_post_permission as 'all_friends' | 'requires_approval' | 'no_one') ?? 'all_friends'
+          (settings.wall_post_permission as 'all_friends' | 'requires_approval' | 'no_one') ??
+            'all_friends'
         );
         setNotificationSoundState(settings.notification_sound ?? true);
         setShowPushNotificationsState(settings.show_push_notifications ?? true);

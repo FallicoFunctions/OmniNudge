@@ -40,8 +40,7 @@ export function PinnedMessagesBar({
   const { t } = useTranslation();
 
   const visibleMessages = useMemo(
-    () =>
-      expanded ? pinnedMessages : pinnedMessages.slice(0, COLLAPSED_VISIBLE_COUNT),
+    () => (expanded ? pinnedMessages : pinnedMessages.slice(0, COLLAPSED_VISIBLE_COUNT)),
     [expanded, pinnedMessages]
   );
 

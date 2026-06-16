@@ -38,6 +38,8 @@ describe('EditProfileModal', () => {
         bio: 'Updated bio',
         avatar_url: 'https://example.com/new.png',
         status_text: 'Building things',
+        banner_url: null,
+        location: null,
       });
     });
   });

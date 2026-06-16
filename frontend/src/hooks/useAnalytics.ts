@@ -6,7 +6,11 @@
 
 import { useCallback, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { analyticsService, type EventName, type EventProperties } from '../services/analyticsService';
+import {
+  analyticsService,
+  type EventName,
+  type EventProperties,
+} from '../services/analyticsService';
 
 export function useAnalytics() {
   const track = useCallback((event: EventName, properties?: EventProperties) => {

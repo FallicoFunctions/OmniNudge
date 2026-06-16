@@ -54,7 +54,7 @@ describe('security remediation static checks', () => {
   it('fetches a short-lived websocket token before connecting', () => {
     const source = read('src/contexts/WebSocketContext.tsx');
     expect(source).toContain("api.post<{ ws_token: string }>('/auth/ws-token')");
-    expect(source).toContain('url.searchParams.set(\'token\', wsToken)');
+    expect(source).toContain("url.searchParams.set('token', wsToken)");
   });
 
   it('uses DOMPurify for Reddit sidebar and wiki HTML sanitizers', () => {

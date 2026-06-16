@@ -52,12 +52,7 @@ describe('PDFViewerModal', () => {
   it('renders and supports pagination/zoom/download', async () => {
     const onClose = vi.fn();
     render(
-      <PDFViewerModal
-        isOpen
-        pdfUrl="/uploads/guide.pdf"
-        fileName="guide.pdf"
-        onClose={onClose}
-      />
+      <PDFViewerModal isOpen pdfUrl="/uploads/guide.pdf" fileName="guide.pdf" onClose={onClose} />
     );
 
     await waitFor(() => {
@@ -82,7 +77,9 @@ describe('PDFViewerModal', () => {
   });
 
   it('shows load error state when document fails to load', async () => {
-    render(<PDFViewerModal isOpen pdfUrl="/uploads/fail.pdf" fileName="fail.pdf" onClose={vi.fn()} />);
+    render(
+      <PDFViewerModal isOpen pdfUrl="/uploads/fail.pdf" fileName="fail.pdf" onClose={vi.fn()} />
+    );
     await waitFor(() => {
       expect(screen.getByText('Failed to load PDF.')).toBeInTheDocument();
     });

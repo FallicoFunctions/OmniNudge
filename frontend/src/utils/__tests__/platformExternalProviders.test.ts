@@ -11,7 +11,9 @@ describe('classifyPlatformExternalUrl', () => {
   });
 
   it('marks TikTok URLs as supported embeds', () => {
-    const result = classifyPlatformExternalUrl('https://www.tiktok.com/@example/video/1234567890123456789');
+    const result = classifyPlatformExternalUrl(
+      'https://www.tiktok.com/@example/video/1234567890123456789'
+    );
 
     expect(result?.status).toBe('supported_embed');
   });
@@ -24,7 +26,9 @@ describe('classifyPlatformExternalUrl', () => {
   });
 
   it('falls back to render_no_media for Pornhub video URLs', () => {
-    const result = classifyPlatformExternalUrl('https://www.pornhub.com/view_video.php?viewkey=ph5f1234567890');
+    const result = classifyPlatformExternalUrl(
+      'https://www.pornhub.com/view_video.php?viewkey=ph5f1234567890' // gitleaks:allow
+    );
 
     expect(result?.id).toBe('pornhub');
     expect(result?.fallbackBehavior).toBe('render_no_media');

@@ -29,37 +29,33 @@ export function QuickReactButton({
   const { recentEmojis, addRecentEmoji } = useRecentEmojis(currentUserId);
 
   const addMutation = useMutation({
-    mutationFn: ({ emoji }: { emoji: string }) =>
-      reactionsService.addReaction(messageId, emoji),
+    mutationFn: ({ emoji }: { emoji: string }) => reactionsService.addReaction(messageId, emoji),
 
     onSuccess: (reaction, { emoji }) => {
-      queryClient.setQueryData<GetReactionsResponse>(
-        ['message-reactions', messageId],
-        (old) => {
-          const entry = {
-            emoji,
-            count: 1,
-            user_ids: [currentUserId],
-            usernames: currentUsername ? [currentUsername] : [],
-            user_reacted: true,
-            my_reaction_id: reaction.id,
+      queryClient.setQueryData<GetReactionsResponse>(['message-reactions', messageId], (old) => {
+        const entry = {
+          emoji,
+          count: 1,
+          user_ids: [currentUserId],
+          usernames: currentUsername ? [currentUsername] : [],
+          user_reacted: true,
+          my_reaction_id: reaction.id,
+        };
+        if (!old) {
+          return { reactions: [entry], total_unique_emoji: 1, users_truncated: false };
+        }
+        const idx = old.reactions.findIndex((r) => r.emoji === emoji);
+        if (idx === -1) {
+          return {
+            ...old,
+            reactions: [...old.reactions, entry],
+            total_unique_emoji: old.total_unique_emoji + 1,
           };
-          if (!old) {
-            return { reactions: [entry], total_unique_emoji: 1, users_truncated: false };
-          }
-          const idx = old.reactions.findIndex((r) => r.emoji === emoji);
-          if (idx === -1) {
-            return {
-              ...old,
-              reactions: [...old.reactions, entry],
-              total_unique_emoji: old.total_unique_emoji + 1,
-            };
-          }
-          const updated = [...old.reactions];
-          updated[idx] = { ...updated[idx], my_reaction_id: reaction.id, user_reacted: true };
-          return { ...old, reactions: updated };
-        },
-      );
+        }
+        const updated = [...old.reactions];
+        updated[idx] = { ...updated[idx], my_reaction_id: reaction.id, user_reacted: true };
+        return { ...old, reactions: updated };
+      });
 
       queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }>>(
         ['messages', conversationId],
@@ -70,11 +66,11 @@ export function QuickReactButton({
             pages: old.pages.map((page) => ({
               ...page,
               messages: page.messages.map((msg) =>
-                msg.id === messageId ? { ...msg, has_reactions: true } : msg,
+                msg.id === messageId ? { ...msg, has_reactions: true } : msg
               ),
             })),
           };
-        },
+        }
       );
     },
   });

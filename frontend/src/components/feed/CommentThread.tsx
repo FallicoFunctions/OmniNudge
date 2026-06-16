@@ -20,10 +20,7 @@ interface Comment {
   reply_count?: number;
 }
 
-type CommentUpdate =
-  | Comment
-  | { __replaceTempId: string }
-  | { __removeTempId: string };
+type CommentUpdate = Comment | { __replaceTempId: string } | { __removeTempId: string };
 
 interface CommentThreadProps {
   comments: Comment[];
@@ -50,7 +47,7 @@ export function CommentThread({
   maxDepth = 1,
   onVote,
   onCommentPosted,
-  onLoadReplies
+  onLoadReplies,
 }: CommentThreadProps) {
   const { t } = useTranslation();
   const { formatNumber, formatRelativeTime } = useFormat();
@@ -81,7 +78,7 @@ export function CommentThread({
   };
 
   const handleExpandReplies = (commentId: number | string) => {
-    setExpandedReplies(prev => {
+    setExpandedReplies((prev) => {
       const next = new Set(prev);
       if (next.has(commentId)) {
         next.delete(commentId);
@@ -99,9 +96,10 @@ export function CommentThread({
   const handleSaveComment = async (comment: Comment) => {
     if (savingComments.has(comment.id)) return;
 
-    const isSaved = typeof comment.id === 'string' ? savedRedditAPICommentIds.has(comment.id) : false;
+    const isSaved =
+      typeof comment.id === 'string' ? savedRedditAPICommentIds.has(comment.id) : false;
 
-    setSavingComments(prev => new Set(prev).add(comment.id));
+    setSavingComments((prev) => new Set(prev).add(comment.id));
 
     try {
       if (postType === 'reddit') {
@@ -119,7 +117,9 @@ export function CommentThread({
               comment_author: comment.username,
               comment_body: comment.content,
               score: comment.score,
-              created_utc: comment.created_at ? Math.floor(new Date(comment.created_at).getTime() / 1000) : undefined,
+              created_utc: comment.created_at
+                ? Math.floor(new Date(comment.created_at).getTime() / 1000)
+                : undefined,
               parent_id: comment.parent_comment_id ? String(comment.parent_comment_id) : undefined,
             });
           }
@@ -136,7 +136,7 @@ export function CommentThread({
     } catch (err) {
       console.error('Failed to save comment:', err);
     } finally {
-      setSavingComments(prev => {
+      setSavingComments((prev) => {
         const next = new Set(prev);
         next.delete(comment.id);
         return next;
@@ -153,13 +153,16 @@ export function CommentThread({
           : formatRelativeTime(createdAt);
 
         const showFirstChild = depth === 0 && comment.replies && comment.replies.length > 0;
-        const remainingReplies = comment.replies ? comment.replies.length - 1 : (comment.reply_count || 0);
+        const remainingReplies = comment.replies
+          ? comment.replies.length - 1
+          : comment.reply_count || 0;
         const scoreValue = !isNaN(comment.score) ? comment.score : 0;
         const pointsLabel = t('posts.point', {
           count: scoreValue,
           formattedCount: formatNumber(scoreValue),
         });
-        const isSaved = typeof comment.id === 'string' ? savedRedditAPICommentIds.has(comment.id) : false;
+        const isSaved =
+          typeof comment.id === 'string' ? savedRedditAPICommentIds.has(comment.id) : false;
 
         return (
           <div
@@ -179,7 +182,9 @@ export function CommentThread({
             <div className="border-b border-[var(--color-border)] p-1">
               {/* Metadata */}
               <div className="flex items-center gap-1.5 text-[10px] text-[var(--color-text-muted)]">
-                <span className="font-semibold text-[var(--color-primary)]">{comment.username}</span>
+                <span className="font-semibold text-[var(--color-primary)]">
+                  {comment.username}
+                </span>
                 <span>•</span>
                 <span>{pointsLabel}</span>
                 <span>•</span>
@@ -216,7 +221,9 @@ export function CommentThread({
                 >
                   {savingComments.has(comment.id)
                     ? t('comments.status.saving')
-                    : (isSaved ? t('comments.actions.unsave') : t('comments.actions.save'))}
+                    : isSaved
+                      ? t('comments.actions.unsave')
+                      : t('comments.actions.save')}
                 </button>
               </div>
 
@@ -260,7 +267,13 @@ export function CommentThread({
                 onClick={() => handleExpandReplies(comment.id)}
                 className="text-[10px] text-cyan-500 hover:text-cyan-400 ml-2 mt-1 flex items-center gap-1"
               >
-                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  className="h-3 w-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <circle cx="12" cy="12" r="10" />
                   <path d="M12 8v8M8 12h8" />
                 </svg>
@@ -269,31 +282,34 @@ export function CommentThread({
             )}
 
             {/* Expanded replies (all collapsed initially) */}
-            {depth === 0 && expandedReplies.has(comment.id) && comment.replies && comment.replies.length > 1 && (
-              <div className="mt-1">
-                <CommentThread
-                  comments={comment.replies.slice(1, 26)} // Load up to 25 more (first one already shown)
-                  postId={postId}
-                  postType={postType}
-                  subreddit={subreddit}
-                  postTitle={postTitle}
-                  postAuthor={postAuthor}
-                  depth={depth + 1}
-                  maxDepth={maxDepth}
-                  onVote={onVote}
-                  onCommentPosted={onCommentPosted}
-                  onLoadReplies={onLoadReplies}
-                />
+            {depth === 0 &&
+              expandedReplies.has(comment.id) &&
+              comment.replies &&
+              comment.replies.length > 1 && (
+                <div className="mt-1">
+                  <CommentThread
+                    comments={comment.replies.slice(1, 26)} // Load up to 25 more (first one already shown)
+                    postId={postId}
+                    postType={postType}
+                    subreddit={subreddit}
+                    postTitle={postTitle}
+                    postAuthor={postAuthor}
+                    depth={depth + 1}
+                    maxDepth={maxDepth}
+                    onVote={onVote}
+                    onCommentPosted={onCommentPosted}
+                    onLoadReplies={onLoadReplies}
+                  />
 
-                {/* Collapse button */}
-                <button
-                  onClick={() => handleExpandReplies(comment.id)}
-                  className="text-[10px] text-cyan-500 hover:text-cyan-400 ml-2 mt-1"
-                >
-                  {t('comments.actions.collapseReplies')}
-                </button>
-              </div>
-            )}
+                  {/* Collapse button */}
+                  <button
+                    onClick={() => handleExpandReplies(comment.id)}
+                    className="text-[10px] text-cyan-500 hover:text-cyan-400 ml-2 mt-1"
+                  >
+                    {t('comments.actions.collapseReplies')}
+                  </button>
+                </div>
+              )}
           </div>
         );
       })}

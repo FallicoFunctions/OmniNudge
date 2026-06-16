@@ -10,11 +10,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
-import {
-  HubJoinSlot,
-  HubCreateSlot,
-  HubModSlot,
-} from './HubDesignSlots';
+import { HubJoinSlot, HubCreateSlot, HubModSlot } from './HubDesignSlots';
 import { subscriptionService } from '../../services/subscriptionService';
 import type { User } from '../../types/auth';
 import { splitAIDesignHTML, type DesignSlot } from '../../utils/splitAIDesignHTML';
@@ -99,10 +95,7 @@ interface AIDesignMarkupProps {
   html: string;
 }
 
-const AIDesignMarkup = memo(function AIDesignMarkup({
-  containerRef,
-  html,
-}: AIDesignMarkupProps) {
+const AIDesignMarkup = memo(function AIDesignMarkup({ containerRef, html }: AIDesignMarkupProps) {
   return <div ref={containerRef} dangerouslySetInnerHTML={{ __html: html }} />;
 });
 
@@ -120,7 +113,7 @@ export default function HubAIDesignRenderer({
 
   const { htmlWithoutStyles, styleContent, slotsByMarker } = useMemo(
     () => splitAIDesignHTML(htmlContent),
-    [htmlContent],
+    [htmlContent]
   );
 
   useEffect(() => {
@@ -200,26 +193,25 @@ export default function HubAIDesignRenderer({
     });
   }, [markerElements, slotsByMarker]);
 
-  const renderSlotContent = useCallback((slot: DesignSlot) => {
-    switch (slot.id) {
-      case 'hub-join':
-        return (
-          <HubJoinSlot
-            hubName={hubName}
-            isSubscribed={isSubscribed}
-            userId={user?.id ?? null}
-          />
-        );
-      case 'hub-create':
-        return <HubCreateSlot hubName={hubName} userId={user?.id ?? null} />;
-      case 'hub-mod':
-        return <HubModSlot hubName={hubName} isModerator={isModerator} />;
-      case 'hub-feed':
-        return <HubFeedSlotContent hubName={hubName} />;
-      default:
-        return null;
-    }
-  }, [hubName, isModerator, isSubscribed, user]);
+  const renderSlotContent = useCallback(
+    (slot: DesignSlot) => {
+      switch (slot.id) {
+        case 'hub-join':
+          return (
+            <HubJoinSlot hubName={hubName} isSubscribed={isSubscribed} userId={user?.id ?? null} />
+          );
+        case 'hub-create':
+          return <HubCreateSlot hubName={hubName} userId={user?.id ?? null} />;
+        case 'hub-mod':
+          return <HubModSlot hubName={hubName} isModerator={isModerator} />;
+        case 'hub-feed':
+          return <HubFeedSlotContent hubName={hubName} />;
+        default:
+          return null;
+      }
+    },
+    [hubName, isModerator, isSubscribed, user]
+  );
 
   return (
     <div style={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>

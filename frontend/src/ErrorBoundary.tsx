@@ -45,7 +45,9 @@ class ErrorBoundary extends Component<Props, State> {
     // If this is a Context error, it might be a lazy loading issue
     // Log additional info for debugging
     if (error.message?.includes('Context') || error.message?.includes('Provider')) {
-      console.error('Context/Provider error detected. This might be a lazy loading or Safari-specific issue.');
+      console.error(
+        'Context/Provider error detected. This might be a lazy loading or Safari-specific issue.'
+      );
       console.error('Component stack:', errorInfo.componentStack);
     }
   }
@@ -53,13 +55,15 @@ class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div style={{
-          padding: '20px',
-          backgroundColor: '#fee',
-          color: '#c00',
-          fontFamily: 'monospace',
-          whiteSpace: 'pre-wrap',
-        }}>
+        <div
+          style={{
+            padding: '20px',
+            backgroundColor: '#fee',
+            color: '#c00',
+            fontFamily: 'monospace',
+            whiteSpace: 'pre-wrap',
+          }}
+        >
           <h1>{i18n.t('errorBoundary.title')}</h1>
           <details style={{ whiteSpace: 'pre-wrap' }}>
             <summary>{i18n.t('errorBoundary.details')}</summary>

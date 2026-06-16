@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AutoDeleteDuration } from '../../types/messages';
 
@@ -38,8 +38,10 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
   // B is scrolled next.
   const incrementRef = useRef(increment);
   const decrementRef = useRef(decrement);
-  incrementRef.current = increment;
-  decrementRef.current = decrement;
+  useLayoutEffect(() => {
+    incrementRef.current = increment;
+    decrementRef.current = decrement;
+  });
 
   // Attach once — non-passive so preventDefault() works to block page scroll.
   // stopPropagation prevents the event reaching adjacent dials.
@@ -56,7 +58,7 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
     };
     el.addEventListener('wheel', handler, { passive: false });
     return () => el.removeEventListener('wheel', handler);
-  // Only re-register when disabled changes — refs handle the rest.
+    // Only re-register when disabled changes — refs handle the rest.
   }, [disabled]);
 
   return (
@@ -116,9 +118,7 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
             '[appearance:textfield]',
             '[&::-webkit-outer-spin-button]:appearance-none',
             '[&::-webkit-inner-spin-button]:appearance-none',
-            isActive
-              ? 'text-[var(--color-primary)]'
-              : 'text-[var(--color-text-muted)] opacity-40',
+            isActive ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)] opacity-40',
           ].join(' ')}
         />
 
@@ -163,11 +163,14 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
   );
 }
 
-export function AutoDeleteDurationPicker({ value, onChange, disabled }: AutoDeleteDurationPickerProps) {
+export function AutoDeleteDurationPicker({
+  value,
+  onChange,
+  disabled,
+}: AutoDeleteDurationPickerProps) {
   const { t } = useTranslation();
 
-  const set = (key: keyof AutoDeleteDuration) => (v: number) =>
-    onChange({ ...value, [key]: v });
+  const set = (key: keyof AutoDeleteDuration) => (v: number) => onChange({ ...value, [key]: v });
 
   return (
     <div className="space-y-3">

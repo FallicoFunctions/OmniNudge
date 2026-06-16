@@ -74,7 +74,9 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               onChange={(e) => setAllowTextPosts(e.target.checked)}
               className="mr-3 h-4 w-4"
             />
-            <span className="text-[var(--color-text-primary)]">{t('hubSettings.content.allowedPostTypes.text')}</span>
+            <span className="text-[var(--color-text-primary)]">
+              {t('hubSettings.content.allowedPostTypes.text')}
+            </span>
           </label>
           <label className="flex items-center">
             <input
@@ -83,7 +85,9 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               onChange={(e) => setAllowLinkPosts(e.target.checked)}
               className="mr-3 h-4 w-4"
             />
-            <span className="text-[var(--color-text-primary)]">{t('hubSettings.content.allowedPostTypes.link')}</span>
+            <span className="text-[var(--color-text-primary)]">
+              {t('hubSettings.content.allowedPostTypes.link')}
+            </span>
           </label>
           <label className="flex items-center">
             <input
@@ -92,7 +96,9 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               onChange={(e) => setAllowImagePosts(e.target.checked)}
               className="mr-3 h-4 w-4"
             />
-            <span className="text-[var(--color-text-primary)]">{t('hubSettings.content.allowedPostTypes.image')}</span>
+            <span className="text-[var(--color-text-primary)]">
+              {t('hubSettings.content.allowedPostTypes.image')}
+            </span>
           </label>
           <label className="flex items-center">
             <input
@@ -101,7 +107,9 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               onChange={(e) => setAllowVideoPosts(e.target.checked)}
               className="mr-3 h-4 w-4"
             />
-            <span className="text-[var(--color-text-primary)]">{t('hubSettings.content.allowedPostTypes.video')}</span>
+            <span className="text-[var(--color-text-primary)]">
+              {t('hubSettings.content.allowedPostTypes.video')}
+            </span>
           </label>
           <label className="flex items-center">
             <input
@@ -110,7 +118,9 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               onChange={(e) => setAllowPollPosts(e.target.checked)}
               className="mr-3 h-4 w-4"
             />
-            <span className="text-[var(--color-text-primary)]">{t('hubSettings.content.allowedPostTypes.poll')}</span>
+            <span className="text-[var(--color-text-primary)]">
+              {t('hubSettings.content.allowedPostTypes.poll')}
+            </span>
           </label>
         </div>
       </div>
@@ -129,7 +139,9 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               className="mr-3 h-4 w-4"
             />
             <div>
-              <span className="text-[var(--color-text-primary)]">{t('hubSettings.content.mediaOptions.allowMediaInComments.label')}</span>
+              <span className="text-[var(--color-text-primary)]">
+                {t('hubSettings.content.mediaOptions.allowMediaInComments.label')}
+              </span>
               <p className="text-xs text-[var(--color-text-secondary)]">
                 {t('hubSettings.content.mediaOptions.allowMediaInComments.helper')}
               </p>
@@ -143,7 +155,9 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               className="mr-3 h-4 w-4"
             />
             <div>
-              <span className="text-[var(--color-text-primary)]">{t('hubSettings.content.mediaOptions.showThumbnails.label')}</span>
+              <span className="text-[var(--color-text-primary)]">
+                {t('hubSettings.content.mediaOptions.showThumbnails.label')}
+              </span>
               <p className="text-xs text-[var(--color-text-secondary)]">
                 {t('hubSettings.content.mediaOptions.showThumbnails.helper')}
               </p>
@@ -157,7 +171,9 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               className="mr-3 h-4 w-4"
             />
             <div>
-              <span className="text-[var(--color-text-primary)]">{t('hubSettings.content.mediaOptions.allowSpoilers.label')}</span>
+              <span className="text-[var(--color-text-primary)]">
+                {t('hubSettings.content.mediaOptions.allowSpoilers.label')}
+              </span>
               <p className="text-xs text-[var(--color-text-secondary)]">
                 {t('hubSettings.content.mediaOptions.allowSpoilers.helper')}
               </p>
@@ -180,7 +196,9 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               className="mr-3 h-4 w-4"
             />
             <div>
-              <span className="text-[var(--color-text-primary)]">{t('hubSettings.content.postRequirements.requireFlair.label')}</span>
+              <span className="text-[var(--color-text-primary)]">
+                {t('hubSettings.content.postRequirements.requireFlair.label')}
+              </span>
               <p className="text-xs text-[var(--color-text-secondary)]">
                 {t('hubSettings.content.postRequirements.requireFlair.helper')}
               </p>
@@ -203,7 +221,9 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               className="mr-3 h-4 w-4"
             />
             <div>
-              <span className="text-[var(--color-text-primary)]">{t('hubSettings.content.features.enableWiki.label')}</span>
+              <span className="text-[var(--color-text-primary)]">
+                {t('hubSettings.content.features.enableWiki.label')}
+              </span>
               <p className="text-xs text-[var(--color-text-secondary)]">
                 {t('hubSettings.content.features.enableWiki.helper')}
               </p>

@@ -40,9 +40,7 @@ const createWrapper = () => {
 
   return ({ children }: { children: React.ReactNode }) => (
     <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </BrowserRouter>
   );
 };
@@ -291,14 +289,7 @@ describe('AdminPage - Ban System', () => {
     fireEvent.change(statusFilter, { target: { value: 'banned' } });
 
     await waitFor(() => {
-      expect(adminService.listUsers).toHaveBeenCalledWith(
-        '',
-        '',
-        'banned',
-        50,
-        0,
-        ''
-      );
+      expect(adminService.listUsers).toHaveBeenCalledWith('', '', 'banned', 50, 0, '');
     });
   });
 

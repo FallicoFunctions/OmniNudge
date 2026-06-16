@@ -164,7 +164,7 @@ describe('HubPage', () => {
     render(
       <Wrapper>
         <HubPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(document.body).toBeTruthy();
   });
@@ -174,7 +174,7 @@ describe('HubPage', () => {
     render(
       <Wrapper>
         <HubPage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     // The hub display title "Test Hub" should appear at least once in the page
@@ -189,7 +189,7 @@ describe('HubPage', () => {
     render(
       <Wrapper>
         <HubPage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await waitFor(() => {
@@ -221,7 +221,7 @@ describe('HubPage', () => {
     render(
       <Wrapper>
         <HubPage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await waitFor(() => {
@@ -249,7 +249,7 @@ describe('HubPage', () => {
     render(
       <Wrapper>
         <HubPage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await waitFor(() => {

@@ -35,7 +35,9 @@ export default function ResetPasswordPage() {
 
     const validateToken = async () => {
       try {
-        const response = await api.get<{ valid: boolean; username?: string }>(`/auth/validate-reset-token?token=${token}`);
+        const response = await api.get<{ valid: boolean; username?: string }>(
+          `/auth/validate-reset-token?token=${token}`
+        );
         setIsValid(response.valid);
         setUsername(response.username || '');
       } catch {
@@ -54,12 +56,18 @@ export default function ResetPasswordPage() {
     setError(null);
 
     if (password.length < 8) {
-      setError({ field: 'password', message: t('auth.resetPasswordPage.errors.passwordMinLength') });
+      setError({
+        field: 'password',
+        message: t('auth.resetPasswordPage.errors.passwordMinLength'),
+      });
       return;
     }
 
     if (password !== confirmPassword) {
-      setError({ field: 'confirmPassword', message: t('auth.resetPasswordPage.errors.passwordsDoNotMatch') });
+      setError({
+        field: 'confirmPassword',
+        message: t('auth.resetPasswordPage.errors.passwordsDoNotMatch'),
+      });
       return;
     }
 
@@ -79,7 +87,10 @@ export default function ResetPasswordPage() {
       }, 3000);
     } catch (err: unknown) {
       const apiError = err as { response?: { data?: { error?: string } } };
-      setError({ message: apiError.response?.data?.error || t('auth.resetPasswordPage.errors.resetFailedTryAgain') });
+      setError({
+        message:
+          apiError.response?.data?.error || t('auth.resetPasswordPage.errors.resetFailedTryAgain'),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -91,7 +102,9 @@ export default function ResetPasswordPage() {
         <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-8">
           <div className="flex items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-border)] border-t-[var(--color-primary)]"></div>
-            <span className="ml-3 text-[var(--color-text-primary)]">{t('auth.resetPasswordPage.status.validating')}</span>
+            <span className="ml-3 text-[var(--color-text-primary)]">
+              {t('auth.resetPasswordPage.status.validating')}
+            </span>
           </div>
         </div>
       </div>
@@ -102,7 +115,9 @@ export default function ResetPasswordPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)]">
         <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-8">
-          <h1 className="mb-4 text-2xl font-bold text-[var(--color-text-primary)]">{t('auth.resetPasswordPage.invalidLinkTitle')}</h1>
+          <h1 className="mb-4 text-2xl font-bold text-[var(--color-text-primary)]">
+            {t('auth.resetPasswordPage.invalidLinkTitle')}
+          </h1>
           <p className="mb-6 text-[var(--color-text-secondary)]">
             {error?.message || t('auth.resetPasswordPage.errors.linkInvalidOrExpired')}
           </p>
@@ -152,7 +167,9 @@ export default function ResetPasswordPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)] px-4">
       <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-8">
-        <h1 className="mb-2 text-2xl font-bold text-[var(--color-text-primary)]">{t('auth.resetPasswordPage.title')}</h1>
+        <h1 className="mb-2 text-2xl font-bold text-[var(--color-text-primary)]">
+          {t('auth.resetPasswordPage.title')}
+        </h1>
         {username && (
           <p className="mb-6 text-sm text-[var(--color-text-secondary)]">
             {t('auth.resetPasswordPage.resettingFor')}{' '}
@@ -201,13 +218,10 @@ export default function ResetPasswordPage() {
             </div>
           )}
 
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={isSubmitting}
-            className="w-full"
-          >
-            {isSubmitting ? t('auth.resetPasswordPage.status.submitting') : t('auth.resetPasswordPage.actions.resetPassword')}
+          <Button type="submit" variant="primary" disabled={isSubmitting} className="w-full">
+            {isSubmitting
+              ? t('auth.resetPasswordPage.status.submitting')
+              : t('auth.resetPasswordPage.actions.resetPassword')}
           </Button>
         </form>
       </div>

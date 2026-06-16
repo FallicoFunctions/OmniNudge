@@ -22,7 +22,7 @@ describe('HubJoinSlot', () => {
 
   it('reacts to isSubscribed prop changes', () => {
     const { rerender } = render(
-      <HubJoinSlot hubName="testHub" isSubscribed={false} userId={123} />,
+      <HubJoinSlot hubName="testHub" isSubscribed={false} userId={123} />
     );
 
     expect(screen.getByRole('button', { name: 'Join' })).toBeInTheDocument();

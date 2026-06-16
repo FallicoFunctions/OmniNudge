@@ -2,10 +2,12 @@ import { useActiveUsers } from './useActiveUsers';
 import { hubPresenceService } from '../services/hubPresenceService';
 import { getStoredAuthToken } from '../lib/api';
 
-export function useHubActiveUsers(hubName: string | null | undefined, user?: { id?: number } | null) {
+export function useHubActiveUsers(
+  hubName: string | null | undefined,
+  user?: { id?: number } | null
+) {
   const normalized = hubName?.trim() ?? '';
-  const hasAuthToken =
-    typeof window !== 'undefined' && Boolean(getStoredAuthToken());
+  const hasAuthToken = typeof window !== 'undefined' && Boolean(getStoredAuthToken());
 
   return useActiveUsers({
     key: `hub:${normalized}`,

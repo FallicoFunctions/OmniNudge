@@ -1,13 +1,12 @@
-
 interface RecordingAnimationProps {
-  audioLevel: number
+  audioLevel: number;
 }
 
 export function RecordingAnimation({ audioLevel }: RecordingAnimationProps) {
   // Outer ring scales 1.0–1.6 with audio level
-  const ringScale = 1 + audioLevel * 0.6
+  const ringScale = 1 + audioLevel * 0.6;
   // Inner dot opacity 0.6–1.0 with audio level (gives breathing feel)
-  const dotOpacity = 0.6 + audioLevel * 0.4
+  const dotOpacity = 0.6 + audioLevel * 0.4;
 
   return (
     <div className="relative flex items-center justify-center w-8 h-8 flex-shrink-0" aria-hidden>
@@ -32,5 +31,5 @@ export function RecordingAnimation({ audioLevel }: RecordingAnimationProps) {
         }}
       />
     </div>
-  )
+  );
 }

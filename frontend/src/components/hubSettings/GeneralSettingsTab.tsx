@@ -12,7 +12,12 @@ interface Props {
   hubName: string;
 }
 
-export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin, hubName }: Props) {
+export default function GeneralSettingsTab({
+  settings,
+  onSave,
+  isHubOwnerOrAdmin,
+  hubName,
+}: Props) {
   const { t } = useTranslation();
   const [displayTitle, setDisplayTitle] = useState(settings.display_title || '');
   const [sidebarMarkdown, setSidebarMarkdown] = useState(settings.sidebar_markdown || '');
@@ -53,7 +58,9 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
         access_request_cooldown_days: settings.access_request_cooldown_days,
       });
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : t('hubSettings.common.errors.saveFailed'));
+      setSaveError(
+        error instanceof Error ? error.message : t('hubSettings.common.errors.saveFailed')
+      );
     } finally {
       setIsSaving(false);
     }
@@ -170,15 +177,15 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
 
       {/* Save Button */}
       <div className="flex justify-end pt-4 border-t border-[var(--color-border)]">
-        {saveError && (
-          <div className="mr-4 p-2 text-sm text-red-600">{saveError}</div>
-        )}
+        {saveError && <div className="mr-4 p-2 text-sm text-red-600">{saveError}</div>}
         <button
           onClick={handleSave}
           disabled={!hasChanges || isSaving}
           className="px-6 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {isSaving ? t('hubSettings.common.status.saving') : t('hubSettings.common.actions.saveChanges')}
+          {isSaving
+            ? t('hubSettings.common.status.saving')
+            : t('hubSettings.common.actions.saveChanges')}
         </button>
       </div>
     </div>

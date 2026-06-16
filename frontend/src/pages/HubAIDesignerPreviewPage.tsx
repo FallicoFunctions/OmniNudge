@@ -53,9 +53,11 @@ export default function HubAIDesignerPreviewPage() {
   });
 
   // Combines HTML body and CSS into a single design string for backend/preview
-  const buildCombinedHtml = useCallback((htmlBody: string, cssStr: string) =>
-    cssStr.trim() ? `<style>${cssStr}</style>\n${htmlBody}` : htmlBody,
-  []);
+  const buildCombinedHtml = useCallback(
+    (htmlBody: string, cssStr: string) =>
+      cssStr.trim() ? `<style>${cssStr}</style>\n${htmlBody}` : htmlBody,
+    []
+  );
 
   // Init state once design loads — split style block from HTML body
   useEffect(() => {
@@ -72,15 +74,21 @@ export default function HubAIDesignerPreviewPage() {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(
-      () => setPreviewHtml(buildCombinedHtml(htmlContent, cssContent)), 400
+      () => setPreviewHtml(buildCombinedHtml(htmlContent, cssContent)),
+      400
     );
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [htmlContent, cssContent, buildCombinedHtml]);
 
   const saveMutation = useMutation({
-    mutationFn: () => hubAIDesignerService.saveVersion(
-      hubName!, numericDesignId, buildCombinedHtml(htmlContent, cssContent)
-    ),
+    mutationFn: () =>
+      hubAIDesignerService.saveVersion(
+        hubName!,
+        numericDesignId,
+        buildCombinedHtml(htmlContent, cssContent)
+      ),
     onSuccess: (data) => {
       setSavedHtml(data.html_content);
       setSaveError(null);
@@ -132,13 +140,23 @@ export default function HubAIDesignerPreviewPage() {
       setCssContent(styleContent);
       setChatMessage('');
     } catch (err) {
-      setChatError(err instanceof Error && err.message
-        ? err.message
-        : 'AI design refinement could not be completed. Please try again.');
+      setChatError(
+        err instanceof Error && err.message
+          ? err.message
+          : 'AI design refinement could not be completed. Please try again.'
+      );
     } finally {
       setChatLoading(false);
     }
-  }, [chatMessage, chatLoading, hubName, numericDesignId, htmlContent, cssContent, buildCombinedHtml]);
+  }, [
+    chatMessage,
+    chatLoading,
+    hubName,
+    numericDesignId,
+    htmlContent,
+    cssContent,
+    buildCombinedHtml,
+  ]);
 
   const isDirty = buildCombinedHtml(htmlContent, cssContent) !== savedHtml;
 
@@ -158,7 +176,6 @@ export default function HubAIDesignerPreviewPage() {
     );
   }
 
-
   return (
     <div className="flex flex-col min-h-screen bg-[var(--color-background)]">
       {/* Top bar */}
@@ -172,7 +189,9 @@ export default function HubAIDesignerPreviewPage() {
 
         <span className="text-sm font-semibold text-[var(--color-text-primary)]">
           {designData.design.name}
-          {isDirty && <span className="ml-2 text-xs font-normal text-amber-500">Unsaved changes</span>}
+          {isDirty && (
+            <span className="ml-2 text-xs font-normal text-amber-500">Unsaved changes</span>
+          )}
         </span>
 
         <button
@@ -187,7 +206,7 @@ export default function HubAIDesignerPreviewPage() {
       {/* AI Chat panel */}
       <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <button
-          onClick={() => setChatOpen(o => !o)}
+          onClick={() => setChatOpen((o) => !o)}
           className="w-full flex items-center justify-between px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-background)] transition-colors"
         >
           <span>✨ AI Chat — ask the AI to refine this design</span>
@@ -199,8 +218,8 @@ export default function HubAIDesignerPreviewPage() {
               <input
                 type="text"
                 value={chatMessage}
-                onChange={e => setChatMessage(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleChat()}
+                onChange={(e) => setChatMessage(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChat()}
                 placeholder='e.g. "Make the hero darker" or "Add a welcome banner at the top"'
                 disabled={chatLoading}
                 className="flex-1 px-3 py-2 text-sm rounded border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)] disabled:opacity-50"
@@ -215,7 +234,9 @@ export default function HubAIDesignerPreviewPage() {
             </div>
             {chatError && <p className="text-xs text-red-500">{chatError}</p>}
             {chatLoading && (
-              <p className="text-xs text-[var(--color-text-secondary)]">AI is refining the design — this may take up to 60 seconds…</p>
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                AI is refining the design — this may take up to 60 seconds…
+              </p>
             )}
           </div>
         )}
@@ -238,7 +259,7 @@ export default function HubAIDesignerPreviewPage() {
       <div className="sticky bottom-0 z-50 border-t border-[var(--color-border)] bg-[#282c34]">
         <div className="flex items-center justify-between px-4 py-2 bg-[#21252b]">
           <button
-            onClick={() => setEditorOpen(o => !o)}
+            onClick={() => setEditorOpen((o) => !o)}
             className="flex items-center gap-2 text-sm font-semibold text-gray-300 hover:text-white transition-colors"
           >
             <span>{'</>'} Editor</span>
@@ -263,7 +284,7 @@ export default function HubAIDesignerPreviewPage() {
             {versionsData?.versions && versionsData.versions.length > 0 && (
               <div className="relative">
                 <button
-                  onClick={() => setVersionPanelOpen(o => !o)}
+                  onClick={() => setVersionPanelOpen((o) => !o)}
                   className="px-3 py-1 text-xs text-gray-300 hover:text-white border border-gray-600 rounded transition-colors"
                 >
                   History ({versionsData.versions.length})
@@ -305,17 +326,11 @@ export default function HubAIDesignerPreviewPage() {
           </div>
         </div>
 
-        {saveError && (
-          <p className="px-4 py-1 text-xs text-red-400 bg-[#21252b]">{saveError}</p>
-        )}
+        {saveError && <p className="px-4 py-1 text-xs text-red-400 bg-[#21252b]">{saveError}</p>}
 
         {editorOpen && (
           <Suspense
-            fallback={
-              <div className="px-4 py-6 text-sm text-gray-300">
-                Loading editor…
-              </div>
-            }
+            fallback={<div className="px-4 py-6 text-sm text-gray-300">Loading editor…</div>}
           >
             <HubAIDesignCodeEditor
               activeEditor={activeEditor}

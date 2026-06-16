@@ -100,7 +100,7 @@ describe('ModMailConversationPage', () => {
     render(
       <Wrapper>
         <ModMailConversationPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(document.body).toBeTruthy();
   });
@@ -110,7 +110,7 @@ describe('ModMailConversationPage', () => {
     render(
       <Wrapper>
         <ModMailConversationPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(document.body).toBeTruthy();
@@ -122,7 +122,7 @@ describe('ModMailConversationPage', () => {
     render(
       <Wrapper>
         <ModMailConversationPage />
-      </Wrapper>,
+      </Wrapper>
     );
     // Page should render without errors
     await waitFor(() => {

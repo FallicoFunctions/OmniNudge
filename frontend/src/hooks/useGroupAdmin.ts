@@ -55,8 +55,19 @@ export function useGroupAdmin({
 
   // Mutations
   const muteUser = useMutation({
-    mutationFn: ({ userId, durationMinutes, reason }: { userId: number; durationMinutes: number; reason?: string }) =>
-      adminGroupsService.muteUser(conversationId, userId, { duration_minutes: durationMinutes, reason }),
+    mutationFn: ({
+      userId,
+      durationMinutes,
+      reason,
+    }: {
+      userId: number;
+      durationMinutes: number;
+      reason?: string;
+    }) =>
+      adminGroupsService.muteUser(conversationId, userId, {
+        duration_minutes: durationMinutes,
+        reason,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['group-restrictions', conversationId] });
     },
@@ -97,7 +108,8 @@ export function useGroupAdmin({
   });
 
   const adminDeleteMessage = useMutation({
-    mutationFn: (messageId: number) => adminGroupsService.adminDeleteMessage(conversationId, messageId),
+    mutationFn: (messageId: number) =>
+      adminGroupsService.adminDeleteMessage(conversationId, messageId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
     },

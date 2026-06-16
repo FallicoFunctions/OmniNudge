@@ -44,13 +44,7 @@ export function getErrorPatternForSeverity(severity: ErrorSeverity): ErrorPatter
   return severityToPattern[severity];
 }
 
-export function trackError({
-  error,
-  severity,
-  area,
-  pattern,
-  context,
-}: TrackErrorParams): void {
+export function trackError({ error, severity, area, pattern, context }: TrackErrorParams): void {
   const resolvedPattern = pattern ?? getErrorPatternForSeverity(severity);
   const errorObject = error instanceof Error ? error : new Error(String(error));
   const trackingContext = {

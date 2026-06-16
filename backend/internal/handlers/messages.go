@@ -5,18 +5,20 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/omninudge/backend/internal/api/middleware"
-	"github.com/omninudge/backend/internal/ports"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
@@ -118,6 +120,20 @@ func (h *MessagesHandler) canAccessConversation(ctx context.Context, conversatio
 			return false, adminErr
 		}
 		return isAdmin, nil
+	}
+
+	if conversationType == "group" {
+		var isParticipant bool
+		err = h.pool.QueryRow(ctx, `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, conversationID, userID).Scan(&isParticipant)
+		if err != nil {
+			return false, err
+		}
+		return isParticipant, nil
 	}
 
 	conversation, err := h.conversationRepo.GetByID(ctx, conversationID)
@@ -506,11 +522,11 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		var userRole string
 		h.pool.QueryRow(c.Request.Context(), `
 			SELECT role FROM conversation_participants WHERE conversation_id=$1 AND user_id=$2
-		`, req.ConversationID, userID).Scan(&userRole)
+		`, req.ConversationID, userID).Scan(&userRole) //nolint:errcheck // role lookup failure defaults to no exemption; non-fatal
 
 		if userRole != "admin" && userRole != "owner" {
 			var slowMode int
-			h.pool.QueryRow(c.Request.Context(), `SELECT slow_mode_seconds FROM conversations WHERE id=$1`, req.ConversationID).Scan(&slowMode)
+			h.pool.QueryRow(c.Request.Context(), `SELECT slow_mode_seconds FROM conversations WHERE id=$1`, req.ConversationID).Scan(&slowMode) //nolint:errcheck // slow-mode lookup failure defaults to 0 (no slow mode); non-fatal
 			if slowMode > 0 && h.cache != nil {
 				cacheKey := fmt.Sprintf("slowmode:%d:%d", req.ConversationID, userID)
 				if val, exists, _ := h.cache.Get(c.Request.Context(), cacheKey); exists {
@@ -525,7 +541,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 					}
 				}
 				expiryTime := time.Now().Add(time.Duration(slowMode) * time.Second)
-				h.cache.Set(c.Request.Context(), cacheKey, strconv.FormatInt(expiryTime.Unix(), 10), time.Duration(slowMode)*time.Second)
+				_ = h.cache.Set(c.Request.Context(), cacheKey, strconv.FormatInt(expiryTime.Unix(), 10), time.Duration(slowMode)*time.Second)
 			}
 		}
 	}
@@ -556,8 +572,27 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 		// For mod mail, we don't target a single recipient; use sender as recipient to satisfy schema
 		recipientID = userID
+	} else if conversationType == "group" {
+		// Group conversations use conversation_participants; User1ID/User2ID are NULL for groups.
+		var isParticipant bool
+		err = h.pool.QueryRow(c.Request.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, req.ConversationID, userID).Scan(&isParticipant)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to check participant status")
+			return
+		}
+		if !isParticipant {
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
+			return
+		}
+		// Group messages have no single recipient; use sender to satisfy schema.
+		recipientID = userID
 	} else {
-		// For regular conversations, use the existing method
+		// For regular DM conversations, use the existing method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), req.ConversationID)
 		if err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
@@ -1029,7 +1064,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			}
 		}
 
-		targetRecipientID := original.RecipientID
+		targetRecipientID := original.RecipientID //nolint:ineffassign,staticcheck // always overwritten in dm and else branches below
 		if targetConversationType == "dm" {
 			targetConversation, err := h.conversationRepo.GetByID(ctx, targetConversationID)
 			if err != nil {
@@ -1835,8 +1870,24 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 				return
 			}
 		}
+	} else if conversationType == "group" {
+		var isParticipant bool
+		err = h.pool.QueryRow(c.Request.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, conversationID, userID).Scan(&isParticipant)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to check participant status")
+			return
+		}
+		if !isParticipant {
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
+			return
+		}
 	} else {
-		// For regular conversations, use the existing method
+		// For regular DM conversations, use the existing method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 		if err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
@@ -1882,8 +1933,8 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 
 	var messages []*models.Message
 
-	// For mod mail, return all messages for the conversation (all participants can view)
-	if conversationType == "mod_mail" {
+	// For mod mail and group conversations, return all messages for the conversation (all participants can view)
+	if conversationType == "mod_mail" || conversationType == "group" {
 		if useCursorPagination {
 			var payload *models.TimeCursor
 			if cursor != nil {
@@ -2348,6 +2399,22 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 				RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 				return
 			}
+		}
+	} else if conversationType == "group" {
+		var isParticipant bool
+		err = h.pool.QueryRow(c.Request.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, conversationID, userID).Scan(&isParticipant)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to check participant status")
+			return
+		}
+		if !isParticipant {
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
+			return
 		}
 	} else {
 		// For DM conversations, use the traditional method

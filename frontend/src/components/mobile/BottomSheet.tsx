@@ -82,7 +82,11 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
     const currentScrollTop = sheetRef.current?.scrollTop || 0;
 
     // Only allow swipe-to-dismiss when at top of sheet AND swiping down
-    if (currentScrollTop === 0 && touchStartScrollTopRef.current === 0 && deltaY > MOBILE_THRESHOLDS.SWIPE_TO_DISMISS) {
+    if (
+      currentScrollTop === 0 &&
+      touchStartScrollTopRef.current === 0 &&
+      deltaY > MOBILE_THRESHOLDS.SWIPE_TO_DISMISS
+    ) {
       onClose();
     }
   };
@@ -107,7 +111,7 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
         className="fixed bottom-0 left-0 right-0 max-h-[80vh] overflow-y-auto bg-[var(--color-surface)] rounded-t-2xl shadow-xl animate-slide-up"
         style={{
           zIndex: MOBILE_Z_INDEX.BOTTOM_SHEET,
-          paddingBottom: 'env(safe-area-inset-bottom)'
+          paddingBottom: 'env(safe-area-inset-bottom)',
         }}
         role="dialog"
         aria-modal="true"
@@ -116,7 +120,10 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
         {/* Header */}
         {title && (
           <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
-            <h2 id="bottom-sheet-title" className="text-lg font-semibold text-[var(--color-text-primary)]">
+            <h2
+              id="bottom-sheet-title"
+              className="text-lg font-semibold text-[var(--color-text-primary)]"
+            >
               {title}
             </h2>
             <button
@@ -131,9 +138,7 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
         )}
 
         {/* Content */}
-        <div className="py-2">
-          {children}
-        </div>
+        <div className="py-2">{children}</div>
       </div>
     </>
   );

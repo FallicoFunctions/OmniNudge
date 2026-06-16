@@ -11,11 +11,7 @@ type BugReportModalProps = {
   initialUrl?: string;
 };
 
-export default function BugReportModal({
-  isOpen,
-  onClose,
-  initialUrl,
-}: BugReportModalProps) {
+export default function BugReportModal({ isOpen, onClose, initialUrl }: BugReportModalProps) {
   const { t } = useTranslation();
   const [pageUrl, setPageUrl] = useState('');
   const [description, setDescription] = useState('');
@@ -203,22 +199,22 @@ export default function BugReportModal({
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                type="submit"
-                disabled={uploading || submitBugMutation.isPending}
-                className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {uploading || submitBugMutation.isPending
-                  ? t('bugReportModal.actions.submitting')
-                  : t('bugReportModal.actions.submit')}
-              </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={uploading || submitBugMutation.isPending}
+              className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {uploading || submitBugMutation.isPending
+                ? t('bugReportModal.actions.submitting')
+                : t('bugReportModal.actions.submit')}
+            </button>
           </div>
         </form>
       )}

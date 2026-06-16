@@ -59,7 +59,9 @@ function getTwitchEmbed(url: string): string | null {
   }
 
   const videoId = extractMatch(url, [/twitch\.tv\/videos\/([0-9]+)/i]);
-  return videoId ? `https://player.twitch.tv/?video=${videoId}&parent=${window.location.hostname}` : null;
+  return videoId
+    ? `https://player.twitch.tv/?video=${videoId}&parent=${window.location.hostname}`
+    : null;
 }
 
 function getDailymotionEmbed(url: string): string | null {

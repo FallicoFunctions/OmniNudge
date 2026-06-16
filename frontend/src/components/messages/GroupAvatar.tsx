@@ -58,7 +58,13 @@ export function GroupAvatar({ name, avatarUrl, size = 40, className = '' }: Grou
 
   return (
     <div
-      style={{ ...style, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{
+        ...style,
+        background: bg,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
       className={`font-semibold text-white select-none ${className}`}
       aria-label={`${name} group avatar`}
       role="img"

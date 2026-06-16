@@ -94,7 +94,8 @@ export function MultiColumnFeedProvider({ children }: { children: ReactNode }) {
             columnCount: parsed.columnCount || parsed.columns.length,
             columns: parsed.columns,
             activeColumnId: null, // Don't persist active column
-            lastStandardPath: typeof parsed.lastStandardPath === 'string' ? parsed.lastStandardPath : null,
+            lastStandardPath:
+              typeof parsed.lastStandardPath === 'string' ? parsed.lastStandardPath : null,
           };
         }
       } catch (e) {
@@ -125,15 +126,15 @@ export function MultiColumnFeedProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   const setViewMode = useCallback((mode: MultiColumnFeedState['viewMode']) => {
-    setState(prev => ({ ...prev, viewMode: mode }));
+    setState((prev) => ({ ...prev, viewMode: mode }));
   }, []);
 
   const setLastStandardPath = useCallback((path: string | null) => {
-    setState(prev => ({ ...prev, lastStandardPath: path }));
+    setState((prev) => ({ ...prev, lastStandardPath: path }));
   }, []);
 
   const setColumnCount = useCallback((count: number) => {
-    setState(prev => {
+    setState((prev) => {
       const newColumns = [...prev.columns];
       // Add or remove columns as needed
       while (newColumns.length < count) {
@@ -155,20 +156,18 @@ export function MultiColumnFeedProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateColumnConfig = useCallback((columnId: string, config: Partial<ColumnConfig>) => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
-      columns: prev.columns.map(col =>
-        col.id === columnId ? { ...col, ...config } : col
-      ),
+      columns: prev.columns.map((col) => (col.id === columnId ? { ...col, ...config } : col)),
     }));
   }, []);
 
   const setActiveColumn = useCallback((columnId: string | null) => {
-    setState(prev => ({ ...prev, activeColumnId: columnId }));
+    setState((prev) => ({ ...prev, activeColumnId: columnId }));
   }, []);
 
   const addColumn = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       columns: [
         ...prev.columns,
@@ -187,21 +186,21 @@ export function MultiColumnFeedProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeColumn = useCallback((columnId: string) => {
-    setState(prev => {
+    setState((prev) => {
       // Don't allow removing if only one column left
       if (prev.columns.length <= 1) {
         return prev;
       }
       return {
         ...prev,
-        columns: prev.columns.filter(col => col.id !== columnId),
+        columns: prev.columns.filter((col) => col.id !== columnId),
         columnCount: prev.columnCount - 1,
       };
     });
   }, []);
 
   const resetColumns = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       columns: createDefaultColumns(),
       columnCount: 3,
@@ -221,9 +220,7 @@ export function MultiColumnFeedProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <MultiColumnFeedContext.Provider value={value}>
-      {children}
-    </MultiColumnFeedContext.Provider>
+    <MultiColumnFeedContext.Provider value={value}>{children}</MultiColumnFeedContext.Provider>
   );
 }
 

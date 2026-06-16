@@ -1,3 +1,5 @@
+//go:build integration
+
 package integration
 
 import (
@@ -11,8 +13,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/require"
+
+	"github.com/omninudge/backend/internal/models"
 )
 
 func readWebSocketEvent(t *testing.T, conn *websocket.Conn, timeout time.Duration, match func(map[string]interface{}) bool) map[string]interface{} {
@@ -20,7 +23,7 @@ func readWebSocketEvent(t *testing.T, conn *websocket.Conn, timeout time.Duratio
 
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		conn.SetReadDeadline(deadline)
+		conn.SetReadDeadline(deadline) //nolint:errcheck // test helper; deadline error non-fatal
 		var event map[string]interface{}
 		require.NoError(t, conn.ReadJSON(&event))
 		if match(event) {
@@ -72,7 +75,7 @@ func TestWebSocketTypingBroadcast(t *testing.T) {
 	defer bobConn.Close()
 
 	consumeInitialState := func(conn *websocket.Conn) {
-		conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(2 * time.Second)) //nolint:errcheck // test helper; deadline error non-fatal
 		var initial map[string]interface{}
 		require.NoError(t, conn.ReadJSON(&initial))
 		require.Equal(t, "initial_state", initial["type"])
@@ -125,4 +128,3 @@ func TestWebSocketTypingBroadcast(t *testing.T) {
 	})
 	require.Contains(t, evt2["type"], "delivered")
 }
-

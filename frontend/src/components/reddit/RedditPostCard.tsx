@@ -64,7 +64,10 @@ function getExpandableImageUrl(post: RedditPostCardProps['post']): string | unde
 
   // Check direct image URL
   const sanitizedPostUrl = sanitizeHttpUrl(post.url);
-  if (sanitizedPostUrl && (post.post_hint === 'image' || IMAGE_URL_REGEX.test(sanitizedPostUrl.toLowerCase()))) {
+  if (
+    sanitizedPostUrl &&
+    (post.post_hint === 'image' || IMAGE_URL_REGEX.test(sanitizedPostUrl.toLowerCase()))
+  ) {
     return sanitizedPostUrl;
   }
 
