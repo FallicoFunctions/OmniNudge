@@ -122,6 +122,20 @@ func (h *MessagesHandler) canAccessConversation(ctx context.Context, conversatio
 		return isAdmin, nil
 	}
 
+	if conversationType == "group" {
+		var isParticipant bool
+		err = h.pool.QueryRow(ctx, `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, conversationID, userID).Scan(&isParticipant)
+		if err != nil {
+			return false, err
+		}
+		return isParticipant, nil
+	}
+
 	conversation, err := h.conversationRepo.GetByID(ctx, conversationID)
 	if err != nil {
 		return false, err
@@ -1856,8 +1870,24 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 				return
 			}
 		}
+	} else if conversationType == "group" {
+		var isParticipant bool
+		err = h.pool.QueryRow(c.Request.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, conversationID, userID).Scan(&isParticipant)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to check participant status")
+			return
+		}
+		if !isParticipant {
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
+			return
+		}
 	} else {
-		// For regular conversations, use the existing method
+		// For regular DM conversations, use the existing method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 		if err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
@@ -2369,6 +2399,22 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 				RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 				return
 			}
+		}
+	} else if conversationType == "group" {
+		var isParticipant bool
+		err = h.pool.QueryRow(c.Request.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, conversationID, userID).Scan(&isParticipant)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to check participant status")
+			return
+		}
+		if !isParticipant {
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
+			return
 		}
 	} else {
 		// For DM conversations, use the traditional method
