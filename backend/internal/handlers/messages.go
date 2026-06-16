@@ -558,8 +558,27 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 		// For mod mail, we don't target a single recipient; use sender as recipient to satisfy schema
 		recipientID = userID
+	} else if conversationType == "group" {
+		// Group conversations use conversation_participants; User1ID/User2ID are NULL for groups.
+		var isParticipant bool
+		err = h.pool.QueryRow(c.Request.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, req.ConversationID, userID).Scan(&isParticipant)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to check participant status")
+			return
+		}
+		if !isParticipant {
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
+			return
+		}
+		// Group messages have no single recipient; use sender to satisfy schema.
+		recipientID = userID
 	} else {
-		// For regular conversations, use the existing method
+		// For regular DM conversations, use the existing method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), req.ConversationID)
 		if err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to get conversation")

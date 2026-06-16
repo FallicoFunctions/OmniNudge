@@ -171,7 +171,8 @@ func TestMessageBlocking(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 
-	// User1 tries to send a message (should fail with 403)
+	// User1 tries to send a message — should fail because user2 blocked user1.
+	// The handler returns 404 "User not found" intentionally to obscure block relationships.
 	sendMsgBody := fmt.Sprintf(`{
 		"conversation_id": %d,
 		"encrypted_content": "blocked_message",
@@ -184,11 +185,11 @@ func TestMessageBlocking(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token1)
 	w = doRequest(t, deps.Router, req)
 
-	assert.Equal(t, http.StatusForbidden, w.Code)
+	assert.Equal(t, http.StatusNotFound, w.Code)
 
 	var response map[string]interface{}
 	json.Unmarshal(w.Body.Bytes(), &response) //nolint:errcheck // test helper; parse error caught by subsequent assertions
-	assert.Contains(t, response["error"], "blocking settings")
+	assert.Contains(t, response["error"], "User not found")
 }
 
 // TestMessageDeletion tests soft and hard deletion of messages

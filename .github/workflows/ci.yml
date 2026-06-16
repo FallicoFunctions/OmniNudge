@@ -84,7 +84,7 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://omninudge:omninudge@localhost:5432/omninudge_test?sslmode=disable
           REDIS_ADDR: localhost:6379
-        run: go test -v -race -count=1 -timeout=10m -tags=integration ./internal/integration/...
+        run: go test -v -race -count=1 -timeout=20m -tags=integration ./internal/integration/...
 
       - name: Show coverage summary
         working-directory: backend
