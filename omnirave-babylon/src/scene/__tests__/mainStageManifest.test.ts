@@ -406,7 +406,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V16_CrownRiggingSpan');
     expectMainStageMarker('V67_VipGardenPearlBasin_L');
     expectMainStageMarker('V66_BackPlazaSightlinePearlPostCluster_L');
-    expectMainStageMarker('V16_PlazaPaverInlay_0');
+    expectMainStageMarker('V69_PlazaPaverPearlBands');
   });
 
   it('exports named sculptural shell details for the Main Stage crown composition', () => {
@@ -4373,6 +4373,295 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the remaining portal arcade proxies with a baked celestial colonnade assembly', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = [
+      'V5_PortalCap',
+      'V5_PortalApron',
+      'V5_ScreenPlinth',
+      'V5_ArcadeBeam_L',
+      'V5_ArcadeBeam_R',
+      'V5_ArcadeCol_L_0',
+      'V5_ArcadeCol_L_1',
+      'V5_ArcadeCol_L_2',
+      'V5_ArcadeCol_R_0',
+      'V5_ArcadeCol_R_1',
+      'V5_ArcadeCol_R_2',
+      'V5_ArcadeColInner_L_0',
+      'V5_ArcadeColInner_L_1',
+      'V5_ArcadeColInner_L_2',
+      'V5_ArcadeColInner_R_0',
+      'V5_ArcadeColInner_R_1',
+      'V5_ArcadeColInner_R_2',
+      'V7_ArcadeCol_L_0',
+      'V7_ArcadeCol_L_1',
+      'V7_ArcadeCol_L_2',
+      'V7_ArcadeCol_L_3',
+      'V7_ArcadeCol_L_4',
+      'V7_ArcadeCol_R_0',
+      'V7_ArcadeCol_R_1',
+      'V7_ArcadeCol_R_2',
+      'V7_ArcadeCol_R_3',
+      'V7_ArcadeCol_R_4',
+      'V7_ArcadeColGoldBand_L_0',
+      'V7_ArcadeColGoldBand_L_1',
+      'V7_ArcadeColGoldBand_L_2',
+      'V7_ArcadeColGoldBand_L_3',
+      'V7_ArcadeColGoldBand_L_4',
+      'V7_ArcadeColGoldBand_R_0',
+      'V7_ArcadeColGoldBand_R_1',
+      'V7_ArcadeColGoldBand_R_2',
+      'V7_ArcadeColGoldBand_R_3',
+      'V7_ArcadeColGoldBand_R_4',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V68_PortalArcadePearl_L',
+      'V68_PortalArcadePearl_R',
+      'V68_PortalArcadeGoldCrest_L',
+      'V68_PortalArcadeGoldCrest_R',
+      'V68_PortalArcadeCyanSpine_L',
+      'V68_PortalArcadeCyanSpine_R',
+      'V68_PortalArcadeShadowCore_L',
+      'V68_PortalArcadeShadowCore_R',
+      'V68_GrandArcadePearlColonnade_L',
+      'V68_GrandArcadePearlColonnade_R',
+      'V68_GrandArcadeGoldBands_L',
+      'V68_GrandArcadeGoldBands_R',
+      'V68_HeroPortalPearlApron',
+      'V68_HeroPortalGoldCap',
+      'V68_HeroPortalCyanPlinth',
+      'V68_HeroPortalShadowDais',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftPortalArcade = readMeshGeometry('V68_PortalArcadePearl_L');
+    const rightPortalArcade = readMeshGeometry('V68_PortalArcadePearl_R');
+    const leftPortalGold = readMeshGeometry('V68_PortalArcadeGoldCrest_L');
+    const rightPortalGold = readMeshGeometry('V68_PortalArcadeGoldCrest_R');
+    const leftPortalCyan = readMeshGeometry('V68_PortalArcadeCyanSpine_L');
+    const rightPortalCyan = readMeshGeometry('V68_PortalArcadeCyanSpine_R');
+    const leftPortalShadow = readMeshGeometry('V68_PortalArcadeShadowCore_L');
+    const rightPortalShadow = readMeshGeometry('V68_PortalArcadeShadowCore_R');
+    const leftGrandArcade = readMeshGeometry('V68_GrandArcadePearlColonnade_L');
+    const rightGrandArcade = readMeshGeometry('V68_GrandArcadePearlColonnade_R');
+    const leftGrandGold = readMeshGeometry('V68_GrandArcadeGoldBands_L');
+    const rightGrandGold = readMeshGeometry('V68_GrandArcadeGoldBands_R');
+    const portalApron = readMeshGeometry('V68_HeroPortalPearlApron');
+    const portalCap = readMeshGeometry('V68_HeroPortalGoldCap');
+    const portalCyanPlinth = readMeshGeometry('V68_HeroPortalCyanPlinth');
+    const portalShadowDais = readMeshGeometry('V68_HeroPortalShadowDais');
+
+    expect(leftPortalArcade.min[0]).toBeLessThan(-15.6);
+    expect(leftPortalArcade.max[0]).toBeLessThan(-8.0);
+    expect(rightPortalArcade.min[0]).toBeGreaterThan(8.0);
+    expect(rightPortalArcade.max[0]).toBeGreaterThan(15.6);
+    expect(leftPortalArcade.min[1]).toBeLessThan(0.2);
+    expect(rightPortalArcade.min[1]).toBeLessThan(0.2);
+    expect(leftPortalArcade.max[1]).toBeGreaterThan(4.6);
+    expect(rightPortalArcade.max[1]).toBeGreaterThan(4.6);
+    expect(leftPortalArcade.min[2]).toBeLessThan(-13.6);
+    expect(rightPortalArcade.min[2]).toBeLessThan(-13.6);
+    expect(leftPortalArcade.max[2]).toBeGreaterThan(14.2);
+    expect(rightPortalArcade.max[2]).toBeGreaterThan(14.2);
+
+    expect(leftPortalGold.min[1]).toBeGreaterThan(1.8);
+    expect(rightPortalGold.min[1]).toBeGreaterThan(1.8);
+    expect(leftPortalGold.max[1]).toBeGreaterThan(4.1);
+    expect(rightPortalGold.max[1]).toBeGreaterThan(4.1);
+    expect(leftPortalCyan.min[1]).toBeGreaterThan(0.1);
+    expect(rightPortalCyan.min[1]).toBeGreaterThan(0.1);
+    expect(leftPortalCyan.max[1]).toBeGreaterThan(3.8);
+    expect(rightPortalCyan.max[1]).toBeGreaterThan(3.8);
+    expect(leftPortalShadow.min[2]).toBeLessThan(-13.4);
+    expect(rightPortalShadow.min[2]).toBeLessThan(-13.4);
+    expect(leftPortalShadow.max[2]).toBeGreaterThan(14.4);
+    expect(rightPortalShadow.max[2]).toBeGreaterThan(14.4);
+
+    expect(leftGrandArcade.min[0]).toBeLessThan(-59.0);
+    expect(leftGrandArcade.max[0]).toBeLessThan(-27.5);
+    expect(rightGrandArcade.min[0]).toBeGreaterThan(27.5);
+    expect(rightGrandArcade.max[0]).toBeGreaterThan(59.0);
+    expect(leftGrandArcade.min[1]).toBeLessThan(1.8);
+    expect(rightGrandArcade.min[1]).toBeLessThan(1.8);
+    expect(leftGrandArcade.max[1]).toBeGreaterThan(13.2);
+    expect(rightGrandArcade.max[1]).toBeGreaterThan(13.2);
+    expect(leftGrandArcade.min[2]).toBeGreaterThan(6.4);
+    expect(rightGrandArcade.min[2]).toBeGreaterThan(6.4);
+    expect(leftGrandArcade.max[2]).toBeLessThan(8.0);
+    expect(rightGrandArcade.max[2]).toBeLessThan(8.0);
+
+    expect(leftGrandGold.min[1]).toBeGreaterThan(12.0);
+    expect(rightGrandGold.min[1]).toBeGreaterThan(12.0);
+    expect(leftGrandGold.max[1]).toBeGreaterThan(12.7);
+    expect(rightGrandGold.max[1]).toBeGreaterThan(12.7);
+
+    expect(portalApron.min[0]).toBeLessThan(-3.0);
+    expect(portalApron.max[0]).toBeGreaterThan(3.0);
+    expect(portalApron.min[1]).toBeGreaterThan(2.5);
+    expect(portalApron.max[1]).toBeGreaterThan(4.1);
+    expect(portalApron.min[2]).toBeGreaterThan(3.4);
+    expect(portalApron.max[2]).toBeGreaterThan(16.0);
+
+    expect(portalCap.min[1]).toBeGreaterThan(34.7);
+    expect(portalCap.max[1]).toBeGreaterThan(36.4);
+    expect(portalCap.min[2]).toBeGreaterThan(34.5);
+    expect(portalCap.max[2]).toBeGreaterThan(36.7);
+
+    expect(portalCyanPlinth.min[1]).toBeGreaterThan(1.5);
+    expect(portalCyanPlinth.max[1]).toBeGreaterThan(4.8);
+    expect(portalCyanPlinth.min[2]).toBeGreaterThan(20.3);
+    expect(portalCyanPlinth.max[2]).toBeGreaterThan(27.3);
+
+    expect(portalShadowDais.min[1]).toBeGreaterThan(1.4);
+    expect(portalShadowDais.max[1]).toBeGreaterThan(4.3);
+    expect(portalShadowDais.min[2]).toBeGreaterThan(20.2);
+    expect(portalShadowDais.max[2]).toBeGreaterThan(27.5);
+
+    expect(readConnectedComponents('V68_GrandArcadePearlColonnade_L')).toHaveLength(5);
+    expect(readConnectedComponents('V68_GrandArcadePearlColonnade_R')).toHaveLength(5);
+    expect(readConnectedComponents('V68_GrandArcadeGoldBands_L')).toHaveLength(5);
+    expect(readConnectedComponents('V68_GrandArcadeGoldBands_R')).toHaveLength(5);
+    expect(readConnectedComponents('V68_PortalArcadeCyanSpine_L')).toHaveLength(3);
+    expect(readConnectedComponents('V68_PortalArcadeCyanSpine_R')).toHaveLength(3);
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(5_000);
+
+    const minimumVertexCounts = new Map([
+      ['V68_PortalArcadePearl_L', 220],
+      ['V68_PortalArcadePearl_R', 220],
+      ['V68_PortalArcadeGoldCrest_L', 160],
+      ['V68_PortalArcadeGoldCrest_R', 160],
+      ['V68_PortalArcadeCyanSpine_L', 120],
+      ['V68_PortalArcadeCyanSpine_R', 120],
+      ['V68_PortalArcadeShadowCore_L', 96],
+      ['V68_PortalArcadeShadowCore_R', 96],
+      ['V68_GrandArcadePearlColonnade_L', 700],
+      ['V68_GrandArcadePearlColonnade_R', 700],
+      ['V68_GrandArcadeGoldBands_L', 260],
+      ['V68_GrandArcadeGoldBands_R', 260],
+      ['V68_HeroPortalPearlApron', 180],
+      ['V68_HeroPortalGoldCap', 120],
+      ['V68_HeroPortalCyanPlinth', 96],
+      ['V68_HeroPortalShadowDais', 96],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V68_PortalArcadePearl_L', 'V19_GatewayPearlIvory'],
+      ['V68_PortalArcadePearl_R', 'V19_GatewayPearlIvory'],
+      ['V68_PortalArcadeGoldCrest_L', 'V19_ArrivalBrushedGold'],
+      ['V68_PortalArcadeGoldCrest_R', 'V19_ArrivalBrushedGold'],
+      ['V68_PortalArcadeCyanSpine_L', 'V19_ArrivalCyanGlow'],
+      ['V68_PortalArcadeCyanSpine_R', 'V19_ArrivalCyanGlow'],
+      ['V68_PortalArcadeShadowCore_L', 'V20_RecessedWarmShadow'],
+      ['V68_PortalArcadeShadowCore_R', 'V20_RecessedWarmShadow'],
+      ['V68_GrandArcadePearlColonnade_L', 'V19_GatewayPearlIvory'],
+      ['V68_GrandArcadePearlColonnade_R', 'V19_GatewayPearlIvory'],
+      ['V68_GrandArcadeGoldBands_L', 'V19_ArrivalBrushedGold'],
+      ['V68_GrandArcadeGoldBands_R', 'V19_ArrivalBrushedGold'],
+      ['V68_HeroPortalPearlApron', 'V19_GatewayPearlIvory'],
+      ['V68_HeroPortalGoldCap', 'V19_ArrivalBrushedGold'],
+      ['V68_HeroPortalCyanPlinth', 'V19_ArrivalCyanGlow'],
+      ['V68_HeroPortalShadowDais', 'V20_RecessedWarmShadow'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
+  it('replaces the remaining plaza paver inlay proxy rows with authored ceremonial bands', () => {
+    for (const legacyPrefix of ['V16_PlazaPaverInlay_', 'V16_PlazaPaverGoldEdge_']) {
+      expect(nodeNamesWithPrefix(legacyPrefix), `legacy nodes still exported for ${legacyPrefix}`).toHaveLength(0);
+    }
+
+    const requiredReplacementNodes = ['V69_PlazaPaverPearlBands', 'V69_PlazaPaverGoldFiligree'];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const pearlBands = readMeshGeometry('V69_PlazaPaverPearlBands');
+    const goldFiligree = readMeshGeometry('V69_PlazaPaverGoldFiligree');
+
+    expect(pearlBands.min[0]).toBeLessThan(-12.2);
+    expect(pearlBands.max[0]).toBeGreaterThan(12.2);
+    expect(pearlBands.min[1]).toBeGreaterThan(0.18);
+    expect(pearlBands.max[1]).toBeGreaterThan(0.64);
+    expect(pearlBands.min[2]).toBeLessThan(-29.2);
+    expect(pearlBands.max[2]).toBeGreaterThan(35.0);
+
+    expect(goldFiligree.min[0]).toBeLessThan(-12.0);
+    expect(goldFiligree.max[0]).toBeGreaterThan(12.0);
+    expect(goldFiligree.min[1]).toBeGreaterThan(0.34);
+    expect(goldFiligree.max[1]).toBeGreaterThan(0.72);
+    expect(goldFiligree.min[2]).toBeLessThan(-37.2);
+    expect(goldFiligree.max[2]).toBeGreaterThan(34.7);
+
+    expect(readConnectedComponents('V69_PlazaPaverPearlBands')).toHaveLength(10);
+    expect(readConnectedComponents('V69_PlazaPaverGoldFiligree')).toHaveLength(10);
+
+    const pearlCenters = readConnectedComponents('V69_PlazaPaverPearlBands').map(({ min, max }) => [
+      (min[0] + max[0]) / 2,
+      (min[1] + max[1]) / 2,
+      (min[2] + max[2]) / 2,
+    ]);
+    for (const expectedZ of [-29, -21, -13, -5, 0, 3, 11, 19, 27, 35]) {
+      expect(
+        pearlCenters.some(([x, _y, z]) => Math.abs(x) < 0.2 && Math.abs(z - expectedZ) < 0.25),
+        `V69_PlazaPaverPearlBands missing ceremonial band around z=${expectedZ}`,
+      ).toBe(true);
+    }
+
+    const goldCenters = readConnectedComponents('V69_PlazaPaverGoldFiligree').map(({ min, max }) => [
+      (min[0] + max[0]) / 2,
+      (min[1] + max[1]) / 2,
+      (min[2] + max[2]) / 2,
+    ]);
+    for (const expectedZ of [-37.25, -29.25, -21.25, -13.25, -5.25, 2.75, 10.75, 18.75, 26.75, 34.75]) {
+      expect(
+        goldCenters.some(([x, _y, z]) => Math.abs(x) < 0.2 && Math.abs(z - expectedZ) < 0.2),
+        `V69_PlazaPaverGoldFiligree missing trim band around z=${expectedZ}`,
+      ).toBe(true);
+    }
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(3_000);
+
+    const minimumVertexCounts = new Map([
+      ['V69_PlazaPaverPearlBands', 1_600],
+      ['V69_PlazaPaverGoldFiligree', 1_200],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V69_PlazaPaverPearlBands', 'V19_GatewayPearlIvory'],
+      ['V69_PlazaPaverGoldFiligree', 'V19_ArrivalBrushedGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports real PBR texture maps for the Main Stage material families', () => {
     const images = mainStageGlbJson.images ?? [];
     const textures = mainStageGlbJson.textures ?? [];
@@ -4595,7 +4884,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
   });
 
   it('reuses the established Main Stage material library for the V24 crown pass', () => {
-    expect(mainStageGlbJson.materials).toHaveLength(51);
+    expect(mainStageGlbJson.materials).toHaveLength(49);
     expect(
       mainStageGlbJson.materials.some(({ name }: { name?: string }) => name?.startsWith('V24_')),
     ).toBe(false);
