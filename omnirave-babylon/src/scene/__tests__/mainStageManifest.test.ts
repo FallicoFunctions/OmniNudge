@@ -405,7 +405,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
   it('exports named production and garden details for the Main Stage fidelity pass', () => {
     expectMainStageMarker('V16_CrownRiggingSpan');
     expectMainStageMarker('V16_VipGardenBasin_L');
-    expectMainStageMarker('V16_BackPlazaSightlineRail_L');
+    expectMainStageMarker('V66_BackPlazaSightlinePearlPostCluster_L');
     expectMainStageMarker('V16_PlazaPaverInlay_0');
   });
 
@@ -4111,6 +4111,131 @@ describe('MAIN_STAGE_MANIFEST', () => {
       ['V65_ArrivalRunwayCyanThreads', 'V19_ArrivalCyanGlow'],
       ['V65_ArrivalThresholdGoldBands', 'V19_ArrivalBrushedGold'],
       ['V65_ArrivalThresholdShadowGrooves', 'V20_RecessedWarmShadow'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
+  it('replaces the back plaza sightline rail proxies with authored balustrades', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = [
+      'V16_BackPlazaSightlineRail_L',
+      'V16_BackPlazaSightlineRail_R',
+      'V16_BackPlazaRailPost_L_0',
+      'V16_BackPlazaRailPost_L_1',
+      'V16_BackPlazaRailPost_L_2',
+      'V16_BackPlazaRailPost_L_3',
+      'V16_BackPlazaRailPost_L_4',
+      'V16_BackPlazaRailPost_R_0',
+      'V16_BackPlazaRailPost_R_1',
+      'V16_BackPlazaRailPost_R_2',
+      'V16_BackPlazaRailPost_R_3',
+      'V16_BackPlazaRailPost_R_4',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V66_BackPlazaSightlinePearlPostCluster_L',
+      'V66_BackPlazaSightlinePearlPostCluster_R',
+      'V66_BackPlazaSightlineGoldRail_L',
+      'V66_BackPlazaSightlineGoldRail_R',
+      'V66_BackPlazaSightlineCyanThread_L',
+      'V66_BackPlazaSightlineCyanThread_R',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftPosts = readMeshGeometry('V66_BackPlazaSightlinePearlPostCluster_L');
+    const rightPosts = readMeshGeometry('V66_BackPlazaSightlinePearlPostCluster_R');
+    const leftGold = readMeshGeometry('V66_BackPlazaSightlineGoldRail_L');
+    const rightGold = readMeshGeometry('V66_BackPlazaSightlineGoldRail_R');
+    const leftCyan = readMeshGeometry('V66_BackPlazaSightlineCyanThread_L');
+    const rightCyan = readMeshGeometry('V66_BackPlazaSightlineCyanThread_R');
+
+    expect(leftPosts.min[0]).toBeLessThan(-27.6);
+    expect(leftPosts.max[0]).toBeGreaterThan(-9.4);
+    expect(leftPosts.min[1]).toBeGreaterThan(-0.01);
+    expect(leftPosts.max[1]).toBeGreaterThan(1.45);
+    expect(leftPosts.min[2]).toBeLessThan(-49.67);
+    expect(leftPosts.max[2]).toBeGreaterThan(-49.33);
+
+    expect(rightPosts.min[0]).toBeLessThan(9.4);
+    expect(rightPosts.max[0]).toBeGreaterThan(27.6);
+    expect(rightPosts.min[1]).toBeGreaterThan(-0.01);
+    expect(rightPosts.max[1]).toBeGreaterThan(1.45);
+    expect(rightPosts.min[2]).toBeLessThan(-49.67);
+    expect(rightPosts.max[2]).toBeGreaterThan(-49.33);
+
+    for (const rail of [leftGold, rightGold]) {
+      expect(rail.min[1]).toBeGreaterThan(0.95);
+      expect(rail.max[1]).toBeGreaterThan(1.35);
+      expect(rail.min[2]).toBeLessThan(-49.60);
+      expect(rail.max[2]).toBeGreaterThan(-49.39);
+    }
+
+    for (const thread of [leftCyan, rightCyan]) {
+      expect(thread.min[1]).toBeGreaterThan(1.0);
+      expect(thread.max[1]).toBeGreaterThan(1.18);
+      expect(thread.min[2]).toBeLessThan(-49.54);
+      expect(thread.max[2]).toBeGreaterThan(-49.46);
+    }
+
+    expect(readConnectedComponents('V66_BackPlazaSightlinePearlPostCluster_L')).toHaveLength(5);
+    expect(readConnectedComponents('V66_BackPlazaSightlinePearlPostCluster_R')).toHaveLength(5);
+    expect(readConnectedComponents('V66_BackPlazaSightlineGoldRail_L')).toHaveLength(1);
+    expect(readConnectedComponents('V66_BackPlazaSightlineGoldRail_R')).toHaveLength(1);
+    expect(readConnectedComponents('V66_BackPlazaSightlineCyanThread_L')).toHaveLength(1);
+    expect(readConnectedComponents('V66_BackPlazaSightlineCyanThread_R')).toHaveLength(1);
+
+    const expectedLeftXs = [-27.5, -23.0, -18.5, -14.0, -9.5];
+    const expectedRightXs = [9.5, 14.0, 18.5, 23.0, 27.5];
+    for (const [nodeName, expectedXs] of [
+      ['V66_BackPlazaSightlinePearlPostCluster_L', expectedLeftXs],
+      ['V66_BackPlazaSightlinePearlPostCluster_R', expectedRightXs],
+    ] as const) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedX of expectedXs) {
+        expect(
+          centers.some(([x, z]) => Math.abs(x - expectedX) < 0.18 && Math.abs(z + 49.5) < 0.12),
+          `${nodeName} missing baluster near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(1_800);
+
+    const minimumVertexCounts = new Map([
+      ['V66_BackPlazaSightlinePearlPostCluster_L', 700],
+      ['V66_BackPlazaSightlinePearlPostCluster_R', 700],
+      ['V66_BackPlazaSightlineGoldRail_L', 220],
+      ['V66_BackPlazaSightlineGoldRail_R', 220],
+      ['V66_BackPlazaSightlineCyanThread_L', 160],
+      ['V66_BackPlazaSightlineCyanThread_R', 160],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V66_BackPlazaSightlinePearlPostCluster_L', 'V19_GatewayPearlIvory'],
+      ['V66_BackPlazaSightlinePearlPostCluster_R', 'V19_GatewayPearlIvory'],
+      ['V66_BackPlazaSightlineGoldRail_L', 'V19_ArrivalBrushedGold'],
+      ['V66_BackPlazaSightlineGoldRail_R', 'V19_ArrivalBrushedGold'],
+      ['V66_BackPlazaSightlineCyanThread_L', 'V19_ArrivalCyanGlow'],
+      ['V66_BackPlazaSightlineCyanThread_R', 'V19_ArrivalCyanGlow'],
     ]);
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
