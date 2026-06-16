@@ -64,8 +64,10 @@ interface SettingsContextType {
   setTypingIndicators: (value: boolean) => void;
   showLastSeen: boolean;
   setShowLastSeen: (value: boolean) => void;
-  profileVisibility: 'public' | 'friends_only' | 'private';
-  setProfileVisibility: (value: 'public' | 'friends_only' | 'private') => void;
+  profileVisibility: 'public' | 'private';
+  setProfileVisibility: (value: 'public' | 'private') => void;
+  wallPostPermission: 'all_friends' | 'requires_approval' | 'no_one';
+  setWallPostPermission: (value: 'all_friends' | 'requires_approval' | 'no_one') => void;
   notificationSound: boolean;
   setNotificationSound: (value: boolean) => void;
   showPushNotifications: boolean;
@@ -115,7 +117,8 @@ interface StoredSettings {
   readReceipts?: boolean;
   typingIndicators?: boolean;
   showLastSeen?: boolean;
-  profileVisibility?: 'public' | 'friends_only' | 'private';
+  profileVisibility?: 'public' | 'private';
+  wallPostPermission?: 'all_friends' | 'requires_approval' | 'no_one';
   notificationSound?: boolean;
   showPushNotifications?: boolean;
   notifyCommentReplies?: boolean;
@@ -127,7 +130,7 @@ interface StoredSettings {
   settingsVersion?: number;
 }
 
-const CURRENT_SETTINGS_VERSION = 12;
+const CURRENT_SETTINGS_VERSION = 13;
 
 const getStoredSettings = (): StoredSettings => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -165,7 +168,11 @@ const getStoredSettings = (): StoredSettings => {
           readReceipts: parsed.readReceipts ?? true,
           typingIndicators: parsed.typingIndicators ?? true,
           showLastSeen: parsed.showLastSeen ?? true,
-          profileVisibility: parsed.profileVisibility ?? 'public',
+          profileVisibility:
+            (parsed.profileVisibility as string) === 'friends_only'
+              ? 'private'
+              : parsed.profileVisibility ?? 'public',
+          wallPostPermission: parsed.wallPostPermission ?? 'all_friends',
           notificationSound: parsed.notificationSound ?? true,
           notifyCommentReplies: parsed.notifyCommentReplies ?? true,
           notifyPostMilestone: parsed.notifyPostMilestone ?? true,
@@ -306,9 +313,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.showLastSeen ?? true;
   });
-  const [profileVisibility, setProfileVisibilityState] = useState<'public' | 'friends_only' | 'private'>(() => {
+  const [profileVisibility, setProfileVisibilityState] = useState<'public' | 'private'>(() => {
     const settings = getStoredSettings();
     return settings.profileVisibility ?? 'public';
+  });
+  const [wallPostPermission, setWallPostPermissionState] = useState<
+    'all_friends' | 'requires_approval' | 'no_one'
+  >(() => {
+    const settings = getStoredSettings();
+    return settings.wallPostPermission ?? 'all_friends';
   });
   const [notificationSound, setNotificationSoundState] = useState<boolean>(() => {
     const settings = getStoredSettings();
@@ -385,8 +398,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setReadReceiptsState(settings.show_read_receipts ?? true);
         setTypingIndicatorsState(settings.show_typing_indicators ?? true);
         setShowLastSeenState(settings.show_last_seen ?? true);
-        setProfileVisibilityState(
-          (settings.profile_visibility as 'public' | 'friends_only' | 'private') ?? 'public'
+        setProfileVisibilityState((settings.profile_visibility as 'public' | 'private') ?? 'public');
+        setWallPostPermissionState(
+          (settings.wall_post_permission as 'all_friends' | 'requires_approval' | 'no_one') ?? 'all_friends'
         );
         setNotificationSoundState(settings.notification_sound ?? true);
         setShowPushNotificationsState(settings.show_push_notifications ?? true);
@@ -440,6 +454,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         typingIndicators,
         showLastSeen,
         profileVisibility,
+        wallPostPermission,
         notificationSound,
         showPushNotifications,
         notifyCommentReplies,
@@ -484,6 +499,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     typingIndicators,
     showLastSeen,
     profileVisibility,
+    wallPostPermission,
     notificationSound,
     showPushNotifications,
     notifyCommentReplies,
@@ -781,13 +797,23 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const setProfileVisibility = (value: 'public' | 'friends_only' | 'private') => {
+  const setProfileVisibility = (value: 'public' | 'private') => {
     const previous = profileVisibility;
     setProfileVisibilityState(value);
     if (!hasAuthToken()) return;
     void userSettingsService.update({ profile_visibility: value }).catch((error) => {
       console.error('[Settings] Failed to update profile visibility setting:', error);
       setProfileVisibilityState(previous);
+    });
+  };
+
+  const setWallPostPermission = (value: 'all_friends' | 'requires_approval' | 'no_one') => {
+    const previous = wallPostPermission;
+    setWallPostPermissionState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ wall_post_permission: value }).catch((error) => {
+      console.error('[Settings] Failed to update wall post permission setting:', error);
+      setWallPostPermissionState(previous);
     });
   };
 
@@ -932,6 +958,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setShowLastSeen,
         profileVisibility,
         setProfileVisibility,
+        wallPostPermission,
+        setWallPostPermission,
         notificationSound,
         setNotificationSound,
         showPushNotifications,

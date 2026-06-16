@@ -20,6 +20,7 @@ export interface UserProfile {
   created_at: string;
   last_seen?: string | null;
   moderated_hubs?: ModeratedHubSummary[];
+  locked?: boolean;
 }
 
 export interface TopFriendEntry {
@@ -34,7 +35,7 @@ export interface TopFriendsResponse {
 }
 
 export interface TopFriendsConfig {
-  count: 0 | 2 | 4 | 6 | 8;
+  count: number;
   best_friend?: string | null;
   friends: string[];
 }
@@ -67,8 +68,6 @@ export interface MutualFriendsResponse {
   mutual_friends: MutualFriendEntry[];
 }
 
-export type WallVisibility = 'public' | 'friends_only' | 'private';
-
 export type WallReactionType = 'like' | 'dislike';
 
 export interface WallPostMedia {
@@ -93,6 +92,7 @@ export interface WallPost {
   comment_count: number;
   liked_by_viewer: boolean;
   disliked_by_viewer: boolean;
+  status: 'pending' | 'approved';
   created_at: string;
   updated_at: string;
 }
@@ -121,9 +121,16 @@ export interface WallReactionResponse {
 export interface WallPostsResponse {
   posts: WallPost[];
   can_post: boolean;
-  wall_visibility: WallVisibility;
+  friend_count: number;
+  own_post_count: number;
+  reply_count: number;
+  photo_count: number;
 }
 
 export interface WallPostCommentsResponse {
   comments: WallPostComment[];
+}
+
+export interface PendingWallPostsResponse {
+  posts: WallPost[];
 }

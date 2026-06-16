@@ -16,7 +16,7 @@ interface AccountMenuProps {
   onUpgrade?: () => void;
 }
 
-export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugReport, plan, planExpiresAt, onUpgrade }: AccountMenuProps) {
+export function AccountMenu({ username, isAdmin, onLogout, onBugReport, plan, planExpiresAt, onUpgrade }: AccountMenuProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);

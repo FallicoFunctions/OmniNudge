@@ -8,7 +8,7 @@ import { resolveMediaUrl } from '../../utils/mediaUrl';
 import type { TopFriendsConfig } from '../../types/users';
 import { useToast } from '../../hooks/useToast';
 
-const TOP_FRIEND_COUNTS = [0, 2, 4, 6, 8] as const;
+const MAX_TOP_FRIENDS = 8;
 
 interface Props {
   username: string;
@@ -23,7 +23,6 @@ interface PickerProps {
 }
 
 function TopFriendsPicker({ currentConfig, onSave, onCancel, isSaving }: PickerProps) {
-  const [count, setCount] = useState<0 | 2 | 4 | 6 | 8>(currentConfig.count);
   const [selected, setSelected] = useState<string[]>(currentConfig.friends ?? []);
   const [bestFriend, setBestFriend] = useState<string>(currentConfig.best_friend ?? '');
 
@@ -32,9 +31,7 @@ function TopFriendsPicker({ currentConfig, onSave, onCancel, isSaving }: PickerP
     queryFn: () => friendsService.getFriends(),
   });
 
-  // Remove any pre-selected entries that are no longer friends (unfriended / deleted account)
-  // so invisible stale entries cannot permanently fill slots and block the Save button.
-  // Must run in useEffect — calling setState during render is a React rules violation.
+  // Remove stale pre-selected entries for unfriended / deleted accounts.
   useEffect(() => {
     if (!friendsQuery.data) return;
     const currentSet = new Set(friendsQuery.data.map((f) => f.username));
@@ -46,38 +43,22 @@ function TopFriendsPicker({ currentConfig, onSave, onCancel, isSaving }: PickerP
   }, [friendsQuery.data]);
 
   const toggleFriend = (username: string) => {
-    // Compute next selected list without side effects inside the updater.
     const next = selected.includes(username)
       ? selected.filter((u) => u !== username)
-      : count > 0 && selected.length >= count
+      : selected.length >= MAX_TOP_FRIENDS
         ? selected
         : [...selected, username];
 
     setSelected(next);
-
-    // Clear bestFriend if it was just deselected — done outside the setter.
-    if (!next.includes(bestFriend)) {
-      setBestFriend('');
-    }
-  };
-
-  const handleCountChange = (newCount: 0 | 2 | 4 | 6 | 8) => {
-    setCount(newCount);
-    if (newCount === 0) {
-      setSelected([]);
-      setBestFriend('');
-    } else if (selected.length > newCount) {
-      const trimmed = selected.slice(0, newCount);
-      setSelected(trimmed);
-      if (!trimmed.includes(bestFriend)) setBestFriend('');
-    }
+    if (!next.includes(bestFriend)) setBestFriend('');
   };
 
   const handleSave = () => {
-    onSave({ count, friends: selected, best_friend: bestFriend || null });
+    onSave({ count: selected.length, friends: selected, best_friend: bestFriend || null });
   };
 
   const friends = friendsQuery.data ?? [];
+  const atMax = selected.length >= MAX_TOP_FRIENDS;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -87,95 +68,79 @@ function TopFriendsPicker({ currentConfig, onSave, onCancel, isSaving }: PickerP
         </h3>
 
         <div className="mt-4">
-          <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">
-            Show
-          </label>
-          <div className="flex gap-2 flex-wrap">
-            {TOP_FRIEND_COUNTS.map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => handleCountChange(n as 0 | 2 | 4 | 6 | 8)}
-                className={`px-3 py-1.5 rounded-full text-sm font-semibold border transition ${
-                  count === n
-                    ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
-                    : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]'
-                }`}
-              >
-                {n === 0 ? 'Off' : `${n} friends`}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {count > 0 && (
-          <div className="mt-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">
-              Select {count} friends ({selected.length}/{count})
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">
+            Select friends ({selected.length}/{MAX_TOP_FRIENDS})
+          </p>
+          {friendsQuery.isLoading ? (
+            <p className="text-sm text-[var(--color-text-secondary)]">Loading friends…</p>
+          ) : friends.length === 0 ? (
+            <p className="text-sm text-[var(--color-text-secondary)]">No friends yet.</p>
+          ) : (
+            <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
+              {friends.map((f) => {
+                const isSelected = selected.includes(f.username);
+                const isBest = bestFriend === f.username;
+                const isDisabled = !isSelected && atMax;
+                return (
+                  <div
+                    key={f.username}
+                    className={`flex items-center gap-3 rounded-md px-3 py-2 transition border ${
+                      isSelected
+                        ? 'bg-[var(--color-primary)]/10 border-[var(--color-primary)]/30 cursor-pointer'
+                        : isDisabled
+                          ? 'border-transparent opacity-40 cursor-not-allowed'
+                          : 'hover:bg-[var(--color-surface-elevated)] border-transparent cursor-pointer'
+                    }`}
+                    onClick={() => !isDisabled && toggleFriend(f.username)}
+                  >
+                    {f.avatar_url ? (
+                      <img
+                        src={resolveMediaUrl(f.avatar_url)}
+                        alt={f.username}
+                        className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg bg-[var(--color-border)] flex items-center justify-center text-xs font-semibold text-[var(--color-text-secondary)] flex-shrink-0">
+                        {f.username.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="flex-1 text-sm font-medium text-[var(--color-text-primary)]">
+                      {f.username}
+                    </span>
+                    {isSelected && (
+                      <button
+                        type="button"
+                        title={isBest ? 'Remove best friend' : 'Set as best friend'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBestFriend(isBest ? '' : f.username);
+                        }}
+                        className={`text-lg transition ${isBest ? 'text-yellow-400' : 'text-[var(--color-text-muted)] hover:text-yellow-400'}`}
+                      >
+                        ★
+                      </button>
+                    )}
+                    {isSelected && (
+                      <svg className="w-4 h-4 text-[var(--color-primary)]" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {bestFriend && (
+            <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+              ★ <span className="font-medium">{bestFriend}</span> is your best friend
             </p>
-            {friendsQuery.isLoading ? (
-              <p className="text-sm text-[var(--color-text-secondary)]">Loading friends…</p>
-            ) : friends.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-secondary)]">No friends yet.</p>
-            ) : (
-              <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
-                {friends.map((f) => {
-                  const isSelected = selected.includes(f.username);
-                  const isBest = bestFriend === f.username;
-                  return (
-                    <div
-                      key={f.username}
-                      className={`flex items-center gap-3 rounded-md px-3 py-2 cursor-pointer transition ${
-                        isSelected
-                          ? 'bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30'
-                          : 'hover:bg-[var(--color-surface-elevated)] border border-transparent'
-                      }`}
-                      onClick={() => toggleFriend(f.username)}
-                    >
-                      {f.avatar_url ? (
-                        <img
-                          src={resolveMediaUrl(f.avatar_url)}
-                          alt={f.username}
-                          className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-lg bg-[var(--color-border)] flex items-center justify-center text-xs font-semibold text-[var(--color-text-secondary)] flex-shrink-0">
-                          {f.username.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <span className="flex-1 text-sm font-medium text-[var(--color-text-primary)]">
-                        {f.username}
-                      </span>
-                      {isSelected && (
-                        <button
-                          type="button"
-                          title={isBest ? 'Remove best friend' : 'Set as best friend'}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setBestFriend(isBest ? '' : f.username);
-                          }}
-                          className={`text-lg transition ${isBest ? 'text-yellow-400' : 'text-[var(--color-text-muted)] hover:text-yellow-400'}`}
-                        >
-                          ★
-                        </button>
-                      )}
-                      {isSelected && (
-                        <svg className="w-4 h-4 text-[var(--color-primary)]" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {bestFriend && (
-              <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                ★ <span className="font-medium">{bestFriend}</span> is your best friend
-              </p>
-            )}
-          </div>
-        )}
+          )}
+          {atMax && (
+            <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+              Maximum of {MAX_TOP_FRIENDS} top friends reached.
+            </p>
+          )}
+        </div>
 
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -189,7 +154,7 @@ function TopFriendsPicker({ currentConfig, onSave, onCancel, isSaving }: PickerP
           <button
             type="button"
             onClick={handleSave}
-            disabled={isSaving || (count > 0 && selected.length !== count)}
+            disabled={isSaving}
             className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
             {isSaving ? 'Saving…' : 'Save'}
@@ -226,16 +191,14 @@ export default function TopFriendsSection({ username, isOwnProfile }: Props) {
 
   const isLoading = topFriendsQuery.isLoading;
   const data = topFriendsQuery.data;
-  const count = data?.count ?? 0;
   const friends = data?.friends ?? [];
   const bestFriend = data?.best_friend ?? '';
 
-  // For non-owners: show a loading skeleton while the query is in flight,
-  // then hide the section only after we've confirmed count === 0.
-  if (!isOwnProfile && !isLoading && count === 0) return null;
+  // For non-owners: hide the section once we know there are no top friends.
+  if (!isOwnProfile && !isLoading && friends.length === 0) return null;
 
   const currentConfig: TopFriendsConfig = {
-    count: (count as 0 | 2 | 4 | 6 | 8),
+    count: friends.length,
     best_friend: bestFriend || null,
     friends: friends.map((f) => f.username),
   };
@@ -269,15 +232,15 @@ export default function TopFriendsSection({ username, isOwnProfile }: Props) {
               </div>
             ))}
           </div>
-        ) : count === 0 || friends.length === 0 ? (
+        ) : friends.length === 0 ? (
           isOwnProfile ? (
             <p className="text-xs text-[var(--color-text-muted)]">
               Click Edit to set your top friends.
             </p>
           ) : null
         ) : (
-          // Grid: 2 cols for 2 friends, 4 cols for 4+
-          <div className={`grid gap-3 ${count <= 2 ? 'grid-cols-2' : 'grid-cols-4'}`}>
+          // Grid: 2 cols for ≤2 friends, 4 cols for more
+          <div className={`grid gap-3 ${friends.length <= 2 ? 'grid-cols-2' : 'grid-cols-4'}`}>
             {friends.map((friend) => (
               <Link
                 key={friend.username}

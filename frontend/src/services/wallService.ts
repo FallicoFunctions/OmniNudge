@@ -1,5 +1,6 @@
 import { api } from '../lib/api';
 import type {
+  PendingWallPostsResponse,
   WallPost,
   WallPostComment,
   WallPostCommentsResponse,
@@ -7,7 +8,6 @@ import type {
   WallPostsResponse,
   WallReactionResponse,
   WallReactionType,
-  WallVisibility,
 } from '../types/users';
 
 export const wallService = {
@@ -48,7 +48,11 @@ export const wallService = {
     return api.post<WallReactionResponse>(`/wall-posts/${postId}/comments/${commentId}/reaction`, { reaction });
   },
 
-  async setWallVisibility(visibility: WallVisibility): Promise<void> {
-    await api.put('/users/me/wall-visibility', { wall_visibility: visibility });
+  async getPendingWallPosts(limit = 20, offset = 0): Promise<PendingWallPostsResponse> {
+    return api.get<PendingWallPostsResponse>(`/users/me/wall/pending?limit=${limit}&offset=${offset}`);
+  },
+
+  async approveWallPost(id: number): Promise<void> {
+    await api.post(`/wall-posts/${id}/approve`, {});
   },
 };

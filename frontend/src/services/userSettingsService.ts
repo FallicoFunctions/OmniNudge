@@ -10,6 +10,7 @@ export type UpdateUserSettingsRequest = Partial<
     | 'show_push_notifications'
     | 'show_last_seen'
     | 'profile_visibility'
+    | 'wall_post_permission'
     | 'use_relative_time'
     | 'auto_close_theme_selector'
     | 'notify_archived_messages'

@@ -163,33 +163,15 @@ export default function UserProfilePage() {
   });
   const { refetch: refetchProfile } = profileQuery;
 
-  const postsQuery = useQuery({
-    queryKey: ['user-profile-posts', username],
-    queryFn: () => usersService.getPosts(username!),
-    enabled: !!username,
-    staleTime: 1000 * 60 * 5,
-  });
-
-  const commentsQuery = useQuery({
-    queryKey: ['user-profile-comments', username],
-    queryFn: () => usersService.getComments(username!),
-    enabled: !!username,
-    staleTime: 1000 * 60 * 5,
-  });
+  const profile = profileQuery.data;
 
   const wallQuery = useQuery({
     queryKey: ['wall-posts', username],
     queryFn: () => wallService.getWallPosts(username!),
-    enabled: !!username,
+    enabled: !!username && !profile?.locked,
     staleTime: 1000 * 30,
   });
 
-  const profile = profileQuery.data;
-  const posts = useMemo(() => postsQuery.data?.posts ?? [], [postsQuery.data?.posts]);
-  const comments = useMemo(
-    () => commentsQuery.data?.comments ?? [],
-    [commentsQuery.data?.comments]
-  );
   const wallMedia = useMemo(() => {
     const items: WallPostMedia[] = [];
     for (const post of wallQuery.data?.posts ?? []) {
@@ -335,7 +317,7 @@ export default function UserProfilePage() {
           </div>
         </div>
         <div className="max-w-6xl mx-auto px-4 py-6 flex gap-6">
-          <div className="hidden lg:block w-72 space-y-3">
+          <div className="hidden md:block w-72 space-y-3">
             <Skeleton variant="rectangular" width="100%" height="120px" />
             <Skeleton variant="rectangular" width="100%" height="90px" />
           </div>
@@ -353,6 +335,83 @@ export default function UserProfilePage() {
     return (
       <div className="mx-auto w-full max-w-5xl px-4 py-8">
         <ErrorMessage>{t('userProfilePage.errors.loadFailed')}</ErrorMessage>
+      </div>
+    );
+  }
+
+  function FriendActionButtons() {
+    return (
+      <>
+        {friendshipStatus === 'accepted' && (
+          <button
+            type="button"
+            disabled={removeFriendMutation.isPending || friendActionDisabled}
+            onClick={() => removeFriendMutation.mutate()}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-success)] px-3 py-1.5 text-sm font-semibold text-[var(--color-success)] hover:opacity-80 disabled:opacity-50 transition"
+          >
+            ✓ {t('friends.actions.friends')}
+          </button>
+        )}
+        {friendshipStatus === 'pending_outgoing' && (
+          <button
+            type="button"
+            disabled={cancelOrDeclineFriendMutation.isPending || friendActionDisabled}
+            onClick={() => cancelOrDeclineFriendMutation.mutate()}
+            className="inline-flex items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50 transition"
+          >
+            {t('friends.actions.cancelRequest')}
+          </button>
+        )}
+        {friendshipStatus === 'pending_incoming' && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={acceptFriendMutation.isPending || friendActionDisabled}
+              onClick={() => acceptFriendMutation.mutate()}
+              className="inline-flex items-center rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
+            >
+              {t('friends.actions.accept')}
+            </button>
+            <button
+              type="button"
+              disabled={cancelOrDeclineFriendMutation.isPending || friendActionDisabled}
+              onClick={() => cancelOrDeclineFriendMutation.mutate()}
+              className="inline-flex items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50 transition"
+            >
+              {t('friends.actions.decline')}
+            </button>
+          </div>
+        )}
+        {friendshipStatus === 'none' && (
+          <button
+            type="button"
+            disabled={friendRequestMutation.isPending || friendActionDisabled}
+            onClick={() => friendRequestMutation.mutate()}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white disabled:opacity-50 transition"
+          >
+            + {t('friends.actions.addFriend')}
+          </button>
+        )}
+      </>
+    );
+  }
+
+  if (profile.locked) {
+    return (
+      <div className="mx-auto w-full max-w-2xl px-4 py-12 flex flex-col items-center gap-3 text-center">
+        <h1 className="text-xl md:text-2xl font-bold text-[var(--color-text-primary)]">{profile.username}</h1>
+        <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.locked.message')}</p>
+        {user && canMessageUser && !isBlocked ? (
+          <FriendActionButtons />
+        ) : !user ? (
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }))}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition"
+          >
+            + {t('friends.actions.addFriend')}
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -422,11 +481,6 @@ export default function UserProfilePage() {
               )}
               <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                 {t('userProfilePage.labels.joined', { time: createdLabel })}
-                {' · '}
-                <span className="font-semibold text-[var(--color-text-secondary)]">
-                  {formatNumber(profile.karma)}
-                </span>{' '}
-                {t('userProfilePage.labels.karma')}
               </p>
             </div>
 
@@ -456,60 +510,7 @@ export default function UserProfilePage() {
                 </Link>
               )}
               {/* Friend buttons */}
-              {user && canMessageUser && !isBlocked && (
-                <>
-                  {friendshipStatus === 'accepted' && (
-                    <button
-                      type="button"
-                      disabled={removeFriendMutation.isPending || friendActionDisabled}
-                      onClick={() => removeFriendMutation.mutate()}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-success)] px-3 py-1.5 text-sm font-semibold text-[var(--color-success)] hover:opacity-80 disabled:opacity-50 transition"
-                    >
-                      ✓ {t('friends.actions.friends')}
-                    </button>
-                  )}
-                  {friendshipStatus === 'pending_outgoing' && (
-                    <button
-                      type="button"
-                      disabled={cancelOrDeclineFriendMutation.isPending || friendActionDisabled}
-                      onClick={() => cancelOrDeclineFriendMutation.mutate()}
-                      className="inline-flex items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50 transition"
-                    >
-                      {t('friends.actions.cancelRequest')}
-                    </button>
-                  )}
-                  {friendshipStatus === 'pending_incoming' && (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={acceptFriendMutation.isPending || friendActionDisabled}
-                        onClick={() => acceptFriendMutation.mutate()}
-                        className="inline-flex items-center rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
-                      >
-                        {t('friends.actions.accept')}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={cancelOrDeclineFriendMutation.isPending || friendActionDisabled}
-                        onClick={() => cancelOrDeclineFriendMutation.mutate()}
-                        className="inline-flex items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50 transition"
-                      >
-                        {t('friends.actions.decline')}
-                      </button>
-                    </div>
-                  )}
-                  {friendshipStatus === 'none' && (
-                    <button
-                      type="button"
-                      disabled={friendRequestMutation.isPending || friendActionDisabled}
-                      onClick={() => friendRequestMutation.mutate()}
-                      className="inline-flex items-center gap-1 rounded-md border border-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white disabled:opacity-50 transition"
-                    >
-                      + {t('friends.actions.addFriend')}
-                    </button>
-                  )}
-                </>
-              )}
+              {user && canMessageUser && !isBlocked && <FriendActionButtons />}
               {canMessageUser && (
                 <button
                   type="button"
@@ -552,34 +553,46 @@ export default function UserProfilePage() {
             </p>
           )}
           <div className="mt-3 pt-3 border-t border-[var(--color-border)] flex flex-wrap gap-4 text-sm">
+            <Link to={`/users/${username}/friends`} className="hover:underline">
+              <span className="font-semibold text-[var(--color-text-primary)]">
+                {wallQuery.isLoading ? '—' : formatNumber(wallQuery.data?.friend_count ?? 0)}
+              </span>
+              <span className="text-[var(--color-text-secondary)] ml-1">
+                {t('userProfilePage.labels.friends')}
+              </span>
+            </Link>
             <div>
-              <span className="font-bold text-[var(--color-text-primary)]">{formatNumber(profile.karma)}</span>
-              <span className="text-[var(--color-text-secondary)] ml-1">{t('userProfilePage.labels.karma')}</span>
+              <span className="font-semibold text-[var(--color-text-primary)]">
+                {wallQuery.isLoading ? '—' : formatNumber(wallQuery.data?.photo_count ?? 0)}
+              </span>
+              <span className="text-[var(--color-text-secondary)] ml-1">
+                {t('userProfilePage.labels.photos')}
+              </span>
             </div>
-            <Link to={`/users/${username}/activity`} className="hover:underline">
-              <span className="font-semibold text-[var(--color-text-primary)]">
-                {postsQuery.isLoading ? '—' : formatNumber(postsQuery.data?.total ?? posts.length)}
-              </span>
-              <span className="text-[var(--color-text-secondary)] ml-1">Posts</span>
-            </Link>
-            <Link to={`/users/${username}/activity?tab=comments`} className="hover:underline">
-              <span className="font-semibold text-[var(--color-text-primary)]">
-                {commentsQuery.isLoading ? '—' : formatNumber(commentsQuery.data?.total ?? comments.length)}
-              </span>
-              <span className="text-[var(--color-text-secondary)] ml-1">Comments</span>
-            </Link>
             <div>
-              <span className="font-semibold text-[var(--color-text-primary)]">{createdLabel}</span>
-              <span className="text-[var(--color-text-secondary)] ml-1">Member since</span>
+              <span className="font-semibold text-[var(--color-text-primary)]">
+                {wallQuery.isLoading ? '—' : formatNumber(wallQuery.data?.own_post_count ?? 0)}
+              </span>
+              <span className="text-[var(--color-text-secondary)] ml-1">
+                {t('userProfilePage.labels.wallPosts')}
+              </span>
+            </div>
+            <div>
+              <span className="font-semibold text-[var(--color-text-primary)]">
+                {wallQuery.isLoading ? '—' : formatNumber(wallQuery.data?.reply_count ?? 0)}
+              </span>
+              <span className="text-[var(--color-text-secondary)] ml-1">
+                {t('userProfilePage.labels.replies')}
+              </span>
             </div>
           </div>
         </div>
 
         {/* ── 3-column layout: Friends | Wall | Activity ──────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_300px] gap-6 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_240px] lg:grid-cols-[260px_1fr_300px] gap-4 lg:gap-6 items-start">
 
           {/* ── Left: Friends ────────────────────────────────────────────── */}
-          <aside className="order-2 lg:order-1 flex flex-col gap-3">
+          <aside className="order-2 md:order-1 flex flex-col gap-3">
             {username && (
               <TopFriendsSection username={username} isOwnProfile={canViewPrivateTabs} />
             )}
@@ -622,6 +635,10 @@ export default function UserProfilePage() {
         onUploadAvatar={async (file) => {
           const uploadResult = await usersService.uploadAvatar(file);
           return uploadResult.avatar_url;
+        }}
+        onUploadBanner={async (file) => {
+          const uploadResult = await usersService.uploadBanner(file);
+          return uploadResult.banner_url;
         }}
         isSaving={updateProfileMutation.isPending}
         onSave={async (payload) => {
