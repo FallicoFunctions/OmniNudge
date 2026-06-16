@@ -19,44 +19,32 @@ var gzipWriterPool = sync.Pool{
 }
 
 // Compression middleware compresses responses with gzip when the client supports it.
-// It wraps the response writer before handlers run so ALL writes go through the gzip
-// writer — never bypassing it — which avoids partial/corrupt responses.
+// It skips already-compressed content types (images, video, audio) by checking the
+// Content-Type header inside WriteHeader, before any body bytes have been sent.
 func Compression() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Only compress when the client advertises gzip support
 		if !strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
 			c.Next()
 			return
 		}
 
-		// Get a pooled gzip writer and redirect it to this response
 		gz := gzipWriterPool.Get().(*gzip.Writer)
 		gz.Reset(c.Writer)
 
-		// Wrap the response writer; all handler writes go through gz
 		grw := &gzipResponseWriter{
 			ResponseWriter: c.Writer,
-			Writer:         gz,
+			gz:             gz,
 		}
 		c.Writer = grw
 
-		// Announce compressed encoding
 		c.Header("Content-Encoding", "gzip")
 		c.Header("Vary", "Accept-Encoding")
-		// Remove Content-Length — it is invalid after compression
 		c.Writer.Header().Del("Content-Length")
 
 		defer func() {
-			// Skip gzip for already-compressed content types (set by the handler)
-			ct := grw.Header().Get("Content-Type")
-			if shouldNotCompress(ct) {
-				// Restore original writer; gzip headers already sent so we have to
-				// flush gz with no data and reset headers in the best-effort fashion.
-				gz.Reset(io.Discard)
-				gzipWriterPool.Put(gz)
-				return
+			if !grw.bypass {
+				gz.Close()
 			}
-			gz.Close()
 			gzipWriterPool.Put(gz)
 		}()
 
@@ -66,22 +54,44 @@ func Compression() gin.HandlerFunc {
 
 type gzipResponseWriter struct {
 	gin.ResponseWriter
-	Writer *gzip.Writer
+	gz     *gzip.Writer
+	bypass bool // true once we decide to skip compression for this response
 }
 
-// Write sends data through the gzip compressor — always, no size bypass.
-// A size bypass would corrupt responses because Content-Encoding: gzip is
-// already set in the header; the client will try to decompress everything.
+// WriteHeader is called by the handler after Content-Type is set but before any
+// body bytes are written. This is the earliest safe point to check whether we
+// should actually compress — if not, we cancel gzip here while headers are still mutable.
+func (g *gzipResponseWriter) WriteHeader(code int) {
+	if !g.bypass && shouldNotCompress(g.Header().Get("Content-Type")) {
+		g.Header().Del("Content-Encoding")
+		g.gz.Reset(io.Discard)
+		g.bypass = true
+	}
+	g.ResponseWriter.WriteHeader(code)
+}
+
+// Write routes body bytes through gzip or directly to the underlying writer.
+// If WriteHeader was never explicitly called (rare but valid), we check Content-Type
+// here too so we don't accidentally compress the first write.
 func (g *gzipResponseWriter) Write(data []byte) (int, error) {
-	return g.Writer.Write(data)
+	if !g.bypass && !g.ResponseWriter.Written() {
+		if shouldNotCompress(g.Header().Get("Content-Type")) {
+			g.Header().Del("Content-Encoding")
+			g.gz.Reset(io.Discard)
+			g.bypass = true
+		}
+	}
+	if g.bypass {
+		return g.ResponseWriter.Write(data)
+	}
+	return g.gz.Write(data)
 }
 
-// Flush flushes both the gzip stream and the underlying TCP buffer so that
-// streaming endpoints (SSE, chunked) deliver data to the client immediately.
+// Flush flushes the gzip stream and the underlying TCP buffer.
 func (g *gzipResponseWriter) Flush() {
-	// Flush compressed data into the underlying writer
-	_ = g.Writer.Flush()
-	// Flush the underlying Gin ResponseWriter (HTTP/TCP buffer)
+	if !g.bypass {
+		_ = g.gz.Flush()
+	}
 	g.ResponseWriter.Flush()
 }
 
