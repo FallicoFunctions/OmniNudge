@@ -197,7 +197,7 @@ export function PlatformPostCard({
   }, [post.id, post.media_url, post.thumbnail_url]);
 
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
-    const failedSrc = event.currentTarget.currentSrc || event.currentTarget.src;
+    const failedSrc = event.currentTarget.getAttribute('src') || event.currentTarget.src;
     if (!failedSrc) return;
     setFailedImageSrcs((prev) => (prev.includes(failedSrc) ? prev : [...prev, failedSrc]));
   };

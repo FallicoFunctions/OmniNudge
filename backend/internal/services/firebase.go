@@ -53,7 +53,7 @@ func (s *FirebaseService) SendNotification(ctx context.Context, token, title, bo
 	// Send the message
 	response, err := s.client.Send(ctx, message)
 	if err != nil {
-		if messaging.IsRegistrationTokenNotRegistered(err) {
+		if messaging.IsUnregistered(err) {
 			return fmt.Errorf("registration-token-not-registered")
 		}
 		if messaging.IsInvalidArgument(err) {

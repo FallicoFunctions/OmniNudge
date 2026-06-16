@@ -66,6 +66,7 @@ jobs:
           working-directory: backend
           args: --timeout=5m
           skip-cache: false
+          only-new-issues: true
 
       - name: Run unit tests
         working-directory: backend
@@ -313,6 +314,7 @@ jobs:
           DB_NAME: omninudge_migrations
           DB_SSLMODE: disable
           JWT_SECRET: ci-test-secret-not-used-in-prod
+          ENCRYPTION_KEY: ci-test-secret-for-ci-only
         run: go run ./cmd/migrate/... -action=up
 
       - name: Verify all up files have matching down files

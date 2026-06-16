@@ -2,7 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SettingsPage from '../SettingsPage';
+
+function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
 
 const setShowPushNotifications = vi.fn();
 const setAutoUnarchiveOnMessage = vi.fn();
@@ -167,11 +179,7 @@ describe('SettingsPage push toggle', () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(true));
     disablePush.mockResolvedValue(true);
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
+    renderPage();
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
     fireEvent.click(
@@ -188,11 +196,7 @@ describe('SettingsPage push toggle', () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(false));
     enablePush.mockResolvedValue(true);
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
+    renderPage();
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
     fireEvent.click(
@@ -209,11 +213,7 @@ describe('SettingsPage push toggle', () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(true));
     disablePush.mockResolvedValue(false);
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
+    renderPage();
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
     fireEvent.click(
@@ -230,11 +230,7 @@ describe('SettingsPage push toggle', () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(false));
     enablePush.mockResolvedValue(false);
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
+    renderPage();
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
     fireEvent.click(
@@ -256,11 +252,7 @@ describe('SettingsPage messaging privacy toggles', () => {
   it('updates auto-unarchive preference from privacy tab', async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(true));
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
+    renderPage();
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.privacy' }));
     fireEvent.click(
@@ -289,11 +281,7 @@ describe('SettingsPage data export', () => {
       note: 'note',
     });
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
+    renderPage();
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.privacy' }));
     fireEvent.change(screen.getByLabelText('Confirm password'), {

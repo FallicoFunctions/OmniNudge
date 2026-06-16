@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	apiresponse "github.com/omninudge/backend/internal/api/response"
 )
 
@@ -53,11 +54,6 @@ func DeprecationWarning(sunsetDate string, successorURL string) gin.HandlerFunc 
 
 		c.Next()
 
-		// Add deprecation notice to JSON responses (if applicable)
-		if c.Writer.Header().Get("Content-Type") == "application/json" {
-			// Note: This modifies the response, so use with caution
-			// Alternatively, document that clients should check headers
-		}
 	}
 }
 
