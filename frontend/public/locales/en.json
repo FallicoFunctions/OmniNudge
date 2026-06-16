@@ -1186,9 +1186,12 @@
     "labels": {
       "joined": "Joined {{time}}",
       "lastSeen": "Last seen {{time}}",
-      "karma": "karma",
       "blocked": "Blocked",
-      "location": "Location"
+      "location": "Location",
+      "friends": "Friends",
+      "photos": "Photos",
+      "wallPosts": "Self Posts",
+      "replies": "Friend Posts"
     },
     "mutualFriends": {
       "count_one": "{{count}} mutual friend",
@@ -1219,6 +1222,9 @@
     "errors": {
       "loadFailed": "Unable to load user profile.",
       "friendsLoadFailed": "Unable to load this user's friends."
+    },
+    "locked": {
+      "message": "This profile is private. Add this person as a friend to see their full profile."
     },
     "aria": {
       "avatarAlt": "Avatar for {{username}}"
@@ -1276,13 +1282,9 @@
       "delete": "Delete",
       "deletePostConfirm": "Delete this wall post?",
       "deleteCommentConfirm": "Delete this comment?",
-      "visibilityPublic": "Public",
-      "visibilityFriends": "Friends only",
-      "visibilityPrivate": "Only me",
-      "visibilityUpdated": "Wall visibility updated.",
-      "visibilityUpdateFailed": "Failed to update wall visibility.",
       "loadFailed": "Unable to load wall posts.",
       "postFailed": "Failed to post to the wall.",
+      "postPendingApproval": "Your post is awaiting approval.",
       "commentFailed": "Failed to post comment.",
       "likeFailed": "Failed to update like.",
       "deleteFailed": "Failed to delete.",
@@ -1290,7 +1292,16 @@
       "uploadingMedia": "Uploading…",
       "removeMedia": "Remove",
       "mediaUploadFailed": "Failed to upload media.",
-      "tooManyMedia": "You can attach up to {{max}} files."
+      "tooManyMedia": "You can attach up to {{max}} files.",
+      "previousMedia": "Previous media",
+      "nextMedia": "Next media",
+      "pending": {
+        "heading": "Pending posts",
+        "approve": "Approve",
+        "reject": "Reject",
+        "approveFailed": "Failed to approve post.",
+        "rejectFailed": "Failed to reject post."
+      }
     }
   },
   "redditPostPage": {
@@ -2171,10 +2182,14 @@
       "lastSeen": "Last seen",
       "lastSeenHelp": "Show others when you were last active. When disabled, your last seen time may be hidden from public profile views.",
       "profileVisibility": "Profile visibility",
-      "profileVisibilityHelp": "Control who can view your public profile details.",
+      "profileVisibilityHelp": "Public profiles can be viewed by anyone. Private profiles only show your username and an Add Friend button to people who aren't your friends.",
       "profileVisibilityPublic": "Public",
-      "profileVisibilityFriendsOnly": "Friends only",
-      "profileVisibilityPrivate": "Private"
+      "profileVisibilityPrivate": "Private",
+      "wallPostPermission": "Wall posting permission",
+      "wallPostPermissionHelp": "Control whether friends can post on your wall, and if their posts need your approval first.",
+      "wallPostPermissionAllFriends": "Any friend can post",
+      "wallPostPermissionRequiresApproval": "Friends can post, but I must approve first",
+      "wallPostPermissionNoOne": "No one can post on my wall"
     },
     "dateTime": {
       "title": "Date & Time Display",

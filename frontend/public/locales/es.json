@@ -1186,9 +1186,12 @@
     "labels": {
       "joined": "Se unió {{time}}",
       "lastSeen": "Visto por última vez {{time}}",
-      "karma": "karma",
       "blocked": "Bloqueado",
-      "location": "Ubicación"
+      "location": "Ubicación",
+      "friends": "Amigos",
+      "photos": "Fotos",
+      "wallPosts": "Publicaciones propias",
+      "replies": "Publicaciones de amigos"
     },
     "mutualFriends": {
       "count_one": "{{count}} amigo en común",
@@ -1219,6 +1222,9 @@
     "errors": {
       "loadFailed": "No se pudo cargar el perfil del usuario.",
       "friendsLoadFailed": "No se pudieron cargar los amigos de este usuario."
+    },
+    "locked": {
+      "message": "Este perfil es privado. Agrega a esta persona como amigo para ver su perfil completo."
     },
     "aria": {
       "avatarAlt": "Avatar de {{username}}"
@@ -1276,13 +1282,9 @@
       "delete": "Eliminar",
       "deletePostConfirm": "¿Eliminar esta publicación del muro?",
       "deleteCommentConfirm": "¿Eliminar este comentario?",
-      "visibilityPublic": "Público",
-      "visibilityFriends": "Solo amigos",
-      "visibilityPrivate": "Solo yo",
-      "visibilityUpdated": "Visibilidad del muro actualizada.",
-      "visibilityUpdateFailed": "No se pudo actualizar la visibilidad del muro.",
       "loadFailed": "No se pudieron cargar las publicaciones del muro.",
       "postFailed": "No se pudo publicar en el muro.",
+      "postPendingApproval": "Tu publicación está pendiente de aprobación.",
       "commentFailed": "No se pudo publicar el comentario.",
       "likeFailed": "No se pudo actualizar el me gusta.",
       "deleteFailed": "No se pudo eliminar.",
@@ -1290,7 +1292,16 @@
       "uploadingMedia": "Subiendo…",
       "removeMedia": "Quitar",
       "mediaUploadFailed": "No se pudo subir el archivo.",
-      "tooManyMedia": "Puedes adjuntar hasta {{max}} archivos."
+      "tooManyMedia": "Puedes adjuntar hasta {{max}} archivos.",
+      "previousMedia": "Contenido anterior",
+      "nextMedia": "Contenido siguiente",
+      "pending": {
+        "heading": "Publicaciones pendientes",
+        "approve": "Aprobar",
+        "reject": "Rechazar",
+        "approveFailed": "No se pudo aprobar la publicación.",
+        "rejectFailed": "No se pudo rechazar la publicación."
+      }
     }
   },
   "redditPostPage": {
@@ -2171,10 +2182,14 @@
       "lastSeen": "Visto por última vez",
       "lastSeenHelp": "Muestra a otros cuándo estuviste activo por última vez. Cuando está desactivado, tu hora de visto por última vez puede ocultarse en las vistas públicas del perfil.",
       "profileVisibility": "Visibilidad del perfil",
-      "profileVisibilityHelp": "Controla quién puede ver los detalles públicos de tu perfil.",
+      "profileVisibilityHelp": "Los perfiles públicos pueden ser vistos por cualquiera. Los perfiles privados solo muestran tu nombre de usuario y un botón de Agregar amigo a quienes no son tus amigos.",
       "profileVisibilityPublic": "Público",
-      "profileVisibilityFriendsOnly": "Solo amigos",
-      "profileVisibilityPrivate": "Privado"
+      "profileVisibilityPrivate": "Privado",
+      "wallPostPermission": "Permiso para publicar en el muro",
+      "wallPostPermissionHelp": "Controla si tus amigos pueden publicar en tu muro y si sus publicaciones necesitan tu aprobación primero.",
+      "wallPostPermissionAllFriends": "Cualquier amigo puede publicar",
+      "wallPostPermissionRequiresApproval": "Los amigos pueden publicar, pero debo aprobarlo primero",
+      "wallPostPermissionNoOne": "Nadie puede publicar en mi muro"
     },
     "dateTime": {
       "title": "Visualización de Fecha y Hora",
