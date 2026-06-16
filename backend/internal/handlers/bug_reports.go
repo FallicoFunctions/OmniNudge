@@ -577,12 +577,12 @@ func notifyFeedbackWebhook(payload notifyFeedbackPayload) {
 			}).DialContext,
 		},
 	}
-	req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewReader(encoded))
+	req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewReader(encoded)) //nolint:gosec // #nosec G704 -- URL is operator-configured env var, not user input
 	if err != nil {
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // #nosec G704 -- request targets operator-configured webhook URL
 	if err != nil {
 		return
 	}
