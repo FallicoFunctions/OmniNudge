@@ -43,6 +43,9 @@ const prefetchRoutes = {
   profile: () => import('../pages/UserProfilePage'),
 };
 
+// Captured at module load so components don't call Date.now() during render
+const MODULE_LOAD_TIME = Date.now();
+
 export default function MainLayout() {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
@@ -467,7 +470,7 @@ export default function MainLayout() {
       {(() => {
         if (user?.plan !== 'paid' || !user.plan_expires_at) return null;
         const daysLeft = Math.ceil(
-          (new Date(user.plan_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          (new Date(user.plan_expires_at).getTime() - MODULE_LOAD_TIME) / (1000 * 60 * 60 * 24)
         );
         if (daysLeft > 3 || daysLeft <= 0) return null;
         return (

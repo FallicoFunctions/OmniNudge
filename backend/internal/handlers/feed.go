@@ -537,7 +537,7 @@ func (h *FeedHandler) fetchSubredditWithCache(
 
 	// Cache the result (5 minute TTL)
 	if data, err := json.Marshal(posts); err == nil {
-		h.cache.Set(ctx, cacheKey, string(data), 5*time.Minute)
+		_ = h.cache.Set(ctx, cacheKey, string(data), 5*time.Minute)
 	}
 
 	return posts

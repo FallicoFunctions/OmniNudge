@@ -941,7 +941,9 @@ func (h *PostsHandler) sendPostDeletionModMail(post *models.PlatformPost, modera
 		return
 	}
 
-	tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		zlog.Error().Err(err).Msg("posts: failed to commit modmail transaction")
+	}
 }
 
 // VotePost votes on a post (upvote, downvote, or clear).

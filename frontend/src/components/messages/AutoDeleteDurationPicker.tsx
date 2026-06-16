@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AutoDeleteDuration } from '../../types/messages';
 
@@ -38,8 +38,10 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
   // B is scrolled next.
   const incrementRef = useRef(increment);
   const decrementRef = useRef(decrement);
-  incrementRef.current = increment;
-  decrementRef.current = decrement;
+  useLayoutEffect(() => {
+    incrementRef.current = increment;
+    decrementRef.current = decrement;
+  });
 
   // Attach once — non-passive so preventDefault() works to block page scroll.
   // stopPropagation prevents the event reaching adjacent dials.
