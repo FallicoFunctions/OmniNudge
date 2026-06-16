@@ -47,10 +47,10 @@ func (r *FeatureFlagRepository) GetFlag(ctx context.Context, key string) (*model
 	}
 
 	if len(metadataJSON) > 0 {
-		json.Unmarshal(metadataJSON, &flag.Metadata)
+		_ = json.Unmarshal(metadataJSON, &flag.Metadata)
 	}
 	if len(rollbackJSON) > 0 {
-		json.Unmarshal(rollbackJSON, &flag.Rollback)
+		_ = json.Unmarshal(rollbackJSON, &flag.Rollback)
 	}
 
 	return &flag, nil

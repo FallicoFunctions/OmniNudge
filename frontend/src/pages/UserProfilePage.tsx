@@ -339,7 +339,7 @@ export default function UserProfilePage() {
     );
   }
 
-  function FriendActionButtons() {
+  function renderFriendActionButtons() {
     return (
       <>
         {friendshipStatus === 'accepted' && (
@@ -402,7 +402,7 @@ export default function UserProfilePage() {
         <h1 className="text-xl md:text-2xl font-bold text-[var(--color-text-primary)]">{profile.username}</h1>
         <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.locked.message')}</p>
         {user && canMessageUser && !isBlocked ? (
-          <FriendActionButtons />
+          renderFriendActionButtons()
         ) : !user ? (
           <button
             type="button"
@@ -510,7 +510,7 @@ export default function UserProfilePage() {
                 </Link>
               )}
               {/* Friend buttons */}
-              {user && canMessageUser && !isBlocked && <FriendActionButtons />}
+              {user && canMessageUser && !isBlocked && renderFriendActionButtons()}
               {canMessageUser && (
                 <button
                   type="button"

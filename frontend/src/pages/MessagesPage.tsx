@@ -2364,11 +2364,10 @@ export default function MessagesPage() {
       if (el) el.scrollTop = el.scrollHeight;
     };
 
-    let rAFId: number;
     let observer: MutationObserver | null = null;
     let stabiliseTimer: ReturnType<typeof setTimeout> | null = null;
 
-    rAFId = requestAnimationFrame(() => {
+    const rAFId = requestAnimationFrame(() => {
       scrollEl();
       const el = slideshowChatScrollRef.current;
       if (!el) return;

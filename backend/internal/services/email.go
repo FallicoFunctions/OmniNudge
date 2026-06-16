@@ -274,7 +274,7 @@ func (s *EmailService) sendWithTLS(addr string, auth smtp.Auth, message string, 
 	if err != nil {
 		return fmt.Errorf("email: smtp new client: %w", err)
 	}
-	defer client.Quit()
+	defer func() { _ = client.Quit() }()
 
 	if err := client.Auth(auth); err != nil {
 		return fmt.Errorf("email: smtp auth: %w", err)

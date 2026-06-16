@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // CommentsHandler handles HTTP requests for post comments
@@ -603,7 +604,9 @@ func (h *CommentsHandler) sendCommentDeletionModMail(comment *models.PostComment
 		return
 	}
 
-	tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		zlog.Error().Err(err).Msg("comments: failed to commit modmail transaction")
+	}
 }
 
 // UpdateCommentPreferencesRequest toggles inbox reply notifications for post comments

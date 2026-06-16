@@ -525,7 +525,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 					}
 				}
 				expiryTime := time.Now().Add(time.Duration(slowMode) * time.Second)
-				h.cache.Set(c.Request.Context(), cacheKey, strconv.FormatInt(expiryTime.Unix(), 10), time.Duration(slowMode)*time.Second)
+				_ = h.cache.Set(c.Request.Context(), cacheKey, strconv.FormatInt(expiryTime.Unix(), 10), time.Duration(slowMode)*time.Second)
 			}
 		}
 	}

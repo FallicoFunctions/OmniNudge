@@ -205,7 +205,7 @@ func (h *LogHandler) HandleFrontendLogs(c *gin.Context) {
 			event.SessionID = &sid
 		}
 
-		h.analytics.TrackEvent(c.Request.Context(), event)
+		_ = h.analytics.TrackEvent(c.Request.Context(), event)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "logged"})

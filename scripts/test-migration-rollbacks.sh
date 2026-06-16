@@ -77,11 +77,6 @@ if [ ! -d "$MIGRATIONS_DIR" ]; then
     error "Migrations directory not found: $MIGRATIONS_DIR"
 fi
 
-# Check if migrate tool exists
-if [ ! -f "$MIGRATE_TOOL" ]; then
-    error "Migrate tool not found: $MIGRATE_TOOL"
-fi
-
 success "Pre-flight checks passed"
 
 # =============================================================================

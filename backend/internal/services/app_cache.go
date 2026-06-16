@@ -280,7 +280,7 @@ func CacheAside[T any](
 	go func() {
 		data, err := json.Marshal(result)
 		if err == nil {
-			cache.Set(context.Background(), key, string(data), ttl)
+			_ = cache.Set(context.Background(), key, string(data), ttl)
 		}
 	}()
 

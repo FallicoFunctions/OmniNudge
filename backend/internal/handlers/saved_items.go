@@ -189,7 +189,7 @@ func (h *SavedItemsHandler) pruneRemovedRedditPosts(c *gin.Context, userID int, 
 		result := <-resultsChan
 
 		if result.err != nil {
-			c.Error(fmt.Errorf("failed to fetch reddit post info for %s/%s: %w", result.post.Subreddit, result.post.RedditPostID, result.err))
+			_ = c.Error(fmt.Errorf("failed to fetch reddit post info for %s/%s: %w", result.post.Subreddit, result.post.RedditPostID, result.err))
 			// Keep the post if we couldn't verify it was removed
 			filtered = append(filtered, result.post)
 			continue
@@ -197,7 +197,7 @@ func (h *SavedItemsHandler) pruneRemovedRedditPosts(c *gin.Context, userID int, 
 
 		if result.isRemoved {
 			if err := h.savedRepo.RemoveRedditPost(ctx, userID, result.post.Subreddit, result.post.RedditPostID); err != nil {
-				c.Error(fmt.Errorf("failed to remove stale reddit post %s/%s: %w", result.post.Subreddit, result.post.RedditPostID, err))
+				_ = c.Error(fmt.Errorf("failed to remove stale reddit post %s/%s: %w", result.post.Subreddit, result.post.RedditPostID, err))
 				filtered = append(filtered, result.post)
 				continue
 			}
@@ -220,11 +220,7 @@ func isLocallyRemovedRedditPost(post *models.SavedRedditPost) bool {
 	}
 
 	author := normalizeSavedText(post.Author)
-	if author == "[deleted]" {
-		return true
-	}
-
-	return false
+	return author == "[deleted]"
 }
 
 func normalizeSavedText(value string) string {

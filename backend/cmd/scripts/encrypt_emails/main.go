@@ -81,7 +81,7 @@ func main() {
 	// Confirm before proceeding
 	fmt.Print("\nThis will encrypt all plaintext emails. Continue? (yes/no): ")
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	if response != "yes" {
 		log.Println("Migration cancelled")
 		os.Exit(0)
