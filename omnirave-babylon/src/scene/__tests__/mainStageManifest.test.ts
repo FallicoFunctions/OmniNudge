@@ -3710,6 +3710,140 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the basin garden and water slab proxies with terraced reflecting parterres', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = [
+      'V7_BasinGardenLong_L',
+      'V7_BasinGardenLong_R',
+      'V7_BasinRetainingGold_L',
+      'V7_BasinRetainingGold_R',
+      'V7_BasinWaterLongAxis',
+      'V7_BasinWaterScreenReflection',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V63_BasinGardenTerrace_L',
+      'V63_BasinGardenTerrace_R',
+      'V63_BasinGardenGoldCrest_L',
+      'V63_BasinGardenGoldCrest_R',
+      'V63_BasinWaterParterre',
+      'V63_BasinScreenReflectionVeil',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftTerrace = readMeshGeometry('V63_BasinGardenTerrace_L');
+    const rightTerrace = readMeshGeometry('V63_BasinGardenTerrace_R');
+    const leftGold = readMeshGeometry('V63_BasinGardenGoldCrest_L');
+    const rightGold = readMeshGeometry('V63_BasinGardenGoldCrest_R');
+    const water = readMeshGeometry('V63_BasinWaterParterre');
+    const reflection = readMeshGeometry('V63_BasinScreenReflectionVeil');
+
+    expect(leftTerrace.min[0]).toBeLessThan(-10.3);
+    expect(leftTerrace.max[0]).toBeLessThan(-6.5);
+    expect(rightTerrace.min[0]).toBeGreaterThan(6.5);
+    expect(rightTerrace.max[0]).toBeGreaterThan(10.3);
+    expect(leftTerrace.min[1]).toBeLessThan(-25.0);
+    expect(leftTerrace.max[1]).toBeGreaterThan(51.0);
+    expect(rightTerrace.min[1]).toBeLessThan(-25.0);
+    expect(rightTerrace.max[1]).toBeGreaterThan(51.0);
+    expect(leftTerrace.min[2]).toBeLessThan(-1.2);
+    expect(leftTerrace.max[2]).toBeLessThan(-0.1);
+    expect(rightTerrace.min[2]).toBeLessThan(-1.2);
+    expect(rightTerrace.max[2]).toBeLessThan(-0.1);
+
+    expect(leftGold.min[0]).toBeLessThan(-7.1);
+    expect(leftGold.max[0]).toBeLessThan(-6.3);
+    expect(rightGold.min[0]).toBeGreaterThan(6.3);
+    expect(rightGold.max[0]).toBeGreaterThan(7.1);
+    expect(leftGold.min[1]).toBeLessThan(-24.0);
+    expect(leftGold.max[1]).toBeGreaterThan(50.0);
+    expect(rightGold.min[1]).toBeLessThan(-24.0);
+    expect(rightGold.max[1]).toBeGreaterThan(50.0);
+    expect(leftGold.min[2]).toBeLessThan(-1.3);
+    expect(leftGold.max[2]).toBeLessThan(-0.55);
+    expect(rightGold.min[2]).toBeLessThan(-1.3);
+    expect(rightGold.max[2]).toBeLessThan(-0.55);
+
+    expect(water.min[0]).toBeLessThan(-6.0);
+    expect(water.max[0]).toBeGreaterThan(6.0);
+    expect(water.min[1]).toBeLessThan(-25.0);
+    expect(water.max[1]).toBeGreaterThan(51.0);
+    expect(water.min[2]).toBeLessThan(-0.42);
+    expect(water.max[2]).toBeLessThan(-0.16);
+
+    expect(reflection.min[0]).toBeLessThan(-6.6);
+    expect(reflection.max[0]).toBeGreaterThan(6.6);
+    expect(reflection.min[1]).toBeLessThan(-28.0);
+    expect(reflection.max[1]).toBeLessThan(-5.7);
+    expect(reflection.min[2]).toBeLessThan(-0.38);
+    expect(reflection.max[2]).toBeLessThan(-0.23);
+
+    expect(readConnectedComponents('V63_BasinGardenTerrace_L')).toHaveLength(8);
+    expect(readConnectedComponents('V63_BasinGardenTerrace_R')).toHaveLength(8);
+    expect(readConnectedComponents('V63_BasinGardenGoldCrest_L')).toHaveLength(4);
+    expect(readConnectedComponents('V63_BasinGardenGoldCrest_R')).toHaveLength(4);
+    expect(readConnectedComponents('V63_BasinWaterParterre')).toHaveLength(8);
+    expect(readConnectedComponents('V63_BasinScreenReflectionVeil')).toHaveLength(1);
+
+    const expectedRows = [-16.2, 3.3, 22.7, 42.2];
+    const centerChecks = new Map([
+      ['V63_BasinGardenTerrace_L', -8.6],
+      ['V63_BasinGardenTerrace_R', 8.6],
+      ['V63_BasinGardenGoldCrest_L', -6.8],
+      ['V63_BasinGardenGoldCrest_R', 6.8],
+      ['V63_BasinWaterParterre', 0],
+    ]);
+    for (const [nodeName, expectedX] of centerChecks) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedZ of expectedRows) {
+        expect(
+          centers.some(([x, y]) => Math.abs(x - expectedX) < 0.3 && Math.abs(y - expectedZ) < 0.9),
+          `${nodeName} missing parterre component around x=${expectedX}, z=${expectedZ}`,
+        ).toBe(true);
+      }
+    }
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(5_500);
+    const minimumVertexCounts = new Map([
+      ['V63_BasinGardenTerrace_L', 1_400],
+      ['V63_BasinGardenTerrace_R', 1_400],
+      ['V63_BasinGardenGoldCrest_L', 500],
+      ['V63_BasinGardenGoldCrest_R', 500],
+      ['V63_BasinWaterParterre', 1_400],
+      ['V63_BasinScreenReflectionVeil', 140],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V63_BasinGardenTerrace_L', 'V19_GatewayPearlIvory'],
+      ['V63_BasinGardenTerrace_R', 'V19_GatewayPearlIvory'],
+      ['V63_BasinGardenGoldCrest_L', 'V19_ArrivalBrushedGold'],
+      ['V63_BasinGardenGoldCrest_R', 'V19_ArrivalBrushedGold'],
+      ['V63_BasinWaterParterre', 'V14_DeepReflectingWater'],
+      ['V63_BasinScreenReflectionVeil', 'V14_CosmicScreenEmission'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports real PBR texture maps for the Main Stage material families', () => {
     const images = mainStageGlbJson.images ?? [];
     const textures = mainStageGlbJson.textures ?? [];
@@ -3820,7 +3954,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
 
     expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
-      16.4 * 1024 * 1024,
+      16.5 * 1024 * 1024,
     );
   });
 
