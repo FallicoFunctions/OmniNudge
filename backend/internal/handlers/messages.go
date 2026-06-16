@@ -1933,8 +1933,8 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 
 	var messages []*models.Message
 
-	// For mod mail, return all messages for the conversation (all participants can view)
-	if conversationType == "mod_mail" {
+	// For mod mail and group conversations, return all messages for the conversation (all participants can view)
+	if conversationType == "mod_mail" || conversationType == "group" {
 		if useCursorPagination {
 			var payload *models.TimeCursor
 			if cursor != nil {
