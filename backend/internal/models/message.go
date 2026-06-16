@@ -82,7 +82,7 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // deferred rollback error is intentionally discarded; tx commit outcome takes precedence
 
 	query := `
 		INSERT INTO messages (
@@ -725,7 +725,7 @@ func (r *MessageRepository) HardDelete(ctx context.Context, messageID int) error
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // deferred rollback error is intentionally discarded; tx commit outcome takes precedence
 
 	// If the message is a thread root/ancestor, preserve its ID as a tombstone so replies remain navigable.
 	_, err = tx.Exec(ctx, `
@@ -908,7 +908,7 @@ func (r *MessageRepository) AutoDelete(ctx context.Context, messageID int) (tomb
 	if err != nil {
 		return false, err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // deferred rollback error is intentionally discarded; tx commit outcome takes precedence
 
 	// Tombstone path: message has replies — scrub content and hide from sender, but
 	// leave deleted_for_recipient=FALSE so the recipient still sees the "[deleted]"

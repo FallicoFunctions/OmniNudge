@@ -1854,7 +1854,7 @@ func TestMediaUpload_RejectsUnsupportedExtension(t *testing.T) {
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "photo.exe")
 	// PNG magic bytes with forbidden extension should still be rejected.
-	part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 'D', 'A', 'T', 'A'})
+	part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 'D', 'A', 'T', 'A'}) //nolint:errcheck // test helper; write error non-fatal
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
@@ -1898,7 +1898,7 @@ func TestMediaUpload_RejectsExtensionMimeMismatch(t *testing.T) {
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "image.jpg")
 	// PDF magic bytes with jpg extension.
-	part.Write([]byte("%PDF-1.4\n1 0 obj\n"))
+	part.Write([]byte("%PDF-1.4\n1 0 obj\n")) //nolint:errcheck // test helper; write error non-fatal
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
@@ -1927,7 +1927,7 @@ func TestMediaUpload_RejectsStorageQuotaExceeded(t *testing.T) {
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "clip.pdf")
-	part.Write([]byte("%PDF-1.4\nquota-test\n"))
+	part.Write([]byte("%PDF-1.4\nquota-test\n")) //nolint:errcheck // test helper; write error non-fatal
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)

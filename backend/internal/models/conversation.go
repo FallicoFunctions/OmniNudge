@@ -831,7 +831,7 @@ func (r *ConversationRepository) HardDeleteMessages(ctx context.Context, convers
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // deferred rollback error is intentionally discarded; tx commit outcome takes precedence
 
 	_, err = tx.Exec(ctx, `
 		UPDATE messages
