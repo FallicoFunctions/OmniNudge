@@ -11,7 +11,11 @@ import { encryptionService } from '../services/encryptionService';
 import { API_BASE_URL, getStoredAuthToken } from '../lib/api';
 import type { Message } from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
-import { decryptMessage, encryptForMultipleRecipients, decryptMultiRecipientContent } from '../utils/encryption';
+import {
+  decryptMessage,
+  encryptForMultipleRecipients,
+  decryptMultiRecipientContent,
+} from '../utils/encryption';
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
 import { LoadingMessage, ErrorMessage } from '../components/common/StatusMessage';
 
@@ -24,7 +28,7 @@ function useDecryptedMessageContent(
 
   useEffect(() => {
     const cipherText = isOwnMessage
-      ? message.sender_encrypted_content ?? message.encrypted_content
+      ? (message.sender_encrypted_content ?? message.encrypted_content)
       : message.encrypted_content;
 
     if (!cipherText) {
@@ -57,7 +61,7 @@ function useDecryptedMessageContent(
 
       const shouldDecrypt = Boolean(
         (isOwnMessage && message.sender_encrypted_content) ||
-          (!isOwnMessage && message.encryption_version === 'v1')
+        (!isOwnMessage && message.encryption_version === 'v1')
       );
 
       if (!shouldDecrypt) {
@@ -137,7 +141,7 @@ export default function ModMailConversationPage() {
       const token = getStoredAuthToken();
       const response = await fetch(`${API_BASE_URL}/mod-mail/${convId}`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -272,8 +276,7 @@ export default function ModMailConversationPage() {
         is_multi_recipient: true,
         encryption_version: 'v2',
         encrypted_content: encrypted.encryptedContent,
-        sender_encrypted_content:
-          encrypted.senderEncryptedContent ?? encrypted.encryptedContent,
+        sender_encrypted_content: encrypted.senderEncryptedContent ?? encrypted.encryptedContent,
         shared_encryption_iv: encrypted.sharedIv,
         recipient_keys: encrypted.recipientKeys,
       };
@@ -289,17 +292,20 @@ export default function ModMailConversationPage() {
         conversation_id: convId,
         message_type: 'text',
         content: encryptionPayload.is_multi_recipient ? undefined : content,
-        encrypted_content:
-          encryptionPayload.is_multi_recipient ? encryptionPayload.encrypted_content : undefined,
+        encrypted_content: encryptionPayload.is_multi_recipient
+          ? encryptionPayload.encrypted_content
+          : undefined,
         sender_encrypted_content: encryptionPayload.is_multi_recipient
           ? encryptionPayload.sender_encrypted_content
           : undefined,
         encryption_version: encryptionPayload.encryption_version,
         is_multi_recipient: encryptionPayload.is_multi_recipient,
-        shared_encryption_iv:
-          encryptionPayload.is_multi_recipient ? encryptionPayload.shared_encryption_iv : undefined,
-        recipient_keys:
-          encryptionPayload.is_multi_recipient ? encryptionPayload.recipient_keys : undefined,
+        shared_encryption_iv: encryptionPayload.is_multi_recipient
+          ? encryptionPayload.shared_encryption_iv
+          : undefined,
+        recipient_keys: encryptionPayload.is_multi_recipient
+          ? encryptionPayload.recipient_keys
+          : undefined,
       });
     },
     onError: (err: unknown) => {
@@ -373,9 +379,7 @@ export default function ModMailConversationPage() {
         </button>
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-              {subject}
-            </h1>
+            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{subject}</h1>
             {hubName && (
               <p className="text-[var(--color-text-secondary)] mt-1">{hubDisplayTitle}</p>
             )}
@@ -386,8 +390,8 @@ export default function ModMailConversationPage() {
                 status === 'open'
                   ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                   : status === 'resolved'
-                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                  : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                    : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
               }`}
             >
               {statusLabel}
@@ -433,7 +437,9 @@ export default function ModMailConversationPage() {
               disabled={isFetchingMoreMessages}
               className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
             >
-              {isFetchingMoreMessages ? t('common.loading') : t('modMailConversationPage.messages.loadMore')}
+              {isFetchingMoreMessages
+                ? t('common.loading')
+                : t('modMailConversationPage.messages.loadMore')}
             </button>
           </div>
         )}
@@ -445,9 +451,12 @@ export default function ModMailConversationPage() {
         <div className="space-y-4">
           {messages?.map((msg: Message) => {
             const isCurrentUser = msg.sender_id === user?.id;
-            const participant = conversation?.participants?.find((p) => p.user_id === msg.sender_id);
+            const participant = conversation?.participants?.find(
+              (p) => p.user_id === msg.sender_id
+            );
             const isModerator = participant?.is_moderator || false;
-            const senderUsername = participant?.username || t('common.userNumber', { id: msg.sender_id });
+            const senderUsername =
+              participant?.username || t('common.userNumber', { id: msg.sender_id });
 
             return (
               <div
@@ -467,18 +476,28 @@ export default function ModMailConversationPage() {
                     currentUserId={user?.id}
                     className="text-sm whitespace-pre-wrap break-words mb-1"
                   />
-                  <div className={`text-xs flex items-center gap-1 ${isCurrentUser ? 'text-white/70' : 'text-[var(--color-text-secondary)]'}`}>
+                  <div
+                    className={`text-xs flex items-center gap-1 ${isCurrentUser ? 'text-white/70' : 'text-[var(--color-text-secondary)]'}`}
+                  >
                     <span>{senderUsername}</span>
                     {isModerator && (
-                      <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
-                        isCurrentUser
-                          ? 'bg-white/20 text-white'
-                          : 'bg-green-600 text-white'
-                      }`}>
+                      <span
+                        className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
+                          isCurrentUser ? 'bg-white/20 text-white' : 'bg-green-600 text-white'
+                        }`}
+                      >
                         {t('modMailConversationPage.badges.mod')}
                       </span>
                     )}
-                    <span>{formatDate(msg.sent_at, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+                    <span>
+                      {formatDate(msg.sent_at, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -489,7 +508,10 @@ export default function ModMailConversationPage() {
       </div>
 
       {/* Reply Form */}
-      <form onSubmit={handleSend} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg p-4">
+      <form
+        onSubmit={handleSend}
+        className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg p-4"
+      >
         <textarea
           value={messageText}
           onChange={(e) => setMessageText(e.target.value)}
@@ -512,7 +534,9 @@ export default function ModMailConversationPage() {
             disabled={!messageText.trim() || sendMutation.isPending}
             className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {sendMutation.isPending ? t('modMailConversationPage.actions.sending') : t('modMailConversationPage.actions.sendReply')}
+            {sendMutation.isPending
+              ? t('modMailConversationPage.actions.sending')
+              : t('modMailConversationPage.actions.sendReply')}
           </button>
         </div>
       </form>

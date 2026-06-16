@@ -30,7 +30,7 @@ describe('PrivacyPolicyPage', () => {
     render(
       <MemoryRouter>
         <PrivacyPolicyPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(document.body).toBeTruthy();
   });
@@ -39,7 +39,7 @@ describe('PrivacyPolicyPage', () => {
     render(
       <MemoryRouter>
         <PrivacyPolicyPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(screen.getByText('privacyPage.title')).toBeInTheDocument();
   });

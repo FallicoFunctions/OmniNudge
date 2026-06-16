@@ -44,12 +44,20 @@ export const wallService = {
     await api.delete(`/wall-posts/${postId}/comments/${commentId}`);
   },
 
-  async setCommentReaction(postId: number, commentId: number, reaction: WallReactionType): Promise<WallReactionResponse> {
-    return api.post<WallReactionResponse>(`/wall-posts/${postId}/comments/${commentId}/reaction`, { reaction });
+  async setCommentReaction(
+    postId: number,
+    commentId: number,
+    reaction: WallReactionType
+  ): Promise<WallReactionResponse> {
+    return api.post<WallReactionResponse>(`/wall-posts/${postId}/comments/${commentId}/reaction`, {
+      reaction,
+    });
   },
 
   async getPendingWallPosts(limit = 20, offset = 0): Promise<PendingWallPostsResponse> {
-    return api.get<PendingWallPostsResponse>(`/users/me/wall/pending?limit=${limit}&offset=${offset}`);
+    return api.get<PendingWallPostsResponse>(
+      `/users/me/wall/pending?limit=${limit}&offset=${offset}`
+    );
   },
 
   async approveWallPost(id: number): Promise<void> {

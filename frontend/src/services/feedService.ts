@@ -1,9 +1,6 @@
 import { api } from '../lib/api';
 import type { PlatformPost } from '../types/posts';
-import {
-  appendTimeRangeParams,
-  type FeedTimeRangeOptions,
-} from '../utils/timeRangeParams';
+import { appendTimeRangeParams, type FeedTimeRangeOptions } from '../utils/timeRangeParams';
 
 export interface RedditPost {
   id: string;

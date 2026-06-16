@@ -42,9 +42,7 @@ export function ViewModeToggle() {
           title={mode.label}
         >
           <span className="font-mono text-sm">{mode.icon}</span>
-          {!isSlimMode && (
-            <span className="ml-1 hidden sm:inline">{mode.label}</span>
-          )}
+          {!isSlimMode && <span className="ml-1 hidden sm:inline">{mode.label}</span>}
         </button>
       ))}
     </div>

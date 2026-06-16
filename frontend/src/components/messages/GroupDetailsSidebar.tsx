@@ -22,11 +22,13 @@ function RoleBadge({ role }: { role: GroupRole }) {
   const { t } = useTranslation();
   if (role === 'member') return null;
   return (
-    <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
-      role === 'owner'
-        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-        : 'bg-blue-100 text-[var(--color-primary)] dark:bg-blue-900/30'
-    }`}>
+    <span
+      className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
+        role === 'owner'
+          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+          : 'bg-blue-100 text-[var(--color-primary)] dark:bg-blue-900/30'
+      }`}
+    >
       {t(`groups.roles.${role}`)}
     </span>
   );
@@ -80,7 +82,9 @@ function ParticipantRow({
           <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
             {participant.username}
             {isCurrentUser && (
-              <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">{t('common.you')}</span>
+              <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">
+                {t('common.you')}
+              </span>
             )}
           </p>
         </div>
@@ -106,7 +110,10 @@ function ParticipantRow({
                 <button
                   type="button"
                   className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-hover)]"
-                  onClick={() => { onChangeRole(participant.user_id, 'admin'); setShowMenu(false); }}
+                  onClick={() => {
+                    onChangeRole(participant.user_id, 'admin');
+                    setShowMenu(false);
+                  }}
                 >
                   {t('groups.makeAdmin')}
                 </button>
@@ -115,7 +122,10 @@ function ParticipantRow({
                 <button
                   type="button"
                   className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-hover)]"
-                  onClick={() => { onChangeRole(participant.user_id, 'member'); setShowMenu(false); }}
+                  onClick={() => {
+                    onChangeRole(participant.user_id, 'member');
+                    setShowMenu(false);
+                  }}
                 >
                   {t('groups.removeAdmin')}
                 </button>
@@ -123,14 +133,20 @@ function ParticipantRow({
               <button
                 type="button"
                 className="w-full px-3 py-2 text-left text-sm text-amber-600 hover:bg-[var(--color-hover)]"
-                onClick={() => { onMute(participant); setShowMenu(false); }}
+                onClick={() => {
+                  onMute(participant);
+                  setShowMenu(false);
+                }}
               >
                 {t('groups.admin.mute')}
               </button>
               <button
                 type="button"
                 className="w-full px-3 py-2 text-left text-sm text-[var(--color-error)] hover:bg-[var(--color-hover)]"
-                onClick={() => { onBan(participant); setShowMenu(false); }}
+                onClick={() => {
+                  onBan(participant);
+                  setShowMenu(false);
+                }}
               >
                 {t('groups.admin.ban')}
               </button>
@@ -138,7 +154,10 @@ function ParticipantRow({
               <button
                 type="button"
                 className="w-full px-3 py-2 text-left text-sm text-[var(--color-error)] hover:bg-[var(--color-hover)]"
-                onClick={() => { onRemove(participant.user_id); setShowMenu(false); }}
+                onClick={() => {
+                  onRemove(participant.user_id);
+                  setShowMenu(false);
+                }}
               >
                 {t('groups.removeFromGroup')}
               </button>
@@ -150,7 +169,11 @@ function ParticipantRow({
   );
 }
 
-export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: GroupDetailsSidebarProps) {
+export function GroupDetailsSidebar({
+  conversation,
+  currentUserId,
+  onClose,
+}: GroupDetailsSidebarProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<SidebarTab>('members');
@@ -179,8 +202,19 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
   } = useGroupConversation({ conversationId: conversation.id, currentUserId });
 
   const muteMutation = useMutation({
-    mutationFn: ({ userId, durationMinutes, reason }: { userId: number; durationMinutes: number; reason: string }) =>
-      adminGroupsService.muteUser(conversation.id, userId, { duration_minutes: durationMinutes, reason }),
+    mutationFn: ({
+      userId,
+      durationMinutes,
+      reason,
+    }: {
+      userId: number;
+      durationMinutes: number;
+      reason: string;
+    }) =>
+      adminGroupsService.muteUser(conversation.id, userId, {
+        duration_minutes: durationMinutes,
+        reason,
+      }),
     onSuccess: () => {
       setMuteTarget(null);
       queryClient.invalidateQueries({ queryKey: ['group-restrictions', conversation.id] });
@@ -188,8 +222,19 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
   });
 
   const banMutation = useMutation({
-    mutationFn: ({ userId, reason, deleteMessages }: { userId: number; reason: string; deleteMessages: boolean }) =>
-      adminGroupsService.banUser(conversation.id, userId, { reason, delete_messages: deleteMessages }),
+    mutationFn: ({
+      userId,
+      reason,
+      deleteMessages,
+    }: {
+      userId: number;
+      reason: string;
+      deleteMessages: boolean;
+    }) =>
+      adminGroupsService.banUser(conversation.id, userId, {
+        reason,
+        delete_messages: deleteMessages,
+      }),
     onSuccess: () => {
       setBanTarget(null);
       queryClient.invalidateQueries({ queryKey: ['group-restrictions', conversation.id] });
@@ -246,7 +291,12 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
           className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-hover)]"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-            <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <path
+              d="M1 1l12 12M13 1L1 13"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
           </svg>
         </button>
       </div>
@@ -267,7 +317,10 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
                 onChange={(e) => setEditedName(e.target.value)}
                 maxLength={100}
                 className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setIsEditingName(false); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveName();
+                  if (e.key === 'Escape') setIsEditingName(false);
+                }}
                 autoFocus
               />
               <button
@@ -287,12 +340,21 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
               {isAdmin && (
                 <button
                   type="button"
-                  onClick={() => { setEditedName(conversation.group_name ?? ''); setIsEditingName(true); }}
+                  onClick={() => {
+                    setEditedName(conversation.group_name ?? '');
+                    setIsEditingName(true);
+                  }}
                   aria-label={t('groups.editName')}
                   className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
                 >
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
-                    <path d="M9 1.5l2.5 2.5-7.5 7.5H1.5V9L9 1.5z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M9 1.5l2.5 2.5-7.5 7.5H1.5V9L9 1.5z"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </button>
               )}
@@ -364,7 +426,10 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
                     { key: 'message_history_visible', labelKey: 'groups.settings.historyVisible' },
                   ] as const
                 ).map(({ key, labelKey }) => (
-                  <label key={key} className="flex cursor-pointer items-center justify-between gap-3">
+                  <label
+                    key={key}
+                    className="flex cursor-pointer items-center justify-between gap-3"
+                  >
                     <span className="text-sm text-[var(--color-text-primary)]">{t(labelKey)}</span>
                     <button
                       type="button"
@@ -392,7 +457,9 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
               </div>
             )}
             {settingsError && (
-              <p className="text-xs text-[var(--color-error)]" role="alert">{settingsError}</p>
+              <p className="text-xs text-[var(--color-error)]" role="alert">
+                {settingsError}
+              </p>
             )}
             <div className="pt-2 border-t border-[var(--color-border)]">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)] mb-3">
@@ -416,11 +483,11 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
 
         {/* Leave group (always visible at bottom) */}
         <div className="px-4 py-4 border-t border-[var(--color-border)]">
-          {leaveError && (
-            <p className="mb-2 text-xs text-[var(--color-error)]">{leaveError}</p>
-          )}
+          {leaveError && <p className="mb-2 text-xs text-[var(--color-error)]">{leaveError}</p>}
           {isOwner && (
-            <p className="mb-2 text-xs text-[var(--color-text-muted)]">{t('groups.transferOwnershipHint')}</p>
+            <p className="mb-2 text-xs text-[var(--color-text-muted)]">
+              {t('groups.transferOwnershipHint')}
+            </p>
           )}
           <button
             type="button"

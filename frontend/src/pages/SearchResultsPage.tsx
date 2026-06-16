@@ -208,7 +208,11 @@ export default function SearchResultsPage() {
     [hiddenRedditPostsData]
   );
 
-  const toggleSaveMutation = useMutation<void, Error, { postId: number; shouldSave: boolean; post: PlatformPost }>({
+  const toggleSaveMutation = useMutation<
+    void,
+    Error,
+    { postId: number; shouldSave: boolean; post: PlatformPost }
+  >({
     mutationFn: async ({ postId, shouldSave }) => {
       if (shouldSave) {
         await savedService.savePost(postId);
@@ -413,7 +417,13 @@ export default function SearchResultsPage() {
       messageFilters?: Partial<
         Pick<
           typeof messageResults,
-          'hasFiles' | 'hasLinks' | 'includeArchived' | 'conversationId' | 'senderId' | 'startDate' | 'endDate'
+          | 'hasFiles'
+          | 'hasLinks'
+          | 'includeArchived'
+          | 'conversationId'
+          | 'senderId'
+          | 'startDate'
+          | 'endDate'
         >
       >;
     }
@@ -424,8 +434,8 @@ export default function SearchResultsPage() {
     setSearchError(null);
     try {
       const targetPage =
-        opts?.page
-        ?? (tabTarget === 'communities'
+        opts?.page ??
+        (tabTarget === 'communities'
           ? communities.page
           : tabTarget === 'messages'
             ? messageResults.page
@@ -445,9 +455,7 @@ export default function SearchResultsPage() {
         }
 
         const messageFilterOverrides = opts?.messageFilters;
-        const resolveMessageFilter = <
-          K extends keyof NonNullable<typeof messageFilterOverrides>
-        >(
+        const resolveMessageFilter = <K extends keyof NonNullable<typeof messageFilterOverrides>>(
           key: K,
           fallback: NonNullable<typeof messageFilterOverrides>[K]
         ) =>
@@ -1073,9 +1081,7 @@ export default function SearchResultsPage() {
 
       {!isLoading && activeTab === 'posts' && (
         <div className="space-y-3">
-          {visiblePosts.length === 0 && (
-            <EmptySearchResults query={query} />
-          )}
+          {visiblePosts.length === 0 && <EmptySearchResults query={query} />}
           <div className="space-y-3">
             {visiblePosts.map((item, idx) => {
               if (item.type === 'reddit') {
@@ -1418,7 +1424,11 @@ export default function SearchResultsPage() {
                     className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
                   >
                     <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                      <span>{t('searchPage.messages.meta.conversation', { id: message.conversation_id })}</span>
+                      <span>
+                        {t('searchPage.messages.meta.conversation', {
+                          id: message.conversation_id,
+                        })}
+                      </span>
                       <span>•</span>
                       <span>
                         {message.sender_username

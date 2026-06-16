@@ -44,12 +44,16 @@ export const foldersService = {
   },
 
   async getFolderConversations(folderID: number): Promise<Conversation[]> {
-    const response = await api.get<{ conversations: Conversation[] }>(`/folders/${folderID}/conversations`);
+    const response = await api.get<{ conversations: Conversation[] }>(
+      `/folders/${folderID}/conversations`
+    );
     return response.conversations ?? [];
   },
 
   async getConversationFolders(conversationID: number): Promise<ConversationFolder[]> {
-    const response = await api.get<{ folders: ConversationFolder[] }>(`/conversations/${conversationID}/folders`);
+    const response = await api.get<{ folders: ConversationFolder[] }>(
+      `/conversations/${conversationID}/folders`
+    );
     return response.folders ?? [];
   },
 };

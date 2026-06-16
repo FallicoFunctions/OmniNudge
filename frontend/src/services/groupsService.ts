@@ -89,10 +89,7 @@ export const groupsService = {
   },
 
   /** Transfer group ownership */
-  async transferOwnership(
-    conversationId: number,
-    data: TransferOwnershipRequest
-  ): Promise<void> {
+  async transferOwnership(conversationId: number, data: TransferOwnershipRequest): Promise<void> {
     await api.post(`/conversations/${conversationId}/transfer-ownership`, data);
   },
 

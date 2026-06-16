@@ -198,7 +198,7 @@ describe('CreatePostPage', () => {
     render(
       <Wrapper>
         <CreatePostPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/enter post title/i)).toBeInTheDocument();
@@ -210,7 +210,7 @@ describe('CreatePostPage', () => {
     render(
       <Wrapper>
         <CreatePostPage />
-      </Wrapper>,
+      </Wrapper>
     );
     const titleInput = await screen.findByPlaceholderText(/enter post title/i);
     fireEvent.change(titleInput, { target: { value: 'My Great Post' } });
@@ -222,7 +222,7 @@ describe('CreatePostPage', () => {
     render(
       <Wrapper>
         <CreatePostPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       // Destination section has "Choose where to post" label
@@ -235,7 +235,7 @@ describe('CreatePostPage', () => {
     render(
       <Wrapper>
         <CreatePostPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^link$/i })).toBeInTheDocument();
@@ -248,7 +248,7 @@ describe('CreatePostPage', () => {
     render(
       <Wrapper>
         <CreatePostPage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await waitFor(() => {
@@ -257,11 +257,13 @@ describe('CreatePostPage', () => {
   });
 
   it('submits using the resolved hub id when defaultHub is preset in navigation state', async () => {
-    const Wrapper = createWrapper([{ pathname: '/posts/create', state: { defaultHub: 'testHub' } }]);
+    const Wrapper = createWrapper([
+      { pathname: '/posts/create', state: { defaultHub: 'testHub' } },
+    ]);
     render(
       <Wrapper>
         <CreatePostPage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await screen.findByDisplayValue('testHub');
@@ -279,11 +281,13 @@ describe('CreatePostPage', () => {
   });
 
   it('shows translated validation when uploaded files are disallowed by hub media settings', async () => {
-    const Wrapper = createWrapper([{ pathname: '/posts/create', state: { defaultHub: 'testHub' } }]);
+    const Wrapper = createWrapper([
+      { pathname: '/posts/create', state: { defaultHub: 'testHub' } },
+    ]);
     render(
       <Wrapper>
         <CreatePostPage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await screen.findByDisplayValue('testHub');
@@ -300,11 +304,13 @@ describe('CreatePostPage', () => {
   it('shows translated upload failure message when media upload fails', async () => {
     vi.mocked(mediaService.batchUploadMedia).mockRejectedValue(new Error('boom'));
 
-    const Wrapper = createWrapper([{ pathname: '/posts/create', state: { defaultHub: 'testHub' } }]);
+    const Wrapper = createWrapper([
+      { pathname: '/posts/create', state: { defaultHub: 'testHub' } },
+    ]);
     render(
       <Wrapper>
         <CreatePostPage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await screen.findByDisplayValue('testHub');
@@ -316,18 +322,20 @@ describe('CreatePostPage', () => {
     await userEvent.upload(fileInput!, imageFile);
 
     expect(
-      await screen.findByText('Failed to upload media. Please try again.'),
+      await screen.findByText('Failed to upload media. Please try again.')
     ).toBeInTheDocument();
   });
 
   it('preserves translated allowed-file label casing in Spanish', async () => {
     await i18n.changeLanguage('es');
 
-    const Wrapper = createWrapper([{ pathname: '/posts/create', state: { defaultHub: 'testHub' } }]);
+    const Wrapper = createWrapper([
+      { pathname: '/posts/create', state: { defaultHub: 'testHub' } },
+    ]);
     render(
       <Wrapper>
         <CreatePostPage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await screen.findByDisplayValue('testHub');
@@ -370,7 +378,7 @@ describe('CreatePostPage — profile cache invalidation after create', () => {
     render(
       <Wrapper>
         <CreatePostPage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     // Wait for the hub to pre-fill
@@ -382,10 +390,9 @@ describe('CreatePostPage — profile cache invalidation after create', () => {
 
     await waitFor(() => {
       expect(
-        queryClient.getQueryData<{ posts: Array<{ title: string }> }>([
-          'user-profile-posts',
-          'testuser',
-        ])?.posts.map((post) => post.title)
+        queryClient
+          .getQueryData<{ posts: Array<{ title: string }> }>(['user-profile-posts', 'testuser'])
+          ?.posts.map((post) => post.title)
       ).toEqual(['New Post', 'Older Post']);
     });
 
@@ -402,7 +409,7 @@ describe('CreatePostPage — profile cache invalidation after create', () => {
     render(
       <Wrapper>
         <CreatePostPage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     const titleInput = await screen.findByPlaceholderText(/enter post title/i);

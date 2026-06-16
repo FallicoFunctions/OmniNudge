@@ -9,9 +9,7 @@ export default function NotFoundPage() {
       <div className="max-w-md">
         <p className="text-sm font-semibold text-blue-600 uppercase tracking-wide">404</p>
         <h1 className="mt-2 text-4xl font-bold text-gray-900">{t('notFoundPage.title')}</h1>
-        <p className="mt-4 text-lg text-gray-600">
-          {t('notFoundPage.description')}
-        </p>
+        <p className="mt-4 text-lg text-gray-600">{t('notFoundPage.description')}</p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
             to="/"

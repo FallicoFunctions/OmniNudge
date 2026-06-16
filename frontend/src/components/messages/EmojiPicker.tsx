@@ -2,10 +2,30 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const EMOJI_OPTIONS = [
-  '👍', '❤️', '😂', '😮', '😢', '🔥',
-  '👏', '🎉', '🙏', '💯', '😎', '🤔',
-  '👀', '✅', '❌', '🚀', '💡', '🤝',
-  '🙌', '🥳', '😅', '😍', '😭', '⚡',
+  '👍',
+  '❤️',
+  '😂',
+  '😮',
+  '😢',
+  '🔥',
+  '👏',
+  '🎉',
+  '🙏',
+  '💯',
+  '😎',
+  '🤔',
+  '👀',
+  '✅',
+  '❌',
+  '🚀',
+  '💡',
+  '🤝',
+  '🙌',
+  '🥳',
+  '😅',
+  '😍',
+  '😭',
+  '⚡',
 ] as const;
 
 const GRID_COLUMNS = 6;

@@ -95,17 +95,32 @@ function App() {
                               path="/r/:subreddit/wiki/revisions/:pagePath"
                               element={<RedditWikiPage mode="history" />}
                             />
-                            <Route path="/r/:subreddit/wiki/revisions" element={<RedditWikiPage mode="history" />} />
+                            <Route
+                              path="/r/:subreddit/wiki/revisions"
+                              element={<RedditWikiPage mode="history" />}
+                            />
                             <Route
                               path="/r/:subreddit/wiki/discussions/:pagePath"
                               element={<RedditWikiPage mode="talk" />}
                             />
-                            <Route path="/r/:subreddit/wiki/discussions" element={<RedditWikiPage mode="talk" />} />
-                            <Route path="/r/:subreddit/wiki/:pagePath" element={<RedditWikiPage mode="view" />} />
-                            <Route path="/r/:subreddit/wiki" element={<RedditWikiPage mode="view" />} />
+                            <Route
+                              path="/r/:subreddit/wiki/discussions"
+                              element={<RedditWikiPage mode="talk" />}
+                            />
+                            <Route
+                              path="/r/:subreddit/wiki/:pagePath"
+                              element={<RedditWikiPage mode="view" />}
+                            />
+                            <Route
+                              path="/r/:subreddit/wiki"
+                              element={<RedditWikiPage mode="view" />}
+                            />
                             <Route path="/wiki/:pagePath" element={<RedditWikiPage />} />
                             <Route path="/wiki" element={<RedditWikiPage />} />
-                            <Route path="/r/:subreddit/comments/:postId" element={<RedditPostWrapper />} />
+                            <Route
+                              path="/r/:subreddit/comments/:postId"
+                              element={<RedditPostWrapper />}
+                            />
                             <Route
                               path="/r/:subreddit/comments/:postId/:commentId"
                               element={<RedditPostWrapper />}
@@ -115,13 +130,28 @@ function App() {
                             <Route path="/h/:hubname" element={<HubPage />} />
                             <Route path="/h/:hubname/wiki/:pagePath" element={<HubWikiPage />} />
                             <Route path="/h/:hubname/wiki" element={<HubWikiPage />} />
-                            <Route path="/h/:hubname/comments/:postId" element={<PostDetailPage />} />
-                            <Route path="/h/:hubname/comments/:postId/:commentId" element={<PostDetailPage />} />
+                            <Route
+                              path="/h/:hubname/comments/:postId"
+                              element={<PostDetailPage />}
+                            />
+                            <Route
+                              path="/h/:hubname/comments/:postId/:commentId"
+                              element={<PostDetailPage />}
+                            />
                             <Route path="/posts/:postId" element={<PostDetailPage />} />
-                            <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
+                            <Route
+                              path="/posts/:postId/comments/:commentId"
+                              element={<PostDetailPage />}
+                            />
                             <Route path="/users/:username" element={<UserProfilePage />} />
-                            <Route path="/users/:username/friends" element={<UserFriendsListPage />} />
-                            <Route path="/users/:username/activity" element={<UserActivityPage />} />
+                            <Route
+                              path="/users/:username/friends"
+                              element={<UserFriendsListPage />}
+                            />
+                            <Route
+                              path="/users/:username/activity"
+                              element={<UserActivityPage />}
+                            />
                             <Route path="/search" element={<SearchResultsPage />} />
                             <Route path="/hubs" element={<HubsAndSubsPage />} />
                             <Route path="/about" element={<AboutPage />} />
@@ -132,7 +162,10 @@ function App() {
                             <Route path="/reset-password" element={<ResetPasswordPage />} />
                             <Route path="/verify-email" element={<VerifyEmailPage />} />
                             {import.meta.env.DEV && (
-                              <Route path="/dev/loading-states" element={<LoadingStatesShowcasePage />} />
+                              <Route
+                                path="/dev/loading-states"
+                                element={<LoadingStatesShowcasePage />}
+                              />
                             )}
 
                             {/* PROTECTED routes - require auth */}

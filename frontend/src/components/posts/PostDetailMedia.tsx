@@ -50,7 +50,9 @@ export function PostDetailMedia({
 
   const hasGallery = galleryImages && galleryImages.length > 0;
   const galleryItem = hasGallery ? galleryImages[galleryIndex] : undefined;
-  const resolvedMediaUrl = hasGallery ? resolveMediaUrl(galleryItem?.url) : resolveMediaUrl(mediaUrl);
+  const resolvedMediaUrl = hasGallery
+    ? resolveMediaUrl(galleryItem?.url)
+    : resolveMediaUrl(mediaUrl);
   const externalMedia = !hasGallery ? getPlatformExternalEmbed(mediaUrl ?? null) : null;
   const embedUrl = externalMedia?.kind === 'iframe' ? externalMedia.src : null;
   const externalVideoUrl = externalMedia?.kind === 'video' ? externalMedia.src : null;

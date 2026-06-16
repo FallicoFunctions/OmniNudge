@@ -17,7 +17,7 @@ const renderPage = (search = '') =>
   render(
     <MemoryRouter initialEntries={[`/verify-email${search}`]}>
       <VerifyEmailPage />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 
 describe('VerifyEmailPage', () => {

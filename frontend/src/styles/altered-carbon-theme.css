@@ -62,11 +62,15 @@
 
 /* Glowing cyan accents */
 .glow-cyan {
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.5), 0 0 20px rgba(0, 229, 255, 0.3);
+  box-shadow:
+    0 0 10px rgba(0, 229, 255, 0.5),
+    0 0 20px rgba(0, 229, 255, 0.3);
 }
 
 .glow-cyan-strong {
-  box-shadow: 0 0 15px rgba(0, 229, 255, 0.7), 0 0 30px rgba(0, 229, 255, 0.5),
+  box-shadow:
+    0 0 15px rgba(0, 229, 255, 0.7),
+    0 0 30px rgba(0, 229, 255, 0.5),
     0 0 45px rgba(0, 229, 255, 0.3);
 }
 
@@ -134,7 +138,8 @@
 
 /* Grid background pattern */
 .grid-bg {
-  background-image: linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
   background-size: 50px 50px;
 }
@@ -142,12 +147,16 @@
 /* Neon border effect */
 .border-neon {
   border: 1px solid var(--ac-cyan);
-  box-shadow: 0 0 5px var(--ac-cyan), inset 0 0 5px rgba(0, 229, 255, 0.2);
+  box-shadow:
+    0 0 5px var(--ac-cyan),
+    inset 0 0 5px rgba(0, 229, 255, 0.2);
 }
 
 .border-neon-purple {
   border: 1px solid var(--ac-purple);
-  box-shadow: 0 0 5px var(--ac-purple), inset 0 0 5px rgba(157, 0, 255, 0.2);
+  box-shadow:
+    0 0 5px var(--ac-purple),
+    inset 0 0 5px rgba(157, 0, 255, 0.2);
 }
 
 /* Column feed active indicator */
@@ -181,17 +190,23 @@
 /* Progress bar with glow */
 .progress-bar-glow {
   background: linear-gradient(90deg, var(--ac-cyan) 0%, var(--ac-purple) 100%);
-  box-shadow: 0 0 10px var(--ac-cyan), 0 0 20px var(--ac-cyan);
+  box-shadow:
+    0 0 10px var(--ac-cyan),
+    0 0 20px var(--ac-cyan);
   animation: progress-glow 2s ease-in-out infinite;
 }
 
 @keyframes progress-glow {
   0%,
   100% {
-    box-shadow: 0 0 10px var(--ac-cyan), 0 0 20px var(--ac-cyan);
+    box-shadow:
+      0 0 10px var(--ac-cyan),
+      0 0 20px var(--ac-cyan);
   }
   50% {
-    box-shadow: 0 0 15px var(--ac-cyan), 0 0 30px var(--ac-cyan);
+    box-shadow:
+      0 0 15px var(--ac-cyan),
+      0 0 30px var(--ac-cyan);
   }
 }
 

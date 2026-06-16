@@ -30,17 +30,15 @@ function useDecryptedHistoryEntries(entries: MessageEditHistoryEntry[]) {
       const result = new Map<number, string>();
       for (const entry of entries) {
         // Fix 13: use encryption_version to detect plaintext — no more heuristic
-        if (
-          entry.encryption_version === 'plaintext' ||
-          entry.encryption_version === 'none'
-        ) {
+        if (entry.encryption_version === 'plaintext' || entry.encryption_version === 'none') {
           result.set(entry.id, entry.sender_encrypted_content ?? entry.content ?? '');
           continue;
         }
 
         // Fix 6: prefer sender_encrypted_content (encrypted with our own public key)
         // so senders can actually read their own history entries.
-        const cipherText = entry.sender_encrypted_content ?? entry.encrypted_content ?? entry.content ?? null;
+        const cipherText =
+          entry.sender_encrypted_content ?? entry.encrypted_content ?? entry.content ?? null;
         if (!cipherText) {
           result.set(entry.id, '');
           continue;
@@ -57,13 +55,19 @@ function useDecryptedHistoryEntries(entries: MessageEditHistoryEntry[]) {
       if (!cancelled) setDecrypted(result);
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [entries]);
 
   return decrypted;
 }
 
-export function MessageEditHistory({ messageId, currentContent, onClose }: MessageEditHistoryProps) {
+export function MessageEditHistory({
+  messageId,
+  currentContent,
+  onClose,
+}: MessageEditHistoryProps) {
   const { t } = useTranslation();
   const { formatDate } = useFormat();
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -82,7 +86,9 @@ export function MessageEditHistory({ messageId, currentContent, onClose }: Messa
 
   // Close on Escape
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
@@ -95,9 +101,11 @@ export function MessageEditHistory({ messageId, currentContent, onClose }: Messa
     if (!modal) return;
 
     const getFocusable = () =>
-      Array.from(modal.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      )).filter((el) => !el.hasAttribute('disabled'));
+      Array.from(
+        modal.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => !el.hasAttribute('disabled'));
 
     const handleTab = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
@@ -106,9 +114,15 @@ export function MessageEditHistory({ messageId, currentContent, onClose }: Messa
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
       } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
 
@@ -130,7 +144,10 @@ export function MessageEditHistory({ messageId, currentContent, onClose }: Messa
       aria-modal="true"
       aria-labelledby={titleId}
     >
-      <div data-modal className="flex w-full max-w-md flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl">
+      <div
+        data-modal
+        className="flex w-full max-w-md flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
           <h2 id={titleId} className="text-sm font-semibold text-[var(--color-text-primary)]">
@@ -144,7 +161,12 @@ export function MessageEditHistory({ messageId, currentContent, onClose }: Messa
             className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-              <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <path
+                d="M1 1l12 12M13 1L1 13"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
         </div>
@@ -174,16 +196,21 @@ export function MessageEditHistory({ messageId, currentContent, onClose }: Messa
                     {t('messages.editHistory.current')}
                   </span>
                   <p className="rounded-md bg-[var(--color-primary)]/8 px-3 py-2 text-sm text-[var(--color-text-primary)]">
-                    {currentContent || <em className="text-[var(--color-text-muted)]">{t('messages.editHistory.decrypting')}</em>}
+                    {currentContent || (
+                      <em className="text-[var(--color-text-muted)]">
+                        {t('messages.editHistory.decrypting')}
+                      </em>
+                    )}
                   </p>
                 </li>
               )}
               {entries.map((entry, index) => {
                 const text = decryptedMap.get(entry.id) ?? '…';
                 // Fix 14: entries are pre-edit snapshots, label them clearly
-                const label = index === 0
-                  ? t('messages.editHistory.original')
-                  : t('messages.editHistory.version', { n: index });
+                const label =
+                  index === 0
+                    ? t('messages.editHistory.original')
+                    : t('messages.editHistory.version', { n: index });
                 return (
                   <li key={entry.id} className="flex flex-col gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
@@ -191,11 +218,15 @@ export function MessageEditHistory({ messageId, currentContent, onClose }: Messa
                     </span>
                     <p className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)]">
                       {text === '\x00' ? (
-                        <em className="text-[var(--color-text-muted)]">{t('messages.editHistory.cannotDecrypt')}</em>
+                        <em className="text-[var(--color-text-muted)]">
+                          {t('messages.editHistory.cannotDecrypt')}
+                        </em>
                       ) : text !== '…' ? (
                         text
                       ) : (
-                        <em className="text-[var(--color-text-muted)]">{t('messages.editHistory.decrypting')}</em>
+                        <em className="text-[var(--color-text-muted)]">
+                          {t('messages.editHistory.decrypting')}
+                        </em>
                       )}
                     </p>
                     <time

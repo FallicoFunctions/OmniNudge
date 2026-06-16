@@ -147,10 +147,12 @@ export default function SettingsPage() {
   const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
-  const [devDirectionOverride, setDevDirectionOverride] = useState<'auto' | DocumentDirection>(() => {
-    const forcedDirection = getForcedDocumentDirection();
-    return forcedDirection ?? 'auto';
-  });
+  const [devDirectionOverride, setDevDirectionOverride] = useState<'auto' | DocumentDirection>(
+    () => {
+      const forcedDirection = getForcedDocumentDirection();
+      return forcedDirection ?? 'auto';
+    }
+  );
 
   // Global auto-delete
   const { data: rawSettings } = useQuery({
@@ -163,15 +165,22 @@ export default function SettingsPage() {
 
   const savedGlobalSeconds = nsToSeconds(rawSettings?.default_auto_delete_after);
   const savedGlobalDuration = secondsToDuration(savedGlobalSeconds);
-  const [globalDuration, setGlobalDuration] = useState<AutoDeleteDuration>({ days: 0, hours: 0, minutes: 0 });
+  const [globalDuration, setGlobalDuration] = useState<AutoDeleteDuration>({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+  });
   const [pendingGlobalSeconds, setPendingGlobalSeconds] = useState<number | null>(null);
   useEffect(() => {
     setGlobalDuration(savedGlobalDuration);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedGlobalSeconds]);
   const saveGlobalAutoDeleteMutation = useMutation({
     mutationFn: ({ seconds, retroactive }: { seconds: number; retroactive: boolean }) =>
-      userSettingsService.update({ default_auto_delete_seconds: seconds, auto_delete_apply_retroactive: retroactive }),
+      userSettingsService.update({
+        default_auto_delete_seconds: seconds,
+        auto_delete_apply_retroactive: retroactive,
+      }),
     onSuccess: () => {
       setPendingGlobalSeconds(null);
     },
@@ -443,54 +452,56 @@ export default function SettingsPage() {
 
           {/* Push Notifications */}
           <Panel as="section">
-          <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.pushNotificationsSection.title')}
-          </h3>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('settings.pushNotificationsSection.description')}
-          </p>
+            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.pushNotificationsSection.title')}
+            </h3>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.pushNotificationsSection.description')}
+            </p>
 
-          {!pushSupported && (
-            <div className="mt-4 rounded-md bg-yellow-50 dark:bg-yellow-900/20 p-4 border border-yellow-200 dark:border-yellow-800">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                {t('settings.pushNotificationsSection.notSupported')}
-              </p>
-            </div>
-          )}
-
-          {pushSupported && (
-            <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <div className="pr-4">
-                <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                  {t('settings.pushNotificationsSection.toggleLabel')}
-                </p>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {showPushNotifications
-                    ? t('settings.pushNotificationsSection.toggleHelpOn')
-                    : t('settings.pushNotificationsSection.toggleHelpOff')}
+            {!pushSupported && (
+              <div className="mt-4 rounded-md bg-yellow-50 dark:bg-yellow-900/20 p-4 border border-yellow-200 dark:border-yellow-800">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  {t('settings.pushNotificationsSection.notSupported')}
                 </p>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={showPushNotifications}
-                onClick={() => {
-                  void handleTogglePushNotifications();
-                }}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  showPushNotifications ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
-              >
-                <span className="sr-only">{t('common.accessibility.togglePushNotifications')}</span>
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    showPushNotifications ? 'translate-x-5' : 'translate-x-0'
+            )}
+
+            {pushSupported && (
+              <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <div className="pr-4">
+                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    {t('settings.pushNotificationsSection.toggleLabel')}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {showPushNotifications
+                      ? t('settings.pushNotificationsSection.toggleHelpOn')
+                      : t('settings.pushNotificationsSection.toggleHelpOff')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showPushNotifications}
+                  onClick={() => {
+                    void handleTogglePushNotifications();
+                  }}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    showPushNotifications ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
                   }`}
-                />
-              </button>
-            </div>
-          )}
+                >
+                  <span className="sr-only">
+                    {t('common.accessibility.togglePushNotifications')}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      showPushNotifications ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            )}
           </Panel>
 
           <Panel as="section">
@@ -529,7 +540,9 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className={`mt-4 grid gap-4 sm:grid-cols-2 ${quietHoursEnabled ? '' : 'opacity-60'}`}>
+            <div
+              className={`mt-4 grid gap-4 sm:grid-cols-2 ${quietHoursEnabled ? '' : 'opacity-60'}`}
+            >
               <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
                 <label
                   htmlFor="quiet-hours-start"
@@ -661,230 +674,244 @@ export default function SettingsPage() {
         {/* Messaging Settings */}
         <div hidden={activeTab !== 'privacy'}>
           <Panel as="section">
-          <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.messagingPrivacy.title')}
-          </h3>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('settings.messagingPrivacy.description')}
-          </p>
+            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.messagingPrivacy.title')}
+            </h3>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.messagingPrivacy.description')}
+            </p>
 
-          <div className="mt-4 space-y-4">
-            {/* Read Receipts Toggle */}
-            <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <div className="pr-4">
-                <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                  {t('settings.messagingPrivacy.readReceipts')}
-                </p>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {t('settings.messagingPrivacy.readReceiptsHelp')}
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={readReceipts}
-                onClick={() => setReadReceipts(!readReceipts)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  readReceipts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
-              >
-                <span className="sr-only">{t('common.accessibility.toggleReadReceipts')}</span>
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    readReceipts ? 'translate-x-5' : 'translate-x-0'
+            <div className="mt-4 space-y-4">
+              {/* Read Receipts Toggle */}
+              <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <div className="pr-4">
+                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    {t('settings.messagingPrivacy.readReceipts')}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {t('settings.messagingPrivacy.readReceiptsHelp')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={readReceipts}
+                  onClick={() => setReadReceipts(!readReceipts)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    readReceipts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
                   }`}
-                />
-              </button>
-            </div>
-
-            {/* Typing Indicators Toggle */}
-            <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <div className="pr-4">
-                <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                  {t('settings.messagingPrivacy.typingIndicators')}
-                </p>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {t('settings.messagingPrivacy.typingIndicatorsHelp')}
-                </p>
+                >
+                  <span className="sr-only">{t('common.accessibility.toggleReadReceipts')}</span>
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      readReceipts ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={typingIndicators}
-                onClick={() => setTypingIndicators(!typingIndicators)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  typingIndicators ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
-              >
-                <span className="sr-only">{t('common.accessibility.toggleTypingIndicators')}</span>
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    typingIndicators ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
 
-            <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <div className="pr-4">
-                <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                  {t('settings.messagingPrivacy.autoUnarchiveOnMessage')}
-                </p>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {t('settings.messagingPrivacy.autoUnarchiveOnMessageHelp')}
-                </p>
+              {/* Typing Indicators Toggle */}
+              <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <div className="pr-4">
+                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    {t('settings.messagingPrivacy.typingIndicators')}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {t('settings.messagingPrivacy.typingIndicatorsHelp')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={typingIndicators}
+                  onClick={() => setTypingIndicators(!typingIndicators)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    typingIndicators ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className="sr-only">
+                    {t('common.accessibility.toggleTypingIndicators')}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      typingIndicators ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={autoUnarchiveOnMessage}
-                onClick={() => setAutoUnarchiveOnMessage(!autoUnarchiveOnMessage)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  autoUnarchiveOnMessage ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
-              >
-                <span className="sr-only">{t('settings.messagingPrivacy.autoUnarchiveOnMessage')}</span>
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    autoUnarchiveOnMessage ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
 
-            {/* Notification Sound Toggle */}
-            <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <div className="pr-4">
-                <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                  {t('settings.messagingPrivacy.notificationSound')}
-                </p>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {t('settings.messagingPrivacy.notificationSoundHelp')}
-                </p>
+              <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <div className="pr-4">
+                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    {t('settings.messagingPrivacy.autoUnarchiveOnMessage')}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {t('settings.messagingPrivacy.autoUnarchiveOnMessageHelp')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoUnarchiveOnMessage}
+                  onClick={() => setAutoUnarchiveOnMessage(!autoUnarchiveOnMessage)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    autoUnarchiveOnMessage ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className="sr-only">
+                    {t('settings.messagingPrivacy.autoUnarchiveOnMessage')}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      autoUnarchiveOnMessage ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={notificationSound}
-                onClick={() => setNotificationSound(!notificationSound)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  notificationSound ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
-              >
-                <span className="sr-only">{t('common.accessibility.toggleNotificationSound')}</span>
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    notificationSound ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
 
-            {/* Last Seen Toggle */}
-            <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <div className="pr-4">
-                <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                  {t('settings.messagingPrivacy.lastSeen')}
-                </p>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {t('settings.messagingPrivacy.lastSeenHelp')}
-                </p>
+              {/* Notification Sound Toggle */}
+              <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <div className="pr-4">
+                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    {t('settings.messagingPrivacy.notificationSound')}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {t('settings.messagingPrivacy.notificationSoundHelp')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={notificationSound}
+                  onClick={() => setNotificationSound(!notificationSound)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    notificationSound ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className="sr-only">
+                    {t('common.accessibility.toggleNotificationSound')}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      notificationSound ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={showLastSeen}
-                onClick={() => setShowLastSeen(!showLastSeen)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  showLastSeen ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
-              >
-                <span className="sr-only">{t('common.accessibility.toggleLastSeen')}</span>
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    showLastSeen ? 'translate-x-5' : 'translate-x-0'
+
+              {/* Last Seen Toggle */}
+              <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <div className="pr-4">
+                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    {t('settings.messagingPrivacy.lastSeen')}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {t('settings.messagingPrivacy.lastSeenHelp')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showLastSeen}
+                  onClick={() => setShowLastSeen(!showLastSeen)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    showLastSeen ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
                   }`}
+                >
+                  <span className="sr-only">{t('common.accessibility.toggleLastSeen')}</span>
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      showLastSeen ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <label
+                  htmlFor="profile-visibility"
+                  className="block text-base font-semibold text-[var(--color-text-primary)]"
+                >
+                  {t('settings.messagingPrivacy.profileVisibility')}
+                </label>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  {t('settings.messagingPrivacy.profileVisibilityHelp')}
+                </p>
+                <select
+                  id="profile-visibility"
+                  value={profileVisibility}
+                  onChange={(e) => setProfileVisibility(e.target.value as 'public' | 'private')}
+                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                >
+                  <option value="public">
+                    {t('settings.messagingPrivacy.profileVisibilityPublic')}
+                  </option>
+                  <option value="private">
+                    {t('settings.messagingPrivacy.profileVisibilityPrivate')}
+                  </option>
+                </select>
+              </div>
+
+              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <label
+                  htmlFor="wall-post-permission"
+                  className="block text-base font-semibold text-[var(--color-text-primary)]"
+                >
+                  {t('settings.messagingPrivacy.wallPostPermission')}
+                </label>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  {t('settings.messagingPrivacy.wallPostPermissionHelp')}
+                </p>
+                <select
+                  id="wall-post-permission"
+                  value={wallPostPermission}
+                  onChange={(e) =>
+                    setWallPostPermission(
+                      e.target.value as 'all_friends' | 'requires_approval' | 'no_one'
+                    )
+                  }
+                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                >
+                  <option value="all_friends">
+                    {t('settings.messagingPrivacy.wallPostPermissionAllFriends')}
+                  </option>
+                  <option value="requires_approval">
+                    {t('settings.messagingPrivacy.wallPostPermissionRequiresApproval')}
+                  </option>
+                  <option value="no_one">
+                    {t('settings.messagingPrivacy.wallPostPermissionNoOne')}
+                  </option>
+                </select>
+              </div>
+
+              {/* Global Auto-Delete */}
+              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  {t('messages.autoDelete.label')}
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)] mb-4">
+                  {t('messages.autoDelete.description')}
+                </p>
+                <AutoDeleteDurationPicker
+                  value={globalDuration}
+                  onChange={setGlobalDuration}
+                  disabled={saveGlobalAutoDeleteMutation.isPending}
                 />
-              </button>
+                <button
+                  type="button"
+                  onClick={handleGlobalAutoDeleteSave}
+                  disabled={!globalIsDirty || saveGlobalAutoDeleteMutation.isPending}
+                  className="mt-4 w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
+                >
+                  {t('common.save')}
+                </button>
+              </div>
             </div>
-
-            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <label
-                htmlFor="profile-visibility"
-                className="block text-base font-semibold text-[var(--color-text-primary)]"
-              >
-                {t('settings.messagingPrivacy.profileVisibility')}
-              </label>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                {t('settings.messagingPrivacy.profileVisibilityHelp')}
-              </p>
-              <select
-                id="profile-visibility"
-                value={profileVisibility}
-                onChange={(e) => setProfileVisibility(e.target.value as 'public' | 'private')}
-                className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-              >
-                <option value="public">{t('settings.messagingPrivacy.profileVisibilityPublic')}</option>
-                <option value="private">
-                  {t('settings.messagingPrivacy.profileVisibilityPrivate')}
-                </option>
-              </select>
-            </div>
-
-            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <label
-                htmlFor="wall-post-permission"
-                className="block text-base font-semibold text-[var(--color-text-primary)]"
-              >
-                {t('settings.messagingPrivacy.wallPostPermission')}
-              </label>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                {t('settings.messagingPrivacy.wallPostPermissionHelp')}
-              </p>
-              <select
-                id="wall-post-permission"
-                value={wallPostPermission}
-                onChange={(e) =>
-                  setWallPostPermission(e.target.value as 'all_friends' | 'requires_approval' | 'no_one')
-                }
-                className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-              >
-                <option value="all_friends">{t('settings.messagingPrivacy.wallPostPermissionAllFriends')}</option>
-                <option value="requires_approval">
-                  {t('settings.messagingPrivacy.wallPostPermissionRequiresApproval')}
-                </option>
-                <option value="no_one">{t('settings.messagingPrivacy.wallPostPermissionNoOne')}</option>
-              </select>
-            </div>
-
-            {/* Global Auto-Delete */}
-            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                {t('messages.autoDelete.label')}
-              </p>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)] mb-4">
-                {t('messages.autoDelete.description')}
-              </p>
-              <AutoDeleteDurationPicker
-                value={globalDuration}
-                onChange={setGlobalDuration}
-                disabled={saveGlobalAutoDeleteMutation.isPending}
-              />
-              <button
-                type="button"
-                onClick={handleGlobalAutoDeleteSave}
-                disabled={!globalIsDirty || saveGlobalAutoDeleteMutation.isPending}
-                className="mt-4 w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
-              >
-                {t('common.save')}
-              </button>
-            </div>
-          </div>
           </Panel>
         </div>
 
@@ -901,7 +928,12 @@ export default function SettingsPage() {
               <div className="flex flex-col gap-2">
                 <button
                   type="button"
-                  onClick={() => saveGlobalAutoDeleteMutation.mutate({ seconds: pendingGlobalSeconds, retroactive: true })}
+                  onClick={() =>
+                    saveGlobalAutoDeleteMutation.mutate({
+                      seconds: pendingGlobalSeconds,
+                      retroactive: true,
+                    })
+                  }
                   disabled={saveGlobalAutoDeleteMutation.isPending}
                   className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
                 >
@@ -909,7 +941,12 @@ export default function SettingsPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => saveGlobalAutoDeleteMutation.mutate({ seconds: pendingGlobalSeconds, retroactive: false })}
+                  onClick={() =>
+                    saveGlobalAutoDeleteMutation.mutate({
+                      seconds: pendingGlobalSeconds,
+                      retroactive: false,
+                    })
+                  }
                   disabled={saveGlobalAutoDeleteMutation.isPending}
                   className="w-full rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
                 >
@@ -937,80 +974,80 @@ export default function SettingsPage() {
 
           {/* Date & Time Settings */}
           <Panel as="section">
-          <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.dateTime.title')}
-          </h3>
+            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.dateTime.title')}
+            </h3>
 
-          <div className="space-y-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <label
-                  htmlFor="relative-time-toggle"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
-                >
-                  {t('settings.dateTime.useRelativeTime')}
-                </label>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {t('settings.dateTime.useRelativeTimeHelp')}
-                </p>
-                <div className="mt-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
-                  <div className="text-xs text-[var(--color-text-secondary)]">
-                    <strong>{t('settings.dateTime.previewLabel')}</strong>
+            <div className="space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <label
+                    htmlFor="relative-time-toggle"
+                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    {t('settings.dateTime.useRelativeTime')}
+                  </label>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {t('settings.dateTime.useRelativeTimeHelp')}
+                  </p>
+                  <div className="mt-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
+                    <div className="text-xs text-[var(--color-text-secondary)]">
+                      <strong>{t('settings.dateTime.previewLabel')}</strong>
+                    </div>
+                    <div className="mt-1 text-sm text-[var(--color-text-primary)]">
+                      {useRelativeTime
+                        ? t('settings.dateTime.relativePreview')
+                        : t('settings.dateTime.absolutePreview')}
+                    </div>
                   </div>
-                  <div className="mt-1 text-sm text-[var(--color-text-primary)]">
-                    {useRelativeTime
-                      ? t('settings.dateTime.relativePreview')
-                      : t('settings.dateTime.absolutePreview')}
-                  </div>
+                </div>
+
+                <div className="ml-4">
+                  <button
+                    id="relative-time-toggle"
+                    type="button"
+                    role="switch"
+                    aria-checked={useRelativeTime}
+                    onClick={() => setUseRelativeTime(!useRelativeTime)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                      useRelativeTime ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span className="sr-only">{t('settings.dateTime.useRelativeTime')}</span>
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        useRelativeTime ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
 
-              <div className="ml-4">
-                <button
-                  id="relative-time-toggle"
-                  type="button"
-                  role="switch"
-                  aria-checked={useRelativeTime}
-                  onClick={() => setUseRelativeTime(!useRelativeTime)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    useRelativeTime ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
+              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <label
+                  htmlFor="access-request-cooldown-display"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
                 >
-                  <span className="sr-only">{t('settings.dateTime.useRelativeTime')}</span>
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      useRelativeTime ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+                  {t('settings.dateTime.cooldownFormat')}
+                </label>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  {t('settings.dateTime.cooldownFormatHelp')}
+                </p>
+                <select
+                  id="access-request-cooldown-display"
+                  value={accessRequestCooldownDisplay}
+                  onChange={(event) =>
+                    setAccessRequestCooldownDisplay(event.target.value as 'days' | 'date' | 'both')
+                  }
+                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                >
+                  <option value="days">{t('settings.dateTime.cooldownDays')}</option>
+                  <option value="date">{t('settings.dateTime.cooldownDate')}</option>
+                  <option value="both">{t('settings.dateTime.cooldownBoth')}</option>
+                </select>
               </div>
             </div>
-
-            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <label
-                htmlFor="access-request-cooldown-display"
-                className="block text-sm font-semibold text-[var(--color-text-primary)]"
-              >
-                {t('settings.dateTime.cooldownFormat')}
-              </label>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                {t('settings.dateTime.cooldownFormatHelp')}
-              </p>
-              <select
-                id="access-request-cooldown-display"
-                value={accessRequestCooldownDisplay}
-                onChange={(event) =>
-                  setAccessRequestCooldownDisplay(event.target.value as 'days' | 'date' | 'both')
-                }
-                className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-              >
-                <option value="days">{t('settings.dateTime.cooldownDays')}</option>
-                <option value="date">{t('settings.dateTime.cooldownDate')}</option>
-                <option value="both">{t('settings.dateTime.cooldownBoth')}</option>
-              </select>
-            </div>
-          </div>
           </Panel>
 
           <Panel as="section">
@@ -1081,607 +1118,617 @@ export default function SettingsPage() {
           </Panel>
 
           <Panel as="section">
-          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.savedItems.title')}
-          </h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('settings.savedItems.description')}
-          </p>
+            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.savedItems.title')}
+            </h2>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.savedItems.description')}
+            </p>
 
-          <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-            <div className="pr-4">
-              <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                {t('settings.savedItems.notifyLabel')}
-              </p>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                {t('settings.savedItems.notifyHelp')}
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={notifyRemovedSavedPosts}
-              onClick={() => setNotifyRemovedSavedPosts(!notifyRemovedSavedPosts)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                notifyRemovedSavedPosts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-              }`}
-            >
-              <span className="sr-only">{t('settings.savedItems.notifyLabel')}</span>
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  notifyRemovedSavedPosts ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-          </Panel>
-
-          <Panel as="section">
-          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.omniFeed.title')}
-          </h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('settings.omniFeed.description')}
-          </p>
-
-          <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-            <div className="pr-4">
-              <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                {t('settings.omniFeed.defaultOmniLabel')}
-              </p>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                {t('settings.omniFeed.defaultOmniHelp')}
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={defaultOmniPostsOnly}
-              onClick={() => setDefaultOmniPostsOnly(!defaultOmniPostsOnly)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                defaultOmniPostsOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-              }`}
-            >
-              <span className="sr-only">{t('common.accessibility.toggleOmniFeed')}</span>
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  defaultOmniPostsOnly ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-
-          <div className="mt-4 border-t border-[var(--color-border)] pt-4">
-            <div className="mt-3 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+            <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
               <div className="pr-4">
                 <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                  {t('settings.omniFeed.stayOnPostLabel')}
+                  {t('settings.savedItems.notifyLabel')}
                 </p>
                 <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {t('settings.omniFeed.stayOnPostHelp')}
+                  {t('settings.savedItems.notifyHelp')}
                 </p>
               </div>
               <button
                 type="button"
                 role="switch"
-                aria-checked={stayOnPostAfterHide}
-                onClick={() => setStayOnPostAfterHide(!stayOnPostAfterHide)}
+                aria-checked={notifyRemovedSavedPosts}
+                onClick={() => setNotifyRemovedSavedPosts(!notifyRemovedSavedPosts)}
                 className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  stayOnPostAfterHide ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  notifyRemovedSavedPosts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
                 }`}
               >
-                <span className="sr-only">{t('settings.omniFeed.stayOnPostLabel')}</span>
+                <span className="sr-only">{t('settings.savedItems.notifyLabel')}</span>
                 <span
                   aria-hidden="true"
                   className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    stayOnPostAfterHide ? 'translate-x-5' : 'translate-x-0'
+                    notifyRemovedSavedPosts ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
             </div>
-          </div>
+          </Panel>
+
+          <Panel as="section">
+            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.omniFeed.title')}
+            </h2>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.omniFeed.description')}
+            </p>
+
+            <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="pr-4">
+                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  {t('settings.omniFeed.defaultOmniLabel')}
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  {t('settings.omniFeed.defaultOmniHelp')}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={defaultOmniPostsOnly}
+                onClick={() => setDefaultOmniPostsOnly(!defaultOmniPostsOnly)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  defaultOmniPostsOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
+              >
+                <span className="sr-only">{t('common.accessibility.toggleOmniFeed')}</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    defaultOmniPostsOnly ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+              <div className="mt-3 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <div className="pr-4">
+                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    {t('settings.omniFeed.stayOnPostLabel')}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {t('settings.omniFeed.stayOnPostHelp')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={stayOnPostAfterHide}
+                  onClick={() => setStayOnPostAfterHide(!stayOnPostAfterHide)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    stayOnPostAfterHide ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className="sr-only">{t('settings.omniFeed.stayOnPostLabel')}</span>
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      stayOnPostAfterHide ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
           </Panel>
 
           {/* Infinite Scroll Settings */}
           <Panel as="section">
-          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.pageNavigation.title')}
-          </h2>
-          <p className="mb-6 text-sm text-[var(--color-text-secondary)]">
-            {t('settings.pageNavigation.description')}
-          </p>
+            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.pageNavigation.title')}
+            </h2>
+            <p className="mb-6 text-sm text-[var(--color-text-secondary)]">
+              {t('settings.pageNavigation.description')}
+            </p>
 
-          <div className="space-y-6">
-            {/* Home Feed Toggle */}
-            <div className="flex items-start justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <div className="flex-1">
-                <label
-                  htmlFor="infinite-scroll-home-toggle"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
-                >
-                  {t('settings.pageNavigation.homeFeed')}
-                </label>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {useInfiniteScrollHome
-                    ? t('settings.pageNavigation.infiniteScroll')
-                    : t('settings.pageNavigation.pagination')}
-                </p>
+            <div className="space-y-6">
+              {/* Home Feed Toggle */}
+              <div className="flex items-start justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <div className="flex-1">
+                  <label
+                    htmlFor="infinite-scroll-home-toggle"
+                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    {t('settings.pageNavigation.homeFeed')}
+                  </label>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {useInfiniteScrollHome
+                      ? t('settings.pageNavigation.infiniteScroll')
+                      : t('settings.pageNavigation.pagination')}
+                  </p>
+                </div>
+
+                <div className="ml-4">
+                  <button
+                    id="infinite-scroll-home-toggle"
+                    type="button"
+                    role="switch"
+                    aria-checked={useInfiniteScrollHome}
+                    onClick={() => setUseInfiniteScrollHome(!useInfiniteScrollHome)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                      useInfiniteScrollHome ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span className="sr-only">
+                      {t('common.accessibility.toggleInfiniteScroll')}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        useInfiniteScrollHome ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
 
-              <div className="ml-4">
-                <button
-                  id="infinite-scroll-home-toggle"
-                  type="button"
-                  role="switch"
-                  aria-checked={useInfiniteScrollHome}
-                  onClick={() => setUseInfiniteScrollHome(!useInfiniteScrollHome)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    useInfiniteScrollHome ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
-                >
-                  <span className="sr-only">{t('common.accessibility.toggleInfiniteScroll')}</span>
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      useInfiniteScrollHome ? 'translate-x-5' : 'translate-x-0'
+              {/* Hubs Toggle */}
+              <div className="flex items-start justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <div className="flex-1">
+                  <label
+                    htmlFor="infinite-scroll-hubs-toggle"
+                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    {t('settings.pageNavigation.hubPages')}
+                  </label>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {useInfiniteScrollHubs
+                      ? t('settings.pageNavigation.infiniteScroll')
+                      : t('settings.pageNavigation.pagination')}
+                  </p>
+                </div>
+
+                <div className="ml-4">
+                  <button
+                    id="infinite-scroll-hubs-toggle"
+                    type="button"
+                    role="switch"
+                    aria-checked={useInfiniteScrollHubs}
+                    onClick={() => setUseInfiniteScrollHubs(!useInfiniteScrollHubs)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                      useInfiniteScrollHubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
                     }`}
-                  />
-                </button>
+                  >
+                    <span className="sr-only">
+                      {t('common.accessibility.toggleInfiniteScroll')}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        useInfiniteScrollHubs ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Subreddits Toggle */}
+              <div className="flex items-start justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <div className="flex-1">
+                  <label
+                    htmlFor="infinite-scroll-subs-toggle"
+                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    {t('settings.pageNavigation.subredditPages')}
+                  </label>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {useInfiniteScrollSubs
+                      ? t('settings.pageNavigation.infiniteScroll')
+                      : t('settings.pageNavigation.pagination')}
+                  </p>
+                </div>
+
+                <div className="ml-4">
+                  <button
+                    id="infinite-scroll-subs-toggle"
+                    type="button"
+                    role="switch"
+                    aria-checked={useInfiniteScrollSubs}
+                    onClick={() => setUseInfiniteScrollSubs(!useInfiniteScrollSubs)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                      useInfiniteScrollSubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span className="sr-only">
+                      {t('common.accessibility.toggleInfiniteScroll')}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        useInfiniteScrollSubs ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
             </div>
-
-            {/* Hubs Toggle */}
-            <div className="flex items-start justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <div className="flex-1">
-                <label
-                  htmlFor="infinite-scroll-hubs-toggle"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
-                >
-                  {t('settings.pageNavigation.hubPages')}
-                </label>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {useInfiniteScrollHubs
-                    ? t('settings.pageNavigation.infiniteScroll')
-                    : t('settings.pageNavigation.pagination')}
-                </p>
-              </div>
-
-              <div className="ml-4">
-                <button
-                  id="infinite-scroll-hubs-toggle"
-                  type="button"
-                  role="switch"
-                  aria-checked={useInfiniteScrollHubs}
-                  onClick={() => setUseInfiniteScrollHubs(!useInfiniteScrollHubs)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    useInfiniteScrollHubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
-                >
-                  <span className="sr-only">{t('common.accessibility.toggleInfiniteScroll')}</span>
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      useInfiniteScrollHubs ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {/* Subreddits Toggle */}
-            <div className="flex items-start justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <div className="flex-1">
-                <label
-                  htmlFor="infinite-scroll-subs-toggle"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
-                >
-                  {t('settings.pageNavigation.subredditPages')}
-                </label>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {useInfiniteScrollSubs
-                    ? t('settings.pageNavigation.infiniteScroll')
-                    : t('settings.pageNavigation.pagination')}
-                </p>
-              </div>
-
-              <div className="ml-4">
-                <button
-                  id="infinite-scroll-subs-toggle"
-                  type="button"
-                  role="switch"
-                  aria-checked={useInfiniteScrollSubs}
-                  onClick={() => setUseInfiniteScrollSubs(!useInfiniteScrollSubs)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    useInfiniteScrollSubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
-                >
-                  <span className="sr-only">{t('common.accessibility.toggleInfiniteScroll')}</span>
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      useInfiniteScrollSubs ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-          </div>
           </Panel>
         </div>
 
         <div hidden={activeTab !== 'privacy'}>
           {/* NSFW Search & Visibility */}
           <Panel as="section">
-          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.nsfw.title')}
-          </h2>
-          <div className="space-y-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <label
-                  htmlFor="block-all-nsfw-toggle"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
-                >
-                  {t('settings.nsfw.blockAll')}
-                </label>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {t('settings.nsfw.blockAllHelp')}
-                </p>
-              </div>
-              <div className="ml-4">
-                <button
-                  id="block-all-nsfw-toggle"
-                  type="button"
-                  role="switch"
-                  aria-checked={blockAllNsfw}
-                  onClick={() => setBlockAllNsfw(!blockAllNsfw)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    blockAllNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
-                >
-                  <span className="sr-only">{t('settings.nsfw.blockAll')}</span>
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      blockAllNsfw ? 'translate-x-5' : 'translate-x-0'
+            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.nsfw.title')}
+            </h2>
+            <div className="space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <label
+                    htmlFor="block-all-nsfw-toggle"
+                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    {t('settings.nsfw.blockAll')}
+                  </label>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {t('settings.nsfw.blockAllHelp')}
+                  </p>
+                </div>
+                <div className="ml-4">
+                  <button
+                    id="block-all-nsfw-toggle"
+                    type="button"
+                    role="switch"
+                    aria-checked={blockAllNsfw}
+                    onClick={() => setBlockAllNsfw(!blockAllNsfw)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                      blockAllNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
                     }`}
-                  />
-                </button>
+                  >
+                    <span className="sr-only">{t('settings.nsfw.blockAll')}</span>
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        blockAllNsfw ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <label
-                  htmlFor="search-include-nsfw-default-toggle"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
-                >
-                  {t('settings.nsfw.defaultInclude')}
-                </label>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {t('settings.nsfw.defaultIncludeHelp')}
-                </p>
-              </div>
-              <div className="ml-4">
-                <button
-                  id="search-include-nsfw-default-toggle"
-                  type="button"
-                  role="switch"
-                  aria-checked={searchIncludeNsfwByDefault && !blockAllNsfw}
-                  onClick={() => {
-                    if (blockAllNsfw) return;
-                    setSearchIncludeNsfwByDefault(!searchIncludeNsfwByDefault);
-                  }}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    searchIncludeNsfwByDefault && !blockAllNsfw
-                      ? 'bg-[var(--color-primary)]'
-                      : 'bg-gray-300'
-                  } ${blockAllNsfw ? 'opacity-60' : ''}`}
-                  aria-disabled={blockAllNsfw}
-                >
-                  <span className="sr-only">{t('settings.nsfw.defaultInclude')}</span>
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <label
+                    htmlFor="search-include-nsfw-default-toggle"
+                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    {t('settings.nsfw.defaultInclude')}
+                  </label>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {t('settings.nsfw.defaultIncludeHelp')}
+                  </p>
+                </div>
+                <div className="ml-4">
+                  <button
+                    id="search-include-nsfw-default-toggle"
+                    type="button"
+                    role="switch"
+                    aria-checked={searchIncludeNsfwByDefault && !blockAllNsfw}
+                    onClick={() => {
+                      if (blockAllNsfw) return;
+                      setSearchIncludeNsfwByDefault(!searchIncludeNsfwByDefault);
+                    }}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
                       searchIncludeNsfwByDefault && !blockAllNsfw
-                        ? 'translate-x-5'
-                        : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+                        ? 'bg-[var(--color-primary)]'
+                        : 'bg-gray-300'
+                    } ${blockAllNsfw ? 'opacity-60' : ''}`}
+                    aria-disabled={blockAllNsfw}
+                  >
+                    <span className="sr-only">{t('settings.nsfw.defaultInclude')}</span>
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        searchIncludeNsfwByDefault && !blockAllNsfw
+                          ? 'translate-x-5'
+                          : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <label
-                  htmlFor="block-nsfw-thumbnails-toggle"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
-                >
-                  {t('settings.nsfw.blockThumbnails')}
-                </label>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {t('settings.nsfw.blockThumbnailsHelp')}
-                </p>
-              </div>
-              <div className="ml-4">
-                <button
-                  id="block-nsfw-thumbnails-toggle"
-                  type="button"
-                  role="switch"
-                  aria-checked={blockNsfwThumbnails}
-                  onClick={() => setBlockNsfwThumbnails(!blockNsfwThumbnails)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    blockNsfwThumbnails ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
-                >
-                  <span className="sr-only">{t('settings.nsfw.blockThumbnails')}</span>
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      blockNsfwThumbnails ? 'translate-x-5' : 'translate-x-0'
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <label
+                    htmlFor="block-nsfw-thumbnails-toggle"
+                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    {t('settings.nsfw.blockThumbnails')}
+                  </label>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {t('settings.nsfw.blockThumbnailsHelp')}
+                  </p>
+                </div>
+                <div className="ml-4">
+                  <button
+                    id="block-nsfw-thumbnails-toggle"
+                    type="button"
+                    role="switch"
+                    aria-checked={blockNsfwThumbnails}
+                    onClick={() => setBlockNsfwThumbnails(!blockNsfwThumbnails)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                      blockNsfwThumbnails ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
                     }`}
-                  />
-                </button>
+                  >
+                    <span className="sr-only">{t('settings.nsfw.blockThumbnails')}</span>
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        blockNsfwThumbnails ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
           </Panel>
 
           {/* Security & Keys */}
           <Panel as="section">
-          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.security.title')}
-          </h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('settings.security.description')}
-          </p>
+            <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.security.title')}
+            </h2>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.security.description')}
+            </p>
 
-          <div className="mt-4 flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setShowPublicKey((v) => !v)}
-                className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-              >
-                {showPublicKey ? t('settings.security.hideKey') : t('settings.security.showKey')}
-              </button>
-              {publicKey && showPublicKey && (
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(publicKey);
-                      setCopyStatus('copied');
-                      setTimeout(() => setCopyStatus('idle'), 1500);
-                    } catch {
-                      setCopyStatus('error');
-                      setTimeout(() => setCopyStatus('idle'), 1500);
-                    }
-                  }}
-                  className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                  onClick={() => setShowPublicKey((v) => !v)}
+                  className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
                 >
-                  {copyStatus === 'copied'
-                    ? t('settings.security.copied')
-                    : copyStatus === 'error'
-                      ? t('settings.security.copyFailed')
-                      : t('settings.security.copy')}
+                  {showPublicKey ? t('settings.security.hideKey') : t('settings.security.showKey')}
                 </button>
-              )}
-            </div>
-
-            {showPublicKey && (
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3 text-sm text-[var(--color-text-primary)] break-all">
-                {publicKey ? (
-                  publicKey
-                ) : (
-                  <span className="text-[var(--color-text-secondary)]">
-                    {t('settings.security.noKey')}
-                  </span>
+                {publicKey && showPublicKey && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(publicKey);
+                        setCopyStatus('copied');
+                        setTimeout(() => setCopyStatus('idle'), 1500);
+                      } catch {
+                        setCopyStatus('error');
+                        setTimeout(() => setCopyStatus('idle'), 1500);
+                      }
+                    }}
+                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                  >
+                    {copyStatus === 'copied'
+                      ? t('settings.security.copied')
+                      : copyStatus === 'error'
+                        ? t('settings.security.copyFailed')
+                        : t('settings.security.copy')}
+                  </button>
                 )}
               </div>
-            )}
-          </div>
+
+              {showPublicKey && (
+                <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3 text-sm text-[var(--color-text-primary)] break-all">
+                  {publicKey ? (
+                    publicKey
+                  ) : (
+                    <span className="text-[var(--color-text-secondary)]">
+                      {t('settings.security.noKey')}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </Panel>
 
           {/* Email Settings */}
           <Panel as="section">
-          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.email.title')}
-          </h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('settings.email.description')}
-          </p>
+            <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.email.title')}
+            </h2>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.email.description')}
+            </p>
 
-          <div className="mt-4">
-            {isEditingEmail ? (
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  setEmailError(null);
-                  setEmailSuccess(false);
+            <div className="mt-4">
+              {isEditingEmail ? (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setEmailError(null);
+                    setEmailSuccess(false);
 
-                  if (emailInput !== emailConfirmInput) {
-                    setEmailError(t('settings.email.emailMismatch'));
-                    return;
-                  }
+                    if (emailInput !== emailConfirmInput) {
+                      setEmailError(t('settings.email.emailMismatch'));
+                      return;
+                    }
 
-                  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                  if (!emailRegex.test(emailInput)) {
-                    setEmailError(t('settings.email.invalidEmail'));
-                    return;
-                  }
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(emailInput)) {
+                      setEmailError(t('settings.email.invalidEmail'));
+                      return;
+                    }
 
-                  setIsUpdatingEmail(true);
-                  try {
-                    await usersService.updateEmail(emailInput, emailConfirmInput);
-                    setPendingEmail(emailInput);
-                    setEmailSuccess(true);
-                    setIsEditingEmail(false);
-                    setEmailInput('');
-                    setEmailConfirmInput('');
-                    // Keep success message visible
-                  } catch (error) {
-                    setEmailError(
-                      error instanceof Error ? error.message : t('settings.email.invalidEmail')
-                    );
-                  } finally {
-                    setIsUpdatingEmail(false);
-                  }
-                }}
-                className="space-y-4"
-              >
-                <div>
-                  <label
-                    htmlFor="email"
-                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
-                  >
-                    {t('settings.email.newEmail')}
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                    placeholder={t('auth.fields.emailPlaceholder')}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="emailConfirm"
-                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
-                  >
-                    {t('settings.email.confirmEmail')}
-                  </label>
-                  <input
-                    type="email"
-                    id="emailConfirm"
-                    value={emailConfirmInput}
-                    onChange={(e) => setEmailConfirmInput(e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                    placeholder={t('auth.fields.emailPlaceholder')}
-                    required
-                  />
-                </div>
-
-                {emailError && (
-                  <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">{emailError}</div>
-                )}
-
-                {emailSuccess && pendingEmail && (
-                  <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-sm text-blue-700">
-                    <div className="flex items-start gap-2">
-                      <span className="text-base">✉️</span>
-                      <p>{t('settings.email.verificationSent', { email: pendingEmail })}</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-3">
-                  <button
-                    type="submit"
-                    disabled={isUpdatingEmail}
-                    className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-                  >
-                    {isUpdatingEmail
-                      ? t('settings.email.updating')
-                      : t('settings.email.saveChanges')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
+                    setIsUpdatingEmail(true);
+                    try {
+                      await usersService.updateEmail(emailInput, emailConfirmInput);
+                      setPendingEmail(emailInput);
+                      setEmailSuccess(true);
                       setIsEditingEmail(false);
                       setEmailInput('');
                       setEmailConfirmInput('');
-                      setEmailError(null);
-                    }}
-                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)]"
-                  >
-                    {t('common.cancel')}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                      // Keep success message visible
+                    } catch (error) {
+                      setEmailError(
+                        error instanceof Error ? error.message : t('settings.email.invalidEmail')
+                      );
+                    } finally {
+                      setIsUpdatingEmail(false);
+                    }
+                  }}
+                  className="space-y-4"
+                >
                   <div>
-                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      {t('settings.email.currentEmail')}
-                    </p>
-                    <p className="mt-1 text-base text-[var(--color-text-secondary)]">
-                      {user?.email || t('settings.email.noEmail')}
-                    </p>
+                    <label
+                      htmlFor="email"
+                      className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                    >
+                      {t('settings.email.newEmail')}
+                    </label>
+                    <input
+                      type="email"
+                      id="email"
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                      placeholder={t('auth.fields.emailPlaceholder')}
+                      required
+                    />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditingEmail(true);
-                      setEmailInput(user?.email || '');
-                      setEmailConfirmInput('');
-                      setEmailError(null);
-                      setEmailSuccess(false);
-                    }}
-                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                  >
-                    {user?.email ? t('settings.email.updateButton') : t('settings.email.addButton')}
-                  </button>
-                </div>
 
-                {pendingEmail && (
-                  <div className="rounded-md border border-amber-300 bg-amber-50 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-sm font-semibold text-amber-900">
-                            {t('settings.email.pendingEmail')}
-                          </p>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900">
-                            ⚠️ {t('settings.email.pendingVerification')}
-                          </span>
-                        </div>
-                        <p className="text-base text-amber-800">{pendingEmail}</p>
-                        <p className="mt-2 text-xs text-amber-700">
-                          {t('settings.email.verificationSent', { email: pendingEmail })}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setIsResendingVerification(true);
-                          try {
-                            await usersService.resendVerification();
-                            // Show brief success feedback
-                            setEmailSuccess(true);
-                            setTimeout(() => setEmailSuccess(false), 3000);
-                          } catch (error) {
-                            setEmailError(
-                              error instanceof Error
-                                ? error.message
-                                : 'Failed to resend verification email'
-                            );
-                            setTimeout(() => setEmailError(null), 5000);
-                          } finally {
-                            setIsResendingVerification(false);
-                          }
-                        }}
-                        disabled={isResendingVerification}
-                        className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-                      >
-                        {isResendingVerification
-                          ? t('settings.email.resending')
-                          : t('settings.email.resendVerification')}
-                      </button>
-                    </div>
+                  <div>
+                    <label
+                      htmlFor="emailConfirm"
+                      className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                    >
+                      {t('settings.email.confirmEmail')}
+                    </label>
+                    <input
+                      type="email"
+                      id="emailConfirm"
+                      value={emailConfirmInput}
+                      onChange={(e) => setEmailConfirmInput(e.target.value)}
+                      className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                      placeholder={t('auth.fields.emailPlaceholder')}
+                      required
+                    />
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+
+                  {emailError && (
+                    <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+                      {emailError}
+                    </div>
+                  )}
+
+                  {emailSuccess && pendingEmail && (
+                    <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-sm text-blue-700">
+                      <div className="flex items-start gap-2">
+                        <span className="text-base">✉️</span>
+                        <p>{t('settings.email.verificationSent', { email: pendingEmail })}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button
+                      type="submit"
+                      disabled={isUpdatingEmail}
+                      className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                    >
+                      {isUpdatingEmail
+                        ? t('settings.email.updating')
+                        : t('settings.email.saveChanges')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingEmail(false);
+                        setEmailInput('');
+                        setEmailConfirmInput('');
+                        setEmailError(null);
+                      }}
+                      className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)]"
+                    >
+                      {t('common.cancel')}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                        {t('settings.email.currentEmail')}
+                      </p>
+                      <p className="mt-1 text-base text-[var(--color-text-secondary)]">
+                        {user?.email || t('settings.email.noEmail')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingEmail(true);
+                        setEmailInput(user?.email || '');
+                        setEmailConfirmInput('');
+                        setEmailError(null);
+                        setEmailSuccess(false);
+                      }}
+                      className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                    >
+                      {user?.email
+                        ? t('settings.email.updateButton')
+                        : t('settings.email.addButton')}
+                    </button>
+                  </div>
+
+                  {pendingEmail && (
+                    <div className="rounded-md border border-amber-300 bg-amber-50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-sm font-semibold text-amber-900">
+                              {t('settings.email.pendingEmail')}
+                            </p>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                              ⚠️ {t('settings.email.pendingVerification')}
+                            </span>
+                          </div>
+                          <p className="text-base text-amber-800">{pendingEmail}</p>
+                          <p className="mt-2 text-xs text-amber-700">
+                            {t('settings.email.verificationSent', { email: pendingEmail })}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setIsResendingVerification(true);
+                            try {
+                              await usersService.resendVerification();
+                              // Show brief success feedback
+                              setEmailSuccess(true);
+                              setTimeout(() => setEmailSuccess(false), 3000);
+                            } catch (error) {
+                              setEmailError(
+                                error instanceof Error
+                                  ? error.message
+                                  : 'Failed to resend verification email'
+                              );
+                              setTimeout(() => setEmailError(null), 5000);
+                            } finally {
+                              setIsResendingVerification(false);
+                            }
+                          }}
+                          disabled={isResendingVerification}
+                          className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                        >
+                          {isResendingVerification
+                            ? t('settings.email.resending')
+                            : t('settings.email.resendVerification')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </Panel>
         </div>
 
@@ -1889,100 +1936,105 @@ export default function SettingsPage() {
 
           {/* Data Export (P0-016: GDPR Right to Data Portability) */}
           <Panel as="section">
-          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.dataExport.title')}
-          </h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('settings.dataExport.description')}
-          </p>
-
-                  <div className="mt-4">
-            <label className="mb-2 block text-sm font-medium text-[var(--color-text-primary)]" htmlFor="export-password">
-              Confirm password
-            </label>
-            <input
-              id="export-password"
-              type="password"
-              autoComplete="current-password"
-              value={exportPassword}
-              onChange={(event) => setExportPassword(event.target.value)}
-              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
-            />
+            <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.dataExport.title')}
+            </h2>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.dataExport.description')}
+            </p>
 
             <div className="mt-4">
-            <button
-              type="button"
-              onClick={async () => {
-                setIsRequestingExport(true);
-                setExportError(null);
-                setExportSuccess(null);
+              <label
+                className="mb-2 block text-sm font-medium text-[var(--color-text-primary)]"
+                htmlFor="export-password"
+              >
+                Confirm password
+              </label>
+              <input
+                id="export-password"
+                type="password"
+                autoComplete="current-password"
+                value={exportPassword}
+                onChange={(event) => setExportPassword(event.target.value)}
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+              />
 
-                try {
-                  const response = await accountService.requestDataExport({
-                    password: exportPassword,
-                    data_types: [
-                      'profile',
-                      'messages',
-                      'posts',
-                      'comments',
-                      'votes',
-                      'saved',
-                      'hubs',
-                      'settings',
-                      'encryption_keys',
-                    ],
-                    include_deleted: false,
-                  });
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsRequestingExport(true);
+                    setExportError(null);
+                    setExportSuccess(null);
 
-                  setExportSuccess(
-                    t('settings.dataExport.successMessage', { exportId: response.export_id })
-                  );
-                } catch (error) {
-                  setExportError(
-                    error instanceof Error ? error.message : t('settings.dataExport.requestButton')
-                  );
-                } finally {
-                  setExportPassword('');
-                  setIsRequestingExport(false);
-                }
-              }}
-              disabled={isRequestingExport || !exportPassword.trim()}
-              className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-            >
-              {isRequestingExport
-                ? t('settings.dataExport.requesting')
-                : t('settings.dataExport.requestButton')}
-            </button>
+                    try {
+                      const response = await accountService.requestDataExport({
+                        password: exportPassword,
+                        data_types: [
+                          'profile',
+                          'messages',
+                          'posts',
+                          'comments',
+                          'votes',
+                          'saved',
+                          'hubs',
+                          'settings',
+                          'encryption_keys',
+                        ],
+                        include_deleted: false,
+                      });
 
-            {exportError && (
-              <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-600">
-                {exportError}
-              </div>
-            )}
+                      setExportSuccess(
+                        t('settings.dataExport.successMessage', { exportId: response.export_id })
+                      );
+                    } catch (error) {
+                      setExportError(
+                        error instanceof Error
+                          ? error.message
+                          : t('settings.dataExport.requestButton')
+                      );
+                    } finally {
+                      setExportPassword('');
+                      setIsRequestingExport(false);
+                    }
+                  }}
+                  disabled={isRequestingExport || !exportPassword.trim()}
+                  className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {isRequestingExport
+                    ? t('settings.dataExport.requesting')
+                    : t('settings.dataExport.requestButton')}
+                </button>
 
-            {exportSuccess && (
-              <div className="mt-4 rounded-md bg-green-50 p-3 text-sm text-green-600">
-                {exportSuccess}
-              </div>
-            )}
-
-            <div className="mt-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
-                {t('settings.dataExport.included')}
-              </h4>
-              <ul className="mt-2 space-y-1 text-sm text-[var(--color-text-secondary)]">
-                {(t('settings.dataExport.includedList', { returnObjects: true }) as string[]).map(
-                  (item: string, index: number) => (
-                    <li key={index}>• {item}</li>
-                  )
+                {exportError && (
+                  <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-600">
+                    {exportError}
+                  </div>
                 )}
-              </ul>
-              <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
-                {t('settings.dataExport.availabilityNote')}
-              </p>
+
+                {exportSuccess && (
+                  <div className="mt-4 rounded-md bg-green-50 p-3 text-sm text-green-600">
+                    {exportSuccess}
+                  </div>
+                )}
+
+                <div className="mt-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                  <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                    {t('settings.dataExport.included')}
+                  </h4>
+                  <ul className="mt-2 space-y-1 text-sm text-[var(--color-text-secondary)]">
+                    {(
+                      t('settings.dataExport.includedList', { returnObjects: true }) as string[]
+                    ).map((item: string, index: number) => (
+                      <li key={index}>• {item}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+                    {t('settings.dataExport.availabilityNote')}
+                  </p>
+                </div>
+              </div>
             </div>
-            </div>
-          </div>
           </Panel>
 
           {/* Account Deletion */}

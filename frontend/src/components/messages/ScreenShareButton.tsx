@@ -1,13 +1,13 @@
-import { Monitor, MonitorOff } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
+import { Monitor, MonitorOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ScreenShareButtonProps {
-  isSharing: boolean
-  peerIsSharing: boolean
-  callId: number | null
-  isCallActive: boolean
-  onStartSharing: () => Promise<void>
-  onStopSharing: () => void
+  isSharing: boolean;
+  peerIsSharing: boolean;
+  callId: number | null;
+  isCallActive: boolean;
+  onStartSharing: () => Promise<void>;
+  onStopSharing: () => void;
 }
 
 export function ScreenShareButton({
@@ -18,17 +18,17 @@ export function ScreenShareButton({
   onStartSharing,
   onStopSharing,
 }: ScreenShareButtonProps) {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
 
-  const isDisabled = !callId || !isCallActive
+  const isDisabled = !callId || !isCallActive;
 
   const handleClick = () => {
     if (isSharing) {
-      onStopSharing()
+      onStopSharing();
     } else {
-      onStartSharing()
+      onStartSharing();
     }
-  }
+  };
 
   return (
     <div className="relative flex flex-col items-center">
@@ -58,5 +58,5 @@ export function ScreenShareButton({
         <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--color-primary)]" />
       )}
     </div>
-  )
+  );
 }

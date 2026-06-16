@@ -236,7 +236,6 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</div>
                 )}
 
-
                 <div>
                   <label
                     htmlFor="auth-username"

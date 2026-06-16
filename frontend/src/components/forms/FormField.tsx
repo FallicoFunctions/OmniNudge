@@ -29,7 +29,9 @@ export function FormField({
         {required ? (
           <span className="text-red-500 ml-1">*</span>
         ) : (
-          <span className="text-[var(--color-text-secondary)] font-normal ml-1">{t('common.optional')}</span>
+          <span className="text-[var(--color-text-secondary)] font-normal ml-1">
+            {t('common.optional')}
+          </span>
         )}
       </label>
 

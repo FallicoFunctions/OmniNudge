@@ -54,9 +54,25 @@ function ProfileInfoCard({ location, t }: { location: string; t: TFunction }) {
         {t('userProfilePage.headings.info')}
       </h3>
       <div className="flex items-center gap-2 text-sm text-[var(--color-text-primary)]">
-        <svg className="w-4 h-4 flex-shrink-0 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        <svg
+          className="w-4 h-4 flex-shrink-0 text-[var(--color-text-secondary)]"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+          />
         </svg>
         <span className="truncate">{location}</span>
       </div>
@@ -84,7 +100,12 @@ function PhotosWidget({ media, t }: { media: WallPostMedia[]; t: TFunction }) {
             className="block aspect-square overflow-hidden rounded-md bg-[var(--color-surface-elevated)]"
           >
             {photo.media_type === 'video' && !photo.thumbnail_url ? (
-              <video src={resolveMediaUrl(photo.url)} className="h-full w-full object-cover" muted preload="metadata" />
+              <video
+                src={resolveMediaUrl(photo.url)}
+                className="h-full w-full object-cover"
+                muted
+                preload="metadata"
+              />
             ) : (
               <img
                 src={resolveMediaUrl(photo.thumbnail_url || photo.url)}
@@ -190,18 +211,22 @@ export default function UserProfilePage() {
   });
   const isBlocked = Boolean(
     profile &&
-      blockedUsersQuery.data?.blocked_users?.some(
-        (bu) => bu.username.toLowerCase() === profile.username.toLowerCase()
-      )
+    blockedUsersQuery.data?.blocked_users?.some(
+      (bu) => bu.username.toLowerCase() === profile.username.toLowerCase()
+    )
   );
 
   const blockMutation = useMutation({
-    mutationFn: async () => { if (profile) await usersService.blockUser(profile.username); },
+    mutationFn: async () => {
+      if (profile) await usersService.blockUser(profile.username);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blocked-users'] }),
   });
 
   const unblockMutation = useMutation({
-    mutationFn: async () => { if (profile) await usersService.unblockUser(profile.username); },
+    mutationFn: async () => {
+      if (profile) await usersService.unblockUser(profile.username);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blocked-users'] }),
   });
 
@@ -298,8 +323,15 @@ export default function UserProfilePage() {
   useEffect(() => {
     if (!user || !username || user.username !== username) return;
     let isActive = true;
-    usersService.ping().then(() => { if (isActive) refetchProfile(); }).catch(() => {});
-    return () => { isActive = false; };
+    usersService
+      .ping()
+      .then(() => {
+        if (isActive) refetchProfile();
+      })
+      .catch(() => {});
+    return () => {
+      isActive = false;
+    };
   }, [user, username, refetchProfile]);
 
   // ─── Loading skeleton ───────────────────────────────────────────────────────
@@ -399,14 +431,20 @@ export default function UserProfilePage() {
   if (profile.locked) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12 flex flex-col items-center gap-3 text-center">
-        <h1 className="text-xl md:text-2xl font-bold text-[var(--color-text-primary)]">{profile.username}</h1>
-        <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.locked.message')}</p>
+        <h1 className="text-xl md:text-2xl font-bold text-[var(--color-text-primary)]">
+          {profile.username}
+        </h1>
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          {t('userProfilePage.locked.message')}
+        </p>
         {user && canMessageUser && !isBlocked ? (
           renderFriendActionButtons()
         ) : !user ? (
           <button
             type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }))}
+            onClick={() =>
+              window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }))
+            }
             className="inline-flex items-center gap-1 rounded-md border border-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition"
           >
             + {t('friends.actions.addFriend')}
@@ -424,7 +462,6 @@ export default function UserProfilePage() {
 
   return (
     <div className="w-full">
-
       {/* ── Cover Banner ─────────────────────────────────────────────────── */}
       <div className="relative h-36 md:h-48 overflow-hidden">
         {profile.banner_url ? (
@@ -442,7 +479,6 @@ export default function UserProfilePage() {
       <div className="bg-[var(--color-surface)] border-b border-[var(--color-border)]">
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4 pb-4 relative">
-
             {/* Avatar — overlaps the banner */}
             <div className="flex-shrink-0 -mt-10 md:-mt-14 z-10 relative w-20 h-20 md:w-28 md:h-28">
               {profile.avatar_url ? (
@@ -493,7 +529,12 @@ export default function UserProfilePage() {
                   className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
                   </svg>
                   {t('userProfilePage.actions.editProfile')}
                 </button>
@@ -504,7 +545,12 @@ export default function UserProfilePage() {
                   className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3v-3z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3v-3z"
+                    />
                   </svg>
                   {t('userProfilePage.actions.message')}
                 </Link>
@@ -518,7 +564,11 @@ export default function UserProfilePage() {
                   onClick={() => {
                     if (isBlocked) {
                       unblockMutation.mutate();
-                    } else if (window.confirm(t('userProfilePage.actions.confirmBlock', { username: profile.username }))) {
+                    } else if (
+                      window.confirm(
+                        t('userProfilePage.actions.confirmBlock', { username: profile.username })
+                      )
+                    ) {
                       blockMutation.mutate();
                     }
                   }}
@@ -528,7 +578,9 @@ export default function UserProfilePage() {
                       : 'border-[var(--color-error)] text-[var(--color-error)] hover:opacity-80'
                   }`}
                 >
-                  {isBlocked ? t('userProfilePage.actions.unblock') : t('userProfilePage.actions.block')}
+                  {isBlocked
+                    ? t('userProfilePage.actions.unblock')
+                    : t('userProfilePage.actions.block')}
                 </button>
               )}
             </div>
@@ -590,7 +642,6 @@ export default function UserProfilePage() {
 
         {/* ── 3-column layout: Friends | Wall | Activity ──────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_240px] lg:grid-cols-[260px_1fr_300px] gap-4 lg:gap-6 items-start">
-
           {/* ── Left: Friends ────────────────────────────────────────────── */}
           <aside className="order-2 md:order-1 flex flex-col gap-3">
             {username && (

@@ -39,7 +39,10 @@ export function detectPreviewKind(mimeType?: string | null): PreviewKind {
   if (mime.startsWith('video/')) return 'video';
   if (mime.startsWith('audio/')) return 'audio';
   if (mime === 'application/pdf') return 'pdf';
-  if (textLikeMimePrefixes.some((prefix) => mime.startsWith(prefix)) || textLikeMimeValues.has(mime)) {
+  if (
+    textLikeMimePrefixes.some((prefix) => mime.startsWith(prefix)) ||
+    textLikeMimeValues.has(mime)
+  ) {
     return 'text';
   }
   if (documentMimePrefixes.some((prefix) => mime.startsWith(prefix))) return 'document';

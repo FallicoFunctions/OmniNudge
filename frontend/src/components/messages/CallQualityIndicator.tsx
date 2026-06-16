@@ -1,7 +1,7 @@
-type Quality = 'excellent' | 'good' | 'fair' | 'poor' | null | undefined
+type Quality = 'excellent' | 'good' | 'fair' | 'poor' | null | undefined;
 
 interface CallQualityIndicatorProps {
-  quality: Quality
+  quality: Quality;
 }
 
 const QUALITY_BARS: Record<NonNullable<Quality>, number> = {
@@ -9,20 +9,20 @@ const QUALITY_BARS: Record<NonNullable<Quality>, number> = {
   good: 3,
   fair: 2,
   poor: 1,
-}
+};
 
 const QUALITY_COLORS: Record<NonNullable<Quality>, string> = {
   excellent: 'var(--color-success, #22c55e)',
   good: 'var(--color-success, #22c55e)',
   fair: 'var(--color-warning, #f59e0b)',
   poor: 'var(--color-error)',
-}
+};
 
 export function CallQualityIndicator({ quality }: CallQualityIndicatorProps) {
-  if (!quality) return null
+  if (!quality) return null;
 
-  const bars = QUALITY_BARS[quality]
-  const color = QUALITY_COLORS[quality]
+  const bars = QUALITY_BARS[quality];
+  const color = QUALITY_COLORS[quality];
 
   return (
     <div className="flex items-end gap-0.5" aria-label={`Call quality: ${quality}`}>
@@ -38,5 +38,5 @@ export function CallQualityIndicator({ quality }: CallQualityIndicatorProps) {
         />
       ))}
     </div>
-  )
+  );
 }

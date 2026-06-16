@@ -26,7 +26,12 @@ export function MediaLightbox({ items, index, onClose, onIndexChange }: MediaLig
   const showNext = () => onIndexChange((index + 1) % items.length);
 
   return (
-    <Modal isOpen onClose={onClose} closeOnOverlayClick className="relative max-h-[90vh] max-w-[90vw]">
+    <Modal
+      isOpen
+      onClose={onClose}
+      closeOnOverlayClick
+      className="relative max-h-[90vh] max-w-[90vw]"
+    >
       <button
         type="button"
         onClick={onClose}

@@ -15,11 +15,7 @@ export function PostHeader({ title, titleBadges, metadataItems }: PostHeaderProp
       </h1>
 
       {/* Badges row */}
-      {titleBadges && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {titleBadges}
-        </div>
-      )}
+      {titleBadges && <div className="mt-2 flex flex-wrap items-center gap-2">{titleBadges}</div>}
 
       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
         {metadataItems.map((item, index) => (

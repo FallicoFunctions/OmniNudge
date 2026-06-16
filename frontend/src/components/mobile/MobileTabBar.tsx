@@ -73,60 +73,63 @@ export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
   /**
    * Handle tab clicks with authentication checks and scroll behavior
    */
-  const handleTabClick = useCallback((
-    tabId: string,
-    path?: string,
-    requiresAuth?: boolean
-  ) => {
-    const isAlreadyActive = activeTab === tabId;
+  const handleTabClick = useCallback(
+    (tabId: string, path?: string, requiresAuth?: boolean) => {
+      const isAlreadyActive = activeTab === tabId;
 
-    // Haptic feedback on all tab taps
-    lightHaptic();
+      // Haptic feedback on all tab taps
+      lightHaptic();
 
-    // Track analytics
-    trackEvent('MobileNavigation', 'TabClick', tabId);
+      // Track analytics
+      trackEvent('MobileNavigation', 'TabClick', tabId);
 
-    // Show loading indicator for navigation
-    if (path && !(isAlreadyActive && location.pathname === path)) {
-      setShowLoadingBar(true);
-      setTimeout(() => setShowLoadingBar(false), MOBILE_TIMING.LOADING_BAR);
-    }
-
-    // If tapping active tab with a path, scroll to top (only if on exact page)
-    if (isAlreadyActive && path && location.pathname === path) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    // Check authentication for protected tabs
-    if (requiresAuth && !isAuthenticated) {
-      window.dispatchEvent(new CustomEvent('open-auth-modal', {
-        detail: { mode: 'login', redirectTo: path || location.pathname },
-      }));
-      return;
-    }
-
-    // Handle navigation paths
-    if (path) {
-      navigate(path);
-      return;
-    }
-
-    // Handle actions (Create, Menu)
-    if (tabId === 'create') {
-      if (!isAuthenticated) {
-        window.dispatchEvent(new CustomEvent('open-auth-modal', {
-          detail: { mode: 'login', redirectTo: '/posts/create' },
-        }));
-      } else {
-        mediumHaptic(); // Stronger haptic for opening sheet
-        setShowCreateMenu(true);
+      // Show loading indicator for navigation
+      if (path && !(isAlreadyActive && location.pathname === path)) {
+        setShowLoadingBar(true);
+        setTimeout(() => setShowLoadingBar(false), MOBILE_TIMING.LOADING_BAR);
       }
-    } else if (tabId === 'menu') {
-      mediumHaptic(); // Stronger haptic for opening sheet
-      setShowMoreMenu(true);
-    }
-  }, [activeTab, location.pathname, isAuthenticated, navigate]);
+
+      // If tapping active tab with a path, scroll to top (only if on exact page)
+      if (isAlreadyActive && path && location.pathname === path) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      // Check authentication for protected tabs
+      if (requiresAuth && !isAuthenticated) {
+        window.dispatchEvent(
+          new CustomEvent('open-auth-modal', {
+            detail: { mode: 'login', redirectTo: path || location.pathname },
+          })
+        );
+        return;
+      }
+
+      // Handle navigation paths
+      if (path) {
+        navigate(path);
+        return;
+      }
+
+      // Handle actions (Create, Menu)
+      if (tabId === 'create') {
+        if (!isAuthenticated) {
+          window.dispatchEvent(
+            new CustomEvent('open-auth-modal', {
+              detail: { mode: 'login', redirectTo: '/posts/create' },
+            })
+          );
+        } else {
+          mediumHaptic(); // Stronger haptic for opening sheet
+          setShowCreateMenu(true);
+        }
+      } else if (tabId === 'menu') {
+        mediumHaptic(); // Stronger haptic for opening sheet
+        setShowMoreMenu(true);
+      }
+    },
+    [activeTab, location.pathname, isAuthenticated, navigate]
+  );
 
   return (
     <>
@@ -136,7 +139,7 @@ export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
           className="fixed top-0 left-0 right-0 h-1 md:hidden bg-[var(--color-primary)] animate-pulse"
           style={{
             zIndex: MOBILE_Z_INDEX.LOADING_BAR,
-            boxShadow: '0 0 10px var(--color-primary)'
+            boxShadow: '0 0 10px var(--color-primary)',
           }}
         />
       )}
@@ -146,7 +149,7 @@ export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
         style={{
           zIndex: MOBILE_Z_INDEX.TAB_BAR,
           height: `${MOBILE_SIZES.TAB_BAR_HEIGHT}px`,
-          paddingBottom: 'env(safe-area-inset-bottom)'
+          paddingBottom: 'env(safe-area-inset-bottom)',
         }}
         role="navigation"
         aria-label={t('ariaLabels.mobileNav')}
@@ -205,15 +208,9 @@ export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
       </nav>
 
       {/* Bottom Sheets */}
-      <CreateMenuSheet
-        isOpen={showCreateMenu}
-        onClose={() => setShowCreateMenu(false)}
-      />
+      <CreateMenuSheet isOpen={showCreateMenu} onClose={() => setShowCreateMenu(false)} />
 
-      <MoreMenuSheet
-        isOpen={showMoreMenu}
-        onClose={() => setShowMoreMenu(false)}
-      />
+      <MoreMenuSheet isOpen={showMoreMenu} onClose={() => setShowMoreMenu(false)} />
     </>
   );
 }

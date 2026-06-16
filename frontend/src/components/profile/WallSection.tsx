@@ -62,13 +62,25 @@ function MediaItemPreview({ item }: { item: WallPostMedia }) {
   return (
     <>
       {item.media_type === 'video' && !item.thumbnail_url ? (
-        <video src={resolveMediaUrl(item.url)} className="h-full w-full object-contain" muted preload="metadata" />
+        <video
+          src={resolveMediaUrl(item.url)}
+          className="h-full w-full object-contain"
+          muted
+          preload="metadata"
+        />
       ) : (
-        <img src={resolveMediaUrl(item.thumbnail_url || item.url)} alt="" className="h-full w-full object-contain" loading="lazy" />
+        <img
+          src={resolveMediaUrl(item.thumbnail_url || item.url)}
+          alt=""
+          className="h-full w-full object-contain"
+          loading="lazy"
+        />
       )}
       {item.media_type === 'video' && (
         <span className="absolute inset-0 flex items-center justify-center">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white">▶</span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white">
+            ▶
+          </span>
         </span>
       )}
     </>
@@ -77,7 +89,13 @@ function MediaItemPreview({ item }: { item: WallPostMedia }) {
 
 function AttachMediaIcon() {
   return (
-    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.5}>
+    <svg
+      className="w-4 h-4"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
       <rect x="2" y="4" width="16" height="12" rx="1.5" />
       <circle cx="7" cy="9" r="1.5" />
       <path d="M3 14l4-4 3 3 3-2 4 4" strokeLinecap="round" strokeLinejoin="round" />
@@ -197,7 +215,10 @@ function WallComposer({
       {allowMedia && mediaPreviews.length > 0 && (
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
           {mediaPreviews.map((preview, index) => (
-            <div key={index} className="relative aspect-square overflow-hidden rounded-md bg-[var(--color-surface-elevated)]">
+            <div
+              key={index}
+              className="relative aspect-square overflow-hidden rounded-md bg-[var(--color-surface-elevated)]"
+            >
               {mediaItems[index]?.media_type === 'video' ? (
                 <video src={preview} className="h-full w-full object-cover" muted />
               ) : (
@@ -246,7 +267,11 @@ function WallComposer({
           disabled={(!value.trim() && mediaItems.length === 0) || isSubmitting || isUploadingMedia}
           className="rounded-md bg-[var(--color-primary)] px-4 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
         >
-          {isUploadingMedia ? t('userProfilePage.wall.uploadingMedia') : isSubmitting ? pendingLabel : submitLabel}
+          {isUploadingMedia
+            ? t('userProfilePage.wall.uploadingMedia')
+            : isSubmitting
+              ? pendingLabel
+              : submitLabel}
         </button>
       </div>
     </div>
@@ -273,7 +298,8 @@ function WallCommentRow({
   const queryClient = useQueryClient();
 
   const reactionMutation = useMutation({
-    mutationFn: (reaction: WallReactionType) => wallService.setCommentReaction(postId, comment.id, reaction),
+    mutationFn: (reaction: WallReactionType) =>
+      wallService.setCommentReaction(postId, comment.id, reaction),
     onSuccess: (result) => {
       queryClient.setQueryData<{ comments: WallPostComment[] } | undefined>(
         ['wall-post-comments', postId],
@@ -612,7 +638,9 @@ function WallPostCard({
               {commentsQuery.isLoading ? (
                 <p className="text-xs text-[var(--color-text-muted)]">{t('common.loading')}</p>
               ) : comments.length === 0 ? (
-                <p className="text-xs text-[var(--color-text-muted)]">{t('userProfilePage.wall.noComments')}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {t('userProfilePage.wall.noComments')}
+                </p>
               ) : (
                 comments.map((comment) => (
                   <WallCommentRow
@@ -661,7 +689,13 @@ export default function WallSection({ username, isOwnProfile }: Props) {
     if (Number.isNaN(d.getTime())) return '';
     return useRelativeTime
       ? formatRelativeTime(d)
-      : formatDate(d, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+      : formatDate(d, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        });
   };
 
   const wallQuery = useQuery({

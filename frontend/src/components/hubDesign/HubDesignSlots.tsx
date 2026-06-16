@@ -14,7 +14,11 @@ interface HubJoinSlotProps {
   userId: number | null;
 }
 
-export function HubJoinSlot({ hubName, isSubscribed: initialSubscribed, userId }: HubJoinSlotProps) {
+export function HubJoinSlot({
+  hubName,
+  isSubscribed: initialSubscribed,
+  userId,
+}: HubJoinSlotProps) {
   const [subscribed, setSubscribed] = useState(initialSubscribed);
   const [loading, setLoading] = useState(false);
 
@@ -29,7 +33,10 @@ export function HubJoinSlot({ hubName, isSubscribed: initialSubscribed, userId }
   };
 
   const toggle = async () => {
-    if (!userId) { openAuth(); return; }
+    if (!userId) {
+      openAuth();
+      return;
+    }
     setLoading(true);
     try {
       if (subscribed) {
@@ -97,7 +104,9 @@ export function HubModSlot({ hubName, isModerator }: HubModSlotProps) {
   return (
     <button
       className="hub-slot-btn hub-slot-btn--mod"
-      onClick={() => { window.location.href = `/h/${hubName}/mod`; }}
+      onClick={() => {
+        window.location.href = `/h/${hubName}/mod`;
+      }}
     >
       Mod Tools
     </button>
@@ -150,7 +159,10 @@ function relativeTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
-interface PostCardProps { post: FeedSlotPost; hubName: string; }
+interface PostCardProps {
+  post: FeedSlotPost;
+  hubName: string;
+}
 
 function StandalonePostCard({ post, hubName }: PostCardProps) {
   const href = `/h/${hubName}/comments/${post.id}`;
@@ -159,12 +171,17 @@ function StandalonePostCard({ post, hubName }: PostCardProps) {
     <div
       className="hub-slot-post-card"
       style={{ cursor: 'pointer', marginBottom: '12px' }}
-      onClick={() => { window.location.href = href; }}
+      onClick={() => {
+        window.location.href = href;
+      }}
     >
       <div className="hub-slot-post-title" style={{ fontWeight: 600, marginBottom: '6px' }}>
         {post.title}
       </div>
-      <div className="hub-slot-post-meta" style={{ fontSize: '0.85rem', display: 'flex', gap: '12px', opacity: 0.7 }}>
+      <div
+        className="hub-slot-post-meta"
+        style={{ fontSize: '0.85rem', display: 'flex', gap: '12px', opacity: 0.7 }}
+      >
         <span>by {authorName}</span>
         <span>↑ {post.score ?? 0}</span>
         <span>💬 {post.comment_count ?? post.num_comments ?? 0}</span>
@@ -181,22 +198,52 @@ export interface StandalonePostFeedProps {
 }
 
 export function StandalonePostFeed({ posts, loading, hubName }: StandalonePostFeedProps) {
-  if (loading) return <p className="hub-slot-feed-empty" style={{ color: 'inherit', padding: '16px' }}>Loading posts…</p>;
-  if (posts.length === 0) return <p className="hub-slot-feed-empty" style={{ color: 'inherit', padding: '16px' }}>No posts yet.</p>;
+  if (loading)
+    return (
+      <p className="hub-slot-feed-empty" style={{ color: 'inherit', padding: '16px' }}>
+        Loading posts…
+      </p>
+    );
+  if (posts.length === 0)
+    return (
+      <p className="hub-slot-feed-empty" style={{ color: 'inherit', padding: '16px' }}>
+        No posts yet.
+      </p>
+    );
   return (
-    <div className="hub-slot-feed-list hub-slot-post-list" style={{ display: 'flex', flexDirection: 'column' }}>
-      {posts.map(post => <StandalonePostCard key={post.id} post={post} hubName={hubName} />)}
+    <div
+      className="hub-slot-feed-list hub-slot-post-list"
+      style={{ display: 'flex', flexDirection: 'column' }}
+    >
+      {posts.map((post) => (
+        <StandalonePostCard key={post.id} post={post} hubName={hubName} />
+      ))}
     </div>
   );
 }
 
 // ─── Feed Controls ───────────────────────────────────────────────────────────
 
-export function HubFeedControls({ sort, onSortChange, searchValue, onSearchChange, onSearch }: HubFeedControlsProps) {
+export function HubFeedControls({
+  sort,
+  onSortChange,
+  searchValue,
+  onSearchChange,
+  onSearch,
+}: HubFeedControlsProps) {
   return (
-    <div className="hub-slot-feed-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+    <div
+      className="hub-slot-feed-controls"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        flexWrap: 'wrap',
+        marginBottom: '16px',
+      }}
+    >
       <div className="hub-slot-feed-tabs" role="tablist" style={{ display: 'flex', gap: '4px' }}>
-        {SORTS.map(s => (
+        {SORTS.map((s) => (
           <button
             key={s.value}
             role="tab"
@@ -214,8 +261,8 @@ export function HubFeedControls({ sort, onSortChange, searchValue, onSearchChang
           className="hub-slot-search"
           placeholder="Search posts…"
           value={searchValue}
-          onChange={e => onSearchChange(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && onSearch()}
+          onChange={(e) => onSearchChange(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onSearch()}
         />
       </div>
     </div>

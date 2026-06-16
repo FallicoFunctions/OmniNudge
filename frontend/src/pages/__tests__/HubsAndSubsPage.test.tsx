@@ -69,7 +69,7 @@ describe('HubsAndSubsPage', () => {
     render(
       <Wrapper>
         <HubsAndSubsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(document.body).toBeTruthy();
   });
@@ -80,7 +80,7 @@ describe('HubsAndSubsPage', () => {
     render(
       <Wrapper>
         <HubsAndSubsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     // A-Z alphabet letters should be rendered as filter buttons
     expect(screen.getByRole('button', { name: 'A' })).toBeInTheDocument();
@@ -89,16 +89,14 @@ describe('HubsAndSubsPage', () => {
 
   it('shows hub list when data loads', async () => {
     mockGetAllHubs.mockResolvedValue({
-      hubs: [
-        { id: 1, name: 'coding', title: 'Coding Hub', member_count: 42, is_nsfw: false },
-      ],
+      hubs: [{ id: 1, name: 'coding', title: 'Coding Hub', member_count: 42, is_nsfw: false }],
       total: 1,
     });
     const Wrapper = createWrapper();
     render(
       <Wrapper>
         <HubsAndSubsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       // Hub name appears as link text in the list
@@ -114,7 +112,7 @@ describe('HubsAndSubsPage', () => {
     render(
       <Wrapper>
         <HubsAndSubsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     const searchInputs = screen.getAllByRole('textbox');
     expect(searchInputs.length).toBeGreaterThan(0);
@@ -126,7 +124,7 @@ describe('HubsAndSubsPage', () => {
     render(
       <Wrapper>
         <HubsAndSubsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByTestId('empty-state')).toBeInTheDocument();

@@ -4,7 +4,7 @@ import type {
   CreateThemeRequest,
   UpdateThemeRequest,
   UserSettings,
-  ThemeOverride
+  ThemeOverride,
 } from '../types/theme';
 
 export const themeService = {
@@ -15,7 +15,11 @@ export const themeService = {
   },
 
   // Get user's custom themes
-  getMyThemes: async (limit = 20, offset = 0, cursor?: string): Promise<{ themes: UserTheme[]; total?: number; next_cursor?: string }> => {
+  getMyThemes: async (
+    limit = 20,
+    offset = 0,
+    cursor?: string
+  ): Promise<{ themes: UserTheme[]; total?: number; next_cursor?: string }> => {
     const { data } = await api.get('/themes/my', { params: { limit, offset, cursor } });
     return data;
   },
@@ -51,7 +55,7 @@ export const themeService = {
     cursor?: string
   ): Promise<{ themes: UserTheme[]; total?: number; next_cursor?: string }> => {
     const { data } = await api.get('/themes/browse', {
-      params: { limit, offset, category, cursor }
+      params: { limit, offset, category, cursor },
     });
     return data;
   },
@@ -79,7 +83,10 @@ export const themeService = {
 
   // Set page override
   setPageOverride: async (pageName: string, themeId: number): Promise<ThemeOverride> => {
-    const { data } = await api.post('/themes/overrides', { page_name: pageName, theme_id: themeId });
+    const { data } = await api.post('/themes/overrides', {
+      page_name: pageName,
+      theme_id: themeId,
+    });
     return data;
   },
 

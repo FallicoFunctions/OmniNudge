@@ -3,9 +3,17 @@ import type { ReactNode } from 'react';
 import { api } from '../lib/api';
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '../types/auth';
 import { OMNI_FEED_STORAGE_KEY, SETTINGS_STORAGE_KEY } from '../constants/storageKeys';
-import { initializeKeys, getOwnPublicKeyBase64, getOwnKeys, storeNonExtractablePrivateKey } from '../services/keyManagementService';
+import {
+  initializeKeys,
+  getOwnPublicKeyBase64,
+  getOwnKeys,
+  storeNonExtractablePrivateKey,
+} from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
-import { encryptPrivateKeyWithPassword, decryptPrivateKeyWithPassword } from '../services/keySyncService';
+import {
+  encryptPrivateKeyWithPassword,
+  decryptPrivateKeyWithPassword,
+} from '../services/keySyncService';
 import { exportKeyPair } from '../utils/encryption';
 import { analyticsService } from '../services/analyticsService';
 
@@ -20,7 +28,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -40,7 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const encryptedPrivateKey = await encryptionService.getEncryptedPrivateKey();
         if (encryptedPrivateKey) {
           try {
-            const privateKeyBase64 = await decryptPrivateKeyWithPassword(encryptedPrivateKey, password);
+            const privateKeyBase64 = await decryptPrivateKeyWithPassword(
+              encryptedPrivateKey,
+              password
+            );
             // Use provided public key or get from local storage
             const publicKeyBase64 = publicKey || getOwnPublicKeyBase64();
 
@@ -68,7 +78,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const keyPair = await getOwnKeys();
           if (keyPair) {
             const exported = await exportKeyPair(keyPair);
-            const encryptedPrivateKey = await encryptPrivateKeyWithPassword(exported.privateKey, password);
+            const encryptedPrivateKey = await encryptPrivateKeyWithPassword(
+              exported.privateKey,
+              password
+            );
             await encryptionService.uploadEncryptedPrivateKey(encryptedPrivateKey);
           }
         }
@@ -120,9 +133,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Initialize encryption keys with password for cross-browser sync (non-blocking)
     // Small delay to ensure token is fully persisted in storage
     setTimeout(() => {
-      initializeEncryptionKeys(credentials.password, response.user.public_key || undefined).catch((err) => {
-        console.error('Background encryption key init failed:', err);
-      });
+      initializeEncryptionKeys(credentials.password, response.user.public_key || undefined).catch(
+        (err) => {
+          console.error('Background encryption key init failed:', err);
+        }
+      );
     }, 100);
   };
 
@@ -159,11 +174,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
     const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
-    void api.request('/auth/logout', { method: 'POST', headers }).catch(() => {
-      // Ignore errors on logout
-    }).finally(() => {
-      clearAuthState();
-    });
+    void api
+      .request('/auth/logout', { method: 'POST', headers })
+      .catch(() => {
+        // Ignore errors on logout
+      })
+      .finally(() => {
+        clearAuthState();
+      });
   };
 
   const refreshUser = async () => {

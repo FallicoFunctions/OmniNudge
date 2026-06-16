@@ -56,6 +56,41 @@ success() {
     echo -e "${GREEN}✓ $1${NC}"
 }
 
+# Insert test data based on migration
+insert_test_data() {
+    local migration_name=$1
+
+    # Determine which migration we're testing and insert appropriate data
+    case "$migration_name" in
+        *"production_schema"*)
+            # Insert test user
+            PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB_NAME" -c "
+                INSERT INTO users (username, password_hash)
+                VALUES ('test_user', 'test_hash')
+                ON CONFLICT DO NOTHING
+            " -q 2>/dev/null || true
+            ;;
+        *"hub"*)
+            # Insert test hub
+            PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB_NAME" -c "
+                INSERT INTO hubs (name, description)
+                VALUES ('test_hub', 'Test hub')
+                ON CONFLICT DO NOTHING
+            " -q 2>/dev/null || true
+            ;;
+        *)
+            # Generic test data insertion
+            ;;
+    esac
+}
+
+# Get snapshot of current database state
+get_data_snapshot() {
+    PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB_NAME" -t -c "
+        SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'
+    " | tr -d ' '
+}
+
 # =============================================================================
 # Pre-flight checks
 # =============================================================================
@@ -190,42 +225,3 @@ fi
 log "============================================"
 
 exit 0
-
-# =============================================================================
-# Helper functions
-# =============================================================================
-
-# Insert test data based on migration
-insert_test_data() {
-    local migration_name=$1
-
-    # Determine which migration we're testing and insert appropriate data
-    case "$migration_name" in
-        *"production_schema"*)
-            # Insert test user
-            PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB_NAME" -c "
-                INSERT INTO users (username, password_hash)
-                VALUES ('test_user', 'test_hash')
-                ON CONFLICT DO NOTHING
-            " -q 2>/dev/null || true
-            ;;
-        *"hub"*)
-            # Insert test hub
-            PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB_NAME" -c "
-                INSERT INTO hubs (name, description)
-                VALUES ('test_hub', 'Test hub')
-                ON CONFLICT DO NOTHING
-            " -q 2>/dev/null || true
-            ;;
-        *)
-            # Generic test data insertion
-            ;;
-    esac
-}
-
-# Get snapshot of current database state
-get_data_snapshot() {
-    PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB_NAME" -t -c "
-        SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'
-    " | tr -d ' '
-}

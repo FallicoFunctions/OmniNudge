@@ -36,7 +36,7 @@ export default function HubWikiPage() {
   const supportsHubAIDesignShell = useMemo(() => {
     if (!hub || !activeAIDesign?.html_content) return false;
     return Array.from(splitAIDesignHTML(activeAIDesign.html_content).slotsByMarker.values()).some(
-      (slot) => slot.id === 'hub-content' || slot.id === 'hub-feed',
+      (slot) => slot.id === 'hub-content' || slot.id === 'hub-feed'
     );
   }, [activeAIDesign?.html_content, hub]);
 
@@ -75,7 +75,9 @@ export default function HubWikiPage() {
   if (hubSettings && !hubSettings.enable_wiki) {
     return (
       <div className="mx-auto w-full max-w-6xl px-4 py-8">
-        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('hubWikiPage.title')}</h1>
+        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+          {t('hubWikiPage.title')}
+        </h1>
         <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
           {t('hubWikiPage.wikiDisabled')}
         </p>
@@ -94,7 +96,9 @@ export default function HubWikiPage() {
             {t('hubWikiPage.headerTitle', { hub })}
           </h1>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            {slug === 'index' ? t('hubWikiPage.subtitle.home') : t('hubWikiPage.subtitle.page', { slug })}
+            {slug === 'index'
+              ? t('hubWikiPage.subtitle.home')
+              : t('hubWikiPage.subtitle.page', { slug })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -157,9 +161,14 @@ export default function HubWikiPage() {
           ) : (
             <>
               {wikiPage?.content?.trim() ? (
-                <MarkdownRenderer content={wikiPage.content} className="text-[var(--color-text-primary)]" />
+                <MarkdownRenderer
+                  content={wikiPage.content}
+                  className="text-[var(--color-text-primary)]"
+                />
               ) : (
-                <p className="text-sm text-[var(--color-text-secondary)]">{t('hubWikiPage.empty')}</p>
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  {t('hubWikiPage.empty')}
+                </p>
               )}
             </>
           )}
@@ -182,7 +191,5 @@ export default function HubWikiPage() {
     );
   }
 
-  return (
-    wikiPageContent
-  );
+  return wikiPageContent;
 }

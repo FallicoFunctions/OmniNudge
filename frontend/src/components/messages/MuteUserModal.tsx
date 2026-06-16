@@ -28,7 +28,8 @@ export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: Mute
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
         <h3 className="text-base font-semibold text-[var(--color-text-primary)] mb-4">
-          {t('groups.admin.muteUser')}: <span className="text-[var(--color-primary)]">{username}</span>
+          {t('groups.admin.muteUser')}:{' '}
+          <span className="text-[var(--color-primary)]">{username}</span>
         </h3>
 
         <div className="mb-4">
@@ -55,7 +56,8 @@ export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: Mute
 
         <div className="mb-6">
           <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-            {t('groups.admin.reason')} <span className="font-normal text-[var(--color-text-muted)]">(optional)</span>
+            {t('groups.admin.reason')}{' '}
+            <span className="font-normal text-[var(--color-text-muted)]">(optional)</span>
           </label>
           <textarea
             value={reason}
@@ -80,7 +82,9 @@ export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: Mute
             disabled={isLoading}
             className="flex-1 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
           >
-            {isLoading ? t('groups.admin.muting', { defaultValue: 'Muting…' }) : t('groups.admin.mute')}
+            {isLoading
+              ? t('groups.admin.muting', { defaultValue: 'Muting…' })
+              : t('groups.admin.mute')}
           </button>
         </div>
       </div>

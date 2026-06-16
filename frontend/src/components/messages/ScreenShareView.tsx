@@ -1,14 +1,14 @@
-import { useEffect, useRef } from 'react'
-import { useTranslation } from 'react-i18next'
-import { MonitorOff } from 'lucide-react'
+import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { MonitorOff } from 'lucide-react';
 
 interface ScreenShareViewProps {
-  isSharing: boolean
-  screenStream: MediaStream | null
-  peerIsSharing: boolean
-  remoteStream: MediaStream | null
-  remoteName: string
-  onStopSharing: () => void
+  isSharing: boolean;
+  screenStream: MediaStream | null;
+  peerIsSharing: boolean;
+  remoteStream: MediaStream | null;
+  remoteName: string;
+  onStopSharing: () => void;
 }
 
 export function ScreenShareView({
@@ -19,25 +19,25 @@ export function ScreenShareView({
   remoteName,
   onStopSharing,
 }: ScreenShareViewProps) {
-  const { t } = useTranslation()
-  const remoteVideoRef = useRef<HTMLVideoElement>(null)
-  const localPreviewRef = useRef<HTMLVideoElement>(null)
+  const { t } = useTranslation();
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localPreviewRef = useRef<HTMLVideoElement>(null);
 
   // Attach remote stream to main view.
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream && peerIsSharing) {
-      remoteVideoRef.current.srcObject = remoteStream
+      remoteVideoRef.current.srcObject = remoteStream;
     }
-  }, [remoteStream, peerIsSharing])
+  }, [remoteStream, peerIsSharing]);
 
   // Attach local screen stream to preview.
   useEffect(() => {
     if (localPreviewRef.current && screenStream && isSharing) {
-      localPreviewRef.current.srcObject = screenStream
+      localPreviewRef.current.srcObject = screenStream;
     }
-  }, [screenStream, isSharing])
+  }, [screenStream, isSharing]);
 
-  if (!isSharing && !peerIsSharing) return null
+  if (!isSharing && !peerIsSharing) return null;
 
   return (
     <div className="absolute inset-0 z-10 flex flex-col bg-black">
@@ -53,9 +53,7 @@ export function ScreenShareView({
       ) : (
         /* Local sharing, no remote share — show indicator */
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <p className="text-white text-lg font-semibold">
-            {t('calls.youAreSharing')}
-          </p>
+          <p className="text-white text-lg font-semibold">{t('calls.youAreSharing')}</p>
           {isSharing && screenStream && (
             <video
               ref={localPreviewRef}
@@ -106,5 +104,5 @@ export function ScreenShareView({
         </div>
       )}
     </div>
-  )
+  );
 }

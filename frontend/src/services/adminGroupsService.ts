@@ -53,12 +53,16 @@ export const adminGroupsService = {
   },
 
   async getRestrictions(groupId: number): Promise<GroupRestriction[]> {
-    const res = await api.get<{ restrictions: GroupRestriction[] }>(`/groups/${groupId}/restrictions`);
+    const res = await api.get<{ restrictions: GroupRestriction[] }>(
+      `/groups/${groupId}/restrictions`
+    );
     return res.restrictions;
   },
 
   async getMyRestriction(groupId: number): Promise<GroupRestriction | null> {
-    const res = await api.get<{ restriction: GroupRestriction | null }>(`/groups/${groupId}/my-restriction`);
+    const res = await api.get<{ restriction: GroupRestriction | null }>(
+      `/groups/${groupId}/my-restriction`
+    );
     return res.restriction;
   },
 

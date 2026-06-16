@@ -60,8 +60,13 @@ export function useFolders() {
   });
 
   const updateFolderMutation = useMutation({
-    mutationFn: ({ id, patch }: { id: number; patch: { name?: string; color?: string; icon?: string } }) =>
-      foldersService.updateFolder(id, patch),
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: number;
+      patch: { name?: string; color?: string; icon?: string };
+    }) => foldersService.updateFolder(id, patch),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['folders'] });
     },
@@ -94,14 +99,16 @@ export function useFolders() {
       const previousFolders = queryClient.getQueryData<ConversationFolder[]>(['folders']);
       queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
         old?.map((f) =>
-          f.id === folderID ? { ...f, conversation_count: (f.conversation_count ?? 0) + 1 } : f,
-        ),
+          f.id === folderID ? { ...f, conversation_count: (f.conversation_count ?? 0) + 1 } : f
+        )
       );
       return { previousFolders };
     },
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['folders'] });
-      void queryClient.invalidateQueries({ queryKey: ['folders', variables.folderID, 'conversations'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['folders', variables.folderID, 'conversations'],
+      });
     },
     onError: (_, __, context) => {
       // Restore snapshot — guaranteed accurate regardless of concurrent mutations
@@ -119,14 +126,18 @@ export function useFolders() {
       const previousFolders = queryClient.getQueryData<ConversationFolder[]>(['folders']);
       queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
         old?.map((f) =>
-          f.id === folderID ? { ...f, conversation_count: Math.max(0, (f.conversation_count ?? 0) - 1) } : f,
-        ),
+          f.id === folderID
+            ? { ...f, conversation_count: Math.max(0, (f.conversation_count ?? 0) - 1) }
+            : f
+        )
       );
       return { previousFolders };
     },
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['folders'] });
-      void queryClient.invalidateQueries({ queryKey: ['folders', variables.folderID, 'conversations'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['folders', variables.folderID, 'conversations'],
+      });
     },
     onError: (_, __, context) => {
       if (context?.previousFolders !== undefined) {
@@ -140,10 +151,15 @@ export function useFolders() {
     return new Set((folderConversationsQuery.data ?? []).map((c) => c.id));
   }, [selectedFolderId, folderConversationsQuery.data]);
 
-  const filterConversationsBySelectedFolder = useCallback((conversations: Conversation[]): Conversation[] => {
-    if (!selectedFolderConversationIDs) return conversations;
-    return conversations.filter((conversation) => selectedFolderConversationIDs.has(conversation.id));
-  }, [selectedFolderConversationIDs]);
+  const filterConversationsBySelectedFolder = useCallback(
+    (conversations: Conversation[]): Conversation[] => {
+      if (!selectedFolderConversationIDs) return conversations;
+      return conversations.filter((conversation) =>
+        selectedFolderConversationIDs.has(conversation.id)
+      );
+    },
+    [selectedFolderConversationIDs]
+  );
 
   return {
     folders: foldersQuery.data ?? [],

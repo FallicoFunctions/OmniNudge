@@ -22,7 +22,7 @@ export function InlineError({ message, className = '' }: InlineErrorProps) {
 export function ErrorBox({
   title = 'Error',
   errors,
-  className = ''
+  className = '',
 }: {
   title?: string;
   errors: string | string[];
@@ -38,9 +38,7 @@ export function ErrorBox({
       <div className="flex gap-3">
         <AlertCircle size={20} className="flex-shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
         <div className="flex-1">
-          <h3 className="font-semibold text-sm text-red-800 dark:text-red-200 mb-1">
-            {title}
-          </h3>
+          <h3 className="font-semibold text-sm text-red-800 dark:text-red-200 mb-1">{title}</h3>
           {errorList.length === 1 ? (
             <p className="text-sm text-red-700 dark:text-red-300">{errorList[0]}</p>
           ) : (

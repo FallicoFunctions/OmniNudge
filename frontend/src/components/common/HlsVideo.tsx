@@ -42,17 +42,20 @@ export const HlsVideo = forwardRef<HlsVideoHandle, HlsVideoProps>(function HlsVi
 
   const isHlsUrl = src.includes('.m3u8') || src.includes('/HLSPlaylist.m3u8');
 
-  const startLoad = useCallback((startPosition = -1) => {
-    if (!isHlsUrl || canNativeHls) {
-      return;
-    }
-    if (hlsRef.current) {
-      hlsRef.current.startLoad?.(startPosition);
-      pendingStartLoadRef.current = null;
-    } else {
-      pendingStartLoadRef.current = startPosition;
-    }
-  }, [isHlsUrl, canNativeHls]);
+  const startLoad = useCallback(
+    (startPosition = -1) => {
+      if (!isHlsUrl || canNativeHls) {
+        return;
+      }
+      if (hlsRef.current) {
+        hlsRef.current.startLoad?.(startPosition);
+        pendingStartLoadRef.current = null;
+      } else {
+        pendingStartLoadRef.current = startPosition;
+      }
+    },
+    [isHlsUrl, canNativeHls]
+  );
 
   const stopLoad = useCallback(() => {
     if (hlsRef.current) {

@@ -61,6 +61,7 @@ jobs:
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
+          version: latest
           working-directory: backend
           args: --timeout=5m
           skip-cache: false

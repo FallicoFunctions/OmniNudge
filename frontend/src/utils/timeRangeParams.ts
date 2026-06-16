@@ -4,10 +4,7 @@ export interface FeedTimeRangeOptions {
   endDate?: string;
 }
 
-export const appendTimeRangeParams = (
-  params: URLSearchParams,
-  options?: FeedTimeRangeOptions
-) => {
+export const appendTimeRangeParams = (params: URLSearchParams, options?: FeedTimeRangeOptions) => {
   if (!options) {
     return;
   }

@@ -10,8 +10,7 @@ interface RedditBlockContextValue {
 
 const RedditBlockContext = createContext<RedditBlockContextValue | undefined>(undefined);
 
-const normalizeUsername = (username?: string | null) =>
-  (username ?? '').trim().toLowerCase();
+const normalizeUsername = (username?: string | null) => (username ?? '').trim().toLowerCase();
 
 const loadFromStorage = (key: string): string[] => {
   if (typeof window === 'undefined') return [];

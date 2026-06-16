@@ -1,13 +1,12 @@
-
 export interface VoiceMessage {
-  id: number
-  message_id: number
-  duration_seconds: number
-  waveform_data: number[] | null  // 100 floats [0.0–1.0]
-  transcription: string | null
-  signed_url: string
-  mime_type: string
-  file_size: number
+  id: number;
+  message_id: number;
+  duration_seconds: number;
+  waveform_data: number[] | null; // 100 floats [0.0–1.0]
+  transcription: string | null;
+  signed_url: string;
+  mime_type: string;
+  file_size: number;
 }
 
 export interface ConversationUser {
@@ -92,8 +91,8 @@ export interface ConversationFolder {
 
 /** Duration broken into days / hours / minutes for the UI dials. */
 export interface AutoDeleteDuration {
-  days: number;    // 0–99
-  hours: number;   // 0–23
+  days: number; // 0–99
+  hours: number; // 0–23
   minutes: number; // 0–59
 }
 

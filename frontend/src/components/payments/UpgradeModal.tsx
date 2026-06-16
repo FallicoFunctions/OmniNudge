@@ -58,7 +58,7 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const meta = COIN_META[selectedCoin];
-  const cryptoAmount = coinPrice ? (meta.usdPricePerMonth / coinPrice) : null;
+  const cryptoAmount = coinPrice ? meta.usdPricePerMonth / coinPrice : null;
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -80,11 +80,20 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
     let cancelled = false;
     setPriceLoading(true);
     setCoinPrice(null);
-    paymentsService.getCoinUSDPrice(selectedCoin)
-      .then(price => { if (!cancelled) setCoinPrice(price); })
-      .catch(() => { /* non-fatal — price display is best-effort */ })
-      .finally(() => { if (!cancelled) setPriceLoading(false); });
-    return () => { cancelled = true; };
+    paymentsService
+      .getCoinUSDPrice(selectedCoin)
+      .then((price) => {
+        if (!cancelled) setCoinPrice(price);
+      })
+      .catch(() => {
+        /* non-fatal — price display is best-effort */
+      })
+      .finally(() => {
+        if (!cancelled) setPriceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedCoin, step]);
 
   // Poll pending payment status
@@ -176,7 +185,12 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
             aria-label="Close"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -193,7 +207,9 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
               <div className="grid grid-cols-2 gap-3">
                 {/* Free */}
                 <div className="rounded-lg border border-[var(--color-border)] p-4">
-                  <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">Free</p>
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
+                    Free
+                  </p>
                   <p className="text-xs text-[var(--color-text-secondary)] mb-3">Always free</p>
                   <ul className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
                     <li>✓ Encrypted messaging</li>
@@ -245,7 +261,7 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
                   Select coin
                 </p>
                 <div className="flex gap-2">
-                  {COINS.map(coin => (
+                  {COINS.map((coin) => (
                     <button
                       key={coin}
                       type="button"
@@ -270,9 +286,7 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
               <div>
                 <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
                   Send exactly{' '}
-                  <span className="text-[var(--color-primary)]">
-                    ${meta.usdPricePerMonth} USD
-                  </span>{' '}
+                  <span className="text-[var(--color-primary)]">${meta.usdPricePerMonth} USD</span>{' '}
                   worth of {meta.name} to:
                 </p>
                 {cryptoAmount && (
@@ -300,7 +314,7 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
                 <input
                   type="text"
                   value={txid}
-                  onChange={e => setTxid(e.target.value)}
+                  onChange={(e) => setTxid(e.target.value)}
                   placeholder={selectedCoin === 'BTC' ? 'e.g. a1b2c3d4...' : 'e.g. 0x1234...'}
                   className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
                   required
@@ -319,7 +333,10 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => { setStep('plan'); setError(null); }}
+                  onClick={() => {
+                    setStep('plan');
+                    setError(null);
+                  }}
                   className="flex-1 rounded-lg border border-[var(--color-border)] px-4 py-2.5 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-colors"
                 >
                   Back
@@ -352,8 +369,8 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
                 </p>
               </div>
               <p className="text-xs text-[var(--color-text-muted)]">
-                This page updates automatically. You can close it and check back later —
-                your plan will upgrade as soon as the transaction confirms.
+                This page updates automatically. You can close it and check back later — your plan
+                will upgrade as soon as the transaction confirms.
               </p>
               <button
                 type="button"
@@ -370,8 +387,18 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
             <div className="space-y-4 text-center py-4">
               <div className="flex justify-center">
                 <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <svg
+                    className="w-8 h-8 text-green-600 dark:text-green-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 </div>
               </div>

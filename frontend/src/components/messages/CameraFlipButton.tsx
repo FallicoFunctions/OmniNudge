@@ -1,15 +1,15 @@
-import { useCallback, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
+import { useCallback, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface CameraFlipButtonProps {
-  cameraDevices: MediaDeviceInfo[]
-  selectedCameraId: string | null
-  switchCamera: (deviceId: string) => Promise<void>
+  cameraDevices: MediaDeviceInfo[];
+  selectedCameraId: string | null;
+  switchCamera: (deviceId: string) => Promise<void>;
 }
 
 function useIsMobile(): boolean {
-  return typeof window !== 'undefined' && 'ontouchstart' in window
+  return typeof window !== 'undefined' && 'ontouchstart' in window;
 }
 
 export function CameraFlipButton({
@@ -17,28 +17,28 @@ export function CameraFlipButton({
   selectedCameraId,
   switchCamera,
 }: CameraFlipButtonProps) {
-  const { t } = useTranslation()
-  const isMobile = useIsMobile()
-  const [isFlipping, setIsFlipping] = useState(false)
+  const { t } = useTranslation();
+  const isMobile = useIsMobile();
+  const [isFlipping, setIsFlipping] = useState(false);
 
   const handleFlip = useCallback(async () => {
-    if (cameraDevices.length < 2 || isFlipping) return
+    if (cameraDevices.length < 2 || isFlipping) return;
 
-    const currentIndex = cameraDevices.findIndex((d) => d.deviceId === selectedCameraId)
-    const nextIndex = (currentIndex + 1) % cameraDevices.length
-    const nextDevice = cameraDevices[nextIndex]
-    if (!nextDevice) return
+    const currentIndex = cameraDevices.findIndex((d) => d.deviceId === selectedCameraId);
+    const nextIndex = (currentIndex + 1) % cameraDevices.length;
+    const nextDevice = cameraDevices[nextIndex];
+    if (!nextDevice) return;
 
-    setIsFlipping(true)
+    setIsFlipping(true);
     try {
-      await switchCamera(nextDevice.deviceId)
+      await switchCamera(nextDevice.deviceId);
     } finally {
-      setIsFlipping(false)
+      setIsFlipping(false);
     }
-  }, [cameraDevices, selectedCameraId, switchCamera, isFlipping])
+  }, [cameraDevices, selectedCameraId, switchCamera, isFlipping]);
 
   // Only show on mobile and when there are multiple cameras.
-  if (!isMobile || cameraDevices.length < 2) return null
+  if (!isMobile || cameraDevices.length < 2) return null;
 
   return (
     <button
@@ -51,5 +51,5 @@ export function CameraFlipButton({
         className={`w-6 h-6 text-[var(--color-text-primary)] ${isFlipping ? 'animate-spin' : ''}`}
       />
     </button>
-  )
+  );
 }

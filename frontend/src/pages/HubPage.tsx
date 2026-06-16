@@ -370,7 +370,7 @@ export default function HubsPage() {
   const activeDesignHasShellSlot = useMemo(() => {
     if (!activeAIDesign?.html_content) return false;
     return Array.from(splitAIDesignHTML(activeAIDesign.html_content).slotsByMarker.values()).some(
-      (slot) => slot.id === 'hub-content',
+      (slot) => slot.id === 'hub-content'
     );
   }, [activeAIDesign?.html_content]);
 
@@ -752,7 +752,11 @@ export default function HubsPage() {
     };
   }, [canReorderPinned, draggingPinnedId, setPinnedOrder, updatePinnedOrderMutation]);
 
-  const savedToggleMutation = useMutation<void, Error, { postId: number; shouldSave: boolean; post: PlatformPost }>({
+  const savedToggleMutation = useMutation<
+    void,
+    Error,
+    { postId: number; shouldSave: boolean; post: PlatformPost }
+  >({
     mutationFn: async ({ postId, shouldSave }) => {
       if (!user) {
         throw new Error(t('alerts.signInToSave'));
@@ -900,7 +904,9 @@ export default function HubsPage() {
             onPinnedPointerDown={onPinnedPointerDown}
             onPinnedPointerUp={onPinnedPointerUp}
             onShare={() => handleSharePost(post.id)}
-            onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave, normalizedPost)}
+            onToggleSave={(shouldSave) =>
+              handleToggleSavePost(post.id, !shouldSave, normalizedPost)
+            }
             onHide={() => handleHidePost(post.id)}
             onCrosspost={() => handleCrosspostSelection(post)}
             onEdit={() => setEditPostTarget(normalizedPost)}

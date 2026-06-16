@@ -45,8 +45,7 @@ export default function HubSettingsPage() {
     (userMod !== undefined && (userMod.role === 'owner' || userMod.role === 'full_moderator'));
 
   // Check if user is hub owner or admin (for owner-only settings)
-  const isHubOwnerOrAdmin =
-    isAdmin(user?.role) || userMod?.role === 'owner';
+  const isHubOwnerOrAdmin = isAdmin(user?.role) || userMod?.role === 'owner';
 
   // Update settings mutation
   const updateMutation = useMutation({
@@ -144,8 +143,8 @@ export default function HubSettingsPage() {
               saveStatus === 'saving'
                 ? 'bg-blue-100 text-blue-800'
                 : saveStatus === 'saved'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-red-100 text-red-800'
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-red-100 text-red-800'
             }`}
           >
             {saveStatus === 'saving' && t('hubSettingsPage.saveBanner.saving')}
@@ -163,9 +162,7 @@ export default function HubSettingsPage() {
 
               return (
                 <div key={tab.id} className="flex items-center gap-x-8">
-                  {showDivider && (
-                    <div className="h-6 w-px bg-[var(--color-border)]" />
-                  )}
+                  {showDivider && <div className="h-6 w-px bg-[var(--color-border)]" />}
                   <button
                     onClick={() => setActiveTab(tab.id)}
                     className={`pb-4 px-2 border-b-2 transition-colors whitespace-nowrap ${

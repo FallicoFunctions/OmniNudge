@@ -146,12 +146,9 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
         try {
           await themeService.setActiveTheme(theme.id);
           if (currentRequestId === selectionRequestId.current) {
-            setUserSettings((prev) =>
+            setUserSettings((prev) => (prev ? { ...prev, active_theme_id: theme.id } : prev));
+            queryClient.setQueryData<UserSettings | undefined>(['user', 'settings'], (prev) =>
               prev ? { ...prev, active_theme_id: theme.id } : prev
-            );
-            queryClient.setQueryData<UserSettings | undefined>(
-              ['user', 'settings'],
-              (prev) => (prev ? { ...prev, active_theme_id: theme.id } : prev)
             );
           }
         } catch (err) {
@@ -229,9 +226,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     async (enabled: boolean) => {
       try {
         await themeService.setAdvancedMode(enabled);
-        setUserSettings((prev) =>
-          prev ? { ...prev, advanced_mode_enabled: enabled } : prev
-        );
+        setUserSettings((prev) => (prev ? { ...prev, advanced_mode_enabled: enabled } : prev));
         queryClient.setQueryData<UserSettings | undefined>(['user', 'settings'], (prev) =>
           prev ? { ...prev, advanced_mode_enabled: enabled } : prev
         );

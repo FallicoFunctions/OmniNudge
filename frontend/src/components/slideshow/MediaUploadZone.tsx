@@ -268,10 +268,7 @@ export function MediaUploadZone({
             <p className="text-sm font-medium text-gray-700">
               {t('mediaUploadZone.selected.title', { count: selectedFiles.length })}
             </p>
-            <button
-              onClick={clearAll}
-              className="text-sm text-red-600 hover:text-red-700"
-            >
+            <button onClick={clearAll} className="text-sm text-red-600 hover:text-red-700">
               {t('mediaUploadZone.actions.clearAll')}
             </button>
           </div>

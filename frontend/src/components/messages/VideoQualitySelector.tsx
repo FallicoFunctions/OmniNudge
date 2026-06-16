@@ -1,15 +1,15 @@
-import { useTranslation } from 'react-i18next'
-import type { VideoQuality } from '../../types/calls'
+import { useTranslation } from 'react-i18next';
+import type { VideoQuality } from '../../types/calls';
 
 interface VideoQualitySelectorProps {
-  videoQuality: VideoQuality
-  setVideoQuality: (q: VideoQuality) => void
+  videoQuality: VideoQuality;
+  setVideoQuality: (q: VideoQuality) => void;
 }
 
-const QUALITY_OPTIONS: VideoQuality[] = ['low', 'medium', 'high']
+const QUALITY_OPTIONS: VideoQuality[] = ['low', 'medium', 'high'];
 
 export function VideoQualitySelector({ videoQuality, setVideoQuality }: VideoQualitySelectorProps) {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
 
   return (
     <div
@@ -33,5 +33,5 @@ export function VideoQualitySelector({ videoQuality, setVideoQuality }: VideoQua
         </button>
       ))}
     </div>
-  )
+  );
 }

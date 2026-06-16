@@ -126,7 +126,7 @@ describe('RedditUserPage', () => {
     render(
       <Wrapper>
         <RedditUserPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(document.body).toBeTruthy();
   });
@@ -136,7 +136,7 @@ describe('RedditUserPage', () => {
     render(
       <Wrapper>
         <RedditUserPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByText(/redditUserPage\.tabs\.overview/i)).toBeInTheDocument();
@@ -148,7 +148,7 @@ describe('RedditUserPage', () => {
     render(
       <Wrapper>
         <RedditUserPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       // tab keys are shown as translation keys

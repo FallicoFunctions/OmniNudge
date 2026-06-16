@@ -55,140 +55,147 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
     navigate('/');
   };
 
-  const items = useMemo(() => [
-    // User section
-    {
-      icon: User,
-      label: user?.username || t('menu.profile'),
-      onClick: () => handleNavigate(`/users/${user?.username}`, 'Profile'),
-      show: isAuthenticated,
-      section: 'user',
-      testId: 'menu-profile-button'
-    },
-    // Navigation section
-    {
-      icon: Grid3x3,
-      label: t('menu.hubs'),
-      onClick: () => handleNavigate('/hubs', 'Hubs'),
-      show: true,
-      section: 'nav',
-      testId: 'menu-hubs-button'
-    },
-    {
-      icon: Info,
-      label: t('menu.about'),
-      onClick: () => handleNavigate('/about', 'About'),
-      show: true,
-      section: 'nav',
-      testId: 'menu-about-button'
-    },
-    // Settings section
-    {
-      icon: Settings,
-      label: t('common.settings'),
-      onClick: () => {
-        if (isAuthenticated) {
-          handleNavigate('/settings', 'Settings');
-        } else {
-          trackEvent('MobileNavigation', 'MoreMenuClick', 'Settings');
+  const items = useMemo(
+    () => [
+      // User section
+      {
+        icon: User,
+        label: user?.username || t('menu.profile'),
+        onClick: () => handleNavigate(`/users/${user?.username}`, 'Profile'),
+        show: isAuthenticated,
+        section: 'user',
+        testId: 'menu-profile-button',
+      },
+      // Navigation section
+      {
+        icon: Grid3x3,
+        label: t('menu.hubs'),
+        onClick: () => handleNavigate('/hubs', 'Hubs'),
+        show: true,
+        section: 'nav',
+        testId: 'menu-hubs-button',
+      },
+      {
+        icon: Info,
+        label: t('menu.about'),
+        onClick: () => handleNavigate('/about', 'About'),
+        show: true,
+        section: 'nav',
+        testId: 'menu-about-button',
+      },
+      // Settings section
+      {
+        icon: Settings,
+        label: t('common.settings'),
+        onClick: () => {
+          if (isAuthenticated) {
+            handleNavigate('/settings', 'Settings');
+          } else {
+            trackEvent('MobileNavigation', 'MoreMenuClick', 'Settings');
+            onClose();
+            window.dispatchEvent(
+              new CustomEvent('open-auth-modal', {
+                detail: { mode: 'login', redirectTo: '/settings' },
+              })
+            );
+          }
+        },
+        show: true,
+        section: 'settings',
+        testId: 'menu-settings-button',
+      },
+      {
+        icon: Shield,
+        label: t('menu.admin'),
+        onClick: () => handleNavigate('/admin', 'Admin'),
+        show: user?.role === 'admin',
+        section: 'settings',
+        testId: 'menu-admin-button',
+      },
+      // Auth section
+      {
+        icon: LogIn,
+        label: t('common.login'),
+        onClick: () => {
+          trackEvent('MobileNavigation', 'MoreMenuClick', 'Login');
           onClose();
-          window.dispatchEvent(new CustomEvent('open-auth-modal', {
-            detail: { mode: 'login', redirectTo: '/settings' },
-          }));
-        }
+          window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+        },
+        show: !isAuthenticated,
+        section: 'auth',
+        testId: 'menu-login-button',
       },
-      show: true,
-      section: 'settings',
-      testId: 'menu-settings-button'
-    },
-    {
-      icon: Shield,
-      label: t('menu.admin'),
-      onClick: () => handleNavigate('/admin', 'Admin'),
-      show: user?.role === 'admin',
-      section: 'settings',
-      testId: 'menu-admin-button'
-    },
-    // Auth section
-    {
-      icon: LogIn,
-      label: t('common.login'),
-      onClick: () => {
-        trackEvent('MobileNavigation', 'MoreMenuClick', 'Login');
-        onClose();
-        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+      {
+        icon: UserPlus,
+        label: t('common.register'),
+        onClick: () => {
+          trackEvent('MobileNavigation', 'MoreMenuClick', 'Register');
+          onClose();
+          window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'signup' }));
+        },
+        show: !isAuthenticated,
+        section: 'auth',
+        testId: 'menu-register-button',
       },
-      show: !isAuthenticated,
-      section: 'auth',
-      testId: 'menu-login-button'
-    },
-    {
-      icon: UserPlus,
-      label: t('common.register'),
-      onClick: () => {
-        trackEvent('MobileNavigation', 'MoreMenuClick', 'Register');
-        onClose();
-        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'signup' }));
+      {
+        icon: LogOut,
+        label: t('menu.logout'),
+        onClick: handleLogoutClick,
+        show: isAuthenticated,
+        section: 'auth',
+        danger: true,
+        testId: 'menu-logout-button',
       },
-      show: !isAuthenticated,
-      section: 'auth',
-      testId: 'menu-register-button'
-    },
-    {
-      icon: LogOut,
-      label: t('menu.logout'),
-      onClick: handleLogoutClick,
-      show: isAuthenticated,
-      section: 'auth',
-      danger: true,
-      testId: 'menu-logout-button'
-    }
-  ], [user, isAuthenticated, t, handleNavigate, onClose, handleLogoutClick]);
+    ],
+    [user, isAuthenticated, t, handleNavigate, onClose, handleLogoutClick]
+  );
 
   // Group items by section
   const sections = ['user', 'nav', 'settings', 'auth'];
-  const groupedItems = useMemo(() => sections
-    .map(section => items.filter(item => item.section === section && item.show))
-    .filter(group => group.length > 0), [items]);
+  const groupedItems = useMemo(
+    () =>
+      sections
+        .map((section) => items.filter((item) => item.section === section && item.show))
+        .filter((group) => group.length > 0),
+    [items]
+  );
 
   return (
     <>
       <BottomSheet isOpen={isOpen} onClose={onClose} title={t('nav.menu')}>
         {groupedItems.map((group, groupIndex) => (
-        <div key={groupIndex}>
-          {/* Divider between sections */}
-          {groupIndex > 0 && (
-            <div className="my-2 border-t border-[var(--color-border)]" />
-          )}
+          <div key={groupIndex}>
+            {/* Divider between sections */}
+            {groupIndex > 0 && <div className="my-2 border-t border-[var(--color-border)]" />}
 
-          {/* Menu items */}
-          {group.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={item.onClick}
-              className={`
+            {/* Menu items */}
+            {group.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={item.onClick}
+                className={`
                 flex items-center w-full px-4 py-4 text-left
                 active:bg-[var(--color-hover)] transition-colors
                 ${item.danger ? 'text-red-500' : ''}
               `}
-              data-testid={item.testId}
-            >
-              <item.icon
-                size={24}
-                className={`mr-3 ${item.danger ? 'text-red-500' : 'text-[var(--color-text-secondary)]'}`}
-              />
-              <span
-                className={`text-base font-medium ${
-                  item.danger ? 'text-red-500' : 'text-[var(--color-text-primary)]'
-                }`}
+                data-testid={item.testId}
               >
-                {item.label}
-              </span>
-            </button>
-          ))}
-        </div>
-      ))}
+                <item.icon
+                  size={24}
+                  className={`mr-3 ${item.danger ? 'text-red-500' : 'text-[var(--color-text-secondary)]'}`}
+                />
+                <span
+                  className={`text-base font-medium ${
+                    item.danger ? 'text-red-500' : 'text-[var(--color-text-primary)]'
+                  }`}
+                >
+                  {item.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        ))}
       </BottomSheet>
 
       {/* Logout confirmation modal */}

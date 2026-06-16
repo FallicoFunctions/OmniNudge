@@ -67,7 +67,9 @@ const createWrapper = () => {
 describe('UserProfilePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuth).mockReturnValue({ user: null, isAuthenticated: false } as ReturnType<typeof useAuth>);
+    vi.mocked(useAuth).mockReturnValue({ user: null, isAuthenticated: false } as ReturnType<
+      typeof useAuth
+    >);
   });
 
   it('renders without crashing with username param', () => {
@@ -76,7 +78,7 @@ describe('UserProfilePage', () => {
     render(
       <Wrapper>
         <UserProfilePage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(document.body).toBeTruthy();
   });
@@ -87,7 +89,7 @@ describe('UserProfilePage', () => {
     render(
       <Wrapper>
         <UserProfilePage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByText(/unable to load user profile/i)).toBeInTheDocument();
@@ -105,7 +107,7 @@ describe('UserProfilePage', () => {
     render(
       <Wrapper>
         <UserProfilePage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await waitFor(() => {
@@ -124,7 +126,7 @@ describe('UserProfilePage', () => {
     render(
       <Wrapper>
         <UserProfilePage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await waitFor(() => {

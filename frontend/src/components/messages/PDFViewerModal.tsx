@@ -46,7 +46,11 @@ export default function PDFViewerModal({ isOpen, pdfUrl, fileName, onClose }: PD
   }, [isOpen, pdfUrl, t]);
 
   const pageLabel = useMemo(
-    () => t('messages.media.pdfViewer.pageLabel', { current: pageNumber, total: Math.max(numPages, 1) }),
+    () =>
+      t('messages.media.pdfViewer.pageLabel', {
+        current: pageNumber,
+        total: Math.max(numPages, 1),
+      }),
     [numPages, pageNumber, t]
   );
 
@@ -141,7 +145,9 @@ export default function PDFViewerModal({ isOpen, pdfUrl, fileName, onClose }: PD
             {loadError}
           </div>
         ) : !pdfModule ? (
-          <div className="text-sm text-[var(--color-text-muted)]">{t('messages.media.loading')}</div>
+          <div className="text-sm text-[var(--color-text-muted)]">
+            {t('messages.media.loading')}
+          </div>
         ) : (
           <div className="flex justify-center">
             <pdfModule.Document
@@ -154,7 +160,11 @@ export default function PDFViewerModal({ isOpen, pdfUrl, fileName, onClose }: PD
               onLoadError={() => {
                 setLoadError(t('messages.media.pdfViewer.loadFailed'));
               }}
-              loading={<div className="text-sm text-[var(--color-text-muted)]">{t('messages.media.loading')}</div>}
+              loading={
+                <div className="text-sm text-[var(--color-text-muted)]">
+                  {t('messages.media.loading')}
+                </div>
+              }
             >
               <pdfModule.Page pageNumber={pageNumber} scale={scale} loading={null} />
             </pdfModule.Document>

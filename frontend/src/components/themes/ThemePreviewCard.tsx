@@ -17,10 +17,26 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
   const rating = theme.average_rating;
 
   const palette = [
-    { id: 'primary', label: t('themes.previewCard.palette.primary'), value: getThemeVariable(theme, '--color-primary', '#3b82f6') },
-    { id: 'surface', label: t('themes.previewCard.palette.surface'), value: getThemeVariable(theme, '--color-surface', '#ffffff') },
-    { id: 'background', label: t('themes.previewCard.palette.background'), value: getThemeVariable(theme, '--color-background', '#f3f4f6') },
-    { id: 'accent', label: t('themes.previewCard.palette.accent'), value: getThemeVariable(theme, '--color-success', '#10b981') },
+    {
+      id: 'primary',
+      label: t('themes.previewCard.palette.primary'),
+      value: getThemeVariable(theme, '--color-primary', '#3b82f6'),
+    },
+    {
+      id: 'surface',
+      label: t('themes.previewCard.palette.surface'),
+      value: getThemeVariable(theme, '--color-surface', '#ffffff'),
+    },
+    {
+      id: 'background',
+      label: t('themes.previewCard.palette.background'),
+      value: getThemeVariable(theme, '--color-background', '#f3f4f6'),
+    },
+    {
+      id: 'accent',
+      label: t('themes.previewCard.palette.accent'),
+      value: getThemeVariable(theme, '--color-success', '#10b981'),
+    },
   ];
 
   const previewStyles = {
@@ -46,9 +62,7 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
             {theme.theme_name}
           </h3>
           {theme.theme_description && (
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {theme.theme_description}
-            </p>
+            <p className="text-sm text-[var(--color-text-secondary)]">{theme.theme_description}</p>
           )}
         </div>
         {isActive && (
@@ -74,10 +88,7 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
           >
             <div className="flex items-center justify-between">
               <div>
-                <p
-                  className="text-sm font-semibold"
-                  style={{ color: previewStyles.textPrimary }}
-                >
+                <p className="text-sm font-semibold" style={{ color: previewStyles.textPrimary }}>
                   {t('themes.previewCard.preview.header')}
                 </p>
                 <p className="text-xs" style={{ color: previewStyles.textSecondary }}>
@@ -101,10 +112,7 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
                   className="rounded-md border px-3 py-2"
                   style={{ borderColor: previewStyles.border }}
                 >
-                  <div
-                    className="text-sm font-medium"
-                    style={{ color: previewStyles.textPrimary }}
-                  >
+                  <div className="text-sm font-medium" style={{ color: previewStyles.textPrimary }}>
                     {t('themes.previewCard.preview.contentBlock', { index })}
                   </div>
                   <div className="mt-1 text-xs" style={{ color: previewStyles.textSecondary }}>
@@ -153,7 +161,9 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
           onClick={() => onSelect?.(theme)}
           disabled={isActive}
         >
-          {isActive ? t('themes.previewCard.actions.selected') : t('themes.previewCard.actions.useTheme')}
+          {isActive
+            ? t('themes.previewCard.actions.selected')
+            : t('themes.previewCard.actions.useTheme')}
         </button>
         {onEdit && (
           <button

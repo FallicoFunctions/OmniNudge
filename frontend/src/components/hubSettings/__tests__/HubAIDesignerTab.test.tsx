@@ -36,7 +36,8 @@ const renderDesignerTab = () => {
 };
 
 describe('HubAIDesignerTab', () => {
-  const validationMessage = 'The AI returned a design that did not meet system rules. Please try again.';
+  const validationMessage =
+    'The AI returned a design that did not meet system rules. Please try again.';
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -48,9 +49,7 @@ describe('HubAIDesignerTab', () => {
   });
 
   it('shows mapped generate validation messages', async () => {
-    vi.mocked(hubAIDesignerService.generateDesign).mockRejectedValue(
-      new Error(validationMessage)
-    );
+    vi.mocked(hubAIDesignerService.generateDesign).mockRejectedValue(new Error(validationMessage));
 
     renderDesignerTab();
     fireEvent.change(screen.getByLabelText('Describe your Hub page'), {
@@ -75,7 +74,9 @@ describe('HubAIDesignerTab', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Generate Design' }));
 
-    expect(await screen.findByText('AI design generation timed out. Please try again.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('AI design generation timed out. Please try again.')
+    ).toBeInTheDocument();
     expect(screen.queryByText(/check your connection/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Request failed with status code 502/i)).not.toBeInTheDocument();
   });

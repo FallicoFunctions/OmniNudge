@@ -73,11 +73,11 @@ describe('ThemesPage', () => {
     render(
       <MemoryRouter>
         <ThemesPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     // When no active theme, the h1 renders the i18n key 'themesPage.hero.noThemeSelected'
     expect(
-      screen.getByRole('heading', { name: 'themesPage.hero.noThemeSelected' }),
+      screen.getByRole('heading', { name: 'themesPage.hero.noThemeSelected' })
     ).toBeInTheDocument();
   });
 
@@ -85,7 +85,7 @@ describe('ThemesPage', () => {
     render(
       <MemoryRouter>
         <ThemesPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     await waitFor(() => {
       expect(screen.getByText('themesPage.hero.noThemeSelected')).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe('ThemesPage', () => {
     render(
       <MemoryRouter>
         <ThemesPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     await waitFor(() => {
       expect(screen.getByText('themesPage.selector.create')).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe('ThemesPage', () => {
     render(
       <MemoryRouter>
         <ThemesPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
 
     await waitFor(() => {

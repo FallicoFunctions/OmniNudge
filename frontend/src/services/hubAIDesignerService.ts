@@ -131,7 +131,11 @@ const toAIDesignError = (error: unknown, operation: 'generation' | 'refinement')
 export const hubAIDesignerService = {
   async generateDesign(hubName: string, prompt: string): Promise<GenerateDesignResponse> {
     try {
-      const response = await api.post(`/hubs/${hubName}/ai-design/generate`, { prompt }, { timeout: 60000 });
+      const response = await api.post(
+        `/hubs/${hubName}/ai-design/generate`,
+        { prompt },
+        { timeout: 60000 }
+      );
       return response.data;
     } catch (error) {
       throw toAIDesignError(error, 'generation');
@@ -184,14 +188,23 @@ export const hubAIDesignerService = {
     return response.data;
   },
 
-  async saveVersion(hubName: string, designId: number, htmlContent: string): Promise<{ html_content: string }> {
+  async saveVersion(
+    hubName: string,
+    designId: number,
+    htmlContent: string
+  ): Promise<{ html_content: string }> {
     const response = await api.post(`/hubs/${hubName}/ai-designs/${designId}/versions`, {
       html_content: htmlContent,
     });
     return response.data;
   },
 
-  async chatRefine(hubName: string, designId: number, currentHtml: string, message: string): Promise<{ html_content: string }> {
+  async chatRefine(
+    hubName: string,
+    designId: number,
+    currentHtml: string,
+    message: string
+  ): Promise<{ html_content: string }> {
     try {
       const response = await api.post(
         `/hubs/${hubName}/ai-designs/${designId}/chat`,

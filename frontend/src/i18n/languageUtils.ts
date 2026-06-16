@@ -71,8 +71,5 @@ export function syncDocumentLanguageAttributes(language: string | null | undefin
 
   document.documentElement.setAttribute('dir', direction);
   document.documentElement.setAttribute('lang', resolvedLanguage);
-  document.documentElement.setAttribute(
-    'data-dir-source',
-    forcedDirection ? 'forced' : 'language'
-  );
+  document.documentElement.setAttribute('data-dir-source', forcedDirection ? 'forced' : 'language');
 }

@@ -56,10 +56,41 @@ export function EmptyStateIllustration({
       return (
         <svg viewBox="0 0 160 110" className={className} aria-hidden="true">
           <circle cx="60" cy="50" r="26" fill="var(--color-surface-elevated)" />
-          <circle cx="60" cy="50" r="16" fill="none" stroke="var(--color-text-secondary)" strokeWidth="4" />
-          <line x1="74" y1="64" x2="102" y2="92" stroke="var(--color-text-secondary)" strokeWidth="6" strokeLinecap="round" />
-          <line x1="112" y1="24" x2="136" y2="24" stroke="var(--color-border)" strokeWidth="6" strokeLinecap="round" />
-          <line x1="112" y1="40" x2="128" y2="40" stroke="var(--color-border)" strokeWidth="6" strokeLinecap="round" />
+          <circle
+            cx="60"
+            cy="50"
+            r="16"
+            fill="none"
+            stroke="var(--color-text-secondary)"
+            strokeWidth="4"
+          />
+          <line
+            x1="74"
+            y1="64"
+            x2="102"
+            y2="92"
+            stroke="var(--color-text-secondary)"
+            strokeWidth="6"
+            strokeLinecap="round"
+          />
+          <line
+            x1="112"
+            y1="24"
+            x2="136"
+            y2="24"
+            stroke="var(--color-border)"
+            strokeWidth="6"
+            strokeLinecap="round"
+          />
+          <line
+            x1="112"
+            y1="40"
+            x2="128"
+            y2="40"
+            stroke="var(--color-border)"
+            strokeWidth="6"
+            strokeLinecap="round"
+          />
         </svg>
       );
     case 'error':
@@ -67,7 +98,15 @@ export function EmptyStateIllustration({
         <svg viewBox="0 0 160 110" className={className} aria-hidden="true">
           <path d="M80 18l48 76H32z" fill="var(--color-error)" opacity="0.15" />
           <path d="M80 26l38 60H42z" fill="none" stroke="var(--color-error)" strokeWidth="4" />
-          <line x1="80" y1="48" x2="80" y2="66" stroke="var(--color-error)" strokeWidth="6" strokeLinecap="round" />
+          <line
+            x1="80"
+            y1="48"
+            x2="80"
+            y2="66"
+            stroke="var(--color-error)"
+            strokeWidth="6"
+            strokeLinecap="round"
+          />
           <circle cx="80" cy="77" r="4" fill="var(--color-error)" />
         </svg>
       );
@@ -75,39 +114,140 @@ export function EmptyStateIllustration({
       return (
         <svg viewBox="0 0 160 110" className={className} aria-hidden="true">
           <rect x="36" y="42" width="88" height="46" rx="10" fill="var(--color-surface-elevated)" />
-          <rect x="36" y="42" width="88" height="46" rx="10" fill="none" stroke="var(--color-border)" strokeWidth="4" />
-          <path d="M56 42V32a24 24 0 0148 0v10" fill="none" stroke="var(--color-text-secondary)" strokeWidth="4" />
+          <rect
+            x="36"
+            y="42"
+            width="88"
+            height="46"
+            rx="10"
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth="4"
+          />
+          <path
+            d="M56 42V32a24 24 0 0148 0v10"
+            fill="none"
+            stroke="var(--color-text-secondary)"
+            strokeWidth="4"
+          />
           <circle cx="80" cy="62" r="6" fill="var(--color-text-secondary)" />
-          <line x1="80" y1="68" x2="80" y2="76" stroke="var(--color-text-secondary)" strokeWidth="4" strokeLinecap="round" />
+          <line
+            x1="80"
+            y1="68"
+            x2="80"
+            y2="76"
+            stroke="var(--color-text-secondary)"
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
         </svg>
       );
     case 'messages':
       return (
         <svg viewBox="0 0 160 110" className={className} aria-hidden="true">
           <rect x="26" y="24" width="68" height="42" rx="10" fill="var(--color-surface-elevated)" />
-          <rect x="26" y="24" width="68" height="42" rx="10" fill="none" stroke="var(--color-border)" strokeWidth="4" />
-          <path d="M52 66l-2 14 14-10" fill="var(--color-surface-elevated)" stroke="var(--color-border)" strokeWidth="4" />
+          <rect
+            x="26"
+            y="24"
+            width="68"
+            height="42"
+            rx="10"
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth="4"
+          />
+          <path
+            d="M52 66l-2 14 14-10"
+            fill="var(--color-surface-elevated)"
+            stroke="var(--color-border)"
+            strokeWidth="4"
+          />
           <rect x="76" y="44" width="58" height="34" rx="8" fill="var(--color-surface-elevated)" />
-          <rect x="76" y="44" width="58" height="34" rx="8" fill="none" stroke="var(--color-border)" strokeWidth="4" />
+          <rect
+            x="76"
+            y="44"
+            width="58"
+            height="34"
+            rx="8"
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth="4"
+          />
         </svg>
       );
     case 'posts':
       return (
         <svg viewBox="0 0 160 110" className={className} aria-hidden="true">
           <rect x="34" y="20" width="92" height="72" rx="10" fill="var(--color-surface-elevated)" />
-          <rect x="34" y="20" width="92" height="72" rx="10" fill="none" stroke="var(--color-border)" strokeWidth="4" />
-          <line x1="50" y1="40" x2="110" y2="40" stroke="var(--color-text-secondary)" strokeWidth="5" strokeLinecap="round" />
-          <line x1="50" y1="56" x2="98" y2="56" stroke="var(--color-border)" strokeWidth="5" strokeLinecap="round" />
-          <line x1="50" y1="72" x2="90" y2="72" stroke="var(--color-border)" strokeWidth="5" strokeLinecap="round" />
+          <rect
+            x="34"
+            y="20"
+            width="92"
+            height="72"
+            rx="10"
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth="4"
+          />
+          <line
+            x1="50"
+            y1="40"
+            x2="110"
+            y2="40"
+            stroke="var(--color-text-secondary)"
+            strokeWidth="5"
+            strokeLinecap="round"
+          />
+          <line
+            x1="50"
+            y1="56"
+            x2="98"
+            y2="56"
+            stroke="var(--color-border)"
+            strokeWidth="5"
+            strokeLinecap="round"
+          />
+          <line
+            x1="50"
+            y1="72"
+            x2="90"
+            y2="72"
+            stroke="var(--color-border)"
+            strokeWidth="5"
+            strokeLinecap="round"
+          />
         </svg>
       );
     case 'media':
       return (
         <svg viewBox="0 0 160 110" className={className} aria-hidden="true">
-          <rect x="26" y="22" width="108" height="66" rx="10" fill="var(--color-surface-elevated)" />
-          <rect x="26" y="22" width="108" height="66" rx="10" fill="none" stroke="var(--color-border)" strokeWidth="4" />
+          <rect
+            x="26"
+            y="22"
+            width="108"
+            height="66"
+            rx="10"
+            fill="var(--color-surface-elevated)"
+          />
+          <rect
+            x="26"
+            y="22"
+            width="108"
+            height="66"
+            rx="10"
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth="4"
+          />
           <circle cx="54" cy="44" r="8" fill="var(--color-primary)" opacity="0.4" />
-          <path d="M42 78l24-24 16 16 16-12 20 20" fill="none" stroke="var(--color-text-secondary)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M42 78l24-24 16 16 16-12 20 20"
+            fill="none"
+            stroke="var(--color-text-secondary)"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       );
     case 'members':
@@ -117,15 +257,35 @@ export function EmptyStateIllustration({
           <circle cx="64" cy="42" r="14" fill="none" stroke="var(--color-border)" strokeWidth="4" />
           <circle cx="98" cy="46" r="11" fill="var(--color-surface-elevated)" />
           <circle cx="98" cy="46" r="11" fill="none" stroke="var(--color-border)" strokeWidth="4" />
-          <path d="M42 86c6-16 38-16 44 0" fill="none" stroke="var(--color-text-secondary)" strokeWidth="4" strokeLinecap="round" />
-          <path d="M88 84c5-12 27-12 32 0" fill="none" stroke="var(--color-border)" strokeWidth="4" strokeLinecap="round" />
+          <path
+            d="M42 86c6-16 38-16 44 0"
+            fill="none"
+            stroke="var(--color-text-secondary)"
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
+          <path
+            d="M88 84c5-12 27-12 32 0"
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
         </svg>
       );
     case 'notifications':
       return (
         <svg viewBox="0 0 160 110" className={className} aria-hidden="true">
-          <path d="M80 24c-14 0-24 10-24 24v16l-8 12h64l-8-12V48c0-14-10-24-24-24z" fill="var(--color-surface-elevated)" />
-          <path d="M80 24c-14 0-24 10-24 24v16l-8 12h64l-8-12V48c0-14-10-24-24-24z" fill="none" stroke="var(--color-border)" strokeWidth="4" />
+          <path
+            d="M80 24c-14 0-24 10-24 24v16l-8 12h64l-8-12V48c0-14-10-24-24-24z"
+            fill="var(--color-surface-elevated)"
+          />
+          <path
+            d="M80 24c-14 0-24 10-24 24v16l-8 12h64l-8-12V48c0-14-10-24-24-24z"
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth="4"
+          />
           <circle cx="80" cy="86" r="8" fill="var(--color-text-secondary)" />
           <circle cx="116" cy="28" r="10" fill="var(--color-primary)" opacity="0.6" />
         </svg>
@@ -135,9 +295,34 @@ export function EmptyStateIllustration({
       return (
         <svg viewBox="0 0 160 110" className={className} aria-hidden="true">
           <rect x="34" y="24" width="92" height="62" rx="10" fill="var(--color-surface-elevated)" />
-          <rect x="34" y="24" width="92" height="62" rx="10" fill="none" stroke="var(--color-border)" strokeWidth="4" />
-          <line x1="50" y1="44" x2="110" y2="44" stroke="var(--color-border)" strokeWidth="5" strokeLinecap="round" />
-          <line x1="50" y1="60" x2="94" y2="60" stroke="var(--color-border)" strokeWidth="5" strokeLinecap="round" />
+          <rect
+            x="34"
+            y="24"
+            width="92"
+            height="62"
+            rx="10"
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth="4"
+          />
+          <line
+            x1="50"
+            y1="44"
+            x2="110"
+            y2="44"
+            stroke="var(--color-border)"
+            strokeWidth="5"
+            strokeLinecap="round"
+          />
+          <line
+            x1="50"
+            y1="60"
+            x2="94"
+            y2="60"
+            stroke="var(--color-border)"
+            strokeWidth="5"
+            strokeLinecap="round"
+          />
           <circle cx="118" cy="78" r="12" fill="var(--color-primary)" opacity="0.35" />
         </svg>
       );
@@ -281,9 +466,7 @@ export function EmptyPosts({ onCreate }: { onCreate?: () => void }) {
       title={t('emptyStates.posts.title')}
       description={t('emptyStates.posts.description')}
       action={
-        onCreate
-          ? { label: t('emptyStates.posts.actions.create'), onClick: onCreate }
-          : undefined
+        onCreate ? { label: t('emptyStates.posts.actions.create'), onClick: onCreate } : undefined
       }
     />
   );
@@ -298,9 +481,7 @@ export function EmptyGallery({ onUpload }: { onUpload?: () => void }) {
       title={t('emptyStates.gallery.title')}
       description={t('emptyStates.gallery.description')}
       action={
-        onUpload
-          ? { label: t('emptyStates.gallery.actions.upload'), onClick: onUpload }
-          : undefined
+        onUpload ? { label: t('emptyStates.gallery.actions.upload'), onClick: onUpload } : undefined
       }
     />
   );
@@ -315,9 +496,7 @@ export function EmptyMembers({ onInvite }: { onInvite?: () => void }) {
       title={t('emptyStates.members.title')}
       description={t('emptyStates.members.description')}
       action={
-        onInvite
-          ? { label: t('emptyStates.members.actions.invite'), onClick: onInvite }
-          : undefined
+        onInvite ? { label: t('emptyStates.members.actions.invite'), onClick: onInvite } : undefined
       }
     />
   );
@@ -365,7 +544,10 @@ export function PermissionDenied({
       description={t('emptyStates.permissionDenied.description', { resource: resolvedResource })}
       action={
         onRequestAccess
-          ? { label: t('emptyStates.permissionDenied.actions.requestAccess'), onClick: onRequestAccess }
+          ? {
+              label: t('emptyStates.permissionDenied.actions.requestAccess'),
+              onClick: onRequestAccess,
+            }
           : undefined
       }
     />
