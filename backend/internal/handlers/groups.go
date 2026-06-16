@@ -283,7 +283,7 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		return
 	}
 	if blocked {
-		RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
+		RespondError(c, http.StatusNotFound, blockingSettingsErrorMessage)
 		return
 	}
 
@@ -524,7 +524,7 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 		return
 	}
 	if blocked {
-		RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
+		RespondError(c, http.StatusNotFound, blockingSettingsErrorMessage)
 		return
 	}
 
@@ -916,7 +916,7 @@ func (h *GroupHandler) CreateGroupInvite(c *gin.Context) {
 		return
 	}
 	if blocked {
-		RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
+		RespondError(c, http.StatusNotFound, blockingSettingsErrorMessage)
 		return
 	}
 
@@ -994,7 +994,7 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 		return
 	}
 	if blocked {
-		RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
+		RespondError(c, http.StatusNotFound, blockingSettingsErrorMessage)
 		return
 	}
 	participants, err := h.getGroupParticipantIDs(c, conversationID)
@@ -1009,7 +1009,7 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 		return
 	}
 	if blocked {
-		RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
+		RespondError(c, http.StatusNotFound, blockingSettingsErrorMessage)
 		return
 	}
 

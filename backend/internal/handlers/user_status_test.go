@@ -20,7 +20,7 @@ func TestGetUsersStatus(t *testing.T) {
 		},
 	}
 
-	handler := NewUserStatusHandler(hub)
+	handler := NewUserStatusHandler(hub, nil)
 
 	router := gin.Default()
 	router.GET("/users/status", handler.GetUsersStatus)
@@ -43,7 +43,7 @@ func TestGetUsersStatus(t *testing.T) {
 
 func TestGetUsersStatus_NoUserIDs(t *testing.T) {
 	hub := &mockHub{}
-	handler := NewUserStatusHandler(hub)
+	handler := NewUserStatusHandler(hub, nil)
 
 	router := gin.Default()
 	router.GET("/users/status", handler.GetUsersStatus)
@@ -62,7 +62,7 @@ func TestGetUsersStatus_NoUserIDs(t *testing.T) {
 
 func TestGetUsersStatus_InvalidFormat(t *testing.T) {
 	hub := &mockHub{}
-	handler := NewUserStatusHandler(hub)
+	handler := NewUserStatusHandler(hub, nil)
 
 	router := gin.Default()
 	router.GET("/users/status", handler.GetUsersStatus)
@@ -81,7 +81,7 @@ func TestGetUsersStatus_InvalidFormat(t *testing.T) {
 
 func TestGetUsersStatus_TooManyUsers(t *testing.T) {
 	hub := &mockHub{}
-	handler := NewUserStatusHandler(hub)
+	handler := NewUserStatusHandler(hub, nil)
 
 	router := gin.Default()
 	router.GET("/users/status", handler.GetUsersStatus)
@@ -112,7 +112,7 @@ func TestGetUsersStatus_AllOffline(t *testing.T) {
 		onlineUsers: map[int]bool{},
 	}
 
-	handler := NewUserStatusHandler(hub)
+	handler := NewUserStatusHandler(hub, nil)
 
 	router := gin.Default()
 	router.GET("/users/status", handler.GetUsersStatus)

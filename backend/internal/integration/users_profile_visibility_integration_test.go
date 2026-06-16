@@ -34,7 +34,7 @@ func createAvatarPNGPayload(t *testing.T, width, height int) []byte {
 	return buf.Bytes()
 }
 
-func TestUserProfile_PrivateVisibility_HiddenFromOthersAndVisibleToOwner(t *testing.T) {
+func TestUserProfile_PrivateVisibility_LockedForOthersAndVisibleToOwner(t *testing.T) {
 	deps := newTestDeps(t)
 
 	owner := createUser(t, deps.UserRepo, "profile_owner", "user")
@@ -49,14 +49,21 @@ func TestUserProfile_PrivateVisibility_HiddenFromOthersAndVisibleToOwner(t *test
 	_, err = settingsRepo.Update(context.Background(), settings)
 	require.NoError(t, err)
 
-	// Different authenticated viewer should get 404 (fail-closed public shape).
+	// A non-friend viewer gets a locked profile (200 + locked:true), not 404.
 	viewerToken, err := deps.AuthService.GenerateJWT(viewer.ID, viewer.Username, viewer.Role)
 	require.NoError(t, err)
 	req, err := http.NewRequest("GET", "/api/v1/users/"+owner.Username, nil)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+viewerToken)
 	resp := doRequest(t, deps.Router, req)
-	require.Equal(t, http.StatusNotFound, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
+
+	var lockedPayload map[string]any
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &lockedPayload))
+	require.Equal(t, owner.Username, lockedPayload["username"])
+	require.Equal(t, true, lockedPayload["locked"])
+	require.NotContains(t, lockedPayload, "bio")
+	require.NotContains(t, lockedPayload, "avatar_url")
 
 	// Owner should still see own profile.
 	ownerToken, err := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
@@ -70,9 +77,10 @@ func TestUserProfile_PrivateVisibility_HiddenFromOthersAndVisibleToOwner(t *test
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(resp2.Body.Bytes(), &payload))
 	require.Equal(t, owner.Username, payload["username"])
+	require.NotContains(t, payload, "locked")
 }
 
-func TestUserProfile_FriendsOnly_VisibleToAcceptedFriendAndHiddenOtherwise(t *testing.T) {
+func TestUserProfile_Private_VisibleToAcceptedFriendAndLockedOtherwise(t *testing.T) {
 	deps := newTestDeps(t)
 
 	owner := createUser(t, deps.UserRepo, "friends_profile_owner", "user")
@@ -82,7 +90,7 @@ func TestUserProfile_FriendsOnly_VisibleToAcceptedFriendAndHiddenOtherwise(t *te
 	settingsRepo := models.NewUserSettingsRepository(deps.DB.Pool)
 	settings, err := settingsRepo.CreateDefault(context.Background(), owner.ID)
 	require.NoError(t, err)
-	settings.ProfileVisibility = "friends_only"
+	settings.ProfileVisibility = "private"
 	_, err = settingsRepo.Update(context.Background(), settings)
 	require.NoError(t, err)
 
@@ -97,13 +105,44 @@ func TestUserProfile_FriendsOnly_VisibleToAcceptedFriendAndHiddenOtherwise(t *te
 	friendResp := doRequest(t, deps.Router, friendReq)
 	require.Equal(t, http.StatusOK, friendResp.Code)
 
+	var friendPayload map[string]any
+	require.NoError(t, json.Unmarshal(friendResp.Body.Bytes(), &friendPayload))
+	require.NotContains(t, friendPayload, "locked")
+
+	// A non-friend viewer gets a locked profile (200 + locked:true), not 404.
 	otherToken, err := deps.AuthService.GenerateJWT(otherViewer.ID, otherViewer.Username, otherViewer.Role)
 	require.NoError(t, err)
 	otherReq, err := http.NewRequest("GET", "/api/v1/users/"+owner.Username, nil)
 	require.NoError(t, err)
 	otherReq.Header.Set("Authorization", "Bearer "+otherToken)
 	otherResp := doRequest(t, deps.Router, otherReq)
-	require.Equal(t, http.StatusNotFound, otherResp.Code)
+	require.Equal(t, http.StatusOK, otherResp.Code)
+
+	var otherPayload map[string]any
+	require.NoError(t, json.Unmarshal(otherResp.Body.Bytes(), &otherPayload))
+	require.Equal(t, owner.Username, otherPayload["username"])
+	require.Equal(t, true, otherPayload["locked"])
+}
+
+func TestUserProfile_BlockedViewer_StillReturnsNotFound(t *testing.T) {
+	deps := newTestDeps(t)
+
+	owner := createUser(t, deps.UserRepo, "blocked_profile_owner", "user")
+	viewer := createUser(t, deps.UserRepo, "blocked_profile_viewer", "user")
+
+	_, err := deps.DB.Pool.Exec(context.Background(), `
+		INSERT INTO blocked_users (blocker_id, blocked_id)
+		VALUES ($1, $2)
+	`, owner.ID, viewer.ID)
+	require.NoError(t, err)
+
+	viewerToken, err := deps.AuthService.GenerateJWT(viewer.ID, viewer.Username, viewer.Role)
+	require.NoError(t, err)
+	req, err := http.NewRequest("GET", "/api/v1/users/"+owner.Username, nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+viewerToken)
+	resp := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusNotFound, resp.Code)
 }
 
 func TestUserProfileByID_PublicVisibility_ReturnsProfile(t *testing.T) {

@@ -92,7 +92,7 @@ func TestBlockedUserCannotSendMessage(t *testing.T) {
 	req2, _ := http.NewRequest(http.MethodPost, "/conversations", bytes.NewBuffer(convBody))
 	req2.Header.Set("Content-Type", "application/json")
 	convRouter.ServeHTTP(w2, req2)
-	assert.Contains(t, []int{http.StatusForbidden, http.StatusBadRequest, http.StatusConflict}, w2.Code,
+	assert.Contains(t, []int{http.StatusForbidden, http.StatusNotFound, http.StatusBadRequest, http.StatusConflict}, w2.Code,
 		"blocked user should not be able to message blocker")
 }
 

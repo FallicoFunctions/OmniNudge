@@ -16,6 +16,7 @@ type PostCommentRepository interface {
 	GetByPostID(ctx context.Context, postID int, sortBy string, limit, offset int, userID *int) ([]*domain.PostComment, error)
 	GetReplies(ctx context.Context, parentCommentID int, sortBy string, limit, offset int, userID *int) ([]*domain.PostComment, error)
 	GetByUserID(ctx context.Context, userID int, limit, offset int) ([]*domain.PostComment, error)
+	CountByUserID(ctx context.Context, userID int) (int, error)
 	Update(ctx context.Context, comment *domain.PostComment) error
 	SetInboxRepliesDisabled(ctx context.Context, commentID, userID int, disabled bool) error
 	SoftDelete(ctx context.Context, commentID int) error

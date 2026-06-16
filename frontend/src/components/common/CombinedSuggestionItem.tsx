@@ -26,7 +26,7 @@ export function CombinedSuggestionItem({
           onClick={() => onSelectHub(hub.name)}
           className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
         >
-          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-[10px] font-semibold text-white">
+          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)] text-[10px] font-semibold text-white">
             {t('common.prefix.hub')}
           </div>
           <div className="flex min-w-0 flex-col">
@@ -64,10 +64,10 @@ export function CombinedSuggestionItem({
             alt=""
             loading="lazy"
             decoding="async"
-            className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
+            className="h-6 w-6 flex-shrink-0 rounded-md object-cover"
           />
         ) : (
-          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
+          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
             {t('common.prefix.subreddit')}
           </div>
         )}

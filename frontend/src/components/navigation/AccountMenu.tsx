@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../../contexts/AuthContext';
+import { friendsService, friendsQueryKeys } from '../../services/friendsService';
 
 interface AccountMenuProps {
   username: string;
@@ -13,9 +16,21 @@ interface AccountMenuProps {
   onUpgrade?: () => void;
 }
 
-export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugReport, plan, planExpiresAt, onUpgrade }: AccountMenuProps) {
+export function AccountMenu({ username, isAdmin, onLogout, onBugReport, plan, planExpiresAt, onUpgrade }: AccountMenuProps) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+
+  const incomingRequestsQuery = useQuery({
+    queryKey: friendsQueryKeys.requests,
+    queryFn: () => friendsService.getFriendRequests(),
+    staleTime: 0, // Always fetch fresh so the badge count is accurate
+    refetchInterval: 30_000, // Poll every 30s to catch new requests in real time
+    // Guard on the auth context user object, not the string prop, so the query
+    // stops immediately on logout rather than firing one more poll while props drain.
+    enabled: !!user,
+  });
+  const incomingCount = incomingRequestsQuery.data?.incoming?.length ?? 0;
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,7 +57,7 @@ export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugRep
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        className="flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-colors"
+        className="relative flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-colors"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -51,6 +66,11 @@ export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugRep
         <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
+        {incomingCount > 0 && (
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-primary)] px-1 text-[10px] font-bold text-white">
+            {incomingCount}
+          </span>
+        )}
       </button>
 
       {isOpen && (
@@ -68,6 +88,35 @@ export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugRep
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
             {username}
+          </Link>
+
+          <Link
+            to={`/users/${username}/activity`}
+            onClick={() => setIsOpen(false)}
+            className={itemClass}
+            role="menuitem"
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            {t('menu.activity')}
+          </Link>
+
+          <Link
+            to="/friends"
+            onClick={() => setIsOpen(false)}
+            className={itemClass}
+            role="menuitem"
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="flex-1">{t('friends.title')}</span>
+            {incomingCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1 text-xs font-bold text-white">
+                {incomingCount}
+              </span>
+            )}
           </Link>
 
           {plan === 'free' && onUpgrade && (
@@ -160,19 +209,7 @@ export function AccountMenu({ username, isAdmin, isModerator, onLogout, onBugRep
             </Link>
           )}
 
-          {isModerator && (
-            <Link
-              to="/mod/reports"
-              onClick={() => setIsOpen(false)}
-              className={itemClass}
-              role="menuitem"
-            >
-              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              {t('common.modTools')}
-            </Link>
-          )}
+
 
           <hr className="border-[var(--color-border)] my-1" />
 

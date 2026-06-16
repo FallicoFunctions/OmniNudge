@@ -21,6 +21,7 @@
     "userNumber": "Usuario #{{id}}",
     "user": "Usuario",
     "unknownUser": "Usuario desconocido",
+    "previous": "Anterior",
     "next": "Siguiente",
     "confirm": "Confirmar",
     "search": "Buscar",
@@ -132,6 +133,7 @@
   },
   "menu": {
     "profile": "Perfil",
+    "activity": "Actividad",
     "settings": "Ajustes",
     "hubs": "Explorar Hubs",
     "games": "Juegos",
@@ -479,7 +481,6 @@
       "userBans": "Baneos",
       "removalReasons": "Razones de eliminación",
       "modLog": "Registro",
-      "reports": "Reportes",
       "modMail": "Correo de moderación",
       "requests": "Solicitudes"
     },
@@ -578,44 +579,6 @@
         "create_removal_reason": "creó una razón de eliminación",
         "update_removal_reason": "actualizó una razón de eliminación",
         "delete_removal_reason": "eliminó una razón de eliminación"
-      }
-    },
-    "reports": {
-      "title": "Cola de reportes",
-      "empty": "No hay reportes en esta cola.",
-      "meta": "Reportante #{{reporterId}} · Objetivo #{{targetId}} · {{createdAt}}",
-      "sort": {
-        "priority": "Prioridad",
-        "recent": "Más recientes"
-      },
-      "status": {
-        "open": "Abierto",
-        "approved": "Aprobado",
-        "rejected": "Rechazado",
-        "no_action": "Sin acción",
-        "reviewed": "Revisado",
-        "dismissed": "Descartado"
-      },
-      "actions": {
-        "approve": "Aprobar",
-        "reject": "Rechazar",
-        "noAction": "Sin acción"
-      },
-      "targetType": {
-        "post": "Post",
-        "comment": "Comentario",
-        "user": "Usuario",
-        "message": "Mensaje",
-        "reddit_comment": "Comentario de Reddit"
-      },
-      "reason": {
-        "spam": "Spam",
-        "harassment": "Acoso",
-        "illegal_content": "Contenido ilegal",
-        "csam": "CSAM",
-        "violence": "Violencia",
-        "hate_speech": "Discurso de odio",
-        "other": "Otro"
       }
     },
     "modMail": {
@@ -1210,31 +1173,37 @@
       "overview": "Resumen",
       "posts": "Posts",
       "comments": "Comentarios",
+      "communities": "Comunidades",
       "saved": "Guardados",
       "hidden": "Ocultos",
       "subscribed": "Suscrito"
     },
     "headings": {
-      "recentPosts": "Posts recientes",
-      "recentComments": "Comentarios recientes",
-      "moderatorOf": "Moderador de"
+      "info": "Información",
+      "photos": "Fotos",
+      "mutualFriends": "Amigos en común"
     },
     "labels": {
       "joined": "Se unió {{time}}",
       "lastSeen": "Visto por última vez {{time}}",
-      "karma": "karma",
-      "blocked": "Bloqueado"
+      "blocked": "Bloqueado",
+      "location": "Ubicación",
+      "friends": "Amigos",
+      "photos": "Fotos",
+      "wallPosts": "Publicaciones propias",
+      "replies": "Publicaciones de amigos"
+    },
+    "mutualFriends": {
+      "count_one": "{{count}} amigo en común",
+      "count_other": "{{count}} amigos en común"
     },
     "actions": {
-      "viewAll": "Ver todo",
       "message": "Mensaje",
       "editProfile": "Editar perfil",
       "viewThread": "Ver hilo",
       "block": "Bloquear",
       "unblock": "Desbloquear",
-      "confirmBlock": "¿Bloquear a {{username}}? No verás sus mensajes.",
-      "report": "Reportar usuario",
-      "reportFailed": "No se pudo enviar el reporte: {{message}}"
+      "confirmBlock": "¿Bloquear a {{username}}? No verás sus mensajes."
     },
     "posts": {
       "empty": "Aún no hay posts."
@@ -1242,13 +1211,20 @@
     "comments": {
       "onPost": "En <link>post #{{id}}</link>"
     },
+    "communities": {
+      "empty": "No es moderador de ninguna comunidad todavía."
+    },
     "private": {
       "saved": "Los elementos guardados son privados.",
       "hidden": "Los elementos ocultos son privados.",
       "subscribed": "Las suscripciones son privadas."
     },
     "errors": {
-      "loadFailed": "No se pudo cargar el perfil del usuario."
+      "loadFailed": "No se pudo cargar el perfil del usuario.",
+      "friendsLoadFailed": "No se pudieron cargar los amigos de este usuario."
+    },
+    "locked": {
+      "message": "Este perfil es privado. Agrega a esta persona como amigo para ver su perfil completo."
     },
     "aria": {
       "avatarAlt": "Avatar de {{username}}"
@@ -1264,15 +1240,67 @@
       "statusLabel": "Estado",
       "statusPlaceholder": "¿Qué estás haciendo?",
       "statusCount": "{{count}} / 500",
+      "locationLabel": "Ubicación",
+      "locationPlaceholder": "Ciudad, País",
+      "locationCount": "{{count}} / 100",
       "bioLabel": "Biografía",
       "bioPlaceholder": "Cuéntale a la gente un poco sobre ti...",
       "bioCount": "{{count}} / 500",
       "errors": {
         "bioTooLong": "La biografía debe tener 500 caracteres o menos.",
         "statusTooLong": "El estado debe tener 500 caracteres o menos.",
+        "locationTooLong": "La ubicación debe tener 100 caracteres o menos.",
         "invalidAvatarUrl": "La URL del avatar debe comenzar con http:// o https://",
         "uploadFailed": "No se pudo subir el avatar: {{message}}",
         "saveFailed": "No se pudo guardar el perfil: {{message}}"
+      }
+    },
+    "friendsPage": {
+      "title": "Amigos de {{username}}",
+      "backToProfile": "Volver al perfil",
+      "empty": "Aún no hay amigos.",
+      "loading": "Cargando amigos…"
+    },
+    "activityPage": {
+      "title": "Actividad de {{username}}",
+      "backToProfile": "Volver al perfil"
+    },
+    "wall": {
+      "heading": "Muro",
+      "composerPlaceholder": "Escribe algo en este muro...",
+      "commentPlaceholder": "Escribe un comentario...",
+      "post": "Publicar",
+      "posting": "Publicando…",
+      "comment": "Comentar",
+      "commenting": "Comentando…",
+      "like": "Me gusta",
+      "comments": "Comentarios",
+      "noComments": "Aún no hay comentarios.",
+      "empty": "Aún no hay publicaciones en este muro.",
+      "emptyOwner": "Aún no hay publicaciones. ¡Sé el primero en escribir algo!",
+      "private": "Este muro es privado.",
+      "delete": "Eliminar",
+      "deletePostConfirm": "¿Eliminar esta publicación del muro?",
+      "deleteCommentConfirm": "¿Eliminar este comentario?",
+      "loadFailed": "No se pudieron cargar las publicaciones del muro.",
+      "postFailed": "No se pudo publicar en el muro.",
+      "postPendingApproval": "Tu publicación está pendiente de aprobación.",
+      "commentFailed": "No se pudo publicar el comentario.",
+      "likeFailed": "No se pudo actualizar el me gusta.",
+      "deleteFailed": "No se pudo eliminar.",
+      "attachMedia": "Adjuntar foto/video",
+      "uploadingMedia": "Subiendo…",
+      "removeMedia": "Quitar",
+      "mediaUploadFailed": "No se pudo subir el archivo.",
+      "tooManyMedia": "Puedes adjuntar hasta {{max}} archivos.",
+      "previousMedia": "Contenido anterior",
+      "nextMedia": "Contenido siguiente",
+      "pending": {
+        "heading": "Publicaciones pendientes",
+        "approve": "Aprobar",
+        "reject": "Rechazar",
+        "approveFailed": "No se pudo aprobar la publicación.",
+        "rejectFailed": "No se pudo rechazar la publicación."
       }
     }
   },
@@ -1383,15 +1411,13 @@
     "send": "Enviar",
     "noMessages": "Aún no hay mensajes",
     "status": {
-      "loadingMessages": "Cargando mensajes...",
-      "reporting": "Reportando..."
+      "loadingMessages": "Cargando mensajes..."
     },
     "empty": {
       "startConversation": "Aún no hay mensajes. ¡Comienza la conversación!"
     },
     "actions": {
       "loadOlder": "Cargar mensajes anteriores",
-      "report": "Reportar",
       "viewProfile": "Ver perfil",
       "reply": "Responder",
       "edit": "Editar",
@@ -1539,7 +1565,7 @@
       "recipientKeyNotFound": "No se encontró la clave pública del destinatario",
       "encryptionKeysMissing": "Tus claves de cifrado no están configuradas",
       "sendFailed": "No se pudo enviar el mensaje. Inténtalo de nuevo.",
-      "reportFailed": "No se pudo enviar el reporte: {{message}}"
+      "userUnavailable": "Este usuario no está disponible."
     },
     "editing": {
       "ariaInput": "Editar texto del mensaje",
@@ -1710,10 +1736,6 @@
     "share": "Compartir",
     "save": "Guardar",
     "hide": "Ocultar",
-    "report": {
-      "reasonPrompt": "Motivo del reporte (elige uno): spam, harassment, illegal_content, csam, violence, hate_speech, other",
-      "success": "¡Gracias! El equipo de moderación ha sido notificado."
-    },
     "delete": "Eliminar",
     "edit": "Editar",
     "editModal": {
@@ -1746,7 +1768,6 @@
       "hide": "Ocultar",
       "share": "Compartir",
       "crosspost": "Crosspost",
-      "report": "Reportar",
       "pin": "Fijar",
       "unpin": "Desfijar",
       "inbox": "Bandeja de entrada",
@@ -1774,7 +1795,6 @@
       "unhiding": "Desocultando...",
       "deleting": "Eliminando...",
       "pinning": "Fijando...",
-      "reporting": "Reportando...",
       "updating": "Actualizando...",
       "unsaving": "Quitando de guardados..."
     },
@@ -1837,38 +1857,6 @@
       "unknownUser": "Usuario desconocido"
     }
   },
-  "reporting": {
-    "reasonPrompt": "Motivo del reporte (elige uno): spam, harassment, illegal_content, csam, violence, hate_speech, other",
-    "detailsPrompt": "Detalles adicionales (opcional):",
-    "invalidReason": "Motivo inválido. Usa uno de: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
-    "success": "¡Gracias! El equipo de moderación ha sido notificado.",
-    "successDetail": "Nuestro equipo revisará tu reporte y tomará medidas en 24 horas.",
-    "reasons": {
-      "spam": "Spam",
-      "harassment": "Acoso",
-      "illegalContent": "Contenido Ilegal",
-      "csam": "CSAM",
-      "violence": "Violencia",
-      "hateSpeech": "Discurso de Odio",
-      "other": "Otro"
-    },
-    "modal": {
-      "title": "Enviar un Reporte",
-      "titleWithName": "Reportar a {{name}}",
-      "reasonLabel": "Motivo",
-      "descriptionLabel": "Detalles adicionales",
-      "descriptionPlaceholder": "Proporciona cualquier contexto adicional que pueda ayudar a nuestro equipo de moderación...",
-      "submit": "Enviar Reporte",
-      "submitting": "Enviando...",
-      "cancel": "Cancelar",
-      "screenReaderDescription": "Usa este formulario para reportar contenido que viola nuestras pautas de la comunidad. Selecciona un motivo y opcionalmente proporciona detalles adicionales.",
-      "characterCount": "{{current}} de {{max}} caracteres"
-    },
-    "errors": {
-      "rateLimited": "Has enviado demasiados reportes recientemente. Por favor espera antes de enviar otro.",
-      "failed": "Error al enviar el reporte: {{message}}"
-    }
-  },
   "comments": {
     "title": "Comentarios",
     "loading": "Cargando comentarios...",
@@ -1901,7 +1889,6 @@
       "delete": "Eliminar",
       "save": "Guardar",
       "unsave": "Desguardar",
-      "report": "Reportar",
       "viewProfile": "Ver perfil",
       "permalink": "Enlace permanente",
       "collapse": "Contraer",
@@ -1913,7 +1900,6 @@
     "status": {
       "saving": "Guardando...",
       "deleting": "Eliminando...",
-      "reporting": "Reportando...",
       "inboxPending": "Actualizando bandeja...",
       "posting": "Publicando..."
     },
@@ -1931,7 +1917,6 @@
       "deleteFailed": "Error al eliminar comentario.",
       "inboxFailed": "Error al actualizar ajuste de bandeja.",
       "saveFailed": "Error al actualizar estado de guardado.",
-      "reportFailed": "Error al reportar comentario.",
       "notFound": "No pudimos encontrar ese comentario. Es posible que haya sido eliminado."
     },
     "confirm": {
@@ -2197,10 +2182,14 @@
       "lastSeen": "Visto por última vez",
       "lastSeenHelp": "Muestra a otros cuándo estuviste activo por última vez. Cuando está desactivado, tu hora de visto por última vez puede ocultarse en las vistas públicas del perfil.",
       "profileVisibility": "Visibilidad del perfil",
-      "profileVisibilityHelp": "Controla quién puede ver los detalles públicos de tu perfil.",
+      "profileVisibilityHelp": "Los perfiles públicos pueden ser vistos por cualquiera. Los perfiles privados solo muestran tu nombre de usuario y un botón de Agregar amigo a quienes no son tus amigos.",
       "profileVisibilityPublic": "Público",
-      "profileVisibilityFriendsOnly": "Solo amigos",
-      "profileVisibilityPrivate": "Privado"
+      "profileVisibilityPrivate": "Privado",
+      "wallPostPermission": "Permiso para publicar en el muro",
+      "wallPostPermissionHelp": "Controla si tus amigos pueden publicar en tu muro y si sus publicaciones necesitan tu aprobación primero.",
+      "wallPostPermissionAllFriends": "Cualquier amigo puede publicar",
+      "wallPostPermissionRequiresApproval": "Los amigos pueden publicar, pero debo aprobarlo primero",
+      "wallPostPermissionNoOne": "Nadie puede publicar en mi muro"
     },
     "dateTime": {
       "title": "Visualización de Fecha y Hora",
@@ -3889,6 +3878,52 @@
       "low": "Calidad baja",
       "medium": "Calidad media",
       "high": "Calidad alta"
+    }
+  },
+  "friends": {
+    "title": "Amigos",
+    "subtitle": "Administra tus amigos y solicitudes de amistad.",
+    "loading": "Cargando...",
+    "empty": "Aún no tienes amigos.",
+    "emptyHint": "Visita el perfil de alguien y haz clic en Agregar amigo para empezar.",
+    "friendsSince": "Amigos desde {{date}}",
+    "tabs": {
+      "friends": "Amigos",
+      "incoming": "Recibidas",
+      "outgoing": "Enviadas"
+    },
+    "actions": {
+      "addFriend": "Agregar amigo",
+      "friends": "Amigos",
+      "accept": "Aceptar",
+      "decline": "Rechazar",
+      "cancelRequest": "Cancelar solicitud",
+      "unfriend": "Eliminar amigo",
+      "seeAll": "Ver todos los amigos"
+    },
+    "incoming": {
+      "empty": "No hay solicitudes de amistad pendientes.",
+      "sentAt": "Enviada el {{date}}"
+    },
+    "outgoing": {
+      "empty": "No has enviado ninguna solicitud de amistad.",
+      "sentAt": "Enviada el {{date}}"
+    },
+    "errors": {
+      "loadFailed": "No se pudieron cargar los amigos.",
+      "sendFailed": "No se pudo enviar la solicitud de amistad. Inténtalo de nuevo.",
+      "acceptFailed": "No se pudo aceptar la solicitud. Inténtalo de nuevo.",
+      "declineFailed": "No se pudo rechazar la solicitud. Inténtalo de nuevo.",
+      "cancelFailed": "No se pudo cancelar la solicitud. Inténtalo de nuevo.",
+      "removeFailed": "No se pudo eliminar el amigo. Inténtalo de nuevo.",
+      "topFriendsFailed": "Failed to save top friends"
+    },
+    "toast": {
+      "sent": "Solicitud de amistad enviada",
+      "accepted": "¡Ahora son amigos!",
+      "removed": "Amigo eliminado",
+      "declined": "Solicitud rechazada",
+      "topFriendsUpdated": "Top friends updated"
     }
   }
 }

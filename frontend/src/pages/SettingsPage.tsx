@@ -84,6 +84,8 @@ export default function SettingsPage() {
     setShowLastSeen,
     profileVisibility,
     setProfileVisibility,
+    wallPostPermission,
+    setWallPostPermission,
     notificationSound,
     setNotificationSound,
     showPushNotifications,
@@ -824,18 +826,39 @@ export default function SettingsPage() {
               <select
                 id="profile-visibility"
                 value={profileVisibility}
-                onChange={(e) =>
-                  setProfileVisibility(e.target.value as 'public' | 'friends_only' | 'private')
-                }
+                onChange={(e) => setProfileVisibility(e.target.value as 'public' | 'private')}
                 className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               >
                 <option value="public">{t('settings.messagingPrivacy.profileVisibilityPublic')}</option>
-                <option value="friends_only">
-                  {t('settings.messagingPrivacy.profileVisibilityFriendsOnly')}
-                </option>
                 <option value="private">
                   {t('settings.messagingPrivacy.profileVisibilityPrivate')}
                 </option>
+              </select>
+            </div>
+
+            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <label
+                htmlFor="wall-post-permission"
+                className="block text-base font-semibold text-[var(--color-text-primary)]"
+              >
+                {t('settings.messagingPrivacy.wallPostPermission')}
+              </label>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                {t('settings.messagingPrivacy.wallPostPermissionHelp')}
+              </p>
+              <select
+                id="wall-post-permission"
+                value={wallPostPermission}
+                onChange={(e) =>
+                  setWallPostPermission(e.target.value as 'all_friends' | 'requires_approval' | 'no_one')
+                }
+                className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              >
+                <option value="all_friends">{t('settings.messagingPrivacy.wallPostPermissionAllFriends')}</option>
+                <option value="requires_approval">
+                  {t('settings.messagingPrivacy.wallPostPermissionRequiresApproval')}
+                </option>
+                <option value="no_one">{t('settings.messagingPrivacy.wallPostPermissionNoOne')}</option>
               </select>
             </div>
 

@@ -151,10 +151,10 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
                       <img
                         src={mod.avatar_url}
                         alt={mod.username}
-                        className="w-8 h-8 rounded-full mr-3"
+                        className="w-8 h-8 rounded-lg mr-3"
                       />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-white mr-3">
+                      <div className="w-8 h-8 rounded-lg bg-[var(--color-primary)] flex items-center justify-center text-white mr-3">
                         {mod.username?.[0]?.toUpperCase()}
                       </div>
                     )}

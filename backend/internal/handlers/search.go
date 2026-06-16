@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/api/middleware"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/monitoring"
 	zlog "github.com/rs/zerolog/log"
@@ -348,20 +349,53 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 		`
 	}
 
+	// Point 5: load the bidirectional block set BEFORE building the SQL so we
+	// can push exclusion into the WHERE clause. This ensures LIMIT/OFFSET are
+	// applied against the already-filtered set, preventing the post-query
+	// filtering from producing pages shorter than requested.
+	searcherID, _ := middleware.GetOptionalUserID(c)
+	var excludeIDs []int
+	if searcherID != 0 {
+		var blockErr error
+		excludeIDs, _, blockErr = models.GetAllBlockedIDs(c.Request.Context(), h.pool, searcherID)
+		if blockErr != nil {
+			// Fail open: return unfiltered results rather than aborting the
+			// search entirely — a degraded search is less harmful than a hard 500.
+			zlog.Warn().Err(blockErr).Int("searcher_id", searcherID).
+				Msg("search: failed to load block set; returning unfiltered results")
+			excludeIDs = nil
+		}
+	}
+
 	rankExpr := "ts_rank(search_vector, plainto_tsquery('english', $1))"
 	cursorClause, cursorArgs := buildSearchCursorClause(sort, cursor, rankExpr, 5)
+
+	// The exclusion param index is after $1-$4 (fixed) and any cursor params.
+	excludeParamIdx := 5 + len(cursorArgs)
+	excludeClause := fmt.Sprintf(" AND ($%d::int[] IS NULL OR id != ALL($%d))", excludeParamIdx, excludeParamIdx)
+
 	sql := `
 		SELECT id, username, bio, avatar_url, karma, created_at,
 		       ` + rankExpr + ` as rank
 		FROM users
 		WHERE search_vector @@ plainto_tsquery('english', $1)
-		AND (nsfw = FALSE OR $4 = TRUE)` + cursorClause + `
+		AND (nsfw = FALSE OR $4 = TRUE)` + cursorClause + excludeClause + `
 	` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
 
+	// Pass a typed nil ([]int(nil)) when there are no excluded IDs so that pgx
+	// sends NULL with the correct int[] OID, matching the $N::int[] cast in the SQL.
+	// Using an untyped nil interface{} would rely on server-side type inference;
+	// a typed nil is explicit and version-stable.
+	var excludeParam []int // nil []int → pgx sends NULL int[]
+	if len(excludeIDs) > 0 {
+		excludeParam = excludeIDs
+	}
 	args := []interface{}{query, limitArg, offsetArg, includeNSFW}
 	args = append(args, cursorArgs...)
+	args = append(args, excludeParam)
+
 	rows, err := h.pool.Query(c.Request.Context(), sql, args...)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Search failed")

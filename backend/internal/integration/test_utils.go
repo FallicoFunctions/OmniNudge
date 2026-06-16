@@ -31,7 +31,6 @@ type TestDeps struct {
 	ConversationRepo *models.ConversationRepository
 	MessageRepo      *models.MessageRepository
 	HubRepo          *models.HubRepository
-	ReportRepo       *models.ReportRepository
 	ModRepo          *models.HubModeratorRepository
 	AuthService      *services.AuthService
 	Hub              *websocket.Hub
@@ -60,7 +59,7 @@ func getTestDB(t *testing.T) *database.DB {
 func resetTables(t *testing.T, db *database.DB) {
 	t.Helper()
 	_, err := db.Pool.Exec(context.Background(), `
-			TRUNCATE TABLE reports, hub_moderators, post_votes, comment_votes, messages, conversations, post_comments, platform_posts, hubs, users RESTART IDENTITY CASCADE;
+			TRUNCATE TABLE hub_moderators, post_votes, comment_votes, messages, conversations, post_comments, platform_posts, hubs, users RESTART IDENTITY CASCADE;
 			INSERT INTO hubs (name, name_normalized, description) VALUES ('general', 'general', 'Default community for all posts');
 		`)
 	require.NoError(t, err)
@@ -113,7 +112,6 @@ func newTestDeps(t *testing.T) *TestDeps {
 	conversationRepo := models.NewConversationRepository(db.Pool)
 	messageRepo := models.NewMessageRepository(db.Pool)
 	hubRepo := models.NewHubRepository(db.Pool)
-	reportRepo := models.NewReportRepository(db.Pool)
 	modRepo := models.NewHubModeratorRepository(db.Pool)
 	notifRepo := models.NewNotificationRepository(db.Pool)
 	redditPostRepo := models.NewRedditPostRepository(db.Pool)
@@ -143,7 +141,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo, autoDeleteSvc)
 	notificationsHandler := handlers.NewNotificationsHandler(notifRepo)
 	thumbnailService := services.NewThumbnailService()
-	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, nil, modRepo, services.NoopCache{}, thumbnailService)
+	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, nil, modRepo, services.NoopCache{}, thumbnailService, db.Pool)
 	mediaQuota := handlers.MediaQuotaConfig{
 		FreeTierBytes: cfg.Media.FreeTierQuotaBytes,
 		ProTierBytes:  cfg.Media.ProTierQuotaBytes,
@@ -153,10 +151,9 @@ func newTestDeps(t *testing.T) *TestDeps {
 	storageHandler := handlers.NewStorageHandler(mediaRepo, mediaQuota)
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo, hubSettingsRepo)
-	moderationHandler := handlers.NewModerationHandler(reportRepo, modRepo, userRepo, notifRepo, hub, nil)
 	adminHandler := handlers.NewAdminHandler(userRepo, modRepo, db.Pool)
 	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
-	userStatusHandler := handlers.NewUserStatusHandler(hub)
+	userStatusHandler := handlers.NewUserStatusHandler(hub, db.Pool)
 	authorizer := websocket.NewAuthorizer(db.Pool)
 	wsHandler := handlers.NewWebSocketHandler(hub, authorizer, userSettingsRepo)
 	searchHandler := handlers.NewSearchHandler(db.Pool)
@@ -219,14 +216,6 @@ func newTestDeps(t *testing.T) *TestDeps {
 
 			protected.POST("/hubs", hubsHandler.Create)
 
-			protected.POST("/reports", moderationHandler.CreateReport)
-			mod := protected.Group("/mod")
-			mod.Use(middleware.RequireRole("moderator", "admin"))
-			{
-				mod.GET("/reports", moderationHandler.ListReports)
-				mod.POST("/reports/:id/status", moderationHandler.UpdateReportStatus)
-			}
-
 			admin := protected.Group("/admin")
 			admin.Use(middleware.RequireRole("admin"))
 			{
@@ -286,7 +275,6 @@ func newTestDeps(t *testing.T) *TestDeps {
 		ConversationRepo: conversationRepo,
 		MessageRepo:      messageRepo,
 		HubRepo:          hubRepo,
-		ReportRepo:       reportRepo,
 		ModRepo:          modRepo,
 		AuthService:      authService,
 		Hub:              hub,

@@ -1,215 +1,146 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { usersService } from '../services/usersService';
+import { wallService } from '../services/wallService';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { resolveMediaUrl } from '../utils/mediaUrl';
-import type { PlatformPost, PostComment } from '../types/posts';
-import type { UserProfile } from '../types/users';
+import type { UserProfile, WallPostMedia } from '../types/users';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
-import { PostBodyMarkdown } from '../components/posts/PostBodyMarkdown';
-import SavedItemsView from '../components/saved/SavedItemsView';
-import HiddenItemsView from '../components/saved/HiddenItemsView';
-import SubscribedView from '../components/subscriptions/SubscribedView';
-import { getPostUrl } from '../utils/postUrl';
-import { Panel } from '../components/common/Panel';
+import { UserAvatar } from '../components/common/UserAvatar';
+import { MediaLightbox } from '../components/common/MediaLightbox';
 import { ErrorMessage } from '../components/common/StatusMessage';
 import { Skeleton } from '../components/common/LoadingStates';
 import { useFormat } from '../hooks/useFormat';
-import { ReportModal } from '../components/moderation/ReportModal';
 import EditProfileModal from '../components/profile/EditProfileModal';
+import TopFriendsSection from '../components/profile/TopFriendsSection';
+import WallSection from '../components/profile/WallSection';
+import { friendsService, friendsQueryKeys } from '../services/friendsService';
+import type { FriendshipStatus } from '../types/friends';
+import { useToast } from '../hooks/useToast';
 
-const BASE_TABS = [
-  { key: 'overview', labelKey: 'userProfilePage.tabs.overview' },
-  { key: 'posts', labelKey: 'userProfilePage.tabs.posts' },
-  { key: 'comments', labelKey: 'userProfilePage.tabs.comments' },
-] as const;
-
-const PRIVATE_TABS = [
-  { key: 'saved', labelKey: 'userProfilePage.tabs.saved' },
-  { key: 'hidden', labelKey: 'userProfilePage.tabs.hidden' },
-  { key: 'subscribed', labelKey: 'userProfilePage.tabs.subscribed' },
-] as const;
-
-type TabKey = (typeof BASE_TABS)[number]['key'] | (typeof PRIVATE_TABS)[number]['key'];
-
-interface PostNavigationState {
-  originPath: string;
+function checkOnline(lastSeen?: string | null): boolean {
+  if (!lastSeen) return false;
+  return Date.now() - new Date(lastSeen).getTime() < 5 * 60 * 1000;
 }
 
-function PostsSection({
-  posts,
-  useRelativeTime,
-  linkState,
-  t,
-  formatNumber,
-  formatTimestampLabel,
-}: {
-  posts: PlatformPost[];
-  useRelativeTime: boolean;
-  linkState: PostNavigationState;
-  t: TFunction;
-  formatNumber: (value: number) => string;
-  formatTimestampLabel: (timestamp: string | number | Date, useRelativeTime: boolean) => string;
-}) {
-  if (!posts.length) {
-    return (
-      <p className="text-sm text-[var(--color-text-secondary)]">
-        {t('userProfilePage.posts.empty')}
-      </p>
-    );
-  }
+function OnlineDot({ lastSeen }: { lastSeen?: string | null }) {
+  const [isOnline, setIsOnline] = useState(() => checkOnline(lastSeen));
+
+  useEffect(() => {
+    setIsOnline(checkOnline(lastSeen));
+    // Re-check every 30 s so the dot flips to offline without a page reload.
+    const id = setInterval(() => setIsOnline(checkOnline(lastSeen)), 30_000);
+    return () => clearInterval(id);
+  }, [lastSeen]);
 
   return (
-    <div className="space-y-3">
-      {posts.map((post) => (
-        <article
-          key={post.id}
-          className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
-        >
-          <div className="flex gap-3 p-4">
-            {/* REDDIT-2: Show thumbnails consistently with standard size */}
-            {post.thumbnail_url && (
-              <img
-                src={resolveMediaUrl(post.thumbnail_url)}
-                alt={t('posts.media.previewImageAlt', { title: post.title })}
-                className="h-24 w-24 flex-shrink-0 rounded-lg object-cover"
-              />
-            )}
-            <div className="flex-1">
-              <div className="text-xs text-[var(--color-text-secondary)]">
-                <Link
-                  to={`/h/${post.hub_name}`}
-                  state={linkState}
-                  className="font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-                >
-                  {t('common.format.hubPath', { name: post.hub_name })}
-                </Link>
-                <span> · </span>
-                <span>
-                  {t('posts.point', {
-                    count: post.score,
-                    formattedCount: formatNumber(post.score),
-                  })}
-                </span>
-                <span> · </span>
-                <span>
-                  {t('posts.submittedAt', {
-                    time: formatTimestampLabel(post.created_at, useRelativeTime),
-                  })}
-                </span>
-              </div>
-              <Link to={getPostUrl(post)} state={linkState}>
-                <h3 className="mt-1 text-lg font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                  {post.title}
-                </h3>
-              </Link>
-              {post.body && (
-                <PostBodyMarkdown
-                  content={post.body}
-                  className="mt-2 text-[var(--color-text-secondary)]"
-                />
-              )}
-              <div className="mt-2 text-xs font-medium text-[var(--color-text-secondary)]">
-                {t('posts.comment', {
-                  count: post.comment_count ?? post.num_comments ?? 0,
-                  formattedCount: formatNumber(post.comment_count ?? post.num_comments ?? 0),
-                })}
-              </div>
-            </div>
-          </div>
-        </article>
-      ))}
+    <span
+      title={isOnline ? 'Online' : 'Offline'}
+      className={`inline-block w-2.5 h-2.5 rounded-full border-2 border-[var(--color-surface)] flex-shrink-0 ${
+        isOnline ? 'bg-green-500' : 'bg-[var(--color-text-muted)]'
+      }`}
+    />
+  );
+}
+
+function ProfileInfoCard({ location, t }: { location: string; t: TFunction }) {
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+        {t('userProfilePage.headings.info')}
+      </h3>
+      <div className="flex items-center gap-2 text-sm text-[var(--color-text-primary)]">
+        <svg className="w-4 h-4 flex-shrink-0 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        <span className="truncate">{location}</span>
+      </div>
     </div>
   );
 }
 
-function CommentsSection({
-  comments,
-  useRelativeTime,
-  linkState,
-  t,
-  formatNumber,
-  formatTimestampLabel,
-}: {
-  comments: PostComment[];
-  useRelativeTime: boolean;
-  linkState: PostNavigationState;
-  t: TFunction;
-  formatNumber: (value: number) => string;
-  formatTimestampLabel: (timestamp: string | number | Date, useRelativeTime: boolean) => string;
-}) {
-  if (!comments.length) {
-    return <p className="text-sm text-[var(--color-text-secondary)]">{t('comments.noComments')}</p>;
-  }
+function PhotosWidget({ media, t }: { media: WallPostMedia[]; t: TFunction }) {
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const photos = useMemo(() => media.slice(0, 9), [media]);
+
+  if (photos.length === 0) return null;
 
   return (
-    <div className="space-y-3">
-      {comments.map((comment) => (
-        <article
-          key={comment.id}
-          className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
-        >
-          <div className="p-4">
-            <div className="mb-2 text-xs text-[var(--color-text-secondary)]">
-              <Trans
-                i18nKey="userProfilePage.comments.onPost"
-                values={{ id: comment.post_id }}
-                components={{
-                  link: (
-                    <Link
-                      to={`/posts/${comment.post_id}`}
-                      state={linkState}
-                      className="font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-                    />
-                  ),
-                }}
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+        {t('userProfilePage.headings.photos')}
+      </h3>
+      <div className="grid grid-cols-3 gap-1.5">
+        {photos.map((photo, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => setLightboxIndex(idx)}
+            className="block aspect-square overflow-hidden rounded-md bg-[var(--color-surface-elevated)]"
+          >
+            {photo.media_type === 'video' && !photo.thumbnail_url ? (
+              <video src={resolveMediaUrl(photo.url)} className="h-full w-full object-cover" muted preload="metadata" />
+            ) : (
+              <img
+                src={resolveMediaUrl(photo.thumbnail_url || photo.url)}
+                alt=""
+                className="h-full w-full object-cover transition group-hover:opacity-90"
+                loading="lazy"
               />
-              <span> · </span>
-              <span>
-                {t('posts.point', {
-                  count: comment.score,
-                  formattedCount: formatNumber(comment.score),
-                })}
-              </span>
-              <span> · </span>
-              <span>{formatTimestampLabel(comment.created_at, useRelativeTime)}</span>
-            </div>
-            <MarkdownRenderer
-              content={comment.content}
-              className="text-[var(--color-text-primary)]"
-            />
+            )}
+          </button>
+        ))}
+      </div>
 
-            {/* Prominent "View thread" link */}
-            <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
-              <Link
-                to={`/posts/${comment.post_id}`}
-                state={linkState}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] hover:underline transition"
-              >
-                {t('userProfilePage.actions.viewThread')}
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 7l5 5m0 0l-5 5m5-5H6"
-                  />
-                </svg>
-              </Link>
-            </div>
-          </div>
-        </article>
-      ))}
+      {lightboxIndex !== null && (
+        <MediaLightbox
+          items={photos}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onIndexChange={setLightboxIndex}
+        />
+      )}
+    </div>
+  );
+}
+
+function MutualFriendsWidget({ username, t }: { username: string; t: TFunction }) {
+  const mutualFriendsQuery = useQuery({
+    queryKey: ['mutual-friends', username],
+    queryFn: () => usersService.getMutualFriends(username),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const mutuals = mutualFriendsQuery.data?.mutual_friends ?? [];
+  if (mutualFriendsQuery.isLoading || mutuals.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+        {t('userProfilePage.headings.mutualFriends')}
+      </h3>
+      <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
+        {t('userProfilePage.mutualFriends.count', { count: mutuals.length })}
+      </p>
+      <div className="space-y-1.5">
+        {mutuals.map((friend) => (
+          <Link
+            key={friend.id}
+            to={`/users/${friend.username}`}
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 -mx-2 hover:bg-[var(--color-surface-elevated)] transition"
+          >
+            <UserAvatar username={friend.username} avatarUrl={friend.avatar_url} size="sm" />
+            <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+              {friend.username}
+            </span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
@@ -217,51 +148,13 @@ function CommentsSection({
 export default function UserProfilePage() {
   const { t } = useTranslation();
   const { formatNumber, formatDate, formatRelativeTime } = useFormat();
-  const location = useLocation();
   const { username } = useParams<{ username: string }>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { useRelativeTime } = useSettings();
-  const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const canViewPrivateTabs = user?.username === username;
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const originState = useMemo(
-    () => ({ originPath: `${location.pathname}${location.search}` }),
-    [location.pathname, location.search]
-  );
-
-  const visibleTabs = useMemo(() => {
-    if (canViewPrivateTabs) {
-      return [...BASE_TABS, ...PRIVATE_TABS];
-    }
-    return BASE_TABS;
-  }, [canViewPrivateTabs]);
-  const resolvedActiveTab =
-    !canViewPrivateTabs &&
-    (activeTab === 'saved' || activeTab === 'hidden' || activeTab === 'subscribed')
-      ? 'overview'
-      : activeTab;
-
-  const formatTimestampLabel = (
-    timestamp: string | number | Date,
-    useRelativeTimeEnabled: boolean
-  ) => {
-    const d = new Date(timestamp);
-    if (Number.isNaN(d.getTime())) return t('common.time.recently');
-
-    if (useRelativeTimeEnabled) {
-      return formatRelativeTime(d);
-    }
-
-    return formatDate(d, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
+  const { toast } = useToast();
 
   const profileQuery = useQuery<UserProfile>({
     queryKey: ['user-profile', username],
@@ -270,27 +163,25 @@ export default function UserProfilePage() {
   });
   const { refetch: refetchProfile } = profileQuery;
 
-  const postsQuery = useQuery({
-    queryKey: ['user-profile-posts', username],
-    queryFn: () => usersService.getPosts(username!),
-    enabled: !!username,
-    staleTime: 1000 * 60 * 5,
-  });
-
-  const commentsQuery = useQuery({
-    queryKey: ['user-profile-comments', username],
-    queryFn: () => usersService.getComments(username!),
-    enabled: !!username,
-    staleTime: 1000 * 60 * 5,
-  });
-
   const profile = profileQuery.data;
-  const posts = useMemo(() => postsQuery.data?.posts ?? [], [postsQuery.data?.posts]);
-  const comments = useMemo(
-    () => commentsQuery.data?.comments ?? [],
-    [commentsQuery.data?.comments]
-  );
+
+  const wallQuery = useQuery({
+    queryKey: ['wall-posts', username],
+    queryFn: () => wallService.getWallPosts(username!),
+    enabled: !!username && !profile?.locked,
+    staleTime: 1000 * 30,
+  });
+
+  const wallMedia = useMemo(() => {
+    const items: WallPostMedia[] = [];
+    for (const post of wallQuery.data?.posts ?? []) {
+      if (post.media) items.push(...post.media);
+    }
+    return items;
+  }, [wallQuery.data?.posts]);
+
   const canMessageUser = user && profile && user.username !== profile.username;
+
   const blockedUsersQuery = useQuery({
     queryKey: ['blocked-users'],
     queryFn: () => usersService.getBlockedUsers(),
@@ -300,27 +191,86 @@ export default function UserProfilePage() {
   const isBlocked = Boolean(
     profile &&
       blockedUsersQuery.data?.blocked_users?.some(
-        (blockedUser) => blockedUser.username.toLowerCase() === profile.username.toLowerCase()
+        (bu) => bu.username.toLowerCase() === profile.username.toLowerCase()
       )
   );
 
   const blockMutation = useMutation({
-    mutationFn: async () => {
-      if (!profile) return;
-      await usersService.blockUser(profile.username);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
-    },
+    mutationFn: async () => { if (profile) await usersService.blockUser(profile.username); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blocked-users'] }),
   });
 
   const unblockMutation = useMutation({
-    mutationFn: async () => {
-      if (!profile) return;
-      await usersService.unblockUser(profile.username);
+    mutationFn: async () => { if (profile) await usersService.unblockUser(profile.username); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blocked-users'] }),
+  });
+
+  const friendshipStatusQuery = useQuery({
+    queryKey: friendsQueryKeys.status(username ?? ''),
+    queryFn: () => friendsService.getFriendshipStatus(username ?? ''),
+    enabled: Boolean(user && username && user.username !== username),
+    refetchOnMount: 'always',
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const friendshipStatus: FriendshipStatus = friendshipStatusQuery.data ?? 'none';
+  const friendActionDisabled = friendshipStatusQuery.isFetching || friendshipStatusQuery.isLoading;
+
+  const setFriendStatus = (status: FriendshipStatus) => {
+    queryClient.setQueryData(friendsQueryKeys.status(username ?? ''), status);
+  };
+
+  const friendRequestMutation = useMutation({
+    mutationFn: () => friendsService.sendFriendRequest(profile!.username),
+    onSuccess: (data) => {
+      toast.success(data.message);
+      setFriendStatus(data.result === 'accepted' ? 'accepted' : 'pending_outgoing');
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
     },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.status(username ?? '') });
+      toast.error(t('friends.errors.sendFailed'));
+    },
+  });
+
+  const acceptFriendMutation = useMutation({
+    mutationFn: () => friendsService.acceptFriendRequest(profile!.username),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
+      toast.success(t('friends.toast.accepted'));
+      setFriendStatus('accepted');
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.friends });
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.status(username ?? '') });
+      toast.error(t('friends.errors.acceptFailed'));
+    },
+  });
+
+  const cancelOrDeclineFriendMutation = useMutation({
+    mutationFn: () => friendsService.declineOrCancelFriendRequest(profile!.username),
+    onSuccess: () => {
+      setFriendStatus('none');
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.status(username ?? '') });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.status(username ?? '') });
+      toast.error(t('friends.errors.cancelFailed'));
+    },
+  });
+
+  const removeFriendMutation = useMutation({
+    mutationFn: () => friendsService.removeFriend(profile!.username),
+    onSuccess: () => {
+      toast.success(t('friends.toast.removed'));
+      setFriendStatus('none');
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.friends });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: friendsQueryKeys.status(username ?? '') });
+      toast.error(t('friends.errors.removeFailed'));
     },
   });
 
@@ -329,8 +279,9 @@ export default function UserProfilePage() {
       bio?: string | null;
       avatar_url?: string | null;
       status_text?: string | null;
-    }) =>
-      usersService.updateProfile(payload),
+      banner_url?: string | null;
+      location?: string | null;
+    }) => usersService.updateProfile(payload),
     onSuccess: async () => {
       await refetchProfile();
       setIsEditProfileOpen(false);
@@ -345,197 +296,35 @@ export default function UserProfilePage() {
   });
 
   useEffect(() => {
-    if (!user || !username || user.username !== username) {
-      return;
-    }
+    if (!user || !username || user.username !== username) return;
     let isActive = true;
-    usersService
-      .ping()
-      .then(() => {
-        if (isActive) {
-          refetchProfile();
-        }
-      })
-      .catch(() => {
-        // Ignore ping failures for profile view
-      });
-    return () => {
-      isActive = false;
-    };
+    usersService.ping().then(() => { if (isActive) refetchProfile(); }).catch(() => {});
+    return () => { isActive = false; };
   }, [user, username, refetchProfile]);
 
-  const createdLabel = profile ? formatTimestampLabel(profile.created_at, useRelativeTime) : '';
-  const lastSeenLabel =
-    profile?.last_seen ? formatTimestampLabel(profile.last_seen, useRelativeTime) : '';
-
-  const renderActiveTab = () => {
-    if (resolvedActiveTab === 'posts') {
-      return (
-        <PostsSection
-          posts={posts}
-          useRelativeTime={useRelativeTime}
-          linkState={originState}
-          t={t}
-          formatNumber={formatNumber}
-          formatTimestampLabel={formatTimestampLabel}
-        />
-      );
-    }
-
-    if (resolvedActiveTab === 'comments') {
-      return (
-        <CommentsSection
-          comments={comments}
-          useRelativeTime={useRelativeTime}
-          linkState={originState}
-          t={t}
-          formatNumber={formatNumber}
-          formatTimestampLabel={formatTimestampLabel}
-        />
-      );
-    }
-
-    if (resolvedActiveTab === 'saved') {
-      if (!canViewPrivateTabs) {
-        return (
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('userProfilePage.private.saved')}
-          </p>
-        );
-      }
-      return <SavedItemsView withContainer={false} showHeading={false} className="space-y-6" />;
-    }
-
-    if (resolvedActiveTab === 'hidden') {
-      if (!canViewPrivateTabs) {
-        return (
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('userProfilePage.private.hidden')}
-          </p>
-        );
-      }
-      return <HiddenItemsView withContainer={false} showHeading={false} className="space-y-6" />;
-    }
-
-    if (resolvedActiveTab === 'subscribed') {
-      if (!canViewPrivateTabs) {
-        return (
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('userProfilePage.private.subscribed')}
-          </p>
-        );
-      }
-      return <SubscribedView withContainer={false} showHeading={false} className="space-y-6" />;
-    }
-
-    return (
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('userProfilePage.headings.recentPosts')}
-            </h3>
-            {posts.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('posts')}
-                className="flex items-center gap-1 text-sm font-medium text-[var(--color-primary)] hover:underline transition"
-              >
-                {t('userProfilePage.actions.viewAll')}
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            )}
-          </div>
-          <PostsSection
-            posts={posts.slice(0, 5)}
-            useRelativeTime={useRelativeTime}
-            linkState={originState}
-            t={t}
-            formatNumber={formatNumber}
-            formatTimestampLabel={formatTimestampLabel}
-          />
-        </section>
-        <section>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('userProfilePage.headings.recentComments')}
-            </h3>
-            {comments.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('comments')}
-                className="flex items-center gap-1 text-sm font-medium text-[var(--color-primary)] hover:underline transition"
-              >
-                {t('userProfilePage.actions.viewAll')}
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            )}
-          </div>
-          <CommentsSection
-            comments={comments.slice(0, 5)}
-            useRelativeTime={useRelativeTime}
-            linkState={originState}
-            t={t}
-            formatNumber={formatNumber}
-            formatTimestampLabel={formatTimestampLabel}
-          />
-        </section>
-      </div>
-    );
-  };
-
+  // ─── Loading skeleton ───────────────────────────────────────────────────────
   if (profileQuery.isLoading) {
     return (
-      <div className="mx-auto w-full max-w-5xl px-4 py-8">
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          <div className="flex items-start gap-6">
-            {/* Avatar skeleton */}
-            <Skeleton variant="circular" width="80px" height="80px" />
-
-            {/* Profile info skeleton */}
-            <div className="flex-1 space-y-3">
-              <Skeleton variant="text" width="200px" height="28px" />
-              <Skeleton variant="text" width="150px" height="16px" />
-              <div className="flex gap-4 mt-4">
-                <Skeleton variant="text" width="100px" height="14px" />
-                <Skeleton variant="text" width="100px" height="14px" />
-              </div>
+      <div className="w-full">
+        <div className="h-40 md:h-52 bg-[var(--color-surface-elevated)] animate-pulse" />
+        <div className="bg-[var(--color-surface)] border-b border-[var(--color-border)] px-4 py-4">
+          <div className="max-w-6xl mx-auto flex gap-4">
+            <Skeleton variant="rectangular" width="80px" height="80px" />
+            <div className="flex-1 space-y-2 mt-1">
+              <Skeleton variant="text" width="180px" height="24px" />
+              <Skeleton variant="text" width="140px" height="16px" />
             </div>
           </div>
-
-          {/* Tabs skeleton */}
-          <div className="mt-6 border-t border-[var(--color-border)] pt-4">
-            <div className="flex gap-4 mb-4">
-              <Skeleton variant="text" width="80px" height="20px" />
-              <Skeleton variant="text" width="80px" height="20px" />
-              <Skeleton variant="text" width="80px" height="20px" />
-            </div>
+        </div>
+        <div className="max-w-6xl mx-auto px-4 py-6 flex gap-6">
+          <div className="hidden md:block w-72 space-y-3">
+            <Skeleton variant="rectangular" width="100%" height="120px" />
+            <Skeleton variant="rectangular" width="100%" height="90px" />
+          </div>
+          <div className="flex-1 space-y-3">
+            <Skeleton variant="rectangular" width="100%" height="40px" />
+            <Skeleton variant="rectangular" width="100%" height="120px" />
+            <Skeleton variant="rectangular" width="100%" height="120px" />
           </div>
         </div>
       </div>
@@ -550,174 +339,290 @@ export default function UserProfilePage() {
     );
   }
 
-  return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8">
-      <Panel>
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-4">
-            {profile.avatar_url ? (
-              <img
-                src={profile.avatar_url}
-                alt={t('userProfilePage.aria.avatarAlt', { username: profile.username })}
-                className="h-16 w-16 rounded-full object-cover"
-              />
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-border)] text-2xl font-semibold text-[var(--color-text-secondary)]">
-                {profile.username.charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div>
-              <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-                {profile.username}
-              </h1>
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                {t('userProfilePage.labels.joined', { time: createdLabel })}
-              </p>
-              {profile.last_seen && (
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  {t('userProfilePage.labels.lastSeen', { time: lastSeenLabel })}
-                </p>
-              )}
-              {profile.status_text && (
-                <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                  {profile.status_text}
-                </p>
-              )}
-            </div>
+  function FriendActionButtons() {
+    return (
+      <>
+        {friendshipStatus === 'accepted' && (
+          <button
+            type="button"
+            disabled={removeFriendMutation.isPending || friendActionDisabled}
+            onClick={() => removeFriendMutation.mutate()}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-success)] px-3 py-1.5 text-sm font-semibold text-[var(--color-success)] hover:opacity-80 disabled:opacity-50 transition"
+          >
+            ✓ {t('friends.actions.friends')}
+          </button>
+        )}
+        {friendshipStatus === 'pending_outgoing' && (
+          <button
+            type="button"
+            disabled={cancelOrDeclineFriendMutation.isPending || friendActionDisabled}
+            onClick={() => cancelOrDeclineFriendMutation.mutate()}
+            className="inline-flex items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50 transition"
+          >
+            {t('friends.actions.cancelRequest')}
+          </button>
+        )}
+        {friendshipStatus === 'pending_incoming' && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={acceptFriendMutation.isPending || friendActionDisabled}
+              onClick={() => acceptFriendMutation.mutate()}
+              className="inline-flex items-center rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
+            >
+              {t('friends.actions.accept')}
+            </button>
+            <button
+              type="button"
+              disabled={cancelOrDeclineFriendMutation.isPending || friendActionDisabled}
+              onClick={() => cancelOrDeclineFriendMutation.mutate()}
+              className="inline-flex items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50 transition"
+            >
+              {t('friends.actions.decline')}
+            </button>
           </div>
-          <div className="flex flex-col gap-2 text-sm text-[var(--color-text-secondary)] md:items-end md:text-right">
-            <div>
-              <span className="font-semibold text-[var(--color-text-primary)]">
-                {formatNumber(profile.karma)}
-              </span>{' '}
-              {t('userProfilePage.labels.karma')}
+        )}
+        {friendshipStatus === 'none' && (
+          <button
+            type="button"
+            disabled={friendRequestMutation.isPending || friendActionDisabled}
+            onClick={() => friendRequestMutation.mutate()}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white disabled:opacity-50 transition"
+          >
+            + {t('friends.actions.addFriend')}
+          </button>
+        )}
+      </>
+    );
+  }
+
+  if (profile.locked) {
+    return (
+      <div className="mx-auto w-full max-w-2xl px-4 py-12 flex flex-col items-center gap-3 text-center">
+        <h1 className="text-xl md:text-2xl font-bold text-[var(--color-text-primary)]">{profile.username}</h1>
+        <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.locked.message')}</p>
+        {user && canMessageUser && !isBlocked ? (
+          <FriendActionButtons />
+        ) : !user ? (
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }))}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition"
+          >
+            + {t('friends.actions.addFriend')}
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  // Join date: respect relative-time preference, but use date-only when absolute
+  // (no time-of-day shown for a membership start date).
+  const createdLabel = useRelativeTime
+    ? formatRelativeTime(new Date(profile.created_at))
+    : formatDate(new Date(profile.created_at), { month: 'short', day: 'numeric', year: 'numeric' });
+
+  return (
+    <div className="w-full">
+
+      {/* ── Cover Banner ─────────────────────────────────────────────────── */}
+      <div className="relative h-36 md:h-48 overflow-hidden">
+        {profile.banner_url ? (
+          <img
+            src={resolveMediaUrl(profile.banner_url)}
+            alt="Profile banner"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-[var(--color-primary)] via-[var(--color-primary-dark)] to-[var(--color-primary-light)] opacity-80" />
+        )}
+      </div>
+
+      {/* ── Profile Header Bar ───────────────────────────────────────────── */}
+      <div className="bg-[var(--color-surface)] border-b border-[var(--color-border)]">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4 pb-4 relative">
+
+            {/* Avatar — overlaps the banner */}
+            <div className="flex-shrink-0 -mt-10 md:-mt-14 z-10 relative w-20 h-20 md:w-28 md:h-28">
+              {profile.avatar_url ? (
+                <img
+                  src={resolveMediaUrl(profile.avatar_url)}
+                  alt={t('userProfilePage.aria.avatarAlt', { username: profile.username })}
+                  className="w-full h-full rounded-lg object-cover border-4 border-[var(--color-surface)] shadow-md"
+                />
+              ) : (
+                <div className="w-full h-full rounded-lg bg-[var(--color-border)] border-4 border-[var(--color-surface)] shadow-md flex items-center justify-center text-3xl font-bold text-[var(--color-text-secondary)]">
+                  {profile.username.charAt(0).toUpperCase()}
+                </div>
+              )}
+              {/* Online status dot */}
+              <div className="absolute bottom-1 right-1">
+                <OnlineDot lastSeen={profile.last_seen} />
+              </div>
             </div>
-            {canViewPrivateTabs && (
-              <button
-                type="button"
-                onClick={() => setIsEditProfileOpen(true)}
-                className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-              >
-                {t('userProfilePage.actions.editProfile')}
-              </button>
-            )}
-            {canMessageUser && (
-              <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                {!isBlocked && (
-                  <Link
-                    to={`/messages?to=${encodeURIComponent(profile.username)}`}
-                    className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                  >
-                    {t('userProfilePage.actions.message')}
-                  </Link>
-                )}
-                <button
-                  type="button"
-                  disabled={blockMutation.isPending || unblockMutation.isPending}
-                  onClick={() => {
-                    if (!profile) return;
-                    if (isBlocked) {
-                      unblockMutation.mutate();
-                    } else if (
-                      window.confirm(
-                        t('userProfilePage.actions.confirmBlock', { username: profile.username })
-                      )
-                    ) {
-                      blockMutation.mutate();
-                    }
-                  }}
-                  className={`inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-semibold transition ${
-                    isBlocked
-                      ? 'border-[var(--color-success)] text-[var(--color-success)] hover:opacity-80'
-                      : 'border-[var(--color-error)] text-[var(--color-error)] hover:opacity-80'
-                  } disabled:opacity-50`}
-                >
-                  {isBlocked
-                    ? t('userProfilePage.actions.unblock')
-                    : t('userProfilePage.actions.block')}
-                </button>
+
+            {/* Name + Status */}
+            <div className="flex-1 min-w-0 pt-1 sm:pb-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl md:text-2xl font-bold text-[var(--color-text-primary)] leading-tight">
+                  {profile.username}
+                </h1>
                 {isBlocked && (
                   <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
                     {t('userProfilePage.labels.blocked')}
                   </span>
                 )}
+              </div>
+              {profile.status_text && (
+                <p className="mt-0.5 text-sm italic text-[var(--color-text-secondary)] truncate max-w-sm">
+                  "{profile.status_text}"
+                </p>
+              )}
+              <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                {t('userProfilePage.labels.joined', { time: createdLabel })}
+              </p>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap items-center gap-2 sm:pb-1">
+              {canViewPrivateTabs && (
                 <button
                   type="button"
-                  onClick={() => setIsReportModalOpen(true)}
-                  className="inline-flex items-center justify-center rounded-md border border-[var(--color-error)] px-4 py-2 text-sm font-semibold text-[var(--color-error)] hover:opacity-80"
+                  onClick={() => setIsEditProfileOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition"
                 >
-                  {t('userProfilePage.actions.report')}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  {t('userProfilePage.actions.editProfile')}
                 </button>
-              </div>
-            )}
+              )}
+              {canMessageUser && !isBlocked && (
+                <Link
+                  to={`/messages?to=${encodeURIComponent(profile.username)}`}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3v-3z" />
+                  </svg>
+                  {t('userProfilePage.actions.message')}
+                </Link>
+              )}
+              {/* Friend buttons */}
+              {user && canMessageUser && !isBlocked && <FriendActionButtons />}
+              {canMessageUser && (
+                <button
+                  type="button"
+                  disabled={blockMutation.isPending || unblockMutation.isPending}
+                  onClick={() => {
+                    if (isBlocked) {
+                      unblockMutation.mutate();
+                    } else if (window.confirm(t('userProfilePage.actions.confirmBlock', { username: profile.username }))) {
+                      blockMutation.mutate();
+                    }
+                  }}
+                  className={`inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-semibold transition disabled:opacity-50 ${
+                    isBlocked
+                      ? 'border-[var(--color-success)] text-[var(--color-success)] hover:opacity-80'
+                      : 'border-[var(--color-error)] text-[var(--color-error)] hover:opacity-80'
+                  }`}
+                >
+                  {isBlocked ? t('userProfilePage.actions.unblock') : t('userProfilePage.actions.block')}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-        {profile.bio && (
-          <div className="mt-4 rounded-md bg-[var(--color-surface-elevated)] p-4 text-sm text-[var(--color-text-primary)]">
-            <MarkdownRenderer content={profile.bio} className="text-[var(--color-text-primary)]" />
-          </div>
-        )}
-      </Panel>
-
-      {profile.moderated_hubs && profile.moderated_hubs.length > 0 && (
-        <div className="mt-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-            {t('userProfilePage.headings.moderatorOf')}
-          </h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {profile.moderated_hubs.map((hub) => (
-              <Link
-                key={hub.id}
-                to={`/h/${hub.name}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] px-4 py-1.5 text-sm font-medium text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition"
-              >
-                <span className="font-semibold">
-                  {t('common.format.hubPath', { name: hub.name })}
-                </span>
-                {hub.title && (
-                  <>
-                    <span className="text-[var(--color-text-muted)]">·</span>
-                    <span className="max-w-[200px] truncate text-xs font-normal text-[var(--color-text-secondary)]">
-                      {hub.title}
-                    </span>
-                  </>
-                )}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="mt-6 border-b border-[var(--color-border)]">
-        <div className="-mb-px flex gap-4">
-          {visibleTabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={`border-b-2 px-4 py-2 text-sm font-semibold ${
-                resolvedActiveTab === tab.key
-                  ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                  : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-              }`}
-            >
-              {t(tab.labelKey)}
-            </button>
-          ))}
         </div>
       </div>
 
-      <div className="mt-6">{renderActiveTab()}</div>
+      {/* ── About + Stats bar (full width) ──────────────────────────────── */}
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 mb-6">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+            About Me
+          </h3>
+          {profile.bio ? (
+            <MarkdownRenderer
+              content={profile.bio}
+              className="text-sm text-[var(--color-text-primary)]"
+            />
+          ) : (
+            <p className="text-sm text-[var(--color-text-muted)] italic">
+              {canViewPrivateTabs ? 'Add a bio to tell people about yourself.' : 'No bio yet.'}
+            </p>
+          )}
+          <div className="mt-3 pt-3 border-t border-[var(--color-border)] flex flex-wrap gap-4 text-sm">
+            <Link to={`/users/${username}/friends`} className="hover:underline">
+              <span className="font-semibold text-[var(--color-text-primary)]">
+                {wallQuery.isLoading ? '—' : formatNumber(wallQuery.data?.friend_count ?? 0)}
+              </span>
+              <span className="text-[var(--color-text-secondary)] ml-1">
+                {t('userProfilePage.labels.friends')}
+              </span>
+            </Link>
+            <div>
+              <span className="font-semibold text-[var(--color-text-primary)]">
+                {wallQuery.isLoading ? '—' : formatNumber(wallQuery.data?.photo_count ?? 0)}
+              </span>
+              <span className="text-[var(--color-text-secondary)] ml-1">
+                {t('userProfilePage.labels.photos')}
+              </span>
+            </div>
+            <div>
+              <span className="font-semibold text-[var(--color-text-primary)]">
+                {wallQuery.isLoading ? '—' : formatNumber(wallQuery.data?.own_post_count ?? 0)}
+              </span>
+              <span className="text-[var(--color-text-secondary)] ml-1">
+                {t('userProfilePage.labels.wallPosts')}
+              </span>
+            </div>
+            <div>
+              <span className="font-semibold text-[var(--color-text-primary)]">
+                {wallQuery.isLoading ? '—' : formatNumber(wallQuery.data?.reply_count ?? 0)}
+              </span>
+              <span className="text-[var(--color-text-secondary)] ml-1">
+                {t('userProfilePage.labels.replies')}
+              </span>
+            </div>
+          </div>
+        </div>
 
-      {profile && (
-        <ReportModal
-          isOpen={isReportModalOpen}
-          onClose={() => setIsReportModalOpen(false)}
-          targetType="user"
-          targetId={profile.id}
-          targetName={profile.username}
-        />
-      )}
+        {/* ── 3-column layout: Friends | Wall | Activity ──────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_240px] lg:grid-cols-[260px_1fr_300px] gap-4 lg:gap-6 items-start">
+
+          {/* ── Left: Friends ────────────────────────────────────────────── */}
+          <aside className="order-2 md:order-1 flex flex-col gap-3">
+            {username && (
+              <TopFriendsSection username={username} isOwnProfile={canViewPrivateTabs} />
+            )}
+            {username && (
+              <Link
+                to={`/users/${username}/friends`}
+                className="text-sm font-medium text-[var(--color-primary)] hover:underline"
+              >
+                {t('friends.actions.seeAll')} →
+              </Link>
+            )}
+          </aside>
+
+          {/* ── Middle: Wall ─────────────────────────────────────────────── */}
+          <main className="order-1 lg:order-2 min-w-0">
+            {username && <WallSection username={username} isOwnProfile={canViewPrivateTabs} />}
+          </main>
+
+          {/* ── Right: Info + Mutual Friends + Photos ───────────────────────── */}
+          <aside className="order-3 flex flex-col gap-4">
+            {profile.location && <ProfileInfoCard location={profile.location} t={t} />}
+
+            {user && username && !canViewPrivateTabs && (
+              <MutualFriendsWidget username={username} t={t} />
+            )}
+
+            <PhotosWidget media={wallMedia} t={t} />
+          </aside>
+        </div>
+      </div>
 
       <EditProfileModal
         isOpen={isEditProfileOpen}
@@ -725,9 +630,15 @@ export default function UserProfilePage() {
         initialBio={profile.bio}
         initialAvatarUrl={profile.avatar_url}
         initialStatusText={profile.status_text}
+        initialBannerUrl={profile.banner_url}
+        initialLocation={profile.location}
         onUploadAvatar={async (file) => {
           const uploadResult = await usersService.uploadAvatar(file);
           return uploadResult.avatar_url;
+        }}
+        onUploadBanner={async (file) => {
+          const uploadResult = await usersService.uploadBanner(file);
+          return uploadResult.banner_url;
         }}
         isSaving={updateProfileMutation.isPending}
         onSave={async (payload) => {

@@ -18,7 +18,6 @@ import {
 } from '../../utils/encryption';
 import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementService';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
-import { ReportModal } from '../moderation/ReportModal';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
 
@@ -228,16 +227,12 @@ interface MessageBubbleProps {
   message: Message;
   isOwnMessage: boolean;
   currentUserId?: number;
-  reporting: boolean;
-  onReport: (message: Message) => void;
 }
 
 function MessageBubble({
   message,
   isOwnMessage,
   currentUserId,
-  reporting,
-  onReport,
 }: MessageBubbleProps) {
   const { t } = useTranslation();
   const { formatRelativeTime } = useFormat();
@@ -303,16 +298,6 @@ function MessageBubble({
         >
           {formatRelativeTime(message.sent_at)}
         </div>
-        {!isOwnMessage && (
-          <button
-            type="button"
-            onClick={() => onReport(message)}
-            disabled={reporting}
-            className="mt-1 text-xs underline opacity-80 hover:opacity-100 disabled:opacity-50"
-          >
-            {reporting ? t('messages.status.reporting') : t('messages.actions.report')}
-          </button>
-        )}
       </div>
     </div>
   );
@@ -325,7 +310,6 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
   const [messageText, setMessageText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
-  const [reportModalMessageID, setReportModalMessageID] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -368,10 +352,6 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
       setSelectedFile(null);
     },
   });
-
-  const handleReportMessage = (message: Message) => {
-    setReportModalMessageID(message.id);
-  };
 
   const handleSendMessage = async () => {
     if ((!messageText.trim() && !selectedFile) || sendMessageMutation.isPending) return;
@@ -556,8 +536,6 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
                 message={message}
                 isOwnMessage={message.sender_id === user?.id}
                 currentUserId={user?.id}
-                reporting={false}
-                onReport={handleReportMessage}
               />
             ))}
             <div ref={messagesEndRef} />
@@ -621,15 +599,6 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
         </div>
       </div>
 
-      {reportModalMessageID !== null && (
-        <ReportModal
-          isOpen={true}
-          onClose={() => setReportModalMessageID(null)}
-          targetType="message"
-          targetId={reportModalMessageID}
-          defaultReason="harassment"
-        />
-      )}
     </div>
   );
 }

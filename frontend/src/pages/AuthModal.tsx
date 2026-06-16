@@ -236,13 +236,6 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</div>
                 )}
 
-                {/* Email warning for signup without email */}
-                {isSignup && !email && (
-                  <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
-                    <p className="font-semibold mb-1">{t('auth.signupNoEmailWarning.title')}</p>
-                    <p>{t('auth.signupNoEmailWarning.description')}</p>
-                  </div>
-                )}
 
                 <div>
                   <label

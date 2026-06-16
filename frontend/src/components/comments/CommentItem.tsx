@@ -14,7 +14,6 @@ export interface CommentActionHandlers<T extends LocalCommentBase> {
   remove: (comment: T) => Promise<void>;
   toggleInbox: (comment: T, nextValue: boolean) => Promise<void>;
   toggleSave: (comment: T, shouldSave: boolean) => Promise<void>;
-  report: (comment: T) => Promise<void>;
   permalink: (comment: T) => void;
   embed?: (comment: T) => void;
 }
@@ -58,7 +57,6 @@ export function CommentItem<T extends LocalCommentBase>({
   const [deletePending, setDeletePending] = useState(false);
   const [inboxPending, setInboxPending] = useState(false);
   const [savePending, setSavePending] = useState(false);
-  const [reportPending, setReportPending] = useState(false);
 
   const replies = useMemo(
     () => allComments.filter((c) => c.parent_comment_id === comment.id),
@@ -166,18 +164,6 @@ export function CommentItem<T extends LocalCommentBase>({
       setActionError(err instanceof Error ? err.message : t('comments.errors.saveFailed'));
     } finally {
       setSavePending(false);
-    }
-  };
-
-  const handleReport = async () => {
-    setActionError(null);
-    setReportPending(true);
-    try {
-      await handlers.report(comment);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : t('comments.errors.reportFailed'));
-    } finally {
-      setReportPending(false);
     }
   };
 
@@ -359,7 +345,7 @@ export function CommentItem<T extends LocalCommentBase>({
             {/* Divider before destructive actions */}
             {(canModerate || !isOwner) && <span className="text-[var(--color-border)] select-none">·</span>}
 
-            {/* Destructive actions: Delete, Report */}
+            {/* Destructive actions: Delete */}
             {canModerate && (
               <button
                 onClick={handleDelete}
@@ -367,15 +353,6 @@ export function CommentItem<T extends LocalCommentBase>({
                 className="text-[11px] text-red-600 hover:text-red-700 disabled:opacity-50"
               >
                 {t('comments.actions.delete')}
-              </button>
-            )}
-            {!isOwner && (
-              <button
-                onClick={handleReport}
-                disabled={reportPending}
-                className="text-[11px] text-red-600 hover:text-red-700 disabled:opacity-50"
-              >
-                {t('comments.actions.report')}
               </button>
             )}
           </div>}

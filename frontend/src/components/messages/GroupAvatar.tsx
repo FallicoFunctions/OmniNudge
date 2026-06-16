@@ -39,7 +39,7 @@ function nameToInitials(name: string): string {
 }
 
 export function GroupAvatar({ name, avatarUrl, size = 40, className = '' }: GroupAvatarProps) {
-  const style: CSSProperties = { width: size, height: size, borderRadius: '50%', flexShrink: 0 };
+  const style: CSSProperties = { width: size, height: size, borderRadius: '8px', flexShrink: 0 };
 
   if (avatarUrl) {
     return (

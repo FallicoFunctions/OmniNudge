@@ -23,6 +23,8 @@ const RedditUserPage = lazy(() => import('./pages/RedditUserPage'));
 const RedditWikiPage = lazy(() => import('./pages/RedditWikiPage'));
 const HubWikiPage = lazy(() => import('./pages/HubWikiPage'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
+const UserFriendsListPage = lazy(() => import('./pages/UserFriendsListPage'));
+const UserActivityPage = lazy(() => import('./pages/UserActivityPage'));
 const HubPage = lazy(() => import('./pages/HubPage'));
 const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
 const HubsAndSubsPage = lazy(() => import('./pages/HubsAndSubsPage'));
@@ -36,8 +38,8 @@ const CCPAPage = lazy(() => import('./pages/CCPAPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const BlockedUsersPage = lazy(() => import('./pages/BlockedUsersPage'));
+const FriendsPage = lazy(() => import('./pages/FriendsPage'));
 const ModToolsPage = lazy(() => import('./pages/ModToolsPage'));
-const ModerationReportsPage = lazy(() => import('./pages/ModerationReportsPage'));
 const HubSettingsPage = lazy(() => import('./pages/HubSettingsPage'));
 const HubAIDesignerPreviewPage = lazy(() => import('./pages/HubAIDesignerPreviewPage'));
 const ModMailConversationPage = lazy(() => import('./pages/ModMailConversationPage'));
@@ -118,6 +120,8 @@ function App() {
                             <Route path="/posts/:postId" element={<PostDetailPage />} />
                             <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
                             <Route path="/users/:username" element={<UserProfilePage />} />
+                            <Route path="/users/:username/friends" element={<UserFriendsListPage />} />
+                            <Route path="/users/:username/activity" element={<UserActivityPage />} />
                             <Route path="/search" element={<SearchResultsPage />} />
                             <Route path="/hubs" element={<HubsAndSubsPage />} />
                             <Route path="/about" element={<AboutPage />} />
@@ -132,14 +136,6 @@ function App() {
                             )}
 
                             {/* PROTECTED routes - require auth */}
-                            <Route
-                              path="/mod/reports"
-                              element={
-                                <ProtectedRoute>
-                                  <ModerationReportsPage />
-                                </ProtectedRoute>
-                              }
-                            />
                             <Route
                               path="/h/:hubName/mod"
                               element={
@@ -201,6 +197,14 @@ function App() {
                               element={
                                 <ProtectedRoute>
                                   <BlockedUsersPage />
+                                </ProtectedRoute>
+                              }
+                            />
+                            <Route
+                              path="/friends"
+                              element={
+                                <ProtectedRoute>
+                                  <FriendsPage />
                                 </ProtectedRoute>
                               }
                             />

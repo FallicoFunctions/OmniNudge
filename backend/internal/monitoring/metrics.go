@@ -226,46 +226,6 @@ var (
 		[]string{"type", "severity"}, // panic, error, warning
 	)
 
-	ModerationReportsCreatedTotal = metricFactory.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "omninudge_moderation_reports_created_total",
-			Help: "Total number of moderation reports created",
-		},
-		[]string{"reason", "target_type"},
-	)
-
-	ModerationReportsResolvedTotal = metricFactory.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "omninudge_moderation_reports_resolved_total",
-			Help: "Total number of moderation reports resolved by final status",
-		},
-		[]string{"status"},
-	)
-
-	ModerationReportResolutionDuration = metricFactory.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "omninudge_moderation_report_resolution_duration_seconds",
-			Help:    "Time from report creation to moderation resolution",
-			Buckets: []float64{60, 300, 900, 1800, 3600, 7200, 14400, 28800, 86400, 172800},
-		},
-		[]string{"status"},
-	)
-
-	ModerationAutoSuspensionsTotal = metricFactory.NewCounter(
-		prometheus.CounterOpts{
-			Name: "omninudge_moderation_auto_suspensions_total",
-			Help: "Total number of users auto-suspended from report thresholds",
-		},
-	)
-
-	ModerationHighPriorityAlertsTotal = metricFactory.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "omninudge_moderation_high_priority_alerts_total",
-			Help: "Total number of high-priority moderation alerts created",
-		},
-		[]string{"reason", "recipient_role"},
-	)
-
 	MessageSearchRequestsTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_message_search_requests_total",
@@ -386,23 +346,6 @@ func IncrementWebSocketConnections() {
 // DecrementWebSocketConnections decrements active WebSocket connections
 func DecrementWebSocketConnections() {
 	metrics.WebSocketConnectionsActive.Dec()
-}
-
-func RecordModerationReportCreated(reason, targetType string) {
-	ModerationReportsCreatedTotal.WithLabelValues(reason, targetType).Inc()
-}
-
-func RecordModerationReportResolved(status string, resolutionDuration time.Duration) {
-	ModerationReportsResolvedTotal.WithLabelValues(status).Inc()
-	ModerationReportResolutionDuration.WithLabelValues(status).Observe(resolutionDuration.Seconds())
-}
-
-func RecordModerationAutoSuspension() {
-	ModerationAutoSuspensionsTotal.Inc()
-}
-
-func RecordModerationHighPriorityAlert(reason, recipientRole string) {
-	ModerationHighPriorityAlertsTotal.WithLabelValues(reason, recipientRole).Inc()
 }
 
 func RecordMessageSearch(duration time.Duration, resultCount int, success bool, hasQuery bool) {
