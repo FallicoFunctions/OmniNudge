@@ -5032,6 +5032,109 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the legacy human-scale door proxies with authored service-door assemblies', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const nodeName of [
+      'V7_HumanScaleDoor_0',
+      'V7_HumanScaleDoor_1',
+      'V7_HumanScaleDoor_2',
+      'V7_HumanScaleDoor_3',
+    ]) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V73_HeroPortalServiceDoorLeafCluster_L',
+      'V73_HeroPortalServiceDoorLeafCluster_R',
+      'V73_HeroPortalServiceDoorFrameCluster_L',
+      'V73_HeroPortalServiceDoorFrameCluster_R',
+    ];
+    expect(nodeNamesWithPrefix('V73_')).toHaveLength(requiredReplacementNodes.length);
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftLeaves = readMeshGeometry('V73_HeroPortalServiceDoorLeafCluster_L');
+    const rightLeaves = readMeshGeometry('V73_HeroPortalServiceDoorLeafCluster_R');
+    const leftFrames = readMeshGeometry('V73_HeroPortalServiceDoorFrameCluster_L');
+    const rightFrames = readMeshGeometry('V73_HeroPortalServiceDoorFrameCluster_R');
+
+    expect(leftLeaves.min[0]).toBeLessThan(-8.1);
+    expect(leftLeaves.max[0]).toBeLessThan(-4.3);
+    expect(leftLeaves.min[1]).toBeGreaterThan(2.4);
+    expect(leftLeaves.max[1]).toBeGreaterThan(5.8);
+    expect(leftLeaves.min[2]).toBeGreaterThan(23.3);
+    expect(leftLeaves.max[2]).toBeGreaterThan(24.2);
+
+    expect(rightLeaves.min[0]).toBeGreaterThan(4.3);
+    expect(rightLeaves.max[0]).toBeGreaterThan(8.1);
+    expect(rightLeaves.min[1]).toBeGreaterThan(2.4);
+    expect(rightLeaves.max[1]).toBeGreaterThan(5.8);
+    expect(rightLeaves.min[2]).toBeGreaterThan(23.3);
+    expect(rightLeaves.max[2]).toBeGreaterThan(24.2);
+
+    expect(leftFrames.min[0]).toBeLessThan(-8.25);
+    expect(leftFrames.max[0]).toBeLessThan(-4.15);
+    expect(leftFrames.min[1]).toBeGreaterThan(2.2);
+    expect(leftFrames.max[1]).toBeGreaterThan(6.0);
+    expect(leftFrames.min[2]).toBeGreaterThan(23.2);
+    expect(leftFrames.max[2]).toBeGreaterThan(24.3);
+
+    expect(rightFrames.min[0]).toBeGreaterThan(4.15);
+    expect(rightFrames.max[0]).toBeGreaterThan(8.25);
+    expect(rightFrames.min[1]).toBeGreaterThan(2.2);
+    expect(rightFrames.max[1]).toBeGreaterThan(6.0);
+    expect(rightFrames.min[2]).toBeGreaterThan(23.2);
+    expect(rightFrames.max[2]).toBeGreaterThan(24.3);
+
+    expect(readConnectedComponents('V73_HeroPortalServiceDoorLeafCluster_L')).toHaveLength(2);
+    expect(readConnectedComponents('V73_HeroPortalServiceDoorLeafCluster_R')).toHaveLength(2);
+    expect(readConnectedComponents('V73_HeroPortalServiceDoorFrameCluster_L')).toHaveLength(2);
+    expect(readConnectedComponents('V73_HeroPortalServiceDoorFrameCluster_R')).toHaveLength(2);
+
+    for (const [nodeName, expectedXs] of [
+      ['V73_HeroPortalServiceDoorLeafCluster_L', [-7.5, -5.0]],
+      ['V73_HeroPortalServiceDoorLeafCluster_R', [5.0, 7.5]],
+      ['V73_HeroPortalServiceDoorFrameCluster_L', [-7.5, -5.0]],
+      ['V73_HeroPortalServiceDoorFrameCluster_R', [5.0, 7.5]],
+    ] as const) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedX of expectedXs) {
+        expect(
+          centers.some(([x, y, z]) => Math.abs(x - expectedX) < 0.18 && Math.abs(y - 4.2) < 0.3 && Math.abs(z - 23.82) < 0.22),
+          `${nodeName} missing service door around x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    const minimumVertexCounts = new Map([
+      ['V73_HeroPortalServiceDoorLeafCluster_L', 300],
+      ['V73_HeroPortalServiceDoorLeafCluster_R', 300],
+      ['V73_HeroPortalServiceDoorFrameCluster_L', 220],
+      ['V73_HeroPortalServiceDoorFrameCluster_R', 220],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V73_HeroPortalServiceDoorLeafCluster_L', 'V16_MatteBlackStageHardware'],
+      ['V73_HeroPortalServiceDoorLeafCluster_R', 'V16_MatteBlackStageHardware'],
+      ['V73_HeroPortalServiceDoorFrameCluster_L', 'V16_BrushedProductionGold'],
+      ['V73_HeroPortalServiceDoorFrameCluster_R', 'V16_BrushedProductionGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
     for (const mesh of mainStageGlbJson.meshes) {
       for (const primitive of mesh.primitives) {
@@ -5103,10 +5206,11 @@ describe('MAIN_STAGE_MANIFEST', () => {
   });
 
   it('reuses the established Main Stage material library for the V24 crown pass', () => {
-    expect(mainStageGlbJson.materials).toHaveLength(49);
+    expect(mainStageGlbJson.materials).toHaveLength(48);
     expect(
       mainStageGlbJson.materials.some(({ name }: { name?: string }) => name?.startsWith('V24_')),
     ).toBe(false);
+    expect(mainStageGlbJson.materials.some(({ name }: { name?: string }) => name === 'V7_BlackTruss')).toBe(false);
     const expectedMaterials = new Map([
       ['V24_CelestialCrownFrontArch_L', 'V20_LayeredPearlShell'],
       ['V24_CelestialCrownFrontArch_R', 'V20_LayeredPearlShell'],
