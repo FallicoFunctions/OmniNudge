@@ -24,18 +24,14 @@ func (r *PostgresUserProfileRepository) GetByUserID(ctx context.Context, userID 
 	return r.inner.GetByUserID(ctx, userID)
 }
 
-func (r *PostgresUserProfileRepository) GetWallVisibility(ctx context.Context, userID int) (string, error) {
-	return r.inner.GetWallVisibility(ctx, userID)
-}
-
 func (r *PostgresUserProfileRepository) Upsert(ctx context.Context, userID int, bio, avatarURL, statusText, bannerURL, topFriendsJSON, location *string) error {
 	return r.inner.Upsert(ctx, userID, bio, avatarURL, statusText, bannerURL, topFriendsJSON, location)
 }
 
-func (r *PostgresUserProfileRepository) UpdateTopFriends(ctx context.Context, userID int, topFriendsJSON *string) error {
-	return r.inner.UpdateTopFriends(ctx, userID, topFriendsJSON)
+func (r *PostgresUserProfileRepository) UpdateBannerURL(ctx context.Context, userID int, bannerURL *string) error {
+	return r.inner.UpdateBannerURL(ctx, userID, bannerURL)
 }
 
-func (r *PostgresUserProfileRepository) UpdateWallVisibility(ctx context.Context, userID int, visibility string) error {
-	return r.inner.UpdateWallVisibility(ctx, userID, visibility)
+func (r *PostgresUserProfileRepository) UpdateTopFriends(ctx context.Context, userID int, topFriendsJSON *string) error {
+	return r.inner.UpdateTopFriends(ctx, userID, topFriendsJSON)
 }

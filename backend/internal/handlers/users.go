@@ -98,6 +98,14 @@ type ModeratedHubResponse struct {
 	Title *string `json:"title,omitempty"`
 }
 
+// LockedProfileResponse is returned for private profiles viewed by a non-friend:
+// only the username is exposed, so the viewer can send a friend request.
+type LockedProfileResponse struct {
+	ID       int    `json:"id"`
+	Username string `json:"username"`
+	Locked   bool   `json:"locked"`
+}
+
 // AgentStateRequest is used to fetch persistent interaction state for the authenticated user.
 type AgentStateRequest struct {
 	PostIDs    []int `json:"post_ids"`
@@ -213,7 +221,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	}
 
 	viewerIsFriend := false
-	if viewerID > 0 && viewerID != user.ID && strings.EqualFold(strings.TrimSpace(profileVisibility), "friends_only") && h.friendRepo != nil {
+	if viewerID > 0 && viewerID != user.ID && strings.EqualFold(strings.TrimSpace(profileVisibility), "private") && h.friendRepo != nil {
 		isFriend, err := h.friendRepo.AreUsersFriends(c.Request.Context(), user.ID, viewerID)
 		if err != nil {
 			resultState = "error"
@@ -224,8 +232,12 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	}
 
 	if !canViewerSeeProfile(user.ID, viewerID, profileVisibility, viewerIsFriend) {
-		resultState = "not_found"
-		RespondError(c, http.StatusNotFound, "User not found")
+		resultState = "locked"
+		c.JSON(http.StatusOK, LockedProfileResponse{
+			ID:       user.ID,
+			Username: user.Username,
+			Locked:   true,
+		})
 		return
 	}
 
@@ -320,10 +332,8 @@ func canViewerSeeProfile(profileUserID, viewerID int, profileVisibility string, 
 	switch strings.ToLower(strings.TrimSpace(profileVisibility)) {
 	case "", "public":
 		return true
-	case "friends_only":
-		return viewerIsFriend
 	case "private":
-		return false
+		return viewerIsFriend
 	default:
 		// Fail closed on invalid persisted values.
 		return false
@@ -351,7 +361,7 @@ func viewerCanSeeProfile(ctx context.Context, settingsRepo ports.UserSettingsRep
 	}
 
 	viewerIsFriend := false
-	if strings.EqualFold(strings.TrimSpace(profileVisibility), "friends_only") &&
+	if strings.EqualFold(strings.TrimSpace(profileVisibility), "private") &&
 		friendRepo != nil && viewerID > 0 {
 		isFriend, err := friendRepo.AreUsersFriends(ctx, user.ID, viewerID)
 		if err != nil {
@@ -672,7 +682,7 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		if avatarURL == "" {
 			user.AvatarURL = nil
 		} else {
-			if !strings.HasPrefix(avatarURL, "http://") && !strings.HasPrefix(avatarURL, "https://") {
+			if !strings.HasPrefix(avatarURL, "http://") && !strings.HasPrefix(avatarURL, "https://") && !strings.HasPrefix(avatarURL, "/uploads/avatars/") {
 				RespondError(c, http.StatusBadRequest, "Avatar URL must be a valid HTTP(S) URL")
 				return
 			}
@@ -686,7 +696,7 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		if bURL == "" {
 			bannerURL = nil
 		} else {
-			if !strings.HasPrefix(bURL, "http://") && !strings.HasPrefix(bURL, "https://") {
+			if !strings.HasPrefix(bURL, "http://") && !strings.HasPrefix(bURL, "https://") && !strings.HasPrefix(bURL, "/uploads/banners/") {
 				RespondError(c, http.StatusBadRequest, "Banner URL must be a valid HTTP(S) URL")
 				return
 			}
@@ -916,6 +926,163 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"avatar_url":     avatarURL,
 		"thumbnail_size": avatarThumbSize,
+	})
+}
+
+const maxBannerUploadSize = 10 * 1024 * 1024
+
+func localBannerDiskPath(bannerURL string) (string, bool) {
+	if !strings.HasPrefix(bannerURL, "/uploads/banners/") {
+		return "", false
+	}
+	trimmed := strings.TrimPrefix(bannerURL, "/")
+	cleaned := filepath.Clean(trimmed)
+	if cleaned != trimmed || filepath.IsAbs(cleaned) {
+		return "", false
+	}
+	bannersRoot := filepath.Clean(filepath.Join("uploads", "banners"))
+	if cleaned != bannersRoot && !strings.HasPrefix(cleaned, bannersRoot+string(os.PathSeparator)) {
+		return "", false
+	}
+	return cleaned, true
+}
+
+// UploadMyBanner uploads a new cover/banner image for the authenticated user.
+// @Summary      Upload banner
+// @Tags         Users
+// @Security     BearerAuth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/banner [post]
+func (h *UsersHandler) UploadMyBanner(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBannerUploadSize+1024)
+	file, header, err := c.Request.FormFile("banner")
+	if err != nil {
+		if isRequestBodyTooLarge(err) {
+			RespondError(c, http.StatusRequestEntityTooLarge, "Banner exceeds 10MB limit")
+			return
+		}
+		file, header, err = c.Request.FormFile("file")
+		if err != nil {
+			if isRequestBodyTooLarge(err) {
+				RespondError(c, http.StatusRequestEntityTooLarge, "Banner exceeds 10MB limit")
+				return
+			}
+			RespondError(c, http.StatusBadRequest, "Banner file is required")
+			return
+		}
+	}
+	defer file.Close()
+
+	if header.Size <= 0 {
+		RespondError(c, http.StatusBadRequest, "Empty banner file is not allowed")
+		return
+	}
+
+	safeName := filepath.Base(header.Filename)
+	ext := strings.ToLower(filepath.Ext(safeName))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp":
+	default:
+		RespondError(c, http.StatusUnsupportedMediaType, "Unsupported banner file extension")
+		return
+	}
+
+	uploadDir := filepath.Join("uploads", "banners")
+	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to prepare banner storage")
+		return
+	}
+
+	filename := fmt.Sprintf("banner_%d_%d%s", userID, time.Now().UnixNano(), ext)
+	filePath := filepath.Join(uploadDir, filename)
+	dst, err := os.Create(filePath)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to create banner file")
+		return
+	}
+	defer dst.Close()
+
+	persist := false
+	defer func() {
+		if !persist {
+			_ = os.Remove(filePath)
+		}
+	}()
+
+	limited := io.LimitReader(file, maxBannerUploadSize+1)
+	var sniff [512]byte
+	n, _ := io.ReadFull(limited, sniff[:])
+	total := int64(n)
+
+	detected := http.DetectContentType(sniff[:n])
+	if !services.IsImageType(detected) {
+		RespondError(c, http.StatusUnsupportedMediaType, "Banner must be an image")
+		return
+	}
+	if !middleware.ValidateExtensionMatchesMIME(safeName, detected) {
+		RespondError(c, http.StatusUnsupportedMediaType, "Banner extension does not match file type")
+		return
+	}
+	if !middleware.ValidateNoSuspiciousSignatures(sniff[:n], detected) {
+		RespondError(c, http.StatusBadRequest, "Banner file contains suspicious data")
+		return
+	}
+	if n > 0 {
+		if _, err := dst.Write(sniff[:n]); err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to write banner file")
+			return
+		}
+	}
+	written, err := io.Copy(dst, limited)
+	total += written
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to save banner file")
+		return
+	}
+	if total > maxBannerUploadSize {
+		RespondError(c, http.StatusRequestEntityTooLarge, "Banner exceeds 10MB limit")
+		return
+	}
+
+	bannerURL := "/" + filepath.ToSlash(filePath)
+
+	if h.userProfRepo != nil {
+		var oldBannerURL *string
+		existing, err := h.userProfRepo.GetByUserID(c.Request.Context(), userID)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch user profile")
+			return
+		}
+		if existing != nil {
+			oldBannerURL = existing.BannerURL
+		}
+		bURL := bannerURL
+		if err := h.userProfRepo.UpdateBannerURL(c.Request.Context(), userID, &bURL); err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to persist banner")
+			return
+		}
+		if oldBannerURL != nil {
+			if path, ok := localBannerDiskPath(*oldBannerURL); ok {
+				_ = os.Remove(path)
+			}
+		}
+	}
+
+	h.invalidateProfileResponseCache(c.Request.Context(), userID)
+	persist = true
+
+	c.JSON(http.StatusOK, gin.H{
+		"banner_url": bannerURL,
 	})
 }
 
@@ -1316,9 +1483,9 @@ func (h *UsersHandler) SetTopFriends(c *gin.Context) {
 		return
 	}
 
-	validCounts := map[int]bool{0: true, 2: true, 4: true, 6: true, 8: true}
-	if !validCounts[req.Count] {
-		RespondError(c, http.StatusBadRequest, "Count must be 0, 2, 4, 6, or 8")
+	const maxTopFriends = 8
+	if req.Count < 0 || req.Count > maxTopFriends {
+		RespondError(c, http.StatusBadRequest, fmt.Sprintf("Count must be between 0 and %d", maxTopFriends))
 		return
 	}
 

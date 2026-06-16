@@ -51,6 +51,10 @@ func (r *PostgresUserFriendshipRepository) ListFriends(ctx context.Context, user
 	return r.inner.ListFriends(ctx, userID)
 }
 
+func (r *PostgresUserFriendshipRepository) CountFriends(ctx context.Context, userID int) (int, error) {
+	return r.inner.CountFriends(ctx, userID)
+}
+
 func (r *PostgresUserFriendshipRepository) ListIncomingRequests(ctx context.Context, userID int) ([]models.FriendRequestEntry, error) {
 	return r.inner.ListIncomingRequests(ctx, userID)
 }

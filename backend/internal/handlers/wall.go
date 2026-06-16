@@ -21,8 +21,8 @@ type WallHandler struct {
 	pool         *pgxpool.Pool
 	wallRepo     ports.WallPostRepository
 	userRepo     ports.UserRepository
-	userProfRepo ports.UserProfileRepository
 	friendRepo   ports.UserFriendshipRepository
+	settingsRepo ports.UserSettingsRepository
 	notifService *services.NotificationService
 }
 
@@ -31,15 +31,15 @@ func NewWallHandler(
 	pool *pgxpool.Pool,
 	wallRepo ports.WallPostRepository,
 	userRepo ports.UserRepository,
-	userProfRepo ports.UserProfileRepository,
 	friendRepo ports.UserFriendshipRepository,
+	settingsRepo ports.UserSettingsRepository,
 ) *WallHandler {
 	return &WallHandler{
 		pool:         pool,
 		wallRepo:     wallRepo,
 		userRepo:     userRepo,
-		userProfRepo: userProfRepo,
 		friendRepo:   friendRepo,
+		settingsRepo: settingsRepo,
 	}
 }
 
@@ -48,81 +48,102 @@ func (h *WallHandler) SetNotificationService(notifService *services.Notification
 	h.notifService = notifService
 }
 
-// resolveWallAccess loads the profile's wall_visibility setting and whether the
-// viewer is friends with the profile owner.
-func (h *WallHandler) resolveWallAccess(ctx context.Context, profileUserID, viewerID int) (visibility string, isFriend bool, err error) {
+// resolveWallAccess loads the profile owner's profile_visibility and
+// wall_post_permission settings and whether the viewer is friends with the
+// profile owner. Wall view access equals profile view access.
+func (h *WallHandler) resolveWallAccess(ctx context.Context, profileUserID, viewerID int) (visibility, wallPostPermission string, isFriend bool, err error) {
 	visibility = "public"
-	if h.userProfRepo != nil {
-		visibility, err = h.userProfRepo.GetWallVisibility(ctx, profileUserID)
-		if err != nil {
-			return "", false, err
+	wallPostPermission = "all_friends"
+	if h.settingsRepo != nil {
+		settings, sErr := h.settingsRepo.GetByUserID(ctx, profileUserID)
+		if sErr != nil {
+			return "", "", false, sErr
+		}
+		if settings != nil {
+			if strings.TrimSpace(settings.ProfileVisibility) != "" {
+				visibility = settings.ProfileVisibility
+			}
+			if strings.TrimSpace(settings.WallPostPermission) != "" {
+				wallPostPermission = settings.WallPostPermission
+			}
 		}
 	}
 
 	if viewerID > 0 && viewerID != profileUserID && h.friendRepo != nil {
 		isFriend, err = h.friendRepo.AreUsersFriends(ctx, profileUserID, viewerID)
 		if err != nil {
-			return visibility, false, err
+			return visibility, wallPostPermission, false, err
 		}
 	}
 
-	return visibility, isFriend, nil
+	return visibility, wallPostPermission, isFriend, nil
 }
 
 // ensureWallViewable verifies the viewer may see profileUserID's wall, writing a
-// 403 response and returning ok=false if not. On success it returns the wall's
-// visibility and whether the viewer is friends with the profile owner, for callers
-// that need them to compute can_post.
-func (h *WallHandler) ensureWallViewable(c *gin.Context, profileUserID, viewerID int) (visibility string, isFriend bool, ok bool) {
-	visibility, isFriend, err := h.resolveWallAccess(c.Request.Context(), profileUserID, viewerID)
+// 403 response and returning ok=false if not. On success it returns the profile's
+// visibility, wall posting permission, and whether the viewer is friends with the
+// profile owner, for callers that need them to compute can_post.
+func (h *WallHandler) ensureWallViewable(c *gin.Context, profileUserID, viewerID int) (visibility, wallPostPermission string, isFriend bool, ok bool) {
+	visibility, wallPostPermission, isFriend, err := h.resolveWallAccess(c.Request.Context(), profileUserID, viewerID)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to load wall")
-		return "", false, false
+		return "", "", false, false
 	}
 	if !canViewerSeeProfile(profileUserID, viewerID, visibility, isFriend) {
 		RespondError(c, http.StatusForbidden, "This wall is private")
-		return "", false, false
+		return "", "", false, false
 	}
-	return visibility, isFriend, true
+	return visibility, wallPostPermission, isFriend, true
 }
 
-// ensureCanInteractWithWall verifies the viewer may post, comment, or like on
+// ensureCanInteractWithWall verifies the viewer may comment or react on
 // profileUserID's wall, writing a 403 response (using forbiddenMsg) and returning
 // ok=false if not.
 func (h *WallHandler) ensureCanInteractWithWall(c *gin.Context, profileUserID, viewerID int, forbiddenMsg string) bool {
-	visibility, isFriend, err := h.resolveWallAccess(c.Request.Context(), profileUserID, viewerID)
+	_, wallPostPermission, isFriend, err := h.resolveWallAccess(c.Request.Context(), profileUserID, viewerID)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to load wall")
 		return false
 	}
-	if !canPostToWall(profileUserID, viewerID, visibility, isFriend) {
+	canPost, _ := resolveWallPostPermission(profileUserID, viewerID, isFriend, wallPostPermission)
+	if !canPost {
 		RespondError(c, http.StatusForbidden, forbiddenMsg)
 		return false
 	}
 	return true
 }
 
-// canPostToWall reports whether viewerID may post, comment, or like on profileUserID's
-// wall. The owner can always interact; friends can interact unless the wall is private
-// (in which case they cannot view it either).
-func canPostToWall(profileUserID, viewerID int, visibility string, isFriend bool) bool {
+// resolveWallPostPermission reports whether viewerID may post on profileUserID's
+// wall, and whether such a post must be queued for the owner's approval. The
+// owner can always post directly. Non-owners must be friends; wallPostPermission
+// then governs all_friends / requires_approval / no_one.
+func resolveWallPostPermission(profileUserID, viewerID int, isFriend bool, wallPostPermission string) (canPost, requiresApproval bool) {
 	if viewerID == profileUserID {
-		return true
+		return true, false
 	}
-	if viewerID <= 0 {
-		return false
+	if viewerID <= 0 || !isFriend {
+		return false, false
 	}
-	if strings.EqualFold(strings.TrimSpace(visibility), "private") {
-		return false
+	switch strings.ToLower(strings.TrimSpace(wallPostPermission)) {
+	case "no_one":
+		return false, false
+	case "requires_approval":
+		return true, true
+	case "all_friends", "":
+		return true, false
+	default:
+		return false, false
 	}
-	return isFriend
 }
 
 // WallPostsResponse is returned by GetWallPosts.
 type WallPostsResponse struct {
-	Posts          []*models.WallPost `json:"posts"`
-	CanPost        bool                `json:"can_post"`
-	WallVisibility string              `json:"wall_visibility"`
+	Posts        []*models.WallPost `json:"posts"`
+	CanPost      bool                `json:"can_post"`
+	FriendCount  int                 `json:"friend_count"`
+	OwnPostCount int                 `json:"own_post_count"`
+	ReplyCount   int                 `json:"reply_count"`
+	PhotoCount   int                 `json:"photo_count"`
 }
 
 // GetWallPosts returns recent posts on a user's profile wall.
@@ -152,7 +173,7 @@ func (h *WallHandler) GetWallPosts(c *gin.Context) {
 		return
 	}
 
-	visibility, isFriend, ok := h.ensureWallViewable(c, user.ID, viewerID)
+	_, wallPostPermission, isFriend, ok := h.ensureWallViewable(c, user.ID, viewerID)
 	if !ok {
 		return
 	}
@@ -172,10 +193,29 @@ func (h *WallHandler) GetWallPosts(c *gin.Context) {
 		return
 	}
 
+	stats, err := h.wallRepo.GetWallStats(c.Request.Context(), user.ID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load wall posts")
+		return
+	}
+
+	var friendCount int
+	if h.friendRepo != nil {
+		friendCount, err = h.friendRepo.CountFriends(c.Request.Context(), user.ID)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to load wall posts")
+			return
+		}
+	}
+
+	canPost, _ := resolveWallPostPermission(user.ID, viewerID, isFriend, wallPostPermission)
 	c.JSON(http.StatusOK, WallPostsResponse{
-		Posts:          posts,
-		CanPost:        canPostToWall(user.ID, viewerID, visibility, isFriend),
-		WallVisibility: visibility,
+		Posts:        posts,
+		CanPost:      canPost,
+		FriendCount:  friendCount,
+		OwnPostCount: stats.OwnPostCount,
+		ReplyCount:   stats.ReplyCount,
+		PhotoCount:   stats.PhotoCount,
 	})
 }
 
@@ -219,7 +259,18 @@ func (h *WallHandler) CreateWallPost(c *gin.Context) {
 		return
 	}
 
-	if !h.ensureCanInteractWithWall(c, user.ID, authorID, "You can't post on this wall") {
+	visibility, wallPostPermission, isFriend, err := h.resolveWallAccess(c.Request.Context(), user.ID, authorID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load wall")
+		return
+	}
+	if !canViewerSeeProfile(user.ID, authorID, visibility, isFriend) {
+		RespondError(c, http.StatusForbidden, "This wall is private")
+		return
+	}
+	canPost, requiresApproval := resolveWallPostPermission(user.ID, authorID, isFriend, wallPostPermission)
+	if !canPost {
+		RespondError(c, http.StatusForbidden, "You can't post on this wall")
 		return
 	}
 
@@ -250,11 +301,17 @@ func (h *WallHandler) CreateWallPost(c *gin.Context) {
 		}
 	}
 
+	status := "approved"
+	if requiresApproval {
+		status = "pending"
+	}
+
 	post := &models.WallPost{
 		ProfileUserID: user.ID,
 		AuthorID:      authorID,
 		Body:          body,
 		Media:         req.Media,
+		Status:        status,
 	}
 	if err := h.wallRepo.Create(c.Request.Context(), post); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to create wall post")
@@ -271,7 +328,11 @@ func (h *WallHandler) CreateWallPost(c *gin.Context) {
 	}
 
 	if h.notifService != nil {
-		go h.notifService.NotifyWallPost(context.Background(), user.ID, authorID, post.ID, post.AuthorUsername)
+		if post.Status == "pending" {
+			go h.notifService.NotifyWallPostPending(context.Background(), user.ID, authorID, post.ID, post.AuthorUsername)
+		} else {
+			go h.notifService.NotifyWallPost(context.Background(), user.ID, authorID, post.ID, post.AuthorUsername)
+		}
 	}
 
 	c.JSON(http.StatusCreated, post)
@@ -439,7 +500,7 @@ func (h *WallHandler) GetWallPostComments(c *gin.Context) {
 	}
 
 	viewerID, _ := middleware.GetOptionalUserID(c)
-	if _, _, ok := h.ensureWallViewable(c, post.ProfileUserID, viewerID); !ok {
+	if _, _, _, ok := h.ensureWallViewable(c, post.ProfileUserID, viewerID); !ok {
 		return
 	}
 
@@ -678,39 +739,99 @@ func (h *WallHandler) SetWallPostCommentReaction(c *gin.Context) {
 	c.JSON(http.StatusOK, WallPostReactionResponse{Liked: liked, Disliked: disliked, LikeCount: likeCount, DislikeCount: dislikeCount})
 }
 
-// SetWallVisibilityRequest is the request body for updating wall visibility.
-type SetWallVisibilityRequest struct {
-	WallVisibility string `json:"wall_visibility" binding:"required,oneof=public friends_only private"`
+// PendingWallPostsResponse is returned by GetPendingWallPosts.
+type PendingWallPostsResponse struct {
+	Posts []*models.WallPost `json:"posts"`
 }
 
-// SetWallVisibility updates the visibility of the authenticated user's profile wall.
-// @Summary      Update wall visibility
+// GetPendingWallPosts returns the authenticated user's wall posts awaiting approval.
+// @Summary      Get pending wall posts
 // @Tags         Users
 // @Security     BearerAuth
-// @Accept       json
 // @Produce      json
-// @Param        body  body  SetWallVisibilityRequest  true  "Visibility"
-// @Success      200  {object}  gin.H
-// @Failure      400  {object}  gin.H
+// @Param        limit   query  int  false  "Page size (default 20)"
+// @Param        offset  query  int  false  "Offset"
+// @Success      200  {object}  PendingWallPostsResponse
 // @Failure      401  {object}  gin.H
 // @Failure      500  {object}  gin.H
-// @Router       /users/me/wall-visibility [put]
-func (h *WallHandler) SetWallVisibility(c *gin.Context) {
+// @Router       /users/me/wall/pending [get]
+func (h *WallHandler) GetPendingWallPosts(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
 		return
 	}
 
-	var req SetWallVisibilityRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		RespondError(c, http.StatusBadRequest, "Invalid request body")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if limit < 1 || limit > 50 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	posts, err := h.wallRepo.GetPendingByProfileUserID(c.Request.Context(), userID, limit, offset)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load pending wall posts")
 		return
 	}
 
-	if err := h.userProfRepo.UpdateWallVisibility(c.Request.Context(), userID, req.WallVisibility); err != nil {
-		RespondError(c, http.StatusInternalServerError, "Failed to update wall visibility")
+	c.JSON(http.StatusOK, PendingWallPostsResponse{Posts: posts})
+}
+
+// ApproveWallPost approves a pending wall post on the authenticated user's own wall.
+// @Summary      Approve a pending wall post
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Wall post ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /wall-posts/{id}/approve [post]
+func (h *WallHandler) ApproveWallPost(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"wall_visibility": req.WallVisibility})
+	postID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid wall post ID")
+		return
+	}
+
+	post, err := h.wallRepo.GetByID(c.Request.Context(), postID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load wall post")
+		return
+	}
+	if post == nil {
+		RespondError(c, http.StatusNotFound, "Wall post not found")
+		return
+	}
+
+	if post.ProfileUserID != userID {
+		RespondError(c, http.StatusForbidden, "You can't approve this post")
+		return
+	}
+
+	if post.Status != "pending" {
+		RespondError(c, http.StatusBadRequest, "Post is not pending approval")
+		return
+	}
+
+	if err := h.wallRepo.ApprovePost(c.Request.Context(), postID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to approve wall post")
+		return
+	}
+
+	if h.notifService != nil {
+		go h.notifService.NotifyWallPostApproved(context.Background(), post.AuthorID, post.ProfileUserID, post.ID, post.AuthorUsername)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Wall post approved"})
 }

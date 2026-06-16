@@ -386,7 +386,7 @@ func (h *FriendsHandler) GetMutualFriends(c *gin.Context) {
 
 	// Apply the same profile-visibility rules as the main profile endpoint so a
 	// non-friend viewer can't use this endpoint to probe the social graph of a
-	// private or friends_only profile.
+	// private profile.
 	canSee, err := viewerCanSeeProfile(ctx, h.settingsRepo, h.friendRepo, other, viewerID)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to load profile")

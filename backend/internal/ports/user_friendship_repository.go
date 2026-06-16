@@ -21,6 +21,7 @@ type UserFriendshipRepository interface {
 
 	// Listing
 	ListFriends(ctx context.Context, userID int) ([]models.FriendEntry, error)
+	CountFriends(ctx context.Context, userID int) (int, error)
 	ListIncomingRequests(ctx context.Context, userID int) ([]models.FriendRequestEntry, error)
 	ListOutgoingRequests(ctx context.Context, userID int) ([]models.FriendRequestEntry, error)
 	GetMutualFriends(ctx context.Context, userID, otherUserID int, limit int) ([]models.MutualFriendEntry, error)
