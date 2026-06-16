@@ -403,7 +403,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
   });
 
   it('exports named production and garden details for the Main Stage fidelity pass', () => {
-    expectMainStageMarker('V16_CrownRiggingSpan');
+    expectMainStageMarker('V72_CrownRiggingFrontTruss');
     expectMainStageMarker('V67_VipGardenPearlBasin_L');
     expectMainStageMarker('V66_BackPlazaSightlinePearlPostCluster_L');
     expectMainStageMarker('V69_PlazaPaverPearlBands');
@@ -4928,40 +4928,107 @@ describe('MAIN_STAGE_MANIFEST', () => {
     );
   });
 
-  it('keeps the legacy crown rigging spans out of the V50 normal-mapped metal contract', () => {
-    const legacyRiggingNodes = [
-      'V16_CrownRiggingSpan',
-      'V16_CrownRiggingFrontChord',
-      'V16_CrownRiggingRearChord',
+  it('replaces the legacy crown rigging span and chords with an authored truss crown assembly', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const nodeName of ['V16_CrownRiggingSpan', 'V16_CrownRiggingFrontChord', 'V16_CrownRiggingRearChord']) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V72_CrownRiggingFrontTruss',
+      'V72_CrownRiggingRearTruss',
+      'V72_CrownRiggingCenterSpine',
+      'V72_CrownRiggingGoldBosses',
     ];
-    const texturedMaterialNames = new Set([
-      'V14_PolishedMoonstoneShell',
-      'V20_LayeredPearlShell',
-      'V13_WetPlazaStone',
-      'V18_WetStonePaver',
-      'V16_MatteBlackStageHardware',
-      'V16_BrushedProductionGold',
+    expect(nodeNamesWithPrefix('V72_')).toHaveLength(requiredReplacementNodes.length);
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const frontTruss = readMeshGeometry('V72_CrownRiggingFrontTruss');
+    const rearTruss = readMeshGeometry('V72_CrownRiggingRearTruss');
+    const centerSpine = readMeshGeometry('V72_CrownRiggingCenterSpine');
+    const goldBosses = readMeshGeometry('V72_CrownRiggingGoldBosses');
+
+    expect(frontTruss.min[0]).toBeLessThan(-21.8);
+    expect(frontTruss.max[0]).toBeGreaterThan(21.8);
+    expect(frontTruss.min[1]).toBeGreaterThan(35.4);
+    expect(frontTruss.max[1]).toBeGreaterThan(36.2);
+    expect(frontTruss.min[2]).toBeGreaterThan(22.1);
+    expect(frontTruss.max[2]).toBeGreaterThan(22.6);
+
+    expect(rearTruss.min[0]).toBeLessThan(-21.8);
+    expect(rearTruss.max[0]).toBeGreaterThan(21.8);
+    expect(rearTruss.min[1]).toBeGreaterThan(35.4);
+    expect(rearTruss.max[1]).toBeGreaterThan(36.2);
+    expect(rearTruss.min[2]).toBeGreaterThan(24.0);
+    expect(rearTruss.max[2]).toBeGreaterThan(24.5);
+
+    expect(centerSpine.min[0]).toBeLessThan(-21.8);
+    expect(centerSpine.max[0]).toBeGreaterThan(21.8);
+    expect(centerSpine.min[1]).toBeGreaterThan(36.5);
+    expect(centerSpine.max[1]).toBeGreaterThan(37.2);
+    expect(centerSpine.min[2]).toBeGreaterThan(22.9);
+    expect(centerSpine.max[2]).toBeGreaterThan(23.8);
+
+    expect(goldBosses.min[0]).toBeLessThan(-18.2);
+    expect(goldBosses.max[0]).toBeGreaterThan(18.2);
+    expect(goldBosses.min[1]).toBeGreaterThan(35.6);
+    expect(goldBosses.max[1]).toBeGreaterThan(37.0);
+    expect(goldBosses.min[2]).toBeGreaterThan(22.1);
+    expect(goldBosses.max[2]).toBeGreaterThan(24.2);
+
+    expect(readConnectedComponents('V72_CrownRiggingFrontTruss')).toHaveLength(7);
+    expect(readConnectedComponents('V72_CrownRiggingRearTruss')).toHaveLength(7);
+    expect(readConnectedComponents('V72_CrownRiggingCenterSpine')).toHaveLength(7);
+    expect(readConnectedComponents('V72_CrownRiggingGoldBosses')).toHaveLength(7);
+
+    const expectedBayCenters = [-18, -12, -6, 0, 6, 12, 18];
+    for (const [nodeName, expectedZ] of [
+      ['V72_CrownRiggingFrontTruss', 22.35],
+      ['V72_CrownRiggingRearTruss', 24.35],
+      ['V72_CrownRiggingCenterSpine', 23.35],
+      ['V72_CrownRiggingGoldBosses', 23.35],
+    ] as const) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedX of expectedBayCenters) {
+        expect(
+          centers.some(([x, , z]) => Math.abs(x - expectedX) < 0.18 && Math.abs(z - expectedZ) < 0.24),
+          `${nodeName} missing crown rigging bay around x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(2_400);
+
+    const minimumVertexCounts = new Map([
+      ['V72_CrownRiggingFrontTruss', 700],
+      ['V72_CrownRiggingRearTruss', 700],
+      ['V72_CrownRiggingCenterSpine', 500],
+      ['V72_CrownRiggingGoldBosses', 280],
     ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
 
-    for (const nodeName of legacyRiggingNodes) {
-      const node = nodesByName.get(nodeName);
-      expect(node?.mesh, `missing legacy crown rigging mesh: ${nodeName}`).toEqual(expect.any(Number));
-
-      const primitive = mainStageGlbJson.meshes[node!.mesh!].primitives[0];
-      expect(primitive.material, `missing material assignment: ${nodeName}`).toEqual(expect.any(Number));
-      const material = mainStageGlbJson.materials[primitive.material!];
-      expect(
-        texturedMaterialNames.has(material.name ?? ''),
-        `${nodeName} should not use a V50 textured material family`,
-      ).toBe(false);
-      expect(
-        primitive.attributes.TEXCOORD_0,
-        `${nodeName} should not export textured UVs once reassigned to a flat rigging material`,
-      ).toBeUndefined();
-      expect(
-        primitive.attributes.TANGENT,
-        `${nodeName} should not export tangent data once reassigned to a non-normal-mapped rigging material`,
-      ).toBeUndefined();
+    const expectedMaterials = new Map([
+      ['V72_CrownRiggingFrontTruss', 'V16_MatteBlackStageHardware'],
+      ['V72_CrownRiggingRearTruss', 'V16_MatteBlackStageHardware'],
+      ['V72_CrownRiggingCenterSpine', 'V16_MatteBlackStageHardware'],
+      ['V72_CrownRiggingGoldBosses', 'V16_BrushedProductionGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
     }
   });
 
