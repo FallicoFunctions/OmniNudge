@@ -404,7 +404,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
 
   it('exports named production and garden details for the Main Stage fidelity pass', () => {
     expectMainStageMarker('V16_CrownRiggingSpan');
-    expectMainStageMarker('V16_VipGardenBasin_L');
+    expectMainStageMarker('V67_VipGardenPearlBasin_L');
     expectMainStageMarker('V66_BackPlazaSightlinePearlPostCluster_L');
     expectMainStageMarker('V16_PlazaPaverInlay_0');
   });
@@ -4242,6 +4242,137 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the VIP garden basin proxies with authored reflecting basins and rib canopies', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = [
+      'V16_VipGardenBasin_L',
+      'V16_VipGardenBasin_R',
+      'V16_VipGardenWater_L',
+      'V16_VipGardenWater_R',
+      'V16_VipGardenGoldRib_L_0',
+      'V16_VipGardenGoldRib_L_1',
+      'V16_VipGardenGoldRib_L_2',
+      'V16_VipGardenGoldRib_L_3',
+      'V16_VipGardenGoldRib_L_4',
+      'V16_VipGardenGoldRib_L_5',
+      'V16_VipGardenGoldRib_L_6',
+      'V16_VipGardenGoldRib_R_0',
+      'V16_VipGardenGoldRib_R_1',
+      'V16_VipGardenGoldRib_R_2',
+      'V16_VipGardenGoldRib_R_3',
+      'V16_VipGardenGoldRib_R_4',
+      'V16_VipGardenGoldRib_R_5',
+      'V16_VipGardenGoldRib_R_6',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V67_VipGardenPearlBasin_L',
+      'V67_VipGardenPearlBasin_R',
+      'V67_VipGardenReflectingPool_L',
+      'V67_VipGardenReflectingPool_R',
+      'V67_VipGardenGoldRibCanopy_L',
+      'V67_VipGardenGoldRibCanopy_R',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftBasin = readMeshGeometry('V67_VipGardenPearlBasin_L');
+    const rightBasin = readMeshGeometry('V67_VipGardenPearlBasin_R');
+    const leftPool = readMeshGeometry('V67_VipGardenReflectingPool_L');
+    const rightPool = readMeshGeometry('V67_VipGardenReflectingPool_R');
+    const leftCanopy = readMeshGeometry('V67_VipGardenGoldRibCanopy_L');
+    const rightCanopy = readMeshGeometry('V67_VipGardenGoldRibCanopy_R');
+
+    expect(leftBasin.min[0]).toBeLessThan(-34.0);
+    expect(leftBasin.max[0]).toBeGreaterThan(-21.0);
+    expect(leftBasin.min[1]).toBeLessThan(2.9);
+    expect(leftBasin.max[1]).toBeGreaterThan(3.8);
+    expect(leftBasin.min[2]).toBeGreaterThan(5.4);
+    expect(leftBasin.max[2]).toBeGreaterThan(9.7);
+
+    expect(rightBasin.min[0]).toBeLessThan(21.0);
+    expect(rightBasin.max[0]).toBeGreaterThan(34.0);
+    expect(rightBasin.min[1]).toBeLessThan(2.9);
+    expect(rightBasin.max[1]).toBeGreaterThan(3.8);
+    expect(rightBasin.min[2]).toBeGreaterThan(5.4);
+    expect(rightBasin.max[2]).toBeGreaterThan(9.7);
+
+    for (const pool of [leftPool, rightPool]) {
+      expect(pool.min[1]).toBeGreaterThan(3.2);
+      expect(pool.max[1]).toBeLessThan(3.7);
+      expect(pool.min[2]).toBeGreaterThan(6.2);
+      expect(pool.max[2]).toBeLessThan(9.0);
+    }
+
+    for (const canopy of [leftCanopy, rightCanopy]) {
+      expect(canopy.min[1]).toBeGreaterThan(3.45);
+      expect(canopy.max[1]).toBeGreaterThan(4.15);
+      expect(canopy.min[2]).toBeGreaterThan(5.7);
+      expect(canopy.max[2]).toBeGreaterThan(9.3);
+    }
+
+    expect(readConnectedComponents('V67_VipGardenPearlBasin_L')).toHaveLength(1);
+    expect(readConnectedComponents('V67_VipGardenPearlBasin_R')).toHaveLength(1);
+    expect(readConnectedComponents('V67_VipGardenReflectingPool_L')).toHaveLength(1);
+    expect(readConnectedComponents('V67_VipGardenReflectingPool_R')).toHaveLength(1);
+    expect(readConnectedComponents('V67_VipGardenGoldRibCanopy_L')).toHaveLength(7);
+    expect(readConnectedComponents('V67_VipGardenGoldRibCanopy_R')).toHaveLength(7);
+
+    const expectedLeftXs = [-32.9, -31.1, -29.3, -27.5, -25.7, -23.9, -22.1];
+    const expectedRightXs = [22.1, 23.9, 25.7, 27.5, 29.3, 31.1, 32.9];
+    for (const [nodeName, expectedXs] of [
+      ['V67_VipGardenGoldRibCanopy_L', expectedLeftXs],
+      ['V67_VipGardenGoldRibCanopy_R', expectedRightXs],
+    ] as const) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedX of expectedXs) {
+        expect(
+          centers.some(([x, z]) => Math.abs(x - expectedX) < 0.2 && Math.abs(z - 7.6) < 0.15),
+          `${nodeName} missing rib near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(4_000);
+
+    const minimumVertexCounts = new Map([
+      ['V67_VipGardenPearlBasin_L', 800],
+      ['V67_VipGardenPearlBasin_R', 800],
+      ['V67_VipGardenReflectingPool_L', 160],
+      ['V67_VipGardenReflectingPool_R', 160],
+      ['V67_VipGardenGoldRibCanopy_L', 900],
+      ['V67_VipGardenGoldRibCanopy_R', 900],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V67_VipGardenPearlBasin_L', 'V19_GatewayPearlIvory'],
+      ['V67_VipGardenPearlBasin_R', 'V19_GatewayPearlIvory'],
+      ['V67_VipGardenReflectingPool_L', 'V14_DeepReflectingWater'],
+      ['V67_VipGardenReflectingPool_R', 'V14_DeepReflectingWater'],
+      ['V67_VipGardenGoldRibCanopy_L', 'V19_ArrivalBrushedGold'],
+      ['V67_VipGardenGoldRibCanopy_R', 'V19_ArrivalBrushedGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports real PBR texture maps for the Main Stage material families', () => {
     const images = mainStageGlbJson.images ?? [];
     const textures = mainStageGlbJson.textures ?? [];
@@ -4464,7 +4595,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
   });
 
   it('reuses the established Main Stage material library for the V24 crown pass', () => {
-    expect(mainStageGlbJson.materials).toHaveLength(52);
+    expect(mainStageGlbJson.materials).toHaveLength(51);
     expect(
       mainStageGlbJson.materials.some(({ name }: { name?: string }) => name?.startsWith('V24_')),
     ).toBe(false);
