@@ -184,6 +184,46 @@ const readAccessorValuesFrom = (glb: ParsedGlb, accessorIndex: number) => {
   );
 };
 const readAccessorValues = (accessorIndex: number) => readAccessorValuesFrom(mainStageGlb, accessorIndex);
+const readVectorLengthRangeFrom = (glb: ParsedGlb, accessorIndex: number, vectorAxes = 3) => {
+  const accessor = glb.json.accessors[accessorIndex];
+  const bufferView = glb.json.bufferViews[accessor.bufferView];
+  const componentByteLength = componentByteLengths.get(accessor.componentType);
+  const componentCount = typeComponentCounts.get(accessor.type);
+  expect(componentByteLength, `unsupported component type: ${accessor.componentType}`).toBeDefined();
+  expect(componentCount, `unsupported accessor type: ${accessor.type}`).toBeDefined();
+  expect(vectorAxes).toBeLessThanOrEqual(componentCount!);
+
+  const packedByteLength = componentByteLength! * componentCount!;
+  const byteStride = bufferView.byteStride ?? packedByteLength;
+  expect(byteStride).toBeGreaterThanOrEqual(packedByteLength);
+  const baseOffset = (bufferView.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+  expect(baseOffset + (accessor.count - 1) * byteStride + packedByteLength).toBeLessThanOrEqual(
+    glb.binaryChunk.length,
+  );
+
+  let minLength = Number.POSITIVE_INFINITY;
+  let maxLength = 0;
+  for (let elementIndex = 0; elementIndex < accessor.count; elementIndex += 1) {
+    let sumSquares = 0;
+    for (let componentIndex = 0; componentIndex < vectorAxes; componentIndex += 1) {
+      const offset = baseOffset + elementIndex * byteStride + componentIndex * componentByteLength!;
+      const component =
+        accessor.componentType === 5126
+          ? glb.binaryChunk.readFloatLE(offset)
+          : accessor.componentType === 5123
+            ? glb.binaryChunk.readUInt16LE(offset)
+            : glb.binaryChunk.readUInt32LE(offset);
+      sumSquares += component * component;
+    }
+    const length = Math.sqrt(sumSquares);
+    minLength = Math.min(minLength, length);
+    maxLength = Math.max(maxLength, length);
+  }
+
+  return { maxLength, minLength };
+};
+const readVectorLengthRange = (accessorIndex: number, vectorAxes = 3) =>
+  readVectorLengthRangeFrom(mainStageGlb, accessorIndex, vectorAxes);
 const readMeshGeometry = (nodeName: string) => {
   const node = nodesByName.get(nodeName);
   expect(node?.mesh, `missing mesh payload: ${nodeName}`).toEqual(expect.any(Number));
@@ -2532,18 +2572,15 @@ describe('MAIN_STAGE_MANIFEST', () => {
           continue;
         }
 
-        const tangents = readAccessorValues(primitive.attributes.TANGENT);
-        for (const tangent of tangents) {
-          const length = Math.hypot(tangent[0], tangent[1], tangent[2]);
-          expect(
-            length,
-            `${material.name ?? 'normal-mapped material'} exported a non-unit tangent`,
-          ).toBeGreaterThan(0.999);
-          expect(
-            length,
-            `${material.name ?? 'normal-mapped material'} exported a non-unit tangent`,
-          ).toBeLessThan(1.001);
-        }
+        const { maxLength, minLength } = readVectorLengthRange(primitive.attributes.TANGENT);
+        expect(
+          minLength,
+          `${material.name ?? 'normal-mapped material'} exported a tangent shorter than unit length`,
+        ).toBeGreaterThan(0.999);
+        expect(
+          maxLength,
+          `${material.name ?? 'normal-mapped material'} exported a tangent longer than unit length`,
+        ).toBeLessThan(1.001);
       }
     }
   });
