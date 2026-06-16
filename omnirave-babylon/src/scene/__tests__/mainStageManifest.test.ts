@@ -3601,6 +3601,115 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the basin bridge slab proxies with layered ceremonial causeways', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = [
+      'V7_BasinBridge_0',
+      'V7_BasinBridge_1',
+      'V7_BasinBridge_2',
+      'V7_BasinBridge_3',
+      'V7_BasinBridgeGoldRail_0_L',
+      'V7_BasinBridgeGoldRail_0_R',
+      'V7_BasinBridgeGoldRail_1_L',
+      'V7_BasinBridgeGoldRail_1_R',
+      'V7_BasinBridgeGoldRail_2_L',
+      'V7_BasinBridgeGoldRail_2_R',
+      'V7_BasinBridgeGoldRail_3_L',
+      'V7_BasinBridgeGoldRail_3_R',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V62_BasinCausewayPearlSpan',
+      'V62_BasinCausewayGoldRail_L',
+      'V62_BasinCausewayGoldRail_R',
+      'V62_BasinCausewayCyanInlay',
+      'V62_BasinCausewayShadowReveal',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const pearl = readMeshGeometry('V62_BasinCausewayPearlSpan');
+    const goldLeft = readMeshGeometry('V62_BasinCausewayGoldRail_L');
+    const goldRight = readMeshGeometry('V62_BasinCausewayGoldRail_R');
+    const cyan = readMeshGeometry('V62_BasinCausewayCyanInlay');
+    const shadow = readMeshGeometry('V62_BasinCausewayShadowReveal');
+
+    expect(pearl.min[0]).toBeLessThan(-10.9);
+    expect(pearl.max[0]).toBeGreaterThan(10.9);
+    expect(pearl.min[1]).toBeLessThan(-7.9);
+    expect(pearl.max[1]).toBeGreaterThan(35.9);
+    expect(pearl.min[2]).toBeLessThan(-2.3);
+    expect(pearl.max[2]).toBeLessThan(-0.7);
+
+    expect(goldLeft.min[0]).toBeLessThan(-10.3);
+    expect(goldLeft.max[0]).toBeLessThan(-9.5);
+    expect(goldRight.min[0]).toBeGreaterThan(9.5);
+    expect(goldRight.max[0]).toBeGreaterThan(10.3);
+    expect(goldLeft.min[1]).toBeLessThan(-7.7);
+    expect(goldLeft.max[1]).toBeGreaterThan(35.7);
+    expect(goldRight.min[1]).toBeLessThan(-7.7);
+    expect(goldRight.max[1]).toBeGreaterThan(35.7);
+
+    expect(cyan.min[1]).toBeLessThan(-7.5);
+    expect(cyan.max[1]).toBeGreaterThan(35.5);
+    expect(shadow.min[1]).toBeLessThan(-7.4);
+    expect(shadow.max[1]).toBeGreaterThan(35.4);
+
+    expect(readConnectedComponents('V62_BasinCausewayPearlSpan')).toHaveLength(4);
+    expect(readConnectedComponents('V62_BasinCausewayGoldRail_L')).toHaveLength(4);
+    expect(readConnectedComponents('V62_BasinCausewayGoldRail_R')).toHaveLength(4);
+    expect(readConnectedComponents('V62_BasinCausewayCyanInlay')).toHaveLength(4);
+    expect(readConnectedComponents('V62_BasinCausewayShadowReveal')).toHaveLength(4);
+
+    const expectedRows = [35, 22, 8.5, -7];
+    const centerChecks = new Map([
+      ['V62_BasinCausewayPearlSpan', 0],
+      ['V62_BasinCausewayGoldRail_L', -10],
+      ['V62_BasinCausewayGoldRail_R', 10],
+      ['V62_BasinCausewayCyanInlay', 0],
+      ['V62_BasinCausewayShadowReveal', 0],
+    ]);
+    for (const [nodeName, expectedX] of centerChecks) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedZ of expectedRows) {
+        expect(
+          centers.some(([x, y]) => Math.abs(x - expectedX) < 0.55 && Math.abs(y - expectedZ) < 0.45),
+          `${nodeName} missing causeway component around x=${expectedX}, z=${expectedZ}`,
+        ).toBe(true);
+      }
+    }
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(2_000);
+    for (const nodeName of requiredReplacementNodes) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        180,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V62_BasinCausewayPearlSpan', 'V19_GatewayPearlIvory'],
+      ['V62_BasinCausewayGoldRail_L', 'V19_ArrivalBrushedGold'],
+      ['V62_BasinCausewayGoldRail_R', 'V19_ArrivalBrushedGold'],
+      ['V62_BasinCausewayCyanInlay', 'V19_ArrivalCyanGlow'],
+      ['V62_BasinCausewayShadowReveal', 'V20_RecessedWarmShadow'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports real PBR texture maps for the Main Stage material families', () => {
     const images = mainStageGlbJson.images ?? [];
     const textures = mainStageGlbJson.textures ?? [];
