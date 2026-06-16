@@ -452,9 +452,9 @@ describe('MAIN_STAGE_MANIFEST', () => {
   });
 
   it('exports authored arrival-threshold trim so the promenade foreground is not placeholder geometry', () => {
-    expectMainStageMarker('V23_ArrivalThresholdGoldRail_0');
+    expectMainStageMarker('V65_ArrivalThresholdGoldBands');
     expectMainStageMarker('V58_ArrivalPlinthPearlDais_L');
-    expectMainStageMarker('V23_ArrivalRunwayInsetRib_0');
+    expectMainStageMarker('V65_ArrivalRunwayPearlBands');
     expectMainStageMarker('V57_BackPlazaSentinelPearl_L');
   });
 
@@ -3973,6 +3973,144 @@ describe('MAIN_STAGE_MANIFEST', () => {
       ['V64_PromenadeCyanThread', 'V19_ArrivalCyanGlow'],
       ['V64_PlazaStoneSpine', 'V19_GatewayPearlIvory'],
       ['V64_PlazaCrossBands', 'V19_ArrivalBrushedGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
+  it('replaces the arrival runway and threshold proxy trims with authored ceremonial bands', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = [
+      'V23_ArrivalRunwayInsetRib_0',
+      'V23_ArrivalRunwayInsetRib_1',
+      'V23_ArrivalRunwayInsetRib_2',
+      'V23_ArrivalRunwayInsetRib_3',
+      'V23_ArrivalThresholdGoldRail_0',
+      'V23_ArrivalThresholdGoldRail_1',
+      'V23_ArrivalThresholdGoldRail_2',
+      'V23_ArrivalThresholdShadowGroove_0',
+      'V23_ArrivalThresholdShadowGroove_1',
+      'V23_ArrivalThresholdShadowGroove_2',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V65_ArrivalRunwayPearlBands',
+      'V65_ArrivalRunwayGoldBands',
+      'V65_ArrivalRunwayCyanThreads',
+      'V65_ArrivalThresholdGoldBands',
+      'V65_ArrivalThresholdShadowGrooves',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const runwayPearl = readMeshGeometry('V65_ArrivalRunwayPearlBands');
+    const runwayGold = readMeshGeometry('V65_ArrivalRunwayGoldBands');
+    const runwayCyan = readMeshGeometry('V65_ArrivalRunwayCyanThreads');
+    const thresholdGold = readMeshGeometry('V65_ArrivalThresholdGoldBands');
+    const thresholdShadow = readMeshGeometry('V65_ArrivalThresholdShadowGrooves');
+
+    expect(runwayPearl.min[0]).toBeLessThan(-5.1);
+    expect(runwayPearl.max[0]).toBeGreaterThan(5.1);
+    expect(runwayPearl.min[1]).toBeGreaterThan(0.05);
+    expect(runwayPearl.max[1]).toBeGreaterThan(0.45);
+    expect(runwayPearl.min[2]).toBeLessThan(-50.1);
+    expect(runwayPearl.max[2]).toBeGreaterThan(2.1);
+
+    expect(runwayGold.min[0]).toBeLessThan(-5.0);
+    expect(runwayGold.max[0]).toBeGreaterThan(5.0);
+    expect(runwayGold.min[1]).toBeGreaterThan(0.02);
+    expect(runwayGold.max[1]).toBeGreaterThan(0.33);
+    expect(runwayGold.min[2]).toBeLessThan(-49.6);
+    expect(runwayGold.max[2]).toBeGreaterThan(1.8);
+
+    expect(runwayCyan.min[0]).toBeLessThan(-4.9);
+    expect(runwayCyan.max[0]).toBeGreaterThan(4.9);
+    expect(runwayCyan.min[1]).toBeGreaterThan(0.004);
+    expect(runwayCyan.max[1]).toBeGreaterThan(0.22);
+    expect(runwayCyan.min[2]).toBeLessThan(-49.4);
+    expect(runwayCyan.max[2]).toBeGreaterThan(1.7);
+
+    expect(thresholdGold.min[0]).toBeLessThan(-13.8);
+    expect(thresholdGold.max[0]).toBeGreaterThan(13.8);
+    expect(thresholdGold.min[1]).toBeGreaterThan(0.35);
+    expect(thresholdGold.max[1]).toBeGreaterThan(0.73);
+    expect(thresholdGold.min[2]).toBeLessThan(-57.0);
+    expect(thresholdGold.max[2]).toBeLessThan(-41.8);
+
+    expect(thresholdShadow.min[0]).toBeLessThan(-12.8);
+    expect(thresholdShadow.max[0]).toBeGreaterThan(12.8);
+    expect(thresholdShadow.min[1]).toBeGreaterThan(0.34);
+    expect(thresholdShadow.max[1]).toBeGreaterThan(0.53);
+    expect(thresholdShadow.min[2]).toBeLessThan(-56.8);
+    expect(thresholdShadow.max[2]).toBeLessThan(-41.5);
+
+    expect(readConnectedComponents('V65_ArrivalRunwayPearlBands')).toHaveLength(4);
+    expect(readConnectedComponents('V65_ArrivalRunwayGoldBands')).toHaveLength(4);
+    expect(readConnectedComponents('V65_ArrivalRunwayCyanThreads')).toHaveLength(4);
+    expect(readConnectedComponents('V65_ArrivalThresholdGoldBands')).toHaveLength(3);
+    expect(readConnectedComponents('V65_ArrivalThresholdShadowGrooves')).toHaveLength(3);
+
+    const runwayLaneXs = [-4.8, -2.4, 2.4, 4.8];
+    for (const nodeName of ['V65_ArrivalRunwayPearlBands', 'V65_ArrivalRunwayGoldBands', 'V65_ArrivalRunwayCyanThreads']) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedX of runwayLaneXs) {
+        expect(
+          centers.some(([x, z]) => Math.abs(x - expectedX) < 0.12 && Math.abs(z + 24) < 0.25),
+          `${nodeName} missing runway lane around x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    const thresholdRowsByNode = new Map([
+      ['V65_ArrivalThresholdGoldBands', [42.0, 49.5, 57.0]],
+      ['V65_ArrivalThresholdShadowGrooves', [41.75, 49.25, 56.75]],
+    ]);
+    for (const [nodeName, thresholdRows] of thresholdRowsByNode) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedY of thresholdRows) {
+        expect(
+          centers.some(([x, z]) => Math.abs(x) < 0.2 && Math.abs(z + expectedY) < 0.2),
+          `${nodeName} missing threshold band around y=${expectedY}`,
+        ).toBe(true);
+      }
+    }
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(2_500);
+
+    const minimumVertexCounts = new Map([
+      ['V65_ArrivalRunwayPearlBands', 670],
+      ['V65_ArrivalRunwayGoldBands', 670],
+      ['V65_ArrivalRunwayCyanThreads', 730],
+      ['V65_ArrivalThresholdGoldBands', 300],
+      ['V65_ArrivalThresholdShadowGrooves', 300],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V65_ArrivalRunwayPearlBands', 'V19_GatewayPearlIvory'],
+      ['V65_ArrivalRunwayGoldBands', 'V19_ArrivalBrushedGold'],
+      ['V65_ArrivalRunwayCyanThreads', 'V19_ArrivalCyanGlow'],
+      ['V65_ArrivalThresholdGoldBands', 'V19_ArrivalBrushedGold'],
+      ['V65_ArrivalThresholdShadowGrooves', 'V20_RecessedWarmShadow'],
     ]);
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
