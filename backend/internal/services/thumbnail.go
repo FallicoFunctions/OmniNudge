@@ -325,7 +325,7 @@ func saveOptimizedJPEG(img image.Image, path string, maxBytes int64) error {
 		}
 		for _, quality := range qualities {
 			if err := imaging.Save(scaled, path, imaging.JPEGQuality(quality)); err != nil {
-				lastErr = err //nolint:ineffassign // always overwritten by the generic error after all quality attempts
+				lastErr = err //nolint:ineffassign,staticcheck // always overwritten by the generic error after all quality attempts
 				continue
 			}
 			if maxBytes <= 0 {
@@ -333,7 +333,7 @@ func saveOptimizedJPEG(img image.Image, path string, maxBytes int64) error {
 			}
 			info, err := os.Stat(path)
 			if err != nil {
-				lastErr = err //nolint:ineffassign // always overwritten by the generic error after all quality attempts
+				lastErr = err //nolint:ineffassign,staticcheck // always overwritten by the generic error after all quality attempts
 				continue
 			}
 			if info.Size() <= maxBytes {

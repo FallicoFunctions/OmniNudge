@@ -29,8 +29,8 @@ type Conversation struct {
 	// Phase 2 features
 	User1AutoDeleteAfter *time.Duration `json:"user1_auto_delete_after,omitempty"`
 	User2AutoDeleteAfter *time.Duration `json:"user2_auto_delete_after,omitempty"`
-	User1Pseudonym       *string `json:"user1_pseudonym,omitempty"`
-	User2Pseudonym       *string `json:"user2_pseudonym,omitempty"`
+	User1Pseudonym       *string        `json:"user1_pseudonym,omitempty"`
+	User2Pseudonym       *string        `json:"user2_pseudonym,omitempty"`
 
 	// Group conversation fields (populated when conversation_type = 'group')
 	IsGroup          bool    `json:"is_group"`
@@ -666,7 +666,7 @@ func (r *ConversationRepository) ArchiveBatch(ctx context.Context, conversationI
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // deferred rollback error is intentionally discarded; tx commit outcome takes precedence
 
 	for _, conversationID := range conversationIDs {
 		var conversationType string

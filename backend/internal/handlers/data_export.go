@@ -12,10 +12,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	zlog "github.com/rs/zerolog/log"
+
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
-	zlog "github.com/rs/zerolog/log"
 )
 
 // DataExportHandler handles GDPR data export requests
@@ -374,7 +375,7 @@ func (h *DataExportHandler) DownloadExport(c *gin.Context) {
 	c.Header("Content-Type", "application/zip")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.zip\"", exportID))
 	if _, err := io.Copy(c.Writer, reader); err != nil {
-		c.Error(err)
+		c.Error(err) //nolint:errcheck // gin c.Error return value is not actionable here; response streaming already failed
 	}
 }
 

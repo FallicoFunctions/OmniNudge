@@ -12,11 +12,12 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
-	"github.com/omninudge/backend/internal/config"
-	"github.com/omninudge/backend/internal/models"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/omninudge/backend/internal/config"
+	"github.com/omninudge/backend/internal/models"
 )
 
 const (
@@ -155,7 +156,7 @@ func resetSeedData(ctx context.Context, pool *pgxpool.Pool) error {
 	if err != nil {
 		return fmt.Errorf("begin reset tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // deferred rollback error is intentionally discarded; tx commit outcome takes precedence
 
 	// 1. NULL out messages.pinned_by for messages sent by seed users
 	//    (FK has no CASCADE/SET NULL so must be cleared before deleting users).
@@ -414,7 +415,7 @@ func createGroupConversation(ctx context.Context, pool *pgxpool.Pool, creatorID 
 	if err != nil {
 		return 0, fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // deferred rollback error is intentionally discarded; tx commit outcome takes precedence
 
 	var convID int
 	err = tx.QueryRow(ctx, `

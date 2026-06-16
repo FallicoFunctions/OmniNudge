@@ -508,11 +508,11 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		var userRole string
 		h.pool.QueryRow(c.Request.Context(), `
 			SELECT role FROM conversation_participants WHERE conversation_id=$1 AND user_id=$2
-		`, req.ConversationID, userID).Scan(&userRole)
+		`, req.ConversationID, userID).Scan(&userRole) //nolint:errcheck // role lookup failure defaults to no exemption; non-fatal
 
 		if userRole != "admin" && userRole != "owner" {
 			var slowMode int
-			h.pool.QueryRow(c.Request.Context(), `SELECT slow_mode_seconds FROM conversations WHERE id=$1`, req.ConversationID).Scan(&slowMode)
+			h.pool.QueryRow(c.Request.Context(), `SELECT slow_mode_seconds FROM conversations WHERE id=$1`, req.ConversationID).Scan(&slowMode) //nolint:errcheck // slow-mode lookup failure defaults to 0 (no slow mode); non-fatal
 			if slowMode > 0 && h.cache != nil {
 				cacheKey := fmt.Sprintf("slowmode:%d:%d", req.ConversationID, userID)
 				if val, exists, _ := h.cache.Get(c.Request.Context(), cacheKey); exists {
@@ -1031,7 +1031,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			}
 		}
 
-		targetRecipientID := original.RecipientID //nolint:ineffassign // always overwritten in dm and else branches below
+		targetRecipientID := original.RecipientID //nolint:ineffassign,staticcheck // always overwritten in dm and else branches below
 		if targetConversationType == "dm" {
 			targetConversation, err := h.conversationRepo.GetByID(ctx, targetConversationID)
 			if err != nil {
