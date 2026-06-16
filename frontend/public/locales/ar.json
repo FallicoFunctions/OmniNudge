@@ -1186,9 +1186,12 @@
     "labels": {
       "joined": "انضم {{time}}",
       "lastSeen": "آخر ظهور {{time}}",
-      "karma": "كارما",
       "blocked": "محظور",
-      "location": "الموقع"
+      "location": "الموقع",
+      "friends": "الأصدقاء",
+      "photos": "الصور",
+      "wallPosts": "منشوراتي",
+      "replies": "منشورات الأصدقاء"
     },
     "mutualFriends": {
       "count_one": "{{count}} صديق مشترك",
@@ -1219,6 +1222,9 @@
     "errors": {
       "loadFailed": "تعذر تحميل ملف المستخدم.",
       "friendsLoadFailed": "تعذر تحميل أصدقاء هذا المستخدم."
+    },
+    "locked": {
+      "message": "هذا الملف الشخصي خاص. أضف هذا الشخص كصديق لرؤية ملفه الشخصي الكامل."
     },
     "aria": {
       "avatarAlt": "صورة {{username}}"
@@ -1276,13 +1282,9 @@
       "delete": "حذف",
       "deletePostConfirm": "حذف هذا المنشور من الحائط؟",
       "deleteCommentConfirm": "حذف هذا التعليق؟",
-      "visibilityPublic": "عام",
-      "visibilityFriends": "الأصدقاء فقط",
-      "visibilityPrivate": "أنا فقط",
-      "visibilityUpdated": "تم تحديث خصوصية الحائط.",
-      "visibilityUpdateFailed": "فشل تحديث خصوصية الحائط.",
       "loadFailed": "تعذر تحميل منشورات الحائط.",
       "postFailed": "فشل النشر على الحائط.",
+      "postPendingApproval": "منشورك في انتظار الموافقة.",
       "commentFailed": "فشل نشر التعليق.",
       "likeFailed": "فشل تحديث الإعجاب.",
       "deleteFailed": "فشل الحذف.",
@@ -1290,7 +1292,16 @@
       "uploadingMedia": "جارٍ التحميل…",
       "removeMedia": "إزالة",
       "mediaUploadFailed": "فشل تحميل الملف.",
-      "tooManyMedia": "يمكنك إرفاق ما يصل إلى {{max}} ملفات."
+      "tooManyMedia": "يمكنك إرفاق ما يصل إلى {{max}} ملفات.",
+      "previousMedia": "الوسائط السابقة",
+      "nextMedia": "الوسائط التالية",
+      "pending": {
+        "heading": "المنشورات المعلقة",
+        "approve": "قبول",
+        "reject": "رفض",
+        "approveFailed": "فشل قبول المنشور.",
+        "rejectFailed": "فشل رفض المنشور."
+      }
     }
   },
   "redditPostPage": {
@@ -2171,10 +2182,14 @@
       "lastSeen": "آخر ظهور",
       "lastSeenHelp": "أظهر للآخرين متى كنت نشطاً آخر مرة. عند التعطيل، قد يتم إخفاء وقت آخر ظهور من العروض العامة للملف الشخصي.",
       "profileVisibility": "خصوصية الملف الشخصي",
-      "profileVisibilityHelp": "تحكم في من يمكنه عرض تفاصيل ملفك الشخصي العامة.",
+      "profileVisibilityHelp": "يمكن لأي شخص عرض الملفات الشخصية العامة. الملفات الشخصية الخاصة تعرض فقط اسم المستخدم وزر إضافة صديق لمن ليسوا أصدقاء.",
       "profileVisibilityPublic": "عام",
-      "profileVisibilityFriendsOnly": "الأصدقاء فقط",
-      "profileVisibilityPrivate": "خاص"
+      "profileVisibilityPrivate": "خاص",
+      "wallPostPermission": "إذن النشر على الحائط",
+      "wallPostPermissionHelp": "تحكم في إمكانية نشر الأصدقاء على حائطك، وما إذا كانت منشوراتهم تحتاج إلى موافقتك أولاً.",
+      "wallPostPermissionAllFriends": "يمكن لأي صديق النشر",
+      "wallPostPermissionRequiresApproval": "يمكن للأصدقاء النشر، ولكن يجب أن أوافق أولاً",
+      "wallPostPermissionNoOne": "لا يمكن لأحد النشر على حائطي"
     },
     "dateTime": {
       "title": "عروض التاريخ والوقت",
