@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/ports"
 )
@@ -85,10 +86,10 @@ func (r *FeatureFlagRepository) ListFlags(ctx context.Context, environment strin
 		}
 
 		if len(metadataJSON) > 0 {
-			json.Unmarshal(metadataJSON, &flag.Metadata)
+			json.Unmarshal(metadataJSON, &flag.Metadata) //nolint:errcheck // unmarshal failure leaves field at zero value; non-fatal
 		}
 		if len(rollbackJSON) > 0 {
-			json.Unmarshal(rollbackJSON, &flag.Rollback)
+			json.Unmarshal(rollbackJSON, &flag.Rollback) //nolint:errcheck // unmarshal failure leaves field at zero value; non-fatal
 		}
 
 		flags = append(flags, &flag)
@@ -251,10 +252,10 @@ func (r *FeatureFlagRepository) GetAuditLog(ctx context.Context, key string, lim
 		}
 
 		if len(oldValueJSON) > 0 {
-			json.Unmarshal(oldValueJSON, &log.OldValue)
+			json.Unmarshal(oldValueJSON, &log.OldValue) //nolint:errcheck // unmarshal failure leaves field at zero value; non-fatal
 		}
 		if len(newValueJSON) > 0 {
-			json.Unmarshal(newValueJSON, &log.NewValue)
+			json.Unmarshal(newValueJSON, &log.NewValue) //nolint:errcheck // unmarshal failure leaves field at zero value; non-fatal
 		}
 
 		logs = append(logs, &log)

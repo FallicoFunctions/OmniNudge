@@ -12,13 +12,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // mockEmailService records all emails sent during a test without making
@@ -76,13 +77,6 @@ func indexOf(s, substr string) int {
 		}
 	}
 	return -1
-}
-
-// callCount returns how many times SendEmail/SendTemplatedEmail were called.
-func (m *mockEmailService) callCount() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return len(m.calls)
 }
 
 // uniqueAuthEmailUsername generates a unique username for auth email tests.
