@@ -18,6 +18,7 @@ type UserSettings struct {
 	ShowTypingIndicators         bool   `json:"show_typing_indicators"`
 	ShowLastSeen                 bool   `json:"show_last_seen"`
 	ProfileVisibility            string `json:"profile_visibility"`
+	WallPostPermission           string `json:"wall_post_permission"`
 	ShowPushNotifications        bool   `json:"show_push_notifications"` // P0-042: Push notification preference
 	AutoAppendInvitation         bool   `json:"auto_append_invitation"`
 	Theme                        string `json:"theme"`
@@ -82,7 +83,7 @@ func NewUserSettingsRepository(pool *pgxpool.Pool) *UserSettingsRepository {
 func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*UserSettings, error) {
 	query := `
 		SELECT user_id, notification_sound, show_read_receipts, show_typing_indicators, show_last_seen,
-		       profile_visibility,
+		       profile_visibility, wall_post_permission,
 		       show_push_notifications, auto_append_invitation, theme,
 		       use_relative_time, auto_close_theme_selector,
 		       notify_archived_messages, auto_unarchive_on_message, notify_removed_saved_posts,
@@ -109,6 +110,7 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		&settings.ShowTypingIndicators,
 		&settings.ShowLastSeen,
 		&settings.ProfileVisibility,
+		&settings.WallPostPermission,
 		&settings.ShowPushNotifications,
 		&settings.AutoAppendInvitation,
 		&settings.Theme,
@@ -166,7 +168,7 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		VALUES ($1, 'system')
 		ON CONFLICT (user_id) DO NOTHING
 		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators, show_last_seen,
-		          profile_visibility,
+		          profile_visibility, wall_post_permission,
 		          show_push_notifications, auto_append_invitation, theme,
 		          use_relative_time, auto_close_theme_selector,
 		          notify_archived_messages, auto_unarchive_on_message, notify_removed_saved_posts,
@@ -191,6 +193,7 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		&settings.ShowTypingIndicators,
 		&settings.ShowLastSeen,
 		&settings.ProfileVisibility,
+		&settings.WallPostPermission,
 		&settings.ShowPushNotifications,
 		&settings.AutoAppendInvitation,
 		&settings.Theme,
@@ -289,10 +292,11 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		    media_gallery_filter = $41,
 		    active_theme_id = $42,
 		    advanced_mode_enabled = $43,
+		    wall_post_permission = $44,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = $1
 		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators, show_last_seen,
-		          profile_visibility,
+		          profile_visibility, wall_post_permission,
 		          show_push_notifications, auto_append_invitation, theme,
 		          use_relative_time, auto_close_theme_selector,
 		          notify_archived_messages, auto_unarchive_on_message, notify_removed_saved_posts,
@@ -354,6 +358,7 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		settings.MediaGalleryFilter,
 		settings.ActiveThemeID,
 		settings.AdvancedModeEnabled,
+		settings.WallPostPermission,
 	).Scan(
 		&updated.UserID,
 		&updated.NotificationSound,
@@ -361,6 +366,7 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		&updated.ShowTypingIndicators,
 		&updated.ShowLastSeen,
 		&updated.ProfileVisibility,
+		&updated.WallPostPermission,
 		&updated.ShowPushNotifications,
 		&updated.AutoAppendInvitation,
 		&updated.Theme,

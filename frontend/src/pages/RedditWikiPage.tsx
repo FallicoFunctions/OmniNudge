@@ -407,7 +407,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
               <img
                 src={subredditIcon}
                 alt=""
-                className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
+                className="h-12 w-12 flex-shrink-0 rounded-lg object-cover"
                 loading="lazy"
                 decoding="async"
               />

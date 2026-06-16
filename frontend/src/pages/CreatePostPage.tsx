@@ -858,10 +858,10 @@ export default function CreatePostPage() {
                                       <img
                                         src={suggestion.icon_url}
                                         alt=""
-                                        className="h-6 w-6 rounded-full object-cover"
+                                        className="h-6 w-6 rounded-lg object-cover"
                                       />
                                     ) : (
-                                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs text-gray-600">
+                                      <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-200 text-xs text-gray-600">
                                         {t('common.prefix.subreddit')}
                                       </div>
                                     )}

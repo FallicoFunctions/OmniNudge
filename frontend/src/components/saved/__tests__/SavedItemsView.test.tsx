@@ -32,9 +32,6 @@ vi.mock('../../../services/postsService', () => ({
   },
 }));
 
-vi.mock('../../../services/reportService', () => ({
-  reportService: {},
-}));
 
 vi.mock('../../../components/hubs/HubPostCard', () => ({
   HubPostCard: ({ post }: { post: { title: string } }) => (

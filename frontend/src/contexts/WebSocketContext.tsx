@@ -5,6 +5,7 @@ import { API_BASE_URL, api } from '../lib/api';
 import type { InfiniteData } from '@tanstack/react-query';
 import type { Message, Conversation, WsMessagePinEvent, WsThreadUpdateEvent } from '../types/messages';
 import type { GetReactionsResponse, WsReactionAddedPayload, WsReactionRemovedPayload } from '../types/reactions';
+import { friendsQueryKeys } from '../services/friendsService';
 
 interface WebSocketMessage {
   type: string;
@@ -425,14 +426,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           break;
         }
 
-        case 'moderation_report_created':
-        case 'moderation_report_updated': {
-          console.log('[WebSocket] Moderation report event:', data.type, data.payload);
-          queryClient.invalidateQueries({ queryKey: ['modReports'] });
-          queryClient.invalidateQueries({ queryKey: ['adminStats'] });
-          break;
-        }
-
         case 'reaction_added': {
           const { message_id, conversation_id, reaction } = data.payload as WsReactionAddedPayload;
           console.log('[WebSocket] Reaction added:', message_id, reaction.emoji);
@@ -624,6 +617,23 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           window.dispatchEvent(new CustomEvent('ws-call-event', {
             detail: { type: data.type, payload: data.payload },
           }));
+          break;
+        }
+
+        case 'friend_request': {
+          // Someone sent us a friend request — invalidate so the badge and
+          // incoming list update immediately without waiting for the 30s poll.
+          queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
+          break;
+        }
+
+        case 'friend_request_accepted': {
+          // A pending request was accepted — update requests, friends list, and
+          // all per-user status caches so profile pages reflect the new state
+          // immediately without waiting for the 60-second stale window to expire.
+          queryClient.invalidateQueries({ queryKey: friendsQueryKeys.requests });
+          queryClient.invalidateQueries({ queryKey: friendsQueryKeys.friends });
+          queryClient.invalidateQueries({ queryKey: ['friends', 'status'] });
           break;
         }
 

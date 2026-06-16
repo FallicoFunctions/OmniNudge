@@ -165,7 +165,7 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 		return
 	}
 	if blockedByEither {
-		RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
+		RespondError(c, http.StatusNotFound, blockingSettingsErrorMessage)
 		return
 	}
 

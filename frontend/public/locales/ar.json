@@ -21,6 +21,7 @@
     "userNumber": "المستخدم رقم {{id}}",
     "user": "مستخدم",
     "unknownUser": "مستخدم غير معروف",
+    "previous": "السابق",
     "next": "التالي",
     "confirm": "تأكيد",
     "search": "بحث",
@@ -132,6 +133,7 @@
   },
   "menu": {
     "profile": "الملف الشخصي",
+    "activity": "النشاط",
     "settings": "الإعدادات",
     "hubs": "تصفح المجموعات",
     "games": "الألعاب",
@@ -479,7 +481,6 @@
       "userBans": "الحظر",
       "removalReasons": "أسباب الإزالة",
       "modLog": "سجل الإشراف",
-      "reports": "البلاغات",
       "modMail": "بريد المشرفين",
       "requests": "الطلبات"
     },
@@ -578,44 +579,6 @@
         "create_removal_reason": "أنشأ سبب إزالة",
         "update_removal_reason": "حدّث سبب إزالة",
         "delete_removal_reason": "حذف سبب إزالة"
-      }
-    },
-    "reports": {
-      "title": "قائمة البلاغات",
-      "empty": "لا توجد بلاغات في هذه القائمة.",
-      "meta": "المبلّغ #{{reporterId}} · الهدف #{{targetId}} · {{createdAt}}",
-      "sort": {
-        "priority": "الأولوية",
-        "recent": "الأحدث"
-      },
-      "status": {
-        "open": "مفتوح",
-        "approved": "مقبول",
-        "rejected": "مرفوض",
-        "no_action": "بدون إجراء",
-        "reviewed": "تمت المراجعة",
-        "dismissed": "مغلق"
-      },
-      "actions": {
-        "approve": "قبول",
-        "reject": "رفض",
-        "noAction": "بدون إجراء"
-      },
-      "targetType": {
-        "post": "منشور",
-        "comment": "تعليق",
-        "user": "مستخدم",
-        "message": "رسالة",
-        "reddit_comment": "تعليق Reddit"
-      },
-      "reason": {
-        "spam": "رسائل مزعجة",
-        "harassment": "تحرش",
-        "illegal_content": "محتوى غير قانوني",
-        "csam": "CSAM",
-        "violence": "عنف",
-        "hate_speech": "خطاب كراهية",
-        "other": "أخرى"
       }
     },
     "modMail": {
@@ -1210,31 +1173,37 @@
       "overview": "نظرة عامة",
       "posts": "المنشورات",
       "comments": "التعليقات",
+      "communities": "المجتمعات",
       "saved": "المحفوظات",
       "hidden": "المخفي",
       "subscribed": "المشترك به"
     },
     "headings": {
-      "recentPosts": "أحدث المنشورات",
-      "recentComments": "أحدث التعليقات",
-      "moderatorOf": "مشرف في"
+      "info": "معلومات",
+      "photos": "الصور",
+      "mutualFriends": "الأصدقاء المشتركون"
     },
     "labels": {
       "joined": "انضم {{time}}",
       "lastSeen": "آخر ظهور {{time}}",
-      "karma": "كارما",
-      "blocked": "محظور"
+      "blocked": "محظور",
+      "location": "الموقع",
+      "friends": "الأصدقاء",
+      "photos": "الصور",
+      "wallPosts": "منشوراتي",
+      "replies": "منشورات الأصدقاء"
+    },
+    "mutualFriends": {
+      "count_one": "{{count}} صديق مشترك",
+      "count_other": "{{count}} أصدقاء مشتركون"
     },
     "actions": {
-      "viewAll": "عرض الكل",
       "message": "رسالة",
       "editProfile": "تعديل الملف الشخصي",
       "viewThread": "عرض السلسلة",
       "block": "حظر",
       "unblock": "إلغاء الحظر",
-      "confirmBlock": "هل تريد حظر {{username}}؟ لن ترى رسائله.",
-      "report": "الإبلاغ عن المستخدم",
-      "reportFailed": "فشل إرسال البلاغ: {{message}}"
+      "confirmBlock": "هل تريد حظر {{username}}؟ لن ترى رسائله."
     },
     "posts": {
       "empty": "لا توجد منشورات بعد."
@@ -1242,13 +1211,20 @@
     "comments": {
       "onPost": "على <link>منشور #{{id}}</link>"
     },
+    "communities": {
+      "empty": "لست مشرفًا على أي مجتمع حتى الآن."
+    },
     "private": {
       "saved": "العناصر المحفوظة خاصة.",
       "hidden": "العناصر المخفية خاصة.",
       "subscribed": "الاشتراكات خاصة."
     },
     "errors": {
-      "loadFailed": "تعذر تحميل ملف المستخدم."
+      "loadFailed": "تعذر تحميل ملف المستخدم.",
+      "friendsLoadFailed": "تعذر تحميل أصدقاء هذا المستخدم."
+    },
+    "locked": {
+      "message": "هذا الملف الشخصي خاص. أضف هذا الشخص كصديق لرؤية ملفه الشخصي الكامل."
     },
     "aria": {
       "avatarAlt": "صورة {{username}}"
@@ -1264,15 +1240,67 @@
       "statusLabel": "نص الحالة",
       "statusPlaceholder": "بماذا تنشغل الآن؟",
       "statusCount": "{{count}} / 500",
+      "locationLabel": "الموقع",
+      "locationPlaceholder": "المدينة، البلد",
+      "locationCount": "{{count}} / 100",
       "bioLabel": "النبذة",
       "bioPlaceholder": "اكتب نبذة قصيرة عنك...",
       "bioCount": "{{count}} / 500",
       "errors": {
         "bioTooLong": "يجب ألا تتجاوز النبذة 500 حرف.",
         "statusTooLong": "يجب ألا يتجاوز نص الحالة 500 حرف.",
+        "locationTooLong": "يجب ألا يتجاوز الموقع 100 حرف.",
         "invalidAvatarUrl": "يجب أن يبدأ رابط الصورة بـ http:// أو https://",
         "uploadFailed": "فشل رفع الصورة الشخصية: {{message}}",
         "saveFailed": "فشل حفظ الملف الشخصي: {{message}}"
+      }
+    },
+    "friendsPage": {
+      "title": "أصدقاء {{username}}",
+      "backToProfile": "العودة إلى الملف الشخصي",
+      "empty": "لا يوجد أصدقاء حتى الآن.",
+      "loading": "جارٍ تحميل الأصدقاء…"
+    },
+    "activityPage": {
+      "title": "نشاط {{username}}",
+      "backToProfile": "العودة إلى الملف الشخصي"
+    },
+    "wall": {
+      "heading": "الحائط",
+      "composerPlaceholder": "اكتب شيئًا على هذا الحائط...",
+      "commentPlaceholder": "اكتب تعليقًا...",
+      "post": "نشر",
+      "posting": "جارٍ النشر…",
+      "comment": "تعليق",
+      "commenting": "جارٍ التعليق…",
+      "like": "إعجاب",
+      "comments": "التعليقات",
+      "noComments": "لا توجد تعليقات بعد.",
+      "empty": "لا توجد منشورات على هذا الحائط بعد.",
+      "emptyOwner": "لا توجد منشورات بعد. كن أول من يكتب شيئًا!",
+      "private": "هذا الحائط خاص.",
+      "delete": "حذف",
+      "deletePostConfirm": "حذف هذا المنشور من الحائط؟",
+      "deleteCommentConfirm": "حذف هذا التعليق؟",
+      "loadFailed": "تعذر تحميل منشورات الحائط.",
+      "postFailed": "فشل النشر على الحائط.",
+      "postPendingApproval": "منشورك في انتظار الموافقة.",
+      "commentFailed": "فشل نشر التعليق.",
+      "likeFailed": "فشل تحديث الإعجاب.",
+      "deleteFailed": "فشل الحذف.",
+      "attachMedia": "إرفاق صورة/فيديو",
+      "uploadingMedia": "جارٍ التحميل…",
+      "removeMedia": "إزالة",
+      "mediaUploadFailed": "فشل تحميل الملف.",
+      "tooManyMedia": "يمكنك إرفاق ما يصل إلى {{max}} ملفات.",
+      "previousMedia": "الوسائط السابقة",
+      "nextMedia": "الوسائط التالية",
+      "pending": {
+        "heading": "المنشورات المعلقة",
+        "approve": "قبول",
+        "reject": "رفض",
+        "approveFailed": "فشل قبول المنشور.",
+        "rejectFailed": "فشل رفض المنشور."
       }
     }
   },
@@ -1383,15 +1411,13 @@
     "send": "إرسال",
     "noMessages": "لا توجد رسائل بعد",
     "status": {
-      "loadingMessages": "جارٍ تحميل الرسائل...",
-      "reporting": "جارٍ الإبلاغ..."
+      "loadingMessages": "جارٍ تحميل الرسائل..."
     },
     "empty": {
       "startConversation": "لا توجد رسائل بعد. ابدأ المحادثة!"
     },
     "actions": {
       "loadOlder": "تحميل الرسائل الأقدم",
-      "report": "إبلاغ",
       "viewProfile": "عرض الملف الشخصي",
       "reply": "رد",
       "edit": "تحرير",
@@ -1539,7 +1565,7 @@
       "recipientKeyNotFound": "لم يتم العثور على المفتاح العام للمستلم",
       "encryptionKeysMissing": "مفاتيح التشفير الخاصة بك غير مُعدّة",
       "sendFailed": "فشل في إرسال الرسالة. يرجى المحاولة مرة أخرى.",
-      "reportFailed": "فشل إرسال البلاغ: {{message}}"
+      "userUnavailable": "هذا المستخدم غير متاح."
     },
     "editing": {
       "ariaInput": "تحرير نص الرسالة",
@@ -1710,10 +1736,6 @@
     "share": "مشاركة",
     "save": "حفظ",
     "hide": "إخفاء",
-    "report": {
-      "reasonPrompt": "سبب الإبلاغ (اختر واحدًا): spam, harassment, illegal_content, csam, violence, hate_speech, other",
-      "success": "شكرًا! تم إبلاغ فريق الإشراف."
-    },
     "delete": "حذف",
     "edit": "تعديل",
     "editModal": {
@@ -1746,7 +1768,6 @@
       "hide": "إخفاء",
       "share": "مشاركة",
       "crosspost": "نشر في مكان آخر",
-      "report": "إبلاغ",
       "pin": "تثبيت",
       "unpin": "إلغاء التثبيت",
       "inbox": "صندوق الوارد",
@@ -1774,7 +1795,6 @@
       "unhiding": "جارٍ إلغاء الإخفاء...",
       "deleting": "جاري الحذف...",
       "pinning": "جاري التثبيت...",
-      "reporting": "جاري الإبلاغ...",
       "updating": "جارٍ التحديث...",
       "unsaving": "جارٍ الإزالة من المحفوظات..."
     },
@@ -1837,38 +1857,6 @@
       "unknownUser": "مستخدم غير معروف"
     }
   },
-  "reporting": {
-    "reasonPrompt": "سبب الإبلاغ (اختر واحدًا): spam, harassment, illegal_content, csam, violence, hate_speech, other",
-    "detailsPrompt": "تفاصيل إضافية (اختياري):",
-    "invalidReason": "سبب غير صالح. استخدم أحد القيم التالية: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
-    "success": "شكرًا! تم إبلاغ فريق الإشراف.",
-    "successDetail": "سيراجع فريقنا تقريرك ويتخذ إجراءات خلال 24 ساعة.",
-    "reasons": {
-      "spam": "بريد مزعج",
-      "harassment": "مضايقة",
-      "illegalContent": "محتوى غير قانوني",
-      "csam": "CSAM",
-      "violence": "عنف",
-      "hateSpeech": "خطاب كراهية",
-      "other": "أخرى"
-    },
-    "modal": {
-      "title": "إرسال بلاغ",
-      "titleWithName": "الإبلاغ عن {{name}}",
-      "reasonLabel": "السبب",
-      "descriptionLabel": "تفاصيل إضافية",
-      "descriptionPlaceholder": "قدم أي سياق إضافي قد يساعد فريق الإشراف لدينا...",
-      "submit": "إرسال البلاغ",
-      "submitting": "جارٍ الإرسال...",
-      "cancel": "إلغاء",
-      "screenReaderDescription": "استخدم هذا النموذج للإبلاغ عن المحتوى الذي ينتهك إرشادات مجتمعنا. حدد سببًا وقدم تفاصيل إضافية اختياريًا.",
-      "characterCount": "{{current}} من {{max}} حرف"
-    },
-    "errors": {
-      "rateLimited": "لقد أرسلت عددًا كبيرًا جدًا من البلاغات مؤخرًا. يرجى الانتظار قبل إرسال بلاغ آخر.",
-      "failed": "فشل إرسال البلاغ: {{message}}"
-    }
-  },
   "comments": {
     "title": "التعليقات",
     "loading": "جاري تحميل التعليقات...",
@@ -1901,7 +1889,6 @@
       "delete": "حذف",
       "save": "حفظ",
       "unsave": "إلغاء الحفظ",
-      "report": "إبلاغ",
       "viewProfile": "عرض الملف الشخصي",
       "permalink": "الرابط الدائم",
       "collapse": "طي",
@@ -1913,7 +1900,6 @@
     "status": {
       "saving": "جاري الحفظ...",
       "deleting": "جاري الحذف...",
-      "reporting": "جاري الإبلاغ...",
       "inboxPending": "جاري تحديث صندوق الوارد...",
       "posting": "جارٍ النشر..."
     },
@@ -1931,7 +1917,6 @@
       "deleteFailed": "فشل حذف التعليق.",
       "inboxFailed": "فشل تحديث إعدادات صندوق الوارد.",
       "saveFailed": "فشل تحديث حالة الحفظ.",
-      "reportFailed": "فشل الإبلاغ عن التعليق.",
       "notFound": "تعذر العثور على هذا التعليق. ربما تمت إزالته."
     },
     "confirm": {
@@ -2197,10 +2182,14 @@
       "lastSeen": "آخر ظهور",
       "lastSeenHelp": "أظهر للآخرين متى كنت نشطاً آخر مرة. عند التعطيل، قد يتم إخفاء وقت آخر ظهور من العروض العامة للملف الشخصي.",
       "profileVisibility": "خصوصية الملف الشخصي",
-      "profileVisibilityHelp": "تحكم في من يمكنه عرض تفاصيل ملفك الشخصي العامة.",
+      "profileVisibilityHelp": "يمكن لأي شخص عرض الملفات الشخصية العامة. الملفات الشخصية الخاصة تعرض فقط اسم المستخدم وزر إضافة صديق لمن ليسوا أصدقاء.",
       "profileVisibilityPublic": "عام",
-      "profileVisibilityFriendsOnly": "الأصدقاء فقط",
-      "profileVisibilityPrivate": "خاص"
+      "profileVisibilityPrivate": "خاص",
+      "wallPostPermission": "إذن النشر على الحائط",
+      "wallPostPermissionHelp": "تحكم في إمكانية نشر الأصدقاء على حائطك، وما إذا كانت منشوراتهم تحتاج إلى موافقتك أولاً.",
+      "wallPostPermissionAllFriends": "يمكن لأي صديق النشر",
+      "wallPostPermissionRequiresApproval": "يمكن للأصدقاء النشر، ولكن يجب أن أوافق أولاً",
+      "wallPostPermissionNoOne": "لا يمكن لأحد النشر على حائطي"
     },
     "dateTime": {
       "title": "عروض التاريخ والوقت",
@@ -3889,6 +3878,52 @@
       "low": "جودة منخفضة",
       "medium": "جودة متوسطة",
       "high": "جودة عالية"
+    }
+  },
+  "friends": {
+    "title": "الأصدقاء",
+    "subtitle": "إدارة أصدقائك وطلبات الصداقة.",
+    "loading": "جاري التحميل...",
+    "empty": "ليس لديك أصدقاء بعد.",
+    "emptyHint": "قم بزيارة ملف شخصي لشخص ما وانقر على إضافة صديق للبدء.",
+    "friendsSince": "أصدقاء منذ {{date}}",
+    "tabs": {
+      "friends": "الأصدقاء",
+      "incoming": "الطلبات الواردة",
+      "outgoing": "الطلبات المرسلة"
+    },
+    "actions": {
+      "addFriend": "إضافة صديق",
+      "friends": "أصدقاء",
+      "accept": "قبول",
+      "decline": "رفض",
+      "cancelRequest": "إلغاء الطلب",
+      "unfriend": "إزالة الصداقة",
+      "seeAll": "عرض جميع الأصدقاء"
+    },
+    "incoming": {
+      "empty": "لا توجد طلبات صداقة معلقة.",
+      "sentAt": "تم الإرسال في {{date}}"
+    },
+    "outgoing": {
+      "empty": "لم ترسل أي طلبات صداقة.",
+      "sentAt": "تم الإرسال في {{date}}"
+    },
+    "errors": {
+      "loadFailed": "فشل تحميل الأصدقاء.",
+      "sendFailed": "تعذر إرسال طلب الصداقة. حاول مرة أخرى.",
+      "acceptFailed": "تعذر قبول الطلب. حاول مرة أخرى.",
+      "declineFailed": "تعذّر رفض الطلب. يرجى المحاولة مرة أخرى.",
+      "cancelFailed": "تعذر إلغاء الطلب. حاول مرة أخرى.",
+      "removeFailed": "تعذر إزالة الصديق. حاول مرة أخرى.",
+      "topFriendsFailed": "Failed to save top friends"
+    },
+    "toast": {
+      "sent": "تم إرسال طلب الصداقة",
+      "accepted": "أنتما أصدقاء الآن!",
+      "removed": "تمت إزالة الصديق",
+      "declined": "تم رفض الطلب",
+      "topFriendsUpdated": "Top friends updated"
     }
   }
 }

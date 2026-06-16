@@ -323,7 +323,7 @@ func TestUpdateSettings_PersistsProfileVisibility(t *testing.T) {
 	})
 
 	body := map[string]any{
-		"profile_visibility": "friends_only",
+		"profile_visibility": "private",
 	}
 	payload, _ := json.Marshal(body)
 
@@ -336,7 +336,87 @@ func TestUpdateSettings_PersistsProfileVisibility(t *testing.T) {
 	settings, err := settingsRepo.GetByUserID(context.Background(), userID)
 	require.NoError(t, err)
 	require.NotNil(t, settings)
-	assert.Equal(t, "friends_only", settings.ProfileVisibility)
+	assert.Equal(t, "private", settings.ProfileVisibility)
+}
+
+func TestUpdateSettings_RejectsInvalidWallPostPermission(t *testing.T) {
+	handler, _, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"wall_post_permission": "everyone",
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid wall_post_permission")
+}
+
+func TestUpdateSettings_PersistsWallPostPermission(t *testing.T) {
+	handler, settingsRepo, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	for _, v := range []string{"all_friends", "requires_approval", "no_one"} {
+		body := map[string]any{
+			"wall_post_permission": v,
+		}
+		payload, _ := json.Marshal(body)
+
+		req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+		settings, err := settingsRepo.GetByUserID(context.Background(), userID)
+		require.NoError(t, err)
+		require.NotNil(t, settings)
+		assert.Equal(t, v, settings.WallPostPermission)
+	}
+}
+
+func TestUpdateSettings_NormalizesWallPostPermissionCaseAndWhitespace(t *testing.T) {
+	handler, settingsRepo, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"wall_post_permission": "  REQUIRES_APPROVAL  ",
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	settings, err := settingsRepo.GetByUserID(context.Background(), userID)
+	require.NoError(t, err)
+	require.NotNil(t, settings)
+	assert.Equal(t, "requires_approval", settings.WallPostPermission)
 }
 
 func TestUpdateSettings_RejectsQuietHoursWithSameStartAndEndWhenEnabled(t *testing.T) {
@@ -513,7 +593,7 @@ func TestUpdateSettings_NormalizesProfileVisibilityCaseAndWhitespace(t *testing.
 	})
 
 	body := map[string]any{
-		"profile_visibility": "  FRIENDS_ONLY  ",
+		"profile_visibility": "  PRIVATE  ",
 	}
 	payload, _ := json.Marshal(body)
 
@@ -526,7 +606,7 @@ func TestUpdateSettings_NormalizesProfileVisibilityCaseAndWhitespace(t *testing.
 	settings, err := settingsRepo.GetByUserID(context.Background(), userID)
 	require.NoError(t, err)
 	require.NotNil(t, settings)
-	assert.Equal(t, "friends_only", settings.ProfileVisibility)
+	assert.Equal(t, "private", settings.ProfileVisibility)
 }
 
 func TestUpdateSettings_NormalizesAccessCooldownDisplayCaseAndWhitespace(t *testing.T) {

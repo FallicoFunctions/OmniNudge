@@ -200,9 +200,14 @@ func (h *CommentsHandler) GetComments(c *gin.Context) {
 		return
 	}
 
+	var viewerIDForBlock int
+	if userIDPtr != nil {
+		viewerIDForBlock = *userIDPtr
+	}
 	for _, comment := range comments {
 		comment.SanitizeDeletedPlaceholder()
 	}
+	redactBlockedComments(c.Request.Context(), h.pool, viewerIDForBlock, comments)
 
 	c.JSON(http.StatusOK, gin.H{
 		"comments": comments,
@@ -238,6 +243,21 @@ func (h *CommentsHandler) GetComment(c *gin.Context) {
 	if comment == nil {
 		RespondError(c, http.StatusNotFound, "Comment not found")
 		return
+	}
+
+	comment.SanitizeDeletedPlaceholder()
+
+	// For a single comment, a direct bidirectional block check is more efficient
+	// than the batched ANY($2) path used in GetComments/GetCommentReplies.
+	// This matches the pattern used in GetPost and getUserProfileResponse.
+	if viewerID, _ := middleware.GetOptionalUserID(c); viewerID != 0 && !comment.IsDeleted && comment.UserID != viewerID {
+		if blocked, err := models.IsBlockedBidirectional(c.Request.Context(), h.pool, comment.UserID, viewerID); err == nil && blocked {
+			comment.Body = models.BlockedCommentPlaceholder
+			comment.Username = models.BlockedCommentPlaceholder
+			comment.UserID = 0
+			comment.User = nil
+		}
+		// On DB error, fail open (same policy as redactBlockedComments).
 	}
 
 	c.JSON(http.StatusOK, comment)
@@ -282,9 +302,14 @@ func (h *CommentsHandler) GetCommentReplies(c *gin.Context) {
 		return
 	}
 
+	var viewerIDForBlock int
+	if userIDPtr != nil {
+		viewerIDForBlock = *userIDPtr
+	}
 	for _, reply := range replies {
 		reply.SanitizeDeletedPlaceholder()
 	}
+	redactBlockedComments(c.Request.Context(), h.pool, viewerIDForBlock, replies)
 
 	c.JSON(http.StatusOK, gin.H{
 		"replies": replies,

@@ -15,12 +15,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/services"
 	zlog "github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/sync/errgroup"
 )
 
 // UsersHandler serves public user profile data and profile management
@@ -35,6 +37,7 @@ type UsersHandler struct {
 	hubModRepo   ports.HubModeratorRepository
 	cache        services.Cache
 	thumbService *services.ThumbnailService
+	pool         *pgxpool.Pool
 }
 
 // NewUsersHandler creates a new UsersHandler
@@ -49,6 +52,7 @@ func NewUsersHandler(
 	hubModRepo ports.HubModeratorRepository,
 	cache services.Cache,
 	thumbService *services.ThumbnailService,
+	pool *pgxpool.Pool,
 ) *UsersHandler {
 	if cache == nil {
 		cache = services.NoopCache{}
@@ -67,6 +71,7 @@ func NewUsersHandler(
 		hubModRepo:   hubModRepo,
 		cache:        cache,
 		thumbService: thumbService,
+		pool:         pool,
 	}
 }
 
@@ -75,8 +80,10 @@ type UserProfileResponse struct {
 	ID        int                    `json:"id"`
 	Username  string                 `json:"username"`
 	AvatarURL *string                `json:"avatar_url,omitempty"`
+	BannerURL *string                `json:"banner_url,omitempty"`
 	Bio       *string                `json:"bio,omitempty"`
 	Status    *string                `json:"status_text,omitempty"`
+	Location  *string                `json:"location,omitempty"`
 	Karma     int                    `json:"karma"`
 	PublicKey *string                `json:"public_key,omitempty"`
 	CreatedAt string                 `json:"created_at"`
@@ -89,6 +96,14 @@ type ModeratedHubResponse struct {
 	ID    int     `json:"id"`
 	Name  string  `json:"name"`
 	Title *string `json:"title,omitempty"`
+}
+
+// LockedProfileResponse is returned for private profiles viewed by a non-friend:
+// only the username is exposed, so the viewer can send a friend request.
+type LockedProfileResponse struct {
+	ID       int    `json:"id"`
+	Username string `json:"username"`
+	Locked   bool   `json:"locked"`
 }
 
 // AgentStateRequest is used to fetch persistent interaction state for the authenticated user.
@@ -173,6 +188,22 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 		return
 	}
 
+	// Point 1: if the profile owner has blocked the viewer, return 404 so the
+	// blocked party cannot confirm the account exists.
+	if viewerID != 0 && viewerID != user.ID && h.pool != nil {
+		blocked, err := models.IsBlockedBidirectional(c.Request.Context(), h.pool, user.ID, viewerID)
+		if err != nil {
+			resultState = "error"
+			RespondError(c, http.StatusInternalServerError, "Failed to load profile")
+			return
+		}
+		if blocked {
+			resultState = "not_found"
+			RespondError(c, http.StatusNotFound, "User not found")
+			return
+		}
+	}
+
 	showLastSeen := true
 	profileVisibility := "public"
 	if h.settingsRepo != nil {
@@ -190,7 +221,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	}
 
 	viewerIsFriend := false
-	if viewerID > 0 && viewerID != user.ID && strings.EqualFold(strings.TrimSpace(profileVisibility), "friends_only") && h.friendRepo != nil {
+	if viewerID > 0 && viewerID != user.ID && strings.EqualFold(strings.TrimSpace(profileVisibility), "private") && h.friendRepo != nil {
 		isFriend, err := h.friendRepo.AreUsersFriends(c.Request.Context(), user.ID, viewerID)
 		if err != nil {
 			resultState = "error"
@@ -201,14 +232,20 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	}
 
 	if !canViewerSeeProfile(user.ID, viewerID, profileVisibility, viewerIsFriend) {
-		resultState = "not_found"
-		RespondError(c, http.StatusNotFound, "User not found")
+		resultState = "locked"
+		c.JSON(http.StatusOK, LockedProfileResponse{
+			ID:       user.ID,
+			Username: user.Username,
+			Locked:   true,
+		})
 		return
 	}
 
 	avatarURL := user.AvatarURL
 	bio := user.Bio
 	var statusText *string
+	var bannerURL *string
+	var location *string
 	if h.userProfRepo != nil {
 		profile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
 		if err != nil {
@@ -220,6 +257,8 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 			avatarURL = profile.AvatarURL
 			bio = profile.Bio
 			statusText = profile.StatusText
+			bannerURL = profile.BannerURL
+			location = profile.Location
 		}
 	}
 
@@ -261,8 +300,10 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 		ID:        user.ID,
 		Username:  user.Username,
 		AvatarURL: avatarURL,
+		BannerURL: bannerURL,
 		Bio:       bio,
 		Status:    statusText,
+		Location:  location,
 		Karma:     user.Karma,
 		PublicKey: user.PublicKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
@@ -291,14 +332,45 @@ func canViewerSeeProfile(profileUserID, viewerID int, profileVisibility string, 
 	switch strings.ToLower(strings.TrimSpace(profileVisibility)) {
 	case "", "public":
 		return true
-	case "friends_only":
-		return viewerIsFriend
 	case "private":
-		return false
+		return viewerIsFriend
 	default:
 		// Fail closed on invalid persisted values.
 		return false
 	}
+}
+
+// viewerCanSeeProfile applies the profile-visibility rules used by the main profile
+// endpoint to secondary per-user endpoints (top friends, friends list, mutual
+// friends, etc.). It is a package-level helper (rather than a method) so any
+// handler with access to a settings and friendship repository can reuse it.
+func viewerCanSeeProfile(ctx context.Context, settingsRepo ports.UserSettingsRepository, friendRepo ports.UserFriendshipRepository, user *models.User, viewerID int) (bool, error) {
+	if viewerID == user.ID {
+		return true, nil
+	}
+
+	profileVisibility := "public"
+	if settingsRepo != nil {
+		settings, err := settingsRepo.GetByUserID(ctx, user.ID)
+		if err != nil {
+			return false, err
+		}
+		if settings != nil && strings.TrimSpace(settings.ProfileVisibility) != "" {
+			profileVisibility = settings.ProfileVisibility
+		}
+	}
+
+	viewerIsFriend := false
+	if strings.EqualFold(strings.TrimSpace(profileVisibility), "private") &&
+		friendRepo != nil && viewerID > 0 {
+		isFriend, err := friendRepo.AreUsersFriends(ctx, user.ID, viewerID)
+		if err != nil {
+			return false, err
+		}
+		viewerIsFriend = isFriend
+	}
+
+	return canViewerSeeProfile(user.ID, viewerID, profileVisibility, viewerIsFriend), nil
 }
 
 // GetUserPosts returns posts by a user.
@@ -337,14 +409,27 @@ func (h *UsersHandler) GetUserPosts(c *gin.Context) {
 		limit = 20
 	}
 
-	posts, err := h.postRepo.GetByAuthor(c.Request.Context(), user.ID, limit, offset)
-	if err != nil {
+	var posts []*models.PlatformPost
+	var total int
+	g, gCtx := errgroup.WithContext(c.Request.Context())
+	g.Go(func() error {
+		var err error
+		posts, err = h.postRepo.GetByAuthor(gCtx, user.ID, limit, offset)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		total, err = h.postRepo.CountByAuthor(gCtx, user.ID)
+		return err
+	})
+	if err := g.Wait(); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch posts")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"posts":  posts,
+		"total":  total,
 		"limit":  limit,
 		"offset": offset,
 	})
@@ -441,14 +526,27 @@ func (h *UsersHandler) GetUserComments(c *gin.Context) {
 		limit = 20
 	}
 
-	comments, err := h.commentRepo.GetByUserID(c.Request.Context(), user.ID, limit, offset)
-	if err != nil {
+	var comments []*models.PostComment
+	var total int
+	g, gCtx := errgroup.WithContext(c.Request.Context())
+	g.Go(func() error {
+		var err error
+		comments, err = h.commentRepo.GetByUserID(gCtx, user.ID, limit, offset)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		total, err = h.commentRepo.CountByUserID(gCtx, user.ID)
+		return err
+	})
+	if err := g.Wait(); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch comments")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"comments": comments,
+		"total":    total,
 		"limit":    limit,
 		"offset":   offset,
 	})
@@ -458,6 +556,8 @@ type updateProfileRequest struct {
 	Bio       *string `json:"bio"`
 	AvatarURL *string `json:"avatar_url"`
 	Status    *string `json:"status_text"`
+	BannerURL *string `json:"banner_url"`
+	Location  *string `json:"location"`
 }
 
 const (
@@ -479,6 +579,20 @@ func localAvatarDiskPath(avatarURL string) (string, bool) {
 		return "", false
 	}
 	return cleaned, true
+}
+
+// normalizeOptionalText trims an optional profile text field and enforces a max
+// length. A blank result normalizes to nil so the field is cleared. ok is false
+// if the trimmed value exceeds maxLen.
+func normalizeOptionalText(raw string, maxLen int) (value *string, ok bool) {
+	trimmed := strings.TrimSpace(raw)
+	if len(trimmed) > maxLen {
+		return nil, false
+	}
+	if trimmed == "" {
+		return nil, true
+	}
+	return &trimmed, true
 }
 
 func isRequestBodyTooLarge(err error) bool {
@@ -528,19 +642,18 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 
 	// Validate bio length if provided
 	if req.Bio != nil {
-		bio := strings.TrimSpace(*req.Bio)
-		if len(bio) > 500 {
+		bio, ok := normalizeOptionalText(*req.Bio, 500)
+		if !ok {
 			RespondError(c, http.StatusBadRequest, "Bio must be 500 characters or less")
 			return
 		}
-		if bio == "" {
-			user.Bio = nil
-		} else {
-			user.Bio = &bio
-		}
+		user.Bio = bio
 	}
 
 	var statusText *string
+	var bannerURL *string
+	var topFriendsJSON *string
+	var location *string
 	if h.userProfRepo != nil {
 		existingProfile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
 		if err != nil {
@@ -549,19 +662,18 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		}
 		if existingProfile != nil {
 			statusText = existingProfile.StatusText
+			bannerURL = existingProfile.BannerURL
+			topFriendsJSON = existingProfile.TopFriendsJSON
+			location = existingProfile.Location
 		}
 	}
 	if req.Status != nil {
-		status := strings.TrimSpace(*req.Status)
-		if len(status) > 500 {
+		status, ok := normalizeOptionalText(*req.Status, 500)
+		if !ok {
 			RespondError(c, http.StatusBadRequest, "Status text must be 500 characters or less")
 			return
 		}
-		if status == "" {
-			statusText = nil
-		} else {
-			statusText = &status
-		}
+		statusText = status
 	}
 
 	// Validate avatar URL if provided
@@ -570,21 +682,45 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		if avatarURL == "" {
 			user.AvatarURL = nil
 		} else {
-			// Basic URL validation
-			if !strings.HasPrefix(avatarURL, "http://") && !strings.HasPrefix(avatarURL, "https://") {
+			if !strings.HasPrefix(avatarURL, "http://") && !strings.HasPrefix(avatarURL, "https://") && !strings.HasPrefix(avatarURL, "/uploads/avatars/") {
 				RespondError(c, http.StatusBadRequest, "Avatar URL must be a valid HTTP(S) URL")
 				return
 			}
 			user.AvatarURL = &avatarURL
 		}
 	}
+
+	// Validate and apply banner URL if provided
+	if req.BannerURL != nil {
+		bURL := strings.TrimSpace(*req.BannerURL)
+		if bURL == "" {
+			bannerURL = nil
+		} else {
+			if !strings.HasPrefix(bURL, "http://") && !strings.HasPrefix(bURL, "https://") && !strings.HasPrefix(bURL, "/uploads/banners/") {
+				RespondError(c, http.StatusBadRequest, "Banner URL must be a valid HTTP(S) URL")
+				return
+			}
+			bannerURL = &bURL
+		}
+	}
+
+	// Validate location if provided
+	if req.Location != nil {
+		loc, ok := normalizeOptionalText(*req.Location, 100)
+		if !ok {
+			RespondError(c, http.StatusBadRequest, "Location must be 100 characters or less")
+			return
+		}
+		location = loc
+	}
+
 	// Update profile
 	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, nil); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update profile")
 		return
 	}
 	if h.userProfRepo != nil {
-		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, statusText); err != nil {
+		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, statusText, bannerURL, topFriendsJSON, location); err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to update user profile")
 			return
 		}
@@ -595,8 +731,10 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		ID:        user.ID,
 		Username:  user.Username,
 		AvatarURL: user.AvatarURL,
+		BannerURL: bannerURL,
 		Bio:       user.Bio,
 		Status:    statusText,
+		Location:  location,
 		Karma:     user.Karma,
 		PublicKey: user.PublicKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
@@ -756,6 +894,9 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 
 	if h.userProfRepo != nil {
 		var statusText *string
+		var bannerURL *string
+		var topFriendsJSON *string
+		var location *string
 		profile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
 		if err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to fetch user profile")
@@ -763,11 +904,14 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 		}
 		if profile != nil {
 			statusText = profile.StatusText
+			bannerURL = profile.BannerURL
+			topFriendsJSON = profile.TopFriendsJSON
+			location = profile.Location
 			if profile.Bio != nil {
 				user.Bio = profile.Bio
 			}
 		}
-		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, statusText); err != nil {
+		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, statusText, bannerURL, topFriendsJSON, location); err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to persist user avatar")
 			return
 		}
@@ -782,6 +926,163 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"avatar_url":     avatarURL,
 		"thumbnail_size": avatarThumbSize,
+	})
+}
+
+const maxBannerUploadSize = 10 * 1024 * 1024
+
+func localBannerDiskPath(bannerURL string) (string, bool) {
+	if !strings.HasPrefix(bannerURL, "/uploads/banners/") {
+		return "", false
+	}
+	trimmed := strings.TrimPrefix(bannerURL, "/")
+	cleaned := filepath.Clean(trimmed)
+	if cleaned != trimmed || filepath.IsAbs(cleaned) {
+		return "", false
+	}
+	bannersRoot := filepath.Clean(filepath.Join("uploads", "banners"))
+	if cleaned != bannersRoot && !strings.HasPrefix(cleaned, bannersRoot+string(os.PathSeparator)) {
+		return "", false
+	}
+	return cleaned, true
+}
+
+// UploadMyBanner uploads a new cover/banner image for the authenticated user.
+// @Summary      Upload banner
+// @Tags         Users
+// @Security     BearerAuth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/banner [post]
+func (h *UsersHandler) UploadMyBanner(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBannerUploadSize+1024)
+	file, header, err := c.Request.FormFile("banner")
+	if err != nil {
+		if isRequestBodyTooLarge(err) {
+			RespondError(c, http.StatusRequestEntityTooLarge, "Banner exceeds 10MB limit")
+			return
+		}
+		file, header, err = c.Request.FormFile("file")
+		if err != nil {
+			if isRequestBodyTooLarge(err) {
+				RespondError(c, http.StatusRequestEntityTooLarge, "Banner exceeds 10MB limit")
+				return
+			}
+			RespondError(c, http.StatusBadRequest, "Banner file is required")
+			return
+		}
+	}
+	defer file.Close()
+
+	if header.Size <= 0 {
+		RespondError(c, http.StatusBadRequest, "Empty banner file is not allowed")
+		return
+	}
+
+	safeName := filepath.Base(header.Filename)
+	ext := strings.ToLower(filepath.Ext(safeName))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp":
+	default:
+		RespondError(c, http.StatusUnsupportedMediaType, "Unsupported banner file extension")
+		return
+	}
+
+	uploadDir := filepath.Join("uploads", "banners")
+	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to prepare banner storage")
+		return
+	}
+
+	filename := fmt.Sprintf("banner_%d_%d%s", userID, time.Now().UnixNano(), ext)
+	filePath := filepath.Join(uploadDir, filename)
+	dst, err := os.Create(filePath)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to create banner file")
+		return
+	}
+	defer dst.Close()
+
+	persist := false
+	defer func() {
+		if !persist {
+			_ = os.Remove(filePath)
+		}
+	}()
+
+	limited := io.LimitReader(file, maxBannerUploadSize+1)
+	var sniff [512]byte
+	n, _ := io.ReadFull(limited, sniff[:])
+	total := int64(n)
+
+	detected := http.DetectContentType(sniff[:n])
+	if !services.IsImageType(detected) {
+		RespondError(c, http.StatusUnsupportedMediaType, "Banner must be an image")
+		return
+	}
+	if !middleware.ValidateExtensionMatchesMIME(safeName, detected) {
+		RespondError(c, http.StatusUnsupportedMediaType, "Banner extension does not match file type")
+		return
+	}
+	if !middleware.ValidateNoSuspiciousSignatures(sniff[:n], detected) {
+		RespondError(c, http.StatusBadRequest, "Banner file contains suspicious data")
+		return
+	}
+	if n > 0 {
+		if _, err := dst.Write(sniff[:n]); err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to write banner file")
+			return
+		}
+	}
+	written, err := io.Copy(dst, limited)
+	total += written
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to save banner file")
+		return
+	}
+	if total > maxBannerUploadSize {
+		RespondError(c, http.StatusRequestEntityTooLarge, "Banner exceeds 10MB limit")
+		return
+	}
+
+	bannerURL := "/" + filepath.ToSlash(filePath)
+
+	if h.userProfRepo != nil {
+		var oldBannerURL *string
+		existing, err := h.userProfRepo.GetByUserID(c.Request.Context(), userID)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch user profile")
+			return
+		}
+		if existing != nil {
+			oldBannerURL = existing.BannerURL
+		}
+		bURL := bannerURL
+		if err := h.userProfRepo.UpdateBannerURL(c.Request.Context(), userID, &bURL); err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to persist banner")
+			return
+		}
+		if oldBannerURL != nil {
+			if path, ok := localBannerDiskPath(*oldBannerURL); ok {
+				_ = os.Remove(path)
+			}
+		}
+	}
+
+	h.invalidateProfileResponseCache(c.Request.Context(), userID)
+	persist = true
+
+	c.JSON(http.StatusOK, gin.H{
+		"banner_url": bannerURL,
 	})
 }
 
@@ -1038,4 +1339,297 @@ func (h *UsersHandler) UpdateLastAgentBrowseAt(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"last_agent_browse_at": timestamp.Format(time.RFC3339),
 	})
+}
+
+// topFriendsConfig is the JSON structure stored in user_profiles.top_friends_json.
+type topFriendsConfig struct {
+	Count      int      `json:"count"`
+	BestFriend string   `json:"best_friend,omitempty"`
+	Friends    []string `json:"friends"`
+}
+
+// TopFriendPreview is a resolved friend entry for API responses.
+type TopFriendPreview struct {
+	Username  string  `json:"username"`
+	AvatarURL *string `json:"avatar_url,omitempty"`
+}
+
+// TopFriendsResponse is returned by GetTopFriends.
+type TopFriendsResponse struct {
+	Count      int                `json:"count"`
+	BestFriend string             `json:"best_friend,omitempty"`
+	Friends    []TopFriendPreview `json:"friends"`
+}
+
+// GetTopFriends returns the configured top friends for a user profile.
+// @Summary      Get top friends
+// @Tags         Users
+// @Produce      json
+// @Param        username  path  string  true  "Username"
+// @Success      200  {object}  TopFriendsResponse
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/{username}/top-friends [get]
+func (h *UsersHandler) GetTopFriends(c *gin.Context) {
+	username := c.Param("username")
+
+	user, err := h.userRepo.GetByUsername(c.Request.Context(), username)
+	if err != nil || user == nil {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// Apply the same profile-visibility check used by the main profile endpoint.
+	var viewerID int
+	if v, _ := middleware.GetOptionalUserID(c); v != 0 {
+		viewerID = v
+	}
+	canSee, err := viewerCanSeeProfile(c.Request.Context(), h.settingsRepo, h.friendRepo, user, viewerID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load profile")
+		return
+	}
+	if !canSee {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if h.userProfRepo == nil {
+		c.JSON(http.StatusOK, TopFriendsResponse{Count: 0, Friends: []TopFriendPreview{}})
+		return
+	}
+
+	profile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch profile")
+		return
+	}
+	if profile == nil || profile.TopFriendsJSON == nil {
+		c.JSON(http.StatusOK, TopFriendsResponse{Count: 0, Friends: []TopFriendPreview{}})
+		return
+	}
+
+	var cfg topFriendsConfig
+	if err := json.Unmarshal([]byte(*profile.TopFriendsJSON), &cfg); err != nil {
+		zlog.Error().Err(err).Int("userID", user.ID).Msg("GetTopFriends: corrupt top_friends_json in DB")
+		RespondError(c, http.StatusInternalServerError, "Failed to load top friends")
+		return
+	}
+
+	previews := make([]TopFriendPreview, 0, len(cfg.Friends))
+	for _, friendUsername := range cfg.Friends {
+		fu, ferr := h.userRepo.GetByUsername(c.Request.Context(), friendUsername)
+		if ferr != nil {
+			// Distinguish a real DB error from a legitimately missing user.
+			zlog.Error().Err(ferr).Str("friend", friendUsername).Msg("GetTopFriends: error fetching friend user")
+			RespondError(c, http.StatusInternalServerError, "Failed to load top friends")
+			return
+		}
+		if fu == nil {
+			// Friend account no longer exists — skip silently.
+			continue
+		}
+		preview := TopFriendPreview{Username: fu.Username}
+		fp, fperr := h.userProfRepo.GetByUserID(c.Request.Context(), fu.ID)
+		if fperr != nil {
+			zlog.Error().Err(fperr).Int("friendID", fu.ID).Msg("GetTopFriends: error fetching friend profile")
+			RespondError(c, http.StatusInternalServerError, "Failed to load top friends")
+			return
+		}
+		if fp != nil && fp.AvatarURL != nil {
+			preview.AvatarURL = fp.AvatarURL
+		} else if fu.AvatarURL != nil {
+			preview.AvatarURL = fu.AvatarURL
+		}
+		previews = append(previews, preview)
+	}
+
+	// Return the actual resolved count rather than the stored count, which may
+	// be stale if friends have since deleted their accounts.
+	c.JSON(http.StatusOK, TopFriendsResponse{
+		Count:      len(previews),
+		BestFriend: cfg.BestFriend,
+		Friends:    previews,
+	})
+}
+
+// setTopFriendsRequest is the request body for SetTopFriends.
+type setTopFriendsRequest struct {
+	Count      int      `json:"count"`
+	BestFriend string   `json:"best_friend,omitempty"`
+	Friends    []string `json:"friends"`
+}
+
+// SetTopFriends saves the authenticated user's top friends configuration.
+// @Summary      Set top friends
+// @Tags         Users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/top-friends [put]
+func (h *UsersHandler) SetTopFriends(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	var req setTopFriendsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	const maxTopFriends = 8
+	if req.Count < 0 || req.Count > maxTopFriends {
+		RespondError(c, http.StatusBadRequest, fmt.Sprintf("Count must be between 0 and %d", maxTopFriends))
+		return
+	}
+
+	if req.Count == 0 {
+		req.Friends = nil
+		req.BestFriend = ""
+	} else {
+		if len(req.Friends) != req.Count {
+			RespondError(c, http.StatusBadRequest, fmt.Sprintf("Expected %d friends, got %d", req.Count, len(req.Friends)))
+			return
+		}
+		// Validate uniqueness
+		seen := make(map[string]bool, len(req.Friends))
+		for _, f := range req.Friends {
+			if seen[f] {
+				RespondError(c, http.StatusBadRequest, "Duplicate friends are not allowed")
+				return
+			}
+			seen[f] = true
+		}
+		// Validate best_friend is in the list
+		if req.BestFriend != "" && !seen[req.BestFriend] {
+			RespondError(c, http.StatusBadRequest, "Best friend must be in the friends list")
+			return
+		}
+		// Validate each listed user is actually a friend
+		if h.friendRepo != nil {
+			for _, friendUsername := range req.Friends {
+				fu, ferr := h.userRepo.GetByUsername(c.Request.Context(), friendUsername)
+				if ferr != nil {
+					RespondError(c, http.StatusInternalServerError, "Failed to validate friends")
+					return
+				}
+				if fu == nil {
+					RespondError(c, http.StatusBadRequest, fmt.Sprintf("User %q not found", friendUsername))
+					return
+				}
+				isFriend, ferr2 := h.friendRepo.AreUsersFriends(c.Request.Context(), userID, fu.ID)
+				if ferr2 != nil {
+					RespondError(c, http.StatusInternalServerError, "Failed to validate friendship")
+					return
+				}
+				if !isFriend {
+					RespondError(c, http.StatusBadRequest, fmt.Sprintf("%q is not your friend", friendUsername))
+					return
+				}
+			}
+		}
+	}
+
+	if h.userProfRepo == nil {
+		RespondError(c, http.StatusInternalServerError, "Profile service unavailable")
+		return
+	}
+
+	cfg := topFriendsConfig{
+		Count:      req.Count,
+		BestFriend: req.BestFriend,
+		Friends:    req.Friends,
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to serialize top friends")
+		return
+	}
+	jsonStr := string(data)
+
+	// Use a targeted single-column update to avoid the read-modify-write race
+	// that would occur if we read all profile fields then Upsert everything back.
+	if err := h.userProfRepo.UpdateTopFriends(c.Request.Context(), userID, &jsonStr); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to save top friends")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Top friends updated"})
+}
+
+// UserFriendsResponse is returned by GetUserFriends.
+type UserFriendsResponse struct {
+	Friends []models.FriendEntry `json:"friends"`
+}
+
+// GetUserFriends returns the accepted friends list for a user profile, subject to
+// the same visibility rules as the profile itself.
+// @Summary      Get user friends
+// @Tags         Users
+// @Produce      json
+// @Param        username  path  string  true  "Username"
+// @Success      200  {object}  UserFriendsResponse
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/{username}/friends [get]
+func (h *UsersHandler) GetUserFriends(c *gin.Context) {
+	username := c.Param("username")
+
+	user, err := h.userRepo.GetByUsername(c.Request.Context(), username)
+	if err != nil || user == nil {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+
+	var viewerID int
+	if v, _ := middleware.GetOptionalUserID(c); v != 0 {
+		viewerID = v
+	}
+	if isPendingDeletionHiddenFromViewer(user, viewerID) {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if viewerID != 0 && viewerID != user.ID && h.pool != nil {
+		blocked, err := models.IsBlockedBidirectional(c.Request.Context(), h.pool, user.ID, viewerID)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to load profile")
+			return
+		}
+		if blocked {
+			RespondError(c, http.StatusNotFound, "User not found")
+			return
+		}
+	}
+
+	canSee, err := viewerCanSeeProfile(c.Request.Context(), h.settingsRepo, h.friendRepo, user, viewerID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load profile")
+		return
+	}
+	if !canSee {
+		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if h.friendRepo == nil {
+		c.JSON(http.StatusOK, UserFriendsResponse{Friends: []models.FriendEntry{}})
+		return
+	}
+
+	friends, err := h.friendRepo.ListFriends(c.Request.Context(), user.ID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load friends")
+		return
+	}
+	if friends == nil {
+		friends = []models.FriendEntry{}
+	}
+	c.JSON(http.StatusOK, UserFriendsResponse{Friends: friends})
 }

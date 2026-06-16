@@ -70,7 +70,7 @@ export const AboutPanel: React.FC<AboutPanelProps> = ({
             <img
               src={icon}
               alt=""
-              className="mt-3 h-12 w-12 rounded-full object-cover"
+              className="mt-3 h-12 w-12 rounded-lg object-cover"
               loading="lazy"
             />
           )}

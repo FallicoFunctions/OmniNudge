@@ -24,6 +24,12 @@ export default defineConfig({
     headers: {
       'Cache-Control': 'no-store',
     },
+    proxy: {
+      '/uploads': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     rollupOptions: {

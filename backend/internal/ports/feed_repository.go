@@ -8,5 +8,5 @@ import (
 
 // FeedRepository defines persistence operations for the unified feed.
 type FeedRepository interface {
-	GetUnifiedFeed(ctx context.Context, sortBy string, limit, offset int, sourceFilter string) ([]*domain.UnifiedFeedItem, error)
+	GetUnifiedFeed(ctx context.Context, sortBy string, limit, offset int, sourceFilter string, excludeAuthorIDs []int) ([]*domain.UnifiedFeedItem, error)
 }

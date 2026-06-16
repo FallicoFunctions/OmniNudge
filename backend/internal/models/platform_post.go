@@ -412,9 +412,66 @@ func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, 
 	return posts, rows.Err()
 }
 
+// CountByAuthor returns the total number of non-deleted posts by an author,
+// regardless of pagination, for use in profile stats.
+func (r *PlatformPostRepository) CountByAuthor(ctx context.Context, authorID int) (int, error) {
+	var count int
+	err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
+		WHERE p.author_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE
+	`, authorID).Scan(&count)
+	return count, err
+}
+
 // GetByHub retrieves posts by hub
 func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy string, limit, offset int) ([]*PlatformPost, error) {
 	return r.GetByHubWithUser(ctx, hubID, sortBy, limit, offset, nil, nil, nil)
+}
+
+// scanPlatformPostRows drains a query result set into a []*PlatformPost slice.
+// Extracted so both getByHubWithUser and GetByHubExcludingAuthors share the
+// same scan logic — a single place to update when new columns are added.
+func scanPlatformPostRows(rows pgx.Rows) ([]*PlatformPost, error) {
+	var posts []*PlatformPost
+	for rows.Next() {
+		post := &PlatformPost{}
+		if err := scanPlatformPostWithUserInfo(rows, post); err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+	return posts, rows.Err()
+}
+
+// GetByHubExcludingAuthors is like GetByHub but filters out posts from the
+// given author IDs at the DB layer so pagination remains consistent.
+// Pass viewerID when the caller has an authenticated user so that per-user
+// vote and comment state is included in the response.
+// If excludeAuthorIDs is empty the call delegates to GetByHubWithUser unchanged.
+func (r *PlatformPostRepository) GetByHubExcludingAuthors(ctx context.Context, hubID int, sortBy string, limit, offset int, viewerID *int, excludeAuthorIDs []int) ([]*PlatformPost, error) {
+	if len(excludeAuthorIDs) == 0 {
+		return r.GetByHubWithUser(ctx, hubID, sortBy, limit, offset, viewerID, nil, nil)
+	}
+	// Build on top of the shared base query.
+	// Params: $1=hubID, $2=limit, $3=offset, $4=viewerID, $5=excludeAuthorIDs
+	orderClause := buildPlatformPostOrder(sortBy, false)
+	query := buildHubPostsBaseQuery(nil, 4) + `
+		AND p.author_id != ALL($5)
+		` + orderClause + `
+		LIMIT $2 OFFSET $3
+	`
+	var userIDArg interface{}
+	if viewerID != nil {
+		userIDArg = *viewerID
+	}
+	args := []interface{}{hubID, limit, offset, userIDArg, excludeAuthorIDs}
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanPlatformPostRows(rows)
 }
 
 func buildHubPinnedClause(pinnedFilter *bool) string {
@@ -480,17 +537,7 @@ func (r *PlatformPostRepository) getByHubWithUser(
 		return nil, err
 	}
 	defer rows.Close()
-
-	var posts []*PlatformPost
-	for rows.Next() {
-		post := &PlatformPost{}
-		if err := scanPlatformPostWithUserInfo(rows, post); err != nil {
-			return nil, err
-		}
-		posts = append(posts, post)
-	}
-
-	return posts, rows.Err()
+	return scanPlatformPostRows(rows)
 }
 
 // GetByHubWithUser retrieves posts by hub with optional user vote information

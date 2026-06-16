@@ -465,6 +465,16 @@ func (r *PostCommentRepository) GetByUserID(ctx context.Context, userID int, lim
 	return comments, rows.Err()
 }
 
+// CountByUserID returns the total number of non-deleted comments by a user,
+// regardless of pagination, for use in profile stats.
+func (r *PostCommentRepository) CountByUserID(ctx context.Context, userID int) (int, error) {
+	var count int
+	err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM post_comments WHERE user_id = $1 AND is_deleted = FALSE
+	`, userID).Scan(&count)
+	return count, err
+}
+
 // Update updates a comment's content
 func (r *PostCommentRepository) Update(ctx context.Context, comment *PostComment) error {
 	query := `

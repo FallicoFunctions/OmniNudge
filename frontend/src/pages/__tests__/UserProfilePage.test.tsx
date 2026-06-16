@@ -31,9 +31,6 @@ vi.mock('../../components/subscriptions/SubscribedView', () => ({
 vi.mock('../../components/profile/EditProfileModal', () => ({
   default: () => null,
 }));
-vi.mock('../../components/moderation/ReportModal', () => ({
-  ReportModal: () => null,
-}));
 
 import { usersService } from '../../services/usersService';
 import { useAuth } from '../../contexts/AuthContext';

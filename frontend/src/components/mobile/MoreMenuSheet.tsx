@@ -109,14 +109,6 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
       section: 'settings',
       testId: 'menu-admin-button'
     },
-    {
-      icon: Shield,
-      label: t('common.modTools'),
-      onClick: () => handleNavigate('/mod/reports', 'Moderation'),
-      show: user?.role === 'admin' || user?.role === 'moderator',
-      section: 'settings',
-      testId: 'menu-moderation-button'
-    },
     // Auth section
     {
       icon: LogIn,

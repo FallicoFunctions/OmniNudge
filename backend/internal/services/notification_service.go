@@ -242,6 +242,111 @@ func (s *NotificationService) NotifyCommentReply(
 	return s.sendNotification(ctx, notification)
 }
 
+// NotifyWallPost notifies a profile owner that someone posted on their wall.
+func (s *NotificationService) NotifyWallPost(ctx context.Context, profileUserID, authorID, wallPostID int, authorUsername string) {
+	if profileUserID == authorID {
+		return
+	}
+
+	contentType := "wall_post"
+	notif := &models.Notification{
+		UserID:           profileUserID,
+		NotificationType: "wall_post",
+		ContentType:      &contentType,
+		ContentID:        &wallPostID,
+		ActorID:          &authorID,
+		Message:          fmt.Sprintf("%s posted on your wall", authorUsername),
+	}
+
+	if err := s.sendNotification(ctx, notif); err != nil {
+		log.Printf("[NotificationService] NotifyWallPost: failed for wall post %d actor %d: %v", wallPostID, authorID, err)
+	}
+}
+
+// NotifyWallPostPending notifies a profile owner that a friend's wall post needs approval.
+func (s *NotificationService) NotifyWallPostPending(ctx context.Context, profileUserID, authorID, wallPostID int, authorUsername string) {
+	if profileUserID == authorID {
+		return
+	}
+
+	contentType := "wall_post"
+	notif := &models.Notification{
+		UserID:           profileUserID,
+		NotificationType: "wall_post_pending",
+		ContentType:      &contentType,
+		ContentID:        &wallPostID,
+		ActorID:          &authorID,
+		Message:          fmt.Sprintf("%s's wall post is awaiting your approval", authorUsername),
+	}
+
+	if err := s.sendNotification(ctx, notif); err != nil {
+		log.Printf("[NotificationService] NotifyWallPostPending: failed for wall post %d actor %d: %v", wallPostID, authorID, err)
+	}
+}
+
+// NotifyWallPostApproved notifies a wall post's author that the profile owner approved it.
+func (s *NotificationService) NotifyWallPostApproved(ctx context.Context, authorID, profileUserID, wallPostID int, profileUsername string) {
+	if authorID == profileUserID {
+		return
+	}
+
+	contentType := "wall_post"
+	notif := &models.Notification{
+		UserID:           authorID,
+		NotificationType: "wall_post_approved",
+		ContentType:      &contentType,
+		ContentID:        &wallPostID,
+		ActorID:          &profileUserID,
+		Message:          fmt.Sprintf("%s approved your wall post", profileUsername),
+	}
+
+	if err := s.sendNotification(ctx, notif); err != nil {
+		log.Printf("[NotificationService] NotifyWallPostApproved: failed for wall post %d actor %d: %v", wallPostID, profileUserID, err)
+	}
+}
+
+// NotifyWallComment notifies a wall post's author that someone commented on it.
+func (s *NotificationService) NotifyWallComment(ctx context.Context, postAuthorID, commenterID, wallPostID int, commenterUsername string) {
+	if postAuthorID == commenterID {
+		return
+	}
+
+	contentType := "wall_post"
+	notif := &models.Notification{
+		UserID:           postAuthorID,
+		NotificationType: "wall_comment",
+		ContentType:      &contentType,
+		ContentID:        &wallPostID,
+		ActorID:          &commenterID,
+		Message:          fmt.Sprintf("%s commented on your wall post", commenterUsername),
+	}
+
+	if err := s.sendNotification(ctx, notif); err != nil {
+		log.Printf("[NotificationService] NotifyWallComment: failed for wall post %d actor %d: %v", wallPostID, commenterID, err)
+	}
+}
+
+// NotifyWallLike notifies a wall post's author that someone liked it.
+func (s *NotificationService) NotifyWallLike(ctx context.Context, postAuthorID, likerID, wallPostID int, likerUsername string) {
+	if postAuthorID == likerID {
+		return
+	}
+
+	contentType := "wall_post"
+	notif := &models.Notification{
+		UserID:           postAuthorID,
+		NotificationType: "wall_like",
+		ContentType:      &contentType,
+		ContentID:        &wallPostID,
+		ActorID:          &likerID,
+		Message:          fmt.Sprintf("%s liked your wall post", likerUsername),
+	}
+
+	if err := s.sendNotification(ctx, notif); err != nil {
+		log.Printf("[NotificationService] NotifyWallLike: failed for wall post %d actor %d: %v", wallPostID, likerID, err)
+	}
+}
+
 // NotifyMessageReaction sends an in-app notification to the message author when
 // someone reacts to their message. The notification is always delivered in-app;
 // push delivery follows the user's ShowPushNotifications preference.
@@ -600,8 +705,24 @@ func (s *NotificationService) deliverNotification(ctx context.Context, notificat
 	}
 }
 
-// sendNotification creates and delivers a notification
+// sendNotification creates and delivers a notification.
+// Point 8: if the actor (source of the event) has blocked the recipient
+// (or vice versa), the notification is silently dropped.
 func (s *NotificationService) sendNotification(ctx context.Context, notification *models.Notification) error {
+	if s.pool != nil && notification.ActorID != nil && *notification.ActorID != 0 {
+		blocked, err := models.IsBlockedBidirectional(ctx, s.pool, *notification.ActorID, notification.UserID)
+		if err != nil {
+			// Fail closed: uncertain block status → drop the notification.
+			// Log so the loss is observable in monitoring.
+			log.Printf("notification: block check failed for actor=%d recipient=%d type=%s err=%v; dropping notification",
+				*notification.ActorID, notification.UserID, notification.NotificationType, err)
+			return nil
+		}
+		if blocked {
+			return nil // drop silently — a blocked actor's action should not reach the recipient
+		}
+	}
+
 	// Save to database (persistent storage)
 	if err := s.notifRepo.Create(ctx, notification); err != nil {
 		return err

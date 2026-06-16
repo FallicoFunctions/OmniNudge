@@ -576,15 +576,6 @@ func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 		TotalHubs                int     `json:"total_hubs"`
 		TotalConversations       int     `json:"total_conversations"`
 		TotalMessages            int     `json:"total_messages"`
-		TotalReports             int     `json:"total_reports"`
-		OpenReports              int     `json:"open_reports"`
-		ApprovedReports          int     `json:"approved_reports"`
-		RejectedReports          int     `json:"rejected_reports"`
-		NoActionReports          int     `json:"no_action_reports"`
-		ReviewedReports          int     `json:"reviewed_reports"`
-		DismissedReports         int     `json:"dismissed_reports"`
-		FalseReportRatePct       float64 `json:"false_report_rate_pct"`
-		AvgReportResolutionHours float64 `json:"avg_report_resolution_hours"`
 		AdminCount               int     `json:"admin_count"`
 		ModeratorCount           int     `json:"moderator_count"`
 	}
@@ -599,7 +590,6 @@ func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 		`SELECT COUNT(*) FROM hubs`:                          &stats.TotalHubs,
 		`SELECT COUNT(*) FROM conversations`:                 &stats.TotalConversations,
 		`SELECT COUNT(*) FROM messages`:                      &stats.TotalMessages,
-		`SELECT COUNT(*) FROM reports`:                       &stats.TotalReports,
 		`SELECT COUNT(*) FROM users WHERE role = 'admin'`:    &stats.AdminCount,
 		`SELECT COUNT(DISTINCT user_id) FROM hub_moderators`: &stats.ModeratorCount,
 	}
@@ -628,41 +618,6 @@ func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 			RespondError(c, http.StatusInternalServerError, "Failed to fetch stats")
 			return
 		}
-	}
-
-	if err := h.pool.QueryRow(ctx, `
-		SELECT
-			COUNT(*) FILTER (WHERE status = 'open'),
-			COUNT(*) FILTER (WHERE status = 'approved'),
-			COUNT(*) FILTER (WHERE status = 'rejected'),
-			COUNT(*) FILTER (WHERE status = 'no_action'),
-			COUNT(*) FILTER (WHERE status = 'reviewed'),
-			COUNT(*) FILTER (WHERE status = 'dismissed')
-		FROM reports
-	`).Scan(
-		&stats.OpenReports,
-		&stats.ApprovedReports,
-		&stats.RejectedReports,
-		&stats.NoActionReports,
-		&stats.ReviewedReports,
-		&stats.DismissedReports,
-	); err != nil {
-		RespondError(c, http.StatusInternalServerError, "Failed to fetch report status stats")
-		return
-	}
-
-	if err := h.pool.QueryRow(ctx, `
-		SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))) / 3600.0, 0)
-		FROM reports
-		WHERE resolved_at IS NOT NULL
-	`).Scan(&stats.AvgReportResolutionHours); err != nil {
-		RespondError(c, http.StatusInternalServerError, "Failed to fetch average report resolution time")
-		return
-	}
-
-	resolvedCount := stats.ApprovedReports + stats.RejectedReports + stats.NoActionReports + stats.ReviewedReports + stats.DismissedReports
-	if resolvedCount > 0 {
-		stats.FalseReportRatePct = (float64(stats.RejectedReports) / float64(resolvedCount)) * 100.0
 	}
 
 	c.JSON(http.StatusOK, stats)

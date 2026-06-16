@@ -72,7 +72,7 @@ function ParticipantRow({
 
   return (
     <div className="flex items-center gap-2 px-4 py-2 hover:bg-[var(--color-hover)] relative">
-      <div className="h-8 w-8 rounded-full bg-[var(--color-primary)]/20 flex items-center justify-center text-sm font-semibold text-[var(--color-primary)] shrink-0">
+      <div className="h-8 w-8 rounded-lg bg-[var(--color-primary)]/20 flex items-center justify-center text-sm font-semibold text-[var(--color-primary)] shrink-0">
         {participant.username[0].toUpperCase()}
       </div>
       <div className="flex-1 min-w-0">

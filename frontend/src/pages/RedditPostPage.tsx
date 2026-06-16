@@ -48,7 +48,6 @@ import { loadHls } from '../utils/hlsLoader';
 import { RedditPostMedia } from '../components/reddit/RedditPostMedia';
 import { useFormat } from '../hooks/useFormat';
 import { buildRedditCommentEmbedHtml } from '../utils/redditEmbed';
-import { normalizeReportReason, reportService, type ReportReason } from '../services/reportService';
 
 interface RedditComment {
   kind: string;
@@ -341,7 +340,6 @@ function RedditCommentView({
   onEdit,
   onDelete,
   onToggleInbox,
-  onReport,
   useRelativeTime,
   isRedditUserBlocked,
   postTitle,
@@ -364,7 +362,6 @@ function RedditCommentView({
   onEdit: (commentId: number, content: string) => Promise<void>;
   onDelete: (commentId: number) => Promise<void>;
   onToggleInbox: (commentId: number, nextValue: boolean) => Promise<void>;
-  onReport: (commentId: number) => Promise<void>;
   useRelativeTime: boolean;
   isRedditUserBlocked: (username?: string | null) => boolean;
   postTitle?: string;
@@ -620,7 +617,6 @@ function RedditCommentView({
                     onEdit={onEdit}
                     onDelete={onDelete}
                     onToggleInbox={onToggleInbox}
-                    onReport={onReport}
                     isRedditUserBlocked={isRedditUserBlocked}
                     useRelativeTime={useRelativeTime}
                     postTitle={postTitle}
@@ -649,7 +645,6 @@ function RedditCommentView({
                       onEdit={onEdit}
                       onDelete={onDelete}
                       onToggleInbox={onToggleInbox}
-                      onReport={onReport}
                       useRelativeTime={useRelativeTime}
                     />
                   ))}
@@ -678,7 +673,6 @@ interface LocalCommentViewProps {
   onEdit: (commentId: number, content: string) => Promise<void>;
   onDelete: (commentId: number) => Promise<void>;
   onToggleInbox: (commentId: number, nextValue: boolean) => Promise<void>;
-  onReport: (commentId: number) => Promise<void>;
   useRelativeTime: boolean;
 }
 
@@ -698,7 +692,6 @@ function LocalCommentView({
   onEdit,
   onDelete,
   onToggleInbox,
-  onReport,
   useRelativeTime,
 }: LocalCommentViewProps) {
   const { t } = useTranslation();
@@ -710,7 +703,6 @@ function LocalCommentView({
   const [isSavingToggle, setIsSavingToggle] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdatingInbox, setIsUpdatingInbox] = useState(false);
-  const [isReporting, setIsReporting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const { formatDate, formatRelativeTime: formatRelativeTimeIntl, formatNumber } = useFormat();
 
@@ -826,18 +818,6 @@ function LocalCommentView({
       setActionError(err instanceof Error ? err.message : t('comments.errors.inboxFailed'));
     } finally {
       setIsUpdatingInbox(false);
-    }
-  };
-
-  const handleReport = async () => {
-    setIsReporting(true);
-    setActionError(null);
-    try {
-      await onReport(comment.id);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : t('comments.errors.reportFailed'));
-    } finally {
-      setIsReporting(false);
     }
   };
 
@@ -1002,15 +982,7 @@ function LocalCommentView({
                     {t('comments.actions.delete')}
                   </button>
                 </>
-              ) : (
-                <button
-                  onClick={handleReport}
-                  disabled={isReporting}
-                  className="text-red-500 hover:text-red-600 disabled:opacity-50"
-                >
-                  {t('comments.actions.report')}
-                </button>
-              )}
+              ) : null}
               <button
                 onClick={() => onReply(comment.id)}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
@@ -1071,7 +1043,6 @@ function LocalCommentView({
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onToggleInbox={onToggleInbox}
-                onReport={onReport}
                 useRelativeTime={useRelativeTime}
               />
             ))}
@@ -1561,25 +1532,6 @@ export default function RedditPostPage() {
     },
   });
 
-  const reportCommentMutation = useMutation({
-    mutationFn: async ({
-      commentId: redditCommentId,
-      reason,
-      description,
-    }: {
-      commentId: number;
-      reason: ReportReason;
-      description?: string;
-    }) => {
-      await reportService.createReport({
-        targetType: 'reddit_comment',
-        targetId: redditCommentId,
-        reason,
-        description,
-      });
-    },
-  });
-
   const originPathFromState = (location.state as { originPath?: string } | undefined)?.originPath;
 
   const redirectAfterHide = () => {
@@ -1743,23 +1695,6 @@ export default function RedditPostPage() {
 
   const handleToggleInbox = (commentIdValue: number, nextValue: boolean) =>
     inboxPreferenceMutation.mutateAsync({ commentId: commentIdValue, nextValue });
-
-  const handleReportComment = async (commentIdValue: number) => {
-    const reasonInput = window.prompt(t('reporting.reasonPrompt'));
-    if (reasonInput === null) return;
-    const reason = normalizeReportReason(reasonInput);
-    if (!reason) {
-      alert(t('reporting.invalidReason'));
-      return;
-    }
-    const detailsInput = window.prompt(t('reporting.detailsPrompt'));
-    await reportCommentMutation.mutateAsync({
-      commentId: commentIdValue,
-      reason,
-      description: detailsInput ?? undefined,
-    });
-    alert(t('reporting.success'));
-  };
 
   const topLevelComments = useMemo(() => {
     if (!localCommentsData) return [];
@@ -2427,7 +2362,6 @@ export default function RedditPostPage() {
                       onEdit={handleEditComment}
                       onDelete={handleDeleteComment}
                       onToggleInbox={handleToggleInbox}
-                      onReport={handleReportComment}
                       useRelativeTime={useRelativeTime}
                     />
                   </div>
@@ -2459,7 +2393,6 @@ export default function RedditPostPage() {
                     onEdit={handleEditComment}
                     onDelete={handleDeleteComment}
                     onToggleInbox={handleToggleInbox}
-                    onReport={handleReportComment}
                     isRedditUserBlocked={isRedditUserBlocked}
                     useRelativeTime={useRelativeTime}
                     postTitle={post?.title}

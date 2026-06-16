@@ -41,10 +41,12 @@ func NewFeedRepository(pool *pgxpool.Pool) *FeedRepository {
 }
 
 // GetUnifiedFeed returns a combined feed of platform and cached Reddit posts.
-func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limit, offset int, sourceFilter string) ([]*UnifiedFeedItem, error) {
+// GetUnifiedFeed returns the unified feed. excludeAuthorIDs filters out platform
+// posts from those authors at the DB layer so pagination stays consistent.
+func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limit, offset int, sourceFilter string, excludeAuthorIDs []int) ([]*UnifiedFeedItem, error) {
 	// Optimize: if filtering by source, skip the other source query entirely
 	if sourceFilter == "platform" {
-		return r.getPlatformOnlyFeed(ctx, sortBy, limit, offset)
+		return r.getPlatformOnlyFeed(ctx, sortBy, limit, offset, excludeAuthorIDs)
 	}
 	if sourceFilter == "reddit" {
 		return r.getRedditOnlyFeed(ctx, sortBy, limit, offset)
@@ -98,6 +100,7 @@ func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limi
 			JOIN users u ON p.author_id = u.id
 			JOIN hubs h ON p.hub_id = h.id
 			WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE AND u.deleted_at IS NULL
+			AND ($4::int[] IS NULL OR p.author_id != ALL($4))
 
 			UNION ALL
 
@@ -127,7 +130,11 @@ func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limi
 		LIMIT $1 OFFSET $2
 	`, orderBy)
 
-	rows, err := r.pool.Query(ctx, query, limit, offset, sourceFilter)
+	var excludeParam interface{}
+	if len(excludeAuthorIDs) > 0 {
+		excludeParam = excludeAuthorIDs
+	}
+	rows, err := r.pool.Query(ctx, query, limit, offset, sourceFilter, excludeParam)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +235,7 @@ func nullableString(ns sql.NullString) *string {
 }
 
 // getPlatformOnlyFeed returns only platform posts (optimized for source filtering)
-func (r *FeedRepository) getPlatformOnlyFeed(ctx context.Context, sortBy string, limit, offset int) ([]*UnifiedFeedItem, error) {
+func (r *FeedRepository) getPlatformOnlyFeed(ctx context.Context, sortBy string, limit, offset int, excludeAuthorIDs []int) ([]*UnifiedFeedItem, error) {
 	orderBy := "p.created_at DESC"
 	if sortBy == "hot" || sortBy == "score" {
 		orderBy = "p.score DESC, p.created_at DESC"
@@ -257,11 +264,16 @@ func (r *FeedRepository) getPlatformOnlyFeed(ctx context.Context, sortBy string,
 		JOIN users u ON p.author_id = u.id
 		JOIN hubs h ON p.hub_id = h.id
 		WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE AND u.deleted_at IS NULL
+		AND ($3::int[] IS NULL OR p.author_id != ALL($3))
 		ORDER BY %s
 		LIMIT $1 OFFSET $2
 	`, orderBy)
 
-	rows, err := r.pool.Query(ctx, query, limit, offset)
+	var excludeParam interface{}
+	if len(excludeAuthorIDs) > 0 {
+		excludeParam = excludeAuthorIDs
+	}
+	rows, err := r.pool.Query(ctx, query, limit, offset, excludeParam)
 	if err != nil {
 		return nil, err
 	}

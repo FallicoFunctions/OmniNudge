@@ -26,7 +26,7 @@ func TestPostgresFeedRepository_GetUnifiedFeed(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			items, err := repo.GetUnifiedFeed(ctx, tc.sortBy, 10, 0, tc.sourceFilter)
+			items, err := repo.GetUnifiedFeed(ctx, tc.sortBy, 10, 0, tc.sourceFilter, nil)
 			require.NoError(t, err)
 			_ = items // May be empty in test DB; we verify no error.
 		})

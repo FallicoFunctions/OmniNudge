@@ -21,6 +21,7 @@
     "userNumber": "User #{{id}}",
     "user": "User",
     "unknownUser": "Unknown user",
+    "previous": "Previous",
     "next": "Next",
     "confirm": "Confirm",
     "search": "Search",
@@ -132,6 +133,7 @@
   },
   "menu": {
     "profile": "Profile",
+    "activity": "Activity",
     "settings": "Settings",
     "hubs": "Browse Hubs",
     "games": "Games",
@@ -479,7 +481,6 @@
       "userBans": "User Bans",
       "removalReasons": "Removal Reasons",
       "modLog": "Mod Log",
-      "reports": "Reports",
       "modMail": "Mod Mail",
       "requests": "Requests"
     },
@@ -578,44 +579,6 @@
         "create_removal_reason": "created removal reason",
         "update_removal_reason": "updated removal reason",
         "delete_removal_reason": "deleted removal reason"
-      }
-    },
-    "reports": {
-      "title": "Reports Queue",
-      "empty": "No reports in this queue.",
-      "meta": "Reporter #{{reporterId}} · Target #{{targetId}} · {{createdAt}}",
-      "sort": {
-        "priority": "Priority",
-        "recent": "Most Recent"
-      },
-      "status": {
-        "open": "Open",
-        "approved": "Approved",
-        "rejected": "Rejected",
-        "no_action": "No Action",
-        "reviewed": "Reviewed",
-        "dismissed": "Dismissed"
-      },
-      "actions": {
-        "approve": "Approve",
-        "reject": "Reject",
-        "noAction": "No Action"
-      },
-      "targetType": {
-        "post": "Post",
-        "comment": "Comment",
-        "user": "User",
-        "message": "Message",
-        "reddit_comment": "Reddit Comment"
-      },
-      "reason": {
-        "spam": "Spam",
-        "harassment": "Harassment",
-        "illegal_content": "Illegal Content",
-        "csam": "CSAM",
-        "violence": "Violence",
-        "hate_speech": "Hate Speech",
-        "other": "Other"
       }
     },
     "modMail": {
@@ -1210,31 +1173,37 @@
       "overview": "Overview",
       "posts": "Posts",
       "comments": "Comments",
+      "communities": "Communities",
       "saved": "Saved",
       "hidden": "Hidden",
       "subscribed": "Subscribed"
     },
     "headings": {
-      "recentPosts": "Recent Posts",
-      "recentComments": "Recent Comments",
-      "moderatorOf": "Moderator of"
+      "info": "Info",
+      "photos": "Photos",
+      "mutualFriends": "Mutual Friends"
     },
     "labels": {
       "joined": "Joined {{time}}",
       "lastSeen": "Last seen {{time}}",
-      "karma": "karma",
-      "blocked": "Blocked"
+      "blocked": "Blocked",
+      "location": "Location",
+      "friends": "Friends",
+      "photos": "Photos",
+      "wallPosts": "Self Posts",
+      "replies": "Friend Posts"
+    },
+    "mutualFriends": {
+      "count_one": "{{count}} mutual friend",
+      "count_other": "{{count}} mutual friends"
     },
     "actions": {
-      "viewAll": "View all",
       "message": "Message",
       "editProfile": "Edit Profile",
       "viewThread": "View thread",
       "block": "Block",
       "unblock": "Unblock",
-      "confirmBlock": "Block {{username}}? You won't see their messages.",
-      "report": "Report User",
-      "reportFailed": "Failed to submit report: {{message}}"
+      "confirmBlock": "Block {{username}}? You won't see their messages."
     },
     "posts": {
       "empty": "No posts yet."
@@ -1242,13 +1211,20 @@
     "comments": {
       "onPost": "On <link>post #{{id}}</link>"
     },
+    "communities": {
+      "empty": "Not a moderator of any communities yet."
+    },
     "private": {
       "saved": "Saved items are private.",
       "hidden": "Hidden items are private.",
       "subscribed": "Subscriptions are private."
     },
     "errors": {
-      "loadFailed": "Unable to load user profile."
+      "loadFailed": "Unable to load user profile.",
+      "friendsLoadFailed": "Unable to load this user's friends."
+    },
+    "locked": {
+      "message": "This profile is private. Add this person as a friend to see their full profile."
     },
     "aria": {
       "avatarAlt": "Avatar for {{username}}"
@@ -1264,15 +1240,67 @@
       "statusLabel": "Status text",
       "statusPlaceholder": "What are you up to?",
       "statusCount": "{{count}} / 500",
+      "locationLabel": "Location",
+      "locationPlaceholder": "City, Country",
+      "locationCount": "{{count}} / 100",
       "bioLabel": "Bio",
       "bioPlaceholder": "Tell people a little about yourself...",
       "bioCount": "{{count}} / 500",
       "errors": {
         "bioTooLong": "Bio must be 500 characters or less.",
         "statusTooLong": "Status text must be 500 characters or less.",
+        "locationTooLong": "Location must be 100 characters or less.",
         "invalidAvatarUrl": "Avatar URL must start with http:// or https://",
         "uploadFailed": "Failed to upload avatar: {{message}}",
         "saveFailed": "Failed to save profile: {{message}}"
+      }
+    },
+    "friendsPage": {
+      "title": "{{username}}'s Friends",
+      "backToProfile": "Back to profile",
+      "empty": "No friends yet.",
+      "loading": "Loading friends…"
+    },
+    "activityPage": {
+      "title": "{{username}}'s Activity",
+      "backToProfile": "Back to profile"
+    },
+    "wall": {
+      "heading": "Wall",
+      "composerPlaceholder": "Write something on this wall...",
+      "commentPlaceholder": "Write a comment...",
+      "post": "Post",
+      "posting": "Posting…",
+      "comment": "Comment",
+      "commenting": "Commenting…",
+      "like": "Like",
+      "comments": "Comments",
+      "noComments": "No comments yet.",
+      "empty": "No posts on this wall yet.",
+      "emptyOwner": "No posts yet. Be the first to write something!",
+      "private": "This wall is private.",
+      "delete": "Delete",
+      "deletePostConfirm": "Delete this wall post?",
+      "deleteCommentConfirm": "Delete this comment?",
+      "loadFailed": "Unable to load wall posts.",
+      "postFailed": "Failed to post to the wall.",
+      "postPendingApproval": "Your post is awaiting approval.",
+      "commentFailed": "Failed to post comment.",
+      "likeFailed": "Failed to update like.",
+      "deleteFailed": "Failed to delete.",
+      "attachMedia": "Attach photo/video",
+      "uploadingMedia": "Uploading…",
+      "removeMedia": "Remove",
+      "mediaUploadFailed": "Failed to upload media.",
+      "tooManyMedia": "You can attach up to {{max}} files.",
+      "previousMedia": "Previous media",
+      "nextMedia": "Next media",
+      "pending": {
+        "heading": "Pending posts",
+        "approve": "Approve",
+        "reject": "Reject",
+        "approveFailed": "Failed to approve post.",
+        "rejectFailed": "Failed to reject post."
       }
     }
   },
@@ -1383,15 +1411,13 @@
     "send": "Send",
     "noMessages": "No messages yet",
     "status": {
-      "loadingMessages": "Loading messages...",
-      "reporting": "Reporting..."
+      "loadingMessages": "Loading messages..."
     },
     "empty": {
       "startConversation": "No messages yet. Start the conversation!"
     },
     "actions": {
       "loadOlder": "Load older messages",
-      "report": "Report",
       "viewProfile": "View Profile",
       "reply": "Reply",
       "edit": "Edit",
@@ -1539,7 +1565,7 @@
       "recipientKeyNotFound": "Recipient public key not found",
       "encryptionKeysMissing": "Your encryption keys are not set up",
       "sendFailed": "Failed to send message. Please try again.",
-      "reportFailed": "Failed to submit report: {{message}}"
+      "userUnavailable": "This user is not available."
     },
     "editing": {
       "ariaInput": "Edit message text",
@@ -1708,10 +1734,6 @@
     "share": "Share",
     "save": "Save",
     "hide": "Hide",
-    "report": {
-      "reasonPrompt": "Report reason (type one): spam, harassment, illegal_content, csam, violence, hate_speech, other",
-      "success": "Thanks! The moderation team has been notified."
-    },
     "delete": "Delete",
     "edit": "Edit",
     "editModal": {
@@ -1744,7 +1766,6 @@
       "hide": "Hide",
       "share": "Share",
       "crosspost": "Crosspost",
-      "report": "Report",
       "pin": "Pin",
       "unpin": "Unpin",
       "inbox": "Inbox",
@@ -1772,7 +1793,6 @@
       "unhiding": "Unhiding...",
       "deleting": "Deleting...",
       "pinning": "Pinning...",
-      "reporting": "Reporting...",
       "updating": "Updating...",
       "unsaving": "Unsaving..."
     },
@@ -1837,38 +1857,6 @@
       "unknownUser": "Unknown user"
     }
   },
-  "reporting": {
-    "reasonPrompt": "Report reason (type one): spam, harassment, illegal_content, csam, violence, hate_speech, other",
-    "detailsPrompt": "Additional details (optional):",
-    "invalidReason": "Invalid reason. Use one of: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
-    "success": "Thanks! The moderation team has been notified.",
-    "successDetail": "Our team will review your report and take action within 24 hours.",
-    "reasons": {
-      "spam": "Spam",
-      "harassment": "Harassment",
-      "illegalContent": "Illegal Content",
-      "csam": "CSAM",
-      "violence": "Violence",
-      "hateSpeech": "Hate Speech",
-      "other": "Other"
-    },
-    "modal": {
-      "title": "Submit a Report",
-      "titleWithName": "Report {{name}}",
-      "reasonLabel": "Reason",
-      "descriptionLabel": "Additional details",
-      "descriptionPlaceholder": "Provide any additional context that may help our moderation team...",
-      "submit": "Submit Report",
-      "submitting": "Submitting...",
-      "cancel": "Cancel",
-      "screenReaderDescription": "Use this form to report content that violates our community guidelines. Select a reason and optionally provide additional details.",
-      "characterCount": "{{current}} of {{max}} characters"
-    },
-    "errors": {
-      "rateLimited": "You have submitted too many reports recently. Please wait before submitting another.",
-      "failed": "Failed to submit report: {{message}}"
-    }
-  },
   "comments": {
     "title": "Comments",
     "loading": "Loading comments...",
@@ -1901,7 +1889,6 @@
       "delete": "Delete",
       "save": "Save",
       "unsave": "Unsave",
-      "report": "Report",
       "viewProfile": "View Profile",
       "permalink": "Permalink",
       "collapse": "Collapse",
@@ -1913,7 +1900,6 @@
     "status": {
       "saving": "Saving...",
       "deleting": "Deleting...",
-      "reporting": "Reporting...",
       "inboxPending": "Updating inbox...",
       "posting": "Posting..."
     },
@@ -1931,7 +1917,6 @@
       "deleteFailed": "Failed to delete comment.",
       "inboxFailed": "Failed to update inbox setting.",
       "saveFailed": "Failed to update save state.",
-      "reportFailed": "Failed to report comment.",
       "notFound": "We couldn't find that comment. It may have been removed."
     },
     "confirm": {
@@ -2197,10 +2182,14 @@
       "lastSeen": "Last seen",
       "lastSeenHelp": "Show others when you were last active. When disabled, your last seen time may be hidden from public profile views.",
       "profileVisibility": "Profile visibility",
-      "profileVisibilityHelp": "Control who can view your public profile details.",
+      "profileVisibilityHelp": "Public profiles can be viewed by anyone. Private profiles only show your username and an Add Friend button to people who aren't your friends.",
       "profileVisibilityPublic": "Public",
-      "profileVisibilityFriendsOnly": "Friends only",
-      "profileVisibilityPrivate": "Private"
+      "profileVisibilityPrivate": "Private",
+      "wallPostPermission": "Wall posting permission",
+      "wallPostPermissionHelp": "Control whether friends can post on your wall, and if their posts need your approval first.",
+      "wallPostPermissionAllFriends": "Any friend can post",
+      "wallPostPermissionRequiresApproval": "Friends can post, but I must approve first",
+      "wallPostPermissionNoOne": "No one can post on my wall"
     },
     "dateTime": {
       "title": "Date & Time Display",
@@ -3889,6 +3878,52 @@
       "low": "Low quality",
       "medium": "Medium quality",
       "high": "High quality"
+    }
+  },
+  "friends": {
+    "title": "Friends",
+    "subtitle": "Manage your friends and friend requests.",
+    "loading": "Loading...",
+    "empty": "You don't have any friends yet.",
+    "emptyHint": "Visit someone's profile and click Add Friend to get started.",
+    "friendsSince": "Friends since {{date}}",
+    "tabs": {
+      "friends": "Friends",
+      "incoming": "Incoming",
+      "outgoing": "Sent"
+    },
+    "actions": {
+      "addFriend": "Add Friend",
+      "friends": "Friends",
+      "accept": "Accept",
+      "decline": "Decline",
+      "cancelRequest": "Cancel Request",
+      "unfriend": "Unfriend",
+      "seeAll": "See all friends"
+    },
+    "incoming": {
+      "empty": "No pending friend requests.",
+      "sentAt": "Sent on {{date}}"
+    },
+    "outgoing": {
+      "empty": "You haven't sent any friend requests.",
+      "sentAt": "Sent on {{date}}"
+    },
+    "errors": {
+      "loadFailed": "Failed to load friends.",
+      "sendFailed": "Could not send friend request. Please try again.",
+      "acceptFailed": "Could not accept request. Please try again.",
+      "declineFailed": "Could not decline request. Please try again.",
+      "cancelFailed": "Could not cancel request. Please try again.",
+      "removeFailed": "Could not remove friend. Please try again.",
+      "topFriendsFailed": "Failed to save top friends"
+    },
+    "toast": {
+      "sent": "Friend request sent",
+      "accepted": "You are now friends!",
+      "removed": "Friend removed",
+      "declined": "Request declined",
+      "topFriendsUpdated": "Top friends updated"
     }
   }
 }

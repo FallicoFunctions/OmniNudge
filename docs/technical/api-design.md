@@ -1173,7 +1173,7 @@ When making breaking changes:
 - **Hubs (site communities):** Any authenticated user can create a hub via `POST /api/v1/hubs`; the creator is auto-added as a moderator. Hub moderators can be added via `/api/v1/admin/hubs/:name/moderators`.
 - **Voting:** `is_upvote` accepts `true` (upvote), `false` (downvote), or `null` (remove vote) on posts and comments.
 - **Media upload:** `POST /api/v1/media/upload` accepts images, video, audio, and document/text attachments up to 25MB; unsupported types or oversized files return 400.
-- **Moderation:** Submit reports with `POST /api/v1/reports`. Moderators/admins: list/update via `/api/v1/mod/reports` and role/admin actions via `/api/v1/admin/users/:id/role`, `/api/v1/admin/hubs/:name/moderators`.
+- **Moderation:** Role/admin actions via `/api/v1/admin/users/:id/role`, `/api/v1/admin/hubs/:name/moderators`.
 - **WebSocket:** Connect with `Authorization: Bearer <token>` header; supports real-time notification delivery.
 
 ### Recently Added Features

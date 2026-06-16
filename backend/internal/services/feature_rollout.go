@@ -130,7 +130,7 @@ func GetPhase0FeatureSuccessMetrics() []FeatureMetrics {
 		{FeatureKey: "F2", EngagementMetrics: []string{"group_messages_sent", "group_creation_rate"}, RetentionTarget: 0.32, NPSTarget: 34, PerformanceBudgetMS: 250},
 		{FeatureKey: "F3", EngagementMetrics: []string{"media_upload_success", "media_messages_sent"}, RetentionTarget: 0.33, NPSTarget: 33, PerformanceBudgetMS: 300},
 		{FeatureKey: "F4", EngagementMetrics: []string{"read_receipt_delivery", "presence_updates"}, RetentionTarget: 0.30, NPSTarget: 32, PerformanceBudgetMS: 150},
-		{FeatureKey: "F5", EngagementMetrics: []string{"moderation_actions", "report_resolution_rate"}, RetentionTarget: 0.29, NPSTarget: 30, PerformanceBudgetMS: 250},
+		{FeatureKey: "F5", EngagementMetrics: []string{"moderation_actions"}, RetentionTarget: 0.29, NPSTarget: 30, PerformanceBudgetMS: 250},
 		{FeatureKey: "F6", EngagementMetrics: []string{"upload_completion_rate", "scan_pass_rate"}, RetentionTarget: 0.31, NPSTarget: 31, PerformanceBudgetMS: 350},
 		{FeatureKey: "F7", EngagementMetrics: []string{"custom_theme_installs", "theme_engagement_time"}, RetentionTarget: 0.28, NPSTarget: 29, PerformanceBudgetMS: 250},
 		{FeatureKey: "F8", EngagementMetrics: []string{"search_ctr", "search_zero_result_rate"}, RetentionTarget: 0.27, NPSTarget: 30, PerformanceBudgetMS: 180},
