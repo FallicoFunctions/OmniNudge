@@ -1122,7 +1122,19 @@ function sanitizeWikiHtml(content: string): string {
       'hr',
       'br',
     ],
-    ALLOWED_ATTR: ['href', 'title', 'id', 'name', 'src', 'alt', 'width', 'height', 'class', 'colspan', 'rowspan'],
+    ALLOWED_ATTR: [
+      'href',
+      'title',
+      'id',
+      'name',
+      'src',
+      'alt',
+      'width',
+      'height',
+      'class',
+      'colspan',
+      'rowspan',
+    ],
   });
   const template = document.createElement('template');
   template.innerHTML = sanitized;
@@ -1195,8 +1207,7 @@ function extractRevisionMeta(
     ?.replace(/^\/+/, '')
     ?.trim();
   const author =
-    (revisionByData?.display_name_prefixed as string | undefined)?.trim() ??
-    rawAuthorName;
+    (revisionByData?.display_name_prefixed as string | undefined)?.trim() ?? rawAuthorName;
 
   let timestamp: number | undefined;
   if (typeof apiData.revision_date === 'number') {

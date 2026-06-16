@@ -66,7 +66,10 @@ describe('markPlatformPostSaved', () => {
   });
 
   it('does not duplicate if already saved', () => {
-    const initial: SavedItemsResponse = { type: 'posts', saved_posts: [{ ...basePlatformPost, comment_count: 3, created_at: '2024-01-01T00:00:00Z' }] };
+    const initial: SavedItemsResponse = {
+      type: 'posts',
+      saved_posts: [{ ...basePlatformPost, comment_count: 3, created_at: '2024-01-01T00:00:00Z' }],
+    };
     queryClient.setQueryData(['saved-items', 'posts'], initial);
 
     markPlatformPostSaved(queryClient, basePlatformPost);
@@ -97,7 +100,10 @@ describe('markPlatformPostUnsaved', () => {
       saved_posts: [{ ...basePlatformPost, comment_count: 3, created_at: '2024-01-01T00:00:00Z' }],
     };
     queryClient.setQueryData(['saved-items', 'posts'], initial);
-    queryClient.setQueryData(['saved-items', 'all'], { type: 'all', saved_posts: [{ ...basePlatformPost, comment_count: 3, created_at: '2024-01-01T00:00:00Z' }] });
+    queryClient.setQueryData(['saved-items', 'all'], {
+      type: 'all',
+      saved_posts: [{ ...basePlatformPost, comment_count: 3, created_at: '2024-01-01T00:00:00Z' }],
+    });
 
     markPlatformPostUnsaved(queryClient, 42);
 
@@ -172,7 +178,11 @@ describe('markRedditPostSaved', () => {
   });
 
   it('does not duplicate if already saved', () => {
-    const existing = { subreddit: 'funny', reddit_post_id: 'abc123', saved_at: '2024-01-01T00:00:00Z' };
+    const existing = {
+      subreddit: 'funny',
+      reddit_post_id: 'abc123',
+      saved_at: '2024-01-01T00:00:00Z',
+    };
     const initial: SavedItemsResponse = { type: 'reddit_posts', saved_reddit_posts: [existing] };
     queryClient.setQueryData(['saved-items', 'reddit_posts'], initial);
 
@@ -183,7 +193,10 @@ describe('markRedditPostSaved', () => {
   });
 
   it('updates both reddit_posts and all caches', () => {
-    queryClient.setQueryData(['saved-items', 'reddit_posts'], { type: 'reddit_posts', saved_reddit_posts: [] });
+    queryClient.setQueryData(['saved-items', 'reddit_posts'], {
+      type: 'reddit_posts',
+      saved_reddit_posts: [],
+    });
     queryClient.setQueryData(['saved-items', 'all'], { type: 'all', saved_reddit_posts: [] });
 
     markRedditPostSaved(queryClient, 'funny', 'abc123', baseRedditPost);
@@ -204,9 +217,19 @@ describe('markRedditPostUnsaved', () => {
 
   it('removes reddit post from both caches', () => {
     const key = getRedditPostKey('funny', 'abc123');
-    const existing = { subreddit: 'funny', reddit_post_id: 'abc123', saved_at: '2024-01-01T00:00:00Z' };
-    queryClient.setQueryData(['saved-items', 'reddit_posts'], { type: 'reddit_posts', saved_reddit_posts: [existing] });
-    queryClient.setQueryData(['saved-items', 'all'], { type: 'all', saved_reddit_posts: [existing] });
+    const existing = {
+      subreddit: 'funny',
+      reddit_post_id: 'abc123',
+      saved_at: '2024-01-01T00:00:00Z',
+    };
+    queryClient.setQueryData(['saved-items', 'reddit_posts'], {
+      type: 'reddit_posts',
+      saved_reddit_posts: [existing],
+    });
+    queryClient.setQueryData(['saved-items', 'all'], {
+      type: 'all',
+      saved_reddit_posts: [existing],
+    });
 
     markRedditPostUnsaved(queryClient, 'funny', 'abc123');
 
@@ -218,8 +241,15 @@ describe('markRedditPostUnsaved', () => {
   });
 
   it('matches t3_ prefixed IDs correctly', () => {
-    const existing = { subreddit: 'funny', reddit_post_id: 'abc123', saved_at: '2024-01-01T00:00:00Z' };
-    queryClient.setQueryData(['saved-items', 'reddit_posts'], { type: 'reddit_posts', saved_reddit_posts: [existing] });
+    const existing = {
+      subreddit: 'funny',
+      reddit_post_id: 'abc123',
+      saved_at: '2024-01-01T00:00:00Z',
+    };
+    queryClient.setQueryData(['saved-items', 'reddit_posts'], {
+      type: 'reddit_posts',
+      saved_reddit_posts: [existing],
+    });
 
     markRedditPostUnsaved(queryClient, 'funny', 't3_abc123');
 
@@ -243,9 +273,20 @@ describe('removeFromHiddenCache', () => {
   });
 
   it('removes the post from hidden_posts in both caches', () => {
-    const hiddenPost = { id: 42, title: 'Hidden', hub_name: 'h', author_username: 'a', score: 0, comment_count: 0, created_at: '2024-01-01T00:00:00Z' };
+    const hiddenPost = {
+      id: 42,
+      title: 'Hidden',
+      hub_name: 'h',
+      author_username: 'a',
+      score: 0,
+      comment_count: 0,
+      created_at: '2024-01-01T00:00:00Z',
+    };
     queryClient.setQueryData(['hidden-items', 'all'], { type: 'all', hidden_posts: [hiddenPost] });
-    queryClient.setQueryData(['hidden-items', 'posts'], { type: 'posts', hidden_posts: [hiddenPost] });
+    queryClient.setQueryData(['hidden-items', 'posts'], {
+      type: 'posts',
+      hidden_posts: [hiddenPost],
+    });
 
     removeFromHiddenCache(queryClient, 42);
 
@@ -256,8 +297,24 @@ describe('removeFromHiddenCache', () => {
   });
 
   it('does not remove other posts', () => {
-    const h1 = { id: 42, title: 'H1', hub_name: 'h', author_username: 'a', score: 0, comment_count: 0, created_at: '2024-01-01T00:00:00Z' };
-    const h2 = { id: 99, title: 'H2', hub_name: 'h', author_username: 'b', score: 0, comment_count: 0, created_at: '2024-01-01T00:00:00Z' };
+    const h1 = {
+      id: 42,
+      title: 'H1',
+      hub_name: 'h',
+      author_username: 'a',
+      score: 0,
+      comment_count: 0,
+      created_at: '2024-01-01T00:00:00Z',
+    };
+    const h2 = {
+      id: 99,
+      title: 'H2',
+      hub_name: 'h',
+      author_username: 'b',
+      score: 0,
+      comment_count: 0,
+      created_at: '2024-01-01T00:00:00Z',
+    };
     queryClient.setQueryData(['hidden-items', 'all'], { type: 'all', hidden_posts: [h1, h2] });
 
     removeFromHiddenCache(queryClient, 42);
@@ -276,9 +333,19 @@ describe('removeRedditFromHiddenCache', () => {
   });
 
   it('removes the reddit post from hidden_reddit_posts in both caches', () => {
-    const existing = { subreddit: 'funny', reddit_post_id: 'abc123', saved_at: '2024-01-01T00:00:00Z' };
-    queryClient.setQueryData(['hidden-items', 'all'], { type: 'all', hidden_reddit_posts: [existing] });
-    queryClient.setQueryData(['hidden-items', 'reddit_posts'], { type: 'reddit_posts', hidden_reddit_posts: [existing] });
+    const existing = {
+      subreddit: 'funny',
+      reddit_post_id: 'abc123',
+      saved_at: '2024-01-01T00:00:00Z',
+    };
+    queryClient.setQueryData(['hidden-items', 'all'], {
+      type: 'all',
+      hidden_reddit_posts: [existing],
+    });
+    queryClient.setQueryData(['hidden-items', 'reddit_posts'], {
+      type: 'reddit_posts',
+      hidden_reddit_posts: [existing],
+    });
 
     removeRedditFromHiddenCache(queryClient, 'funny', 'abc123');
 

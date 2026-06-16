@@ -26,13 +26,22 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
     }
   };
 
-  debugLog('[ColumnConfigPanel] Render:', columnId, 'isExpanded:', isExpanded, 'showCreatePost:', showCreatePost);
+  debugLog(
+    '[ColumnConfigPanel] Render:',
+    columnId,
+    'isExpanded:',
+    isExpanded,
+    'showCreatePost:',
+    showCreatePost
+  );
 
   // Check if user can subscribe (must be logged in and have a feedSource)
-  const canSubscribe = user && config.feedSource && (config.feedType === 'hub' || config.feedType === 'subreddit');
+  const canSubscribe =
+    user && config.feedSource && (config.feedType === 'hub' || config.feedType === 'subreddit');
 
   // Check if user can create posts (must be logged in, have a feedSource, and be hub/subreddit)
-  const canCreatePost = user && config.feedSource && (config.feedType === 'hub' || config.feedType === 'subreddit');
+  const canCreatePost =
+    user && config.feedSource && (config.feedType === 'hub' || config.feedType === 'subreddit');
 
   // Fetch subscription status
   const { data: subscriptionStatus } = useQuery({
@@ -70,7 +79,9 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
     },
     onSuccess: () => {
       // Invalidate subscription queries
-      queryClient.invalidateQueries({ queryKey: ['subscription', config.feedType, config.feedSource] });
+      queryClient.invalidateQueries({
+        queryKey: ['subscription', config.feedType, config.feedSource],
+      });
       queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
     },
   });
@@ -78,7 +89,9 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
   const getFeedLabel = () => {
     switch (config.feedType) {
       case 'home':
-        return config.omniOnly ? t('columnConfigPanel.feedLabel.homeOmniOnly') : t('columnConfigPanel.feedLabel.home');
+        return config.omniOnly
+          ? t('columnConfigPanel.feedLabel.homeOmniOnly')
+          : t('columnConfigPanel.feedLabel.home');
       case 'subreddit':
         return config.feedSource
           ? t('common.format.subredditPath', { name: config.feedSource })
@@ -106,7 +119,12 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            debugLog('[ColumnConfigPanel] Arrow clicked for column:', columnId, 'current isExpanded:', isExpanded);
+            debugLog(
+              '[ColumnConfigPanel] Arrow clicked for column:',
+              columnId,
+              'current isExpanded:',
+              isExpanded
+            );
             setIsExpanded(!isExpanded);
           }}
           className="flex-1 px-3 py-2 text-xs text-left flex items-center justify-between hover:bg-[var(--color-hover)] transition-cyber"
@@ -177,7 +195,11 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                 ? 'text-cyan-400 hover:text-red-400 hover:bg-red-400/10'
                 : 'text-[var(--color-text-muted)] hover:text-cyan-400 hover:bg-cyan-400/10'
             } disabled:opacity-50`}
-            title={isSubscribed ? t('columnConfigPanel.title.unsubscribe') : t('columnConfigPanel.title.subscribe')}
+            title={
+              isSubscribed
+                ? t('columnConfigPanel.title.unsubscribe')
+                : t('columnConfigPanel.title.subscribe')
+            }
           >
             {subscribeMutation.isPending ? '...' : isSubscribed ? '✓' : '+'}
           </button>
@@ -312,7 +334,9 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                 <option value="new">{t('columnConfigPanel.sortOption.new')}</option>
                 <option value="top">{t('columnConfigPanel.sortOption.top')}</option>
                 <option value="rising">{t('columnConfigPanel.sortOption.rising')}</option>
-                <option value="controversial">{t('columnConfigPanel.sortOption.controversial')}</option>
+                <option value="controversial">
+                  {t('columnConfigPanel.sortOption.controversial')}
+                </option>
               </select>
             </div>
           )}

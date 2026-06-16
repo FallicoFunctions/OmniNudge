@@ -102,7 +102,7 @@ func (s *FeatureFlagService) IsEnabled(ctx context.Context, key string, userID *
 // bucketUser uses FNV-1a hash for consistent bucketing (0-99)
 func bucketUser(userID int64) int {
 	h := fnv.New32a()
-	binary.Write(h, binary.BigEndian, userID)
+	_ = binary.Write(h, binary.BigEndian, userID)
 	return int(h.Sum32() % 100)
 }
 

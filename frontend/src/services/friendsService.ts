@@ -1,9 +1,5 @@
 import { api } from '../lib/api';
-import type {
-  FriendEntry,
-  FriendRequestsResponse,
-  FriendshipStatus,
-} from '../types/friends';
+import type { FriendEntry, FriendRequestsResponse, FriendshipStatus } from '../types/friends';
 
 export const friendsService = {
   async getFriends(): Promise<FriendEntry[]> {
@@ -15,8 +11,13 @@ export const friendsService = {
     return api.get<FriendRequestsResponse>('/users/me/friends/requests');
   },
 
-  async sendFriendRequest(username: string): Promise<{ message: string; result: 'sent' | 'accepted' }> {
-    return api.post<{ message: string; result: 'sent' | 'accepted' }>('/users/me/friends/requests', { username });
+  async sendFriendRequest(
+    username: string
+  ): Promise<{ message: string; result: 'sent' | 'accepted' }> {
+    return api.post<{ message: string; result: 'sent' | 'accepted' }>(
+      '/users/me/friends/requests',
+      { username }
+    );
   },
 
   async acceptFriendRequest(username: string): Promise<{ message: string }> {
@@ -45,10 +46,7 @@ export const friendsQueryKeys = {
 };
 
 /** Helper: resolves the action label for a given friendship status */
-export function friendActionLabel(
-  status: FriendshipStatus,
-  t: (key: string) => string
-): string {
+export function friendActionLabel(status: FriendshipStatus, t: (key: string) => string): string {
   switch (status) {
     case 'accepted':
       return t('friends.actions.unfriend');

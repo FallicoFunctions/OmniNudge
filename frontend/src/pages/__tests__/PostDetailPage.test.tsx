@@ -98,7 +98,7 @@ const renderWithPostId = (postId: string) => {
           <Route path="/posts/:postId" element={<PostDetailPage />} />
         </Routes>
       </MemoryRouter>
-    </Wrapper>,
+    </Wrapper>
   );
 };
 
@@ -111,7 +111,7 @@ const renderWithHubPostId = (hubName: string, postId: string) => {
           <Route path="/h/:hubname/comments/:postId" element={<PostDetailPage />} />
         </Routes>
       </MemoryRouter>
-    </Wrapper>,
+    </Wrapper>
   );
 };
 
@@ -217,16 +217,15 @@ describe('PostDetailPage', () => {
       comment_count: 0,
       num_comments: 0,
       created_at: new Date().toISOString(),
-      media_url: 'https://thefootballromantic.blogspot.com/2026/05/the-anatomy-of-football-team.html',
+      media_url:
+        'https://thefootballromantic.blogspot.com/2026/05/the-anatomy-of-football-team.html',
       user_vote: 1,
     } as PlatformPost);
 
     renderWithHubPostId('testhub', '113');
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('link', { name: 'The anatomy of a football team' })
-      ).toHaveAttribute(
+      expect(screen.getByRole('link', { name: 'The anatomy of a football team' })).toHaveAttribute(
         'href',
         'https://thefootballromantic.blogspot.com/2026/05/the-anatomy-of-football-team.html'
       );

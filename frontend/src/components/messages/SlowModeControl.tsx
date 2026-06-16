@@ -17,7 +17,11 @@ const SLOW_MODE_OPTIONS: { labelKey: string; value: number }[] = [
   { labelKey: 'groups.admin.slowMode1h', value: 3600 },
 ];
 
-export function SlowModeControl({ currentSeconds, onSetSlowMode, isLoading }: SlowModeControlProps) {
+export function SlowModeControl({
+  currentSeconds,
+  onSetSlowMode,
+  isLoading,
+}: SlowModeControlProps) {
   const { t } = useTranslation();
 
   return (

@@ -75,7 +75,7 @@ class AnalyticsService {
       console.log('[Analytics] Initialized:', {
         config: this.config,
         anonymousId: this.anonymousId,
-        sessionId: this.sessionId
+        sessionId: this.sessionId,
       });
     }
 
@@ -178,7 +178,7 @@ class AnalyticsService {
 
   /**
    * Set user properties
-   * (Currently just tracks a 'user_properties_updated' event for simplicity, 
+   * (Currently just tracks a 'user_properties_updated' event for simplicity,
    * or could be expanded to a dedicated endpoint)
    */
   setUserProperties(properties: EventProperties) {
@@ -216,12 +216,14 @@ class AnalyticsService {
     try {
       this.updateActivityTimestamp();
       // Don't await this, let it happen in background
-      api.post('/analytics/session/start', {
-        session_id: sessionId,
-        anonymous_id: this.anonymousId,
-      }).catch(err => {
-        if (this.config.debug) console.warn('[Analytics] Failed to start session:', err);
-      });
+      api
+        .post('/analytics/session/start', {
+          session_id: sessionId,
+          anonymous_id: this.anonymousId,
+        })
+        .catch((err) => {
+          if (this.config.debug) console.warn('[Analytics] Failed to start session:', err);
+        });
     } catch {
       // Ignore
     }
@@ -242,7 +244,7 @@ class AnalyticsService {
         if (now - lastActive > SESSION_TIMEOUT_MS) {
           if (this.config.debug) console.log('[Analytics] Session timed out, starting new one');
           this.endSessionBackend(); // End old one if possible
-          this.startNewSession();   // Start new one
+          this.startNewSession(); // Start new one
         }
       }
       this.updateActivityTimestamp();
@@ -263,8 +265,8 @@ class AnalyticsService {
       this.updateActivityTimestamp();
     };
     // Debounce or just set it; localStorage is fast enough for low freq events
-    // but maybe don't add too many listeners. 
-    // Just relying on track() and visibility change is often enough, 
+    // but maybe don't add too many listeners.
+    // Just relying on track() and visibility change is often enough,
     // but adding a few key ones covers "reading" time.
     window.addEventListener('click', updateActivity);
     window.addEventListener('keydown', updateActivity);
@@ -282,7 +284,7 @@ class AnalyticsService {
       navigator.sendBeacon(url, blob);
     } else {
       // Fallback
-      api.post('/analytics/session/end', data).catch(() => { });
+      api.post('/analytics/session/end', data).catch(() => {});
     }
   }
 }

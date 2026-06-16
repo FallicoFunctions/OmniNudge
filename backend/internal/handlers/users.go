@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/omninudge/backend/internal/ports"
 	"io"
 	"net/http"
 	"os"
@@ -14,15 +13,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/omninudge/backend/internal/ports"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	zlog "github.com/rs/zerolog/log"
+	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/services"
-	zlog "github.com/rs/zerolog/log"
-	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/sync/errgroup"
 )
 
 // UsersHandler serves public user profile data and profile management
@@ -1541,11 +1543,7 @@ func (h *UsersHandler) SetTopFriends(c *gin.Context) {
 		return
 	}
 
-	cfg := topFriendsConfig{
-		Count:      req.Count,
-		BestFriend: req.BestFriend,
-		Friends:    req.Friends,
-	}
+	cfg := topFriendsConfig(req)
 	data, err := json.Marshal(cfg)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to serialize top friends")

@@ -346,7 +346,9 @@ describe('ThreadView', () => {
 
     await waitFor(() => expect(screen.getByText('message-100')).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'Mute thread' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Unmute thread' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Unmute thread' })).toBeInTheDocument()
+    );
 
     rerender(
       <ThreadView
@@ -369,6 +371,8 @@ describe('ThreadView', () => {
       />
     );
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Unmute thread' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Unmute thread' })).toBeInTheDocument()
+    );
   });
 });

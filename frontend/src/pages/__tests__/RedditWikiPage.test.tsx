@@ -90,7 +90,7 @@ describe('RedditWikiPage', () => {
     render(
       <Wrapper>
         <RedditWikiPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(document.body).toBeTruthy();
   });
@@ -100,7 +100,7 @@ describe('RedditWikiPage', () => {
     render(
       <Wrapper>
         <RedditWikiPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       // wiki content or loading state should be rendered
@@ -113,7 +113,7 @@ describe('RedditWikiPage', () => {
     render(
       <Wrapper>
         <RedditWikiPage mode="view" />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(document.body).toBeTruthy();

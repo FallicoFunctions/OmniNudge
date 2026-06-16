@@ -13,7 +13,10 @@ export function buildLocaleLoadPath(language: string): string {
   return `/locales/${language}.json?${params.toString()}`;
 }
 
-function logMissingTranslation(key: string, language: string | readonly string[] | undefined): void {
+function logMissingTranslation(
+  key: string,
+  language: string | readonly string[] | undefined
+): void {
   if (!isDev) {
     return;
   }

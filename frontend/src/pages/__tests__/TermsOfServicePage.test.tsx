@@ -30,7 +30,7 @@ describe('TermsOfServicePage', () => {
     render(
       <MemoryRouter>
         <TermsOfServicePage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(document.body).toBeTruthy();
   });
@@ -39,7 +39,7 @@ describe('TermsOfServicePage', () => {
     render(
       <MemoryRouter>
         <TermsOfServicePage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(screen.getByText('termsPage.title')).toBeInTheDocument();
   });

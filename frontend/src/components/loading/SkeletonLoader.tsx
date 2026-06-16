@@ -12,7 +12,7 @@ function Skeleton({ className = '' }: SkeletonProps) {
 // Text line skeleton
 export function SkeletonText({
   lines = 1,
-  className = ''
+  className = '',
 }: {
   lines?: number;
   className?: string;
@@ -20,10 +20,7 @@ export function SkeletonText({
   return (
     <div className={`space-y-2 ${className}`}>
       {Array.from({ length: lines }).map((_, i) => (
-        <Skeleton
-          key={i}
-          className={`h-4 ${i === lines - 1 ? 'w-3/4' : 'w-full'}`}
-        />
+        <Skeleton key={i} className={`h-4 ${i === lines - 1 ? 'w-3/4' : 'w-full'}`} />
       ))}
     </div>
   );
@@ -32,7 +29,7 @@ export function SkeletonText({
 // Image skeleton
 export function SkeletonImage({
   aspectRatio = 'square',
-  className = ''
+  className = '',
 }: {
   aspectRatio?: 'square' | 'video' | 'wide';
   className?: string;
@@ -108,7 +105,7 @@ export function SkeletonPost({ className = '' }: SkeletonProps) {
 // List skeleton
 export function SkeletonList({
   items = 5,
-  className = ''
+  className = '',
 }: {
   items?: number;
   className?: string;
@@ -132,7 +129,7 @@ export function SkeletonList({
 // Message bubble skeleton
 export function SkeletonMessage({
   isOwn = false,
-  className = ''
+  className = '',
 }: {
   isOwn?: boolean;
   className?: string;

@@ -1,41 +1,51 @@
-import { useState, useCallback } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Play, Pause, ChevronDown, ChevronUp } from 'lucide-react'
-import type { VoiceMessage } from '../../types/messages'
-import { useVoicePlayer } from '../../hooks/useVoicePlayer'
-import { WaveformVisualizer } from './WaveformVisualizer'
+import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Play, Pause, ChevronDown, ChevronUp } from 'lucide-react';
+import type { VoiceMessage } from '../../types/messages';
+import { useVoicePlayer } from '../../hooks/useVoicePlayer';
+import { WaveformVisualizer } from './WaveformVisualizer';
 
 interface VoiceMessageBubbleProps {
-  voiceMessage: VoiceMessage
-  isOwn: boolean
+  voiceMessage: VoiceMessage;
+  isOwn: boolean;
 }
 
 function formatTime(seconds: number): string {
-  if (!isFinite(seconds)) return '0:00'
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m}:${String(s).padStart(2, '0')}`
+  if (!isFinite(seconds)) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-const PLAYBACK_RATES = [1, 1.5, 2]
+const PLAYBACK_RATES = [1, 1.5, 2];
 
 export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubbleProps) {
-  const { t } = useTranslation()
-  const { state, currentTime, duration, progress, playbackRate, play, pause, seek, setPlaybackRate } = useVoicePlayer()
-  const [transcriptionOpen, setTranscriptionOpen] = useState(false)
+  const { t } = useTranslation();
+  const {
+    state,
+    currentTime,
+    duration,
+    progress,
+    playbackRate,
+    play,
+    pause,
+    seek,
+    setPlaybackRate,
+  } = useVoicePlayer();
+  const [transcriptionOpen, setTranscriptionOpen] = useState(false);
 
-  const isPlaying = state === 'playing'
-  const isLoading = state === 'loading'
+  const isPlaying = state === 'playing';
+  const isLoading = state === 'loading';
 
   const handlePlayPause = useCallback(() => {
     if (isPlaying) {
-      pause()
+      pause();
     } else {
-      play(voiceMessage.signed_url)
+      play(voiceMessage.signed_url);
     }
-  }, [isPlaying, pause, play, voiceMessage.signed_url])
+  }, [isPlaying, pause, play, voiceMessage.signed_url]);
 
-  const totalDuration = duration > 0 ? duration : voiceMessage.duration_seconds
+  const totalDuration = duration > 0 ? duration : voiceMessage.duration_seconds;
 
   return (
     <div
@@ -77,7 +87,10 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
         {/* Time */}
         <span
           className="text-xs tabular-nums flex-shrink-0"
-          style={{ opacity: isOwn ? 0.85 : undefined, color: isOwn ? '#fff' : 'var(--color-text-secondary)' }}
+          style={{
+            opacity: isOwn ? 0.85 : undefined,
+            color: isOwn ? '#fff' : 'var(--color-text-secondary)',
+          }}
         >
           {formatTime(currentTime)} / {formatTime(totalDuration)}
         </span>
@@ -85,7 +98,7 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
 
       {/* Playback speed row */}
       <div className="flex items-center gap-1">
-        {PLAYBACK_RATES.map(rate => (
+        {PLAYBACK_RATES.map((rate) => (
           <button
             key={rate}
             type="button"
@@ -93,12 +106,20 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
             aria-label={`${t('voice.speed')} ${rate}x`}
             className="text-xs px-1.5 py-0.5 rounded transition-opacity"
             style={{
-              background: playbackRate === rate
-                ? (isOwn ? 'rgba(255,255,255,0.25)' : 'var(--color-primary)')
-                : 'transparent',
-              color: playbackRate === rate
-                ? (isOwn ? '#fff' : '#fff')
-                : (isOwn ? 'rgba(255,255,255,0.7)' : 'var(--color-text-secondary)'),
+              background:
+                playbackRate === rate
+                  ? isOwn
+                    ? 'rgba(255,255,255,0.25)'
+                    : 'var(--color-primary)'
+                  : 'transparent',
+              color:
+                playbackRate === rate
+                  ? isOwn
+                    ? '#fff'
+                    : '#fff'
+                  : isOwn
+                    ? 'rgba(255,255,255,0.7)'
+                    : 'var(--color-text-secondary)',
               fontWeight: playbackRate === rate ? 600 : 400,
             }}
           >
@@ -112,7 +133,7 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
         <div>
           <button
             type="button"
-            onClick={() => setTranscriptionOpen(o => !o)}
+            onClick={() => setTranscriptionOpen((o) => !o)}
             className="flex items-center gap-1 text-xs"
             style={{ opacity: 0.75 }}
           >
@@ -134,5 +155,5 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
         </p>
       )}
     </div>
-  )
+  );
 }

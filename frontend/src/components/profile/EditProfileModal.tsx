@@ -121,7 +121,7 @@ export default function EditProfileModal({
       trimmedAvatarUrl &&
       !trimmedAvatarUrl.startsWith('http://') &&
       !trimmedAvatarUrl.startsWith('https://') &&
-      !trimmedAvatarUrl.startsWith('/')  // allow server-relative paths from file uploads
+      !trimmedAvatarUrl.startsWith('/') // allow server-relative paths from file uploads
     ) {
       setError(t('userProfilePage.edit.errors.invalidAvatarUrl'));
       return;
@@ -228,9 +228,13 @@ export default function EditProfileModal({
                   accept="image/png,image/jpeg,image/gif,image/webp"
                   className="hidden"
                   disabled={isUploadingBanner}
-                  onChange={(event) => { void handleBannerFileChange(event); }}
+                  onChange={(event) => {
+                    void handleBannerFileChange(event);
+                  }}
                 />
-                <span className="text-xs text-[var(--color-text-secondary)]">PNG, JPG, GIF, WebP · max 10MB</span>
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  PNG, JPG, GIF, WebP · max 10MB
+                </span>
               </div>
             )}
             <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
@@ -323,7 +327,11 @@ export default function EditProfileModal({
             disabled={isSaving || isUploadingAvatar || isUploadingBanner}
             className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
-            {isSaving ? t('common.loading') : isUploadingAvatar || isUploadingBanner ? t('userProfilePage.edit.avatarUploading') : t('common.save')}
+            {isSaving
+              ? t('common.loading')
+              : isUploadingAvatar || isUploadingBanner
+                ? t('userProfilePage.edit.avatarUploading')
+                : t('common.save')}
           </button>
         </div>
       </div>

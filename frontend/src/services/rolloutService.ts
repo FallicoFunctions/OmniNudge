@@ -61,13 +61,13 @@ class RolloutService {
   private hashUserFeature(userId: number, featureName: string): number {
     const str = `${userId}:${featureName}`;
     let hash = 0;
-    
+
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
       hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
-    
+
     return Math.abs(hash);
   }
 
@@ -109,11 +109,11 @@ class RolloutService {
   getNextRolloutStage(current: RolloutPercentage): RolloutPercentage | null {
     const stages: RolloutPercentage[] = [1, 5, 10, 25, 50, 100];
     const currentIndex = stages.indexOf(current);
-    
+
     if (currentIndex === -1 || currentIndex === stages.length - 1) {
       return null; // Already at 100%
     }
-    
+
     return stages[currentIndex + 1];
   }
 

@@ -1,15 +1,17 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/omninudge/backend/internal/ports"
+
+	"github.com/gin-gonic/gin"
+
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
-	"github.com/gin-gonic/gin"
 )
 
 // ThemesHandler handles user theme customization endpoints.
@@ -296,7 +298,7 @@ func (h *ThemesHandler) GetMyThemes(c *gin.Context) {
 		offset = 0
 	}
 
-	themes := make([]*models.UserTheme, 0)
+	var themes []*models.UserTheme
 	var err error
 	if useCursorPagination {
 		var payload *models.TimeCursor

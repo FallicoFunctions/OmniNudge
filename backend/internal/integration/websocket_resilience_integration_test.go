@@ -14,7 +14,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
-	"github.com/omninudge/backend/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,8 +100,7 @@ func TestWebSocketRejectsExpiredToken(t *testing.T) {
 
 	user := createUser(t, deps.UserRepo, uniqueWSRUsername("expired"), "user")
 
-	cfg, _ := config.Load()
-	expiredToken := buildExpiredJWT(t, cfg.JWT.Secret, user.ID, user.Username, user.Role)
+	expiredToken := buildExpiredJWT(t, "test-jwt-secret", user.ID, user.Username, user.Role)
 
 	_, resp, err := dialWS(ts, expiredToken)
 	if err == nil {

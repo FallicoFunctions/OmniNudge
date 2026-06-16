@@ -34,7 +34,9 @@ export function SlideshowControls({
             : 'bg-white/20 text-white hover:bg-white/30'
         }`}
         aria-label={
-          autoAdvance ? t('slideshowControls.aria.pauseSlideshow') : t('slideshowControls.aria.playSlideshow')
+          autoAdvance
+            ? t('slideshowControls.aria.pauseSlideshow')
+            : t('slideshowControls.aria.playSlideshow')
         }
       >
         <svg
@@ -75,7 +77,9 @@ export function SlideshowControls({
 
       {/* Interval selector with label */}
       <div className="flex items-center gap-2">
-        <span className="text-white text-sm font-medium">{t('slideshowControls.labels.speed')}</span>
+        <span className="text-white text-sm font-medium">
+          {t('slideshowControls.labels.speed')}
+        </span>
         <div className="flex gap-1">
           {INTERVAL_OPTIONS.map((option) => (
             <button

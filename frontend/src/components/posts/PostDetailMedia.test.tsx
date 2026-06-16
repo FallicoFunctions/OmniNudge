@@ -49,7 +49,7 @@ describe('PostDetailMedia', () => {
 
     expect(screen.getByRole('img', { name: 'The anatomy of a football team' })).toHaveAttribute(
       'src',
-      'http://localhost:8080/uploads/link-thumb.png'
+      '/uploads/link-thumb.png'
     );
   });
 

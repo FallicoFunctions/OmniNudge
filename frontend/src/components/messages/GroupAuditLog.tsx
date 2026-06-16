@@ -25,7 +25,8 @@ function getActionLabel(actionType: string, t: (key: string) => string): string 
 
 function actionBadgeClass(actionType: string): string {
   if (actionType.includes('ban')) return 'bg-[var(--color-error)]/10 text-[var(--color-error)]';
-  if (actionType.includes('mute')) return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+  if (actionType.includes('mute'))
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
   return 'bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)]';
 }
 
@@ -60,13 +61,7 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
   const { t } = useTranslation();
   const [actionTypeFilter, setActionTypeFilter] = useState('');
 
-  const {
-    data,
-    isLoading,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
-  } = useInfiniteQuery({
+  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useInfiniteQuery({
     queryKey: ['group-audit-log', conversationId, actionTypeFilter],
     queryFn: ({ pageParam }) =>
       adminGroupsService.getAuditLog(conversationId, {
@@ -107,7 +102,13 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
             className="flex items-center gap-1.5 rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
           >
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
-              <path d="M6.5 1v8M3 6l3.5 3.5L10 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M6.5 1v8M3 6l3.5 3.5L10 6"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
               <path d="M1 11h11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
             </svg>
             {t('groups.admin.exportCsv')}
@@ -119,7 +120,10 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
       {isLoading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-10 rounded-md bg-[var(--color-surface-elevated)] animate-pulse" />
+            <div
+              key={i}
+              className="h-10 rounded-md bg-[var(--color-surface-elevated)] animate-pulse"
+            />
           ))}
         </div>
       ) : allEntries.length === 0 ? (
@@ -139,7 +143,10 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
                     t('groups.admin.colTarget'),
                     t('groups.admin.colDetails'),
                   ].map((col) => (
-                    <th key={col} className="px-3 py-2 text-left text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide">
+                    <th
+                      key={col}
+                      className="px-3 py-2 text-left text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide"
+                    >
                       {col}
                     </th>
                   ))}
@@ -147,7 +154,10 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
               </thead>
               <tbody>
                 {allEntries.map((entry) => (
-                  <tr key={entry.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-hover)]">
+                  <tr
+                    key={entry.id}
+                    className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-hover)]"
+                  >
                     <td className="px-3 py-2 text-xs text-[var(--color-text-muted)] whitespace-nowrap">
                       {new Date(entry.created_at).toLocaleString()}
                     </td>
@@ -155,7 +165,9 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
                       {entry.admin_username}
                     </td>
                     <td className="px-3 py-2">
-                      <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${actionBadgeClass(entry.action_type)}`}>
+                      <span
+                        className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${actionBadgeClass(entry.action_type)}`}
+                      >
                         {getActionLabel(entry.action_type, t)}
                       </span>
                     </td>

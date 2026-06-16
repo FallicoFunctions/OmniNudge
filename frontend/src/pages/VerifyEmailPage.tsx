@@ -40,7 +40,9 @@ export default function VerifyEmailPage() {
       hasVerified.current = true;
 
       try {
-        const response = await api.get<{ purpose: string; verified: boolean; username: string }>(`/auth/verify-email?token=${token}`);
+        const response = await api.get<{ purpose: string; verified: boolean; username: string }>(
+          `/auth/verify-email?token=${token}`
+        );
         debugLog('Verification response:', response);
         setStatus('success');
         setPurpose(response.purpose);
@@ -76,15 +78,27 @@ export default function VerifyEmailPage() {
             <div className="mb-4 flex justify-center">
               <div className="h-12 w-12 animate-spin rounded-full border-4 border-[var(--color-border)] border-t-[var(--color-primary)]"></div>
             </div>
-            <p className="text-[var(--color-text-primary)]">{t('auth.verifyEmailPage.status.verifying')}</p>
+            <p className="text-[var(--color-text-primary)]">
+              {t('auth.verifyEmailPage.status.verifying')}
+            </p>
           </div>
         )}
 
         {status === 'success' && (
           <div className="text-center">
             <div className="mb-4 flex justify-center">
-              <svg className="h-16 w-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="h-16 w-16 text-green-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
             <h1 className="mb-2 text-2xl font-bold text-[var(--color-text-primary)]">
@@ -103,16 +117,24 @@ export default function VerifyEmailPage() {
         {status === 'error' && (
           <div className="text-center">
             <div className="mb-4 flex justify-center">
-              <svg className="h-16 w-16 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="h-16 w-16 text-red-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </div>
             <h1 className="mb-2 text-2xl font-bold text-[var(--color-text-primary)]">
               {t('auth.verifyEmailPage.error.title')}
             </h1>
-            <p className="mb-6 text-[var(--color-text-secondary)]">
-              {message}
-            </p>
+            <p className="mb-6 text-[var(--color-text-secondary)]">{message}</p>
             <Button
               variant="primary"
               onClick={() => navigate('/', { replace: true })}

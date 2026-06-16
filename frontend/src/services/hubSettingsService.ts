@@ -14,10 +14,7 @@ export const hubSettingsService = {
     return response.data;
   },
 
-  async updateHubSettings(
-    hubName: string,
-    settings: UpdateHubSettingsRequest
-  ): Promise<void> {
+  async updateHubSettings(hubName: string, settings: UpdateHubSettingsRequest): Promise<void> {
     await api.put(`/hubs/${hubName}/settings`, settings);
   },
 
@@ -46,5 +43,4 @@ export const hubSettingsService = {
   async removeModerator(hubName: string, userId: number): Promise<void> {
     await api.delete(`/hubs/${hubName}/moderators/${userId}`);
   },
-
 };

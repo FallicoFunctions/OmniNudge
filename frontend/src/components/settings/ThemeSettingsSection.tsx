@@ -87,7 +87,8 @@ const ThemeSettingsSection = ({ onCreateTheme, onManageThemes }: ThemeSettingsSe
                 {activeTheme.theme_name}
               </p>
               <p className="text-sm text-[var(--color-text-secondary)]">
-                {activeTheme.theme_description ?? t('settings.themeSettingsSection.activeTheme.noDescription')}
+                {activeTheme.theme_description ??
+                  t('settings.themeSettingsSection.activeTheme.noDescription')}
               </p>
               <dl className="mt-4 grid grid-cols-2 gap-4 text-xs text-[var(--color-text-secondary)]">
                 <div>
@@ -138,9 +139,7 @@ const ThemeSettingsSection = ({ onCreateTheme, onManageThemes }: ThemeSettingsSe
             <p className="font-semibold text-[var(--color-text-primary)]">
               {t('settings.themeSettingsSection.reminder.title')}
             </p>
-            <p className="mt-1">
-              {t('settings.themeSettingsSection.reminder.body')}
-            </p>
+            <p className="mt-1">{t('settings.themeSettingsSection.reminder.body')}</p>
           </div>
         </div>
       </div>

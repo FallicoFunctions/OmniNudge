@@ -1,3 +1,5 @@
+//go:build integration
+
 package integration
 
 import (
@@ -10,9 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/omninudge/backend/internal/models"
 )
 
 var messagingTestCounter int64
@@ -157,7 +160,7 @@ func TestMessageBlocking(t *testing.T) {
 	w := doRequest(t, deps.Router, req)
 
 	var conversation models.Conversation
-	json.Unmarshal(w.Body.Bytes(), &conversation)
+	json.Unmarshal(w.Body.Bytes(), &conversation) //nolint:errcheck // test helper; parse error caught by subsequent assertions
 
 	// User2 blocks User1
 	blockBody := fmt.Sprintf(`{"username":"%s"}`, user1.Username)
@@ -168,7 +171,8 @@ func TestMessageBlocking(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 
-	// User1 tries to send a message (should fail with 403)
+	// User1 tries to send a message — should fail because user2 blocked user1.
+	// The handler returns 404 "User not found" intentionally to obscure block relationships.
 	sendMsgBody := fmt.Sprintf(`{
 		"conversation_id": %d,
 		"encrypted_content": "blocked_message",
@@ -181,11 +185,11 @@ func TestMessageBlocking(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token1)
 	w = doRequest(t, deps.Router, req)
 
-	assert.Equal(t, http.StatusForbidden, w.Code)
+	assert.Equal(t, http.StatusNotFound, w.Code)
 
 	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
-	assert.Contains(t, response["error"], "blocking settings")
+	json.Unmarshal(w.Body.Bytes(), &response) //nolint:errcheck // test helper; parse error caught by subsequent assertions
+	assert.Contains(t, response["error"], "User not found")
 }
 
 // TestMessageDeletion tests soft and hard deletion of messages
@@ -209,7 +213,7 @@ func TestMessageDeletion(t *testing.T) {
 	w := doRequest(t, deps.Router, req)
 
 	var conversation models.Conversation
-	json.Unmarshal(w.Body.Bytes(), &conversation)
+	json.Unmarshal(w.Body.Bytes(), &conversation) //nolint:errcheck // test helper; parse error caught by subsequent assertions
 
 	// Send message
 	sendMsgBody := fmt.Sprintf(`{
@@ -225,7 +229,7 @@ func TestMessageDeletion(t *testing.T) {
 	w = doRequest(t, deps.Router, req)
 
 	var message models.Message
-	json.Unmarshal(w.Body.Bytes(), &message)
+	json.Unmarshal(w.Body.Bytes(), &message) //nolint:errcheck // test helper; parse error caught by subsequent assertions
 
 	// User1 soft deletes message
 	req, _ = http.NewRequest("DELETE", fmt.Sprintf("/api/v1/messages/%d", message.ID), nil)
@@ -240,7 +244,7 @@ func TestMessageDeletion(t *testing.T) {
 	w = doRequest(t, deps.Router, req)
 
 	var msgResponse map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &msgResponse)
+	json.Unmarshal(w.Body.Bytes(), &msgResponse) //nolint:errcheck // test helper; parse error caught by subsequent assertions
 
 	messages := msgResponse["messages"].([]interface{})
 	assert.Len(t, messages, 0, "User1 should not see deleted message")
@@ -250,7 +254,7 @@ func TestMessageDeletion(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token2)
 	w = doRequest(t, deps.Router, req)
 
-	json.Unmarshal(w.Body.Bytes(), &msgResponse)
+	json.Unmarshal(w.Body.Bytes(), &msgResponse) //nolint:errcheck // test helper; parse error caught by subsequent assertions
 	messages = msgResponse["messages"].([]interface{})
 	assert.Len(t, messages, 1, "User2 should still see the message")
 

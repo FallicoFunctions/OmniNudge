@@ -1,26 +1,26 @@
-import { Mic, MicOff, Camera, CameraOff, PhoneOff } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-import { CameraFlipButton } from './CameraFlipButton'
-import { ScreenShareButton } from './ScreenShareButton'
+import { Mic, MicOff, Camera, CameraOff, PhoneOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { CameraFlipButton } from './CameraFlipButton';
+import { ScreenShareButton } from './ScreenShareButton';
 
 interface CallControlsProps {
-  isMuted: boolean
-  isCameraOff: boolean
-  callType: 'voice' | 'video'
-  callId: number | null
-  isCallActive: boolean
+  isMuted: boolean;
+  isCameraOff: boolean;
+  callType: 'voice' | 'video';
+  callId: number | null;
+  isCallActive: boolean;
   // F13: camera flip
-  cameraDevices: MediaDeviceInfo[]
-  selectedCameraId: string | null
-  onSwitchCamera: (deviceId: string) => Promise<void>
+  cameraDevices: MediaDeviceInfo[];
+  selectedCameraId: string | null;
+  onSwitchCamera: (deviceId: string) => Promise<void>;
   // F14: screen sharing
-  isSharing: boolean
-  peerIsSharing: boolean
-  onStartSharing: () => Promise<void>
-  onStopSharing: () => void
-  onToggleMute: () => void
-  onToggleCamera: () => void
-  onEndCall: () => void
+  isSharing: boolean;
+  peerIsSharing: boolean;
+  onStartSharing: () => Promise<void>;
+  onStopSharing: () => void;
+  onToggleMute: () => void;
+  onToggleCamera: () => void;
+  onEndCall: () => void;
 }
 
 export function CallControls({
@@ -40,7 +40,7 @@ export function CallControls({
   onToggleCamera,
   onEndCall,
 }: CallControlsProps) {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
 
   return (
     <div className="flex items-center justify-center gap-4 flex-wrap">
@@ -100,5 +100,5 @@ export function CallControls({
         <PhoneOff className="w-6 h-6 text-white" />
       </button>
     </div>
-  )
+  );
 }

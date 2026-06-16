@@ -30,7 +30,7 @@ function renderLayout(htmlContent: string, routeVariant: 'index' | 'post' | 'wik
       >
         <div data-testid="route-content">Route content</div>
       </HubAIDesignLayout>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
 }
 
@@ -55,12 +55,15 @@ describe('HubAIDesignLayout', () => {
   });
 
   it('falls back to the legacy hub-feed host for non-index routes', async () => {
-    const { container } = renderLayout(`
+    const { container } = renderLayout(
+      `
       <div class="hub-custom-page">
         <aside id="hub-join"></aside>
         <section id="hub-feed"></section>
       </div>
-    `, 'wiki');
+    `,
+      'wiki'
+    );
 
     const feedHost = container.querySelector('#hub-feed');
     expect(feedHost).not.toBeNull();
@@ -79,7 +82,9 @@ describe('HubAIDesignLayout', () => {
     `);
 
     const joinHost = container.querySelector('#hub-join');
-    expect(await within(joinHost as HTMLElement).findByRole('button', { name: 'Unsubscribe' })).toBeInTheDocument();
+    expect(
+      await within(joinHost as HTMLElement).findByRole('button', { name: 'Unsubscribe' })
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /\+ create post/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mod Tools' })).toBeInTheDocument();
   });

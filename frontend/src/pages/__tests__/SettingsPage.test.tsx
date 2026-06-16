@@ -2,7 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SettingsPage from '../SettingsPage';
+
+function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
 
 const setShowPushNotifications = vi.fn();
 const setAutoUnarchiveOnMessage = vi.fn();
@@ -152,8 +164,7 @@ vi.mock('../../i18n/languageUtils', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { returnObjects?: boolean }) =>
-      options?.returnObjects ? [] : key,
+    t: (key: string, options?: { returnObjects?: boolean }) => (options?.returnObjects ? [] : key),
     i18n: { language: 'en', resolvedLanguage: 'en' },
   }),
   Trans: ({ i18nKey }: { i18nKey: string }) => <span>{i18nKey}</span>,
@@ -164,97 +175,73 @@ describe('SettingsPage push toggle', () => {
     vi.clearAllMocks();
   });
 
-  it(
-    'disables push setting when currently enabled and unregister succeeds',
-    async () => {
+  it('disables push setting when currently enabled and unregister succeeds', async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(true));
     disablePush.mockResolvedValue(true);
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
+    renderPage();
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
-    fireEvent.click(screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' }));
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' })
+    );
 
     await waitFor(() => {
       expect(disablePush).toHaveBeenCalledTimes(1);
       expect(setShowPushNotifications).toHaveBeenCalledWith(false);
     });
-    },
-    10000
-  );
+  }, 10000);
 
-  it(
-    'enables push setting only when permission flow succeeds',
-    async () => {
+  it('enables push setting only when permission flow succeeds', async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(false));
     enablePush.mockResolvedValue(true);
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
+    renderPage();
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
-    fireEvent.click(screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' }));
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' })
+    );
 
     await waitFor(() => {
       expect(enablePush).toHaveBeenCalledTimes(1);
       expect(setShowPushNotifications).toHaveBeenCalledWith(true);
     });
-    },
-    10000
-  );
+  }, 10000);
 
-  it(
-    'keeps push setting unchanged when unregister fails',
-    async () => {
+  it('keeps push setting unchanged when unregister fails', async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(true));
     disablePush.mockResolvedValue(false);
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
+    renderPage();
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
-    fireEvent.click(screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' }));
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' })
+    );
 
     await waitFor(() => {
       expect(disablePush).toHaveBeenCalledTimes(1);
     });
     expect(setShowPushNotifications).not.toHaveBeenCalledWith(false);
-    },
-    10000
-  );
+  }, 10000);
 
-  it(
-    'keeps push setting unchanged when enable flow fails',
-    async () => {
+  it('keeps push setting unchanged when enable flow fails', async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(false));
     enablePush.mockResolvedValue(false);
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
+    renderPage();
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
-    fireEvent.click(screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' }));
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' })
+    );
 
     await waitFor(() => {
       expect(enablePush).toHaveBeenCalledTimes(1);
     });
     expect(setShowPushNotifications).not.toHaveBeenCalledWith(true);
-    },
-    10000
-  );
+  }, 10000);
 });
 
 describe('SettingsPage messaging privacy toggles', () => {
@@ -262,16 +249,10 @@ describe('SettingsPage messaging privacy toggles', () => {
     vi.clearAllMocks();
   });
 
-  it(
-    'updates auto-unarchive preference from privacy tab',
-    async () => {
+  it('updates auto-unarchive preference from privacy tab', async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(true));
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
+    renderPage();
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.privacy' }));
     fireEvent.click(
@@ -283,9 +264,7 @@ describe('SettingsPage messaging privacy toggles', () => {
     await waitFor(() => {
       expect(setAutoUnarchiveOnMessage).toHaveBeenCalledWith(false);
     });
-    },
-    10000
-  );
+  }, 10000);
 });
 
 describe('SettingsPage data export', () => {
@@ -302,11 +281,7 @@ describe('SettingsPage data export', () => {
       note: 'note',
     });
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
+    renderPage();
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.privacy' }));
     fireEvent.change(screen.getByLabelText('Confirm password'), {

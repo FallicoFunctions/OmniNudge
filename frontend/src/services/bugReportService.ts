@@ -92,12 +92,17 @@ export const bugReportService = {
   },
 
   // Admin only: Create known bug
-  async createKnownBug(bug: Omit<KnownBug, 'id' | 'created_at' | 'updated_at' | 'fixed_at'>): Promise<KnownBug> {
+  async createKnownBug(
+    bug: Omit<KnownBug, 'id' | 'created_at' | 'updated_at' | 'fixed_at'>
+  ): Promise<KnownBug> {
     return api.post<KnownBug>('/admin/known-bugs', bug);
   },
 
   // Admin only: Update known bug
-  async updateKnownBug(id: number, bug: Omit<KnownBug, 'id' | 'created_at' | 'updated_at'>): Promise<void> {
+  async updateKnownBug(
+    id: number,
+    bug: Omit<KnownBug, 'id' | 'created_at' | 'updated_at'>
+  ): Promise<void> {
     await api.put(`/admin/known-bugs/${id}`, bug);
   },
 

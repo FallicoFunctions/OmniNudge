@@ -95,12 +95,12 @@ func (db *DB) Migrate(ctx context.Context) error {
 		}
 
 		if _, err := tx.Exec(ctx, contentStr); err != nil {
-			tx.Rollback(ctx)
+			_ = tx.Rollback(ctx)
 			return fmt.Errorf("failed to execute migration %s: %w", filename, err)
 		}
 
 		if _, err := tx.Exec(ctx, "INSERT INTO public.schema_migrations (version) VALUES ($1)", version); err != nil {
-			tx.Rollback(ctx)
+			_ = tx.Rollback(ctx)
 			return fmt.Errorf("failed to record migration %s: %w", filename, err)
 		}
 
@@ -154,12 +154,12 @@ func (db *DB) MigrateDown(ctx context.Context) error {
 	}
 
 	if _, err := tx.Exec(ctx, string(content)); err != nil {
-		tx.Rollback(ctx)
+		_ = tx.Rollback(ctx)
 		return fmt.Errorf("failed to execute rollback %s: %w", downFile, err)
 	}
 
 	if _, err := tx.Exec(ctx, "DELETE FROM public.schema_migrations WHERE version = $1", version); err != nil {
-		tx.Rollback(ctx)
+		_ = tx.Rollback(ctx)
 		return fmt.Errorf("failed to remove migration record %s: %w", version, err)
 	}
 

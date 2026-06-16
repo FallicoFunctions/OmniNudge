@@ -173,7 +173,9 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
                       }
                       className="px-2 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] text-[var(--color-text-primary)] text-sm"
                     >
-                      <option value="full_moderator">{t('hubSettings.roles.fullModeratorOption')}</option>
+                      <option value="full_moderator">
+                        {t('hubSettings.roles.fullModeratorOption')}
+                      </option>
                       <option value="moderator">{t('hubSettings.roles.moderatorOption')}</option>
                     </select>
                   ) : (
@@ -241,7 +243,9 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
                   onChange={(e) => setNewModRole(e.target.value as ModeratorRole)}
                   className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 >
-                  <option value="full_moderator">{t('hubSettings.roles.fullModeratorOption')}</option>
+                  <option value="full_moderator">
+                    {t('hubSettings.roles.fullModeratorOption')}
+                  </option>
                   <option value="moderator">{t('hubSettings.roles.moderatorOption')}</option>
                 </select>
               </div>

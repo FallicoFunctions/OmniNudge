@@ -33,7 +33,7 @@ export const FEATURE_FLAGS = {
   ENHANCED_NOTIFICATIONS: 'enhanced_notifications',
 } as const;
 
-export type FeatureFlagKey = typeof FEATURE_FLAGS[keyof typeof FEATURE_FLAGS];
+export type FeatureFlagKey = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
 
 /**
  * Feature flag metadata for documentation

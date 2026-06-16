@@ -119,7 +119,8 @@ export default function RedditPage() {
   const { subreddit: routeSubreddit } = useParams<{ subreddit?: string }>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { useRelativeTime, useInfiniteScrollSubs, searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
+  const { useRelativeTime, useInfiniteScrollSubs, searchIncludeNsfwByDefault, blockAllNsfw } =
+    useSettings();
   const { blockedUsers } = useRedditBlocklist();
   const [subreddit, setSubreddit] = useState(routeSubreddit ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising' | 'controversial'>('hot');
@@ -175,8 +176,8 @@ export default function RedditPage() {
     isTimedSort && timeOptions?.timeRange !== 'custom'
       ? timeOptions?.timeRange
       : isTimedSort && timeOptions?.timeRange === 'custom'
-      ? 'all'
-      : undefined;
+        ? 'all'
+        : undefined;
   const originState = useMemo(
     () => ({ originPath: `${location.pathname}${location.search}` }),
     [location.pathname, location.search]
@@ -201,7 +202,13 @@ export default function RedditPage() {
 
   // Paginated query
   const paginatedRedditQuery = useQuery<FeedRedditPostsResponse>({
-    queryKey: ['reddit-paginated', subreddit, sort, timeRangeKey, pageHistory[pageHistory.length - 1]],
+    queryKey: [
+      'reddit-paginated',
+      subreddit,
+      sort,
+      timeRangeKey,
+      pageHistory[pageHistory.length - 1],
+    ],
     queryFn: () => {
       const limit = 50;
       const after = pageHistory[pageHistory.length - 1];
@@ -216,17 +223,17 @@ export default function RedditPage() {
 
   // Memoize flattened posts to prevent re-creating the entire array on every render
   const flattenedPosts = useMemo(() => {
-    return infiniteRedditQuery.data?.pages.flatMap(page => page.posts) ?? [];
+    return infiniteRedditQuery.data?.pages.flatMap((page) => page.posts) ?? [];
   }, [infiniteRedditQuery.data]);
 
   // Use appropriate query based on settings - memoize to prevent object recreation
   const data = useMemo(() => {
-    return useInfiniteScrollSubs
-      ? { posts: flattenedPosts }
-      : paginatedRedditQuery.data;
+    return useInfiniteScrollSubs ? { posts: flattenedPosts } : paginatedRedditQuery.data;
   }, [useInfiniteScrollSubs, flattenedPosts, paginatedRedditQuery.data]);
 
-  const isLoading = useInfiniteScrollSubs ? infiniteRedditQuery.isLoading : paginatedRedditQuery.isLoading;
+  const isLoading = useInfiniteScrollSubs
+    ? infiniteRedditQuery.isLoading
+    : paginatedRedditQuery.isLoading;
   const error = useInfiniteScrollSubs ? infiniteRedditQuery.error : paginatedRedditQuery.error;
 
   // Fetch hidden Reddit posts
@@ -275,10 +282,7 @@ export default function RedditPage() {
   });
 
   // Determine whether the subreddit exposes a wiki page so we can show the Wiki button.
-  const {
-    data: wikiPreviewData,
-    isError: wikiPreviewError,
-  } = useQuery({
+  const { data: wikiPreviewData, isError: wikiPreviewError } = useQuery({
     queryKey: ['subreddit-wiki-preview', subreddit],
     queryFn: () => redditService.getSubredditWikiPage(subreddit, 'index'),
     enabled: !!subreddit && subreddit !== 'popular' && subreddit !== 'frontpage',
@@ -348,8 +352,8 @@ export default function RedditPage() {
     if (!filteredRedditPosts.length) return [];
     const hiddenPostIds = hiddenPostsData?.hidden_reddit_posts
       ? new Set(
-          hiddenPostsData.hidden_reddit_posts.map(
-            (p) => getRedditPostKey(p.subreddit, p.reddit_post_id)
+          hiddenPostsData.hidden_reddit_posts.map((p) =>
+            getRedditPostKey(p.subreddit, p.reddit_post_id)
           )
         )
       : null;
@@ -447,8 +451,14 @@ export default function RedditPage() {
   };
 
   const savedLocalToggleMutation = useMutation({
-    mutationFn: ({ postId, shouldSave }: { postId: number; shouldSave: boolean; post: PlatformPost }) =>
-      shouldSave ? savedService.savePost(postId) : savedService.unsavePost(postId),
+    mutationFn: ({
+      postId,
+      shouldSave,
+    }: {
+      postId: number;
+      shouldSave: boolean;
+      post: PlatformPost;
+    }) => (shouldSave ? savedService.savePost(postId) : savedService.unsavePost(postId)),
     onSuccess: (_data, { postId, shouldSave, post }) => {
       if (shouldSave) {
         markPlatformPostSaved(queryClient, post);
@@ -461,7 +471,11 @@ export default function RedditPage() {
     },
   });
 
-  const handleToggleSaveLocalPost = (postId: number, currentlySaved: boolean, post: PlatformPost) => {
+  const handleToggleSaveLocalPost = (
+    postId: number,
+    currentlySaved: boolean,
+    post: PlatformPost
+  ) => {
     savedLocalToggleMutation.mutate({ postId, shouldSave: !currentlySaved, post });
   };
 
@@ -481,8 +495,8 @@ export default function RedditPage() {
     hideTarget?.type === 'reddit'
       ? hideRedditPostMutation.isPending
       : hideTarget?.type === 'platform'
-      ? hideLocalPostMutation.isPending
-      : false;
+        ? hideLocalPostMutation.isPending
+        : false;
 
   const handleConfirmHide = () => {
     if (!hideTarget) return;
@@ -690,75 +704,71 @@ export default function RedditPage() {
     }
   };
 
-  const runPostSearch = useCallback(async (query: string, forceScoped: boolean = false) => {
-    if (!query) {
-      setScopedSearchResults(null);
-      setPostSearchQuery('');
-      setScopedSearchAfter(null);
-      setScopedSearchQuery('');
-      setScopedSearchPage(1);
-      return;
-    }
-    const shouldScope = forceScoped || limitSearchToContext;
-    if (shouldScope) {
-      setPostSearchQuery('');
-      setScopedSearchQuery(query);
-      setScopedSearchPage(1);
-      try {
-        const [redditResults, platformResults] = await Promise.all([
-          redditService.searchPosts(query, {
-            subreddit,
-            limit: 25,
-            includeNsfw: includeNsfwSearch && !blockAllNsfw,
-            after: scopedSearchAfter ?? undefined,
-          }),
-          searchPlatformPosts(query, includeNsfwSearch && !blockAllNsfw, {
-            limit: 25,
-            offset: 0,
-          }),
-        ]);
-
-        const filteredPlatform = platformResults.filter(
-          (post) => post.target_subreddit?.toLowerCase() === subreddit.toLowerCase()
-        );
-
-        const redditItems: CrosspostSource[] =
-          redditResults.posts?.map((post) => ({ type: 'reddit' as const, post })) ?? [];
-        const platformItems: CrosspostSource[] =
-          filteredPlatform.map((post) => ({ type: 'platform' as const, post })) ?? [];
-
-        const sorted = [...redditItems, ...platformItems].sort((a, b) => {
-          const aTime =
-            a.type === 'reddit'
-              ? a.post.created_utc * 1000
-              : new Date(a.post.crossposted_at ?? a.post.created_at ?? '').getTime();
-          const bTime =
-            b.type === 'reddit'
-              ? b.post.created_utc * 1000
-              : new Date(b.post.crossposted_at ?? b.post.created_at ?? '').getTime();
-          return bTime - aTime;
-        });
-
-        setScopedSearchResults(sorted);
-        setScopedSearchAfter(redditResults.after ?? null);
-      } catch (searchError) {
-        console.error('Scoped search failed', searchError);
-        setScopedSearchResults([]);
+  const runPostSearch = useCallback(
+    async (query: string, forceScoped: boolean = false) => {
+      if (!query) {
+        setScopedSearchResults(null);
+        setPostSearchQuery('');
         setScopedSearchAfter(null);
+        setScopedSearchQuery('');
+        setScopedSearchPage(1);
+        return;
       }
-      return;
-    }
-    navigate(
-      `/search?q=${encodeURIComponent(query)}&sort=relevance${includeNsfwSearch && !blockAllNsfw ? '&include_nsfw=true' : ''}`
-    );
-  }, [
-    blockAllNsfw,
-    includeNsfwSearch,
-    limitSearchToContext,
-    navigate,
-    scopedSearchAfter,
-    subreddit,
-  ]);
+      const shouldScope = forceScoped || limitSearchToContext;
+      if (shouldScope) {
+        setPostSearchQuery('');
+        setScopedSearchQuery(query);
+        setScopedSearchPage(1);
+        try {
+          const [redditResults, platformResults] = await Promise.all([
+            redditService.searchPosts(query, {
+              subreddit,
+              limit: 25,
+              includeNsfw: includeNsfwSearch && !blockAllNsfw,
+              after: scopedSearchAfter ?? undefined,
+            }),
+            searchPlatformPosts(query, includeNsfwSearch && !blockAllNsfw, {
+              limit: 25,
+              offset: 0,
+            }),
+          ]);
+
+          const filteredPlatform = platformResults.filter(
+            (post) => post.target_subreddit?.toLowerCase() === subreddit.toLowerCase()
+          );
+
+          const redditItems: CrosspostSource[] =
+            redditResults.posts?.map((post) => ({ type: 'reddit' as const, post })) ?? [];
+          const platformItems: CrosspostSource[] =
+            filteredPlatform.map((post) => ({ type: 'platform' as const, post })) ?? [];
+
+          const sorted = [...redditItems, ...platformItems].sort((a, b) => {
+            const aTime =
+              a.type === 'reddit'
+                ? a.post.created_utc * 1000
+                : new Date(a.post.crossposted_at ?? a.post.created_at ?? '').getTime();
+            const bTime =
+              b.type === 'reddit'
+                ? b.post.created_utc * 1000
+                : new Date(b.post.crossposted_at ?? b.post.created_at ?? '').getTime();
+            return bTime - aTime;
+          });
+
+          setScopedSearchResults(sorted);
+          setScopedSearchAfter(redditResults.after ?? null);
+        } catch (searchError) {
+          console.error('Scoped search failed', searchError);
+          setScopedSearchResults([]);
+          setScopedSearchAfter(null);
+        }
+        return;
+      }
+      navigate(
+        `/search?q=${encodeURIComponent(query)}&sort=relevance${includeNsfwSearch && !blockAllNsfw ? '&include_nsfw=true' : ''}`
+      );
+    },
+    [blockAllNsfw, includeNsfwSearch, limitSearchToContext, navigate, scopedSearchAfter, subreddit]
+  );
 
   const handlePostSearchSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -805,7 +815,10 @@ export default function RedditPage() {
     [subredditAbout?.description_html]
   );
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const fallbackSubredditIcon = useMemo(() => normalizeSubredditIcon(subredditAbout), [subredditAbout]);
+  const fallbackSubredditIcon = useMemo(
+    () => normalizeSubredditIcon(subredditAbout),
+    [subredditAbout]
+  );
 
   const {
     trimmedInput: trimmedInputValue,
@@ -820,7 +833,9 @@ export default function RedditPage() {
     setIsAutocompleteOpen(false);
   };
 
-  const currentPageSize = useInfiniteScrollSubs ? undefined : paginatedRedditQuery.data?.posts.length ?? 0;
+  const currentPageSize = useInfiniteScrollSubs
+    ? undefined
+    : (paginatedRedditQuery.data?.posts.length ?? 0);
 
   const combinedPosts = useMemo(() => {
     if (
@@ -952,8 +967,7 @@ export default function RedditPage() {
     if (!query) {
       return combinedPosts;
     }
-    const matchesSearch = (value?: string | null) =>
-      (value ?? '').toLowerCase().includes(query);
+    const matchesSearch = (value?: string | null) => (value ?? '').toLowerCase().includes(query);
 
     return combinedPosts.filter((item) => {
       if (item.type === 'reddit') {
@@ -982,15 +996,13 @@ export default function RedditPage() {
     if (item.type === 'platform') {
       const post = item.post;
       const isDeleting =
-        deleteLocalPostMutation.isPending &&
-        deleteLocalPostMutation.variables === post.id;
+        deleteLocalPostMutation.isPending && deleteLocalPostMutation.variables === post.id;
       const isSavedLocal = savedLocalPostIds.has(post.id);
       const isSavePendingLocal =
         savedLocalToggleMutation.isPending &&
         savedLocalToggleMutation.variables?.postId === post.id;
       const isHidingLocal =
-        hideLocalPostMutation.isPending &&
-        hideLocalPostMutation.variables === post.id;
+        hideLocalPostMutation.isPending && hideLocalPostMutation.variables === post.id;
       const normalizedPost: PlatformPost = {
         ...post,
         author_username:
@@ -998,10 +1010,7 @@ export default function RedditPage() {
           post.author?.username ||
           (post.author_id === user?.id ? user?.username : undefined) ||
           'unknown',
-        hub_name:
-          post.hub_name ||
-          post.hub?.name ||
-          'unknown',
+        hub_name: post.hub_name || post.hub?.name || 'unknown',
       };
 
       return (
@@ -1038,9 +1047,7 @@ export default function RedditPage() {
         isSaveActionPending={isSaveActionPending}
         pendingShouldSave={pendingShouldSave}
         onShare={() => handleShareRedditPost(post)}
-        onToggleSave={(shouldSave) =>
-          toggleSaveRedditPostMutation.mutate({ post, shouldSave })
-        }
+        onToggleSave={(shouldSave) => toggleSaveRedditPostMutation.mutate({ post, shouldSave })}
         onHide={() => handleSetHideTarget({ type: 'reddit', post })}
         onCrosspost={() => handleCrosspostSelection({ type: 'reddit', post })}
         linkState={originState}
@@ -1052,16 +1059,16 @@ export default function RedditPage() {
   const handleNextPage = () => {
     const nextAfter = paginatedRedditQuery.data?.after;
     if (nextAfter) {
-      setPageHistory(prev => [...prev, nextAfter]);
-      setCurrentPage(prev => prev + 1);
+      setPageHistory((prev) => [...prev, nextAfter]);
+      setCurrentPage((prev) => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handlePrevPage = () => {
     if (pageHistory.length > 1) {
-      setPageHistory(prev => prev.slice(0, -1));
-      setCurrentPage(prev => prev - 1);
+      setPageHistory((prev) => prev.slice(0, -1));
+      setCurrentPage((prev) => prev - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -1226,7 +1233,12 @@ export default function RedditPage() {
                     className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
                     </svg>
                     {t('home.sort.scroll')}
                   </button>
@@ -1296,9 +1308,9 @@ export default function RedditPage() {
                         <label className="flex items-center gap-2">
                           <input
                             type="checkbox"
-                          checked={limitSearchToContext}
-                          onChange={(e) => setLimitSearchToContext(e.target.checked)}
-                        />
+                            checked={limitSearchToContext}
+                            onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                          />
                           <span>{t('home.search.limitToSubreddit', { subreddit })}</span>
                         </label>
                         {!blockAllNsfw && (
@@ -1354,7 +1366,9 @@ export default function RedditPage() {
                   onChange={(event) => setCustomTopStart(event.target.value)}
                   className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 />
-                <span className="text-xs text-[var(--color-text-secondary)]">{t('home.timeRange.to')}</span>
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  {t('home.timeRange.to')}
+                </span>
                 <input
                   type="datetime-local"
                   value={customTopEnd}
@@ -1399,7 +1413,11 @@ export default function RedditPage() {
                 <div className="space-y-3">
                   {scopedSearchResults.map((item) => (
                     <div
-                      key={item.type === 'platform' ? `scoped-local-${item.post.id}` : `scoped-reddit-${item.post.id}`}
+                      key={
+                        item.type === 'platform'
+                          ? `scoped-local-${item.post.id}`
+                          : `scoped-reddit-${item.post.id}`
+                      }
                     >
                       {renderCombinedPost(item)}
                     </div>
@@ -1425,7 +1443,11 @@ export default function RedditPage() {
           ) : filteredCombinedPosts.length > 0 ? (
             <div className="space-y-3">
               {filteredCombinedPosts.map((item) => (
-                <div key={item.type === 'platform' ? `local-${item.post.id}` : `reddit-${item.post.id}`}>
+                <div
+                  key={
+                    item.type === 'platform' ? `local-${item.post.id}` : `reddit-${item.post.id}`
+                  }
+                >
                   {renderCombinedPost(item)}
                 </div>
               ))}
@@ -1438,8 +1460,8 @@ export default function RedditPage() {
                   postSearchQuery
                     ? t('subredditPage.empty.noMatches', { query: postSearchQuery })
                     : showOmniOnly
-                    ? t('subredditPage.empty.noOmniPosts', { subreddit })
-                    : t('subredditPage.empty.noPosts', { subreddit })
+                      ? t('subredditPage.empty.noOmniPosts', { subreddit })
+                      : t('subredditPage.empty.noPosts', { subreddit })
                 }
               />
             )
@@ -1461,19 +1483,19 @@ export default function RedditPage() {
             !scopedSearchResults &&
             filteredCombinedPosts.length > 0 &&
             (pageHistory.length > 1 || Boolean(paginatedRedditQuery.data?.after)) && (
-            <OffsetPaginationControls
-              hasPrev={pageHistory.length > 1}
-              hasMore={Boolean(paginatedRedditQuery.data?.after)}
-              isFetching={paginatedRedditQuery.isFetching}
-              onPrev={handlePrevPage}
-              onNext={handleNextPage}
-              centerContent={
-                <span className="text-sm text-[var(--color-text-secondary)]">
-                  {t('searchPage.pagination.page', { page: currentPage })}
-                </span>
-              }
-            />
-          )}
+              <OffsetPaginationControls
+                hasPrev={pageHistory.length > 1}
+                hasMore={Boolean(paginatedRedditQuery.data?.after)}
+                isFetching={paginatedRedditQuery.isFetching}
+                onPrev={handlePrevPage}
+                onNext={handleNextPage}
+                centerContent={
+                  <span className="text-sm text-[var(--color-text-secondary)]">
+                    {t('searchPage.pagination.page', { page: currentPage })}
+                  </span>
+                }
+              />
+            )}
         </div>
 
         {shouldShowSubredditSidebar && (
@@ -1492,7 +1514,9 @@ export default function RedditPage() {
       {hideTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('modals.hide.title')}</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {t('modals.hide.title')}
+            </h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
               {t('modals.hide.description')}
             </p>
@@ -1622,8 +1646,11 @@ function sanitizeRedditSidebarHtml(content?: string | null): string | null {
       const href = el.getAttribute('href');
       if (href) {
         // Keep internal app links (subreddit, user, wiki) as relative for React Router
-        const isInternalLink = href.startsWith('/r/') || href.startsWith('/u/') ||
-                               href.startsWith('/user/') || href.startsWith('/wiki/');
+        const isInternalLink =
+          href.startsWith('/r/') ||
+          href.startsWith('/u/') ||
+          href.startsWith('/user/') ||
+          href.startsWith('/wiki/');
 
         if (!isInternalLink) {
           // External links open in new tab

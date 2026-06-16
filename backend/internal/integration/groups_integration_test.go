@@ -307,12 +307,14 @@ func TestGroupMessageEncryption(t *testing.T) {
 		m1Token, nil)
 	assert.Equal(t, http.StatusOK, w3.Code, "fetch messages: %s", w3.Body.String())
 
-	var messages []models.Message
-	require.NoError(t, json.Unmarshal(w3.Body.Bytes(), &messages))
-	require.NotEmpty(t, messages, "messages list should not be empty")
+	var messagesResp struct {
+		Messages []models.Message `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(w3.Body.Bytes(), &messagesResp))
+	require.NotEmpty(t, messagesResp.Messages, "messages list should not be empty")
 
 	found := false
-	for _, m := range messages {
+	for _, m := range messagesResp.Messages {
 		if m.EncryptedContent == encryptedPayload {
 			assert.Equal(t, "v1", m.EncryptionVersion)
 			found = true

@@ -67,7 +67,7 @@ describe('FeatureFlagsAdminPage', () => {
     render(
       <Wrapper>
         <AdminFeatureFlags />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(screen.getByText(/loading feature flags/i)).toBeInTheDocument();
   });
@@ -78,7 +78,7 @@ describe('FeatureFlagsAdminPage', () => {
     render(
       <Wrapper>
         <AdminFeatureFlags />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByText('new-ui')).toBeInTheDocument();
@@ -91,7 +91,7 @@ describe('FeatureFlagsAdminPage', () => {
     render(
       <Wrapper>
         <AdminFeatureFlags />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /create new flag/i })).toBeInTheDocument();
@@ -105,7 +105,7 @@ describe('FeatureFlagsAdminPage', () => {
     render(
       <Wrapper>
         <AdminFeatureFlags />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => screen.getByText('new-ui'));
 
@@ -125,7 +125,7 @@ describe('FeatureFlagsAdminPage', () => {
     render(
       <Wrapper>
         <AdminFeatureFlags />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByRole('columnheader', { name: /^key$/i })).toBeInTheDocument();

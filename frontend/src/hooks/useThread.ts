@@ -98,7 +98,11 @@ export function useThread({ rootMessageId, open, pageSize = 20 }: UseThreadOptio
     setLoadingMore(true);
     setError(null);
     try {
-      const response = await messagesService.getMessageThread(rootMessageId, pageSize, replies.length);
+      const response = await messagesService.getMessageThread(
+        rootMessageId,
+        pageSize,
+        replies.length
+      );
       const mergedReplies = [...replies, ...response.replies];
       const entry: ThreadCacheEntry = {
         rootMessage: response.root_message,

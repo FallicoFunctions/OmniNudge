@@ -16,7 +16,9 @@ export function LanguageSelector() {
       </label>
       <select
         value={selectedLanguage}
-        onChange={(e) => handleLanguageChange(e.target.value as (typeof LANGUAGE_OPTIONS)[number]['code'])}
+        onChange={(e) =>
+          handleLanguageChange(e.target.value as (typeof LANGUAGE_OPTIONS)[number]['code'])
+        }
         className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
       >
         {LANGUAGE_OPTIONS.map((lang) => (
@@ -25,9 +27,7 @@ export function LanguageSelector() {
           </option>
         ))}
       </select>
-      <p className="text-xs text-[var(--color-text-secondary)]">
-        {t('settings.language_help')}
-      </p>
+      <p className="text-xs text-[var(--color-text-secondary)]">{t('settings.language_help')}</p>
       <p className="mt-4 text-[10px] text-[var(--color-text-secondary)] opacity-60">
         {t('settings.language_footer')}
       </p>

@@ -50,7 +50,9 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
     try {
       if (files.length === 1) {
         const response = await mediaService.uploadMedia(files[0]);
-        const normalizedUrl = normalizeUploadedMediaUrl(response.storage_url || response.storage_path);
+        const normalizedUrl = normalizeUploadedMediaUrl(
+          response.storage_url || response.storage_path
+        );
         setMediaUrl(normalizedUrl);
         setMediaItems([
           {
@@ -146,7 +148,12 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="text-cyan-400 font-semibold">
-          {t(feedType === 'hub' ? 'inlineCreatePost.header.hub' : 'inlineCreatePost.header.subreddit', { name: feedSource })}
+          {t(
+            feedType === 'hub'
+              ? 'inlineCreatePost.header.hub'
+              : 'inlineCreatePost.header.subreddit',
+            { name: feedSource }
+          )}
         </div>
         <button
           onClick={onClose}
@@ -210,20 +217,25 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
               disabled={isUploadingMedia}
               className="w-full px-2 py-1.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded hover:bg-cyan-500/20 transition-colors disabled:opacity-50"
             >
-              {isUploadingMedia ? t('inlineCreatePost.status.uploading') : t('inlineCreatePost.actions.uploadMedia')}
+              {isUploadingMedia
+                ? t('inlineCreatePost.status.uploading')
+                : t('inlineCreatePost.actions.uploadMedia')}
             </button>
 
-            {mediaUploadError && (
-              <div className="text-red-400 text-[10px]">{mediaUploadError}</div>
-            )}
+            {mediaUploadError && <div className="text-red-400 text-[10px]">{mediaUploadError}</div>}
 
             {mediaPreviews.length > 0 && (
               <div className="space-y-1">
                 {mediaPreviews.map((preview, index) => (
-                  <div key={index} className="flex items-center gap-2 p-1 bg-[var(--color-background)] rounded">
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 p-1 bg-[var(--color-background)] rounded"
+                  >
                     <img src={preview} alt="" className="w-8 h-8 object-cover rounded" />
                     <span className="flex-1 truncate text-[var(--color-text-muted)] text-[10px]">
-                      {mediaItems[index]?.media_type === 'video' ? t('common.media.video') : t('common.media.image')}
+                      {mediaItems[index]?.media_type === 'video'
+                        ? t('common.media.video')
+                        : t('common.media.image')}
                     </span>
                     <button
                       type="button"
@@ -279,7 +291,9 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
             disabled={createPostMutation.isPending || isUploadingMedia || !title.trim()}
             className="flex-1 px-3 py-1.5 bg-cyan-500 text-white rounded hover:bg-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {createPostMutation.isPending ? t('inlineCreatePost.status.posting') : t('inlineCreatePost.actions.post')}
+            {createPostMutation.isPending
+              ? t('inlineCreatePost.status.posting')
+              : t('inlineCreatePost.actions.post')}
           </button>
         </div>
       </form>

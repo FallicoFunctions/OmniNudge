@@ -197,7 +197,7 @@ export function PlatformPostCard({
   }, [post.id, post.media_url, post.thumbnail_url]);
 
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
-    const failedSrc = event.currentTarget.currentSrc || event.currentTarget.src;
+    const failedSrc = event.currentTarget.getAttribute('src') || event.currentTarget.src;
     if (!failedSrc) return;
     setFailedImageSrcs((prev) => (prev.includes(failedSrc) ? prev : [...prev, failedSrc]));
   };
@@ -537,7 +537,9 @@ export function PlatformPostCard({
                       playsInline
                       preload="metadata"
                     />
-                  ) : post.media_url && post.media_type?.startsWith('image') && showExpandedImage ? (
+                  ) : post.media_url &&
+                    post.media_type?.startsWith('image') &&
+                    showExpandedImage ? (
                     <img
                       src={resolvedMediaUrl ?? undefined}
                       alt={post.title}

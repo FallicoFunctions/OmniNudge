@@ -8,9 +8,10 @@ export function useFormat() {
   const { i18n } = useTranslation();
   const rawLanguage = i18n.language || i18n.resolvedLanguage || 'en';
   const resolvedLanguage = i18n.resolvedLanguage || rawLanguage;
-  const locale = getBaseLanguage(rawLanguage) === resolveSupportedLanguage(resolvedLanguage)
-    ? rawLanguage
-    : resolveSupportedLanguage(resolvedLanguage);
+  const locale =
+    getBaseLanguage(rawLanguage) === resolveSupportedLanguage(resolvedLanguage)
+      ? rawLanguage
+      : resolveSupportedLanguage(resolvedLanguage);
 
   /**
    * Format a date based on the current locale
@@ -23,7 +24,10 @@ export function useFormat() {
   /**
    * Format a number based on the current locale
    */
-  const formatNumber = (num: number | null | undefined, options?: Intl.NumberFormatOptions): string => {
+  const formatNumber = (
+    num: number | null | undefined,
+    options?: Intl.NumberFormatOptions
+  ): string => {
     if (num == null || !isFinite(num)) return '—';
     return new Intl.NumberFormat(locale, options).format(num);
   };

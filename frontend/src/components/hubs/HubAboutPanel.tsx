@@ -70,15 +70,27 @@ export default function HubAboutPanel({
           {showStats && (
             <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-[var(--color-text-primary)]">{t('hubAboutPanel.labels.members')}</span>
-                <span>{typeof hubDetails.subscriber_count === 'number' ? formatNumber(hubDetails.subscriber_count) : '—'}</span>
+                <span className="font-semibold text-[var(--color-text-primary)]">
+                  {t('hubAboutPanel.labels.members')}
+                </span>
+                <span>
+                  {typeof hubDetails.subscriber_count === 'number'
+                    ? formatNumber(hubDetails.subscriber_count)
+                    : '—'}
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-[var(--color-text-primary)]">{t('hubAboutPanel.labels.activeOmniUsers')}</span>
-                <span>{typeof activeOmniUsers === 'number' ? formatNumber(activeOmniUsers) : '—'}</span>
+                <span className="font-semibold text-[var(--color-text-primary)]">
+                  {t('hubAboutPanel.labels.activeOmniUsers')}
+                </span>
+                <span>
+                  {typeof activeOmniUsers === 'number' ? formatNumber(activeOmniUsers) : '—'}
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-[var(--color-text-primary)]">{t('hubAboutPanel.labels.visibility')}</span>
+                <span className="font-semibold text-[var(--color-text-primary)]">
+                  {t('hubAboutPanel.labels.visibility')}
+                </span>
                 <span>
                   {hubDetails.type
                     ? hubDetails.type.charAt(0).toUpperCase() + hubDetails.type.slice(1)
@@ -87,8 +99,16 @@ export default function HubAboutPanel({
               </div>
               {hubDetails.created_at && (
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-[var(--color-text-primary)]">{t('hubAboutPanel.labels.created')}</span>
-                  <span>{formatDate(new Date(hubDetails.created_at), { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  <span className="font-semibold text-[var(--color-text-primary)]">
+                    {t('hubAboutPanel.labels.created')}
+                  </span>
+                  <span>
+                    {formatDate(new Date(hubDetails.created_at), {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </span>
                 </div>
               )}
             </div>

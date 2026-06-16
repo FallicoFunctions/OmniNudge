@@ -135,7 +135,9 @@ export function ThreadView({
   if (!open || !rootMessageId) return null;
 
   return (
-    <div className={`fixed inset-0 z-50 flex bg-black/50 ${isMobile ? 'items-center justify-center p-4' : 'items-stretch justify-end p-0'}`}>
+    <div
+      className={`fixed inset-0 z-50 flex bg-black/50 ${isMobile ? 'items-center justify-center p-4' : 'items-stretch justify-end p-0'}`}
+    >
       <div
         className={`flex flex-col overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl ${
           isMobile
@@ -211,7 +213,13 @@ export function ThreadView({
                   <div
                     key={message.id}
                     id={`thread-message-${message.id}`}
-                    style={!isRoot ? { marginLeft: `${Math.min(depthByMessageID.get(message.id) ?? 1, 3) * 12}px` } : undefined}
+                    style={
+                      !isRoot
+                        ? {
+                            marginLeft: `${Math.min(depthByMessageID.get(message.id) ?? 1, 3) * 12}px`,
+                          }
+                        : undefined
+                    }
                     className={`rounded-lg border px-3 py-2 ${
                       isRoot
                         ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
@@ -243,10 +251,12 @@ export function ThreadView({
                           type="button"
                           onClick={() => {
                             if (!message.reply_to) return;
-                            document.getElementById(`thread-message-${message.reply_to}`)?.scrollIntoView({
-                              behavior: 'smooth',
-                              block: 'center',
-                            });
+                            document
+                              .getElementById(`thread-message-${message.reply_to}`)
+                              ?.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center',
+                              });
                           }}
                           className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
                         >

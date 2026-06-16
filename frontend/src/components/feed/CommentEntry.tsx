@@ -122,9 +122,7 @@ export function CommentEntry({
         rows={1}
         disabled={isSubmitting}
       />
-      {error && (
-        <div className="text-red-500 text-[10px] mt-1">{error}</div>
-      )}
+      {error && <div className="text-red-500 text-[10px] mt-1">{error}</div>}
       <div className="flex gap-2 mt-1">
         <button
           type="submit"

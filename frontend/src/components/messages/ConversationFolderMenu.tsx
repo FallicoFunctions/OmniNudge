@@ -95,22 +95,41 @@ export function ConversationFolderMenu({
               >
                 {isPending ? (
                   <svg className="h-3 w-3 animate-spin" viewBox="0 0 16 16" fill="none">
-                    <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="9.4 28.3" strokeDashoffset="0" />
+                    <circle
+                      cx="8"
+                      cy="8"
+                      r="6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeDasharray="9.4 28.3"
+                      strokeDashoffset="0"
+                    />
                   </svg>
                 ) : inFolder ? (
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M2 5l2.5 2.5L8 3"
+                      stroke="white"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 ) : null}
               </span>
-              <span className="inline-flex flex-shrink-0 items-center text-base leading-none" aria-hidden>
+              <span
+                className="inline-flex flex-shrink-0 items-center text-base leading-none"
+                aria-hidden
+              >
                 {folder.icon}
               </span>
               <span className="flex-1 truncate text-left">{folder.name}</span>
             </button>
             {hasError && (
               <div className="flex items-center justify-between px-3 pb-1">
-                <p role="alert" className="text-xs text-[var(--color-error)]">{t('messages.folders.toggleError')}</p>
+                <p role="alert" className="text-xs text-[var(--color-error)]">
+                  {t('messages.folders.toggleError')}
+                </p>
                 <button
                   type="button"
                   onClick={() => void handleToggle(folder)}

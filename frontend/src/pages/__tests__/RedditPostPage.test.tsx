@@ -194,7 +194,7 @@ describe('RedditPostPage', () => {
     render(
       <Wrapper>
         <RedditPostPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(document.body).toBeTruthy();
   });
@@ -204,7 +204,7 @@ describe('RedditPostPage', () => {
     render(
       <Wrapper>
         <RedditPostPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(document.body).toBeTruthy();

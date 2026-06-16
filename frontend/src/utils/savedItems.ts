@@ -1,5 +1,10 @@
 import type { QueryClient } from '@tanstack/react-query';
-import type { SavedItemsResponse, HiddenItemsResponse, SavedPost, SavedRedditPost } from '../types/saved';
+import type {
+  SavedItemsResponse,
+  HiddenItemsResponse,
+  SavedPost,
+  SavedRedditPost,
+} from '../types/saved';
 
 export const normalizeRedditPostId = (postId: string) => postId.replace(/^t3_/, '');
 
@@ -66,7 +71,12 @@ export const markRedditPostSaved = (
   queryClient: QueryClient,
   subreddit: string,
   postId: string,
-  payload: Partial<Pick<SavedRedditPost, 'title' | 'author' | 'score' | 'num_comments' | 'thumbnail' | 'created_utc'>> = {}
+  payload: Partial<
+    Pick<
+      SavedRedditPost,
+      'title' | 'author' | 'score' | 'num_comments' | 'thumbnail' | 'created_utc'
+    >
+  > = {}
 ) => {
   const normalizedId = normalizeRedditPostId(postId);
   const key = getRedditPostKey(subreddit, normalizedId);
@@ -82,7 +92,9 @@ export const markRedditPostSaved = (
     saved_at: new Date().toISOString(),
   };
   const insert = (list: SavedRedditPost[]): SavedRedditPost[] =>
-    list.some((p) => getRedditPostKey(p.subreddit, p.reddit_post_id) === key) ? list : [...list, entry];
+    list.some((p) => getRedditPostKey(p.subreddit, p.reddit_post_id) === key)
+      ? list
+      : [...list, entry];
 
   queryClient.setQueryData<SavedItemsResponse>(['saved-items', 'reddit_posts'], (old) => ({
     ...(old ?? { type: 'reddit_posts' as const }),
@@ -94,7 +106,11 @@ export const markRedditPostSaved = (
   }));
 };
 
-export const markRedditPostUnsaved = (queryClient: QueryClient, subreddit: string, postId: string) => {
+export const markRedditPostUnsaved = (
+  queryClient: QueryClient,
+  subreddit: string,
+  postId: string
+) => {
   const key = getRedditPostKey(subreddit, postId);
   const remove = (list: SavedRedditPost[]): SavedRedditPost[] =>
     list.filter((p) => getRedditPostKey(p.subreddit, p.reddit_post_id) !== key);
@@ -149,25 +165,26 @@ export const getHiddenPostIdSet = (data?: HiddenItemsResponse) =>
 
 export const getHiddenRedditPostIdSet = (data?: HiddenItemsResponse) =>
   new Set<string>(
-    data?.hidden_reddit_posts?.map(
-      (post) => getRedditPostKey(post.subreddit, post.reddit_post_id)
+    data?.hidden_reddit_posts?.map((post) =>
+      getRedditPostKey(post.subreddit, post.reddit_post_id)
     ) ?? []
   );
 
 export const getSavedRedditPostIdSet = (data?: SavedItemsResponse) =>
   new Set<string>(
-    data?.saved_reddit_posts?.map((post) => getRedditPostKey(post.subreddit, post.reddit_post_id)) ?? []
+    data?.saved_reddit_posts?.map((post) =>
+      getRedditPostKey(post.subreddit, post.reddit_post_id)
+    ) ?? []
   );
 
 export const getSavedCommentIdSet = (data?: SavedItemsResponse) =>
-  new Set<number>(
-    data?.saved_post_comments?.map((entry) => entry.comment_id ?? entry.id) ?? []
-  );
+  new Set<number>(data?.saved_post_comments?.map((entry) => entry.comment_id ?? entry.id) ?? []);
 
 export const getSavedRedditCommentIdSet = (data?: SavedItemsResponse) =>
   new Set<string>(
     data?.saved_reddit_comments?.map(
-      (comment) => `${comment.subreddit}-${normalizeRedditPostId(comment.reddit_post_id)}-${comment.id}`
+      (comment) =>
+        `${comment.subreddit}-${normalizeRedditPostId(comment.reddit_post_id)}-${comment.id}`
     ) ?? []
   );
 
@@ -175,4 +192,6 @@ export const getSavedRedditCommentIdSetById = (data?: SavedItemsResponse) =>
   new Set<number>(data?.saved_reddit_comments?.map((comment) => comment.id) ?? []);
 
 export const getSavedRedditAPICommentIdSet = (data?: SavedItemsResponse) =>
-  new Set<string>(data?.saved_reddit_api_comments?.map((comment) => comment.reddit_comment_id) ?? []);
+  new Set<string>(
+    data?.saved_reddit_api_comments?.map((comment) => comment.reddit_comment_id) ?? []
+  );

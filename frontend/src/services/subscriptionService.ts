@@ -65,7 +65,9 @@ export const subscriptionService = {
   },
 
   async getUserSubredditSubscriptions(): Promise<SubredditSubscription[]> {
-    const response = await api.get<SubredditSubscriptionsResponse>('/users/me/subscriptions/subreddits');
+    const response = await api.get<SubredditSubscriptionsResponse>(
+      '/users/me/subscriptions/subreddits'
+    );
     return response.subscriptions || [];
   },
 };

@@ -28,11 +28,9 @@ vi.mock('../../services/hubSettingsService', () => ({
       allow_links: true,
       allow_text_posts: true,
     }),
-    getHubModerators: vi
-      .fn()
-      .mockResolvedValue({
-        moderators: [{ user_id: 1, role: 'owner', username: 'ownerUser' }],
-      }),
+    getHubModerators: vi.fn().mockResolvedValue({
+      moderators: [{ user_id: 1, role: 'owner', username: 'ownerUser' }],
+    }),
     updateHubSettings: vi.fn().mockResolvedValue({}),
   },
 }));
@@ -98,7 +96,7 @@ describe('HubSettingsPage', () => {
     render(
       <Wrapper>
         <HubSettingsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       // i18n mock returns the key; the hub name or settings heading must appear
@@ -111,7 +109,7 @@ describe('HubSettingsPage', () => {
     render(
       <Wrapper>
         <HubSettingsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByTestId('general-tab')).toBeInTheDocument();
@@ -128,7 +126,7 @@ describe('HubSettingsPage', () => {
     render(
       <Wrapper>
         <HubSettingsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByText(/permission denied/i)).toBeInTheDocument();
@@ -140,7 +138,7 @@ describe('HubSettingsPage', () => {
     render(
       <Wrapper>
         <HubSettingsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       // tabs should be rendered

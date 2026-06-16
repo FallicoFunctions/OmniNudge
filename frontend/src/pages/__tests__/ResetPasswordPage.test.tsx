@@ -17,7 +17,7 @@ const renderPage = (search = '') =>
   render(
     <MemoryRouter initialEntries={[`/reset-password${search}`]}>
       <ResetPasswordPage />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 
 describe('ResetPasswordPage', () => {
@@ -73,7 +73,7 @@ describe('ResetPasswordPage', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/at least 8 characters|minimum|password.*length/i),
+        screen.getByText(/at least 8 characters|minimum|password.*length/i)
       ).toBeInTheDocument();
     });
   });

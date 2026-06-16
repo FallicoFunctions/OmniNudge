@@ -129,7 +129,10 @@ function matchSegmentTemplate(path: string, pattern: string): { wildcardCount: n
   return { wildcardCount };
 }
 
-function matchPath(path: string, rule: CatalogMatchRule): { pathSpecificity: number; wildcardCount: number } | null {
+function matchPath(
+  path: string,
+  rule: CatalogMatchRule
+): { pathSpecificity: number; wildcardCount: number } | null {
   const normalizedPath = normalizePathname(path);
   let best: { pathSpecificity: number; wildcardCount: number } | null = null;
 
@@ -161,7 +164,8 @@ function matchPath(path: string, rule: CatalogMatchRule): { pathSpecificity: num
       if (
         !best ||
         candidate.pathSpecificity > best.pathSpecificity ||
-        (candidate.pathSpecificity === best.pathSpecificity && candidate.wildcardCount < best.wildcardCount)
+        (candidate.pathSpecificity === best.pathSpecificity &&
+          candidate.wildcardCount < best.wildcardCount)
       ) {
         best = candidate;
       }
@@ -171,7 +175,10 @@ function matchPath(path: string, rule: CatalogMatchRule): { pathSpecificity: num
   return best;
 }
 
-function matchesQuery(searchParams: URLSearchParams, requirements: CatalogMatchRule['query_requirements']): boolean {
+function matchesQuery(
+  searchParams: URLSearchParams,
+  requirements: CatalogMatchRule['query_requirements']
+): boolean {
   if (!requirements) {
     return true;
   }

@@ -89,7 +89,9 @@ export const AboutPanel: React.FC<AboutPanelProps> = ({
             <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
               {stats.map((stat, index) => (
                 <div key={index} className="flex items-center justify-between">
-                  <span className="font-semibold text-[var(--color-text-primary)]">{stat.label}</span>
+                  <span className="font-semibold text-[var(--color-text-primary)]">
+                    {stat.label}
+                  </span>
                   <span>{formatStatValue(stat)}</span>
                 </div>
               ))}

@@ -12,6 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	zlog "github.com/rs/zerolog/log"
+
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/ports"
@@ -19,7 +21,6 @@ import (
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/services/externalproviders"
 	linkpreviewsvc "github.com/omninudge/backend/internal/services/linkpreview"
-	zlog "github.com/rs/zerolog/log"
 )
 
 // PostsHandler handles HTTP requests for platform posts
@@ -726,7 +727,7 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 	}
 
 	mediaChanged := normalizeOptionalString(existingPost.MediaURL) != normalizeOptionalString(req.MediaURL) ||
-		strings.ToLower(normalizeOptionalString(existingPost.MediaType)) != strings.ToLower(normalizeOptionalString(req.MediaType))
+		!strings.EqualFold(normalizeOptionalString(existingPost.MediaType), normalizeOptionalString(req.MediaType))
 
 	// Update post fields
 	existingPost.Title = req.Title
@@ -941,7 +942,9 @@ func (h *PostsHandler) sendPostDeletionModMail(post *models.PlatformPost, modera
 		return
 	}
 
-	tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		zlog.Error().Err(err).Msg("posts: failed to commit modmail transaction")
+	}
 }
 
 // VotePost votes on a post (upvote, downvote, or clear).

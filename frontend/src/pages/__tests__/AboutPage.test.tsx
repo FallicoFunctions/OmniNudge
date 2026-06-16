@@ -22,7 +22,7 @@ describe('AboutPage', () => {
     render(
       <MemoryRouter>
         <AboutPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(document.body).toBeTruthy();
   });
@@ -31,7 +31,7 @@ describe('AboutPage', () => {
     render(
       <MemoryRouter>
         <AboutPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
 
     const body = document.body.textContent ?? '';
@@ -39,10 +39,10 @@ describe('AboutPage', () => {
     expect(body.indexOf('aboutPage.availableToday.title')).toBeGreaterThanOrEqual(0);
     expect(body.indexOf('aboutPage.vision.title')).toBeGreaterThanOrEqual(0);
     expect(body.indexOf('aboutPage.aiDesigner.title')).toBeLessThan(
-      body.indexOf('aboutPage.availableToday.title'),
+      body.indexOf('aboutPage.availableToday.title')
     );
     expect(body.indexOf('aboutPage.aiDesigner.title')).toBeLessThan(
-      body.indexOf('aboutPage.vision.title'),
+      body.indexOf('aboutPage.vision.title')
     );
 
     expect(screen.getByText('aboutPage.messagingEncryption.title')).toBeInTheDocument();

@@ -5,7 +5,9 @@ import type { PlatformPost } from '../types/posts';
  * - If the post has a target_subreddit, use Reddit-style URL: /r/{subreddit}/comments/{id}
  * - Otherwise, use hub URL: /h/{hubname}/comments/{id}
  */
-export function getPostUrl(post: Pick<PlatformPost, 'id' | 'target_subreddit' | 'hub_name'>): string {
+export function getPostUrl(
+  post: Pick<PlatformPost, 'id' | 'target_subreddit' | 'hub_name'>
+): string {
   if (post.target_subreddit) {
     // Use Reddit-style URL for posts crossposted to subreddits
     return `/r/${post.target_subreddit}/comments/${post.id}`;

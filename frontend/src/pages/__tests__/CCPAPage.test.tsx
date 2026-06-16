@@ -25,7 +25,7 @@ describe('CCPAPage', () => {
     render(
       <MemoryRouter>
         <CCPAPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(document.body).toBeTruthy();
   });
@@ -34,7 +34,7 @@ describe('CCPAPage', () => {
     render(
       <MemoryRouter>
         <CCPAPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(screen.getByText('ccpaPage.title')).toBeInTheDocument();
   });
@@ -43,7 +43,7 @@ describe('CCPAPage', () => {
     render(
       <MemoryRouter>
         <CCPAPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(screen.getByText('ccpaPage.sections.ccpa.title')).toBeInTheDocument();
   });

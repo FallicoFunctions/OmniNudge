@@ -98,11 +98,7 @@ export function ChatSettingsModal({
           <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-3">
             {t('messages.autoDelete.label')}
           </label>
-          <AutoDeleteDurationPicker
-            value={duration}
-            onChange={setDuration}
-            disabled={isSaving}
-          />
+          <AutoDeleteDurationPicker value={duration} onChange={setDuration} disabled={isSaving} />
         </div>
 
         <div className="flex gap-2">

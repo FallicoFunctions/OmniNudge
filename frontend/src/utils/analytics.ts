@@ -18,12 +18,7 @@ export interface AnalyticsEvent {
  * @param label - Optional event label (e.g., 'HomeTab', 'CreatePost')
  * @param value - Optional numeric value
  */
-export function trackEvent(
-  category: string,
-  action: string,
-  label?: string,
-  value?: number
-): void {
+export function trackEvent(category: string, action: string, label?: string, value?: number): void {
   // Log in development for debugging
   if (import.meta.env.DEV) {
     console.log('[Analytics]', {
@@ -31,7 +26,7 @@ export function trackEvent(
       action,
       label,
       value,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 

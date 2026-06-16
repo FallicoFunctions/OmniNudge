@@ -40,7 +40,11 @@ const AIDesignMarkup = memo(function AIDesignMarkup({ containerRef, html }: AIDe
   return <div ref={containerRef} dangerouslySetInnerHTML={{ __html: html }} />;
 });
 
-function isContentSlot(slot: DesignSlot, routeVariant: RouteVariant, hasExplicitContentSlot: boolean) {
+function isContentSlot(
+  slot: DesignSlot,
+  routeVariant: RouteVariant,
+  hasExplicitContentSlot: boolean
+) {
   if (slot.id === 'hub-content') {
     return true;
   }
@@ -62,12 +66,12 @@ export default function HubAIDesignLayout({
 
   const { htmlWithoutStyles, styleContent, slotsByMarker } = useMemo(
     () => splitAIDesignHTML(htmlContent),
-    [htmlContent],
+    [htmlContent]
   );
 
   const hasExplicitContentSlot = useMemo(
     () => Array.from(slotsByMarker.values()).some((slot) => slot.id === 'hub-content'),
-    [slotsByMarker],
+    [slotsByMarker]
   );
 
   const { data: subscriptionData } = useQuery({
@@ -102,7 +106,9 @@ export default function HubAIDesignLayout({
     const root = container.firstElementChild as HTMLElement | null;
     if (root) {
       root.dataset.hubRoute = routeVariant;
-      Object.values(ROUTE_CLASS_BY_VARIANT).forEach((className) => root.classList.remove(className));
+      Object.values(ROUTE_CLASS_BY_VARIANT).forEach((className) =>
+        root.classList.remove(className)
+      );
       root.classList.add(ROUTE_CLASS_BY_VARIANT[routeVariant]);
     }
 
@@ -156,7 +162,9 @@ export default function HubAIDesignLayout({
 
     switch (slot.id) {
       case 'hub-join':
-        return <HubJoinSlot hubName={hubName} isSubscribed={isSubscribed} userId={user?.id ?? null} />;
+        return (
+          <HubJoinSlot hubName={hubName} isSubscribed={isSubscribed} userId={user?.id ?? null} />
+        );
       case 'hub-create':
         return <HubCreateSlot hubName={hubName} userId={user?.id ?? null} />;
       case 'hub-mod':

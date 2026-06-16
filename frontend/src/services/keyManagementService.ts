@@ -5,12 +5,7 @@
  * to prevent XSS exfiltration. Public keys remain in localStorage (not secret).
  */
 
-import {
-  generateKeyPair,
-  exportKeyPair,
-  importPublicKey,
-  type KeyPair,
-} from '../utils/encryption';
+import { generateKeyPair, exportKeyPair, importPublicKey, type KeyPair } from '../utils/encryption';
 
 const PRIVATE_KEY_STORAGE_KEY = 'omninudge_private_key';
 const PUBLIC_KEY_STORAGE_KEY = 'omninudge_public_key';
@@ -99,7 +94,7 @@ export async function getOwnKeys(): Promise<KeyPair | null> {
   if (!privateKeyBase64 || !publicKeyBase64) return null;
 
   try {
-    const privateKeyBytes = Uint8Array.from(atob(privateKeyBase64), c => c.charCodeAt(0));
+    const privateKeyBytes = Uint8Array.from(atob(privateKeyBase64), (c) => c.charCodeAt(0));
     const privateKey = await window.crypto.subtle.importKey(
       'pkcs8',
       privateKeyBytes,
@@ -155,8 +150,11 @@ export async function saveKeys(keyPair: KeyPair): Promise<void> {
  * Store a private key (from server backup decryption) directly as non-extractable in IndexedDB.
  * Used by AuthContext after decrypting the server-side encrypted backup.
  */
-export async function storeNonExtractablePrivateKey(privateKeyBase64: string, publicKeyBase64: string): Promise<void> {
-  const privateKeyBytes = Uint8Array.from(atob(privateKeyBase64), c => c.charCodeAt(0));
+export async function storeNonExtractablePrivateKey(
+  privateKeyBase64: string,
+  publicKeyBase64: string
+): Promise<void> {
+  const privateKeyBytes = Uint8Array.from(atob(privateKeyBase64), (c) => c.charCodeAt(0));
   const privateKey = await window.crypto.subtle.importKey(
     'pkcs8',
     privateKeyBytes,

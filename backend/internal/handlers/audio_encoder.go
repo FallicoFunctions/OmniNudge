@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
 	"context"
 	"fmt"
 	"io"
@@ -13,7 +12,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/omninudge/backend/internal/ports"
+
 	"github.com/gin-gonic/gin"
+
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/queue"
 )
@@ -154,7 +156,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 	filename := fmt.Sprintf("voice_%d_%d.webm", userID, time.Now().Unix())
 	finalPath := filepath.Join(uploadsDir, filename)
 
-	if err := os.WriteFile(finalPath, encodedData, 0644); err != nil {
+	if err := os.WriteFile(finalPath, encodedData, 0644); err != nil { // #nosec G703 -- path built from hardcoded dir + integer IDs, not user-controlled
 		log.Printf("Failed to write encoded file: %v", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to save audio")
 		return

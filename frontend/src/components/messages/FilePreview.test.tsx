@@ -109,7 +109,12 @@ describe('FilePreview', () => {
   it('does not open viewer when clicking video element controls area', () => {
     const onOpen = vi.fn();
     const { container } = render(
-      <FilePreview src="/uploads/clip.mp4" mimeType="video/mp4" fileName="clip.mp4" onOpen={onOpen} />
+      <FilePreview
+        src="/uploads/clip.mp4"
+        mimeType="video/mp4"
+        fileName="clip.mp4"
+        onOpen={onOpen}
+      />
     );
 
     const video = container.querySelector('video');
@@ -125,7 +130,13 @@ describe('FilePreview', () => {
 
   it('opens external file previews with noopener/noreferrer', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
-    render(<FilePreview src="/uploads/file.bin" mimeType="application/octet-stream" fileName="file.bin" />);
+    render(
+      <FilePreview
+        src="/uploads/file.bin"
+        mimeType="application/octet-stream"
+        fileName="file.bin"
+      />
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Open' }));
     expect(openSpy).toHaveBeenCalledWith('/uploads/file.bin', '_blank', 'noopener,noreferrer');

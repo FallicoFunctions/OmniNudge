@@ -19,9 +19,7 @@ export function SystemMessage({ message }: SystemMessageProps) {
 
   return (
     <div className="flex flex-col items-center py-2 px-4">
-      <p className="text-xs text-[var(--color-text-muted)] italic text-center">
-        {message.text}
-      </p>
+      <p className="text-xs text-[var(--color-text-muted)] italic text-center">{message.text}</p>
       <time
         dateTime={message.created_at}
         className="text-[10px] text-[var(--color-text-muted)] opacity-70 mt-0.5"
@@ -57,7 +55,10 @@ export function buildSystemMessageText(
     case 'group_updated':
       return t('groups.systemMessages.groupUpdated', { actor: actorName });
     case 'ownership_transferred':
-      return t('groups.systemMessages.ownershipTransferred', { actor: actorName, target: targetName });
+      return t('groups.systemMessages.ownershipTransferred', {
+        actor: actorName,
+        target: targetName,
+      });
     default:
       return '';
   }

@@ -19,7 +19,13 @@ interface MediaViewerProps {
   autoplay?: boolean;
 }
 
-export function MediaViewer({ media, className = '', onLoad, onError, autoplay = false }: MediaViewerProps) {
+export function MediaViewer({
+  media,
+  className = '',
+  onLoad,
+  onError,
+  autoplay = false,
+}: MediaViewerProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,9 +48,13 @@ export function MediaViewer({ media, className = '', onLoad, onError, autoplay =
 
   if (error) {
     return (
-      <div className={`flex items-center justify-center bg-[var(--color-surface)] rounded ${className}`}>
+      <div
+        className={`flex items-center justify-center bg-[var(--color-surface)] rounded ${className}`}
+      >
         <div className="text-center p-8">
-          <div className="text-[var(--color-error)] text-lg mb-2">{t('mediaViewer.errors.failedToLoad')}</div>
+          <div className="text-[var(--color-error)] text-lg mb-2">
+            {t('mediaViewer.errors.failedToLoad')}
+          </div>
           <div className="text-[var(--color-text-secondary)] text-sm">{error}</div>
         </div>
       </div>

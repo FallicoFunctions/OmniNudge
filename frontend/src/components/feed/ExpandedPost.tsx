@@ -54,10 +54,7 @@ interface ThreadComment {
   __removeTempId?: string;
 }
 
-type CommentUpdate =
-  | ThreadComment
-  | { __removeTempId: string }
-  | { __replaceTempId: string };
+type CommentUpdate = ThreadComment | { __removeTempId: string } | { __replaceTempId: string };
 
 interface RedditCommentNode {
   kind?: string;
@@ -99,21 +96,28 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
   const mediaUrl = postData.media_url || postData.url;
   let thumbnail = postData.thumbnail_url || postData.thumbnail;
 
-  if (thumbnail === 'self' || thumbnail === 'default' || thumbnail === 'nsfw' || thumbnail === 'spoiler') {
+  if (
+    thumbnail === 'self' ||
+    thumbnail === 'default' ||
+    thumbnail === 'nsfw' ||
+    thumbnail === 'spoiler'
+  ) {
     thumbnail = null;
   }
 
-  const isVideo = postData.is_video ||
+  const isVideo =
+    postData.is_video ||
     isRedditVideo ||
     mediaUrl?.includes('.mp4') ||
     mediaUrl?.includes('.webm') ||
     mediaUrl?.includes('v.redd.it');
 
-  const isImage = !isVideo && !isGallery && (
-    mediaUrl?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ||
-    mediaUrl?.includes('i.redd.it') ||
-    mediaUrl?.includes('preview.redd.it')
-  );
+  const isImage =
+    !isVideo &&
+    !isGallery &&
+    (mediaUrl?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ||
+      mediaUrl?.includes('i.redd.it') ||
+      mediaUrl?.includes('preview.redd.it'));
 
   let displayMedia = null;
   if (isGallery && galleryImages) {
@@ -124,7 +128,12 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
     displayMedia = mediaUrl;
   }
 
-  const videoPoster = isVideo && thumbnail ? (thumbnail.startsWith('http') ? thumbnail : resolveMediaUrl(thumbnail)) : undefined;
+  const videoPoster =
+    isVideo && thumbnail
+      ? thumbnail.startsWith('http')
+        ? thumbnail
+        : resolveMediaUrl(thumbnail)
+      : undefined;
 
   // Gallery state for carousel
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -147,10 +156,14 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
       try {
         if (postType === 'reddit') {
           // Fetch from Reddit API (same endpoint as normal post page)
-          const response = await api.get<unknown>(`/reddit/r/${postData.subreddit}/comments/${postData.id}`);
+          const response = await api.get<unknown>(
+            `/reddit/r/${postData.subreddit}/comments/${postData.id}`
+          );
 
           // Reddit API returns [postListing, commentsListing]
-          const commentsListing = Array.isArray(response) ? (response[1] as RedditListing) : undefined;
+          const commentsListing = Array.isArray(response)
+            ? (response[1] as RedditListing)
+            : undefined;
           const redditComments = commentsListing?.data?.children || [];
 
           // Flatten and normalize Reddit API comments
@@ -214,22 +227,22 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
 
   const handleVote = async (commentId: number | string, vote: number) => {
     // Optimistic update first
-    setComments(prevComments => {
+    setComments((prevComments) => {
       const updateComment = (comments: ThreadComment[]): ThreadComment[] => {
-        return comments.map(comment => {
+        return comments.map((comment) => {
           if (comment.id === commentId) {
             const oldVote = comment.user_vote || 0;
             const scoreDelta = vote - oldVote;
             return {
               ...comment,
               user_vote: vote,
-              score: comment.score + scoreDelta
+              score: comment.score + scoreDelta,
             };
           }
           if (comment.replies) {
             return {
               ...comment,
-              replies: updateComment(comment.replies)
+              replies: updateComment(comment.replies),
             };
           }
           return comment;
@@ -247,21 +260,21 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
     } catch (err) {
       console.error('Failed to vote on comment:', err);
       // Revert optimistic update on error
-      setComments(prevComments => {
+      setComments((prevComments) => {
         const revertComment = (comments: ThreadComment[]): ThreadComment[] => {
-          return comments.map(comment => {
+          return comments.map((comment) => {
             if (comment.id === commentId) {
               const scoreDelta = -(vote - (comment.user_vote || 0));
               return {
                 ...comment,
                 user_vote: comment.user_vote === vote ? 0 : comment.user_vote,
-                score: comment.score + scoreDelta
+                score: comment.score + scoreDelta,
               };
             }
             if (comment.replies) {
               return {
                 ...comment,
-                replies: revertComment(comment.replies)
+                replies: revertComment(comment.replies),
               };
             }
             return comment;
@@ -275,15 +288,19 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
   const handleCommentPosted = (parentId: number | string | null, newComment: CommentUpdate) => {
     const removeById = (comments: ThreadComment[], targetId: string): ThreadComment[] => {
       return comments
-        .filter(comment => String(comment.id) !== targetId)
-        .map(comment => ({
+        .filter((comment) => String(comment.id) !== targetId)
+        .map((comment) => ({
           ...comment,
           replies: comment.replies ? removeById(comment.replies, targetId) : comment.replies,
         }));
     };
 
-    const replaceById = (comments: ThreadComment[], targetId: string, replacement: ThreadComment): ThreadComment[] => {
-      return comments.map(comment => {
+    const replaceById = (
+      comments: ThreadComment[],
+      targetId: string,
+      replacement: ThreadComment
+    ): ThreadComment[] => {
+      return comments.map((comment) => {
         if (String(comment.id) === targetId) {
           return { ...replacement };
         }
@@ -297,7 +314,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
     if ('__removeTempId' in newComment) {
       const removeId = newComment.__removeTempId;
       if (removeId) {
-        setComments(prev => removeById(prev, removeId));
+        setComments((prev) => removeById(prev, removeId));
         return;
       }
     }
@@ -308,7 +325,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
         const replacement = { ...(newComment as ThreadComment) };
         delete replacement.__replaceTempId;
         delete replacement.__removeTempId;
-        setComments(prev => replaceById(prev, replaceId, replacement));
+        setComments((prev) => replaceById(prev, replaceId, replacement));
         return;
       }
     }
@@ -316,26 +333,26 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
     const comment = newComment as ThreadComment;
     if (parentId === null) {
       // Top-level comment
-      setComments(prev => [comment, ...prev]);
+      setComments((prev) => [comment, ...prev]);
       return;
     }
 
     // Reply to existing comment
-      const commentToAdd = comment;
-    setComments(prevComments => {
+    const commentToAdd = comment;
+    setComments((prevComments) => {
       const addReply = (comments: ThreadComment[]): ThreadComment[] => {
-        return comments.map(comment => {
+        return comments.map((comment) => {
           if (comment.id === parentId) {
             return {
               ...comment,
               replies: [commentToAdd, ...(comment.replies || [])],
-              reply_count: (comment.reply_count || 0) + 1
+              reply_count: (comment.reply_count || 0) + 1,
             };
           }
           if (comment.replies) {
             return {
               ...comment,
-              replies: addReply(comment.replies)
+              replies: addReply(comment.replies),
             };
           }
           return comment;
@@ -357,7 +374,13 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
           onClick={onCollapse}
           className="text-cyan-500 hover:text-cyan-400 text-xs flex items-center gap-1 transition-colors"
         >
-          <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            className="h-3 w-3"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
           {t('common.back')}
@@ -377,7 +400,11 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
         <div className="w-full">
           {isVideo ? (
             <HlsVideo
-              src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia) ?? ''}
+              src={
+                displayMedia.startsWith('http')
+                  ? displayMedia
+                  : (resolveMediaUrl(displayMedia) ?? '')
+              }
               poster={videoPoster}
               className="w-full h-auto"
               style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}
@@ -389,7 +416,9 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
           ) : (
             <img
               src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}
-              alt={t('posts.media.previewImageAlt', { title: postData.title || t('posts.compact.untitled') })}
+              alt={t('posts.media.previewImageAlt', {
+                title: postData.title || t('posts.compact.untitled'),
+              })}
               className="w-full h-auto"
               style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}
               loading="lazy"

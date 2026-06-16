@@ -98,7 +98,7 @@ describe('HubWikiPage', () => {
     render(
       <Wrapper>
         <HubWikiPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(document.body).toBeTruthy();
   });
@@ -108,7 +108,7 @@ describe('HubWikiPage', () => {
     render(
       <Wrapper>
         <HubWikiPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByTestId('markdown-renderer')).toBeInTheDocument();
@@ -120,7 +120,7 @@ describe('HubWikiPage', () => {
     render(
       <Wrapper>
         <HubWikiPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.queryByText(/hubWikiPage.edit/i)).toBeNull();
@@ -132,7 +132,7 @@ describe('HubWikiPage', () => {
     render(
       <Wrapper>
         <HubWikiPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(document.body).toBeTruthy();
@@ -159,7 +159,7 @@ describe('HubWikiPage', () => {
     render(
       <Wrapper>
         <HubWikiPage />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await waitFor(() => {

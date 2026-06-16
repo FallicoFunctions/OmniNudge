@@ -92,7 +92,13 @@ export default function SubredditAboutPanel({
                 <span className="font-semibold text-[var(--color-text-primary)]">
                   {t('subredditAboutPanel.labels.created')}
                 </span>
-                <span>{formatDate(new Date(about.created_utc * 1000), { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                <span>
+                  {formatDate(new Date(about.created_utc * 1000), {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </span>
               </div>
             )}
           </div>
