@@ -3844,6 +3844,141 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the promenade and plaza strip proxies with authored inlay ribbons', () => {
+    const forbiddenLegacyPrefixes = ['V7_PromenadeInlay_', 'V7_PlazaStoneLane_', 'V7_PlazaCrossInlay_'];
+    for (const legacyPrefix of forbiddenLegacyPrefixes) {
+      expect(nodeNamesWithPrefix(legacyPrefix), `legacy nodes still exported for ${legacyPrefix}`).toHaveLength(0);
+    }
+
+    const requiredReplacementNodes = [
+      'V64_PromenadePearlRibbon',
+      'V64_PromenadeGoldInlay',
+      'V64_PromenadeCyanThread',
+      'V64_PlazaStoneSpine',
+      'V64_PlazaCrossBands',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const promenadePearl = readMeshGeometry('V64_PromenadePearlRibbon');
+    const promenadeGold = readMeshGeometry('V64_PromenadeGoldInlay');
+    const promenadeCyan = readMeshGeometry('V64_PromenadeCyanThread');
+    const plazaStone = readMeshGeometry('V64_PlazaStoneSpine');
+    const plazaCross = readMeshGeometry('V64_PlazaCrossBands');
+
+    expect(promenadePearl.min[0]).toBeLessThan(-5.4);
+    expect(promenadePearl.max[0]).toBeGreaterThan(5.4);
+    expect(promenadePearl.min[1]).toBeLessThan(-20.0);
+    expect(promenadePearl.max[1]).toBeGreaterThan(34.0);
+    expect(promenadePearl.min[2]).toBeLessThan(-0.33);
+    expect(promenadePearl.max[2]).toBeLessThan(-0.15);
+
+    expect(promenadeGold.min[0]).toBeLessThan(-4.6);
+    expect(promenadeGold.max[0]).toBeGreaterThan(4.6);
+    expect(promenadeGold.min[1]).toBeLessThan(-19.3);
+    expect(promenadeGold.max[1]).toBeGreaterThan(33.3);
+    expect(promenadeGold.min[2]).toBeLessThan(-0.42);
+    expect(promenadeGold.max[2]).toBeLessThan(-0.24);
+
+    expect(promenadeCyan.min[0]).toBeLessThan(-3.5);
+    expect(promenadeCyan.max[0]).toBeGreaterThan(3.5);
+    expect(promenadeCyan.min[1]).toBeLessThan(-18.8);
+    expect(promenadeCyan.max[1]).toBeGreaterThan(32.8);
+    expect(promenadeCyan.min[2]).toBeLessThan(-0.49);
+    expect(promenadeCyan.max[2]).toBeLessThan(-0.34);
+
+    expect(plazaStone.min[0]).toBeLessThan(-13.5);
+    expect(plazaStone.max[0]).toBeGreaterThan(13.5);
+    expect(plazaStone.min[1]).toBeLessThan(7.9);
+    expect(plazaStone.max[1]).toBeGreaterThan(88.1);
+    expect(plazaStone.min[2]).toBeLessThan(-0.23);
+    expect(plazaStone.max[2]).toBeLessThan(-0.07);
+
+    expect(plazaCross.min[0]).toBeLessThan(-16.7);
+    expect(plazaCross.max[0]).toBeGreaterThan(16.7);
+    expect(plazaCross.min[1]).toBeLessThan(30.0);
+    expect(plazaCross.max[1]).toBeGreaterThan(70.0);
+    expect(plazaCross.min[2]).toBeLessThan(-0.31);
+    expect(plazaCross.max[2]).toBeLessThan(-0.13);
+
+    expect(readConnectedComponents('V64_PromenadePearlRibbon')).toHaveLength(11);
+    expect(readConnectedComponents('V64_PromenadeGoldInlay')).toHaveLength(11);
+    expect(readConnectedComponents('V64_PromenadeCyanThread')).toHaveLength(11);
+    expect(readConnectedComponents('V64_PlazaStoneSpine')).toHaveLength(6);
+    expect(readConnectedComponents('V64_PlazaCrossBands')).toHaveLength(4);
+
+    const promenadeRows = [-18, -13, -8, -3, 2, 7, 12, 17, 22, 27, 32];
+    for (const nodeName of ['V64_PromenadePearlRibbon', 'V64_PromenadeGoldInlay', 'V64_PromenadeCyanThread']) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedY of promenadeRows) {
+        expect(
+          centers.some(([x, y]) => Math.abs(x) < 0.25 && Math.abs(y - expectedY) < 0.15),
+          `${nodeName} missing promenade band around y=${expectedY}`,
+        ).toBe(true);
+      }
+    }
+
+    const plazaLaneXs = [-13, -9, -5, 5, 9, 13];
+    const stoneCenters = readConnectedComponents('V64_PlazaStoneSpine').map(({ min, max }) => [
+      (min[0] + max[0]) / 2,
+      (min[1] + max[1]) / 2,
+      (min[2] + max[2]) / 2,
+    ]);
+    for (const expectedX of plazaLaneXs) {
+      expect(
+        stoneCenters.some(([x, y]) => Math.abs(x - expectedX) < 0.1 && Math.abs(y - 48) < 0.2),
+        `V64_PlazaStoneSpine missing lane around x=${expectedX}`,
+      ).toBe(true);
+    }
+
+    const plazaCrossRows = [32, 44, 56, 68];
+    const crossCenters = readConnectedComponents('V64_PlazaCrossBands').map(({ min, max }) => [
+      (min[0] + max[0]) / 2,
+      (min[1] + max[1]) / 2,
+      (min[2] + max[2]) / 2,
+    ]);
+    for (const expectedY of plazaCrossRows) {
+      expect(
+        crossCenters.some(([x, y]) => Math.abs(x) < 0.2 && Math.abs(y - expectedY) < 0.15),
+        `V64_PlazaCrossBands missing band around y=${expectedY}`,
+      ).toBe(true);
+    }
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(5_000);
+    const minimumVertexCounts = new Map([
+      ['V64_PromenadePearlRibbon', 1_700],
+      ['V64_PromenadeGoldInlay', 1_700],
+      ['V64_PromenadeCyanThread', 700],
+      ['V64_PlazaStoneSpine', 380],
+      ['V64_PlazaCrossBands', 470],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V64_PromenadePearlRibbon', 'V19_GatewayPearlIvory'],
+      ['V64_PromenadeGoldInlay', 'V19_ArrivalBrushedGold'],
+      ['V64_PromenadeCyanThread', 'V19_ArrivalCyanGlow'],
+      ['V64_PlazaStoneSpine', 'V19_GatewayPearlIvory'],
+      ['V64_PlazaCrossBands', 'V19_ArrivalBrushedGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports real PBR texture maps for the Main Stage material families', () => {
     const images = mainStageGlbJson.images ?? [];
     const textures = mainStageGlbJson.textures ?? [];
@@ -3954,7 +4089,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
 
     expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
-      16.5 * 1024 * 1024,
+      16.6 * 1024 * 1024,
     );
   });
 
