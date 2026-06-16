@@ -2587,7 +2587,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
     ).toBeLessThanOrEqual(5_000);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V49_'))).toBe(false);
-    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_172);
+    expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_176);
   });
 
   it('replaces the legacy crown tower monolith with a layered celestial obelisk assembly', () => {
@@ -3478,6 +3478,129 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the rear-mass vertical light proxies with cathedral aurora fins', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = [
+      'V7_RearMassVerticalLight_L_0',
+      'V7_RearMassVerticalLight_L_1',
+      'V7_RearMassVerticalLight_R_0',
+      'V7_RearMassVerticalLight_R_1',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V61_RearMassAuroraPearl_L',
+      'V61_RearMassAuroraPearl_R',
+      'V61_RearMassAuroraGoldSpine_L',
+      'V61_RearMassAuroraGoldSpine_R',
+      'V61_RearMassAuroraCyanCore_L',
+      'V61_RearMassAuroraCyanCore_R',
+      'V61_RearMassAuroraShadowRibbon_L',
+      'V61_RearMassAuroraShadowRibbon_R',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftPearl = readMeshGeometry('V61_RearMassAuroraPearl_L');
+    const rightPearl = readMeshGeometry('V61_RearMassAuroraPearl_R');
+    const leftGold = readMeshGeometry('V61_RearMassAuroraGoldSpine_L');
+    const rightGold = readMeshGeometry('V61_RearMassAuroraGoldSpine_R');
+    const leftCyan = readMeshGeometry('V61_RearMassAuroraCyanCore_L');
+    const rightCyan = readMeshGeometry('V61_RearMassAuroraCyanCore_R');
+    const leftShadow = readMeshGeometry('V61_RearMassAuroraShadowRibbon_L');
+    const rightShadow = readMeshGeometry('V61_RearMassAuroraShadowRibbon_R');
+
+    expect(leftPearl.min[0]).toBeLessThan(-18.8);
+    expect(leftPearl.max[0]).toBeLessThan(-12.6);
+    expect(rightPearl.min[0]).toBeGreaterThan(12.6);
+    expect(rightPearl.max[0]).toBeGreaterThan(18.8);
+    expect(leftPearl.min[1]).toBeGreaterThan(6.5);
+    expect(leftPearl.max[1]).toBeGreaterThan(37.0);
+    expect(rightPearl.min[1]).toBeGreaterThan(6.5);
+    expect(rightPearl.max[1]).toBeGreaterThan(37.0);
+    expect(leftPearl.min[2]).toBeGreaterThan(34.0);
+    expect(leftPearl.max[2]).toBeGreaterThan(34.4);
+    expect(rightPearl.min[2]).toBeGreaterThan(34.0);
+    expect(rightPearl.max[2]).toBeGreaterThan(34.4);
+
+    expect(leftGold.min[1]).toBeGreaterThan(7.0);
+    expect(leftGold.max[1]).toBeGreaterThan(37.2);
+    expect(rightGold.min[1]).toBeGreaterThan(7.0);
+    expect(rightGold.max[1]).toBeGreaterThan(37.2);
+
+    expect(leftCyan.min[1]).toBeGreaterThan(7.8);
+    expect(leftCyan.max[1]).toBeGreaterThan(34.0);
+    expect(rightCyan.min[1]).toBeGreaterThan(7.8);
+    expect(rightCyan.max[1]).toBeGreaterThan(34.0);
+
+    expect(leftShadow.min[1]).toBeGreaterThan(7.0);
+    expect(leftShadow.max[1]).toBeGreaterThan(35.0);
+    expect(rightShadow.min[1]).toBeGreaterThan(7.0);
+    expect(rightShadow.max[1]).toBeGreaterThan(35.0);
+
+    expect(readConnectedComponents('V61_RearMassAuroraPearl_L')).toHaveLength(2);
+    expect(readConnectedComponents('V61_RearMassAuroraPearl_R')).toHaveLength(2);
+    expect(readConnectedComponents('V61_RearMassAuroraGoldSpine_L')).toHaveLength(2);
+    expect(readConnectedComponents('V61_RearMassAuroraGoldSpine_R')).toHaveLength(2);
+    expect(readConnectedComponents('V61_RearMassAuroraCyanCore_L')).toHaveLength(2);
+    expect(readConnectedComponents('V61_RearMassAuroraCyanCore_R')).toHaveLength(2);
+    expect(readConnectedComponents('V61_RearMassAuroraShadowRibbon_L')).toHaveLength(2);
+    expect(readConnectedComponents('V61_RearMassAuroraShadowRibbon_R')).toHaveLength(2);
+
+    const expectedZ = 34.4;
+    const expectedXByNode = new Map([
+      ['V61_RearMassAuroraPearl_L', [-18.5, -13.5]],
+      ['V61_RearMassAuroraGoldSpine_L', [-18.5, -13.5]],
+      ['V61_RearMassAuroraCyanCore_L', [-18.5, -13.5]],
+      ['V61_RearMassAuroraShadowRibbon_L', [-18.5, -13.5]],
+      ['V61_RearMassAuroraPearl_R', [13.5, 18.5]],
+      ['V61_RearMassAuroraGoldSpine_R', [13.5, 18.5]],
+      ['V61_RearMassAuroraCyanCore_R', [13.5, 18.5]],
+      ['V61_RearMassAuroraShadowRibbon_R', [13.5, 18.5]],
+    ]);
+    for (const nodeName of requiredReplacementNodes) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedX of expectedXByNode.get(nodeName) ?? []) {
+        expect(
+          centers.some(([x, , z]) => Math.abs(x - expectedX) < 0.45 && Math.abs(z - expectedZ) < 0.3),
+          `${nodeName} missing rear fin around x=${expectedX}, z=${expectedZ}`,
+        ).toBe(true);
+      }
+    }
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(1_400);
+    for (const nodeName of requiredReplacementNodes) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        120,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V61_RearMassAuroraPearl_L', 'V19_GatewayPearlIvory'],
+      ['V61_RearMassAuroraPearl_R', 'V19_GatewayPearlIvory'],
+      ['V61_RearMassAuroraGoldSpine_L', 'V19_ArrivalBrushedGold'],
+      ['V61_RearMassAuroraGoldSpine_R', 'V19_ArrivalBrushedGold'],
+      ['V61_RearMassAuroraCyanCore_L', 'V19_ArrivalCyanGlow'],
+      ['V61_RearMassAuroraCyanCore_R', 'V19_ArrivalCyanGlow'],
+      ['V61_RearMassAuroraShadowRibbon_L', 'V20_RecessedWarmShadow'],
+      ['V61_RearMassAuroraShadowRibbon_R', 'V20_RecessedWarmShadow'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports real PBR texture maps for the Main Stage material families', () => {
     const images = mainStageGlbJson.images ?? [];
     const textures = mainStageGlbJson.textures ?? [];
@@ -3700,7 +3823,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
   });
 
   it('reuses the established Main Stage material library for the V24 crown pass', () => {
-    expect(mainStageGlbJson.materials).toHaveLength(53);
+    expect(mainStageGlbJson.materials).toHaveLength(52);
     expect(
       mainStageGlbJson.materials.some(({ name }: { name?: string }) => name?.startsWith('V24_')),
     ).toBe(false);
