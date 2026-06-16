@@ -202,7 +202,8 @@ func TestSettings_Update_NormalizesEnumValuesCaseAndWhitespace(t *testing.T) {
 
 	updateBody := map[string]any{
 		"theme":                           "  AUTO  ",
-		"profile_visibility":              "  FRIENDS_ONLY  ",
+		"profile_visibility":              "  PRIVATE  ",
+		"wall_post_permission":            "  REQUIRES_APPROVAL  ",
 		"access_request_cooldown_display": "  DATE  ",
 	}
 	payload, err := json.Marshal(updateBody)
@@ -218,6 +219,7 @@ func TestSettings_Update_NormalizesEnumValuesCaseAndWhitespace(t *testing.T) {
 	var updated map[string]any
 	require.NoError(t, json.Unmarshal(updateResp.Body.Bytes(), &updated))
 	require.Equal(t, "system", updated["theme"])
-	require.Equal(t, "friends_only", updated["profile_visibility"])
+	require.Equal(t, "private", updated["profile_visibility"])
+	require.Equal(t, "requires_approval", updated["wall_post_permission"])
 	require.Equal(t, "date", updated["access_request_cooldown_display"])
 }

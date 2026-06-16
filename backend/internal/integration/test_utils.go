@@ -59,7 +59,7 @@ func getTestDB(t *testing.T) *database.DB {
 func resetTables(t *testing.T, db *database.DB) {
 	t.Helper()
 	_, err := db.Pool.Exec(context.Background(), `
-			TRUNCATE TABLE reports, hub_moderators, post_votes, comment_votes, messages, conversations, post_comments, platform_posts, hubs, users RESTART IDENTITY CASCADE;
+			TRUNCATE TABLE hub_moderators, post_votes, comment_votes, messages, conversations, post_comments, platform_posts, hubs, users RESTART IDENTITY CASCADE;
 			INSERT INTO hubs (name, name_normalized, description) VALUES ('general', 'general', 'Default community for all posts');
 		`)
 	require.NoError(t, err)
