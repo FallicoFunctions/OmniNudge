@@ -5,6 +5,7 @@ import { MAIN_STAGE_MANIFEST } from '../mainStageManifest';
 import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from '../reviewRouteData';
 
 const projectRoot = process.cwd();
+const applyTextureScript = readFileSync(path.join(projectRoot, 'scripts/apply-main-stage-pbr-textures.py'), 'utf8');
 const exportScript = readFileSync(path.join(projectRoot, 'scripts/export-main-stage.py'), 'utf8');
 const optimizeScript = readFileSync(path.join(projectRoot, 'scripts/optimize-main-stage.mjs'), 'utf8');
 const mainStageGlbText = readFileSync(
@@ -394,6 +395,11 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(exportScript).toContain('V7_ArcadeCol_');
     expect(exportScript).toContain('V7_PlazaLightMast_');
     expect(exportScript).toContain('V8_SpawnGalleryCol_');
+  });
+
+  it('avoids deprecated Blender material.use_nodes access in the V50 texture-apply pipeline', () => {
+    expect(applyTextureScript).not.toContain('use_nodes');
+    expect(applyTextureScript).toContain('material.node_tree');
   });
 
   it('exports named production and garden details for the Main Stage fidelity pass', () => {
