@@ -453,7 +453,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
 
   it('exports authored arrival-threshold trim so the promenade foreground is not placeholder geometry', () => {
     expectMainStageMarker('V23_ArrivalThresholdGoldRail_0');
-    expectMainStageMarker('V23_ArrivalSidePlinthPearlCap_L');
+    expectMainStageMarker('V58_ArrivalPlinthPearlDais_L');
     expectMainStageMarker('V23_ArrivalRunwayInsetRib_0');
     expectMainStageMarker('V57_BackPlazaSentinelPearl_L');
   });
@@ -3165,6 +3165,226 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the arrival side-plinth slab proxies with terraced processional podiums', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = [
+      'V23_ArrivalSidePlinthPearlCap_L',
+      'V23_ArrivalSidePlinthPearlCap_R',
+      'V23_ArrivalSidePlinthGoldInlay_L',
+      'V23_ArrivalSidePlinthGoldInlay_R',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V58_ArrivalPlinthPearlDais_L',
+      'V58_ArrivalPlinthPearlDais_R',
+      'V58_ArrivalPlinthGoldInlay_L',
+      'V58_ArrivalPlinthGoldInlay_R',
+      'V58_ArrivalPlinthCyanSpine_L',
+      'V58_ArrivalPlinthCyanSpine_R',
+      'V58_ArrivalPlinthShadowReveal_L',
+      'V58_ArrivalPlinthShadowReveal_R',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftPearl = readMeshGeometry('V58_ArrivalPlinthPearlDais_L');
+    const rightPearl = readMeshGeometry('V58_ArrivalPlinthPearlDais_R');
+    const leftGold = readMeshGeometry('V58_ArrivalPlinthGoldInlay_L');
+    const rightGold = readMeshGeometry('V58_ArrivalPlinthGoldInlay_R');
+    const leftCyan = readMeshGeometry('V58_ArrivalPlinthCyanSpine_L');
+    const rightCyan = readMeshGeometry('V58_ArrivalPlinthCyanSpine_R');
+    const leftShadow = readMeshGeometry('V58_ArrivalPlinthShadowReveal_L');
+    const rightShadow = readMeshGeometry('V58_ArrivalPlinthShadowReveal_R');
+
+    expect(leftPearl.min[0]).toBeLessThan(-28.5);
+    expect(leftPearl.max[0]).toBeLessThan(-19.2);
+    expect(rightPearl.min[0]).toBeGreaterThan(19.2);
+    expect(rightPearl.max[0]).toBeGreaterThan(28.5);
+    expect(leftPearl.min[1]).toBeGreaterThan(1.0);
+    expect(leftPearl.max[1]).toBeGreaterThan(3.0);
+    expect(rightPearl.min[1]).toBeGreaterThan(1.0);
+    expect(rightPearl.max[1]).toBeGreaterThan(3.0);
+    expect(leftPearl.min[2]).toBeLessThan(-53.7);
+    expect(leftPearl.max[2]).toBeLessThan(-35.5);
+    expect(rightPearl.min[2]).toBeLessThan(-53.7);
+    expect(rightPearl.max[2]).toBeLessThan(-35.5);
+
+    expect(leftGold.min[1]).toBeGreaterThan(1.2);
+    expect(leftGold.max[1]).toBeGreaterThan(3.2);
+    expect(rightGold.min[1]).toBeGreaterThan(1.2);
+    expect(rightGold.max[1]).toBeGreaterThan(3.2);
+
+    expect(leftCyan.min[1]).toBeGreaterThan(1.3);
+    expect(leftCyan.max[1]).toBeGreaterThan(2.8);
+    expect(rightCyan.min[1]).toBeGreaterThan(1.3);
+    expect(rightCyan.max[1]).toBeGreaterThan(2.8);
+
+    expect(leftShadow.min[1]).toBeGreaterThan(1.0);
+    expect(leftShadow.max[1]).toBeGreaterThan(2.7);
+    expect(rightShadow.min[1]).toBeGreaterThan(1.0);
+    expect(rightShadow.max[1]).toBeGreaterThan(2.7);
+
+    expect(readConnectedComponents('V58_ArrivalPlinthPearlDais_L')).toHaveLength(4);
+    expect(readConnectedComponents('V58_ArrivalPlinthPearlDais_R')).toHaveLength(4);
+    expect(readConnectedComponents('V58_ArrivalPlinthGoldInlay_L')).toHaveLength(4);
+    expect(readConnectedComponents('V58_ArrivalPlinthGoldInlay_R')).toHaveLength(4);
+    expect(readConnectedComponents('V58_ArrivalPlinthCyanSpine_L')).toHaveLength(4);
+    expect(readConnectedComponents('V58_ArrivalPlinthCyanSpine_R')).toHaveLength(4);
+    expect(readConnectedComponents('V58_ArrivalPlinthShadowReveal_L')).toHaveLength(4);
+    expect(readConnectedComponents('V58_ArrivalPlinthShadowReveal_R')).toHaveLength(4);
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(1_800);
+    for (const nodeName of requiredReplacementNodes) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        180,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V58_ArrivalPlinthPearlDais_L', 'V19_GatewayPearlIvory'],
+      ['V58_ArrivalPlinthPearlDais_R', 'V19_GatewayPearlIvory'],
+      ['V58_ArrivalPlinthGoldInlay_L', 'V19_ArrivalBrushedGold'],
+      ['V58_ArrivalPlinthGoldInlay_R', 'V19_ArrivalBrushedGold'],
+      ['V58_ArrivalPlinthCyanSpine_L', 'V19_ArrivalCyanGlow'],
+      ['V58_ArrivalPlinthCyanSpine_R', 'V19_ArrivalCyanGlow'],
+      ['V58_ArrivalPlinthShadowReveal_L', 'V20_RecessedWarmShadow'],
+      ['V58_ArrivalPlinthShadowReveal_R', 'V20_RecessedWarmShadow'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
+  it('replaces the back-plaza stick lights with jeweled lantern triplets', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = [
+      'V7_PlazaLightMast_L_0',
+      'V7_PlazaLightMast_L_1',
+      'V7_PlazaLightMast_L_2',
+      'V7_PlazaLightMast_R_0',
+      'V7_PlazaLightMast_R_1',
+      'V7_PlazaLightMast_R_2',
+      'V7_PlazaLightHead_L_0',
+      'V7_PlazaLightHead_L_1',
+      'V7_PlazaLightHead_L_2',
+      'V7_PlazaLightHead_R_0',
+      'V7_PlazaLightHead_R_1',
+      'V7_PlazaLightHead_R_2',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V59_BackPlazaLanternStemCluster_L',
+      'V59_BackPlazaLanternStemCluster_R',
+      'V59_BackPlazaLanternGoldCage_L',
+      'V59_BackPlazaLanternGoldCage_R',
+      'V59_BackPlazaLanternWarmCore_L',
+      'V59_BackPlazaLanternWarmCore_R',
+      'V59_BackPlazaLanternHaloRim_L',
+      'V59_BackPlazaLanternHaloRim_R',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftStem = readMeshGeometry('V59_BackPlazaLanternStemCluster_L');
+    const rightStem = readMeshGeometry('V59_BackPlazaLanternStemCluster_R');
+    const leftGold = readMeshGeometry('V59_BackPlazaLanternGoldCage_L');
+    const rightGold = readMeshGeometry('V59_BackPlazaLanternGoldCage_R');
+    const leftCore = readMeshGeometry('V59_BackPlazaLanternWarmCore_L');
+    const rightCore = readMeshGeometry('V59_BackPlazaLanternWarmCore_R');
+    const leftHalo = readMeshGeometry('V59_BackPlazaLanternHaloRim_L');
+    const rightHalo = readMeshGeometry('V59_BackPlazaLanternHaloRim_R');
+
+    expect(leftStem.min[0]).toBeLessThan(-25.3);
+    expect(leftStem.max[0]).toBeLessThan(-24.2);
+    expect(rightStem.min[0]).toBeGreaterThan(24.2);
+    expect(rightStem.max[0]).toBeGreaterThan(25.3);
+    expect(leftStem.min[1]).toBeLessThan(0.2);
+    expect(leftStem.max[1]).toBeGreaterThan(10.5);
+    expect(rightStem.min[1]).toBeLessThan(0.2);
+    expect(rightStem.max[1]).toBeGreaterThan(10.5);
+    expect(leftStem.min[2]).toBeLessThan(-68.0);
+    expect(leftStem.max[2]).toBeLessThan(-25.6);
+    expect(rightStem.min[2]).toBeLessThan(-68.0);
+    expect(rightStem.max[2]).toBeLessThan(-25.6);
+
+    expect(leftGold.min[1]).toBeGreaterThan(8.4);
+    expect(leftGold.max[1]).toBeGreaterThan(10.9);
+    expect(rightGold.min[1]).toBeGreaterThan(8.4);
+    expect(rightGold.max[1]).toBeGreaterThan(10.9);
+
+    expect(leftCore.min[1]).toBeGreaterThan(8.8);
+    expect(leftCore.max[1]).toBeGreaterThan(10.59);
+    expect(rightCore.min[1]).toBeGreaterThan(8.8);
+    expect(rightCore.max[1]).toBeGreaterThan(10.59);
+
+    expect(leftHalo.min[1]).toBeGreaterThan(9.1);
+    expect(leftHalo.max[1]).toBeGreaterThan(11.0);
+    expect(rightHalo.min[1]).toBeGreaterThan(9.1);
+    expect(rightHalo.max[1]).toBeGreaterThan(11.0);
+
+    expect(readConnectedComponents('V59_BackPlazaLanternStemCluster_L')).toHaveLength(3);
+    expect(readConnectedComponents('V59_BackPlazaLanternStemCluster_R')).toHaveLength(3);
+    expect(readConnectedComponents('V59_BackPlazaLanternGoldCage_L')).toHaveLength(3);
+    expect(readConnectedComponents('V59_BackPlazaLanternGoldCage_R')).toHaveLength(3);
+    expect(readConnectedComponents('V59_BackPlazaLanternWarmCore_L')).toHaveLength(3);
+    expect(readConnectedComponents('V59_BackPlazaLanternWarmCore_R')).toHaveLength(3);
+    expect(readConnectedComponents('V59_BackPlazaLanternHaloRim_L')).toHaveLength(3);
+    expect(readConnectedComponents('V59_BackPlazaLanternHaloRim_R')).toHaveLength(3);
+
+    const expectedRows = [-68, -47, -26];
+    for (const nodeName of requiredReplacementNodes) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      const expectedX = nodeName.endsWith('_L') ? -25 : 25;
+      for (const expectedZ of expectedRows) {
+        expect(
+          centers.some(([x, , z]) => Math.abs(x - expectedX) < 0.35 && Math.abs(z - expectedZ) < 0.4),
+          `${nodeName} missing lantern around x=${expectedX}, z=${expectedZ}`,
+        ).toBe(true);
+      }
+    }
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(1_800);
+    for (const nodeName of requiredReplacementNodes) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        180,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V59_BackPlazaLanternStemCluster_L', 'V16_MatteBlackStageHardware'],
+      ['V59_BackPlazaLanternStemCluster_R', 'V16_MatteBlackStageHardware'],
+      ['V59_BackPlazaLanternGoldCage_L', 'V19_ArrivalBrushedGold'],
+      ['V59_BackPlazaLanternGoldCage_R', 'V19_ArrivalBrushedGold'],
+      ['V59_BackPlazaLanternWarmCore_L', 'V13_WarmPracticalLight'],
+      ['V59_BackPlazaLanternWarmCore_R', 'V13_WarmPracticalLight'],
+      ['V59_BackPlazaLanternHaloRim_L', 'V19_ArrivalBrushedGold'],
+      ['V59_BackPlazaLanternHaloRim_R', 'V19_ArrivalBrushedGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports real PBR texture maps for the Main Stage material families', () => {
     const images = mainStageGlbJson.images ?? [];
     const textures = mainStageGlbJson.textures ?? [];
@@ -3275,7 +3495,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
 
     expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
-      16.25 * 1024 * 1024,
+      16.4 * 1024 * 1024,
     );
   });
 
@@ -3387,7 +3607,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
   });
 
   it('reuses the established Main Stage material library for the V24 crown pass', () => {
-    expect(mainStageGlbJson.materials).toHaveLength(54);
+    expect(mainStageGlbJson.materials).toHaveLength(53);
     expect(
       mainStageGlbJson.materials.some(({ name }: { name?: string }) => name?.startsWith('V24_')),
     ).toBe(false);
