@@ -39,6 +39,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -58,15 +60,17 @@ jobs:
         working-directory: backend
         run: go vet ./...
 
+      - name: Fetch main for lint comparison
+        run: git fetch origin main --depth=1
+
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
           install-mode: goinstall
           working-directory: backend
-          args: --timeout=5m
+          args: --timeout=5m --new-from-rev=origin/main
           skip-cache: false
-          only-new-issues: true
 
       - name: Run unit tests
         working-directory: backend
