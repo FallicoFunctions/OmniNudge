@@ -17,11 +17,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	zlog "github.com/rs/zerolog/log"
+	htmlnode "golang.org/x/net/html"
+
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/repository"
-	zlog "github.com/rs/zerolog/log"
-	htmlnode "golang.org/x/net/html"
 )
 
 // ─── HTML sanitization regexps ─────────────────────────────────────────────
@@ -457,8 +458,7 @@ func validateCSSStatement(statement string) error {
 }
 
 func nextCSSChunk(css string) (prelude string, body string, rest string, isBlock bool, ok bool) {
-	openIndex := -1
-	statementIndex := -1
+	var openIndex, statementIndex int
 	var quote rune
 	parenDepth := 0
 	bracketDepth := 0

@@ -32,15 +32,5 @@ func CacheControl() gin.HandlerFunc {
 
 		c.Next()
 
-		// Add ETag for cacheable responses
-		if c.Writer.Status() == 200 && shouldAddETag(path) {
-			// TODO: Generate ETag from response body hash
-			// c.Header("ETag", generateETag(responseBody))
-		}
 	}
-}
-
-func shouldAddETag(path string) bool {
-	// Add ETag for static files and GET endpoints
-	return strings.HasPrefix(path, "/uploads/") || strings.HasPrefix(path, "/api/v1/users/")
 }

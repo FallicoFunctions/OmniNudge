@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
-	"github.com/omninudge/backend/internal/api/middleware"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -15,8 +13,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+
 	"github.com/omninudge/backend/internal/models"
 )
 
@@ -436,11 +438,6 @@ func (h *BugReportsHandler) UpdateKnownBug(c *gin.Context) {
 		Workaround:     req.Workaround,
 	}
 
-	// Set fixed_at if status is fixed and not already set
-	if req.Status == "fixed" {
-		// This will be handled in the repository if needed
-	}
-
 	if err := h.knownBugRepo.Update(c.Request.Context(), bug); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update known bug")
 		return
@@ -577,12 +574,12 @@ func notifyFeedbackWebhook(payload notifyFeedbackPayload) {
 			}).DialContext,
 		},
 	}
-	req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewReader(encoded)) //nolint:gosec // #nosec G704 -- URL is operator-configured env var, not user input
+	req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewReader(encoded)) // #nosec G704 -- URL is operator-configured env var, not user input
 	if err != nil {
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req) //nolint:gosec // #nosec G704 -- request targets operator-configured webhook URL
+	resp, err := client.Do(req) // #nosec G704 -- request targets operator-configured webhook URL
 	if err != nil {
 		return
 	}

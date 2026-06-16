@@ -5,18 +5,20 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/omninudge/backend/internal/api/middleware"
-	"github.com/omninudge/backend/internal/ports"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
@@ -1029,7 +1031,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			}
 		}
 
-		targetRecipientID := original.RecipientID
+		targetRecipientID := original.RecipientID //nolint:ineffassign // always overwritten in dm and else branches below
 		if targetConversationType == "dm" {
 			targetConversation, err := h.conversationRepo.GetByID(ctx, targetConversationID)
 			if err != nil {
