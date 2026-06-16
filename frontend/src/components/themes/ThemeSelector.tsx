@@ -67,17 +67,13 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
 
   const menuContent = (
     <div
-      className={`${
-        isMobile ? 'fixed inset-0 z-40 bg-black/50' : 'absolute z-20 mt-2 w-full'
-      }`}
+      className={`${isMobile ? 'fixed inset-0 z-40 bg-black/50' : 'absolute z-20 mt-2 w-full'}`}
       role="dialog"
       aria-modal={isMobile}
     >
       <div
         className={`${
-          isMobile
-            ? 'absolute inset-x-0 top-auto bottom-0 rounded-t-3xl'
-            : 'w-full'
+          isMobile ? 'absolute inset-x-0 top-auto bottom-0 rounded-t-3xl' : 'w-full'
         } rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl`}
         style={isMobile ? { maxHeight: '85vh' } : undefined}
       >
@@ -106,8 +102,7 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
                 onClick={() => setIsOpen(false)}
                 aria-label={t('themes.selector.actions.closeAria')}
               >
-                {t('themes.selector.actions.close')}{' '}
-                <span aria-hidden="true">✕</span>
+                {t('themes.selector.actions.close')} <span aria-hidden="true">✕</span>
               </button>
             )}
           </div>
@@ -131,7 +126,11 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
                 ) : (
                   themes.map((theme) => {
                     const isActive = activeTheme?.id === theme.id;
-                    const primaryColor = getThemeVariable(theme, '--color-primary', 'var(--color-primary)');
+                    const primaryColor = getThemeVariable(
+                      theme,
+                      '--color-primary',
+                      'var(--color-primary)'
+                    );
                     const backgroundColor = getThemeVariable(
                       theme,
                       '--color-background',
@@ -225,9 +224,7 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
             {activeTheme?.theme_name ?? t('themes.selector.selectThemeFallback')}
           </p>
         </div>
-        <span className="text-lg text-[var(--color-text-muted)]">
-          {isOpen ? '▴' : '▾'}
-        </span>
+        <span className="text-lg text-[var(--color-text-muted)]">{isOpen ? '▴' : '▾'}</span>
       </button>
 
       {isOpen && menu}

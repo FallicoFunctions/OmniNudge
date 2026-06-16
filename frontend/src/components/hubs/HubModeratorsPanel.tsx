@@ -43,9 +43,13 @@ export default function HubModeratorsPanel({
       ) : (
         <ul className="mt-3 space-y-2">
           {moderators.map((moderator) => {
-            const displayName = moderator.username ?? t('common.userNumber', { id: moderator.user_id });
+            const displayName =
+              moderator.username ?? t('common.userNumber', { id: moderator.user_id });
             return (
-              <li key={`${moderator.user_id}-${moderator.role}`} className="flex items-center gap-3">
+              <li
+                key={`${moderator.user_id}-${moderator.role}`}
+                className="flex items-center gap-3"
+              >
                 {moderator.avatar_url ? (
                   <img
                     src={moderator.avatar_url}

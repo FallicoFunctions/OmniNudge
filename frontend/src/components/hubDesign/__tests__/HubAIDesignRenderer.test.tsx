@@ -23,7 +23,7 @@ vi.mock('../../../services/subscriptionService', () => ({
 function renderRenderer(
   htmlContent: string,
   user: { id: number } | null = null,
-  isModerator = false,
+  isModerator = false
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -37,7 +37,7 @@ function renderRenderer(
         user={user as never}
         isModerator={isModerator}
       />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
 
   return {
@@ -69,7 +69,8 @@ describe('HubAIDesignRenderer', () => {
   });
 
   it('renders the shared live and preview slot contract inside the original AI DOM structure', async () => {
-    const { container } = renderRenderer(`
+    const { container } = renderRenderer(
+      `
       <div class="hub-custom-page">
         <section class="hero-shell">
           <h1>Hero copy</h1>
@@ -81,7 +82,10 @@ describe('HubAIDesignRenderer', () => {
           <div id="hub-feed" style="--color-background:#111;padding:24px"></div>
         </main>
       </div>
-    `, { id: 7 }, true);
+    `,
+      { id: 7 },
+      true
+    );
 
     const heroSection = container.querySelector('.hero-shell');
     expect(heroSection).not.toBeNull();
@@ -89,9 +93,11 @@ describe('HubAIDesignRenderer', () => {
 
     await waitFor(() => {
       expect(
-        within(heroSection as HTMLElement).getByRole('button', { name: 'Join' }),
+        within(heroSection as HTMLElement).getByRole('button', { name: 'Join' })
       ).toBeInTheDocument();
-      expect(within(container).getByRole('button', { name: /\+ Create Post/i })).toBeInTheDocument();
+      expect(
+        within(container).getByRole('button', { name: /\+ Create Post/i })
+      ).toBeInTheDocument();
       expect(within(container).getByRole('button', { name: 'Mod Tools' })).toBeInTheDocument();
       expect(within(container).getByText('Rendered through slot')).toBeInTheDocument();
     });
@@ -161,7 +167,9 @@ describe('HubAIDesignRenderer', () => {
     expect(joinHost?.tagName).toBe('DIV');
     expect(joinHost).toHaveClass('join-shell');
     expect(joinHost).toHaveAttribute('data-cta', 'join-now');
-    expect(within(joinHost as HTMLElement).getByRole('button', { name: 'Join' })).toBeInTheDocument();
+    expect(
+      within(joinHost as HTMLElement).getByRole('button', { name: 'Join' })
+    ).toBeInTheDocument();
   });
 
   it('strips harmful host attributes like hidden and aria-hidden at runtime', async () => {
@@ -212,12 +220,16 @@ describe('HubAIDesignRenderer', () => {
 
     const joinHost = container.querySelector('#hub-join');
     expect(joinHost?.tagName).toBe('ASIDE');
-    expect(within(joinHost as HTMLElement).getByRole('button', { name: 'Join' })).toBeInTheDocument();
+    expect(
+      within(joinHost as HTMLElement).getByRole('button', { name: 'Join' })
+    ).toBeInTheDocument();
 
     const feedHost = container.querySelector('#hub-feed');
     expect(feedHost?.tagName).toBe('SECTION');
     expect(within(feedHost as HTMLElement).getByRole('tab', { name: 'Hot' })).toBeInTheDocument();
-    expect(within(feedHost as HTMLElement).getByPlaceholderText('Search posts…')).toBeInTheDocument();
+    expect(
+      within(feedHost as HTMLElement).getByPlaceholderText('Search posts…')
+    ).toBeInTheDocument();
   });
 
   it('mounts the feed as one structured subtree with stable styling hooks', async () => {
@@ -279,7 +291,10 @@ describe('HubAIDesignRenderer', () => {
     await user.click(await within(container).findByRole('tab', { name: 'New' }));
 
     await waitFor(() => {
-      expect(within(container).getByRole('tab', { name: 'New' })).toHaveAttribute('aria-selected', 'true');
+      expect(within(container).getByRole('tab', { name: 'New' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
     });
   });
 
@@ -316,7 +331,9 @@ describe('HubAIDesignRenderer', () => {
 
     await waitFor(() => {
       expect(within(container).getByRole('button', { name: 'Join' })).toBeInTheDocument();
-      expect(within(container).getByRole('button', { name: /\+ Create Post/i })).toBeInTheDocument();
+      expect(
+        within(container).getByRole('button', { name: /\+ Create Post/i })
+      ).toBeInTheDocument();
       expect(within(container).getByRole('button', { name: 'Mod Tools' })).toBeInTheDocument();
       expect(within(container).getByText('Rendered through slot')).toBeInTheDocument();
     });
@@ -329,12 +346,14 @@ describe('HubAIDesignRenderer', () => {
           user={{ id: 7 } as never}
           isModerator
         />
-      </QueryClientProvider>,
+      </QueryClientProvider>
     );
 
     await waitFor(() => {
       expect(within(container).getByRole('button', { name: 'Join' })).toBeInTheDocument();
-      expect(within(container).getByRole('button', { name: /\+ Create Post/i })).toBeInTheDocument();
+      expect(
+        within(container).getByRole('button', { name: /\+ Create Post/i })
+      ).toBeInTheDocument();
       expect(within(container).getByRole('button', { name: 'Mod Tools' })).toBeInTheDocument();
       expect(within(container).getByText('Rendered through slot')).toBeInTheDocument();
     });

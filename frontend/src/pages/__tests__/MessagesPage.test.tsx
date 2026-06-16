@@ -160,13 +160,12 @@ vi.mock('../../services/keyManagementService', () => ({
     publicKey: {} as CryptoKey,
     privateKey: {} as CryptoKey,
   })),
-  getUserPublicKey: vi.fn(async () => ({} as CryptoKey)),
+  getUserPublicKey: vi.fn(async () => ({}) as CryptoKey),
 }));
 
 vi.mock('../../utils/encryption', async () => {
-  const actual = await vi.importActual<typeof import('../../utils/encryption')>(
-    '../../utils/encryption'
-  );
+  const actual =
+    await vi.importActual<typeof import('../../utils/encryption')>('../../utils/encryption');
   return {
     ...actual,
     decryptMessage: vi.fn(async () => 'decrypted-forward-plaintext'),

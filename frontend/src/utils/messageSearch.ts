@@ -29,11 +29,7 @@ function escapeRegExp(value: string): string {
 }
 
 function tokenizeQuery(query: string): string[] {
-  return query
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
+  return query.trim().toLowerCase().split(/\s+/).filter(Boolean);
 }
 
 function hasLink(text: string): boolean {
@@ -77,8 +73,8 @@ function computeRecencyBoost(sentAt: string, now: Date): number {
   if (!Number.isFinite(sent)) return 0;
   const ageHours = Math.max(0, (now.getTime() - sent) / (1000 * 60 * 60));
   if (ageHours <= 24) return 2.5;
-  if (ageHours <= 24*7) return 1.5;
-  if (ageHours <= 24*30) return 0.75;
+  if (ageHours <= 24 * 7) return 1.5;
+  if (ageHours <= 24 * 30) return 0.75;
   return 0;
 }
 

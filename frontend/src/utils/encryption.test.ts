@@ -94,7 +94,8 @@ describe('Encryption Utilities', () => {
     });
 
     it('should encrypt and decrypt a long message', async () => {
-      const originalMessage = 'A'.repeat(100) + ' This is a longer message to test encryption. ' + 'B'.repeat(50);
+      const originalMessage =
+        'A'.repeat(100) + ' This is a longer message to test encryption. ' + 'B'.repeat(50);
 
       const encrypted = await encryptMessage(originalMessage, recipientKeyPair.publicKey);
       const decrypted = await decryptMessage(encrypted, recipientKeyPair.privateKey);
@@ -117,9 +118,7 @@ describe('Encryption Utilities', () => {
 
       const encrypted = await encryptMessage(originalMessage, recipientKeyPair.publicKey);
 
-      await expect(
-        decryptMessage(encrypted, wrongKeyPair.privateKey)
-      ).rejects.toThrow();
+      await expect(decryptMessage(encrypted, wrongKeyPair.privateKey)).rejects.toThrow();
     });
 
     it('should encrypt different messages to different ciphertexts', async () => {
@@ -190,7 +189,7 @@ describe('Encryption Utilities', () => {
 
     it('should encrypt and decrypt a binary file', async () => {
       // Create a small binary file (simulated image)
-      const binaryData = new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10]); // Fake JPEG header
+      const binaryData = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]); // Fake JPEG header
       const file = new File([binaryData], 'test.jpg', { type: 'image/jpeg' });
 
       const encrypted = await encryptFile(file);
@@ -339,9 +338,7 @@ describe('Encryption Utilities', () => {
     it('should encrypt sender copy with RSA', async () => {
       const originalMessage = 'Message with sender copy';
 
-      const recipients = [
-        { userId: 1, publicKey: recipient1KeyPair.publicKey },
-      ];
+      const recipients = [{ userId: 1, publicKey: recipient1KeyPair.publicKey }];
 
       const result = await encryptForMultipleRecipients(
         originalMessage,
@@ -362,14 +359,9 @@ describe('Encryption Utilities', () => {
     it('should work with single recipient (edge case)', async () => {
       const originalMessage = 'Single recipient multi-recipient encryption';
 
-      const recipients = [
-        { userId: 1, publicKey: recipient1KeyPair.publicKey },
-      ];
+      const recipients = [{ userId: 1, publicKey: recipient1KeyPair.publicKey }];
 
-      const result = await encryptForMultipleRecipients(
-        originalMessage,
-        recipients
-      );
+      const result = await encryptForMultipleRecipients(originalMessage, recipients);
 
       const decrypted = await decryptMultiRecipientContent(
         result.encryptedContent,
@@ -385,14 +377,9 @@ describe('Encryption Utilities', () => {
       const originalMessage = 'Secret message';
       const wrongKeyPair = await generateKeyPair();
 
-      const recipients = [
-        { userId: 1, publicKey: recipient1KeyPair.publicKey },
-      ];
+      const recipients = [{ userId: 1, publicKey: recipient1KeyPair.publicKey }];
 
-      const result = await encryptForMultipleRecipients(
-        originalMessage,
-        recipients
-      );
+      const result = await encryptForMultipleRecipients(originalMessage, recipients);
 
       await expect(
         decryptMultiRecipientContent(
@@ -412,10 +399,7 @@ describe('Encryption Utilities', () => {
         { userId: 2, publicKey: recipient2KeyPair.publicKey },
       ];
 
-      const result = await encryptForMultipleRecipients(
-        originalMessage,
-        recipients
-      );
+      const result = await encryptForMultipleRecipients(originalMessage, recipients);
 
       const decrypted1 = await decryptMultiRecipientContent(
         result.encryptedContent,

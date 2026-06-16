@@ -8,10 +8,7 @@ export interface RedditCommentEmbedPayload {
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function escapeHtmlAttribute(value: string): string {
@@ -23,10 +20,7 @@ function escapeHtmlAttribute(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-export function buildRedditCommentEmbedHtml(
-  data: RedditCommentEmbedPayload,
-  t: Translate
-): string {
+export function buildRedditCommentEmbedHtml(data: RedditCommentEmbedPayload, t: Translate): string {
   const body = escapeHtml(data.body);
   const authorPath = t('common.format.userPath', { name: data.author });
   const commentByText = escapeHtml(t('posts.embed.commentByUser', { author: authorPath }));
@@ -35,4 +29,3 @@ export function buildRedditCommentEmbedHtml(
 
   return `<blockquote class="reddit-card" data-card-created="${timestamp}"><p>${body}</p><a href="${permalink}">${commentByText}</a></blockquote><script async src="https://embed.redditmedia.com/widgets/platform.js" charset="UTF-8"></script>`;
 }
-

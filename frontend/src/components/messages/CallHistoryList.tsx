@@ -1,37 +1,37 @@
-import { useQuery } from '@tanstack/react-query'
-import { Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneCall } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-import { callsService } from '../../services/callsService'
-import type { Call } from '../../types/calls'
+import { useQuery } from '@tanstack/react-query';
+import { Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneCall } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { callsService } from '../../services/callsService';
+import type { Call } from '../../types/calls';
 
 interface CallHistoryListProps {
-  conversationId: number
-  currentUserId: number
-  onCallBack?: (callType: 'voice' | 'video') => void
+  conversationId: number;
+  currentUserId: number;
+  onCallBack?: (callType: 'voice' | 'video') => void;
 }
 
 function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function formatTimestamp(iso: string): string {
-  const date = new Date(iso)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / 86400000)
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
 
   if (diffDays === 0) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
   if (diffDays === 1) {
-    return 'Yesterday'
+    return 'Yesterday';
   }
   if (diffDays < 7) {
-    return date.toLocaleDateString([], { weekday: 'short' })
+    return date.toLocaleDateString([], { weekday: 'short' });
   }
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 function CallRow({
@@ -39,17 +39,17 @@ function CallRow({
   currentUserId,
   onCallBack,
 }: {
-  call: Call
-  currentUserId: number
-  onCallBack?: (callType: 'voice' | 'video') => void
+  call: Call;
+  currentUserId: number;
+  onCallBack?: (callType: 'voice' | 'video') => void;
 }) {
-  const { t } = useTranslation()
-  const isOutgoing = call.caller_id === currentUserId
-  const isMissed = call.status === 'missed' || (call.status === 'ringing' && !call.answered_at)
-  const isRejected = call.status === 'rejected'
+  const { t } = useTranslation();
+  const isOutgoing = call.caller_id === currentUserId;
+  const isMissed = call.status === 'missed' || (call.status === 'ringing' && !call.answered_at);
+  const isRejected = call.status === 'rejected';
 
   const rowColor =
-    isMissed || isRejected ? 'text-[var(--color-error)]' : 'text-[var(--color-text-primary)]'
+    isMissed || isRejected ? 'text-[var(--color-error)]' : 'text-[var(--color-text-primary)]';
 
   const directionIcon = isMissed ? (
     <PhoneMissed className="w-4 h-4" aria-hidden="true" />
@@ -57,7 +57,7 @@ function CallRow({
     <PhoneOutgoing className="w-4 h-4" aria-hidden="true" />
   ) : (
     <PhoneIncoming className="w-4 h-4" aria-hidden="true" />
-  )
+  );
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)] transition-colors">
@@ -99,7 +99,7 @@ function CallRow({
         </button>
       )}
     </div>
-  )
+  );
 }
 
 export function CallHistoryList({
@@ -107,20 +107,20 @@ export function CallHistoryList({
   currentUserId,
   onCallBack,
 }: CallHistoryListProps) {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['call-history', conversationId],
     queryFn: () => callsService.getCallHistory(conversationId),
     staleTime: 60_000,
-  })
+  });
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8 text-sm text-[var(--color-text-secondary)]">
         {t('common.loading', 'Loading...')}
       </div>
-    )
+    );
   }
 
   if (isError) {
@@ -128,29 +128,24 @@ export function CallHistoryList({
       <div className="flex items-center justify-center py-8 text-sm text-[var(--color-error)]">
         {t('errors.failedToLoad', 'Failed to load')}
       </div>
-    )
+    );
   }
 
-  const calls: Call[] = data?.calls ?? []
+  const calls: Call[] = data?.calls ?? [];
 
   if (calls.length === 0) {
     return (
       <div className="flex items-center justify-center py-8 text-sm text-[var(--color-text-secondary)]">
         {t('calls.noHistory')}
       </div>
-    )
+    );
   }
 
   return (
     <div className="divide-y divide-[var(--color-border)]">
       {calls.map((call) => (
-        <CallRow
-          key={call.id}
-          call={call}
-          currentUserId={currentUserId}
-          onCallBack={onCallBack}
-        />
+        <CallRow key={call.id} call={call} currentUserId={currentUserId} onCallBack={onCallBack} />
       ))}
     </div>
-  )
+  );
 }

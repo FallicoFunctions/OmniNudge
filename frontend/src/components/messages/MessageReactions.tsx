@@ -90,8 +90,7 @@ export function MessageReactions({
         // Disable toggling when: unauthenticated (id≤0), mutation in flight, or
         // user reacted but we don't have the reaction ID needed for DELETE.
         const canToggle =
-          currentUserId > 0 &&
-          (isActive ? summary.my_reaction_id !== undefined : true);
+          currentUserId > 0 && (isActive ? summary.my_reaction_id !== undefined : true);
 
         // Stable ID for aria-describedby — emoji codepoint makes it unique per message
         const tooltipId = `rt-${messageId}-${summary.emoji.codePointAt(0)}`;
@@ -123,15 +122,13 @@ export function MessageReactions({
                 }
                 toggleReaction(summary);
               }}
-              onMouseEnter={() =>
-                setTooltip({ emoji: summary.emoji, text: buildTooltip(summary) })
-              }
+              onMouseEnter={() => setTooltip({ emoji: summary.emoji, text: buildTooltip(summary) })}
               onMouseLeave={() => setTooltip(null)}
-              onFocus={() =>
-                setTooltip({ emoji: summary.emoji, text: buildTooltip(summary) })
-              }
+              onFocus={() => setTooltip({ emoji: summary.emoji, text: buildTooltip(summary) })}
               onBlur={() => setTooltip(null)}
-              onKeyDown={(e) => { if (e.key === 'Escape') setTooltip(null); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setTooltip(null);
+              }}
             >
               <span className="text-base leading-none">{summary.emoji}</span>
               <span className="tabular-nums">{summary.count}</span>
@@ -179,12 +176,12 @@ export function MessageReactions({
             if (e.key === 'Escape') setMobileDetails(null);
           }}
         >
-            <button
-              type="button"
-              aria-label={t('messages.reactions.closeDetailsAria')}
-              className="absolute inset-0 bg-black/40"
-              onClick={() => setMobileDetails(null)}
-            />
+          <button
+            type="button"
+            aria-label={t('messages.reactions.closeDetailsAria')}
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobileDetails(null)}
+          />
           <div className="relative z-10 w-full rounded-t-2xl bg-[var(--color-surface)] p-4 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
@@ -217,7 +214,10 @@ export function MessageReactions({
               {mobileDetails.usernames.length > 0 ? (
                 <ul className="divide-y divide-[var(--color-border)]">
                   {mobileDetails.usernames.map((username, index) => (
-                    <li key={`${username}-${index}`} className="px-3 py-2 text-sm text-[var(--color-text-primary)]">
+                    <li
+                      key={`${username}-${index}`}
+                      className="px-3 py-2 text-sm text-[var(--color-text-primary)]"
+                    >
                       {username}
                     </li>
                   ))}

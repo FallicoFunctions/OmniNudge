@@ -16,7 +16,15 @@ export interface SplitDesignResult {
 
 const SLOT_IDS: SlotId[] = ['hub-feed', 'hub-join', 'hub-create', 'hub-mod', 'hub-content'];
 const MARKER_PREFIX = 'hub-slot-marker-';
-const SAFE_SLOT_HOST_TAGS = new Set(['div', 'section', 'aside', 'article', 'header', 'footer', 'main']);
+const SAFE_SLOT_HOST_TAGS = new Set([
+  'div',
+  'section',
+  'aside',
+  'article',
+  'header',
+  'footer',
+  'main',
+]);
 const SAFE_SLOT_ATTR_NAMES = new Set([
   'class',
   'title',
@@ -34,7 +42,12 @@ function isSafeSlotAttribute(attributeName: string): boolean {
   return SAFE_SLOT_ATTR_NAMES.has(attributeName);
 }
 
-function sanitizeSlotHost(doc: Document, slotNode: HTMLElement, slotId: SlotId, marker: string): HTMLElement {
+function sanitizeSlotHost(
+  doc: Document,
+  slotNode: HTMLElement,
+  slotId: SlotId,
+  marker: string
+): HTMLElement {
   const normalizedTagName = SAFE_SLOT_HOST_TAGS.has(slotNode.tagName.toLowerCase())
     ? slotNode.tagName.toLowerCase()
     : 'div';
@@ -42,9 +55,10 @@ function sanitizeSlotHost(doc: Document, slotNode: HTMLElement, slotId: SlotId, 
     .filter((attribute) => isSafeSlotAttribute(attribute.name))
     .map((attribute) => ({ name: attribute.name, value: attribute.value }));
   const style = slotNode.getAttribute('style') ?? '';
-  const sanitizedHost = normalizedTagName === slotNode.tagName.toLowerCase()
-    ? slotNode
-    : doc.createElement(normalizedTagName);
+  const sanitizedHost =
+    normalizedTagName === slotNode.tagName.toLowerCase()
+      ? slotNode
+      : doc.createElement(normalizedTagName);
 
   if (sanitizedHost !== slotNode) {
     while (slotNode.firstChild) {

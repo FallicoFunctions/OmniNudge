@@ -112,10 +112,7 @@ export function BaseSlideshow({
   const currentItem = items[currentIndex];
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black bg-opacity-95 flex flex-col"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-95 flex flex-col" onClick={onClose}>
       {/* Single header row with counter, controls, and close button */}
       {/* MSG-3: Improved lightbox header with clearer counter */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 z-10">
@@ -142,11 +139,11 @@ export function BaseSlideshow({
         )}
 
         {/* Close button - right */}
-	        <button
-	          onClick={onClose}
-	          className="bg-black/60 backdrop-blur-sm hover:bg-red-600/80 text-white transition-colors p-2 rounded-lg"
-	          aria-label={t('slideshow.aria.closeEsc')}
-	        >
+        <button
+          onClick={onClose}
+          className="bg-black/60 backdrop-blur-sm hover:bg-red-600/80 text-white transition-colors p-2 rounded-lg"
+          aria-label={t('slideshow.aria.closeEsc')}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-6 w-6"
@@ -165,15 +162,15 @@ export function BaseSlideshow({
       </div>
 
       {/* Previous button - MSG-3: More prominent navigation */}
-	      {items.length > 1 && (
-	        <button
+      {items.length > 1 && (
+        <button
           onClick={(e) => {
             e.stopPropagation();
             handlePrevious();
           }}
           className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-sm hover:bg-white/20 text-white transition-colors z-10 p-3 rounded-full"
-	          aria-label={t('slideshow.aria.previous')}
-	        >
+          aria-label={t('slideshow.aria.previous')}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-8 w-8"
@@ -181,7 +178,12 @@ export function BaseSlideshow({
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={3}
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
         </button>
       )}
@@ -195,15 +197,15 @@ export function BaseSlideshow({
       </div>
 
       {/* Next button - MSG-3: More prominent navigation */}
-	      {items.length > 1 && (
-	        <button
+      {items.length > 1 && (
+        <button
           onClick={(e) => {
             e.stopPropagation();
             handleNext();
           }}
           className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-sm hover:bg-white/20 text-white transition-colors z-10 p-3 rounded-full"
-	          aria-label={t('slideshow.aria.next')}
-	        >
+          aria-label={t('slideshow.aria.next')}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-8 w-8"
@@ -217,11 +219,7 @@ export function BaseSlideshow({
       )}
 
       {/* Optional bottom strip (e.g. mini chat bar) */}
-      {bottomContent && (
-        <div onClick={(e) => e.stopPropagation()}>
-          {bottomContent}
-        </div>
-      )}
+      {bottomContent && <div onClick={(e) => e.stopPropagation()}>{bottomContent}</div>}
     </div>
   );
 }

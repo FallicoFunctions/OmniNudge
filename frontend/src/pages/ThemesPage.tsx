@@ -56,8 +56,7 @@ export default function ThemesPage() {
                 {activeTheme ? activeTheme.theme_name : t('themesPage.hero.noThemeSelected')}
               </h1>
               <p className="text-sm text-[var(--color-text-secondary)]">
-                {activeTheme?.theme_description ??
-                  t('themesPage.hero.descriptionFallback')}
+                {activeTheme?.theme_description ?? t('themesPage.hero.descriptionFallback')}
               </p>
             </div>
             <ThemeSelector onCreateNewTheme={handleOpenCreate} />
@@ -69,19 +68,22 @@ export default function ThemesPage() {
                 {t('themesPage.palette.title')}
               </p>
               <div className="mt-3 flex gap-3">
-                {['--color-primary', '--color-primary-dark', '--color-primary-light', '--color-success'].map(
-                  (variable) => (
-                    <div key={variable} className="flex flex-col items-center gap-1">
-                      <span
-                        className="h-12 w-12 rounded-full border border-[var(--color-border)]"
-                        style={{ backgroundColor: `var(${variable})` }}
-                      />
-                      <span className="text-[10px] text-[var(--color-text-muted)]">
-                        {variable.replace('--color-', '')}
-                      </span>
-                    </div>
-                  )
-                )}
+                {[
+                  '--color-primary',
+                  '--color-primary-dark',
+                  '--color-primary-light',
+                  '--color-success',
+                ].map((variable) => (
+                  <div key={variable} className="flex flex-col items-center gap-1">
+                    <span
+                      className="h-12 w-12 rounded-full border border-[var(--color-border)]"
+                      style={{ backgroundColor: `var(${variable})` }}
+                    />
+                    <span className="text-[10px] text-[var(--color-text-muted)]">
+                      {variable.replace('--color-', '')}
+                    </span>
+                  </div>
+                ))}
               </div>
             </article>
 
@@ -91,17 +93,21 @@ export default function ThemesPage() {
               </p>
               <div className="mt-3 flex flex-col gap-2">
                 {[
-                  { label: t('themesPage.typography.labels.heading'), className: 'text-xl font-semibold' },
+                  {
+                    label: t('themesPage.typography.labels.heading'),
+                    className: 'text-xl font-semibold',
+                  },
                   { label: t('themesPage.typography.labels.body'), className: 'text-base' },
-                  { label: t('themesPage.typography.labels.caption'), className: 'text-sm text-[var(--color-text-secondary)]' },
+                  {
+                    label: t('themesPage.typography.labels.caption'),
+                    className: 'text-sm text-[var(--color-text-secondary)]',
+                  },
                 ].map((item) => (
                   <div key={item.label}>
                     <p className="text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
                       {item.label}
                     </p>
-                    <p className={item.className}>
-                      {t('themesPage.typography.sampleText')}
-                    </p>
+                    <p className={item.className}>{t('themesPage.typography.sampleText')}</p>
                   </div>
                 ))}
               </div>
@@ -109,7 +115,10 @@ export default function ThemesPage() {
           </div>
         </section>
 
-        <ThemeSettingsSection onCreateTheme={handleOpenCreate} onManageThemes={handleManageThemes} />
+        <ThemeSettingsSection
+          onCreateTheme={handleOpenCreate}
+          onManageThemes={handleManageThemes}
+        />
 
         <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-md">
           <header className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">

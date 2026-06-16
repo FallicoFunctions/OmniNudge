@@ -385,7 +385,6 @@ export default function MainLayout() {
                       ]}
                     />
                   )}
-
                 </>
               ) : (
                 <>

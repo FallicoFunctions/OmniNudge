@@ -81,9 +81,16 @@ import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplet
 import type { LocalSubredditPost } from '../services/hubsService';
 import type { RedditApiPost } from '../types/reddit';
 import { ChatSettingsModal } from '../components/messages/ChatSettingsModal';
-import { searchMessages, type MessageSearchFilters, type MessageSearchResult } from '../utils/messageSearch';
+import {
+  searchMessages,
+  type MessageSearchFilters,
+  type MessageSearchResult,
+} from '../utils/messageSearch';
 import { secondsToDuration } from '../types/messages';
-import { formatRedditSlideshowInput, parseRedditSlideshowInput } from '../utils/redditSlideshowInput';
+import {
+  formatRedditSlideshowInput,
+  parseRedditSlideshowInput,
+} from '../utils/redditSlideshowInput';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
 const SEARCH_PAGE_SIZE = 50;
@@ -760,8 +767,11 @@ export default function MessagesPage() {
   } = useCallManager();
   const [searchQuery, setSearchQuery] = useState('');
   const [messageSearchQuery, setMessageSearchQuery] = useState('');
-  const [messageSearchSenderFilter, setMessageSearchSenderFilter] = useState<'all' | 'mine' | 'others'>('all');
-  const [messageSearchDateRange, setMessageSearchDateRange] = useState<MessageSearchDateRange>('all');
+  const [messageSearchSenderFilter, setMessageSearchSenderFilter] = useState<
+    'all' | 'mine' | 'others'
+  >('all');
+  const [messageSearchDateRange, setMessageSearchDateRange] =
+    useState<MessageSearchDateRange>('all');
   const [messageSearchHasFiles, setMessageSearchHasFiles] = useState(false);
   const [messageSearchHasLinks, setMessageSearchHasLinks] = useState(false);
   const [messageSearchPage, setMessageSearchPage] = useState(0);
@@ -798,7 +808,9 @@ export default function MessagesPage() {
     addConversationToFolder,
     removeConversationFromFolder,
   } = useFolders();
-  const [folderModalOpen, setFolderModalOpen] = useState<'new' | { folder: ConversationFolder } | null>(null);
+  const [folderModalOpen, setFolderModalOpen] = useState<
+    'new' | { folder: ConversationFolder } | null
+  >(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<ConversationFolder | null>(null);
   const [deleteFolderError, setDeleteFolderError] = useState('');
   const [showMobileFolderSheet, setShowMobileFolderSheet] = useState(false);
@@ -932,7 +944,9 @@ export default function MessagesPage() {
       return allConversations.filter((c) => c.is_archived === true && !isModMail(c));
     }
     // Active tab: exclude archived and mod mail.
-    const activeNonModMail = allConversations.filter((c) => c.is_archived !== true && !isModMail(c));
+    const activeNonModMail = allConversations.filter(
+      (c) => c.is_archived !== true && !isModMail(c)
+    );
     const folderFiltered = filterConversationsBySelectedFolder(activeNonModMail);
     if (smartFolder === 'unread') {
       // Keep a conversation that was opened FROM the Unread folder visible while
@@ -941,7 +955,13 @@ export default function MessagesPage() {
       return folderFiltered.filter((c) => c.unread_count > 0 || c.id === unreadPinnedId);
     }
     return folderFiltered;
-  }, [allConversations, activeTab, filterConversationsBySelectedFolder, smartFolder, unreadPinnedId]);
+  }, [
+    allConversations,
+    activeTab,
+    filterConversationsBySelectedFolder,
+    smartFolder,
+    unreadPinnedId,
+  ]);
 
   // Apply search filter
   const conversations = useMemo(() => {
@@ -1060,7 +1080,9 @@ export default function MessagesPage() {
   const groupAdmin = useGroupAdmin({
     conversationId: selectedConversationId ?? 0,
     conversationType: selectedConversation?.conversation_type,
-    isAdmin: selectedConversation?.current_user_role === 'admin' || selectedConversation?.current_user_role === 'owner',
+    isAdmin:
+      selectedConversation?.current_user_role === 'admin' ||
+      selectedConversation?.current_user_role === 'owner',
   });
 
   // Route incoming WS events to useGroupAdmin handler
@@ -1199,12 +1221,7 @@ export default function MessagesPage() {
   const uploadMediaMutation = useMutation({
     mutationFn: (file: File) => mediaService.uploadMedia(file),
   });
-  const {
-    archiveConversation,
-    unarchiveConversation,
-    isArchiving,
-    isUnarchiving,
-  } = useArchive();
+  const { archiveConversation, unarchiveConversation, isArchiving, isUnarchiving } = useArchive();
 
   const sendMessageMutation = useMutation({
     mutationFn: (data: SendMessageRequest) => messagesService.sendMessage(data),
@@ -1295,7 +1312,6 @@ export default function MessagesPage() {
     },
   });
 
-
   const muteConversationMutation = useMutation({
     mutationFn: (conversationId: number) => messagesService.muteConversation(conversationId),
     onSuccess: async () => {
@@ -1365,7 +1381,10 @@ export default function MessagesPage() {
         const conversation = allConversations.find((entry) => entry.id === conversationId);
         if (!conversation) {
           throw new Error(
-            t('messages.errors.forwardConversationMissing', 'Forward target conversation not found.')
+            t(
+              'messages.errors.forwardConversationMissing',
+              'Forward target conversation not found.'
+            )
           );
         }
         return conversation;
@@ -1387,7 +1406,9 @@ export default function MessagesPage() {
           );
         }
         const conversation = (await response.json()) as ModMailConversation;
-        const participantIDs = (conversation.participants ?? []).map((participant) => participant.user_id);
+        const participantIDs = (conversation.participants ?? []).map(
+          (participant) => participant.user_id
+        );
         if (!participantIDs.length) {
           throw new Error(
             t(
@@ -1431,7 +1452,9 @@ export default function MessagesPage() {
         );
         if (
           targetParticipants.length !== sourceParticipants.length ||
-          targetParticipants.some((participantID, index) => participantID !== sourceParticipants[index])
+          targetParticipants.some(
+            (participantID, index) => participantID !== sourceParticipants[index]
+          )
         ) {
           throw new Error(
             t(
@@ -1579,7 +1602,9 @@ export default function MessagesPage() {
         encrypted_content: encryptedContent,
         sender_encrypted_content: senderEncryptedContent,
         encryption_version: encryptionVersion,
-        media_encryption_key: includeMedia ? (message.media_encryption_key ?? undefined) : undefined,
+        media_encryption_key: includeMedia
+          ? (message.media_encryption_key ?? undefined)
+          : undefined,
         media_encryption_iv: includeMedia ? (message.media_encryption_iv ?? undefined) : undefined,
         sender_media_encryption_key: includeMedia
           ? (message.sender_media_encryption_key ?? undefined)
@@ -2090,7 +2115,8 @@ export default function MessagesPage() {
 
   // Decrypt all messages for search functionality
   useEffect(() => {
-    const requiresDecryptedContent = Boolean(debouncedMessageSearch.trim()) || messageSearchHasLinks;
+    const requiresDecryptedContent =
+      Boolean(debouncedMessageSearch.trim()) || messageSearchHasLinks;
     if (!requiresDecryptedContent || orderedMessages.length === 0) {
       setDecryptedContentMap(new Map());
       setIsDecryptingForSearch(false);
@@ -2200,7 +2226,8 @@ export default function MessagesPage() {
     user?.id,
   ]);
 
-  const hasActiveMessageSearch = Boolean(debouncedMessageSearch.trim()) ||
+  const hasActiveMessageSearch =
+    Boolean(debouncedMessageSearch.trim()) ||
     messageSearchSenderFilter !== 'all' ||
     messageSearchDateRange !== 'all' ||
     messageSearchHasFiles ||
@@ -2211,10 +2238,16 @@ export default function MessagesPage() {
       return { total: 0, results: [] };
     }
 
-    return searchMessages(orderedMessages, decryptedContentMap, debouncedMessageSearch, messageSearchFilters, {
-      limit: SEARCH_PAGE_SIZE,
-      offset: messageSearchPage * SEARCH_PAGE_SIZE,
-    });
+    return searchMessages(
+      orderedMessages,
+      decryptedContentMap,
+      debouncedMessageSearch,
+      messageSearchFilters,
+      {
+        limit: SEARCH_PAGE_SIZE,
+        offset: messageSearchPage * SEARCH_PAGE_SIZE,
+      }
+    );
   }, [
     hasActiveMessageSearch,
     orderedMessages,
@@ -2231,7 +2264,9 @@ export default function MessagesPage() {
         : orderedMessages,
     [hasActiveMessageSearch, messageSearchOutput, orderedMessages]
   );
-  const filteredMessageCount = hasActiveMessageSearch ? messageSearchOutput.total : orderedMessages.length;
+  const filteredMessageCount = hasActiveMessageSearch
+    ? messageSearchOutput.total
+    : orderedMessages.length;
   const searchResultMetaByMessageId = useMemo(() => {
     if (!hasActiveMessageSearch) return new Map<number, MessageSearchResult>();
     const map = new Map<number, MessageSearchResult>();
@@ -2304,7 +2339,9 @@ export default function MessagesPage() {
   // the backend unread count stays at 0 and doesn't resurface when switching chats.
   useEffect(() => {
     const handler = (event: Event) => {
-      const { conversationId } = (event as CustomEvent<{ conversationId: number; senderId: number }>).detail;
+      const { conversationId } = (
+        event as CustomEvent<{ conversationId: number; senderId: number }>
+      ).detail;
       if (conversationId === selectedConversationId && !isCreatingChat) {
         markConversationAsRead(conversationId);
       }
@@ -2510,7 +2547,6 @@ export default function MessagesPage() {
     setSelectedFile(null);
   }, []);
 
-
   // Cleanup typing timeout on unmount
   useEffect(() => {
     return () => {
@@ -2519,7 +2555,6 @@ export default function MessagesPage() {
       }
     };
   }, []);
-
 
   // Mini chat strip shown inside both full-screen slideshow modes
   const slideshowMiniChat = (
@@ -2539,16 +2574,15 @@ export default function MessagesPage() {
                     own ? 'bg-[var(--color-primary)] text-white' : 'bg-white/20 text-white'
                   }`}
                 >
-                  {m.media_url && !m.encrypted_content
-                    ? `[${t('messages.media.fallbackText')}]`
-                    : (
-                      <DecryptedMessageContent
-                        message={m}
-                        isOwnMessage={own}
-                        currentUserId={user?.id}
-                      />
-                    )
-                  }
+                  {m.media_url && !m.encrypted_content ? (
+                    `[${t('messages.media.fallbackText')}]`
+                  ) : (
+                    <DecryptedMessageContent
+                      message={m}
+                      isOwnMessage={own}
+                      currentUserId={user?.id}
+                    />
+                  )}
                 </span>
               </div>
             );
@@ -2601,7 +2635,10 @@ export default function MessagesPage() {
               onSelectSmartFolder={setSmartFolder}
               onNewFolder={() => setFolderModalOpen('new')}
               onEditFolder={(folder) => setFolderModalOpen({ folder })}
-              onDeleteFolder={(folder) => { setDeleteFolderTarget(folder); setDeleteFolderError(''); }}
+              onDeleteFolder={(folder) => {
+                setDeleteFolderTarget(folder);
+                setDeleteFolderError('');
+              }}
               isLoading={isLoadingFolders}
               deletingFolderId={deletingFolderId}
               collapsed={isFolderCollapsed}
@@ -2612,357 +2649,401 @@ export default function MessagesPage() {
 
           {/* Conversation list panel */}
           <div className="flex w-[20rem] flex-shrink-0 flex-col overflow-hidden">
-          <div className="border-b border-[var(--color-border)] p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-                {t('messages.title')}
-              </h2>
-              <div className="flex items-center gap-2">
+            <div className="border-b border-[var(--color-border)] p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+                  {t('messages.title')}
+                </h2>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setIsCreatingChat(true);
+                      setSelectedConversationId(null);
+                      setNewChatUsername('');
+                      setMessageText('');
+                      setSelectedFile(null);
+                    }}
+                    className="rounded-md bg-[var(--color-primary)] px-3 py-2 md:py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)]"
+                  >
+                    {t('messages.newConversation')}
+                  </button>
+                  <button
+                    onClick={() => setShowCreateGroupModal(true)}
+                    title={t('groups.newGroup')}
+                    className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                      {/* Two people silhouettes */}
+                      <circle cx="5.5" cy="4.5" r="2" fill="currentColor" />
+                      <path
+                        d="M1 12c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4"
+                        stroke="currentColor"
+                        strokeWidth="1.3"
+                        strokeLinecap="round"
+                        fill="none"
+                      />
+                      {/* Plus badge top-right */}
+                      <circle
+                        cx="12.5"
+                        cy="4.5"
+                        r="3"
+                        fill="var(--color-surface)"
+                        stroke="var(--color-border)"
+                        strokeWidth="1"
+                      />
+                      <path
+                        d="M12.5 3v3M11 4.5h3"
+                        stroke="currentColor"
+                        strokeWidth="1.2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              {/* Tabs */}
+              <div className="flex gap-1 border-b border-[var(--color-border)]">
                 <button
-                  onClick={() => {
-                    setIsCreatingChat(true);
-                    setSelectedConversationId(null);
-                    setNewChatUsername('');
-                    setMessageText('');
-                    setSelectedFile(null);
-                  }}
-                  className="rounded-md bg-[var(--color-primary)] px-3 py-2 md:py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)]"
+                  onClick={() => setActiveTab('active')}
+                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                    activeTab === 'active'
+                      ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]'
+                      : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                  }`}
                 >
-                  {t('messages.newConversation')}
+                  {t('messages.tabs.active')}
                 </button>
                 <button
-                  onClick={() => setShowCreateGroupModal(true)}
-                  title={t('groups.newGroup')}
-                  className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                  onClick={() => setActiveTab('archived')}
+                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                    activeTab === 'archived'
+                      ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]'
+                      : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                  }`}
                 >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-                    {/* Two people silhouettes */}
-                    <circle cx="5.5" cy="4.5" r="2" fill="currentColor"/>
-                    <path d="M1 12c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-                    {/* Plus badge top-right */}
-                    <circle cx="12.5" cy="4.5" r="3" fill="var(--color-surface)" stroke="var(--color-border)" strokeWidth="1"/>
-                    <path d="M12.5 3v3M11 4.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                  </svg>
+                  {t('messages.tabs.archived')}
                 </button>
               </div>
-            </div>
-            {/* Tabs */}
-            <div className="flex gap-1 border-b border-[var(--color-border)]">
-              <button
-                onClick={() => setActiveTab('active')}
-                className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === 'active'
-                    ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]'
-                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                }`}
-              >
-                {t('messages.tabs.active')}
-              </button>
-              <button
-                onClick={() => setActiveTab('archived')}
-                className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === 'archived'
-                    ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]'
-                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                }`}
-              >
-                {t('messages.tabs.archived')}
-              </button>
-            </div>
 
-            {/* Mobile folder filter bar */}
-            {isMobile && (
-              <nav aria-label={t('messages.folders.title')} className="flex items-center gap-1.5 overflow-x-auto border-b border-[var(--color-border)] px-3 py-2 [scrollbar-width:none]">
-                {/* All */}
-                <button
-                  type="button"
-                  onClick={() => { setSelectedFolderId(null); setSmartFolder(null); }}
-                  aria-current={selectedFolderId === null && smartFolder === null ? 'page' : undefined}
-                  className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
-                    selectedFolderId === null && smartFolder === null
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                      : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                  }`}
+              {/* Mobile folder filter bar */}
+              {isMobile && (
+                <nav
+                  aria-label={t('messages.folders.title')}
+                  className="flex items-center gap-1.5 overflow-x-auto border-b border-[var(--color-border)] px-3 py-2 [scrollbar-width:none]"
                 >
-                  {t('messages.folders.allConversations')}
-                </button>
-                {/* Unread */}
-                <button
-                  type="button"
-                  onClick={() => { setSelectedFolderId(null); setSmartFolder('unread'); }}
-                  aria-current={smartFolder === 'unread' ? 'page' : undefined}
-                  className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
-                    smartFolder === 'unread'
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                      : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                  }`}
-                >
-                  {t('messages.folders.unread')}
-                </button>
-                {/* User folders */}
-                {folders.map((folder) => (
+                  {/* All */}
                   <button
-                    key={folder.id}
                     type="button"
-                    onClick={() => { setSelectedFolderId(folder.id); setSmartFolder(null); }}
-                    aria-current={selectedFolderId === folder.id ? 'page' : undefined}
-                    className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
-                      selectedFolderId === folder.id
+                    onClick={() => {
+                      setSelectedFolderId(null);
+                      setSmartFolder(null);
+                    }}
+                    aria-current={
+                      selectedFolderId === null && smartFolder === null ? 'page' : undefined
+                    }
+                    className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+                      selectedFolderId === null && smartFolder === null
                         ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
                         : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                     }`}
-                    style={selectedFolderId === folder.id ? undefined : { borderColor: hexToRgba(folder.color, 0.4) }}
                   >
-                    <span aria-hidden>{folder.icon}</span>
-                    <span className="max-w-[5rem] truncate">{folder.name}</span>
+                    {t('messages.folders.allConversations')}
                   </button>
-                ))}
-                {/* Manage folders button */}
-                <button
-                  type="button"
-                  onClick={() => setShowMobileFolderSheet(true)}
-                  className="flex-shrink-0 rounded-full border border-[var(--color-border)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
-                  aria-label={t('messages.folders.manageFolder')}
-                  title={t('messages.folders.manageFolder')}
-                >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                    <circle cx="6" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
-                    <path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.4 2.4l1.1 1.1M8.5 8.5l1.1 1.1M9.6 2.4L8.5 3.5M3.5 8.5l-1.1 1.1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                  </svg>
-                </button>
-              </nav>
-            )}
-
-            {/* Search input */}
-            <div className="p-3 border-b border-[var(--color-border)]">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t('messages.search.conversations')}
-                className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-              />
-              {searchQuery && conversations && (
-                <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">
-                  {t('messages.search.conversationResults', { count: conversations.length })}
-                </p>
+                  {/* Unread */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFolderId(null);
+                      setSmartFolder('unread');
+                    }}
+                    aria-current={smartFolder === 'unread' ? 'page' : undefined}
+                    className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+                      smartFolder === 'unread'
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                        : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                    }`}
+                  >
+                    {t('messages.folders.unread')}
+                  </button>
+                  {/* User folders */}
+                  {folders.map((folder) => (
+                    <button
+                      key={folder.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedFolderId(folder.id);
+                        setSmartFolder(null);
+                      }}
+                      aria-current={selectedFolderId === folder.id ? 'page' : undefined}
+                      className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+                        selectedFolderId === folder.id
+                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                          : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                      }`}
+                      style={
+                        selectedFolderId === folder.id
+                          ? undefined
+                          : { borderColor: hexToRgba(folder.color, 0.4) }
+                      }
+                    >
+                      <span aria-hidden>{folder.icon}</span>
+                      <span className="max-w-[5rem] truncate">{folder.name}</span>
+                    </button>
+                  ))}
+                  {/* Manage folders button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowMobileFolderSheet(true)}
+                    className="flex-shrink-0 rounded-full border border-[var(--color-border)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                    aria-label={t('messages.folders.manageFolder')}
+                    title={t('messages.folders.manageFolder')}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <circle cx="6" cy="6" r="2" stroke="currentColor" strokeWidth="1.2" />
+                      <path
+                        d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.4 2.4l1.1 1.1M8.5 8.5l1.1 1.1M9.6 2.4L8.5 3.5M3.5 8.5l-1.1 1.1"
+                        stroke="currentColor"
+                        strokeWidth="1.2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+                </nav>
               )}
-            </div>
-          </div>
 
-          <div className="flex-1 overflow-y-auto min-h-0">
-            {loadingConversations && (
-              <div className="p-4 text-center">
-                <LoadingMessage className="text-sm">{t('common.loading')}</LoadingMessage>
+              {/* Search input */}
+              <div className="p-3 border-b border-[var(--color-border)]">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t('messages.search.conversations')}
+                  className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                />
+                {searchQuery && conversations && (
+                  <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">
+                    {t('messages.search.conversationResults', { count: conversations.length })}
+                  </p>
+                )}
               </div>
-            )}
+            </div>
 
-            <GroupInvitesList onConversationOpened={setSelectedConversationId} />
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {loadingConversations && (
+                <div className="p-4 text-center">
+                  <LoadingMessage className="text-sm">{t('common.loading')}</LoadingMessage>
+                </div>
+              )}
 
-            {conversations?.map((conversation) => (
-              <div
-                key={conversation.id}
-                className={`group relative w-full border-b border-[var(--color-border)] transition-colors ${
-                  selectedConversationId === conversation.id
-                    ? 'bg-[var(--color-surface-elevated)]'
-                    : 'hover:bg-[var(--color-surface-elevated)] active:bg-[var(--color-surface-elevated)]'
-                }`}
-                data-conversation-menu-container={conversation.id}
-              >
+              <GroupInvitesList onConversationOpened={setSelectedConversationId} />
+
+              {conversations?.map((conversation) => (
                 <div
-                  role="button"
-                  tabIndex={0}
-                  aria-label={t('messages.aria.openConversation')}
-                  onClick={() => handleSelectConversation(conversation.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      handleSelectConversation(conversation.id);
-                    }
-                  }}
-                  onTouchStart={(event) => handleConversationTouchStart(conversation.id, event)}
-                  onTouchEnd={(event) => handleConversationTouchEnd(conversation.id, event)}
-                  className="w-full p-4 text-left"
+                  key={conversation.id}
+                  className={`group relative w-full border-b border-[var(--color-border)] transition-colors ${
+                    selectedConversationId === conversation.id
+                      ? 'bg-[var(--color-surface-elevated)]'
+                      : 'hover:bg-[var(--color-surface-elevated)] active:bg-[var(--color-surface-elevated)]'
+                  }`}
+                  data-conversation-menu-container={conversation.id}
                 >
-                  {/* MSG-2: Enhanced conversation preview with timestamp and better spacing */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`font-medium text-[var(--color-text-primary)] ${conversation.unread_count > 0 ? 'font-semibold' : ''}`}
-                          >
-                            {conversation.conversation_type === 'mod_mail'
-                              ? `${getHubDisplayTitle(conversation.hub_name)} - ${t('messages.modMail')} - ${conversation.subject || t('messages.untitled')}`
-                              : conversation.conversation_type === 'group'
-                                ? conversation.group_name || t('groups.groupConversation')
-                                : conversation.other_user?.username || t('messages.unknown')}
-                          </span>
-                          {conversation.other_user?.id && (
-                            <OnlineStatusIndicator userId={conversation.other_user.id} />
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t('messages.aria.openConversation')}
+                    onClick={() => handleSelectConversation(conversation.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleSelectConversation(conversation.id);
+                      }
+                    }}
+                    onTouchStart={(event) => handleConversationTouchStart(conversation.id, event)}
+                    onTouchEnd={(event) => handleConversationTouchEnd(conversation.id, event)}
+                    className="w-full p-4 text-left"
+                  >
+                    {/* MSG-2: Enhanced conversation preview with timestamp and better spacing */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`font-medium text-[var(--color-text-primary)] ${conversation.unread_count > 0 ? 'font-semibold' : ''}`}
+                            >
+                              {conversation.conversation_type === 'mod_mail'
+                                ? `${getHubDisplayTitle(conversation.hub_name)} - ${t('messages.modMail')} - ${conversation.subject || t('messages.untitled')}`
+                                : conversation.conversation_type === 'group'
+                                  ? conversation.group_name || t('groups.groupConversation')
+                                  : conversation.other_user?.username || t('messages.unknown')}
+                            </span>
+                            {conversation.other_user?.id && (
+                              <OnlineStatusIndicator userId={conversation.other_user.id} />
+                            )}
+                            {(conversation.is_archived ?? conversation.archived_at !== null) && (
+                              <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                                {t('messages.badges.archived')}
+                              </span>
+                            )}
+                          </div>
+                          {conversation.latest_message?.sent_at && (
+                            <span className="text-xs text-[var(--color-text-muted)] flex-shrink-0">
+                              {formatRelativeTime(conversation.latest_message.sent_at)}
+                            </span>
                           )}
-                          {(conversation.is_archived ?? conversation.archived_at !== null) && (
+                          {conversation.muted && (
                             <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                              {t('messages.badges.archived')}
+                              {t('messages.muted')}
                             </span>
                           )}
                         </div>
-                        {conversation.latest_message?.sent_at && (
-                          <span className="text-xs text-[var(--color-text-muted)] flex-shrink-0">
-                            {formatRelativeTime(conversation.latest_message.sent_at)}
-                          </span>
-                        )}
-                        {conversation.muted && (
-                          <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                            {t('messages.muted')}
-                          </span>
-                        )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {activeTab === 'archived' && (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {activeTab === 'archived' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              unarchiveConversation(conversation.id);
+                            }}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onTouchEnd={(e) => e.stopPropagation()}
+                            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
+                            disabled={isUnarchiving}
+                          >
+                            {t('messages.unarchive')}
+                          </button>
+                        )}
+                        {conversation.unread_count > 0 &&
+                          conversation.id !== selectedConversationId && (
+                            <span className="rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-xs font-semibold text-white">
+                              {conversation.unread_count}
+                            </span>
+                          )}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            unarchiveConversation(conversation.id);
+                            setConversationMenuOpen(
+                              conversationMenuOpen === conversation.id ? null : conversation.id
+                            );
                           }}
                           onTouchStart={(e) => e.stopPropagation()}
                           onTouchEnd={(e) => e.stopPropagation()}
-                          className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
+                          className={`rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 ${conversationMenuOpen === conversation.id ? '!opacity-100' : ''}`}
+                        >
+                          ...
+                        </button>
+                      </div>
+                    </div>
+                    {conversation.latest_message &&
+                      conversation.latest_message.encrypted_content &&
+                      !isAutoGeneratedMediaCaption(conversation.latest_message) && (
+                        <DecryptedMessageContent
+                          message={conversation.latest_message}
+                          isOwnMessage={conversation.latest_message.sender_id === user?.id}
+                          currentUserId={user?.id}
+                          className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2"
+                        />
+                      )}
+                    {/* Show folder badge when viewing a specific folder */}
+                    {selectedFolderId !== null &&
+                      (() => {
+                        const activeFolder = folders.find((f) => f.id === selectedFolderId);
+                        return activeFolder ? <FolderBadge folder={activeFolder} /> : null;
+                      })()}
+                  </div>
+                  {/* Context Menu */}
+                  {conversationMenuOpen === conversation.id && (
+                    <div className="absolute right-2 top-12 z-20 w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-lg">
+                      {activeTab === 'active' ? (
+                        <button
+                          type="button"
+                          className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                          onClick={() => {
+                            archiveConversation(conversation.id);
+                            setConversationMenuOpen(null);
+                          }}
+                          disabled={isArchiving}
+                        >
+                          {t('messages.archive')}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                          onClick={() => {
+                            unarchiveConversation(conversation.id);
+                            setConversationMenuOpen(null);
+                          }}
                           disabled={isUnarchiving}
                         >
                           {t('messages.unarchive')}
                         </button>
                       )}
-                      {conversation.unread_count > 0 &&
-                        conversation.id !== selectedConversationId && (
-                          <span className="rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-xs font-semibold text-white">
-                            {conversation.unread_count}
-                          </span>
-                        )}
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConversationMenuOpen(
-                            conversationMenuOpen === conversation.id ? null : conversation.id
-                          );
+                        className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                        onClick={() => {
+                          if (conversation.muted) {
+                            unmuteConversationMutation.mutate(conversation.id);
+                          } else {
+                            muteConversationMutation.mutate(conversation.id);
+                          }
                         }}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
-                        className={`rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 ${conversationMenuOpen === conversation.id ? '!opacity-100' : ''}`}
                       >
-                        ...
+                        {conversation.muted ? t('messages.unmute') : t('messages.mute')}
                       </button>
+                      <button
+                        type="button"
+                        className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-error)] hover:bg-[var(--color-surface-elevated)]"
+                        onClick={() => {
+                          setConversationMenuOpen(null);
+                          setDeleteConversationDialog(conversation);
+                        }}
+                      >
+                        {t('common.delete')}
+                      </button>
+                      {folders.length > 0 && (
+                        <ConversationFolderMenu
+                          conversationId={conversation.id}
+                          folders={folders}
+                          onAdd={(folderID) =>
+                            addConversationToFolder({ folderID, conversationID: conversation.id })
+                          }
+                          onRemove={(folderID) =>
+                            removeConversationFromFolder({
+                              folderID,
+                              conversationID: conversation.id,
+                            })
+                          }
+                        />
+                      )}
                     </div>
-                  </div>
-                  {conversation.latest_message &&
-                    conversation.latest_message.encrypted_content &&
-                    !isAutoGeneratedMediaCaption(conversation.latest_message) && (
-                      <DecryptedMessageContent
-                        message={conversation.latest_message}
-                        isOwnMessage={conversation.latest_message.sender_id === user?.id}
-                        currentUserId={user?.id}
-                        className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2"
-                      />
-                    )}
-                  {/* Show folder badge when viewing a specific folder */}
-                  {selectedFolderId !== null && (() => {
-                    const activeFolder = folders.find((f) => f.id === selectedFolderId);
-                    return activeFolder ? (
-                      <FolderBadge folder={activeFolder} />
-                    ) : null;
-                  })()}
+                  )}
                 </div>
-                {/* Context Menu */}
-                {conversationMenuOpen === conversation.id && (
-                  <div className="absolute right-2 top-12 z-20 w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-lg">
-                    {activeTab === 'active' ? (
-                      <button
-                        type="button"
-                        className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                        onClick={() => {
-                          archiveConversation(conversation.id);
-                          setConversationMenuOpen(null);
-                        }}
-                        disabled={isArchiving}
-                      >
-                        {t('messages.archive')}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                        onClick={() => {
-                          unarchiveConversation(conversation.id);
-                          setConversationMenuOpen(null);
-                        }}
-                        disabled={isUnarchiving}
-                      >
-                        {t('messages.unarchive')}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                      onClick={() => {
-                        if (conversation.muted) {
-                          unmuteConversationMutation.mutate(conversation.id);
-                        } else {
-                          muteConversationMutation.mutate(conversation.id);
-                        }
-                      }}
-                    >
-                      {conversation.muted ? t('messages.unmute') : t('messages.mute')}
-                    </button>
-                    <button
-                      type="button"
-                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-error)] hover:bg-[var(--color-surface-elevated)]"
-                      onClick={() => {
-                        setConversationMenuOpen(null);
-                        setDeleteConversationDialog(conversation);
-                      }}
-                    >
-                      {t('common.delete')}
-                    </button>
-                    {folders.length > 0 && (
-                      <ConversationFolderMenu
-                        conversationId={conversation.id}
-                        folders={folders}
-                        onAdd={(folderID) =>
-                          addConversationToFolder({ folderID, conversationID: conversation.id })
-                        }
-                        onRemove={(folderID) =>
-                          removeConversationFromFolder({ folderID, conversationID: conversation.id })
-                        }
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+              ))}
 
-            {conversations?.length === 0 && (
-              <div className="p-4">
-                <EmptyConversations />
-              </div>
-            )}
+              {conversations?.length === 0 && (
+                <div className="p-4">
+                  <EmptyConversations />
+                </div>
+              )}
 
-            {hasMoreConversations && (
-              <div className="p-4">
-                <button
-                  type="button"
-                  onClick={() => fetchMoreConversations()}
-                  disabled={isFetchingMoreConversations}
-                  className="w-full rounded-md border border-[var(--color-border)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
-                >
-                  {isFetchingMoreConversations ? t('common.loading') : t('messages.loadMore')}
-                </button>
-              </div>
-            )}
+              {hasMoreConversations && (
+                <div className="p-4">
+                  <button
+                    type="button"
+                    onClick={() => fetchMoreConversations()}
+                    disabled={isFetchingMoreConversations}
+                    className="w-full rounded-md border border-[var(--color-border)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
+                  >
+                    {isFetchingMoreConversations ? t('common.loading') : t('messages.loadMore')}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-          </div>{/* end conversation list panel */}
+          {/* end conversation list panel */}
         </div>
 
         {/* Chat Area */}
@@ -2978,7 +3059,10 @@ export default function MessagesPage() {
               {/* Chat Header */}
               <div className="border-b border-[var(--color-border)] p-3 md:p-4">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-                  <div className="flex min-w-0 items-center gap-1 md:gap-2" style={{ flex: '1 1 8rem' }}>
+                  <div
+                    className="flex min-w-0 items-center gap-1 md:gap-2"
+                    style={{ flex: '1 1 8rem' }}
+                  >
                     {/* Back button — mobile only */}
                     {isMobile && (
                       <button
@@ -3020,7 +3104,9 @@ export default function MessagesPage() {
                       selectedConversation?.conversation_type === 'group' &&
                       selectedConversation?.participant_count != null && (
                         <span className="text-xs text-[var(--color-text-muted)]">
-                          {t('groups.participantCount', { count: selectedConversation.participant_count })}
+                          {t('groups.participantCount', {
+                            count: selectedConversation.participant_count,
+                          })}
                         </span>
                       )}
                     {!isCreatingChat &&
@@ -3040,7 +3126,21 @@ export default function MessagesPage() {
                         className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
                         aria-label={t('messages.chatSettings')}
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <circle cx="12" cy="12" r="3" />
+                          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                        </svg>
                       </button>
                     )}
                     {/* Voice / Video call buttons — DM conversations only */}
@@ -3054,7 +3154,20 @@ export default function MessagesPage() {
                             className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
                             aria-label={t('calls.startVoiceCall')}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.61 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.08 6.08l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.61 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.08 6.08l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+                            </svg>
                           </button>
                           <button
                             type="button"
@@ -3062,7 +3175,21 @@ export default function MessagesPage() {
                             className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
                             aria-label={t('calls.startVideoCall')}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <polygon points="23 7 16 12 23 17 23 7" />
+                              <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                            </svg>
                           </button>
                         </>
                       )}
@@ -3076,8 +3203,13 @@ export default function MessagesPage() {
                         aria-label={t('groups.groupInfo')}
                       >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-                          <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3"/>
-                          <path d="M8 7v4M8 5.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                          <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" />
+                          <path
+                            d="M8 7v4M8 5.5v.5"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                          />
                         </svg>
                       </button>
                     )}
@@ -3104,7 +3236,9 @@ export default function MessagesPage() {
                           <circle cx="12" cy="12" r="10" />
                           <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88" />
                         </svg>
-                        <span className="hidden md:inline whitespace-nowrap">{t('messages.browseRedditHub')}</span>
+                        <span className="hidden md:inline whitespace-nowrap">
+                          {t('messages.browseRedditHub')}
+                        </span>
                       </button>
                     )}
 
@@ -3153,8 +3287,20 @@ export default function MessagesPage() {
                         aria-label={t('messages.search.ariaToggle')}
                         aria-pressed={showMessageSearch}
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                          />
                         </svg>
                       </button>
                     )}
@@ -3164,46 +3310,16 @@ export default function MessagesPage() {
 
               {/* Message Search Bar — slides in/out */}
               {!isCreatingChat && (
-                <div className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${showMessageSearch ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-                <div className="overflow-hidden">
-                <div className="border-b border-[var(--color-border)] p-3 bg-[var(--color-surface-elevated)]">
-                  <div className="relative flex items-center gap-2">
-                    {/* Search Icon */}
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 absolute left-3 text-[var(--color-text-muted)] pointer-events-none"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
-
-                    {/* Search Input */}
-                    <input
-                      type="text"
-                      value={messageSearchQuery}
-                      onChange={(e) => setMessageSearchQuery(e.target.value)}
-                      placeholder={t('messages.search.inConversation')}
-                      className="w-full pl-9 pr-20 py-2 text-sm border border-[var(--color-border)] rounded-md bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-                    />
-
-                    {/* Clear Button */}
-                    {messageSearchQuery && (
-                      <button
-                        type="button"
-                        onClick={resetMessageSearch}
-                        className="absolute right-16 p-1 rounded-full hover:bg-[var(--color-surface-hover)] active:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
-                        aria-label={t('messages.search.clearLabel')}
-                      >
+                <div
+                  className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${showMessageSearch ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+                >
+                  <div className="overflow-hidden">
+                    <div className="border-b border-[var(--color-border)] p-3 bg-[var(--color-surface-elevated)]">
+                      <div className="relative flex items-center gap-2">
+                        {/* Search Icon */}
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
+                          className="h-4 w-4 absolute left-3 text-[var(--color-text-muted)] pointer-events-none"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -3212,73 +3328,109 @@ export default function MessagesPage() {
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                           />
                         </svg>
-                      </button>
-                    )}
 
-                    {/* Result Count */}
-                    {hasActiveMessageSearch && (
-                      <div className="absolute right-3 flex items-center gap-1 text-xs text-[var(--color-text-muted)] bg-[var(--color-surface-elevated)] px-2 py-1 rounded">
-                        {isDecryptingForSearch ? (
-                          <span>{t('messages.searching')}</span>
-                        ) : (
-                          <span>
-                            {filteredMessageCount}{' '}
-                            {filteredMessageCount === 1
-                              ? t('messages.match')
-                              : t('messages.matches')}
-                          </span>
+                        {/* Search Input */}
+                        <input
+                          type="text"
+                          value={messageSearchQuery}
+                          onChange={(e) => setMessageSearchQuery(e.target.value)}
+                          placeholder={t('messages.search.inConversation')}
+                          className="w-full pl-9 pr-20 py-2 text-sm border border-[var(--color-border)] rounded-md bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                        />
+
+                        {/* Clear Button */}
+                        {messageSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={resetMessageSearch}
+                            className="absolute right-16 p-1 rounded-full hover:bg-[var(--color-surface-hover)] active:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+                            aria-label={t('messages.search.clearLabel')}
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        )}
+
+                        {/* Result Count */}
+                        {hasActiveMessageSearch && (
+                          <div className="absolute right-3 flex items-center gap-1 text-xs text-[var(--color-text-muted)] bg-[var(--color-surface-elevated)] px-2 py-1 rounded">
+                            {isDecryptingForSearch ? (
+                              <span>{t('messages.searching')}</span>
+                            ) : (
+                              <span>
+                                {filteredMessageCount}{' '}
+                                {filteredMessageCount === 1
+                                  ? t('messages.match')
+                                  : t('messages.matches')}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
+                      <div className="mt-2 grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+                        <select
+                          value={messageSearchSenderFilter}
+                          onChange={(e) =>
+                            setMessageSearchSenderFilter(
+                              e.target.value as 'all' | 'mine' | 'others'
+                            )
+                          }
+                          className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
+                        >
+                          <option value="all">{t('messages.search.filters.senderAll')}</option>
+                          <option value="mine">{t('messages.search.filters.senderMine')}</option>
+                          <option value="others">
+                            {t('messages.search.filters.senderOthers')}
+                          </option>
+                        </select>
+                        <select
+                          value={messageSearchDateRange}
+                          onChange={(e) =>
+                            setMessageSearchDateRange(
+                              e.target.value as 'all' | '24h' | '7d' | '30d'
+                            )
+                          }
+                          className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
+                        >
+                          <option value="all">{t('messages.search.filters.dateAll')}</option>
+                          <option value="24h">{t('messages.search.filters.date24h')}</option>
+                          <option value="7d">{t('messages.search.filters.date7d')}</option>
+                          <option value="30d">{t('messages.search.filters.date30d')}</option>
+                        </select>
+                        <label className="inline-flex items-center gap-1 text-xs text-[var(--color-text-secondary)]">
+                          <input
+                            type="checkbox"
+                            checked={messageSearchHasFiles}
+                            onChange={(e) => setMessageSearchHasFiles(e.target.checked)}
+                          />
+                          {t('messages.search.filters.hasFiles')}
+                        </label>
+                        <label className="inline-flex items-center gap-1 text-xs text-[var(--color-text-secondary)]">
+                          <input
+                            type="checkbox"
+                            checked={messageSearchHasLinks}
+                            onChange={(e) => setMessageSearchHasLinks(e.target.checked)}
+                          />
+                          {t('messages.search.filters.hasLinks')}
+                        </label>
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
-                    <select
-                      value={messageSearchSenderFilter}
-                      onChange={(e) =>
-                        setMessageSearchSenderFilter(e.target.value as 'all' | 'mine' | 'others')
-                      }
-                      className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
-                    >
-                      <option value="all">{t('messages.search.filters.senderAll')}</option>
-                      <option value="mine">{t('messages.search.filters.senderMine')}</option>
-                      <option value="others">{t('messages.search.filters.senderOthers')}</option>
-                    </select>
-                    <select
-                      value={messageSearchDateRange}
-                      onChange={(e) =>
-                        setMessageSearchDateRange(
-                          e.target.value as 'all' | '24h' | '7d' | '30d'
-                        )
-                      }
-                      className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
-                    >
-                      <option value="all">{t('messages.search.filters.dateAll')}</option>
-                      <option value="24h">{t('messages.search.filters.date24h')}</option>
-                      <option value="7d">{t('messages.search.filters.date7d')}</option>
-                      <option value="30d">{t('messages.search.filters.date30d')}</option>
-                    </select>
-                    <label className="inline-flex items-center gap-1 text-xs text-[var(--color-text-secondary)]">
-                      <input
-                        type="checkbox"
-                        checked={messageSearchHasFiles}
-                        onChange={(e) => setMessageSearchHasFiles(e.target.checked)}
-                      />
-                      {t('messages.search.filters.hasFiles')}
-                    </label>
-                    <label className="inline-flex items-center gap-1 text-xs text-[var(--color-text-secondary)]">
-                      <input
-                        type="checkbox"
-                        checked={messageSearchHasLinks}
-                        onChange={(e) => setMessageSearchHasLinks(e.target.checked)}
-                      />
-                      {t('messages.search.filters.hasLinks')}
-                    </label>
-                  </div>
-                </div>
-                </div>
                 </div>
               )}
 
@@ -3328,10 +3480,7 @@ export default function MessagesPage() {
                       // centred text with no bubble, avatar, or actions.
                       if (message.message_type === 'system') {
                         return (
-                          <div
-                            key={message.id}
-                            className="flex justify-center my-1 px-4"
-                          >
+                          <div key={message.id} className="flex justify-center my-1 px-4">
                             <span className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 text-xs text-[var(--color-text-muted)] text-center max-w-[70%]">
                               {message.encrypted_content}
                             </span>
@@ -3375,7 +3524,8 @@ export default function MessagesPage() {
                       const parentDeleted =
                         !!message.reply_to &&
                         (!parentMessage ||
-                          (parentMessage.deleted_for_sender && parentMessage.deleted_for_recipient));
+                          (parentMessage.deleted_for_sender &&
+                            parentMessage.deleted_for_recipient));
                       const parentDecrypted = parentMessage
                         ? decryptedContentMap.get(parentMessage.id)
                         : undefined;
@@ -3439,43 +3589,47 @@ export default function MessagesPage() {
                                 />
                               )}
                               {message.encrypted_content &&
-                                !isAutoGeneratedMediaCaption(message) && (
-                                  editingMessageId === message.id ? (
-                                    <MessageEditMode
-                                      initialContent={editingContent}
-                                      sentAt={message.sent_at}
-                                      isSaving={isEditSaving}
-                                      onSave={(content) => saveEdit(message.id, content).then(() => undefined)}
-                                      onCancel={cancelEdit}
-                                      isOwnMessage={isOwnMessage}
-                                    />
-                                  ) : message.voice_message ? (
-                                    <VoiceMessageBubble
-                                      voiceMessage={message.voice_message}
-                                      isOwn={isOwnMessage}
-                                    />
-                                  ) : (
-                                    <DecryptedMessageContent
-                                      message={message}
-                                      isOwnMessage={isOwnMessage}
-                                      currentUserId={user?.id}
-                                      className="text-sm mb-1"
-                                      highlightText={debouncedMessageSearch}
-                                    />
-                                  )
-                                )}
-                              {hasActiveMessageSearch && searchResultMetaByMessageId.get(message.id)?.snippet && (
-                                <p
-                                  className={`text-xs mb-1 ${
-                                    isOwnMessage ? 'text-white/80' : 'text-[var(--color-text-muted)]'
-                                  }`}
-                                >
-                                  <HighlightedText
-                                    text={searchResultMetaByMessageId.get(message.id)!.snippet}
-                                    highlight={debouncedMessageSearch}
+                                !isAutoGeneratedMediaCaption(message) &&
+                                (editingMessageId === message.id ? (
+                                  <MessageEditMode
+                                    initialContent={editingContent}
+                                    sentAt={message.sent_at}
+                                    isSaving={isEditSaving}
+                                    onSave={(content) =>
+                                      saveEdit(message.id, content).then(() => undefined)
+                                    }
+                                    onCancel={cancelEdit}
+                                    isOwnMessage={isOwnMessage}
                                   />
-                                </p>
-                              )}
+                                ) : message.voice_message ? (
+                                  <VoiceMessageBubble
+                                    voiceMessage={message.voice_message}
+                                    isOwn={isOwnMessage}
+                                  />
+                                ) : (
+                                  <DecryptedMessageContent
+                                    message={message}
+                                    isOwnMessage={isOwnMessage}
+                                    currentUserId={user?.id}
+                                    className="text-sm mb-1"
+                                    highlightText={debouncedMessageSearch}
+                                  />
+                                ))}
+                              {hasActiveMessageSearch &&
+                                searchResultMetaByMessageId.get(message.id)?.snippet && (
+                                  <p
+                                    className={`text-xs mb-1 ${
+                                      isOwnMessage
+                                        ? 'text-white/80'
+                                        : 'text-[var(--color-text-muted)]'
+                                    }`}
+                                  >
+                                    <HighlightedText
+                                      text={searchResultMetaByMessageId.get(message.id)!.snippet}
+                                      highlight={debouncedMessageSearch}
+                                    />
+                                  </p>
+                                )}
                               <div
                                 className={`text-xs flex items-center gap-1 ${
                                   isOwnMessage ? 'text-white/70' : 'text-[var(--color-text-muted)]'
@@ -3530,7 +3684,9 @@ export default function MessagesPage() {
                                 )}
                               </div>
                             </div>
-                            <div className={`relative opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 ${messageMenuOpen === message.id ? '!opacity-100' : ''}`}>
+                            <div
+                              className={`relative opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 ${messageMenuOpen === message.id ? '!opacity-100' : ''}`}
+                            >
                               <button
                                 type="button"
                                 aria-label={t('messages.messageOptions.ariaLabel')}
@@ -3598,7 +3754,10 @@ export default function MessagesPage() {
                                       className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                                       onClick={async () => {
                                         // Fix 7: decrypt on demand so edit form always starts with correct content
-                                        const content = await decryptMessageForEdit(message, isOwnMessage);
+                                        const content = await decryptMessageForEdit(
+                                          message,
+                                          isOwnMessage
+                                        );
                                         startEdit(message, content);
                                         setMessageMenuOpen(null);
                                       }}
@@ -3612,7 +3771,10 @@ export default function MessagesPage() {
                                       className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                                       onClick={async () => {
                                         // Fix 14: decrypt current content to show at top of history modal
-                                        const content = await decryptMessageForEdit(message, isOwnMessage);
+                                        const content = await decryptMessageForEdit(
+                                          message,
+                                          isOwnMessage
+                                        );
                                         setHistoryCurrentContent(content);
                                         openHistory(message.id);
                                         setMessageMenuOpen(null);
@@ -3716,7 +3878,9 @@ export default function MessagesPage() {
                         <button
                           type="button"
                           onClick={() => setMessageSearchPage((prev) => prev + 1)}
-                          disabled={(messageSearchPage + 1) * SEARCH_PAGE_SIZE >= filteredMessageCount}
+                          disabled={
+                            (messageSearchPage + 1) * SEARCH_PAGE_SIZE >= filteredMessageCount
+                          }
                           className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
                         >
                           {t('common.next')}
@@ -4442,7 +4606,12 @@ export default function MessagesPage() {
                 aria-label={t('messages.folders.cancel')}
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                  <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path
+                    d="M2 2l10 10M12 2L2 12"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </button>
             </div>
@@ -4452,11 +4621,27 @@ export default function MessagesPage() {
                 folders={folders}
                 selectedFolderId={selectedFolderId}
                 smartFolder={smartFolder}
-                onSelectFolder={(id) => { setSelectedFolderId(id); setShowMobileFolderSheet(false); }}
-                onSelectSmartFolder={(s) => { setSmartFolder(s); setShowMobileFolderSheet(false); }}
-                onNewFolder={() => { setShowMobileFolderSheet(false); setFolderModalOpen('new'); }}
-                onEditFolder={(folder) => { setShowMobileFolderSheet(false); setFolderModalOpen({ folder }); }}
-                onDeleteFolder={(folder) => { setShowMobileFolderSheet(false); setDeleteFolderTarget(folder); setDeleteFolderError(''); }}
+                onSelectFolder={(id) => {
+                  setSelectedFolderId(id);
+                  setShowMobileFolderSheet(false);
+                }}
+                onSelectSmartFolder={(s) => {
+                  setSmartFolder(s);
+                  setShowMobileFolderSheet(false);
+                }}
+                onNewFolder={() => {
+                  setShowMobileFolderSheet(false);
+                  setFolderModalOpen('new');
+                }}
+                onEditFolder={(folder) => {
+                  setShowMobileFolderSheet(false);
+                  setFolderModalOpen({ folder });
+                }}
+                onDeleteFolder={(folder) => {
+                  setShowMobileFolderSheet(false);
+                  setDeleteFolderTarget(folder);
+                  setDeleteFolderError('');
+                }}
                 isLoading={isLoadingFolders}
                 deletingFolderId={deletingFolderId}
                 alwaysShowActions
@@ -4514,7 +4699,10 @@ export default function MessagesPage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => { setDeleteFolderTarget(null); setDeleteFolderError(''); }}
+                onClick={() => {
+                  setDeleteFolderTarget(null);
+                  setDeleteFolderError('');
+                }}
                 disabled={isDeletingFolder}
                 className="flex-1 rounded-lg border border-[var(--color-border)] py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50"
               >
@@ -4536,8 +4724,21 @@ export default function MessagesPage() {
               >
                 {isDeletingFolder ? (
                   <span className="inline-flex items-center justify-center gap-1.5">
-                    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 16 16" fill="none" aria-hidden>
-                      <circle cx="8" cy="8" r="6" stroke="white" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
+                    <svg
+                      className="h-3.5 w-3.5 animate-spin"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      aria-hidden
+                    >
+                      <circle
+                        cx="8"
+                        cy="8"
+                        r="6"
+                        stroke="white"
+                        strokeWidth="2"
+                        strokeDasharray="28"
+                        strokeDashoffset="10"
+                      />
                     </svg>
                     {t('messages.folders.deleteFolder')}
                   </span>
@@ -4564,7 +4765,9 @@ export default function MessagesPage() {
               { headers: { Authorization: `Bearer ${getStoredAuthToken()}` } }
             );
             if (!res.ok) return [];
-            const data = await res.json() as { users?: { id: number; username: string; avatar_url?: string }[] };
+            const data = (await res.json()) as {
+              users?: { id: number; username: string; avatar_url?: string }[];
+            };
             return data.users ?? [];
           }}
         />
@@ -4589,11 +4792,7 @@ export default function MessagesPage() {
 
       {/* Incoming call modal */}
       {callState === 'ringing_incoming' && activeCall && (
-        <IncomingCallModal
-          call={activeCall}
-          onAccept={answerCall}
-          onDecline={rejectCall}
-        />
+        <IncomingCallModal call={activeCall} onAccept={answerCall} onDecline={rejectCall} />
       )}
 
       {/* Active / outgoing call screen */}

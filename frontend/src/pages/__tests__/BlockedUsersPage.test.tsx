@@ -62,7 +62,7 @@ describe('BlockedUsersPage', () => {
     render(
       <Wrapper>
         <BlockedUsersPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /blocked users/i })).toBeInTheDocument();
@@ -75,7 +75,7 @@ describe('BlockedUsersPage', () => {
     render(
       <Wrapper>
         <BlockedUsersPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(screen.getByTestId('loading-message')).toBeInTheDocument();
   });
@@ -86,7 +86,7 @@ describe('BlockedUsersPage', () => {
     render(
       <Wrapper>
         <BlockedUsersPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByText(/haven't blocked anyone/i)).toBeInTheDocument();
@@ -95,15 +95,13 @@ describe('BlockedUsersPage', () => {
 
   it('shows list of blocked users when data loads', async () => {
     mockGetBlockedUsers.mockResolvedValue({
-      blocked_users: [
-        { id: 1, username: 'spammer99', blocked_at: '2024-01-01T00:00:00Z' },
-      ],
+      blocked_users: [{ id: 1, username: 'spammer99', blocked_at: '2024-01-01T00:00:00Z' }],
     });
     const Wrapper = createWrapper();
     render(
       <Wrapper>
         <BlockedUsersPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByText('spammer99')).toBeInTheDocument();
@@ -112,16 +110,14 @@ describe('BlockedUsersPage', () => {
 
   it('unblock button calls unblockUser API', async () => {
     mockGetBlockedUsers.mockResolvedValue({
-      blocked_users: [
-        { id: 1, username: 'spammer99', blocked_at: '2024-01-01T00:00:00Z' },
-      ],
+      blocked_users: [{ id: 1, username: 'spammer99', blocked_at: '2024-01-01T00:00:00Z' }],
     });
     mockUnblockUser.mockResolvedValue({});
     const Wrapper = createWrapper();
     render(
       <Wrapper>
         <BlockedUsersPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => screen.getByText('spammer99'));
 

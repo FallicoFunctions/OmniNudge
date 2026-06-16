@@ -64,7 +64,11 @@ export function StandardScrollControls({
               ? 'bg-cyan-500 text-black hover:bg-cyan-400'
               : 'bg-gray-800/80 text-white hover:bg-gray-700/80'
           } backdrop-blur-sm`}
-          title={autoAdvance ? t('standardScrollControls.titles.pauseAutoAdvance') : t('standardScrollControls.titles.enableAutoAdvance')}
+          title={
+            autoAdvance
+              ? t('standardScrollControls.titles.pauseAutoAdvance')
+              : t('standardScrollControls.titles.enableAutoAdvance')
+          }
         >
           {autoAdvance ? (
             <svg
@@ -131,7 +135,7 @@ export function StandardScrollControls({
                 d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
                 clipRule="evenodd"
               />
-          </svg>
+            </svg>
             {t('standardScrollControls.settingsPanel.title')}
           </h3>
 
@@ -153,9 +157,22 @@ export function StandardScrollControls({
 
           <div className="mt-4 pt-4 border-t border-gray-700">
             <div className="text-gray-400 text-xs space-y-1">
-              <p><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">↑↓</kbd> {t('standardScrollControls.help.navigate')}</p>
-              <p><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">{t('standardScrollControls.keys.space')}</kbd> {t('standardScrollControls.help.toggleAuto')}</p>
-              <p><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">{t('standardScrollControls.keys.escape')}</kbd> {t('standardScrollControls.help.exit')}</p>
+              <p>
+                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">↑↓</kbd>{' '}
+                {t('standardScrollControls.help.navigate')}
+              </p>
+              <p>
+                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">
+                  {t('standardScrollControls.keys.space')}
+                </kbd>{' '}
+                {t('standardScrollControls.help.toggleAuto')}
+              </p>
+              <p>
+                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">
+                  {t('standardScrollControls.keys.escape')}
+                </kbd>{' '}
+                {t('standardScrollControls.help.exit')}
+              </p>
             </div>
           </div>
         </div>

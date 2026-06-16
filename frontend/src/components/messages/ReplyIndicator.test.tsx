@@ -6,11 +6,7 @@ import { ReplyIndicator } from './ReplyIndicator';
 describe('ReplyIndicator', () => {
   it('renders replying context with username and preview', () => {
     render(
-      <ReplyIndicator
-        parentUsername="alice"
-        parentPreview="Original preview"
-        deleted={false}
-      />
+      <ReplyIndicator parentUsername="alice" parentPreview="Original preview" deleted={false} />
     );
 
     expect(screen.getByText('Replying to @alice:')).toBeInTheDocument();
@@ -27,11 +23,7 @@ describe('ReplyIndicator', () => {
     const onJump = vi.fn();
 
     render(
-      <ReplyIndicator
-        parentUsername="alice"
-        parentPreview="Preview"
-        onJumpToOriginal={onJump}
-      />
+      <ReplyIndicator parentUsername="alice" parentPreview="Preview" onJumpToOriginal={onJump} />
     );
 
     await user.click(screen.getByRole('button', { name: 'Open original message' }));

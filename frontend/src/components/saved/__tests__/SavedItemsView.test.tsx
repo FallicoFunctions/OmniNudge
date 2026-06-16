@@ -32,7 +32,6 @@ vi.mock('../../../services/postsService', () => ({
   },
 }));
 
-
 vi.mock('../../../components/hubs/HubPostCard', () => ({
   HubPostCard: ({ post }: { post: { title: string } }) => (
     <div data-testid="hub-post-card">{post.title}</div>
@@ -119,7 +118,7 @@ describe('SavedItemsView', () => {
     render(
       <Wrapper>
         <SavedItemsView withContainer={false} showHeading={false} />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await waitFor(() => {
@@ -155,7 +154,7 @@ describe('SavedItemsView', () => {
     render(
       <Wrapper>
         <SavedItemsView withContainer={false} showHeading={false} />
-      </Wrapper>,
+      </Wrapper>
     );
 
     await waitFor(() => {

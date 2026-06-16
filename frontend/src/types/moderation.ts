@@ -82,4 +82,3 @@ export interface ModLogResponse {
   offset: number;
   next_cursor?: string;
 }
-

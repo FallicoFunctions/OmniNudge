@@ -13,7 +13,9 @@ describe('normalizeUploadedMediaUrl', () => {
   });
 
   it('preserves relative upload URLs from local storage', () => {
-    expect(normalizeUploadedMediaUrl('/uploads/test.jpg', 'uploads/test.jpg')).toBe('/uploads/test.jpg');
+    expect(normalizeUploadedMediaUrl('/uploads/test.jpg', 'uploads/test.jpg')).toBe(
+      '/uploads/test.jpg'
+    );
   });
 
   it('falls back to storage path when storage URL is absent', () => {

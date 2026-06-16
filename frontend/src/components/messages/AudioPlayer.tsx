@@ -18,7 +18,12 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export default function AudioPlayer({ src, mimeType, fileName, onLoadedMetadata }: AudioPlayerProps) {
+export default function AudioPlayer({
+  src,
+  mimeType,
+  fileName,
+  onLoadedMetadata,
+}: AudioPlayerProps) {
   const { t } = useTranslation();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -90,7 +95,9 @@ export default function AudioPlayer({ src, mimeType, fileName, onLoadedMetadata 
         {t('messages.media.preview.audioUnsupported')}
       </audio>
 
-      <div className="mb-2 text-sm font-medium truncate">{fileName || t('messages.media.attachmentFallback')}</div>
+      <div className="mb-2 text-sm font-medium truncate">
+        {fileName || t('messages.media.attachmentFallback')}
+      </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <button
@@ -149,4 +156,3 @@ export default function AudioPlayer({ src, mimeType, fileName, onLoadedMetadata 
     </div>
   );
 }
-

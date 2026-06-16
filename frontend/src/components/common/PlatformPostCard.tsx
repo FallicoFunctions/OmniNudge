@@ -537,7 +537,9 @@ export function PlatformPostCard({
                       playsInline
                       preload="metadata"
                     />
-                  ) : post.media_url && post.media_type?.startsWith('image') && showExpandedImage ? (
+                  ) : post.media_url &&
+                    post.media_type?.startsWith('image') &&
+                    showExpandedImage ? (
                     <img
                       src={resolvedMediaUrl ?? undefined}
                       alt={post.title}

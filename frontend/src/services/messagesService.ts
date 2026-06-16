@@ -112,7 +112,9 @@ export const messagesService = {
       limit: String(limit),
       offset: String(offset),
     });
-    return api.get<MessageEditHistoryResponse>(`/messages/${messageId}/history?${params.toString()}`);
+    return api.get<MessageEditHistoryResponse>(
+      `/messages/${messageId}/history?${params.toString()}`
+    );
   },
 
   async getMessageThread(
@@ -257,9 +259,10 @@ export const messagesService = {
 
   async editMessage(messageId: number, data: EditMessageRequest): Promise<Message> {
     // Use caller-supplied recipient_id when available to skip the extra API round-trip.
-    const recipientId = data.recipient_id !== undefined
-      ? data.recipient_id
-      : (await this.getConversation(data.conversation_id)).other_user?.id;
+    const recipientId =
+      data.recipient_id !== undefined
+        ? data.recipient_id
+        : (await this.getConversation(data.conversation_id)).other_user?.id;
 
     let encryptedContent = data.content;
     let senderEncryptedContent = data.content;
@@ -346,7 +349,9 @@ export const messagesService = {
     await api.delete(`/conversations/${conversationId}${query}`);
   },
 
-  async getChatSettings(conversationId: number): Promise<{ auto_delete_after_seconds: number | null }> {
+  async getChatSettings(
+    conversationId: number
+  ): Promise<{ auto_delete_after_seconds: number | null }> {
     return api.get<{ auto_delete_after_seconds: number | null }>(
       `/conversations/${conversationId}/settings`
     );

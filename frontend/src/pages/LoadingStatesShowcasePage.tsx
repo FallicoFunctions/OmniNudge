@@ -46,7 +46,9 @@ export default function LoadingStatesShowcasePage() {
         <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
           {t('loadingShowcase.title')}
         </h1>
-        <p className="text-sm text-[var(--color-text-secondary)]">{t('loadingShowcase.subtitle')}</p>
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          {t('loadingShowcase.subtitle')}
+        </p>
       </header>
 
       <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">

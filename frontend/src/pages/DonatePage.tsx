@@ -76,8 +76,8 @@ export default function DonatePage() {
             Support OmniNudge
           </h1>
           <p className="text-body text-[var(--color-text-secondary)]">
-            OmniNudge is independently built and operated with no ads and no data selling.
-            If you find value in it, a crypto donation helps keep the servers running.
+            OmniNudge is independently built and operated with no ads and no data selling. If you
+            find value in it, a crypto donation helps keep the servers running.
           </p>
         </div>
 

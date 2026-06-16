@@ -534,7 +534,11 @@ export default function HomePage() {
     },
   });
 
-  const savedToggleMutation = useMutation<void, Error, { postId: number; shouldSave: boolean; post: PlatformPost }>({
+  const savedToggleMutation = useMutation<
+    void,
+    Error,
+    { postId: number; shouldSave: boolean; post: PlatformPost }
+  >({
     mutationFn: async ({ postId, shouldSave }) => {
       if (!user) {
         throw new Error(t('alerts.signInToSave'));

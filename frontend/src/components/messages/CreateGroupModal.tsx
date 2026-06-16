@@ -61,25 +61,35 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
 
   // Close on Escape
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
   // Auto-focus first input on mount
-  useEffect(() => { firstInputRef.current?.focus(); }, []);
+  useEffect(() => {
+    firstInputRef.current?.focus();
+  }, []);
 
   // Live search
   useEffect(() => {
-    if (!searchQuery.trim()) { setSearchResults([]); return; }
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
         const results = await searchUsers(searchQuery);
         // Exclude already selected users
         setSearchResults(results.filter((u) => !selectedUsers.find((s) => s.id === u.id)));
-      } catch { /* ignore */ }
-      finally { setIsSearching(false); }
+      } catch {
+        /* ignore */
+      } finally {
+        setIsSearching(false);
+      }
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery, selectedUsers, searchUsers]);
@@ -96,11 +106,17 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
 
   const handleNext = () => {
     if (step === 1) {
-      if (!groupName.trim()) { setError(t('groups.nameRequired')); return; }
+      if (!groupName.trim()) {
+        setError(t('groups.nameRequired'));
+        return;
+      }
       setError('');
       setStep(2);
     } else if (step === 2) {
-      if (selectedUsers.length < 1) { setError(t('groups.minParticipants')); return; }
+      if (selectedUsers.length < 1) {
+        setError(t('groups.minParticipants'));
+        return;
+      }
       setError('');
       setStep(3);
     } else {
@@ -121,7 +137,9 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+      onClick={(e) => {
+        if (e.target === overlayRef.current) onClose();
+      }}
     >
       <div className="flex w-full max-w-md flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl">
         {/* Header */}
@@ -135,7 +153,13 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
                 aria-label={t('common.back')}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-                  <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M10 12L6 8l4-4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </button>
             )}
@@ -152,7 +176,12 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
               className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-hover)]"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path
+                  d="M1 1l12 12M13 1L1 13"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
@@ -232,7 +261,11 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
                         className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-[var(--color-hover)]"
                       >
                         {user.avatar_url ? (
-                          <img src={user.avatar_url} alt="" className="h-6 w-6 rounded-lg object-cover" />
+                          <img
+                            src={user.avatar_url}
+                            alt=""
+                            className="h-6 w-6 rounded-lg object-cover"
+                          />
                         ) : (
                           <div className="h-6 w-6 rounded-lg bg-[var(--color-primary)] flex items-center justify-center text-xs text-white font-semibold">
                             {user.username[0].toUpperCase()}
@@ -263,7 +296,12 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
                         className="ml-0.5 rounded-full hover:bg-[var(--color-primary)]/20"
                       >
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                          <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          <path
+                            d="M1 1l10 10M11 1L1 11"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                          />
                         </svg>
                       </button>
                     </div>
@@ -280,9 +318,21 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
                 {t('groups.reviewSummary', { name: groupName, count: selectedUsers.length + 1 })}
               </p>
               {[
-                { label: t('groups.settings.anyoneCanInvite'), value: anyoneCanInvite, onChange: setAnyoneCanInvite },
-                { label: t('groups.settings.anyoneCanPin'), value: anyoneCanPin, onChange: setAnyoneCanPin },
-                { label: t('groups.settings.historyVisible'), value: historyVisible, onChange: setHistoryVisible },
+                {
+                  label: t('groups.settings.anyoneCanInvite'),
+                  value: anyoneCanInvite,
+                  onChange: setAnyoneCanInvite,
+                },
+                {
+                  label: t('groups.settings.anyoneCanPin'),
+                  value: anyoneCanPin,
+                  onChange: setAnyoneCanPin,
+                },
+                {
+                  label: t('groups.settings.historyVisible'),
+                  value: historyVisible,
+                  onChange: setHistoryVisible,
+                },
               ].map(({ label, value, onChange }) => (
                 <label key={label} className="flex cursor-pointer items-center justify-between">
                   <span className="text-sm text-[var(--color-text-primary)]">{label}</span>

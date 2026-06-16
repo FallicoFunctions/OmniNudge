@@ -184,8 +184,19 @@ function CommentsSection({
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] hover:underline transition"
               >
                 {t('userProfilePage.actions.viewThread')}
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 7l5 5m0 0l-5 5m5-5H6"
+                  />
                 </svg>
               </Link>
             </div>
@@ -236,7 +247,14 @@ export default function UserActivityPage() {
   const { useRelativeTime } = useSettings();
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    if (tab === 'posts' || tab === 'comments' || tab === 'communities' || tab === 'saved' || tab === 'hidden' || tab === 'subscribed') {
+    if (
+      tab === 'posts' ||
+      tab === 'comments' ||
+      tab === 'communities' ||
+      tab === 'saved' ||
+      tab === 'hidden' ||
+      tab === 'subscribed'
+    ) {
       return tab;
     }
     return 'posts';
@@ -266,7 +284,13 @@ export default function UserActivityPage() {
       const d = new Date(timestamp);
       if (Number.isNaN(d.getTime())) return t('common.time.recently');
       if (useRelativeTimeEnabled) return formatRelativeTime(d);
-      return formatDate(d, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+      return formatDate(d, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
     },
     [t, formatRelativeTime, formatDate]
   );
@@ -328,15 +352,30 @@ export default function UserActivityPage() {
       return <CommunitiesSection profile={profileQuery.data} t={t} />;
     }
     if (resolvedActiveTab === 'saved') {
-      if (!canViewPrivateTabs) return <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.private.saved')}</p>;
+      if (!canViewPrivateTabs)
+        return (
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            {t('userProfilePage.private.saved')}
+          </p>
+        );
       return <SavedItemsView withContainer={false} showHeading={false} className="space-y-4" />;
     }
     if (resolvedActiveTab === 'hidden') {
-      if (!canViewPrivateTabs) return <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.private.hidden')}</p>;
+      if (!canViewPrivateTabs)
+        return (
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            {t('userProfilePage.private.hidden')}
+          </p>
+        );
       return <HiddenItemsView withContainer={false} showHeading={false} className="space-y-4" />;
     }
     if (resolvedActiveTab === 'subscribed') {
-      if (!canViewPrivateTabs) return <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.private.subscribed')}</p>;
+      if (!canViewPrivateTabs)
+        return (
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            {t('userProfilePage.private.subscribed')}
+          </p>
+        );
       return <SubscribedView withContainer={false} showHeading={false} className="space-y-4" />;
     }
 

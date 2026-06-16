@@ -67,11 +67,17 @@ export const moderationService = {
 
   // ===== REMOVAL REASONS =====
 
-  async createRemovalReason(hubName: string, data: CreateRemovalReasonRequest): Promise<RemovalReason> {
+  async createRemovalReason(
+    hubName: string,
+    data: CreateRemovalReasonRequest
+  ): Promise<RemovalReason> {
     return api.post<RemovalReason>(`/mod/hubs/${hubName}/removal-reasons`, data);
   },
 
-  async updateRemovalReason(reasonId: number, data: UpdateRemovalReasonRequest): Promise<RemovalReason> {
+  async updateRemovalReason(
+    reasonId: number,
+    data: UpdateRemovalReasonRequest
+  ): Promise<RemovalReason> {
     return api.put<RemovalReason>(`/mod/removal-reasons/${reasonId}`, data);
   },
 
@@ -80,13 +86,20 @@ export const moderationService = {
   },
 
   async getRemovalReasons(hubName: string): Promise<RemovalReason[]> {
-    const response = await api.get<{ reasons: RemovalReason[] }>(`/mod/hubs/${hubName}/removal-reasons`);
+    const response = await api.get<{ reasons: RemovalReason[] }>(
+      `/mod/hubs/${hubName}/removal-reasons`
+    );
     return response.reasons;
   },
 
   // ===== MOD LOG =====
 
-  async getModLog(hubName: string, limit = 50, offset = 0, cursor?: string): Promise<ModLogResponse> {
+  async getModLog(
+    hubName: string,
+    limit = 50,
+    offset = 0,
+    cursor?: string
+  ): Promise<ModLogResponse> {
     const params = new URLSearchParams({
       limit: String(limit),
       offset: String(offset),
@@ -96,5 +109,4 @@ export const moderationService = {
     }
     return api.get<ModLogResponse>(`/mod/hubs/${hubName}/mod-log?${params.toString()}`);
   },
-
 };

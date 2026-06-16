@@ -207,7 +207,11 @@ const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
               theme={theme}
               isActive={activeTheme?.id === theme.id}
               onSelect={handleSelectTheme}
-              onEdit={filter === 'custom' || customThemes.some((item) => item.id === theme.id) ? onEditTheme : undefined}
+              onEdit={
+                filter === 'custom' || customThemes.some((item) => item.id === theme.id)
+                  ? onEditTheme
+                  : undefined
+              }
             />
           ))}
         </div>

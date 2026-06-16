@@ -31,20 +31,23 @@ export function CreateMenuSheet({ isOpen, onClose }: CreateMenuSheetProps) {
     onClose();
   };
 
-  const items = useMemo(() => [
-    {
-      icon: FileText,
-      label: t('create.post'),
-      onClick: () => handleNavigate('/posts/create', 'CreatePost'),
-      testId: 'create-post-button'
-    },
-    {
-      icon: Users,
-      label: t('create.hub'),
-      onClick: () => handleNavigate('/hubs/create', 'CreateHub'),
-      testId: 'create-hub-button'
-    }
-  ], [t, handleNavigate]);
+  const items = useMemo(
+    () => [
+      {
+        icon: FileText,
+        label: t('create.post'),
+        onClick: () => handleNavigate('/posts/create', 'CreatePost'),
+        testId: 'create-post-button',
+      },
+      {
+        icon: Users,
+        label: t('create.hub'),
+        onClick: () => handleNavigate('/hubs/create', 'CreateHub'),
+        testId: 'create-hub-button',
+      },
+    ],
+    [t, handleNavigate]
+  );
 
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose} title={t('nav.create')}>

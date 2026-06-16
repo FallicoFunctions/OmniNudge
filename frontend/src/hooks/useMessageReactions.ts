@@ -50,67 +50,57 @@ export function useMessageReactions({
   }, [messageId, queryClient]);
 
   const addMutation = useMutation({
-    mutationFn: ({ emoji }: { emoji: string }) =>
-      reactionsService.addReaction(messageId, emoji),
+    mutationFn: ({ emoji }: { emoji: string }) => reactionsService.addReaction(messageId, emoji),
     onMutate: async ({ emoji }) => {
       await queryClient.cancelQueries({ queryKey: ['message-reactions', messageId] });
-      const prev = queryClient.getQueryData<GetReactionsResponse>([
-        'message-reactions',
-        messageId,
-      ]);
+      const prev = queryClient.getQueryData<GetReactionsResponse>(['message-reactions', messageId]);
 
-      queryClient.setQueryData<GetReactionsResponse>(
-        ['message-reactions', messageId],
-        (old) => {
-          if (!old) return old;
-          const idx = old.reactions.findIndex((r) => r.emoji === emoji);
-          if (idx === -1) {
-            return {
-              ...old,
-              reactions: [
-                ...old.reactions,
-                {
-                  emoji,
-                  count: 1,
-                  user_ids: [currentUserId],
-                  usernames: currentUsername ? [currentUsername] : [],
-                  user_reacted: true,
-                  my_reaction_id: undefined,
-                },
-              ],
-              total_unique_emoji: old.total_unique_emoji + 1,
-            };
-          }
-
-          const updated = [...old.reactions];
-          updated[idx] = {
-            ...updated[idx],
-            count: updated[idx].count + 1,
-            user_ids: [...updated[idx].user_ids, currentUserId],
-            usernames: currentUsername
-              ? [...updated[idx].usernames, currentUsername]
-              : updated[idx].usernames,
-            user_reacted: true,
+      queryClient.setQueryData<GetReactionsResponse>(['message-reactions', messageId], (old) => {
+        if (!old) return old;
+        const idx = old.reactions.findIndex((r) => r.emoji === emoji);
+        if (idx === -1) {
+          return {
+            ...old,
+            reactions: [
+              ...old.reactions,
+              {
+                emoji,
+                count: 1,
+                user_ids: [currentUserId],
+                usernames: currentUsername ? [currentUsername] : [],
+                user_reacted: true,
+                my_reaction_id: undefined,
+              },
+            ],
+            total_unique_emoji: old.total_unique_emoji + 1,
           };
-          return { ...old, reactions: updated };
-        },
-      );
+        }
+
+        const updated = [...old.reactions];
+        updated[idx] = {
+          ...updated[idx],
+          count: updated[idx].count + 1,
+          user_ids: [...updated[idx].user_ids, currentUserId],
+          usernames: currentUsername
+            ? [...updated[idx].usernames, currentUsername]
+            : updated[idx].usernames,
+          user_reacted: true,
+        };
+        return { ...old, reactions: updated };
+      });
 
       return { prev };
     },
     onSuccess: (reaction, { emoji }) => {
-      queryClient.setQueryData<GetReactionsResponse>(
-        ['message-reactions', messageId],
-        (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            reactions: old.reactions.map((r) =>
-              r.emoji === emoji ? { ...r, my_reaction_id: reaction.id } : r,
-            ),
-          };
-        },
-      );
+      queryClient.setQueryData<GetReactionsResponse>(['message-reactions', messageId], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          reactions: old.reactions.map((r) =>
+            r.emoji === emoji ? { ...r, my_reaction_id: reaction.id } : r
+          ),
+        };
+      });
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) {
@@ -124,42 +114,33 @@ export function useMessageReactions({
       reactionsService.removeReaction(messageId, reactionId),
     onMutate: async ({ reactionId }) => {
       await queryClient.cancelQueries({ queryKey: ['message-reactions', messageId] });
-      const prev = queryClient.getQueryData<GetReactionsResponse>([
-        'message-reactions',
-        messageId,
-      ]);
+      const prev = queryClient.getQueryData<GetReactionsResponse>(['message-reactions', messageId]);
 
-      queryClient.setQueryData<GetReactionsResponse>(
-        ['message-reactions', messageId],
-        (old) => {
-          if (!old) return old;
-          const reactions = old.reactions
-            .map((r) => {
-              if (r.my_reaction_id !== reactionId) return r;
-              const newCount = r.count - 1;
-              if (newCount === 0) return null;
-              const userIdx = r.user_ids.indexOf(currentUserId);
-              return {
-                ...r,
-                count: newCount,
-                user_ids: r.user_ids.filter((id) => id !== currentUserId),
-                usernames:
-                  userIdx >= 0
-                    ? r.usernames.filter((_, i) => i !== userIdx)
-                    : r.usernames,
-                user_reacted: false,
-                my_reaction_id: undefined,
-              };
-            })
-            .filter(Boolean) as typeof old.reactions;
+      queryClient.setQueryData<GetReactionsResponse>(['message-reactions', messageId], (old) => {
+        if (!old) return old;
+        const reactions = old.reactions
+          .map((r) => {
+            if (r.my_reaction_id !== reactionId) return r;
+            const newCount = r.count - 1;
+            if (newCount === 0) return null;
+            const userIdx = r.user_ids.indexOf(currentUserId);
+            return {
+              ...r,
+              count: newCount,
+              user_ids: r.user_ids.filter((id) => id !== currentUserId),
+              usernames: userIdx >= 0 ? r.usernames.filter((_, i) => i !== userIdx) : r.usernames,
+              user_reacted: false,
+              my_reaction_id: undefined,
+            };
+          })
+          .filter(Boolean) as typeof old.reactions;
 
-          return {
-            ...old,
-            reactions,
-            total_unique_emoji: reactions.length,
-          };
-        },
-      );
+        return {
+          ...old,
+          reactions,
+          total_unique_emoji: reactions.length,
+        };
+      });
 
       return { prev };
     },
@@ -179,7 +160,7 @@ export function useMessageReactions({
         addMutation.mutate({ emoji: summary.emoji });
       }
     },
-    [addMutation, removeMutation],
+    [addMutation, removeMutation]
   );
 
   return {
@@ -191,4 +172,3 @@ export function useMessageReactions({
     toggleReaction,
   };
 }
-

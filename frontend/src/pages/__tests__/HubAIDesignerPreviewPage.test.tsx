@@ -78,7 +78,7 @@ function renderPreviewPage() {
           />
         </Routes>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
 
   return { ...renderResult, queryClient };
@@ -123,7 +123,9 @@ describe('HubAIDesignerPreviewPage', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
 
-    expect(await screen.findByText('AI design refinement timed out. Please try again.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('AI design refinement timed out. Please try again.')
+    ).toBeInTheDocument();
     expect(screen.queryByText(/AI request failed/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/check your connection/i)).not.toBeInTheDocument();
     await waitFor(() => {
@@ -147,7 +149,9 @@ describe('HubAIDesignerPreviewPage', () => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['hubAIDesigns', 'testHub'] });
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['hubAIActiveDesign', 'testHub'] });
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['aiDesign', 'testHub', 123] });
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['aiDesignVersions', 'testHub', 123] });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['aiDesignVersions', 'testHub', 123],
+      });
     });
   });
 });

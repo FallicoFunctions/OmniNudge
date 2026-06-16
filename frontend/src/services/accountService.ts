@@ -66,7 +66,7 @@ class AccountService {
   async requestAccountDeletion(password: string, confirm: string) {
     const response = await api.post('/account/delete', {
       password,
-      confirm
+      confirm,
     });
     return response.data;
   }

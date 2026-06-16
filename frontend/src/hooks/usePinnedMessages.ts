@@ -211,9 +211,12 @@ export function usePinnedMessages({
         pinned_at: detail.pinned_at ?? new Date().toISOString(),
       };
 
-      queryClient.setQueryData<PinnedMessagesResponse>(['pinnedMessages', conversationId], (prev) => ({
-        pinned_messages: mergePinnedMessage(prev?.pinned_messages ?? [], nextPinnedMessage),
-      }));
+      queryClient.setQueryData<PinnedMessagesResponse>(
+        ['pinnedMessages', conversationId],
+        (prev) => ({
+          pinned_messages: mergePinnedMessage(prev?.pinned_messages ?? [], nextPinnedMessage),
+        })
+      );
 
       queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }>>(
         ['messages', conversationId],
@@ -232,9 +235,14 @@ export function usePinnedMessages({
       const detail = (event as CustomEvent<WsMessagePinEvent>).detail;
       if (!detail || detail.conversation_id !== conversationId) return;
 
-      queryClient.setQueryData<PinnedMessagesResponse>(['pinnedMessages', conversationId], (prev) => ({
-        pinned_messages: (prev?.pinned_messages ?? []).filter((message) => message.id !== detail.message_id),
-      }));
+      queryClient.setQueryData<PinnedMessagesResponse>(
+        ['pinnedMessages', conversationId],
+        (prev) => ({
+          pinned_messages: (prev?.pinned_messages ?? []).filter(
+            (message) => message.id !== detail.message_id
+          ),
+        })
+      );
 
       queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }>>(
         ['messages', conversationId],

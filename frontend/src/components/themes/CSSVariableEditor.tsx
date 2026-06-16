@@ -35,21 +35,23 @@ const CSSVariableEditor = ({
               const isSelected = selectedVariable === variable.name;
               const errorMessage = variableErrors[variable.name];
               const descriptionId = `${variable.name}-description`;
-              const inputClasses = [
-                'rounded-md border border-[var(--color-border)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none',
-                variable.type === 'color' ? 'uppercase w-28' : '',
-                variable.type === 'string' ? 'w-full max-w-xs' : '',
-                variable.type === 'size' ? 'w-32' : '',
-                variable.type === 'number' ? 'w-24' : '',
-              ]
-                .filter(Boolean)
-                .join(' ') || 'rounded-md border border-[var(--color-border)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none';
+              const inputClasses =
+                [
+                  'rounded-md border border-[var(--color-border)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none',
+                  variable.type === 'color' ? 'uppercase w-28' : '',
+                  variable.type === 'string' ? 'w-full max-w-xs' : '',
+                  variable.type === 'size' ? 'w-32' : '',
+                  variable.type === 'number' ? 'w-24' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ') ||
+                'rounded-md border border-[var(--color-border)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none';
 
               const placeholder =
                 variable.type === 'color'
                   ? '#000000'
                   : variable.type === 'size'
-                    ? variable.unit ?? '1rem'
+                    ? (variable.unit ?? '1rem')
                     : variable.type === 'number'
                       ? '1.0'
                       : variable.type === 'string'
@@ -76,9 +78,7 @@ const CSSVariableEditor = ({
                         {variable.description}
                       </p>
                     )}
-                    {errorMessage && (
-                      <p className="text-xs text-red-500">{errorMessage}</p>
-                    )}
+                    {errorMessage && <p className="text-xs text-red-500">{errorMessage}</p>}
                   </div>
                   <div className="flex items-center gap-3">
                     {variable.type === 'color' && (

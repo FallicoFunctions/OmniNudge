@@ -29,7 +29,7 @@ describe('TermsPage', () => {
     render(
       <MemoryRouter>
         <TermsPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(document.body).toBeTruthy();
   });
@@ -38,7 +38,7 @@ describe('TermsPage', () => {
     render(
       <MemoryRouter>
         <TermsPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(screen.getByText('termsPage.title')).toBeInTheDocument();
   });
@@ -47,7 +47,7 @@ describe('TermsPage', () => {
     render(
       <MemoryRouter>
         <TermsPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(screen.getByText('termsPage.sections.acceptance.title')).toBeInTheDocument();
   });

@@ -96,43 +96,59 @@ export async function siteWideSearch(
 
   let subredditsSearch: SubredditSearchResponse | null = null;
 
-  const platformCursor = opts?.platformCursor ? `&cursor=${encodeURIComponent(opts.platformCursor)}` : '';
+  const platformCursor = opts?.platformCursor
+    ? `&cursor=${encodeURIComponent(opts.platformCursor)}`
+    : '';
   const hubsCursor = opts?.hubsCursor ? `&cursor=${encodeURIComponent(opts.hubsCursor)}` : '';
-  const omniUsersCursor = opts?.omniUsersCursor ? `&cursor=${encodeURIComponent(opts.omniUsersCursor)}` : '';
+  const omniUsersCursor = opts?.omniUsersCursor
+    ? `&cursor=${encodeURIComponent(opts.omniUsersCursor)}`
+    : '';
 
-  const [
-    platformPostsResult,
-    hubsResult,
-    omniUsersResult,
-    redditPostsResult,
-    redditUsersResult,
-  ] = await Promise.allSettled([
-    api.get<{ posts: PlatformPost[]; next_cursor?: string | null }>(
-      `/search/posts?q=${encodeURIComponent(query)}&include_nsfw=${qsInclude}&limit=25&offset=0&sort=${encodeURIComponent(sortParam)}${platformCursor}`
-    ),
-    api.get<{ hubs: Hub[]; next_cursor?: string | null }>(
-      `/search/hubs?q=${encodeURIComponent(query)}&limit=25&offset=0&sort=${encodeURIComponent(sortParam)}${hubsCursor}`
-    ),
-    api.get<{ users: UserProfile[]; next_cursor?: string | null }>(
-      `/search/users?q=${encodeURIComponent(query)}&include_nsfw=${qsInclude}&limit=25&offset=0&sort=${encodeURIComponent(sortParam)}${omniUsersCursor}`
-    ),
-    api.get<RedditPostsResponse>(`/reddit/search?q=${encodeURIComponent(query)}&limit=25&include_nsfw=${qsInclude}&sort=${encodeURIComponent(sortParam)}${opts?.redditAfter ? `&after=${encodeURIComponent(opts.redditAfter)}` : ''}`),
-    api.get<{ users: RedditUserSearchResult[]; after?: string | null }>(
-      `/reddit/users/search?q=${encodeURIComponent(query)}&limit=25&include_nsfw=${qsInclude}`
-    ),
-  ]);
+  const [platformPostsResult, hubsResult, omniUsersResult, redditPostsResult, redditUsersResult] =
+    await Promise.allSettled([
+      api.get<{ posts: PlatformPost[]; next_cursor?: string | null }>(
+        `/search/posts?q=${encodeURIComponent(query)}&include_nsfw=${qsInclude}&limit=25&offset=0&sort=${encodeURIComponent(sortParam)}${platformCursor}`
+      ),
+      api.get<{ hubs: Hub[]; next_cursor?: string | null }>(
+        `/search/hubs?q=${encodeURIComponent(query)}&limit=25&offset=0&sort=${encodeURIComponent(sortParam)}${hubsCursor}`
+      ),
+      api.get<{ users: UserProfile[]; next_cursor?: string | null }>(
+        `/search/users?q=${encodeURIComponent(query)}&include_nsfw=${qsInclude}&limit=25&offset=0&sort=${encodeURIComponent(sortParam)}${omniUsersCursor}`
+      ),
+      api.get<RedditPostsResponse>(
+        `/reddit/search?q=${encodeURIComponent(query)}&limit=25&include_nsfw=${qsInclude}&sort=${encodeURIComponent(sortParam)}${opts?.redditAfter ? `&after=${encodeURIComponent(opts.redditAfter)}` : ''}`
+      ),
+      api.get<{ users: RedditUserSearchResult[]; after?: string | null }>(
+        `/reddit/users/search?q=${encodeURIComponent(query)}&limit=25&include_nsfw=${qsInclude}`
+      ),
+    ]);
 
-  if (platformPostsResult.status === 'rejected') console.error('Search: platform posts failed', platformPostsResult.reason);
+  if (platformPostsResult.status === 'rejected')
+    console.error('Search: platform posts failed', platformPostsResult.reason);
   if (hubsResult.status === 'rejected') console.error('Search: hubs failed', hubsResult.reason);
-  if (omniUsersResult.status === 'rejected') console.error('Search: omni users failed', omniUsersResult.reason);
-  if (redditPostsResult.status === 'rejected') console.error('Search: reddit posts failed', redditPostsResult.reason);
-  if (redditUsersResult.status === 'rejected') console.error('Search: reddit users failed', redditUsersResult.reason);
+  if (omniUsersResult.status === 'rejected')
+    console.error('Search: omni users failed', omniUsersResult.reason);
+  if (redditPostsResult.status === 'rejected')
+    console.error('Search: reddit posts failed', redditPostsResult.reason);
+  if (redditUsersResult.status === 'rejected')
+    console.error('Search: reddit users failed', redditUsersResult.reason);
 
-  const platformPosts = platformPostsResult.status === 'fulfilled' ? platformPostsResult.value : { posts: [], next_cursor: null };
-  const hubs = hubsResult.status === 'fulfilled' ? hubsResult.value : { hubs: [], next_cursor: null };
-  const omniUsers = omniUsersResult.status === 'fulfilled' ? omniUsersResult.value : { users: [], next_cursor: null };
-  const redditPosts = redditPostsResult.status === 'fulfilled' ? redditPostsResult.value : { posts: [], after: null } as RedditPostsResponse;
-  const redditUsers = redditUsersResult.status === 'fulfilled' ? redditUsersResult.value : { users: [], after: null };
+  const platformPosts =
+    platformPostsResult.status === 'fulfilled'
+      ? platformPostsResult.value
+      : { posts: [], next_cursor: null };
+  const hubs =
+    hubsResult.status === 'fulfilled' ? hubsResult.value : { hubs: [], next_cursor: null };
+  const omniUsers =
+    omniUsersResult.status === 'fulfilled'
+      ? omniUsersResult.value
+      : { users: [], next_cursor: null };
+  const redditPosts =
+    redditPostsResult.status === 'fulfilled'
+      ? redditPostsResult.value
+      : ({ posts: [], after: null } as RedditPostsResponse);
+  const redditUsers =
+    redditUsersResult.status === 'fulfilled' ? redditUsersResult.value : { users: [], after: null };
 
   try {
     subredditsSearch = await api.get<SubredditSearchResponse>(
@@ -189,7 +205,7 @@ export async function siteWideSearch(
   }
 
   const filteredRedditUsers = includeNsfw
-    ? redditUsers.users ?? []
+    ? (redditUsers.users ?? [])
     : (redditUsers.users ?? []).filter((u) => !u.over18);
 
   return {

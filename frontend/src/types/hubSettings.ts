@@ -84,4 +84,3 @@ export interface AddModeratorRequest {
 export interface UpdateModeratorRoleRequest {
   role: ModeratorRole;
 }
-

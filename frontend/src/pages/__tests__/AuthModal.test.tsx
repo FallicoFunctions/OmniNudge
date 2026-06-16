@@ -20,7 +20,9 @@ vi.mock('../../utils/passwordStrength', () => ({
 }));
 vi.mock('../../components/ui/ModalCloseButton', () => ({
   ModalCloseButton: ({ onClose }: { onClose: () => void }) => (
-    <button onClick={onClose} aria-label="Close">×</button>
+    <button onClick={onClose} aria-label="Close">
+      ×
+    </button>
   ),
 }));
 vi.mock('../../lib/api', () => ({
@@ -53,7 +55,7 @@ const renderModal = (props = {}) => {
   return render(
     <MemoryRouter>
       <AuthModal {...merged} />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 };
 
@@ -72,7 +74,7 @@ describe('AuthModal', () => {
     renderModal({ mode: 'signup' });
     // signup form must include a "Sign Up" / "Create Account" heading distinct from login
     expect(
-      screen.getByRole('heading', { name: /sign up|create account|register/i }),
+      screen.getByRole('heading', { name: /sign up|create account|register/i })
     ).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/username/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/password/i)).toBeInTheDocument();
@@ -101,7 +103,7 @@ describe('AuthModal', () => {
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith(
-        expect.objectContaining({ username: 'testuser', password: 'secret123' }),
+        expect.objectContaining({ username: 'testuser', password: 'secret123' })
       );
     });
   });

@@ -71,7 +71,7 @@ describe('CreateHubPage', () => {
     render(
       <Wrapper>
         <CreateHubPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(screen.getByText(/create a hub/i)).toBeInTheDocument();
   });
@@ -81,7 +81,7 @@ describe('CreateHubPage', () => {
     render(
       <Wrapper>
         <CreateHubPage />
-      </Wrapper>,
+      </Wrapper>
     );
     // Placeholder is "e.g., books or bookclub" from i18n — use getAllByPlaceholderText
     const nameInputs = screen.getAllByPlaceholderText(/books/i);
@@ -93,7 +93,7 @@ describe('CreateHubPage', () => {
     render(
       <Wrapper>
         <CreateHubPage />
-      </Wrapper>,
+      </Wrapper>
     );
     const nameInputs = screen.getAllByPlaceholderText(/books/i);
     const nameInput = nameInputs[0];
@@ -114,7 +114,7 @@ describe('CreateHubPage', () => {
     render(
       <Wrapper>
         <CreateHubPage />
-      </Wrapper>,
+      </Wrapper>
     );
     const nameInputs = screen.getAllByPlaceholderText(/books/i);
     const nameInput = nameInputs[0];
@@ -122,9 +122,7 @@ describe('CreateHubPage', () => {
     fireEvent.submit(document.querySelector('form')!);
 
     await waitFor(() => {
-      expect(mockCreateHub).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'myhub' }),
-      );
+      expect(mockCreateHub).toHaveBeenCalledWith(expect.objectContaining({ name: 'myhub' }));
     });
   });
 
@@ -133,7 +131,7 @@ describe('CreateHubPage', () => {
     render(
       <Wrapper>
         <CreateHubPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(screen.getByText(/public/i)).toBeInTheDocument();
     expect(screen.getByText(/private/i)).toBeInTheDocument();

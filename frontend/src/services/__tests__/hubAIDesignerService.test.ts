@@ -12,8 +12,10 @@ vi.mock('../api', () => ({
 }));
 
 describe('hubAIDesignerService', () => {
-  const validationMessage = 'The AI returned a design that did not meet system rules. Please try again.';
-  const rawValidationMessage = 'ordinary CSS selectors must be scoped to the AI hub root or slot containers';
+  const validationMessage =
+    'The AI returned a design that did not meet system rules. Please try again.';
+  const rawValidationMessage =
+    'ordinary CSS selectors must be scoped to the AI hub root or slot containers';
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -31,11 +33,13 @@ describe('hubAIDesignerService', () => {
       })
     );
 
-    await hubAIDesignerService.generateDesign('underreportednews', 'make it clean').catch((error: Error) => {
-      expect(error.message).toBe(validationMessage);
-      expect(error.message).not.toContain('ordinary CSS selectors');
-      expect(error.message).not.toContain('Request failed with status code 502');
-    });
+    await hubAIDesignerService
+      .generateDesign('underreportednews', 'make it clean')
+      .catch((error: Error) => {
+        expect(error.message).toBe(validationMessage);
+        expect(error.message).not.toContain('ordinary CSS selectors');
+        expect(error.message).not.toContain('Request failed with status code 502');
+      });
   });
 
   it('maps timeout generate failures without blaming the connection', async () => {
@@ -43,19 +47,21 @@ describe('hubAIDesignerService', () => {
       Object.assign(new Error('timeout of 60000ms exceeded'), { code: 'ECONNABORTED' })
     );
 
-    await hubAIDesignerService.generateDesign('underreportednews', 'make it clean').catch((error: Error) => {
-      expect(error.message).toBe('AI design generation timed out. Please try again.');
-      expect(error.message).not.toContain('check your connection');
-      expect(error.message).not.toContain('Request failed with status code 502');
-    });
+    await hubAIDesignerService
+      .generateDesign('underreportednews', 'make it clean')
+      .catch((error: Error) => {
+        expect(error.message).toBe('AI design generation timed out. Please try again.');
+        expect(error.message).not.toContain('check your connection');
+        expect(error.message).not.toContain('Request failed with status code 502');
+      });
   });
 
   it('keeps a concise fallback for network generate failures', async () => {
     vi.mocked(api.post).mockRejectedValue(new Error('Network Error'));
 
-    await expect(hubAIDesignerService.generateDesign('underreportednews', 'make it clean')).rejects.toThrow(
-      'AI design generation could not be completed. Please try again.'
-    );
+    await expect(
+      hubAIDesignerService.generateDesign('underreportednews', 'make it clean')
+    ).rejects.toThrow('AI design generation could not be completed. Please try again.');
   });
 
   it('preserves successful generate responses', async () => {
@@ -70,9 +76,9 @@ describe('hubAIDesignerService', () => {
     };
     vi.mocked(api.post).mockResolvedValue(response);
 
-    await expect(hubAIDesignerService.generateDesign('underreportednews', 'make it clean')).resolves.toEqual(
-      response.data
-    );
+    await expect(
+      hubAIDesignerService.generateDesign('underreportednews', 'make it clean')
+    ).resolves.toEqual(response.data);
   });
 
   it('maps backend validation messages for chat refinement failures', async () => {

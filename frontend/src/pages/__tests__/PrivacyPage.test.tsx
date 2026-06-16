@@ -29,7 +29,7 @@ describe('PrivacyPage', () => {
     render(
       <MemoryRouter>
         <PrivacyPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(document.body).toBeTruthy();
   });
@@ -38,7 +38,7 @@ describe('PrivacyPage', () => {
     render(
       <MemoryRouter>
         <PrivacyPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(screen.getByText('privacyPage.title')).toBeInTheDocument();
   });
@@ -47,7 +47,7 @@ describe('PrivacyPage', () => {
     render(
       <MemoryRouter>
         <PrivacyPage />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(screen.getByText('privacyPage.sections.collect.title')).toBeInTheDocument();
   });

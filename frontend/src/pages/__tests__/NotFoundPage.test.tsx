@@ -8,7 +8,7 @@ const renderNotFound = () =>
   render(
     <MemoryRouter>
       <NotFoundPage />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 
 describe('NotFoundPage', () => {

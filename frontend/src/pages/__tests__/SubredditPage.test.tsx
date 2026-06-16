@@ -118,9 +118,7 @@ vi.mock('../../components/subreddit/SubredditSidebar', () => ({
   SubredditSidebar: () => <div data-testid="subreddit-sidebar" />,
 }));
 vi.mock('../../components/common/CommunityHeader', () => ({
-  CommunityHeader: ({ name }: { name: string }) => (
-    <div data-testid="community-header">{name}</div>
-  ),
+  CommunityHeader: ({ name }: { name: string }) => <div data-testid="community-header">{name}</div>,
 }));
 vi.mock('../../components/common/CommunityHeaderControlsRow', () => ({
   CommunityHeaderControlsRow: () => <div data-testid="controls-row" />,
@@ -181,7 +179,7 @@ describe('SubredditPage', () => {
     render(
       <Wrapper>
         <SubredditPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(document.body).toBeTruthy();
   });
@@ -191,7 +189,7 @@ describe('SubredditPage', () => {
     render(
       <Wrapper>
         <SubredditPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(screen.getByTestId('community-header')).toBeInTheDocument();
   });
@@ -201,7 +199,7 @@ describe('SubredditPage', () => {
     render(
       <Wrapper>
         <SubredditPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(screen.getByTestId('subreddit-sidebar')).toBeInTheDocument();
   });
@@ -211,7 +209,7 @@ describe('SubredditPage', () => {
     render(
       <Wrapper>
         <SubredditPage />
-      </Wrapper>,
+      </Wrapper>
     );
     // Page renders without crash and has subreddit sidebar (rendered outside CommunityHeader)
     expect(screen.getByTestId('subreddit-sidebar')).toBeInTheDocument();

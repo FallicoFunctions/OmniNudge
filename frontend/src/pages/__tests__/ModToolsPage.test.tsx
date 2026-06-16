@@ -84,7 +84,7 @@ describe('ModToolsPage', () => {
     render(
       <Wrapper>
         <ModToolsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(screen.getByRole('heading', { name: /mod tools/i })).toBeInTheDocument();
   });
@@ -94,7 +94,7 @@ describe('ModToolsPage', () => {
     render(
       <Wrapper>
         <ModToolsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(screen.getByText(/mod tools.*testhub|testhub.*mod tools/i)).toBeInTheDocument();
   });
@@ -104,7 +104,7 @@ describe('ModToolsPage', () => {
     render(
       <Wrapper>
         <ModToolsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(screen.getByRole('button', { name: /user bans/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /removal reasons/i })).toBeInTheDocument();
@@ -116,7 +116,7 @@ describe('ModToolsPage', () => {
     render(
       <Wrapper>
         <ModToolsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     expect(screen.getByRole('button', { name: /exit/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /hub settings/i })).toBeInTheDocument();
@@ -127,7 +127,7 @@ describe('ModToolsPage', () => {
     render(
       <Wrapper>
         <ModToolsPage />
-      </Wrapper>,
+      </Wrapper>
     );
     fireEvent.click(screen.getByRole('button', { name: /mod log/i }));
     // After switching, user bans content should no longer be the active panel

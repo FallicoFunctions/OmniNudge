@@ -24,13 +24,20 @@ export default function HubAIDesignerTab({ hubName }: Props) {
 
   useEffect(() => {
     if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-    if (!previewHTML) { setPreviewBlobUrl(null); return; }
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><script src="https://cdn.tailwindcss.com"></` + `script></head><body class="bg-white p-4">${previewHTML}</body></html>`;
+    if (!previewHTML) {
+      setPreviewBlobUrl(null);
+      return;
+    }
+    const html =
+      `<!DOCTYPE html><html><head><meta charset="utf-8"><script src="https://cdn.tailwindcss.com"></` +
+      `script></head><body class="bg-white p-4">${previewHTML}</body></html>`;
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     blobUrlRef.current = url;
     setPreviewBlobUrl(url);
-    return () => { URL.revokeObjectURL(url); };
+    return () => {
+      URL.revokeObjectURL(url);
+    };
   }, [previewHTML]);
 
   const { data: designsData, isLoading: designsLoading } = useQuery({
@@ -92,8 +99,8 @@ export default function HubAIDesignerTab({ hubName }: Props) {
       <div>
         <h2 className="text-xl font-bold text-[var(--color-text-primary)]">AI Hub Page Designer</h2>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          Describe your ideal Hub page and AI will generate the HTML layout for you.
-          Designs are previewed in a sandboxed iframe with script isolation.
+          Describe your ideal Hub page and AI will generate the HTML layout for you. Designs are
+          previewed in a sandboxed iframe with script isolation.
         </p>
       </div>
 
@@ -132,7 +139,9 @@ export default function HubAIDesignerTab({ hubName }: Props) {
             <div>
               <h3 className="font-medium text-[var(--color-text-primary)]">Preview</h3>
               {pendingDesignName && (
-                <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">{pendingDesignName}</p>
+                <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+                  {pendingDesignName}
+                </p>
               )}
             </div>
             <div className="flex gap-2">
@@ -152,7 +161,11 @@ export default function HubAIDesignerTab({ hubName }: Props) {
                     {activateMutation.isPending ? 'Publishing…' : 'Publish'}
                   </button>
                   <button
-                    onClick={() => { setPreviewHTML(null); setPendingDesignId(null); setPendingDesignName(''); }}
+                    onClick={() => {
+                      setPreviewHTML(null);
+                      setPendingDesignId(null);
+                      setPendingDesignName('');
+                    }}
                     className="px-3 py-1 text-sm rounded border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-background)] transition-colors"
                   >
                     Close
@@ -178,7 +191,9 @@ export default function HubAIDesignerTab({ hubName }: Props) {
             <div>
               <h3 className="font-medium text-green-900">
                 {activeDesign.name}
-                <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-green-600 text-white">Live</span>
+                <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-green-600 text-white">
+                  Live
+                </span>
               </h3>
               <p className="text-sm text-green-800 italic mt-0.5">"{activeDesign.prompt}"</p>
             </div>

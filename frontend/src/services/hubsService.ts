@@ -1,9 +1,6 @@
 import { api } from '../lib/api';
 import type { HubWikiPage } from '../types/hubWiki';
-import {
-  appendTimeRangeParams,
-  type FeedTimeRangeOptions,
-} from '../utils/timeRangeParams';
+import { appendTimeRangeParams, type FeedTimeRangeOptions } from '../utils/timeRangeParams';
 
 export interface HubModerator {
   id: number;
@@ -212,7 +209,11 @@ export const hubsService = {
     return response;
   },
 
-  async updateHubWikiPage(hubName: string, pagePath: string, content: string): Promise<HubWikiPage> {
+  async updateHubWikiPage(
+    hubName: string,
+    pagePath: string,
+    content: string
+  ): Promise<HubWikiPage> {
     const response = await api.put<HubWikiPage>(`/hubs/${hubName}/wiki/${pagePath}`, { content });
     return response;
   },
@@ -244,7 +245,9 @@ export const hubsService = {
       params.set('cursor', cursor);
     }
     appendTimeRangeParams(params, options);
-    return api.get<SubredditPostsResponse>(`/subreddits/${subredditName}/posts?${params.toString()}`);
+    return api.get<SubredditPostsResponse>(
+      `/subreddits/${subredditName}/posts?${params.toString()}`
+    );
   },
 
   async crosspostToHub(

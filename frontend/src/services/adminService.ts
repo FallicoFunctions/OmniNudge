@@ -1,10 +1,29 @@
 import { api } from '../lib/api';
-import type { AdminUser, SiteStats, HubModerator, UpdateRoleRequest, BanHistoryItem } from '../types/admin';
+import type {
+  AdminUser,
+  SiteStats,
+  HubModerator,
+  UpdateRoleRequest,
+  BanHistoryItem,
+} from '../types/admin';
 
 export const adminService = {
   // ===== USER MANAGEMENT =====
 
-  async listUsers(search?: string, role?: string, status?: string, limit = 50, offset = 0, cursor?: string): Promise<{ users: AdminUser[]; limit: number; offset: number; total: number; next_cursor?: string }> {
+  async listUsers(
+    search?: string,
+    role?: string,
+    status?: string,
+    limit = 50,
+    offset = 0,
+    cursor?: string
+  ): Promise<{
+    users: AdminUser[];
+    limit: number;
+    offset: number;
+    total: number;
+    next_cursor?: string;
+  }> {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     if (role) params.append('role', role);
@@ -13,19 +32,41 @@ export const adminService = {
     params.append('offset', offset.toString());
     if (cursor) params.append('cursor', cursor);
 
-    return api.get<{ users: AdminUser[]; limit: number; offset: number; total: number; next_cursor?: string }>(`/admin/users?${params.toString()}`);
+    return api.get<{
+      users: AdminUser[];
+      limit: number;
+      offset: number;
+      total: number;
+      next_cursor?: string;
+    }>(`/admin/users?${params.toString()}`);
   },
 
-  async updateUserRole(userId: number, data: UpdateRoleRequest): Promise<{ message: string; user_id: number; role: string }> {
-    return api.post<{ message: string; user_id: number; role: string }>(`/admin/users/${userId}/role`, data);
+  async updateUserRole(
+    userId: number,
+    data: UpdateRoleRequest
+  ): Promise<{ message: string; user_id: number; role: string }> {
+    return api.post<{ message: string; user_id: number; role: string }>(
+      `/admin/users/${userId}/role`,
+      data
+    );
   },
 
   async banUser(userId: number, reason: string, showReason: boolean): Promise<{ message: string }> {
-    return api.post<{ message: string }>(`/admin/users/${userId}/ban`, { reason, show_reason: showReason });
+    return api.post<{ message: string }>(`/admin/users/${userId}/ban`, {
+      reason,
+      show_reason: showReason,
+    });
   },
 
-  async shadowBanUser(userId: number, reason: string, showReason: boolean): Promise<{ message: string }> {
-    return api.post<{ message: string }>(`/admin/users/${userId}/shadow-ban`, { reason, show_reason: showReason });
+  async shadowBanUser(
+    userId: number,
+    reason: string,
+    showReason: boolean
+  ): Promise<{ message: string }> {
+    return api.post<{ message: string }>(`/admin/users/${userId}/shadow-ban`, {
+      reason,
+      show_reason: showReason,
+    });
   },
 
   async unbanUser(userId: number, reason: string): Promise<{ message: string }> {
@@ -37,26 +78,44 @@ export const adminService = {
   },
 
   async getBanHistory(userId: number) {
-    const response = await api.get<{ history: BanHistoryItem[] | null }>(`/admin/users/${userId}/ban-history`);
+    const response = await api.get<{ history: BanHistoryItem[] | null }>(
+      `/admin/users/${userId}/ban-history`
+    );
     return { ...response, history: response.history ?? [] };
   },
 
-  async getAllBanHistory(limit = 50, offset = 0, cursor?: string): Promise<{ history: BanHistoryItem[]; limit: number; offset: number; total: number; next_cursor?: string }> {
+  async getAllBanHistory(
+    limit = 50,
+    offset = 0,
+    cursor?: string
+  ): Promise<{
+    history: BanHistoryItem[];
+    limit: number;
+    offset: number;
+    total: number;
+    next_cursor?: string;
+  }> {
     const params = new URLSearchParams();
     params.append('limit', limit.toString());
     params.append('offset', offset.toString());
     if (cursor) params.append('cursor', cursor);
 
-    const response = await api.get<{ history: BanHistoryItem[] | null; limit: number; offset: number; total: number; next_cursor?: string }>(
-      `/admin/ban-history?${params.toString()}`
-    );
+    const response = await api.get<{
+      history: BanHistoryItem[] | null;
+      limit: number;
+      offset: number;
+      total: number;
+      next_cursor?: string;
+    }>(`/admin/ban-history?${params.toString()}`);
     return { ...response, history: response.history ?? [] };
   },
 
   // ===== HUB MODERATOR MANAGEMENT =====
 
   async getHubModerators(hubId: number): Promise<HubModerator[]> {
-    const response = await api.get<{ moderators: HubModerator[] }>(`/admin/hubs/${hubId}/moderators`);
+    const response = await api.get<{ moderators: HubModerator[] }>(
+      `/admin/hubs/${hubId}/moderators`
+    );
     return response.moderators;
   },
 
@@ -122,11 +181,29 @@ export const adminService = {
     return api.get('/admin/retention/policy');
   },
 
-  async updateRetentionPolicy(dataType: string, retentionDays: number, enabled?: boolean, reason?: string): Promise<{ message: string }> {
-    return api.put(`/admin/retention/policy/${dataType}`, { retention_days: retentionDays, enabled, reason });
+  async updateRetentionPolicy(
+    dataType: string,
+    retentionDays: number,
+    enabled?: boolean,
+    reason?: string
+  ): Promise<{ message: string }> {
+    return api.put(`/admin/retention/policy/${dataType}`, {
+      retention_days: retentionDays,
+      enabled,
+      reason,
+    });
   },
 
-  async getRetentionHistory(): Promise<{ history: Array<{ data_type: string; changed_by: number; old_days: number; new_days: number; reason: string; changed_at: string }> }> {
+  async getRetentionHistory(): Promise<{
+    history: Array<{
+      data_type: string;
+      changed_by: number;
+      old_days: number;
+      new_days: number;
+      reason: string;
+      changed_at: string;
+    }>;
+  }> {
     return api.get('/admin/retention/history');
   },
 };

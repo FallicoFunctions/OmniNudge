@@ -1,8 +1,5 @@
 import { api } from '../lib/api';
-import type {
-  GetReactionsResponse,
-  MessageReaction,
-} from '../types/reactions';
+import type { GetReactionsResponse, MessageReaction } from '../types/reactions';
 
 export const reactionsService = {
   /**

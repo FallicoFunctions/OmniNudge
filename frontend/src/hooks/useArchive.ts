@@ -15,15 +15,15 @@ const removeConversationFromPages = (
     ...data,
     pages: data.pages.map((page) => ({
       ...page,
-      conversations: page.conversations.filter((conversation) => conversation.id !== conversationID),
+      conversations: page.conversations.filter(
+        (conversation) => conversation.id !== conversationID
+      ),
     })),
   };
 };
 
-const removeConversationFromList = (
-  data: Conversation[] | undefined,
-  conversationID: number
-) => data?.filter((conversation) => conversation.id !== conversationID);
+const removeConversationFromList = (data: Conversation[] | undefined, conversationID: number) =>
+  data?.filter((conversation) => conversation.id !== conversationID);
 
 const removeConversationsFromPages = (
   data: InfiniteData<ConversationsPage> | undefined,
@@ -34,7 +34,9 @@ const removeConversationsFromPages = (
     ...data,
     pages: data.pages.map((page) => ({
       ...page,
-      conversations: page.conversations.filter((conversation) => !conversationIDs.has(conversation.id)),
+      conversations: page.conversations.filter(
+        (conversation) => !conversationIDs.has(conversation.id)
+      ),
     })),
   };
 };
@@ -63,13 +65,11 @@ export function useArchive() {
       ]);
       const previousActive = queryClient.getQueryData<Conversation[]>(['conversations', 'active']);
 
-      queryClient.setQueryData<InfiniteData<ConversationsPage>>(
-        ['conversations', 'all'],
-        (old) => removeConversationFromPages(old, conversationID)
+      queryClient.setQueryData<InfiniteData<ConversationsPage>>(['conversations', 'all'], (old) =>
+        removeConversationFromPages(old, conversationID)
       );
-      queryClient.setQueryData<Conversation[]>(
-        ['conversations', 'active'],
-        (old) => removeConversationFromList(old, conversationID)
+      queryClient.setQueryData<Conversation[]>(['conversations', 'active'], (old) =>
+        removeConversationFromList(old, conversationID)
       );
 
       return { previousAll, previousActive };
@@ -92,7 +92,8 @@ export function useArchive() {
   });
 
   const archiveBatchMutation = useMutation({
-    mutationFn: (conversationIDs: number[]) => messagesService.archiveConversationsBatch(conversationIDs),
+    mutationFn: (conversationIDs: number[]) =>
+      messagesService.archiveConversationsBatch(conversationIDs),
     onMutate: async (conversationIDs: number[]) => {
       const ids = new Set(conversationIDs);
       await Promise.all([
@@ -106,13 +107,11 @@ export function useArchive() {
       ]);
       const previousActive = queryClient.getQueryData<Conversation[]>(['conversations', 'active']);
 
-      queryClient.setQueryData<InfiniteData<ConversationsPage>>(
-        ['conversations', 'all'],
-        (old) => removeConversationsFromPages(old, ids)
+      queryClient.setQueryData<InfiniteData<ConversationsPage>>(['conversations', 'all'], (old) =>
+        removeConversationsFromPages(old, ids)
       );
-      queryClient.setQueryData<Conversation[]>(
-        ['conversations', 'active'],
-        (old) => removeConversationsFromList(old, ids)
+      queryClient.setQueryData<Conversation[]>(['conversations', 'active'], (old) =>
+        removeConversationsFromList(old, ids)
       );
 
       return { previousAll, previousActive };
@@ -155,9 +154,8 @@ export function useArchive() {
         ['conversations', 'archived'],
         (old) => removeConversationFromPages(old, conversationID)
       );
-      queryClient.setQueryData<Conversation[]>(
-        ['conversations', 'with-archived'],
-        (old) => removeConversationFromList(old, conversationID)
+      queryClient.setQueryData<Conversation[]>(['conversations', 'with-archived'], (old) =>
+        removeConversationFromList(old, conversationID)
       );
 
       return { previousArchived, previousWithArchived };

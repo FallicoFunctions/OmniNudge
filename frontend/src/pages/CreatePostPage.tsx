@@ -348,19 +348,14 @@ export default function CreatePostPage() {
     mutationFn: (data: CreatePostRequest) => postsService.createPost(data),
     onSuccess: (post) => {
       // Attach hub_name from selectedHub if the API didn't return it
-      const resolvedHubName =
-        post.hub_name || post.hub?.name || selectedHub?.name || '';
-      const enrichedPost = resolvedHubName !== post.hub_name
-        ? { ...post, hub_name: resolvedHubName }
-        : post;
+      const resolvedHubName = post.hub_name || post.hub?.name || selectedHub?.name || '';
+      const enrichedPost =
+        resolvedHubName !== post.hub_name ? { ...post, hub_name: resolvedHubName } : post;
 
       if (user?.username) {
         const profilePostsKey = ['user-profile-posts', user.username] as const;
-        queryClient.setQueryData<UserPostsResponse | undefined>(
-          profilePostsKey,
-          (old) => (old
-            ? { ...old, posts: [enrichedPost, ...old.posts] }
-            : old)
+        queryClient.setQueryData<UserPostsResponse | undefined>(profilePostsKey, (old) =>
+          old ? { ...old, posts: [enrichedPost, ...old.posts] } : old
         );
         queryClient.invalidateQueries({
           queryKey: profilePostsKey,

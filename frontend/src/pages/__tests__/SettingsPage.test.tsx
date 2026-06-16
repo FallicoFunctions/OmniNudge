@@ -152,8 +152,7 @@ vi.mock('../../i18n/languageUtils', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { returnObjects?: boolean }) =>
-      options?.returnObjects ? [] : key,
+    t: (key: string, options?: { returnObjects?: boolean }) => (options?.returnObjects ? [] : key),
     i18n: { language: 'en', resolvedLanguage: 'en' },
   }),
   Trans: ({ i18nKey }: { i18nKey: string }) => <span>{i18nKey}</span>,
@@ -164,9 +163,7 @@ describe('SettingsPage push toggle', () => {
     vi.clearAllMocks();
   });
 
-  it(
-    'disables push setting when currently enabled and unregister succeeds',
-    async () => {
+  it('disables push setting when currently enabled and unregister succeeds', async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(true));
     disablePush.mockResolvedValue(true);
 
@@ -177,19 +174,17 @@ describe('SettingsPage push toggle', () => {
     );
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
-    fireEvent.click(screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' }));
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' })
+    );
 
     await waitFor(() => {
       expect(disablePush).toHaveBeenCalledTimes(1);
       expect(setShowPushNotifications).toHaveBeenCalledWith(false);
     });
-    },
-    10000
-  );
+  }, 10000);
 
-  it(
-    'enables push setting only when permission flow succeeds',
-    async () => {
+  it('enables push setting only when permission flow succeeds', async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(false));
     enablePush.mockResolvedValue(true);
 
@@ -200,19 +195,17 @@ describe('SettingsPage push toggle', () => {
     );
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
-    fireEvent.click(screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' }));
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' })
+    );
 
     await waitFor(() => {
       expect(enablePush).toHaveBeenCalledTimes(1);
       expect(setShowPushNotifications).toHaveBeenCalledWith(true);
     });
-    },
-    10000
-  );
+  }, 10000);
 
-  it(
-    'keeps push setting unchanged when unregister fails',
-    async () => {
+  it('keeps push setting unchanged when unregister fails', async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(true));
     disablePush.mockResolvedValue(false);
 
@@ -223,19 +216,17 @@ describe('SettingsPage push toggle', () => {
     );
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
-    fireEvent.click(screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' }));
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' })
+    );
 
     await waitFor(() => {
       expect(disablePush).toHaveBeenCalledTimes(1);
     });
     expect(setShowPushNotifications).not.toHaveBeenCalledWith(false);
-    },
-    10000
-  );
+  }, 10000);
 
-  it(
-    'keeps push setting unchanged when enable flow fails',
-    async () => {
+  it('keeps push setting unchanged when enable flow fails', async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(false));
     enablePush.mockResolvedValue(false);
 
@@ -246,15 +237,15 @@ describe('SettingsPage push toggle', () => {
     );
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
-    fireEvent.click(screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' }));
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' })
+    );
 
     await waitFor(() => {
       expect(enablePush).toHaveBeenCalledTimes(1);
     });
     expect(setShowPushNotifications).not.toHaveBeenCalledWith(true);
-    },
-    10000
-  );
+  }, 10000);
 });
 
 describe('SettingsPage messaging privacy toggles', () => {
@@ -262,9 +253,7 @@ describe('SettingsPage messaging privacy toggles', () => {
     vi.clearAllMocks();
   });
 
-  it(
-    'updates auto-unarchive preference from privacy tab',
-    async () => {
+  it('updates auto-unarchive preference from privacy tab', async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(true));
 
     render(
@@ -283,9 +272,7 @@ describe('SettingsPage messaging privacy toggles', () => {
     await waitFor(() => {
       expect(setAutoUnarchiveOnMessage).toHaveBeenCalledWith(false);
     });
-    },
-    10000
-  );
+  }, 10000);
 });
 
 describe('SettingsPage data export', () => {

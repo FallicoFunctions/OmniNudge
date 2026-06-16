@@ -185,7 +185,9 @@ export function HiddenItemsView({
       }
       fetchingDetailsRef.current.add(postKey);
       return api
-        .get<[RedditListingData, unknown]>(`/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`)
+        .get<[RedditListingData, unknown]>(
+          `/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`
+        )
         .then((response) => {
           const listing = response[0];
           const remotePost = listing?.data?.children?.[0]?.data;
@@ -208,8 +210,7 @@ export function HiddenItemsView({
               is_self: remotePost.is_self,
               post_hint: remotePost.post_hint,
               is_video: remotePost.is_video,
-              score:
-                typeof remotePost.score === 'number' ? remotePost.score : prev[postKey]?.score,
+              score: typeof remotePost.score === 'number' ? remotePost.score : prev[postKey]?.score,
               num_comments:
                 typeof remotePost.num_comments === 'number'
                   ? remotePost.num_comments
@@ -223,11 +224,7 @@ export function HiddenItemsView({
                 null,
               link_flair_text_color:
                 remotePost.link_flair_text_color ?? prev[postKey]?.link_flair_text_color ?? null,
-              over18:
-                remotePost.over18 ??
-                remotePost.over_18 ??
-                prev[postKey]?.over18 ??
-                null,
+              over18: remotePost.over18 ?? remotePost.over_18 ?? prev[postKey]?.over18 ?? null,
               preview: remotePost.preview ?? prev[postKey]?.preview ?? null,
               media: remotePost.media ?? prev[postKey]?.media ?? null,
               secure_media: remotePost.secure_media ?? prev[postKey]?.secure_media ?? null,
@@ -296,10 +293,9 @@ export function HiddenItemsView({
     const cleanupRemovedPosts = async () => {
       // Unhide all posts concurrently for better performance
       const unhidePromises = removedHiddenRedditPosts.map((post) =>
-        savedService.unhideRedditPost(post.subreddit, post.reddit_post_id)
-          .catch((cleanupError) => {
-            console.error('Failed to auto-unhide removed Reddit post', cleanupError);
-          })
+        savedService.unhideRedditPost(post.subreddit, post.reddit_post_id).catch((cleanupError) => {
+          console.error('Failed to auto-unhide removed Reddit post', cleanupError);
+        })
       );
 
       await Promise.allSettled(unhidePromises);
@@ -329,7 +325,13 @@ export function HiddenItemsView({
   });
 
   const unhideRedditPostMutation = useMutation({
-    mutationFn: async ({ subreddit, reddit_post_id }: { subreddit: string; reddit_post_id: string }) => {
+    mutationFn: async ({
+      subreddit,
+      reddit_post_id,
+    }: {
+      subreddit: string;
+      reddit_post_id: string;
+    }) => {
       await savedService.unhideRedditPost(subreddit, reddit_post_id);
     },
     onSuccess: (_data, { subreddit, reddit_post_id }) => {
@@ -342,7 +344,13 @@ export function HiddenItemsView({
   });
 
   const resaveRedditPostMutation = useMutation({
-    mutationFn: async ({ subreddit, reddit_post_id }: { subreddit: string; reddit_post_id: string }) => {
+    mutationFn: async ({
+      subreddit,
+      reddit_post_id,
+    }: {
+      subreddit: string;
+      reddit_post_id: string;
+    }) => {
       await Promise.all([
         savedService.unhideRedditPost(subreddit, reddit_post_id),
         savedService.saveRedditPost(subreddit, reddit_post_id),
@@ -420,7 +428,8 @@ export function HiddenItemsView({
           media_type: detailedPost?.media_type ?? hiddenPostExtras.media_type ?? null,
           thumbnail_url: detailedPost?.thumbnail_url ?? hiddenPostExtras.thumbnail_url ?? null,
           nsfw: detailedPost?.nsfw ?? hiddenPostExtras.nsfw ?? undefined,
-          target_subreddit: detailedPost?.target_subreddit ?? hiddenPostExtras.target_subreddit ?? null,
+          target_subreddit:
+            detailedPost?.target_subreddit ?? hiddenPostExtras.target_subreddit ?? null,
           hub_display_title:
             detailedPost?.hub_display_title ?? hiddenPostExtras.hub_display_title ?? null,
           hub_id: detailedPost?.hub_id ?? hiddenPostExtras.hub_id ?? null,
@@ -492,11 +501,17 @@ export function HiddenItemsView({
             pendingShouldSave={false}
             onShare={() => handleShareRedditPost(mergedPost)}
             onToggleSave={() => setSaveConfirmTarget(post)}
-            onHide={() => unhideRedditPostMutation.mutate({
-              subreddit: post.subreddit,
-              reddit_post_id: post.reddit_post_id,
-            })}
-            onCrosspost={() => navigate(`/r/${post.subreddit}/comments/${post.reddit_post_id}`, { state: { isHidden: true } })}
+            onHide={() =>
+              unhideRedditPostMutation.mutate({
+                subreddit: post.subreddit,
+                reddit_post_id: post.reddit_post_id,
+              })
+            }
+            onCrosspost={() =>
+              navigate(`/r/${post.subreddit}/comments/${post.reddit_post_id}`, {
+                state: { isHidden: true },
+              })
+            }
             hideLabel={t('posts.actions.unhide')}
           />
         );
@@ -525,8 +540,7 @@ export function HiddenItemsView({
     resetPage,
   } = usePagination(filteredItems, PAGE_SIZE);
 
-  const emptyStateKey =
-    sourceFilter === 'reddit' ? 'hidden.empty.reddit' : 'hidden.empty.omni';
+  const emptyStateKey = sourceFilter === 'reddit' ? 'hidden.empty.reddit' : 'hidden.empty.omni';
 
   const renderContent = () => {
     if (filteredItems.length === 0) {
@@ -560,8 +574,12 @@ export function HiddenItemsView({
     <>
       {showHeading && (
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">{t('hidden.headingTitle')}</h1>
-          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{t('hidden.headingDescription')}</p>
+          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
+            {t('hidden.headingTitle')}
+          </h1>
+          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            {t('hidden.headingDescription')}
+          </p>
         </div>
       )}
 
@@ -593,7 +611,9 @@ export function HiddenItemsView({
       {saveConfirmTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('hidden.modal.saveTitle')}</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {t('hidden.modal.saveTitle')}
+            </h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
               {t('hidden.modal.saveDescription')}
             </p>
@@ -615,7 +635,9 @@ export function HiddenItemsView({
                 disabled={resaveRedditPostMutation.isPending}
                 className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
               >
-                {resaveRedditPostMutation.isPending ? t('posts.status.saving') : t('hidden.modal.moveToSaved')}
+                {resaveRedditPostMutation.isPending
+                  ? t('posts.status.saving')
+                  : t('hidden.modal.moveToSaved')}
               </button>
             </div>
           </div>

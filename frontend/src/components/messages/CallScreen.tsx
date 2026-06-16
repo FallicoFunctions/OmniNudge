@@ -1,45 +1,45 @@
-import { useEffect, useRef } from 'react'
-import { useTranslation } from 'react-i18next'
-import { CallControls } from './CallControls'
-import { CallQualityIndicator } from './CallQualityIndicator'
-import { VideoQualitySelector } from './VideoQualitySelector'
-import { ScreenShareView } from './ScreenShareView'
-import { useScreenShare } from '../../hooks/useScreenShare'
-import type { Call } from '../../types/calls'
-import type { VideoQuality } from '../../types/calls'
+import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { CallControls } from './CallControls';
+import { CallQualityIndicator } from './CallQualityIndicator';
+import { VideoQualitySelector } from './VideoQualitySelector';
+import { ScreenShareView } from './ScreenShareView';
+import { useScreenShare } from '../../hooks/useScreenShare';
+import type { Call } from '../../types/calls';
+import type { VideoQuality } from '../../types/calls';
 
 interface CallScreenProps {
-  call: Call
-  localStream: MediaStream | null
-  remoteStream: MediaStream | null
-  isMuted: boolean
-  isCameraOff: boolean
-  callDuration: number
-  isConnecting?: boolean
+  call: Call;
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
+  isMuted: boolean;
+  isCameraOff: boolean;
+  callDuration: number;
+  isConnecting?: boolean;
   // Issue 4: real quality value from useCallManager
-  callQuality?: 'excellent' | 'good' | 'fair' | 'poor' | null
+  callQuality?: 'excellent' | 'good' | 'fair' | 'poor' | null;
   // F13
-  cameraDevices: MediaDeviceInfo[]
-  selectedCameraId: string | null
-  videoQuality: VideoQuality
-  onSwitchCamera: (deviceId: string) => Promise<void>
-  onSetVideoQuality: (q: VideoQuality) => void
+  cameraDevices: MediaDeviceInfo[];
+  selectedCameraId: string | null;
+  videoQuality: VideoQuality;
+  onSwitchCamera: (deviceId: string) => Promise<void>;
+  onSetVideoQuality: (q: VideoQuality) => void;
   // F14
-  peerIsSharing: boolean
-  peerConnection: RTCPeerConnection | null
-  onToggleMute: () => void
-  onToggleCamera: () => void
-  onEndCall: () => void
+  peerIsSharing: boolean;
+  peerConnection: RTCPeerConnection | null;
+  onToggleMute: () => void;
+  onToggleCamera: () => void;
+  onEndCall: () => void;
 }
 
 function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
   if (h > 0) {
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 export function CallScreen({
@@ -62,32 +62,32 @@ export function CallScreen({
   onToggleCamera,
   onEndCall,
 }: CallScreenProps) {
-  const { t } = useTranslation()
-  const remoteVideoRef = useRef<HTMLVideoElement>(null)
-  const localVideoRef = useRef<HTMLVideoElement>(null)
+  const { t } = useTranslation();
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
 
   const { isSharing, screenStream, startSharing, stopSharing } = useScreenShare(
     call.id,
-    peerConnection,
-  )
+    peerConnection
+  );
 
   // Attach remote stream to video element.
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream
+      remoteVideoRef.current.srcObject = remoteStream;
     }
-  }, [remoteStream])
+  }, [remoteStream]);
 
   // Attach local stream to local preview.
   useEffect(() => {
     if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream
+      localVideoRef.current.srcObject = localStream;
     }
-  }, [localStream])
+  }, [localStream]);
 
-  const isVideo = call.call_type === 'video'
-  const remoteName = call.caller_username ?? call.callee_username ?? t('common.unknown', 'Unknown')
-  const isCallActive = call.status === 'active'
+  const isVideo = call.call_type === 'video';
+  const remoteName = call.caller_username ?? call.callee_username ?? t('common.unknown', 'Unknown');
+  const isCallActive = call.status === 'active';
 
   return (
     <div
@@ -141,10 +141,7 @@ export function CallScreen({
           <CallQualityIndicator quality={callQuality} />
           {/* F13: Video quality selector — only for video calls */}
           {isVideo && isCallActive && (
-            <VideoQualitySelector
-              videoQuality={videoQuality}
-              setVideoQuality={onSetVideoQuality}
-            />
+            <VideoQualitySelector videoQuality={videoQuality} setVideoQuality={onSetVideoQuality} />
           )}
         </div>
 
@@ -195,5 +192,5 @@ export function CallScreen({
         />
       </div>
     </div>
-  )
+  );
 }

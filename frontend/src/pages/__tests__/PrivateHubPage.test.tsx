@@ -42,10 +42,18 @@ vi.mock('../../hooks/useFormat', () => ({
 
 // --- Context mocks ---
 const { getAuthUser, setAuthUser } = vi.hoisted(() => {
-  const state = { user: { id: 1, username: 'alice', role: 'user' } as { id: number; username: string; role: string } | null };
+  const state = {
+    user: { id: 1, username: 'alice', role: 'user' } as {
+      id: number;
+      username: string;
+      role: string;
+    } | null,
+  };
   return {
     getAuthUser: () => state.user,
-    setAuthUser: (u: typeof state.user) => { state.user = u; },
+    setAuthUser: (u: typeof state.user) => {
+      state.user = u;
+    },
   };
 });
 
@@ -87,7 +95,7 @@ describe('PrivateHubPage', () => {
     render(
       <Wrapper>
         <PrivateHubPage />
-      </Wrapper>,
+      </Wrapper>
     );
     // Non-auth users see the private hub locked screen with a login/request button
     expect(screen.getByText(/private hub/i)).toBeInTheDocument();
@@ -98,7 +106,7 @@ describe('PrivateHubPage', () => {
     render(
       <Wrapper>
         <PrivateHubPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByText(/private hub/i)).toBeInTheDocument();
@@ -110,7 +118,7 @@ describe('PrivateHubPage', () => {
     render(
       <Wrapper>
         <PrivateHubPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /request access/i })).toBeInTheDocument();
@@ -137,7 +145,7 @@ describe('PrivateHubPage', () => {
     render(
       <Wrapper>
         <PrivateHubPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => {
       // pending state is shown – either a status label or disabled submit
@@ -154,7 +162,7 @@ describe('PrivateHubPage', () => {
     render(
       <Wrapper>
         <PrivateHubPage />
-      </Wrapper>,
+      </Wrapper>
     );
     await waitFor(() => screen.getByRole('button', { name: /request access/i }));
 

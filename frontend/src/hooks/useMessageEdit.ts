@@ -65,34 +65,33 @@ export function useMessageEdit({
     onMutate: async ({ messageId, content }) => {
       optimisticContentRef.current = content;
       await queryClient.cancelQueries({ queryKey: ['messages', conversationId] });
-      const previous = queryClient.getQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }>>(
-        ['messages', conversationId]
-      );
-      queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
-        ['messages', conversationId],
-        (prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            pages: prev.pages.map((page) => ({
-              ...page,
-              messages: page.messages.map((msg) =>
-                msg.id === messageId
-                  ? {
-                      ...msg,
-                      // Store plaintext optimistically so DecryptedMessageContent can render it
-                      encrypted_content: content,
-                      sender_encrypted_content: content,
-                      encryption_version: 'plaintext',
-                      edited: true,
-                      edited_at: new Date().toISOString(),
-                    }
-                  : msg
-              ),
-            })),
-          };
-        }
-      );
+      const previous = queryClient.getQueryData<
+        InfiniteData<{ messages: Message[]; next_cursor?: string }>
+      >(['messages', conversationId]);
+      queryClient.setQueryData<
+        InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined
+      >(['messages', conversationId], (prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          pages: prev.pages.map((page) => ({
+            ...page,
+            messages: page.messages.map((msg) =>
+              msg.id === messageId
+                ? {
+                    ...msg,
+                    // Store plaintext optimistically so DecryptedMessageContent can render it
+                    encrypted_content: content,
+                    sender_encrypted_content: content,
+                    encryption_version: 'plaintext',
+                    edited: true,
+                    edited_at: new Date().toISOString(),
+                  }
+                : msg
+            ),
+          })),
+        };
+      });
       // Close the edit form immediately so the optimistic bubble is visible
       setEditingMessageId(null);
       setEditingContent('');
@@ -100,21 +99,20 @@ export function useMessageEdit({
     },
     onSuccess: (updatedMessage) => {
       // Replace optimistic entry with server-confirmed (properly encrypted) data
-      queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
-        ['messages', conversationId],
-        (prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            pages: prev.pages.map((page) => ({
-              ...page,
-              messages: page.messages.map((msg) =>
-                msg.id === updatedMessage.id ? { ...msg, ...updatedMessage } : msg
-              ),
-            })),
-          };
-        }
-      );
+      queryClient.setQueryData<
+        InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined
+      >(['messages', conversationId], (prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          pages: prev.pages.map((page) => ({
+            ...page,
+            messages: page.messages.map((msg) =>
+              msg.id === updatedMessage.id ? { ...msg, ...updatedMessage } : msg
+            ),
+          })),
+        };
+      });
     },
     onError: (_, __, context) => {
       // Roll back optimistic update
@@ -142,8 +140,7 @@ export function useMessageEdit({
   // Fix 17: mutateAsync is a stable reference from TanStack Query — no need for
   // an intermediate useCallback with an unstable editMutation dependency.
   const saveEdit = useCallback(
-    (messageId: number, content: string) =>
-      editMutation.mutateAsync({ messageId, content }),
+    (messageId: number, content: string) => editMutation.mutateAsync({ messageId, content }),
     [editMutation]
   );
 
@@ -159,9 +156,9 @@ export function useMessageEdit({
   // than polling every 5 seconds.
   useEffect(() => {
     if (editingMessageId === null) return;
-    const data = queryClient.getQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }>>(
-      ['messages', conversationId]
-    );
+    const data = queryClient.getQueryData<
+      InfiniteData<{ messages: Message[]; next_cursor?: string }>
+    >(['messages', conversationId]);
     if (!data) return;
     let sentAt: number | null = null;
     for (const page of data.pages) {

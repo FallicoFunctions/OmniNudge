@@ -230,8 +230,8 @@ export function CommentItem<T extends LocalCommentBase>({
                 comment.user_vote === 1
                   ? 'text-orange-500'
                   : comment.user_vote === -1
-                  ? 'text-blue-500'
-                  : 'text-[var(--color-text-primary)]'
+                    ? 'text-blue-500'
+                    : 'text-[var(--color-text-primary)]'
               }`}
             >
               {pointsLabel}
@@ -245,37 +245,41 @@ export function CommentItem<T extends LocalCommentBase>({
             )}
           </div>
 
-          {!isCollapsed && (isEditing ? (
-            <form onSubmit={handleEditSubmit} className="mt-1 space-y-2">
-              <MarkdownInput
-                label={t('comments.labels.editComment')}
-                value={editText}
-                onChange={setEditText}
-                rows={4}
+          {!isCollapsed &&
+            (isEditing ? (
+              <form onSubmit={handleEditSubmit} className="mt-1 space-y-2">
+                <MarkdownInput
+                  label={t('comments.labels.editComment')}
+                  value={editText}
+                  onChange={setEditText}
+                  rows={4}
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={editPending || !editText.trim()}
+                    className="rounded bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    {editPending ? t('comments.status.saving') : t('common.save')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditText(comment.content);
+                    }}
+                    className="rounded border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)]"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <MarkdownRenderer
+                content={comment.content}
+                className="mt-1 text-[var(--color-text-primary)]"
               />
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={editPending || !editText.trim()}
-                  className="rounded bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
-                >
-                  {editPending ? t('comments.status.saving') : t('common.save')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setEditText(comment.content);
-                  }}
-                  className="rounded border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)]"
-                >
-                  {t('common.cancel')}
-                </button>
-              </div>
-            </form>
-          ) : (
-            <MarkdownRenderer content={comment.content} className="mt-1 text-[var(--color-text-primary)]" />
-          ))}
+            ))}
 
           {!isCollapsed && actionError && (
             <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">
@@ -283,79 +287,92 @@ export function CommentItem<T extends LocalCommentBase>({
             </div>
           )}
 
-          {!isCollapsed && <div className="mt-2 flex flex-wrap items-center gap-2 text-left text-xs">
-            {/* Primary action: Reply */}
-            <button
-              onClick={() => onReplySelect(comment.id)}
-              className="font-semibold text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition"
-            >
-              {t('comments.actions.reply')}
-            </button>
-
-            {/* Secondary actions: Save, Edit, Inbox toggle */}
-            <button
-              onClick={() => navigate(`/users/${encodeURIComponent(comment.username)}`)}
-              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-            >
-              {t('comments.actions.viewProfile')}
-            </button>
-            <button
-              onClick={handleToggleSave}
-              disabled={savePending}
-              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-            >
-              {savePending ? t('comments.status.saving') : isSaved ? t('comments.actions.unsave') : t('comments.actions.save')}
-            </button>
-            {isOwner && (
-              <>
-                <button onClick={() => setIsEditing(true)} className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]">
-                  {t('comments.actions.edit')}
-                </button>
-                <button
-                  onClick={handleInboxToggle}
-                  disabled={inboxPending}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-                >
-                  {inboxDisabled ? t('comments.actions.enableInbox') : t('comments.actions.disableInbox')}
-                </button>
-              </>
-            )}
-
-            {/* Divider before tertiary actions */}
-            <span className="text-[var(--color-border)] select-none">·</span>
-
-            {/* Tertiary actions: Permalink, Embed */}
-            <button
-              onClick={() => handlers.permalink(comment)}
-              className="text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
-              title={t('comments.actions.permalink')}
-            >
-              {t('comments.actions.permalink')}
-            </button>
-            {handlers.embed && (
+          {!isCollapsed && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-left text-xs">
+              {/* Primary action: Reply */}
               <button
-                onClick={() => handlers.embed?.(comment)}
+                onClick={() => onReplySelect(comment.id)}
+                className="font-semibold text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition"
+              >
+                {t('comments.actions.reply')}
+              </button>
+
+              {/* Secondary actions: Save, Edit, Inbox toggle */}
+              <button
+                onClick={() => navigate(`/users/${encodeURIComponent(comment.username)}`)}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+              >
+                {t('comments.actions.viewProfile')}
+              </button>
+              <button
+                onClick={handleToggleSave}
+                disabled={savePending}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+              >
+                {savePending
+                  ? t('comments.status.saving')
+                  : isSaved
+                    ? t('comments.actions.unsave')
+                    : t('comments.actions.save')}
+              </button>
+              {isOwner && (
+                <>
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                  >
+                    {t('comments.actions.edit')}
+                  </button>
+                  <button
+                    onClick={handleInboxToggle}
+                    disabled={inboxPending}
+                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                  >
+                    {inboxDisabled
+                      ? t('comments.actions.enableInbox')
+                      : t('comments.actions.disableInbox')}
+                  </button>
+                </>
+              )}
+
+              {/* Divider before tertiary actions */}
+              <span className="text-[var(--color-border)] select-none">·</span>
+
+              {/* Tertiary actions: Permalink, Embed */}
+              <button
+                onClick={() => handlers.permalink(comment)}
                 className="text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
-                title={t('posts.actions.embed')}
+                title={t('comments.actions.permalink')}
               >
-                {t('posts.actions.embed')}
+                {t('comments.actions.permalink')}
               </button>
-            )}
+              {handlers.embed && (
+                <button
+                  onClick={() => handlers.embed?.(comment)}
+                  className="text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+                  title={t('posts.actions.embed')}
+                >
+                  {t('posts.actions.embed')}
+                </button>
+              )}
 
-            {/* Divider before destructive actions */}
-            {(canModerate || !isOwner) && <span className="text-[var(--color-border)] select-none">·</span>}
+              {/* Divider before destructive actions */}
+              {(canModerate || !isOwner) && (
+                <span className="text-[var(--color-border)] select-none">·</span>
+              )}
 
-            {/* Destructive actions: Delete */}
-            {canModerate && (
-              <button
-                onClick={handleDelete}
-                disabled={deletePending}
-                className="text-[11px] text-red-600 hover:text-red-700 disabled:opacity-50"
-              >
-                {t('comments.actions.delete')}
-              </button>
-            )}
-          </div>}
+              {/* Destructive actions: Delete */}
+              {canModerate && (
+                <button
+                  onClick={handleDelete}
+                  disabled={deletePending}
+                  className="text-[11px] text-red-600 hover:text-red-700 disabled:opacity-50"
+                >
+                  {t('comments.actions.delete')}
+                </button>
+              )}
+            </div>
+          )}
 
           {!isCollapsed && isReplying && (
             <form onSubmit={handleReplySubmit} className="mt-3">

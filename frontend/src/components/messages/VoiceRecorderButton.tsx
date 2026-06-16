@@ -1,78 +1,82 @@
-import React, { useRef, useCallback } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Mic, X, Check, Trash2, Play, Pause } from 'lucide-react'
-import { useVoiceRecorder } from '../../hooks/useVoiceRecorder'
-import { RecordingAnimation } from './RecordingAnimation'
-import { WaveformVisualizer } from './WaveformVisualizer'
+import React, { useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Mic, X, Check, Trash2, Play, Pause } from 'lucide-react';
+import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { RecordingAnimation } from './RecordingAnimation';
+import { WaveformVisualizer } from './WaveformVisualizer';
 
 interface VoiceRecorderButtonProps {
-  onVoiceMessage: (blob: Blob, durationSeconds: number) => void
-  disabled?: boolean
+  onVoiceMessage: (blob: Blob, durationSeconds: number) => void;
+  disabled?: boolean;
 }
 
 function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export function VoiceRecorderButton({ onVoiceMessage, disabled = false }: VoiceRecorderButtonProps) {
-  const { t } = useTranslation()
-  const { state, durationSeconds, audioBlob, audioLevel, error, start, stop, cancel } = useVoiceRecorder()
-  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
-  const [isPlaying, setIsPlaying] = React.useState(false)
-  const [previewProgress, setPreviewProgress] = React.useState(0)
+export function VoiceRecorderButton({
+  onVoiceMessage,
+  disabled = false,
+}: VoiceRecorderButtonProps) {
+  const { t } = useTranslation();
+  const { state, durationSeconds, audioBlob, audioLevel, error, start, stop, cancel } =
+    useVoiceRecorder();
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = React.useState(false);
+  const [previewProgress, setPreviewProgress] = React.useState(0);
   const previewUrl = React.useMemo(
     () => (audioBlob ? URL.createObjectURL(audioBlob) : null),
     [audioBlob]
-  )
+  );
 
   React.useEffect(() => {
     // Destroy old Audio element when previewUrl changes (re-record) or on unmount
     return () => {
       if (previewAudioRef.current) {
-        previewAudioRef.current.pause()
-        previewAudioRef.current.src = ''
-        previewAudioRef.current.ontimeupdate = null
-        previewAudioRef.current.onended = null
-        previewAudioRef.current = null
+        previewAudioRef.current.pause();
+        previewAudioRef.current.src = '';
+        previewAudioRef.current.ontimeupdate = null;
+        previewAudioRef.current.onended = null;
+        previewAudioRef.current = null;
       }
-      setIsPlaying(false)
-      setPreviewProgress(0)
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
-    }
-  }, [previewUrl])
+      setIsPlaying(false);
+      setPreviewProgress(0);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   const handleSend = useCallback(() => {
     if (audioBlob) {
-      onVoiceMessage(audioBlob, durationSeconds)
-      cancel()
+      onVoiceMessage(audioBlob, durationSeconds);
+      cancel();
     }
-  }, [audioBlob, durationSeconds, onVoiceMessage, cancel])
+  }, [audioBlob, durationSeconds, onVoiceMessage, cancel]);
 
   const togglePreviewPlay = useCallback(() => {
-    if (!previewUrl) return
+    if (!previewUrl) return;
     if (!previewAudioRef.current) {
-      previewAudioRef.current = new Audio(previewUrl)
+      previewAudioRef.current = new Audio(previewUrl);
       previewAudioRef.current.ontimeupdate = () => {
-        const audio = previewAudioRef.current
+        const audio = previewAudioRef.current;
         if (audio && audio.duration) {
-          setPreviewProgress(audio.currentTime / audio.duration)
+          setPreviewProgress(audio.currentTime / audio.duration);
         }
-      }
+      };
       previewAudioRef.current.onended = () => {
-        setIsPlaying(false)
-        setPreviewProgress(0)
-      }
+        setIsPlaying(false);
+        setPreviewProgress(0);
+      };
     }
     if (isPlaying) {
-      previewAudioRef.current.pause()
-      setIsPlaying(false)
+      previewAudioRef.current.pause();
+      setIsPlaying(false);
     } else {
-      previewAudioRef.current.play()
-      setIsPlaying(true)
+      previewAudioRef.current.play();
+      setIsPlaying(true);
     }
-  }, [previewUrl, isPlaying])
+  }, [previewUrl, isPlaying]);
 
   // Idle: show microphone button
   if (state === 'idle' || state === 'requesting' || state === 'error') {
@@ -88,7 +92,7 @@ export function VoiceRecorderButton({ onVoiceMessage, disabled = false }: VoiceR
       >
         <Mic size={18} />
       </button>
-    )
+    );
   }
 
   // Recording state
@@ -121,12 +125,7 @@ export function VoiceRecorderButton({ onVoiceMessage, disabled = false }: VoiceR
 
         {/* Live waveform */}
         <div className="flex-1 min-w-0">
-          <WaveformVisualizer
-            data={[]}
-            progress={0}
-            isLive
-            liveLevel={audioLevel}
-          />
+          <WaveformVisualizer data={[]} progress={0} isLive liveLevel={audioLevel} />
         </div>
 
         {/* Send */}
@@ -141,7 +140,7 @@ export function VoiceRecorderButton({ onVoiceMessage, disabled = false }: VoiceR
           <Check size={16} />
         </button>
       </div>
-    )
+    );
   }
 
   // Stopped — preview
@@ -200,8 +199,8 @@ export function VoiceRecorderButton({ onVoiceMessage, disabled = false }: VoiceR
           <Check size={16} />
         </button>
       </div>
-    )
+    );
   }
 
-  return null
+  return null;
 }

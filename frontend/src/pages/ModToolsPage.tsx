@@ -175,8 +175,19 @@ function BansTab({ hubName }: { hubName: string }) {
       {bans && bans.length === 0 && (
         <div className="text-center py-12 px-4">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--color-surface-elevated)] mb-4">
-            <svg className="w-8 h-8 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            <svg
+              className="w-8 h-8 text-[var(--color-text-secondary)]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+              />
             </svg>
           </div>
           <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">
@@ -212,18 +223,30 @@ function BansTab({ hubName }: { hubName: string }) {
                 )}
                 <div className="text-xs text-[var(--color-text-secondary)] mt-2">
                   {ban.ban_type === 'permanent' ? (
-                    <span className="text-red-600 font-medium">{t('modToolsPage.bans.permanent')}</span>
+                    <span className="text-red-600 font-medium">
+                      {t('modToolsPage.bans.permanent')}
+                    </span>
                   ) : (
                     <span>
                       {t('modToolsPage.bans.temporaryUntil', {
-                        date: formatDate(ban.expires_at!, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
+                        date: formatDate(ban.expires_at!, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        }),
                       })}
                     </span>
                   )}
                   {' • '}
                   {t('modToolsPage.bans.bannedByOn', {
                     moderator: ban.banned_by_name || `#${ban.banned_by}`,
-                    date: formatDate(ban.created_at, { month: 'short', day: 'numeric', year: 'numeric' }),
+                    date: formatDate(ban.created_at, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    }),
                   })}
                 </div>
               </div>
@@ -279,13 +302,17 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mb-6 p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)]">
+    <form
+      onSubmit={handleSubmit}
+      className="mb-6 p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)]"
+    >
       <h3 className="font-medium mb-4">{t('modToolsPage.bans.form.title')}</h3>
 
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1">
-            {t('modToolsPage.bans.form.fields.userId.label')} <span className="text-red-500">*</span>
+            {t('modToolsPage.bans.form.fields.userId.label')}{' '}
+            <span className="text-red-500">*</span>
           </label>
           <input
             type="number"
@@ -297,21 +324,28 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">{t('modToolsPage.bans.form.fields.banType.label')}</label>
+          <label className="block text-sm font-medium mb-1">
+            {t('modToolsPage.bans.form.fields.banType.label')}
+          </label>
           <select
             value={banType}
             onChange={(e) => setBanType(e.target.value as 'permanent' | 'temporary')}
             className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
           >
-            <option value="permanent">{t('modToolsPage.bans.form.fields.banType.permanent')}</option>
-            <option value="temporary">{t('modToolsPage.bans.form.fields.banType.temporary')}</option>
+            <option value="permanent">
+              {t('modToolsPage.bans.form.fields.banType.permanent')}
+            </option>
+            <option value="temporary">
+              {t('modToolsPage.bans.form.fields.banType.temporary')}
+            </option>
           </select>
         </div>
 
         {banType === 'temporary' && (
           <div>
             <label className="block text-sm font-medium mb-1">
-              {t('modToolsPage.bans.form.fields.expiresAt.label')} <span className="text-red-500">*</span>
+              {t('modToolsPage.bans.form.fields.expiresAt.label')}{' '}
+              <span className="text-red-500">*</span>
             </label>
             <input
               type="datetime-local"
@@ -324,7 +358,9 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
         )}
 
         <div>
-          <label className="block text-sm font-medium mb-1">{t('modToolsPage.bans.form.fields.reason.label')}</label>
+          <label className="block text-sm font-medium mb-1">
+            {t('modToolsPage.bans.form.fields.reason.label')}
+          </label>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
@@ -335,7 +371,9 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">{t('modToolsPage.bans.form.fields.note.label')}</label>
+          <label className="block text-sm font-medium mb-1">
+            {t('modToolsPage.bans.form.fields.note.label')}
+          </label>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -350,7 +388,9 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
           disabled={banMutation.isPending}
           className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
         >
-          {banMutation.isPending ? t('modToolsPage.bans.form.actions.banning') : t('modToolsPage.bans.actions.banUser')}
+          {banMutation.isPending
+            ? t('modToolsPage.bans.form.actions.banning')
+            : t('modToolsPage.bans.actions.banUser')}
         </button>
       </div>
     </form>
@@ -437,7 +477,11 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
                 </div>
                 <div className="text-xs text-[var(--color-text-secondary)] mt-2">
                   {t('modToolsPage.removalReasons.lastUpdated', {
-                    date: formatDate(reason.updated_at, { month: 'short', day: 'numeric', year: 'numeric' }),
+                    date: formatDate(reason.updated_at, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    }),
                   })}
                 </div>
               </div>
@@ -506,9 +550,14 @@ function RemovalReasonForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mb-6 p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)]">
+    <form
+      onSubmit={handleSubmit}
+      className="mb-6 p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)]"
+    >
       <h3 className="font-medium mb-4">
-        {reason ? t('modToolsPage.removalReasons.form.editTitle') : t('modToolsPage.removalReasons.form.createTitle')}
+        {reason
+          ? t('modToolsPage.removalReasons.form.editTitle')
+          : t('modToolsPage.removalReasons.form.createTitle')}
       </h3>
 
       <div className="space-y-4">
@@ -549,7 +598,9 @@ function RemovalReasonForm({
             disabled={createMutation.isPending || updateMutation.isPending}
             className="flex-1 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
           >
-            {(createMutation.isPending || updateMutation.isPending) ? t('modToolsPage.removalReasons.form.saving') : t('common.save')}
+            {createMutation.isPending || updateMutation.isPending
+              ? t('modToolsPage.removalReasons.form.saving')
+              : t('common.save')}
           </button>
           <button
             type="button"
@@ -601,8 +652,19 @@ function ModLogTab({ hubName }: { hubName: string }) {
       {logs.length === 0 && (
         <div className="text-center py-12 px-4">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--color-surface-elevated)] mb-4">
-            <svg className="w-8 h-8 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <svg
+              className="w-8 h-8 text-[var(--color-text-secondary)]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
           </div>
           <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">
@@ -623,7 +685,8 @@ function ModLogTab({ hubName }: { hubName: string }) {
             <div className="flex justify-between items-start">
               <div>
                 <span className="font-medium">
-                  {log.moderator_name || t('modToolsPage.modLog.moderatorFallback', { id: log.moderator_id })}
+                  {log.moderator_name ||
+                    t('modToolsPage.modLog.moderatorFallback', { id: log.moderator_id })}
                 </span>
                 <span className="text-[var(--color-text-secondary)]">
                   {' '}
@@ -631,7 +694,13 @@ function ModLogTab({ hubName }: { hubName: string }) {
                 </span>
               </div>
               <div className="text-xs text-[var(--color-text-secondary)]">
-                {formatDate(log.created_at, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                {formatDate(log.created_at, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}
               </div>
             </div>
             {log.details && Object.keys(log.details).length > 0 && (
@@ -656,7 +725,11 @@ function ModLogTab({ hubName }: { hubName: string }) {
               setCursorStack((prev) => [...prev, nextCursor]);
             }
           }}
-          centerContent={<span className="px-4 py-2">{t('searchPage.pagination.page', { page: cursorStack.length })}</span>}
+          centerContent={
+            <span className="px-4 py-2">
+              {t('searchPage.pagination.page', { page: cursorStack.length })}
+            </span>
+          }
         />
       )}
     </div>
@@ -688,7 +761,9 @@ function ModMailTab({ hubName }: { hubName: string }) {
   const { formatDate } = useFormat();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [statusFilter, setStatusFilter] = useState<'open' | 'archived' | 'resolved' | 'all'>('open');
+  const [statusFilter, setStatusFilter] = useState<'open' | 'archived' | 'resolved' | 'all'>(
+    'open'
+  );
 
   const { data, isLoading } = useQuery({
     queryKey: ['modMail', hubName, statusFilter],
@@ -696,8 +771,13 @@ function ModMailTab({ hubName }: { hubName: string }) {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ conversationId, status }: { conversationId: number; status: 'open' | 'archived' | 'resolved' }) =>
-      modMailService.updateStatus(conversationId, { status }),
+    mutationFn: ({
+      conversationId,
+      status,
+    }: {
+      conversationId: number;
+      status: 'open' | 'archived' | 'resolved';
+    }) => modMailService.updateStatus(conversationId, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['modMail', hubName] });
     },
@@ -721,7 +801,9 @@ function ModMailTab({ hubName }: { hubName: string }) {
         <h2 className="text-xl font-semibold">{t('modToolsPage.modMail.title')}</h2>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as 'open' | 'archived' | 'resolved' | 'all')}
+          onChange={(e) =>
+            setStatusFilter(e.target.value as 'open' | 'archived' | 'resolved' | 'all')
+          }
           className="px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-surface)] text-sm"
         >
           <option value="open">{t('modToolsPage.modMail.status.open')}</option>
@@ -760,11 +842,13 @@ function ModMailTab({ hubName }: { hubName: string }) {
                       conv.status === 'open'
                         ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                         : conv.status === 'resolved'
-                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                        : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
                     }`}
                   >
-                    {t(`modToolsPage.modMail.statusBadge.${conv.status}`, { defaultValue: conv.status })}
+                    {t(`modToolsPage.modMail.statusBadge.${conv.status}`, {
+                      defaultValue: conv.status,
+                    })}
                   </span>
                   {conv.unread_count > 0 && (
                     <span className="px-2 py-0.5 text-xs bg-red-500 text-white rounded-full">
@@ -781,13 +865,25 @@ function ModMailTab({ hubName }: { hubName: string }) {
                     })}
                   </span>
                   <span className="mx-2">•</span>
-                  <span>{formatDate(conv.created_at, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  <span>
+                    {formatDate(conv.created_at, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </span>
                   {conv.latest_message && (
                     <>
                       <span className="mx-2">•</span>
                       <span>
                         {t('modToolsPage.modMail.lastReply', {
-                          date: formatDate(conv.latest_message.sent_at, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
+                          date: formatDate(conv.latest_message.sent_at, {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          }),
                         })}
                       </span>
                     </>
@@ -798,14 +894,18 @@ function ModMailTab({ hubName }: { hubName: string }) {
                 {conv.status === 'open' && (
                   <>
                     <button
-                      onClick={() => updateStatusMutation.mutate({ conversationId: conv.id, status: 'resolved' })}
+                      onClick={() =>
+                        updateStatusMutation.mutate({ conversationId: conv.id, status: 'resolved' })
+                      }
                       className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                       disabled={updateStatusMutation.isPending}
                     >
                       {t('modToolsPage.modMail.actions.resolve')}
                     </button>
                     <button
-                      onClick={() => updateStatusMutation.mutate({ conversationId: conv.id, status: 'archived' })}
+                      onClick={() =>
+                        updateStatusMutation.mutate({ conversationId: conv.id, status: 'archived' })
+                      }
                       className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
                       disabled={updateStatusMutation.isPending}
                     >
@@ -815,7 +915,9 @@ function ModMailTab({ hubName }: { hubName: string }) {
                 )}
                 {conv.status !== 'open' && (
                   <button
-                    onClick={() => updateStatusMutation.mutate({ conversationId: conv.id, status: 'open' })}
+                    onClick={() =>
+                      updateStatusMutation.mutate({ conversationId: conv.id, status: 'open' })
+                    }
                     className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
                     disabled={updateStatusMutation.isPending}
                   >
@@ -838,7 +940,9 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
   const { formatDate } = useFormat();
   const queryClient = useQueryClient();
   const [usernameInput, setUsernameInput] = useState('');
-  const [addUserStatus, setAddUserStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [addUserStatus, setAddUserStatus] = useState<'idle' | 'saving' | 'success' | 'error'>(
+    'idle'
+  );
   const [addUserError, setAddUserError] = useState('');
 
   const { data: requests, isLoading } = useQuery({
@@ -922,15 +1026,17 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
             disabled={addUserMutation.isPending || usernameInput.trim().length === 0}
             className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {addUserMutation.isPending ? t('modToolsPage.requests.grantByUsername.granting') : t('modToolsPage.requests.grantByUsername.grantButton')}
+            {addUserMutation.isPending
+              ? t('modToolsPage.requests.grantByUsername.granting')
+              : t('modToolsPage.requests.grantByUsername.grantButton')}
           </button>
         </form>
         {addUserStatus === 'success' && (
-          <p className="mt-2 text-sm text-green-600">{t('modToolsPage.requests.grantByUsername.success')}</p>
+          <p className="mt-2 text-sm text-green-600">
+            {t('modToolsPage.requests.grantByUsername.success')}
+          </p>
         )}
-        {addUserStatus === 'error' && (
-          <p className="mt-2 text-sm text-red-600">{addUserError}</p>
-        )}
+        {addUserStatus === 'error' && <p className="mt-2 text-sm text-red-600">{addUserError}</p>}
       </div>
 
       {pendingRequests.length === 0 && (
@@ -962,7 +1068,11 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
                 )}
                 <div className="text-xs text-[var(--color-text-secondary)] mt-2">
                   {t('modToolsPage.requests.requestedOn', {
-                    date: formatDate(request.created_at, { month: 'short', day: 'numeric', year: 'numeric' }),
+                    date: formatDate(request.created_at, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    }),
                   })}
                 </div>
               </div>

@@ -47,7 +47,9 @@ export const postsService = {
   },
 
   async getComments(postId: number): Promise<PostComment[]> {
-    const response = await api.get<{ comments: PostComment[] } | PostComment[]>(`/posts/${postId}/comments`);
+    const response = await api.get<{ comments: PostComment[] } | PostComment[]>(
+      `/posts/${postId}/comments`
+    );
     // Handle both wrapped {comments: [...]} and unwrapped [...] formats
     if (Array.isArray(response)) {
       return response;

@@ -97,7 +97,9 @@ describe('SearchResultsPage message search URL behavior', () => {
   });
 
   it('loads message-tab deep links with filter/page params even when q is empty', async () => {
-    renderPage('/search?tab=messages&sort=old&has_files=true&has_links=true&include_archived=true&conversation_id=42&sender_id=7&start_date=2026-02-01T00:00:00Z&end_date=2026-02-15T00:00:00Z&mpage=2');
+    renderPage(
+      '/search?tab=messages&sort=old&has_files=true&has_links=true&include_archived=true&conversation_id=42&sender_id=7&start_date=2026-02-01T00:00:00Z&end_date=2026-02-15T00:00:00Z&mpage=2'
+    );
 
     await waitFor(() => {
       expect(searchMessagesMock).toHaveBeenCalled();
@@ -233,7 +235,9 @@ describe('SearchResultsPage message search URL behavior', () => {
 
   it('clears conversation, sender, and date filters from message-tab controls', async () => {
     const user = userEvent.setup();
-    renderPage('/search?tab=messages&q=hello&sort=relevance&conversation_id=42&sender_id=7&start_date=2026-02-10T00:00:00Z&end_date=2026-02-15T00:00:00Z');
+    renderPage(
+      '/search?tab=messages&q=hello&sort=relevance&conversation_id=42&sender_id=7&start_date=2026-02-10T00:00:00Z&end_date=2026-02-15T00:00:00Z'
+    );
 
     await waitFor(() => {
       expect(searchMessagesMock).toHaveBeenCalled();

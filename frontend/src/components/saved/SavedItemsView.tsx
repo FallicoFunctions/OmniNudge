@@ -3,7 +3,12 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { savedService } from '../../services/savedService';
-import type { SavedPost, SavedPostComment, SavedRedditPost, SavedRedditAPIComment } from '../../types/saved';
+import type {
+  SavedPost,
+  SavedPostComment,
+  SavedRedditPost,
+  SavedRedditAPIComment,
+} from '../../types/saved';
 import type { LocalRedditComment } from '../../types/reddit';
 import { api } from '../../lib/api';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -68,11 +73,7 @@ const normalizeRemovedLabel = (value?: string) => value?.trim().toLowerCase() ??
 
 const isRedditPostLikelyRemoved = (post: SavedRedditPost) => {
   const title = normalizeRemovedLabel(post.title);
-  if (
-    title === '[removed]' ||
-    title === '[deleted]' ||
-    title.includes('removed by moderator')
-  ) {
+  if (title === '[removed]' || title === '[deleted]' || title.includes('removed by moderator')) {
     return true;
   }
 
@@ -111,17 +112,20 @@ export function SavedItemsView({
   const [removedNoticeDismissed, setRemovedNoticeDismissed] = useState(false);
 
   const formatSavedTimestamp = (value: string | number | Date) =>
-    formatDate(value, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    formatDate(value, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
   const { data, isLoading, error } = useSavedItems('all', !!user);
   const { data: hiddenPostsData } = useQuery({
     queryKey: ['hidden-items', 'reddit_posts'],
     queryFn: () => savedService.getHiddenItems('reddit_posts'),
   });
 
-  const savedPosts = useMemo(
-    () => (data?.saved_posts ?? []) as SavedPost[],
-    [data?.saved_posts]
-  );
+  const savedPosts = useMemo(() => (data?.saved_posts ?? []) as SavedPost[], [data?.saved_posts]);
   const rawSavedRedditPosts = useMemo(
     () => (data?.saved_reddit_posts ?? []) as SavedRedditPost[],
     [data?.saved_reddit_posts]
@@ -183,9 +187,7 @@ export function SavedItemsView({
       }
       fetchingDetailsRef.current.add(postKey);
       return api
-        .get<[RedditListingData, unknown]>(
-          `/r/${post.subreddit}/comments/${post.reddit_post_id}`
-        )
+        .get<[RedditListingData, unknown]>(`/r/${post.subreddit}/comments/${post.reddit_post_id}`)
         .then((response) => {
           const listing = response[0];
           const remotePost = listing?.data?.children?.[0]?.data;
@@ -208,8 +210,7 @@ export function SavedItemsView({
               is_self: remotePost.is_self,
               post_hint: remotePost.post_hint,
               is_video: remotePost.is_video,
-              score:
-                typeof remotePost.score === 'number' ? remotePost.score : prev[postKey]?.score,
+              score: typeof remotePost.score === 'number' ? remotePost.score : prev[postKey]?.score,
               num_comments:
                 typeof remotePost.num_comments === 'number'
                   ? remotePost.num_comments
@@ -223,11 +224,7 @@ export function SavedItemsView({
                 null,
               link_flair_text_color:
                 remotePost.link_flair_text_color ?? prev[postKey]?.link_flair_text_color ?? null,
-              over18:
-                remotePost.over18 ??
-                remotePost.over_18 ??
-                prev[postKey]?.over18 ??
-                null,
+              over18: remotePost.over18 ?? remotePost.over_18 ?? prev[postKey]?.over18 ?? null,
               preview: remotePost.preview ?? prev[postKey]?.preview ?? null,
               media: remotePost.media ?? prev[postKey]?.media ?? null,
               secure_media: remotePost.secure_media ?? prev[postKey]?.secure_media ?? null,
@@ -288,7 +285,13 @@ export function SavedItemsView({
   };
 
   const unsaveRedditPostMutation = useMutation({
-    mutationFn: async ({ subreddit, reddit_post_id }: { subreddit: string; reddit_post_id: string }) => {
+    mutationFn: async ({
+      subreddit,
+      reddit_post_id,
+    }: {
+      subreddit: string;
+      reddit_post_id: string;
+    }) => {
       await savedService.unsaveRedditPost(subreddit, reddit_post_id);
     },
     onSuccess: () => {
@@ -312,7 +315,13 @@ export function SavedItemsView({
   });
 
   const hideRedditPostMutation = useMutation({
-    mutationFn: async ({ subreddit, reddit_post_id }: { subreddit: string; reddit_post_id: string }) => {
+    mutationFn: async ({
+      subreddit,
+      reddit_post_id,
+    }: {
+      subreddit: string;
+      reddit_post_id: string;
+    }) => {
       // Unsave and hide concurrently for better performance
       await Promise.all([
         savedService.unsaveRedditPost(subreddit, reddit_post_id),
@@ -400,7 +409,8 @@ export function SavedItemsView({
           media_type: detailedPost?.media_type ?? savedPostExtras.media_type ?? null,
           thumbnail_url: detailedPost?.thumbnail_url ?? savedPostExtras.thumbnail_url ?? null,
           nsfw: detailedPost?.nsfw ?? savedPostExtras.nsfw ?? undefined,
-          target_subreddit: detailedPost?.target_subreddit ?? savedPostExtras.target_subreddit ?? null,
+          target_subreddit:
+            detailedPost?.target_subreddit ?? savedPostExtras.target_subreddit ?? null,
           hub_display_title:
             detailedPost?.hub_display_title ?? savedPostExtras.hub_display_title ?? null,
           hub_id: detailedPost?.hub_id ?? savedPostExtras.hub_id ?? null,
@@ -451,7 +461,14 @@ export function SavedItemsView({
             </div>
             <div className="mt-1">
               <span className="font-semibold">{t('saved.labels.post')}</span>{' '}
-              <Link to={getPostUrl({ id: comment.post_id, target_subreddit: null, hub_name: comment.hub_name })} className="text-[var(--color-primary)] hover:underline">
+              <Link
+                to={getPostUrl({
+                  id: comment.post_id,
+                  target_subreddit: null,
+                  hub_name: comment.hub_name,
+                })}
+                className="text-[var(--color-primary)] hover:underline"
+              >
                 {comment.post_title}
               </Link>
             </div>
@@ -465,7 +482,10 @@ export function SavedItemsView({
               })}
             </span>
             <Link
-              to={getPostCommentUrl({ id: comment.post_id, target_subreddit: null, hub_name: comment.hub_name }, comment.comment_id)}
+              to={getPostCommentUrl(
+                { id: comment.post_id, target_subreddit: null, hub_name: comment.hub_name },
+                comment.comment_id
+              )}
               className="text-[var(--color-primary)] hover:underline"
             >
               {t('saved.labels.viewThread')}
@@ -484,7 +504,8 @@ export function SavedItemsView({
         const postKey = `${post.subreddit}-${post.reddit_post_id}`;
         const mergedPost = { ...post, ...(postDetails[postKey] ?? {}) };
         const isSaved = true; // Always saved in this view
-        const isSaveActionPending = unsaveRedditPostMutation.isPending &&
+        const isSaveActionPending =
+          unsaveRedditPostMutation.isPending &&
           unsaveRedditPostMutation.variables?.subreddit === post.subreddit &&
           unsaveRedditPostMutation.variables?.reddit_post_id === post.reddit_post_id;
 
@@ -520,10 +541,12 @@ export function SavedItemsView({
             isSaveActionPending={isSaveActionPending}
             pendingShouldSave={false}
             onShare={() => handleShareRedditPost(mergedPost)}
-            onToggleSave={() => unsaveRedditPostMutation.mutate({
-              subreddit: post.subreddit,
-              reddit_post_id: post.reddit_post_id,
-            })}
+            onToggleSave={() =>
+              unsaveRedditPostMutation.mutate({
+                subreddit: post.subreddit,
+                reddit_post_id: post.reddit_post_id,
+              })
+            }
             onHide={() => setHideTargetPost(post)}
             onCrosspost={() => navigate(`/r/${post.subreddit}/comments/${post.reddit_post_id}`)}
             linkState={originState}
@@ -551,7 +574,8 @@ export function SavedItemsView({
               </div>
               {comment.reddit_post_title && (
                 <div className="mt-1">
-                  <span className="font-semibold">{t('saved.labels.post')}</span> <span>{comment.reddit_post_title}</span>
+                  <span className="font-semibold">{t('saved.labels.post')}</span>{' '}
+                  <span>{comment.reddit_post_title}</span>
                 </div>
               )}
             </div>
@@ -587,7 +611,9 @@ export function SavedItemsView({
                 <Link to={permalink} className="text-[var(--color-primary)] hover:underline">
                   {comment.post_title || t('saved.labels.postFallback')}
                 </Link>
-                {comment.post_author ? ` ${t('saved.labels.byAuthor', { author: comment.post_author })}` : ''}
+                {comment.post_author
+                  ? ` ${t('saved.labels.byAuthor', { author: comment.post_author })}`
+                  : ''}
                 {` ${t('saved.labels.inSubreddit', { subreddit: comment.subreddit })}`}
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -609,10 +635,16 @@ export function SavedItemsView({
                 )}
               </div>
             </div>
-            <p className="mt-2 text-sm text-[var(--color-text-primary)] whitespace-pre-wrap">{comment.comment_body}</p>
+            <p className="mt-2 text-sm text-[var(--color-text-primary)] whitespace-pre-wrap">
+              {comment.comment_body}
+            </p>
             <div className="mt-3 flex items-center gap-4 text-xs">
               <button
-                onClick={() => savedService.unsaveRedditAPIComment(comment.reddit_comment_id).then(() => invalidateSavedQueries())}
+                onClick={() =>
+                  savedService
+                    .unsaveRedditAPIComment(comment.reddit_comment_id)
+                    .then(() => invalidateSavedQueries())
+                }
                 className="text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors"
               >
                 {t('posts.actions.unsave')}
@@ -642,12 +674,13 @@ export function SavedItemsView({
 
     // Filter by content type
     if (contentType === 'posts') {
-      items = items.filter(item =>
-        item.key.includes('-post-') ||
-        (item.key.includes('reddit-post-') && !item.key.includes('reddit-api-comment-'))
+      items = items.filter(
+        (item) =>
+          item.key.includes('-post-') ||
+          (item.key.includes('reddit-post-') && !item.key.includes('reddit-api-comment-'))
       );
     } else if (contentType === 'comments') {
-      items = items.filter(item => item.key.includes('-comment-'));
+      items = items.filter((item) => item.key.includes('-comment-'));
     }
     // If contentType === 'both', don't filter by type
 
@@ -714,7 +747,9 @@ export function SavedItemsView({
     <>
       {showHeading && (
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">{t('saved.headingTitle')}</h1>
+          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
+            {t('saved.headingTitle')}
+          </h1>
           <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
             {t('saved.headingDescription')}
           </p>
@@ -746,27 +781,33 @@ export function SavedItemsView({
         </div>
       )}
 
-      {!isLoading && !error && notifyRemovedSavedPosts && !removedNoticeDismissed && autoRemovedRedditPosts.length > 0 && (
-        <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <span>{t('saved.removedByModerators', { count: autoRemovedRedditPosts.length })}</span>
-              <div className="mt-1 text-xs">
-                <Link to="/settings" className="text-[var(--color-primary)] hover:underline">
-                  {t('saved.manageAlertInSettings')}
-                </Link>
+      {!isLoading &&
+        !error &&
+        notifyRemovedSavedPosts &&
+        !removedNoticeDismissed &&
+        autoRemovedRedditPosts.length > 0 && (
+          <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span>
+                  {t('saved.removedByModerators', { count: autoRemovedRedditPosts.length })}
+                </span>
+                <div className="mt-1 text-xs">
+                  <Link to="/settings" className="text-[var(--color-primary)] hover:underline">
+                    {t('saved.manageAlertInSettings')}
+                  </Link>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setRemovedNoticeDismissed(true)}
+                className="rounded border border-yellow-400 px-2 py-1 text-xs font-semibold text-yellow-900 hover:bg-yellow-100"
+              >
+                {t('saved.dismiss')}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setRemovedNoticeDismissed(true)}
-              className="rounded border border-yellow-400 px-2 py-1 text-xs font-semibold text-yellow-900 hover:bg-yellow-100"
-            >
-              {t('saved.dismiss')}
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
       {!isLoading && !error && renderContent()}
     </>
@@ -779,7 +820,9 @@ export function SavedItemsView({
       {hideTargetPost && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('modals.hide.title')}</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {t('modals.hide.title')}
+            </h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
               {t('modals.hide.confirmSaved')}
             </p>
@@ -801,7 +844,9 @@ export function SavedItemsView({
                 disabled={hideRedditPostMutation.isPending}
                 className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
               >
-                {hideRedditPostMutation.isPending ? t('modals.hide.hiding') : t('modals.hide.hideButton')}
+                {hideRedditPostMutation.isPending
+                  ? t('modals.hide.hiding')
+                  : t('modals.hide.hideButton')}
               </button>
             </div>
           </div>
