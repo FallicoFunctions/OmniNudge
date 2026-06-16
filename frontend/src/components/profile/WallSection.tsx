@@ -12,7 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useFormat } from '../../hooks/useFormat';
 import { useToast } from '../../hooks/useToast';
-import type { WallPost, WallPostComment, WallPostMedia, WallReactionType, WallVisibility } from '../../types/users';
+import type { WallPost, WallPostComment, WallPostMedia, WallReactionType } from '../../types/users';
 
 const MAX_BODY_LENGTH = 2000;
 const MAX_MEDIA_ITEMS = 10;
@@ -58,6 +58,23 @@ function BrokenHeartIcon({ filled }: { filled: boolean }) {
   );
 }
 
+function MediaItemPreview({ item }: { item: WallPostMedia }) {
+  return (
+    <>
+      {item.media_type === 'video' && !item.thumbnail_url ? (
+        <video src={resolveMediaUrl(item.url)} className="h-full w-full object-contain" muted preload="metadata" />
+      ) : (
+        <img src={resolveMediaUrl(item.thumbnail_url || item.url)} alt="" className="h-full w-full object-contain" loading="lazy" />
+      )}
+      {item.media_type === 'video' && (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white">▶</span>
+        </span>
+      )}
+    </>
+  );
+}
+
 function AttachMediaIcon() {
   return (
     <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.5}>
@@ -65,21 +82,6 @@ function AttachMediaIcon() {
       <circle cx="7" cy="9" r="1.5" />
       <path d="M3 14l4-4 3 3 3-2 4 4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-}
-
-function WallVisibilityPicker({ value, onChange }: { value: WallVisibility; onChange: (v: WallVisibility) => void }) {
-  const { t } = useTranslation();
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value as WallVisibility)}
-      className="text-xs font-medium rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-    >
-      <option value="public">{t('userProfilePage.wall.visibilityPublic')}</option>
-      <option value="friends_only">{t('userProfilePage.wall.visibilityFriends')}</option>
-      <option value="private">{t('userProfilePage.wall.visibilityPrivate')}</option>
-    </select>
   );
 }
 
@@ -383,6 +385,7 @@ function WallPostCard({
   const queryClient = useQueryClient();
   const [showComments, setShowComments] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [mediaIndex, setMediaIndex] = useState(0);
 
   const commentsQuery = useQuery({
     queryKey: ['wall-post-comments', post.id],
@@ -393,7 +396,7 @@ function WallPostCard({
   const reactionMutation = useMutation({
     mutationFn: (reaction: WallReactionType) => wallService.setPostReaction(post.id, reaction),
     onSuccess: (result) => {
-      queryClient.setQueryData<{ posts: WallPost[]; can_post: boolean; wall_visibility: WallVisibility } | undefined>(
+      queryClient.setQueryData<{ posts: WallPost[]; can_post: boolean } | undefined>(
         ['wall-posts', username],
         (data) => {
           if (!data) return data;
@@ -433,7 +436,7 @@ function WallPostCard({
     mutationFn: (body: string) => wallService.createComment(post.id, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wall-post-comments', post.id] });
-      queryClient.setQueryData<{ posts: WallPost[]; can_post: boolean; wall_visibility: WallVisibility } | undefined>(
+      queryClient.setQueryData<{ posts: WallPost[]; can_post: boolean } | undefined>(
         ['wall-posts', username],
         (data) => {
           if (!data) return data;
@@ -455,7 +458,7 @@ function WallPostCard({
     mutationFn: (commentId: number) => wallService.deleteComment(post.id, commentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wall-post-comments', post.id] });
-      queryClient.setQueryData<{ posts: WallPost[]; can_post: boolean; wall_visibility: WallVisibility } | undefined>(
+      queryClient.setQueryData<{ posts: WallPost[]; can_post: boolean } | undefined>(
         ['wall-posts', username],
         (data) => {
           if (!data) return data;
@@ -501,42 +504,44 @@ function WallPostCard({
           )}
 
           {post.media && post.media.length > 0 && (
-            <div
-              className={`mt-2 grid gap-1.5 ${post.media.length === 1 ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-3'}`}
-            >
-              {post.media.map((item, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setLightboxIndex(idx)}
-                  className={`relative overflow-hidden rounded-md bg-[var(--color-surface-elevated)] ${
-                    post.media!.length === 1 ? 'max-h-96' : 'aspect-square'
-                  }`}
-                >
-                  {item.media_type === 'video' && !item.thumbnail_url ? (
-                    <video
-                      src={resolveMediaUrl(item.url)}
-                      className={`h-full w-full ${post.media!.length === 1 ? 'object-contain' : 'object-cover'}`}
-                      muted
-                      preload="metadata"
-                    />
-                  ) : (
-                    <img
-                      src={resolveMediaUrl(item.thumbnail_url || item.url)}
-                      alt=""
-                      className={`h-full w-full ${post.media!.length === 1 ? 'object-contain' : 'object-cover'}`}
-                      loading="lazy"
-                    />
-                  )}
-                  {item.media_type === 'video' && (
-                    <span className="absolute inset-0 flex items-center justify-center">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white">
-                        ▶
-                      </span>
-                    </span>
-                  )}
-                </button>
-              ))}
+            <div className="group relative mt-2">
+              <button
+                type="button"
+                onClick={() => setLightboxIndex(mediaIndex)}
+                className="relative block w-full max-h-96 overflow-hidden rounded-md bg-[var(--color-surface-elevated)]"
+              >
+                <MediaItemPreview item={post.media[mediaIndex]} />
+              </button>
+
+              {post.media.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMediaIndex((i) => (i - 1 + post.media!.length) % post.media!.length);
+                    }}
+                    aria-label={t('userProfilePage.wall.previousMedia')}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/70"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMediaIndex((i) => (i + 1) % post.media!.length);
+                    }}
+                    aria-label={t('userProfilePage.wall.nextMedia')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/70"
+                  >
+                    ›
+                  </button>
+                  <span className="absolute bottom-2 right-2 rounded-full bg-black/50 px-2 py-0.5 text-xs text-white">
+                    {mediaIndex + 1} / {post.media.length}
+                  </span>
+                </>
+              )}
             </div>
           )}
 
@@ -545,7 +550,10 @@ function WallPostCard({
               items={post.media}
               index={lightboxIndex}
               onClose={() => setLightboxIndex(null)}
-              onIndexChange={setLightboxIndex}
+              onIndexChange={(idx) => {
+                setLightboxIndex(idx);
+                setMediaIndex(idx);
+              }}
             />
           )}
 
@@ -662,28 +670,45 @@ export default function WallSection({ username, isOwnProfile }: Props) {
     staleTime: 1000 * 30,
   });
 
+  const pendingPostsQuery = useQuery({
+    queryKey: ['wall-pending-posts', username],
+    queryFn: () => wallService.getPendingWallPosts(),
+    enabled: isOwnProfile,
+  });
+
   const createPostMutation = useMutation({
     mutationFn: ({ body, media }: { body: string; media?: WallPostMedia[] }) =>
       wallService.createWallPost(username, body, media),
-    onSuccess: () => {
+    onSuccess: (post) => {
       queryClient.invalidateQueries({ queryKey: ['wall-posts', username] });
+      if (post.status === 'pending') {
+        queryClient.invalidateQueries({ queryKey: ['wall-pending-posts', username] });
+        toast.info(t('userProfilePage.wall.postPendingApproval'));
+      }
     },
     onError: () => {
       toast.error(t('userProfilePage.wall.postFailed'));
     },
   });
 
-  const visibilityMutation = useMutation({
-    mutationFn: (visibility: WallVisibility) => wallService.setWallVisibility(visibility),
-    onSuccess: (_data, visibility) => {
-      queryClient.setQueryData<{ posts: WallPost[]; can_post: boolean; wall_visibility: WallVisibility } | undefined>(
-        ['wall-posts', username],
-        (data) => (data ? { ...data, wall_visibility: visibility } : data)
-      );
-      toast.success(t('userProfilePage.wall.visibilityUpdated'));
+  const approvePostMutation = useMutation({
+    mutationFn: (id: number) => wallService.approveWallPost(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wall-pending-posts', username] });
+      queryClient.invalidateQueries({ queryKey: ['wall-posts', username] });
     },
     onError: () => {
-      toast.error(t('userProfilePage.wall.visibilityUpdateFailed'));
+      toast.error(t('userProfilePage.wall.pending.approveFailed'));
+    },
+  });
+
+  const rejectPostMutation = useMutation({
+    mutationFn: (id: number) => wallService.deleteWallPost(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wall-pending-posts', username] });
+    },
+    onError: () => {
+      toast.error(t('userProfilePage.wall.pending.rejectFailed'));
     },
   });
 
@@ -718,7 +743,7 @@ export default function WallSection({ username, isOwnProfile }: Props) {
   const data = wallQuery.data;
   const posts = data?.posts ?? [];
   const canPost = data?.can_post ?? false;
-  const wallVisibility = data?.wall_visibility ?? 'public';
+  const pendingPosts = pendingPostsQuery.data?.posts ?? [];
 
   return (
     <div className="space-y-3">
@@ -726,10 +751,53 @@ export default function WallSection({ username, isOwnProfile }: Props) {
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
           {t('userProfilePage.wall.heading')}
         </h3>
-        {isOwnProfile && (
-          <WallVisibilityPicker value={wallVisibility} onChange={(v) => visibilityMutation.mutate(v)} />
-        )}
       </div>
+
+      {isOwnProfile && pendingPosts.length > 0 && (
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
+          <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            {t('userProfilePage.wall.pending.heading')}
+          </h4>
+          {pendingPosts.map((post) => (
+            <div key={post.id} className="rounded-md border border-[var(--color-border)] p-2">
+              <div className="flex gap-2">
+                <Link to={`/users/${post.author_username}`} className="flex-shrink-0">
+                  <UserAvatar username={post.author_username} avatarUrl={post.author_avatar_url} />
+                </Link>
+                <div className="flex-1 min-w-0">
+                  <Link
+                    to={`/users/${post.author_username}`}
+                    className="text-sm font-semibold text-[var(--color-text-primary)] hover:underline"
+                  >
+                    {post.author_username}
+                  </Link>
+                  <p className="text-sm text-[var(--color-text-primary)] whitespace-pre-wrap break-words">
+                    {post.body}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => approvePostMutation.mutate(post.id)}
+                  disabled={approvePostMutation.isPending}
+                  className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {t('userProfilePage.wall.pending.approve')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => rejectPostMutation.mutate(post.id)}
+                  disabled={rejectPostMutation.isPending}
+                  className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-error)] disabled:opacity-50"
+                >
+                  {t('userProfilePage.wall.pending.reject')}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {canPost && (
         <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
@@ -750,13 +818,11 @@ export default function WallSection({ username, isOwnProfile }: Props) {
       )}
 
       {posts.length === 0 ? (
-        wallVisibility !== 'private' && (
-          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {isOwnProfile ? t('userProfilePage.wall.emptyOwner') : t('userProfilePage.wall.empty')}
-            </p>
-          </div>
-        )
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            {isOwnProfile ? t('userProfilePage.wall.emptyOwner') : t('userProfilePage.wall.empty')}
+          </p>
+        </div>
       ) : (
         posts.map((post) => (
           <WallPostCard

@@ -1,7 +1,6 @@
 import { api } from '../lib/api';
 import type {
   FriendEntry,
-  FriendRequestEntry,
   FriendRequestsResponse,
   FriendshipStatus,
 } from '../types/friends';

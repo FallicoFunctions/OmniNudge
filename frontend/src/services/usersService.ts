@@ -52,6 +52,10 @@ export const usersService = {
     return api.uploadFile<{ avatar_url: string; thumbnail_size: number }>('/users/me/avatar', file);
   },
 
+  async uploadBanner(file: File): Promise<{ banner_url: string }> {
+    return api.uploadFile<{ banner_url: string }>('/users/me/banner', file);
+  },
+
   async getPosts(username: string, limit = 20, offset = 0): Promise<UserPostsResponse> {
     return api.get<UserPostsResponse>(`/users/${username}/posts?limit=${limit}&offset=${offset}`, {
       cache: 'no-store',

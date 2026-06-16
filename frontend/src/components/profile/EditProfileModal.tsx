@@ -17,6 +17,7 @@ interface EditProfileModalProps {
   initialBannerUrl?: string | null;
   initialLocation?: string | null;
   onUploadAvatar?: (file: File) => Promise<string>;
+  onUploadBanner?: (file: File) => Promise<string>;
   isSaving?: boolean;
 }
 
@@ -30,6 +31,7 @@ export default function EditProfileModal({
   initialBannerUrl,
   initialLocation,
   onUploadAvatar,
+  onUploadBanner,
   isSaving = false,
 }: EditProfileModalProps) {
   const { t } = useTranslation();
@@ -39,6 +41,7 @@ export default function EditProfileModal({
   const [bannerUrl, setBannerUrl] = useState(initialBannerUrl ?? '');
   const [location, setLocation] = useState(initialLocation ?? '');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,6 +78,26 @@ export default function EditProfileModal({
     }
   };
 
+  const handleBannerFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !onUploadBanner) return;
+    setError(null);
+    setIsUploadingBanner(true);
+    try {
+      const uploadedUrl = await onUploadBanner(file);
+      setBannerUrl(uploadedUrl);
+    } catch (err) {
+      setError(
+        t('userProfilePage.edit.errors.uploadFailed', {
+          message: err instanceof Error ? err.message : t('common.error'),
+        })
+      );
+    } finally {
+      setIsUploadingBanner(false);
+      event.target.value = '';
+    }
+  };
+
   const handleSave = async () => {
     const trimmedBio = bio.trim();
     const trimmedAvatarUrl = avatarUrl.trim();
@@ -106,7 +129,8 @@ export default function EditProfileModal({
     if (
       trimmedBannerUrl &&
       !trimmedBannerUrl.startsWith('http://') &&
-      !trimmedBannerUrl.startsWith('https://')
+      !trimmedBannerUrl.startsWith('https://') &&
+      !trimmedBannerUrl.startsWith('/uploads/banners/')
     ) {
       setError('Banner URL must start with http:// or https://');
       return;
@@ -190,6 +214,25 @@ export default function EditProfileModal({
               placeholder="https://example.com/banner.jpg"
               className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
             />
+            {onUploadBanner && (
+              <div className="mt-2 flex items-center gap-2">
+                <label
+                  htmlFor="edit-profile-banner-file"
+                  className="inline-flex cursor-pointer items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                >
+                  {isUploadingBanner ? 'Uploading…' : 'Upload banner image'}
+                </label>
+                <input
+                  id="edit-profile-banner-file"
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  className="hidden"
+                  disabled={isUploadingBanner}
+                  onChange={(event) => { void handleBannerFileChange(event); }}
+                />
+                <span className="text-xs text-[var(--color-text-secondary)]">PNG, JPG, GIF, WebP · max 10MB</span>
+              </div>
+            )}
             <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
               Shown as the full-width banner behind your profile header.
             </p>
@@ -269,7 +312,7 @@ export default function EditProfileModal({
           <button
             type="button"
             onClick={onClose}
-            disabled={isSaving || isUploadingAvatar}
+            disabled={isSaving || isUploadingAvatar || isUploadingBanner}
             className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
           >
             {t('common.cancel')}
@@ -277,10 +320,10 @@ export default function EditProfileModal({
           <button
             type="button"
             onClick={() => void handleSave()}
-            disabled={isSaving || isUploadingAvatar}
+            disabled={isSaving || isUploadingAvatar || isUploadingBanner}
             className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
-            {isSaving ? t('common.loading') : isUploadingAvatar ? t('userProfilePage.edit.avatarUploading') : t('common.save')}
+            {isSaving ? t('common.loading') : isUploadingAvatar || isUploadingBanner ? t('userProfilePage.edit.avatarUploading') : t('common.save')}
           </button>
         </div>
       </div>
