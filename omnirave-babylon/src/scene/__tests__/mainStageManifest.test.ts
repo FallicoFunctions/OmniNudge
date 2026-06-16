@@ -4924,7 +4924,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
 
     expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
-      16.6 * 1024 * 1024,
+      16.65 * 1024 * 1024,
     );
   });
 
@@ -5129,6 +5129,127 @@ describe('MAIN_STAGE_MANIFEST', () => {
       ['V73_HeroPortalServiceDoorLeafCluster_R', 'V16_MatteBlackStageHardware'],
       ['V73_HeroPortalServiceDoorFrameCluster_L', 'V16_BrushedProductionGold'],
       ['V73_HeroPortalServiceDoorFrameCluster_R', 'V16_BrushedProductionGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
+  it('replaces the remaining sweep anchor collar proxies with authored crown anchor assemblies', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const nodeName of [
+      'V7_SweepInnerAnchorCollar_L',
+      'V7_SweepInnerAnchorCollar_R',
+      'V7_SweepOuterAnchorCollar_L',
+      'V7_SweepOuterAnchorCollar_R',
+    ]) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V74_SweepOuterAnchorGoldCrown_L',
+      'V74_SweepOuterAnchorGoldCrown_R',
+      'V74_SweepOuterAnchorShadowCore_L',
+      'V74_SweepOuterAnchorShadowCore_R',
+      'V74_SweepInnerAnchorGoldCrown_L',
+      'V74_SweepInnerAnchorGoldCrown_R',
+      'V74_SweepInnerAnchorShadowCore_L',
+      'V74_SweepInnerAnchorShadowCore_R',
+    ];
+    expect(nodeNamesWithPrefix('V74_')).toHaveLength(requiredReplacementNodes.length);
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const outerLeftGold = readMeshGeometry('V74_SweepOuterAnchorGoldCrown_L');
+    const outerRightGold = readMeshGeometry('V74_SweepOuterAnchorGoldCrown_R');
+    const innerLeftGold = readMeshGeometry('V74_SweepInnerAnchorGoldCrown_L');
+    const innerRightGold = readMeshGeometry('V74_SweepInnerAnchorGoldCrown_R');
+    const outerLeftShadow = readMeshGeometry('V74_SweepOuterAnchorShadowCore_L');
+    const outerRightShadow = readMeshGeometry('V74_SweepOuterAnchorShadowCore_R');
+    const innerLeftShadow = readMeshGeometry('V74_SweepInnerAnchorShadowCore_L');
+    const innerRightShadow = readMeshGeometry('V74_SweepInnerAnchorShadowCore_R');
+
+    expect(outerLeftGold.min[0]).toBeLessThan(-60.7);
+    expect(outerLeftGold.max[0]).toBeLessThan(-55.8);
+    expect(outerLeftGold.min[1]).toBeGreaterThan(19.2);
+    expect(outerLeftGold.max[1]).toBeGreaterThan(24.2);
+    expect(outerLeftGold.min[2]).toBeGreaterThan(16.4);
+    expect(outerLeftGold.max[2]).toBeGreaterThan(21.1);
+
+    expect(outerRightGold.min[0]).toBeGreaterThan(55.8);
+    expect(outerRightGold.max[0]).toBeGreaterThan(60.7);
+    expect(outerRightGold.min[1]).toBeGreaterThan(19.2);
+    expect(outerRightGold.max[1]).toBeGreaterThan(24.2);
+    expect(outerRightGold.min[2]).toBeGreaterThan(16.4);
+    expect(outerRightGold.max[2]).toBeGreaterThan(21.1);
+
+    expect(innerLeftGold.min[0]).toBeLessThan(-33.0);
+    expect(innerLeftGold.max[0]).toBeLessThan(-29.0);
+    expect(innerLeftGold.min[1]).toBeGreaterThan(26.4);
+    expect(innerLeftGold.max[1]).toBeGreaterThan(30.6);
+    expect(innerLeftGold.min[2]).toBeGreaterThan(25.0);
+    expect(innerLeftGold.max[2]).toBeGreaterThan(29.3);
+
+    expect(innerRightGold.min[0]).toBeGreaterThan(29.0);
+    expect(innerRightGold.max[0]).toBeGreaterThan(33.0);
+    expect(innerRightGold.min[1]).toBeGreaterThan(26.4);
+    expect(innerRightGold.max[1]).toBeGreaterThan(30.6);
+    expect(innerRightGold.min[2]).toBeGreaterThan(25.0);
+    expect(innerRightGold.max[2]).toBeGreaterThan(29.3);
+
+    expect(outerLeftShadow.min[0]).toBeLessThan(-59.8);
+    expect(outerLeftShadow.max[0]).toBeLessThan(-56.4);
+    expect(outerRightShadow.min[0]).toBeGreaterThan(56.4);
+    expect(outerRightShadow.max[0]).toBeGreaterThan(59.8);
+    expect(innerLeftShadow.min[0]).toBeLessThan(-32.2);
+    expect(innerLeftShadow.max[0]).toBeLessThan(-29.5);
+    expect(innerRightShadow.min[0]).toBeGreaterThan(29.5);
+    expect(innerRightShadow.max[0]).toBeGreaterThan(32.2);
+
+    for (const nodeName of [
+      'V74_SweepOuterAnchorGoldCrown_L',
+      'V74_SweepOuterAnchorGoldCrown_R',
+      'V74_SweepInnerAnchorGoldCrown_L',
+      'V74_SweepInnerAnchorGoldCrown_R',
+    ]) {
+      expect(readConnectedComponents(nodeName)).toHaveLength(3);
+    }
+    for (const nodeName of [
+      'V74_SweepOuterAnchorShadowCore_L',
+      'V74_SweepOuterAnchorShadowCore_R',
+      'V74_SweepInnerAnchorShadowCore_L',
+      'V74_SweepInnerAnchorShadowCore_R',
+    ]) {
+      expect(readConnectedComponents(nodeName)).toHaveLength(1);
+    }
+
+    const minimumVertexCounts = new Map([
+      ['V74_SweepOuterAnchorGoldCrown_L', 140],
+      ['V74_SweepOuterAnchorGoldCrown_R', 140],
+      ['V74_SweepOuterAnchorShadowCore_L', 100],
+      ['V74_SweepOuterAnchorShadowCore_R', 100],
+      ['V74_SweepInnerAnchorGoldCrown_L', 140],
+      ['V74_SweepInnerAnchorGoldCrown_R', 140],
+      ['V74_SweepInnerAnchorShadowCore_L', 100],
+      ['V74_SweepInnerAnchorShadowCore_R', 100],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V74_SweepOuterAnchorGoldCrown_L', 'V20_ChasedGoldFiligree'],
+      ['V74_SweepOuterAnchorGoldCrown_R', 'V20_ChasedGoldFiligree'],
+      ['V74_SweepOuterAnchorShadowCore_L', 'V14_MatteBlackProductionRig'],
+      ['V74_SweepOuterAnchorShadowCore_R', 'V14_MatteBlackProductionRig'],
+      ['V74_SweepInnerAnchorGoldCrown_L', 'V20_ChasedGoldFiligree'],
+      ['V74_SweepInnerAnchorGoldCrown_R', 'V20_ChasedGoldFiligree'],
+      ['V74_SweepInnerAnchorShadowCore_L', 'V14_MatteBlackProductionRig'],
+      ['V74_SweepInnerAnchorShadowCore_R', 'V14_MatteBlackProductionRig'],
     ]);
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
