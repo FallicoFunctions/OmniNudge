@@ -388,6 +388,14 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(exportScript).toMatch(/finally:[\s\S]*obj\.hide_viewport = previous_hide_viewport\[obj\.name\]/);
   });
 
+  it('temporarily triangulates legacy cylindrical structures before tangent export', () => {
+    expect(exportScript).toContain('TEMP_TANGENT_TRIANGULATE_MODIFIER');
+    expect(exportScript).toContain('V13_BasinFountainJet_');
+    expect(exportScript).toContain('V7_ArcadeCol_');
+    expect(exportScript).toContain('V7_PlazaLightMast_');
+    expect(exportScript).toContain('V8_SpawnGalleryCol_');
+  });
+
   it('exports named production and garden details for the Main Stage fidelity pass', () => {
     expectMainStageMarker('V16_CrownRiggingSpan');
     expectMainStageMarker('V16_VipGardenBasin_L');

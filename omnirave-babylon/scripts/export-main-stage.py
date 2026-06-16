@@ -9,6 +9,13 @@ output_dir.mkdir(parents=True, exist_ok=True)
 
 scene_output = output_dir / "main-stage.glb"
 collision_output = output_dir / "main-stage-collision.glb"
+TEMP_TANGENT_TRIANGULATE_MODIFIER = "OmniRaveTempTangentsTriangulate"
+TEMP_TANGENT_TRIANGULATE_PREFIXES = (
+    "V13_BasinFountainJet_",
+    "V7_ArcadeCol_",
+    "V7_PlazaLightMast_",
+    "V8_SpawnGalleryCol_",
+)
 
 
 def strip_unused_tangents(glb_path):
@@ -46,6 +53,21 @@ def strip_unused_tangents(glb_path):
     glb_path.write_bytes(data)
     print(f"Stripped unused tangents from {removed} Main Stage primitives")
 
+
+def ensure_temp_tangent_triangulation(objects):
+    added = 0
+    for obj in objects:
+        if obj.type != "MESH" or not obj.name.startswith(TEMP_TANGENT_TRIANGULATE_PREFIXES):
+            continue
+        if obj.modifiers.get(TEMP_TANGENT_TRIANGULATE_MODIFIER) is not None:
+            continue
+        modifier = obj.modifiers.new(TEMP_TANGENT_TRIANGULATE_MODIFIER, "TRIANGULATE")
+        modifier.quad_method = "BEAUTY"
+        modifier.ngon_method = "BEAUTY"
+        added += 1
+    if added:
+        print(f"Temporarily triangulated {added} legacy Main Stage cylindrical meshes for tangent export")
+
 collision_collection = bpy.data.collections.get("Collision")
 if collision_collection is None:
     raise RuntimeError('Expected a "Collision" collection for main-stage-collision.glb export')
@@ -66,6 +88,7 @@ for obj in bpy.context.scene.objects:
 if not visible_objects:
     raise RuntimeError("No visible Main Stage objects selected for main-stage.glb export")
 
+ensure_temp_tangent_triangulation(visible_objects)
 bpy.context.view_layer.objects.active = visible_objects[0]
 bpy.ops.export_scene.gltf(
     filepath=str(scene_output),
