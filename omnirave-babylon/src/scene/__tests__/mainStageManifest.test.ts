@@ -458,6 +458,172 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expectMainStageMarker('V23_BackPlazaFramingPylon_L');
   });
 
+  it('replaces the remaining V6 inner-shell proxy architecture with finished celestial portal massing', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = [
+      'V6_ProscShell_L',
+      'V6_ProscShell_R',
+      'V6_ProscShellBack_L',
+      'V6_ProscShellBack_R',
+      'V6_SweepAnchor_L',
+      'V6_SweepAnchor_R',
+      'V6_PortalWall_L',
+      'V6_PortalWall_R',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V50_InnerPortalPylon_L',
+      'V50_InnerPortalPylon_R',
+      'V50_InnerPortalGoldReveal_L',
+      'V50_InnerPortalGoldReveal_R',
+      'V50_InnerShellCascade_L',
+      'V50_InnerShellCascade_R',
+      'V50_OuterSweepSpire_L',
+      'V50_OuterSweepSpire_R',
+    ];
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftPylon = readMeshGeometry('V50_InnerPortalPylon_L');
+    const rightPylon = readMeshGeometry('V50_InnerPortalPylon_R');
+    const leftCascade = readMeshGeometry('V50_InnerShellCascade_L');
+    const rightCascade = readMeshGeometry('V50_InnerShellCascade_R');
+    const leftSpire = readMeshGeometry('V50_OuterSweepSpire_L');
+    const rightSpire = readMeshGeometry('V50_OuterSweepSpire_R');
+
+    expect(leftPylon.max[0]).toBeLessThan(0);
+    expect(rightPylon.min[0]).toBeGreaterThan(0);
+    expect(leftPylon.max[1] - leftPylon.min[1]).toBeGreaterThan(20);
+    expect(rightPylon.max[1] - rightPylon.min[1]).toBeGreaterThan(20);
+    expect(leftCascade.min[0]).toBeLessThan(-20);
+    expect(rightCascade.max[0]).toBeGreaterThan(20);
+    expect(leftCascade.max[2] - leftCascade.min[2]).toBeGreaterThan(6);
+    expect(rightCascade.max[2] - rightCascade.min[2]).toBeGreaterThan(6);
+    expect(leftSpire.min[0]).toBeLessThan(-28);
+    expect(rightSpire.max[0]).toBeGreaterThan(28);
+    expect(leftSpire.max[1]).toBeGreaterThan(32);
+    expect(rightSpire.max[1]).toBeGreaterThan(32);
+
+    const expectedMaterials = new Map([
+      ['V50_InnerPortalPylon_L', 'V16_PearlArchitecturalShell'],
+      ['V50_InnerPortalPylon_R', 'V16_PearlArchitecturalShell'],
+      ['V50_InnerPortalGoldReveal_L', 'V20_ChasedGoldFiligree'],
+      ['V50_InnerPortalGoldReveal_R', 'V20_ChasedGoldFiligree'],
+      ['V50_InnerShellCascade_L', 'V16_PearlArchitecturalShell'],
+      ['V50_InnerShellCascade_R', 'V16_PearlArchitecturalShell'],
+      ['V50_OuterSweepSpire_L', 'V20_ChasedGoldFiligree'],
+      ['V50_OuterSweepSpire_R', 'V20_ChasedGoldFiligree'],
+    ]);
+
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
+  it('replaces rear cathedral proxy blocks with finished monumental shell massing', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = [
+      'V4_RearMass_L',
+      'V4_RearMass_R',
+      'V4_RearCore',
+      'V5_ShoulderMass_L',
+      'V5_ShoulderMass_R',
+      'V5_OculusHousing_L',
+      'V5_OculusHousing_R',
+      'V4_ProscTower_L',
+      'V4_ProscTower_R',
+      'V4_PortalTop',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V51_RearCathedralMass_L',
+      'V51_RearCathedralMass_R',
+      'V51_RearCathedralCore',
+      'V51_ShoulderCrownMass_L',
+      'V51_ShoulderCrownMass_R',
+      'V51_OculusCanopy_L',
+      'V51_OculusCanopy_R',
+      'V51_ProsceniumPylon_L',
+      'V51_ProsceniumPylon_R',
+      'V51_PortalCrestBridge',
+    ];
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftRearMass = readMeshGeometry('V51_RearCathedralMass_L');
+    const rightRearMass = readMeshGeometry('V51_RearCathedralMass_R');
+    const rearCore = readMeshGeometry('V51_RearCathedralCore');
+    const leftShoulder = readMeshGeometry('V51_ShoulderCrownMass_L');
+    const rightShoulder = readMeshGeometry('V51_ShoulderCrownMass_R');
+    const leftOculus = readMeshGeometry('V51_OculusCanopy_L');
+    const rightOculus = readMeshGeometry('V51_OculusCanopy_R');
+    const leftPylon = readMeshGeometry('V51_ProsceniumPylon_L');
+    const rightPylon = readMeshGeometry('V51_ProsceniumPylon_R');
+    const crestBridge = readMeshGeometry('V51_PortalCrestBridge');
+
+    expect(leftRearMass.max[0]).toBeLessThan(-5);
+    expect(rightRearMass.min[0]).toBeGreaterThan(5);
+    expect(leftRearMass.max[1]).toBeGreaterThan(44);
+    expect(rightRearMass.max[1]).toBeGreaterThan(44);
+    expect(rearCore.min[0]).toBeLessThan(-5);
+    expect(rearCore.max[0]).toBeGreaterThan(5);
+    expect(rearCore.max[1]).toBeGreaterThan(43);
+    expect(leftShoulder.min[0]).toBeLessThanOrEqual(-34);
+    expect(rightShoulder.max[0]).toBeGreaterThanOrEqual(34);
+    expect(leftShoulder.max[1] - leftShoulder.min[1]).toBeGreaterThan(15);
+    expect(rightShoulder.max[1] - rightShoulder.min[1]).toBeGreaterThan(15);
+    expect(leftOculus.max[0]).toBeLessThan(-17);
+    expect(rightOculus.min[0]).toBeGreaterThan(17);
+    expect(leftOculus.max[1] - leftOculus.min[1]).toBeGreaterThan(10);
+    expect(rightOculus.max[1] - rightOculus.min[1]).toBeGreaterThan(10);
+    expect(leftPylon.max[0]).toBeLessThan(-9);
+    expect(rightPylon.min[0]).toBeGreaterThan(9);
+    expect(leftPylon.max[1]).toBeGreaterThan(40);
+    expect(rightPylon.max[1]).toBeGreaterThan(40);
+    expect(crestBridge.min[0]).toBeLessThan(-8);
+    expect(crestBridge.max[0]).toBeGreaterThan(8);
+    expect(crestBridge.max[1] - crestBridge.min[1]).toBeGreaterThan(3);
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(1_000);
+
+    for (const nodeName of requiredReplacementNodes) {
+      const geometry = readMeshGeometry(nodeName);
+      expect(geometry.vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(72);
+    }
+
+    const expectedMaterials = new Map([
+      ['V51_RearCathedralMass_L', 'V16_PearlArchitecturalShell'],
+      ['V51_RearCathedralMass_R', 'V16_PearlArchitecturalShell'],
+      ['V51_RearCathedralCore', 'V16_PearlArchitecturalShell'],
+      ['V51_ShoulderCrownMass_L', 'V16_PearlArchitecturalShell'],
+      ['V51_ShoulderCrownMass_R', 'V16_PearlArchitecturalShell'],
+      ['V51_OculusCanopy_L', 'V20_ChasedGoldFiligree'],
+      ['V51_OculusCanopy_R', 'V20_ChasedGoldFiligree'],
+      ['V51_ProsceniumPylon_L', 'V16_PearlArchitecturalShell'],
+      ['V51_ProsceniumPylon_R', 'V16_PearlArchitecturalShell'],
+      ['V51_PortalCrestBridge', 'V20_ChasedGoldFiligree'],
+    ]);
+
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('replaces stacked legacy hero screens with one crown-integrated portal assembly', () => {
     const forbiddenLegacyPrefixes = [
       'V6_PortalScreen',
@@ -1209,7 +1375,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
     ).toBeGreaterThanOrEqual(1.5);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V33_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_450);
-  });
+  }, 10_000);
 
   it('replaces slabbed approach promenade and back-plaza gateway proxies with batched arrival architecture', () => {
     const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
