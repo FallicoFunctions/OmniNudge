@@ -4662,6 +4662,97 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the central promenade proxy slab with an authored ceremonial runway assembly', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const nodeName of ['V5_Promenade', 'V5_PromenadeTrim']) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V70_PromenadePearlRunway',
+      'V70_PromenadeGoldShoulders',
+      'V70_PromenadeCyanSpine',
+      'V70_PromenadeShadowKeel',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const pearlRunway = readMeshGeometry('V70_PromenadePearlRunway');
+    const goldShoulders = readMeshGeometry('V70_PromenadeGoldShoulders');
+    const cyanSpine = readMeshGeometry('V70_PromenadeCyanSpine');
+    const shadowKeel = readMeshGeometry('V70_PromenadeShadowKeel');
+
+    expect(pearlRunway.min[0]).toBeLessThan(-5.2);
+    expect(pearlRunway.max[0]).toBeGreaterThan(5.2);
+    expect(pearlRunway.min[1]).toBeLessThan(-10.8);
+    expect(pearlRunway.max[1]).toBeGreaterThan(40.8);
+    expect(pearlRunway.min[2]).toBeLessThan(-0.62);
+    expect(pearlRunway.max[2]).toBeLessThan(-0.08);
+
+    expect(goldShoulders.min[0]).toBeLessThan(-5.0);
+    expect(goldShoulders.max[0]).toBeGreaterThan(5.0);
+    expect(goldShoulders.min[1]).toBeLessThan(-10.0);
+    expect(goldShoulders.max[1]).toBeGreaterThan(40.0);
+    expect(goldShoulders.min[2]).toBeLessThan(-0.74);
+    expect(goldShoulders.max[2]).toBeLessThan(-0.22);
+
+    expect(cyanSpine.min[0]).toBeLessThan(-1.0);
+    expect(cyanSpine.max[0]).toBeGreaterThan(1.0);
+    expect(cyanSpine.min[1]).toBeLessThan(-9.4);
+    expect(cyanSpine.max[1]).toBeGreaterThan(39.4);
+    expect(cyanSpine.min[2]).toBeLessThan(-0.58);
+    expect(cyanSpine.max[2]).toBeLessThan(-0.18);
+
+    expect(shadowKeel.min[0]).toBeLessThan(-5.1);
+    expect(shadowKeel.max[0]).toBeGreaterThan(5.1);
+    expect(shadowKeel.min[1]).toBeLessThan(-10.2);
+    expect(shadowKeel.max[1]).toBeGreaterThan(40.2);
+    expect(shadowKeel.min[2]).toBeLessThan(-0.18);
+    expect(shadowKeel.max[2]).toBeGreaterThan(0.0);
+
+    expect(readConnectedComponents('V70_PromenadePearlRunway')).toHaveLength(1);
+    expect(readConnectedComponents('V70_PromenadeGoldShoulders')).toHaveLength(2);
+    expect(readConnectedComponents('V70_PromenadeCyanSpine')).toHaveLength(1);
+    expect(readConnectedComponents('V70_PromenadeShadowKeel')).toHaveLength(1);
+
+    const shoulderCenters = readConnectedComponents('V70_PromenadeGoldShoulders').map(({ min, max }) => [
+      (min[0] + max[0]) / 2,
+      (min[1] + max[1]) / 2,
+      (min[2] + max[2]) / 2,
+    ]);
+    expect(shoulderCenters.some(([x, y, _z]) => x < -3.0 && Math.abs(y - 15.0) < 0.4)).toBe(true);
+    expect(shoulderCenters.some(([x, y, _z]) => x > 3.0 && Math.abs(y - 15.0) < 0.4)).toBe(true);
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(1_800);
+
+    const minimumVertexCounts = new Map([
+      ['V70_PromenadePearlRunway', 500],
+      ['V70_PromenadeGoldShoulders', 700],
+      ['V70_PromenadeCyanSpine', 220],
+      ['V70_PromenadeShadowKeel', 220],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V70_PromenadePearlRunway', 'V19_GatewayPearlIvory'],
+      ['V70_PromenadeGoldShoulders', 'V19_ArrivalBrushedGold'],
+      ['V70_PromenadeCyanSpine', 'V7_AccentGlow'],
+      ['V70_PromenadeShadowKeel', 'V20_RecessedWarmShadow'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports real PBR texture maps for the Main Stage material families', () => {
     const images = mainStageGlbJson.images ?? [];
     const textures = mainStageGlbJson.textures ?? [];
