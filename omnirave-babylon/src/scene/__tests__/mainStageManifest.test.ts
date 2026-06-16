@@ -2590,6 +2590,95 @@ describe('MAIN_STAGE_MANIFEST', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_167);
   });
 
+  it('replaces the legacy crown tower monolith with a layered celestial obelisk assembly', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const forbiddenLegacyNodes = [
+      'V4_CrownTower',
+      'V4_CrownSpire',
+      'V4_CrownApex',
+      'V7_CrownTowerGoldBand_44',
+      'V7_CrownTowerGoldBand_50',
+      'V7_CrownTowerGoldBand_56',
+      'V7_CrownTowerGoldBand_62',
+      'V14_CrownTowerVerticalInlay_0',
+      'V14_CrownTowerVerticalInlay_1',
+      'V14_CrownTowerVerticalInlay_2',
+      'V14_CrownTowerVerticalInlay_3',
+      'V14_CrownTowerVerticalInlay_4',
+      'V14_CrownApexCyanCrystal',
+      'V14_CrownCrystalPedestalGold',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V52_CrownObeliskPearlCore',
+      'V52_CrownObeliskGoldTracery',
+      'V52_CrownObeliskShadowSpine',
+      'V52_CrownSpirePearlBlade_L',
+      'V52_CrownSpirePearlBlade_R',
+      'V52_CrownSpireGoldFin_L',
+      'V52_CrownSpireGoldFin_R',
+      'V52_CrownApexCrystal',
+      'V52_CrownApexPedestal',
+    ];
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const pearlCore = readMeshGeometry('V52_CrownObeliskPearlCore');
+    const tracery = readMeshGeometry('V52_CrownObeliskGoldTracery');
+    const shadowSpine = readMeshGeometry('V52_CrownObeliskShadowSpine');
+    const leftBlade = readMeshGeometry('V52_CrownSpirePearlBlade_L');
+    const rightBlade = readMeshGeometry('V52_CrownSpirePearlBlade_R');
+    const leftFin = readMeshGeometry('V52_CrownSpireGoldFin_L');
+    const rightFin = readMeshGeometry('V52_CrownSpireGoldFin_R');
+    const crystal = readMeshGeometry('V52_CrownApexCrystal');
+    const pedestal = readMeshGeometry('V52_CrownApexPedestal');
+
+    expect(pearlCore.min[0]).toBeLessThan(-2.2);
+    expect(pearlCore.max[0]).toBeGreaterThan(2.2);
+    expect(pearlCore.max[1]).toBeGreaterThan(71);
+    expect(pearlCore.max[2]).toBeGreaterThan(49);
+    expect(tracery.max[1]).toBeGreaterThan(72);
+    expect(shadowSpine.min[2]).toBeGreaterThan(43);
+    expect(leftBlade.max[0]).toBeLessThan(0);
+    expect(rightBlade.min[0]).toBeGreaterThan(0);
+    expect(leftBlade.max[1]).toBeGreaterThan(78);
+    expect(rightBlade.max[1]).toBeGreaterThan(78);
+    expect(leftFin.max[1]).toBeGreaterThan(77);
+    expect(rightFin.max[1]).toBeGreaterThan(77);
+    expect(crystal.max[1]).toBeGreaterThan(80);
+    expect(crystal.max[0] - crystal.min[0]).toBeGreaterThan(4);
+    expect(pedestal.max[1]).toBeGreaterThan(76);
+    expect(pedestal.max[2] - pedestal.min[2]).toBeGreaterThan(0.5);
+
+    const vertexTotal = requiredReplacementNodes
+      .map((nodeName) => readMeshGeometry(nodeName))
+      .reduce((sum, geometry) => sum + geometry.vertexCount, 0);
+    expect(vertexTotal).toBeGreaterThan(900);
+    for (const nodeName of requiredReplacementNodes) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(48);
+    }
+
+    const expectedMaterials = new Map([
+      ['V52_CrownObeliskPearlCore', 'V16_PearlArchitecturalShell'],
+      ['V52_CrownObeliskGoldTracery', 'V20_ChasedGoldFiligree'],
+      ['V52_CrownObeliskShadowSpine', 'V20_RecessedWarmShadow'],
+      ['V52_CrownSpirePearlBlade_L', 'V16_PearlArchitecturalShell'],
+      ['V52_CrownSpirePearlBlade_R', 'V16_PearlArchitecturalShell'],
+      ['V52_CrownSpireGoldFin_L', 'V20_ChasedGoldFiligree'],
+      ['V52_CrownSpireGoldFin_R', 'V20_ChasedGoldFiligree'],
+      ['V52_CrownApexCrystal', 'V20_CelestialCyanGlass'],
+      ['V52_CrownApexPedestal', 'V20_ChasedGoldFiligree'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports real PBR texture maps for the Main Stage material families', () => {
     const images = mainStageGlbJson.images ?? [];
     const textures = mainStageGlbJson.textures ?? [];
@@ -2812,7 +2901,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
   });
 
   it('reuses the established Main Stage material library for the V24 crown pass', () => {
-    expect(mainStageGlbJson.materials).toHaveLength(55);
+    expect(mainStageGlbJson.materials).toHaveLength(54);
     expect(
       mainStageGlbJson.materials.some(({ name }: { name?: string }) => name?.startsWith('V24_')),
     ).toBe(false);
