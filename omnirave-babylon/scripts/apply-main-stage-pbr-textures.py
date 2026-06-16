@@ -99,7 +99,8 @@ def apply_texture_set(material_name, texture_set_name):
     if material is None:
         return False
 
-    material.use_nodes = True
+    if material.node_tree is None:
+        raise RuntimeError(f"{material_name} has no node tree")
     nodes = material.node_tree.nodes
     links = material.node_tree.links
     principled = nodes.get("Principled BSDF")
@@ -143,7 +144,7 @@ def apply_texture_set(material_name, texture_set_name):
 
 
 def remove_omnirave_texture_nodes(material):
-    if not material or not material.use_nodes:
+    if not material or material.node_tree is None:
         return
     for node in list(material.node_tree.nodes):
         if node.name.startswith("OmniRaveTexture_"):
