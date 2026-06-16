@@ -62,6 +62,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+          install-mode: goinstall
           working-directory: backend
           args: --timeout=5m
           skip-cache: false
@@ -209,6 +210,7 @@ jobs:
           DB_PASSWORD: omninudge
           DB_NAME: omninudge_test
           DB_SSLMODE: disable
+          JWT_SECRET: ci-test-secret-not-used-in-prod
         run: go run ./cmd/migrate/... -action=up
 
       - name: Seed test data
@@ -310,6 +312,7 @@ jobs:
           DB_PASSWORD: omninudge
           DB_NAME: omninudge_migrations
           DB_SSLMODE: disable
+          JWT_SECRET: ci-test-secret-not-used-in-prod
         run: go run ./cmd/migrate/... -action=up
 
       - name: Verify all up files have matching down files

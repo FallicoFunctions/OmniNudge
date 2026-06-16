@@ -27,7 +27,7 @@ describe('classifyPlatformExternalUrl', () => {
 
   it('falls back to render_no_media for Pornhub video URLs', () => {
     const result = classifyPlatformExternalUrl(
-      'https://www.pornhub.com/view_video.php?viewkey=ph5f1234567890'
+      'https://www.pornhub.com/view_video.php?viewkey=ph5f1234567890' // gitleaks:allow
     );
 
     expect(result?.id).toBe('pornhub');
