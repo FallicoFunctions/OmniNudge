@@ -35,6 +35,7 @@ type WallPost struct {
 	CommentCount     int             `json:"comment_count"`
 	LikedByViewer    bool            `json:"liked_by_viewer"`
 	DislikedByViewer bool            `json:"disliked_by_viewer"`
+	Status           string          `json:"status"`
 	CreatedAt        time.Time       `json:"created_at"`
 	UpdatedAt        time.Time       `json:"updated_at"`
 }
@@ -74,17 +75,21 @@ func NewWallPostRepository(pool *pgxpool.Pool) *WallPostRepository {
 
 // Create inserts a new wall post.
 func (r *WallPostRepository) Create(ctx context.Context, post *WallPost) error {
-	mediaJSON, err := json.Marshal(post.Media)
+	media := post.Media
+	if media == nil {
+		media = []WallPostMedia{}
+	}
+	mediaJSON, err := json.Marshal(media)
 	if err != nil {
 		return fmt.Errorf("marshal wall post media: %w", err)
 	}
 
 	query := `
-		INSERT INTO wall_posts (profile_user_id, author_id, body, media)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO wall_posts (profile_user_id, author_id, body, media, status)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, like_count, comment_count, created_at, updated_at
 	`
-	return r.pool.QueryRow(ctx, query, post.ProfileUserID, post.AuthorID, post.Body, mediaJSON).Scan(
+	return r.pool.QueryRow(ctx, query, post.ProfileUserID, post.AuthorID, post.Body, mediaJSON, post.Status).Scan(
 		&post.ID,
 		&post.LikeCount,
 		&post.CommentCount,
@@ -98,13 +103,13 @@ func (r *WallPostRepository) Create(ctx context.Context, post *WallPost) error {
 func (r *WallPostRepository) GetByProfileUserID(ctx context.Context, profileUserID, viewerID, limit, offset int) ([]*WallPost, error) {
 	query := `
 		SELECT wp.id, wp.profile_user_id, wp.author_id, u.username, u.avatar_url,
-		       wp.body, wp.media, wp.like_count, wp.dislike_count, wp.comment_count, wp.created_at, wp.updated_at,
+		       wp.body, wp.media, wp.like_count, wp.dislike_count, wp.comment_count, wp.status, wp.created_at, wp.updated_at,
 		       COALESCE(wl.reaction_type = 'like', FALSE) AS liked_by_viewer,
 		       COALESCE(wl.reaction_type = 'dislike', FALSE) AS disliked_by_viewer
 		FROM wall_posts wp
 		JOIN users u ON u.id = wp.author_id
 		LEFT JOIN wall_post_likes wl ON wl.wall_post_id = wp.id AND wl.user_id = $4
-		WHERE wp.profile_user_id = $1 AND wp.is_deleted = FALSE
+		WHERE wp.profile_user_id = $1 AND wp.is_deleted = FALSE AND wp.status = 'approved'
 		ORDER BY wp.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
@@ -130,6 +135,7 @@ func (r *WallPostRepository) GetByProfileUserID(ctx context.Context, profileUser
 			&post.LikeCount,
 			&post.DislikeCount,
 			&post.CommentCount,
+			&post.Status,
 			&post.CreatedAt,
 			&post.UpdatedAt,
 			&post.LikedByViewer,
@@ -147,11 +153,95 @@ func (r *WallPostRepository) GetByProfileUserID(ctx context.Context, profileUser
 	return posts, rows.Err()
 }
 
+// GetPendingByProfileUserID returns wall posts awaiting approval for a profile,
+// oldest first, viewed from the profile owner's perspective.
+func (r *WallPostRepository) GetPendingByProfileUserID(ctx context.Context, profileUserID, limit, offset int) ([]*WallPost, error) {
+	query := `
+		SELECT wp.id, wp.profile_user_id, wp.author_id, u.username, u.avatar_url,
+		       wp.body, wp.media, wp.like_count, wp.dislike_count, wp.comment_count, wp.status, wp.created_at, wp.updated_at,
+		       COALESCE(wl.reaction_type = 'like', FALSE) AS liked_by_viewer,
+		       COALESCE(wl.reaction_type = 'dislike', FALSE) AS disliked_by_viewer
+		FROM wall_posts wp
+		JOIN users u ON u.id = wp.author_id
+		LEFT JOIN wall_post_likes wl ON wl.wall_post_id = wp.id AND wl.user_id = $1
+		WHERE wp.profile_user_id = $1 AND wp.is_deleted = FALSE AND wp.status = 'pending'
+		ORDER BY wp.created_at ASC
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := r.pool.Query(ctx, query, profileUserID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	posts := []*WallPost{}
+	for rows.Next() {
+		post := &WallPost{}
+		var mediaBytes []byte
+		if err := rows.Scan(
+			&post.ID,
+			&post.ProfileUserID,
+			&post.AuthorID,
+			&post.AuthorUsername,
+			&post.AuthorAvatarURL,
+			&post.Body,
+			&mediaBytes,
+			&post.LikeCount,
+			&post.DislikeCount,
+			&post.CommentCount,
+			&post.Status,
+			&post.CreatedAt,
+			&post.UpdatedAt,
+			&post.LikedByViewer,
+			&post.DislikedByViewer,
+		); err != nil {
+			return nil, err
+		}
+		if len(mediaBytes) > 0 && string(mediaBytes) != "null" {
+			if err := json.Unmarshal(mediaBytes, &post.Media); err != nil {
+				return nil, fmt.Errorf("unmarshal wall post media: %w", err)
+			}
+		}
+		posts = append(posts, post)
+	}
+	return posts, rows.Err()
+}
+
+// ApprovePost flips a pending wall post to approved.
+func (r *WallPostRepository) ApprovePost(ctx context.Context, id int) error {
+	_, err := r.pool.Exec(ctx, `UPDATE wall_posts SET status = 'approved', updated_at = NOW() WHERE id = $1 AND status = 'pending'`, id)
+	return err
+}
+
+// WallStats holds aggregate counts for a profile's wall.
+type WallStats struct {
+	OwnPostCount int
+	ReplyCount   int
+	PhotoCount   int
+}
+
+// GetWallStats returns aggregate counts for profileUserID's wall: posts authored
+// by the profile owner, posts authored by others, and total media items across
+// all non-deleted wall posts.
+func (r *WallPostRepository) GetWallStats(ctx context.Context, profileUserID int) (WallStats, error) {
+	var stats WallStats
+	err := r.pool.QueryRow(ctx, `
+		SELECT
+			COUNT(*) FILTER (WHERE author_id = profile_user_id),
+			COUNT(*) FILTER (WHERE author_id != profile_user_id),
+			COALESCE(SUM(CASE WHEN jsonb_typeof(media) = 'array' THEN jsonb_array_length(media) ELSE 0 END), 0)
+		FROM wall_posts
+		WHERE profile_user_id = $1 AND is_deleted = FALSE AND status = 'approved'
+	`, profileUserID).Scan(&stats.OwnPostCount, &stats.ReplyCount, &stats.PhotoCount)
+	return stats, err
+}
+
 // GetByID returns a single wall post by id, or nil if not found / deleted.
 func (r *WallPostRepository) GetByID(ctx context.Context, id int) (*WallPost, error) {
 	query := `
 		SELECT wp.id, wp.profile_user_id, wp.author_id, u.username, u.avatar_url,
-		       wp.body, wp.like_count, wp.dislike_count, wp.comment_count, wp.created_at, wp.updated_at
+		       wp.body, wp.like_count, wp.dislike_count, wp.comment_count, wp.status, wp.created_at, wp.updated_at
 		FROM wall_posts wp
 		JOIN users u ON u.id = wp.author_id
 		WHERE wp.id = $1 AND wp.is_deleted = FALSE
@@ -168,6 +258,7 @@ func (r *WallPostRepository) GetByID(ctx context.Context, id int) (*WallPost, er
 		&post.LikeCount,
 		&post.DislikeCount,
 		&post.CommentCount,
+		&post.Status,
 		&post.CreatedAt,
 		&post.UpdatedAt,
 	)

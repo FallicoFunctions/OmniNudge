@@ -206,6 +206,16 @@ func (r *UserFriendshipRepository) ListFriends(ctx context.Context, userID int) 
 	return friends, rows.Err()
 }
 
+// CountFriends returns the number of accepted friends for userID.
+func (r *UserFriendshipRepository) CountFriends(ctx context.Context, userID int) (int, error) {
+	var count int
+	err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM user_friendships
+		WHERE status = 'accepted' AND (user_id = $1 OR friend_user_id = $1)
+	`, userID).Scan(&count)
+	return count, err
+}
+
 // MutualFriendEntry describes a friend shared between two users.
 type MutualFriendEntry struct {
 	UserID    int     `json:"id"`

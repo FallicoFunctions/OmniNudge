@@ -534,7 +534,7 @@ func main() {
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService, cache, queueClient).WithAutoDeleteService(autoDeleteSvc)
 	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache, thumbnailService, db.Pool)
 	wallPostRepo := repository.NewPostgresWallPostRepository(db.Pool)
-	wallHandler := handlers.NewWallHandler(db.Pool, wallPostRepo, userRepo, userProfileRepo, userFriendshipRepo)
+	wallHandler := handlers.NewWallHandler(db.Pool, wallPostRepo, userRepo, userFriendshipRepo, userSettingsRepo)
 	mediaQuota := handlers.MediaQuotaConfig{
 		FreeTierBytes: cfg.Media.FreeTierQuotaBytes,
 		ProTierBytes:  cfg.Media.ProTierQuotaBytes,
@@ -1284,12 +1284,14 @@ func main() {
 			protected.GET("/users/me/storage", storageHandler.GetMyStorage)
 			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
 			protected.PUT("/users/me/top-friends", usersHandler.SetTopFriends)
-			protected.PUT("/users/me/wall-visibility", wallHandler.SetWallVisibility)
 			protected.POST("/users/me/avatar", usersHandler.UploadMyAvatar)
+			protected.POST("/users/me/banner", usersHandler.UploadMyBanner)
 
 			// Profile wall
+			protected.GET("/users/me/wall/pending", wallHandler.GetPendingWallPosts)
 			protected.POST("/users/:username/wall", wallHandler.CreateWallPost)
 			protected.DELETE("/wall-posts/:id", wallHandler.DeleteWallPost)
+			protected.POST("/wall-posts/:id/approve", wallHandler.ApproveWallPost)
 			protected.POST("/wall-posts/:id/reaction", wallHandler.SetWallPostReaction)
 			protected.POST("/wall-posts/:id/comments", wallHandler.CreateWallPostComment)
 			protected.DELETE("/wall-posts/:id/comments/:commentId", wallHandler.DeleteWallPostComment)

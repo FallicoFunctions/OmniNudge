@@ -56,6 +56,7 @@ type updateSettingsRequest struct {
 	ShowTypingIndicators         *bool   `json:"show_typing_indicators"`
 	ShowLastSeen                 *bool   `json:"show_last_seen"`
 	ProfileVisibility            *string `json:"profile_visibility"`
+	WallPostPermission           *string `json:"wall_post_permission"`
 	ShowPushNotifications        *bool   `json:"show_push_notifications"` // P0-042
 	AutoAppendInvitation         *bool   `json:"auto_append_invitation"`
 	Theme                        *string `json:"theme"`
@@ -143,10 +144,20 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if req.ProfileVisibility != nil {
 		v := strings.ToLower(strings.TrimSpace(*req.ProfileVisibility))
 		switch v {
-		case "public", "friends_only", "private":
+		case "public", "private":
 			settings.ProfileVisibility = v
 		default:
 			RespondError(c, http.StatusBadRequest, "Invalid profile_visibility")
+			return
+		}
+	}
+	if req.WallPostPermission != nil {
+		v := strings.ToLower(strings.TrimSpace(*req.WallPostPermission))
+		switch v {
+		case "all_friends", "requires_approval", "no_one":
+			settings.WallPostPermission = v
+		default:
+			RespondError(c, http.StatusBadRequest, "Invalid wall_post_permission")
 			return
 		}
 	}

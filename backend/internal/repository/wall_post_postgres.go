@@ -27,6 +27,18 @@ func (r *PostgresWallPostRepository) GetByProfileUserID(ctx context.Context, pro
 	return r.inner.GetByProfileUserID(ctx, profileUserID, viewerID, limit, offset)
 }
 
+func (r *PostgresWallPostRepository) GetPendingByProfileUserID(ctx context.Context, profileUserID, limit, offset int) ([]*models.WallPost, error) {
+	return r.inner.GetPendingByProfileUserID(ctx, profileUserID, limit, offset)
+}
+
+func (r *PostgresWallPostRepository) ApprovePost(ctx context.Context, id int) error {
+	return r.inner.ApprovePost(ctx, id)
+}
+
+func (r *PostgresWallPostRepository) GetWallStats(ctx context.Context, profileUserID int) (models.WallStats, error) {
+	return r.inner.GetWallStats(ctx, profileUserID)
+}
+
 func (r *PostgresWallPostRepository) GetByID(ctx context.Context, id int) (*models.WallPost, error) {
 	return r.inner.GetByID(ctx, id)
 }

@@ -263,6 +263,48 @@ func (s *NotificationService) NotifyWallPost(ctx context.Context, profileUserID,
 	}
 }
 
+// NotifyWallPostPending notifies a profile owner that a friend's wall post needs approval.
+func (s *NotificationService) NotifyWallPostPending(ctx context.Context, profileUserID, authorID, wallPostID int, authorUsername string) {
+	if profileUserID == authorID {
+		return
+	}
+
+	contentType := "wall_post"
+	notif := &models.Notification{
+		UserID:           profileUserID,
+		NotificationType: "wall_post_pending",
+		ContentType:      &contentType,
+		ContentID:        &wallPostID,
+		ActorID:          &authorID,
+		Message:          fmt.Sprintf("%s's wall post is awaiting your approval", authorUsername),
+	}
+
+	if err := s.sendNotification(ctx, notif); err != nil {
+		log.Printf("[NotificationService] NotifyWallPostPending: failed for wall post %d actor %d: %v", wallPostID, authorID, err)
+	}
+}
+
+// NotifyWallPostApproved notifies a wall post's author that the profile owner approved it.
+func (s *NotificationService) NotifyWallPostApproved(ctx context.Context, authorID, profileUserID, wallPostID int, profileUsername string) {
+	if authorID == profileUserID {
+		return
+	}
+
+	contentType := "wall_post"
+	notif := &models.Notification{
+		UserID:           authorID,
+		NotificationType: "wall_post_approved",
+		ContentType:      &contentType,
+		ContentID:        &wallPostID,
+		ActorID:          &profileUserID,
+		Message:          fmt.Sprintf("%s approved your wall post", profileUsername),
+	}
+
+	if err := s.sendNotification(ctx, notif); err != nil {
+		log.Printf("[NotificationService] NotifyWallPostApproved: failed for wall post %d actor %d: %v", wallPostID, profileUserID, err)
+	}
+}
+
 // NotifyWallComment notifies a wall post's author that someone commented on it.
 func (s *NotificationService) NotifyWallComment(ctx context.Context, postAuthorID, commenterID, wallPostID int, commenterUsername string) {
 	if postAuthorID == commenterID {
