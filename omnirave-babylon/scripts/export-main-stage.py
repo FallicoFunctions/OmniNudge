@@ -15,6 +15,9 @@ TEMP_TANGENT_TRIANGULATE_PREFIXES = (
     "V7_ArcadeCol_",
     "V7_PlazaLightMast_",
     "V8_SpawnGalleryCol_",
+    "V87_WingFacadeShadowFrameArray_",
+    "V87_WingFacadeShadowVaultArray_",
+    "V87_WingFacadeGoldLintelArray_",
 )
 
 
