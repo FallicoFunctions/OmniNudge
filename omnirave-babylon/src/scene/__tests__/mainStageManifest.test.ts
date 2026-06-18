@@ -6149,6 +6149,98 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
   });
 
+  it('replaces the spawn-lane crowd-control proxy bars with authored barrier assemblies', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const retiredCrowdControlNodes = [
+      'V13_CrowdControlFoot_L_0',
+      'V13_CrowdControlFoot_L_1',
+      'V13_CrowdControlFoot_L_2',
+      'V13_CrowdControlFoot_L_3',
+      'V13_CrowdControlFoot_R_0',
+      'V13_CrowdControlFoot_R_1',
+      'V13_CrowdControlFoot_R_2',
+      'V13_CrowdControlFoot_R_3',
+      'V13_CrowdControlRail_L_0',
+      'V13_CrowdControlRail_L_1',
+      'V13_CrowdControlRail_L_2',
+      'V13_CrowdControlRail_L_3',
+      'V13_CrowdControlRail_R_0',
+      'V13_CrowdControlRail_R_1',
+      'V13_CrowdControlRail_R_2',
+      'V13_CrowdControlRail_R_3',
+    ];
+    for (const nodeName of retiredCrowdControlNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V84_CrowdControlFrameArray_L',
+      'V84_CrowdControlFrameArray_R',
+      'V84_CrowdControlRailArray_L',
+      'V84_CrowdControlRailArray_R',
+    ];
+    expect(nodeNamesWithPrefix('V84_')).toHaveLength(requiredReplacementNodes.length);
+
+    const leftFrame = readMeshGeometry('V84_CrowdControlFrameArray_L');
+    const rightFrame = readMeshGeometry('V84_CrowdControlFrameArray_R');
+    const leftRail = readMeshGeometry('V84_CrowdControlRailArray_L');
+    const rightRail = readMeshGeometry('V84_CrowdControlRailArray_R');
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+    }
+
+    expect(leftFrame.max[0]).toBeLessThan(-16.9);
+    expect(leftFrame.min[1]).toBeLessThan(0.05);
+    expect(leftFrame.max[1]).toBeGreaterThan(1.45);
+    expect(leftFrame.min[2]).toBeGreaterThan(19.4);
+    expect(leftFrame.max[2]).toBeGreaterThan(64.3);
+
+    expect(rightFrame.min[0]).toBeGreaterThan(16.9);
+    expect(rightFrame.min[1]).toBeLessThan(0.05);
+    expect(rightFrame.max[1]).toBeGreaterThan(1.45);
+    expect(rightFrame.min[2]).toBeGreaterThan(19.4);
+    expect(rightFrame.max[2]).toBeGreaterThan(64.3);
+
+    expect(leftRail.max[0]).toBeLessThan(-17.2);
+    expect(leftRail.min[1]).toBeGreaterThan(0.55);
+    expect(leftRail.max[1]).toBeGreaterThan(1.25);
+    expect(leftRail.min[2]).toBeGreaterThan(20.7);
+    expect(leftRail.max[2]).toBeGreaterThan(63.0);
+
+    expect(rightRail.min[0]).toBeGreaterThan(17.2);
+    expect(rightRail.min[1]).toBeGreaterThan(0.55);
+    expect(rightRail.max[1]).toBeGreaterThan(1.25);
+    expect(rightRail.min[2]).toBeGreaterThan(20.7);
+    expect(rightRail.max[2]).toBeGreaterThan(63.0);
+
+    expect(readConnectedComponents('V84_CrowdControlFrameArray_L')).toHaveLength(4);
+    expect(readConnectedComponents('V84_CrowdControlFrameArray_R')).toHaveLength(4);
+    expect(readConnectedComponents('V84_CrowdControlRailArray_L')).toHaveLength(4);
+    expect(readConnectedComponents('V84_CrowdControlRailArray_R')).toHaveLength(4);
+
+    const minimumVertexCounts = new Map([
+      ['V84_CrowdControlFrameArray_L', 250],
+      ['V84_CrowdControlFrameArray_R', 250],
+      ['V84_CrowdControlRailArray_L', 200],
+      ['V84_CrowdControlRailArray_R', 200],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V84_CrowdControlFrameArray_L', 'V13_BlackStageRigging'],
+      ['V84_CrowdControlFrameArray_R', 'V13_BlackStageRigging'],
+      ['V84_CrowdControlRailArray_L', 'V14_BurnishedCelestialGold'],
+      ['V84_CrowdControlRailArray_R', 'V14_BurnishedCelestialGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
     for (const mesh of mainStageGlbJson.meshes) {
       for (const primitive of mesh.primitives) {
