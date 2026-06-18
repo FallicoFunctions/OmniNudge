@@ -6658,6 +6658,76 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(rightCoping.max[2]).toBeGreaterThan(12);
   });
 
+  it('replaces the support tent proxy blocks with pavilion frame and canopy assemblies', () => {
+    expect(nodeNamesWithPrefix('V13_SupportTentBase_'), 'legacy support tent base nodes still exported').toHaveLength(0);
+    expect(nodeNamesWithPrefix('V13_SupportTentRoof_'), 'legacy support tent roof nodes still exported').toHaveLength(0);
+
+    const requiredReplacementNodes = [
+      'V91_SupportTentFrame_L',
+      'V91_SupportTentFrame_R',
+      'V91_SupportTentCanopy_L',
+      'V91_SupportTentCanopy_R',
+      'V91_SupportTentCrest_L',
+      'V91_SupportTentCrest_R',
+    ];
+    expect(nodeNamesWithPrefix('V91_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 80, minUniquePositions: 120, minVertexCount: 180 });
+    }
+
+    for (const side of ['L', 'R'] as const) {
+      const frameNode = `V91_SupportTentFrame_${side}`;
+      const canopyNode = `V91_SupportTentCanopy_${side}`;
+      const crestNode = `V91_SupportTentCrest_${side}`;
+
+      const frame = readMeshGeometry(frameNode, { minNonZeroAreaTriangles: 140, minUniquePositions: 180, minVertexCount: 420 });
+      const canopy = readMeshGeometry(canopyNode, { minNonZeroAreaTriangles: 100, minUniquePositions: 120, minVertexCount: 180 });
+      const crest = readMeshGeometry(crestNode, { minNonZeroAreaTriangles: 40, minUniquePositions: 60, minVertexCount: 96 });
+
+      expect(readConnectedComponents(frameNode)).toHaveLength(8);
+      expect(readConnectedComponents(canopyNode)).toHaveLength(1);
+      expect(readConnectedComponents(crestNode)).toHaveLength(1);
+
+      expect(frame.max[0] - frame.min[0]).toBeGreaterThan(8.0);
+      expect(frame.max[1] - frame.min[1]).toBeGreaterThan(2.3);
+      expect(frame.max[2] - frame.min[2]).toBeGreaterThan(5.6);
+
+      expect(canopy.max[0] - canopy.min[0]).toBeGreaterThan(9.1);
+      expect(canopy.max[1] - canopy.min[1]).toBeGreaterThan(0.95);
+      expect(canopy.max[2] - canopy.min[2]).toBeGreaterThan(6.5);
+      expect(canopy.min[1]).toBeGreaterThan(frame.max[1] - 0.6);
+      expect(canopy.max[1]).toBeGreaterThan(3.0);
+
+      expect(crest.max[0] - crest.min[0]).toBeGreaterThan(4.2);
+      expect(crest.max[1] - crest.min[1]).toBeGreaterThan(0.28);
+      expect(crest.max[2] - crest.min[2]).toBeGreaterThan(0.35);
+      expect(crest.min[1]).toBeGreaterThan(canopy.max[1] - 0.3);
+
+      if (side === 'L') {
+        expect(frame.max[0]).toBeLessThan(-30.5);
+        expect(frame.min[0]).toBeLessThan(-39.0);
+        expect(canopy.max[0]).toBeLessThan(-29.9);
+        expect(crest.max[0]).toBeLessThan(-31.2);
+      } else {
+        expect(frame.min[0]).toBeGreaterThan(30.5);
+        expect(frame.max[0]).toBeGreaterThan(39.0);
+        expect(canopy.min[0]).toBeGreaterThan(29.9);
+        expect(crest.min[0]).toBeGreaterThan(31.2);
+      }
+
+      expect(frame.min[2]).toBeLessThan(45.2);
+      expect(frame.max[2]).toBeGreaterThan(50.8);
+      expect(canopy.min[2]).toBeLessThan(44.7);
+      expect(canopy.max[2]).toBeGreaterThan(51.3);
+
+      expect(materialNameFor(frameNode)).toBe('V15_PearlShellBeveled');
+      expect(materialNameFor(canopyNode)).toBe('V15_PearlShellBeveled');
+      expect(materialNameFor(crestNode)).toBe('V13_BrushedFestivalGold');
+    }
+  });
+
   it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
     for (const mesh of mainStageGlbJson.meshes) {
       for (const primitive of mesh.primitives) {
