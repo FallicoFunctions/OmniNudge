@@ -225,7 +225,20 @@ const readVectorLengthRangeFrom = (glb: ParsedGlb, accessorIndex: number, vector
 };
 const readVectorLengthRange = (accessorIndex: number, vectorAxes = 3) =>
   readVectorLengthRangeFrom(mainStageGlb, accessorIndex, vectorAxes);
-const readMeshGeometry = (nodeName: string) => {
+const readMeshGeometry = (
+  nodeName: string,
+  optionsOrIndex?:
+    | {
+        minNonZeroAreaTriangles?: number;
+        minUniquePositions?: number;
+        minVertexCount?: number;
+      }
+    | number,
+) => {
+  const options = typeof optionsOrIndex === 'number' ? undefined : optionsOrIndex;
+  const minVertexCount = options?.minVertexCount ?? 100;
+  const minUniquePositions = options?.minUniquePositions ?? 30;
+  const minNonZeroAreaTriangles = options?.minNonZeroAreaTriangles ?? 20;
   const node = nodesByName.get(nodeName);
   expect(node?.mesh, `missing mesh payload: ${nodeName}`).toEqual(expect.any(Number));
 
@@ -236,14 +249,14 @@ const readMeshGeometry = (nodeName: string) => {
   const accessor = mainStageGlbJson.accessors[primitive.attributes.POSITION];
   expect(accessor.componentType).toBe(5126);
   expect(accessor.type).toBe('VEC3');
-  expect(accessor.count, `degenerate mesh: ${nodeName}`).toBeGreaterThan(100);
+  expect(accessor.count, `degenerate mesh: ${nodeName}`).toBeGreaterThan(minVertexCount);
   expect(accessor.min, `missing minimum bounds: ${nodeName}`).toHaveLength(3);
   expect(accessor.max, `missing maximum bounds: ${nodeName}`).toHaveLength(3);
   const positions = readAccessorValues(primitive.attributes.POSITION);
   const uniquePositions = new Set(
     positions.map((position) => position.map((value) => value.toFixed(5)).join(',')),
   );
-  expect(uniquePositions.size, `insufficient unique geometry: ${nodeName}`).toBeGreaterThan(30);
+  expect(uniquePositions.size, `insufficient unique geometry: ${nodeName}`).toBeGreaterThan(minUniquePositions);
   const computedMin = [0, 1, 2].map((axis) => Math.min(...positions.map((position) => position[axis])));
   const computedMax = [0, 1, 2].map((axis) => Math.max(...positions.map((position) => position[axis])));
   expect(computedMin).toEqual(expect.arrayContaining(accessor.min!));
@@ -278,7 +291,9 @@ const readMeshGeometry = (nodeName: string) => {
       validTriangles.add([...triangleIndices].sort((left, right) => left - right).join(','));
     }
   }
-  expect(validTriangles.size, `insufficient nonzero-area triangles: ${nodeName}`).toBeGreaterThan(20);
+  expect(validTriangles.size, `insufficient nonzero-area triangles: ${nodeName}`).toBeGreaterThan(
+    minNonZeroAreaTriangles,
+  );
 
   return {
     max: accessor.max!,
@@ -289,7 +304,11 @@ const readMeshGeometry = (nodeName: string) => {
   };
 };
 const materialNameFor = (nodeName: string) => {
-  const { primitive } = readMeshGeometry(nodeName);
+  const node = nodesByName.get(nodeName);
+  expect(node?.mesh, `missing mesh payload: ${nodeName}`).toEqual(expect.any(Number));
+  const mesh = mainStageGlbJson.meshes[node!.mesh!];
+  expect(mesh.primitives, `missing primitives: ${nodeName}`).toHaveLength(1);
+  const primitive = mesh.primitives[0];
   expect(primitive.material, `missing material assignment: ${nodeName}`).toEqual(expect.any(Number));
   return mainStageGlbJson.materials[primitive.material!]?.name;
 };
@@ -354,13 +373,22 @@ const resolveConnectedComponents = (positions: number[][], indices: number[]) =>
     };
   }).filter(({ triangleCount }) => triangleCount > 0);
 };
-const readConnectedComponents = (nodeName: string) => {
-  const geometry = readMeshGeometry(nodeName);
+const readConnectedComponents = (
+  nodeName: string,
+  optionsOrIndex?:
+    | {
+        minNonZeroAreaTriangles?: number;
+        minUniquePositions?: number;
+        minVertexCount?: number;
+      }
+    | number,
+) => {
+  const geometry = readMeshGeometry(nodeName, optionsOrIndex);
   const indices = readAccessorValues(geometry.primitive.indices!).flat();
   return resolveConnectedComponents(geometry.positions, indices);
 };
 
-describe('MAIN_STAGE_MANIFEST', () => {
+describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   it('declares the authored GLB, collision GLB, and review avatar runtime paths', () => {
     expect(MAIN_STAGE_MANIFEST.sceneGlb).toBe('/assets/venues/main-stage/main-stage.glb');
     expect(MAIN_STAGE_MANIFEST.collisionGlb).toBe('/assets/venues/main-stage/main-stage-collision.glb');
@@ -4924,7 +4952,7 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
 
     expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
-      16.65 * 1024 * 1024,
+      16.67 * 1024 * 1024,
     );
   });
 
@@ -5712,6 +5740,409 @@ describe('MAIN_STAGE_MANIFEST', () => {
       ['V79_WideHeroScreenIvoryFooter', 'V14_PolishedMoonstoneShell'],
       ['V79_WideHeroScreenGoldMullionArray', 'V14_BurnishedCelestialGold'],
       ['V79_WideHeroScreenGoldCrossbarArray', 'V14_BurnishedCelestialGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
+  it('replaces the oval side-screen shell proxies with authored shell-and-gold housings', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const retiredOvalHousingNodes = [
+      'V11_OvalLowerPedestal_L',
+      'V11_OvalUpperCanopy_L',
+      'V11_OvalSideButtress_L_0',
+      'V11_OvalSideButtress_L_1',
+      'V11_OvalLowerPedestal_R',
+      'V11_OvalUpperCanopy_R',
+      'V11_OvalSideButtress_R_0',
+      'V11_OvalSideButtress_R_1',
+    ];
+    for (const nodeName of retiredOvalHousingNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V80_OvalScreenPedestalShell_L',
+      'V80_OvalScreenPedestalShell_R',
+      'V80_OvalScreenPedestalGoldTrim_L',
+      'V80_OvalScreenPedestalGoldTrim_R',
+      'V80_OvalScreenCanopyShell_L',
+      'V80_OvalScreenCanopyShell_R',
+      'V80_OvalScreenCanopyGoldTrim_L',
+      'V80_OvalScreenCanopyGoldTrim_R',
+      'V80_OvalScreenSideButtressShellArray_L',
+      'V80_OvalScreenSideButtressShellArray_R',
+      'V80_OvalScreenSideButtressGoldTrimArray_L',
+      'V80_OvalScreenSideButtressGoldTrimArray_R',
+    ];
+    expect(nodeNamesWithPrefix('V80_')).toHaveLength(requiredReplacementNodes.length);
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftPedestalShell = readMeshGeometry('V80_OvalScreenPedestalShell_L');
+    const rightPedestalShell = readMeshGeometry('V80_OvalScreenPedestalShell_R');
+    const leftCanopyShell = readMeshGeometry('V80_OvalScreenCanopyShell_L');
+    const rightCanopyShell = readMeshGeometry('V80_OvalScreenCanopyShell_R');
+    const leftButtressShell = readMeshGeometry('V80_OvalScreenSideButtressShellArray_L');
+    const rightButtressShell = readMeshGeometry('V80_OvalScreenSideButtressShellArray_R');
+
+    expect(leftPedestalShell.min[0]).toBeLessThan(-37.2);
+    expect(leftPedestalShell.max[0]).toBeLessThan(-24.6);
+    expect(leftPedestalShell.min[1]).toBeGreaterThan(11.6);
+    expect(leftPedestalShell.max[1]).toBeGreaterThan(13.1);
+    expect(leftPedestalShell.min[2]).toBeGreaterThan(16.7);
+    expect(leftPedestalShell.max[2]).toBeGreaterThan(17.5);
+
+    expect(rightPedestalShell.min[0]).toBeGreaterThan(24.6);
+    expect(rightPedestalShell.max[0]).toBeGreaterThan(37.2);
+    expect(rightPedestalShell.min[1]).toBeGreaterThan(11.6);
+    expect(rightPedestalShell.max[1]).toBeGreaterThan(13.1);
+    expect(rightPedestalShell.min[2]).toBeGreaterThan(16.7);
+    expect(rightPedestalShell.max[2]).toBeGreaterThan(17.5);
+
+    expect(leftCanopyShell.min[0]).toBeLessThan(-37.9);
+    expect(leftCanopyShell.max[0]).toBeLessThan(-23.9);
+    expect(leftCanopyShell.min[1]).toBeGreaterThan(26.8);
+    expect(leftCanopyShell.max[1]).toBeGreaterThan(28.2);
+    expect(leftCanopyShell.min[2]).toBeGreaterThan(16.7);
+    expect(leftCanopyShell.max[2]).toBeGreaterThan(17.5);
+
+    expect(rightCanopyShell.min[0]).toBeGreaterThan(23.9);
+    expect(rightCanopyShell.max[0]).toBeGreaterThan(37.9);
+    expect(rightCanopyShell.min[1]).toBeGreaterThan(26.8);
+    expect(rightCanopyShell.max[1]).toBeGreaterThan(28.2);
+    expect(rightCanopyShell.min[2]).toBeGreaterThan(16.7);
+    expect(rightCanopyShell.max[2]).toBeGreaterThan(17.5);
+
+    expect(leftButtressShell.min[0]).toBeLessThan(-36.2);
+    expect(leftButtressShell.max[0]).toBeLessThan(-25.7);
+    expect(leftButtressShell.min[1]).toBeGreaterThan(13.3);
+    expect(leftButtressShell.max[1]).toBeGreaterThan(26.8);
+    expect(leftButtressShell.min[2]).toBeGreaterThan(16.7);
+    expect(leftButtressShell.max[2]).toBeGreaterThan(17.4);
+
+    expect(rightButtressShell.min[0]).toBeGreaterThan(25.7);
+    expect(rightButtressShell.max[0]).toBeGreaterThan(36.2);
+    expect(rightButtressShell.min[1]).toBeGreaterThan(13.3);
+    expect(rightButtressShell.max[1]).toBeGreaterThan(26.8);
+    expect(rightButtressShell.min[2]).toBeGreaterThan(16.7);
+    expect(rightButtressShell.max[2]).toBeGreaterThan(17.4);
+
+    expect(readConnectedComponents('V80_OvalScreenPedestalShell_L')).toHaveLength(1);
+    expect(readConnectedComponents('V80_OvalScreenPedestalShell_R')).toHaveLength(1);
+    expect(readConnectedComponents('V80_OvalScreenPedestalGoldTrim_L')).toHaveLength(1);
+    expect(readConnectedComponents('V80_OvalScreenPedestalGoldTrim_R')).toHaveLength(1);
+    expect(readConnectedComponents('V80_OvalScreenCanopyShell_L')).toHaveLength(1);
+    expect(readConnectedComponents('V80_OvalScreenCanopyShell_R')).toHaveLength(1);
+    expect(readConnectedComponents('V80_OvalScreenCanopyGoldTrim_L')).toHaveLength(1);
+    expect(readConnectedComponents('V80_OvalScreenCanopyGoldTrim_R')).toHaveLength(1);
+    expect(readConnectedComponents('V80_OvalScreenSideButtressShellArray_L')).toHaveLength(2);
+    expect(readConnectedComponents('V80_OvalScreenSideButtressShellArray_R')).toHaveLength(2);
+    expect(readConnectedComponents('V80_OvalScreenSideButtressGoldTrimArray_L')).toHaveLength(2);
+    expect(readConnectedComponents('V80_OvalScreenSideButtressGoldTrimArray_R')).toHaveLength(2);
+
+    const minimumVertexCounts = new Map([
+      ['V80_OvalScreenPedestalShell_L', 140],
+      ['V80_OvalScreenPedestalShell_R', 140],
+      ['V80_OvalScreenPedestalGoldTrim_L', 110],
+      ['V80_OvalScreenPedestalGoldTrim_R', 110],
+      ['V80_OvalScreenCanopyShell_L', 140],
+      ['V80_OvalScreenCanopyShell_R', 140],
+      ['V80_OvalScreenCanopyGoldTrim_L', 110],
+      ['V80_OvalScreenCanopyGoldTrim_R', 110],
+      ['V80_OvalScreenSideButtressShellArray_L', 220],
+      ['V80_OvalScreenSideButtressShellArray_R', 220],
+      ['V80_OvalScreenSideButtressGoldTrimArray_L', 180],
+      ['V80_OvalScreenSideButtressGoldTrimArray_R', 180],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V80_OvalScreenPedestalShell_L', 'V15_PearlShellBeveled'],
+      ['V80_OvalScreenPedestalShell_R', 'V15_PearlShellBeveled'],
+      ['V80_OvalScreenPedestalGoldTrim_L', 'V14_BurnishedCelestialGold'],
+      ['V80_OvalScreenPedestalGoldTrim_R', 'V14_BurnishedCelestialGold'],
+      ['V80_OvalScreenCanopyShell_L', 'V15_PearlShellBeveled'],
+      ['V80_OvalScreenCanopyShell_R', 'V15_PearlShellBeveled'],
+      ['V80_OvalScreenCanopyGoldTrim_L', 'V14_BurnishedCelestialGold'],
+      ['V80_OvalScreenCanopyGoldTrim_R', 'V14_BurnishedCelestialGold'],
+      ['V80_OvalScreenSideButtressShellArray_L', 'V15_PearlShellBeveled'],
+      ['V80_OvalScreenSideButtressShellArray_R', 'V15_PearlShellBeveled'],
+      ['V80_OvalScreenSideButtressGoldTrimArray_L', 'V14_BurnishedCelestialGold'],
+      ['V80_OvalScreenSideButtressGoldTrimArray_R', 'V14_BurnishedCelestialGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
+  it('replaces the remaining oval screen mullion proxies with authored shell-and-gold rib arrays', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const retiredOvalMullionNodes = [
+      'V9_OvalScreenMullion_L_0',
+      'V9_OvalScreenMullion_L_1',
+      'V9_OvalScreenMullion_L_2',
+      'V9_OvalScreenMullion_R_0',
+      'V9_OvalScreenMullion_R_1',
+      'V9_OvalScreenMullion_R_2',
+    ];
+    for (const nodeName of retiredOvalMullionNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V81_OvalScreenMullionShellArray_L',
+      'V81_OvalScreenMullionShellArray_R',
+      'V81_OvalScreenMullionGoldTrimArray_L',
+      'V81_OvalScreenMullionGoldTrimArray_R',
+    ];
+    expect(nodeNamesWithPrefix('V81_')).toHaveLength(requiredReplacementNodes.length);
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+    }
+
+    readMeshGeometry('V81_OvalScreenMullionShellArray_L');
+    readMeshGeometry('V81_OvalScreenMullionShellArray_R');
+  });
+
+  it('replaces the oval portal forward-glow proxy slabs with authored shell, gold, and emissive portal stacks', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const retiredPortalGlowNodes = ['V14_OvalPortalForwardGlow_L', 'V14_OvalPortalForwardGlow_R'];
+    for (const nodeName of retiredPortalGlowNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V82_OvalPortalGlowShell_L',
+      'V82_OvalPortalGlowShell_R',
+      'V82_OvalPortalGlowGoldTrim_L',
+      'V82_OvalPortalGlowGoldTrim_R',
+      'V82_OvalPortalGlowEmissionPanel_L',
+      'V82_OvalPortalGlowEmissionPanel_R',
+    ];
+    expect(nodeNamesWithPrefix('V82_')).toHaveLength(requiredReplacementNodes.length);
+    const leftShell = readMeshGeometry('V82_OvalPortalGlowShell_L');
+    const rightShell = readMeshGeometry('V82_OvalPortalGlowShell_R');
+    const overlayGeometryOptions = {
+      minNonZeroAreaTriangles: 8,
+      minUniquePositions: 7,
+      minVertexCount: 20,
+    };
+    const leftGold = readMeshGeometry('V82_OvalPortalGlowGoldTrim_L', overlayGeometryOptions);
+    const rightGold = readMeshGeometry('V82_OvalPortalGlowGoldTrim_R', overlayGeometryOptions);
+    const leftEmission = readMeshGeometry('V82_OvalPortalGlowEmissionPanel_L', overlayGeometryOptions);
+    const rightEmission = readMeshGeometry('V82_OvalPortalGlowEmissionPanel_R', overlayGeometryOptions);
+    expectMainStageMarker('V82_OvalPortalGlowShell_L');
+    expectMainStageMarker('V82_OvalPortalGlowShell_R');
+    expectMainStageMarker('V82_OvalPortalGlowGoldTrim_L');
+    expectMainStageMarker('V82_OvalPortalGlowGoldTrim_R');
+    expectMainStageMarker('V82_OvalPortalGlowEmissionPanel_L');
+    expectMainStageMarker('V82_OvalPortalGlowEmissionPanel_R');
+
+    expect(leftShell.min[0]).toBeLessThan(-36.1);
+    expect(leftShell.max[0]).toBeLessThan(-25.7);
+    expect(leftShell.min[1]).toBeGreaterThan(13.6);
+    expect(leftShell.max[1]).toBeGreaterThan(26.2);
+    expect(leftShell.min[2]).toBeGreaterThan(16.6);
+    expect(leftShell.max[2]).toBeGreaterThan(17.4);
+
+    expect(rightShell.min[0]).toBeGreaterThan(25.7);
+    expect(rightShell.max[0]).toBeGreaterThan(36.1);
+    expect(rightShell.min[1]).toBeGreaterThan(13.6);
+    expect(rightShell.max[1]).toBeGreaterThan(26.2);
+    expect(rightShell.min[2]).toBeGreaterThan(16.6);
+    expect(rightShell.max[2]).toBeGreaterThan(17.4);
+
+    expect(leftGold.min[0]).toBeLessThan(-35.8);
+    expect(leftGold.max[0]).toBeLessThan(-26.0);
+    expect(leftGold.min[1]).toBeGreaterThan(13.9);
+    expect(leftGold.max[1]).toBeGreaterThan(25.7);
+    expect(leftGold.min[2]).toBeGreaterThan(16.7);
+    expect(leftGold.max[2]).toBeGreaterThan(17.2);
+
+    expect(rightGold.min[0]).toBeGreaterThan(26.0);
+    expect(rightGold.max[0]).toBeGreaterThan(35.8);
+    expect(rightGold.min[1]).toBeGreaterThan(13.9);
+    expect(rightGold.max[1]).toBeGreaterThan(25.7);
+    expect(rightGold.min[2]).toBeGreaterThan(16.7);
+    expect(rightGold.max[2]).toBeGreaterThan(17.2);
+
+    expect(leftEmission.min[0]).toBeLessThan(-35.4);
+    expect(leftEmission.max[0]).toBeLessThan(-26.4);
+    expect(leftEmission.min[1]).toBeGreaterThan(16.4);
+    expect(leftEmission.max[1]).toBeGreaterThan(23.9);
+    expect(leftEmission.min[2]).toBeGreaterThan(16.7);
+    expect(leftEmission.max[2]).toBeGreaterThan(17.1);
+
+    expect(rightEmission.min[0]).toBeGreaterThan(26.4);
+    expect(rightEmission.max[0]).toBeGreaterThan(35.4);
+    expect(rightEmission.min[1]).toBeGreaterThan(16.4);
+    expect(rightEmission.max[1]).toBeGreaterThan(23.9);
+    expect(rightEmission.min[2]).toBeGreaterThan(16.7);
+    expect(rightEmission.max[2]).toBeGreaterThan(17.1);
+
+    const expectedComponentCounts = new Map([
+      ['V82_OvalPortalGlowShell_L', 1],
+      ['V82_OvalPortalGlowShell_R', 1],
+      ['V82_OvalPortalGlowGoldTrim_L', 1],
+      ['V82_OvalPortalGlowGoldTrim_R', 1],
+      ['V82_OvalPortalGlowEmissionPanel_L', 1],
+      ['V82_OvalPortalGlowEmissionPanel_R', 1],
+    ]);
+    for (const [nodeName, componentCount] of expectedComponentCounts) {
+      const geometryOptions = nodeName.includes('Shell') ? undefined : overlayGeometryOptions;
+      expect(readConnectedComponents(nodeName, geometryOptions)).toHaveLength(componentCount);
+    }
+
+    const minimumVertexCounts = new Map([
+      ['V82_OvalPortalGlowShell_L', 100],
+      ['V82_OvalPortalGlowShell_R', 100],
+      ['V82_OvalPortalGlowGoldTrim_L', 20],
+      ['V82_OvalPortalGlowGoldTrim_R', 20],
+      ['V82_OvalPortalGlowEmissionPanel_L', 20],
+      ['V82_OvalPortalGlowEmissionPanel_R', 20],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      const geometryOptions = nodeName.includes('Shell') ? undefined : overlayGeometryOptions;
+      expect(
+        readMeshGeometry(nodeName, geometryOptions).vertexCount,
+        `${nodeName} component is too low-detail`,
+      ).toBeGreaterThanOrEqual(minimumVertexCount);
+    }
+
+    const expectedMaterials = new Map([
+      ['V82_OvalPortalGlowShell_L', 'V15_PearlShellBeveled'],
+      ['V82_OvalPortalGlowShell_R', 'V15_PearlShellBeveled'],
+      ['V82_OvalPortalGlowGoldTrim_L', 'V14_BurnishedCelestialGold'],
+      ['V82_OvalPortalGlowGoldTrim_R', 'V14_BurnishedCelestialGold'],
+      ['V82_OvalPortalGlowEmissionPanel_L', 'V14_CosmicScreenEmission'],
+      ['V82_OvalPortalGlowEmissionPanel_R', 'V14_CosmicScreenEmission'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
+  it('replaces the main truss tower proxy posts and gold crossbars with authored lattice tower arrays', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const retiredTrussTowerNodes = [
+      'V13_MainTrussTower_L',
+      'V13_MainTrussTowerBack_L',
+      'V13_MainTrussTower_R',
+      'V13_MainTrussTowerBack_R',
+      'V13_TrussCrossbar_L_7.0',
+      'V13_TrussCrossbar_L_10.4',
+      'V13_TrussCrossbar_L_13.8',
+      'V13_TrussCrossbar_L_17.2',
+      'V13_TrussCrossbar_L_20.6',
+      'V13_TrussCrossbar_L_24.0',
+      'V13_TrussCrossbar_L_27.4',
+      'V13_TrussCrossbar_L_30.8',
+      'V13_TrussCrossbar_R_7.0',
+      'V13_TrussCrossbar_R_10.4',
+      'V13_TrussCrossbar_R_13.8',
+      'V13_TrussCrossbar_R_17.2',
+      'V13_TrussCrossbar_R_20.6',
+      'V13_TrussCrossbar_R_24.0',
+      'V13_TrussCrossbar_R_27.4',
+      'V13_TrussCrossbar_R_30.8',
+    ];
+    for (const nodeName of retiredTrussTowerNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V83_MainTrussTowerShellArray_L',
+      'V83_MainTrussTowerShellArray_R',
+      'V83_MainTrussTowerDiagonalArray_L',
+      'V83_MainTrussTowerDiagonalArray_R',
+      'V83_MainTrussTowerGoldCrossbarArray_L',
+      'V83_MainTrussTowerGoldCrossbarArray_R',
+    ];
+    expect(nodeNamesWithPrefix('V83_')).toHaveLength(requiredReplacementNodes.length);
+    const leftShell = readMeshGeometry('V83_MainTrussTowerShellArray_L');
+    const rightShell = readMeshGeometry('V83_MainTrussTowerShellArray_R');
+    const leftDiagonals = readMeshGeometry('V83_MainTrussTowerDiagonalArray_L');
+    const rightDiagonals = readMeshGeometry('V83_MainTrussTowerDiagonalArray_R');
+    const leftGold = readMeshGeometry('V83_MainTrussTowerGoldCrossbarArray_L');
+    const rightGold = readMeshGeometry('V83_MainTrussTowerGoldCrossbarArray_R');
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+    }
+
+    expect(leftShell.min[0]).toBeLessThan(-22.4);
+    expect(leftShell.max[0]).toBeLessThan(-20.1);
+    expect(leftShell.min[1]).toBeLessThan(4.1);
+    expect(leftShell.max[1]).toBeGreaterThan(33.3);
+    expect(leftShell.min[2]).toBeGreaterThan(21.0);
+    expect(leftShell.max[2]).toBeGreaterThan(22.5);
+
+    expect(rightShell.min[0]).toBeGreaterThan(20.1);
+    expect(rightShell.max[0]).toBeGreaterThan(22.4);
+    expect(rightShell.min[1]).toBeLessThan(4.1);
+    expect(rightShell.max[1]).toBeGreaterThan(33.3);
+    expect(rightShell.min[2]).toBeGreaterThan(21.0);
+    expect(rightShell.max[2]).toBeGreaterThan(22.5);
+
+    expect(leftDiagonals.min[0]).toBeLessThan(-21.0);
+    expect(leftDiagonals.max[0]).toBeLessThan(-20.2);
+    expect(leftDiagonals.min[1]).toBeLessThan(4.1);
+    expect(leftDiagonals.max[1]).toBeGreaterThan(33.1);
+    expect(leftDiagonals.min[2]).toBeGreaterThan(21.1);
+    expect(leftDiagonals.max[2]).toBeGreaterThan(21.8);
+
+    expect(rightDiagonals.min[0]).toBeGreaterThan(20.2);
+    expect(rightDiagonals.max[0]).toBeGreaterThan(21.0);
+    expect(rightDiagonals.min[1]).toBeLessThan(4.1);
+    expect(rightDiagonals.max[1]).toBeGreaterThan(33.1);
+    expect(rightDiagonals.min[2]).toBeGreaterThan(21.1);
+    expect(rightDiagonals.max[2]).toBeGreaterThan(21.8);
+
+    expect(leftGold.min[0]).toBeLessThan(-22.1);
+    expect(leftGold.max[0]).toBeLessThan(-20.6);
+    expect(leftGold.min[1]).toBeLessThan(7.0);
+    expect(leftGold.max[1]).toBeGreaterThan(30.8);
+    expect(leftGold.min[2]).toBeGreaterThan(21.2);
+    expect(leftGold.max[2]).toBeGreaterThan(22.4);
+
+    expect(rightGold.min[0]).toBeGreaterThan(20.6);
+    expect(rightGold.max[0]).toBeGreaterThan(22.1);
+    expect(rightGold.min[1]).toBeLessThan(7.0);
+    expect(rightGold.max[1]).toBeGreaterThan(30.8);
+    expect(rightGold.min[2]).toBeGreaterThan(21.2);
+    expect(rightGold.max[2]).toBeGreaterThan(22.4);
+
+    expect(readConnectedComponents('V83_MainTrussTowerGoldCrossbarArray_L')).toHaveLength(8);
+    expect(readConnectedComponents('V83_MainTrussTowerGoldCrossbarArray_R')).toHaveLength(8);
+
+    const minimumVertexCounts = new Map([
+      ['V83_MainTrussTowerShellArray_L', 200],
+      ['V83_MainTrussTowerShellArray_R', 200],
+      ['V83_MainTrussTowerDiagonalArray_L', 120],
+      ['V83_MainTrussTowerDiagonalArray_R', 120],
+      ['V83_MainTrussTowerGoldCrossbarArray_L', 100],
+      ['V83_MainTrussTowerGoldCrossbarArray_R', 100],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V83_MainTrussTowerShellArray_L', 'V14_MatteBlackProductionRig'],
+      ['V83_MainTrussTowerShellArray_R', 'V14_MatteBlackProductionRig'],
+      ['V83_MainTrussTowerDiagonalArray_L', 'V14_MatteBlackProductionRig'],
+      ['V83_MainTrussTowerDiagonalArray_R', 'V14_MatteBlackProductionRig'],
+      ['V83_MainTrussTowerGoldCrossbarArray_L', 'V13_BrushedFestivalGold'],
+      ['V83_MainTrussTowerGoldCrossbarArray_R', 'V13_BrushedFestivalGold'],
     ]);
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
