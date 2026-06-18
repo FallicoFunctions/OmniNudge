@@ -6445,6 +6445,69 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
   });
 
+  it('replaces the mixed wing shadow-bay proxy stack with batched recessed facade vault arrays', () => {
+    for (const legacyPrefix of [
+      'V13_WingFacadeShadowBay_',
+      'V15_WingShadowInset_',
+      'V15_WingShadowInsetVerticalA_',
+      'V15_WingShadowInsetVerticalB_',
+      'V15_WingGoldCap_',
+    ]) {
+      expect(nodeNamesWithPrefix(legacyPrefix), `legacy nodes still exported for ${legacyPrefix}`).toHaveLength(0);
+    }
+
+    const requiredReplacementNodes = [
+      'V87_WingFacadeShadowFrameArray_L',
+      'V87_WingFacadeShadowFrameArray_R',
+      'V87_WingFacadeShadowVaultArray_L',
+      'V87_WingFacadeShadowVaultArray_R',
+      'V87_WingFacadeGoldLintelArray_L',
+      'V87_WingFacadeGoldLintelArray_R',
+    ];
+    expect(nodeNamesWithPrefix('V87_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 40, minUniquePositions: 80, minVertexCount: 200 });
+    }
+
+    for (const side of ['L', 'R'] as const) {
+      const frameNode = `V87_WingFacadeShadowFrameArray_${side}`;
+      const vaultNode = `V87_WingFacadeShadowVaultArray_${side}`;
+      const lintelNode = `V87_WingFacadeGoldLintelArray_${side}`;
+      const frame = readMeshGeometry(frameNode, { minNonZeroAreaTriangles: 80, minUniquePositions: 160, minVertexCount: 700 });
+      const vault = readMeshGeometry(vaultNode, { minNonZeroAreaTriangles: 60, minUniquePositions: 120, minVertexCount: 500 });
+      const lintel = readMeshGeometry(lintelNode, { minNonZeroAreaTriangles: 40, minUniquePositions: 80, minVertexCount: 240 });
+
+      expect(readConnectedComponents(frameNode)).toHaveLength(4);
+      expect(readConnectedComponents(vaultNode)).toHaveLength(4);
+      expect(readConnectedComponents(lintelNode)).toHaveLength(4);
+
+      expect(frame.max[1] - frame.min[1]).toBeGreaterThan(0.2);
+      expect(frame.max[2] - frame.min[2]).toBeGreaterThan(4.6);
+      expect(vault.max[1] - vault.min[1]).toBeGreaterThan(4.1);
+      expect(vault.max[2] - vault.min[2]).toBeGreaterThan(0.16);
+      expect(lintel.min[1]).toBeGreaterThan(9.4);
+      expect(lintel.max[1]).toBeGreaterThan(17.4);
+
+      if (side === 'L') {
+        expect(frame.max[0]).toBeLessThan(-20.8);
+        expect(frame.min[0]).toBeLessThan(-57.8);
+        expect(vault.max[0]).toBeLessThan(-21.4);
+        expect(lintel.max[0]).toBeLessThan(-20.9);
+      } else {
+        expect(frame.min[0]).toBeGreaterThan(20.8);
+        expect(frame.max[0]).toBeGreaterThan(57.8);
+        expect(vault.min[0]).toBeGreaterThan(21.4);
+        expect(lintel.min[0]).toBeGreaterThan(20.9);
+      }
+
+      expect(materialNameFor(frameNode)).toBe('V15_PearlShellBeveled');
+      expect(materialNameFor(vaultNode)).toBe('V20_RecessedWarmShadow');
+      expect(materialNameFor(lintelNode)).toBe('V20_ChasedGoldFiligree');
+    }
+  });
+
   it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
     for (const mesh of mainStageGlbJson.meshes) {
       for (const primitive of mesh.primitives) {
