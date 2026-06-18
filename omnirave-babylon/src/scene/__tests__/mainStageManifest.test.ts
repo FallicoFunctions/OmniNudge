@@ -6616,6 +6616,48 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
   });
 
+  it('replaces the basin stone lip proxy strips with sculpted coping arrays', () => {
+    expect(nodeNamesWithPrefix('V13_BasinStoneLip_'), 'legacy basin stone lip nodes still exported').toHaveLength(0);
+
+    const requiredReplacementNodes = ['V90_BasinStoneCopingArray_L', 'V90_BasinStoneCopingArray_R'];
+    expect(nodeNamesWithPrefix('V90_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 120, minUniquePositions: 180, minVertexCount: 360 });
+      expect(readConnectedComponents(nodeName)).toHaveLength(3);
+      expect(materialNameFor(nodeName)).toBe('V15_PearlShellBeveled');
+    }
+
+    const leftCoping = readMeshGeometry('V90_BasinStoneCopingArray_L', {
+      minNonZeroAreaTriangles: 160,
+      minUniquePositions: 220,
+      minVertexCount: 540,
+    });
+    const rightCoping = readMeshGeometry('V90_BasinStoneCopingArray_R', {
+      minNonZeroAreaTriangles: 160,
+      minUniquePositions: 220,
+      minVertexCount: 540,
+    });
+
+    expect(leftCoping.max[2] - leftCoping.min[2]).toBeGreaterThan(56);
+    expect(rightCoping.max[2] - rightCoping.min[2]).toBeGreaterThan(56);
+    expect(leftCoping.max[0] - leftCoping.min[0]).toBeGreaterThan(16.5);
+    expect(rightCoping.max[0] - rightCoping.min[0]).toBeGreaterThan(16.5);
+    expect(leftCoping.max[1] - leftCoping.min[1]).toBeGreaterThan(0.28);
+    expect(rightCoping.max[1] - rightCoping.min[1]).toBeGreaterThan(0.28);
+
+    expect(leftCoping.max[0]).toBeLessThan(-5);
+    expect(leftCoping.min[0]).toBeLessThan(-22);
+    expect(rightCoping.min[0]).toBeGreaterThan(5);
+    expect(rightCoping.max[0]).toBeGreaterThan(22);
+
+    expect(leftCoping.min[2]).toBeLessThan(-45);
+    expect(leftCoping.max[2]).toBeGreaterThan(12);
+    expect(rightCoping.min[2]).toBeLessThan(-45);
+    expect(rightCoping.max[2]).toBeGreaterThan(12);
+  });
+
   it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
     for (const mesh of mainStageGlbJson.meshes) {
       for (const primitive of mesh.primitives) {
