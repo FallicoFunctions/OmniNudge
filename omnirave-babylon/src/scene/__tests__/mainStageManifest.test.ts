@@ -5517,6 +5517,85 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the center-screen side pier proxy boxes with authored gold-and-cyan pier clusters', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const nodeName of ['V10_CenterScreenSidePier_L', 'V10_CenterScreenSidePier_R']) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V78_CenterScreenSidePierGoldFrame_L',
+      'V78_CenterScreenSidePierGoldFrame_R',
+      'V78_CenterScreenSidePierCyanCore_L',
+      'V78_CenterScreenSidePierCyanCore_R',
+    ];
+    expect(nodeNamesWithPrefix('V78_')).toHaveLength(requiredReplacementNodes.length);
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftGold = readMeshGeometry('V78_CenterScreenSidePierGoldFrame_L');
+    const rightGold = readMeshGeometry('V78_CenterScreenSidePierGoldFrame_R');
+    const leftCyan = readMeshGeometry('V78_CenterScreenSidePierCyanCore_L');
+    const rightCyan = readMeshGeometry('V78_CenterScreenSidePierCyanCore_R');
+
+    expect(leftGold.min[0]).toBeLessThan(-19.1);
+    expect(leftGold.max[0]).toBeLessThan(-16.8);
+    expect(leftGold.min[1]).toBeGreaterThan(12.8);
+    expect(leftGold.max[1]).toBeGreaterThan(28.8);
+    expect(leftGold.min[2]).toBeGreaterThan(22.5);
+    expect(leftGold.max[2]).toBeGreaterThan(25.2);
+
+    expect(rightGold.min[0]).toBeGreaterThan(16.7);
+    expect(rightGold.max[0]).toBeGreaterThan(18.95);
+    expect(rightGold.min[1]).toBeGreaterThan(12.8);
+    expect(rightGold.max[1]).toBeGreaterThan(28.8);
+    expect(rightGold.min[2]).toBeGreaterThan(22.5);
+    expect(rightGold.max[2]).toBeGreaterThan(25.2);
+
+    expect(leftCyan.min[0]).toBeLessThan(-18.55);
+    expect(leftCyan.max[0]).toBeLessThan(-17.35);
+    expect(leftCyan.min[1]).toBeGreaterThan(13.6);
+    expect(leftCyan.max[1]).toBeGreaterThan(28.0);
+    expect(leftCyan.min[2]).toBeGreaterThan(23.0);
+    expect(leftCyan.max[2]).toBeGreaterThan(24.8);
+
+    expect(rightCyan.min[0]).toBeGreaterThan(17.35);
+    expect(rightCyan.max[0]).toBeGreaterThan(18.45);
+    expect(rightCyan.min[1]).toBeGreaterThan(13.6);
+    expect(rightCyan.max[1]).toBeGreaterThan(28.0);
+    expect(rightCyan.min[2]).toBeGreaterThan(23.0);
+    expect(rightCyan.max[2]).toBeGreaterThan(24.8);
+
+    expect(readConnectedComponents('V78_CenterScreenSidePierGoldFrame_L')).toHaveLength(1);
+    expect(readConnectedComponents('V78_CenterScreenSidePierGoldFrame_R')).toHaveLength(1);
+    expect(readConnectedComponents('V78_CenterScreenSidePierCyanCore_L')).toHaveLength(1);
+    expect(readConnectedComponents('V78_CenterScreenSidePierCyanCore_R')).toHaveLength(1);
+
+    const minimumVertexCounts = new Map([
+      ['V78_CenterScreenSidePierGoldFrame_L', 140],
+      ['V78_CenterScreenSidePierGoldFrame_R', 140],
+      ['V78_CenterScreenSidePierCyanCore_L', 120],
+      ['V78_CenterScreenSidePierCyanCore_R', 120],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V78_CenterScreenSidePierGoldFrame_L', 'V14_BurnishedCelestialGold'],
+      ['V78_CenterScreenSidePierGoldFrame_R', 'V14_BurnishedCelestialGold'],
+      ['V78_CenterScreenSidePierCyanCore_L', 'V13_CelestialScreenGlass'],
+      ['V78_CenterScreenSidePierCyanCore_R', 'V13_CelestialScreenGlass'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
     for (const mesh of mainStageGlbJson.meshes) {
       for (const primitive of mesh.primitives) {
