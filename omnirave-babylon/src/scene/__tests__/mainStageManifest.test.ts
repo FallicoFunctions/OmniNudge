@@ -6508,6 +6508,58 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
   });
 
+  it('replaces the rear cathedral recess proxy fins with layered lancet arrays', () => {
+    expect(nodeNamesWithPrefix('V13_RearCathedralRecess_'), 'legacy rear cathedral recess nodes still exported').toHaveLength(0);
+
+    const requiredReplacementNodes = [
+      'V88_RearCathedralLancetFrameArray_L',
+      'V88_RearCathedralLancetFrameArray_R',
+      'V88_RearCathedralLancetPearlArray_L',
+      'V88_RearCathedralLancetPearlArray_R',
+      'V88_RearCathedralLancetGoldArray_L',
+      'V88_RearCathedralLancetGoldArray_R',
+    ];
+    expect(nodeNamesWithPrefix('V88_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 30, minUniquePositions: 60, minVertexCount: 160 });
+    }
+
+    for (const side of ['L', 'R'] as const) {
+      const frameNode = `V88_RearCathedralLancetFrameArray_${side}`;
+      const pearlNode = `V88_RearCathedralLancetPearlArray_${side}`;
+      const goldNode = `V88_RearCathedralLancetGoldArray_${side}`;
+      const frame = readMeshGeometry(frameNode, { minNonZeroAreaTriangles: 60, minUniquePositions: 140, minVertexCount: 500 });
+      const pearl = readMeshGeometry(pearlNode, { minNonZeroAreaTriangles: 50, minUniquePositions: 110, minVertexCount: 360 });
+      const gold = readMeshGeometry(goldNode, { minNonZeroAreaTriangles: 40, minUniquePositions: 80, minVertexCount: 220 });
+
+      expect(readConnectedComponents(frameNode)).toHaveLength(4);
+      expect(readConnectedComponents(pearlNode)).toHaveLength(4);
+      expect(readConnectedComponents(goldNode)).toHaveLength(4);
+
+      expect(frame.max[1] - frame.min[1]).toBeGreaterThan(16.5);
+      expect(pearl.max[1] - pearl.min[1]).toBeGreaterThan(15.2);
+      expect(gold.max[1] - gold.min[1]).toBeGreaterThan(16.2);
+
+      if (side === 'L') {
+        expect(frame.max[0]).toBeLessThan(-9.0);
+        expect(frame.min[0]).toBeLessThan(-22.6);
+        expect(pearl.max[0]).toBeLessThan(-9.1);
+        expect(gold.max[0]).toBeLessThan(-9.1);
+      } else {
+        expect(frame.min[0]).toBeGreaterThan(9.0);
+        expect(frame.max[0]).toBeGreaterThan(22.6);
+        expect(pearl.min[0]).toBeGreaterThan(9.1);
+        expect(gold.min[0]).toBeGreaterThan(9.1);
+      }
+
+      expect(materialNameFor(frameNode)).toBe('V20_RecessedWarmShadow');
+      expect(materialNameFor(pearlNode)).toBe('V19_GatewayPearlIvory');
+      expect(materialNameFor(goldNode)).toBe('V19_ArrivalBrushedGold');
+    }
+  });
+
   it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
     for (const mesh of mainStageGlbJson.meshes) {
       for (const primitive of mesh.primitives) {
