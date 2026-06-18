@@ -5256,6 +5256,188 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the repeated arc anchor plate and socket proxies with authored anchor crest clusters', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const nodeName of [...Array(10).keys()].flatMap((index) => [`V15_ArcAnchorPlate_${index}`, `V15_ArcAnchorSocket_${index}`])) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V75_ArcAnchorGoldCluster_L',
+      'V75_ArcAnchorGoldCluster_R',
+      'V75_ArcAnchorShadowCluster_L',
+      'V75_ArcAnchorShadowCluster_R',
+    ];
+    expect(nodeNamesWithPrefix('V75_')).toHaveLength(requiredReplacementNodes.length);
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftGold = readMeshGeometry('V75_ArcAnchorGoldCluster_L');
+    const rightGold = readMeshGeometry('V75_ArcAnchorGoldCluster_R');
+    const leftShadow = readMeshGeometry('V75_ArcAnchorShadowCluster_L');
+    const rightShadow = readMeshGeometry('V75_ArcAnchorShadowCluster_R');
+
+    expect(leftGold.min[0]).toBeLessThan(-62.4);
+    expect(leftGold.max[0]).toBeLessThan(-14.7);
+    expect(leftGold.min[1]).toBeGreaterThan(5.2);
+    expect(leftGold.max[1]).toBeGreaterThan(43.3);
+    expect(leftGold.min[2]).toBeGreaterThan(3.3);
+    expect(leftGold.max[2]).toBeGreaterThan(36.3);
+
+    expect(rightGold.min[0]).toBeGreaterThan(14.7);
+    expect(rightGold.max[0]).toBeGreaterThan(62.4);
+    expect(rightGold.min[1]).toBeGreaterThan(5.2);
+    expect(rightGold.max[1]).toBeGreaterThan(43.3);
+    expect(rightGold.min[2]).toBeGreaterThan(3.3);
+    expect(rightGold.max[2]).toBeGreaterThan(36.3);
+
+    expect(leftShadow.min[0]).toBeLessThan(-61.9);
+    expect(leftShadow.max[0]).toBeLessThan(-15.3);
+    expect(leftShadow.min[1]).toBeGreaterThan(5.2);
+    expect(leftShadow.max[1]).toBeGreaterThan(43.1);
+    expect(leftShadow.min[2]).toBeGreaterThan(3.3);
+    expect(leftShadow.max[2]).toBeGreaterThan(36.2);
+
+    expect(rightShadow.min[0]).toBeGreaterThan(15.3);
+    expect(rightShadow.max[0]).toBeGreaterThan(61.9);
+    expect(rightShadow.min[1]).toBeGreaterThan(5.2);
+    expect(rightShadow.max[1]).toBeGreaterThan(43.1);
+    expect(rightShadow.min[2]).toBeGreaterThan(3.3);
+    expect(rightShadow.max[2]).toBeGreaterThan(36.2);
+
+    expect(readConnectedComponents('V75_ArcAnchorGoldCluster_L')).toHaveLength(5);
+    expect(readConnectedComponents('V75_ArcAnchorGoldCluster_R')).toHaveLength(5);
+    expect(readConnectedComponents('V75_ArcAnchorShadowCluster_L')).toHaveLength(5);
+    expect(readConnectedComponents('V75_ArcAnchorShadowCluster_R')).toHaveLength(5);
+
+    for (const [nodeName, expectedCenters] of [
+      ['V75_ArcAnchorGoldCluster_L', [-61.5, -56.0, -45.0, -23.5, -16.0]],
+      ['V75_ArcAnchorGoldCluster_R', [16.0, 23.5, 45.0, 56.0, 61.5]],
+      ['V75_ArcAnchorShadowCluster_L', [-61.5, -56.0, -45.0, -23.5, -16.0]],
+      ['V75_ArcAnchorShadowCluster_R', [16.0, 23.5, 45.0, 56.0, 61.5]],
+    ] as const) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) / 2,
+        (min[1] + max[1]) / 2,
+        (min[2] + max[2]) / 2,
+      ]);
+      for (const expectedX of expectedCenters) {
+        expect(
+          centers.some(([x, y, z]) => Math.abs(x - expectedX) < 0.45 && y > 5.2 && y < 43.4 && z > 3.3 && z < 36.5),
+          `${nodeName} missing anchor crest near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    const minimumVertexCounts = new Map([
+      ['V75_ArcAnchorGoldCluster_L', 350],
+      ['V75_ArcAnchorGoldCluster_R', 350],
+      ['V75_ArcAnchorShadowCluster_L', 350],
+      ['V75_ArcAnchorShadowCluster_R', 350],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V75_ArcAnchorGoldCluster_L', 'V15_EngineeredGoldAnchors'],
+      ['V75_ArcAnchorGoldCluster_R', 'V15_EngineeredGoldAnchors'],
+      ['V75_ArcAnchorShadowCluster_L', 'V15_MatteProductionBlack'],
+      ['V75_ArcAnchorShadowCluster_R', 'V15_MatteProductionBlack'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
+  it('replaces the side-screen anchor cubes with authored vertical anchor spines', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const nodeName of [
+      'V14_ScreenFrameAnchor_L',
+      'V14_ScreenUpperAnchor_L',
+      'V14_ScreenFrameAnchor_R',
+      'V14_ScreenUpperAnchor_R',
+    ]) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V76_SideScreenAnchorGoldSpine_L',
+      'V76_SideScreenAnchorGoldSpine_R',
+      'V76_SideScreenAnchorShadowBrace_L',
+      'V76_SideScreenAnchorShadowBrace_R',
+    ];
+    expect(nodeNamesWithPrefix('V76_')).toHaveLength(requiredReplacementNodes.length);
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftGold = readMeshGeometry('V76_SideScreenAnchorGoldSpine_L');
+    const rightGold = readMeshGeometry('V76_SideScreenAnchorGoldSpine_R');
+    const leftShadow = readMeshGeometry('V76_SideScreenAnchorShadowBrace_L');
+    const rightShadow = readMeshGeometry('V76_SideScreenAnchorShadowBrace_R');
+
+    expect(leftGold.min[0]).toBeLessThan(-15.8);
+    expect(leftGold.max[0]).toBeLessThan(-13.5);
+    expect(leftGold.min[1]).toBeGreaterThan(12.0);
+    expect(leftGold.max[1]).toBeGreaterThan(27.6);
+    expect(leftGold.min[2]).toBeGreaterThan(22.4);
+    expect(leftGold.max[2]).toBeGreaterThan(22.95);
+
+    expect(rightGold.min[0]).toBeGreaterThan(13.5);
+    expect(rightGold.max[0]).toBeGreaterThan(15.8);
+    expect(rightGold.min[1]).toBeGreaterThan(12.0);
+    expect(rightGold.max[1]).toBeGreaterThan(27.6);
+    expect(rightGold.min[2]).toBeGreaterThan(22.4);
+    expect(rightGold.max[2]).toBeGreaterThan(22.95);
+
+    expect(leftShadow.min[0]).toBeLessThan(-15.5);
+    expect(leftShadow.max[0]).toBeLessThan(-14.0);
+    expect(leftShadow.min[1]).toBeGreaterThan(12.5);
+    expect(leftShadow.max[1]).toBeGreaterThan(27.4);
+    expect(leftShadow.min[2]).toBeGreaterThan(22.45);
+    expect(leftShadow.max[2]).toBeGreaterThan(22.85);
+
+    expect(rightShadow.min[0]).toBeGreaterThan(14.0);
+    expect(rightShadow.max[0]).toBeGreaterThan(15.5);
+    expect(rightShadow.min[1]).toBeGreaterThan(12.5);
+    expect(rightShadow.max[1]).toBeGreaterThan(27.4);
+    expect(rightShadow.min[2]).toBeGreaterThan(22.45);
+    expect(rightShadow.max[2]).toBeGreaterThan(22.85);
+
+    expect(readConnectedComponents('V76_SideScreenAnchorGoldSpine_L')).toHaveLength(1);
+    expect(readConnectedComponents('V76_SideScreenAnchorGoldSpine_R')).toHaveLength(1);
+    expect(readConnectedComponents('V76_SideScreenAnchorShadowBrace_L')).toHaveLength(1);
+    expect(readConnectedComponents('V76_SideScreenAnchorShadowBrace_R')).toHaveLength(1);
+
+    const minimumVertexCounts = new Map([
+      ['V76_SideScreenAnchorGoldSpine_L', 110],
+      ['V76_SideScreenAnchorGoldSpine_R', 110],
+      ['V76_SideScreenAnchorShadowBrace_L', 100],
+      ['V76_SideScreenAnchorShadowBrace_R', 100],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V76_SideScreenAnchorGoldSpine_L', 'V14_BurnishedCelestialGold'],
+      ['V76_SideScreenAnchorGoldSpine_R', 'V14_BurnishedCelestialGold'],
+      ['V76_SideScreenAnchorShadowBrace_L', 'V14_MatteBlackProductionRig'],
+      ['V76_SideScreenAnchorShadowBrace_R', 'V14_MatteBlackProductionRig'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
     for (const mesh of mainStageGlbJson.meshes) {
       for (const primitive of mesh.primitives) {
