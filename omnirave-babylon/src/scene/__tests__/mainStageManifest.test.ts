@@ -5596,6 +5596,128 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the wide hero screen proxy rails with an authored proscenium frame cluster', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const retiredWideHeroNodes = [
+      'V10_WideHeroScreenShadow',
+      'V10_WideHeroScreenGoldTop',
+      'V10_WideHeroScreenGoldBottom',
+      'V10_WideHeroScreenGoldLeft',
+      'V10_WideHeroScreenGoldRight',
+      'V10_WideHeroScreenIvoryTop',
+      'V10_WideHeroScreenIvoryBottom',
+      'V10_WideHeroScreenMullion_0',
+      'V10_WideHeroScreenMullion_1',
+      'V10_WideHeroScreenMullion_2',
+      'V10_WideHeroScreenMullion_3',
+      'V10_WideHeroScreenMullion_4',
+      'V10_WideHeroScreenMullion_5',
+      'V10_WideHeroScreenMullion_6',
+      'V10_WideHeroScreenRow_0',
+      'V10_WideHeroScreenRow_1',
+      'V10_WideHeroScreenRow_2',
+    ];
+    for (const nodeName of retiredWideHeroNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V79_WideHeroScreenShadowCoffer',
+      'V79_WideHeroScreenGoldFrame',
+      'V79_WideHeroScreenIvoryHeader',
+      'V79_WideHeroScreenIvoryFooter',
+      'V79_WideHeroScreenGoldMullionArray',
+      'V79_WideHeroScreenGoldCrossbarArray',
+    ];
+    expect(nodeNamesWithPrefix('V79_')).toHaveLength(requiredReplacementNodes.length);
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const shadow = readMeshGeometry('V79_WideHeroScreenShadowCoffer');
+    const goldFrame = readMeshGeometry('V79_WideHeroScreenGoldFrame');
+    const ivoryHeader = readMeshGeometry('V79_WideHeroScreenIvoryHeader');
+    const ivoryFooter = readMeshGeometry('V79_WideHeroScreenIvoryFooter');
+    const mullions = readMeshGeometry('V79_WideHeroScreenGoldMullionArray');
+    const crossbars = readMeshGeometry('V79_WideHeroScreenGoldCrossbarArray');
+
+    expect(shadow.min[0]).toBeLessThan(-18.0);
+    expect(shadow.max[0]).toBeGreaterThan(18.0);
+    expect(shadow.min[1]).toBeGreaterThan(14.2);
+    expect(shadow.max[1]).toBeGreaterThan(26.8);
+    expect(shadow.min[2]).toBeGreaterThan(22.6);
+    expect(shadow.max[2]).toBeGreaterThan(24.2);
+
+    expect(goldFrame.min[0]).toBeLessThan(-16.4);
+    expect(goldFrame.max[0]).toBeGreaterThan(16.4);
+    expect(goldFrame.min[1]).toBeGreaterThan(14.8);
+    expect(goldFrame.max[1]).toBeGreaterThan(26.1);
+    expect(goldFrame.min[2]).toBeGreaterThan(22.6);
+    expect(goldFrame.max[2]).toBeGreaterThan(23.7);
+
+    expect(ivoryHeader.min[0]).toBeLessThan(-17.8);
+    expect(ivoryHeader.max[0]).toBeGreaterThan(17.8);
+    expect(ivoryHeader.min[1]).toBeGreaterThan(25.9);
+    expect(ivoryHeader.max[1]).toBeGreaterThan(27.5);
+    expect(ivoryHeader.min[2]).toBeGreaterThan(22.7);
+    expect(ivoryHeader.max[2]).toBeGreaterThan(24.2);
+
+    expect(ivoryFooter.min[0]).toBeLessThan(-17.8);
+    expect(ivoryFooter.max[0]).toBeGreaterThan(17.8);
+    expect(ivoryFooter.min[1]).toBeLessThan(13.7);
+    expect(ivoryFooter.max[1]).toBeGreaterThan(15.1);
+    expect(ivoryFooter.min[2]).toBeGreaterThan(22.7);
+    expect(ivoryFooter.max[2]).toBeGreaterThan(24.2);
+
+    expect(mullions.min[0]).toBeLessThan(-11.6);
+    expect(mullions.max[0]).toBeGreaterThan(11.6);
+    expect(mullions.min[1]).toBeGreaterThan(15.7);
+    expect(mullions.max[1]).toBeGreaterThan(25.3);
+    expect(mullions.min[2]).toBeGreaterThan(22.7);
+    expect(mullions.max[2]).toBeGreaterThan(23.3);
+
+    expect(crossbars.min[0]).toBeLessThan(-15.3);
+    expect(crossbars.max[0]).toBeGreaterThan(15.3);
+    expect(crossbars.min[1]).toBeGreaterThan(17.0);
+    expect(crossbars.max[1]).toBeGreaterThan(24.1);
+    expect(crossbars.min[2]).toBeGreaterThan(22.7);
+    expect(crossbars.max[2]).toBeGreaterThan(23.2);
+
+    expect(readConnectedComponents('V79_WideHeroScreenShadowCoffer')).toHaveLength(1);
+    expect(readConnectedComponents('V79_WideHeroScreenGoldFrame')).toHaveLength(1);
+    expect(readConnectedComponents('V79_WideHeroScreenIvoryHeader')).toHaveLength(1);
+    expect(readConnectedComponents('V79_WideHeroScreenIvoryFooter')).toHaveLength(1);
+    expect(readConnectedComponents('V79_WideHeroScreenGoldMullionArray')).toHaveLength(7);
+    expect(readConnectedComponents('V79_WideHeroScreenGoldCrossbarArray')).toHaveLength(3);
+
+    const minimumVertexCounts = new Map([
+      ['V79_WideHeroScreenShadowCoffer', 180],
+      ['V79_WideHeroScreenGoldFrame', 180],
+      ['V79_WideHeroScreenIvoryHeader', 180],
+      ['V79_WideHeroScreenIvoryFooter', 180],
+      ['V79_WideHeroScreenGoldMullionArray', 360],
+      ['V79_WideHeroScreenGoldCrossbarArray', 150],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V79_WideHeroScreenShadowCoffer', 'V14_MatteBlackProductionRig'],
+      ['V79_WideHeroScreenGoldFrame', 'V14_BurnishedCelestialGold'],
+      ['V79_WideHeroScreenIvoryHeader', 'V14_PolishedMoonstoneShell'],
+      ['V79_WideHeroScreenIvoryFooter', 'V14_PolishedMoonstoneShell'],
+      ['V79_WideHeroScreenGoldMullionArray', 'V14_BurnishedCelestialGold'],
+      ['V79_WideHeroScreenGoldCrossbarArray', 'V14_BurnishedCelestialGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
     for (const mesh of mainStageGlbJson.meshes) {
       for (const primitive of mesh.primitives) {
