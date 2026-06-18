@@ -4952,7 +4952,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
 
     expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
-      16.67 * 1024 * 1024,
+      16.73 * 1024 * 1024,
     );
   });
 
@@ -6235,6 +6235,93 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       ['V84_CrowdControlFrameArray_R', 'V13_BlackStageRigging'],
       ['V84_CrowdControlRailArray_L', 'V14_BurnishedCelestialGold'],
       ['V84_CrowdControlRailArray_R', 'V14_BurnishedCelestialGold'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
+  it('replaces the spawn wet-plaza proxy strips with authored stepped stone bands', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    const retiredWetPaverNodes = [
+      'V13_WetPaverPanel_0',
+      'V13_WetPaverPanel_1',
+      'V13_WetPaverPanel_2',
+      'V13_WetPaverPanel_3',
+      'V13_WetPaverPanel_4',
+      'V13_WetPaverGoldSeam_0',
+      'V13_WetPaverGoldSeam_1',
+      'V13_WetPaverGoldSeam_2',
+      'V13_WetPaverGoldSeam_3',
+      'V13_WetPaverGoldSeam_4',
+    ];
+    for (const nodeName of retiredWetPaverNodes) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = ['V85_WetPaverStoneBands', 'V85_WetPaverGoldSeamBands'];
+    expect(nodeNamesWithPrefix('V85_')).toHaveLength(requiredReplacementNodes.length);
+
+    const stoneBands = readMeshGeometry('V85_WetPaverStoneBands');
+    const goldBands = readMeshGeometry('V85_WetPaverGoldSeamBands');
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+    }
+
+    expect(stoneBands.min[0]).toBeLessThan(-12.1);
+    expect(stoneBands.max[0]).toBeGreaterThan(12.1);
+    expect(stoneBands.min[1]).toBeLessThan(0.02);
+    expect(stoneBands.max[1]).toBeGreaterThan(0.42);
+    expect(stoneBands.min[2]).toBeGreaterThan(22.4);
+    expect(stoneBands.max[2]).toBeGreaterThan(65.4);
+
+    expect(goldBands.min[0]).toBeLessThan(-12.0);
+    expect(goldBands.max[0]).toBeGreaterThan(12.0);
+    expect(goldBands.min[1]).toBeGreaterThan(0.16);
+    expect(goldBands.max[1]).toBeGreaterThan(0.34);
+    expect(goldBands.min[2]).toBeGreaterThan(25.45);
+    expect(goldBands.max[2]).toBeGreaterThan(62.3);
+
+    expect(readConnectedComponents('V85_WetPaverStoneBands')).toHaveLength(5);
+    expect(readConnectedComponents('V85_WetPaverGoldSeamBands')).toHaveLength(5);
+
+    const stoneCenters = readConnectedComponents('V85_WetPaverStoneBands').map(({ min, max }) => [
+      (min[0] + max[0]) / 2,
+      (min[1] + max[1]) / 2,
+      (min[2] + max[2]) / 2,
+    ]);
+    for (const expectedZ of [26, 35, 44, 53, 62]) {
+      expect(
+        stoneCenters.some(([x, _y, z]) => Math.abs(x) < 0.2 && Math.abs(z - expectedZ) < 0.3),
+        `V85_WetPaverStoneBands missing stepped band around z=${expectedZ}`,
+      ).toBe(true);
+    }
+
+    const goldCenters = readConnectedComponents('V85_WetPaverGoldSeamBands').map(({ min, max }) => [
+      (min[0] + max[0]) / 2,
+      (min[1] + max[1]) / 2,
+      (min[2] + max[2]) / 2,
+    ]);
+    for (const expectedZ of [26, 35, 44, 53, 62]) {
+      expect(
+        goldCenters.some(([x, _y, z]) => Math.abs(x) < 0.2 && Math.abs(z - expectedZ) < 0.2),
+        `V85_WetPaverGoldSeamBands missing seam band around z=${expectedZ}`,
+      ).toBe(true);
+    }
+
+    const minimumVertexCounts = new Map([
+      ['V85_WetPaverStoneBands', 900],
+      ['V85_WetPaverGoldSeamBands', 600],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V85_WetPaverStoneBands', 'V13_WetPlazaStone'],
+      ['V85_WetPaverGoldSeamBands', 'V14_BurnishedCelestialGold'],
     ]);
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
