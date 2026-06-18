@@ -6560,6 +6560,62 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
   });
 
+  it('replaces the basin fountain jet and light proxies with sculpted nozzle arrays', () => {
+    expect(nodeNamesWithPrefix('V13_BasinFountainJet_'), 'legacy basin fountain jet nodes still exported').toHaveLength(0);
+    expect(nodeNamesWithPrefix('V13_BasinFountainLight_'), 'legacy basin fountain light nodes still exported').toHaveLength(0);
+
+    const requiredReplacementNodes = [
+      'V89_BasinFountainPedestalArray_L',
+      'V89_BasinFountainPedestalArray_R',
+      'V89_BasinFountainLightArray_L',
+      'V89_BasinFountainLightArray_R',
+      'V89_BasinFountainJetArray_L',
+      'V89_BasinFountainJetArray_R',
+    ];
+    expect(nodeNamesWithPrefix('V89_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 40, minUniquePositions: 100, minVertexCount: 160 });
+    }
+
+    for (const side of ['L', 'R'] as const) {
+      const pedestalNode = `V89_BasinFountainPedestalArray_${side}`;
+      const lightNode = `V89_BasinFountainLightArray_${side}`;
+      const jetNode = `V89_BasinFountainJetArray_${side}`;
+      const pedestal = readMeshGeometry(pedestalNode, { minNonZeroAreaTriangles: 90, minUniquePositions: 120, minVertexCount: 180 });
+      const light = readMeshGeometry(lightNode, { minNonZeroAreaTriangles: 60, minUniquePositions: 90, minVertexCount: 120 });
+      const jet = readMeshGeometry(jetNode, { minNonZeroAreaTriangles: 90, minUniquePositions: 120, minVertexCount: 180 });
+
+      expect(readConnectedComponents(pedestalNode)).toHaveLength(9);
+      expect(readConnectedComponents(lightNode)).toHaveLength(9);
+      expect(readConnectedComponents(jetNode)).toHaveLength(9);
+
+      expect(pedestal.max[2] - pedestal.min[2]).toBeGreaterThan(47);
+      expect(light.max[2] - light.min[2]).toBeGreaterThan(47);
+      expect(jet.max[2] - jet.min[2]).toBeGreaterThan(47);
+      expect(pedestal.max[1] - pedestal.min[1]).toBeGreaterThan(0.34);
+      expect(light.max[1] - light.min[1]).toBeGreaterThan(0.12);
+      expect(jet.max[1] - jet.min[1]).toBeGreaterThan(2.2);
+
+      if (side === 'L') {
+        expect(pedestal.max[0]).toBeLessThan(-8.6);
+        expect(light.max[0]).toBeLessThan(-8.8);
+        expect(jet.max[0]).toBeLessThan(-8.9);
+        expect(pedestal.min[0]).toBeLessThan(-15.7);
+      } else {
+        expect(pedestal.min[0]).toBeGreaterThan(8.6);
+        expect(light.min[0]).toBeGreaterThan(8.8);
+        expect(jet.min[0]).toBeGreaterThan(8.9);
+        expect(pedestal.max[0]).toBeGreaterThan(15.7);
+      }
+
+      expect(materialNameFor(pedestalNode)).toBe('V15_PearlShellBeveled');
+      expect(materialNameFor(lightNode)).toBe('V13_WarmPracticalLight');
+      expect(materialNameFor(jetNode)).toBe('V14_CosmicScreenEmission');
+    }
+  });
+
   it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
     for (const mesh of mainStageGlbJson.meshes) {
       for (const primitive of mesh.primitives) {
