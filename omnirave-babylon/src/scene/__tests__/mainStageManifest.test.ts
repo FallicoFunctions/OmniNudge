@@ -6328,6 +6328,123 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
   });
 
+  it('replaces the foreground wet-stone pocket proxies with authored reflecting basins and garden copings', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const legacyPrefix of ['V14_SpawnWetStoneInset_', 'V14_GardenStoneEdge_']) {
+      expect(nodeNamesWithPrefix(legacyPrefix), `legacy nodes still exported for ${legacyPrefix}`).toHaveLength(0);
+    }
+
+    const requiredReplacementNodes = [
+      'V86_SpawnWetInsetPoolArray_L',
+      'V86_SpawnWetInsetPoolArray_R',
+      'V86_GardenStoneEdgeArray_L',
+      'V86_GardenStoneEdgeArray_R',
+    ];
+    expect(nodeNamesWithPrefix('V86_')).toHaveLength(requiredReplacementNodes.length);
+
+    const leftPool = readMeshGeometry('V86_SpawnWetInsetPoolArray_L');
+    const rightPool = readMeshGeometry('V86_SpawnWetInsetPoolArray_R');
+    const leftEdge = readMeshGeometry('V86_GardenStoneEdgeArray_L');
+    const rightEdge = readMeshGeometry('V86_GardenStoneEdgeArray_R');
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      expect(exportedNodeNames).toContain(nodeName);
+    }
+
+    expect(leftPool.max[0]).toBeLessThan(-2.0);
+    expect(leftPool.min[1]).toBeGreaterThan(-0.02);
+    expect(leftPool.max[1]).toBeGreaterThan(0.15);
+    expect(leftPool.min[2]).toBeGreaterThan(14.9);
+    expect(leftPool.max[2]).toBeGreaterThan(44.9);
+
+    expect(rightPool.min[0]).toBeGreaterThan(2.0);
+    expect(rightPool.min[1]).toBeGreaterThan(-0.02);
+    expect(rightPool.max[1]).toBeGreaterThan(0.15);
+    expect(rightPool.min[2]).toBeGreaterThan(14.9);
+    expect(rightPool.max[2]).toBeGreaterThan(44.9);
+
+    expect(leftEdge.max[0]).toBeLessThan(-7.9);
+    expect(leftEdge.min[1]).toBeGreaterThan(0.35);
+    expect(leftEdge.max[1]).toBeGreaterThan(0.82);
+    expect(leftEdge.min[2]).toBeLessThan(-38.2);
+    expect(leftEdge.max[2]).toBeGreaterThan(8.2);
+
+    expect(rightEdge.min[0]).toBeGreaterThan(7.9);
+    expect(rightEdge.min[1]).toBeGreaterThan(0.35);
+    expect(rightEdge.max[1]).toBeGreaterThan(0.82);
+    expect(rightEdge.min[2]).toBeLessThan(-38.2);
+    expect(rightEdge.max[2]).toBeGreaterThan(8.2);
+
+    expect(readConnectedComponents('V86_SpawnWetInsetPoolArray_L')).toHaveLength(4);
+    expect(readConnectedComponents('V86_SpawnWetInsetPoolArray_R')).toHaveLength(4);
+    expect(readConnectedComponents('V86_GardenStoneEdgeArray_L')).toHaveLength(6);
+    expect(readConnectedComponents('V86_GardenStoneEdgeArray_R')).toHaveLength(6);
+
+    const leftPoolCenters = readConnectedComponents('V86_SpawnWetInsetPoolArray_L').map(({ min, max }) => [
+      (min[0] + max[0]) / 2,
+      (min[1] + max[1]) / 2,
+      (min[2] + max[2]) / 2,
+    ]);
+    const rightPoolCenters = readConnectedComponents('V86_SpawnWetInsetPoolArray_R').map(({ min, max }) => [
+      (min[0] + max[0]) / 2,
+      (min[1] + max[1]) / 2,
+      (min[2] + max[2]) / 2,
+    ]);
+    for (const expectedZ of [42, 34, 26, 18]) {
+      expect(
+        leftPoolCenters.some(([x, _y, z]) => x < -2.2 && Math.abs(z - expectedZ) < 0.4),
+        `V86_SpawnWetInsetPoolArray_L missing basin around z=${expectedZ}`,
+      ).toBe(true);
+      expect(
+        rightPoolCenters.some(([x, _y, z]) => x > 2.2 && Math.abs(z - expectedZ) < 0.4),
+        `V86_SpawnWetInsetPoolArray_R missing basin around z=${expectedZ}`,
+      ).toBe(true);
+    }
+
+    const leftEdgeCenters = readConnectedComponents('V86_GardenStoneEdgeArray_L').map(({ min, max }) => [
+      (min[0] + max[0]) / 2,
+      (min[1] + max[1]) / 2,
+      (min[2] + max[2]) / 2,
+    ]);
+    const rightEdgeCenters = readConnectedComponents('V86_GardenStoneEdgeArray_R').map(({ min, max }) => [
+      (min[0] + max[0]) / 2,
+      (min[1] + max[1]) / 2,
+      (min[2] + max[2]) / 2,
+    ]);
+    for (const expectedZ of [8, 1, -8, -18, -29, -38]) {
+      expect(
+        leftEdgeCenters.some(([x, _y, z]) => x < -8.0 && Math.abs(z - expectedZ) < 0.4),
+        `V86_GardenStoneEdgeArray_L missing coping around z=${expectedZ}`,
+      ).toBe(true);
+      expect(
+        rightEdgeCenters.some(([x, _y, z]) => x > 8.0 && Math.abs(z - expectedZ) < 0.4),
+        `V86_GardenStoneEdgeArray_R missing coping around z=${expectedZ}`,
+      ).toBe(true);
+    }
+
+    const minimumVertexCounts = new Map([
+      ['V86_SpawnWetInsetPoolArray_L', 700],
+      ['V86_SpawnWetInsetPoolArray_R', 700],
+      ['V86_GardenStoneEdgeArray_L', 900],
+      ['V86_GardenStoneEdgeArray_R', 900],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V86_SpawnWetInsetPoolArray_L', 'V14_DeepReflectingWater'],
+      ['V86_SpawnWetInsetPoolArray_R', 'V14_DeepReflectingWater'],
+      ['V86_GardenStoneEdgeArray_L', 'V14_PolishedMoonstoneShell'],
+      ['V86_GardenStoneEdgeArray_R', 'V14_PolishedMoonstoneShell'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
     for (const mesh of mainStageGlbJson.meshes) {
       for (const primitive of mesh.primitives) {
