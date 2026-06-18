@@ -5438,6 +5438,85 @@ describe('MAIN_STAGE_MANIFEST', () => {
     }
   });
 
+  it('replaces the flat oval-screen recess planes with authored recessed housings', () => {
+    const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
+    for (const nodeName of ['V11_OvalScreenDarkRecess_L', 'V11_OvalScreenDarkRecess_R']) {
+      expect(exportedNodeNames).not.toContain(nodeName);
+    }
+
+    const requiredReplacementNodes = [
+      'V77_OvalScreenRecessGoldFrame_L',
+      'V77_OvalScreenRecessGoldFrame_R',
+      'V77_OvalScreenRecessShadowPocket_L',
+      'V77_OvalScreenRecessShadowPocket_R',
+    ];
+    expect(nodeNamesWithPrefix('V77_')).toHaveLength(requiredReplacementNodes.length);
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+    }
+
+    const leftGold = readMeshGeometry('V77_OvalScreenRecessGoldFrame_L');
+    const rightGold = readMeshGeometry('V77_OvalScreenRecessGoldFrame_R');
+    const leftShadow = readMeshGeometry('V77_OvalScreenRecessShadowPocket_L');
+    const rightShadow = readMeshGeometry('V77_OvalScreenRecessShadowPocket_R');
+
+    expect(leftGold.min[0]).toBeLessThan(-38.8);
+    expect(leftGold.max[0]).toBeLessThan(-22.8);
+    expect(leftGold.min[1]).toBeGreaterThan(11.9);
+    expect(leftGold.max[1]).toBeGreaterThan(28.3);
+    expect(leftGold.min[2]).toBeGreaterThan(17.3);
+    expect(leftGold.max[2]).toBeGreaterThan(18.1);
+
+    expect(rightGold.min[0]).toBeGreaterThan(22.8);
+    expect(rightGold.max[0]).toBeGreaterThan(38.8);
+    expect(rightGold.min[1]).toBeGreaterThan(11.9);
+    expect(rightGold.max[1]).toBeGreaterThan(28.3);
+    expect(rightGold.min[2]).toBeGreaterThan(17.3);
+    expect(rightGold.max[2]).toBeGreaterThan(18.1);
+
+    expect(leftShadow.min[0]).toBeLessThan(-38.3);
+    expect(leftShadow.max[0]).toBeLessThan(-23.4);
+    expect(leftShadow.min[1]).toBeGreaterThan(12.2);
+    expect(leftShadow.max[1]).toBeGreaterThan(27.9);
+    expect(leftShadow.min[2]).toBeGreaterThan(17.5);
+    expect(leftShadow.max[2]).toBeGreaterThan(18.4);
+
+    expect(rightShadow.min[0]).toBeGreaterThan(23.4);
+    expect(rightShadow.max[0]).toBeGreaterThan(38.3);
+    expect(rightShadow.min[1]).toBeGreaterThan(12.2);
+    expect(rightShadow.max[1]).toBeGreaterThan(27.9);
+    expect(rightShadow.min[2]).toBeGreaterThan(17.5);
+    expect(rightShadow.max[2]).toBeGreaterThan(18.4);
+
+    expect(readConnectedComponents('V77_OvalScreenRecessGoldFrame_L')).toHaveLength(1);
+    expect(readConnectedComponents('V77_OvalScreenRecessGoldFrame_R')).toHaveLength(1);
+    expect(readConnectedComponents('V77_OvalScreenRecessShadowPocket_L')).toHaveLength(1);
+    expect(readConnectedComponents('V77_OvalScreenRecessShadowPocket_R')).toHaveLength(1);
+
+    const minimumVertexCounts = new Map([
+      ['V77_OvalScreenRecessGoldFrame_L', 120],
+      ['V77_OvalScreenRecessGoldFrame_R', 120],
+      ['V77_OvalScreenRecessShadowPocket_L', 140],
+      ['V77_OvalScreenRecessShadowPocket_R', 140],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    const expectedMaterials = new Map([
+      ['V77_OvalScreenRecessGoldFrame_L', 'V14_BurnishedCelestialGold'],
+      ['V77_OvalScreenRecessGoldFrame_R', 'V14_BurnishedCelestialGold'],
+      ['V77_OvalScreenRecessShadowPocket_L', 'V14_MatteBlackProductionRig'],
+      ['V77_OvalScreenRecessShadowPocket_R', 'V14_MatteBlackProductionRig'],
+    ]);
+    for (const [nodeName, expectedMaterial] of expectedMaterials) {
+      expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
+    }
+  });
+
   it('exports unit-length tangents for every normal-mapped Main Stage primitive', () => {
     for (const mesh of mainStageGlbJson.meshes) {
       for (const primitive of mesh.primitives) {
