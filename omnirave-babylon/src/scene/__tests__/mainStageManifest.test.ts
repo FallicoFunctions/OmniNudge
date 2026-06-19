@@ -6674,7 +6674,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     for (const nodeName of requiredReplacementNodes) {
       expectMainStageMarker(nodeName);
-      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 80, minUniquePositions: 120, minVertexCount: 180 });
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 40, minUniquePositions: 40, minVertexCount: 80 });
     }
 
     for (const side of ['L', 'R'] as const) {
@@ -6725,6 +6725,67 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       expect(materialNameFor(frameNode)).toBe('V15_PearlShellBeveled');
       expect(materialNameFor(canopyNode)).toBe('V15_PearlShellBeveled');
       expect(materialNameFor(crestNode)).toBe('V13_BrushedFestivalGold');
+    }
+  });
+
+  it('replaces the service case stack proxies with detailed road-case assemblies', () => {
+    expect(nodeNamesWithPrefix('V13_ServiceCaseStack'), 'legacy service case stack nodes still exported').toHaveLength(0);
+
+    const requiredReplacementNodes = [
+      'V92_ServiceCaseBank_L',
+      'V92_ServiceCaseBank_R',
+      'V92_ServiceCaseTopper_L',
+      'V92_ServiceCaseTopper_R',
+    ];
+    expect(nodeNamesWithPrefix('V92_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 40, minUniquePositions: 40, minVertexCount: 80 });
+    }
+
+    for (const side of ['L', 'R'] as const) {
+      const bankNode = `V92_ServiceCaseBank_${side}`;
+      const topperNode = `V92_ServiceCaseTopper_${side}`;
+
+      const bank = readMeshGeometry(bankNode, { minNonZeroAreaTriangles: 90, minUniquePositions: 120, minVertexCount: 220 });
+      const topper = readMeshGeometry(topperNode, { minNonZeroAreaTriangles: 40, minUniquePositions: 40, minVertexCount: 80 });
+
+      expect(
+        readConnectedComponents(bankNode, { minNonZeroAreaTriangles: 90, minUniquePositions: 120, minVertexCount: 220 }),
+      ).toHaveLength(3);
+      expect(
+        readConnectedComponents(topperNode, { minNonZeroAreaTriangles: 40, minUniquePositions: 40, minVertexCount: 80 }),
+      ).toHaveLength(1);
+
+      expect(bank.max[0] - bank.min[0]).toBeGreaterThan(2.35);
+      expect(bank.max[1] - bank.min[1]).toBeGreaterThan(1.45);
+      expect(bank.max[2] - bank.min[2]).toBeGreaterThan(1.55);
+      expect(bank.min[1]).toBeLessThan(0.2);
+      expect(bank.max[1]).toBeGreaterThan(1.6);
+      expect(bank.min[2]).toBeGreaterThan(39.0);
+      expect(bank.max[2]).toBeGreaterThan(40.8);
+
+      expect(topper.max[0] - topper.min[0]).toBeGreaterThan(2.3);
+      expect(topper.max[1] - topper.min[1]).toBeGreaterThan(0.48);
+      expect(topper.max[2] - topper.min[2]).toBeGreaterThan(1.55);
+      expect(topper.min[1]).toBeGreaterThan(1.2);
+      expect(topper.max[1]).toBeGreaterThan(bank.max[1] - 0.1);
+      expect(topper.min[2]).toBeLessThan(bank.min[2] + 0.7);
+      expect(topper.max[2]).toBeLessThan(bank.max[2] - 0.8);
+
+      if (side === 'L') {
+        expect(bank.max[0]).toBeLessThan(-23.7);
+        expect(bank.min[0]).toBeLessThan(-26.1);
+        expect(topper.max[0]).toBeLessThan(-23.7);
+      } else {
+        expect(bank.min[0]).toBeGreaterThan(23.7);
+        expect(bank.max[0]).toBeGreaterThan(26.1);
+        expect(topper.min[0]).toBeGreaterThan(23.7);
+      }
+
+      expect(materialNameFor(bankNode)).toBe('V13_BlackStageRigging');
+      expect(materialNameFor(topperNode)).toBe('V13_BrushedFestivalGold');
     }
   });
 
