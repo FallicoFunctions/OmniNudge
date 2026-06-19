@@ -7328,6 +7328,109 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
   });
 
+  it('replaces the remaining basin slab proxies with sculpted basin architecture', () => {
+    const forbiddenLegacyNodes = [
+      'V4_BasinChannel',
+      'V4_BasinRunway',
+      'V4_BasinParapet_L',
+      'V4_BasinParapet_R',
+      'V4_BasinRetain_L',
+      'V4_BasinRetain_R',
+    ];
+    for (const nodeName of forbiddenLegacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy basin proxy still exported: ${nodeName}`).toBe(false);
+    }
+
+    const requiredReplacementNodes = [
+      'V99_BasinChannelRelief',
+      'V99_BasinRunwaySpine',
+      'V99_BasinParapetRelief_L',
+      'V99_BasinParapetRelief_R',
+      'V99_BasinRetainingWall_L',
+      'V99_BasinRetainingWall_R',
+    ];
+    expect(nodeNamesWithPrefix('V99_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 120, minUniquePositions: 120, minVertexCount: 180 });
+      expect(readConnectedComponents(nodeName)).toHaveLength(1);
+      expect(materialNameFor(nodeName)).toBe('V15_PearlShellBeveled');
+    }
+
+    const channel = readMeshGeometry('V99_BasinChannelRelief', {
+      minNonZeroAreaTriangles: 180,
+      minUniquePositions: 180,
+      minVertexCount: 260,
+    });
+    const runway = readMeshGeometry('V99_BasinRunwaySpine', {
+      minNonZeroAreaTriangles: 180,
+      minUniquePositions: 180,
+      minVertexCount: 260,
+    });
+
+    expect(channel.max[0] - channel.min[0]).toBeGreaterThan(8.2);
+    expect(channel.max[2] - channel.min[2]).toBeGreaterThan(61.0);
+    expect(channel.max[1] - channel.min[1]).toBeGreaterThan(0.42);
+    expect(channel.min[0]).toBeGreaterThan(-4.7);
+    expect(channel.max[0]).toBeLessThan(4.7);
+    expect(channel.min[2]).toBeLessThan(-39.8);
+    expect(channel.max[2]).toBeGreaterThan(21.8);
+    expect(channel.min[1]).toBeLessThanOrEqual(-0.31);
+    expect(channel.max[1]).toBeGreaterThan(0.08);
+
+    expect(runway.max[0] - runway.min[0]).toBeGreaterThan(2.7);
+    expect(runway.max[2] - runway.min[2]).toBeGreaterThan(58.0);
+    expect(runway.max[1] - runway.min[1]).toBeGreaterThan(0.42);
+    expect(runway.min[0]).toBeGreaterThan(-1.7);
+    expect(runway.max[0]).toBeLessThan(1.7);
+    expect(runway.min[2]).toBeLessThan(-18.8);
+    expect(runway.max[2]).toBeGreaterThan(18.8);
+    expect(runway.min[1]).toBeGreaterThan(0.12);
+    expect(runway.max[1]).toBeGreaterThan(0.72);
+
+    for (const side of ['L', 'R'] as const) {
+      const parapetNode = `V99_BasinParapetRelief_${side}`;
+      const retainingNode = `V99_BasinRetainingWall_${side}`;
+      const parapet = readMeshGeometry(parapetNode, {
+        minNonZeroAreaTriangles: 160,
+        minUniquePositions: 150,
+        minVertexCount: 220,
+      });
+      const retaining = readMeshGeometry(retainingNode, {
+        minNonZeroAreaTriangles: 160,
+        minUniquePositions: 150,
+        minVertexCount: 220,
+      });
+
+      expect(parapet.max[2] - parapet.min[2]).toBeGreaterThan(56.0);
+      expect(parapet.max[1] - parapet.min[1]).toBeGreaterThan(0.55);
+      expect(retaining.max[2] - retaining.min[2]).toBeGreaterThan(56.0);
+      expect(retaining.max[1] - retaining.min[1]).toBeGreaterThan(2.0);
+
+      expect(parapet.min[2]).toBeLessThan(-18.8);
+      expect(parapet.max[2]).toBeGreaterThan(18.8);
+      expect(retaining.min[2]).toBeLessThan(-18.8);
+      expect(retaining.max[2]).toBeGreaterThan(18.8);
+      expect(parapet.min[1]).toBeGreaterThan(1.45);
+      expect(parapet.max[1]).toBeGreaterThan(2.08);
+      expect(retaining.min[1]).toBeLessThan(0.02);
+      expect(retaining.max[1]).toBeGreaterThan(2.02);
+
+      if (side === 'L') {
+        expect(parapet.max[0]).toBeLessThan(-8.0);
+        expect(parapet.min[0]).toBeLessThan(-9.3);
+        expect(retaining.max[0]).toBeLessThan(-5.2);
+        expect(retaining.min[0]).toBeLessThan(-7.0);
+      } else {
+        expect(parapet.min[0]).toBeGreaterThan(8.0);
+        expect(parapet.max[0]).toBeGreaterThan(9.3);
+        expect(retaining.min[0]).toBeGreaterThan(5.2);
+        expect(retaining.max[0]).toBeGreaterThan(7.0);
+      }
+    }
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
