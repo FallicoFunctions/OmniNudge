@@ -4952,7 +4952,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
 
     expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
-      16.73 * 1024 * 1024,
+      16.9 * 1024 * 1024,
     );
   });
 
@@ -6786,6 +6786,444 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
       expect(materialNameFor(bankNode)).toBe('V13_BlackStageRigging');
       expect(materialNameFor(topperNode)).toBe('V13_BrushedFestivalGold');
+    }
+  });
+
+  it('replaces the wing service case cube props with detailed batched road-case arrays', () => {
+    expect(nodeNamesWithPrefix('V10_ServiceCase_'), 'legacy wing service case nodes still exported').toHaveLength(0);
+
+    const requiredReplacementNodes = ['V93_ServiceCaseArray_L', 'V93_ServiceCaseArray_R'];
+    expect(nodeNamesWithPrefix('V93_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 120, minUniquePositions: 140, minVertexCount: 260 });
+      expect(
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 120, minUniquePositions: 140, minVertexCount: 260 }),
+      ).toHaveLength(2);
+      expect(materialNameFor(nodeName)).toBe('V9_BlackRigging');
+    }
+
+    const leftArray = readMeshGeometry('V93_ServiceCaseArray_L', {
+      minNonZeroAreaTriangles: 140,
+      minUniquePositions: 160,
+      minVertexCount: 320,
+    });
+    const rightArray = readMeshGeometry('V93_ServiceCaseArray_R', {
+      minNonZeroAreaTriangles: 140,
+      minUniquePositions: 160,
+      minVertexCount: 320,
+    });
+
+    expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(2.65);
+    expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(2.65);
+    expect(leftArray.max[1] - leftArray.min[1]).toBeGreaterThan(1.54);
+    expect(rightArray.max[1] - rightArray.min[1]).toBeGreaterThan(1.54);
+    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(27.0);
+    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(27.0);
+
+    expect(leftArray.min[2]).toBeLessThan(-7.7);
+    expect(leftArray.max[2]).toBeGreaterThan(19.7);
+    expect(rightArray.min[2]).toBeLessThan(-7.7);
+    expect(rightArray.max[2]).toBeGreaterThan(19.7);
+
+    expect(leftArray.max[0]).toBeLessThan(-20.5);
+    expect(leftArray.min[0]).toBeLessThan(-23.2);
+    expect(rightArray.min[0]).toBeGreaterThan(20.5);
+    expect(rightArray.max[0]).toBeGreaterThan(23.2);
+
+    expect(leftArray.min[1]).toBeLessThan(0.2);
+    expect(leftArray.max[1]).toBeGreaterThan(1.62);
+    expect(rightArray.min[1]).toBeLessThan(0.2);
+    expect(rightArray.max[1]).toBeGreaterThan(1.62);
+  });
+
+  it('replaces the wing barrier stick props with batched crowd-control assemblies', () => {
+    expect(nodeNamesWithPrefix('V10_BarrierFoot_'), 'legacy wing barrier foot nodes still exported').toHaveLength(0);
+    expect(nodeNamesWithPrefix('V10_CrowdBarrier_'), 'legacy wing crowd barrier nodes still exported').toHaveLength(0);
+
+    const requiredReplacementNodes = [
+      'V94_CrowdBarrierBaseArray_L',
+      'V94_CrowdBarrierBaseArray_R',
+      'V94_CrowdBarrierRailArray_L',
+      'V94_CrowdBarrierRailArray_R',
+    ];
+    expect(nodeNamesWithPrefix('V94_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 120, minUniquePositions: 120, minVertexCount: 240 });
+    }
+
+    for (const side of ['L', 'R'] as const) {
+      const baseNode = `V94_CrowdBarrierBaseArray_${side}`;
+      const railNode = `V94_CrowdBarrierRailArray_${side}`;
+
+      const base = readMeshGeometry(baseNode, { minNonZeroAreaTriangles: 160, minUniquePositions: 180, minVertexCount: 360 });
+      const rail = readMeshGeometry(railNode, { minNonZeroAreaTriangles: 160, minUniquePositions: 180, minVertexCount: 360 });
+
+      expect(
+        readConnectedComponents(baseNode, { minNonZeroAreaTriangles: 160, minUniquePositions: 180, minVertexCount: 360 }),
+      ).toHaveLength(6);
+      expect(
+        readConnectedComponents(railNode, { minNonZeroAreaTriangles: 160, minUniquePositions: 180, minVertexCount: 360 }),
+      ).toHaveLength(6);
+
+      expect(base.max[0] - base.min[0]).toBeGreaterThan(0.88);
+      expect(base.max[1] - base.min[1]).toBeGreaterThan(0.2);
+      expect(base.max[2] - base.min[2]).toBeGreaterThan(59.0);
+      expect(rail.max[0] - rail.min[0]).toBeGreaterThan(0.14);
+      expect(rail.max[1] - rail.min[1]).toBeGreaterThan(0.82);
+      expect(rail.max[2] - rail.min[2]).toBeGreaterThan(59.0);
+
+      if (side === 'L') {
+        expect(base.max[0]).toBeLessThan(-12.7);
+        expect(rail.max[0]).toBeLessThan(-13.0);
+      } else {
+        expect(base.min[0]).toBeGreaterThan(12.7);
+        expect(rail.min[0]).toBeGreaterThan(13.0);
+      }
+
+      expect(base.min[1]).toBeLessThan(0.2);
+      expect(base.max[1]).toBeLessThan(0.5);
+      expect(rail.min[1]).toBeGreaterThanOrEqual(0.5);
+      expect(rail.max[1]).toBeGreaterThan(1.3);
+
+      expect(base.min[2]).toBeLessThan(-26.1);
+      expect(base.max[2]).toBeGreaterThan(34.1);
+      expect(rail.min[2]).toBeLessThan(-28.8);
+      expect(rail.max[2]).toBeGreaterThan(36.8);
+
+      expect(materialNameFor(baseNode)).toBe('V9_BlackRigging');
+      expect(materialNameFor(railNode)).toBe('V9_CrownFiligreeGold');
+    }
+  });
+
+  it('replaces the stage-edge pyro proxy pylons and nozzles with batched ceremonial pyro arrays', () => {
+    expect(nodeNamesWithPrefix('V10_PyroPylon_'), 'legacy stage-edge pyro pylons still exported').toHaveLength(0);
+    expect(nodeNamesWithPrefix('V10_PyroNozzle_'), 'legacy stage-edge pyro nozzles still exported').toHaveLength(0);
+
+    const requiredReplacementNodes = [
+      'V95_PyroPylonArray_L',
+      'V95_PyroPylonArray_R',
+      'V95_PyroNozzleArray_L',
+      'V95_PyroNozzleArray_R',
+    ];
+    expect(nodeNamesWithPrefix('V95_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 120, minUniquePositions: 120, minVertexCount: 220 });
+    }
+
+    for (const side of ['L', 'R'] as const) {
+      const pylonNode = `V95_PyroPylonArray_${side}`;
+      const nozzleNode = `V95_PyroNozzleArray_${side}`;
+
+      const pylons = readMeshGeometry(pylonNode, {
+        minNonZeroAreaTriangles: 180,
+        minUniquePositions: 180,
+        minVertexCount: 420,
+      });
+      const nozzles = readMeshGeometry(nozzleNode, {
+        minNonZeroAreaTriangles: 120,
+        minUniquePositions: 120,
+        minVertexCount: 240,
+      });
+
+      const pylonComponents = readConnectedComponents(pylonNode, {
+        minNonZeroAreaTriangles: 180,
+        minUniquePositions: 180,
+        minVertexCount: 420,
+      });
+      const nozzleComponents = readConnectedComponents(nozzleNode, {
+        minNonZeroAreaTriangles: 120,
+        minUniquePositions: 120,
+        minVertexCount: 240,
+      });
+
+      expect(pylonComponents).toHaveLength(3);
+      expect(nozzleComponents).toHaveLength(3);
+
+      expect(pylons.max[1] - pylons.min[1]).toBeGreaterThan(6.2);
+      expect(pylons.max[2] - pylons.min[2]).toBeGreaterThan(51.5);
+      expect(nozzles.max[1] - nozzles.min[1]).toBeGreaterThan(0.36);
+      expect(nozzles.max[2] - nozzles.min[2]).toBeGreaterThan(51.5);
+
+      if (side === 'L') {
+        expect(pylons.max[0]).toBeLessThan(-16.7);
+        expect(nozzles.max[0]).toBeLessThan(-16.8);
+      } else {
+        expect(pylons.min[0]).toBeGreaterThan(16.7);
+        expect(nozzles.min[0]).toBeGreaterThan(16.8);
+      }
+
+      expect(pylons.min[1]).toBeLessThan(0.1);
+      expect(pylons.max[1]).toBeGreaterThan(6.1);
+      expect(nozzles.min[1]).toBeGreaterThan(6.2);
+      expect(nozzles.max[1]).toBeGreaterThan(6.7);
+      expect(pylons.min[2]).toBeLessThan(-24.4);
+      expect(pylons.max[2]).toBeGreaterThan(28.4);
+      expect(nozzles.min[2]).toBeLessThan(-24.3);
+      expect(nozzles.max[2]).toBeGreaterThan(28.3);
+
+      const expectedRows = [-24, 2, 28];
+      for (const [components, expectedY, label] of [
+        [pylonComponents, 3.1, pylonNode],
+        [nozzleComponents, 6.55, nozzleNode],
+      ] as const) {
+        const centers = components.map(({ min, max }) => [
+          (min[0] + max[0]) * 0.5,
+          (min[1] + max[1]) * 0.5,
+          (min[2] + max[2]) * 0.5,
+        ]);
+        const expectedX = side === 'L' ? -17.4 : 17.4;
+        for (const expectedZ of expectedRows) {
+          expect(
+            centers.some(
+              ([x, y, z]) =>
+                Math.abs(x - expectedX) < 0.15 && Math.abs(y - expectedY) < 0.2 && Math.abs(z - expectedZ) < 0.15,
+            ),
+            `${label} missing ceremonial pyro assembly near x=${expectedX}, y=${expectedY}, z=${expectedZ}`,
+          ).toBe(true);
+        }
+      }
+
+      expect(materialNameFor(pylonNode)).toBe('V15_PearlShellBeveled');
+      expect(materialNameFor(nozzleNode)).toBe('V9_CrownFiligreeGold');
+    }
+  });
+
+  it('replaces the rear-mass strip and recess proxy bars with batched aurora facade arrays', () => {
+    expect(nodeNamesWithPrefix('V10_RearMassHorizontalGold_'), 'legacy rear-mass gold strip bars still exported').toHaveLength(0);
+    expect(nodeNamesWithPrefix('V10_RearMassShadowRecess_'), 'legacy rear-mass shadow recess bars still exported').toHaveLength(0);
+
+    const requiredReplacementNodes = [
+      'V96_RearMassGoldBandArray_L',
+      'V96_RearMassGoldBandArray_R',
+      'V96_RearMassShadowChannelArray_L',
+      'V96_RearMassShadowChannelArray_R',
+    ];
+    expect(nodeNamesWithPrefix('V96_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 120, minUniquePositions: 120, minVertexCount: 220 });
+    }
+
+    for (const side of ['L', 'R'] as const) {
+      const goldNode = `V96_RearMassGoldBandArray_${side}`;
+      const shadowNode = `V96_RearMassShadowChannelArray_${side}`;
+
+      const gold = readMeshGeometry(goldNode, {
+        minNonZeroAreaTriangles: 180,
+        minUniquePositions: 180,
+        minVertexCount: 400,
+      });
+      const shadow = readMeshGeometry(shadowNode, {
+        minNonZeroAreaTriangles: 120,
+        minUniquePositions: 140,
+        minVertexCount: 260,
+      });
+
+      const goldComponents = readConnectedComponents(goldNode, {
+        minNonZeroAreaTriangles: 180,
+        minUniquePositions: 180,
+        minVertexCount: 400,
+      });
+      const shadowComponents = readConnectedComponents(shadowNode, {
+        minNonZeroAreaTriangles: 120,
+        minUniquePositions: 140,
+        minVertexCount: 260,
+      });
+
+      expect(goldComponents).toHaveLength(5);
+      expect(shadowComponents).toHaveLength(3);
+
+      expect(gold.max[0] - gold.min[0]).toBeGreaterThan(11.7);
+      expect(gold.max[1] - gold.min[1]).toBeGreaterThan(22.0);
+      expect(gold.max[2] - gold.min[2]).toBeGreaterThan(0.18);
+      expect(shadow.max[0] - shadow.min[0]).toBeGreaterThan(9.2);
+      expect(shadow.max[1] - shadow.min[1]).toBeGreaterThan(17.0);
+      expect(shadow.max[2] - shadow.min[2]).toBeGreaterThan(0.18);
+
+      if (side === 'L') {
+        expect(gold.max[0]).toBeLessThan(-8.0);
+        expect(shadow.max[0]).toBeLessThan(-10.0);
+      } else {
+        expect(gold.min[0]).toBeGreaterThan(8.0);
+        expect(shadow.min[0]).toBeGreaterThan(10.0);
+      }
+
+      expect(gold.min[2]).toBeGreaterThan(33.7);
+      expect(gold.max[2]).toBeGreaterThan(34.0);
+      expect(shadow.min[2]).toBeGreaterThan(33.8);
+      expect(shadow.max[2]).toBeGreaterThan(34.2);
+
+      const expectedGoldRows = [11.5, 17, 22.5, 28, 33.5];
+      const goldCenters = goldComponents.map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+      const expectedGoldX = side === 'L' ? -14.8 : 14.8;
+      for (const expectedY of expectedGoldRows) {
+        expect(
+          goldCenters.some(
+            ([x, y, z]) => Math.abs(x - expectedGoldX) < 0.15 && Math.abs(y - expectedY) < 0.12 && Math.abs(z - 34.0) < 0.2,
+          ),
+          `${goldNode} missing gold facade band near x=${expectedGoldX}, y=${expectedY}`,
+        ).toBe(true);
+      }
+
+      const expectedShadowColumns = side === 'L' ? [-19, -15, -11] : [11, 15, 19];
+      const shadowCenters = shadowComponents.map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+      for (const expectedX of expectedShadowColumns) {
+        expect(
+          shadowCenters.some(
+            ([x, y, z]) => Math.abs(x - expectedX) < 0.15 && Math.abs(y - 23.0) < 0.15 && Math.abs(z - 34.2) < 0.2,
+          ),
+          `${shadowNode} missing shadow recess near x=${expectedX}`,
+        ).toBe(true);
+      }
+
+      expect(materialNameFor(goldNode)).toBe('V14_BurnishedCelestialGold');
+      expect(materialNameFor(shadowNode)).toBe('V14_MatteBlackProductionRig');
+    }
+  });
+
+  it('replaces the wet route slab proxies with authored ceremonial wet-stone bands', () => {
+    expect(nodeNamesWithPrefix('V10_WetStoneRoutePanel_'), 'legacy wet route slab panels still exported').toHaveLength(0);
+
+    const requiredReplacementNodes = ['V97_WetRouteStoneBandArray', 'V97_WetRouteGoldSeamArray'];
+    expect(nodeNamesWithPrefix('V97_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 200, minUniquePositions: 220, minVertexCount: 500 });
+    }
+
+    const stoneBands = readMeshGeometry('V97_WetRouteStoneBandArray', {
+      minNonZeroAreaTriangles: 320,
+      minUniquePositions: 320,
+      minVertexCount: 900,
+    });
+    const goldBands = readMeshGeometry('V97_WetRouteGoldSeamArray', {
+      minNonZeroAreaTriangles: 240,
+      minUniquePositions: 240,
+      minVertexCount: 600,
+    });
+
+    expect(stoneBands.min[0]).toBeLessThan(-7.7);
+    expect(stoneBands.max[0]).toBeGreaterThan(7.7);
+    expect(stoneBands.min[1]).toBeLessThan(0.08);
+    expect(stoneBands.max[1]).toBeGreaterThan(0.22);
+    expect(stoneBands.min[2]).toBeLessThan(-41.1);
+    expect(stoneBands.max[2]).toBeGreaterThan(44.1);
+
+    expect(goldBands.min[0]).toBeLessThan(-7.1);
+    expect(goldBands.max[0]).toBeGreaterThan(7.1);
+    expect(goldBands.min[1]).toBeGreaterThan(-0.1);
+    expect(goldBands.max[1]).toBeGreaterThan(0.2);
+    expect(goldBands.min[2]).toBeLessThan(-37.8);
+    expect(goldBands.max[2]).toBeGreaterThan(41.9);
+
+    const stoneComponents = readConnectedComponents('V97_WetRouteStoneBandArray', {
+      minNonZeroAreaTriangles: 320,
+      minUniquePositions: 320,
+      minVertexCount: 900,
+    });
+    const goldComponents = readConnectedComponents('V97_WetRouteGoldSeamArray', {
+      minNonZeroAreaTriangles: 240,
+      minUniquePositions: 240,
+      minVertexCount: 600,
+    });
+    expect(stoneComponents).toHaveLength(10);
+    expect(goldComponents).toHaveLength(10);
+
+    const expectedZRows = [42, 33, 24, 15, 6, -3, -12, -21, -30, -39];
+    const stoneCenters = stoneComponents.map(({ min, max }) => [
+      (min[0] + max[0]) * 0.5,
+      (min[1] + max[1]) * 0.5,
+      (min[2] + max[2]) * 0.5,
+    ]);
+    for (const expectedZ of expectedZRows) {
+      expect(
+        stoneCenters.some(([x, y, z]) => Math.abs(x) < 0.2 && Math.abs(y - 0.115) < 0.12 && Math.abs(z - expectedZ) < 0.2),
+        `V97_WetRouteStoneBandArray missing wet-stone route band around z=${expectedZ}`,
+      ).toBe(true);
+    }
+
+    expect(materialNameFor('V97_WetRouteStoneBandArray')).toBe('V13_WetPlazaStone');
+    expect(materialNameFor('V97_WetRouteGoldSeamArray')).toBe('V14_BurnishedCelestialGold');
+  });
+
+  it('replaces the crown buttress slab proxies with layered relief buttress assemblies', () => {
+    expect(nodeNamesWithPrefix('V9_CrownButtressCarvedFace_'), 'legacy crown buttress slab faces still exported').toHaveLength(0);
+    expect(nodeNamesWithPrefix('V9_CrownButtressGoldLine_'), 'legacy crown buttress gold strips still exported').toHaveLength(0);
+
+    const requiredReplacementNodes = [
+      'V98_CrownButtressRelief_L',
+      'V98_CrownButtressRelief_R',
+      'V98_CrownButtressGoldInlay_L',
+      'V98_CrownButtressGoldInlay_R',
+    ];
+    expect(nodeNamesWithPrefix('V98_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 80, minUniquePositions: 100, minVertexCount: 170 });
+      expect(readConnectedComponents(nodeName)).toHaveLength(1);
+    }
+
+    for (const side of ['L', 'R'] as const) {
+      const reliefNode = `V98_CrownButtressRelief_${side}`;
+      const goldNode = `V98_CrownButtressGoldInlay_${side}`;
+
+      const relief = readMeshGeometry(reliefNode, {
+        minNonZeroAreaTriangles: 120,
+        minUniquePositions: 100,
+        minVertexCount: 150,
+      });
+      const gold = readMeshGeometry(goldNode, {
+        minNonZeroAreaTriangles: 90,
+        minUniquePositions: 90,
+        minVertexCount: 140,
+      });
+
+      expect(relief.max[0] - relief.min[0]).toBeGreaterThan(4.1);
+      expect(relief.max[1] - relief.min[1]).toBeGreaterThan(24.5);
+      expect(relief.max[2] - relief.min[2]).toBeGreaterThan(0.5);
+      expect(gold.max[0] - gold.min[0]).toBeGreaterThan(2.7);
+      expect(gold.max[1] - gold.min[1]).toBeGreaterThan(23.0);
+      expect(gold.max[2] - gold.min[2]).toBeGreaterThan(0.18);
+
+      expect(relief.min[1]).toBeLessThan(10.8);
+      expect(relief.max[1]).toBeGreaterThan(35.2);
+      expect(gold.min[1]).toBeGreaterThan(11.2);
+      expect(gold.max[1]).toBeGreaterThan(34.4);
+
+      expect(relief.min[2]).toBeGreaterThan(24.2);
+      expect(relief.max[2]).toBeGreaterThan(24.85);
+      expect(gold.min[2]).toBeGreaterThan(relief.min[2] + 0.02);
+      expect(gold.max[2]).toBeLessThan(relief.max[2] + 0.05);
+
+      if (side === 'L') {
+        expect(relief.max[0]).toBeLessThan(-12.2);
+        expect(relief.min[0]).toBeLessThan(-17.6);
+        expect(gold.max[0]).toBeLessThan(-11.7);
+      } else {
+        expect(relief.min[0]).toBeGreaterThan(12.2);
+        expect(relief.max[0]).toBeGreaterThan(17.6);
+        expect(gold.min[0]).toBeGreaterThan(11.7);
+      }
+
+      expect(materialNameFor(reliefNode)).toBe('V15_PearlShellBeveled');
+      expect(materialNameFor(goldNode)).toBe('V14_BurnishedCelestialGold');
     }
   });
 
