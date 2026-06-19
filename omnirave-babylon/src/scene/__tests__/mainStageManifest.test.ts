@@ -7599,6 +7599,75 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
   });
 
+  it('replaces the merged VIP balustrade filigree placeholder with authored gold side arrays', () => {
+    expect(nodesByName.has('V21_Merged_V20_VipBalustradeFiligree')).toBe(false);
+
+    const replacementNodes = ['V102_VipBalustradeFiligreeArray_L', 'V102_VipBalustradeFiligreeArray_R'] as const;
+    expect(nodeNamesWithPrefix('V102_')).toHaveLength(replacementNodes.length);
+
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 140, minUniquePositions: 180, minVertexCount: 320 });
+      expect(readConnectedComponents(nodeName)).toHaveLength(3);
+      expect(materialNameFor(nodeName)).toBe('V20_ChasedGoldFiligree');
+    }
+
+    const leftArray = readMeshGeometry('V102_VipBalustradeFiligreeArray_L', {
+      minNonZeroAreaTriangles: 180,
+      minUniquePositions: 220,
+      minVertexCount: 420,
+    });
+    const rightArray = readMeshGeometry('V102_VipBalustradeFiligreeArray_R', {
+      minNonZeroAreaTriangles: 180,
+      minUniquePositions: 220,
+      minVertexCount: 420,
+    });
+
+    expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(7.4);
+    expect(leftArray.max[1] - leftArray.min[1]).toBeGreaterThan(0.5);
+    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(4.2);
+    expect(leftArray.min[0]).toBeLessThan(-30.6);
+    expect(leftArray.max[0]).toBeLessThan(-22.9);
+    expect(leftArray.min[1]).toBeGreaterThan(3.9);
+    expect(leftArray.max[1]).toBeLessThan(5.35);
+    expect(leftArray.min[2]).toBeLessThan(3.7);
+    expect(leftArray.max[2]).toBeGreaterThan(7.9);
+
+    expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(7.4);
+    expect(rightArray.max[1] - rightArray.min[1]).toBeGreaterThan(0.5);
+    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(4.2);
+    expect(rightArray.min[0]).toBeGreaterThan(22.9);
+    expect(rightArray.max[0]).toBeGreaterThan(30.6);
+    expect(rightArray.min[1]).toBeGreaterThan(3.9);
+    expect(rightArray.max[1]).toBeLessThan(5.35);
+    expect(rightArray.min[2]).toBeLessThan(3.7);
+    expect(rightArray.max[2]).toBeGreaterThan(7.9);
+
+    for (const [nodeName, expectedX] of [
+      ['V102_VipBalustradeFiligreeArray_L', -26.8],
+      ['V102_VipBalustradeFiligreeArray_R', 26.8],
+    ] as const) {
+      const componentCenters = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 140,
+        minUniquePositions: 180,
+        minVertexCount: 320,
+      }).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+
+      for (const expectedZ of [3.8, 5.8, 7.8]) {
+        expect(
+          componentCenters.some(
+            ([x, y, z]) => Math.abs(x - expectedX) < 0.35 && Math.abs(y - 4.62) < 0.24 && Math.abs(z - expectedZ) < 0.22,
+          ),
+          `${nodeName} missing VIP balustrade filigree span near z=${expectedZ}`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
