@@ -7520,6 +7520,85 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V100_CentralWaterLightLensArray')).toBe('V19_ArrivalCyanGlow');
   });
 
+  it('replaces the VIP balustrade lower chord proxies with authored gold side arrays', () => {
+    const legacyNodes = [
+      'V20_VipBalustradeLowerChord_L_0',
+      'V20_VipBalustradeLowerChord_L_1',
+      'V20_VipBalustradeLowerChord_L_2',
+      'V20_VipBalustradeLowerChord_R_0',
+      'V20_VipBalustradeLowerChord_R_1',
+      'V20_VipBalustradeLowerChord_R_2',
+    ];
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy VIP balustrade lower chord still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNodes = ['V101_VipBalustradeLowerChordArray_L', 'V101_VipBalustradeLowerChordArray_R'] as const;
+    expect(nodeNamesWithPrefix('V101_')).toHaveLength(replacementNodes.length);
+
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 90, minUniquePositions: 100, minVertexCount: 180 });
+      expect(readConnectedComponents(nodeName)).toHaveLength(3);
+      expect(materialNameFor(nodeName)).toBe('V20_ChasedGoldFiligree');
+    }
+
+    const leftArray = readMeshGeometry('V101_VipBalustradeLowerChordArray_L', {
+      minNonZeroAreaTriangles: 120,
+      minUniquePositions: 140,
+      minVertexCount: 240,
+    });
+    const rightArray = readMeshGeometry('V101_VipBalustradeLowerChordArray_R', {
+      minNonZeroAreaTriangles: 120,
+      minUniquePositions: 140,
+      minVertexCount: 240,
+    });
+
+    expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(7.4);
+    expect(leftArray.max[1] - leftArray.min[1]).toBeGreaterThan(0.1);
+    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(4.0);
+    expect(leftArray.min[0]).toBeLessThan(-30.4);
+    expect(leftArray.max[0]).toBeLessThan(-22.8);
+    expect(leftArray.min[1]).toBeGreaterThan(3.9);
+    expect(leftArray.max[1]).toBeLessThan(4.35);
+    expect(leftArray.min[2]).toBeLessThan(3.8);
+    expect(leftArray.max[2]).toBeGreaterThan(7.8);
+
+    expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(7.4);
+    expect(rightArray.max[1] - rightArray.min[1]).toBeGreaterThan(0.1);
+    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(4.0);
+    expect(rightArray.min[0]).toBeGreaterThan(22.8);
+    expect(rightArray.max[0]).toBeGreaterThan(30.4);
+    expect(rightArray.min[1]).toBeGreaterThan(3.9);
+    expect(rightArray.max[1]).toBeLessThan(4.35);
+    expect(rightArray.min[2]).toBeLessThan(3.8);
+    expect(rightArray.max[2]).toBeGreaterThan(7.8);
+
+    for (const [nodeName, expectedX] of [
+      ['V101_VipBalustradeLowerChordArray_L', -26.8],
+      ['V101_VipBalustradeLowerChordArray_R', 26.8],
+    ] as const) {
+      const componentCenters = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 90,
+        minUniquePositions: 100,
+        minVertexCount: 180,
+      }).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+
+      for (const expectedZ of [3.8, 5.8, 7.8]) {
+        expect(
+          componentCenters.some(
+            ([x, y, z]) => Math.abs(x - expectedX) < 0.25 && Math.abs(y - 4.08) < 0.18 && Math.abs(z - expectedZ) < 0.2,
+          ),
+          `${nodeName} missing VIP balustrade lower chord span near z=${expectedZ}`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
