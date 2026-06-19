@@ -7668,6 +7668,102 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
   });
 
+  it('replaces the merged pearl-surface proxy bands with layered side-shell relief arrays', () => {
+    expect(nodesByName.has('V21_Merged_V20_PearlSurfaceRelief')).toBe(false);
+    expect(nodesByName.has('V21_Merged_V20_PearlSurfaceInset')).toBe(false);
+
+    const replacementNodes = [
+      'V103_PearlSurfaceGoldRelief_L',
+      'V103_PearlSurfaceGoldRelief_R',
+      'V103_PearlSurfaceCyanInset_L',
+      'V103_PearlSurfaceCyanInset_R',
+    ] as const;
+    expect(nodeNamesWithPrefix('V103_')).toHaveLength(replacementNodes.length);
+
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 120, minUniquePositions: 140, minVertexCount: 220 });
+      expect(readConnectedComponents(nodeName)).toHaveLength(3);
+    }
+
+    const leftGold = readMeshGeometry('V103_PearlSurfaceGoldRelief_L', {
+      minNonZeroAreaTriangles: 160,
+      minUniquePositions: 180,
+      minVertexCount: 280,
+    });
+    const rightGold = readMeshGeometry('V103_PearlSurfaceGoldRelief_R', {
+      minNonZeroAreaTriangles: 160,
+      minUniquePositions: 180,
+      minVertexCount: 280,
+    });
+    const leftCyan = readMeshGeometry('V103_PearlSurfaceCyanInset_L', {
+      minNonZeroAreaTriangles: 140,
+      minUniquePositions: 160,
+      minVertexCount: 240,
+    });
+    const rightCyan = readMeshGeometry('V103_PearlSurfaceCyanInset_R', {
+      minNonZeroAreaTriangles: 140,
+      minUniquePositions: 160,
+      minVertexCount: 240,
+    });
+
+    expect(leftGold.min[0]).toBeLessThan(-32.5);
+    expect(leftGold.max[0]).toBeLessThan(-16.4);
+    expect(leftGold.max[0] - leftGold.min[0]).toBeGreaterThan(16.0);
+    expect(leftGold.min[1]).toBeGreaterThan(7.3);
+    expect(leftGold.max[1]).toBeGreaterThan(14.4);
+    expect(leftGold.max[1] - leftGold.min[1]).toBeGreaterThan(7.0);
+    expect(leftGold.max[2] - leftGold.min[2]).toBeGreaterThan(0.34);
+
+    expect(rightGold.min[0]).toBeGreaterThan(16.4);
+    expect(rightGold.max[0]).toBeGreaterThan(32.5);
+    expect(rightGold.max[0] - rightGold.min[0]).toBeGreaterThan(16.0);
+    expect(rightGold.min[1]).toBeGreaterThan(7.3);
+    expect(rightGold.max[1]).toBeGreaterThan(14.4);
+    expect(rightGold.max[1] - rightGold.min[1]).toBeGreaterThan(7.0);
+    expect(rightGold.max[2] - rightGold.min[2]).toBeGreaterThan(0.34);
+
+    for (const inset of [leftCyan, rightCyan]) {
+      expect(inset.max[1] - inset.min[1]).toBeGreaterThan(1.9);
+      expect(inset.max[2] - inset.min[2]).toBeGreaterThan(0.14);
+    }
+    expect(leftCyan.min[0]).toBeLessThan(-32.7);
+    expect(leftCyan.max[0]).toBeLessThan(-17.2);
+    expect(rightCyan.min[0]).toBeGreaterThan(17.2);
+    expect(rightCyan.max[0]).toBeGreaterThan(32.7);
+
+    for (const [nodeName, expectedX, expectedY, expectedZ] of [
+      ['V103_PearlSurfaceGoldRelief_L', -30.2, 10.93, 15.86],
+      ['V103_PearlSurfaceGoldRelief_L', -24.6, 10.94, 15.86],
+      ['V103_PearlSurfaceGoldRelief_L', -19.0, 10.96, 15.86],
+      ['V103_PearlSurfaceGoldRelief_R', 19.0, 10.93, 15.86],
+      ['V103_PearlSurfaceGoldRelief_R', 24.6, 10.94, 15.86],
+      ['V103_PearlSurfaceGoldRelief_R', 30.2, 10.96, 15.86],
+    ] as const) {
+      const componentCenters = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 120,
+        minUniquePositions: 140,
+        minVertexCount: 220,
+      }).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+      expect(
+        componentCenters.some(
+          ([x, y, z]) =>
+            Math.abs(x - expectedX) < 0.3 && Math.abs(y - expectedY) < 0.12 && Math.abs(z - expectedZ) < 0.05,
+        ),
+        `${nodeName} missing relief lobe near x=${expectedX}`,
+      ).toBe(true);
+    }
+
+    expect(materialNameFor('V103_PearlSurfaceGoldRelief_L')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V103_PearlSurfaceGoldRelief_R')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V103_PearlSurfaceCyanInset_L')).toBe('V20_CelestialCyanGlass');
+    expect(materialNameFor('V103_PearlSurfaceCyanInset_R')).toBe('V20_CelestialCyanGlass');
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
