@@ -7833,6 +7833,77 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
   });
 
+  it('replaces the merged rear-shell gold seam proxy bars with authored side arrays', () => {
+    expect(nodesByName.has('V21_Merged_V20_RearShellGoldSeam')).toBe(false);
+
+    const replacementNodes = ['V105_RearShellGoldSeamArray_L', 'V105_RearShellGoldSeamArray_R'] as const;
+    expect(nodeNamesWithPrefix('V105_')).toHaveLength(replacementNodes.length);
+
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 40, minUniquePositions: 36, minVertexCount: 36 });
+      expect(
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 40, minUniquePositions: 36, minVertexCount: 36 }),
+      ).toHaveLength(4);
+      expect(materialNameFor(nodeName)).toBe('V20_ChasedGoldFiligree');
+    }
+
+    const leftArray = readMeshGeometry('V105_RearShellGoldSeamArray_L', {
+      minNonZeroAreaTriangles: 40,
+      minUniquePositions: 36,
+      minVertexCount: 36,
+    });
+    const rightArray = readMeshGeometry('V105_RearShellGoldSeamArray_R', {
+      minNonZeroAreaTriangles: 40,
+      minUniquePositions: 36,
+      minVertexCount: 36,
+    });
+
+    expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(20.0);
+    expect(leftArray.max[1] - leftArray.min[1]).toBeGreaterThan(5.4);
+    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(0.09);
+    expect(leftArray.min[0]).toBeLessThan(-35.0);
+    expect(leftArray.max[0]).toBeLessThan(-14.6);
+    expect(leftArray.min[1]).toBeGreaterThan(10.4);
+    expect(leftArray.max[1]).toBeGreaterThan(16.1);
+    expect(leftArray.min[2]).toBeGreaterThan(12.12);
+    expect(leftArray.max[2]).toBeGreaterThan(12.2);
+
+    expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(20.0);
+    expect(rightArray.max[1] - rightArray.min[1]).toBeGreaterThan(5.4);
+    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(0.09);
+    expect(rightArray.min[0]).toBeGreaterThan(14.6);
+    expect(rightArray.max[0]).toBeGreaterThan(35.0);
+    expect(rightArray.min[1]).toBeGreaterThan(10.4);
+    expect(rightArray.max[1]).toBeGreaterThan(16.1);
+    expect(rightArray.min[2]).toBeGreaterThan(12.12);
+    expect(rightArray.max[2]).toBeGreaterThan(12.2);
+
+    for (const [nodeName, expectedCenters] of [
+      ['V105_RearShellGoldSeamArray_L', [-33.2, -28.0, -22.5, -17.0]],
+      ['V105_RearShellGoldSeamArray_R', [17.0, 22.5, 28.0, 33.2]],
+    ] as const) {
+      const componentCenters = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 40,
+        minUniquePositions: 36,
+        minVertexCount: 36,
+      }).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+
+      for (const expectedX of expectedCenters) {
+        expect(
+          componentCenters.some(
+            ([x, y, z]) => Math.abs(x - expectedX) < 0.35 && y > 11.0 && y < 15.9 && z > 12.15 && z < 12.3,
+          ),
+          `${nodeName} missing authored rear-shell seam near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
