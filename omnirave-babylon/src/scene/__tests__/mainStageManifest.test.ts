@@ -7764,6 +7764,75 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V103_PearlSurfaceCyanInset_R')).toBe('V20_CelestialCyanGlass');
   });
 
+  it('replaces the merged outer-wing gold spine proxy bars with authored side arrays', () => {
+    expect(nodesByName.has('V21_Merged_V20_OuterWingGoldSpine')).toBe(false);
+
+    const replacementNodes = ['V104_OuterWingGoldSpineArray_L', 'V104_OuterWingGoldSpineArray_R'] as const;
+    expect(nodeNamesWithPrefix('V104_')).toHaveLength(replacementNodes.length);
+
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 90, minUniquePositions: 110, minVertexCount: 160 });
+      expect(readConnectedComponents(nodeName)).toHaveLength(4);
+      expect(materialNameFor(nodeName)).toBe('V20_ChasedGoldFiligree');
+    }
+
+    const leftArray = readMeshGeometry('V104_OuterWingGoldSpineArray_L', {
+      minNonZeroAreaTriangles: 90,
+      minUniquePositions: 120,
+      minVertexCount: 160,
+    });
+    const rightArray = readMeshGeometry('V104_OuterWingGoldSpineArray_R', {
+      minNonZeroAreaTriangles: 90,
+      minUniquePositions: 120,
+      minVertexCount: 160,
+    });
+
+    expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(16.2);
+    expect(leftArray.max[1] - leftArray.min[1]).toBeGreaterThan(8.9);
+    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(0.7);
+    expect(leftArray.min[0]).toBeLessThan(-35.3);
+    expect(leftArray.max[0]).toBeLessThan(-18.8);
+    expect(leftArray.min[1]).toBeLessThan(3.6);
+    expect(leftArray.max[1]).toBeGreaterThan(12.2);
+    expect(leftArray.min[2]).toBeGreaterThan(10.4);
+    expect(leftArray.max[2]).toBeGreaterThan(13.5);
+
+    expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(16.2);
+    expect(rightArray.max[1] - rightArray.min[1]).toBeGreaterThan(8.9);
+    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(0.7);
+    expect(rightArray.min[0]).toBeGreaterThan(18.8);
+    expect(rightArray.max[0]).toBeGreaterThan(35.3);
+    expect(rightArray.min[1]).toBeLessThan(3.6);
+    expect(rightArray.max[1]).toBeGreaterThan(12.2);
+    expect(rightArray.min[2]).toBeGreaterThan(10.3);
+    expect(rightArray.max[2]).toBeGreaterThan(13.5);
+
+    for (const [nodeName, expectedCenters] of [
+      ['V104_OuterWingGoldSpineArray_L', [-34.5, -30.0, -25.0, -20.0]],
+      ['V104_OuterWingGoldSpineArray_R', [20.0, 25.0, 30.0, 34.5]],
+    ] as const) {
+      const componentCenters = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 90,
+        minUniquePositions: 110,
+        minVertexCount: 160,
+      }).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+
+      for (const expectedX of expectedCenters) {
+        expect(
+          componentCenters.some(
+            ([x, y, z]) => Math.abs(x - expectedX) < 0.4 && y > 6.4 && y < 8.2 && z > 11.8 && z < 12.3,
+          ),
+          `${nodeName} missing authored gold spine near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
