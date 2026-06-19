@@ -7298,7 +7298,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   });
 
   it('reuses the established Main Stage material library for the V24 crown pass', () => {
-    expect(mainStageGlbJson.materials).toHaveLength(48);
+    expect(mainStageGlbJson.materials).toHaveLength(47);
     expect(
       mainStageGlbJson.materials.some(({ name }: { name?: string }) => name?.startsWith('V24_')),
     ).toBe(false);
@@ -7429,6 +7429,95 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
         expect(retaining.max[0]).toBeGreaterThan(7.0);
       }
     }
+  });
+
+  it('replaces the central water light bar proxies with layered luminous basin fixtures', () => {
+    const legacyNodes = Array.from({ length: 8 }, (_, index) => `V9_CentralWaterLightBar_${index}`);
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy central water light bar still exported: ${nodeName}`).toBe(false);
+    }
+
+    const requiredReplacementNodes = [
+      'V100_CentralWaterLightHousingArray',
+      'V100_CentralWaterLightGoldTrimArray',
+      'V100_CentralWaterLightLensArray',
+    ];
+    expect(nodeNamesWithPrefix('V100_')).toHaveLength(requiredReplacementNodes.length);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 120, minUniquePositions: 140, minVertexCount: 220 });
+      expect(readConnectedComponents(nodeName)).toHaveLength(8);
+    }
+
+    const housing = readMeshGeometry('V100_CentralWaterLightHousingArray', {
+      minNonZeroAreaTriangles: 180,
+      minUniquePositions: 200,
+      minVertexCount: 360,
+    });
+    const goldTrim = readMeshGeometry('V100_CentralWaterLightGoldTrimArray', {
+      minNonZeroAreaTriangles: 160,
+      minUniquePositions: 180,
+      minVertexCount: 320,
+    });
+    const lens = readMeshGeometry('V100_CentralWaterLightLensArray', {
+      minNonZeroAreaTriangles: 160,
+      minUniquePositions: 180,
+      minVertexCount: 320,
+    });
+
+    expect(housing.max[0] - housing.min[0]).toBeGreaterThan(6.4);
+    expect(housing.max[2] - housing.min[2]).toBeGreaterThan(62.0);
+    expect(housing.max[1] - housing.min[1]).toBeGreaterThan(0.22);
+    expect(housing.min[0]).toBeGreaterThan(-3.7);
+    expect(housing.max[0]).toBeLessThan(3.7);
+    expect(housing.min[2]).toBeLessThan(-39.2);
+    expect(housing.max[2]).toBeGreaterThan(24.2);
+    expect(housing.min[1]).toBeGreaterThan(0.44);
+    expect(housing.max[1]).toBeLessThan(1.02);
+
+    expect(goldTrim.max[0] - goldTrim.min[0]).toBeGreaterThan(6.0);
+    expect(goldTrim.max[2] - goldTrim.min[2]).toBeGreaterThan(61.0);
+    expect(goldTrim.max[1] - goldTrim.min[1]).toBeGreaterThan(0.08);
+    expect(goldTrim.min[1]).toBeGreaterThan(0.63);
+    expect(goldTrim.max[1]).toBeLessThan(0.97);
+
+    expect(lens.max[0] - lens.min[0]).toBeGreaterThan(4.0);
+    expect(lens.max[2] - lens.min[2]).toBeGreaterThan(60.0);
+    expect(lens.max[1] - lens.min[1]).toBeGreaterThan(0.07);
+    expect(lens.min[1]).toBeGreaterThan(0.67);
+    expect(lens.max[1]).toBeLessThan(0.96);
+
+    const expectedRows = [-39, -30, -21, -12, -3, 6, 15, 24];
+    for (const [nodeName, expectedY, yTolerance, xTolerance] of [
+      ['V100_CentralWaterLightHousingArray', 0.73, 0.16, 0.22],
+      ['V100_CentralWaterLightGoldTrimArray', 0.81, 0.16, 0.2],
+      ['V100_CentralWaterLightLensArray', 0.83, 0.16, 0.18],
+    ] as const) {
+      const components = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 120,
+        minUniquePositions: 140,
+        minVertexCount: 220,
+      });
+      const componentCenters = components.map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+      for (const expectedZ of expectedRows) {
+        expect(
+          componentCenters.some(
+            ([x, y, z]) =>
+              Math.abs(x) < xTolerance && Math.abs(y - expectedY) < yTolerance && Math.abs(z - expectedZ) < 0.2,
+          ),
+          `${nodeName} missing central basin light fixture near z=${expectedZ}`,
+        ).toBe(true);
+      }
+    }
+
+    expect(materialNameFor('V100_CentralWaterLightHousingArray')).toBe('V15_MatteProductionBlack');
+    expect(materialNameFor('V100_CentralWaterLightGoldTrimArray')).toBe('V15_EngineeredGoldAnchors');
+    expect(materialNameFor('V100_CentralWaterLightLensArray')).toBe('V19_ArrivalCyanGlow');
   });
 
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
