@@ -4660,16 +4660,16 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       ['V68_PortalArcadeGoldCrest_R', 160],
       ['V68_PortalArcadeCyanSpine_L', 120],
       ['V68_PortalArcadeCyanSpine_R', 120],
-      ['V68_PortalArcadeShadowCore_L', 96],
-      ['V68_PortalArcadeShadowCore_R', 96],
+      ['V68_PortalArcadeShadowCore_L', 180],
+      ['V68_PortalArcadeShadowCore_R', 180],
       ['V68_GrandArcadePearlColonnade_L', 700],
       ['V68_GrandArcadePearlColonnade_R', 700],
       ['V68_GrandArcadeGoldBands_L', 260],
       ['V68_GrandArcadeGoldBands_R', 260],
       ['V68_HeroPortalPearlApron', 180],
       ['V68_HeroPortalGoldCap', 120],
-      ['V68_HeroPortalCyanPlinth', 96],
-      ['V68_HeroPortalShadowDais', 96],
+      ['V68_HeroPortalCyanPlinth', 180],
+      ['V68_HeroPortalShadowDais', 180],
     ]);
     for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
       expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
