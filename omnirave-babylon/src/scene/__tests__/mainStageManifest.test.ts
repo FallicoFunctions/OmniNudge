@@ -5204,10 +5204,11 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const outerRightGold = readMeshGeometry('V74_SweepOuterAnchorGoldCrown_R');
     const innerLeftGold = readMeshGeometry('V74_SweepInnerAnchorGoldCrown_L');
     const innerRightGold = readMeshGeometry('V74_SweepInnerAnchorGoldCrown_R');
-    const outerLeftShadow = readMeshGeometry('V74_SweepOuterAnchorShadowCore_L');
-    const outerRightShadow = readMeshGeometry('V74_SweepOuterAnchorShadowCore_R');
-    const innerLeftShadow = readMeshGeometry('V74_SweepInnerAnchorShadowCore_L');
-    const innerRightShadow = readMeshGeometry('V74_SweepInnerAnchorShadowCore_R');
+    const shadowGeometryOptions = { minNonZeroAreaTriangles: 140, minUniquePositions: 84, minVertexCount: 140 };
+    const outerLeftShadow = readMeshGeometry('V74_SweepOuterAnchorShadowCore_L', shadowGeometryOptions);
+    const outerRightShadow = readMeshGeometry('V74_SweepOuterAnchorShadowCore_R', shadowGeometryOptions);
+    const innerLeftShadow = readMeshGeometry('V74_SweepInnerAnchorShadowCore_L', shadowGeometryOptions);
+    const innerRightShadow = readMeshGeometry('V74_SweepInnerAnchorShadowCore_R', shadowGeometryOptions);
 
     expect(outerLeftGold.min[0]).toBeLessThan(-60.7);
     expect(outerLeftGold.max[0]).toBeLessThan(-55.8);
@@ -5260,21 +5261,22 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       'V74_SweepInnerAnchorShadowCore_L',
       'V74_SweepInnerAnchorShadowCore_R',
     ]) {
-      expect(readConnectedComponents(nodeName)).toHaveLength(1);
+      expect(readConnectedComponents(nodeName, shadowGeometryOptions)).toHaveLength(1);
     }
 
     const minimumVertexCounts = new Map([
       ['V74_SweepOuterAnchorGoldCrown_L', 140],
       ['V74_SweepOuterAnchorGoldCrown_R', 140],
-      ['V74_SweepOuterAnchorShadowCore_L', 100],
-      ['V74_SweepOuterAnchorShadowCore_R', 100],
+      ['V74_SweepOuterAnchorShadowCore_L', 140],
+      ['V74_SweepOuterAnchorShadowCore_R', 140],
       ['V74_SweepInnerAnchorGoldCrown_L', 140],
       ['V74_SweepInnerAnchorGoldCrown_R', 140],
-      ['V74_SweepInnerAnchorShadowCore_L', 100],
-      ['V74_SweepInnerAnchorShadowCore_R', 100],
+      ['V74_SweepInnerAnchorShadowCore_L', 140],
+      ['V74_SweepInnerAnchorShadowCore_R', 140],
     ]);
     for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
-      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+      const options = nodeName.includes('ShadowCore') ? shadowGeometryOptions : undefined;
+      expect(readMeshGeometry(nodeName, options).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
         minimumVertexCount,
       );
     }
