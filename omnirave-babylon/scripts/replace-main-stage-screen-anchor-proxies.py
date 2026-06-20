@@ -294,7 +294,7 @@ build_profile_object(
     collection,
     gold_component(frame_left, upper_left),
     bevel_width=0.024,
-    bevel_segments=1,
+    bevel_segments=2,
 )
 build_profile_object(
     "V76_SideScreenAnchorGoldSpine_R",
@@ -302,7 +302,7 @@ build_profile_object(
     collection,
     gold_component(frame_right, upper_right),
     bevel_width=0.024,
-    bevel_segments=1,
+    bevel_segments=2,
 )
 build_profile_object(
     "V76_SideScreenAnchorShadowBrace_L",
