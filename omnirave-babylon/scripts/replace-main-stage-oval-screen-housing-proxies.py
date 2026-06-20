@@ -382,7 +382,7 @@ def build_side(side):
         GOLD,
         [pedestal_trim],
         bevel_width=0.018,
-        bevel_segments=1,
+        bevel_segments=2,
         profile=trim_profile,
     )
     build_profiled_object(
@@ -398,7 +398,7 @@ def build_side(side):
         GOLD,
         [canopy_trim],
         bevel_width=0.018,
-        bevel_segments=1,
+        bevel_segments=2,
         profile=trim_profile,
     )
     build_profiled_object(
