@@ -13,6 +13,12 @@ GROUPS = [
 
 LEGACY_NAMES = [legacy for legacy, _replacement, _material, _kind in GROUPS]
 REPLACEMENT_NAMES = [replacement for _legacy, replacement, _material, _kind in GROUPS]
+SHELL_FALLBACKS = {
+    "V119_OvalPortalGlowGoldArray_L": "V82_OvalPortalGlowShell_L",
+    "V119_OvalPortalGlowGoldArray_R": "V82_OvalPortalGlowShell_R",
+    "V119_OvalPortalGlowEmissionArray_L": "V82_OvalPortalGlowShell_L",
+    "V119_OvalPortalGlowEmissionArray_R": "V82_OvalPortalGlowShell_R",
+}
 
 
 def ensure_object_mode():
@@ -83,7 +89,14 @@ def ensure_vertex_stable_uvs(mesh, cube_size=8.0):
         uv_layer.data[loop.index].uv = per_vertex_uvs[loop.vertex_index]
 
 
-def finalize(obj):
+def finalize(obj, bevel_width, bevel_segments):
+    set_active(obj)
+    bevel = obj.modifiers.new("OmniRaveBevel", "BEVEL")
+    bevel.width = bevel_width
+    bevel.segments = bevel_segments
+    bevel.limit_method = "ANGLE"
+    bevel.profile = 0.7
+    bpy.ops.object.modifier_apply(modifier=bevel.name)
     triangulate_mesh(obj)
     ensure_vertex_stable_uvs(obj.data)
     set_active(obj)
@@ -114,6 +127,12 @@ def span(bounds, axis):
 
 
 def source_bounds(legacy_name, replacement_name):
+    shell_name = SHELL_FALLBACKS.get(replacement_name)
+    if shell_name is not None:
+        shell = bpy.data.objects.get(shell_name)
+        if shell is not None and shell.type == "MESH" and shell.data.vertices:
+            return world_bounds_for_object(shell)
+
     legacy = bpy.data.objects.get(legacy_name)
     if legacy is not None and legacy.type == "MESH" and legacy.data.vertices:
         return world_bounds_for_object(legacy)
@@ -125,87 +144,51 @@ def source_bounds(legacy_name, replacement_name):
     raise RuntimeError(f"Missing source bounds for {legacy_name} / {replacement_name}")
 
 
-def add_extruded_polygon_x(bm, polygon, x_min, x_max):
-    left = [bm.verts.new((x_min, y_value, z_value)) for y_value, z_value in polygon]
-    right = [bm.verts.new((x_max, y_value, z_value)) for y_value, z_value in polygon]
-    bm.faces.new(left)
-    bm.faces.new(list(reversed(right)))
-    count = len(polygon)
-    for index in range(count):
-        next_index = (index + 1) % count
-        bm.faces.new([left[index], left[next_index], right[next_index], right[index]])
+def fit_overlay_bounds(bounds, kind):
+    if kind == "gold":
+        return {
+            "x": (bounds["x"][0] + 0.34, bounds["x"][1] - 0.34),
+            "y": (bounds["y"][0] - 0.02, bounds["y"][1] - 0.18),
+            "z": (bounds["z"][0] + 0.44, bounds["z"][1] - 0.92),
+        }
+
+    return {
+        "x": (bounds["x"][0] + 0.74, bounds["x"][1] - 0.74),
+        "y": (bounds["y"][0] - 0.02, bounds["y"][1] - 0.30),
+        "z": (bounds["z"][0] + 2.88, bounds["z"][1] - 2.72),
+    }
 
 
-def gold_profile(bounds):
-    y_center = midpoint(bounds, "y")
-    z_center = midpoint(bounds, "z")
-    y_half = span(bounds, "y") * 0.5 + 0.14
-    z_half = span(bounds, "z") * 0.5 + 0.08
-    return [
-        (y_center - y_half, z_center - z_half * 0.94),
-        (y_center - y_half * 0.9, z_center - z_half * 0.56),
-        (y_center - y_half * 0.84, z_center - z_half * 0.2),
-        (y_center - y_half * 0.82, z_center + z_half * 0.18),
-        (y_center - y_half * 0.72, z_center + z_half * 0.5),
-        (y_center - y_half * 0.48, z_center + z_half * 0.8),
-        (y_center - y_half * 0.14, z_center + z_half),
-        (y_center + y_half * 0.18, z_center + z_half * 0.92),
-        (y_center + y_half * 0.5, z_center + z_half * 0.72),
-        (y_center + y_half * 0.76, z_center + z_half * 0.42),
-        (y_center + y_half * 0.9, z_center + z_half * 0.06),
-        (y_center + y_half, z_center - z_half * 0.34),
-        (y_center + y_half * 0.86, z_center - z_half * 0.72),
-        (y_center + y_half * 0.54, z_center - z_half),
-        (y_center + y_half * 0.12, z_center - z_half * 0.86),
-        (y_center - y_half * 0.24, z_center - z_half * 0.7),
-        (y_center - y_half * 0.56, z_center - z_half * 0.84),
-        (y_center - y_half * 0.82, z_center - z_half),
-    ]
-
-
-def emission_profile(bounds):
-    y_center = midpoint(bounds, "y")
-    z_center = midpoint(bounds, "z")
-    y_half = span(bounds, "y") * 0.5 + 0.1
-    z_half = span(bounds, "z") * 0.5 + 0.08
-    return [
-        (y_center - y_half, z_center - z_half * 0.46),
-        (y_center - y_half * 0.78, z_center - z_half * 0.9),
-        (y_center - y_half * 0.42, z_center - z_half),
-        (y_center - y_half * 0.08, z_center - z_half * 0.82),
-        (y_center + y_half * 0.22, z_center - z_half * 0.52),
-        (y_center + y_half * 0.56, z_center - z_half * 0.12),
-        (y_center + y_half * 0.88, z_center + z_half * 0.16),
-        (y_center + y_half, z_center + z_half * 0.62),
-        (y_center + y_half * 0.7, z_center + z_half),
-        (y_center + y_half * 0.28, z_center + z_half * 0.92),
-        (y_center - y_half * 0.12, z_center + z_half * 0.68),
-        (y_center - y_half * 0.48, z_center + z_half * 0.9),
-        (y_center - y_half * 0.82, z_center + z_half * 0.46),
-        (y_center - y_half * 0.94, z_center),
-    ]
-
-
-def build_overlay(name, collection, bounds, polygon, material_name, min_width, width_padding):
+def build_overlay(name, collection, bounds, material_name, bevel_width, bevel_segments):
     mesh = bpy.data.meshes.new(name)
     obj = bpy.data.objects.new(name, mesh)
     collection.objects.link(obj)
 
-    x_min = bounds["x"][0] - width_padding
-    x_max = bounds["x"][1] + width_padding
-    if x_max - x_min < min_width:
-        x_center = midpoint(bounds, "x")
-        x_min = x_center - min_width * 0.5
-        x_max = x_center + min_width * 0.5
-
     bm = bmesh.new()
-    add_extruded_polygon_x(bm, polygon, x_min, x_max)
-    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    bmesh.ops.create_cube(bm, size=2.0)
+    bmesh.ops.scale(
+        bm,
+        verts=bm.verts,
+        vec=(
+            span(bounds, "x") * 0.5,
+            span(bounds, "y") * 0.5,
+            span(bounds, "z") * 0.5,
+        ),
+    )
+    bmesh.ops.translate(
+        bm,
+        verts=bm.verts,
+        vec=(
+            midpoint(bounds, "x"),
+            midpoint(bounds, "y"),
+            midpoint(bounds, "z"),
+        ),
+    )
     bm.to_mesh(mesh)
     bm.free()
 
     assign_material(obj, material_name)
-    finalize(obj)
+    finalize(obj, bevel_width, bevel_segments)
     return obj
 
 
@@ -221,16 +204,14 @@ def main():
     delete_existing(REPLACEMENT_NAMES)
 
     for legacy_name, replacement_name, material_name, kind in GROUPS:
-        bounds = bounds_map[replacement_name]
-        polygon = gold_profile(bounds) if kind == "gold" else emission_profile(bounds)
+        bounds = fit_overlay_bounds(bounds_map[replacement_name], kind)
         build_overlay(
             replacement_name,
             collection,
             bounds,
-            polygon,
             material_name,
-            min_width=max(span(bounds, "x") + 0.04, 0.56),
-            width_padding=0.02,
+            bevel_width=0.05 if kind == "gold" else 0.04,
+            bevel_segments=3 if kind == "gold" else 2,
         )
 
     delete_existing(LEGACY_NAMES)

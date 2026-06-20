@@ -6102,10 +6102,10 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const minimumVertexCounts = new Map([
       ['V82_OvalPortalGlowShell_L', 160],
       ['V82_OvalPortalGlowShell_R', 160],
-      ['V119_OvalPortalGlowGoldArray_L', 48],
-      ['V119_OvalPortalGlowGoldArray_R', 48],
-      ['V119_OvalPortalGlowEmissionArray_L', 48],
-      ['V119_OvalPortalGlowEmissionArray_R', 48],
+      ['V119_OvalPortalGlowGoldArray_L', 80],
+      ['V119_OvalPortalGlowGoldArray_R', 80],
+      ['V119_OvalPortalGlowEmissionArray_L', 64],
+      ['V119_OvalPortalGlowEmissionArray_R', 64],
     ]);
     for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
       const geometryOptions = nodeName.includes('Shell') ? undefined : overlayGeometryOptions;
