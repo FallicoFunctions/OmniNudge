@@ -6100,8 +6100,8 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
 
     const minimumVertexCounts = new Map([
-      ['V82_OvalPortalGlowShell_L', 100],
-      ['V82_OvalPortalGlowShell_R', 100],
+      ['V82_OvalPortalGlowShell_L', 160],
+      ['V82_OvalPortalGlowShell_R', 160],
       ['V119_OvalPortalGlowGoldArray_L', 48],
       ['V119_OvalPortalGlowGoldArray_R', 48],
       ['V119_OvalPortalGlowEmissionArray_L', 48],

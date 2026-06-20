@@ -366,8 +366,8 @@ def build_side(side):
     shell_profile = {
         "primary_inset": 0.34,
         "primary_depth": 0.12,
-        "secondary_inset": 0.0,
-        "secondary_depth": 0.0,
+        "secondary_inset": 0.18,
+        "secondary_depth": 0.06,
     }
 
     build_profiled_object(
