@@ -1468,6 +1468,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     const paverField = readMeshGeometry('V34_ApproachPaverField');
     const paverComponents = readConnectedComponents('V34_ApproachPaverField');
+    const reflectionUnderlay = readMeshGeometry('V34_ApproachReflectionUnderlay');
     expect(paverComponents.length).toBeGreaterThanOrEqual(12);
     expect(paverField.max[2] - paverField.min[2]).toBeGreaterThan(280);
     expect(paverField.max[0] - paverField.min[0]).toBeGreaterThan(20);
@@ -1475,6 +1476,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       expect(component.vertexCount).toBeGreaterThanOrEqual(32);
       expect(component.triangleCount).toBeGreaterThanOrEqual(40);
     }
+    expect(reflectionUnderlay.max[2] - reflectionUnderlay.min[2]).toBeGreaterThan(280);
+    expect(reflectionUnderlay.vertexCount).toBeGreaterThanOrEqual(180);
+    expect(materialNameFor('V34_ApproachReflectionUnderlay')).toBe('V19_DeepWetArrivalStone');
 
     const inlayNetwork = readMeshGeometry('V34_ApproachGoldInlayNetwork');
     const inlayComponents = readConnectedComponents('V34_ApproachGoldInlayNetwork');
