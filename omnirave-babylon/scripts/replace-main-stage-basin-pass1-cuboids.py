@@ -13,6 +13,12 @@ GROUPS = [
 
 REPLACEMENT_NAMES = [replacement for _legacy, replacement, _material in GROUPS]
 LEGACY_NAMES = [legacy for legacy, _replacement, _material in GROUPS]
+LOCKED_X_BOUNDS = {
+    "V118_BasinWallRelief_L": (-8.18, -6.22),
+    "V118_BasinWallRelief_R": (6.22, 8.18),
+    "V118_BasinWaterSheet_L": (-17.3, -8.3),
+    "V118_BasinWaterSheet_R": (8.3, 17.3),
+}
 
 
 def ensure_object_mode():
@@ -125,6 +131,16 @@ def source_bounds(legacy_name, replacement_name):
     raise RuntimeError(f"Missing source bounds for {legacy_name} / {replacement_name}")
 
 
+def lock_bounds(replacement_name, bounds):
+    x_bounds = LOCKED_X_BOUNDS.get(replacement_name)
+    if x_bounds is None:
+        return bounds
+    return {
+        **bounds,
+        "x": x_bounds,
+    }
+
+
 def add_extruded_polygon_x(bm, polygon, x_min, x_max):
     left = [bm.verts.new((x_min, y_value, z_value)) for y_value, z_value in polygon]
     right = [bm.verts.new((x_max, y_value, z_value)) for y_value, z_value in polygon]
@@ -144,6 +160,7 @@ def wall_profile(bounds):
     return [
         (y_center - y_half, z_center - z_half * 0.96),
         (y_center - y_half * 0.92, z_center - z_half * 0.54),
+        (y_center - y_half * 0.84, z_center - z_half * 0.34),
         (y_center - y_half * 0.76, z_center - z_half * 0.18),
         (y_center - y_half * 0.5, z_center + z_half * 0.18),
         (y_center - y_half * 0.18, z_center + z_half * 0.62),
@@ -167,6 +184,7 @@ def water_profile(bounds):
         (y_center - y_half * 0.68, z_center - z_half * 0.35),
         (y_center - y_half * 0.34, z_center + z_half * 0.12),
         (y_center, z_center + z_half),
+        (y_center + y_half * 0.18, z_center + z_half * 0.58),
         (y_center + y_half * 0.32, z_center + z_half * 0.22),
         (y_center + y_half * 0.66, z_center - z_half * 0.08),
         (y_center + y_half, z_center - z_half * 0.72),
@@ -203,7 +221,7 @@ def main():
     collection = resolve_collection()
 
     bounds_map = {
-        replacement_name: source_bounds(legacy_name, replacement_name)
+        replacement_name: lock_bounds(replacement_name, source_bounds(legacy_name, replacement_name))
         for legacy_name, replacement_name, _material_name in GROUPS
     }
 
@@ -216,7 +234,7 @@ def main():
         wall_profile(bounds_map["V118_BasinWallRelief_L"]),
         "V13_BlackStageRigging",
         min_width=1.95,
-        width_padding=0.08,
+        width_padding=0.01,
     )
     build_replacement(
         "V118_BasinWallRelief_R",
@@ -225,7 +243,7 @@ def main():
         wall_profile(bounds_map["V118_BasinWallRelief_R"]),
         "V13_BlackStageRigging",
         min_width=1.95,
-        width_padding=0.08,
+        width_padding=0.01,
     )
     build_replacement(
         "V118_BasinWaterSheet_L",
@@ -234,7 +252,7 @@ def main():
         water_profile(bounds_map["V118_BasinWaterSheet_L"]),
         "V14_DeepReflectingWater",
         min_width=8.95,
-        width_padding=0.1,
+        width_padding=0.0,
     )
     build_replacement(
         "V118_BasinWaterSheet_R",
@@ -243,7 +261,7 @@ def main():
         water_profile(bounds_map["V118_BasinWaterSheet_R"]),
         "V14_DeepReflectingWater",
         min_width=8.95,
-        width_padding=0.1,
+        width_padding=0.0,
     )
 
     delete_existing(LEGACY_NAMES)
