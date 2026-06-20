@@ -6827,13 +6827,13 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const topperNode = `V92_ServiceCaseTopper_${side}`;
 
       const bank = readMeshGeometry(bankNode, { minNonZeroAreaTriangles: 90, minUniquePositions: 120, minVertexCount: 220 });
-      const topper = readMeshGeometry(topperNode, { minNonZeroAreaTriangles: 40, minUniquePositions: 40, minVertexCount: 80 });
+      const topper = readMeshGeometry(topperNode, { minNonZeroAreaTriangles: 120, minUniquePositions: 100, minVertexCount: 140 });
 
       expect(
         readConnectedComponents(bankNode, { minNonZeroAreaTriangles: 90, minUniquePositions: 120, minVertexCount: 220 }),
       ).toHaveLength(3);
       expect(
-        readConnectedComponents(topperNode, { minNonZeroAreaTriangles: 40, minUniquePositions: 40, minVertexCount: 80 }),
+        readConnectedComponents(topperNode, { minNonZeroAreaTriangles: 120, minUniquePositions: 100, minVertexCount: 140 }),
       ).toHaveLength(1);
 
       expect(bank.max[0] - bank.min[0]).toBeGreaterThan(2.35);

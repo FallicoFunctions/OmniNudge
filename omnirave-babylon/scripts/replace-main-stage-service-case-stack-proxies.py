@@ -124,16 +124,26 @@ def chamfered_rect_points(center_x, center_y, half_x, half_y, chamfer):
 
 def service_topper_profile(center_x, z_base, width, depth_bias=0.0):
     half = width * 0.5
+    lower_rise = z_base + 0.03
+    shoulder = z_base + 0.15
+    crown = z_base + 0.31 + depth_bias * 0.5
+    cap = z_base + 0.36 + depth_bias * 0.35
     return [
-        (center_x - half, z_base + 0.02),
+        (center_x - half, lower_rise),
+        (center_x - half * 0.92, z_base - 0.02),
         (center_x - half * 0.82, z_base - 0.05),
-        (center_x - half * 0.60, z_base - 0.08),
+        (center_x - half * 0.68, z_base - 0.08),
+        (center_x - half * 0.52, shoulder),
         (center_x - half * 0.28, z_base + 0.24 + depth_bias),
-        (center_x, z_base + 0.34 + depth_bias * 0.5),
+        (center_x - half * 0.12, crown),
+        (center_x, cap),
+        (center_x + half * 0.12, crown),
         (center_x + half * 0.28, z_base + 0.24 + depth_bias),
-        (center_x + half * 0.60, z_base - 0.08),
+        (center_x + half * 0.52, shoulder),
+        (center_x + half * 0.68, z_base - 0.08),
         (center_x + half * 0.82, z_base - 0.05),
-        (center_x + half, z_base + 0.02),
+        (center_x + half * 0.92, z_base - 0.02),
+        (center_x + half, lower_rise),
         (center_x, z_base + 0.27 + depth_bias * 0.3),
     ]
 
@@ -314,10 +324,12 @@ def build_topper(side):
 
     def _build(bm):
         loops = [
-            (center_y - y_half, service_topper_profile(center_x, z_base, width * 0.99, depth_bias=-0.02)),
-            (center_y - y_half * 0.30, service_topper_profile(center_x, z_base + 0.05, width * 0.96, depth_bias=0.03)),
-            (center_y + y_half * 0.28, service_topper_profile(center_x, z_base + 0.05, width * 0.95, depth_bias=0.03)),
-            (center_y + y_half, service_topper_profile(center_x, z_base - 0.01, width * 0.98, depth_bias=-0.02)),
+            (center_y - y_half, service_topper_profile(center_x, z_base, width * 0.995, depth_bias=-0.03)),
+            (center_y - y_half * 0.56, service_topper_profile(center_x, z_base + 0.02, width * 0.98, depth_bias=-0.01)),
+            (center_y - y_half * 0.16, service_topper_profile(center_x, z_base + 0.05, width * 0.96, depth_bias=0.03)),
+            (center_y + y_half * 0.18, service_topper_profile(center_x, z_base + 0.06, width * 0.955, depth_bias=0.04)),
+            (center_y + y_half * 0.58, service_topper_profile(center_x, z_base + 0.02, width * 0.975, depth_bias=-0.005)),
+            (center_y + y_half, service_topper_profile(center_x, z_base - 0.01, width * 0.99, depth_bias=-0.03)),
         ]
         add_loft_stack_y(bm, loops)
 
