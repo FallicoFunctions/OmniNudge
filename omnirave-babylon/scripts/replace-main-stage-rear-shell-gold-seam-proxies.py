@@ -177,21 +177,30 @@ def add_extruded_profile_x(bm, x_min, x_max, profile):
 
 
 def seam_profile(bounds):
-    center_y = midpoint(bounds, "y")
+    center_y = midpoint(bounds, "y") - 0.012
     base_z = bounds["z"][0] - 0.015
-    shoulder_z = bounds["z"][1] - max(span(bounds, "z") * 0.18, 0.14)
+    lower_shoulder_z = bounds["z"][0] + span(bounds, "z") * 0.2
+    upper_shoulder_z = bounds["z"][1] - max(span(bounds, "z") * 0.14, 0.12)
     crown_z = bounds["z"][1] + 0.085
     front_z = bounds["z"][1] - 0.02
     back = center_y - 0.055
     front = center_y + 0.055
+    rear_mid = center_y - 0.03
+    front_mid = center_y + 0.03
     center = center_y
 
     return [
         (back, base_z),
-        (back, shoulder_z),
+        (back - 0.01, lower_shoulder_z),
+        (rear_mid, upper_shoulder_z),
+        (center - 0.012, crown_z - 0.018),
         (center, crown_z),
-        (front, front_z),
+        (center + 0.012, crown_z - 0.018),
+        (front_mid, upper_shoulder_z),
+        (front + 0.01, front_z),
+        (front, front_z - 0.022),
         (front, base_z),
+        (center, base_z - 0.01),
     ]
 
 

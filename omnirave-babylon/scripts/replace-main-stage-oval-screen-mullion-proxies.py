@@ -346,12 +346,18 @@ def build_side(side):
         bevel_width=0.012,
         bevel_segments=1,
     )
-    build_box_object(
+    build_profiled_object(
         f"V81_OvalScreenMullionGoldTrimArray_{side}",
         GOLD,
         trim_boxes,
-        bevel_width=0.0,
+        bevel_width=0.003,
         bevel_segments=1,
+        profile={
+            "primary_inset": 0.038,
+            "primary_depth": 0.055,
+            "secondary_inset": 0.02,
+            "secondary_depth": 0.028,
+        },
     )
 
 
