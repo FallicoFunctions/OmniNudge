@@ -441,7 +441,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expectMainStageMarker('V114_CelestialHaloOuterRingArray');
     expectMainStageMarker('V113_CrownShellLamellaArray_L');
     expectMainStageMarker('V115_CenterScreenMullionArray');
-    expectMainStageMarker('V17_WingCanopyLamella_L_0');
+    expectMainStageMarker('V117_WingCanopyLamellaGoldArray_L_Front');
     expectMainStageMarker('V116_ProsceniumPearlRevealArray_L');
   });
 
@@ -8883,6 +8883,160 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(
       pearlLeft.vertexCount + pearlRight.vertexCount + shadowLeft.vertexCount + shadowRight.vertexCount,
     ).toBeLessThanOrEqual(320);
+  });
+
+  it('replaces the wing-canopy lamella proxy strips with authored side row arrays', () => {
+    const legacyNodes = [
+      'V17_WingCanopyLamella_L_0_0',
+      'V17_WingCanopyLamella_L_0_1',
+      'V17_WingCanopyLamella_L_0_2',
+      'V17_WingCanopyLamella_L_0_3',
+      'V17_WingCanopyLamella_L_0_4',
+      'V17_WingCanopyLamella_L_0_5',
+      'V17_WingCanopyLamella_L_0_6',
+      'V17_WingCanopyLamella_L_0_7',
+      'V17_WingCanopyLamella_L_1_0',
+      'V17_WingCanopyLamella_L_1_1',
+      'V17_WingCanopyLamella_L_1_2',
+      'V17_WingCanopyLamella_L_1_3',
+      'V17_WingCanopyLamella_L_1_4',
+      'V17_WingCanopyLamella_L_1_5',
+      'V17_WingCanopyLamella_L_1_6',
+      'V17_WingCanopyLamella_L_1_7',
+      'V17_WingCanopyLamella_L_2_0',
+      'V17_WingCanopyLamella_L_2_1',
+      'V17_WingCanopyLamella_L_2_2',
+      'V17_WingCanopyLamella_L_2_3',
+      'V17_WingCanopyLamella_L_2_4',
+      'V17_WingCanopyLamella_L_2_5',
+      'V17_WingCanopyLamella_L_2_6',
+      'V17_WingCanopyLamella_L_2_7',
+      'V17_WingCanopyLamella_R_0_0',
+      'V17_WingCanopyLamella_R_0_1',
+      'V17_WingCanopyLamella_R_0_2',
+      'V17_WingCanopyLamella_R_0_3',
+      'V17_WingCanopyLamella_R_0_4',
+      'V17_WingCanopyLamella_R_0_5',
+      'V17_WingCanopyLamella_R_0_6',
+      'V17_WingCanopyLamella_R_0_7',
+      'V17_WingCanopyLamella_R_1_0',
+      'V17_WingCanopyLamella_R_1_1',
+      'V17_WingCanopyLamella_R_1_2',
+      'V17_WingCanopyLamella_R_1_3',
+      'V17_WingCanopyLamella_R_1_4',
+      'V17_WingCanopyLamella_R_1_5',
+      'V17_WingCanopyLamella_R_1_6',
+      'V17_WingCanopyLamella_R_1_7',
+      'V17_WingCanopyLamella_R_2_0',
+      'V17_WingCanopyLamella_R_2_1',
+      'V17_WingCanopyLamella_R_2_2',
+      'V17_WingCanopyLamella_R_2_3',
+      'V17_WingCanopyLamella_R_2_4',
+      'V17_WingCanopyLamella_R_2_5',
+      'V17_WingCanopyLamella_R_2_6',
+      'V17_WingCanopyLamella_R_2_7',
+    ] as const;
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy wing-canopy lamella still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNodes = [
+      'V117_WingCanopyLamellaGoldArray_L_Front',
+      'V117_WingCanopyLamellaPearlArray_L_Mid',
+      'V117_WingCanopyLamellaGoldArray_L_Rear',
+      'V117_WingCanopyLamellaGoldArray_R_Front',
+      'V117_WingCanopyLamellaPearlArray_R_Mid',
+      'V117_WingCanopyLamellaGoldArray_R_Rear',
+    ] as const;
+    expect(nodeNamesWithPrefix('V117_')).toEqual(replacementNodes);
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      expect(readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 48, minUniquePositions: 48, minVertexCount: 96 })).toHaveLength(8);
+    }
+
+    const leftFront = readMeshGeometry('V117_WingCanopyLamellaGoldArray_L_Front', {
+      minNonZeroAreaTriangles: 48,
+      minUniquePositions: 48,
+      minVertexCount: 96,
+    });
+    const leftMid = readMeshGeometry('V117_WingCanopyLamellaPearlArray_L_Mid', {
+      minNonZeroAreaTriangles: 48,
+      minUniquePositions: 48,
+      minVertexCount: 96,
+    });
+    const leftRear = readMeshGeometry('V117_WingCanopyLamellaGoldArray_L_Rear', {
+      minNonZeroAreaTriangles: 48,
+      minUniquePositions: 48,
+      minVertexCount: 96,
+    });
+    const rightFront = readMeshGeometry('V117_WingCanopyLamellaGoldArray_R_Front', {
+      minNonZeroAreaTriangles: 48,
+      minUniquePositions: 48,
+      minVertexCount: 96,
+    });
+    const rightMid = readMeshGeometry('V117_WingCanopyLamellaPearlArray_R_Mid', {
+      minNonZeroAreaTriangles: 48,
+      minUniquePositions: 48,
+      minVertexCount: 96,
+    });
+    const rightRear = readMeshGeometry('V117_WingCanopyLamellaGoldArray_R_Rear', {
+      minNonZeroAreaTriangles: 48,
+      minUniquePositions: 48,
+      minVertexCount: 96,
+    });
+
+    expect(leftFront.min[0]).toBeLessThan(-58.0);
+    expect(leftFront.max[0]).toBeLessThan(-25.6);
+    expect(leftFront.min[1]).toBeGreaterThan(18.2);
+    expect(leftFront.max[1]).toBeGreaterThan(22.9);
+    expect(leftFront.min[2]).toBeGreaterThan(9.7);
+    expect(leftFront.max[2]).toBeLessThan(10.1);
+
+    expect(leftMid.min[0]).toBeLessThan(-58.0);
+    expect(leftMid.max[0]).toBeLessThan(-25.6);
+    expect(leftMid.min[1]).toBeGreaterThan(19.4);
+    expect(leftMid.max[1]).toBeGreaterThan(24.1);
+    expect(leftMid.min[2]).toBeGreaterThan(10.2);
+    expect(leftMid.max[2]).toBeLessThan(10.5);
+
+    expect(leftRear.min[0]).toBeLessThan(-58.0);
+    expect(leftRear.max[0]).toBeLessThan(-25.6);
+    expect(leftRear.min[1]).toBeGreaterThan(20.6);
+    expect(leftRear.max[1]).toBeGreaterThan(25.3);
+    expect(leftRear.min[2]).toBeGreaterThan(10.6);
+    expect(leftRear.max[2]).toBeLessThan(11.0);
+
+    expect(rightFront.min[0]).toBeGreaterThan(25.6);
+    expect(rightFront.max[0]).toBeGreaterThan(58.0);
+    expect(rightFront.min[1]).toBeGreaterThan(18.2);
+    expect(rightFront.max[1]).toBeGreaterThan(22.9);
+    expect(rightFront.min[2]).toBeGreaterThan(9.7);
+    expect(rightFront.max[2]).toBeLessThan(10.1);
+
+    expect(rightMid.min[0]).toBeGreaterThan(25.6);
+    expect(rightMid.max[0]).toBeGreaterThan(58.0);
+    expect(rightMid.min[1]).toBeGreaterThan(19.4);
+    expect(rightMid.max[1]).toBeGreaterThan(24.1);
+    expect(rightMid.min[2]).toBeGreaterThan(10.2);
+    expect(rightMid.max[2]).toBeLessThan(10.5);
+
+    expect(rightRear.min[0]).toBeGreaterThan(25.6);
+    expect(rightRear.max[0]).toBeGreaterThan(58.0);
+    expect(rightRear.min[1]).toBeGreaterThan(20.6);
+    expect(rightRear.max[1]).toBeGreaterThan(25.3);
+    expect(rightRear.min[2]).toBeGreaterThan(10.6);
+    expect(rightRear.max[2]).toBeLessThan(11.0);
+
+    expect(materialNameFor('V117_WingCanopyLamellaGoldArray_L_Front')).toBe('V17_CrownBrushedGold');
+    expect(materialNameFor('V117_WingCanopyLamellaPearlArray_L_Mid')).toBe('V17_PearlShellSatin');
+    expect(materialNameFor('V117_WingCanopyLamellaGoldArray_L_Rear')).toBe('V17_CrownBrushedGold');
+    expect(materialNameFor('V117_WingCanopyLamellaGoldArray_R_Front')).toBe('V17_CrownBrushedGold');
+    expect(materialNameFor('V117_WingCanopyLamellaPearlArray_R_Mid')).toBe('V17_PearlShellSatin');
+    expect(materialNameFor('V117_WingCanopyLamellaGoldArray_R_Rear')).toBe('V17_CrownBrushedGold');
+
+    expect(
+      leftFront.vertexCount + leftMid.vertexCount + leftRear.vertexCount + rightFront.vertexCount + rightMid.vertexCount + rightRear.vertexCount,
+    ).toBeLessThanOrEqual(1900);
   });
 
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
