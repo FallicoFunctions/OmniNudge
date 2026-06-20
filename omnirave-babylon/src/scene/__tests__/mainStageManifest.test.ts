@@ -1057,6 +1057,8 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(readMeshGeometry('V30_VipUndersideRib_R_00').vertexCount).toBeGreaterThanOrEqual(180);
     expect(readMeshGeometry('V30_VipGoldBaluster_L_00').vertexCount).toBeGreaterThanOrEqual(180);
     expect(readMeshGeometry('V30_VipGoldBaluster_R_00').vertexCount).toBeGreaterThanOrEqual(180);
+    expect(readMeshGeometry('V30_WingGoldBaluster_L_00').vertexCount).toBeGreaterThanOrEqual(180);
+    expect(readMeshGeometry('V30_WingGoldBaluster_R_00').vertexCount).toBeGreaterThanOrEqual(180);
 
     expect(materialNameFor('V30_VipShellFascia_L')).toBe('V20_LayeredPearlShell');
     expect(materialNameFor('V30_VipShellFascia_R')).toBe('V20_LayeredPearlShell');
