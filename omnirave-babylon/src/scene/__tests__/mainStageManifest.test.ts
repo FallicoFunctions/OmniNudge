@@ -1053,6 +1053,8 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(rightWingFascia.max[0] - rightWingFascia.min[0]).toBeGreaterThan(30);
     expect(leftWingFascia.max[1] - leftWingFascia.min[1]).toBeGreaterThan(2.5);
     expect(rightWingFascia.max[1] - rightWingFascia.min[1]).toBeGreaterThan(2.5);
+    expect(readMeshGeometry('V30_VipUndersideRib_L_00').vertexCount).toBeGreaterThanOrEqual(180);
+    expect(readMeshGeometry('V30_VipUndersideRib_R_00').vertexCount).toBeGreaterThanOrEqual(180);
     expect(readMeshGeometry('V30_VipGoldBaluster_L_00').vertexCount).toBeGreaterThanOrEqual(180);
     expect(readMeshGeometry('V30_VipGoldBaluster_R_00').vertexCount).toBeGreaterThanOrEqual(180);
 
