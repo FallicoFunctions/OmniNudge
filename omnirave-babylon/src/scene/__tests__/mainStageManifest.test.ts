@@ -440,7 +440,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   it('exports named sculptural shell details for the Main Stage crown composition', () => {
     expectMainStageMarker('V114_CelestialHaloOuterRingArray');
     expectMainStageMarker('V113_CrownShellLamellaArray_L');
-    expectMainStageMarker('V17_CenterScreenMullionRib_0');
+    expectMainStageMarker('V115_CenterScreenMullionArray');
     expectMainStageMarker('V17_WingCanopyLamella_L_0');
     expectMainStageMarker('V17_ProsceniumPearlReveal_L');
   });
@@ -8695,6 +8695,84 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V114_CelestialHaloCyanEdgeArray')).toBe('V20_CelestialCyanGlass');
 
     expect(outer.vertexCount + inner.vertexCount + cyan.vertexCount).toBeLessThanOrEqual(2400);
+  });
+
+  it('replaces the center-screen mullion and cyan edge strips with authored screen-frame arrays', () => {
+    const legacyNodes = [
+      'V17_CenterScreenMullionRib_0',
+      'V17_CenterScreenMullionRib_1',
+      'V17_CenterScreenMullionRib_2',
+      'V17_CenterScreenMullionRib_3',
+      'V17_CenterScreenMullionRib_4',
+      'V17_CenterScreenMullionRib_5',
+      'V17_CenterScreenMullionRib_6',
+      'V17_CenterScreenCyanEdge_0',
+      'V17_CenterScreenCyanEdge_1',
+      'V17_CenterScreenCyanEdge_2',
+      'V17_CenterScreenCyanEdge_3',
+      'V17_CenterScreenCyanEdge_4',
+      'V17_CenterScreenCyanEdge_5',
+      'V17_CenterScreenCyanEdge_6',
+    ] as const;
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy center-screen strip still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNodes = ['V115_CenterScreenMullionArray', 'V115_CenterScreenCyanEdgeArray'] as const;
+    expect(nodeNamesWithPrefix('V115_')).toEqual(replacementNodes);
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+    }
+
+    const mullion = readMeshGeometry('V115_CenterScreenMullionArray', {
+      minNonZeroAreaTriangles: 84,
+      minUniquePositions: 84,
+      minVertexCount: 168,
+    });
+    const cyan = readMeshGeometry('V115_CenterScreenCyanEdgeArray', {
+      minNonZeroAreaTriangles: 84,
+      minUniquePositions: 84,
+      minVertexCount: 168,
+    });
+
+    expect(readConnectedComponents('V115_CenterScreenMullionArray')).toHaveLength(7);
+    expect(readConnectedComponents('V115_CenterScreenCyanEdgeArray')).toHaveLength(7);
+
+    expect(mullion.min[0]).toBeLessThan(-7.35);
+    expect(mullion.max[0]).toBeGreaterThan(7.35);
+    expect(mullion.min[1]).toBeGreaterThan(8.0);
+    expect(mullion.max[1]).toBeGreaterThan(31.4);
+    expect(mullion.min[2]).toBeGreaterThan(24.9);
+    expect(mullion.max[2]).toBeLessThan(25.7);
+
+    expect(cyan.min[0]).toBeLessThan(-7.1);
+    expect(cyan.max[0]).toBeGreaterThan(7.45);
+    expect(cyan.min[1]).toBeGreaterThan(8.4);
+    expect(cyan.max[1]).toBeGreaterThan(30.9);
+    expect(cyan.min[2]).toBeGreaterThan(25.3);
+    expect(cyan.max[2]).toBeLessThan(25.8);
+
+    for (const [nodeName, expectedCenters] of [
+      ['V115_CenterScreenMullionArray', [-7.2, -4.8, -2.4, 0.0, 2.4, 4.8, 7.2]],
+      ['V115_CenterScreenCyanEdgeArray', [-7.02, -4.62, -2.22, 0.18, 2.58, 4.98, 7.38]],
+    ] as const) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+      for (const expectedX of expectedCenters) {
+        expect(
+          centers.some(([x, y, z]) => Math.abs(x - expectedX) < 0.25 && y > 19.4 && y < 20.3 && z > 25.25 && z < 25.7),
+          `${nodeName} missing authored screen strip near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    expect(materialNameFor('V115_CenterScreenMullionArray')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V115_CenterScreenCyanEdgeArray')).toBe('V20_CelestialCyanGlass');
+
+    expect(mullion.vertexCount + cyan.vertexCount).toBeLessThanOrEqual(1800);
   });
 
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
