@@ -5474,8 +5474,8 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(readConnectedComponents('V76_SideScreenAnchorShadowBrace_R')).toHaveLength(1);
 
     const minimumVertexCounts = new Map([
-      ['V76_SideScreenAnchorGoldSpine_L', 110],
-      ['V76_SideScreenAnchorGoldSpine_R', 110],
+      ['V76_SideScreenAnchorGoldSpine_L', 160],
+      ['V76_SideScreenAnchorGoldSpine_R', 160],
       ['V76_SideScreenAnchorShadowBrace_L', 100],
       ['V76_SideScreenAnchorShadowBrace_R', 100],
     ]);
