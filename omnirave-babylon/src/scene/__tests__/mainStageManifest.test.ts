@@ -451,7 +451,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expectMainStageMarker('V37_ProductionTrussTowerFrame_L');
     expectMainStageMarker('V29_MainLineArrayCabinet_L_00');
     expectMainStageMarker('V35_BasinFountainMist_L');
-    expectMainStageMarker('V18_WingFacadeArchInlay_L_0');
+    expectMainStageMarker('V109_WingFacadeArchInlayArray_L');
   });
 
   it('exports named foreground arrival details for the far spawn reveal camera', () => {
@@ -464,12 +464,22 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   });
 
   it('exports named facade refinement details for the Main Stage side-shell read', () => {
-    expectMainStageMarker('V20_RearShellPanel_L_0');
-    expectMainStageMarker('V20_OuterWingButtress_L_0');
-    expectMainStageMarker('V20_VipBalustradeFiligree_L_0');
-    expectMainStageMarker('V20_SideScreenOrbitalRing_L_0');
+    expectMainStageMarker('V111_RearShellPanelArray_L');
+    expectMainStageMarker('V107_OuterWingButtressArray_L');
+    expectMainStageMarker('V102_VipBalustradeFiligreeArray_L');
+    expectMainStageMarker('V31_SideParallaxGoldOrbit_L');
     expectMainStageMarker('V25_CrownApexCrystal');
     expectMainStageMarker('V20_PearlSurfaceRelief_L_0');
+  });
+
+  it('keeps invisible marker anchors out of the visible Main Stage GLB', () => {
+    for (const nodeName of [
+      'V18_WingFacadeArchInlay_L_0',
+      'V20_SideScreenOrbitalRing_L_0',
+      'V20_VipBalustradeFiligree_L_0',
+    ] as const) {
+      expect(nodesByName.has(nodeName), `invisible marker anchor still exported: ${nodeName}`).toBe(false);
+    }
   });
 
   it('exports physical screen depth baffles that break up flat emissive panels', () => {
@@ -7902,6 +7912,534 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
         ).toBe(true);
       }
     }
+  });
+
+  it('replaces the rear-shell shadow reveal proxy bars with authored side arrays', () => {
+    const legacyNodes = [
+      'V20_RearShellShadowReveal_L_0',
+      'V20_RearShellShadowReveal_L_1',
+      'V20_RearShellShadowReveal_L_2',
+      'V20_RearShellShadowReveal_L_3',
+      'V20_RearShellShadowReveal_R_0',
+      'V20_RearShellShadowReveal_R_1',
+      'V20_RearShellShadowReveal_R_2',
+      'V20_RearShellShadowReveal_R_3',
+    ];
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy rear-shell shadow reveal still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNodes = ['V106_RearShellShadowRevealArray_L', 'V106_RearShellShadowRevealArray_R'] as const;
+    expect(nodeNamesWithPrefix('V106_')).toHaveLength(replacementNodes.length);
+
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 48, minUniquePositions: 40, minVertexCount: 40 });
+      expect(
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 48, minUniquePositions: 40, minVertexCount: 40 }),
+      ).toHaveLength(4);
+      expect(materialNameFor(nodeName)).toBe('V20_RecessedWarmShadow');
+    }
+
+    const leftArray = readMeshGeometry('V106_RearShellShadowRevealArray_L', {
+      minNonZeroAreaTriangles: 48,
+      minUniquePositions: 40,
+      minVertexCount: 40,
+    });
+    const rightArray = readMeshGeometry('V106_RearShellShadowRevealArray_R', {
+      minNonZeroAreaTriangles: 48,
+      minUniquePositions: 40,
+      minVertexCount: 40,
+    });
+
+    expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(16.0);
+    expect(leftArray.max[1] - leftArray.min[1]).toBeGreaterThan(10.0);
+    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(0.14);
+    expect(leftArray.min[0]).toBeLessThan(-31.8);
+    expect(leftArray.max[0]).toBeLessThan(-15.0);
+    expect(leftArray.min[1]).toBeGreaterThan(5.6);
+    expect(leftArray.max[1]).toBeGreaterThan(15.6);
+    expect(leftArray.min[2]).toBeGreaterThan(11.95);
+    expect(leftArray.max[2]).toBeGreaterThan(12.16);
+
+    expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(16.0);
+    expect(rightArray.max[1] - rightArray.min[1]).toBeGreaterThan(10.0);
+    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(0.14);
+    expect(rightArray.min[0]).toBeGreaterThan(15.0);
+    expect(rightArray.max[0]).toBeGreaterThan(31.8);
+    expect(rightArray.min[1]).toBeGreaterThan(5.6);
+    expect(rightArray.max[1]).toBeGreaterThan(15.6);
+    expect(rightArray.min[2]).toBeGreaterThan(11.95);
+    expect(rightArray.max[2]).toBeGreaterThan(12.16);
+
+    for (const [nodeName, expectedCenters] of [
+      ['V106_RearShellShadowRevealArray_L', [-31.65, -26.45, -20.95, -15.45]],
+      ['V106_RearShellShadowRevealArray_R', [15.45, 20.95, 26.45, 31.65]],
+    ] as const) {
+      const componentCenters = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 48,
+        minUniquePositions: 40,
+        minVertexCount: 40,
+      }).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+
+      for (const expectedX of expectedCenters) {
+        expect(
+          componentCenters.some(
+            ([x, y, z]) => Math.abs(x - expectedX) < 0.35 && y > 8.2 && y < 10.9 && z > 12.08 && z < 12.2,
+          ),
+          `${nodeName} missing authored rear-shell shadow reveal near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('replaces the outer-wing buttress proxy cluster with authored side arrays', () => {
+    const legacyNodes = [
+      'V20_OuterWingButtress_L_0',
+      'V20_OuterWingButtress_L_1',
+      'V20_OuterWingButtress_L_2',
+      'V20_OuterWingButtress_L_3',
+      'V20_OuterWingButtress_R_0',
+      'V20_OuterWingButtress_R_1',
+      'V20_OuterWingButtress_R_2',
+      'V20_OuterWingButtress_R_3',
+    ];
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy outer-wing buttress still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNodes = ['V107_OuterWingButtressArray_L', 'V107_OuterWingButtressArray_R'] as const;
+    expect(nodeNamesWithPrefix('V107_')).toHaveLength(replacementNodes.length);
+
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 60, minUniquePositions: 72, minVertexCount: 72 });
+      expect(readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 60, minUniquePositions: 72, minVertexCount: 72 })).toHaveLength(4);
+      expect(materialNameFor(nodeName)).toBe('V20_LayeredPearlShell');
+    }
+
+    const leftArray = readMeshGeometry('V107_OuterWingButtressArray_L', {
+      minNonZeroAreaTriangles: 60,
+      minUniquePositions: 72,
+      minVertexCount: 72,
+    });
+    const rightArray = readMeshGeometry('V107_OuterWingButtressArray_R', {
+      minNonZeroAreaTriangles: 60,
+      minUniquePositions: 72,
+      minVertexCount: 72,
+    });
+
+    expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(16.0);
+    expect(leftArray.max[1] - leftArray.min[1]).toBeGreaterThan(10.4);
+    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(4.4);
+    expect(leftArray.min[0]).toBeLessThan(-35.2);
+    expect(leftArray.max[0]).toBeLessThan(-18.3);
+    expect(leftArray.min[1]).toBeGreaterThan(2.3);
+    expect(leftArray.max[1]).toBeGreaterThan(12.8);
+    expect(leftArray.min[2]).toBeGreaterThan(9.2);
+    expect(leftArray.max[2]).toBeGreaterThan(14.0);
+
+    expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(16.0);
+    expect(rightArray.max[1] - rightArray.min[1]).toBeGreaterThan(10.4);
+    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(4.4);
+    expect(rightArray.min[0]).toBeGreaterThan(18.3);
+    expect(rightArray.max[0]).toBeGreaterThan(35.2);
+    expect(rightArray.min[1]).toBeGreaterThan(2.3);
+    expect(rightArray.max[1]).toBeGreaterThan(12.8);
+    expect(rightArray.min[2]).toBeGreaterThan(9.2);
+    expect(rightArray.max[2]).toBeGreaterThan(14.0);
+
+    for (const [nodeName, expectedCenters] of [
+      ['V107_OuterWingButtressArray_L', [-34.2, -29.7, -24.7, -19.7]],
+      ['V107_OuterWingButtressArray_R', [19.7, 24.7, 29.7, 34.2]],
+    ] as const) {
+      const componentCenters = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 60,
+        minUniquePositions: 72,
+        minVertexCount: 72,
+      }).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+
+      for (const expectedX of expectedCenters) {
+        expect(
+          componentCenters.some(
+            ([x, y, z]) => Math.abs(x - expectedX) < 0.45 && y > 6.3 && y < 8.2 && z > 11.5 && z < 12.2,
+          ),
+          `${nodeName} missing authored outer-wing buttress near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('replaces the merged foreground barricade run strips with authored ceremonial sweep rails', () => {
+    const legacyNodes = ['V21_Merged_V18_ForegroundBarricadeRun', 'V21_Merged_V18_ForegroundBarricadeLowerRun'];
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy foreground barricade run still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNodes = ['V108_ForegroundBarricadeGoldRun', 'V108_ForegroundBarricadePearlRun'] as const;
+    expect(nodeNamesWithPrefix('V108_')).toHaveLength(replacementNodes.length);
+
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 24, minUniquePositions: 24, minVertexCount: 40 });
+      expect(
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 24, minUniquePositions: 24, minVertexCount: 40 }),
+      ).toHaveLength(1);
+    }
+
+    const goldRun = readMeshGeometry('V108_ForegroundBarricadeGoldRun', {
+      minNonZeroAreaTriangles: 24,
+      minUniquePositions: 24,
+      minVertexCount: 40,
+    });
+    const pearlRun = readMeshGeometry('V108_ForegroundBarricadePearlRun', {
+      minNonZeroAreaTriangles: 24,
+      minUniquePositions: 24,
+      minVertexCount: 40,
+    });
+
+    expect(goldRun.max[0] - goldRun.min[0]).toBeGreaterThan(18.0);
+    expect(goldRun.max[1] - goldRun.min[1]).toBeGreaterThan(0.08);
+    expect(goldRun.max[2] - goldRun.min[2]).toBeGreaterThan(41.0);
+    expect(goldRun.min[0]).toBeLessThan(-9.0);
+    expect(goldRun.max[0]).toBeGreaterThan(9.0);
+    expect(goldRun.min[1]).toBeGreaterThan(0.88);
+    expect(goldRun.max[1]).toBeGreaterThan(1.04);
+    expect(goldRun.min[2]).toBeLessThan(-41.9);
+    expect(goldRun.max[2]).toBeGreaterThan(-0.1);
+
+    expect(pearlRun.max[0] - pearlRun.min[0]).toBeGreaterThan(18.0);
+    expect(pearlRun.max[1] - pearlRun.min[1]).toBeGreaterThan(0.08);
+    expect(pearlRun.max[2] - pearlRun.min[2]).toBeGreaterThan(41.0);
+    expect(pearlRun.min[0]).toBeLessThan(-9.0);
+    expect(pearlRun.max[0]).toBeGreaterThan(9.0);
+    expect(pearlRun.min[1]).toBeGreaterThan(0.5);
+    expect(pearlRun.max[1]).toBeGreaterThan(0.62);
+    expect(pearlRun.min[2]).toBeLessThan(-41.9);
+    expect(pearlRun.max[2]).toBeGreaterThan(-0.1);
+
+    expect(goldRun.min[1]).toBeGreaterThan(pearlRun.max[1] + 0.22);
+    expect(materialNameFor('V108_ForegroundBarricadeGoldRun')).toBe('V18_BrushedGoldTrim');
+    expect(materialNameFor('V108_ForegroundBarricadePearlRun')).toBe('V18_PearlFacadeInlay');
+
+    expect(goldRun.vertexCount + pearlRun.vertexCount).toBeLessThanOrEqual(220);
+  });
+
+  it('replaces the merged wing-facade arch inlay strip with authored side arrays', () => {
+    const legacyNode = 'V21_Merged_V18_WingFacadeArchInlay';
+    expect(nodesByName.has(legacyNode), `legacy wing-facade arch inlay still exported: ${legacyNode}`).toBe(false);
+
+    const replacementNodes = ['V109_WingFacadeArchInlayArray_L', 'V109_WingFacadeArchInlayArray_R'] as const;
+    expect(nodeNamesWithPrefix('V109_')).toHaveLength(replacementNodes.length);
+
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 40, minUniquePositions: 40, minVertexCount: 80 });
+      expect(
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 40, minUniquePositions: 40, minVertexCount: 80 }),
+      ).toHaveLength(4);
+      expect(materialNameFor(nodeName)).toBe('V18_BrushedGoldTrim');
+    }
+
+    const leftArray = readMeshGeometry('V109_WingFacadeArchInlayArray_L', {
+      minNonZeroAreaTriangles: 40,
+      minUniquePositions: 40,
+      minVertexCount: 80,
+    });
+    const rightArray = readMeshGeometry('V109_WingFacadeArchInlayArray_R', {
+      minNonZeroAreaTriangles: 40,
+      minUniquePositions: 40,
+      minVertexCount: 80,
+    });
+
+    expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(16.0);
+    expect(leftArray.max[1] - leftArray.min[1]).toBeGreaterThan(2.0);
+    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(0.06);
+    expect(leftArray.min[0]).toBeLessThan(-33.3);
+    expect(leftArray.max[0]).toBeLessThan(-17.0);
+    expect(leftArray.min[1]).toBeGreaterThan(6.1);
+    expect(leftArray.max[1]).toBeGreaterThan(8.3);
+    expect(leftArray.min[2]).toBeGreaterThan(15.37);
+    expect(leftArray.max[2]).toBeGreaterThan(15.44);
+
+    expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(16.0);
+    expect(rightArray.max[1] - rightArray.min[1]).toBeGreaterThan(2.0);
+    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(0.06);
+    expect(rightArray.min[0]).toBeGreaterThan(17.0);
+    expect(rightArray.max[0]).toBeGreaterThan(33.3);
+    expect(rightArray.min[1]).toBeGreaterThan(6.1);
+    expect(rightArray.max[1]).toBeGreaterThan(8.3);
+    expect(rightArray.min[2]).toBeGreaterThan(15.37);
+    expect(rightArray.max[2]).toBeGreaterThan(15.44);
+
+    for (const [nodeName, expectedCenters, expectedZRange] of [
+      ['V109_WingFacadeArchInlayArray_L', [-32.0, -27.5, -23.0, -18.5], [15.77, 15.81]],
+      ['V109_WingFacadeArchInlayArray_R', [18.5, 23.0, 27.5, 32.0], [15.41, 15.45]],
+    ] as const) {
+      const componentCenters = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 40,
+        minUniquePositions: 40,
+        minVertexCount: 80,
+      }).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+
+      for (const expectedX of expectedCenters) {
+        expect(
+          componentCenters.some(
+            ([x, y, z]) =>
+              Math.abs(x - expectedX) < 0.55 &&
+              y > 7.0 &&
+              y < 7.5 &&
+              z > expectedZRange[0] &&
+              z < expectedZRange[1],
+          ),
+          `${nodeName} missing authored wing-facade arch inlay near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    expect(leftArray.vertexCount + rightArray.vertexCount).toBeLessThanOrEqual(520);
+  });
+
+  it('replaces the wing-facade inset glow slabs with authored side arrays', () => {
+    const legacyNodes = [
+      'V18_WingFacadeInsetGlow_L_0',
+      'V18_WingFacadeInsetGlow_L_1',
+      'V18_WingFacadeInsetGlow_L_2',
+      'V18_WingFacadeInsetGlow_L_3',
+      'V18_WingFacadeInsetGlow_R_0',
+      'V18_WingFacadeInsetGlow_R_1',
+      'V18_WingFacadeInsetGlow_R_2',
+      'V18_WingFacadeInsetGlow_R_3',
+    ] as const;
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy wing-facade inset glow still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNodes = ['V110_WingFacadeInsetGlowArray_L', 'V110_WingFacadeInsetGlowArray_R'] as const;
+    expect(nodeNamesWithPrefix('V110_')).toHaveLength(replacementNodes.length);
+
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 24, minUniquePositions: 32, minVertexCount: 64 });
+      expect(
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 24, minUniquePositions: 32, minVertexCount: 64 }),
+      ).toHaveLength(4);
+      expect(materialNameFor(nodeName)).toBe('V18_CyanWaterMistGlow');
+    }
+
+    const leftArray = readMeshGeometry('V110_WingFacadeInsetGlowArray_L', {
+      minNonZeroAreaTriangles: 24,
+      minUniquePositions: 32,
+      minVertexCount: 64,
+    });
+    const rightArray = readMeshGeometry('V110_WingFacadeInsetGlowArray_R', {
+      minNonZeroAreaTriangles: 24,
+      minUniquePositions: 32,
+      minVertexCount: 64,
+    });
+
+    expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(14.8);
+    expect(leftArray.max[1] - leftArray.min[1]).toBeGreaterThan(1.0);
+    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(0.08);
+    expect(leftArray.min[0]).toBeLessThan(-32.9);
+    expect(leftArray.max[0]).toBeLessThan(-17.45);
+    expect(leftArray.min[1]).toBeGreaterThan(4.6);
+    expect(leftArray.max[1]).toBeGreaterThan(5.8);
+    expect(leftArray.min[2]).toBeGreaterThan(15.32);
+    expect(leftArray.max[2]).toBeGreaterThan(15.50);
+
+    expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(14.8);
+    expect(rightArray.max[1] - rightArray.min[1]).toBeGreaterThan(1.0);
+    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(0.08);
+    expect(rightArray.min[0]).toBeGreaterThan(17.45);
+    expect(rightArray.max[0]).toBeGreaterThan(32.9);
+    expect(rightArray.min[1]).toBeGreaterThan(4.6);
+    expect(rightArray.max[1]).toBeGreaterThan(5.8);
+    expect(rightArray.min[2]).toBeGreaterThan(14.96);
+    expect(rightArray.max[2]).toBeGreaterThan(15.14);
+
+    for (const [nodeName, expectedCenters, expectedZRange] of [
+      ['V110_WingFacadeInsetGlowArray_L', [-32.0, -27.5, -23.0, -18.5], [15.75, 15.81]],
+      ['V110_WingFacadeInsetGlowArray_R', [18.5, 23.0, 27.5, 32.0], [15.39, 15.45]],
+    ] as const) {
+      const componentCenters = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 24,
+        minUniquePositions: 32,
+        minVertexCount: 64,
+      }).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+
+      for (const expectedX of expectedCenters) {
+        expect(
+          componentCenters.some(
+            ([x, y, z]) =>
+              Math.abs(x - expectedX) < 0.55 &&
+              y > 5.0 &&
+              y < 5.5 &&
+              z > expectedZRange[0] &&
+              z < expectedZRange[1],
+          ),
+          `${nodeName} missing authored wing-facade glow inset near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    expect(leftArray.vertexCount + rightArray.vertexCount).toBeLessThanOrEqual(400);
+  });
+
+  it('replaces the rear-shell pearl slab panels with authored side arrays', () => {
+    const legacyNodes = [
+      'V20_RearShellPanel_L_0',
+      'V20_RearShellPanel_L_1',
+      'V20_RearShellPanel_L_2',
+      'V20_RearShellPanel_L_3',
+      'V20_RearShellPanel_R_0',
+      'V20_RearShellPanel_R_1',
+      'V20_RearShellPanel_R_2',
+      'V20_RearShellPanel_R_3',
+    ] as const;
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy rear-shell panel still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNodes = ['V111_RearShellPanelArray_L', 'V111_RearShellPanelArray_R'] as const;
+    expect(nodeNamesWithPrefix('V111_')).toHaveLength(replacementNodes.length);
+
+    for (const nodeName of replacementNodes) {
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 96, minUniquePositions: 96, minVertexCount: 192 });
+      expect(
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 96, minUniquePositions: 96, minVertexCount: 192 }),
+      ).toHaveLength(4);
+      expect(materialNameFor(nodeName)).toBe('V20_LayeredPearlShell');
+    }
+
+    const leftArray = readMeshGeometry('V111_RearShellPanelArray_L', {
+      minNonZeroAreaTriangles: 96,
+      minUniquePositions: 96,
+      minVertexCount: 192,
+    });
+    const rightArray = readMeshGeometry('V111_RearShellPanelArray_R', {
+      minNonZeroAreaTriangles: 96,
+      minUniquePositions: 96,
+      minVertexCount: 192,
+    });
+
+    expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(19.5);
+    expect(leftArray.max[1] - leftArray.min[1]).toBeGreaterThan(10.5);
+    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(0.26);
+    expect(leftArray.min[0]).toBeLessThan(-35.0);
+    expect(leftArray.max[0]).toBeLessThan(-14.5);
+    expect(leftArray.min[1]).toBeGreaterThan(5.2);
+    expect(leftArray.max[1]).toBeGreaterThan(16.0);
+    expect(leftArray.min[2]).toBeGreaterThan(11.8);
+    expect(leftArray.max[2]).toBeGreaterThan(12.18);
+
+    expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(19.5);
+    expect(rightArray.max[1] - rightArray.min[1]).toBeGreaterThan(10.5);
+    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(0.26);
+    expect(rightArray.min[0]).toBeGreaterThan(14.5);
+    expect(rightArray.max[0]).toBeGreaterThan(35.0);
+    expect(rightArray.min[1]).toBeGreaterThan(5.2);
+    expect(rightArray.max[1]).toBeGreaterThan(16.0);
+    expect(rightArray.min[2]).toBeGreaterThan(11.8);
+    expect(rightArray.max[2]).toBeGreaterThan(12.18);
+
+    for (const [nodeName, expectedCenters] of [
+      ['V111_RearShellPanelArray_L', [-17.0, -22.5, -28.0, -33.2]],
+      ['V111_RearShellPanelArray_R', [17.0, 22.5, 28.0, 33.2]],
+    ] as const) {
+      const componentCenters = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 96,
+        minUniquePositions: 96,
+        minVertexCount: 192,
+      }).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+
+      for (const expectedX of expectedCenters) {
+        expect(
+          componentCenters.some(
+            ([x, y, z]) => Math.abs(x - expectedX) < 0.45 && y > 8.0 && y < 11.4 && z > 12.02 && z < 12.18,
+          ),
+          `${nodeName} missing authored rear-shell panel near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    expect(leftArray.vertexCount + rightArray.vertexCount).toBeLessThanOrEqual(1600);
+  });
+
+  it('replaces the crown crystal gold edge strips with an authored five-piece halo array', () => {
+    const legacyNodes = [
+      'V20_CrownCrystalGoldEdge_0',
+      'V20_CrownCrystalGoldEdge_1',
+      'V20_CrownCrystalGoldEdge_2',
+      'V20_CrownCrystalGoldEdge_3',
+      'V20_CrownCrystalGoldEdge_4',
+    ] as const;
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy crown crystal gold edge still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNode = 'V112_CrownCrystalGoldEdgeArray';
+    expect(nodeNamesWithPrefix('V112_')).toEqual([replacementNode]);
+    expectMainStageMarker(replacementNode);
+    const geometry = readMeshGeometry(replacementNode, {
+      minNonZeroAreaTriangles: 40,
+      minUniquePositions: 40,
+      minVertexCount: 60,
+    });
+    const components = readConnectedComponents(replacementNode, {
+      minNonZeroAreaTriangles: 8,
+      minUniquePositions: 8,
+      minVertexCount: 12,
+    });
+
+    expect(components).toHaveLength(5);
+    expect(materialNameFor(replacementNode)).toBe('V20_ChasedGoldFiligree');
+
+    expect(geometry.max[0] - geometry.min[0]).toBeGreaterThan(6.9);
+    expect(geometry.max[1] - geometry.min[1]).toBeGreaterThan(6.3);
+    expect(geometry.max[2] - geometry.min[2]).toBeGreaterThan(0.11);
+    expect(geometry.min[0]).toBeLessThan(-3.5);
+    expect(geometry.max[0]).toBeGreaterThan(3.5);
+    expect(geometry.min[1]).toBeGreaterThan(39.2);
+    expect(geometry.max[1]).toBeGreaterThan(45.8);
+    expect(geometry.min[2]).toBeGreaterThan(20.24);
+    expect(geometry.max[2]).toBeGreaterThan(20.64);
+
+    const componentCenters = components.map(({ min, max }) => [
+      (min[0] + max[0]) * 0.5,
+      (min[1] + max[1]) * 0.5,
+      (min[2] + max[2]) * 0.5,
+    ]);
+    for (const expectedX of [-2.6, -1.2, 0.0, 1.2, 2.6]) {
+      expect(
+        componentCenters.some(
+          ([x, y, z]) => Math.abs(x - expectedX) < 0.45 && y > 41.0 && y < 43.7 && z > 20.30 && z < 20.63,
+        ),
+        `${replacementNode} missing authored crown crystal edge near x=${expectedX}`,
+      ).toBe(true);
+    }
+
+    expect(geometry.vertexCount).toBeLessThanOrEqual(120);
   });
 
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
