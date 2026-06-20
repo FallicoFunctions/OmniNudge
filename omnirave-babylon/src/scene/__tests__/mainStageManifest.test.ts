@@ -438,7 +438,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   });
 
   it('exports named sculptural shell details for the Main Stage crown composition', () => {
-    expectMainStageMarker('V17_CelestialHaloRingOuter_0');
+    expectMainStageMarker('V114_CelestialHaloOuterRingArray');
     expectMainStageMarker('V113_CrownShellLamellaArray_L');
     expectMainStageMarker('V17_CenterScreenMullionRib_0');
     expectMainStageMarker('V17_WingCanopyLamella_L_0');
@@ -8560,6 +8560,141 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V113_CrownShellLamellaArray_R')).toBe('V20_LayeredPearlShell');
     expect(materialNameFor('V113_CrownShellGoldSeamArray_L')).toBe('V20_ChasedGoldFiligree');
     expect(materialNameFor('V113_CrownShellGoldSeamArray_R')).toBe('V20_ChasedGoldFiligree');
+  });
+
+  it('replaces the celestial halo proxy slices with authored crown halo arrays', () => {
+    const legacyNodes = [
+      'V17_CelestialHaloRingOuter_0',
+      'V17_CelestialHaloRingOuter_1',
+      'V17_CelestialHaloRingOuter_2',
+      'V17_CelestialHaloRingOuter_3',
+      'V17_CelestialHaloRingOuter_4',
+      'V17_CelestialHaloRingOuter_5',
+      'V17_CelestialHaloRingOuter_6',
+      'V17_CelestialHaloRingOuter_7',
+      'V17_CelestialHaloRingOuter_8',
+      'V17_CelestialHaloRingOuter_9',
+      'V17_CelestialHaloRingOuter_10',
+      'V17_CelestialHaloRingOuter_11',
+      'V17_CelestialHaloRingOuter_12',
+      'V17_CelestialHaloRingOuter_13',
+      'V17_CelestialHaloRingOuter_14',
+      'V17_CelestialHaloRingOuter_15',
+      'V17_CelestialHaloRingOuter_16',
+      'V17_CelestialHaloRingOuter_17',
+      'V17_CelestialHaloRingInner_0',
+      'V17_CelestialHaloRingInner_1',
+      'V17_CelestialHaloRingInner_2',
+      'V17_CelestialHaloRingInner_3',
+      'V17_CelestialHaloRingInner_4',
+      'V17_CelestialHaloRingInner_5',
+      'V17_CelestialHaloRingInner_6',
+      'V17_CelestialHaloRingInner_7',
+      'V17_CelestialHaloRingInner_8',
+      'V17_CelestialHaloRingInner_9',
+      'V17_CelestialHaloRingInner_10',
+      'V17_CelestialHaloRingInner_11',
+      'V17_CelestialHaloRingInner_12',
+      'V17_CelestialHaloRingInner_13',
+      'V17_CelestialHaloRingInner_14',
+      'V17_CelestialHaloRingInner_15',
+      'V17_CelestialHaloCyanEdge_0',
+      'V17_CelestialHaloCyanEdge_1',
+      'V17_CelestialHaloCyanEdge_2',
+      'V17_CelestialHaloCyanEdge_3',
+      'V17_CelestialHaloCyanEdge_4',
+      'V17_CelestialHaloCyanEdge_5',
+      'V17_CelestialHaloCyanEdge_6',
+      'V17_CelestialHaloCyanEdge_7',
+      'V17_CelestialHaloCyanEdge_8',
+      'V17_CelestialHaloCyanEdge_9',
+      'V17_CelestialHaloCyanEdge_10',
+      'V17_CelestialHaloCyanEdge_11',
+      'V17_CelestialHaloCyanEdge_12',
+      'V17_CelestialHaloCyanEdge_13',
+      'V17_CelestialHaloCyanEdge_14',
+      'V17_CelestialHaloCyanEdge_15',
+    ] as const;
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy celestial halo slice still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNodes = [
+      'V114_CelestialHaloOuterRingArray',
+      'V114_CelestialHaloInnerRingArray',
+      'V114_CelestialHaloCyanEdgeArray',
+    ] as const;
+    expect(nodeNamesWithPrefix('V114_')).toEqual(replacementNodes);
+
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+    }
+
+    const outer = readMeshGeometry('V114_CelestialHaloOuterRingArray', {
+      minNonZeroAreaTriangles: 120,
+      minUniquePositions: 120,
+      minVertexCount: 220,
+    });
+    const inner = readMeshGeometry('V114_CelestialHaloInnerRingArray', {
+      minNonZeroAreaTriangles: 96,
+      minUniquePositions: 96,
+      minVertexCount: 180,
+    });
+    const cyan = readMeshGeometry('V114_CelestialHaloCyanEdgeArray', {
+      minNonZeroAreaTriangles: 96,
+      minUniquePositions: 96,
+      minVertexCount: 180,
+    });
+
+    expect(readConnectedComponents('V114_CelestialHaloOuterRingArray')).toHaveLength(18);
+    expect(readConnectedComponents('V114_CelestialHaloInnerRingArray')).toHaveLength(16);
+    expect(readConnectedComponents('V114_CelestialHaloCyanEdgeArray')).toHaveLength(16);
+
+    expect(outer.min[0]).toBeLessThan(-16.6);
+    expect(outer.max[0]).toBeGreaterThan(16.6);
+    expect(outer.min[1]).toBeGreaterThan(55.8);
+    expect(outer.max[1]).toBeGreaterThan(70.8);
+    expect(outer.min[2]).toBeGreaterThan(24.15);
+    expect(outer.max[2]).toBeLessThan(24.6);
+
+    expect(inner.min[0]).toBeLessThan(-12.1);
+    expect(inner.max[0]).toBeGreaterThan(12.1);
+    expect(inner.min[1]).toBeGreaterThan(54.4);
+    expect(inner.max[1]).toBeGreaterThan(64.3);
+    expect(inner.min[2]).toBeGreaterThan(24.38);
+    expect(inner.max[2]).toBeLessThan(24.7);
+
+    expect(cyan.min[0]).toBeLessThan(-13.8);
+    expect(cyan.max[0]).toBeGreaterThan(13.8);
+    expect(cyan.min[1]).toBeGreaterThan(54.5);
+    expect(cyan.max[1]).toBeGreaterThan(66.1);
+    expect(cyan.min[2]).toBeGreaterThan(24.55);
+    expect(cyan.max[2]).toBeLessThan(24.75);
+
+    for (const [nodeName, expectedCenters] of [
+      ['V114_CelestialHaloOuterRingArray', [16.01, 14.72, 13.218, 11.525, 9.665, 7.666, 5.556, 3.366, 1.127, -1.127, -3.366, -5.556, -7.666, -9.665, -11.525, -13.218, -14.72, -16.01]],
+      ['V114_CelestialHaloInnerRingArray', [11.72, 10.536, 9.196, 7.719, 6.126, 4.442, 2.692, 0.902, -0.902, -2.692, -4.442, -6.126, -7.719, -9.196, -10.536, -11.72]],
+      ['V114_CelestialHaloCyanEdgeArray', [13.466, 12.141, 10.621, 8.932, 7.1, 5.154, 3.126, 1.047, -1.047, -3.126, -5.154, -7.1, -8.932, -10.621, -12.141, -13.466]],
+    ] as const) {
+      const centers = readConnectedComponents(nodeName).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+
+      for (const expectedX of expectedCenters) {
+        expect(
+          centers.some(([x, y, z]) => Math.abs(x - expectedX) < 0.4 && y > 55.0 && y < 71.0 && z > 24.2 && z < 24.7),
+          `${nodeName} missing authored halo slice near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    expect(materialNameFor('V114_CelestialHaloOuterRingArray')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V114_CelestialHaloInnerRingArray')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V114_CelestialHaloCyanEdgeArray')).toBe('V20_CelestialCyanGlass');
+
+    expect(outer.vertexCount + inner.vertexCount + cyan.vertexCount).toBeLessThanOrEqual(2400);
   });
 
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
