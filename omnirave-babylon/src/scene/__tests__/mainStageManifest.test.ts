@@ -5920,6 +5920,68 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     readMeshGeometry('V81_OvalScreenMullionShellArray_L');
     readMeshGeometry('V81_OvalScreenMullionShellArray_R');
+    for (const nodeName of ['V81_OvalScreenMullionGoldTrimArray_L', 'V81_OvalScreenMullionGoldTrimArray_R'] as const) {
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 60, minUniquePositions: 48, minVertexCount: 144 });
+      expect(
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 60, minUniquePositions: 48, minVertexCount: 144 }),
+      ).toHaveLength(3);
+      expect(materialNameFor(nodeName)).toBe('V14_BurnishedCelestialGold');
+    }
+
+    const leftTrim = readMeshGeometry('V81_OvalScreenMullionGoldTrimArray_L', {
+      minNonZeroAreaTriangles: 60,
+      minUniquePositions: 48,
+      minVertexCount: 144,
+    });
+    const rightTrim = readMeshGeometry('V81_OvalScreenMullionGoldTrimArray_R', {
+      minNonZeroAreaTriangles: 60,
+      minUniquePositions: 48,
+      minVertexCount: 144,
+    });
+
+    expect(leftTrim.max[0] - leftTrim.min[0]).toBeGreaterThan(5.8);
+    expect(leftTrim.max[1] - leftTrim.min[1]).toBeGreaterThan(10.4);
+    expect(leftTrim.max[2] - leftTrim.min[2]).toBeGreaterThan(0.26);
+    expect(leftTrim.min[0]).toBeLessThan(-33.9);
+    expect(leftTrim.max[0]).toBeLessThan(-28.0);
+    expect(leftTrim.min[1]).toBeGreaterThan(14.7);
+    expect(leftTrim.max[1]).toBeGreaterThan(25.5);
+    expect(leftTrim.min[2]).toBeGreaterThan(17.0);
+    expect(leftTrim.max[2]).toBeGreaterThan(17.3);
+
+    expect(rightTrim.max[0] - rightTrim.min[0]).toBeGreaterThan(5.8);
+    expect(rightTrim.max[1] - rightTrim.min[1]).toBeGreaterThan(10.4);
+    expect(rightTrim.max[2] - rightTrim.min[2]).toBeGreaterThan(0.26);
+    expect(rightTrim.min[0]).toBeGreaterThan(28.0);
+    expect(rightTrim.max[0]).toBeGreaterThan(33.9);
+    expect(rightTrim.min[1]).toBeGreaterThan(14.7);
+    expect(rightTrim.max[1]).toBeGreaterThan(25.5);
+    expect(rightTrim.min[2]).toBeGreaterThan(17.0);
+    expect(rightTrim.max[2]).toBeGreaterThan(17.3);
+
+    for (const [nodeName, expectedCenters] of [
+      ['V81_OvalScreenMullionGoldTrimArray_L', [-33.8, -31.0, -28.2]],
+      ['V81_OvalScreenMullionGoldTrimArray_R', [28.2, 31.0, 33.8]],
+    ] as const) {
+      const componentCenters = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 60,
+        minUniquePositions: 48,
+        minVertexCount: 144,
+      }).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+
+      for (const expectedX of expectedCenters) {
+        expect(
+          componentCenters.some(
+            ([x, y, z]) => Math.abs(x - expectedX) < 0.3 && y > 19.9 && y < 20.6 && z > 17.12 && z < 17.26,
+          ),
+          `${nodeName} missing authored mullion gold trim near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
   });
 
   it('replaces the oval portal forward-glow proxy slabs with authored shell, gold, and emissive portal stacks', () => {
@@ -7857,22 +7919,22 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     for (const nodeName of replacementNodes) {
       expectMainStageMarker(nodeName);
-      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 40, minUniquePositions: 36, minVertexCount: 36 });
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 64, minUniquePositions: 56, minVertexCount: 68 });
       expect(
-        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 40, minUniquePositions: 36, minVertexCount: 36 }),
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 64, minUniquePositions: 56, minVertexCount: 68 }),
       ).toHaveLength(4);
       expect(materialNameFor(nodeName)).toBe('V20_ChasedGoldFiligree');
     }
 
     const leftArray = readMeshGeometry('V105_RearShellGoldSeamArray_L', {
-      minNonZeroAreaTriangles: 40,
-      minUniquePositions: 36,
-      minVertexCount: 36,
+      minNonZeroAreaTriangles: 64,
+      minUniquePositions: 56,
+      minVertexCount: 68,
     });
     const rightArray = readMeshGeometry('V105_RearShellGoldSeamArray_R', {
-      minNonZeroAreaTriangles: 40,
-      minUniquePositions: 36,
-      minVertexCount: 36,
+      minNonZeroAreaTriangles: 64,
+      minUniquePositions: 56,
+      minVertexCount: 68,
     });
 
     expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(20.0);
@@ -7900,9 +7962,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       ['V105_RearShellGoldSeamArray_R', [17.0, 22.5, 28.0, 33.2]],
     ] as const) {
       const componentCenters = readConnectedComponents(nodeName, {
-        minNonZeroAreaTriangles: 40,
-        minUniquePositions: 36,
-        minVertexCount: 36,
+        minNonZeroAreaTriangles: 64,
+        minUniquePositions: 56,
+        minVertexCount: 68,
       }).map(({ min, max }) => [
         (min[0] + max[0]) * 0.5,
         (min[1] + max[1]) * 0.5,
@@ -7940,22 +8002,22 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     for (const nodeName of replacementNodes) {
       expectMainStageMarker(nodeName);
-      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 48, minUniquePositions: 40, minVertexCount: 40 });
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 72, minUniquePositions: 64, minVertexCount: 72 });
       expect(
-        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 48, minUniquePositions: 40, minVertexCount: 40 }),
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 72, minUniquePositions: 64, minVertexCount: 72 }),
       ).toHaveLength(4);
       expect(materialNameFor(nodeName)).toBe('V20_RecessedWarmShadow');
     }
 
     const leftArray = readMeshGeometry('V106_RearShellShadowRevealArray_L', {
-      minNonZeroAreaTriangles: 48,
-      minUniquePositions: 40,
-      minVertexCount: 40,
+      minNonZeroAreaTriangles: 72,
+      minUniquePositions: 64,
+      minVertexCount: 72,
     });
     const rightArray = readMeshGeometry('V106_RearShellShadowRevealArray_R', {
-      minNonZeroAreaTriangles: 48,
-      minUniquePositions: 40,
-      minVertexCount: 40,
+      minNonZeroAreaTriangles: 72,
+      minUniquePositions: 64,
+      minVertexCount: 72,
     });
 
     expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(16.0);
@@ -7983,9 +8045,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       ['V106_RearShellShadowRevealArray_R', [15.45, 20.95, 26.45, 31.65]],
     ] as const) {
       const componentCenters = readConnectedComponents(nodeName, {
-        minNonZeroAreaTriangles: 48,
-        minUniquePositions: 40,
-        minVertexCount: 40,
+        minNonZeroAreaTriangles: 72,
+        minUniquePositions: 64,
+        minVertexCount: 72,
       }).map(({ min, max }) => [
         (min[0] + max[0]) * 0.5,
         (min[1] + max[1]) * 0.5,

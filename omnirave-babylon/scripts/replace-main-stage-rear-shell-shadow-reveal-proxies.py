@@ -163,23 +163,41 @@ def add_extruded_profile_x(bm, x_min, x_max, profile):
 
 
 def reveal_profile(bounds):
-    y_min, y_max = bounds["y"]
-    z_min, z_max = bounds["z"]
-    center_y = midpoint(bounds, "y")
-    height = span(bounds, "y")
+    y_min = -bounds["z"][1] - 0.015
+    y_max = -bounds["z"][0] + 0.015
+    z_min, z_max = bounds["y"]
+    center_y = (y_min + y_max) * 0.5
+    center_z = midpoint(bounds, "y")
+    height = z_max - z_min
+    thickness = y_max - y_min
     end_cap = max(height * 0.022, 0.11)
-    shoulder_z = z_min + span(bounds, "z") * 0.42
-    floor_z = z_min - 0.035
-    notch_z = z_min - 0.055
-    crown_z = z_max + 0.045
+    lower_shoulder_y = y_min + thickness * 0.24
+    upper_shoulder_y = y_max - thickness * 0.24
+    floor_y = y_min - 0.03
+    shoulder_z = max(z_min + 0.02, 5.72)
+    lower_base_z = max(z_min + 0.04, 5.78)
+    lower_mid_z = max(z_min + 0.16, 5.96)
+    upper_shoulder_z = z_min + height * 0.38
+    notch_z = z_min + height * 0.52
+    inner_notch_z = z_min + height * 0.38
+    crown_z = z_max - 0.03
 
     return [
-        (y_min - end_cap, floor_z),
-        (y_min - end_cap * 0.18, shoulder_z),
+        (floor_y, lower_base_z),
+        (lower_shoulder_y, lower_mid_z),
+        (y_min, shoulder_z),
+        (y_min + thickness * 0.1, upper_shoulder_z),
+        (center_y - thickness * 0.08, crown_z - 0.018),
         (center_y, crown_z),
-        (y_max + end_cap * 0.18, shoulder_z),
-        (y_max + end_cap, floor_z),
+        (center_y + thickness * 0.08, crown_z - 0.018),
+        (y_max - thickness * 0.1, upper_shoulder_z),
+        (y_max, shoulder_z),
+        (upper_shoulder_y, lower_mid_z),
+        (floor_y + thickness * 0.35, z_min + height * 0.36),
+        (y_max, z_max - end_cap * 0.18),
+        (center_y + thickness * 0.12, inner_notch_z),
         (center_y, notch_z),
+        (center_y - thickness * 0.12, inner_notch_z),
     ]
 
 
