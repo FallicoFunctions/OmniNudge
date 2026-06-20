@@ -208,7 +208,11 @@ def build_run(name, material_name, bounds, collection, *, lower=False):
 
     y_min = bounds["y"][0] - 0.020
     y_max = bounds["y"][1] + 0.020
-    loops = [(y_value, build_profile(bounds, index / 3, lower=lower)) for index, y_value in enumerate(station_series(y_min, y_max, 4))]
+    station_count = 8
+    loops = [
+        (y_value, build_profile(bounds, index / (station_count - 1), lower=lower))
+        for index, y_value in enumerate(station_series(y_min, y_max, station_count))
+    ]
 
     bm = bmesh.new()
     add_ring_stack_y(bm, loops)
