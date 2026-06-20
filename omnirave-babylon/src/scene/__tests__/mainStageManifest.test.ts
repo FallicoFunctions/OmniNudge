@@ -9039,6 +9039,63 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     ).toBeLessThanOrEqual(1900);
   });
 
+  it('replaces the pass-one basin wall and water cuboids with authored side reliefs and water sheets', () => {
+    const legacyNodes = ['Pass1_BasinWall_-1', 'Pass1_BasinWall_1', 'Pass1_BasinWater_-1', 'Pass1_BasinWater_1'] as const;
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `pass-one basin cuboid still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNodes = [
+      'V118_BasinWallRelief_L',
+      'V118_BasinWallRelief_R',
+      'V118_BasinWaterSheet_L',
+      'V118_BasinWaterSheet_R',
+    ] as const;
+    expect(nodeNamesWithPrefix('V118_')).toEqual(replacementNodes);
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      expect(readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 12, minUniquePositions: 12, minVertexCount: 20 })).toHaveLength(1);
+    }
+
+    const wallLeft = readMeshGeometry('V118_BasinWallRelief_L', {
+      minNonZeroAreaTriangles: 12,
+      minUniquePositions: 12,
+      minVertexCount: 20,
+    });
+    const wallRight = readMeshGeometry('V118_BasinWallRelief_R', {
+      minNonZeroAreaTriangles: 12,
+      minUniquePositions: 12,
+      minVertexCount: 20,
+    });
+    const waterLeft = readMeshGeometry('V118_BasinWaterSheet_L', {
+      minNonZeroAreaTriangles: 8,
+      minUniquePositions: 8,
+      minVertexCount: 20,
+    });
+    const waterRight = readMeshGeometry('V118_BasinWaterSheet_R', {
+      minNonZeroAreaTriangles: 8,
+      minUniquePositions: 8,
+      minVertexCount: 20,
+    });
+
+    expect(wallLeft.min[0]).toBeLessThan(-8.17);
+    expect(wallLeft.max[0]).toBeLessThan(-6.2);
+    expect(wallRight.min[0]).toBeGreaterThan(6.2);
+    expect(wallRight.max[0]).toBeGreaterThan(8.17);
+
+    expect(waterLeft.min[0]).toBeLessThan(-17.2);
+    expect(waterLeft.max[0]).toBeLessThan(-8.29);
+    expect(waterRight.min[0]).toBeGreaterThan(8.29);
+    expect(waterRight.max[0]).toBeGreaterThan(17.2);
+
+    expect(materialNameFor('V118_BasinWallRelief_L')).toBe('V13_BlackStageRigging');
+    expect(materialNameFor('V118_BasinWallRelief_R')).toBe('V13_BlackStageRigging');
+    expect(materialNameFor('V118_BasinWaterSheet_L')).toBe('V14_DeepReflectingWater');
+    expect(materialNameFor('V118_BasinWaterSheet_R')).toBe('V14_DeepReflectingWater');
+
+    expect(wallLeft.vertexCount + wallRight.vertexCount + waterLeft.vertexCount + waterRight.vertexCount).toBeLessThanOrEqual(140);
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
