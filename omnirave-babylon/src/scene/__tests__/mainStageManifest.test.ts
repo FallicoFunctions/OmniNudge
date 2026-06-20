@@ -8194,6 +8194,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       minVertexCount: 40,
     });
 
+    expect(goldRun.vertexCount).toBeGreaterThanOrEqual(160);
+    expect(pearlRun.vertexCount).toBeGreaterThanOrEqual(160);
+
     expect(goldRun.max[0] - goldRun.min[0]).toBeGreaterThan(18.0);
     expect(goldRun.max[1] - goldRun.min[1]).toBeGreaterThan(0.08);
     expect(goldRun.max[2] - goldRun.min[2]).toBeGreaterThan(41.0);
@@ -8218,7 +8221,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V108_ForegroundBarricadeGoldRun')).toBe('V18_BrushedGoldTrim');
     expect(materialNameFor('V108_ForegroundBarricadePearlRun')).toBe('V18_PearlFacadeInlay');
 
-    expect(goldRun.vertexCount + pearlRun.vertexCount).toBeLessThanOrEqual(220);
+    expect(goldRun.vertexCount + pearlRun.vertexCount).toBeLessThanOrEqual(320);
   });
 
   it('replaces the merged wing-facade arch inlay strip with authored side arrays', () => {
