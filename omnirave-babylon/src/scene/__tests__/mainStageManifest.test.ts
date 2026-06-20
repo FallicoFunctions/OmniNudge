@@ -9151,22 +9151,22 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const wallLeft = readMeshGeometry('V118_BasinWallRelief_L', {
       minNonZeroAreaTriangles: 12,
       minUniquePositions: 12,
-      minVertexCount: 20,
+      minVertexCount: 39,
     });
     const wallRight = readMeshGeometry('V118_BasinWallRelief_R', {
       minNonZeroAreaTriangles: 12,
       minUniquePositions: 12,
-      minVertexCount: 20,
+      minVertexCount: 39,
     });
     const waterLeft = readMeshGeometry('V118_BasinWaterSheet_L', {
       minNonZeroAreaTriangles: 8,
       minUniquePositions: 8,
-      minVertexCount: 20,
+      minVertexCount: 27,
     });
     const waterRight = readMeshGeometry('V118_BasinWaterSheet_R', {
       minNonZeroAreaTriangles: 8,
       minUniquePositions: 8,
-      minVertexCount: 20,
+      minVertexCount: 27,
     });
 
     expect(wallLeft.min[0]).toBeLessThan(-8.17);
