@@ -1500,10 +1500,16 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const cyan = readMeshGeometry(`V34_BackPlazaGatewayCyanInlay_${side}`);
       const gold = readMeshGeometry(`V34_BackPlazaGatewayGoldCrown_${side}`);
       const bannerRail = readMeshGeometry(`V34_BackPlazaBannerRail_${side}`);
+      const goldTriangleCount = mainStageGlbJson.accessors[gold.primitive.indices!].count / 3;
+      const bannerRailTriangleCount = mainStageGlbJson.accessors[bannerRail.primitive.indices!].count / 3;
       expect(readConnectedComponents(`V34_BackPlazaGatewayPearl_${side}`)).toHaveLength(1);
       expect(cyan.max[1] - cyan.min[1]).toBeGreaterThan(4.5);
       expect(gold.max[1]).toBeGreaterThan(pearl.max[1] - 0.4);
+      expect(gold.vertexCount).toBeGreaterThanOrEqual(180);
+      expect(goldTriangleCount).toBeGreaterThanOrEqual(260);
       expect(bannerRail.max[2] - bannerRail.min[2]).toBeGreaterThan(24);
+      expect(bannerRail.vertexCount).toBeGreaterThanOrEqual(180);
+      expect(bannerRailTriangleCount).toBeGreaterThanOrEqual(260);
       expect(materialNameFor(`V34_BackPlazaGatewayPearl_${side}`)).toBe('V19_GatewayPearlIvory');
       expect(materialNameFor(`V34_BackPlazaGatewayCyanInlay_${side}`)).toBe('V19_ArrivalCyanGlow');
       expect(materialNameFor(`V34_BackPlazaGatewayGoldCrown_${side}`)).toBe('V19_ArrivalBrushedGold');
