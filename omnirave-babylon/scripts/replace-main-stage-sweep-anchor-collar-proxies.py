@@ -160,22 +160,38 @@ def pinnacle_profile(center_x, lower_z, upper_z, half_width):
 
 def shadow_profile(center_x, lower_z, upper_z, half_width):
     height = upper_z - lower_z
+    lower_step_z = lower_z + height * 0.10
     shoulder_z = lower_z + height * 0.44
+    upper_shoulder_z = lower_z + height * 0.72
     inset_width = half_width * 0.42
+    core_width = half_width * 0.56
     return [
         (center_x - half_width, lower_z),
+        (center_x - half_width * 0.92, lower_step_z),
+        (center_x - half_width * 0.86, shoulder_z - height * 0.10),
         (center_x - half_width * 0.78, shoulder_z),
+        (center_x - core_width, upper_shoulder_z),
         (center_x - inset_width, upper_z - height * 0.14),
+        (center_x - half_width * 0.34, upper_z - height * 0.09),
         (center_x - half_width * 0.28, upper_z - height * 0.07),
         (center_x - half_width * 0.18, upper_z - height * 0.03),
+        (center_x - half_width * 0.08, upper_z - height * 0.015),
         (center_x, upper_z),
+        (center_x + half_width * 0.08, upper_z - height * 0.015),
         (center_x + half_width * 0.18, upper_z - height * 0.03),
         (center_x + half_width * 0.28, upper_z - height * 0.07),
+        (center_x + half_width * 0.34, upper_z - height * 0.09),
         (center_x + inset_width, upper_z - height * 0.14),
+        (center_x + core_width, upper_shoulder_z),
         (center_x + half_width * 0.78, shoulder_z),
+        (center_x + half_width * 0.86, shoulder_z - height * 0.10),
+        (center_x + half_width * 0.92, lower_step_z),
         (center_x + half_width, lower_z),
+        (center_x + half_width * 0.40, lower_z - height * 0.04),
         (center_x + half_width * 0.26, lower_z - height * 0.08),
+        (center_x, lower_z - height * 0.10),
         (center_x - half_width * 0.26, lower_z - height * 0.08),
+        (center_x - half_width * 0.40, lower_z - height * 0.04),
     ]
 
 
@@ -392,7 +408,7 @@ build_profile_object(
     collection,
     shadow_components(snapshots["outer_left"], "outer"),
     bevel_width=0.035,
-    bevel_segments=1,
+    bevel_segments=2,
 )
 build_profile_object(
     "V74_SweepOuterAnchorShadowCore_R",
@@ -400,7 +416,7 @@ build_profile_object(
     collection,
     shadow_components(snapshots["outer_right"], "outer"),
     bevel_width=0.035,
-    bevel_segments=1,
+    bevel_segments=2,
 )
 build_profile_object(
     "V74_SweepInnerAnchorGoldCrown_L",
@@ -424,7 +440,7 @@ build_profile_object(
     collection,
     shadow_components(snapshots["inner_left"], "inner"),
     bevel_width=0.03,
-    bevel_segments=1,
+    bevel_segments=2,
 )
 build_profile_object(
     "V74_SweepInnerAnchorShadowCore_R",
@@ -432,7 +448,7 @@ build_profile_object(
     collection,
     shadow_components(snapshots["inner_right"], "inner"),
     bevel_width=0.03,
-    bevel_segments=1,
+    bevel_segments=2,
 )
 
 for name in REPLACEMENT_NAMES:
