@@ -8891,12 +8891,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const pearlLeft = readMeshGeometry('V116_ProsceniumPearlRevealArray_L', {
       minNonZeroAreaTriangles: 60,
       minUniquePositions: 60,
-      minVertexCount: 90,
+      minVertexCount: 94,
     });
     const pearlRight = readMeshGeometry('V116_ProsceniumPearlRevealArray_R', {
       minNonZeroAreaTriangles: 60,
       minUniquePositions: 60,
-      minVertexCount: 90,
+      minVertexCount: 94,
     });
     const shadowLeft = readMeshGeometry('V116_ProsceniumShadowPocketArray_L', {
       minNonZeroAreaTriangles: 32,
@@ -8913,14 +8913,14 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       readConnectedComponents('V116_ProsceniumPearlRevealArray_L', {
         minNonZeroAreaTriangles: 60,
         minUniquePositions: 60,
-        minVertexCount: 90,
+        minVertexCount: 94,
       }),
     ).toHaveLength(1);
     expect(
       readConnectedComponents('V116_ProsceniumPearlRevealArray_R', {
         minNonZeroAreaTriangles: 60,
         minUniquePositions: 60,
-        minVertexCount: 90,
+        minVertexCount: 94,
       }),
     ).toHaveLength(1);
     expect(
