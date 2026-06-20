@@ -486,9 +486,9 @@ def portal_arcade_shadow_components(snapshot, side):
     half_z = 2.18
     return [
         [
-            (beam["y"][0] - 0.10, rounded_loop(center_x, z_center, half_x * 0.94, half_z * 0.92, 2.8, 18)),
-            (midpoint(beam, "y"), rounded_loop(center_x, z_center + 0.04, half_x, half_z, 3.0, 18)),
-            (beam["y"][1] + 0.10, rounded_loop(center_x, z_center, half_x * 0.94, half_z * 0.92, 2.8, 18)),
+            (beam["y"][0] - 0.10, rounded_loop(center_x, z_center, half_x * 0.94, half_z * 0.92, 2.8, 24)),
+            (midpoint(beam, "y"), rounded_loop(center_x, z_center + 0.04, half_x, half_z, 3.0, 24)),
+            (beam["y"][1] + 0.10, rounded_loop(center_x, z_center, half_x * 0.94, half_z * 0.92, 2.8, 24)),
         ]
     ]
 
@@ -530,9 +530,9 @@ def center_cyan_components(snapshot):
     z_center = midpoint(plinth, "z")
     return [
         [
-            (plinth["y"][0] - 0.28, rounded_loop(x_center, z_center, 4.25, 1.55, 3.0, 18)),
-            (midpoint(plinth, "y"), rounded_loop(x_center, z_center + 0.10, 3.80, 1.75, 3.2, 18)),
-            (plinth["y"][1] + 0.28, rounded_loop(x_center, z_center, 4.25, 1.55, 3.0, 18)),
+            (plinth["y"][0] - 0.28, rounded_loop(x_center, z_center, 4.25, 1.55, 3.0, 24)),
+            (midpoint(plinth, "y"), rounded_loop(x_center, z_center + 0.10, 3.80, 1.75, 3.2, 24)),
+            (plinth["y"][1] + 0.28, rounded_loop(x_center, z_center, 4.25, 1.55, 3.0, 24)),
         ]
     ]
 
@@ -543,9 +543,9 @@ def center_shadow_components(snapshot):
     z_center = midpoint(plinth, "z") - 0.15
     return [
         [
-            (plinth["y"][0] - 0.40, rounded_loop(x_center, z_center, 4.65, 1.35, 2.8, 18)),
-            (midpoint(plinth, "y"), rounded_loop(x_center, z_center - 0.08, 4.10, 1.55, 3.0, 18)),
-            (plinth["y"][1] + 0.40, rounded_loop(x_center, z_center, 4.65, 1.35, 2.8, 18)),
+            (plinth["y"][0] - 0.40, rounded_loop(x_center, z_center, 4.65, 1.35, 2.8, 24)),
+            (midpoint(plinth, "y"), rounded_loop(x_center, z_center - 0.08, 4.10, 1.55, 3.0, 24)),
+            (plinth["y"][1] + 0.40, rounded_loop(x_center, z_center, 4.65, 1.35, 2.8, 24)),
         ]
     ]
 
@@ -614,7 +614,7 @@ build_loft_object_y(
     collection,
     portal_arcade_shadow_components(left_portal_arcade, "L"),
     bevel_width=0.02,
-    bevel_segments=1,
+    bevel_segments=2,
 )
 build_loft_object_y(
     "V68_PortalArcadeShadowCore_R",
@@ -622,7 +622,7 @@ build_loft_object_y(
     collection,
     portal_arcade_shadow_components(right_portal_arcade, "R"),
     bevel_width=0.02,
-    bevel_segments=1,
+    bevel_segments=2,
 )
 build_loft_object_z(
     "V68_GrandArcadePearlColonnade_L",
@@ -678,7 +678,7 @@ build_loft_object_y(
     collection,
     center_cyan_components(center_portal),
     bevel_width=0.014,
-    bevel_segments=1,
+    bevel_segments=2,
 )
 build_loft_object_y(
     "V68_HeroPortalShadowDais",
@@ -686,7 +686,7 @@ build_loft_object_y(
     collection,
     center_shadow_components(center_portal),
     bevel_width=0.02,
-    bevel_segments=1,
+    bevel_segments=2,
 )
 
 delete_existing(LEGACY_NAMES)
