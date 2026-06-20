@@ -439,7 +439,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
   it('exports named sculptural shell details for the Main Stage crown composition', () => {
     expectMainStageMarker('V17_CelestialHaloRingOuter_0');
-    expectMainStageMarker('V17_CrownShellLamella_L_0');
+    expectMainStageMarker('V113_CrownShellLamellaArray_L');
     expectMainStageMarker('V17_CenterScreenMullionRib_0');
     expectMainStageMarker('V17_WingCanopyLamella_L_0');
     expectMainStageMarker('V17_ProsceniumPearlReveal_L');
@@ -8440,6 +8440,126 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
 
     expect(geometry.vertexCount).toBeLessThanOrEqual(120);
+  });
+
+  it('replaces the crown shell lamella and gold seam strips with authored side arrays', () => {
+    const legacyNodes = [
+      'V17_CrownShellLamella_L_0',
+      'V17_CrownShellLamella_L_1',
+      'V17_CrownShellLamella_L_2',
+      'V17_CrownShellLamella_L_3',
+      'V17_CrownShellLamella_R_0',
+      'V17_CrownShellLamella_R_1',
+      'V17_CrownShellLamella_R_2',
+      'V17_CrownShellLamella_R_3',
+      'V17_CrownShellGoldSeam_L_0',
+      'V17_CrownShellGoldSeam_L_1',
+      'V17_CrownShellGoldSeam_L_2',
+      'V17_CrownShellGoldSeam_L_3',
+      'V17_CrownShellGoldSeam_R_0',
+      'V17_CrownShellGoldSeam_R_1',
+      'V17_CrownShellGoldSeam_R_2',
+      'V17_CrownShellGoldSeam_R_3',
+    ] as const;
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy crown shell strip still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNodes = [
+      'V113_CrownShellLamellaArray_L',
+      'V113_CrownShellLamellaArray_R',
+      'V113_CrownShellGoldSeamArray_L',
+      'V113_CrownShellGoldSeamArray_R',
+    ] as const;
+    expect(nodeNamesWithPrefix('V113_')).toHaveLength(replacementNodes.length);
+
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 48, minUniquePositions: 48, minVertexCount: 96 });
+      expect(
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 48, minUniquePositions: 48, minVertexCount: 96 }),
+      ).toHaveLength(4);
+    }
+
+    const lamellaLeft = readMeshGeometry('V113_CrownShellLamellaArray_L', {
+      minNonZeroAreaTriangles: 48,
+      minUniquePositions: 48,
+      minVertexCount: 96,
+    });
+    const lamellaRight = readMeshGeometry('V113_CrownShellLamellaArray_R', {
+      minNonZeroAreaTriangles: 48,
+      minUniquePositions: 48,
+      minVertexCount: 96,
+    });
+    const goldLeft = readMeshGeometry('V113_CrownShellGoldSeamArray_L', {
+      minNonZeroAreaTriangles: 48,
+      minUniquePositions: 48,
+      minVertexCount: 96,
+    });
+    const goldRight = readMeshGeometry('V113_CrownShellGoldSeamArray_R', {
+      minNonZeroAreaTriangles: 48,
+      minUniquePositions: 48,
+      minVertexCount: 96,
+    });
+
+    expect(lamellaLeft.min[0]).toBeLessThan(-17.3);
+    expect(lamellaLeft.max[0]).toBeLessThan(-3.0);
+    expect(lamellaLeft.min[1]).toBeGreaterThan(23.7);
+    expect(lamellaLeft.max[1]).toBeGreaterThan(24.8);
+    expect(lamellaLeft.min[2]).toBeLessThan(-62.0);
+    expect(lamellaLeft.max[2]).toBeLessThan(-29.6);
+
+    expect(lamellaRight.min[0]).toBeGreaterThan(3.0);
+    expect(lamellaRight.max[0]).toBeGreaterThan(17.3);
+    expect(lamellaRight.min[1]).toBeGreaterThan(23.7);
+    expect(lamellaRight.max[1]).toBeGreaterThan(24.8);
+    expect(lamellaRight.min[2]).toBeLessThan(-62.0);
+    expect(lamellaRight.max[2]).toBeLessThan(-29.6);
+
+    expect(goldLeft.min[0]).toBeLessThan(-15.2);
+    expect(goldLeft.max[0]).toBeLessThan(-3.1);
+    expect(goldLeft.min[1]).toBeGreaterThan(24.0);
+    expect(goldLeft.max[1]).toBeGreaterThan(24.8);
+    expect(goldLeft.min[2]).toBeLessThan(-62.0);
+    expect(goldLeft.max[2]).toBeLessThan(-29.7);
+
+    expect(goldRight.min[0]).toBeGreaterThan(3.1);
+    expect(goldRight.max[0]).toBeGreaterThan(15.2);
+    expect(goldRight.min[1]).toBeGreaterThan(24.0);
+    expect(goldRight.max[1]).toBeGreaterThan(24.8);
+    expect(goldRight.min[2]).toBeLessThan(-62.0);
+    expect(goldRight.max[2]).toBeLessThan(-29.7);
+
+    for (const [nodeName, expectedCenters] of [
+      ['V113_CrownShellLamellaArray_L', [-11.6, -9.55, -7.5, -5.45]],
+      ['V113_CrownShellLamellaArray_R', [5.45, 7.5, 9.55, 11.6]],
+      ['V113_CrownShellGoldSeamArray_L', [-11.368, -9.359, -7.35, -5.341]],
+      ['V113_CrownShellGoldSeamArray_R', [5.341, 7.35, 9.359, 11.368]],
+    ] as const) {
+      const componentCenters = readConnectedComponents(nodeName, {
+        minNonZeroAreaTriangles: 48,
+        minUniquePositions: 48,
+        minVertexCount: 96,
+      }).map(({ min, max }) => [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+      ]);
+
+      for (const expectedX of expectedCenters) {
+        expect(
+          componentCenters.some(
+            ([x, y, z]) => Math.abs(x - expectedX) < 0.35 && y > 24.0 && y < 24.9 && z < -45.0 && z > -46.3,
+          ),
+          `${nodeName} missing authored crown-shell strip near x=${expectedX}`,
+        ).toBe(true);
+      }
+    }
+
+    expect(materialNameFor('V113_CrownShellLamellaArray_L')).toBe('V20_LayeredPearlShell');
+    expect(materialNameFor('V113_CrownShellLamellaArray_R')).toBe('V20_LayeredPearlShell');
+    expect(materialNameFor('V113_CrownShellGoldSeamArray_L')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V113_CrownShellGoldSeamArray_R')).toBe('V20_ChasedGoldFiligree');
   });
 
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
