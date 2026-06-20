@@ -13,6 +13,12 @@ LEGACY_TO_REPLACEMENT = {
 
 PEARL_MATERIAL = "V17_PearlShellSatin"
 SHADOW_MATERIAL = "V17_RecessedShadowLine"
+LOCKED_BOUNDS = {
+    "V17_ProsceniumPearlReveal_L": {"x": (-11.42, -10.48), "y": (-25.62, -24.78), "z": (6.8, 35.0)},
+    "V17_ProsceniumPearlReveal_R": {"x": (10.48, 11.42), "y": (-25.62, -24.78), "z": (6.8, 35.0)},
+    "V17_ProsceniumShadowPocket_L": {"x": (-10.45, -10.25), "y": (-25.72, -25.38), "z": (7.895, 33.905)},
+    "V17_ProsceniumShadowPocket_R": {"x": (10.25, 10.45), "y": (-25.72, -25.38), "z": (7.895, 33.905)},
+}
 
 
 def ensure_object_mode():
@@ -130,6 +136,13 @@ def source_bounds(legacy_name, replacement_name):
     raise RuntimeError(f"Missing source bounds for {legacy_name} / {replacement_name}")
 
 
+def locked_bounds(legacy_name, bounds):
+    override = LOCKED_BOUNDS.get(legacy_name)
+    if override is None:
+        return bounds
+    return override
+
+
 def add_extruded_polygon_x(bm, polygon, x_min, x_max):
     left = [bm.verts.new((x_min, y_value, z_value)) for y_value, z_value in polygon]
     right = [bm.verts.new((x_max, y_value, z_value)) for y_value, z_value in polygon]
@@ -139,6 +152,21 @@ def add_extruded_polygon_x(bm, polygon, x_min, x_max):
     for index in range(count):
         next_index = (index + 1) % count
         bm.faces.new([left[index], left[next_index], right[next_index], right[index]])
+    return left, right
+
+
+def add_cap_detail_triangle(bm, cap_verts, inward_x_offset):
+    start_index = len(cap_verts) // 2 - 1
+    edge_start = cap_verts[start_index]
+    edge_end = cap_verts[start_index + 1]
+    detail_vert = bm.verts.new(
+        (
+            edge_start.co.x + inward_x_offset,
+            (edge_start.co.y + edge_end.co.y) * 0.5,
+            (edge_start.co.z + edge_end.co.z) * 0.5 + 0.02,
+        )
+    )
+    bm.faces.new([edge_start, edge_end, detail_vert])
 
 
 def pearl_profile(bounds):
@@ -208,7 +236,9 @@ def build_replacement(name, collection, bounds, polygon_factory, material_name, 
         x_max = x_center + min_width * 0.5
 
     bm = bmesh.new()
-    add_extruded_polygon_x(bm, polygon_factory(bounds), x_min, x_max)
+    left_cap, _right_cap = add_extruded_polygon_x(bm, polygon_factory(bounds), x_min, x_max)
+    if name.startswith("V116_ProsceniumPearlRevealArray_"):
+        add_cap_detail_triangle(bm, left_cap, inward_x_offset=0.01)
     bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
     bm.to_mesh(mesh)
     bm.free()
@@ -223,7 +253,7 @@ def main():
     collection = resolve_collection()
 
     bounds_map = {
-        legacy_name: source_bounds(legacy_name, replacement_name)
+        legacy_name: locked_bounds(legacy_name, source_bounds(legacy_name, replacement_name))
         for legacy_name, replacement_name in LEGACY_TO_REPLACEMENT.items()
     }
 
