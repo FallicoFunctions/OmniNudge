@@ -442,7 +442,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expectMainStageMarker('V113_CrownShellLamellaArray_L');
     expectMainStageMarker('V115_CenterScreenMullionArray');
     expectMainStageMarker('V17_WingCanopyLamella_L_0');
-    expectMainStageMarker('V17_ProsceniumPearlReveal_L');
+    expectMainStageMarker('V116_ProsceniumPearlRevealArray_L');
   });
 
   it('exports named approach, production, and basin details for the Main Stage arrival read', () => {
@@ -8773,6 +8773,116 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V115_CenterScreenCyanEdgeArray')).toBe('V20_CelestialCyanGlass');
 
     expect(mullion.vertexCount + cyan.vertexCount).toBeLessThanOrEqual(1800);
+  });
+
+  it('replaces the proscenium reveal and shadow strip proxies with authored side arrays', () => {
+    const legacyNodes = [
+      'V17_ProsceniumPearlReveal_L',
+      'V17_ProsceniumPearlReveal_R',
+      'V17_ProsceniumShadowPocket_L',
+      'V17_ProsceniumShadowPocket_R',
+    ] as const;
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName), `legacy proscenium strip still exported: ${nodeName}`).toBe(false);
+    }
+
+    const replacementNodes = [
+      'V116_ProsceniumPearlRevealArray_L',
+      'V116_ProsceniumPearlRevealArray_R',
+      'V116_ProsceniumShadowPocketArray_L',
+      'V116_ProsceniumShadowPocketArray_R',
+    ] as const;
+    expect(nodeNamesWithPrefix('V116_')).toEqual(replacementNodes);
+    for (const nodeName of replacementNodes) {
+      expectMainStageMarker(nodeName);
+    }
+
+    const pearlLeft = readMeshGeometry('V116_ProsceniumPearlRevealArray_L', {
+      minNonZeroAreaTriangles: 60,
+      minUniquePositions: 60,
+      minVertexCount: 90,
+    });
+    const pearlRight = readMeshGeometry('V116_ProsceniumPearlRevealArray_R', {
+      minNonZeroAreaTriangles: 60,
+      minUniquePositions: 60,
+      minVertexCount: 90,
+    });
+    const shadowLeft = readMeshGeometry('V116_ProsceniumShadowPocketArray_L', {
+      minNonZeroAreaTriangles: 32,
+      minUniquePositions: 32,
+      minVertexCount: 56,
+    });
+    const shadowRight = readMeshGeometry('V116_ProsceniumShadowPocketArray_R', {
+      minNonZeroAreaTriangles: 32,
+      minUniquePositions: 32,
+      minVertexCount: 56,
+    });
+
+    expect(
+      readConnectedComponents('V116_ProsceniumPearlRevealArray_L', {
+        minNonZeroAreaTriangles: 60,
+        minUniquePositions: 60,
+        minVertexCount: 90,
+      }),
+    ).toHaveLength(1);
+    expect(
+      readConnectedComponents('V116_ProsceniumPearlRevealArray_R', {
+        minNonZeroAreaTriangles: 60,
+        minUniquePositions: 60,
+        minVertexCount: 90,
+      }),
+    ).toHaveLength(1);
+    expect(
+      readConnectedComponents('V116_ProsceniumShadowPocketArray_L', {
+        minNonZeroAreaTriangles: 32,
+        minUniquePositions: 32,
+        minVertexCount: 56,
+      }),
+    ).toHaveLength(1);
+    expect(
+      readConnectedComponents('V116_ProsceniumShadowPocketArray_R', {
+        minNonZeroAreaTriangles: 32,
+        minUniquePositions: 32,
+        minVertexCount: 56,
+      }),
+    ).toHaveLength(1);
+
+    expect(pearlLeft.min[0]).toBeLessThan(-11.2);
+    expect(pearlLeft.max[0]).toBeLessThan(-10.4);
+    expect(pearlLeft.min[1]).toBeLessThan(6.9);
+    expect(pearlLeft.max[1]).toBeGreaterThan(35.0);
+    expect(pearlLeft.min[2]).toBeGreaterThan(24.7);
+    expect(pearlLeft.max[2]).toBeLessThan(25.7);
+
+    expect(pearlRight.min[0]).toBeGreaterThan(10.4);
+    expect(pearlRight.max[0]).toBeGreaterThan(11.2);
+    expect(pearlRight.min[1]).toBeLessThan(6.9);
+    expect(pearlRight.max[1]).toBeGreaterThan(35.0);
+    expect(pearlRight.min[2]).toBeGreaterThan(24.7);
+    expect(pearlRight.max[2]).toBeLessThan(25.7);
+
+    expect(shadowLeft.min[0]).toBeLessThan(-10.4);
+    expect(shadowLeft.max[0]).toBeLessThan(-10.2);
+    expect(shadowLeft.min[1]).toBeGreaterThan(7.8);
+    expect(shadowLeft.max[1]).toBeGreaterThan(33.8);
+    expect(shadowLeft.min[2]).toBeGreaterThan(25.3);
+    expect(shadowLeft.max[2]).toBeLessThan(25.8);
+
+    expect(shadowRight.min[0]).toBeGreaterThan(10.2);
+    expect(shadowRight.max[0]).toBeGreaterThan(10.4);
+    expect(shadowRight.min[1]).toBeGreaterThan(7.8);
+    expect(shadowRight.max[1]).toBeGreaterThan(33.8);
+    expect(shadowRight.min[2]).toBeGreaterThan(25.3);
+    expect(shadowRight.max[2]).toBeLessThan(25.8);
+
+    expect(materialNameFor('V116_ProsceniumPearlRevealArray_L')).toBe('V17_PearlShellSatin');
+    expect(materialNameFor('V116_ProsceniumPearlRevealArray_R')).toBe('V17_PearlShellSatin');
+    expect(materialNameFor('V116_ProsceniumShadowPocketArray_L')).toBe('V17_RecessedShadowLine');
+    expect(materialNameFor('V116_ProsceniumShadowPocketArray_R')).toBe('V17_RecessedShadowLine');
+
+    expect(
+      pearlLeft.vertexCount + pearlRight.vertexCount + shadowLeft.vertexCount + shadowRight.vertexCount,
+    ).toBeLessThanOrEqual(320);
   });
 
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
