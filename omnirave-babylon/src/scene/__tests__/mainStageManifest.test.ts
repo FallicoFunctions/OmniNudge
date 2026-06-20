@@ -5932,29 +5932,35 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const requiredReplacementNodes = [
       'V82_OvalPortalGlowShell_L',
       'V82_OvalPortalGlowShell_R',
-      'V82_OvalPortalGlowGoldTrim_L',
-      'V82_OvalPortalGlowGoldTrim_R',
-      'V82_OvalPortalGlowEmissionPanel_L',
-      'V82_OvalPortalGlowEmissionPanel_R',
+      'V119_OvalPortalGlowGoldArray_L',
+      'V119_OvalPortalGlowGoldArray_R',
+      'V119_OvalPortalGlowEmissionArray_L',
+      'V119_OvalPortalGlowEmissionArray_R',
     ];
-    expect(nodeNamesWithPrefix('V82_')).toHaveLength(requiredReplacementNodes.length);
+    expect(nodeNamesWithPrefix('V82_')).toEqual(['V82_OvalPortalGlowShell_L', 'V82_OvalPortalGlowShell_R']);
+    expect(nodeNamesWithPrefix('V119_')).toEqual([
+      'V119_OvalPortalGlowGoldArray_L',
+      'V119_OvalPortalGlowGoldArray_R',
+      'V119_OvalPortalGlowEmissionArray_L',
+      'V119_OvalPortalGlowEmissionArray_R',
+    ]);
     const leftShell = readMeshGeometry('V82_OvalPortalGlowShell_L');
     const rightShell = readMeshGeometry('V82_OvalPortalGlowShell_R');
     const overlayGeometryOptions = {
-      minNonZeroAreaTriangles: 8,
-      minUniquePositions: 7,
-      minVertexCount: 20,
+      minNonZeroAreaTriangles: 24,
+      minUniquePositions: 24,
+      minVertexCount: 47,
     };
-    const leftGold = readMeshGeometry('V82_OvalPortalGlowGoldTrim_L', overlayGeometryOptions);
-    const rightGold = readMeshGeometry('V82_OvalPortalGlowGoldTrim_R', overlayGeometryOptions);
-    const leftEmission = readMeshGeometry('V82_OvalPortalGlowEmissionPanel_L', overlayGeometryOptions);
-    const rightEmission = readMeshGeometry('V82_OvalPortalGlowEmissionPanel_R', overlayGeometryOptions);
+    const leftGold = readMeshGeometry('V119_OvalPortalGlowGoldArray_L', overlayGeometryOptions);
+    const rightGold = readMeshGeometry('V119_OvalPortalGlowGoldArray_R', overlayGeometryOptions);
+    const leftEmission = readMeshGeometry('V119_OvalPortalGlowEmissionArray_L', overlayGeometryOptions);
+    const rightEmission = readMeshGeometry('V119_OvalPortalGlowEmissionArray_R', overlayGeometryOptions);
     expectMainStageMarker('V82_OvalPortalGlowShell_L');
     expectMainStageMarker('V82_OvalPortalGlowShell_R');
-    expectMainStageMarker('V82_OvalPortalGlowGoldTrim_L');
-    expectMainStageMarker('V82_OvalPortalGlowGoldTrim_R');
-    expectMainStageMarker('V82_OvalPortalGlowEmissionPanel_L');
-    expectMainStageMarker('V82_OvalPortalGlowEmissionPanel_R');
+    expectMainStageMarker('V119_OvalPortalGlowGoldArray_L');
+    expectMainStageMarker('V119_OvalPortalGlowGoldArray_R');
+    expectMainStageMarker('V119_OvalPortalGlowEmissionArray_L');
+    expectMainStageMarker('V119_OvalPortalGlowEmissionArray_R');
 
     expect(leftShell.min[0]).toBeLessThan(-36.1);
     expect(leftShell.max[0]).toBeLessThan(-25.7);
@@ -5974,37 +5980,37 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(leftGold.max[0]).toBeLessThan(-26.0);
     expect(leftGold.min[1]).toBeGreaterThan(13.9);
     expect(leftGold.max[1]).toBeGreaterThan(25.7);
-    expect(leftGold.min[2]).toBeGreaterThan(16.7);
+    expect(leftGold.min[2]).toBeGreaterThan(16.6);
     expect(leftGold.max[2]).toBeGreaterThan(17.2);
 
     expect(rightGold.min[0]).toBeGreaterThan(26.0);
     expect(rightGold.max[0]).toBeGreaterThan(35.8);
     expect(rightGold.min[1]).toBeGreaterThan(13.9);
     expect(rightGold.max[1]).toBeGreaterThan(25.7);
-    expect(rightGold.min[2]).toBeGreaterThan(16.7);
+    expect(rightGold.min[2]).toBeGreaterThan(16.6);
     expect(rightGold.max[2]).toBeGreaterThan(17.2);
 
     expect(leftEmission.min[0]).toBeLessThan(-35.4);
     expect(leftEmission.max[0]).toBeLessThan(-26.4);
     expect(leftEmission.min[1]).toBeGreaterThan(16.4);
     expect(leftEmission.max[1]).toBeGreaterThan(23.9);
-    expect(leftEmission.min[2]).toBeGreaterThan(16.7);
+    expect(leftEmission.min[2]).toBeGreaterThan(16.6);
     expect(leftEmission.max[2]).toBeGreaterThan(17.1);
 
     expect(rightEmission.min[0]).toBeGreaterThan(26.4);
     expect(rightEmission.max[0]).toBeGreaterThan(35.4);
     expect(rightEmission.min[1]).toBeGreaterThan(16.4);
     expect(rightEmission.max[1]).toBeGreaterThan(23.9);
-    expect(rightEmission.min[2]).toBeGreaterThan(16.7);
+    expect(rightEmission.min[2]).toBeGreaterThan(16.6);
     expect(rightEmission.max[2]).toBeGreaterThan(17.1);
 
     const expectedComponentCounts = new Map([
       ['V82_OvalPortalGlowShell_L', 1],
       ['V82_OvalPortalGlowShell_R', 1],
-      ['V82_OvalPortalGlowGoldTrim_L', 1],
-      ['V82_OvalPortalGlowGoldTrim_R', 1],
-      ['V82_OvalPortalGlowEmissionPanel_L', 1],
-      ['V82_OvalPortalGlowEmissionPanel_R', 1],
+      ['V119_OvalPortalGlowGoldArray_L', 1],
+      ['V119_OvalPortalGlowGoldArray_R', 1],
+      ['V119_OvalPortalGlowEmissionArray_L', 1],
+      ['V119_OvalPortalGlowEmissionArray_R', 1],
     ]);
     for (const [nodeName, componentCount] of expectedComponentCounts) {
       const geometryOptions = nodeName.includes('Shell') ? undefined : overlayGeometryOptions;
@@ -6014,10 +6020,10 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const minimumVertexCounts = new Map([
       ['V82_OvalPortalGlowShell_L', 100],
       ['V82_OvalPortalGlowShell_R', 100],
-      ['V82_OvalPortalGlowGoldTrim_L', 20],
-      ['V82_OvalPortalGlowGoldTrim_R', 20],
-      ['V82_OvalPortalGlowEmissionPanel_L', 20],
-      ['V82_OvalPortalGlowEmissionPanel_R', 20],
+      ['V119_OvalPortalGlowGoldArray_L', 48],
+      ['V119_OvalPortalGlowGoldArray_R', 48],
+      ['V119_OvalPortalGlowEmissionArray_L', 48],
+      ['V119_OvalPortalGlowEmissionArray_R', 48],
     ]);
     for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
       const geometryOptions = nodeName.includes('Shell') ? undefined : overlayGeometryOptions;
@@ -6030,10 +6036,10 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const expectedMaterials = new Map([
       ['V82_OvalPortalGlowShell_L', 'V15_PearlShellBeveled'],
       ['V82_OvalPortalGlowShell_R', 'V15_PearlShellBeveled'],
-      ['V82_OvalPortalGlowGoldTrim_L', 'V14_BurnishedCelestialGold'],
-      ['V82_OvalPortalGlowGoldTrim_R', 'V14_BurnishedCelestialGold'],
-      ['V82_OvalPortalGlowEmissionPanel_L', 'V14_CosmicScreenEmission'],
-      ['V82_OvalPortalGlowEmissionPanel_R', 'V14_CosmicScreenEmission'],
+      ['V119_OvalPortalGlowGoldArray_L', 'V14_BurnishedCelestialGold'],
+      ['V119_OvalPortalGlowGoldArray_R', 'V14_BurnishedCelestialGold'],
+      ['V119_OvalPortalGlowEmissionArray_L', 'V14_CosmicScreenEmission'],
+      ['V119_OvalPortalGlowEmissionArray_R', 'V14_CosmicScreenEmission'],
     ]);
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
