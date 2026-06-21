@@ -39,6 +39,7 @@ GROUPS = [
 
 REPLACEMENT_NAMES = [group[0] for group in GROUPS]
 LEGACY_NAMES = [name for _, names, _ in GROUPS for name in names]
+ORPHAN_LEGACY_NAMES = ["V17_WingCanopyLamella_L_0"]
 
 
 def ensure_object_mode():
@@ -53,7 +54,7 @@ def set_active(obj):
 
 
 def resolve_collection():
-    for name in [*REPLACEMENT_NAMES, *LEGACY_NAMES, "V17_WingCanopyLamella_L_0"]:
+    for name in [*REPLACEMENT_NAMES, *LEGACY_NAMES, *ORPHAN_LEGACY_NAMES]:
         obj = bpy.data.objects.get(name)
         if obj is not None and obj.users_collection:
             return obj.users_collection[0]
@@ -247,9 +248,22 @@ def build_array(name, collection, components, material_name):
     return obj
 
 
+def has_all_replacements():
+    return all(bpy.data.objects.get(name) is not None for name in REPLACEMENT_NAMES)
+
+
+def has_any_legacy():
+    return any(bpy.data.objects.get(name) is not None for name in LEGACY_NAMES)
+
+
 def main():
     ensure_object_mode()
     collection = resolve_collection()
+
+    if not has_any_legacy() and has_all_replacements():
+        delete_existing(ORPHAN_LEGACY_NAMES)
+        bpy.ops.wm.save_mainfile()
+        return
 
     component_map = {
         replacement_name: source_component_bounds(legacy_names, replacement_name, 8)
@@ -261,7 +275,7 @@ def main():
     for replacement_name, _legacy_names, material_name in GROUPS:
         build_array(replacement_name, collection, component_map[replacement_name], material_name)
 
-    delete_existing(LEGACY_NAMES)
+    delete_existing([*LEGACY_NAMES, *ORPHAN_LEGACY_NAMES])
     bpy.ops.wm.save_mainfile()
 
 
