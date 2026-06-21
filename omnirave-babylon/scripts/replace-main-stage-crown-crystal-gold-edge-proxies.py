@@ -137,15 +137,20 @@ def edge_profile(bounds):
 
     outer_x = x_min - 0.08
     inner_x = x_max + 0.08
+    lower_left = x_min + width * 0.14
+    lower_right = x_max - width * 0.14
     inset_left = center_x - width * 0.22
     inset_right = center_x + width * 0.22
+    lower_shoulder_z = z_min + height * 0.56
 
     return [
         (outer_x, skirt_z),
         (x_min - 0.03, waist_z),
+        (lower_left, lower_shoulder_z),
         (inset_left, shoulder_z),
         (center_x, tip_z),
         (inset_right, shoulder_z),
+        (lower_right, lower_shoulder_z),
         (x_max + 0.03, waist_z),
         (inner_x, skirt_z),
         (center_x, z_min - 0.03),
