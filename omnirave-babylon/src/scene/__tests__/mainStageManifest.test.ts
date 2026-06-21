@@ -8823,7 +8823,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const cyan = readMeshGeometry('V115_CenterScreenCyanEdgeArray', {
       minNonZeroAreaTriangles: 84,
       minUniquePositions: 84,
-      minVertexCount: 168,
+      minVertexCount: 175,
     });
 
     expect(readConnectedComponents('V115_CenterScreenMullionArray')).toHaveLength(7);
