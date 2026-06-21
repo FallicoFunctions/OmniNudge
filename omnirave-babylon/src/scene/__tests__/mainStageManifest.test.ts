@@ -6064,7 +6064,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const goldGeometryOptions = {
       minNonZeroAreaTriangles: 60,
       minUniquePositions: 48,
-      minVertexCount: 119,
+      minVertexCount: 122,
     };
     const leftGold = readMeshGeometry('V119_OvalPortalGlowGoldArray_L', goldGeometryOptions);
     const rightGold = readMeshGeometry('V119_OvalPortalGlowGoldArray_R', goldGeometryOptions);
@@ -6139,8 +6139,8 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const minimumVertexCounts = new Map([
       ['V82_OvalPortalGlowShell_L', 160],
       ['V82_OvalPortalGlowShell_R', 160],
-      ['V119_OvalPortalGlowGoldArray_L', 120],
-      ['V119_OvalPortalGlowGoldArray_R', 120],
+      ['V119_OvalPortalGlowGoldArray_L', 123],
+      ['V119_OvalPortalGlowGoldArray_R', 123],
       ['V119_OvalPortalGlowEmissionArray_L', 64],
       ['V119_OvalPortalGlowEmissionArray_R', 64],
     ]);
