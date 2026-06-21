@@ -160,6 +160,21 @@ def add_extruded_profile_x(bm, x_min, x_max, profile):
 
     bm.faces.new(list(reversed(lower_ring)))
     bm.faces.new(upper_ring)
+    return lower_ring, upper_ring
+
+
+def add_cap_detail_triangle(bm, cap_verts, inward_x_offset):
+    start_index = len(cap_verts) // 2 - 1
+    edge_start = cap_verts[start_index]
+    edge_end = cap_verts[start_index + 1]
+    detail_vert = bm.verts.new(
+        (
+            edge_start.co.x + inward_x_offset,
+            (edge_start.co.y + edge_end.co.y) * 0.5,
+            (edge_start.co.z + edge_end.co.z) * 0.5 + 0.018,
+        )
+    )
+    bm.faces.new([edge_start, edge_end, detail_vert])
 
 
 def reveal_profile(bounds):
@@ -187,11 +202,13 @@ def reveal_profile(bounds):
         (lower_shoulder_y, lower_mid_z),
         (y_min, shoulder_z),
         (y_min + thickness * 0.1, upper_shoulder_z),
+        (center_y - thickness * 0.28, crown_z - 0.065),
         (center_y - thickness * 0.14, crown_z - 0.006),
         (center_y - thickness * 0.08, crown_z - 0.018),
         (center_y, crown_z),
         (center_y + thickness * 0.08, crown_z - 0.018),
         (center_y + thickness * 0.14, crown_z - 0.006),
+        (center_y + thickness * 0.28, crown_z - 0.065),
         (y_max - thickness * 0.1, upper_shoulder_z),
         (y_max, shoulder_z),
         (upper_shoulder_y, lower_mid_z),
@@ -213,7 +230,9 @@ def build_array(name, side, collection):
     for bounds in components:
         x_min = bounds["x"][0] - 0.045
         x_max = bounds["x"][1] + 0.045
-        add_extruded_profile_x(bm, x_min, x_max, reveal_profile(bounds))
+        left_cap, right_cap = add_extruded_profile_x(bm, x_min, x_max, reveal_profile(bounds))
+        add_cap_detail_triangle(bm, left_cap, inward_x_offset=0.008)
+        add_cap_detail_triangle(bm, right_cap, inward_x_offset=-0.008)
 
     bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
     bm.to_mesh(mesh)
