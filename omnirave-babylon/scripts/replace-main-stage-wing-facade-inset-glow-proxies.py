@@ -28,7 +28,7 @@ REPLACEMENT_NAMES = [
     "V110_WingFacadeInsetGlowArray_R",
 ]
 GLOW = "V18_CyanWaterMistGlow"
-STATION_COUNT = 6
+STATION_COUNT = 7
 
 FALLBACK_COMPONENTS = [
     {"side": "L", "x": (-32.95, -31.05), "y": (-15.808, -15.752), "z": (4.73, 5.97)},
