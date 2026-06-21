@@ -149,6 +149,7 @@ def edge_profile(bounds):
         (lower_left, lower_shoulder_z),
         (center_x - width * 0.10, shoulder_z + height * 0.08),
         (inset_left, shoulder_z),
+        (center_x, shoulder_z + height * 0.18),
         (center_x, tip_z),
         (inset_right, shoulder_z),
         (center_x + width * 0.10, shoulder_z + height * 0.08),
