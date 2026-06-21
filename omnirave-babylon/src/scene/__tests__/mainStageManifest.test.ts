@@ -8495,7 +8495,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const geometry = readMeshGeometry(replacementNode, {
       minNonZeroAreaTriangles: 40,
       minUniquePositions: 40,
-      minVertexCount: 60,
+      minVertexCount: 80,
     });
     const components = readConnectedComponents(replacementNode, {
       minNonZeroAreaTriangles: 8,
