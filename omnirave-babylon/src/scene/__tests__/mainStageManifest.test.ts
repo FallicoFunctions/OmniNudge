@@ -8978,6 +8978,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
   it('replaces the wing-canopy lamella proxy strips with authored side row arrays', () => {
     const legacyNodes = [
+      'V17_WingCanopyLamella_L_0',
       'V17_WingCanopyLamella_L_0_0',
       'V17_WingCanopyLamella_L_0_1',
       'V17_WingCanopyLamella_L_0_2',
