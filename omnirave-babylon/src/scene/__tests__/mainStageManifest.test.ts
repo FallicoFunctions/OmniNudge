@@ -8927,14 +8927,14 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       minVertexCount: 94,
     });
     const shadowLeft = readMeshGeometry('V116_ProsceniumShadowPocketArray_L', {
-      minNonZeroAreaTriangles: 32,
-      minUniquePositions: 32,
-      minVertexCount: 59,
+      minNonZeroAreaTriangles: 96,
+      minUniquePositions: 48,
+      minVertexCount: 90,
     });
     const shadowRight = readMeshGeometry('V116_ProsceniumShadowPocketArray_R', {
-      minNonZeroAreaTriangles: 32,
-      minUniquePositions: 32,
-      minVertexCount: 59,
+      minNonZeroAreaTriangles: 96,
+      minUniquePositions: 48,
+      minVertexCount: 90,
     });
 
     expect(
@@ -8953,16 +8953,16 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     ).toHaveLength(1);
     expect(
       readConnectedComponents('V116_ProsceniumShadowPocketArray_L', {
-        minNonZeroAreaTriangles: 32,
-        minUniquePositions: 32,
-        minVertexCount: 59,
+        minNonZeroAreaTriangles: 96,
+        minUniquePositions: 48,
+        minVertexCount: 90,
       }),
     ).toHaveLength(1);
     expect(
       readConnectedComponents('V116_ProsceniumShadowPocketArray_R', {
-        minNonZeroAreaTriangles: 32,
-        minUniquePositions: 32,
-        minVertexCount: 59,
+        minNonZeroAreaTriangles: 96,
+        minUniquePositions: 48,
+        minVertexCount: 90,
       }),
     ).toHaveLength(1);
 
@@ -9001,7 +9001,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(
       pearlLeft.vertexCount + pearlRight.vertexCount + shadowLeft.vertexCount + shadowRight.vertexCount,
-    ).toBeLessThanOrEqual(320);
+    ).toBeLessThanOrEqual(560);
   });
 
   it('replaces the wing-canopy lamella proxy strips with authored side row arrays', () => {
