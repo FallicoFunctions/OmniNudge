@@ -8901,12 +8901,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const shadowLeft = readMeshGeometry('V116_ProsceniumShadowPocketArray_L', {
       minNonZeroAreaTriangles: 32,
       minUniquePositions: 32,
-      minVertexCount: 56,
+      minVertexCount: 59,
     });
     const shadowRight = readMeshGeometry('V116_ProsceniumShadowPocketArray_R', {
       minNonZeroAreaTriangles: 32,
       minUniquePositions: 32,
-      minVertexCount: 56,
+      minVertexCount: 59,
     });
 
     expect(
@@ -8927,14 +8927,14 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       readConnectedComponents('V116_ProsceniumShadowPocketArray_L', {
         minNonZeroAreaTriangles: 32,
         minUniquePositions: 32,
-        minVertexCount: 56,
+        minVertexCount: 59,
       }),
     ).toHaveLength(1);
     expect(
       readConnectedComponents('V116_ProsceniumShadowPocketArray_R', {
         minNonZeroAreaTriangles: 32,
         minUniquePositions: 32,
-        minVertexCount: 56,
+        minVertexCount: 59,
       }),
     ).toHaveLength(1);
 
