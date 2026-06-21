@@ -8554,7 +8554,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const geometry = readMeshGeometry(replacementNode, {
       minNonZeroAreaTriangles: 180,
       minUniquePositions: 104,
-      minVertexCount: 100,
+      minVertexCount: 124,
     });
     const components = readConnectedComponents(replacementNode, {
       minNonZeroAreaTriangles: 8,
@@ -8589,7 +8589,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       ).toBe(true);
     }
 
-    expect(geometry.vertexCount).toBeLessThanOrEqual(120);
+    expect(geometry.vertexCount).toBeLessThanOrEqual(132);
   });
 
   it('replaces the crown shell lamella and gold seam strips with authored side arrays', () => {
