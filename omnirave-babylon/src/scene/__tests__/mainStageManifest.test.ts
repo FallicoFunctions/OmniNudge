@@ -8585,7 +8585,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const goldLeft = readMeshGeometry('V113_CrownShellGoldSeamArray_L', {
       minNonZeroAreaTriangles: 48,
       minUniquePositions: 48,
-      minVertexCount: 96,
+      minVertexCount: 180,
     });
     const goldRight = readMeshGeometry('V113_CrownShellGoldSeamArray_R', {
       minNonZeroAreaTriangles: 48,
