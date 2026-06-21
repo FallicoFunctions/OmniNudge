@@ -7980,9 +7980,13 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     for (const nodeName of replacementNodes) {
       expectMainStageMarker(nodeName);
-      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 160, minUniquePositions: 90, minVertexCount: 90 });
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 160, minUniquePositions: 90, minVertexCount: 108 });
       expect(
-        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 160, minUniquePositions: 90, minVertexCount: 90 }),
+        readConnectedComponents(nodeName, {
+          minNonZeroAreaTriangles: 160,
+          minUniquePositions: 90,
+          minVertexCount: 108,
+        }),
       ).toHaveLength(4);
       expect(materialNameFor(nodeName)).toBe('V20_ChasedGoldFiligree');
     }
@@ -7990,12 +7994,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const leftArray = readMeshGeometry('V105_RearShellGoldSeamArray_L', {
       minNonZeroAreaTriangles: 160,
       minUniquePositions: 90,
-      minVertexCount: 90,
+      minVertexCount: 108,
     });
     const rightArray = readMeshGeometry('V105_RearShellGoldSeamArray_R', {
       minNonZeroAreaTriangles: 160,
       minUniquePositions: 90,
-      minVertexCount: 90,
+      minVertexCount: 108,
     });
 
     expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(20.0);
@@ -8025,7 +8029,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const componentCenters = readConnectedComponents(nodeName, {
         minNonZeroAreaTriangles: 160,
         minUniquePositions: 90,
-        minVertexCount: 90,
+        minVertexCount: 108,
       }).map(({ min, max }) => [
         (min[0] + max[0]) * 0.5,
         (min[1] + max[1]) * 0.5,
