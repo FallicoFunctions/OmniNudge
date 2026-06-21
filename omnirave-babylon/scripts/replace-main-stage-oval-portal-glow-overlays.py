@@ -89,7 +89,75 @@ def ensure_vertex_stable_uvs(mesh, cube_size=8.0):
         uv_layer.data[loop.index].uv = per_vertex_uvs[loop.vertex_index]
 
 
-def finalize(obj, bevel_width, bevel_segments):
+def add_gold_face_relief(mesh, inset_thickness=0.18, inset_depth=0.01):
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bm.faces.ensure_lookup_table()
+    relief_faces = [face for face in bm.faces if abs(face.normal.z) > 0.9]
+    relief_faces.sort(key=lambda face: face.calc_area(), reverse=True)
+    target_faces = relief_faces[:2]
+    if not target_faces:
+        bm.free()
+        return
+
+    bmesh.ops.inset_region(
+        bm,
+        faces=target_faces,
+        thickness=inset_thickness,
+        depth=0.0,
+        use_even_offset=True,
+        use_boundary=True,
+    )
+
+    inset_faces = [face for face in bm.faces if abs(face.normal.z) > 0.9]
+    inset_faces.sort(key=lambda face: face.calc_area())
+    for face in inset_faces[:2]:
+        direction = -1.0 if face.normal.z > 0.0 else 1.0
+        for vert in face.verts:
+            vert.co.z += inset_depth * direction
+
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    bm.to_mesh(mesh)
+    bm.free()
+
+
+def add_emission_face_relief(mesh, inset_thicknesses=(0.12, 0.08, 0.05, 0.03, 0.02, 0.015), inset_depth=0.006):
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bm.faces.ensure_lookup_table()
+    relief_faces = [face for face in bm.faces if abs(face.normal.z) > 0.9]
+    relief_faces.sort(key=lambda face: face.calc_area(), reverse=True)
+    target_faces = relief_faces[:2]
+    if not target_faces:
+        bm.free()
+        return
+
+    for thickness in inset_thicknesses:
+        result = bmesh.ops.inset_region(
+            bm,
+            faces=target_faces,
+            thickness=thickness,
+            depth=0.0,
+            use_even_offset=True,
+            use_boundary=True,
+        )
+        target_faces = [face for face in result.get("faces", []) if face.is_valid and abs(face.normal.z) > 0.9]
+        target_faces.sort(key=lambda face: face.calc_area())
+        target_faces = target_faces[:2]
+        if not target_faces:
+            break
+
+    for face in target_faces:
+        direction = -1.0 if face.normal.z > 0.0 else 1.0
+        for vert in face.verts:
+            vert.co.z += inset_depth * direction
+
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    bm.to_mesh(mesh)
+    bm.free()
+
+
+def finalize(obj, bevel_width, bevel_segments, kind):
     set_active(obj)
     bevel = obj.modifiers.new("OmniRaveBevel", "BEVEL")
     bevel.width = bevel_width
@@ -97,6 +165,10 @@ def finalize(obj, bevel_width, bevel_segments):
     bevel.limit_method = "ANGLE"
     bevel.profile = 0.7
     bpy.ops.object.modifier_apply(modifier=bevel.name)
+    if kind == "gold":
+        add_gold_face_relief(obj.data)
+    elif kind == "emission":
+        add_emission_face_relief(obj.data)
     triangulate_mesh(obj)
     ensure_vertex_stable_uvs(obj.data)
     set_active(obj)
@@ -159,7 +231,7 @@ def fit_overlay_bounds(bounds, kind):
     }
 
 
-def build_overlay(name, collection, bounds, material_name, bevel_width, bevel_segments):
+def build_overlay(name, collection, bounds, material_name, bevel_width, bevel_segments, kind):
     mesh = bpy.data.meshes.new(name)
     obj = bpy.data.objects.new(name, mesh)
     collection.objects.link(obj)
@@ -188,7 +260,7 @@ def build_overlay(name, collection, bounds, material_name, bevel_width, bevel_se
     bm.free()
 
     assign_material(obj, material_name)
-    finalize(obj, bevel_width, bevel_segments)
+    finalize(obj, bevel_width, bevel_segments, kind)
     return obj
 
 
@@ -212,6 +284,7 @@ def main():
             material_name,
             bevel_width=0.05 if kind == "gold" else 0.04,
             bevel_segments=3 if kind == "gold" else 2,
+            kind=kind,
         )
 
     delete_existing(LEGACY_NAMES)
