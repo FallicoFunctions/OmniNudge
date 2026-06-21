@@ -8471,9 +8471,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(nodeNamesWithPrefix('V111_')).toHaveLength(replacementNodes.length);
 
     for (const nodeName of replacementNodes) {
-      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 96, minUniquePositions: 96, minVertexCount: 192 });
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 96, minUniquePositions: 96, minVertexCount: 288 });
       expect(
-        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 96, minUniquePositions: 96, minVertexCount: 192 }),
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 96, minUniquePositions: 96, minVertexCount: 288 }),
       ).toHaveLength(4);
       expect(materialNameFor(nodeName)).toBe('V20_LayeredPearlShell');
     }
@@ -8481,12 +8481,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const leftArray = readMeshGeometry('V111_RearShellPanelArray_L', {
       minNonZeroAreaTriangles: 96,
       minUniquePositions: 96,
-      minVertexCount: 192,
+      minVertexCount: 288,
     });
     const rightArray = readMeshGeometry('V111_RearShellPanelArray_R', {
       minNonZeroAreaTriangles: 96,
       minUniquePositions: 96,
-      minVertexCount: 192,
+      minVertexCount: 288,
     });
 
     expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(19.5);
@@ -8516,7 +8516,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const componentCenters = readConnectedComponents(nodeName, {
         minNonZeroAreaTriangles: 96,
         minUniquePositions: 96,
-        minVertexCount: 192,
+        minVertexCount: 288,
       }).map(({ min, max }) => [
         (min[0] + max[0]) * 0.5,
         (min[1] + max[1]) * 0.5,
