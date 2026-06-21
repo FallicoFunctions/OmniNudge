@@ -239,6 +239,8 @@ def build_replacement(name, collection, bounds, polygon_factory, material_name, 
     left_cap, _right_cap = add_extruded_polygon_x(bm, polygon_factory(bounds), x_min, x_max)
     if name.startswith("V116_ProsceniumPearlRevealArray_"):
         add_cap_detail_triangle(bm, left_cap, inward_x_offset=0.01)
+    if name.startswith("V116_ProsceniumShadowPocketArray_"):
+        add_cap_detail_triangle(bm, left_cap, inward_x_offset=0.006)
     bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
     bm.to_mesh(mesh)
     bm.free()
