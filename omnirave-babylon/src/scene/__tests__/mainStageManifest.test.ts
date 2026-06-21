@@ -489,6 +489,21 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expectMainStageMarker('V22_CrownScreenShadowCoffer');
   });
 
+  it('profiles the visible screen baffles and coffers beyond raw cuboid placeholders', () => {
+    for (const nodeName of [
+      'V22_CenterScreenDepthBaffle_0',
+      'V22_CenterScreenShadowCoffer_Top',
+      'V22_WingScreenDepthBaffle_L_0',
+      'V22_CrownScreenShadowCoffer',
+    ] as const) {
+      readMeshGeometry(nodeName, {
+        minNonZeroAreaTriangles: 140,
+        minUniquePositions: 120,
+        minVertexCount: 170,
+      });
+    }
+  });
+
   it('exports authored arrival-threshold trim so the promenade foreground is not placeholder geometry', () => {
     expectMainStageMarker('V65_ArrivalThresholdGoldBands');
     expectMainStageMarker('V58_ArrivalPlinthPearlDais_L');
