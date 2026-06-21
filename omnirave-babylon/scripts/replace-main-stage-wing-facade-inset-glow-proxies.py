@@ -179,6 +179,21 @@ def add_extruded_polygon_y(bm, polygon, y_min, y_max):
     for index in range(count):
         next_index = (index + 1) % count
         bm.faces.new([front[index], front[next_index], back[next_index], back[index]])
+    return front, back
+
+
+def add_cap_detail_triangle(bm, cap_verts, outward_y_offset):
+    start_index = len(cap_verts) // 2 - 1
+    edge_start = cap_verts[start_index]
+    edge_end = cap_verts[start_index + 1]
+    detail_vert = bm.verts.new(
+        (
+            (edge_start.co.x + edge_end.co.x) * 0.5,
+            edge_start.co.y + outward_y_offset,
+            (edge_start.co.z + edge_end.co.z) * 0.5 + 0.015,
+        )
+    )
+    bm.faces.new([edge_start, edge_end, detail_vert])
 
 
 def build_array(name, side, collection, components):
@@ -190,7 +205,9 @@ def build_array(name, side, collection, components):
     for bounds in grouped_side_bounds(components, side):
         y_min = bounds["y"][0] - 0.026
         y_max = bounds["y"][1] + 0.026
-        add_extruded_polygon_y(bm, glow_polygon(bounds), y_min, y_max)
+        front_cap, back_cap = add_extruded_polygon_y(bm, glow_polygon(bounds), y_min, y_max)
+        add_cap_detail_triangle(bm, front_cap, outward_y_offset=-0.008)
+        add_cap_detail_triangle(bm, back_cap, outward_y_offset=0.008)
 
     bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
     bm.to_mesh(mesh)
