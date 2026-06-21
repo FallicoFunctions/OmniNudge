@@ -460,7 +460,6 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expectMainStageMarker('V40_ApproachLightStem_L');
     expectMainStageMarker('V32_CrowdCluster_L_Near');
     expectMainStageMarker('V43_WayfindingPylonPearlShell');
-    expectMainStageMarker('V19_ScreenConstellationStroke_0');
   });
 
   it('exports named facade refinement details for the Main Stage side-shell read', () => {
@@ -469,12 +468,13 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expectMainStageMarker('V102_VipBalustradeFiligreeArray_L');
     expectMainStageMarker('V31_SideParallaxGoldOrbit_L');
     expectMainStageMarker('V25_CrownApexCrystal');
-    expectMainStageMarker('V20_PearlSurfaceRelief_L_0');
   });
 
   it('keeps invisible marker anchors out of the visible Main Stage GLB', () => {
     for (const nodeName of [
+      'V19_ScreenConstellationStroke_0',
       'V18_WingFacadeArchInlay_L_0',
+      'V20_PearlSurfaceRelief_L_0',
       'V20_SideScreenOrbitalRing_L_0',
       'V20_VipBalustradeFiligree_L_0',
     ] as const) {
@@ -7396,7 +7396,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   });
 
   it('reuses the established Main Stage material library for the V24 crown pass', () => {
-    expect(mainStageGlbJson.materials).toHaveLength(47);
+    expect(mainStageGlbJson.materials).toHaveLength(46);
     expect(
       mainStageGlbJson.materials.some(({ name }: { name?: string }) => name?.startsWith('V24_')),
     ).toBe(false);
