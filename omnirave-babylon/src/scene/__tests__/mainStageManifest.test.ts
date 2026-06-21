@@ -6061,8 +6061,13 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       minUniquePositions: 24,
       minVertexCount: 47,
     };
-    const leftGold = readMeshGeometry('V119_OvalPortalGlowGoldArray_L', overlayGeometryOptions);
-    const rightGold = readMeshGeometry('V119_OvalPortalGlowGoldArray_R', overlayGeometryOptions);
+    const goldGeometryOptions = {
+      minNonZeroAreaTriangles: 60,
+      minUniquePositions: 48,
+      minVertexCount: 119,
+    };
+    const leftGold = readMeshGeometry('V119_OvalPortalGlowGoldArray_L', goldGeometryOptions);
+    const rightGold = readMeshGeometry('V119_OvalPortalGlowGoldArray_R', goldGeometryOptions);
     const leftEmission = readMeshGeometry('V119_OvalPortalGlowEmissionArray_L', overlayGeometryOptions);
     const rightEmission = readMeshGeometry('V119_OvalPortalGlowEmissionArray_R', overlayGeometryOptions);
     expectMainStageMarker('V82_OvalPortalGlowShell_L');
@@ -6123,20 +6128,28 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       ['V119_OvalPortalGlowEmissionArray_R', 1],
     ]);
     for (const [nodeName, componentCount] of expectedComponentCounts) {
-      const geometryOptions = nodeName.includes('Shell') ? undefined : overlayGeometryOptions;
+      const geometryOptions = nodeName.includes('Shell')
+        ? undefined
+        : nodeName.includes('GoldArray')
+          ? goldGeometryOptions
+          : overlayGeometryOptions;
       expect(readConnectedComponents(nodeName, geometryOptions)).toHaveLength(componentCount);
     }
 
     const minimumVertexCounts = new Map([
       ['V82_OvalPortalGlowShell_L', 160],
       ['V82_OvalPortalGlowShell_R', 160],
-      ['V119_OvalPortalGlowGoldArray_L', 80],
-      ['V119_OvalPortalGlowGoldArray_R', 80],
+      ['V119_OvalPortalGlowGoldArray_L', 120],
+      ['V119_OvalPortalGlowGoldArray_R', 120],
       ['V119_OvalPortalGlowEmissionArray_L', 64],
       ['V119_OvalPortalGlowEmissionArray_R', 64],
     ]);
     for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
-      const geometryOptions = nodeName.includes('Shell') ? undefined : overlayGeometryOptions;
+      const geometryOptions = nodeName.includes('Shell')
+        ? undefined
+        : nodeName.includes('GoldArray')
+          ? goldGeometryOptions
+          : overlayGeometryOptions;
       expect(
         readMeshGeometry(nodeName, geometryOptions).vertexCount,
         `${nodeName} component is too low-detail`,
