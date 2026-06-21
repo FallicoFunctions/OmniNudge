@@ -165,6 +165,8 @@ def wall_profile(bounds):
         (y_center - y_half * 0.5, z_center + z_half * 0.18),
         (y_center - y_half * 0.18, z_center + z_half * 0.62),
         (y_center + y_half * 0.18, z_center + z_half),
+        (y_center + y_half * 0.32, z_center + z_half * 0.96),
+        (y_center + y_half * 0.4, z_center + z_half * 0.86),
         (y_center + y_half * 0.48, z_center + z_half * 0.7),
         (y_center + y_half * 0.74, z_center + z_half * 0.28),
         (y_center + y_half * 0.92, z_center - z_half * 0.16),
