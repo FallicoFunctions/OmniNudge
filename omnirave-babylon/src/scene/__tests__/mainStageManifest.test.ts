@@ -8538,9 +8538,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(nodeNamesWithPrefix('V112_')).toEqual([replacementNode]);
     expectMainStageMarker(replacementNode);
     const geometry = readMeshGeometry(replacementNode, {
-      minNonZeroAreaTriangles: 40,
-      minUniquePositions: 40,
-      minVertexCount: 80,
+      minNonZeroAreaTriangles: 180,
+      minUniquePositions: 104,
+      minVertexCount: 100,
     });
     const components = readConnectedComponents(replacementNode, {
       minNonZeroAreaTriangles: 8,
