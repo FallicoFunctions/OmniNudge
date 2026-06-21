@@ -8067,12 +8067,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     for (const nodeName of replacementNodes) {
       expectMainStageMarker(nodeName);
-      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 224, minUniquePositions: 124, minVertexCount: 120 });
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 224, minUniquePositions: 124, minVertexCount: 140 });
       expect(
         readConnectedComponents(nodeName, {
           minNonZeroAreaTriangles: 224,
           minUniquePositions: 124,
-          minVertexCount: 120,
+          minVertexCount: 140,
         }),
       ).toHaveLength(4);
       expect(materialNameFor(nodeName)).toBe('V20_RecessedWarmShadow');
@@ -8081,12 +8081,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const leftArray = readMeshGeometry('V106_RearShellShadowRevealArray_L', {
       minNonZeroAreaTriangles: 224,
       minUniquePositions: 124,
-      minVertexCount: 120,
+      minVertexCount: 140,
     });
     const rightArray = readMeshGeometry('V106_RearShellShadowRevealArray_R', {
       minNonZeroAreaTriangles: 224,
       minUniquePositions: 124,
-      minVertexCount: 120,
+      minVertexCount: 140,
     });
 
     expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(16.0);
@@ -8116,7 +8116,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const componentCenters = readConnectedComponents(nodeName, {
         minNonZeroAreaTriangles: 224,
         minUniquePositions: 124,
-        minVertexCount: 120,
+        minVertexCount: 140,
       }).map(({ min, max }) => [
         (min[0] + max[0]) * 0.5,
         (min[1] + max[1]) * 0.5,
