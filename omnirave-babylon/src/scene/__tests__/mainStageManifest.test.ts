@@ -507,6 +507,16 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
   });
 
+  it('keeps the oval portal emissive overlays richer than flat proxy slabs', () => {
+    for (const nodeName of ['V119_OvalPortalGlowEmissionArray_L', 'V119_OvalPortalGlowEmissionArray_R'] as const) {
+      readMeshGeometry(nodeName, {
+        minNonZeroAreaTriangles: 140,
+        minUniquePositions: 80,
+        minVertexCount: 90,
+      });
+    }
+  });
+
   it('exports authored arrival-threshold trim so the promenade foreground is not placeholder geometry', () => {
     expectMainStageMarker('V65_ArrivalThresholdGoldBands');
     expectMainStageMarker('V58_ArrivalPlinthPearlDais_L');
