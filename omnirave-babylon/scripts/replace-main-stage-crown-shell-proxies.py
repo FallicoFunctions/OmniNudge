@@ -223,21 +223,27 @@ def gold_polygon(bounds):
     lower = y_min - 0.06
     upper = y_max + 0.04
     lower_step = y_min + y_span * 0.16
+    lower_mid = y_min + y_span * 0.24
     mid_low = y_min + y_span * 0.34
     mid_high = y_min + y_span * 0.62
+    upper_mid = y_min + y_span * 0.74
     upper_step = y_min + y_span * 0.84
     return [
         (center_x - x_half * 0.42, lower),
         (center_x - x_half * 0.68, lower_step),
+        (center_x - x_half * 0.73, lower_mid),
         (center_x - x_half * 0.74, mid_low),
         (center_x - x_half * 0.70, mid_high),
+        (center_x - x_half * 0.62, upper_mid),
         (center_x - x_half * 0.52, upper_step),
         (center_x - x_half * 0.22, upper),
         (center_x, upper + 0.06),
         (center_x + x_half * 0.22, upper),
         (center_x + x_half * 0.52, upper_step),
+        (center_x + x_half * 0.62, upper_mid),
         (center_x + x_half * 0.70, mid_high),
         (center_x + x_half * 0.74, mid_low),
+        (center_x + x_half * 0.73, lower_mid),
         (center_x + x_half * 0.68, lower_step),
         (center_x + x_half * 0.42, lower),
         (center_x, lower - 0.06),
