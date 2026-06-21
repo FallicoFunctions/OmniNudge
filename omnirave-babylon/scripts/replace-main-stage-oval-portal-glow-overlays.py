@@ -121,7 +121,7 @@ def add_gold_face_relief(mesh, inset_thickness=0.18, inset_depth=0.01):
     bm.free()
 
 
-def add_emission_face_relief(mesh, inset_thicknesses=(0.12, 0.08, 0.05, 0.03, 0.02, 0.015), inset_depth=0.006):
+def add_emission_face_relief(mesh, inset_thicknesses=(0.12, 0.08, 0.05, 0.03), inset_depth=0.006):
     bm = bmesh.new()
     bm.from_mesh(mesh)
     bm.faces.ensure_lookup_table()
