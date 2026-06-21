@@ -590,6 +590,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
     }
+
   });
 
   it('replaces rear cathedral proxy blocks with finished monumental shell massing', () => {
@@ -688,6 +689,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
     }
+
   });
 
   it('replaces stacked legacy hero screens with one crown-integrated portal assembly', () => {
@@ -2761,6 +2763,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
     }
+
   });
 
   it('replaces the legacy crown jewel proxies with a layered apex jewel assembly', () => {
@@ -6167,6 +6170,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
     }
+    expect(leftGold.vertexCount + rightGold.vertexCount + leftEmission.vertexCount + rightEmission.vertexCount).toBeLessThanOrEqual(500);
   });
 
   it('replaces the main truss tower proxy posts and gold crossbars with authored lattice tower arrays', () => {
@@ -8950,12 +8954,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const pearlLeft = readMeshGeometry('V116_ProsceniumPearlRevealArray_L', {
       minNonZeroAreaTriangles: 120,
       minUniquePositions: 80,
-      minVertexCount: 130,
+      minVertexCount: 136,
     });
     const pearlRight = readMeshGeometry('V116_ProsceniumPearlRevealArray_R', {
       minNonZeroAreaTriangles: 120,
       minUniquePositions: 80,
-      minVertexCount: 130,
+      minVertexCount: 136,
     });
     const shadowLeft = readMeshGeometry('V116_ProsceniumShadowPocketArray_L', {
       minNonZeroAreaTriangles: 96,
@@ -8972,14 +8976,14 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       readConnectedComponents('V116_ProsceniumPearlRevealArray_L', {
         minNonZeroAreaTriangles: 120,
         minUniquePositions: 80,
-        minVertexCount: 130,
+        minVertexCount: 136,
       }),
     ).toHaveLength(1);
     expect(
       readConnectedComponents('V116_ProsceniumPearlRevealArray_R', {
         minNonZeroAreaTriangles: 120,
         minUniquePositions: 80,
-        minVertexCount: 130,
+        minVertexCount: 136,
       }),
     ).toHaveLength(1);
     expect(
