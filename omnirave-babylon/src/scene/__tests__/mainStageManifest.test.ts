@@ -492,8 +492,11 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   it('profiles the visible screen baffles and coffers beyond raw cuboid placeholders', () => {
     for (const nodeName of [
       'V22_CenterScreenDepthBaffle_0',
+      'V22_CenterScreenGoldInterruptRail_0',
       'V22_CenterScreenShadowCoffer_Top',
       'V22_WingScreenDepthBaffle_L_0',
+      'V22_WingScreenTopCoffer_L',
+      'V22_WingScreenBottomCoffer_L',
       'V22_CrownScreenShadowCoffer',
     ] as const) {
       readMeshGeometry(nodeName, {
