@@ -9211,12 +9211,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const wallLeft = readMeshGeometry('V118_BasinWallRelief_L', {
       minNonZeroAreaTriangles: 12,
       minUniquePositions: 12,
-      minVertexCount: 39,
+      minVertexCount: 43,
     });
     const wallRight = readMeshGeometry('V118_BasinWallRelief_R', {
       minNonZeroAreaTriangles: 12,
       minUniquePositions: 12,
-      minVertexCount: 39,
+      minVertexCount: 43,
     });
     const waterLeft = readMeshGeometry('V118_BasinWaterSheet_L', {
       minNonZeroAreaTriangles: 8,
@@ -9244,7 +9244,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V118_BasinWaterSheet_L')).toBe('V14_DeepReflectingWater');
     expect(materialNameFor('V118_BasinWaterSheet_R')).toBe('V14_DeepReflectingWater');
 
-    expect(wallLeft.vertexCount + wallRight.vertexCount + waterLeft.vertexCount + waterRight.vertexCount).toBeLessThanOrEqual(140);
+    expect(wallLeft.vertexCount + wallRight.vertexCount + waterLeft.vertexCount + waterRight.vertexCount).toBeLessThanOrEqual(152);
   });
 
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
