@@ -12,6 +12,26 @@ REPLACEMENT_NAMES = ["V115_CenterScreenMullionArray", "V115_CenterScreenCyanEdge
 GOLD = "V20_ChasedGoldFiligree"
 CYAN = "V20_CelestialCyanGlass"
 
+LOCKED_MULLION_COMPONENTS = [
+    {"x": (-7.38, -7.02), "y": (-25.42, -25.23), "z": (8.29, 31.53)},
+    {"x": (-4.98, -4.62), "y": (-25.42, -25.23), "z": (8.29, 31.53)},
+    {"x": (-2.58, -2.22), "y": (-25.42, -25.23), "z": (8.29, 31.53)},
+    {"x": (-0.18, 0.18), "y": (-25.42, -25.23), "z": (8.29, 31.53)},
+    {"x": (2.22, 2.58), "y": (-25.42, -25.23), "z": (8.29, 31.53)},
+    {"x": (4.62, 4.98), "y": (-25.42, -25.23), "z": (8.29, 31.53)},
+    {"x": (7.02, 7.38), "y": (-25.42, -25.23), "z": (8.29, 31.53)},
+]
+
+LOCKED_CYAN_COMPONENTS = [
+    {"x": (-7.135, -6.905), "y": (-25.64, -25.46), "z": (8.64, 31.17)},
+    {"x": (-4.735, -4.505), "y": (-25.64, -25.46), "z": (8.64, 31.17)},
+    {"x": (-2.335, -2.105), "y": (-25.64, -25.46), "z": (8.64, 31.17)},
+    {"x": (0.065, 0.295), "y": (-25.64, -25.46), "z": (8.64, 31.17)},
+    {"x": (2.465, 2.695), "y": (-25.64, -25.46), "z": (8.64, 31.17)},
+    {"x": (4.865, 5.095), "y": (-25.64, -25.46), "z": (8.64, 31.17)},
+    {"x": (7.265, 7.495), "y": (-25.64, -25.46), "z": (8.64, 31.17)},
+]
+
 
 def ensure_object_mode():
     if bpy.context.object and bpy.context.object.mode != "OBJECT":
@@ -154,6 +174,11 @@ def source_component_bounds(names, replacement_name, expected_count):
     if components:
         return sorted(components, key=lambda bounds: midpoint(bounds, "x"))
 
+    if replacement_name == "V115_CenterScreenMullionArray":
+        return [dict(component) for component in LOCKED_MULLION_COMPONENTS]
+    if replacement_name == "V115_CenterScreenCyanEdgeArray":
+        return [dict(component) for component in LOCKED_CYAN_COMPONENTS]
+
     replacement = bpy.data.objects.get(replacement_name)
     if replacement is None or replacement.type != "MESH" or not replacement.data.vertices:
         raise RuntimeError(f"Missing legacy components and replacement fallback: {replacement_name}")
@@ -206,11 +231,13 @@ def cyan_profile(bounds):
     upper = y_max + 0.08
     knee = y_min + height * 0.18
     crown = y_min + height * 0.86
+    crest = upper + 0.06
     return [
         (center_x - half_width * 0.64, lower),
         (center_x - half_width, knee),
         (center_x - half_width * 0.82, crown),
         (center_x - half_width * 0.34, upper),
+        (center_x, crest),
         (center_x + half_width * 0.34, upper),
         (center_x + half_width * 0.82, crown),
         (center_x + half_width, knee),
