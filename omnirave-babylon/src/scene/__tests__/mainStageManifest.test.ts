@@ -8323,9 +8323,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     for (const nodeName of replacementNodes) {
       expectMainStageMarker(nodeName);
-      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 24, minUniquePositions: 32, minVertexCount: 64 });
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 24, minUniquePositions: 32, minVertexCount: 80 });
       expect(
-        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 24, minUniquePositions: 32, minVertexCount: 64 }),
+        readConnectedComponents(nodeName, { minNonZeroAreaTriangles: 24, minUniquePositions: 32, minVertexCount: 80 }),
       ).toHaveLength(4);
       expect(materialNameFor(nodeName)).toBe('V18_CyanWaterMistGlow');
     }
@@ -8333,12 +8333,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const leftArray = readMeshGeometry('V110_WingFacadeInsetGlowArray_L', {
       minNonZeroAreaTriangles: 24,
       minUniquePositions: 32,
-      minVertexCount: 64,
+      minVertexCount: 80,
     });
     const rightArray = readMeshGeometry('V110_WingFacadeInsetGlowArray_R', {
       minNonZeroAreaTriangles: 24,
       minUniquePositions: 32,
-      minVertexCount: 64,
+      minVertexCount: 80,
     });
 
     expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(14.8);
@@ -8368,7 +8368,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const componentCenters = readConnectedComponents(nodeName, {
         minNonZeroAreaTriangles: 24,
         minUniquePositions: 32,
-        minVertexCount: 64,
+        minVertexCount: 80,
       }).map(({ min, max }) => [
         (min[0] + max[0]) * 0.5,
         (min[1] + max[1]) * 0.5,
