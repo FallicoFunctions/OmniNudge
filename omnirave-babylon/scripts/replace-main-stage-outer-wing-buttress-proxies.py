@@ -230,6 +230,21 @@ def add_ring_stack_x(bm, loops):
 
     bm.faces.new(list(reversed(rings[0])))
     bm.faces.new(rings[-1])
+    return rings[0], rings[-1]
+
+
+def add_cap_detail_triangle(bm, cap_verts, inward_x_offset):
+    start_index = len(cap_verts) // 2 - 1
+    edge_start = cap_verts[start_index]
+    edge_end = cap_verts[start_index + 1]
+    detail_vert = bm.verts.new(
+        (
+            edge_start.co.x + inward_x_offset,
+            (edge_start.co.y + edge_end.co.y) * 0.5,
+            (edge_start.co.z + edge_end.co.z) * 0.5 + 0.02,
+        )
+    )
+    bm.faces.new([edge_start, edge_end, detail_vert])
 
 
 def build_array(name, side, collection):
@@ -240,7 +255,9 @@ def build_array(name, side, collection):
 
     bm = bmesh.new()
     for bounds in components:
-        add_ring_stack_x(bm, buttress_component_loops(bounds))
+        left_cap, right_cap = add_ring_stack_x(bm, buttress_component_loops(bounds))
+        add_cap_detail_triangle(bm, left_cap, inward_x_offset=0.01)
+        add_cap_detail_triangle(bm, right_cap, inward_x_offset=-0.01)
 
     bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
     bm.to_mesh(mesh)
