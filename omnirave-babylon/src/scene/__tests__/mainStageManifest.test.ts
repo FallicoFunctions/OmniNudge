@@ -9400,6 +9400,58 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     ).toBeLessThanOrEqual(1_400);
   });
 
+  it('replaces the stage-front portal apron and shoulder-face cuboids with authored relief shells', () => {
+    const legacyNodes = ['V4_PortalApron', 'V4_StageShoulderFace_L', 'V4_StageShoulderFace_R'] as const;
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName)).toBe(false);
+    }
+
+    const replacementNodes = [
+      'V122_PortalApronRelief',
+      'V122_StageShoulderRelief_L',
+      'V122_StageShoulderRelief_R',
+    ] as const;
+    expect(nodeNamesWithPrefix('V122_')).toEqual(replacementNodes);
+
+    const portalApron = readMeshGeometry('V122_PortalApronRelief', {
+      minNonZeroAreaTriangles: 30,
+      minUniquePositions: 30,
+      minVertexCount: 80,
+    });
+    const leftShoulder = readMeshGeometry('V122_StageShoulderRelief_L', {
+      minNonZeroAreaTriangles: 30,
+      minUniquePositions: 30,
+      minVertexCount: 80,
+    });
+    const rightShoulder = readMeshGeometry('V122_StageShoulderRelief_R', {
+      minNonZeroAreaTriangles: 30,
+      minUniquePositions: 30,
+      minVertexCount: 80,
+    });
+
+    expect(readConnectedComponents('V122_PortalApronRelief')).toHaveLength(1);
+    expect(readConnectedComponents('V122_StageShoulderRelief_L')).toHaveLength(1);
+    expect(readConnectedComponents('V122_StageShoulderRelief_R')).toHaveLength(1);
+
+    expect(portalApron.max[0] - portalApron.min[0]).toBeGreaterThan(6.8);
+    expect(portalApron.max[1] - portalApron.min[1]).toBeGreaterThan(0.4);
+    expect(portalApron.max[2] - portalApron.min[2]).toBeGreaterThan(13.0);
+
+    expect(leftShoulder.max[0] - leftShoulder.min[0]).toBeGreaterThan(4.3);
+    expect(leftShoulder.max[1] - leftShoulder.min[1]).toBeGreaterThan(12.0);
+    expect(leftShoulder.max[2] - leftShoulder.min[2]).toBeGreaterThan(5.6);
+
+    expect(rightShoulder.max[0] - rightShoulder.min[0]).toBeGreaterThan(4.3);
+    expect(rightShoulder.max[1] - rightShoulder.min[1]).toBeGreaterThan(12.0);
+    expect(rightShoulder.max[2] - rightShoulder.min[2]).toBeGreaterThan(5.6);
+
+    expect(materialNameFor('V122_PortalApronRelief')).toBe('V15_PearlShellBeveled');
+    expect(materialNameFor('V122_StageShoulderRelief_L')).toBe('V15_PearlShellBeveled');
+    expect(materialNameFor('V122_StageShoulderRelief_R')).toBe('V15_PearlShellBeveled');
+
+    expect(portalApron.vertexCount + leftShoulder.vertexCount + rightShoulder.vertexCount).toBeLessThanOrEqual(900);
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
