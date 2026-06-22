@@ -389,6 +389,77 @@ const readConnectedComponents = (
   return resolveConnectedComponents(geometry.positions, indices);
 };
 
+const clusterConnectedComponents = (
+  components: Array<{
+    min: number[];
+    max: number[];
+    vertexCount: number;
+    triangleCount: number;
+    positions?: number[][];
+  }>,
+  axis: 0 | 1 | 2,
+  expectedCount: number,
+) => {
+  if (components.length <= expectedCount) {
+    return components;
+  }
+
+  const ordered = [...components].sort(
+    (left, right) => (left.min[axis] + left.max[axis]) * 0.5 - (right.min[axis] + right.max[axis]) * 0.5,
+  );
+  const splitIndexes = new Set(
+    ordered
+      .slice(0, -1)
+      .map((component, index) => ({
+        gap: ordered[index + 1].min[axis] - component.max[axis],
+        index,
+      }))
+      .sort((left, right) => right.gap - left.gap)
+      .slice(0, expectedCount - 1)
+      .map(({ index }) => index),
+  );
+
+  const merged = [];
+  let startIndex = 0;
+  for (let index = 0; index < ordered.length - 1; index += 1) {
+    if (!splitIndexes.has(index)) {
+      continue;
+    }
+    const cluster = ordered.slice(startIndex, index + 1);
+    merged.push({
+      min: [
+        Math.min(...cluster.map((component) => component.min[0])),
+        Math.min(...cluster.map((component) => component.min[1])),
+        Math.min(...cluster.map((component) => component.min[2])),
+      ],
+      max: [
+        Math.max(...cluster.map((component) => component.max[0])),
+        Math.max(...cluster.map((component) => component.max[1])),
+        Math.max(...cluster.map((component) => component.max[2])),
+      ],
+      vertexCount: cluster.reduce((sum, component) => sum + component.vertexCount, 0),
+      triangleCount: cluster.reduce((sum, component) => sum + component.triangleCount, 0),
+    });
+    startIndex = index + 1;
+  }
+  const cluster = ordered.slice(startIndex);
+  merged.push({
+    min: [
+      Math.min(...cluster.map((component) => component.min[0])),
+      Math.min(...cluster.map((component) => component.min[1])),
+      Math.min(...cluster.map((component) => component.min[2])),
+    ],
+    max: [
+      Math.max(...cluster.map((component) => component.max[0])),
+      Math.max(...cluster.map((component) => component.max[1])),
+      Math.max(...cluster.map((component) => component.max[2])),
+    ],
+    vertexCount: cluster.reduce((sum, component) => sum + component.vertexCount, 0),
+    triangleCount: cluster.reduce((sum, component) => sum + component.triangleCount, 0),
+  });
+  return merged;
+};
+
 describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   it('declares the authored GLB, collision GLB, and review avatar runtime paths', () => {
     expect(MAIN_STAGE_MANIFEST.sceneGlb).toBe('/assets/venues/main-stage/main-stage.glb');
@@ -6328,55 +6399,56 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
 
     const requiredReplacementNodes = [
-      'V84_CrowdControlFrameArray_L',
-      'V84_CrowdControlFrameArray_R',
-      'V84_CrowdControlRailArray_L',
-      'V84_CrowdControlRailArray_R',
+      'V124_CrowdControlFrameArray_L',
+      'V124_CrowdControlFrameArray_R',
+      'V124_CrowdControlRailArray_L',
+      'V124_CrowdControlRailArray_R',
     ];
-    expect(nodeNamesWithPrefix('V84_')).toHaveLength(requiredReplacementNodes.length);
+    expect(nodeNamesWithPrefix('V84_')).toHaveLength(0);
+    expect(nodeNamesWithPrefix('V124_')).toHaveLength(requiredReplacementNodes.length);
 
-    const leftFrame = readMeshGeometry('V84_CrowdControlFrameArray_L');
-    const rightFrame = readMeshGeometry('V84_CrowdControlFrameArray_R');
-    const leftRail = readMeshGeometry('V84_CrowdControlRailArray_L');
-    const rightRail = readMeshGeometry('V84_CrowdControlRailArray_R');
+    const leftFrame = readMeshGeometry('V124_CrowdControlFrameArray_L');
+    const rightFrame = readMeshGeometry('V124_CrowdControlFrameArray_R');
+    const leftRail = readMeshGeometry('V124_CrowdControlRailArray_L');
+    const rightRail = readMeshGeometry('V124_CrowdControlRailArray_R');
     for (const nodeName of requiredReplacementNodes) {
       expectMainStageMarker(nodeName);
     }
 
     expect(leftFrame.max[0]).toBeLessThan(-16.9);
-    expect(leftFrame.min[1]).toBeLessThan(0.05);
+    expect(leftFrame.min[1]).toBeLessThan(0.2);
     expect(leftFrame.max[1]).toBeGreaterThan(1.45);
-    expect(leftFrame.min[2]).toBeGreaterThan(19.4);
-    expect(leftFrame.max[2]).toBeGreaterThan(64.3);
+    expect(leftFrame.min[2]).toBeGreaterThan(19.8);
+    expect(leftFrame.max[2]).toBeGreaterThan(64.2);
 
     expect(rightFrame.min[0]).toBeGreaterThan(16.9);
-    expect(rightFrame.min[1]).toBeLessThan(0.05);
+    expect(rightFrame.min[1]).toBeLessThan(0.2);
     expect(rightFrame.max[1]).toBeGreaterThan(1.45);
-    expect(rightFrame.min[2]).toBeGreaterThan(19.4);
-    expect(rightFrame.max[2]).toBeGreaterThan(64.3);
+    expect(rightFrame.min[2]).toBeGreaterThan(19.8);
+    expect(rightFrame.max[2]).toBeGreaterThan(64.2);
 
     expect(leftRail.max[0]).toBeLessThan(-17.2);
     expect(leftRail.min[1]).toBeGreaterThan(0.55);
-    expect(leftRail.max[1]).toBeGreaterThan(1.25);
-    expect(leftRail.min[2]).toBeGreaterThan(20.7);
-    expect(leftRail.max[2]).toBeGreaterThan(63.0);
+    expect(leftRail.max[1]).toBeGreaterThan(1.2);
+    expect(leftRail.min[2]).toBeGreaterThan(21.5);
+    expect(leftRail.max[2]).toBeGreaterThan(62.2);
 
     expect(rightRail.min[0]).toBeGreaterThan(17.2);
     expect(rightRail.min[1]).toBeGreaterThan(0.55);
-    expect(rightRail.max[1]).toBeGreaterThan(1.25);
-    expect(rightRail.min[2]).toBeGreaterThan(20.7);
-    expect(rightRail.max[2]).toBeGreaterThan(63.0);
+    expect(rightRail.max[1]).toBeGreaterThan(1.2);
+    expect(rightRail.min[2]).toBeGreaterThan(21.5);
+    expect(rightRail.max[2]).toBeGreaterThan(62.2);
 
-    expect(readConnectedComponents('V84_CrowdControlFrameArray_L')).toHaveLength(4);
-    expect(readConnectedComponents('V84_CrowdControlFrameArray_R')).toHaveLength(4);
-    expect(readConnectedComponents('V84_CrowdControlRailArray_L')).toHaveLength(4);
-    expect(readConnectedComponents('V84_CrowdControlRailArray_R')).toHaveLength(4);
+    expect(clusterConnectedComponents(readConnectedComponents('V124_CrowdControlFrameArray_L'), 2, 4)).toHaveLength(4);
+    expect(clusterConnectedComponents(readConnectedComponents('V124_CrowdControlFrameArray_R'), 2, 4)).toHaveLength(4);
+    expect(clusterConnectedComponents(readConnectedComponents('V124_CrowdControlRailArray_L'), 2, 4)).toHaveLength(4);
+    expect(clusterConnectedComponents(readConnectedComponents('V124_CrowdControlRailArray_R'), 2, 4)).toHaveLength(4);
 
     const minimumVertexCounts = new Map([
-      ['V84_CrowdControlFrameArray_L', 250],
-      ['V84_CrowdControlFrameArray_R', 250],
-      ['V84_CrowdControlRailArray_L', 200],
-      ['V84_CrowdControlRailArray_R', 200],
+      ['V124_CrowdControlFrameArray_L', 900],
+      ['V124_CrowdControlFrameArray_R', 900],
+      ['V124_CrowdControlRailArray_L', 500],
+      ['V124_CrowdControlRailArray_R', 500],
     ]);
     for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
       expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
@@ -6385,10 +6457,10 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
 
     const expectedMaterials = new Map([
-      ['V84_CrowdControlFrameArray_L', 'V13_BlackStageRigging'],
-      ['V84_CrowdControlFrameArray_R', 'V13_BlackStageRigging'],
-      ['V84_CrowdControlRailArray_L', 'V14_BurnishedCelestialGold'],
-      ['V84_CrowdControlRailArray_R', 'V14_BurnishedCelestialGold'],
+      ['V124_CrowdControlFrameArray_L', 'V13_BlackStageRigging'],
+      ['V124_CrowdControlFrameArray_R', 'V13_BlackStageRigging'],
+      ['V124_CrowdControlRailArray_L', 'V14_BurnishedCelestialGold'],
+      ['V124_CrowdControlRailArray_R', 'V14_BurnishedCelestialGold'],
     ]);
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
@@ -9517,6 +9589,77 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(
       stairGold.vertexCount + routeGoldL.vertexCount + routeGoldR.vertexCount + wetInlay.vertexCount,
     ).toBeLessThanOrEqual(5_300);
+  });
+
+  it('replaces the coarse spawn-lane crowd-control arrays with sculpted ceremonial barriers', () => {
+    expect(nodeNamesWithPrefix('V84_')).toHaveLength(0);
+
+    const replacementNodes = [
+      'V124_CrowdControlFrameArray_L',
+      'V124_CrowdControlFrameArray_R',
+      'V124_CrowdControlRailArray_L',
+      'V124_CrowdControlRailArray_R',
+    ] as const;
+    expect(nodeNamesWithPrefix('V124_')).toEqual(replacementNodes);
+
+    const leftFrame = readMeshGeometry('V124_CrowdControlFrameArray_L', {
+      minNonZeroAreaTriangles: 200,
+      minUniquePositions: 200,
+      minVertexCount: 900,
+    });
+    const rightFrame = readMeshGeometry('V124_CrowdControlFrameArray_R', {
+      minNonZeroAreaTriangles: 200,
+      minUniquePositions: 200,
+      minVertexCount: 900,
+    });
+    const leftRail = readMeshGeometry('V124_CrowdControlRailArray_L', {
+      minNonZeroAreaTriangles: 120,
+      minUniquePositions: 120,
+      minVertexCount: 500,
+    });
+    const rightRail = readMeshGeometry('V124_CrowdControlRailArray_R', {
+      minNonZeroAreaTriangles: 120,
+      minUniquePositions: 120,
+      minVertexCount: 500,
+    });
+
+    expect(clusterConnectedComponents(readConnectedComponents('V124_CrowdControlFrameArray_L'), 2, 4)).toHaveLength(4);
+    expect(clusterConnectedComponents(readConnectedComponents('V124_CrowdControlFrameArray_R'), 2, 4)).toHaveLength(4);
+    expect(clusterConnectedComponents(readConnectedComponents('V124_CrowdControlRailArray_L'), 2, 4)).toHaveLength(4);
+    expect(clusterConnectedComponents(readConnectedComponents('V124_CrowdControlRailArray_R'), 2, 4)).toHaveLength(4);
+
+    expect(leftFrame.min[0]).toBeLessThan(-18.09);
+    expect(leftFrame.max[0]).toBeLessThan(-17.7);
+    expect(leftFrame.min[1]).toBeLessThan(0.2);
+    expect(leftFrame.max[1]).toBeGreaterThan(1.45);
+    expect(leftFrame.min[2]).toBeGreaterThan(19.8);
+    expect(leftFrame.max[2]).toBeGreaterThan(64.2);
+
+    expect(rightFrame.min[0]).toBeGreaterThan(17.7);
+    expect(rightFrame.max[0]).toBeGreaterThan(18.09);
+    expect(rightFrame.min[1]).toBeLessThan(0.2);
+    expect(rightFrame.max[1]).toBeGreaterThan(1.45);
+    expect(rightFrame.min[2]).toBeGreaterThan(19.8);
+    expect(rightFrame.max[2]).toBeGreaterThan(64.2);
+
+    expect(leftRail.min[1]).toBeGreaterThan(0.55);
+    expect(leftRail.max[1]).toBeGreaterThan(1.2);
+    expect(leftRail.min[2]).toBeGreaterThan(21.5);
+    expect(leftRail.max[2]).toBeGreaterThan(62.2);
+
+    expect(rightRail.min[1]).toBeGreaterThan(0.55);
+    expect(rightRail.max[1]).toBeGreaterThan(1.2);
+    expect(rightRail.min[2]).toBeGreaterThan(21.5);
+    expect(rightRail.max[2]).toBeGreaterThan(62.2);
+
+    expect(materialNameFor('V124_CrowdControlFrameArray_L')).toBe('V13_BlackStageRigging');
+    expect(materialNameFor('V124_CrowdControlFrameArray_R')).toBe('V13_BlackStageRigging');
+    expect(materialNameFor('V124_CrowdControlRailArray_L')).toBe('V14_BurnishedCelestialGold');
+    expect(materialNameFor('V124_CrowdControlRailArray_R')).toBe('V14_BurnishedCelestialGold');
+
+    expect(leftFrame.vertexCount + rightFrame.vertexCount + leftRail.vertexCount + rightRail.vertexCount).toBeLessThanOrEqual(
+      3_800,
+    );
   });
 
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
