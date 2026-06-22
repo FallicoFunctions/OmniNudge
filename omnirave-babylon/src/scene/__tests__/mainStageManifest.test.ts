@@ -8382,12 +8382,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     for (const nodeName of replacementNodes) {
       expectMainStageMarker(nodeName);
-      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 176, minUniquePositions: 100, minVertexCount: 132 });
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 176, minUniquePositions: 100, minVertexCount: 131 });
       expect(
         readConnectedComponents(nodeName, {
           minNonZeroAreaTriangles: 176,
           minUniquePositions: 100,
-          minVertexCount: 132,
+          minVertexCount: 131,
         }),
       ).toHaveLength(4);
       expect(materialNameFor(nodeName)).toBe('V18_CyanWaterMistGlow');
@@ -8396,12 +8396,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const leftArray = readMeshGeometry('V110_WingFacadeInsetGlowArray_L', {
       minNonZeroAreaTriangles: 176,
       minUniquePositions: 100,
-      minVertexCount: 132,
+      minVertexCount: 131,
     });
     const rightArray = readMeshGeometry('V110_WingFacadeInsetGlowArray_R', {
       minNonZeroAreaTriangles: 176,
       minUniquePositions: 100,
-      minVertexCount: 132,
+      minVertexCount: 131,
     });
 
     expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(14.8);
@@ -8431,7 +8431,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const componentCenters = readConnectedComponents(nodeName, {
         minNonZeroAreaTriangles: 176,
         minUniquePositions: 100,
-        minVertexCount: 132,
+        minVertexCount: 131,
       }).map(({ min, max }) => [
         (min[0] + max[0]) * 0.5,
         (min[1] + max[1]) * 0.5,
@@ -9213,24 +9213,24 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
 
     const wallLeft = readMeshGeometry('V118_BasinWallRelief_L', {
-      minNonZeroAreaTriangles: 12,
-      minUniquePositions: 12,
-      minVertexCount: 43,
+      minNonZeroAreaTriangles: 16,
+      minUniquePositions: 16,
+      minVertexCount: 50,
     });
     const wallRight = readMeshGeometry('V118_BasinWallRelief_R', {
-      minNonZeroAreaTriangles: 12,
-      minUniquePositions: 12,
-      minVertexCount: 43,
+      minNonZeroAreaTriangles: 16,
+      minUniquePositions: 16,
+      minVertexCount: 50,
     });
     const waterLeft = readMeshGeometry('V118_BasinWaterSheet_L', {
-      minNonZeroAreaTriangles: 8,
-      minUniquePositions: 8,
-      minVertexCount: 27,
+      minNonZeroAreaTriangles: 10,
+      minUniquePositions: 10,
+      minVertexCount: 29,
     });
     const waterRight = readMeshGeometry('V118_BasinWaterSheet_R', {
-      minNonZeroAreaTriangles: 8,
-      minUniquePositions: 8,
-      minVertexCount: 27,
+      minNonZeroAreaTriangles: 10,
+      minUniquePositions: 10,
+      minVertexCount: 29,
     });
 
     expect(wallLeft.min[0]).toBeLessThan(-8.17);
@@ -9248,7 +9248,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V118_BasinWaterSheet_L')).toBe('V14_DeepReflectingWater');
     expect(materialNameFor('V118_BasinWaterSheet_R')).toBe('V14_DeepReflectingWater');
 
-    expect(wallLeft.vertexCount + wallRight.vertexCount + waterLeft.vertexCount + waterRight.vertexCount).toBeLessThanOrEqual(152);
+    expect(wallLeft.vertexCount + wallRight.vertexCount + waterLeft.vertexCount + waterRight.vertexCount).toBeLessThanOrEqual(170);
   });
 
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {

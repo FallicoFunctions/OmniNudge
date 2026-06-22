@@ -207,7 +207,6 @@ def build_array(name, side, collection, components):
         y_max = bounds["y"][1] + 0.026
         front_cap, back_cap = add_extruded_polygon_y(bm, glow_polygon(bounds), y_min, y_max)
         add_cap_detail_triangle(bm, front_cap, outward_y_offset=-0.008)
-        add_cap_detail_triangle(bm, back_cap, outward_y_offset=0.008)
 
     bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
     bm.to_mesh(mesh)
