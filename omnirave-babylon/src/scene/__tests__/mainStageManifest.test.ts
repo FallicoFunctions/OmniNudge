@@ -574,7 +574,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   it('profiles the visible screen baffles and coffers beyond raw cuboid placeholders', () => {
     for (const nodeName of [
       'V22_CenterScreenDepthBaffle_0',
-      'V22_CenterScreenGoldInterruptRail_0',
+      'V128_CenterScreenGoldInterruptRailArray',
       'V22_CenterScreenShadowCoffer_Top',
       'V22_WingScreenDepthBaffle_L_0',
       'V22_WingScreenTopCoffer_L',
@@ -5932,6 +5932,27 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(materialNameFor('V127_CrownScreenShadowCoffer')).toBe('V14_MatteBlackProductionRig');
     expect(materialNameFor('V127_CrownScreenVerticalKeystone')).toBe('V14_BurnishedCelestialGold');
+  });
+
+  it('replaces the center-screen gold interrupt proxy rails with an authored crest array', () => {
+    expect(nodeNamesWithPrefix('V22_CenterScreenGoldInterruptRail_')).toHaveLength(0);
+
+    const requiredReplacementNodes = ['V128_CenterScreenGoldInterruptRailArray'] as const;
+    expect(nodeNamesWithPrefix('V128_')).toEqual([...requiredReplacementNodes]);
+
+    expectMainStageMarker('V128_CenterScreenGoldInterruptRailArray');
+    const rails = readMeshGeometry('V128_CenterScreenGoldInterruptRailArray');
+    expect(readConnectedComponents('V128_CenterScreenGoldInterruptRailArray')).toHaveLength(3);
+
+    expect(rails.min[0]).toBeLessThan(-14.7);
+    expect(rails.max[0]).toBeGreaterThan(14.7);
+    expect(rails.min[1]).toBeGreaterThan(17.0);
+    expect(rails.max[1]).toBeGreaterThan(24.1);
+    expect(rails.min[2]).toBeGreaterThan(22.9);
+    expect(rails.max[2]).toBeGreaterThan(23.2);
+
+    expect(rails.vertexCount, 'V128_CenterScreenGoldInterruptRailArray is too low-detail').toBeGreaterThanOrEqual(720);
+    expect(materialNameFor('V128_CenterScreenGoldInterruptRailArray')).toBe('V20_ChasedGoldFiligree');
   });
 
   it('replaces the oval side-screen shell proxies with authored shell-and-gold housings', () => {
