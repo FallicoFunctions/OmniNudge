@@ -9452,6 +9452,73 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(portalApron.vertexCount + leftShoulder.vertexCount + rightShoulder.vertexCount).toBeLessThanOrEqual(900);
   });
 
+  it('replaces the repeated V15 processional trim slabs with authored route arrays', () => {
+    expect(nodeNamesWithPrefix('V15_CentralStairGoldNosing_')).toHaveLength(0);
+    expect(nodeNamesWithPrefix('V15_SpawnRouteGoldEdge_')).toHaveLength(0);
+    expect(nodeNamesWithPrefix('V15_SpawnRouteWetCenterInlay_')).toHaveLength(0);
+
+    const replacementNodes = [
+      'V123_CentralStairGoldNosingArray',
+      'V123_SpawnRouteGoldEdgeArray_L',
+      'V123_SpawnRouteGoldEdgeArray_R',
+      'V123_SpawnRouteWetCenterInlayArray',
+    ] as const;
+    expect(nodeNamesWithPrefix('V123_')).toEqual(replacementNodes);
+
+    const stairGold = readMeshGeometry('V123_CentralStairGoldNosingArray', {
+      minNonZeroAreaTriangles: 80,
+      minUniquePositions: 80,
+      minVertexCount: 300,
+    });
+    const routeGoldL = readMeshGeometry('V123_SpawnRouteGoldEdgeArray_L', {
+      minNonZeroAreaTriangles: 100,
+      minUniquePositions: 100,
+      minVertexCount: 500,
+    });
+    const routeGoldR = readMeshGeometry('V123_SpawnRouteGoldEdgeArray_R', {
+      minNonZeroAreaTriangles: 100,
+      minUniquePositions: 100,
+      minVertexCount: 500,
+    });
+    const wetInlay = readMeshGeometry('V123_SpawnRouteWetCenterInlayArray', {
+      minNonZeroAreaTriangles: 100,
+      minUniquePositions: 100,
+      minVertexCount: 500,
+    });
+
+    expect(readConnectedComponents('V123_CentralStairGoldNosingArray')).toHaveLength(7);
+    expect(readConnectedComponents('V123_SpawnRouteGoldEdgeArray_L')).toHaveLength(9);
+    expect(readConnectedComponents('V123_SpawnRouteGoldEdgeArray_R')).toHaveLength(9);
+    expect(readConnectedComponents('V123_SpawnRouteWetCenterInlayArray')).toHaveLength(9);
+
+    expect(stairGold.max[0] - stairGold.min[0]).toBeGreaterThan(8.3);
+    expect(stairGold.max[1] - stairGold.min[1]).toBeGreaterThan(0.7);
+    expect(stairGold.max[2] - stairGold.min[2]).toBeGreaterThan(18.0);
+
+    expect(routeGoldL.max[0] - routeGoldL.min[0]).toBeGreaterThan(0.15);
+    expect(routeGoldL.max[1] - routeGoldL.min[1]).toBeGreaterThan(0.06);
+    expect(routeGoldL.max[2] - routeGoldL.min[2]).toBeGreaterThan(58.0);
+    expect(routeGoldL.max[0]).toBeLessThan(0);
+
+    expect(routeGoldR.max[0] - routeGoldR.min[0]).toBeGreaterThan(0.15);
+    expect(routeGoldR.max[1] - routeGoldR.min[1]).toBeGreaterThan(0.06);
+    expect(routeGoldR.max[2] - routeGoldR.min[2]).toBeGreaterThan(58.0);
+    expect(routeGoldR.min[0]).toBeGreaterThan(0);
+
+    expect(wetInlay.max[0] - wetInlay.min[0]).toBeGreaterThan(2.1);
+    expect(wetInlay.max[1] - wetInlay.min[1]).toBeGreaterThan(0.05);
+    expect(wetInlay.max[2] - wetInlay.min[2]).toBeGreaterThan(58.0);
+
+    expect(materialNameFor('V123_CentralStairGoldNosingArray')).toBe('V15_EngineeredGoldAnchors');
+    expect(materialNameFor('V123_SpawnRouteGoldEdgeArray_L')).toBe('V15_EngineeredGoldAnchors');
+    expect(materialNameFor('V123_SpawnRouteGoldEdgeArray_R')).toBe('V15_EngineeredGoldAnchors');
+    expect(materialNameFor('V123_SpawnRouteWetCenterInlayArray')).toBe('V15_WetPlazaInlay');
+
+    expect(
+      stairGold.vertexCount + routeGoldL.vertexCount + routeGoldR.vertexCount + wetInlay.vertexCount,
+    ).toBeLessThanOrEqual(5_300);
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
