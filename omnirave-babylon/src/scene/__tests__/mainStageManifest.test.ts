@@ -566,7 +566,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
   it('exports physical screen depth baffles that break up flat emissive panels', () => {
     expectMainStageMarker('V129_CenterScreenDepthBaffleArray');
-    expectMainStageMarker('V22_CenterScreenShadowCoffer_Top');
+    expectMainStageMarker('V130_CenterScreenShadowCofferArray');
     expectMainStageMarker('V22_WingScreenDepthBaffle_L_0');
     expectMainStageMarker('V127_CrownScreenShadowCoffer');
   });
@@ -575,7 +575,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     for (const nodeName of [
       'V129_CenterScreenDepthBaffleArray',
       'V128_CenterScreenGoldInterruptRailArray',
-      'V22_CenterScreenShadowCoffer_Top',
+      'V130_CenterScreenShadowCofferArray',
       'V22_WingScreenDepthBaffle_L_0',
       'V22_WingScreenTopCoffer_L',
       'V22_WingScreenBottomCoffer_L',
@@ -5974,6 +5974,27 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(baffles.vertexCount, 'V129_CenterScreenDepthBaffleArray is too low-detail').toBeGreaterThanOrEqual(840);
     expect(materialNameFor('V129_CenterScreenDepthBaffleArray')).toBe('V14_MatteBlackProductionRig');
+  });
+
+  it('replaces the center-screen shadow coffer proxy frame with an authored array', () => {
+    expect(nodeNamesWithPrefix('V22_CenterScreenShadowCoffer_')).toHaveLength(0);
+
+    const requiredReplacementNodes = ['V130_CenterScreenShadowCofferArray'] as const;
+    expect(nodeNamesWithPrefix('V130_')).toEqual([...requiredReplacementNodes]);
+
+    expectMainStageMarker('V130_CenterScreenShadowCofferArray');
+    const coffer = readMeshGeometry('V130_CenterScreenShadowCofferArray');
+    expect(readConnectedComponents('V130_CenterScreenShadowCofferArray')).toHaveLength(4);
+
+    expect(coffer.min[0]).toBeLessThan(-16.6);
+    expect(coffer.max[0]).toBeGreaterThan(16.6);
+    expect(coffer.min[1]).toBeGreaterThan(14.6);
+    expect(coffer.max[1]).toBeGreaterThan(26.0);
+    expect(coffer.min[2]).toBeGreaterThan(22.3);
+    expect(coffer.max[2]).toBeGreaterThan(23.7);
+
+    expect(coffer.vertexCount, 'V130_CenterScreenShadowCofferArray is too low-detail').toBeGreaterThanOrEqual(560);
+    expect(materialNameFor('V130_CenterScreenShadowCofferArray')).toBe('V15_ShadowedInsetSeams');
   });
 
   it('replaces the oval side-screen shell proxies with authored shell-and-gold housings', () => {
