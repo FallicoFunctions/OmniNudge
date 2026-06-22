@@ -565,7 +565,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   });
 
   it('exports physical screen depth baffles that break up flat emissive panels', () => {
-    expectMainStageMarker('V22_CenterScreenDepthBaffle_0');
+    expectMainStageMarker('V129_CenterScreenDepthBaffleArray');
     expectMainStageMarker('V22_CenterScreenShadowCoffer_Top');
     expectMainStageMarker('V22_WingScreenDepthBaffle_L_0');
     expectMainStageMarker('V127_CrownScreenShadowCoffer');
@@ -573,7 +573,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
   it('profiles the visible screen baffles and coffers beyond raw cuboid placeholders', () => {
     for (const nodeName of [
-      'V22_CenterScreenDepthBaffle_0',
+      'V129_CenterScreenDepthBaffleArray',
       'V128_CenterScreenGoldInterruptRailArray',
       'V22_CenterScreenShadowCoffer_Top',
       'V22_WingScreenDepthBaffle_L_0',
@@ -5953,6 +5953,27 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(rails.vertexCount, 'V128_CenterScreenGoldInterruptRailArray is too low-detail').toBeGreaterThanOrEqual(720);
     expect(materialNameFor('V128_CenterScreenGoldInterruptRailArray')).toBe('V20_ChasedGoldFiligree');
+  });
+
+  it('replaces the center-screen depth baffle proxy bars with an authored vertical array', () => {
+    expect(nodeNamesWithPrefix('V22_CenterScreenDepthBaffle_')).toHaveLength(0);
+
+    const requiredReplacementNodes = ['V129_CenterScreenDepthBaffleArray'] as const;
+    expect(nodeNamesWithPrefix('V129_')).toEqual([...requiredReplacementNodes]);
+
+    expectMainStageMarker('V129_CenterScreenDepthBaffleArray');
+    const baffles = readMeshGeometry('V129_CenterScreenDepthBaffleArray');
+    expect(readConnectedComponents('V129_CenterScreenDepthBaffleArray')).toHaveLength(7);
+
+    expect(baffles.min[0]).toBeLessThan(-12.1);
+    expect(baffles.max[0]).toBeGreaterThan(12.1);
+    expect(baffles.min[1]).toBeGreaterThan(14.9);
+    expect(baffles.max[1]).toBeGreaterThan(26.1);
+    expect(baffles.min[2]).toBeGreaterThan(22.9);
+    expect(baffles.max[2]).toBeGreaterThan(23.3);
+
+    expect(baffles.vertexCount, 'V129_CenterScreenDepthBaffleArray is too low-detail').toBeGreaterThanOrEqual(840);
+    expect(materialNameFor('V129_CenterScreenDepthBaffleArray')).toBe('V14_MatteBlackProductionRig');
   });
 
   it('replaces the oval side-screen shell proxies with authored shell-and-gold housings', () => {
