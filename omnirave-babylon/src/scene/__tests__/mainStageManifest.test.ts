@@ -568,7 +568,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expectMainStageMarker('V22_CenterScreenDepthBaffle_0');
     expectMainStageMarker('V22_CenterScreenShadowCoffer_Top');
     expectMainStageMarker('V22_WingScreenDepthBaffle_L_0');
-    expectMainStageMarker('V22_CrownScreenShadowCoffer');
+    expectMainStageMarker('V127_CrownScreenShadowCoffer');
   });
 
   it('profiles the visible screen baffles and coffers beyond raw cuboid placeholders', () => {
@@ -579,7 +579,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       'V22_WingScreenDepthBaffle_L_0',
       'V22_WingScreenTopCoffer_L',
       'V22_WingScreenBottomCoffer_L',
-      'V22_CrownScreenShadowCoffer',
+      'V127_CrownScreenShadowCoffer',
     ] as const) {
       readMeshGeometry(nodeName, {
         minNonZeroAreaTriangles: 140,
@@ -5888,6 +5888,50 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
     }
+  });
+
+  it('replaces the crown-screen top coffer and keystone with a sculpted crest assembly', () => {
+    expect(nodeNamesWithPrefix('V22_CrownScreenShadowCoffer')).toHaveLength(0);
+    expect(nodeNamesWithPrefix('V22_CrownScreenVerticalKeystone')).toHaveLength(0);
+
+    const requiredReplacementNodes = ['V127_CrownScreenShadowCoffer', 'V127_CrownScreenVerticalKeystone'] as const;
+    expect(nodeNamesWithPrefix('V127_')).toEqual([...requiredReplacementNodes]);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+      expect(readConnectedComponents(nodeName)).toHaveLength(1);
+    }
+
+    const shadow = readMeshGeometry('V127_CrownScreenShadowCoffer');
+    const keystone = readMeshGeometry('V127_CrownScreenVerticalKeystone');
+
+    expect(shadow.min[0]).toBeLessThan(-8.1);
+    expect(shadow.max[0]).toBeGreaterThan(8.1);
+    expect(shadow.min[1]).toBeGreaterThan(22.5);
+    expect(shadow.max[1]).toBeGreaterThan(23.5);
+    expect(shadow.min[2]).toBeLessThan(-28.4);
+    expect(shadow.max[2]).toBeLessThan(-27.6);
+
+    expect(keystone.min[0]).toBeLessThan(-0.23);
+    expect(keystone.max[0]).toBeGreaterThan(0.23);
+    expect(keystone.min[1]).toBeGreaterThan(22.7);
+    expect(keystone.max[1]).toBeGreaterThan(23.4);
+    expect(keystone.min[2]).toBeLessThan(-30.6);
+    expect(keystone.max[2]).toBeLessThan(-25.5);
+
+    const minimumVertexCounts = new Map([
+      ['V127_CrownScreenShadowCoffer', 260],
+      ['V127_CrownScreenVerticalKeystone', 240],
+    ]);
+    for (const [nodeName, minimumVertexCount] of minimumVertexCounts) {
+      expect(readMeshGeometry(nodeName).vertexCount, `${nodeName} component is too low-detail`).toBeGreaterThanOrEqual(
+        minimumVertexCount,
+      );
+    }
+
+    expect(materialNameFor('V127_CrownScreenShadowCoffer')).toBe('V14_MatteBlackProductionRig');
+    expect(materialNameFor('V127_CrownScreenVerticalKeystone')).toBe('V14_BurnishedCelestialGold');
   });
 
   it('replaces the oval side-screen shell proxies with authored shell-and-gold housings', () => {
