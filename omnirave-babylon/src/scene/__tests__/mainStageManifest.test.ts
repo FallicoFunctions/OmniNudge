@@ -7,6 +7,7 @@ import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from '../reviewRouteData';
 const projectRoot = process.cwd();
 const applyTextureScript = readFileSync(path.join(projectRoot, 'scripts/apply-main-stage-pbr-textures.py'), 'utf8');
 const exportScript = readFileSync(path.join(projectRoot, 'scripts/export-main-stage.py'), 'utf8');
+const exportShellScript = readFileSync(path.join(projectRoot, 'scripts/export-main-stage.sh'), 'utf8');
 const optimizeScript = readFileSync(path.join(projectRoot, 'scripts/optimize-main-stage.mjs'), 'utf8');
 const mainStageGlbText = readFileSync(
   path.join(projectRoot, 'public/assets/venues/main-stage/main-stage.glb'),
@@ -399,6 +400,16 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(exportScript).toContain('main-stage-collision.glb');
     expect(exportScript).toContain('Collision');
     expect(optimizeScript).toContain('main-stage-collision.glb');
+  });
+
+  it('runs lossless texture optimization before export and verifies the GLBs afterward', () => {
+    expect(exportShellScript).toMatch(/node "\$ROOT_DIR\/scripts\/optimize-main-stage\.mjs"/);
+    expect(exportShellScript).toMatch(/blender -b "\$BLEND_FILE" --python "\$PYTHON_SCRIPT"/);
+    expect(exportShellScript).toMatch(/node "\$ROOT_DIR\/scripts\/optimize-main-stage\.mjs" --require-exports/);
+    expect(optimizeScript).toContain('jpegtran');
+    expect(optimizeScript).toContain('-optimize');
+    expect(optimizeScript).toContain('textures/polyhaven');
+    expect(optimizeScript).toContain('--require-exports');
   });
 
   it('keeps collision-only objects out of the visible scene export', () => {
@@ -9249,6 +9260,144 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V118_BasinWaterSheet_R')).toBe('V14_DeepReflectingWater');
 
     expect(wallLeft.vertexCount + wallRight.vertexCount + waterLeft.vertexCount + waterRight.vertexCount).toBeLessThanOrEqual(170);
+  });
+
+  it('replaces the remaining basin side deck cuboids with authored relief slabs', () => {
+    expect(nodesByName.has('BasinDeck_-1')).toBe(false);
+    expect(nodesByName.has('BasinDeck_1')).toBe(false);
+
+    const replacementNodes = ['V120_BasinDeckRelief_L', 'V120_BasinDeckRelief_R'] as const;
+    expect(nodeNamesWithPrefix('V120_')).toEqual(replacementNodes);
+
+    const leftDeck = readMeshGeometry('V120_BasinDeckRelief_L', {
+      minNonZeroAreaTriangles: 40,
+      minUniquePositions: 40,
+      minVertexCount: 100,
+    });
+    const rightDeck = readMeshGeometry('V120_BasinDeckRelief_R', {
+      minNonZeroAreaTriangles: 40,
+      minUniquePositions: 40,
+      minVertexCount: 100,
+    });
+
+    expect(readConnectedComponents('V120_BasinDeckRelief_L')).toHaveLength(1);
+    expect(readConnectedComponents('V120_BasinDeckRelief_R')).toHaveLength(1);
+
+    expect(leftDeck.max[0] - leftDeck.min[0]).toBeGreaterThan(24.0);
+    expect(leftDeck.max[1] - leftDeck.min[1]).toBeGreaterThan(0.8);
+    expect(leftDeck.max[2] - leftDeck.min[2]).toBeGreaterThan(34.2);
+    expect(leftDeck.min[0]).toBeLessThan(-30.0);
+    expect(leftDeck.max[0]).toBeLessThan(-5.7);
+    expect(leftDeck.min[1]).toBeLessThan(0.01);
+    expect(leftDeck.max[1]).toBeGreaterThan(0.8);
+    expect(leftDeck.min[2]).toBeLessThan(-21.2);
+    expect(leftDeck.max[2]).toBeGreaterThan(13.2);
+
+    expect(rightDeck.max[0] - rightDeck.min[0]).toBeGreaterThan(24.0);
+    expect(rightDeck.max[1] - rightDeck.min[1]).toBeGreaterThan(0.8);
+    expect(rightDeck.max[2] - rightDeck.min[2]).toBeGreaterThan(34.2);
+    expect(rightDeck.min[0]).toBeGreaterThan(5.7);
+    expect(rightDeck.max[0]).toBeGreaterThan(30.0);
+    expect(rightDeck.min[1]).toBeLessThan(0.01);
+    expect(rightDeck.max[1]).toBeGreaterThan(0.8);
+    expect(rightDeck.min[2]).toBeLessThan(-21.2);
+    expect(rightDeck.max[2]).toBeGreaterThan(13.2);
+
+    expect(materialNameFor('V120_BasinDeckRelief_L')).toBe('V14_PolishedMoonstoneShell');
+    expect(materialNameFor('V120_BasinDeckRelief_R')).toBe('V14_PolishedMoonstoneShell');
+
+    expect(leftDeck.vertexCount + rightDeck.vertexCount).toBeLessThanOrEqual(390);
+  });
+
+  it('replaces the legacy basin bridge and retaining-wall cuboids with authored relief spans', () => {
+    const legacyNodes = [
+      'V4_BridgeNorth',
+      'V4_BridgeSouth',
+      'V4_CenterBridge',
+      'V4_RetainingWall_L',
+      'V4_RetainingWall_R',
+    ] as const;
+    for (const nodeName of legacyNodes) {
+      expect(nodesByName.has(nodeName)).toBe(false);
+    }
+
+    const replacementNodes = [
+      'V121_BasinBridgeRelief_North',
+      'V121_BasinBridgeRelief_South',
+      'V121_BasinBridgeRelief_Center',
+      'V121_BasinRetainingRelief_L',
+      'V121_BasinRetainingRelief_R',
+    ] as const;
+    expect(nodeNamesWithPrefix('V121_')).toEqual(replacementNodes);
+
+    const northBridge = readMeshGeometry('V121_BasinBridgeRelief_North', {
+      minNonZeroAreaTriangles: 30,
+      minUniquePositions: 30,
+      minVertexCount: 80,
+    });
+    const southBridge = readMeshGeometry('V121_BasinBridgeRelief_South', {
+      minNonZeroAreaTriangles: 30,
+      minUniquePositions: 30,
+      minVertexCount: 80,
+    });
+    const centerBridge = readMeshGeometry('V121_BasinBridgeRelief_Center', {
+      minNonZeroAreaTriangles: 30,
+      minUniquePositions: 30,
+      minVertexCount: 80,
+    });
+    const leftRetaining = readMeshGeometry('V121_BasinRetainingRelief_L', {
+      minNonZeroAreaTriangles: 30,
+      minUniquePositions: 30,
+      minVertexCount: 80,
+    });
+    const rightRetaining = readMeshGeometry('V121_BasinRetainingRelief_R', {
+      minNonZeroAreaTriangles: 30,
+      minUniquePositions: 30,
+      minVertexCount: 80,
+    });
+
+    for (const nodeName of replacementNodes) {
+      expect(readConnectedComponents(nodeName)).toHaveLength(1);
+      expect(materialNameFor(nodeName)).toBe('V15_PearlShellBeveled');
+    }
+
+    expect(northBridge.max[0] - northBridge.min[0]).toBeGreaterThan(8.0);
+    expect(northBridge.max[1] - northBridge.min[1]).toBeGreaterThan(0.35);
+    expect(northBridge.max[2] - northBridge.min[2]).toBeGreaterThan(1.8);
+    expect(northBridge.min[2]).toBeLessThan(-24.0);
+    expect(northBridge.max[2]).toBeLessThan(-21.9);
+
+    expect(southBridge.max[0] - southBridge.min[0]).toBeGreaterThan(8.0);
+    expect(southBridge.max[1] - southBridge.min[1]).toBeGreaterThan(0.35);
+    expect(southBridge.max[2] - southBridge.min[2]).toBeGreaterThan(1.8);
+    expect(southBridge.min[2]).toBeLessThan(-0.1);
+    expect(southBridge.max[2]).toBeGreaterThan(2.0);
+
+    expect(centerBridge.max[0] - centerBridge.min[0]).toBeGreaterThan(3.8);
+    expect(centerBridge.max[1] - centerBridge.min[1]).toBeGreaterThan(0.3);
+    expect(centerBridge.max[2] - centerBridge.min[2]).toBeGreaterThan(19.0);
+    expect(centerBridge.min[2]).toBeLessThan(-6.1);
+    expect(centerBridge.max[2]).toBeGreaterThan(13.0);
+
+    expect(leftRetaining.max[0] - leftRetaining.min[0]).toBeGreaterThan(2.2);
+    expect(leftRetaining.max[1] - leftRetaining.min[1]).toBeGreaterThan(1.3);
+    expect(leftRetaining.max[2] - leftRetaining.min[2]).toBeGreaterThan(20.0);
+    expect(leftRetaining.min[0]).toBeLessThan(-28.1);
+    expect(leftRetaining.max[0]).toBeLessThan(-25.6);
+
+    expect(rightRetaining.max[0] - rightRetaining.min[0]).toBeGreaterThan(2.2);
+    expect(rightRetaining.max[1] - rightRetaining.min[1]).toBeGreaterThan(1.3);
+    expect(rightRetaining.max[2] - rightRetaining.min[2]).toBeGreaterThan(20.0);
+    expect(rightRetaining.min[0]).toBeGreaterThan(25.6);
+    expect(rightRetaining.max[0]).toBeGreaterThan(28.1);
+
+    expect(
+      northBridge.vertexCount
+        + southBridge.vertexCount
+        + centerBridge.vertexCount
+        + leftRetaining.vertexCount
+        + rightRetaining.vertexCount,
+    ).toBeLessThanOrEqual(1_400);
   });
 
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
