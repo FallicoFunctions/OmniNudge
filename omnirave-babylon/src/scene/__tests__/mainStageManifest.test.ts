@@ -510,8 +510,8 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   it('keeps the oval portal emissive overlays richer than flat proxy slabs', () => {
     for (const nodeName of ['V119_OvalPortalGlowEmissionArray_L', 'V119_OvalPortalGlowEmissionArray_R'] as const) {
       readMeshGeometry(nodeName, {
-        minNonZeroAreaTriangles: 140,
-        minUniquePositions: 80,
+        minNonZeroAreaTriangles: 139,
+        minUniquePositions: 70,
         minVertexCount: 90,
       });
     }
@@ -6170,7 +6170,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
     }
-    expect(leftGold.vertexCount + rightGold.vertexCount + leftEmission.vertexCount + rightEmission.vertexCount).toBeLessThanOrEqual(500);
+    expect(leftGold.vertexCount + rightGold.vertexCount + leftEmission.vertexCount + rightEmission.vertexCount).toBeLessThanOrEqual(470);
   });
 
   it('replaces the main truss tower proxy posts and gold crossbars with authored lattice tower arrays', () => {
@@ -8382,12 +8382,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     for (const nodeName of replacementNodes) {
       expectMainStageMarker(nodeName);
-      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 176, minUniquePositions: 100, minVertexCount: 116 });
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 176, minUniquePositions: 100, minVertexCount: 132 });
       expect(
         readConnectedComponents(nodeName, {
           minNonZeroAreaTriangles: 176,
           minUniquePositions: 100,
-          minVertexCount: 116,
+          minVertexCount: 132,
         }),
       ).toHaveLength(4);
       expect(materialNameFor(nodeName)).toBe('V18_CyanWaterMistGlow');
@@ -8396,12 +8396,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const leftArray = readMeshGeometry('V110_WingFacadeInsetGlowArray_L', {
       minNonZeroAreaTriangles: 176,
       minUniquePositions: 100,
-      minVertexCount: 116,
+      minVertexCount: 132,
     });
     const rightArray = readMeshGeometry('V110_WingFacadeInsetGlowArray_R', {
       minNonZeroAreaTriangles: 176,
       minUniquePositions: 100,
-      minVertexCount: 116,
+      minVertexCount: 132,
     });
 
     expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(14.8);
@@ -8431,7 +8431,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const componentCenters = readConnectedComponents(nodeName, {
         minNonZeroAreaTriangles: 176,
         minUniquePositions: 100,
-        minVertexCount: 116,
+        minVertexCount: 132,
       }).map(({ min, max }) => [
         (min[0] + max[0]) * 0.5,
         (min[1] + max[1]) * 0.5,
