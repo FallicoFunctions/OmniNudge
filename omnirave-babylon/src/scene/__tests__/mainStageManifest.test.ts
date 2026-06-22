@@ -7064,54 +7064,63 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(rightArray.max[1]).toBeGreaterThan(1.62);
   });
 
-  it('replaces the wing barrier stick props with batched crowd-control assemblies', () => {
+  it('replaces the wing barrier stick props with sculpted ceremonial barrier arrays', () => {
     expect(nodeNamesWithPrefix('V10_BarrierFoot_'), 'legacy wing barrier foot nodes still exported').toHaveLength(0);
     expect(nodeNamesWithPrefix('V10_CrowdBarrier_'), 'legacy wing crowd barrier nodes still exported').toHaveLength(0);
 
     const requiredReplacementNodes = [
-      'V94_CrowdBarrierBaseArray_L',
-      'V94_CrowdBarrierBaseArray_R',
-      'V94_CrowdBarrierRailArray_L',
-      'V94_CrowdBarrierRailArray_R',
+      'V125_CrowdBarrierBaseArray_L',
+      'V125_CrowdBarrierBaseArray_R',
+      'V125_CrowdBarrierRailArray_L',
+      'V125_CrowdBarrierRailArray_R',
     ];
-    expect(nodeNamesWithPrefix('V94_')).toHaveLength(requiredReplacementNodes.length);
+    expect(nodeNamesWithPrefix('V94_')).toHaveLength(0);
+    expect(nodeNamesWithPrefix('V125_')).toHaveLength(requiredReplacementNodes.length);
 
     for (const nodeName of requiredReplacementNodes) {
       expectMainStageMarker(nodeName);
-      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 120, minUniquePositions: 120, minVertexCount: 240 });
+      readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 140, minUniquePositions: 140, minVertexCount: 320 });
     }
 
     for (const side of ['L', 'R'] as const) {
-      const baseNode = `V94_CrowdBarrierBaseArray_${side}`;
-      const railNode = `V94_CrowdBarrierRailArray_${side}`;
+      const baseNode = `V125_CrowdBarrierBaseArray_${side}`;
+      const railNode = `V125_CrowdBarrierRailArray_${side}`;
 
-      const base = readMeshGeometry(baseNode, { minNonZeroAreaTriangles: 160, minUniquePositions: 180, minVertexCount: 360 });
-      const rail = readMeshGeometry(railNode, { minNonZeroAreaTriangles: 160, minUniquePositions: 180, minVertexCount: 360 });
+      const base = readMeshGeometry(baseNode, { minNonZeroAreaTriangles: 200, minUniquePositions: 200, minVertexCount: 700 });
+      const rail = readMeshGeometry(railNode, { minNonZeroAreaTriangles: 180, minUniquePositions: 180, minVertexCount: 500 });
 
       expect(
-        readConnectedComponents(baseNode, { minNonZeroAreaTriangles: 160, minUniquePositions: 180, minVertexCount: 360 }),
+        clusterConnectedComponents(
+          readConnectedComponents(baseNode, { minNonZeroAreaTriangles: 200, minUniquePositions: 200, minVertexCount: 700 }),
+          2,
+          6,
+        ),
       ).toHaveLength(6);
       expect(
-        readConnectedComponents(railNode, { minNonZeroAreaTriangles: 160, minUniquePositions: 180, minVertexCount: 360 }),
+        clusterConnectedComponents(
+          readConnectedComponents(railNode, { minNonZeroAreaTriangles: 180, minUniquePositions: 180, minVertexCount: 500 }),
+          2,
+          6,
+        ),
       ).toHaveLength(6);
 
       expect(base.max[0] - base.min[0]).toBeGreaterThan(0.88);
-      expect(base.max[1] - base.min[1]).toBeGreaterThan(0.2);
+      expect(base.max[1] - base.min[1]).toBeGreaterThan(0.28);
       expect(base.max[2] - base.min[2]).toBeGreaterThan(59.0);
       expect(rail.max[0] - rail.min[0]).toBeGreaterThan(0.14);
       expect(rail.max[1] - rail.min[1]).toBeGreaterThan(0.82);
       expect(rail.max[2] - rail.min[2]).toBeGreaterThan(59.0);
 
       if (side === 'L') {
-        expect(base.max[0]).toBeLessThan(-12.7);
+        expect(base.max[0]).toBeLessThan(-12.67);
         expect(rail.max[0]).toBeLessThan(-13.0);
       } else {
-        expect(base.min[0]).toBeGreaterThan(12.7);
+        expect(base.min[0]).toBeGreaterThan(12.67);
         expect(rail.min[0]).toBeGreaterThan(13.0);
       }
 
       expect(base.min[1]).toBeLessThan(0.2);
-      expect(base.max[1]).toBeLessThan(0.5);
+      expect(base.max[1]).toBeLessThan(0.65);
       expect(rail.min[1]).toBeGreaterThanOrEqual(0.5);
       expect(rail.max[1]).toBeGreaterThan(1.3);
 
