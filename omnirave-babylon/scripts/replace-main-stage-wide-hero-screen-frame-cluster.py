@@ -487,7 +487,7 @@ apply_boolean_difference(
     },
     "header_inset",
 )
-finalize(header, bevel_width=0.028, bevel_segments=1, material_name=IVORY)
+finalize(header, bevel_width=0.03, bevel_segments=2, material_name=IVORY)
 
 footer_bounds = {
     "x": (legacy_bounds["x"][0] + 0.05, legacy_bounds["x"][1] - 0.05),
@@ -513,7 +513,7 @@ apply_boolean_difference(
     },
     "footer_inset",
 )
-finalize(footer, bevel_width=0.028, bevel_segments=1, material_name=IVORY)
+finalize(footer, bevel_width=0.03, bevel_segments=2, material_name=IVORY)
 
 mullion_centers = [-11.5, -7.6, -3.8, 0.0, 3.8, 7.6, 11.5]
 mullion_boxes = []
