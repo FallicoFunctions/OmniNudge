@@ -121,7 +121,7 @@ def add_gold_face_relief(mesh, inset_thickness=0.18, inset_depth=0.01):
     bm.free()
 
 
-def add_emission_face_relief(mesh, inset_thicknesses=(0.12, 0.08), inset_depth=0.006):
+def add_emission_face_relief(mesh, inset_thicknesses=(0.16, 0.13, 0.10, 0.07, 0.05, 0.03), inset_depth=0.006):
     bm = bmesh.new()
     bm.from_mesh(mesh)
     bm.faces.ensure_lookup_table()
@@ -226,7 +226,7 @@ def fit_overlay_bounds(bounds, kind):
 
     return {
         "x": (bounds["x"][0] + 0.74, bounds["x"][1] - 0.74),
-        "y": (bounds["y"][0] - 0.02, bounds["y"][1] - 0.26),
+        "y": (bounds["y"][0] - 0.02, bounds["y"][1] - 0.20),
         "z": (bounds["z"][0] + 2.88, bounds["z"][1] - 2.72),
     }
 
@@ -283,7 +283,7 @@ def main():
             bounds,
             material_name,
             bevel_width=0.05 if kind == "gold" else 0.04,
-            bevel_segments=3 if kind == "gold" else 2,
+            bevel_segments=3 if kind == "gold" else 1,
             kind=kind,
         )
 
