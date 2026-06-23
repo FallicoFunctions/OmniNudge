@@ -9715,16 +9715,16 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(readConnectedComponents('V122_StageShoulderRelief_R')).toHaveLength(1);
 
     expect(portalApron.max[0] - portalApron.min[0]).toBeGreaterThan(6.8);
-    expect(portalApron.max[1] - portalApron.min[1]).toBeGreaterThan(0.4);
+    expect(portalApron.max[1] - portalApron.min[1]).toBeGreaterThan(0.62);
     expect(portalApron.max[2] - portalApron.min[2]).toBeGreaterThan(13.0);
 
     expect(leftShoulder.max[0] - leftShoulder.min[0]).toBeGreaterThan(4.3);
     expect(leftShoulder.max[1] - leftShoulder.min[1]).toBeGreaterThan(12.0);
-    expect(leftShoulder.max[2] - leftShoulder.min[2]).toBeGreaterThan(5.6);
+    expect(leftShoulder.max[2] - leftShoulder.min[2]).toBeGreaterThan(5.95);
 
     expect(rightShoulder.max[0] - rightShoulder.min[0]).toBeGreaterThan(4.3);
     expect(rightShoulder.max[1] - rightShoulder.min[1]).toBeGreaterThan(12.0);
-    expect(rightShoulder.max[2] - rightShoulder.min[2]).toBeGreaterThan(5.6);
+    expect(rightShoulder.max[2] - rightShoulder.min[2]).toBeGreaterThan(5.95);
 
     expect(materialNameFor('V122_PortalApronRelief')).toBe('V15_PearlShellBeveled');
     expect(materialNameFor('V122_StageShoulderRelief_L')).toBe('V15_PearlShellBeveled');

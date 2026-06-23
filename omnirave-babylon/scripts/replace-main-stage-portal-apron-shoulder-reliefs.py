@@ -194,10 +194,10 @@ def build_loft_object(name, material_name, collection, loops, axis, bevel_width=
 def portal_apron_profile(bounds, flare, crown):
     x_center = midpoint(bounds, "x")
     x_half = span(bounds, "x") * 0.5
-    y_floor = bounds["y"][0] - 0.03
-    y_base = bounds["y"][0] + 0.04
-    y_mid = midpoint(bounds, "y") + 0.03 + crown * 0.03
-    y_cap = bounds["y"][1] + 0.04 + crown * 0.05
+    y_floor = bounds["y"][0] - 0.05
+    y_base = bounds["y"][0] + 0.03
+    y_mid = midpoint(bounds, "y") + 0.06 + crown * 0.04
+    y_cap = bounds["y"][1] + 0.08 + crown * 0.06
 
     outer = x_half + 0.1 + 0.04 * flare
     shoulder = x_half * (0.82 + 0.05 * crown)
@@ -205,7 +205,7 @@ def portal_apron_profile(bounds, flare, crown):
     crest = x_half * (0.16 + 0.02 * crown)
 
     return [
-        (x_center - crest * 0.42, y_cap + 0.02),
+        (x_center - crest * 0.42, y_cap + 0.03),
         (x_center - crest, y_cap),
         (x_center - waist, y_mid),
         (x_center - shoulder, y_base + 0.05),
@@ -216,7 +216,7 @@ def portal_apron_profile(bounds, flare, crown):
         (x_center + shoulder, y_base + 0.05),
         (x_center + waist, y_mid),
         (x_center + crest, y_cap),
-        (x_center + crest * 0.42, y_cap + 0.02),
+        (x_center + crest * 0.42, y_cap + 0.03),
     ]
 
 
@@ -239,11 +239,11 @@ def portal_apron_loops(bounds):
 def shoulder_profile(bounds, flare, crown):
     x_center = midpoint(bounds, "x")
     x_half = span(bounds, "x") * 0.5
-    z_floor = bounds["z"][0] - 0.04
-    z_base = bounds["z"][0] + 0.14
-    z_mid = midpoint(bounds, "z") + 0.12 * flare
-    z_cap = bounds["z"][1] + 0.04 + 0.04 * crown
-    z_crest = z_cap + 0.06
+    z_floor = bounds["z"][0] - 0.08
+    z_base = bounds["z"][0] + 0.11
+    z_mid = midpoint(bounds, "z") + 0.18 * flare
+    z_cap = bounds["z"][1] + 0.10 + 0.07 * crown
+    z_crest = z_cap + 0.1
 
     outer = x_half + 0.08 + 0.04 * flare
     shoulder = x_half * (0.84 + 0.04 * crown)
