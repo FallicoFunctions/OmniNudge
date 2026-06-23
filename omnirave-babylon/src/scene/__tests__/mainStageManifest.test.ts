@@ -9309,17 +9309,17 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(shadowLeft.max[0]).toBeLessThan(-10.2);
     expect(shadowLeft.min[1]).toBeGreaterThan(7.8);
     expect(shadowLeft.max[1]).toBeGreaterThan(33.8);
-    expect(shadowLeft.max[2] - shadowLeft.min[2]).toBeGreaterThan(0.45);
-    expect(shadowLeft.min[2]).toBeGreaterThan(25.3);
-    expect(shadowLeft.max[2]).toBeLessThan(25.8);
+    expect(shadowLeft.max[2] - shadowLeft.min[2]).toBeGreaterThan(0.54);
+    expect(shadowLeft.min[2]).toBeGreaterThan(25.26);
+    expect(shadowLeft.max[2]).toBeLessThan(25.84);
 
     expect(shadowRight.min[0]).toBeGreaterThan(10.2);
     expect(shadowRight.max[0]).toBeGreaterThan(10.4);
     expect(shadowRight.min[1]).toBeGreaterThan(7.8);
     expect(shadowRight.max[1]).toBeGreaterThan(33.8);
-    expect(shadowRight.max[2] - shadowRight.min[2]).toBeGreaterThan(0.45);
-    expect(shadowRight.min[2]).toBeGreaterThan(25.3);
-    expect(shadowRight.max[2]).toBeLessThan(25.8);
+    expect(shadowRight.max[2] - shadowRight.min[2]).toBeGreaterThan(0.54);
+    expect(shadowRight.min[2]).toBeGreaterThan(25.26);
+    expect(shadowRight.max[2]).toBeLessThan(25.84);
 
     expect(materialNameFor('V116_ProsceniumPearlRevealArray_L')).toBe('V17_PearlShellSatin');
     expect(materialNameFor('V116_ProsceniumPearlRevealArray_R')).toBe('V17_PearlShellSatin');

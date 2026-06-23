@@ -211,7 +211,7 @@ def pearl_profile(bounds):
 def shadow_profile(bounds):
     y_center = midpoint(bounds, "y")
     z_center = midpoint(bounds, "z")
-    y_half = span(bounds, "y") * 0.5 + 0.065
+    y_half = span(bounds, "y") * 0.5 + 0.11
     z_half = span(bounds, "z") * 0.5 - 0.08
     left_side = []
     for z_ratio, y_ratio in [
