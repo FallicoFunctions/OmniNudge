@@ -16,6 +16,18 @@ GROUPS = [
 LEGACY_NAMES = [legacy_name for legacy_name, _replacement_name in GROUPS]
 REPLACEMENT_NAMES = [replacement_name for _legacy_name, replacement_name in GROUPS]
 PEARL = "V14_PolishedMoonstoneShell"
+ORIGINAL_BOUNDS = {
+    "V120_BasinDeckRelief_L": {
+        "x": (-30.639, -5.361),
+        "y": (-13.320, 21.320),
+        "z": (-0.040, 0.820),
+    },
+    "V120_BasinDeckRelief_R": {
+        "x": (5.361, 30.639),
+        "y": (-13.320, 21.320),
+        "z": (-0.040, 0.820),
+    },
+}
 
 
 def ensure_object_mode():
@@ -60,6 +72,8 @@ def world_bounds(name):
 def capture_bounds(legacy_name, replacement_name):
     if bpy.data.objects.get(legacy_name) is not None:
         return world_bounds(legacy_name)
+    if replacement_name in ORIGINAL_BOUNDS:
+        return ORIGINAL_BOUNDS[replacement_name]
     if bpy.data.objects.get(replacement_name) is not None:
         return world_bounds(replacement_name)
     raise RuntimeError(f"Missing both legacy and replacement deck objects for {replacement_name}")
@@ -159,10 +173,10 @@ def build_loft_object(name, material_name, collection, loops):
 def deck_profile(bounds, flare, crown):
     x_center = midpoint(bounds, "x")
     x_half = span(bounds, "x") * 0.5 + 0.18
-    z_floor = bounds["z"][0] - 0.03
-    z_base = bounds["z"][0] + 0.06
-    z_cap = bounds["z"][1] + 0.02
-    z_crown = bounds["z"][1] + 0.06 + crown * 0.02
+    z_floor = bounds["z"][0] - 0.05
+    z_base = bounds["z"][0] + 0.04
+    z_cap = bounds["z"][1] + 0.04
+    z_crown = bounds["z"][1] + 0.17 + crown * 0.06
 
     outer = x_half * (1.0 + 0.02 * flare)
     shoulder = x_half * (0.88 + 0.03 * flare)
