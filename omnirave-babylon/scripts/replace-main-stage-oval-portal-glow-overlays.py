@@ -226,7 +226,7 @@ def fit_overlay_bounds(bounds, kind):
 
     return {
         "x": (bounds["x"][0] + 0.74, bounds["x"][1] - 0.74),
-        "y": (bounds["y"][0] - 0.02, bounds["y"][1] - 0.30),
+        "y": (bounds["y"][0] - 0.02, bounds["y"][1] - 0.26),
         "z": (bounds["z"][0] + 2.88, bounds["z"][1] - 2.72),
     }
 
