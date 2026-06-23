@@ -6153,12 +6153,19 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(rightButtressShell.min[2]).toBeGreaterThan(16.7);
     expect(rightButtressShell.max[2]).toBeGreaterThan(17.4);
 
-    expect(readConnectedComponents('V80_OvalScreenPedestalShell_L')).toHaveLength(1);
-    expect(readConnectedComponents('V80_OvalScreenPedestalShell_R')).toHaveLength(1);
+    for (const nodeName of [
+      'V80_OvalScreenPedestalShell_L',
+      'V80_OvalScreenPedestalShell_R',
+      'V80_OvalScreenCanopyShell_L',
+      'V80_OvalScreenCanopyShell_R',
+    ] as const) {
+      const components = readConnectedComponents(nodeName);
+      expect(components).toHaveLength(1);
+      expect(components[0]!.vertexCount, `${nodeName} shell is still too coarse`).toBeGreaterThanOrEqual(90);
+      expect(components[0]!.triangleCount, `${nodeName} shell is still too flat`).toBeGreaterThanOrEqual(180);
+    }
     expect(readConnectedComponents('V80_OvalScreenPedestalGoldTrim_L')).toHaveLength(1);
     expect(readConnectedComponents('V80_OvalScreenPedestalGoldTrim_R')).toHaveLength(1);
-    expect(readConnectedComponents('V80_OvalScreenCanopyShell_L')).toHaveLength(1);
-    expect(readConnectedComponents('V80_OvalScreenCanopyShell_R')).toHaveLength(1);
     expect(readConnectedComponents('V80_OvalScreenCanopyGoldTrim_L')).toHaveLength(1);
     expect(readConnectedComponents('V80_OvalScreenCanopyGoldTrim_R')).toHaveLength(1);
     expect(readConnectedComponents('V80_OvalScreenSideButtressShellArray_L')).toHaveLength(2);
@@ -6167,12 +6174,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(readConnectedComponents('V80_OvalScreenSideButtressGoldTrimArray_R')).toHaveLength(2);
 
     const minimumVertexCounts = new Map([
-      ['V80_OvalScreenPedestalShell_L', 140],
-      ['V80_OvalScreenPedestalShell_R', 140],
+      ['V80_OvalScreenPedestalShell_L', 210],
+      ['V80_OvalScreenPedestalShell_R', 210],
       ['V80_OvalScreenPedestalGoldTrim_L', 160],
       ['V80_OvalScreenPedestalGoldTrim_R', 160],
-      ['V80_OvalScreenCanopyShell_L', 140],
-      ['V80_OvalScreenCanopyShell_R', 140],
+      ['V80_OvalScreenCanopyShell_L', 210],
+      ['V80_OvalScreenCanopyShell_R', 210],
       ['V80_OvalScreenCanopyGoldTrim_L', 160],
       ['V80_OvalScreenCanopyGoldTrim_R', 160],
       ['V80_OvalScreenSideButtressShellArray_L', 220],
