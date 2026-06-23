@@ -9532,8 +9532,10 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(waterLeft.min[0]).toBeLessThan(-17.2);
     expect(waterLeft.max[0]).toBeLessThan(-8.29);
+    expect(waterLeft.max[1] - waterLeft.min[1]).toBeGreaterThan(0.26);
     expect(waterRight.min[0]).toBeGreaterThan(8.29);
     expect(waterRight.max[0]).toBeGreaterThan(17.2);
+    expect(waterRight.max[1] - waterRight.min[1]).toBeGreaterThan(0.26);
 
     expect(materialNameFor('V118_BasinWallRelief_L')).toBe('V13_BlackStageRigging');
     expect(materialNameFor('V118_BasinWallRelief_R')).toBe('V13_BlackStageRigging');
