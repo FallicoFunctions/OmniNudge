@@ -11,7 +11,7 @@ import bpy
 #     overlap >= 0.005m on X/Z so each emissive bay keeps the established wing-facade cadence.
 #   V110_WingFacadeInsetGlowArray_R four-bay glow lenses <-> legacy V18_WingFacadeInsetGlow_R_* slab footprints:
 #     overlap >= 0.005m on X/Z with the mirrored right-side spacing preserved.
-#   Each replacement lens projects 0.026m beyond the source depth envelope so the inset reads as a luminous carved pocket instead of a flat card.
+#   Each replacement lens extends the source depth envelope by 0.100m overall so the inset reads as a luminous carved pocket instead of a flat card.
 
 LEGACY_NAMES = [
     "V18_WingFacadeInsetGlow_L_0",
@@ -203,8 +203,8 @@ def build_array(name, side, collection, components):
 
     bm = bmesh.new()
     for bounds in grouped_side_bounds(components, side):
-        y_min = bounds["y"][0] - 0.040
-        y_max = bounds["y"][1] + 0.030
+        y_min = bounds["y"][0] - 0.055
+        y_max = bounds["y"][1] + 0.045
         front_cap, back_cap = add_extruded_polygon_y(bm, glow_polygon(bounds), y_min, y_max)
         add_cap_detail_triangle(bm, front_cap, outward_y_offset=-0.008)
 
