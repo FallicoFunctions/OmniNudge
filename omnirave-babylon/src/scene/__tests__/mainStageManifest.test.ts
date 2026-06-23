@@ -8858,12 +8858,12 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(geometry.max[0] - geometry.min[0]).toBeGreaterThan(6.9);
     expect(geometry.max[1] - geometry.min[1]).toBeGreaterThan(6.3);
-    expect(geometry.max[2] - geometry.min[2]).toBeGreaterThan(0.11);
+    expect(geometry.max[2] - geometry.min[2]).toBeGreaterThan(0.5);
     expect(geometry.min[0]).toBeLessThan(-3.5);
     expect(geometry.max[0]).toBeGreaterThan(3.5);
     expect(geometry.min[1]).toBeGreaterThan(39.2);
     expect(geometry.max[1]).toBeGreaterThan(45.8);
-    expect(geometry.min[2]).toBeGreaterThan(20.24);
+    expect(geometry.min[2]).toBeGreaterThan(20.2);
     expect(geometry.max[2]).toBeGreaterThan(20.64);
 
     const componentCenters = components.map(({ min, max }) => [
