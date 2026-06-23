@@ -9190,6 +9190,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(cyan.max[0]).toBeGreaterThan(7.45);
     expect(cyan.min[1]).toBeGreaterThan(8.4);
     expect(cyan.max[1]).toBeGreaterThan(30.9);
+    expect(cyan.max[2] - cyan.min[2]).toBeGreaterThan(0.43);
     expect(cyan.min[2]).toBeGreaterThan(25.3);
     expect(cyan.max[2]).toBeLessThan(25.8);
 

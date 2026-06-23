@@ -227,7 +227,7 @@ def cyan_profile(bounds):
     y_min, y_max = bounds["y"]
     half_width = span(bounds, "x") * 0.5 + 0.09
     height = y_max - y_min
-    lower = y_min - 0.08
+    lower = y_min - 0.12
     upper = y_max + 0.08
     knee = y_min + height * 0.18
     crown = y_min + height * 0.86
