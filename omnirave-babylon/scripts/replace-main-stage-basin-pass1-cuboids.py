@@ -196,7 +196,7 @@ def water_profile(bounds):
     y_center = midpoint(bounds, "y")
     z_center = midpoint(bounds, "z")
     y_half = span(bounds, "y") * 0.5 + 0.2
-    z_half = max(span(bounds, "z") * 0.5, 0.08)
+    z_half = max(span(bounds, "z") * 0.5, 0.14)
     return [
         (y_center - y_half, z_center - z_half),
         (y_center - y_half * 0.82, z_center - z_half * 0.64),
