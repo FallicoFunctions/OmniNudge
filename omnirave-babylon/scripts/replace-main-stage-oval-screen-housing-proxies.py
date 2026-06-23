@@ -240,6 +240,118 @@ def build_profiled_object(name, material_name, boxes, *, bevel_width, bevel_segm
     return obj
 
 
+def add_box(bm, bounds):
+    center = (
+        axis_center(bounds, "x"),
+        axis_center(bounds, "y"),
+        axis_center(bounds, "z"),
+    )
+    half_extents = (
+        (bounds["x"][1] - bounds["x"][0]) * 0.5,
+        (bounds["y"][1] - bounds["y"][0]) * 0.5,
+        (bounds["z"][1] - bounds["z"][0]) * 0.5,
+    )
+    result = bmesh.ops.create_cube(bm, size=2.0)
+    bmesh.ops.scale(bm, verts=result["verts"], vec=half_extents)
+    bmesh.ops.translate(bm, verts=result["verts"], vec=center)
+
+
+def create_box_object(name, material_name, bounds):
+    mesh = bpy.data.meshes.new(name)
+    obj = bpy.data.objects.new(name, mesh)
+    collection.objects.link(obj)
+    bm = bmesh.new()
+    add_box(bm, bounds)
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    bm.to_mesh(mesh)
+    bm.free()
+    assign_material(obj, material_name)
+    return obj
+
+
+def apply_boolean_difference(obj, cutter_bounds, suffix):
+    cutter = create_box_object(f"{obj.name}_{suffix}", SHELL, cutter_bounds)
+    set_active(obj)
+    modifier = obj.modifiers.new(f"OmniRaveDifference_{suffix}", "BOOLEAN")
+    modifier.operation = "DIFFERENCE"
+    modifier.solver = "EXACT"
+    modifier.object = cutter
+    bpy.ops.object.modifier_apply(modifier=modifier.name)
+    cutter_data = cutter.data
+    bpy.data.objects.remove(cutter, do_unlink=True)
+    if cutter_data and cutter_data.users == 0:
+        bpy.data.meshes.remove(cutter_data)
+
+
+def apply_boolean_union(obj, addition_bounds, suffix):
+    addition = create_box_object(f"{obj.name}_{suffix}", SHELL, addition_bounds)
+    set_active(obj)
+    modifier = obj.modifiers.new(f"OmniRaveUnion_{suffix}", "BOOLEAN")
+    modifier.operation = "UNION"
+    modifier.solver = "EXACT"
+    modifier.object = addition
+    bpy.ops.object.modifier_apply(modifier=modifier.name)
+    addition_data = addition.data
+    bpy.data.objects.remove(addition, do_unlink=True)
+    if addition_data and addition_data.users == 0:
+        bpy.data.meshes.remove(addition_data)
+
+
+def build_sculpted_shell(name, bounds, motif):
+    obj = create_box_object(name, SHELL, bounds)
+    width = bounds["x"][1] - bounds["x"][0]
+    depth = bounds["y"][1] - bounds["y"][0]
+    height = bounds["z"][1] - bounds["z"][0]
+    x_center = axis_center(bounds, "x")
+    x_outer_inset = max(width * 0.085, 0.92)
+    front_reveal_depth = min(depth * 0.52, 0.40)
+    front_y_min = bounds["y"][1] - front_reveal_depth
+
+    apply_boolean_difference(
+        obj,
+        {
+            "x": (bounds["x"][0] + x_outer_inset, bounds["x"][1] - x_outer_inset),
+            "y": (front_y_min, bounds["y"][1] + 0.03),
+            "z": (bounds["z"][0] + height * 0.10, bounds["z"][1] - height * 0.10),
+        },
+        "front_panel",
+    )
+    apply_boolean_difference(
+        obj,
+        {
+            "x": (x_center - 0.44, x_center + 0.44),
+            "y": (bounds["y"][1] - front_reveal_depth * 0.86, bounds["y"][1] + 0.03),
+            "z": (bounds["z"][0] + height * 0.20, bounds["z"][1] - height * 0.20),
+        },
+        "center_channel",
+    )
+
+    if motif == "pedestal":
+        apply_boolean_difference(
+            obj,
+            {
+                "x": (bounds["x"][0] + x_outer_inset * 0.65, bounds["x"][1] - x_outer_inset * 0.65),
+                "y": (bounds["y"][1] - front_reveal_depth * 0.78, bounds["y"][1] + 0.03),
+                "z": (bounds["z"][0] + 0.18, bounds["z"][0] + 0.40),
+            },
+            "plinth_shadow",
+        )
+    else:
+        apply_boolean_difference(
+            obj,
+            {
+                "x": (bounds["x"][0] + x_outer_inset * 0.72, bounds["x"][1] - x_outer_inset * 0.72),
+                "y": (bounds["y"][1] - front_reveal_depth * 0.74, bounds["y"][1] + 0.03),
+                "z": (bounds["z"][1] - 0.42, bounds["z"][1] - 0.20),
+            },
+            "cornice_shadow",
+        )
+
+    finalize(obj, bevel_width=0.016, bevel_segments=1)
+    assign_material(obj, SHELL)
+    return obj
+
+
 def log_bounds(name):
     bounds = world_bounds(name)
     print(
@@ -369,14 +481,7 @@ def build_side(side):
         "secondary_depth": 0.0,
     }
 
-    build_profiled_object(
-        f"V80_OvalScreenPedestalShell_{side}",
-        SHELL,
-        [pedestal_shell],
-        bevel_width=0.028,
-        bevel_segments=1,
-        profile=shell_profile,
-    )
+    build_sculpted_shell(f"V80_OvalScreenPedestalShell_{side}", pedestal_shell, "pedestal")
     build_profiled_object(
         f"V80_OvalScreenPedestalGoldTrim_{side}",
         GOLD,
@@ -385,14 +490,7 @@ def build_side(side):
         bevel_segments=2,
         profile=trim_profile,
     )
-    build_profiled_object(
-        f"V80_OvalScreenCanopyShell_{side}",
-        SHELL,
-        [canopy_shell],
-        bevel_width=0.028,
-        bevel_segments=1,
-        profile=shell_profile,
-    )
+    build_sculpted_shell(f"V80_OvalScreenCanopyShell_{side}", canopy_shell, "canopy")
     build_profiled_object(
         f"V80_OvalScreenCanopyGoldTrim_{side}",
         GOLD,
