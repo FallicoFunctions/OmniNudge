@@ -9502,22 +9502,22 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const wallLeft = readMeshGeometry('V118_BasinWallRelief_L', {
       minNonZeroAreaTriangles: 16,
       minUniquePositions: 16,
-      minVertexCount: 50,
+      minVertexCount: 64,
     });
     const wallRight = readMeshGeometry('V118_BasinWallRelief_R', {
       minNonZeroAreaTriangles: 16,
       minUniquePositions: 16,
-      minVertexCount: 50,
+      minVertexCount: 64,
     });
     const waterLeft = readMeshGeometry('V118_BasinWaterSheet_L', {
       minNonZeroAreaTriangles: 10,
       minUniquePositions: 10,
-      minVertexCount: 29,
+      minVertexCount: 35,
     });
     const waterRight = readMeshGeometry('V118_BasinWaterSheet_R', {
       minNonZeroAreaTriangles: 10,
       minUniquePositions: 10,
-      minVertexCount: 29,
+      minVertexCount: 35,
     });
 
     expect(wallLeft.min[0]).toBeLessThan(-8.17);
@@ -9535,7 +9535,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V118_BasinWaterSheet_L')).toBe('V14_DeepReflectingWater');
     expect(materialNameFor('V118_BasinWaterSheet_R')).toBe('V14_DeepReflectingWater');
 
-    expect(wallLeft.vertexCount + wallRight.vertexCount + waterLeft.vertexCount + waterRight.vertexCount).toBeLessThanOrEqual(170);
+    expect(wallLeft.vertexCount + wallRight.vertexCount + waterLeft.vertexCount + waterRight.vertexCount).toBeLessThanOrEqual(210);
   });
 
   it('replaces the remaining basin side deck cuboids with authored relief slabs', () => {
