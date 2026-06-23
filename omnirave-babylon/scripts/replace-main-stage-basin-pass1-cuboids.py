@@ -19,6 +19,12 @@ LOCKED_X_BOUNDS = {
     "V118_BasinWaterSheet_L": (-17.3, -8.3),
     "V118_BasinWaterSheet_R": (8.3, 17.3),
 }
+ORIGINAL_BOUNDS = {
+    "V118_BasinWallRelief_L": {"x": (-8.18, -6.22), "y": (-22.8, 38.8), "z": (-2.2, 4.1)},
+    "V118_BasinWallRelief_R": {"x": (6.22, 8.18), "y": (-22.8, 38.8), "z": (-2.2, 4.1)},
+    "V118_BasinWaterSheet_L": {"x": (-17.3, -8.3), "y": (-23.0, 39.0), "z": (0.0, 0.16)},
+    "V118_BasinWaterSheet_R": {"x": (8.3, 17.3), "y": (-23.0, 39.0), "z": (0.0, 0.16)},
+}
 
 
 def ensure_object_mode():
@@ -124,6 +130,10 @@ def source_bounds(legacy_name, replacement_name):
     if legacy is not None and legacy.type == "MESH" and legacy.data.vertices:
         return world_bounds_for_object(legacy)
 
+    original_bounds = ORIGINAL_BOUNDS.get(replacement_name)
+    if original_bounds is not None:
+        return original_bounds
+
     replacement = bpy.data.objects.get(replacement_name)
     if replacement is not None and replacement.type == "MESH" and replacement.data.vertices:
         return world_bounds_for_object(replacement)
@@ -160,17 +170,21 @@ def wall_profile(bounds):
     return [
         (y_center - y_half, z_center - z_half * 0.96),
         (y_center - y_half * 0.92, z_center - z_half * 0.54),
+        (y_center - y_half * 0.9, z_center - z_half * 0.42),
         (y_center - y_half * 0.84, z_center - z_half * 0.34),
         (y_center - y_half * 0.76, z_center - z_half * 0.18),
         (y_center - y_half * 0.63, z_center - z_half * 0.02),
         (y_center - y_half * 0.5, z_center + z_half * 0.18),
+        (y_center - y_half * 0.34, z_center + z_half * 0.38),
         (y_center - y_half * 0.18, z_center + z_half * 0.62),
         (y_center + y_half * 0.18, z_center + z_half),
+        (y_center + y_half * 0.26, z_center + z_half * 0.99),
         (y_center + y_half * 0.32, z_center + z_half * 0.96),
         (y_center + y_half * 0.4, z_center + z_half * 0.86),
         (y_center + y_half * 0.48, z_center + z_half * 0.7),
         (y_center + y_half * 0.62, z_center + z_half * 0.52),
         (y_center + y_half * 0.74, z_center + z_half * 0.28),
+        (y_center + y_half * 0.82, z_center + z_half * 0.08),
         (y_center + y_half * 0.92, z_center - z_half * 0.16),
         (y_center + y_half, z_center - z_half * 0.58),
         (y_center + y_half * 0.82, z_center - z_half),
@@ -185,12 +199,15 @@ def water_profile(bounds):
     z_half = max(span(bounds, "z") * 0.5, 0.08)
     return [
         (y_center - y_half, z_center - z_half),
+        (y_center - y_half * 0.82, z_center - z_half * 0.64),
         (y_center - y_half * 0.68, z_center - z_half * 0.35),
         (y_center - y_half * 0.34, z_center + z_half * 0.12),
+        (y_center - y_half * 0.12, z_center + z_half * 0.52),
         (y_center, z_center + z_half),
         (y_center + y_half * 0.12, z_center + z_half * 0.74),
         (y_center + y_half * 0.18, z_center + z_half * 0.58),
         (y_center + y_half * 0.32, z_center + z_half * 0.22),
+        (y_center + y_half * 0.5, z_center + z_half * 0.08),
         (y_center + y_half * 0.66, z_center - z_half * 0.08),
         (y_center + y_half, z_center - z_half * 0.72),
         (y_center + y_half * 0.42, z_center - z_half * 0.96),
