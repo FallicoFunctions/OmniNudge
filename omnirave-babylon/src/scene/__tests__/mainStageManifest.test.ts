@@ -6404,12 +6404,17 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
         : nodeName.includes('GoldArray')
           ? goldGeometryOptions
           : overlayGeometryOptions;
-      expect(readConnectedComponents(nodeName, geometryOptions)).toHaveLength(componentCount);
+      const components = readConnectedComponents(nodeName, geometryOptions);
+      expect(components).toHaveLength(componentCount);
+      if (nodeName.includes('Shell')) {
+        expect(components[0]!.vertexCount, `${nodeName} shell is still too coarse`).toBeGreaterThanOrEqual(90);
+        expect(components[0]!.triangleCount, `${nodeName} shell is still too flat`).toBeGreaterThanOrEqual(180);
+      }
     }
 
     const minimumVertexCounts = new Map([
-      ['V82_OvalPortalGlowShell_L', 160],
-      ['V82_OvalPortalGlowShell_R', 160],
+      ['V82_OvalPortalGlowShell_L', 200],
+      ['V82_OvalPortalGlowShell_R', 200],
       ['V119_OvalPortalGlowGoldArray_L', 123],
       ['V119_OvalPortalGlowGoldArray_R', 123],
       ['V119_OvalPortalGlowEmissionArray_L', 64],

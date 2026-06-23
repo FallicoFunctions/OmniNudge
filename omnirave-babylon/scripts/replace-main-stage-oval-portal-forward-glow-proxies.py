@@ -257,6 +257,83 @@ def build_box_object(name, material_name, boxes, *, bevel_width, bevel_segments)
     return obj
 
 
+def create_box_object(name, material_name, bounds):
+    mesh = bpy.data.meshes.new(name)
+    obj = bpy.data.objects.new(name, mesh)
+    collection.objects.link(obj)
+    bm = bmesh.new()
+    add_box(bm, bounds)
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    bm.to_mesh(mesh)
+    bm.free()
+    assign_material(obj, material_name)
+    return obj
+
+
+def apply_boolean_difference(obj, cutter_bounds, suffix):
+    cutter = create_box_object(f"{obj.name}_{suffix}", SHELL, cutter_bounds)
+    set_active(obj)
+    modifier = obj.modifiers.new(f"OmniRaveDifference_{suffix}", "BOOLEAN")
+    modifier.operation = "DIFFERENCE"
+    modifier.solver = "EXACT"
+    modifier.object = cutter
+    bpy.ops.object.modifier_apply(modifier=modifier.name)
+    cutter_data = cutter.data
+    bpy.data.objects.remove(cutter, do_unlink=True)
+    if cutter_data and cutter_data.users == 0:
+        bpy.data.meshes.remove(cutter_data)
+
+
+def build_sculpted_shell(name, bounds):
+    obj = create_box_object(name, SHELL, bounds)
+    width = bounds["x"][1] - bounds["x"][0]
+    height = bounds["z"][1] - bounds["z"][0]
+    front_reveal_depth = min((bounds["y"][1] - bounds["y"][0]) * 0.52, 0.36)
+    x_outer_inset = max(width * 0.095, 0.86)
+    x_center = axis_center(bounds, "x")
+
+    apply_boolean_difference(
+        obj,
+        {
+            "x": (bounds["x"][0] + x_outer_inset, bounds["x"][1] - x_outer_inset),
+            "y": (bounds["y"][1] - front_reveal_depth, bounds["y"][1] + 0.03),
+            "z": (bounds["z"][0] + height * 0.09, bounds["z"][1] - height * 0.09),
+        },
+        "front_panel",
+    )
+    apply_boolean_difference(
+        obj,
+        {
+            "x": (x_center - 0.40, x_center + 0.40),
+            "y": (bounds["y"][1] - front_reveal_depth * 0.84, bounds["y"][1] + 0.03),
+            "z": (bounds["z"][0] + height * 0.18, bounds["z"][1] - height * 0.18),
+        },
+        "center_channel",
+    )
+    apply_boolean_difference(
+        obj,
+        {
+            "x": (bounds["x"][0] + x_outer_inset * 0.72, bounds["x"][1] - x_outer_inset * 0.72),
+            "y": (bounds["y"][1] - front_reveal_depth * 0.76, bounds["y"][1] + 0.03),
+            "z": (bounds["z"][0] + 0.28, bounds["z"][0] + 1.36),
+        },
+        "lower_band",
+    )
+    apply_boolean_difference(
+        obj,
+        {
+            "x": (bounds["x"][0] + x_outer_inset * 0.72, bounds["x"][1] - x_outer_inset * 0.72),
+            "y": (bounds["y"][1] - front_reveal_depth * 0.76, bounds["y"][1] + 0.03),
+            "z": (bounds["z"][1] - 1.36, bounds["z"][1] - 0.28),
+        },
+        "upper_band",
+    )
+
+    finalize(obj, bevel_width=0.016, bevel_segments=1)
+    assign_material(obj, SHELL)
+    return obj
+
+
 def log_bounds(name):
     bounds = world_bounds(name)
     print(
@@ -363,21 +440,7 @@ def build_side(side):
         z_inset=2.84,
     )
 
-    shell_profile = {
-        "primary_inset": 0.34,
-        "primary_depth": 0.12,
-        "secondary_inset": 0.18,
-        "secondary_depth": 0.06,
-    }
-
-    build_profiled_object(
-        f"V82_OvalPortalGlowShell_{side}",
-        SHELL,
-        [shell_box],
-        bevel_width=0.028,
-        bevel_segments=1,
-        profile=shell_profile,
-    )
+    build_sculpted_shell(f"V82_OvalPortalGlowShell_{side}", shell_box)
     build_box_object(
         f"V82_OvalPortalGlowGoldTrim_{side}",
         GOLD,
