@@ -577,8 +577,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       'V128_CenterScreenGoldInterruptRailArray',
       'V130_CenterScreenShadowCofferArray',
       'V131_WingScreenDepthBaffleArray_L',
-      'V22_WingScreenTopCoffer_L',
-      'V22_WingScreenBottomCoffer_L',
+      'V132_WingScreenShadowCofferArray_L',
       'V127_CrownScreenShadowCoffer',
     ] as const) {
       readMeshGeometry(nodeName, {
@@ -6031,6 +6030,42 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(right.vertexCount, 'V131_WingScreenDepthBaffleArray_R is too low-detail').toBeGreaterThanOrEqual(360);
     expect(materialNameFor('V131_WingScreenDepthBaffleArray_L')).toBe('V14_MatteBlackProductionRig');
     expect(materialNameFor('V131_WingScreenDepthBaffleArray_R')).toBe('V14_MatteBlackProductionRig');
+  });
+
+  it('replaces the wing-screen shadow coffer proxy bars with authored side arrays', () => {
+    expect(nodeNamesWithPrefix('V22_WingScreenTopCoffer_')).toHaveLength(0);
+    expect(nodeNamesWithPrefix('V22_WingScreenBottomCoffer_')).toHaveLength(0);
+
+    const requiredReplacementNodes = ['V132_WingScreenShadowCofferArray_L', 'V132_WingScreenShadowCofferArray_R'] as const;
+    expect(nodeNamesWithPrefix('V132_')).toEqual([...requiredReplacementNodes]);
+
+    for (const nodeName of requiredReplacementNodes) {
+      expectMainStageMarker(nodeName);
+      readMeshGeometry(nodeName);
+      expect(readConnectedComponents(nodeName)).toHaveLength(2);
+    }
+
+    const left = readMeshGeometry('V132_WingScreenShadowCofferArray_L');
+    const right = readMeshGeometry('V132_WingScreenShadowCofferArray_R');
+
+    expect(left.min[0]).toBeLessThan(-36.4);
+    expect(left.max[0]).toBeLessThan(-25.5);
+    expect(left.min[1]).toBeGreaterThan(14.8);
+    expect(left.max[1]).toBeGreaterThan(25.4);
+    expect(left.min[2]).toBeGreaterThan(16.8);
+    expect(left.max[2]).toBeGreaterThan(17.3);
+
+    expect(right.min[0]).toBeGreaterThan(25.5);
+    expect(right.max[0]).toBeGreaterThan(36.4);
+    expect(right.min[1]).toBeGreaterThan(14.8);
+    expect(right.max[1]).toBeGreaterThan(25.4);
+    expect(right.min[2]).toBeGreaterThan(16.8);
+    expect(right.max[2]).toBeGreaterThan(17.3);
+
+    expect(left.vertexCount, 'V132_WingScreenShadowCofferArray_L is too low-detail').toBeGreaterThanOrEqual(280);
+    expect(right.vertexCount, 'V132_WingScreenShadowCofferArray_R is too low-detail').toBeGreaterThanOrEqual(280);
+    expect(materialNameFor('V132_WingScreenShadowCofferArray_L')).toBe('V15_ShadowedInsetSeams');
+    expect(materialNameFor('V132_WingScreenShadowCofferArray_R')).toBe('V15_ShadowedInsetSeams');
   });
 
   it('replaces the oval side-screen shell proxies with authored shell-and-gold housings', () => {
