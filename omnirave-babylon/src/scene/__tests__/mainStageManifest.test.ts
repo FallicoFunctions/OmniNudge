@@ -8695,7 +8695,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(14.8);
     expect(leftArray.max[1] - leftArray.min[1]).toBeGreaterThan(1.0);
-    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(0.13);
+    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(0.16);
     expect(leftArray.min[0]).toBeLessThan(-32.9);
     expect(leftArray.max[0]).toBeLessThan(-17.45);
     expect(leftArray.min[1]).toBeGreaterThan(4.6);
@@ -8705,7 +8705,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(14.8);
     expect(rightArray.max[1] - rightArray.min[1]).toBeGreaterThan(1.0);
-    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(0.13);
+    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(0.16);
     expect(rightArray.min[0]).toBeGreaterThan(17.45);
     expect(rightArray.max[0]).toBeGreaterThan(32.9);
     expect(rightArray.min[1]).toBeGreaterThan(4.6);
