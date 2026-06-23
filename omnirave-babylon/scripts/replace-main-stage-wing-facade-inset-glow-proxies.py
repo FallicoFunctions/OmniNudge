@@ -203,8 +203,8 @@ def build_array(name, side, collection, components):
 
     bm = bmesh.new()
     for bounds in grouped_side_bounds(components, side):
-        y_min = bounds["y"][0] - 0.026
-        y_max = bounds["y"][1] + 0.026
+        y_min = bounds["y"][0] - 0.040
+        y_max = bounds["y"][1] + 0.030
         front_cap, back_cap = add_extruded_polygon_y(bm, glow_polygon(bounds), y_min, y_max)
         add_cap_detail_triangle(bm, front_cap, outward_y_offset=-0.008)
 
