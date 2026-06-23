@@ -167,8 +167,8 @@ def build_array(collection):
 
     bm = bmesh.new()
     for bounds in source_component_bounds():
-        y_min = bounds["y"][0] - 0.045
-        y_max = bounds["y"][1] + 0.045
+        y_min = bounds["y"][0] - 0.075
+        y_max = bounds["y"][1] + 0.075
         add_extruded_profile_y(bm, y_min, y_max, edge_profile(bounds))
 
     bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
