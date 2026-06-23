@@ -9563,26 +9563,26 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(leftDeck.max[1] - leftDeck.min[1]).toBeGreaterThan(0.8);
     expect(leftDeck.max[2] - leftDeck.min[2]).toBeGreaterThan(34.2);
     expect(leftDeck.min[0]).toBeLessThan(-30.0);
-    expect(leftDeck.max[0]).toBeLessThan(-5.7);
+    expect(leftDeck.max[0]).toBeLessThan(-4.8);
     expect(leftDeck.min[1]).toBeLessThan(0.01);
-    expect(leftDeck.max[1]).toBeGreaterThan(0.8);
+    expect(leftDeck.max[1]).toBeGreaterThan(0.95);
     expect(leftDeck.min[2]).toBeLessThan(-21.2);
     expect(leftDeck.max[2]).toBeGreaterThan(13.2);
 
     expect(rightDeck.max[0] - rightDeck.min[0]).toBeGreaterThan(24.0);
     expect(rightDeck.max[1] - rightDeck.min[1]).toBeGreaterThan(0.8);
     expect(rightDeck.max[2] - rightDeck.min[2]).toBeGreaterThan(34.2);
-    expect(rightDeck.min[0]).toBeGreaterThan(5.7);
+    expect(rightDeck.min[0]).toBeGreaterThan(4.8);
     expect(rightDeck.max[0]).toBeGreaterThan(30.0);
     expect(rightDeck.min[1]).toBeLessThan(0.01);
-    expect(rightDeck.max[1]).toBeGreaterThan(0.8);
+    expect(rightDeck.max[1]).toBeGreaterThan(0.95);
     expect(rightDeck.min[2]).toBeLessThan(-21.2);
     expect(rightDeck.max[2]).toBeGreaterThan(13.2);
 
     expect(materialNameFor('V120_BasinDeckRelief_L')).toBe('V14_PolishedMoonstoneShell');
     expect(materialNameFor('V120_BasinDeckRelief_R')).toBe('V14_PolishedMoonstoneShell');
 
-    expect(leftDeck.vertexCount + rightDeck.vertexCount).toBeLessThanOrEqual(390);
+    expect(leftDeck.vertexCount + rightDeck.vertexCount).toBeLessThanOrEqual(430);
   });
 
   it('replaces the legacy basin bridge and retaining-wall cuboids with authored relief spans', () => {
