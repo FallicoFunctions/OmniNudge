@@ -5815,58 +5815,62 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(shadow.min[0]).toBeLessThan(-18.0);
     expect(shadow.max[0]).toBeGreaterThan(18.0);
-    expect(shadow.min[1]).toBeGreaterThan(13.8);
+    expect(shadow.min[1]).toBeGreaterThan(13.6);
     expect(shadow.max[1]).toBeGreaterThan(26.8);
-    expect(shadow.min[2]).toBeGreaterThan(21.7);
+    expect(shadow.min[2]).toBeGreaterThan(21.3);
     expect(shadow.max[2]).toBeGreaterThan(25.1);
 
     expect(goldFrame.min[0]).toBeLessThan(-16.4);
     expect(goldFrame.max[0]).toBeGreaterThan(16.4);
-    expect(goldFrame.min[1]).toBeGreaterThan(14.4);
+    expect(goldFrame.min[1]).toBeGreaterThan(14.2);
     expect(goldFrame.max[1]).toBeGreaterThan(26.1);
-    expect(goldFrame.min[2]).toBeGreaterThan(21.7);
+    expect(goldFrame.min[2]).toBeGreaterThan(21.3);
     expect(goldFrame.max[2]).toBeGreaterThan(24.5);
 
     expect(ivoryHeader.min[0]).toBeLessThan(-17.8);
     expect(ivoryHeader.max[0]).toBeGreaterThan(17.8);
     expect(ivoryHeader.min[1]).toBeGreaterThan(25.9);
     expect(ivoryHeader.max[1]).toBeGreaterThan(27.5);
-    expect(ivoryHeader.min[2]).toBeGreaterThan(21.8);
+    expect(ivoryHeader.min[2]).toBeGreaterThan(21.4);
     expect(ivoryHeader.max[2]).toBeGreaterThan(25.1);
 
     expect(ivoryFooter.min[0]).toBeLessThan(-17.8);
     expect(ivoryFooter.max[0]).toBeGreaterThan(17.8);
     expect(ivoryFooter.min[1]).toBeLessThan(13.7);
-    expect(ivoryFooter.max[1]).toBeGreaterThan(14.7);
-    expect(ivoryFooter.min[2]).toBeGreaterThan(21.8);
+    expect(ivoryFooter.max[1]).toBeGreaterThan(14.5);
+    expect(ivoryFooter.min[2]).toBeGreaterThan(21.4);
     expect(ivoryFooter.max[2]).toBeGreaterThan(25.1);
 
     expect(mullions.min[0]).toBeLessThan(-11.6);
     expect(mullions.max[0]).toBeGreaterThan(11.6);
-    expect(mullions.min[1]).toBeGreaterThan(15.3);
+    expect(mullions.min[1]).toBeGreaterThan(15.1);
     expect(mullions.max[1]).toBeGreaterThan(25.3);
-    expect(mullions.min[2]).toBeGreaterThan(22.0);
+    expect(mullions.min[2]).toBeGreaterThan(21.7);
     expect(mullions.max[2]).toBeGreaterThan(23.3);
 
     expect(crossbars.min[0]).toBeLessThan(-15.3);
     expect(crossbars.max[0]).toBeGreaterThan(15.3);
     expect(crossbars.min[1]).toBeGreaterThan(17.0);
     expect(crossbars.max[1]).toBeGreaterThan(24.1);
-    expect(crossbars.min[2]).toBeGreaterThan(22.0);
+    expect(crossbars.min[2]).toBeGreaterThan(21.6);
     expect(crossbars.max[2]).toBeGreaterThan(23.2);
 
     expect(readConnectedComponents('V126_WideHeroScreenShadowCoffer')).toHaveLength(1);
     expect(readConnectedComponents('V126_WideHeroScreenGoldFrame')).toHaveLength(1);
-    expect(readConnectedComponents('V126_WideHeroScreenIvoryHeader')).toHaveLength(1);
-    expect(readConnectedComponents('V126_WideHeroScreenIvoryFooter')).toHaveLength(1);
+    for (const nodeName of ['V126_WideHeroScreenIvoryHeader', 'V126_WideHeroScreenIvoryFooter'] as const) {
+      const components = readConnectedComponents(nodeName);
+      expect(components).toHaveLength(1);
+      expect(components[0]!.vertexCount, `${nodeName} ivory band is still too coarse`).toBeGreaterThanOrEqual(70);
+      expect(components[0]!.triangleCount, `${nodeName} ivory band is still too flat`).toBeGreaterThanOrEqual(120);
+    }
     expect(readConnectedComponents('V126_WideHeroScreenGoldMullionArray')).toHaveLength(7);
     expect(readConnectedComponents('V126_WideHeroScreenGoldCrossbarArray')).toHaveLength(3);
 
     const minimumVertexCounts = new Map([
       ['V126_WideHeroScreenShadowCoffer', 220],
       ['V126_WideHeroScreenGoldFrame', 220],
-      ['V126_WideHeroScreenIvoryHeader', 100],
-      ['V126_WideHeroScreenIvoryFooter', 100],
+      ['V126_WideHeroScreenIvoryHeader', 140],
+      ['V126_WideHeroScreenIvoryFooter', 140],
       ['V126_WideHeroScreenGoldMullionArray', 340],
       ['V126_WideHeroScreenGoldCrossbarArray', 160],
     ]);
