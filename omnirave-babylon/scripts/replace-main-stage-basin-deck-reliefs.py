@@ -7,7 +7,7 @@ import bpy
 # Connection Map:
 #   V120_BasinDeckRelief_L outer shoulders <-> legacy BasinDeck_-1 footprint: >=0.18m X overlap to preserve the existing basin terrace reach
 #   V120_BasinDeckRelief_R outer shoulders <-> legacy BasinDeck_1 footprint: >=0.18m X overlap to preserve the existing basin terrace reach
-#   V120_BasinDeckRelief_L/R upper crown <-> basin promenade read: >=0.04m Z relief above the legacy slab cap so the decks stop reading as flat cuboids
+#   V120_BasinDeckRelief_L/R upper crown <-> basin promenade read: >=0.08m Z relief above the legacy slab cap so the decks stop reading as flat cuboids
 
 GROUPS = [
     ("BasinDeck_-1", "V120_BasinDeckRelief_L"),
@@ -95,7 +95,7 @@ def assign_material(obj, material_name):
     obj.data.materials.append(material)
 
 
-def finalize(obj, bevel_width=0.02, bevel_segments=2):
+def finalize(obj, bevel_width=0.02, bevel_segments=1):
     set_active(obj)
     bevel = obj.modifiers.new("OmniRaveBevel", "BEVEL")
     bevel.width = bevel_width
@@ -173,10 +173,10 @@ def build_loft_object(name, material_name, collection, loops):
 def deck_profile(bounds, flare, crown):
     x_center = midpoint(bounds, "x")
     x_half = span(bounds, "x") * 0.5 + 0.18
-    z_floor = bounds["z"][0] - 0.05
-    z_base = bounds["z"][0] + 0.04
-    z_cap = bounds["z"][1] + 0.04
-    z_crown = bounds["z"][1] + 0.17 + crown * 0.06
+    z_floor = bounds["z"][0] - 0.08
+    z_base = bounds["z"][0] + 0.03
+    z_cap = bounds["z"][1] + 0.06
+    z_crown = bounds["z"][1] + 0.23 + crown * 0.08
 
     outer = x_half * (1.0 + 0.02 * flare)
     shoulder = x_half * (0.88 + 0.03 * flare)
@@ -204,11 +204,11 @@ def deck_loops(bounds):
     y_max = bounds["y"][1] + 0.08
     y_span = y_max - y_min
     stations = [
-        (y_min, 0.62, 0.18),
-        (y_min + y_span * 0.18, 0.92, 0.54),
-        (midpoint(bounds, "y"), 1.0, 1.0),
-        (y_max - y_span * 0.18, 0.9, 0.52),
-        (y_max, 0.64, 0.2),
+        (y_min, 0.64, 0.24),
+        (y_min + y_span * 0.18, 0.96, 0.64),
+        (midpoint(bounds, "y"), 1.04, 1.18),
+        (y_max - y_span * 0.18, 0.94, 0.62),
+        (y_max, 0.66, 0.24),
     ]
     return [(y_value, deck_profile(bounds, flare, crown)) for y_value, flare, crown in stations]
 
@@ -275,17 +275,17 @@ def main():
 
     verify_span("V120_BasinDeckRelief_L", "x", 21.2)
     verify_span("V120_BasinDeckRelief_L", "y", 33.0)
-    verify_span("V120_BasinDeckRelief_L", "z", 0.46)
+    verify_span("V120_BasinDeckRelief_L", "z", 0.56)
     verify_extent("V120_BasinDeckRelief_L", "x", minimum=-28.8, maximum=-7.0)
     verify_extent("V120_BasinDeckRelief_L", "y", minimum=-12.8, maximum=20.8)
-    verify_extent("V120_BasinDeckRelief_L", "z", minimum=0.09, maximum=0.53)
+    verify_extent("V120_BasinDeckRelief_L", "z", minimum=0.08, maximum=0.61)
 
     verify_span("V120_BasinDeckRelief_R", "x", 21.2)
     verify_span("V120_BasinDeckRelief_R", "y", 33.0)
-    verify_span("V120_BasinDeckRelief_R", "z", 0.46)
+    verify_span("V120_BasinDeckRelief_R", "z", 0.56)
     verify_extent("V120_BasinDeckRelief_R", "x", minimum=7.0, maximum=28.8)
     verify_extent("V120_BasinDeckRelief_R", "y", minimum=-12.8, maximum=20.8)
-    verify_extent("V120_BasinDeckRelief_R", "z", minimum=0.09, maximum=0.53)
+    verify_extent("V120_BasinDeckRelief_R", "z", minimum=0.08, maximum=0.61)
 
     print(f"deck crown delta={left_bounds['z'][1] - bounds_map['V120_BasinDeckRelief_L']['z'][1]:.3f}")
     print(f"deck crown delta={right_bounds['z'][1] - bounds_map['V120_BasinDeckRelief_R']['z'][1]:.3f}")

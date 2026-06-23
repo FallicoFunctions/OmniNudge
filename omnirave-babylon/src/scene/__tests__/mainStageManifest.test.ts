@@ -9565,22 +9565,22 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(readConnectedComponents('V120_BasinDeckRelief_R')).toHaveLength(1);
 
     expect(leftDeck.max[0] - leftDeck.min[0]).toBeGreaterThan(24.0);
-    expect(leftDeck.max[1] - leftDeck.min[1]).toBeGreaterThan(0.8);
+    expect(leftDeck.max[1] - leftDeck.min[1]).toBeGreaterThan(1.22);
     expect(leftDeck.max[2] - leftDeck.min[2]).toBeGreaterThan(34.2);
     expect(leftDeck.min[0]).toBeLessThan(-30.0);
     expect(leftDeck.max[0]).toBeLessThan(-4.8);
     expect(leftDeck.min[1]).toBeLessThan(0.01);
-    expect(leftDeck.max[1]).toBeGreaterThan(0.95);
+    expect(leftDeck.max[1]).toBeGreaterThan(1.13);
     expect(leftDeck.min[2]).toBeLessThan(-21.2);
     expect(leftDeck.max[2]).toBeGreaterThan(13.2);
 
     expect(rightDeck.max[0] - rightDeck.min[0]).toBeGreaterThan(24.0);
-    expect(rightDeck.max[1] - rightDeck.min[1]).toBeGreaterThan(0.8);
+    expect(rightDeck.max[1] - rightDeck.min[1]).toBeGreaterThan(1.22);
     expect(rightDeck.max[2] - rightDeck.min[2]).toBeGreaterThan(34.2);
     expect(rightDeck.min[0]).toBeGreaterThan(4.8);
     expect(rightDeck.max[0]).toBeGreaterThan(30.0);
     expect(rightDeck.min[1]).toBeLessThan(0.01);
-    expect(rightDeck.max[1]).toBeGreaterThan(0.95);
+    expect(rightDeck.max[1]).toBeGreaterThan(1.13);
     expect(rightDeck.min[2]).toBeLessThan(-21.2);
     expect(rightDeck.max[2]).toBeGreaterThan(13.2);
 
