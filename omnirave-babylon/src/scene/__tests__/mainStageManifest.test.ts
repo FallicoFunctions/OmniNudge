@@ -9306,6 +9306,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(shadowLeft.max[0]).toBeLessThan(-10.2);
     expect(shadowLeft.min[1]).toBeGreaterThan(7.8);
     expect(shadowLeft.max[1]).toBeGreaterThan(33.8);
+    expect(shadowLeft.max[2] - shadowLeft.min[2]).toBeGreaterThan(0.45);
     expect(shadowLeft.min[2]).toBeGreaterThan(25.3);
     expect(shadowLeft.max[2]).toBeLessThan(25.8);
 
@@ -9313,6 +9314,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(shadowRight.max[0]).toBeGreaterThan(10.4);
     expect(shadowRight.min[1]).toBeGreaterThan(7.8);
     expect(shadowRight.max[1]).toBeGreaterThan(33.8);
+    expect(shadowRight.max[2] - shadowRight.min[2]).toBeGreaterThan(0.45);
     expect(shadowRight.min[2]).toBeGreaterThan(25.3);
     expect(shadowRight.max[2]).toBeLessThan(25.8);
 
