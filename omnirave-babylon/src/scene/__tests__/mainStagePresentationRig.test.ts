@@ -26,6 +26,20 @@ describe('createMainStagePresentationRig', () => {
     expect(scene.environmentIntensity).toBeGreaterThanOrEqual(0.75);
     expect(scene.environmentIntensity).toBeLessThanOrEqual(0.9);
     expect(rig.environmentTexture.level).toBeLessThanOrEqual(0.9);
+    expect(rig.backdropRoot.name).toBe('main-stage-presentation-backdrop');
+    expect(scene.getMeshByName('main-stage-celestial-vault')?.parent?.name).toBe(
+      'main-stage-presentation-backdrop',
+    );
+    expect(scene.getMeshByName('main-stage-horizon-shroud')?.parent?.name).toBe(
+      'main-stage-presentation-backdrop',
+    );
+    expect(scene.getMeshByName('main-stage-arrival-void-veil')?.parent?.name).toBe(
+      'main-stage-presentation-backdrop',
+    );
+    expect(scene.getMaterialByName('main-stage-celestial-vault-material')?.getClassName()).toBe(
+      'PBRMaterial',
+    );
+    expect(scene.getMaterialByName('main-stage-arrival-void-veil-material')).not.toBeNull();
     expect(rig.pipeline.name).toBe('main-stage-presentation-pipeline');
     expect(rig.pipeline.bloomEnabled).toBe(true);
     expect(rig.pipeline.fxaaEnabled).toBe(true);

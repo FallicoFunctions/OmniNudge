@@ -1,10 +1,15 @@
 import type { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
+import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline.js';
+import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
+import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { BaseTexture } from '@babylonjs/core/Materials/Textures/baseTexture.js';
 import { RawCubeTexture } from '@babylonjs/core/Materials/Textures/rawCubeTexture.js';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import type { Scene } from '@babylonjs/core/scene.js';
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 
 const ENVIRONMENT_TEXTURE_SIZE = 1;
 const rgb = (red: number, green: number, blue: number) => new Uint8Array([red, green, blue]);
@@ -12,9 +17,10 @@ const rgb = (red: number, green: number, blue: number) => new Uint8Array([red, g
 export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   const environmentTexture = createEnvironmentTexture(scene);
   environmentTexture.name = 'main-stage-night-reflection-env';
-  environmentTexture.level = 0.86;
+  environmentTexture.level = 0.88;
   scene.environmentTexture = environmentTexture;
-  scene.environmentIntensity = 0.86;
+  scene.environmentIntensity = 0.88;
+  const backdropRoot = createPresentationBackdrop(scene);
 
   const pipeline = new DefaultRenderingPipeline(
     'main-stage-presentation-pipeline',
@@ -35,6 +41,7 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   pipeline.sharpenEnabled = true;
 
   return {
+    backdropRoot,
     environmentTexture,
     pipeline,
   };
@@ -64,4 +71,88 @@ function createEnvironmentTexture(scene: Scene) {
   } catch {
     return new BaseTexture(scene);
   }
+}
+
+function createPresentationBackdrop(scene: Scene) {
+  const root = new TransformNode('main-stage-presentation-backdrop', scene);
+
+  const celestialVault = MeshBuilder.CreateSphere(
+    'main-stage-celestial-vault',
+    {
+      diameter: 520,
+      segments: 24,
+      sideOrientation: Mesh.BACKSIDE,
+    },
+    scene,
+  );
+  celestialVault.parent = root;
+  celestialVault.isPickable = false;
+  celestialVault.infiniteDistance = true;
+  celestialVault.material = createCelestialVaultMaterial(scene);
+
+  const horizonShroud = MeshBuilder.CreateCylinder(
+    'main-stage-horizon-shroud',
+    {
+      height: 96,
+      diameterTop: 340,
+      diameterBottom: 430,
+      tessellation: 64,
+      sideOrientation: Mesh.BACKSIDE,
+    },
+    scene,
+  );
+  horizonShroud.parent = root;
+  horizonShroud.position.y = 18;
+  horizonShroud.isPickable = false;
+  horizonShroud.material = createHorizonShroudMaterial(scene);
+
+  const arrivalVoidVeil = MeshBuilder.CreateGround(
+    'main-stage-arrival-void-veil',
+    {
+      width: 360,
+      height: 360,
+      subdivisions: 2,
+    },
+    scene,
+  );
+  arrivalVoidVeil.parent = root;
+  arrivalVoidVeil.position.y = -0.14;
+  arrivalVoidVeil.isPickable = false;
+  arrivalVoidVeil.material = createArrivalVoidVeilMaterial(scene);
+
+  return root;
+}
+
+function createCelestialVaultMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-celestial-vault-material', scene);
+  material.backFaceCulling = false;
+  material.unlit = true;
+  material.albedoColor = new Color3(0.018, 0.03, 0.06);
+  material.reflectivityColor = new Color3(0, 0, 0);
+
+  return material;
+}
+
+function createHorizonShroudMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-horizon-shroud-material', scene);
+  material.backFaceCulling = false;
+  material.unlit = true;
+  material.albedoColor = new Color3(0.01, 0.015, 0.03);
+  material.alpha = 0.92;
+
+  return material;
+}
+
+function createArrivalVoidVeilMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-arrival-void-veil-material', scene);
+  material.albedoColor = new Color3(0.018, 0.022, 0.03);
+  material.metallic = 0.08;
+  material.roughness = 0.26;
+  material.alpha = 0.96;
+  material.environmentIntensity = 1.12;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.38;
+  material.clearCoat.roughness = 0.08;
+
+  return material;
 }
