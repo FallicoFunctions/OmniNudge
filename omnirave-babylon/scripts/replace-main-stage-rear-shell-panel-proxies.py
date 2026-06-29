@@ -169,12 +169,12 @@ def panel_profile(bounds, station_t, edge_pull):
     height = span(bounds, "z")
     arch = math.sin(station_t * math.pi)
 
-    back_y = y_min - 0.10 - arch * 0.015
-    inner_y = center_y - depth * 0.18 - arch * 0.01
-    seam_y = y_min + depth * 0.18
-    shoulder_y = y_max + 0.07 + arch * 0.02
-    face_y = y_max + 0.11 + arch * 0.03
-    lip_y = y_max + 0.065
+    back_y = y_min - 0.13 - arch * 0.02
+    inner_y = center_y - depth * 0.24 - arch * 0.014
+    seam_y = y_min + depth * 0.12
+    shoulder_y = y_max + 0.09 + arch * 0.028
+    face_y = y_max + 0.145 + arch * 0.038
+    lip_y = y_max + 0.09
 
     base_z = z_min - 0.09 + edge_pull * 0.05
     knee_z = z_min + height * (0.20 - edge_pull * 0.02)
@@ -211,7 +211,7 @@ def panel_component_loops(bounds):
             profile.append(
                 (
                     y_value - edge_pull * 0.025,
-                    z_value - edge_pull * 0.08,
+                    z_value - edge_pull * 0.06,
                 )
             )
         loops.append((station_x, profile))
