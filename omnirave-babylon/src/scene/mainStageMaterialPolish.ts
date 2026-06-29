@@ -234,15 +234,16 @@ function applyWingFacadeShadowFrameOverride(material: PBRMaterial) {
 }
 
 function applyVipShellFasciaOverride(material: PBRMaterial) {
-  material.albedoColor = new Color3(0.4, 0.43, 0.5);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.22, 0.25, 0.3);
   material.emissiveColor = new Color3(0.01, 0.015, 0.02);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.02;
-  material.roughness = 0.76;
+  material.roughness = 0.86;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.12;
-  material.clearCoat.roughness = 0.38;
-  material.environmentIntensity = 0.36;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.54;
+  material.environmentIntensity = 0.24;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'vip-shell-fascia',
