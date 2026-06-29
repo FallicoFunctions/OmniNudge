@@ -73,6 +73,30 @@ describe('createMainStageProductionSurfaces', () => {
     expect(scene?.getMeshByName('main-stage-wing-screen-right-mullion-01')).not.toBeNull();
     expect(scene?.getMeshByName('main-stage-wing-screen-right-mullion-02')).not.toBeNull();
     expect(scene?.getMeshByName('main-stage-center-celestial-screen-crossbar')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-celestial-inset')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-celestial-halo')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-celestial-portal-ring')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-celestial-latitude-north')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-celestial-latitude-south')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-celestial-spine-left')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-celestial-spine-right')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-oracle-inset')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-oracle-halo')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-oracle-sigil-ring')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-oracle-pillar-left')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-oracle-pillar-right')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-left-inset')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-left-inner-frame')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-left-scanline-01')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-left-scanline-06')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-left-rail-left')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-left-rail-right')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-right-inset')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-right-inner-frame')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-right-scanline-01')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-right-scanline-06')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-right-rail-left')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-right-rail-right')).not.toBeNull();
 
     const wingHousing = scene?.getMeshByName('main-stage-wing-screen-right-housing');
     expect(wingHousing?.metadata).toMatchObject({
@@ -101,6 +125,28 @@ describe('createMainStageProductionSurfaces', () => {
     expect(housingMaterial?.alpha).toBe(1);
     expect(housingMaterial?.metallic).toBeGreaterThanOrEqual(0.4);
     expect(housingMaterial?.roughness).toBeLessThanOrEqual(0.42);
+
+    const focalMaterial = scene?.getMaterialByName('main-stage-screen-focal-material') as
+      | PBRMaterial
+      | undefined;
+    expect(focalMaterial?.emissiveIntensity).toBeGreaterThanOrEqual(0.48);
+    expect(focalMaterial?.alpha).toBeLessThanOrEqual(0.38);
+
+    const haloMaterial = scene?.getMaterialByName('main-stage-screen-halo-material') as
+      | PBRMaterial
+      | undefined;
+    expect(haloMaterial?.emissiveIntensity).toBeGreaterThanOrEqual(0.9);
+    expect(haloMaterial?.alpha).toBeLessThanOrEqual(0.18);
+
+    const scanlineCount = scene?.meshes.filter(
+      (mesh) => mesh.metadata?.productionRole === 'screen-scanline',
+    ).length;
+    expect(scanlineCount).toBeGreaterThanOrEqual(12);
+
+    const focalMeshCount = scene?.meshes.filter(
+      (mesh) => mesh.metadata?.productionRole === 'screen-focal',
+    ).length;
+    expect(focalMeshCount).toBeGreaterThanOrEqual(8);
 
     const mullionCount = scene?.meshes.filter((mesh) => mesh.metadata?.productionRole === 'screen-mullion').length;
     expect(mullionCount).toBeGreaterThanOrEqual(7);
