@@ -97,3 +97,9 @@ node_modules/
 **/dist/
 backend/dump.rdb
 frontend/storybook-static/
+
+# Local generated / non-product artifacts
+.git-lfs/
+.superpowers/
+TMP_MAIN_STAGE_TEST.glb
+docs/superpowers/plans/
