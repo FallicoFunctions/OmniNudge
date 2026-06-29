@@ -42,9 +42,11 @@ describe('createMainStageProductionSurfaces', () => {
     const centerMaterial = rig.surfaces[0].material as PBRMaterial;
     expect(centerMaterial.name).toBe('main-stage-celestial-screen-material');
     expect(centerMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.18);
-    expect(centerMaterial.emissiveIntensity).toBeLessThanOrEqual(0.42);
-    expect(centerMaterial.alpha).toBeLessThanOrEqual(0.24);
+    expect(centerMaterial.emissiveIntensity).toBeLessThanOrEqual(0.26);
+    expect(centerMaterial.alpha).toBeLessThanOrEqual(0.16);
     expect(centerMaterial.backFaceCulling).toBe(false);
+    expect(centerMaterial.metallic).toBeGreaterThanOrEqual(0.1);
+    expect(centerMaterial.roughness).toBeLessThanOrEqual(0.26);
 
     const accentSurface = rig.surfaces.find(
       (surface) => surface.name === 'main-stage-center-celestial-horizon-line',
@@ -53,7 +55,8 @@ describe('createMainStageProductionSurfaces', () => {
     const accentMaterial = accentSurface?.material as PBRMaterial | undefined;
     expect(accentMaterial?.name).toBe('main-stage-celestial-accent-material');
     expect(accentMaterial?.emissiveIntensity).toBeGreaterThan(centerMaterial.emissiveIntensity);
-    expect(accentMaterial?.emissiveIntensity).toBeLessThanOrEqual(1.75);
+    expect(accentMaterial?.emissiveIntensity).toBeLessThanOrEqual(1.15);
+    expect(accentMaterial?.alpha).toBeLessThanOrEqual(0.38);
 
     const screenBaseSurfaces = rig.surfaces.filter(
       (surface) => surface.metadata?.productionRole === 'screen-base',
@@ -67,6 +70,6 @@ describe('createMainStageProductionSurfaces', () => {
       const material = surface.material as PBRMaterial;
       return total + surface.metadata.productionArea * material.emissiveIntensity * material.alpha;
     }, 0);
-    expect(weightedScreenGlow).toBeLessThanOrEqual(18);
+    expect(weightedScreenGlow).toBeLessThanOrEqual(7);
   });
 });

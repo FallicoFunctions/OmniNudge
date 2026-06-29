@@ -116,28 +116,28 @@ export function createMainStageProductionSurfaces(scene: Scene) {
 
 function createCelestialScreenMaterial(scene: Scene) {
   const material = new PBRMaterial('main-stage-celestial-screen-material', scene);
-  material.albedoColor = new Color3(0.02, 0.11, 0.22);
-  material.emissiveColor = new Color3(0.01, 0.18, 0.28);
-  material.emissiveIntensity = 0.32;
-  material.metallic = 0.05;
-  material.roughness = 0.46;
-  material.alpha = 0.2;
+  material.albedoColor = new Color3(0.012, 0.075, 0.14);
+  material.emissiveColor = new Color3(0.008, 0.14, 0.22);
+  material.emissiveIntensity = 0.24;
+  material.metallic = 0.14;
+  material.roughness = 0.22;
+  material.alpha = 0.12;
   material.transparencyMode = Material.MATERIAL_ALPHABLEND;
   material.backFaceCulling = false;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.18;
-  material.clearCoat.roughness = 0.18;
+  material.clearCoat.intensity = 0.34;
+  material.clearCoat.roughness = 0.12;
   return material;
 }
 
 function createCelestialAccentMaterial(scene: Scene) {
   const material = new PBRMaterial('main-stage-celestial-accent-material', scene);
-  material.albedoColor = new Color3(0.05, 0.45, 0.68);
-  material.emissiveColor = new Color3(0.04, 0.78, 1);
-  material.emissiveIntensity = 1.45;
+  material.albedoColor = new Color3(0.026, 0.24, 0.38);
+  material.emissiveColor = new Color3(0.028, 0.48, 0.7);
+  material.emissiveIntensity = 0.96;
   material.metallic = 0.02;
   material.roughness = 0.36;
-  material.alpha = 0.58;
+  material.alpha = 0.34;
   material.transparencyMode = Material.MATERIAL_ALPHABLEND;
   material.backFaceCulling = false;
   return material;
@@ -145,12 +145,12 @@ function createCelestialAccentMaterial(scene: Scene) {
 
 function createApproachRibbonMaterial(scene: Scene) {
   const material = new PBRMaterial('main-stage-approach-ribbon-material', scene);
-  material.albedoColor = new Color3(0.02, 0.55, 0.72);
-  material.emissiveColor = new Color3(0.02, 0.62, 0.74);
-  material.emissiveIntensity = 0.95;
+  material.albedoColor = new Color3(0.016, 0.26, 0.34);
+  material.emissiveColor = new Color3(0.014, 0.36, 0.46);
+  material.emissiveIntensity = 0.52;
   material.metallic = 0.12;
-  material.roughness = 0.4;
-  material.alpha = 0.42;
+  material.roughness = 0.3;
+  material.alpha = 0.24;
   material.transparencyMode = Material.MATERIAL_ALPHABLEND;
   material.backFaceCulling = false;
   return material;
