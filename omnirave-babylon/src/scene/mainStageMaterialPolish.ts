@@ -135,6 +135,32 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V113_CrownShellLamellaArray_')) {
+      const cacheKey = `${material.uniqueId}:crown-shell-lamella`;
+      let lamellaMaterial = clonedMaterials.get(cacheKey);
+      if (!lamellaMaterial) {
+        lamellaMaterial = material.clone(`${material.name}__crown-shell-lamella`);
+        applyCrownShellLamellaOverride(lamellaMaterial);
+        clonedMaterials.set(cacheKey, lamellaMaterial);
+      }
+
+      mesh.material = lamellaMaterial;
+      continue;
+    }
+
+    if (mesh.name.startsWith('V90_BasinStoneCopingArray_')) {
+      const cacheKey = `${material.uniqueId}:basin-stone-coping`;
+      let copingMaterial = clonedMaterials.get(cacheKey);
+      if (!copingMaterial) {
+        copingMaterial = material.clone(`${material.name}__basin-stone-coping`);
+        applyBasinStoneCopingOverride(copingMaterial);
+        clonedMaterials.set(cacheKey, copingMaterial);
+      }
+
+      mesh.material = copingMaterial;
+      continue;
+    }
+
     if (mesh.name.startsWith('V31_SideGlassLens_')) {
       const cacheKey = `${material.uniqueId}:side-screen-glass-lens`;
       let lensMaterial = clonedMaterials.get(cacheKey);
@@ -351,6 +377,40 @@ function applyApproachReflectionUnderlayOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'approach-reflection-underlay',
+  };
+}
+
+function applyCrownShellLamellaOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.22, 0.18, 0.08);
+  material.emissiveColor = new Color3(0.01, 0.008, 0.004);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.22;
+  material.roughness = 0.82;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.78;
+  material.environmentIntensity = 0.18;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-shell-lamella',
+  };
+}
+
+function applyBasinStoneCopingOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.44, 0.42, 0.38);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.02;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-stone-coping',
   };
 }
 
