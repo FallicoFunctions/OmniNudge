@@ -209,4 +209,74 @@ describe('polishMainStageMaterials', () => {
     expect(sideLensMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
     expect(sideLensMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
   });
+
+  it('regrades the spawn field and approach deck into authored night materials so the entry view does not read as muddy proxy texture', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedStoneMaterial = new PBRMaterial('V19_DeepWetArrivalStone', scene);
+    sharedStoneMaterial.albedoColor.set(0.62, 0.58, 0.5);
+    sharedStoneMaterial.emissiveColor.set(0.06, 0.04, 0.03);
+    sharedStoneMaterial.emissiveIntensity = 0.16;
+    sharedStoneMaterial.roughness = 0.42;
+    const sharedAlbedoTexture = {
+      clone() {
+        return this;
+      },
+      name: 'deep-wet-arrival-stone-albedo',
+    } as unknown as PBRMaterial['albedoTexture'];
+    sharedStoneMaterial.albedoTexture = sharedAlbedoTexture;
+
+    const untouchedStone = MeshBuilder.CreateBox('V19_DeepWetArrivalStone_01', { size: 1 }, scene);
+    untouchedStone.material = sharedStoneMaterial;
+
+    const festivalField = MeshBuilder.CreateBox('FestivalField', { size: 1 }, scene);
+    festivalField.material = sharedStoneMaterial;
+
+    const approachPaver = MeshBuilder.CreateBox('V34_ApproachPaverField', { size: 1 }, scene);
+    approachPaver.material = sharedStoneMaterial;
+
+    const reflectionUnderlay = MeshBuilder.CreateBox('V34_ApproachReflectionUnderlay', { size: 1 }, scene);
+    reflectionUnderlay.material = sharedStoneMaterial;
+
+    polishMainStageMaterials([untouchedStone, festivalField, approachPaver, reflectionUnderlay]);
+
+    expect(untouchedStone.material).toBe(sharedStoneMaterial);
+    expect(festivalField.material).toBeInstanceOf(PBRMaterial);
+    expect(approachPaver.material).toBeInstanceOf(PBRMaterial);
+    expect(reflectionUnderlay.material).toBeInstanceOf(PBRMaterial);
+    expect(festivalField.material).not.toBe(sharedStoneMaterial);
+    expect(approachPaver.material).not.toBe(sharedStoneMaterial);
+    expect(reflectionUnderlay.material).not.toBe(sharedStoneMaterial);
+
+    const festivalFieldMaterial = festivalField.material as PBRMaterial;
+    const approachPaverMaterial = approachPaver.material as PBRMaterial;
+    const reflectionUnderlayMaterial = reflectionUnderlay.material as PBRMaterial;
+
+    expect(festivalFieldMaterial.metadata?.mainStageMaterialPolish).toBe('wet');
+    expect(festivalFieldMaterial.metadata?.mainStageMaterialOverride).toBe('festival-field-night');
+    expect(festivalFieldMaterial.albedoTexture).toBeNull();
+    expect(festivalFieldMaterial.albedoColor.r).toBeLessThanOrEqual(0.12);
+    expect(festivalFieldMaterial.albedoColor.g).toBeLessThanOrEqual(0.13);
+    expect(festivalFieldMaterial.albedoColor.b).toBeLessThanOrEqual(0.16);
+    expect(festivalFieldMaterial.roughness).toBeGreaterThanOrEqual(0.8);
+    expect(festivalFieldMaterial.environmentIntensity).toBeLessThanOrEqual(0.32);
+
+    expect(approachPaverMaterial.metadata?.mainStageMaterialPolish).toBe('wet');
+    expect(approachPaverMaterial.metadata?.mainStageMaterialOverride).toBe('approach-paver-field');
+    expect(approachPaverMaterial.albedoTexture).toBeNull();
+    expect(approachPaverMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(approachPaverMaterial.albedoColor.g).toBeLessThanOrEqual(0.18);
+    expect(approachPaverMaterial.albedoColor.b).toBeLessThanOrEqual(0.18);
+    expect(approachPaverMaterial.roughness).toBeGreaterThanOrEqual(0.5);
+    expect(approachPaverMaterial.clearCoat.intensity).toBeGreaterThanOrEqual(0.2);
+
+    expect(reflectionUnderlayMaterial.metadata?.mainStageMaterialPolish).toBe('wet');
+    expect(reflectionUnderlayMaterial.metadata?.mainStageMaterialOverride).toBe('approach-reflection-underlay');
+    expect(reflectionUnderlayMaterial.albedoTexture).toBeNull();
+    expect(reflectionUnderlayMaterial.alpha).toBeGreaterThanOrEqual(0.94);
+    expect(reflectionUnderlayMaterial.roughness).toBeLessThanOrEqual(0.26);
+    expect(reflectionUnderlayMaterial.clearCoat.intensity).toBeGreaterThanOrEqual(0.55);
+    expect(reflectionUnderlayMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.72);
+  });
 });
