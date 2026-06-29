@@ -171,4 +171,42 @@ describe('polishMainStageMaterials', () => {
     expect(fasciaMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(fasciaMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
   });
+
+  it('gives the side screen glass lens a smoked transparent finish so the VIP terrace view does not read as a cyan card', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedLensMaterial = new PBRMaterial('V20_CelestialCyanGlass', scene);
+    sharedLensMaterial.albedoColor.set(0.42, 0.86, 0.98);
+    sharedLensMaterial.emissiveColor.set(0.08, 0.3, 0.4);
+    sharedLensMaterial.emissiveIntensity = 0.34;
+    sharedLensMaterial.alpha = 1;
+    sharedLensMaterial.environmentIntensity = 0.82;
+
+    const centerLens = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    centerLens.material = sharedLensMaterial;
+
+    const sideLens = MeshBuilder.CreateBox('V31_SideGlassLens_L', { size: 1 }, scene);
+    sideLens.material = sharedLensMaterial;
+
+    polishMainStageMaterials([centerLens, sideLens]);
+
+    expect(centerLens.material).toBe(sharedLensMaterial);
+    expect(sideLens.material).toBeInstanceOf(PBRMaterial);
+    expect(sideLens.material).not.toBe(sharedLensMaterial);
+
+    const centerLensMaterial = centerLens.material as PBRMaterial;
+    const sideLensMaterial = sideLens.material as PBRMaterial;
+    expect(sideLensMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(sideLensMaterial.metadata?.mainStageMaterialOverride).toBe('side-screen-glass-lens');
+    expect(centerLensMaterial.alpha).toBe(1);
+    expect(sideLensMaterial.alpha).toBeLessThanOrEqual(0.5);
+    expect(sideLensMaterial.albedoColor.r).toBeLessThanOrEqual(0.12);
+    expect(sideLensMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(sideLensMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(sideLensMaterial.emissiveIntensity).toBeLessThanOrEqual(0.12);
+    expect(sideLensMaterial.roughness).toBeGreaterThanOrEqual(0.08);
+    expect(sideLensMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+    expect(sideLensMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+  });
 });
