@@ -103,3 +103,5 @@ frontend/storybook-static/
 .superpowers/
 TMP_MAIN_STAGE_TEST.glb
 docs/superpowers/plans/
+frontend/playwright-report/
+frontend/test-results/
