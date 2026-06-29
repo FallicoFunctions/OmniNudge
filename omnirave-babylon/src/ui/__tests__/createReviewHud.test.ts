@@ -9,8 +9,30 @@ describe('createReviewHud', () => {
 
     createReviewHud(host, {
       checkpoints: [
-        { id: 'spawn_reveal', x: 0, y: 1.7, z: -48 },
-        { id: 'vip_terrace', x: 22, y: 8.5, z: 18 },
+        {
+          id: 'spawn_reveal',
+          x: 0,
+          y: 1.7,
+          z: -48,
+          camera: {
+            alpha: -Math.PI / 2,
+            beta: 1.08,
+            radius: 60,
+            focusOffset: { x: 0, y: 8, z: 44 },
+          },
+        },
+        {
+          id: 'vip_terrace',
+          x: 22,
+          y: 8.5,
+          z: 18,
+          camera: {
+            alpha: -2.8,
+            beta: 1,
+            radius: 38,
+            focusOffset: { x: -10, y: 3, z: -14 },
+          },
+        },
       ],
       onSelectCheckpoint,
     });
@@ -27,6 +49,17 @@ describe('createReviewHud', () => {
 
     vipButton?.click();
 
-    expect(onSelectCheckpoint).toHaveBeenCalledWith({ id: 'vip_terrace', x: 22, y: 8.5, z: 18 });
+    expect(onSelectCheckpoint).toHaveBeenCalledWith({
+      id: 'vip_terrace',
+      x: 22,
+      y: 8.5,
+      z: 18,
+      camera: {
+        alpha: -2.8,
+        beta: 1,
+        radius: 38,
+        focusOffset: { x: -10, y: 3, z: -14 },
+      },
+    });
   });
 });

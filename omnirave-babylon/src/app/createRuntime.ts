@@ -50,6 +50,9 @@ export async function createRuntime(host: HTMLElement) {
       checkpoints: reviewRuntime?.checkpoints,
       onSelectCheckpoint(checkpoint) {
         reviewRuntime?.playerRig?.root.position.set(checkpoint.x, checkpoint.y, checkpoint.z);
+        if (checkpoint.camera) {
+          reviewRuntime?.cameraRig?.applyCheckpointView(checkpoint.camera);
+        }
       },
     });
     perfOverlay = createPerfOverlay(host);

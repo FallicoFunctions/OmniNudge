@@ -1,9 +1,4 @@
-export interface ReviewCheckpoint {
-  id: string;
-  x: number;
-  y: number;
-  z: number;
-}
+import type { ReviewCheckpoint } from '../scene/reviewRouteData';
 
 export interface CreateReviewHudOptions {
   checkpoints?: ReviewCheckpoint[];
