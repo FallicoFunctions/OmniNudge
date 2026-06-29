@@ -74,6 +74,7 @@ describe('createMainStageScene', () => {
     expect(scene.environmentTexture?.name).toBe('main-stage-night-reflection-env');
     expect(scene.metadata?.reviewRuntime?.reviewAvatar).toBeDefined();
     expect(scene.getTransformNodeByName('review-avatar-root')?.parent?.name).toBe('player-avatar-anchor');
+    expect(scene.getTransformNodeByName('review-camera-target')).not.toBeNull();
     expect(scene.lights.map((light) => light.name)).toEqual(
       expect.arrayContaining(['main-stage-hemi-light', 'main-stage-key-light']),
     );
@@ -88,9 +89,11 @@ describe('createMainStageScene', () => {
     const camera = scene.activeCamera as ArcRotateCamera | null;
 
     expect(camera).not.toBeNull();
-    expect(camera!.radius).toBe(60);
-    expect(camera!.alpha).toBeCloseTo(-Math.PI / 2);
-    expect(camera!.beta).toBeCloseTo(1.1);
+    expect(camera!.position.y).toBeGreaterThan(20);
+    expect(camera!.position.z).toBeLessThan(-90);
+    expect(camera!.lockedTarget?.name).toBe('review-camera-target');
+    expect((camera!.lockedTarget as TransformNode).position.y).toBeCloseTo(14);
+    expect((camera!.lockedTarget as TransformNode).position.z).toBeCloseTo(12);
 
     camera!.radius = 20;
     scene.render();

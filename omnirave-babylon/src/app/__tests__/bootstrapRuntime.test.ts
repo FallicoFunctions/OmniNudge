@@ -130,12 +130,30 @@ describe('createRuntime', () => {
     }));
     const sceneRender = vi.fn();
     const playerPositionSet = vi.fn();
+    const applyCheckpointView = vi.fn();
     const scene = {
       pick: scenePick,
       render: sceneRender,
       metadata: {
         reviewRuntime: {
-          checkpoints: [{ id: 'spawn_reveal', x: 0, y: 1.7, z: -48 }],
+          checkpoints: [
+            {
+              id: 'spawn_reveal',
+              x: 0,
+              y: 1.7,
+              z: -48,
+              camera: {
+                alpha: -Math.PI / 2,
+                beta: 1.08,
+                radius: 60,
+                focusOffset: { x: 0, y: 8, z: 44 },
+                positionOffset: { x: 0, y: 26.3, z: -57 },
+              },
+            },
+          ],
+          cameraRig: {
+            applyCheckpointView,
+          },
           playerRig: {
             root: {
               position: {
@@ -190,6 +208,13 @@ describe('createRuntime', () => {
     );
     host.querySelector<HTMLButtonElement>('[data-review-checkpoint="spawn_reveal"]')?.click();
     expect(playerPositionSet).toHaveBeenCalledWith(0, 1.7, -48);
+    expect(applyCheckpointView).toHaveBeenCalledWith({
+      alpha: -Math.PI / 2,
+      beta: 1.08,
+      radius: 60,
+      focusOffset: { x: 0, y: 8, z: 44 },
+      positionOffset: { x: 0, y: 26.3, z: -57 },
+    });
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
     expect(engineDispose).not.toHaveBeenCalled();
   });
