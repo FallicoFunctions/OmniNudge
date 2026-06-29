@@ -93,6 +93,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       mesh.material = fasciaMaterial;
+      continue;
+    }
+
+    if (mesh.name.startsWith('V31_SideGlassLens_')) {
+      const cacheKey = `${material.uniqueId}:side-screen-glass-lens`;
+      let lensMaterial = clonedMaterials.get(cacheKey);
+      if (!lensMaterial) {
+        lensMaterial = material.clone(`${material.name}__side-screen-glass-lens`);
+        applySideScreenGlassLensOverride(lensMaterial);
+        clonedMaterials.set(cacheKey, lensMaterial);
+      }
+
+      mesh.material = lensMaterial;
     }
   }
 }
@@ -247,5 +260,23 @@ function applyVipShellFasciaOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'vip-shell-fascia',
+  };
+}
+
+function applySideScreenGlassLensOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.08, 0.18, 0.24);
+  material.emissiveColor = new Color3(0.01, 0.04, 0.06);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.42;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.18;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.3;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'side-screen-glass-lens',
   };
 }
