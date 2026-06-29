@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -100,40 +102,13 @@ func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 
-		// In production, restrict this to your frontend domain
-		allowedOrigins := []string{
-			"https://omninudge.com",
-			"https://www.omninudge.com",
-			"https://play.omninudge.com",
-			"http://localhost:3000",
-			"http://localhost:4173",
-			"http://localhost:5173",
-			"http://localhost:5174",
-			"http://localhost:5175",
-			"http://localhost:5176",
-			"http://localhost:5177",
-			"http://localhost:5178",
-			"http://localhost:5179",
-			"http://127.0.0.1:3000",
-			"http://127.0.0.1:4173",
-			"http://127.0.0.1:5173",
-			"http://127.0.0.1:5174",
-			"http://127.0.0.1:5175",
-			"http://127.0.0.1:5176",
-			"http://127.0.0.1:5177",
-			"http://127.0.0.1:5178",
-			"http://127.0.0.1:5179",
+		allowedOrigins := map[string]struct{}{
+			"https://omninudge.com":      {},
+			"https://www.omninudge.com":  {},
+			"https://play.omninudge.com": {},
 		}
 
-		allowed := false
-		for _, o := range allowedOrigins {
-			if origin == o {
-				allowed = true
-				break
-			}
-		}
-
-		if allowed {
+		if _, ok := allowedOrigins[origin]; ok || isLoopbackDevOrigin(origin) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
@@ -147,4 +122,22 @@ func CORS() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func isLoopbackDevOrigin(origin string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+
+	host := parsed.Hostname()
+	if host == "localhost" {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
