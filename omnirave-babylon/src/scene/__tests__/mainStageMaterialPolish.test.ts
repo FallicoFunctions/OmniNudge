@@ -338,4 +338,63 @@ describe('polishMainStageMaterials', () => {
     expect(basinCopingMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(basinCopingMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
+
+  it('rebalances the crown screen coffers and promenade runway into lower-glare night finishes so the basin view stage face reads with depth instead of dead black bars and pearl slab washout', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedBlackMaterial = new PBRMaterial('V14_MatteBlackProductionRig', scene);
+    sharedBlackMaterial.albedoColor.set(0.01, 0.01, 0.01);
+    sharedBlackMaterial.emissiveColor.set(0, 0, 0);
+    sharedBlackMaterial.emissiveIntensity = 0;
+    sharedBlackMaterial.roughness = 0.54;
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.3;
+
+    const otherRig = MeshBuilder.CreateBox('V24_CrownHaloBackplate', { size: 1 }, scene);
+    otherRig.material = sharedBlackMaterial;
+
+    const screenCoffer = MeshBuilder.CreateBox('V127_CrownScreenShadowCoffer', { size: 1 }, scene);
+    screenCoffer.material = sharedBlackMaterial;
+
+    const otherIvory = MeshBuilder.CreateBox('V25_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherIvory.material = sharedIvoryMaterial;
+
+    const promenadeRunway = MeshBuilder.CreateBox('V70_PromenadePearlRunway', { size: 1 }, scene);
+    promenadeRunway.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([otherRig, screenCoffer, otherIvory, promenadeRunway]);
+
+    expect(otherRig.material).toBe(sharedBlackMaterial);
+    expect(screenCoffer.material).toBeInstanceOf(PBRMaterial);
+    expect(screenCoffer.material).not.toBe(sharedBlackMaterial);
+
+    expect(otherIvory.material).toBe(sharedIvoryMaterial);
+    expect(promenadeRunway.material).toBeInstanceOf(PBRMaterial);
+    expect(promenadeRunway.material).not.toBe(sharedIvoryMaterial);
+
+    const screenCofferMaterial = screenCoffer.material as PBRMaterial;
+    const promenadeRunwayMaterial = promenadeRunway.material as PBRMaterial;
+
+    expect(screenCofferMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(screenCofferMaterial.metadata?.mainStageMaterialOverride).toBe('crown-screen-shadow-coffer');
+    expect(screenCofferMaterial.albedoColor.r).toBeLessThanOrEqual(0.05);
+    expect(screenCofferMaterial.albedoColor.g).toBeLessThanOrEqual(0.07);
+    expect(screenCofferMaterial.albedoColor.b).toBeLessThanOrEqual(0.09);
+    expect(screenCofferMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.04);
+    expect(screenCofferMaterial.emissiveIntensity).toBeLessThanOrEqual(0.12);
+    expect(screenCofferMaterial.environmentIntensity).toBeLessThanOrEqual(0.22);
+
+    expect(promenadeRunwayMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(promenadeRunwayMaterial.metadata?.mainStageMaterialOverride).toBe('promenade-pearl-runway');
+    expect(promenadeRunwayMaterial.albedoColor.r).toBeLessThanOrEqual(0.34);
+    expect(promenadeRunwayMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
+    expect(promenadeRunwayMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(promenadeRunwayMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
+    expect(promenadeRunwayMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(promenadeRunwayMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+  });
 });
