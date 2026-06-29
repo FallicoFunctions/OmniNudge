@@ -187,6 +187,45 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V30_VipGlassBalustrade_')) {
+      const cacheKey = `${material.uniqueId}:vip-glass-balustrade`;
+      let balustradeMaterial = clonedMaterials.get(cacheKey);
+      if (!balustradeMaterial) {
+        balustradeMaterial = material.clone(`${material.name}__vip-glass-balustrade`);
+        applyVipGlassBalustradeOverride(balustradeMaterial);
+        clonedMaterials.set(cacheKey, balustradeMaterial);
+      }
+
+      mesh.material = balustradeMaterial;
+      continue;
+    }
+
+    if (mesh.name.startsWith('V51_OculusCanopy_')) {
+      const cacheKey = `${material.uniqueId}:oculus-canopy`;
+      let canopyMaterial = clonedMaterials.get(cacheKey);
+      if (!canopyMaterial) {
+        canopyMaterial = material.clone(`${material.name}__oculus-canopy`);
+        applyOculusCanopyOverride(canopyMaterial);
+        clonedMaterials.set(cacheKey, canopyMaterial);
+      }
+
+      mesh.material = canopyMaterial;
+      continue;
+    }
+
+    if (mesh.name.startsWith('V117_WingCanopyLamellaGoldArray_')) {
+      const cacheKey = `${material.uniqueId}:wing-canopy-lamella-gold`;
+      let wingCanopyMaterial = clonedMaterials.get(cacheKey);
+      if (!wingCanopyMaterial) {
+        wingCanopyMaterial = material.clone(`${material.name}__wing-canopy-lamella-gold`);
+        applyWingCanopyLamellaGoldOverride(wingCanopyMaterial);
+        clonedMaterials.set(cacheKey, wingCanopyMaterial);
+      }
+
+      mesh.material = wingCanopyMaterial;
+      continue;
+    }
+
     if (mesh.name.startsWith('V31_SideGlassLens_')) {
       const cacheKey = `${material.uniqueId}:side-screen-glass-lens`;
       let lensMaterial = clonedMaterials.get(cacheKey);
@@ -468,6 +507,58 @@ function applyPromenadePearlRunwayOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'promenade-pearl-runway',
+  };
+}
+
+function applyVipGlassBalustradeOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.05, 0.07, 0.08);
+  material.emissiveColor = new Color3(0, 0.01, 0.015);
+  material.emissiveIntensity = 0.01;
+  material.alpha = 0.18;
+  material.metallic = 0.02;
+  material.roughness = 0.72;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.06;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'vip-glass-balustrade',
+  };
+}
+
+function applyOculusCanopyOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.13, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0.01;
+  material.metallic = 0.18;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.82;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oculus-canopy',
+  };
+}
+
+function applyWingCanopyLamellaGoldOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-canopy-lamella-gold',
   };
 }
 

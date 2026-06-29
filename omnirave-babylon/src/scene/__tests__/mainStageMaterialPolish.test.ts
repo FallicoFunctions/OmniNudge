@@ -397,4 +397,96 @@ describe('polishMainStageMaterials', () => {
     expect(promenadeRunwayMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(promenadeRunwayMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
+
+  it('darkens the VIP terrace balustrade and canopy metals so the terrace read stops collapsing into a cyan roof slab and flat gold wall', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedCyanGlass = new PBRMaterial('V20_CelestialCyanGlass', scene);
+    sharedCyanGlass.albedoColor.set(0.44, 0.86, 0.98);
+    sharedCyanGlass.emissiveColor.set(0.08, 0.28, 0.36);
+    sharedCyanGlass.emissiveIntensity = 0.28;
+    sharedCyanGlass.alpha = 1;
+    sharedCyanGlass.roughness = 0.22;
+
+    const sharedGold = new PBRMaterial('V20_ChasedGoldFiligree', scene);
+    sharedGold.albedoColor.set(0.76, 0.62, 0.24);
+    sharedGold.emissiveIntensity = 0.12;
+    sharedGold.metallic = 0.78;
+    sharedGold.roughness = 0.36;
+
+    const sharedCrownGold = new PBRMaterial('V17_CrownBrushedGold', scene);
+    sharedCrownGold.albedoColor.set(0.72, 0.58, 0.2);
+    sharedCrownGold.emissiveIntensity = 0.1;
+    sharedCrownGold.metallic = 0.74;
+    sharedCrownGold.roughness = 0.32;
+
+    const otherGlass = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    otherGlass.material = sharedCyanGlass;
+
+    const vipBalustrade = MeshBuilder.CreateBox('V30_VipGlassBalustrade_L', { size: 1 }, scene);
+    vipBalustrade.material = sharedCyanGlass;
+
+    const otherGold = MeshBuilder.CreateBox('V68_PortalArcadeGoldCrest_L', { size: 1 }, scene);
+    otherGold.material = sharedGold;
+
+    const oculusCanopy = MeshBuilder.CreateBox('V51_OculusCanopy_L', { size: 1 }, scene);
+    oculusCanopy.material = sharedGold;
+
+    const otherCrownGold = MeshBuilder.CreateBox('V24_CrownHaloBackplate', { size: 1 }, scene);
+    otherCrownGold.material = sharedCrownGold;
+
+    const wingCanopy = MeshBuilder.CreateBox('V117_WingCanopyLamellaGoldArray_L_Front', { size: 1 }, scene);
+    wingCanopy.material = sharedCrownGold;
+
+    polishMainStageMaterials([
+      otherGlass,
+      vipBalustrade,
+      otherGold,
+      oculusCanopy,
+      otherCrownGold,
+      wingCanopy,
+    ]);
+
+    expect(otherGlass.material).toBe(sharedCyanGlass);
+    expect(vipBalustrade.material).toBeInstanceOf(PBRMaterial);
+    expect(vipBalustrade.material).not.toBe(sharedCyanGlass);
+
+    expect(otherGold.material).toBe(sharedGold);
+    expect(oculusCanopy.material).toBeInstanceOf(PBRMaterial);
+    expect(oculusCanopy.material).not.toBe(sharedGold);
+
+    expect(otherCrownGold.material).toBe(sharedCrownGold);
+    expect(wingCanopy.material).toBeInstanceOf(PBRMaterial);
+    expect(wingCanopy.material).not.toBe(sharedCrownGold);
+
+    const vipBalustradeMaterial = vipBalustrade.material as PBRMaterial;
+    const oculusCanopyMaterial = oculusCanopy.material as PBRMaterial;
+    const wingCanopyMaterial = wingCanopy.material as PBRMaterial;
+
+    expect(vipBalustradeMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(vipBalustradeMaterial.metadata?.mainStageMaterialOverride).toBe('vip-glass-balustrade');
+    expect(vipBalustradeMaterial.albedoColor.r).toBeLessThanOrEqual(0.08);
+    expect(vipBalustradeMaterial.albedoColor.g).toBeLessThanOrEqual(0.1);
+    expect(vipBalustradeMaterial.albedoColor.b).toBeLessThanOrEqual(0.11);
+    expect(vipBalustradeMaterial.alpha).toBeLessThanOrEqual(0.24);
+    expect(vipBalustradeMaterial.roughness).toBeGreaterThanOrEqual(0.68);
+    expect(vipBalustradeMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+
+    expect(oculusCanopyMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(oculusCanopyMaterial.metadata?.mainStageMaterialOverride).toBe('oculus-canopy');
+    expect(oculusCanopyMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(oculusCanopyMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(oculusCanopyMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(oculusCanopyMaterial.roughness).toBeGreaterThanOrEqual(0.8);
+    expect(oculusCanopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+
+    expect(wingCanopyMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(wingCanopyMaterial.metadata?.mainStageMaterialOverride).toBe('wing-canopy-lamella-gold');
+    expect(wingCanopyMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(wingCanopyMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
+    expect(wingCanopyMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(wingCanopyMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(wingCanopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+  });
 });
