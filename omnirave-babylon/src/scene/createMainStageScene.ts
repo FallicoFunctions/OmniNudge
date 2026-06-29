@@ -37,9 +37,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
   const reviewAvatar = await createReviewAvatar(scene);
   reviewAvatar.root.parent = playerRig.avatarAnchor;
   const cameraRig = createFollowCameraRig(scene, playerRig.root);
-  cameraRig.camera.alpha = -Math.PI / 2;
-  cameraRig.camera.beta = 1.1;
-  cameraRig.camera.radius = 60;
+  cameraRig.applyCheckpointView(MAIN_STAGE_REVIEW_ROUTE[0].camera);
 
   scene.activeCamera = cameraRig.camera;
   const presentationRig = createMainStagePresentationRig(scene, cameraRig.camera);

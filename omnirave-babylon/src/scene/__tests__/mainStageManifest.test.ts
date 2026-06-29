@@ -9961,6 +9961,12 @@ describe('reviewRouteData', () => {
   it('starts from the back-plaza reveal and defines at least four review checkpoints', () => {
     expect(BACK_PLAZA_SPAWN).toEqual({ x: 0, y: 1.7, z: -48 });
     expect(MAIN_STAGE_REVIEW_ROUTE.length).toBeGreaterThanOrEqual(4);
+    for (const checkpoint of MAIN_STAGE_REVIEW_ROUTE) {
+      expect(checkpoint.camera.radius).toBeGreaterThan(0);
+      expect(checkpoint.camera.beta).toBeGreaterThan(0.8);
+      expect(checkpoint.camera.focusOffset.y).toBeGreaterThanOrEqual(0);
+      expect(checkpoint.camera.positionOffset?.y ?? 0).toBeGreaterThan(0);
+    }
   });
 
   it('keeps the approval route aligned with forward traversal toward the stage', () => {
