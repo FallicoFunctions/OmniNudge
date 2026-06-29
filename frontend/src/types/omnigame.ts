@@ -2,15 +2,20 @@ export type OmniGameSlug = 'omnirave';
 
 export type OmniGameLaunchMode = 'account' | 'guest';
 
+export interface GameGalleryEntry {
+  titleKey: string;
+  captionKey: string;
+}
+
 export interface GameCatalogEntry {
   slug: OmniGameSlug;
   name: string;
-  summary: string;
+  summaryKey: string;
   runtimeUrl: string;
-  hero: string;
-  supportsGuestLaunch: boolean;
-  signedInDescription: string;
-  guestDescription: string;
+  heroKey: string;
+  descriptionKeys: string[];
+  highlightKeys: string[];
+  gallery: GameGalleryEntry[];
 }
 
 export interface OmniGameLaunchRequest {
