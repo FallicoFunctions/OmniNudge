@@ -36,9 +36,13 @@ func TestCORS_AllowsLocalhostAndLoopbackDevOrigins(t *testing.T) {
 	for _, origin := range []string{
 		"https://play.omninudge.com",
 		"http://localhost:4173",
+		"http://localhost:4174",
 		"http://localhost:5176",
+		"http://localhost:6099",
 		"http://127.0.0.1:4173",
+		"http://127.0.0.1:4174",
 		"http://127.0.0.1:5176",
+		"http://127.0.0.1:6099",
 	} {
 		t.Run(origin, func(t *testing.T) {
 			router := gin.New()
@@ -57,6 +61,24 @@ func TestCORS_AllowsLocalhostAndLoopbackDevOrigins(t *testing.T) {
 			require.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
 		})
 	}
+}
+
+func TestCORS_RejectsNonLoopbackDevOrigins(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(CORS())
+	router.OPTIONS("/", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("OPTIONS", "/", nil)
+	req.Header.Set("Origin", "http://192.168.1.10:4174")
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusNoContent, w.Code)
+	require.Empty(t, w.Header().Get("Access-Control-Allow-Origin"))
 }
 
 func TestRequireRole_BlocksWhenRoleMissing(t *testing.T) {
