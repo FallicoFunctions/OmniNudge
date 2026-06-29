@@ -16,12 +16,21 @@ interface SurfacePlacement {
   width: number;
 }
 
+interface ScreenTreatmentMaterials {
+  focal: PBRMaterial;
+  halo: PBRMaterial;
+  inset: PBRMaterial;
+  line: PBRMaterial;
+  scanline: PBRMaterial;
+}
+
 export function createMainStageProductionSurfaces(scene: Scene) {
   const root = new TransformNode('main-stage-production-surfaces', scene);
   const celestialMaterial = createCelestialScreenMaterial(scene);
   const accentMaterial = createCelestialAccentMaterial(scene);
   const ribbonMaterial = createApproachRibbonMaterial(scene);
   const housingMaterial = createScreenHousingMaterial(scene);
+  const treatmentMaterials = createScreenTreatmentMaterials(scene);
 
   const surfaces = [
     createSurface(scene, root, celestialMaterial, {
@@ -115,6 +124,7 @@ export function createMainStageProductionSurfaces(scene: Scene) {
     }
     createScreenHousing(scene, root, surface, housingMaterial);
     createScreenMullions(scene, surface, housingMaterial);
+    createScreenDisplayDetails(scene, surface, treatmentMaterials);
   }
 
   return {
@@ -180,6 +190,81 @@ function createScreenHousingMaterial(scene: Scene) {
   return material;
 }
 
+function createScreenTreatmentMaterials(scene: Scene): ScreenTreatmentMaterials {
+  return {
+    inset: createScreenInsetMaterial(scene),
+    focal: createScreenFocalMaterial(scene),
+    line: createScreenLineMaterial(scene),
+    halo: createScreenHaloMaterial(scene),
+    scanline: createScreenScanlineMaterial(scene),
+  };
+}
+
+function createScreenInsetMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-screen-inset-material', scene);
+  material.albedoColor = new Color3(0.01, 0.04, 0.075);
+  material.emissiveColor = new Color3(0.01, 0.11, 0.18);
+  material.emissiveIntensity = 0.24;
+  material.metallic = 0.08;
+  material.roughness = 0.26;
+  material.alpha = 0.62;
+  material.transparencyMode = Material.MATERIAL_ALPHABLEND;
+  material.backFaceCulling = false;
+  return material;
+}
+
+function createScreenFocalMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-screen-focal-material', scene);
+  material.albedoColor = new Color3(0.03, 0.28, 0.42);
+  material.emissiveColor = new Color3(0.05, 0.72, 1);
+  material.emissiveIntensity = 0.76;
+  material.metallic = 0.02;
+  material.roughness = 0.3;
+  material.alpha = 0.38;
+  material.transparencyMode = Material.MATERIAL_ALPHABLEND;
+  material.backFaceCulling = false;
+  return material;
+}
+
+function createScreenLineMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-screen-line-material', scene);
+  material.albedoColor = new Color3(0.02, 0.16, 0.25);
+  material.emissiveColor = new Color3(0.034, 0.56, 0.82);
+  material.emissiveIntensity = 0.62;
+  material.metallic = 0.02;
+  material.roughness = 0.34;
+  material.alpha = 0.36;
+  material.transparencyMode = Material.MATERIAL_ALPHABLEND;
+  material.backFaceCulling = false;
+  return material;
+}
+
+function createScreenHaloMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-screen-halo-material', scene);
+  material.albedoColor = new Color3(0.014, 0.1, 0.16);
+  material.emissiveColor = new Color3(0.08, 0.72, 1);
+  material.emissiveIntensity = 1.18;
+  material.metallic = 0;
+  material.roughness = 0.4;
+  material.alpha = 0.18;
+  material.transparencyMode = Material.MATERIAL_ALPHABLEND;
+  material.backFaceCulling = false;
+  return material;
+}
+
+function createScreenScanlineMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-screen-scanline-material', scene);
+  material.albedoColor = new Color3(0.02, 0.18, 0.28);
+  material.emissiveColor = new Color3(0.04, 0.62, 0.92);
+  material.emissiveIntensity = 0.72;
+  material.metallic = 0.02;
+  material.roughness = 0.32;
+  material.alpha = 0.36;
+  material.transparencyMode = Material.MATERIAL_ALPHABLEND;
+  material.backFaceCulling = false;
+  return material;
+}
+
 function createSurface(
   scene: Scene,
   root: TransformNode,
@@ -207,6 +292,178 @@ function createSurface(
     productionRole: placement.productionRole,
   };
   return mesh;
+}
+
+function createScreenDisplayDetails(
+  scene: Scene,
+  screen: Mesh,
+  materials: ScreenTreatmentMaterials,
+) {
+  if (screen.name === 'main-stage-center-celestial-screen') {
+    createCenterScreenDetails(scene, screen, materials);
+    return;
+  }
+
+  if (screen.name === 'main-stage-crown-oracle-screen') {
+    createCrownScreenDetails(scene, screen, materials);
+    return;
+  }
+
+  if (screen.name.includes('wing-screen')) {
+    createWingScreenDetails(scene, screen, materials);
+  }
+}
+
+function createCenterScreenDetails(
+  scene: Scene,
+  screen: Mesh,
+  materials: ScreenTreatmentMaterials,
+) {
+  createDecorPlane(scene, screen, materials.inset, {
+    name: 'main-stage-center-celestial-inset',
+    width: 15.6,
+    height: 6.2,
+    offset: new Vector3(0, 0, -0.01),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.halo, {
+    name: 'main-stage-center-celestial-halo',
+    width: 16.6,
+    height: 6.7,
+    offset: new Vector3(0, 0, -0.03),
+    productionRole: 'screen-halo',
+  });
+  createDecorRing(scene, screen, materials.focal, {
+    name: 'main-stage-center-celestial-portal-ring',
+    diameter: 4.6,
+    thickness: 0.18,
+    offset: new Vector3(0, 0.02, -0.04),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.line, {
+    name: 'main-stage-center-celestial-latitude-north',
+    width: 11.2,
+    height: 0.1,
+    offset: new Vector3(0, 1.62, -0.05),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.line, {
+    name: 'main-stage-center-celestial-latitude-south',
+    width: 11.2,
+    height: 0.1,
+    offset: new Vector3(0, -1.62, -0.05),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.line, {
+    name: 'main-stage-center-celestial-spine-left',
+    width: 0.12,
+    height: 4.9,
+    offset: new Vector3(-3.5, 0, -0.05),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.line, {
+    name: 'main-stage-center-celestial-spine-right',
+    width: 0.12,
+    height: 4.9,
+    offset: new Vector3(3.5, 0, -0.05),
+    productionRole: 'screen-focal',
+  });
+}
+
+function createCrownScreenDetails(
+  scene: Scene,
+  screen: Mesh,
+  materials: ScreenTreatmentMaterials,
+) {
+  createDecorPlane(scene, screen, materials.inset, {
+    name: 'main-stage-crown-oracle-inset',
+    width: 6.4,
+    height: 4.3,
+    offset: new Vector3(0, 0, -0.01),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.halo, {
+    name: 'main-stage-crown-oracle-halo',
+    width: 7,
+    height: 4.8,
+    offset: new Vector3(0, 0, -0.03),
+    productionRole: 'screen-halo',
+  });
+  createDecorRing(scene, screen, materials.focal, {
+    name: 'main-stage-crown-oracle-sigil-ring',
+    diameter: 2.48,
+    thickness: 0.12,
+    offset: new Vector3(0, 0, -0.04),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.line, {
+    name: 'main-stage-crown-oracle-pillar-left',
+    width: 0.1,
+    height: 3.4,
+    offset: new Vector3(-1.76, 0, -0.05),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.line, {
+    name: 'main-stage-crown-oracle-pillar-right',
+    width: 0.1,
+    height: 3.4,
+    offset: new Vector3(1.76, 0, -0.05),
+    productionRole: 'screen-focal',
+  });
+}
+
+function createWingScreenDetails(
+  scene: Scene,
+  screen: Mesh,
+  materials: ScreenTreatmentMaterials,
+) {
+  const baseName = screen.name;
+  createDecorPlane(scene, screen, materials.inset, {
+    name: `${baseName}-inset`,
+    width: 7.4,
+    height: 2.76,
+    offset: new Vector3(0, 0, -0.01),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.line, {
+    name: `${baseName}-inner-frame`,
+    width: 7.9,
+    height: 3.04,
+    offset: new Vector3(0, 0, -0.03),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.line, {
+    name: `${baseName}-rail-left`,
+    width: 0.12,
+    height: 2.54,
+    offset: new Vector3(-3.02, 0, -0.04),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.line, {
+    name: `${baseName}-rail-right`,
+    width: 0.12,
+    height: 2.54,
+    offset: new Vector3(3.02, 0, -0.04),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.focal, {
+    name: `${baseName}-center-glyph`,
+    width: 1.18,
+    height: 0.22,
+    offset: new Vector3(0, 0, -0.06),
+    productionRole: 'screen-focal',
+  });
+
+  for (let index = 0; index < 6; index += 1) {
+    const suffix = String(index + 1).padStart(2, '0');
+    createDecorPlane(scene, screen, materials.scanline, {
+      name: `${baseName}-scanline-${suffix}`,
+      width: 6.4,
+      height: 0.1,
+      offset: new Vector3(0, 1.04 - index * 0.42, -0.05),
+      productionRole: 'screen-scanline',
+    });
+  }
 }
 
 function createScreenHousing(
@@ -320,4 +577,69 @@ function createFramePiece(
     productionRole: name.includes('mullion') || name.includes('crossbar') ? 'screen-mullion' : 'screen-frame',
     screenTarget: screen.name,
   };
+}
+
+function createDecorPlane(
+  scene: Scene,
+  screen: Mesh,
+  material: PBRMaterial,
+  options: {
+    height: number;
+    name: string;
+    offset: Vector3;
+    productionRole: string;
+    width: number;
+  },
+) {
+  const plane = MeshBuilder.CreatePlane(
+    options.name,
+    {
+      width: options.width,
+      height: options.height,
+    },
+    scene,
+  );
+  plane.parent = screen;
+  plane.position.copyFrom(options.offset);
+  plane.material = material;
+  plane.isPickable = false;
+  plane.renderingGroupId = 1;
+  plane.metadata = {
+    productionRole: options.productionRole,
+    screenTarget: screen.name,
+  };
+  return plane;
+}
+
+function createDecorRing(
+  scene: Scene,
+  screen: Mesh,
+  material: PBRMaterial,
+  options: {
+    diameter: number;
+    name: string;
+    offset: Vector3;
+    productionRole: string;
+    thickness: number;
+  },
+) {
+  const ring = MeshBuilder.CreateTorus(
+    options.name,
+    {
+      diameter: options.diameter,
+      thickness: options.thickness,
+      tessellation: 48,
+    },
+    scene,
+  );
+  ring.parent = screen;
+  ring.position.copyFrom(options.offset);
+  ring.material = material;
+  ring.isPickable = false;
+  ring.renderingGroupId = 1;
+  ring.metadata = {
+    productionRole: options.productionRole,
+    screenTarget: screen.name,
+  };
+  return ring;
 }
