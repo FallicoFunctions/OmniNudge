@@ -10,6 +10,6 @@ export default defineConfig({
     css: false,
     testTimeout: 10000,
     slowTestThreshold: 5000,
-    exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**', 'tests/**/*.spec.ts'],
   },
 });

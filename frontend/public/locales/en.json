@@ -124,6 +124,7 @@
     "notifications": "Notifications",
     "profile": "Profile",
     "admin": "Admin",
+    "games": "Games",
     "hubs": "Hubs",
     "search": "Search",
     "create": "Create",
@@ -192,6 +193,56 @@
     "memberCount_other": "{{formattedCount}} members",
     "pagination": {
       "page": "Page {{formattedPage}}"
+    }
+  },
+  "gamesPage": {
+    "eyebrow": "OmniGame",
+    "title": "Games",
+    "description": "Step into dedicated multiplayer spaces built inside OmniNudge, starting with the first live room: OmniRave.",
+    "availableNow": "Available now",
+    "viewGame": "View game"
+  },
+  "gameDetailPage": {
+    "eyebrow": "OmniGame / OmniRave",
+    "play": "Play",
+    "playGuest": "Play as Guest",
+    "signIn": "Sign In to Play",
+    "playing": "Entering OmniRave...",
+    "heroTitle": "Enter the room without any lobby shell.",
+    "heroBody": "Play should feel immediate: black-in, live crowd, stage lights, and the room already moving.",
+    "accountHint": "Account launch will restore your return point.",
+    "guestHint": "Guests drop straight into Main Stage.",
+    "signInHint": "Sign in to restore your return point and loadout.",
+    "highlightsTitle": "What makes the room feel real",
+    "launchError": "Unable to launch OmniRave right now."
+  },
+  "games": {
+    "omnirave": {
+      "summary": "A browser rave where one live crowd moves through three synchronized stages in the same world.",
+      "hero": "One world. Three stages. Shared pulse.",
+      "description": [
+        "OmniRave drops every player into the same authoritative venue, so the room feels alive the moment you arrive.",
+        "Guests spawn instantly at the Main Stage, while returning signed-in players come back through their saved return point with their loadout intact."
+      ],
+      "highlights": [
+        "Main Stage spawn for first-time and guest players",
+        "Saved return-point re-entry for signed-in regulars",
+        "Authoritative zone audio and world-state sync across every stage"
+      ],
+      "gallery": {
+        "0": {
+          "title": "Main Stage",
+          "caption": "The arrival point where the whole room first locks into the beat."
+        },
+        "1": {
+          "title": "The Underground",
+          "caption": "A darker floor built for harder cuts, denser lights, and late-night motion."
+        },
+        "2": {
+          "title": "P.L.U.R.R. Partay",
+          "caption": "A neon side room tuned for color, bounce, and euphoric spillover."
+        }
+      }
     }
   },
   "bugReportModal": {

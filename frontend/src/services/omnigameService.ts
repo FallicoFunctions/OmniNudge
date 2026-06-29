@@ -8,13 +8,32 @@ const gameCatalog: GameCatalogEntry[] = [
   {
     slug: 'omnirave',
     name: 'OmniRave',
-    summary:
-      'A shared multiplayer browser rave with one authoritative world, three synced music zones, and explicit guest or signed-in launch flows.',
+    summaryKey: 'games.omnirave.summary',
     runtimeUrl: OMNIRAVE_RUNTIME_URL,
-    hero: 'One world. Three stages. Shared playheads.',
-    supportsGuestLaunch: true,
-    signedInDescription: 'Launch with your OmniNudge identity and keep your loadout plus saved return point.',
-    guestDescription: 'Launch instantly as a guest with full access but no saved profile, loadout, or return point.',
+    heroKey: 'games.omnirave.hero',
+    descriptionKeys: [
+      'games.omnirave.description.0',
+      'games.omnirave.description.1',
+    ],
+    highlightKeys: [
+      'games.omnirave.highlights.0',
+      'games.omnirave.highlights.1',
+      'games.omnirave.highlights.2',
+    ],
+    gallery: [
+      {
+        titleKey: 'games.omnirave.gallery.0.title',
+        captionKey: 'games.omnirave.gallery.0.caption',
+      },
+      {
+        titleKey: 'games.omnirave.gallery.1.title',
+        captionKey: 'games.omnirave.gallery.1.caption',
+      },
+      {
+        titleKey: 'games.omnirave.gallery.2.title',
+        captionKey: 'games.omnirave.gallery.2.caption',
+      },
+    ],
   },
 ];
 
