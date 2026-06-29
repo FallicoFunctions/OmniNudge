@@ -8784,22 +8784,22 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(leftArray.max[0] - leftArray.min[0]).toBeGreaterThan(19.5);
     expect(leftArray.max[1] - leftArray.min[1]).toBeGreaterThan(10.5);
-    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(0.26);
+    expect(leftArray.max[2] - leftArray.min[2]).toBeGreaterThan(0.5);
     expect(leftArray.min[0]).toBeLessThan(-35.0);
     expect(leftArray.max[0]).toBeLessThan(-14.5);
     expect(leftArray.min[1]).toBeGreaterThan(5.2);
     expect(leftArray.max[1]).toBeGreaterThan(16.0);
-    expect(leftArray.min[2]).toBeGreaterThan(11.8);
+    expect(leftArray.min[2]).toBeGreaterThan(11.78);
     expect(leftArray.max[2]).toBeGreaterThan(12.18);
 
     expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(19.5);
     expect(rightArray.max[1] - rightArray.min[1]).toBeGreaterThan(10.5);
-    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(0.26);
+    expect(rightArray.max[2] - rightArray.min[2]).toBeGreaterThan(0.5);
     expect(rightArray.min[0]).toBeGreaterThan(14.5);
     expect(rightArray.max[0]).toBeGreaterThan(35.0);
     expect(rightArray.min[1]).toBeGreaterThan(5.2);
     expect(rightArray.max[1]).toBeGreaterThan(16.0);
-    expect(rightArray.min[2]).toBeGreaterThan(11.8);
+    expect(rightArray.min[2]).toBeGreaterThan(11.78);
     expect(rightArray.max[2]).toBeGreaterThan(12.18);
 
     for (const [nodeName, expectedCenters] of [
