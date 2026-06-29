@@ -54,6 +54,7 @@ interface GlbMesh {
 interface GlbNode {
   mesh?: number;
   name?: string;
+  translation?: number[];
 }
 
 interface GlbTextureInfo {
@@ -1207,6 +1208,72 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V30_WingUndersideRib_R_00')).toBe('V20_RecessedWarmShadow');
     expect(materialNameFor('V30_WingGoldBaluster_L_00')).toBe('V20_ChasedGoldFiligree');
     expect(materialNameFor('V30_WingGoldBaluster_R_00')).toBe('V20_ChasedGoldFiligree');
+  });
+
+  it('adds authored terrace relief arrays so the VIP and wing fascia shells stop reading like uninterrupted slabs', () => {
+    const replacementNodes = [
+      'V133_VipTerraceGoldArray_L',
+      'V133_VipTerraceGoldArray_R',
+      'V133_WingTerraceGoldArray_L',
+      'V133_WingTerraceGoldArray_R',
+    ] as const;
+    expect(nodeNamesWithPrefix('V133_')).toEqual(replacementNodes);
+
+    const vipLeft = readMeshGeometry('V133_VipTerraceGoldArray_L', {
+      minNonZeroAreaTriangles: 60,
+      minUniquePositions: 30,
+      minVertexCount: 70,
+    });
+    const vipRight = readMeshGeometry('V133_VipTerraceGoldArray_R', {
+      minNonZeroAreaTriangles: 60,
+      minUniquePositions: 30,
+      minVertexCount: 70,
+    });
+    const wingLeft = readMeshGeometry('V133_WingTerraceGoldArray_L', {
+      minNonZeroAreaTriangles: 60,
+      minUniquePositions: 40,
+      minVertexCount: 90,
+    });
+    const wingRight = readMeshGeometry('V133_WingTerraceGoldArray_R', {
+      minNonZeroAreaTriangles: 60,
+      minUniquePositions: 40,
+      minVertexCount: 90,
+    });
+
+    expect(nodesByName.get('V133_VipTerraceGoldArray_L')?.mesh).toBe(nodesByName.get('V133_VipTerraceGoldArray_R')?.mesh);
+    expect(nodesByName.get('V133_WingTerraceGoldArray_L')?.mesh).toBe(
+      nodesByName.get('V133_WingTerraceGoldArray_R')?.mesh,
+    );
+    expect(nodesByName.get('V133_VipTerraceGoldArray_R')?.translation?.[0]).toBeGreaterThan(40);
+    expect(nodesByName.get('V133_WingTerraceGoldArray_R')?.translation?.[0]).toBeGreaterThan(90);
+
+    expect(readConnectedComponents('V133_VipTerraceGoldArray_L', { minUniquePositions: 30, minVertexCount: 70 })).toHaveLength(5);
+    expect(readConnectedComponents('V133_VipTerraceGoldArray_R', { minUniquePositions: 30, minVertexCount: 70 })).toHaveLength(5);
+    expect(readConnectedComponents('V133_WingTerraceGoldArray_L', { minUniquePositions: 40, minVertexCount: 90 })).toHaveLength(6);
+    expect(readConnectedComponents('V133_WingTerraceGoldArray_R', { minUniquePositions: 40, minVertexCount: 90 })).toHaveLength(6);
+
+    expect(vipLeft.max[0] - vipLeft.min[0]).toBeGreaterThan(7.6);
+    expect(vipRight.max[0] - vipRight.min[0]).toBeGreaterThan(7.6);
+    expect(vipLeft.max[1] - vipLeft.min[1]).toBeGreaterThan(0.32);
+    expect(vipRight.max[1] - vipRight.min[1]).toBeGreaterThan(0.32);
+    expect(vipLeft.max[2] - vipLeft.min[2]).toBeGreaterThan(35.0);
+    expect(vipRight.max[2] - vipRight.min[2]).toBeGreaterThan(35.0);
+    expect(vipLeft.vertexCount).toBeLessThanOrEqual(160);
+    expect(vipRight.vertexCount).toBeLessThanOrEqual(160);
+
+    expect(wingLeft.max[0] - wingLeft.min[0]).toBeGreaterThan(24.0);
+    expect(wingRight.max[0] - wingRight.min[0]).toBeGreaterThan(24.0);
+    expect(wingLeft.max[1] - wingLeft.min[1]).toBeGreaterThan(0.28);
+    expect(wingRight.max[1] - wingRight.min[1]).toBeGreaterThan(0.28);
+    expect(wingLeft.max[2] - wingLeft.min[2]).toBeGreaterThan(7.4);
+    expect(wingRight.max[2] - wingRight.min[2]).toBeGreaterThan(7.4);
+    expect(wingLeft.vertexCount).toBeLessThanOrEqual(160);
+    expect(wingRight.vertexCount).toBeLessThanOrEqual(160);
+
+    expect(materialNameFor('V133_VipTerraceGoldArray_L')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V133_VipTerraceGoldArray_R')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V133_WingTerraceGoldArray_L')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V133_WingTerraceGoldArray_R')).toBe('V20_ChasedGoldFiligree');
   });
 
   it('replaces flat screen cards with layered LED tile lenses and parallax depth', () => {

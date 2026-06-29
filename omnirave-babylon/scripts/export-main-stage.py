@@ -44,17 +44,29 @@ def strip_unused_tangents(glb_path):
                 del primitive["attributes"]["TANGENT"]
                 removed += 1
 
-    if removed == 0:
-        return
-
+    binary_chunk_length, binary_chunk_type = struct.unpack_from("<II", data, json_end)
+    if binary_chunk_type != 0x004E4942:
+        raise RuntimeError(f"{glb_path} does not contain a BIN chunk after the JSON chunk")
+    binary_chunk_start = json_end + 8
+    binary_chunk = bytes(data[binary_chunk_start : binary_chunk_start + binary_chunk_length])
     next_json = json.dumps(glb_json, separators=(",", ":")).encode("utf-8")
-    if len(next_json) > json_chunk_length:
-        raise RuntimeError("Cannot strip tangents because the GLB JSON chunk grew unexpectedly")
+    json_padding = (4 - (len(next_json) % 4)) % 4
+    padded_json = next_json + b" " * json_padding
+    total_length = 12 + 8 + len(padded_json) + 8 + len(binary_chunk)
 
-    next_json = next_json + b" " * (json_chunk_length - len(next_json))
-    data[json_start:json_end] = next_json
-    glb_path.write_bytes(data)
-    print(f"Stripped unused tangents from {removed} Main Stage primitives")
+    rewritten = bytearray()
+    rewritten.extend(b"glTF")
+    rewritten.extend(struct.pack("<I", 2))
+    rewritten.extend(struct.pack("<I", total_length))
+    rewritten.extend(struct.pack("<I", len(padded_json)))
+    rewritten.extend(struct.pack("<I", 0x4E4F534A))
+    rewritten.extend(padded_json)
+    rewritten.extend(struct.pack("<I", len(binary_chunk)))
+    rewritten.extend(struct.pack("<I", 0x004E4942))
+    rewritten.extend(binary_chunk)
+    glb_path.write_bytes(rewritten)
+    if removed:
+        print(f"Stripped unused tangents from {removed} Main Stage primitives")
 
 
 def ensure_temp_tangent_triangulation(objects):
