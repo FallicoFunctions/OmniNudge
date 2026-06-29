@@ -28,7 +28,7 @@ REPLACEMENT_NAMES = [
     "V87_WingFacadeGoldLintelArray_R",
 ]
 
-FRAME = "V15_PearlShellBeveled"
+FRAME = "V20_RecessedWarmShadow"
 SHADOW = "V20_RecessedWarmShadow"
 GOLD = "V20_ChasedGoldFiligree"
 
@@ -45,10 +45,15 @@ def set_active(obj):
 
 
 def resolve_collection():
-    anchor = bpy.data.objects.get("V13_WingFacadeShadowBay_L_0")
-    if anchor is None or not anchor.users_collection:
-        return bpy.context.scene.collection
-    return anchor.users_collection[0]
+    for anchor_name in (
+        "V87_WingFacadeShadowFrameArray_L",
+        "V38_WingFacadeShadowReveal_L",
+        "V13_WingFacadeShadowBay_L_0",
+    ):
+        anchor = bpy.data.objects.get(anchor_name)
+        if anchor is not None and anchor.users_collection:
+            return anchor.users_collection[0]
+    return bpy.context.scene.collection
 
 
 def delete_existing(names):
@@ -76,6 +81,18 @@ def existing_bounds(name):
 
 def midpoint(bounds, axis):
     return (bounds[axis][0] + bounds[axis][1]) * 0.5
+
+
+def split_span(minimum, maximum, count, outer_margin, gap):
+    span = maximum - minimum
+    usable_span = span - outer_margin * 2.0 - gap * (count - 1)
+    section_span = usable_span / count
+    sections = []
+    cursor = minimum + outer_margin
+    for _ in range(count):
+        sections.append((cursor, cursor + section_span))
+        cursor += section_span + gap
+    return sections
 
 
 def rounded_rect_points(center_x, center_z, half_x, half_z, radius, corner_steps=3):
@@ -106,7 +123,9 @@ def lancet_profile(x_min, x_max, z_min, z_max):
     shoulder = width * 0.18
     return [
         (center_x, z_max + height * 0.12),
+        (center_x - shoulder * 0.18, z_max + height * 0.105),
         (center_x - shoulder * 0.35, z_max + height * 0.08),
+        (x_min + width * 0.10, z_max + height * 0.02),
         (x_min + width * 0.14, z_max - height * 0.02),
         (x_min + width * 0.05, z_max - height * 0.14),
         (x_min, z_max - height * 0.28),
@@ -120,7 +139,9 @@ def lancet_profile(x_min, x_max, z_min, z_max):
         (x_max, z_max - height * 0.28),
         (x_max - width * 0.05, z_max - height * 0.14),
         (x_max - width * 0.14, z_max - height * 0.02),
+        (x_max - width * 0.10, z_max + height * 0.02),
         (center_x + shoulder * 0.35, z_max + height * 0.08),
+        (center_x + shoulder * 0.18, z_max + height * 0.105),
     ]
 
 
@@ -263,108 +284,132 @@ def audit_transforms(names):
             raise RuntimeError(f"Unexpected transform residue on {name}: rot={rotation} scale={scale}")
 
 
-def frame_components(side):
+def facade_seed(side):
+    frame = existing_bounds(f"V87_WingFacadeShadowFrameArray_{side}")
+    vault = existing_bounds(f"V87_WingFacadeShadowVaultArray_{side}")
+    lintel = existing_bounds(f"V87_WingFacadeGoldLintelArray_{side}")
+    reveal = existing_bounds(f"V38_WingFacadeShadowReveal_{side}")
+    return {
+        "frame": frame,
+        "vault": vault,
+        "lintel": lintel,
+        "reveal": reveal,
+    }
+
+
+def frame_components(side, seed):
     components = []
-    for index in range(4):
-        panel = existing_bounds(f"V13_WingFacadeShadowBay_{side}_{index}")
-        shadow = existing_bounds(f"V15_WingShadowInset_{side}_{index}")
-        vertical_bounds = sorted(
-            [
-                existing_bounds(f"V15_WingShadowInsetVerticalA_{side}_{index}"),
-                existing_bounds(f"V15_WingShadowInsetVerticalB_{side}_{index}"),
-            ],
-            key=lambda bounds: bounds["x"][0],
-        )
-        gold = existing_bounds(f"V15_WingGoldCap_{side}_{index}")
+    frame = seed["frame"]
+    vault = seed["vault"]
+    reveal = seed["reveal"]
+    sections = split_span(frame["x"][0], frame["x"][1], 4, outer_margin=0.56, gap=0.72)
+    front_y = reveal["y"][0] - 0.18
+    back_y = front_y + 1.88
+    mid_y = front_y + 0.92
+    outer_z_min = frame["z"][0] + 0.18
+    outer_z_max = max(frame["z"][1], vault["z"][1]) - 0.42
+    sill_z_max = outer_z_min + 1.42
+    crown_z_min = outer_z_max - 2.3
 
-        outer_x_min = vertical_bounds[0]["x"][0] - 0.35
-        outer_x_max = vertical_bounds[1]["x"][1] + 0.35
-        inner_x_min = vertical_bounds[0]["x"][1] + 0.12
-        inner_x_max = vertical_bounds[1]["x"][0] - 0.12
-        outer_z_min = panel["z"][0] - 0.18
-        outer_z_max = gold["z"][1] + 0.16
-        opening_z_min = panel["z"][0] + 0.26
-        opening_z_max = shadow["z"][0] - 0.18
-        sill_z_max = opening_z_min + 0.32
-        crown_z_min = opening_z_max - 0.22
-
-        front_y = max(panel["y"][1], shadow["y"][1], gold["y"][1]) + 0.05
-        back_y = min(panel["y"][0], shadow["y"][0], gold["y"][0]) - 0.22
+    for outer_x_min, outer_x_max in sections:
+        inner_x_min = outer_x_min + 1.08
+        inner_x_max = outer_x_max - 1.08
         center_x = (outer_x_min + outer_x_max) * 0.5
         center_z = (outer_z_min + outer_z_max) * 0.5
 
         profiles = [
-            rounded_rect_points((outer_x_min + inner_x_min) * 0.5, center_z, (inner_x_min - outer_x_min) * 0.5, (outer_z_max - outer_z_min) * 0.5, 0.12, 3),
-            rounded_rect_points((inner_x_max + outer_x_max) * 0.5, center_z, (outer_x_max - inner_x_max) * 0.5, (outer_z_max - outer_z_min) * 0.5, 0.12, 3),
-            rounded_rect_points((inner_x_min + inner_x_max) * 0.5, (outer_z_min + sill_z_max) * 0.5, (inner_x_max - inner_x_min) * 0.5, (sill_z_max - outer_z_min) * 0.5, 0.12, 3),
-            rounded_rect_points((inner_x_min + inner_x_max) * 0.5, (crown_z_min + outer_z_max) * 0.5, (inner_x_max - inner_x_min) * 0.5, (outer_z_max - crown_z_min) * 0.5, 0.12, 3),
+            rounded_rect_points(
+                (outer_x_min + inner_x_min) * 0.5,
+                center_z,
+                (inner_x_min - outer_x_min) * 0.5,
+                (outer_z_max - outer_z_min) * 0.5,
+                0.14,
+                4,
+            ),
+            rounded_rect_points(
+                (inner_x_max + outer_x_max) * 0.5,
+                center_z,
+                (outer_x_max - inner_x_max) * 0.5,
+                (outer_z_max - outer_z_min) * 0.5,
+                0.14,
+                4,
+            ),
+            rounded_rect_points(
+                (inner_x_min + inner_x_max) * 0.5,
+                (outer_z_min + sill_z_max) * 0.5,
+                (inner_x_max - inner_x_min) * 0.5,
+                (sill_z_max - outer_z_min) * 0.5,
+                0.14,
+                4,
+            ),
+            rounded_rect_points(
+                (inner_x_min + inner_x_max) * 0.5,
+                (crown_z_min + outer_z_max) * 0.5,
+                (inner_x_max - inner_x_min) * 0.5,
+                (outer_z_max - crown_z_min) * 0.5,
+                0.18,
+                4,
+            ),
         ]
         for profile in profiles:
             components.append(
                 [
                     (front_y, profile),
-                    (front_y - 0.08, transform_points(profile, center_x, center_z, scale_x=0.992, scale_z=0.986)),
-                    (back_y + 0.08, transform_points(profile, center_x, center_z, scale_x=0.975, scale_z=0.972, z_shift=-0.03)),
-                    (back_y, transform_points(profile, center_x, center_z, scale_x=0.960, scale_z=0.960, z_shift=-0.05)),
+                    (front_y + 0.24, transform_points(profile, center_x, center_z, scale_x=0.996, scale_z=0.992)),
+                    (mid_y, transform_points(profile, center_x, center_z, scale_x=0.984, scale_z=0.978, z_shift=-0.04)),
+                    (back_y, transform_points(profile, center_x, center_z, scale_x=0.964, scale_z=0.952, z_shift=-0.12)),
                 ]
             )
     return components
 
 
-def vault_components(side):
+def vault_components(side, seed):
     components = []
-    for index in range(4):
-        panel = existing_bounds(f"V13_WingFacadeShadowBay_{side}_{index}")
-        shadow = existing_bounds(f"V15_WingShadowInset_{side}_{index}")
-        vertical_bounds = sorted(
-            [
-                existing_bounds(f"V15_WingShadowInsetVerticalA_{side}_{index}"),
-                existing_bounds(f"V15_WingShadowInsetVerticalB_{side}_{index}"),
-            ],
-            key=lambda bounds: bounds["x"][0],
-        )
+    frame = seed["frame"]
+    vault = seed["vault"]
+    reveal = seed["reveal"]
+    sections = split_span(frame["x"][0], frame["x"][1], 4, outer_margin=0.9, gap=1.18)
+    front_y = reveal["y"][0] + 0.28
+    back_y = front_y + 1.1
+    z_min = vault["z"][0] + 0.3
+    z_max = vault["z"][1] - 0.26
 
-        x_min = vertical_bounds[0]["x"][1] + 0.22
-        x_max = vertical_bounds[1]["x"][0] - 0.22
-        z_min = panel["z"][0] + 0.34
-        z_max = shadow["z"][0] - 0.28
+    for x_min, x_max in sections:
         profile = lancet_profile(x_min, x_max, z_min, z_max)
         center_x = midpoint({"x": (x_min, x_max)}, "x")
         center_z = midpoint({"z": (z_min, z_max)}, "z")
-        front_y = panel["y"][0] - 0.05
-        back_y = front_y - 0.28
         components.append(
             [
                 (front_y, profile),
-                (front_y - 0.06, transform_points(profile, center_x, center_z, scale_x=0.985, scale_z=0.982)),
-                (front_y - 0.12, transform_points(profile, center_x, center_z, scale_x=0.968, scale_z=0.955, z_shift=-0.03)),
-                (back_y + 0.05, transform_points(profile, center_x, center_z, scale_x=0.950, scale_z=0.930, z_shift=-0.06)),
-                (back_y, transform_points(profile, center_x, center_z, scale_x=0.938, scale_z=0.918, z_shift=-0.08)),
+                (front_y + 0.18, transform_points(profile, center_x, center_z, scale_x=0.988, scale_z=0.986)),
+                (back_y - 0.18, transform_points(profile, center_x, center_z, scale_x=0.964, scale_z=0.948, z_shift=-0.05)),
+                (back_y, transform_points(profile, center_x, center_z, scale_x=0.948, scale_z=0.932, z_shift=-0.08)),
             ]
         )
     return components
 
 
-def lintel_components(side):
+def lintel_components(side, seed):
     components = []
-    for index in range(4):
-        shadow = existing_bounds(f"V15_WingShadowInset_{side}_{index}")
-        gold = existing_bounds(f"V15_WingGoldCap_{side}_{index}")
-        x_min = gold["x"][0]
-        x_max = gold["x"][1]
-        z_min = shadow["z"][1] + 0.03
-        z_max = gold["z"][1] + 0.12
+    frame = seed["frame"]
+    lintel = seed["lintel"]
+    reveal = seed["reveal"]
+    sections = split_span(frame["x"][0], frame["x"][1], 4, outer_margin=0.44, gap=0.58)
+    front_y = reveal["y"][0] - 0.12
+    back_y = front_y + 0.92
+    z_min = lintel["z"][0] + 0.08
+    z_max = lintel["z"][1] + 0.08
+
+    for x_min, x_max in sections:
         profile = lintel_profile(x_min, x_max, z_min, z_max)
         center_x = midpoint({"x": (x_min, x_max)}, "x")
         center_z = midpoint({"z": (z_min, z_max)}, "z")
-        front_y = gold["y"][1] + 0.04
-        back_y = gold["y"][0] - 0.12
         components.append(
             [
                 (front_y, profile),
-                (front_y - 0.05, transform_points(profile, center_x, center_z, scale_x=0.992, scale_z=0.990)),
-                (back_y + 0.04, transform_points(profile, center_x, center_z, scale_x=0.970, scale_z=0.960, z_shift=-0.01)),
-                (back_y, transform_points(profile, center_x, center_z, scale_x=0.955, scale_z=0.945, z_shift=-0.02)),
+                (front_y + 0.12, transform_points(profile, center_x, center_z, scale_x=0.994, scale_z=0.992)),
+                (back_y - 0.12, transform_points(profile, center_x, center_z, scale_x=0.974, scale_z=0.968, z_shift=-0.02)),
+                (back_y, transform_points(profile, center_x, center_z, scale_x=0.958, scale_z=0.950, z_shift=-0.04)),
             ]
         )
     return components
@@ -372,15 +417,17 @@ def lintel_components(side):
 
 ensure_object_mode()
 collection = resolve_collection()
+left_seed = facade_seed("L")
+right_seed = facade_seed("R")
 
 delete_existing(REPLACEMENT_NAMES)
 
-left_frame = frame_components("L")
-right_frame = frame_components("R")
-left_vault = vault_components("L")
-right_vault = vault_components("R")
-left_lintel = lintel_components("L")
-right_lintel = lintel_components("R")
+left_frame = frame_components("L", left_seed)
+right_frame = frame_components("R", right_seed)
+left_vault = vault_components("L", left_seed)
+right_vault = vault_components("R", right_seed)
+left_lintel = lintel_components("L", left_seed)
+right_lintel = lintel_components("R", right_seed)
 
 delete_existing(LEGACY_NAMES)
 

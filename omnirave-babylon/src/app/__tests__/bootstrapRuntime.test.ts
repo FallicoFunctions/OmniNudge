@@ -124,9 +124,14 @@ describe('createRuntime', () => {
     const engineDispose = vi.fn();
     const engineRunRenderLoop = vi.fn();
     const engineResize = vi.fn();
+    const scenePick = vi.fn(() => ({
+      hit: true,
+      pickedMesh: { name: 'main-stage-wing-screen-right' },
+    }));
     const sceneRender = vi.fn();
     const playerPositionSet = vi.fn();
     const scene = {
+      pick: scenePick,
       render: sceneRender,
       metadata: {
         reviewRuntime: {
@@ -166,6 +171,23 @@ describe('createRuntime', () => {
     expect(host.querySelector('[data-debug-toggle="collision"]')).not.toBeNull();
     expect(host.querySelector('[data-debug-toggle="routes"]')).not.toBeNull();
     expect(host.querySelector('[data-debug-toggle="lighting"]')).not.toBeNull();
+    expect(host.querySelector('[data-debug-readout="mesh-pick"]')).not.toBeNull();
+    expect(window.__OMNIRAVE_RUNTIME__).toMatchObject({
+      canvas: expect.any(HTMLCanvasElement),
+      debugPanel: expect.any(HTMLElement),
+      engine: expect.any(Object),
+      host,
+      hud: expect.any(HTMLElement),
+      perfOverlay: expect.any(HTMLElement),
+      scene,
+    });
+    host
+      .querySelector<HTMLCanvasElement>('canvas[data-testid="babylon-render-canvas"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(scenePick).toHaveBeenCalledTimes(1);
+    expect(host.querySelector('[data-debug-readout="mesh-pick"]')?.textContent).toContain(
+      'main-stage-wing-screen-right',
+    );
     host.querySelector<HTMLButtonElement>('[data-review-checkpoint="spawn_reveal"]')?.click();
     expect(playerPositionSet).toHaveBeenCalledWith(0, 1.7, -48);
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
