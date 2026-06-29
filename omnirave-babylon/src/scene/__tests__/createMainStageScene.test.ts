@@ -88,8 +88,9 @@ describe('createMainStageScene', () => {
     const camera = scene.activeCamera as ArcRotateCamera | null;
 
     expect(camera).not.toBeNull();
-    expect(camera!.radius).toBe(72);
+    expect(camera!.radius).toBe(60);
     expect(camera!.alpha).toBeCloseTo(-Math.PI / 2);
+    expect(camera!.beta).toBeCloseTo(1.1);
 
     camera!.radius = 20;
     scene.render();
