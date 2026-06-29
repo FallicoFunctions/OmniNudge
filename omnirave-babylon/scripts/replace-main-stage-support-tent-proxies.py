@@ -225,11 +225,11 @@ def tent_spec(side):
         "frame_top": base_bounds["z"][1] + 0.34,
         "beam_bottom": roof_bounds["z"][0] - 0.12,
         "beam_top": roof_bounds["z"][0] + 0.18,
-        "canopy_low": roof_bounds["z"][0] - 0.02,
-        "canopy_mid": roof_bounds["z"][1] - 0.06,
-        "canopy_peak": roof_bounds["z"][1] + 0.32,
-        "crest_base": roof_bounds["z"][1] + 0.20,
-        "crest_peak": roof_bounds["z"][1] + 0.54,
+        "canopy_low": roof_bounds["z"][0] - 0.10,
+        "canopy_mid": roof_bounds["z"][1] + 0.02,
+        "canopy_peak": roof_bounds["z"][1] + 0.48,
+        "crest_base": roof_bounds["z"][1] + 0.34,
+        "crest_peak": roof_bounds["z"][1] + 0.66,
     }
 
 

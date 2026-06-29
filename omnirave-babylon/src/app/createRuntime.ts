@@ -8,6 +8,20 @@ import { createPerfOverlay } from '../ui/createPerfOverlay';
 import { createReviewHud } from '../ui/createReviewHud';
 import { RUNTIME_CONFIG } from './runtimeConfig';
 
+declare global {
+  interface Window {
+    __OMNIRAVE_RUNTIME__?: {
+      canvas: HTMLCanvasElement;
+      debugPanel?: HTMLElement;
+      engine: Engine;
+      host: HTMLElement;
+      hud?: HTMLElement;
+      perfOverlay?: HTMLElement;
+      scene: Awaited<ReturnType<typeof createMainStageScene>>;
+    };
+  }
+}
+
 export async function createRuntime(host: HTMLElement) {
   const canvas = document.createElement('canvas');
   canvas.id = RUNTIME_CONFIG.defaultCanvasId;
@@ -27,6 +41,7 @@ export async function createRuntime(host: HTMLElement) {
   let hud: HTMLElement | undefined;
   let perfOverlay: HTMLElement | undefined;
   let debugPanel: HTMLElement | undefined;
+  let handleCanvasPick: ((event: MouseEvent) => void) | undefined;
 
   try {
     const scene = await createMainStageScene(engine);
@@ -39,6 +54,28 @@ export async function createRuntime(host: HTMLElement) {
     });
     perfOverlay = createPerfOverlay(host);
     debugPanel = createDebugPanel(host);
+    const pickReadout = debugPanel.querySelector<HTMLOutputElement>('[data-debug-readout="mesh-pick"]');
+
+    handleCanvasPick = (event: MouseEvent) => {
+      if (!pickReadout) {
+        return;
+      }
+
+      const pick = scene.pick(event.offsetX ?? 0, event.offsetY ?? 0);
+      pickReadout.value = pick?.pickedMesh?.name ?? 'none';
+      pickReadout.textContent = `Pick: ${pick?.pickedMesh?.name ?? 'none'}`;
+    };
+    canvas.addEventListener('click', handleCanvasPick);
+
+    window.__OMNIRAVE_RUNTIME__ = {
+      canvas,
+      debugPanel,
+      engine,
+      host,
+      hud,
+      perfOverlay,
+      scene,
+    };
 
     engine.runRenderLoop(() => {
       scene.render();
@@ -48,6 +85,10 @@ export async function createRuntime(host: HTMLElement) {
 
     return { engine, scene, canvas, hud, perfOverlay, debugPanel, config: RUNTIME_CONFIG };
   } catch (error) {
+    delete window.__OMNIRAVE_RUNTIME__;
+    if (handleCanvasPick) {
+      canvas.removeEventListener('click', handleCanvasPick);
+    }
     window.removeEventListener('resize', handleResize);
     engine.dispose();
     debugPanel?.remove();

@@ -43,7 +43,58 @@ export function polishMainStageMaterials(meshes: AbstractMesh[]): MainStageMater
     summary[family] += 1;
   }
 
+  applyMeshSpecificOverrides(meshes);
+
   return summary;
+}
+
+function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
+  const clonedMaterials = new Map<string, PBRMaterial>();
+
+  for (const mesh of meshes) {
+    const material = mesh.material;
+    if (!(material instanceof PBRMaterial)) {
+      continue;
+    }
+
+    if (mesh.name.startsWith('V91_SupportTentCanopy_')) {
+      const cacheKey = `${material.uniqueId}:support-tent-canopy`;
+      let canopyMaterial = clonedMaterials.get(cacheKey);
+      if (!canopyMaterial) {
+        canopyMaterial = material.clone(`${material.name}__support-tent-canopy`);
+        applySupportTentCanopyOverride(canopyMaterial);
+        clonedMaterials.set(cacheKey, canopyMaterial);
+      }
+
+      mesh.material = canopyMaterial;
+      continue;
+    }
+
+    if (mesh.name.startsWith('V87_WingFacadeShadowFrameArray_')) {
+      const cacheKey = `${material.uniqueId}:wing-facade-shadow-frame`;
+      let frameMaterial = clonedMaterials.get(cacheKey);
+      if (!frameMaterial) {
+        frameMaterial = material.clone(`${material.name}__wing-facade-shadow-frame`);
+        applyWingFacadeShadowFrameOverride(frameMaterial);
+        clonedMaterials.set(cacheKey, frameMaterial);
+      }
+
+      mesh.material = frameMaterial;
+      continue;
+    }
+
+    if (mesh.name.startsWith('V30_VipShellFascia_')) {
+      const cacheKey = `${material.uniqueId}:vip-shell-fascia`;
+      let fasciaMaterial = clonedMaterials.get(cacheKey);
+      if (!fasciaMaterial) {
+        fasciaMaterial = material.clone(`${material.name}__vip-shell-fascia`);
+        applyVipShellFasciaOverride(fasciaMaterial);
+        clonedMaterials.set(cacheKey, fasciaMaterial);
+      }
+
+      mesh.material = fasciaMaterial;
+    }
+  }
 }
 
 function resolveMainStageMaterialFamily(materialName: string): MainStageMaterialFamily | null {
@@ -148,4 +199,52 @@ function applyMainStageMaterialFamily(material: PBRMaterial, family: MainStageMa
   material.metallic = 0.32;
   material.roughness = 0.68;
   material.environmentIntensity = 0.55;
+}
+
+function applySupportTentCanopyOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.34, 0.38, 0.44);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.01;
+  material.roughness = 0.82;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.08;
+  material.clearCoat.roughness = 0.48;
+  material.environmentIntensity = 0.32;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'support-tent-canopy',
+  };
+}
+
+function applyWingFacadeShadowFrameOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.08;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.28;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-facade-shadow-frame',
+  };
+}
+
+function applyVipShellFasciaOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.4, 0.43, 0.5);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.76;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.12;
+  material.clearCoat.roughness = 0.38;
+  material.environmentIntensity = 0.36;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'vip-shell-fascia',
+  };
 }
