@@ -137,6 +137,13 @@ describe('polishMainStageMaterials', () => {
     sharedPearlMaterial.albedoColor.set(0.58, 0.86, 0.98);
     sharedPearlMaterial.emissiveColor.set(0.16, 0.3, 0.4);
     sharedPearlMaterial.emissiveIntensity = 0.28;
+    const sharedAlbedoTexture = {
+      clone() {
+        return this;
+      },
+      name: 'layered-pearl-albedo',
+    } as unknown as PBRMaterial['albedoTexture'];
+    sharedPearlMaterial.albedoTexture = sharedAlbedoTexture;
 
     const otherPearl = MeshBuilder.CreateBox('V68_HeroPortalPearlApron', { size: 1 }, scene);
     otherPearl.material = sharedPearlMaterial;
@@ -150,14 +157,18 @@ describe('polishMainStageMaterials', () => {
     expect(vipFascia.material).toBeInstanceOf(PBRMaterial);
     expect(vipFascia.material).not.toBe(sharedPearlMaterial);
 
+    const otherPearlMaterial = otherPearl.material as PBRMaterial;
     const fasciaMaterial = vipFascia.material as PBRMaterial;
     expect(fasciaMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(fasciaMaterial.metadata?.mainStageMaterialOverride).toBe('vip-shell-fascia');
-    expect(fasciaMaterial.albedoColor.r).toBeGreaterThanOrEqual(0.36);
-    expect(fasciaMaterial.albedoColor.g).toBeLessThanOrEqual(0.46);
-    expect(fasciaMaterial.albedoColor.b).toBeLessThanOrEqual(0.54);
+    expect(otherPearlMaterial.albedoTexture).toBe(sharedAlbedoTexture);
+    expect(fasciaMaterial.albedoTexture).toBeNull();
+    expect(fasciaMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
+    expect(fasciaMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
+    expect(fasciaMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
     expect(fasciaMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(fasciaMaterial.roughness).toBeGreaterThanOrEqual(0.68);
-    expect(fasciaMaterial.environmentIntensity).toBeLessThanOrEqual(0.5);
+    expect(fasciaMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(fasciaMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(fasciaMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
   });
 });
