@@ -6912,30 +6912,32 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const vault = readMeshGeometry(vaultNode, { minNonZeroAreaTriangles: 60, minUniquePositions: 120, minVertexCount: 500 });
       const lintel = readMeshGeometry(lintelNode, { minNonZeroAreaTriangles: 40, minUniquePositions: 80, minVertexCount: 240 });
 
-      expect(readConnectedComponents(frameNode)).toHaveLength(4);
+      expect(readConnectedComponents(frameNode)).toHaveLength(8);
       expect(readConnectedComponents(vaultNode)).toHaveLength(4);
       expect(readConnectedComponents(lintelNode)).toHaveLength(4);
 
-      expect(frame.max[1] - frame.min[1]).toBeGreaterThan(0.2);
-      expect(frame.max[2] - frame.min[2]).toBeGreaterThan(4.6);
-      expect(vault.max[1] - vault.min[1]).toBeGreaterThan(4.1);
-      expect(vault.max[2] - vault.min[2]).toBeGreaterThan(0.16);
+      expect(frame.max[1] - frame.min[1]).toBeGreaterThan(12.8);
+      expect(frame.max[1] - frame.min[1]).toBeLessThan(15.2);
+      expect(frame.max[2] - frame.min[2]).toBeGreaterThan(1.4);
+      expect(frame.max[2] - frame.min[2]).toBeLessThan(2.4);
+      expect(vault.max[1] - vault.min[1]).toBeGreaterThan(16.5);
+      expect(vault.max[2] - vault.min[2]).toBeGreaterThan(0.9);
       expect(lintel.min[1]).toBeGreaterThan(9.4);
       expect(lintel.max[1]).toBeGreaterThan(17.4);
 
       if (side === 'L') {
         expect(frame.max[0]).toBeLessThan(-20.8);
-        expect(frame.min[0]).toBeLessThan(-57.8);
+        expect(frame.min[0]).toBeLessThan(-56.4);
         expect(vault.max[0]).toBeLessThan(-21.4);
         expect(lintel.max[0]).toBeLessThan(-20.9);
       } else {
         expect(frame.min[0]).toBeGreaterThan(20.8);
-        expect(frame.max[0]).toBeGreaterThan(57.8);
+        expect(frame.max[0]).toBeGreaterThan(56.4);
         expect(vault.min[0]).toBeGreaterThan(21.4);
         expect(lintel.min[0]).toBeGreaterThan(20.9);
       }
 
-      expect(materialNameFor(frameNode)).toBe('V15_PearlShellBeveled');
+      expect(materialNameFor(frameNode)).toBe('V20_RecessedWarmShadow');
       expect(materialNameFor(vaultNode)).toBe('V20_RecessedWarmShadow');
       expect(materialNameFor(lintelNode)).toBe('V20_ChasedGoldFiligree');
     }
@@ -7128,10 +7130,10 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       expect(frame.max[2] - frame.min[2]).toBeGreaterThan(5.6);
 
       expect(canopy.max[0] - canopy.min[0]).toBeGreaterThan(9.1);
-      expect(canopy.max[1] - canopy.min[1]).toBeGreaterThan(0.95);
+      expect(canopy.max[1] - canopy.min[1]).toBeGreaterThan(1.35);
       expect(canopy.max[2] - canopy.min[2]).toBeGreaterThan(6.5);
       expect(canopy.min[1]).toBeGreaterThan(frame.max[1] - 0.6);
-      expect(canopy.max[1]).toBeGreaterThan(3.0);
+      expect(canopy.max[1]).toBeGreaterThan(3.38);
 
       expect(crest.max[0] - crest.min[0]).toBeGreaterThan(4.2);
       expect(crest.max[1] - crest.min[1]).toBeGreaterThan(0.28);

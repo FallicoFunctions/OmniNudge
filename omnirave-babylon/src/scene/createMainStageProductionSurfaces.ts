@@ -21,6 +21,7 @@ export function createMainStageProductionSurfaces(scene: Scene) {
   const celestialMaterial = createCelestialScreenMaterial(scene);
   const accentMaterial = createCelestialAccentMaterial(scene);
   const ribbonMaterial = createApproachRibbonMaterial(scene);
+  const housingMaterial = createScreenHousingMaterial(scene);
 
   const surfaces = [
     createSurface(scene, root, celestialMaterial, {
@@ -108,6 +109,14 @@ export function createMainStageProductionSurfaces(scene: Scene) {
     }),
   ];
 
+  for (const surface of surfaces) {
+    if (surface.metadata?.productionRole !== 'screen-base') {
+      continue;
+    }
+    createScreenHousing(scene, root, surface, housingMaterial);
+    createScreenMullions(scene, surface, housingMaterial);
+  }
+
   return {
     root,
     surfaces,
@@ -156,6 +165,21 @@ function createApproachRibbonMaterial(scene: Scene) {
   return material;
 }
 
+function createScreenHousingMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-screen-housing-material', scene);
+  material.albedoColor = new Color3(0.05, 0.055, 0.07);
+  material.emissiveColor = new Color3(0.01, 0.012, 0.018);
+  material.emissiveIntensity = 0.08;
+  material.metallic = 0.54;
+  material.roughness = 0.38;
+  material.alpha = 1;
+  material.backFaceCulling = false;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.26;
+  material.clearCoat.roughness = 0.14;
+  return material;
+}
+
 function createSurface(
   scene: Scene,
   root: TransformNode,
@@ -183,4 +207,117 @@ function createSurface(
     productionRole: placement.productionRole,
   };
   return mesh;
+}
+
+function createScreenHousing(
+  scene: Scene,
+  _root: TransformNode,
+  screen: Mesh,
+  material: PBRMaterial,
+) {
+  const boundingInfo = screen.getBoundingInfo().boundingBox.extendSize;
+  const width = boundingInfo.x * 2;
+  const height = boundingInfo.y * 2;
+  const depth = 0.28;
+
+  const housing = MeshBuilder.CreateBox(
+    `${screen.name}-housing`,
+    {
+      width: width + 0.52,
+      height: height + 0.42,
+      depth,
+    },
+    scene,
+  );
+  housing.parent = screen;
+  housing.position = new Vector3(0, 0, 0.04);
+  housing.material = material;
+  housing.isPickable = false;
+  housing.renderingGroupId = 1;
+  housing.metadata = {
+    productionRole: 'screen-housing',
+    screenTarget: screen.name,
+  };
+
+  const frameDepth = depth + 0.03;
+  const sideThickness = 0.16;
+  const topThickness = 0.18;
+  createFramePiece(scene, material, `${screen.name}-frame-top`, width + 0.34, topThickness, frameDepth, screen, new Vector3(0, height / 2 + 0.12, 0.08));
+  createFramePiece(scene, material, `${screen.name}-frame-bottom`, width + 0.34, topThickness, frameDepth, screen, new Vector3(0, -height / 2 - 0.12, 0.08));
+  createFramePiece(scene, material, `${screen.name}-frame-left`, sideThickness, height + 0.08, frameDepth, screen, new Vector3(-width / 2 - 0.11, 0, 0.08));
+  createFramePiece(scene, material, `${screen.name}-frame-right`, sideThickness, height + 0.08, frameDepth, screen, new Vector3(width / 2 + 0.11, 0, 0.08));
+}
+
+function createScreenMullions(scene: Scene, screen: Mesh, material: PBRMaterial) {
+  const boundingInfo = screen.getBoundingInfo().boundingBox.extendSize;
+  const width = boundingInfo.x * 2;
+  const height = boundingInfo.y * 2;
+  const depth = 0.06;
+
+  createFramePiece(
+    scene,
+    material,
+    `${screen.name}-crossbar`,
+    width - 0.42,
+    0.12,
+    depth,
+    screen,
+    new Vector3(0, 0, 0.03),
+  );
+
+  if (!screen.name.includes('wing-screen') && !screen.name.includes('center-celestial-screen')) {
+    return;
+  }
+
+  const mullionOffset = width * 0.18;
+  createFramePiece(
+    scene,
+    material,
+    `${screen.name}-mullion-01`,
+    0.12,
+    height - 0.28,
+    depth,
+    screen,
+    new Vector3(-mullionOffset, 0, 0.03),
+  );
+  createFramePiece(
+    scene,
+    material,
+    `${screen.name}-mullion-02`,
+    0.12,
+    height - 0.28,
+    depth,
+    screen,
+    new Vector3(mullionOffset, 0, 0.03),
+  );
+}
+
+function createFramePiece(
+  scene: Scene,
+  material: PBRMaterial,
+  name: string,
+  width: number,
+  height: number,
+  depth: number,
+  screen: Mesh,
+  localOffset: Vector3,
+) {
+  const piece = MeshBuilder.CreateBox(
+    name,
+    {
+      width,
+      height,
+      depth,
+    },
+    scene,
+  );
+  piece.parent = screen;
+  piece.position.copyFrom(localOffset);
+  piece.material = material;
+  piece.isPickable = false;
+  piece.renderingGroupId = 1;
+  piece.metadata = {
+    productionRole: name.includes('mullion') || name.includes('crossbar') ? 'screen-mullion' : 'screen-frame',
+    screenTarget: screen.name,
+  };
 }

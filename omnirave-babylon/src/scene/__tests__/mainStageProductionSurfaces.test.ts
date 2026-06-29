@@ -62,6 +62,29 @@ describe('createMainStageProductionSurfaces', () => {
       (surface) => surface.metadata?.productionRole === 'screen-base',
     );
     expect(screenBaseSurfaces).toHaveLength(4);
+    expect(scene?.getMeshByName('main-stage-center-celestial-screen-housing')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-oracle-screen-housing')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-left-housing')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-right-housing')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-left-frame-top')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-right-frame-top')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-left-mullion-01')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-left-mullion-02')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-right-mullion-01')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-wing-screen-right-mullion-02')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-celestial-screen-crossbar')).not.toBeNull();
+
+    const wingHousing = scene?.getMeshByName('main-stage-wing-screen-right-housing');
+    expect(wingHousing?.metadata).toMatchObject({
+      productionRole: 'screen-housing',
+      screenTarget: 'main-stage-wing-screen-right',
+    });
+
+    const wingMullion = scene?.getMeshByName('main-stage-wing-screen-right-mullion-01');
+    expect(wingMullion?.metadata).toMatchObject({
+      productionRole: 'screen-mullion',
+      screenTarget: 'main-stage-wing-screen-right',
+    });
 
     const weightedScreenGlow = screenBaseSurfaces.reduce((total, surface) => {
       if (typeof surface.metadata?.productionArea !== 'number') {
@@ -71,5 +94,15 @@ describe('createMainStageProductionSurfaces', () => {
       return total + surface.metadata.productionArea * material.emissiveIntensity * material.alpha;
     }, 0);
     expect(weightedScreenGlow).toBeLessThanOrEqual(7);
+
+    const housingMaterial = scene?.getMaterialByName('main-stage-screen-housing-material') as
+      | PBRMaterial
+      | undefined;
+    expect(housingMaterial?.alpha).toBe(1);
+    expect(housingMaterial?.metallic).toBeGreaterThanOrEqual(0.4);
+    expect(housingMaterial?.roughness).toBeLessThanOrEqual(0.42);
+
+    const mullionCount = scene?.meshes.filter((mesh) => mesh.metadata?.productionRole === 'screen-mullion').length;
+    expect(mullionCount).toBeGreaterThanOrEqual(7);
   });
 });
