@@ -65,13 +65,16 @@ describe('createMainStageScene', () => {
     );
     expect(scene.metadata?.reviewRuntime?.productionSurfaces).toBeDefined();
     expect(scene.getMeshByName('main-stage-center-celestial-screen')).not.toBeNull();
+    expect(scene.getTransformNodeByName('main-stage-presentation-backdrop')).not.toBeNull();
+    expect(scene.getMeshByName('main-stage-celestial-vault')).not.toBeNull();
+    expect(scene.getMeshByName('main-stage-arrival-void-veil')).not.toBeNull();
     expect(scene.environmentTexture?.name).toBe('main-stage-night-reflection-env');
     expect(scene.metadata?.reviewRuntime?.reviewAvatar).toBeDefined();
     expect(scene.getTransformNodeByName('review-avatar-root')?.parent?.name).toBe('player-avatar-anchor');
     expect(scene.lights.map((light) => light.name)).toEqual(
       expect.arrayContaining(['main-stage-hemi-light', 'main-stage-key-light']),
     );
-    expect(scene.effectLayers.map((layer) => layer.name)).toContain('main-stage-emissive-glow');
+    expect(scene.effectLayers).toHaveLength(0);
   });
 
   it('keeps zoom state synced even while the player is idle', async () => {
