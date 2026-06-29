@@ -260,6 +260,40 @@ def canopy_profile(width, z_min, z_max):
     ]
 
 
+def canopy_inner_profile(width, z_min, z_max):
+    arc = z_min + (z_max - z_min) * 0.66
+    return [
+        (-width * 0.94, z_min + 0.55),
+        (-width * 0.94, arc),
+        (-width * 0.68, z_max - 0.1),
+        (-width * 0.28, z_max + 1.05),
+        (0.0, z_max + 1.45),
+        (width * 0.28, z_max + 1.05),
+        (width * 0.68, z_max - 0.1),
+        (width * 0.94, arc),
+        (width * 0.94, z_min + 0.55),
+        (width * 0.60, z_min + 0.05),
+        (-width * 0.60, z_min + 0.05),
+    ]
+
+
+def canopy_brow_profile(width, z_min, z_max):
+    shoulder = z_min + (z_max - z_min) * 0.42
+    return [
+        (-width * 0.92, z_min + 0.18),
+        (-width * 0.92, shoulder),
+        (-width * 0.62, z_max - 0.35),
+        (-width * 0.18, z_max + 0.45),
+        (0.0, z_max + 0.75),
+        (width * 0.18, z_max + 0.45),
+        (width * 0.62, z_max - 0.35),
+        (width * 0.92, shoulder),
+        (width * 0.92, z_min + 0.18),
+        (width * 0.54, z_min - 0.08),
+        (-width * 0.54, z_min - 0.08),
+    ]
+
+
 def pylon_profile(width, z_min, z_max):
     upper = z_min + (z_max - z_min) * 0.78
     return [
@@ -350,9 +384,9 @@ def build_side(center_sign, collection, rear_bounds, shoulder_bounds, canopy_bou
     )
 
     canopy_center_x = midpoint(canopy_bounds, "x")
-    canopy_width = axis_span(canopy_bounds, "x") * 0.5
-    canopy_z_min = canopy_bounds["z"][0]
-    canopy_z_max = canopy_bounds["z"][1]
+    canopy_width = axis_span(canopy_bounds, "x") * 0.5 * 1.08
+    canopy_z_min = canopy_bounds["z"][0] - 0.55
+    canopy_z_max = canopy_bounds["z"][1] + 1.15
     build_profile_object(
         f"V51_OculusCanopy_{suffix}",
         GOLD,
@@ -363,12 +397,28 @@ def build_side(center_sign, collection, rear_bounds, shoulder_bounds, canopy_bou
                     canopy_center_x,
                     canopy_profile(canopy_width, canopy_z_min, canopy_z_max),
                 ),
-                "y_min": canopy_bounds["y"][0] + 0.35,
-                "y_max": canopy_bounds["y"][1] - 0.2,
+                "y_min": canopy_bounds["y"][0] - 0.15,
+                "y_max": canopy_bounds["y"][1] + 0.15,
+            },
+            {
+                "points": offset_profile(
+                    canopy_center_x,
+                    canopy_inner_profile(canopy_width * 0.76, canopy_z_min + 0.9, canopy_z_max - 0.7),
+                ),
+                "y_min": canopy_bounds["y"][0] + 1.35,
+                "y_max": canopy_bounds["y"][1] - 1.2,
+            },
+            {
+                "points": offset_profile(
+                    canopy_center_x,
+                    canopy_brow_profile(canopy_width * 0.9, canopy_z_min - 0.05, canopy_z_min + 2.6),
+                ),
+                "y_min": canopy_bounds["y"][0] + 0.55,
+                "y_max": canopy_bounds["y"][0] + 2.2,
             },
         ],
         bevel_width=0.12,
-        bevel_segments=3,
+        bevel_segments=2,
     )
 
     pylon_center_x = midpoint(pylon_bounds, "x")

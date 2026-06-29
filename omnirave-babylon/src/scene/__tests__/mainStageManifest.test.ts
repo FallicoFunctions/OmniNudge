@@ -715,8 +715,16 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const rearCore = readMeshGeometry('V51_RearCathedralCore');
     const leftShoulder = readMeshGeometry('V51_ShoulderCrownMass_L');
     const rightShoulder = readMeshGeometry('V51_ShoulderCrownMass_R');
-    const leftOculus = readMeshGeometry('V51_OculusCanopy_L');
-    const rightOculus = readMeshGeometry('V51_OculusCanopy_R');
+    const leftOculus = readMeshGeometry('V51_OculusCanopy_L', {
+      minNonZeroAreaTriangles: 420,
+      minUniquePositions: 220,
+      minVertexCount: 220,
+    });
+    const rightOculus = readMeshGeometry('V51_OculusCanopy_R', {
+      minNonZeroAreaTriangles: 420,
+      minUniquePositions: 220,
+      minVertexCount: 220,
+    });
     const leftPylon = readMeshGeometry('V51_ProsceniumPylon_L');
     const rightPylon = readMeshGeometry('V51_ProsceniumPylon_R');
     const crestBridge = readMeshGeometry('V51_PortalCrestBridge');
@@ -736,6 +744,8 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(rightOculus.min[0]).toBeGreaterThan(17);
     expect(leftOculus.max[1] - leftOculus.min[1]).toBeGreaterThan(10);
     expect(rightOculus.max[1] - rightOculus.min[1]).toBeGreaterThan(10);
+    expect(leftOculus.max[2] - leftOculus.min[2]).toBeGreaterThan(9);
+    expect(rightOculus.max[2] - rightOculus.min[2]).toBeGreaterThan(9);
     expect(leftPylon.max[0]).toBeLessThan(-9);
     expect(rightPylon.min[0]).toBeGreaterThan(9);
     expect(leftPylon.max[1]).toBeGreaterThan(40);
