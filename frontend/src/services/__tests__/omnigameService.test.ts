@@ -22,7 +22,11 @@ describe('omnigameService', () => {
     expect(catalog[0]).toMatchObject({
       slug: 'omnirave',
       name: 'OmniRave',
-      supportsGuestLaunch: true,
+      summaryKey: 'games.omnirave.summary',
+      heroKey: 'games.omnirave.hero',
+      gallery: expect.any(Array),
+      highlightKeys: expect.any(Array),
+      descriptionKeys: expect.any(Array),
     });
   });
 
