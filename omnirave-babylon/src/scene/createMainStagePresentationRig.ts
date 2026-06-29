@@ -120,6 +120,38 @@ function createPresentationBackdrop(scene: Scene) {
   arrivalVoidVeil.isPickable = false;
   arrivalVoidVeil.material = createArrivalVoidVeilMaterial(scene);
 
+  const crownHalo = MeshBuilder.CreateCylinder(
+    'main-stage-crown-halo',
+    {
+      height: 0.4,
+      diameter: 128,
+      tessellation: 64,
+      subdivisions: 1,
+    },
+    scene,
+  );
+  crownHalo.parent = root;
+  crownHalo.position.y = 40;
+  crownHalo.position.z = 58;
+  crownHalo.rotation.x = Math.PI / 2;
+  crownHalo.isPickable = false;
+  crownHalo.material = createCrownHaloMaterial(scene);
+
+  const horizonAura = MeshBuilder.CreatePlane(
+    'main-stage-horizon-aura',
+    {
+      width: 320,
+      height: 116,
+      sideOrientation: Mesh.DOUBLESIDE,
+    },
+    scene,
+  );
+  horizonAura.parent = root;
+  horizonAura.position.y = 26;
+  horizonAura.position.z = 122;
+  horizonAura.isPickable = false;
+  horizonAura.material = createHorizonAuraMaterial(scene);
+
   return root;
 }
 
@@ -128,6 +160,8 @@ function createCelestialVaultMaterial(scene: Scene) {
   material.backFaceCulling = false;
   material.unlit = true;
   material.albedoColor = new Color3(0.018, 0.03, 0.06);
+  material.emissiveColor = new Color3(0.012, 0.02, 0.038);
+  material.emissiveIntensity = 0.3;
   material.reflectivityColor = new Color3(0, 0, 0);
 
   return material;
@@ -153,6 +187,30 @@ function createArrivalVoidVeilMaterial(scene: Scene) {
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.38;
   material.clearCoat.roughness = 0.08;
+
+  return material;
+}
+
+function createCrownHaloMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-crown-halo-material', scene);
+  material.backFaceCulling = false;
+  material.unlit = true;
+  material.albedoColor = new Color3(0.02, 0.06, 0.09);
+  material.emissiveColor = new Color3(0.08, 0.34, 0.44);
+  material.emissiveIntensity = 0.34;
+  material.alpha = 0.24;
+
+  return material;
+}
+
+function createHorizonAuraMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-horizon-aura-material', scene);
+  material.backFaceCulling = false;
+  material.unlit = true;
+  material.albedoColor = new Color3(0.018, 0.028, 0.05);
+  material.emissiveColor = new Color3(0.04, 0.12, 0.18);
+  material.emissiveIntensity = 0.22;
+  material.alpha = 0.34;
 
   return material;
 }
