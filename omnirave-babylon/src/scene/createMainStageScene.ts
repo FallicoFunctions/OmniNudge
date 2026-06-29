@@ -38,8 +38,8 @@ export async function createMainStageScene(engine: AbstractEngine) {
   reviewAvatar.root.parent = playerRig.avatarAnchor;
   const cameraRig = createFollowCameraRig(scene, playerRig.root);
   cameraRig.camera.alpha = -Math.PI / 2;
-  cameraRig.camera.beta = 1.22;
-  cameraRig.camera.radius = 72;
+  cameraRig.camera.beta = 1.1;
+  cameraRig.camera.radius = 60;
 
   scene.activeCamera = cameraRig.camera;
   const presentationRig = createMainStagePresentationRig(scene, cameraRig.camera);
