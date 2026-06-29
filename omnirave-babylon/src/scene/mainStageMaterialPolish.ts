@@ -96,6 +96,45 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'FestivalField') {
+      const cacheKey = `${material.uniqueId}:festival-field-night`;
+      let fieldMaterial = clonedMaterials.get(cacheKey);
+      if (!fieldMaterial) {
+        fieldMaterial = material.clone(`${material.name}__festival-field-night`);
+        applyFestivalFieldOverride(fieldMaterial);
+        clonedMaterials.set(cacheKey, fieldMaterial);
+      }
+
+      mesh.material = fieldMaterial;
+      continue;
+    }
+
+    if (mesh.name === 'V34_ApproachPaverField') {
+      const cacheKey = `${material.uniqueId}:approach-paver-field`;
+      let paverMaterial = clonedMaterials.get(cacheKey);
+      if (!paverMaterial) {
+        paverMaterial = material.clone(`${material.name}__approach-paver-field`);
+        applyApproachPaverFieldOverride(paverMaterial);
+        clonedMaterials.set(cacheKey, paverMaterial);
+      }
+
+      mesh.material = paverMaterial;
+      continue;
+    }
+
+    if (mesh.name === 'V34_ApproachReflectionUnderlay') {
+      const cacheKey = `${material.uniqueId}:approach-reflection-underlay`;
+      let reflectionMaterial = clonedMaterials.get(cacheKey);
+      if (!reflectionMaterial) {
+        reflectionMaterial = material.clone(`${material.name}__approach-reflection-underlay`);
+        applyApproachReflectionUnderlayOverride(reflectionMaterial);
+        clonedMaterials.set(cacheKey, reflectionMaterial);
+      }
+
+      mesh.material = reflectionMaterial;
+      continue;
+    }
+
     if (mesh.name.startsWith('V31_SideGlassLens_')) {
       const cacheKey = `${material.uniqueId}:side-screen-glass-lens`;
       let lensMaterial = clonedMaterials.get(cacheKey);
@@ -260,6 +299,58 @@ function applyVipShellFasciaOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'vip-shell-fascia',
+  };
+}
+
+function applyFestivalFieldOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.08, 0.1, 0.14);
+  material.emissiveColor = new Color3(0.005, 0.01, 0.014);
+  material.emissiveIntensity = 0.06;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.12;
+  material.clearCoat.roughness = 0.42;
+  material.environmentIntensity = 0.24;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'festival-field-night',
+  };
+}
+
+function applyApproachPaverFieldOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.14, 0.135, 0.13);
+  material.emissiveColor = new Color3(0.01, 0.012, 0.015);
+  material.emissiveIntensity = 0.05;
+  material.metallic = 0.06;
+  material.roughness = 0.58;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.26;
+  material.clearCoat.roughness = 0.2;
+  material.environmentIntensity = 0.5;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'approach-paver-field',
+  };
+}
+
+function applyApproachReflectionUnderlayOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.04, 0.06, 0.08);
+  material.emissiveColor = new Color3(0.01, 0.025, 0.035);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.98;
+  material.metallic = 0.02;
+  material.roughness = 0.22;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.7;
+  material.clearCoat.roughness = 0.08;
+  material.environmentIntensity = 0.86;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'approach-reflection-underlay',
   };
 }
 
