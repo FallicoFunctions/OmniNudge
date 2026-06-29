@@ -161,6 +161,32 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V127_CrownScreenShadowCoffer') {
+      const cacheKey = `${material.uniqueId}:crown-screen-shadow-coffer`;
+      let cofferMaterial = clonedMaterials.get(cacheKey);
+      if (!cofferMaterial) {
+        cofferMaterial = material.clone(`${material.name}__crown-screen-shadow-coffer`);
+        applyCrownScreenShadowCofferOverride(cofferMaterial);
+        clonedMaterials.set(cacheKey, cofferMaterial);
+      }
+
+      mesh.material = cofferMaterial;
+      continue;
+    }
+
+    if (mesh.name === 'V70_PromenadePearlRunway') {
+      const cacheKey = `${material.uniqueId}:promenade-pearl-runway`;
+      let runwayMaterial = clonedMaterials.get(cacheKey);
+      if (!runwayMaterial) {
+        runwayMaterial = material.clone(`${material.name}__promenade-pearl-runway`);
+        applyPromenadePearlRunwayOverride(runwayMaterial);
+        clonedMaterials.set(cacheKey, runwayMaterial);
+      }
+
+      mesh.material = runwayMaterial;
+      continue;
+    }
+
     if (mesh.name.startsWith('V31_SideGlassLens_')) {
       const cacheKey = `${material.uniqueId}:side-screen-glass-lens`;
       let lensMaterial = clonedMaterials.get(cacheKey);
@@ -411,6 +437,37 @@ function applyBasinStoneCopingOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-stone-coping',
+  };
+}
+
+function applyCrownScreenShadowCofferOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.03, 0.05, 0.07);
+  material.emissiveColor = new Color3(0.01, 0.06, 0.09);
+  material.emissiveIntensity = 0.08;
+  material.metallic = 0.04;
+  material.roughness = 0.72;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-screen-shadow-coffer',
+  };
+}
+
+function applyPromenadePearlRunwayOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.3, 0.28, 0.24);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.02;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'promenade-pearl-runway',
   };
 }
 
