@@ -2270,6 +2270,47 @@ describe('polishMainStageMaterials', () => {
     expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('smokes the wing arcade cyan inlays so the side portals read as inset jewel glass instead of bright cyan cards', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedCyanGlass = new PBRMaterial('V20_CelestialCyanGlass', scene);
+    sharedCyanGlass.albedoColor.set(0.42, 0.86, 0.98);
+    sharedCyanGlass.emissiveColor.set(0.08, 0.3, 0.4);
+    sharedCyanGlass.emissiveIntensity = 0.34;
+    sharedCyanGlass.alpha = 1;
+    sharedCyanGlass.environmentIntensity = 0.82;
+
+    const controlGlass = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    controlGlass.material = sharedCyanGlass;
+
+    const leftInlay = MeshBuilder.CreateBox('V28_WingArcadeCyanInlay_L', { size: 1 }, scene);
+    leftInlay.material = sharedCyanGlass;
+
+    const rightInlay = MeshBuilder.CreateBox('V28_WingArcadeCyanInlay_R', { size: 1 }, scene);
+    rightInlay.material = sharedCyanGlass;
+
+    polishMainStageMaterials([controlGlass, leftInlay, rightInlay]);
+
+    expect(controlGlass.material).toBe(sharedCyanGlass);
+    expect(leftInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(rightInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(leftInlay.material).not.toBe(sharedCyanGlass);
+    expect(rightInlay.material).not.toBe(sharedCyanGlass);
+    expect(rightInlay.material).toBe(leftInlay.material);
+
+    const inlayMaterial = leftInlay.material as PBRMaterial;
+    expect(inlayMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(inlayMaterial.metadata?.mainStageMaterialOverride).toBe('wing-arcade-cyan-inlay');
+    expect(inlayMaterial.alpha).toBeLessThanOrEqual(0.4);
+    expect(inlayMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(inlayMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(inlayMaterial.albedoColor.b).toBeLessThanOrEqual(0.34);
+    expect(inlayMaterial.emissiveIntensity).toBeLessThanOrEqual(0.12);
+    expect(inlayMaterial.roughness).toBeGreaterThanOrEqual(0.16);
+    expect(inlayMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
+  });
+
   it('darkens the promenade pearl ribbon so the central route reads as authored night inlay instead of a repeated bright ivory strip', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
