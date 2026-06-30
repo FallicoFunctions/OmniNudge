@@ -2189,6 +2189,46 @@ describe('polishMainStageMaterials', () => {
     expect(plinthMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the wing arcade pearl arches so the side portals read as carved support shells instead of bright ivory frames', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const controlIvory = MeshBuilder.CreateBox('TestPearlControlMesh', { size: 1 }, scene);
+    controlIvory.material = sharedIvoryMaterial;
+
+    const leftArch = MeshBuilder.CreateBox('V28_WingArcadePearlArch_L', { size: 1 }, scene);
+    leftArch.material = sharedIvoryMaterial;
+
+    const rightArch = MeshBuilder.CreateBox('V28_WingArcadePearlArch_R', { size: 1 }, scene);
+    rightArch.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([controlIvory, leftArch, rightArch]);
+
+    expect(controlIvory.material).toBe(sharedIvoryMaterial);
+    expect(leftArch.material).toBeInstanceOf(PBRMaterial);
+    expect(rightArch.material).toBeInstanceOf(PBRMaterial);
+    expect(leftArch.material).not.toBe(sharedIvoryMaterial);
+    expect(rightArch.material).not.toBe(sharedIvoryMaterial);
+    expect(rightArch.material).toBe(leftArch.material);
+
+    const archMaterial = leftArch.material as PBRMaterial;
+    expect(archMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(archMaterial.metadata?.mainStageMaterialOverride).toBe('wing-arcade-pearl-arch');
+    expect(archMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
+    expect(archMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(archMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(archMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(archMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(archMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(archMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the promenade pearl ribbon so the central route reads as authored night inlay instead of a repeated bright ivory strip', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
