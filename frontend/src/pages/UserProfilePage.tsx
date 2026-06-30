@@ -121,12 +121,13 @@ function PhotosWidget({
 
   if (allItems.length === 0) return null;
 
-  const tabs: { key: PhotoAlbum; label: string; count: number }[] = [
+  const allTabs: { key: PhotoAlbum; label: string; count: number }[] = [
     { key: 'all',    label: 'All',    count: allItems.length },
     { key: 'wall',   label: 'Wall',   count: media.length },
     { key: 'avatar', label: 'Avatar', count: avatarItems.length },
     { key: 'cover',  label: 'Cover',  count: bannerItems.length },
-  ].filter((tab) => tab.key === 'all' || tab.count > 0);
+  ];
+  const tabs = allTabs.filter((tab) => tab.key === 'all' || tab.count > 0);
 
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
