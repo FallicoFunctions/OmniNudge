@@ -33,14 +33,14 @@ type oauthUserInfo struct {
 
 // OAuthHandler handles social login via Google and Discord.
 type OAuthHandler struct {
-	authService *services.AuthService
-	userRepo    ports.UserRepository
-	db          *pgxpool.Pool
-	frontendURL string
-	backendURL  string
+	authService  *services.AuthService
+	userRepo     ports.UserRepository
+	db           *pgxpool.Pool
+	frontendURL  string
+	backendURL   string
 	secureCookie bool // true in production (HTTPS)
-	google      *oauth2.Config
-	discord     *oauth2.Config
+	google       *oauth2.Config
+	discord      *oauth2.Config
 }
 
 // NewOAuthHandler creates the handler. Pass empty client IDs to disable a provider.
