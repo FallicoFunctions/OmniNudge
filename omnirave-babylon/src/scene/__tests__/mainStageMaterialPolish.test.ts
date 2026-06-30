@@ -797,6 +797,52 @@ describe('polishMainStageMaterials', () => {
     expect(stageMassMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
 
+  it('darkens the V51 cathedral core and proscenium pylon shells so the stage crown reads as carved depth instead of bright centerline pylons', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V16_PearlArchitecturalShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const controlPearl = MeshBuilder.CreateBox('V56_SpawnCanopyPearlVault_L', { size: 1 }, scene);
+    controlPearl.material = sharedPearlMaterial;
+
+    const cathedralCore = MeshBuilder.CreateBox('V51_RearCathedralCore', { size: 1 }, scene);
+    cathedralCore.material = sharedPearlMaterial;
+
+    const leftPylon = MeshBuilder.CreateBox('V51_ProsceniumPylon_L', { size: 1 }, scene);
+    leftPylon.material = sharedPearlMaterial;
+
+    const rightPylon = MeshBuilder.CreateBox('V51_ProsceniumPylon_R', { size: 1 }, scene);
+    rightPylon.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, cathedralCore, leftPylon, rightPylon]);
+
+    expect(controlPearl.material).toBe(sharedPearlMaterial);
+    expect(cathedralCore.material).toBeInstanceOf(PBRMaterial);
+    expect(leftPylon.material).toBeInstanceOf(PBRMaterial);
+    expect(rightPylon.material).toBeInstanceOf(PBRMaterial);
+    expect(cathedralCore.material).not.toBe(sharedPearlMaterial);
+    expect(leftPylon.material).not.toBe(sharedPearlMaterial);
+    expect(rightPylon.material).not.toBe(sharedPearlMaterial);
+    expect(leftPylon.material).toBe(cathedralCore.material);
+    expect(rightPylon.material).toBe(cathedralCore.material);
+
+    const shellMaterial = cathedralCore.material as PBRMaterial;
+    expect(shellMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(shellMaterial.metadata?.mainStageMaterialOverride).toBe('rear-cathedral-pearl-core');
+    expect(shellMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(shellMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(shellMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(shellMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(shellMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(shellMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the rear shell shadow reveal arrays so the promenade flanks stop reading as white oval proxies', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
