@@ -545,6 +545,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V54_SpawnGalleryPierPearl_')) {
+      const cacheKey = `${material.uniqueId}:spawn-gallery-pier-pearl`;
+      let pierMaterial = clonedMaterials.get(cacheKey);
+      if (!pierMaterial) {
+        pierMaterial = material.clone(`${material.name}__spawn-gallery-pier-pearl`);
+        applySpawnGalleryPierPearlOverride(pierMaterial);
+        clonedMaterials.set(cacheKey, pierMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pierMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V60_SpawnGateSentinelPearl_')) {
       const cacheKey = `${material.uniqueId}:spawn-gate-sentinel-pearl`;
       let sentinelMaterial = clonedMaterials.get(cacheKey);
@@ -1388,6 +1401,23 @@ function applyBackPlazaGatewayPearlOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'back-plaza-gateway-pearl',
+  };
+}
+
+function applySpawnGalleryPierPearlOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-gallery-pier-pearl',
   };
 }
 
