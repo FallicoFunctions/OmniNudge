@@ -748,6 +748,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V68_HeroPortalGoldCap') {
+      const cacheKey = `${material.uniqueId}:hero-portal-gold-cap`;
+      let capMaterial = clonedMaterials.get(cacheKey);
+      if (!capMaterial) {
+        capMaterial = material.clone(`${material.name}__hero-portal-gold-cap`);
+        applyHeroPortalGoldCapOverride(capMaterial);
+        clonedMaterials.set(cacheKey, capMaterial);
+      }
+
+      assignOverrideMaterial(mesh, capMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V61_RearMassAuroraPearl_')) {
       const cacheKey = `${material.uniqueId}:rear-mass-aurora-pearl`;
       let auroraMaterial = clonedMaterials.get(cacheKey);
@@ -2211,6 +2224,20 @@ function applyPortalArcadeShadowCoreOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'portal-arcade-shadow-core',
+  };
+}
+
+function applyHeroPortalGoldCapOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.07);
+  material.emissiveColor = new Color3(0.018, 0.012, 0.005);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.18;
+  material.roughness = 0.88;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'hero-portal-gold-cap',
   };
 }
 

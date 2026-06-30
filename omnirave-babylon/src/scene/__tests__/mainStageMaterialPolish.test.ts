@@ -2431,6 +2431,41 @@ describe('polishMainStageMaterials', () => {
     expect(coreMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
   });
 
+  it('tones down the hero portal gold cap so the celestial colonnade terminus reads as carved metal detailing instead of a bright foil crown', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V19_ArrivalBrushedGold', scene);
+    sharedGoldMaterial.albedoColor.set(0.92, 0.76, 0.32);
+    sharedGoldMaterial.emissiveColor.set(0.24, 0.16, 0.06);
+    sharedGoldMaterial.emissiveIntensity = 0.26;
+    sharedGoldMaterial.metallic = 0.9;
+    sharedGoldMaterial.roughness = 0.22;
+
+    const controlGold = MeshBuilder.CreateBox('TestGoldControlMesh', { size: 1 }, scene);
+    controlGold.material = sharedGoldMaterial;
+
+    const heroCap = MeshBuilder.CreateBox('V68_HeroPortalGoldCap', { size: 1 }, scene);
+    heroCap.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([controlGold, heroCap]);
+
+    expect(controlGold.material).toBe(sharedGoldMaterial);
+    expect(heroCap.material).toBeInstanceOf(PBRMaterial);
+    expect(heroCap.material).not.toBe(sharedGoldMaterial);
+
+    const capMaterial = heroCap.material as PBRMaterial;
+    expect(capMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(capMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-gold-cap');
+    expect(capMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(capMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(capMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(capMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(capMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(capMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(capMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the promenade pearl ribbon so the central route reads as authored night inlay instead of a repeated bright ivory strip', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
