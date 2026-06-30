@@ -30,5 +30,15 @@ export function createLightingRig(scene: Scene) {
   rim.intensity = 1.22;
   rim.position = new Vector3(-30, 26, -72);
 
-  return { hemi, key, rim };
+  const fill = new DirectionalLight(
+    'main-stage-front-fill-light',
+    new Vector3(0, -0.72, 0.96),
+    scene,
+  );
+  fill.diffuse = new Color3(0.22, 0.34, 0.58);
+  fill.specular = new Color3(0.1, 0.18, 0.34);
+  fill.intensity = 1.08;
+  fill.position = new Vector3(0, 24, -84);
+
+  return { hemi, key, rim, fill };
 }
