@@ -439,6 +439,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V129_CenterScreenDepthBaffleArray') {
+      const cacheKey = `${material.uniqueId}:center-screen-depth-baffle-array`;
+      let baffleMaterial = clonedMaterials.get(cacheKey);
+      if (!baffleMaterial) {
+        baffleMaterial = material.clone(`${material.name}__center-screen-depth-baffle-array`);
+        applyCenterScreenDepthBaffleArrayOverride(baffleMaterial);
+        clonedMaterials.set(cacheKey, baffleMaterial);
+      }
+
+      assignOverrideMaterial(mesh, baffleMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V130_CenterScreenShadowCofferArray') {
       const cacheKey = `${material.uniqueId}:center-screen-shadow-coffer-array`;
       let cofferMaterial = clonedMaterials.get(cacheKey);
@@ -1477,6 +1490,23 @@ function applyCenterScreenGoldInterruptRailOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'center-screen-gold-interrupt-rail',
+  };
+}
+
+function applyCenterScreenDepthBaffleArrayOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.03, 0.05, 0.07);
+  material.emissiveColor = new Color3(0.006, 0.03, 0.05);
+  material.emissiveIntensity = 0.05;
+  material.metallic = 0.04;
+  material.roughness = 0.8;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.74;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'center-screen-depth-baffle-array',
   };
 }
 
