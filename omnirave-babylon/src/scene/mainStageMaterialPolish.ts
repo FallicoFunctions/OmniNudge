@@ -320,6 +320,22 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name === 'V51_RearCathedralCore' ||
+      mesh.name.startsWith('V51_ProsceniumPylon_')
+    ) {
+      const cacheKey = `${material.uniqueId}:rear-cathedral-pearl-core`;
+      let coreMaterial = clonedMaterials.get(cacheKey);
+      if (!coreMaterial) {
+        coreMaterial = material.clone(`${material.name}__rear-cathedral-pearl-core`);
+        applyRearCathedralPearlCoreOverride(coreMaterial);
+        clonedMaterials.set(cacheKey, coreMaterial);
+      }
+
+      assignOverrideMaterial(mesh, coreMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V53_SpawnGalleryArcadePearl_')) {
       const cacheKey = `${material.uniqueId}:spawn-gallery-arcade-pearl`;
       let arcadeMaterial = clonedMaterials.get(cacheKey);
@@ -1170,6 +1186,23 @@ function applyStageMassIvoryOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'stage-mass-ivory',
+  };
+}
+
+function applyRearCathedralPearlCoreOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'rear-cathedral-pearl-core',
   };
 }
 
