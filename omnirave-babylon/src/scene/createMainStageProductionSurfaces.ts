@@ -63,6 +63,27 @@ export function createMainStageProductionSurfaces(scene: Scene) {
       rotation: new Vector3(0, 0.18, 0),
       productionRole: 'screen-base',
     }),
+    createSurface(scene, root, celestialMaterial, {
+      name: 'main-stage-front-fascia-screen',
+      width: 7.6,
+      height: 1.96,
+      position: new Vector3(0, 11.05, 18.24),
+      productionRole: 'screen-base',
+    }),
+    createSurface(scene, root, celestialMaterial, {
+      name: 'main-stage-front-callout-screen-left',
+      width: 3.2,
+      height: 1.16,
+      position: new Vector3(-5.6, 10.48, 17.92),
+      productionRole: 'screen-base',
+    }),
+    createSurface(scene, root, celestialMaterial, {
+      name: 'main-stage-front-callout-screen-right',
+      width: 3.2,
+      height: 1.16,
+      position: new Vector3(5.6, 10.48, 17.92),
+      productionRole: 'screen-base',
+    }),
     createSurface(scene, root, accentMaterial, {
       name: 'main-stage-center-celestial-horizon-line',
       width: 15.8,
@@ -393,7 +414,7 @@ function createCelestialScreenMaterial(scene: Scene) {
   const material = new PBRMaterial('main-stage-celestial-screen-material', scene);
   material.albedoColor = new Color3(0.012, 0.075, 0.14);
   material.emissiveColor = new Color3(0.008, 0.14, 0.22);
-  material.emissiveIntensity = 0.24;
+  material.emissiveIntensity = 0.23;
   material.metallic = 0.14;
   material.roughness = 0.22;
   material.alpha = 0.12;
@@ -567,6 +588,11 @@ function createScreenDisplayDetails(
 
   if (screen.name.includes('wing-screen')) {
     createWingScreenDetails(scene, screen, materials);
+    return;
+  }
+
+  if (screen.name.includes('front-') && screen.name.includes('screen')) {
+    createBannerScreenDetails(scene, screen, materials);
   }
 }
 
@@ -717,6 +743,65 @@ function createWingScreenDetails(
       width: 6.4,
       height: 0.1,
       offset: new Vector3(0, 1.04 - index * 0.42, -0.05),
+      productionRole: 'screen-scanline',
+    });
+  }
+}
+
+function createBannerScreenDetails(
+  scene: Scene,
+  screen: Mesh,
+  materials: ScreenTreatmentMaterials,
+) {
+  const boundingInfo = screen.getBoundingInfo().boundingBox.extendSize;
+  const width = boundingInfo.x * 2;
+  const height = boundingInfo.y * 2;
+  const scanlineInset = screen.name.includes('fascia-screen') ? 0.42 : 0.28;
+  const scanlineCount = 4;
+
+  createDecorPlane(scene, screen, materials.inset, {
+    name: `${screen.name}-inset`,
+    width: width - 0.36,
+    height: height - 0.22,
+    offset: new Vector3(0, 0, -0.01),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.halo, {
+    name: `${screen.name}-halo`,
+    width: width + 0.24,
+    height: height + 0.16,
+    offset: new Vector3(0, 0, -0.03),
+    productionRole: 'screen-halo',
+  });
+  createDecorPlane(scene, screen, materials.focal, {
+    name: `${screen.name}-center-band`,
+    width: width * 0.44,
+    height: Math.max(0.16, height * 0.14),
+    offset: new Vector3(0, 0, -0.05),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.line, {
+    name: `${screen.name}-top-keyline`,
+    width: width - 0.46,
+    height: 0.08,
+    offset: new Vector3(0, height * 0.28, -0.05),
+    productionRole: 'screen-focal',
+  });
+  createDecorPlane(scene, screen, materials.line, {
+    name: `${screen.name}-bottom-keyline`,
+    width: width - 0.46,
+    height: 0.08,
+    offset: new Vector3(0, -height * 0.28, -0.05),
+    productionRole: 'screen-focal',
+  });
+
+  for (let index = 0; index < scanlineCount; index += 1) {
+    const suffix = String(index + 1).padStart(2, '0');
+    createDecorPlane(scene, screen, materials.scanline, {
+      name: `${screen.name}-scanline-${suffix}`,
+      width: width - scanlineInset,
+      height: 0.07,
+      offset: new Vector3(0, height * 0.27 - index * (height * 0.18), -0.05),
       productionRole: 'screen-scanline',
     });
   }
