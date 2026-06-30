@@ -1010,6 +1010,47 @@ describe('polishMainStageMaterials', () => {
     expect(buttressMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('tones down the wing-facade arch inlays so the terrace arches keep shadow depth instead of bright gold ribbons', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V18_BrushedGoldTrim', scene);
+    sharedGoldMaterial.albedoColor.set(0.76, 0.68, 0.42);
+    sharedGoldMaterial.emissiveColor.set(0.08, 0.06, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.16;
+    sharedGoldMaterial.metallic = 0.78;
+    sharedGoldMaterial.roughness = 0.24;
+
+    const otherGold = MeshBuilder.CreateBox('V68_PortalArcadeGoldCrest_L', { size: 1 }, scene);
+    otherGold.material = sharedGoldMaterial;
+
+    const leftInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_L', { size: 1 }, scene);
+    leftInlay.material = sharedGoldMaterial;
+
+    const rightInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_R', { size: 1 }, scene);
+    rightInlay.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, leftInlay, rightInlay]);
+
+    expect(otherGold.material).toBe(sharedGoldMaterial);
+    expect(leftInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(rightInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(leftInlay.material).not.toBe(sharedGoldMaterial);
+    expect(rightInlay.material).not.toBe(sharedGoldMaterial);
+    expect(rightInlay.material).toBe(leftInlay.material);
+
+    const inlayMaterial = leftInlay.material as PBRMaterial;
+    expect(inlayMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(inlayMaterial.metadata?.mainStageMaterialOverride).toBe('wing-facade-arch-inlay');
+    expect(inlayMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(inlayMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(inlayMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(inlayMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(inlayMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(inlayMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(inlayMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('rebalances the crown screen coffers and promenade runway into lower-glare night finishes so the basin view stage face reads with depth instead of dead black bars and pearl slab washout', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
