@@ -136,9 +136,7 @@ function PhotosWidget({
               }`}
             >
               {tab.label}
-              {tab.count > 1 && (
-                <span className="ml-1 opacity-70">{tab.count}</span>
-              )}
+              <span className="ml-1 opacity-70">{tab.count}</span>
             </button>
           ))}
         </div>
