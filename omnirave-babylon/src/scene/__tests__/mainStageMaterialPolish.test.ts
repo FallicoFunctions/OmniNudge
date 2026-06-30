@@ -183,6 +183,59 @@ describe('polishMainStageMaterials', () => {
     expect(mullionMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('tones down the oval side-screen gold trim families so the side-screen stacks keep relief without blowing out into pale metallic stripes', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V14_BurnishedCelestialGold', scene);
+    sharedGoldMaterial.albedoColor.set(0.76, 0.68, 0.42);
+    sharedGoldMaterial.emissiveColor.set(0.08, 0.06, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.16;
+    sharedGoldMaterial.metallic = 0.78;
+    sharedGoldMaterial.roughness = 0.24;
+
+    const otherGold = MeshBuilder.CreateBox('V124_CrowdControlRailArray_L', { size: 1 }, scene);
+    otherGold.material = sharedGoldMaterial;
+
+    const pedestalTrim = MeshBuilder.CreateBox('V80_OvalScreenPedestalGoldTrim_L', { size: 1 }, scene);
+    pedestalTrim.material = sharedGoldMaterial;
+
+    const canopyTrim = MeshBuilder.CreateBox('V80_OvalScreenCanopyGoldTrim_L', { size: 1 }, scene);
+    canopyTrim.material = sharedGoldMaterial;
+
+    const buttressTrim = MeshBuilder.CreateBox('V80_OvalScreenSideButtressGoldTrimArray_L', { size: 1 }, scene);
+    buttressTrim.material = sharedGoldMaterial;
+
+    const mullionTrim = MeshBuilder.CreateBox('V81_OvalScreenMullionGoldTrimArray_L', { size: 1 }, scene);
+    mullionTrim.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, pedestalTrim, canopyTrim, buttressTrim, mullionTrim]);
+
+    expect(otherGold.material).toBe(sharedGoldMaterial);
+    expect(pedestalTrim.material).toBeInstanceOf(PBRMaterial);
+    expect(canopyTrim.material).toBeInstanceOf(PBRMaterial);
+    expect(buttressTrim.material).toBeInstanceOf(PBRMaterial);
+    expect(mullionTrim.material).toBeInstanceOf(PBRMaterial);
+    expect(pedestalTrim.material).not.toBe(sharedGoldMaterial);
+    expect(canopyTrim.material).not.toBe(sharedGoldMaterial);
+    expect(buttressTrim.material).not.toBe(sharedGoldMaterial);
+    expect(mullionTrim.material).not.toBe(sharedGoldMaterial);
+    expect(canopyTrim.material).toBe(pedestalTrim.material);
+    expect(buttressTrim.material).toBe(pedestalTrim.material);
+    expect(mullionTrim.material).toBe(pedestalTrim.material);
+
+    const trimMaterial = pedestalTrim.material as PBRMaterial;
+    expect(trimMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(trimMaterial.metadata?.mainStageMaterialOverride).toBe('oval-screen-gold-trim');
+    expect(trimMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(trimMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(trimMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(trimMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(trimMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(trimMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(trimMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('neutralizes the V87 wing-facade shadow frames so they do not inherit the bright cyan shadow texture read in the VIP terrace view', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);

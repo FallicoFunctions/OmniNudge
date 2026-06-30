@@ -100,6 +100,24 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name.startsWith('V80_OvalScreenPedestalGoldTrim_') ||
+      mesh.name.startsWith('V80_OvalScreenCanopyGoldTrim_') ||
+      mesh.name.startsWith('V80_OvalScreenSideButtressGoldTrimArray_') ||
+      mesh.name.startsWith('V81_OvalScreenMullionGoldTrimArray_')
+    ) {
+      const cacheKey = `${material.uniqueId}:oval-screen-gold-trim`;
+      let trimMaterial = clonedMaterials.get(cacheKey);
+      if (!trimMaterial) {
+        trimMaterial = material.clone(`${material.name}__oval-screen-gold-trim`);
+        applyOvalScreenGoldTrimOverride(trimMaterial);
+        clonedMaterials.set(cacheKey, trimMaterial);
+      }
+
+      mesh.material = trimMaterial;
+      continue;
+    }
+
     if (mesh.name.startsWith('V87_WingFacadeShadowFrameArray_')) {
       const cacheKey = `${material.uniqueId}:wing-facade-shadow-frame`;
       let frameMaterial = clonedMaterials.get(cacheKey);
@@ -554,6 +572,23 @@ function applyOvalScreenMullionShellOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'oval-screen-mullion-shell',
+  };
+}
+
+function applyOvalScreenGoldTrimOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-screen-gold-trim',
   };
 }
 
