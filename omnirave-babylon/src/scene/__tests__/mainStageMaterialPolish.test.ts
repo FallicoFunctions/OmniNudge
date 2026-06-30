@@ -648,4 +648,44 @@ describe('polishMainStageMaterials', () => {
     expect(wingFasciaMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(wingFasciaMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
+
+  it('darkens the spawn canopy pearl vaults so the far reveal reads as authored arrival architecture instead of white proxy shells', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V16_PearlArchitecturalShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.8, 0.78, 0.74);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const otherPearl = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherPearl.material = sharedPearlMaterial;
+
+    const leftVault = MeshBuilder.CreateBox('V56_SpawnCanopyPearlVault_L', { size: 1 }, scene);
+    leftVault.material = sharedPearlMaterial;
+
+    const rightVault = MeshBuilder.CreateBox('V56_SpawnCanopyPearlVault_R', { size: 1 }, scene);
+    rightVault.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, leftVault, rightVault]);
+
+    expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(leftVault.material).toBeInstanceOf(PBRMaterial);
+    expect(rightVault.material).toBeInstanceOf(PBRMaterial);
+    expect(leftVault.material).not.toBe(sharedPearlMaterial);
+    expect(rightVault.material).not.toBe(sharedPearlMaterial);
+    expect(rightVault.material).toBe(leftVault.material);
+
+    const vaultMaterial = leftVault.material as PBRMaterial;
+    expect(vaultMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(vaultMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-canopy-pearl-vault');
+    expect(vaultMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(vaultMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(vaultMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(vaultMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(vaultMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(vaultMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(vaultMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
 });
