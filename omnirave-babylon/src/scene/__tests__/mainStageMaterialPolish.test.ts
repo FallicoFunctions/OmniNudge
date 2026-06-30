@@ -688,4 +688,38 @@ describe('polishMainStageMaterials', () => {
     expect(vaultMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(vaultMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
+
+  it('darkens the basin causeway pearl span so the spawn reveal keeps runway depth instead of a white threshold bar', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const otherIvory = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherIvory.material = sharedIvoryMaterial;
+
+    const causewaySpan = MeshBuilder.CreateBox('V62_BasinCausewayPearlSpan', { size: 1 }, scene);
+    causewaySpan.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([otherIvory, causewaySpan]);
+
+    expect(otherIvory.material).toBe(sharedIvoryMaterial);
+    expect(causewaySpan.material).toBeInstanceOf(PBRMaterial);
+    expect(causewaySpan.material).not.toBe(sharedIvoryMaterial);
+
+    const causewayMaterial = causewaySpan.material as PBRMaterial;
+    expect(causewayMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(causewayMaterial.metadata?.mainStageMaterialOverride).toBe('basin-causeway-pearl-span');
+    expect(causewayMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(causewayMaterial.albedoColor.g).toBeLessThanOrEqual(0.25);
+    expect(causewayMaterial.albedoColor.b).toBeLessThanOrEqual(0.29);
+    expect(causewayMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(causewayMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(causewayMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(causewayMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
 });
