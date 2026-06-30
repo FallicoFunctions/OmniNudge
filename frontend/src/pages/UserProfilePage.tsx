@@ -426,7 +426,8 @@ export default function UserProfilePage() {
     <div className="w-full">
 
       {/* ── Cover Banner ─────────────────────────────────────────────────── */}
-      <div className="relative h-36 md:h-48 overflow-hidden">
+      {/* aspect-[3/1] matches the banner crop tool exactly (WYSIWYG) */}
+      <div className="relative w-full aspect-[3/1] overflow-hidden">
         {profile.banner_url ? (
           <img
             src={resolveMediaUrl(profile.banner_url)}
