@@ -1606,6 +1606,58 @@ describe('polishMainStageMaterials', () => {
     expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the inner portal pearl shell masses so the hero portal reads as carved depth instead of bright ivory pylons', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V16_PearlArchitecturalShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const controlPearl = MeshBuilder.CreateBox('V56_SpawnCanopyPearlVault_L', { size: 1 }, scene);
+    controlPearl.material = sharedPearlMaterial;
+
+    const leftPylon = MeshBuilder.CreateBox('V50_InnerPortalPylon_L', { size: 1 }, scene);
+    leftPylon.material = sharedPearlMaterial;
+
+    const rightPylon = MeshBuilder.CreateBox('V50_InnerPortalPylon_R', { size: 1 }, scene);
+    rightPylon.material = sharedPearlMaterial;
+
+    const leftCascade = MeshBuilder.CreateBox('V50_InnerShellCascade_L', { size: 1 }, scene);
+    leftCascade.material = sharedPearlMaterial;
+
+    const rightCascade = MeshBuilder.CreateBox('V50_InnerShellCascade_R', { size: 1 }, scene);
+    rightCascade.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, leftPylon, rightPylon, leftCascade, rightCascade]);
+
+    expect(controlPearl.material).toBe(sharedPearlMaterial);
+    expect(leftPylon.material).toBeInstanceOf(PBRMaterial);
+    expect(rightPylon.material).toBeInstanceOf(PBRMaterial);
+    expect(leftCascade.material).toBeInstanceOf(PBRMaterial);
+    expect(rightCascade.material).toBeInstanceOf(PBRMaterial);
+    expect(leftPylon.material).not.toBe(sharedPearlMaterial);
+    expect(rightPylon.material).not.toBe(sharedPearlMaterial);
+    expect(leftCascade.material).not.toBe(sharedPearlMaterial);
+    expect(rightCascade.material).not.toBe(sharedPearlMaterial);
+    expect(rightPylon.material).toBe(leftPylon.material);
+    expect(leftCascade.material).toBe(leftPylon.material);
+    expect(rightCascade.material).toBe(leftPylon.material);
+
+    const shellMaterial = leftPylon.material as PBRMaterial;
+    expect(shellMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(shellMaterial.metadata?.mainStageMaterialOverride).toBe('inner-portal-pearl-shell');
+    expect(shellMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(shellMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(shellMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(shellMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(shellMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(shellMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the spawn gallery pier pearl shells so the arrival buttresses read as carved support architecture instead of bright side slabs', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
