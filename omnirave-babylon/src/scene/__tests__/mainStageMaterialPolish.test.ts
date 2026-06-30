@@ -1218,6 +1218,40 @@ describe('polishMainStageMaterials', () => {
     expect(ribbonMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the plaza paver pearl bands so the route approach stops reading as stacked bright ivory bars', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const otherIvory = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherIvory.material = sharedIvoryMaterial;
+
+    const plazaBands = MeshBuilder.CreateBox('V69_PlazaPaverPearlBands', { size: 1 }, scene);
+    plazaBands.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([otherIvory, plazaBands]);
+
+    expect(otherIvory.material).toBe(sharedIvoryMaterial);
+    expect(plazaBands.material).toBeInstanceOf(PBRMaterial);
+    expect(plazaBands.material).not.toBe(sharedIvoryMaterial);
+
+    const plazaMaterial = plazaBands.material as PBRMaterial;
+    expect(plazaMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(plazaMaterial.metadata?.mainStageMaterialOverride).toBe('plaza-paver-pearl-bands');
+    expect(plazaMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
+    expect(plazaMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(plazaMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(plazaMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(plazaMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(plazaMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(plazaMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the spawn gallery arcade pearl shells so the VIP long view reads as layered arrival architecture instead of a white side slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
