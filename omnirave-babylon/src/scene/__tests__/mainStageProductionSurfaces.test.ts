@@ -42,6 +42,8 @@ describe('createMainStageProductionSurfaces', () => {
         'main-stage-center-portal-jamb-right',
         'main-stage-threshold-spine-left',
         'main-stage-threshold-spine-right',
+        'main-stage-crown-bridge-left',
+        'main-stage-crown-bridge-right',
       ]),
     );
     expect(rig.surfaces.every((surface) => surface.parent === rig.root)).toBe(true);
@@ -132,6 +134,12 @@ describe('createMainStageProductionSurfaces', () => {
     expect(scene?.getMeshByName('main-stage-threshold-bar-03')).not.toBeNull();
     expect(scene?.getMeshByName('main-stage-threshold-bar-01-glow')).not.toBeNull();
     expect(scene?.getMeshByName('main-stage-threshold-bar-03-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-bridge-left')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-bridge-center')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-bridge-right')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-bridge-left-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-bridge-center-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-bridge-right-glow')).not.toBeNull();
 
     const wingHousing = scene?.getMeshByName('main-stage-wing-screen-right-housing');
     expect(wingHousing?.metadata).toMatchObject({
@@ -186,7 +194,7 @@ describe('createMainStageProductionSurfaces', () => {
     const stageBeaconCount = scene?.meshes.filter(
       (mesh) => mesh.metadata?.productionRole === 'stage-beacon',
     ).length;
-    expect(stageBeaconCount).toBeGreaterThanOrEqual(27);
+    expect(stageBeaconCount).toBeGreaterThanOrEqual(33);
 
     const mullionCount = scene?.meshes.filter((mesh) => mesh.metadata?.productionRole === 'screen-mullion').length;
     expect(mullionCount).toBeGreaterThanOrEqual(7);
