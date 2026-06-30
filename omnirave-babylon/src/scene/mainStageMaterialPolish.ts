@@ -172,6 +172,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V87_WingFacadeGoldLintelArray_')) {
+      const cacheKey = `${material.uniqueId}:wing-facade-gold-lintel`;
+      let lintelMaterial = clonedMaterials.get(cacheKey);
+      if (!lintelMaterial) {
+        lintelMaterial = material.clone(`${material.name}__wing-facade-gold-lintel`);
+        applyWingFacadeGoldLintelOverride(lintelMaterial);
+        clonedMaterials.set(cacheKey, lintelMaterial);
+      }
+
+      assignOverrideMaterial(mesh, lintelMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V30_VipShellFascia_')) {
       const cacheKey = `${material.uniqueId}:vip-shell-fascia`;
       let fasciaMaterial = clonedMaterials.get(cacheKey);
@@ -976,6 +989,23 @@ function applyWingFacadeShadowFrameOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-facade-shadow-frame',
+  };
+}
+
+function applyWingFacadeGoldLintelOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-facade-gold-lintel',
   };
 }
 

@@ -558,6 +558,47 @@ describe('polishMainStageMaterials', () => {
     expect(vaultMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
   });
 
+  it('tones down the V87 wing-facade gold lintel arrays so the terrace soffits keep depth instead of reading as bright foil bars', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V14_BurnishedCelestialGold', scene);
+    sharedGoldMaterial.albedoColor.set(0.76, 0.68, 0.42);
+    sharedGoldMaterial.emissiveColor.set(0.08, 0.06, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.16;
+    sharedGoldMaterial.metallic = 0.78;
+    sharedGoldMaterial.roughness = 0.24;
+
+    const otherGold = MeshBuilder.CreateBox('V68_PortalArcadeGoldCrest_L', { size: 1 }, scene);
+    otherGold.material = sharedGoldMaterial;
+
+    const leftLintel = MeshBuilder.CreateBox('V87_WingFacadeGoldLintelArray_L', { size: 1 }, scene);
+    leftLintel.material = sharedGoldMaterial;
+
+    const rightLintel = MeshBuilder.CreateBox('V87_WingFacadeGoldLintelArray_R', { size: 1 }, scene);
+    rightLintel.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, leftLintel, rightLintel]);
+
+    expect(otherGold.material).toBe(sharedGoldMaterial);
+    expect(leftLintel.material).toBeInstanceOf(PBRMaterial);
+    expect(rightLintel.material).toBeInstanceOf(PBRMaterial);
+    expect(leftLintel.material).not.toBe(sharedGoldMaterial);
+    expect(rightLintel.material).not.toBe(sharedGoldMaterial);
+    expect(rightLintel.material).toBe(leftLintel.material);
+
+    const lintelMaterial = leftLintel.material as PBRMaterial;
+    expect(lintelMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(lintelMaterial.metadata?.mainStageMaterialOverride).toBe('wing-facade-gold-lintel');
+    expect(lintelMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(lintelMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(lintelMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(lintelMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(lintelMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(lintelMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(lintelMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('gives the VIP shell fascia its own stone-shell finish so the terrace fascia does not read as a cyan slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
