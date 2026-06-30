@@ -2642,6 +2642,41 @@ describe('polishMainStageMaterials', () => {
     expect(plazaMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('tones down the plaza paver gold filigree so the route approach reads as carved metal detailing instead of bright foil strips', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V19_ArrivalBrushedGold', scene);
+    sharedGoldMaterial.albedoColor.set(0.92, 0.76, 0.32);
+    sharedGoldMaterial.emissiveColor.set(0.24, 0.16, 0.06);
+    sharedGoldMaterial.emissiveIntensity = 0.26;
+    sharedGoldMaterial.metallic = 0.9;
+    sharedGoldMaterial.roughness = 0.22;
+
+    const controlGold = MeshBuilder.CreateBox('TestGoldControlMesh', { size: 1 }, scene);
+    controlGold.material = sharedGoldMaterial;
+
+    const goldFiligree = MeshBuilder.CreateBox('V69_PlazaPaverGoldFiligree', { size: 1 }, scene);
+    goldFiligree.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([controlGold, goldFiligree]);
+
+    expect(controlGold.material).toBe(sharedGoldMaterial);
+    expect(goldFiligree.material).toBeInstanceOf(PBRMaterial);
+    expect(goldFiligree.material).not.toBe(sharedGoldMaterial);
+
+    const filigreeMaterial = goldFiligree.material as PBRMaterial;
+    expect(filigreeMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(filigreeMaterial.metadata?.mainStageMaterialOverride).toBe('plaza-paver-gold-filigree');
+    expect(filigreeMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(filigreeMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(filigreeMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(filigreeMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(filigreeMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(filigreeMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(filigreeMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the hero portal pearl arcade family so the first central stage reveal reads as layered architecture instead of bright ivory slabs', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
