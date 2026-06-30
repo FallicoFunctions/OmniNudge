@@ -2244,16 +2244,6 @@
       "blockThumbnails": "Block NSFW post thumbnails",
       "blockThumbnailsHelp": "Blur NSFW post thumbnails and overlay an 18+ warning."
     },
-    "security": {
-      "title": "Security",
-      "description": "Your public key is used for end-to-end encrypted features. It isn't shown on your public profile.",
-      "showKey": "Show public key",
-      "hideKey": "Hide public key",
-      "copy": "Copy",
-      "copied": "Copied!",
-      "copyFailed": "Copy failed",
-      "noKey": "No public key found for this account."
-    },
     "email": {
       "title": "Email",
       "description": "Manage your email address associated with this account.",

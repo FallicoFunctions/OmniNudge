@@ -2244,16 +2244,6 @@
       "blockThumbnails": "Bloquear miniaturas de posts NSFW",
       "blockThumbnailsHelp": "Difumina las miniaturas de posts NSFW y superpone una advertencia de +18."
     },
-    "security": {
-      "title": "Seguridad",
-      "description": "Tu clave pública se utiliza para funciones cifradas de extremo a extremo. No se muestra en tu perfil público.",
-      "showKey": "Mostrar clave pública",
-      "hideKey": "Ocultar clave pública",
-      "copy": "Copiar",
-      "copied": "¡Copiado!",
-      "copyFailed": "Fallo al copiar",
-      "noKey": "No se encontró clave pública para esta cuenta."
-    },
     "email": {
       "title": "Email",
       "description": "Gestiona tu dirección de email asociada con esta cuenta.",
