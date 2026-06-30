@@ -2533,6 +2533,47 @@ describe('polishMainStageMaterials', () => {
     expect(daisMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
   });
 
+  it('tones down the grand arcade gold bands so the celestial colonnade flanks read as carved metal detailing instead of bright foil seams', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V19_ArrivalBrushedGold', scene);
+    sharedGoldMaterial.albedoColor.set(0.92, 0.76, 0.32);
+    sharedGoldMaterial.emissiveColor.set(0.24, 0.16, 0.06);
+    sharedGoldMaterial.emissiveIntensity = 0.26;
+    sharedGoldMaterial.metallic = 0.9;
+    sharedGoldMaterial.roughness = 0.22;
+
+    const controlGold = MeshBuilder.CreateBox('TestGoldControlMesh', { size: 1 }, scene);
+    controlGold.material = sharedGoldMaterial;
+
+    const leftBands = MeshBuilder.CreateBox('V68_GrandArcadeGoldBands_L', { size: 1 }, scene);
+    leftBands.material = sharedGoldMaterial;
+
+    const rightBands = MeshBuilder.CreateBox('V68_GrandArcadeGoldBands_R', { size: 1 }, scene);
+    rightBands.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([controlGold, leftBands, rightBands]);
+
+    expect(controlGold.material).toBe(sharedGoldMaterial);
+    expect(leftBands.material).toBeInstanceOf(PBRMaterial);
+    expect(rightBands.material).toBeInstanceOf(PBRMaterial);
+    expect(leftBands.material).not.toBe(sharedGoldMaterial);
+    expect(rightBands.material).not.toBe(sharedGoldMaterial);
+    expect(rightBands.material).toBe(leftBands.material);
+
+    const bandsMaterial = leftBands.material as PBRMaterial;
+    expect(bandsMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(bandsMaterial.metadata?.mainStageMaterialOverride).toBe('grand-arcade-gold-bands');
+    expect(bandsMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(bandsMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(bandsMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(bandsMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(bandsMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(bandsMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(bandsMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the promenade pearl ribbon so the central route reads as authored night inlay instead of a repeated bright ivory strip', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
