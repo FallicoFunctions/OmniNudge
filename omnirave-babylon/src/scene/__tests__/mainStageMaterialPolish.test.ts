@@ -609,4 +609,43 @@ describe('polishMainStageMaterials', () => {
     expect(terraceGoldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(terraceGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
+
+  it('darkens the wing terrace fascia so the promenade flanks stop reading as bright pearl slabs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V20_LayeredPearlShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.78, 0.74, 0.68);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.05);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.36;
+
+    const otherPearl = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherPearl.material = sharedPearlMaterial;
+
+    const leftWingFascia = MeshBuilder.CreateBox('V30_WingTerraceFascia_L', { size: 1 }, scene);
+    leftWingFascia.material = sharedPearlMaterial;
+
+    const rightWingFascia = MeshBuilder.CreateBox('V30_WingTerraceFascia_R', { size: 1 }, scene);
+    rightWingFascia.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, leftWingFascia, rightWingFascia]);
+
+    expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(leftWingFascia.material).toBeInstanceOf(PBRMaterial);
+    expect(rightWingFascia.material).toBeInstanceOf(PBRMaterial);
+    expect(leftWingFascia.material).not.toBe(sharedPearlMaterial);
+    expect(rightWingFascia.material).not.toBe(sharedPearlMaterial);
+    expect(rightWingFascia.material).toBe(leftWingFascia.material);
+
+    const wingFasciaMaterial = leftWingFascia.material as PBRMaterial;
+    expect(wingFasciaMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(wingFasciaMaterial.metadata?.mainStageMaterialOverride).toBe('wing-terrace-fascia');
+    expect(wingFasciaMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(wingFasciaMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(wingFasciaMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(wingFasciaMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(wingFasciaMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(wingFasciaMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
 });
