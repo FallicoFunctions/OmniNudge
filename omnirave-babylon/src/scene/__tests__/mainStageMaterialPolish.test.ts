@@ -1182,6 +1182,42 @@ describe('polishMainStageMaterials', () => {
     expect(railMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('darkens the center screen shadow coffer array so the hero wall frame reads as depth instead of a flat glossy black border', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedShadowMaterial = new PBRMaterial('V15_ShadowedInsetSeams', scene);
+    sharedShadowMaterial.albedoColor.set(0.12, 0.12, 0.12);
+    sharedShadowMaterial.emissiveColor.set(0, 0, 0);
+    sharedShadowMaterial.emissiveIntensity = 0;
+    sharedShadowMaterial.metallic = 0.24;
+    sharedShadowMaterial.roughness = 0.42;
+
+    const otherShadow = MeshBuilder.CreateBox('V88_WingScreenShadowFrame_L', { size: 1 }, scene);
+    otherShadow.material = sharedShadowMaterial;
+
+    const coffer = MeshBuilder.CreateBox('V130_CenterScreenShadowCofferArray', { size: 1 }, scene);
+    coffer.material = sharedShadowMaterial;
+
+    polishMainStageMaterials([otherShadow, coffer]);
+
+    expect(otherShadow.material).toBe(sharedShadowMaterial);
+    expect(coffer.material).toBeInstanceOf(PBRMaterial);
+    expect(coffer.material).not.toBe(sharedShadowMaterial);
+
+    const cofferMaterial = coffer.material as PBRMaterial;
+    expect(cofferMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(cofferMaterial.metadata?.mainStageMaterialOverride).toBe('center-screen-shadow-coffer-array');
+    expect(cofferMaterial.albedoColor.r).toBeLessThanOrEqual(0.06);
+    expect(cofferMaterial.albedoColor.g).toBeLessThanOrEqual(0.08);
+    expect(cofferMaterial.albedoColor.b).toBeLessThanOrEqual(0.1);
+    expect(cofferMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.04);
+    expect(cofferMaterial.emissiveIntensity).toBeLessThanOrEqual(0.1);
+    expect(cofferMaterial.metallic).toBeLessThanOrEqual(0.08);
+    expect(cofferMaterial.roughness).toBeGreaterThanOrEqual(0.74);
+    expect(cofferMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
+  });
+
   it('tones down the wide hero screen gold frame cluster so the stage face keeps depth instead of bright metallic rails', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
