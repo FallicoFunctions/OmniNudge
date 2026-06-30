@@ -1184,6 +1184,40 @@ describe('polishMainStageMaterials', () => {
     expect(plinthMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the promenade pearl ribbon so the central route reads as authored night inlay instead of a repeated bright ivory strip', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const otherIvory = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherIvory.material = sharedIvoryMaterial;
+
+    const promenadeRibbon = MeshBuilder.CreateBox('V64_PromenadePearlRibbon', { size: 1 }, scene);
+    promenadeRibbon.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([otherIvory, promenadeRibbon]);
+
+    expect(otherIvory.material).toBe(sharedIvoryMaterial);
+    expect(promenadeRibbon.material).toBeInstanceOf(PBRMaterial);
+    expect(promenadeRibbon.material).not.toBe(sharedIvoryMaterial);
+
+    const ribbonMaterial = promenadeRibbon.material as PBRMaterial;
+    expect(ribbonMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(ribbonMaterial.metadata?.mainStageMaterialOverride).toBe('promenade-pearl-ribbon');
+    expect(ribbonMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
+    expect(ribbonMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(ribbonMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(ribbonMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(ribbonMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(ribbonMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(ribbonMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the spawn gallery arcade pearl shells so the VIP long view reads as layered arrival architecture instead of a white side slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
