@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -152,16 +153,23 @@ func (h *OAuthHandler) Callback(c *gin.Context) {
 		return
 	}
 
-	// Find or create the local user account
-	user, err := h.findOrCreateUser(c.Request.Context(), provider, info)
+	// Find an existing account to log into, or stage a pending signup that
+	// requires the user to pick a username before the account is created.
+	user, pending, err := h.findOrPrepareUser(c.Request.Context(), provider, info)
 	if err != nil {
-		log.Printf("[oauth] findOrCreateUser failed (provider=%s): %v", provider, err)
+		log.Printf("[oauth] findOrPrepareUser failed (provider=%s): %v", provider, err)
 		c.Redirect(http.StatusFound, h.oauthErrorURL("account_error"))
 		return
 	}
 
+	if pending != nil {
+		c.Redirect(http.StatusFound, h.frontendURL+"/auth/choose-username?pending_token="+pending.Token+
+			"&suggested="+url.QueryEscape(pending.SuggestedUsername)+"&provider="+provider)
+		return
+	}
+
 	// Issue JWT (7-day, same as regular login)
-	jwtToken, err := h.authService.GenerateJWT(user.ID, user.Username, user.Role)
+	jwtToken, err := h.authService.GenerateJWTWithVersion(user.ID, user.Username, user.Role, user.TokenVersion)
 	if err != nil {
 		log.Printf("[oauth] GenerateJWT failed: %v", err)
 		c.Redirect(http.StatusFound, h.oauthErrorURL("server_error"))
@@ -169,6 +177,81 @@ func (h *OAuthHandler) Callback(c *gin.Context) {
 	}
 
 	c.Redirect(http.StatusFound, h.frontendURL+"/auth/callback?token="+jwtToken+"&provider="+provider)
+}
+
+// completeSignupRequest is the body for POST /auth/oauth/complete.
+type completeSignupRequest struct {
+	PendingToken string `json:"pending_token"`
+	Username     string `json:"username"`
+}
+
+// CompleteSignup handles POST /auth/oauth/complete — finalises a pending OAuth
+// signup with the user's chosen username, creates the account, and issues a JWT.
+func (h *OAuthHandler) CompleteSignup(c *gin.Context) {
+	var req completeSignupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	username := strings.TrimSpace(req.Username)
+	if len(username) < 3 || len(username) > 50 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "username must be between 3 and 50 characters"})
+		return
+	}
+
+	pending, err := h.getPendingSignup(c.Request.Context(), req.PendingToken)
+	if err != nil || pending == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "this sign-up link has expired, please sign in again"})
+		return
+	}
+
+	if existing, _ := h.userRepo.GetByUsername(c.Request.Context(), username); existing != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "username already taken"})
+		return
+	}
+
+	var avatarURL *string
+	if pending.AvatarURL != "" {
+		avatarURL = &pending.AvatarURL
+	}
+	var email *string
+	if pending.Email != "" {
+		email = &pending.Email
+	}
+
+	newUser := &models.User{
+		Username:      username,
+		Email:         email,
+		EmailVerified: pending.Email != "",
+		PasswordHash:  "", // no password for OAuth-only accounts
+		AvatarURL:     avatarURL,
+	}
+
+	if err := h.userRepo.Create(c.Request.Context(), newUser); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "username already taken"})
+		return
+	}
+
+	info := &oauthUserInfo{
+		ProviderUserID: pending.ProviderUserID,
+		Email:          pending.Email,
+		Name:           pending.Name,
+		AvatarURL:      pending.AvatarURL,
+	}
+	if err := h.insertOAuthAccount(c.Request.Context(), newUser.ID, pending.Provider, info); err != nil {
+		log.Printf("[oauth] insert oauth_account for new user_id=%d: %v", newUser.ID, err)
+	}
+
+	h.deletePendingSignup(c.Request.Context(), req.PendingToken)
+
+	jwtToken, err := h.authService.GenerateJWTWithVersion(newUser.ID, newUser.Username, newUser.Role, newUser.TokenVersion)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"token": jwtToken})
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -235,7 +318,20 @@ func (h *OAuthHandler) fetchUserInfo(ctx context.Context, provider string, token
 	return info, nil
 }
 
-func (h *OAuthHandler) findOrCreateUser(ctx context.Context, provider string, info *oauthUserInfo) (*models.User, error) {
+// pendingSignup holds a staged OAuth profile awaiting username selection.
+type pendingSignup struct {
+	Token             string
+	Provider          string
+	ProviderUserID    string
+	Email             string
+	Name              string
+	AvatarURL         string
+	SuggestedUsername string
+}
+
+// findOrPrepareUser returns an existing user to log into, or (if this is a brand-new
+// identity) stages a pendingSignup so the frontend can ask the user to pick a username.
+func (h *OAuthHandler) findOrPrepareUser(ctx context.Context, provider string, info *oauthUserInfo) (*models.User, *pendingSignup, error) {
 	// 1. Check if this OAuth identity already exists
 	var userID int
 	err := h.db.QueryRow(ctx,
@@ -245,7 +341,8 @@ func (h *OAuthHandler) findOrCreateUser(ctx context.Context, provider string, in
 
 	if err == nil {
 		// Existing OAuth account — load user
-		return h.userRepo.GetByID(ctx, userID)
+		user, getErr := h.userRepo.GetByID(ctx, userID)
+		return user, nil, getErr
 	}
 
 	// 2. If the provider gave us an email, try to find an existing native account to link
@@ -256,42 +353,67 @@ func (h *OAuthHandler) findOrCreateUser(ctx context.Context, provider string, in
 			if linkErr := h.insertOAuthAccount(ctx, existing.ID, provider, info); linkErr != nil {
 				log.Printf("[oauth] link existing account (user_id=%d): %v", existing.ID, linkErr)
 			}
-			return existing, nil
+			return existing, nil, nil
 		}
 	}
 
-	// 3. Create a brand-new user
-	username, err := h.generateUsername(ctx, info.Name, info.Email)
+	// 3. Brand-new identity — stage a pending signup awaiting username selection
+	suggested, err := h.generateUsername(ctx, info.Name, info.Email)
 	if err != nil {
-		return nil, fmt.Errorf("generateUsername: %w", err)
+		return nil, nil, fmt.Errorf("generateUsername: %w", err)
 	}
 
-	var avatarURL *string
-	if info.AvatarURL != "" {
-		avatarURL = &info.AvatarURL
-	}
-	var email *string
-	if info.Email != "" {
-		email = &info.Email
+	token, err := randomHex(24)
+	if err != nil {
+		return nil, nil, fmt.Errorf("randomHex: %w", err)
 	}
 
-	newUser := &models.User{
-		Username:      username,
-		Email:         email,
-		EmailVerified: info.Email != "",
-		PasswordHash:  "", // no password for OAuth-only accounts
-		AvatarURL:     avatarURL,
+	_, err = h.db.Exec(ctx,
+		`INSERT INTO oauth_pending_signups (token, provider, provider_user_id, email, name, avatar_url, suggested_username, expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		token, provider, info.ProviderUserID, info.Email, info.Name, info.AvatarURL, suggested, time.Now().UTC().Add(15*time.Minute),
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("insert pending signup: %w", err)
 	}
 
-	if err := h.userRepo.Create(ctx, newUser); err != nil {
-		return nil, fmt.Errorf("create user: %w", err)
-	}
+	return nil, &pendingSignup{
+		Token:             token,
+		Provider:          provider,
+		ProviderUserID:    info.ProviderUserID,
+		Email:             info.Email,
+		Name:              info.Name,
+		AvatarURL:         info.AvatarURL,
+		SuggestedUsername: suggested,
+	}, nil
+}
 
-	if err := h.insertOAuthAccount(ctx, newUser.ID, provider, info); err != nil {
-		log.Printf("[oauth] insert oauth_account for new user_id=%d: %v", newUser.ID, err)
+// getPendingSignup loads and validates a not-yet-expired pending signup.
+func (h *OAuthHandler) getPendingSignup(ctx context.Context, token string) (*pendingSignup, error) {
+	if token == "" {
+		return nil, fmt.Errorf("missing token")
 	}
+	p := &pendingSignup{Token: token}
+	var expiresAt time.Time
+	err := h.db.QueryRow(ctx,
+		`SELECT provider, provider_user_id, COALESCE(email, ''), COALESCE(name, ''), COALESCE(avatar_url, ''), suggested_username, expires_at
+		 FROM oauth_pending_signups WHERE token = $1`,
+		token,
+	).Scan(&p.Provider, &p.ProviderUserID, &p.Email, &p.Name, &p.AvatarURL, &p.SuggestedUsername, &expiresAt)
+	if err != nil {
+		return nil, err
+	}
+	if time.Now().UTC().After(expiresAt) {
+		h.deletePendingSignup(ctx, token)
+		return nil, fmt.Errorf("pending signup expired")
+	}
+	return p, nil
+}
 
-	return newUser, nil
+func (h *OAuthHandler) deletePendingSignup(ctx context.Context, token string) {
+	if _, err := h.db.Exec(ctx, `DELETE FROM oauth_pending_signups WHERE token = $1`, token); err != nil {
+		log.Printf("[oauth] delete pending signup failed: %v", err)
+	}
 }
 
 func (h *OAuthHandler) insertOAuthAccount(ctx context.Context, userID int, provider string, info *oauthUserInfo) error {

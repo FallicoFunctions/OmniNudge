@@ -840,6 +840,7 @@ func main() {
 			// Social / OAuth login
 			auth.GET("/oauth/:provider", oauthHandler.Initiate)
 			auth.GET("/oauth/:provider/callback", oauthHandler.Callback)
+			auth.POST("/oauth/complete", oauthHandler.CompleteSignup)
 		}
 
 		// Combined feed routes (optional auth)
