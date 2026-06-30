@@ -2393,6 +2393,44 @@ describe('polishMainStageMaterials', () => {
     expect(spineMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
   });
 
+  it('neutralizes the portal arcade shadow cores so the celestial colonnade reads as recessed depth instead of bright cyan inserts', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedShadowMaterial = new PBRMaterial('V20_RecessedWarmShadow', scene);
+    sharedShadowMaterial.albedoColor.set(0.46, 0.84, 0.98);
+    sharedShadowMaterial.emissiveColor.set(0.18, 0.36, 0.44);
+    sharedShadowMaterial.emissiveIntensity = 0.32;
+
+    const controlShadow = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    controlShadow.material = sharedShadowMaterial;
+
+    const leftCore = MeshBuilder.CreateBox('V68_PortalArcadeShadowCore_L', { size: 1 }, scene);
+    leftCore.material = sharedShadowMaterial;
+
+    const rightCore = MeshBuilder.CreateBox('V68_PortalArcadeShadowCore_R', { size: 1 }, scene);
+    rightCore.material = sharedShadowMaterial;
+
+    polishMainStageMaterials([controlShadow, leftCore, rightCore]);
+
+    expect(controlShadow.material).toBe(sharedShadowMaterial);
+    expect(leftCore.material).toBeInstanceOf(PBRMaterial);
+    expect(rightCore.material).toBeInstanceOf(PBRMaterial);
+    expect(leftCore.material).not.toBe(sharedShadowMaterial);
+    expect(rightCore.material).not.toBe(sharedShadowMaterial);
+    expect(rightCore.material).toBe(leftCore.material);
+
+    const coreMaterial = leftCore.material as PBRMaterial;
+    expect(coreMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(coreMaterial.metadata?.mainStageMaterialOverride).toBe('portal-arcade-shadow-core');
+    expect(coreMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
+    expect(coreMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
+    expect(coreMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
+    expect(coreMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
+    expect(coreMaterial.roughness).toBeGreaterThanOrEqual(0.78);
+    expect(coreMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+  });
+
   it('darkens the promenade pearl ribbon so the central route reads as authored night inlay instead of a repeated bright ivory strip', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
