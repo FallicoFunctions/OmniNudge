@@ -504,7 +504,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                 <div className="mt-3 flex gap-3">
                   {/* Google */}
                   <a
-                    href={`${import.meta.env.VITE_API_URL}/auth/oauth/google`}
+                    href={`${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/auth/oauth/google`}
                     className="flex flex-1 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
                   >
                     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
@@ -518,7 +518,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
 
                   {/* Discord */}
                   <a
-                    href={`${import.meta.env.VITE_API_URL}/auth/oauth/discord`}
+                    href={`${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/auth/oauth/discord`}
                     className="flex flex-1 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
                   >
                     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="#5865F2">
