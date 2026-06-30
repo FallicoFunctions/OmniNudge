@@ -123,10 +123,6 @@ vi.mock('../../hooks/useFeatureFlag', () => ({
   useFeatureFlag: () => false,
 }));
 
-vi.mock('../../services/keyManagementService', () => ({
-  getOwnPublicKeyBase64: () => null,
-}));
-
 vi.mock('../../services/usersService', () => ({
   usersService: {
     updateEmail: vi.fn(),
