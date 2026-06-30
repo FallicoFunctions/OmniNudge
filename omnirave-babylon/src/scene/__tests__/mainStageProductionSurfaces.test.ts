@@ -34,6 +34,10 @@ describe('createMainStageProductionSurfaces', () => {
         'main-stage-wing-screen-right-keyline',
         'main-stage-approach-light-ribbon-left',
         'main-stage-approach-light-ribbon-right',
+        'main-stage-center-beacon-left-outer',
+        'main-stage-center-beacon-right-outer',
+        'main-stage-crown-lattice-tracer-left',
+        'main-stage-crown-lattice-tracer-right',
       ]),
     );
     expect(rig.surfaces.every((surface) => surface.parent === rig.root)).toBe(true);
@@ -97,6 +101,16 @@ describe('createMainStageProductionSurfaces', () => {
     expect(scene?.getMeshByName('main-stage-wing-screen-right-scanline-06')).not.toBeNull();
     expect(scene?.getMeshByName('main-stage-wing-screen-right-rail-left')).not.toBeNull();
     expect(scene?.getMeshByName('main-stage-wing-screen-right-rail-right')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-beacon-left-outer')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-beacon-left-inner')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-beacon-right-inner')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-beacon-right-outer')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-beacon-left-outer-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-beacon-right-outer-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-lattice-tracer-left')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-lattice-tracer-right')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-lattice-tracer-left-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-crown-lattice-tracer-right-glow')).not.toBeNull();
 
     const wingHousing = scene?.getMeshByName('main-stage-wing-screen-right-housing');
     expect(wingHousing?.metadata).toMatchObject({
@@ -147,6 +161,11 @@ describe('createMainStageProductionSurfaces', () => {
       (mesh) => mesh.metadata?.productionRole === 'screen-focal',
     ).length;
     expect(focalMeshCount).toBeGreaterThanOrEqual(8);
+
+    const stageBeaconCount = scene?.meshes.filter(
+      (mesh) => mesh.metadata?.productionRole === 'stage-beacon',
+    ).length;
+    expect(stageBeaconCount).toBeGreaterThanOrEqual(10);
 
     const mullionCount = scene?.meshes.filter((mesh) => mesh.metadata?.productionRole === 'screen-mullion').length;
     expect(mullionCount).toBeGreaterThanOrEqual(7);
