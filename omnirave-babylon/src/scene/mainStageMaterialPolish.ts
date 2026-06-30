@@ -504,6 +504,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V70_PromenadeGoldShoulders') {
+      const cacheKey = `${material.uniqueId}:promenade-gold-shoulders`;
+      let shoulderMaterial = clonedMaterials.get(cacheKey);
+      if (!shoulderMaterial) {
+        shoulderMaterial = material.clone(`${material.name}__promenade-gold-shoulders`);
+        applyPromenadeGoldShouldersOverride(shoulderMaterial);
+        clonedMaterials.set(cacheKey, shoulderMaterial);
+      }
+
+      assignOverrideMaterial(mesh, shoulderMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V30_VipGlassBalustrade_')) {
       const cacheKey = `${material.uniqueId}:vip-glass-balustrade`;
       let balustradeMaterial = clonedMaterials.get(cacheKey);
@@ -1887,6 +1900,20 @@ function applyPromenadePearlRunwayOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'promenade-pearl-runway',
+  };
+}
+
+function applyPromenadeGoldShouldersOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.07);
+  material.emissiveColor = new Color3(0.018, 0.012, 0.005);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.18;
+  material.roughness = 0.88;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'promenade-gold-shoulders',
   };
 }
 
