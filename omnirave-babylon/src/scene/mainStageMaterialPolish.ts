@@ -735,6 +735,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V68_PortalArcadeShadowCore_L' || mesh.name === 'V68_PortalArcadeShadowCore_R') {
+      const cacheKey = `${material.uniqueId}:portal-arcade-shadow-core`;
+      let coreMaterial = clonedMaterials.get(cacheKey);
+      if (!coreMaterial) {
+        coreMaterial = material.clone(`${material.name}__portal-arcade-shadow-core`);
+        applyPortalArcadeShadowCoreOverride(coreMaterial);
+        clonedMaterials.set(cacheKey, coreMaterial);
+      }
+
+      assignOverrideMaterial(mesh, coreMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V61_RearMassAuroraPearl_')) {
       const cacheKey = `${material.uniqueId}:rear-mass-aurora-pearl`;
       let auroraMaterial = clonedMaterials.get(cacheKey);
@@ -2182,6 +2195,22 @@ function applyPortalArcadeCyanSpineOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'portal-arcade-cyan-spine',
+  };
+}
+
+function applyPortalArcadeShadowCoreOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.08;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.28;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'portal-arcade-shadow-core',
   };
 }
 
