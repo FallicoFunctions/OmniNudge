@@ -1418,6 +1418,46 @@ describe('polishMainStageMaterials', () => {
     expect(postMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the VIP garden pearl basins so the side gardens read as grounded carved basins instead of bright ivory tubs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const controlIvory = MeshBuilder.CreateBox('V43_WayfindingPylonPearlShell', { size: 1 }, scene);
+    controlIvory.material = sharedIvoryMaterial;
+
+    const leftBasin = MeshBuilder.CreateBox('V67_VipGardenPearlBasin_L', { size: 1 }, scene);
+    leftBasin.material = sharedIvoryMaterial;
+
+    const rightBasin = MeshBuilder.CreateBox('V67_VipGardenPearlBasin_R', { size: 1 }, scene);
+    rightBasin.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([controlIvory, leftBasin, rightBasin]);
+
+    expect(controlIvory.material).toBe(sharedIvoryMaterial);
+    expect(leftBasin.material).toBeInstanceOf(PBRMaterial);
+    expect(rightBasin.material).toBeInstanceOf(PBRMaterial);
+    expect(leftBasin.material).not.toBe(sharedIvoryMaterial);
+    expect(rightBasin.material).not.toBe(sharedIvoryMaterial);
+    expect(rightBasin.material).toBe(leftBasin.material);
+
+    const basinMaterial = leftBasin.material as PBRMaterial;
+    expect(basinMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(basinMaterial.metadata?.mainStageMaterialOverride).toBe('vip-garden-pearl-basin');
+    expect(basinMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(basinMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(basinMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(basinMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(basinMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(basinMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(basinMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the spawn gallery arcade pearl shells so the VIP long view reads as layered arrival architecture instead of a white side slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
