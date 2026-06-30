@@ -32,6 +32,18 @@ type Config struct {
 	TURN          TURNConfig
 	Gemini        GeminiConfig
 	Crypto        CryptoConfig
+	OAuth         OAuthConfig
+}
+
+// OAuthConfig holds client credentials for social login providers.
+type OAuthConfig struct {
+	GoogleClientID      string // GOOGLE_CLIENT_ID
+	GoogleClientSecret  string // GOOGLE_CLIENT_SECRET
+	DiscordClientID     string // DISCORD_CLIENT_ID
+	DiscordClientSecret string // DISCORD_CLIENT_SECRET
+	// BackendURL is the public base URL of the backend API (e.g. https://api.omninudge.com).
+	// OAuth providers redirect here; the backend then redirects the browser to FrontendURL.
+	BackendURL string // BACKEND_URL
 }
 
 // CryptoConfig holds wallet addresses for accepting crypto donations and payments.
@@ -273,6 +285,13 @@ func Load() (*Config, error) {
 		Gemini: GeminiConfig{
 			APIKey: getEnv("GEMINI_API_KEY", ""),
 			Model:  getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
+		},
+		OAuth: OAuthConfig{
+			GoogleClientID:      getEnv("GOOGLE_CLIENT_ID", ""),
+			GoogleClientSecret:  getEnv("GOOGLE_CLIENT_SECRET", ""),
+			DiscordClientID:     getEnv("DISCORD_CLIENT_ID", ""),
+			DiscordClientSecret: getEnv("DISCORD_CLIENT_SECRET", ""),
+			BackendURL:          getEnv("BACKEND_URL", "http://localhost:8080"),
 		},
 	}
 
