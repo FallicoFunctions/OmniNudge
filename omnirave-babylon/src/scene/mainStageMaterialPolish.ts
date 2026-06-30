@@ -787,6 +787,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V68_GrandArcadeGoldBands_L' || mesh.name === 'V68_GrandArcadeGoldBands_R') {
+      const cacheKey = `${material.uniqueId}:grand-arcade-gold-bands`;
+      let bandsMaterial = clonedMaterials.get(cacheKey);
+      if (!bandsMaterial) {
+        bandsMaterial = material.clone(`${material.name}__grand-arcade-gold-bands`);
+        applyGrandArcadeGoldBandsOverride(bandsMaterial);
+        clonedMaterials.set(cacheKey, bandsMaterial);
+      }
+
+      assignOverrideMaterial(mesh, bandsMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V61_RearMassAuroraPearl_')) {
       const cacheKey = `${material.uniqueId}:rear-mass-aurora-pearl`;
       let auroraMaterial = clonedMaterials.get(cacheKey);
@@ -2298,6 +2311,20 @@ function applyHeroPortalShadowDaisOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'hero-portal-shadow-dais',
+  };
+}
+
+function applyGrandArcadeGoldBandsOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.07);
+  material.emissiveColor = new Color3(0.018, 0.012, 0.005);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.18;
+  material.roughness = 0.88;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'grand-arcade-gold-bands',
   };
 }
 
