@@ -411,6 +411,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V64_PromenadePearlRibbon') {
+      const cacheKey = `${material.uniqueId}:promenade-pearl-ribbon`;
+      let ribbonMaterial = clonedMaterials.get(cacheKey);
+      if (!ribbonMaterial) {
+        ribbonMaterial = material.clone(`${material.name}__promenade-pearl-ribbon`);
+        applyPromenadePearlRibbonOverride(ribbonMaterial);
+        clonedMaterials.set(cacheKey, ribbonMaterial);
+      }
+
+      assignOverrideMaterial(mesh, ribbonMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V60_SpawnGateSentinelPearl_')) {
       const cacheKey = `${material.uniqueId}:spawn-gate-sentinel-pearl`;
       let sentinelMaterial = clonedMaterials.get(cacheKey);
@@ -1084,6 +1097,23 @@ function applyArrivalPlinthPearlDaisOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'arrival-plinth-pearl-dais',
+  };
+}
+
+function applyPromenadePearlRibbonOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.24, 0.26, 0.3);
+  material.emissiveColor = new Color3(0.006, 0.01, 0.014);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'promenade-pearl-ribbon',
   };
 }
 
