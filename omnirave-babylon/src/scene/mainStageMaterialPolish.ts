@@ -70,6 +70,23 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name.startsWith('V80_OvalScreenPedestalShell_') ||
+      mesh.name.startsWith('V80_OvalScreenCanopyShell_') ||
+      mesh.name.startsWith('V80_OvalScreenSideButtressShellArray_')
+    ) {
+      const cacheKey = `${material.uniqueId}:oval-screen-shell-housing`;
+      let housingMaterial = clonedMaterials.get(cacheKey);
+      if (!housingMaterial) {
+        housingMaterial = material.clone(`${material.name}__oval-screen-shell-housing`);
+        applyOvalScreenShellHousingOverride(housingMaterial);
+        clonedMaterials.set(cacheKey, housingMaterial);
+      }
+
+      mesh.material = housingMaterial;
+      continue;
+    }
+
     if (mesh.name.startsWith('V87_WingFacadeShadowFrameArray_')) {
       const cacheKey = `${material.uniqueId}:wing-facade-shadow-frame`;
       let frameMaterial = clonedMaterials.get(cacheKey);
@@ -490,6 +507,23 @@ function applySupportTentCanopyOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'support-tent-canopy',
+  };
+}
+
+function applyOvalScreenShellHousingOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.22, 0.24, 0.28);
+  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-screen-shell-housing',
   };
 }
 
