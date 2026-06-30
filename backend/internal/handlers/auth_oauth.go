@@ -246,8 +246,12 @@ func (h *OAuthHandler) finishOAuthLogin(c *gin.Context, provider string, info *o
 	}
 
 	if pending != nil {
-		c.Redirect(http.StatusFound, h.frontendURL+"/auth/choose-username?pending_token="+pending.Token+
-			"&suggested="+url.QueryEscape(pending.SuggestedUsername)+"&provider="+provider)
+		redirectURL := h.frontendURL + "/auth/choose-username?pending_token=" + pending.Token +
+			"&suggested=" + url.QueryEscape(pending.SuggestedUsername) + "&provider=" + provider
+		if pending.Email == "" {
+			redirectURL += "&no_email=1"
+		}
+		c.Redirect(http.StatusFound, redirectURL)
 		return
 	}
 
@@ -354,6 +358,7 @@ func (h *OAuthHandler) fetchSteamUserInfo(ctx context.Context, steamID string) (
 type completeSignupRequest struct {
 	PendingToken string `json:"pending_token"`
 	Username     string `json:"username"`
+	Email        string `json:"email"` // optional; only sent when the provider didn't supply one
 }
 
 // CompleteSignup handles POST /auth/oauth/complete — finalises a pending OAuth
@@ -386,16 +391,25 @@ func (h *OAuthHandler) CompleteSignup(c *gin.Context) {
 	if pending.AvatarURL != "" {
 		avatarURL = &pending.AvatarURL
 	}
+
+	// Use the provider-supplied email if available; otherwise accept the
+	// user-supplied one (only offered when the provider gave us nothing).
+	resolvedEmail := pending.Email
+	userSuppliedEmail := strings.TrimSpace(req.Email)
+	if resolvedEmail == "" && userSuppliedEmail != "" {
+		resolvedEmail = userSuppliedEmail
+	}
+
 	var email *string
-	if pending.Email != "" {
-		email = &pending.Email
+	if resolvedEmail != "" {
+		email = &resolvedEmail
 	}
 
 	newUser := &models.User{
 		Username:      username,
 		Email:         email,
-		EmailVerified: pending.Email != "",
-		PasswordHash:  "", // no password for OAuth-only accounts
+		EmailVerified: pending.Email != "", // only mark verified if it came from the provider
+		PasswordHash:  "",                  // no password for OAuth-only accounts
 		AvatarURL:     avatarURL,
 	}
 
@@ -406,7 +420,7 @@ func (h *OAuthHandler) CompleteSignup(c *gin.Context) {
 
 	info := &oauthUserInfo{
 		ProviderUserID: pending.ProviderUserID,
-		Email:          pending.Email,
+		Email:          resolvedEmail,
 		Name:           pending.Name,
 		AvatarURL:      pending.AvatarURL,
 	}
