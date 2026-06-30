@@ -1040,6 +1040,46 @@ describe('polishMainStageMaterials', () => {
     expect(wingCanopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
   });
 
+  it('darkens the wing-canopy pearl lamellae so the side crowns read as layered depth instead of bright ivory fins', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V16_PearlArchitecturalShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const controlPearl = MeshBuilder.CreateBox('V16_ArchitecturalPearlControl', { size: 1 }, scene);
+    controlPearl.material = sharedPearlMaterial;
+
+    const leftLamella = MeshBuilder.CreateBox('V117_WingCanopyLamellaPearlArray_L_Mid', { size: 1 }, scene);
+    leftLamella.material = sharedPearlMaterial;
+
+    const rightLamella = MeshBuilder.CreateBox('V117_WingCanopyLamellaPearlArray_R_Mid', { size: 1 }, scene);
+    rightLamella.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, leftLamella, rightLamella]);
+
+    expect(controlPearl.material).toBe(sharedPearlMaterial);
+    expect(leftLamella.material).toBeInstanceOf(PBRMaterial);
+    expect(rightLamella.material).toBeInstanceOf(PBRMaterial);
+    expect(leftLamella.material).not.toBe(sharedPearlMaterial);
+    expect(rightLamella.material).not.toBe(sharedPearlMaterial);
+    expect(rightLamella.material).toBe(leftLamella.material);
+
+    const lamellaMaterial = leftLamella.material as PBRMaterial;
+    expect(lamellaMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(lamellaMaterial.metadata?.mainStageMaterialOverride).toBe('wing-canopy-lamella-pearl');
+    expect(lamellaMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(lamellaMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(lamellaMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(lamellaMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(lamellaMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(lamellaMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(lamellaMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('regrades the V51 shoulder and cathedral masses into darker night-shell forms so the route views stop reading them as white proxy monoliths', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);

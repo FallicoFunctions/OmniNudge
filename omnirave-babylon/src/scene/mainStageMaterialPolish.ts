@@ -747,6 +747,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V117_WingCanopyLamellaPearlArray_')) {
+      const cacheKey = `${material.uniqueId}:wing-canopy-lamella-pearl`;
+      let wingCanopyMaterial = clonedMaterials.get(cacheKey);
+      if (!wingCanopyMaterial) {
+        wingCanopyMaterial = material.clone(`${material.name}__wing-canopy-lamella-pearl`);
+        applyWingCanopyLamellaPearlOverride(wingCanopyMaterial);
+        clonedMaterials.set(cacheKey, wingCanopyMaterial);
+      }
+
+      assignOverrideMaterial(mesh, wingCanopyMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V31_SideGlassLens_')) {
       const cacheKey = `${material.uniqueId}:side-screen-glass-lens`;
       let lensMaterial = clonedMaterials.get(cacheKey);
@@ -1252,6 +1265,23 @@ function applyWingCanopyLamellaGoldOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-canopy-lamella-gold',
+  };
+}
+
+function applyWingCanopyLamellaPearlOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-canopy-lamella-pearl',
   };
 }
 
