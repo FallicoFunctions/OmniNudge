@@ -38,6 +38,8 @@ describe('createMainStageProductionSurfaces', () => {
         'main-stage-center-beacon-right-outer',
         'main-stage-crown-lattice-tracer-left',
         'main-stage-crown-lattice-tracer-right',
+        'main-stage-center-portal-jamb-left',
+        'main-stage-center-portal-jamb-right',
       ]),
     );
     expect(rig.surfaces.every((surface) => surface.parent === rig.root)).toBe(true);
@@ -111,6 +113,14 @@ describe('createMainStageProductionSurfaces', () => {
     expect(scene?.getMeshByName('main-stage-crown-lattice-tracer-right')).not.toBeNull();
     expect(scene?.getMeshByName('main-stage-crown-lattice-tracer-left-glow')).not.toBeNull();
     expect(scene?.getMeshByName('main-stage-crown-lattice-tracer-right-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-portal-jamb-left')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-portal-jamb-right')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-portal-jamb-left-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-portal-jamb-right-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-portal-header')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-portal-header-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-portal-sill')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-center-portal-sill-glow')).not.toBeNull();
 
     const wingHousing = scene?.getMeshByName('main-stage-wing-screen-right-housing');
     expect(wingHousing?.metadata).toMatchObject({
@@ -165,7 +175,7 @@ describe('createMainStageProductionSurfaces', () => {
     const stageBeaconCount = scene?.meshes.filter(
       (mesh) => mesh.metadata?.productionRole === 'stage-beacon',
     ).length;
-    expect(stageBeaconCount).toBeGreaterThanOrEqual(10);
+    expect(stageBeaconCount).toBeGreaterThanOrEqual(18);
 
     const mullionCount = scene?.meshes.filter((mesh) => mesh.metadata?.productionRole === 'screen-mullion').length;
     expect(mullionCount).toBeGreaterThanOrEqual(7);
