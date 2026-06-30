@@ -11,7 +11,7 @@ interface SurfacePlacement {
   height: number;
   name: string;
   position: Vector3;
-  productionRole?: 'screen-base' | 'screen-accent' | 'approach-ribbon';
+  productionRole?: 'screen-base' | 'screen-accent' | 'approach-ribbon' | 'stage-beacon';
   rotation?: Vector3;
   width: number;
 }
@@ -99,6 +99,90 @@ export function createMainStageProductionSurfaces(scene: Scene) {
       position: new Vector3(20.4, 11.5, 22.02),
       rotation: new Vector3(0, 0.18, 0),
       productionRole: 'screen-accent',
+    }),
+    createSurface(scene, root, accentMaterial, {
+      name: 'main-stage-center-beacon-left-outer',
+      width: 0.18,
+      height: 18.8,
+      position: new Vector3(-7.35, 19.8, 25.55),
+      productionRole: 'stage-beacon',
+    }),
+    createSurface(scene, root, accentMaterial, {
+      name: 'main-stage-center-beacon-left-inner',
+      width: 0.14,
+      height: 18.2,
+      position: new Vector3(-2.55, 19.8, 25.52),
+      productionRole: 'stage-beacon',
+    }),
+    createSurface(scene, root, accentMaterial, {
+      name: 'main-stage-center-beacon-right-inner',
+      width: 0.14,
+      height: 18.2,
+      position: new Vector3(2.55, 19.8, 25.52),
+      productionRole: 'stage-beacon',
+    }),
+    createSurface(scene, root, accentMaterial, {
+      name: 'main-stage-center-beacon-right-outer',
+      width: 0.18,
+      height: 18.8,
+      position: new Vector3(7.35, 19.8, 25.55),
+      productionRole: 'stage-beacon',
+    }),
+    createSurface(scene, root, treatmentMaterials.halo, {
+      name: 'main-stage-center-beacon-left-outer-glow',
+      width: 0.58,
+      height: 19.8,
+      position: new Vector3(-7.35, 19.8, 25.48),
+      productionRole: 'stage-beacon',
+    }),
+    createSurface(scene, root, treatmentMaterials.halo, {
+      name: 'main-stage-center-beacon-left-inner-glow',
+      width: 0.46,
+      height: 19.2,
+      position: new Vector3(-2.55, 19.8, 25.46),
+      productionRole: 'stage-beacon',
+    }),
+    createSurface(scene, root, treatmentMaterials.halo, {
+      name: 'main-stage-center-beacon-right-inner-glow',
+      width: 0.46,
+      height: 19.2,
+      position: new Vector3(2.55, 19.8, 25.46),
+      productionRole: 'stage-beacon',
+    }),
+    createSurface(scene, root, treatmentMaterials.halo, {
+      name: 'main-stage-center-beacon-right-outer-glow',
+      width: 0.58,
+      height: 19.8,
+      position: new Vector3(7.35, 19.8, 25.48),
+      productionRole: 'stage-beacon',
+    }),
+    createSurface(scene, root, accentMaterial, {
+      name: 'main-stage-crown-lattice-tracer-left',
+      width: 0.12,
+      height: 4.2,
+      position: new Vector3(-1.72, 22.4, 26.56),
+      productionRole: 'stage-beacon',
+    }),
+    createSurface(scene, root, accentMaterial, {
+      name: 'main-stage-crown-lattice-tracer-right',
+      width: 0.12,
+      height: 4.2,
+      position: new Vector3(1.72, 22.4, 26.56),
+      productionRole: 'stage-beacon',
+    }),
+    createSurface(scene, root, treatmentMaterials.halo, {
+      name: 'main-stage-crown-lattice-tracer-left-glow',
+      width: 0.42,
+      height: 4.8,
+      position: new Vector3(-1.72, 22.4, 26.5),
+      productionRole: 'stage-beacon',
+    }),
+    createSurface(scene, root, treatmentMaterials.halo, {
+      name: 'main-stage-crown-lattice-tracer-right-glow',
+      width: 0.42,
+      height: 4.8,
+      position: new Vector3(1.72, 22.4, 26.5),
+      productionRole: 'stage-beacon',
     }),
     createSurface(scene, root, ribbonMaterial, {
       name: 'main-stage-approach-light-ribbon-left',
