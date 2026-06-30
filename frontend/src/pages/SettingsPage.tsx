@@ -8,7 +8,6 @@ import { LanguageSelector } from '../components/settings/LanguageSelector';
 import { Panel } from '../components/common/Panel';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
-import { getOwnPublicKeyBase64 } from '../services/keyManagementService';
 import { usersService } from '../services/usersService';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { accountService } from '../services/accountService';
@@ -131,9 +130,6 @@ export default function SettingsPage() {
     if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 0;
     return Math.max(0, Math.min(1439, hh * 60 + mm));
   };
-  const [publicKey, setPublicKey] = useState<string | null>(null);
-  const [showPublicKey, setShowPublicKey] = useState(false);
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const { user, refreshUser } = useAuth();
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [emailInput, setEmailInput] = useState('');
@@ -249,10 +245,6 @@ export default function SettingsPage() {
       window.history.replaceState({}, document.title);
     }
   }, [location.state, refreshUser]);
-
-  useEffect(() => {
-    setPublicKey(getOwnPublicKeyBase64());
-  }, []);
 
   useEffect(() => {
     if (!import.meta.env.DEV) {
@@ -1470,62 +1462,6 @@ export default function SettingsPage() {
                   </button>
                 </div>
               </div>
-            </div>
-          </Panel>
-
-          {/* Security & Keys */}
-          <Panel as="section">
-            <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
-              {t('settings.security.title')}
-            </h2>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t('settings.security.description')}
-            </p>
-
-            <div className="mt-4 flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowPublicKey((v) => !v)}
-                  className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                >
-                  {showPublicKey ? t('settings.security.hideKey') : t('settings.security.showKey')}
-                </button>
-                {publicKey && showPublicKey && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(publicKey);
-                        setCopyStatus('copied');
-                        setTimeout(() => setCopyStatus('idle'), 1500);
-                      } catch {
-                        setCopyStatus('error');
-                        setTimeout(() => setCopyStatus('idle'), 1500);
-                      }
-                    }}
-                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                  >
-                    {copyStatus === 'copied'
-                      ? t('settings.security.copied')
-                      : copyStatus === 'error'
-                        ? t('settings.security.copyFailed')
-                        : t('settings.security.copy')}
-                  </button>
-                )}
-              </div>
-
-              {showPublicKey && (
-                <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3 text-sm text-[var(--color-text-primary)] break-all">
-                  {publicKey ? (
-                    publicKey
-                  ) : (
-                    <span className="text-[var(--color-text-secondary)]">
-                      {t('settings.security.noKey')}
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
           </Panel>
 
