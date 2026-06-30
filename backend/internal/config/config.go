@@ -41,6 +41,9 @@ type OAuthConfig struct {
 	GoogleClientSecret  string // GOOGLE_CLIENT_SECRET
 	DiscordClientID     string // DISCORD_CLIENT_ID
 	DiscordClientSecret string // DISCORD_CLIENT_SECRET
+	GitHubClientID      string // GITHUB_CLIENT_ID
+	GitHubClientSecret  string // GITHUB_CLIENT_SECRET
+	SteamAPIKey         string // STEAM_API_KEY — Steam uses OpenID 2.0, not OAuth2; no client secret
 	// BackendURL is the public base URL of the backend API (e.g. https://api.omninudge.com).
 	// OAuth providers redirect here; the backend then redirects the browser to FrontendURL.
 	BackendURL string // BACKEND_URL
@@ -291,6 +294,9 @@ func Load() (*Config, error) {
 			GoogleClientSecret:  getEnv("GOOGLE_CLIENT_SECRET", ""),
 			DiscordClientID:     getEnv("DISCORD_CLIENT_ID", ""),
 			DiscordClientSecret: getEnv("DISCORD_CLIENT_SECRET", ""),
+			GitHubClientID:      getEnv("GITHUB_CLIENT_ID", ""),
+			GitHubClientSecret:  getEnv("GITHUB_CLIENT_SECRET", ""),
+			SteamAPIKey:         getEnv("STEAM_API_KEY", ""),
 			BackendURL:          getEnv("BACKEND_URL", "http://localhost:8080"),
 		},
 	}
