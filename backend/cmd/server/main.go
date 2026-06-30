@@ -518,6 +518,7 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, lockoutService, cfg.AppEnv)
+	oauthHandler := handlers.NewOAuthHandler(authService, userRepo, db.Pool, cfg.FrontendURL, cfg.OAuth.BackendURL, cfg.OAuth.GoogleClientID, cfg.OAuth.GoogleClientSecret, cfg.OAuth.DiscordClientID, cfg.OAuth.DiscordClientSecret, cfg.AppEnv)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo, autoDeleteSvc)
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo, hubSettingsRepo)
 	postsHandler.SetLinkPreviewService(linkpreviewsvc.NewService(nil, storageService, virusScanner))
@@ -835,6 +836,11 @@ func main() {
 			// Email verification — 3 requests per hour per IP
 			auth.GET("/verify-email", authHandler.VerifyEmail)
 			auth.POST("/resend-verification", passwordResetRateLimiter.Middleware(), authHandler.ResendVerification)
+
+			// Social / OAuth login
+			auth.GET("/oauth/:provider", oauthHandler.Initiate)
+			auth.GET("/oauth/:provider/callback", oauthHandler.Callback)
+			auth.POST("/oauth/complete", oauthHandler.CompleteSignup)
 		}
 
 		// Combined feed routes (optional auth)
@@ -1284,8 +1290,8 @@ func main() {
 			protected.GET("/users/me/storage", storageHandler.GetMyStorage)
 			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
 			protected.PUT("/users/me/top-friends", usersHandler.SetTopFriends)
-			protected.POST("/users/me/avatar", usersHandler.UploadMyAvatar)
-			protected.POST("/users/me/banner", usersHandler.UploadMyBanner)
+			protected.POST("/users/me/avatar", middleware.RequestSizeLimiter(5<<20), usersHandler.UploadMyAvatar)
+			protected.POST("/users/me/banner", middleware.RequestSizeLimiter(10<<20), usersHandler.UploadMyBanner)
 
 			// Profile wall
 			protected.GET("/users/me/wall/pending", wallHandler.GetPendingWallPosts)
