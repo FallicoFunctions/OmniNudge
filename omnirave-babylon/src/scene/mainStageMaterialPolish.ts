@@ -692,6 +692,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V69_PlazaPaverGoldFiligree') {
+      const cacheKey = `${material.uniqueId}:plaza-paver-gold-filigree`;
+      let filigreeMaterial = clonedMaterials.get(cacheKey);
+      if (!filigreeMaterial) {
+        filigreeMaterial = material.clone(`${material.name}__plaza-paver-gold-filigree`);
+        applyPlazaPaverGoldFiligreeOverride(filigreeMaterial);
+        clonedMaterials.set(cacheKey, filigreeMaterial);
+      }
+
+      assignOverrideMaterial(mesh, filigreeMaterial);
+      continue;
+    }
+
     if (
       mesh.name.startsWith('V68_PortalArcadePearl_') ||
       mesh.name.startsWith('V68_GrandArcadePearlColonnade_') ||
@@ -2198,6 +2211,20 @@ function applyPlazaPaverPearlBandsOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'plaza-paver-pearl-bands',
+  };
+}
+
+function applyPlazaPaverGoldFiligreeOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.07);
+  material.emissiveColor = new Color3(0.018, 0.012, 0.005);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.18;
+  material.roughness = 0.88;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'plaza-paver-gold-filigree',
   };
 }
 
