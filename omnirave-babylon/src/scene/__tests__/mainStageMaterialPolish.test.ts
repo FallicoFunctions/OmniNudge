@@ -1146,6 +1146,42 @@ describe('polishMainStageMaterials', () => {
     expect(keystoneMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('darkens the center screen interrupt rails so the hero wall reads with layered depth instead of three bright gold bars', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V20_ChasedGoldFiligree', scene);
+    sharedGoldMaterial.albedoColor.set(0.78, 0.7, 0.44);
+    sharedGoldMaterial.emissiveColor.set(0.09, 0.07, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.18;
+    sharedGoldMaterial.metallic = 0.8;
+    sharedGoldMaterial.roughness = 0.22;
+
+    const otherGold = MeshBuilder.CreateBox('V115_CenterScreenMullionArray', { size: 1 }, scene);
+    otherGold.material = sharedGoldMaterial;
+
+    const rails = MeshBuilder.CreateBox('V128_CenterScreenGoldInterruptRailArray', { size: 1 }, scene);
+    rails.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, rails]);
+
+    expect(otherGold.material).toBe(sharedGoldMaterial);
+    expect(rails.material).toBeInstanceOf(PBRMaterial);
+    expect(rails.material).not.toBe(sharedGoldMaterial);
+
+    const railMaterial = rails.material as PBRMaterial;
+    expect(railMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(railMaterial.metadata?.mainStageMaterialOverride).toBe('center-screen-gold-interrupt-rail');
+    expect(railMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(railMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(railMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(railMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(railMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(railMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(railMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(railMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('tones down the wide hero screen gold frame cluster so the stage face keeps depth instead of bright metallic rails', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
