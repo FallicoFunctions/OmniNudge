@@ -2501,6 +2501,38 @@ describe('polishMainStageMaterials', () => {
     expect(plinthMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
   });
 
+  it('neutralizes the hero portal shadow dais so the celestial colonnade terminus reads as recessed depth instead of a bright cyan insert', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedShadowMaterial = new PBRMaterial('V20_RecessedWarmShadow', scene);
+    sharedShadowMaterial.albedoColor.set(0.46, 0.84, 0.98);
+    sharedShadowMaterial.emissiveColor.set(0.18, 0.36, 0.44);
+    sharedShadowMaterial.emissiveIntensity = 0.32;
+
+    const controlShadow = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    controlShadow.material = sharedShadowMaterial;
+
+    const heroDais = MeshBuilder.CreateBox('V68_HeroPortalShadowDais', { size: 1 }, scene);
+    heroDais.material = sharedShadowMaterial;
+
+    polishMainStageMaterials([controlShadow, heroDais]);
+
+    expect(controlShadow.material).toBe(sharedShadowMaterial);
+    expect(heroDais.material).toBeInstanceOf(PBRMaterial);
+    expect(heroDais.material).not.toBe(sharedShadowMaterial);
+
+    const daisMaterial = heroDais.material as PBRMaterial;
+    expect(daisMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(daisMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-shadow-dais');
+    expect(daisMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
+    expect(daisMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
+    expect(daisMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
+    expect(daisMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
+    expect(daisMaterial.roughness).toBeGreaterThanOrEqual(0.78);
+    expect(daisMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+  });
+
   it('darkens the promenade pearl ribbon so the central route reads as authored night inlay instead of a repeated bright ivory strip', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
