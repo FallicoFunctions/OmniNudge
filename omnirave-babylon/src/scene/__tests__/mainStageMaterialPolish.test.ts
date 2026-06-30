@@ -1298,6 +1298,46 @@ describe('polishMainStageMaterials', () => {
     expect(portalMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the rear mass aurora pearl fins so the stage backdrop keeps silhouette depth instead of reading as two bright ivory blades', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const controlIvory = MeshBuilder.CreateBox('V57_BackPlazaSentinelPearl_L', { size: 1 }, scene);
+    controlIvory.material = sharedIvoryMaterial;
+
+    const leftAurora = MeshBuilder.CreateBox('V61_RearMassAuroraPearl_L', { size: 1 }, scene);
+    leftAurora.material = sharedIvoryMaterial;
+
+    const rightAurora = MeshBuilder.CreateBox('V61_RearMassAuroraPearl_R', { size: 1 }, scene);
+    rightAurora.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([controlIvory, leftAurora, rightAurora]);
+
+    expect(controlIvory.material).toBe(sharedIvoryMaterial);
+    expect(leftAurora.material).toBeInstanceOf(PBRMaterial);
+    expect(rightAurora.material).toBeInstanceOf(PBRMaterial);
+    expect(leftAurora.material).not.toBe(sharedIvoryMaterial);
+    expect(rightAurora.material).not.toBe(sharedIvoryMaterial);
+    expect(rightAurora.material).toBe(leftAurora.material);
+
+    const auroraMaterial = leftAurora.material as PBRMaterial;
+    expect(auroraMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(auroraMaterial.metadata?.mainStageMaterialOverride).toBe('rear-mass-aurora-pearl');
+    expect(auroraMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
+    expect(auroraMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(auroraMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(auroraMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(auroraMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(auroraMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(auroraMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the spawn gallery arcade pearl shells so the VIP long view reads as layered arrival architecture instead of a white side slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
