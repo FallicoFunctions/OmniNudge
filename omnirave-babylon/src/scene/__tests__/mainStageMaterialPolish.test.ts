@@ -1244,6 +1244,47 @@ describe('polishMainStageMaterials', () => {
     expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
   });
 
+  it('tones down the rear-cathedral lancet gold arrays so the skyline keeps shadow depth instead of bright foil tracery', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V14_BurnishedCelestialGold', scene);
+    sharedGoldMaterial.albedoColor.set(0.76, 0.68, 0.42);
+    sharedGoldMaterial.emissiveColor.set(0.08, 0.06, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.16;
+    sharedGoldMaterial.metallic = 0.78;
+    sharedGoldMaterial.roughness = 0.24;
+
+    const otherGold = MeshBuilder.CreateBox('V68_PortalArcadeGoldCrest_L', { size: 1 }, scene);
+    otherGold.material = sharedGoldMaterial;
+
+    const leftGold = MeshBuilder.CreateBox('V88_RearCathedralLancetGoldArray_L', { size: 1 }, scene);
+    leftGold.material = sharedGoldMaterial;
+
+    const rightGold = MeshBuilder.CreateBox('V88_RearCathedralLancetGoldArray_R', { size: 1 }, scene);
+    rightGold.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, leftGold, rightGold]);
+
+    expect(otherGold.material).toBe(sharedGoldMaterial);
+    expect(leftGold.material).toBeInstanceOf(PBRMaterial);
+    expect(rightGold.material).toBeInstanceOf(PBRMaterial);
+    expect(leftGold.material).not.toBe(sharedGoldMaterial);
+    expect(rightGold.material).not.toBe(sharedGoldMaterial);
+    expect(rightGold.material).toBe(leftGold.material);
+
+    const goldMaterial = leftGold.material as PBRMaterial;
+    expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(goldMaterial.metadata?.mainStageMaterialOverride).toBe('rear-cathedral-lancet-gold');
+    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(goldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the rear shell shadow reveal arrays so the promenade flanks stop reading as white oval proxies', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
