@@ -2948,4 +2948,44 @@ describe('polishMainStageMaterials', () => {
     expect(inlayMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(inlayMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
+
+  it('darkens the VIP terrace outer sweeps so the podium flanks read as carved support shells instead of bright pearl slabs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V20_LayeredPearlShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.78, 0.74, 0.68);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.05);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.36;
+
+    const otherPearl = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherPearl.material = sharedPearlMaterial;
+
+    const leftSweep = MeshBuilder.CreateBox('V26_VipTerraceOuterSweep_L', { size: 1 }, scene);
+    leftSweep.material = sharedPearlMaterial;
+
+    const rightSweep = MeshBuilder.CreateBox('V26_VipTerraceOuterSweep_R', { size: 1 }, scene);
+    rightSweep.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, leftSweep, rightSweep]);
+
+    expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(leftSweep.material).toBeInstanceOf(PBRMaterial);
+    expect(rightSweep.material).toBeInstanceOf(PBRMaterial);
+    expect(leftSweep.material).not.toBe(sharedPearlMaterial);
+    expect(rightSweep.material).not.toBe(sharedPearlMaterial);
+    expect(rightSweep.material).toBe(leftSweep.material);
+
+    const sweepMaterial = leftSweep.material as PBRMaterial;
+    expect(sweepMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(sweepMaterial.metadata?.mainStageMaterialOverride).toBe('vip-terrace-outer-sweep');
+    expect(sweepMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(sweepMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(sweepMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(sweepMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(sweepMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(sweepMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(sweepMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
 });

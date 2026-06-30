@@ -910,6 +910,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V26_VipTerraceOuterSweep_')) {
+      const cacheKey = `${material.uniqueId}:vip-terrace-outer-sweep`;
+      let sweepMaterial = clonedMaterials.get(cacheKey);
+      if (!sweepMaterial) {
+        sweepMaterial = material.clone(`${material.name}__vip-terrace-outer-sweep`);
+        applyVipTerraceOuterSweepOverride(sweepMaterial);
+        clonedMaterials.set(cacheKey, sweepMaterial);
+      }
+
+      assignOverrideMaterial(mesh, sweepMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V26_VipTerraceGoldInlay_')) {
       const cacheKey = `${material.uniqueId}:vip-terrace-gold-inlay`;
       let inlayMaterial = clonedMaterials.get(cacheKey);
@@ -2240,6 +2253,23 @@ function applyWingTerraceGoldOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-terrace-gold',
+  };
+}
+
+function applyVipTerraceOuterSweepOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'vip-terrace-outer-sweep',
   };
 }
 
