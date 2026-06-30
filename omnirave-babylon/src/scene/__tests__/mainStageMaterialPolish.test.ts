@@ -236,6 +236,46 @@ describe('polishMainStageMaterials', () => {
     expect(trimMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('darkens the basin retaining reliefs so the basin-edge sidewalls read as grounded architecture instead of bright pearl sheets', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V15_PearlShellBeveled', scene);
+    sharedPearlMaterial.albedoColor.set(0.8, 0.78, 0.74);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const otherPearl = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherPearl.material = sharedPearlMaterial;
+
+    const leftRelief = MeshBuilder.CreateBox('V121_BasinRetainingRelief_L', { size: 1 }, scene);
+    leftRelief.material = sharedPearlMaterial;
+
+    const rightRelief = MeshBuilder.CreateBox('V121_BasinRetainingRelief_R', { size: 1 }, scene);
+    rightRelief.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, leftRelief, rightRelief]);
+
+    expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(leftRelief.material).toBeInstanceOf(PBRMaterial);
+    expect(rightRelief.material).toBeInstanceOf(PBRMaterial);
+    expect(leftRelief.material).not.toBe(sharedPearlMaterial);
+    expect(rightRelief.material).not.toBe(sharedPearlMaterial);
+    expect(rightRelief.material).toBe(leftRelief.material);
+
+    const reliefMaterial = leftRelief.material as PBRMaterial;
+    expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('neutralizes the V87 wing-facade shadow frames so they do not inherit the bright cyan shadow texture read in the VIP terrace view', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
