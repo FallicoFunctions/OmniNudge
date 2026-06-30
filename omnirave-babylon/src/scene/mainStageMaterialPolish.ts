@@ -87,6 +87,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V81_OvalScreenMullionShellArray_')) {
+      const cacheKey = `${material.uniqueId}:oval-screen-mullion-shell`;
+      let mullionMaterial = clonedMaterials.get(cacheKey);
+      if (!mullionMaterial) {
+        mullionMaterial = material.clone(`${material.name}__oval-screen-mullion-shell`);
+        applyOvalScreenMullionShellOverride(mullionMaterial);
+        clonedMaterials.set(cacheKey, mullionMaterial);
+      }
+
+      mesh.material = mullionMaterial;
+      continue;
+    }
+
     if (mesh.name.startsWith('V87_WingFacadeShadowFrameArray_')) {
       const cacheKey = `${material.uniqueId}:wing-facade-shadow-frame`;
       let frameMaterial = clonedMaterials.get(cacheKey);
@@ -524,6 +537,23 @@ function applyOvalScreenShellHousingOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'oval-screen-shell-housing',
+  };
+}
+
+function applyOvalScreenMullionShellOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-screen-mullion-shell',
   };
 }
 
