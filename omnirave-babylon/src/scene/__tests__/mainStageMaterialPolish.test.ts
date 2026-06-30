@@ -97,6 +97,52 @@ describe('polishMainStageMaterials', () => {
     expect(canopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.72);
   });
 
+  it('darkens the oval side-screen shell housings so the promenade checkpoint no longer reads them as giant pale slab proxies', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V15_PearlShellBeveled', scene);
+    sharedPearlMaterial.albedoColor.set(0.8, 0.78, 0.74);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const otherPearl = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherPearl.material = sharedPearlMaterial;
+
+    const pedestalShell = MeshBuilder.CreateBox('V80_OvalScreenPedestalShell_L', { size: 1 }, scene);
+    pedestalShell.material = sharedPearlMaterial;
+
+    const canopyShell = MeshBuilder.CreateBox('V80_OvalScreenCanopyShell_L', { size: 1 }, scene);
+    canopyShell.material = sharedPearlMaterial;
+
+    const buttressShell = MeshBuilder.CreateBox('V80_OvalScreenSideButtressShellArray_L', { size: 1 }, scene);
+    buttressShell.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, pedestalShell, canopyShell, buttressShell]);
+
+    expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(pedestalShell.material).toBeInstanceOf(PBRMaterial);
+    expect(canopyShell.material).toBeInstanceOf(PBRMaterial);
+    expect(buttressShell.material).toBeInstanceOf(PBRMaterial);
+    expect(pedestalShell.material).not.toBe(sharedPearlMaterial);
+    expect(canopyShell.material).not.toBe(sharedPearlMaterial);
+    expect(buttressShell.material).not.toBe(sharedPearlMaterial);
+    expect(canopyShell.material).toBe(pedestalShell.material);
+    expect(buttressShell.material).toBe(pedestalShell.material);
+
+    const housingMaterial = pedestalShell.material as PBRMaterial;
+    expect(housingMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(housingMaterial.metadata?.mainStageMaterialOverride).toBe('oval-screen-shell-housing');
+    expect(housingMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(housingMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(housingMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(housingMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(housingMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(housingMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(housingMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('neutralizes the V87 wing-facade shadow frames so they do not inherit the bright cyan shadow texture read in the VIP terrace view', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
