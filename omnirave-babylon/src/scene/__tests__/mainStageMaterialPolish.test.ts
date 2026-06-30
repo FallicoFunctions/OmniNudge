@@ -1566,6 +1566,46 @@ describe('polishMainStageMaterials', () => {
     expect(gatewayMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the oval portal glow shells so the arrival-side portals read as carved architecture instead of bright pearl side slabs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V15_PearlShellBeveled', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const controlPearl = MeshBuilder.CreateBox('V80_OvalScreenPedestalShell_L', { size: 1 }, scene);
+    controlPearl.material = sharedPearlMaterial;
+
+    const leftShell = MeshBuilder.CreateBox('V82_OvalPortalGlowShell_L', { size: 1 }, scene);
+    leftShell.material = sharedPearlMaterial;
+
+    const rightShell = MeshBuilder.CreateBox('V82_OvalPortalGlowShell_R', { size: 1 }, scene);
+    rightShell.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, leftShell, rightShell]);
+
+    expect(controlPearl.material).toBe(sharedPearlMaterial);
+    expect(leftShell.material).toBeInstanceOf(PBRMaterial);
+    expect(rightShell.material).toBeInstanceOf(PBRMaterial);
+    expect(leftShell.material).not.toBe(sharedPearlMaterial);
+    expect(rightShell.material).not.toBe(sharedPearlMaterial);
+    expect(rightShell.material).toBe(leftShell.material);
+
+    const shellMaterial = leftShell.material as PBRMaterial;
+    expect(shellMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(shellMaterial.metadata?.mainStageMaterialOverride).toBe('oval-portal-glow-shell');
+    expect(shellMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(shellMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(shellMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(shellMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(shellMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(shellMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the spawn gallery pier pearl shells so the arrival buttresses read as carved support architecture instead of bright side slabs', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
