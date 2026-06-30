@@ -1144,6 +1144,46 @@ describe('polishMainStageMaterials', () => {
     expect(runwayMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the arrival side-plinth pearl dais so the forward reveal flanks stop reading as bright ivory podium slabs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const otherIvory = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherIvory.material = sharedIvoryMaterial;
+
+    const leftPlinthDais = MeshBuilder.CreateBox('V58_ArrivalPlinthPearlDais_L', { size: 1 }, scene);
+    leftPlinthDais.material = sharedIvoryMaterial;
+
+    const rightPlinthDais = MeshBuilder.CreateBox('V58_ArrivalPlinthPearlDais_R', { size: 1 }, scene);
+    rightPlinthDais.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([otherIvory, leftPlinthDais, rightPlinthDais]);
+
+    expect(otherIvory.material).toBe(sharedIvoryMaterial);
+    expect(leftPlinthDais.material).toBeInstanceOf(PBRMaterial);
+    expect(rightPlinthDais.material).toBeInstanceOf(PBRMaterial);
+    expect(leftPlinthDais.material).not.toBe(sharedIvoryMaterial);
+    expect(rightPlinthDais.material).not.toBe(sharedIvoryMaterial);
+    expect(rightPlinthDais.material).toBe(leftPlinthDais.material);
+
+    const plinthMaterial = leftPlinthDais.material as PBRMaterial;
+    expect(plinthMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(plinthMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-plinth-pearl-dais');
+    expect(plinthMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
+    expect(plinthMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(plinthMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(plinthMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(plinthMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(plinthMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(plinthMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the spawn gallery arcade pearl shells so the VIP long view reads as layered arrival architecture instead of a white side slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
