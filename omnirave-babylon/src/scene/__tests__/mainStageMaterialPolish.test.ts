@@ -489,4 +489,44 @@ describe('polishMainStageMaterials', () => {
     expect(wingCanopyMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(wingCanopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
   });
+
+  it('regrades the V51 shoulder and cathedral masses into darker night-shell forms so the route views stop reading them as white proxy monoliths', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const otherIvory = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherIvory.material = sharedIvoryMaterial;
+
+    const shoulderMass = MeshBuilder.CreateBox('V51_ShoulderCrownMass_L', { size: 1 }, scene);
+    shoulderMass.material = sharedIvoryMaterial;
+
+    const cathedralMass = MeshBuilder.CreateBox('V51_RearCathedralMass_L', { size: 1 }, scene);
+    cathedralMass.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([otherIvory, shoulderMass, cathedralMass]);
+
+    expect(otherIvory.material).toBe(sharedIvoryMaterial);
+    expect(shoulderMass.material).toBeInstanceOf(PBRMaterial);
+    expect(cathedralMass.material).toBeInstanceOf(PBRMaterial);
+    expect(shoulderMass.material).not.toBe(sharedIvoryMaterial);
+    expect(cathedralMass.material).not.toBe(sharedIvoryMaterial);
+    expect(cathedralMass.material).toBe(shoulderMass.material);
+
+    const stageMassMaterial = shoulderMass.material as PBRMaterial;
+    expect(stageMassMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(stageMassMaterial.metadata?.mainStageMaterialOverride).toBe('stage-mass-ivory');
+    expect(stageMassMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
+    expect(stageMassMaterial.albedoColor.g).toBeLessThanOrEqual(0.3);
+    expect(stageMassMaterial.albedoColor.b).toBeLessThanOrEqual(0.34);
+    expect(stageMassMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(stageMassMaterial.roughness).toBeGreaterThanOrEqual(0.8);
+    expect(stageMassMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.08);
+    expect(stageMassMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+  });
 });
