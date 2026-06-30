@@ -1110,6 +1110,53 @@ describe('polishMainStageMaterials', () => {
     expect(promenadeRunwayMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
 
+  it('tones down the wide hero screen gold frame cluster so the stage face keeps depth instead of bright metallic rails', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V14_BurnishedCelestialGold', scene);
+    sharedGoldMaterial.albedoColor.set(0.76, 0.68, 0.42);
+    sharedGoldMaterial.emissiveColor.set(0.08, 0.06, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.16;
+    sharedGoldMaterial.metallic = 0.78;
+    sharedGoldMaterial.roughness = 0.24;
+
+    const otherGold = MeshBuilder.CreateBox('V68_PortalArcadeGoldCrest_L', { size: 1 }, scene);
+    otherGold.material = sharedGoldMaterial;
+
+    const frame = MeshBuilder.CreateBox('V126_WideHeroScreenGoldFrame', { size: 1 }, scene);
+    frame.material = sharedGoldMaterial;
+
+    const mullions = MeshBuilder.CreateBox('V126_WideHeroScreenGoldMullionArray', { size: 1 }, scene);
+    mullions.material = sharedGoldMaterial;
+
+    const crossbars = MeshBuilder.CreateBox('V126_WideHeroScreenGoldCrossbarArray', { size: 1 }, scene);
+    crossbars.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, frame, mullions, crossbars]);
+
+    expect(otherGold.material).toBe(sharedGoldMaterial);
+    expect(frame.material).toBeInstanceOf(PBRMaterial);
+    expect(mullions.material).toBeInstanceOf(PBRMaterial);
+    expect(crossbars.material).toBeInstanceOf(PBRMaterial);
+    expect(frame.material).not.toBe(sharedGoldMaterial);
+    expect(mullions.material).not.toBe(sharedGoldMaterial);
+    expect(crossbars.material).not.toBe(sharedGoldMaterial);
+    expect(mullions.material).toBe(frame.material);
+    expect(crossbars.material).toBe(frame.material);
+
+    const frameMaterial = frame.material as PBRMaterial;
+    expect(frameMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(frameMaterial.metadata?.mainStageMaterialOverride).toBe('wide-hero-screen-gold-frame');
+    expect(frameMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(frameMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(frameMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(frameMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(frameMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(frameMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the VIP terrace balustrade and canopy metals so the terrace read stops collapsing into a cyan roof slab and flat gold wall', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
