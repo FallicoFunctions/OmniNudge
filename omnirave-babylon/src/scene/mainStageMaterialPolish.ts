@@ -328,6 +328,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V98_CrownButtressRelief_')) {
+      const cacheKey = `${material.uniqueId}:crown-buttress-relief`;
+      let reliefMaterial = clonedMaterials.get(cacheKey);
+      if (!reliefMaterial) {
+        reliefMaterial = material.clone(`${material.name}__crown-buttress-relief`);
+        applyCrownButtressReliefOverride(reliefMaterial);
+        clonedMaterials.set(cacheKey, reliefMaterial);
+      }
+
+      assignOverrideMaterial(mesh, reliefMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V127_CrownScreenShadowCoffer') {
       const cacheKey = `${material.uniqueId}:crown-screen-shadow-coffer`;
       let cofferMaterial = clonedMaterials.get(cacheKey);
@@ -1233,6 +1246,23 @@ function applyCrownButtressGoldInlayOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-buttress-gold-inlay',
+  };
+}
+
+function applyCrownButtressReliefOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.21, 0.23, 0.27);
+  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-buttress-relief',
   };
 }
 
