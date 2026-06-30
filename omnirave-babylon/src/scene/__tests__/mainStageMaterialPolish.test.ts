@@ -1658,6 +1658,52 @@ describe('polishMainStageMaterials', () => {
     expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('darkens the crown obelisk pearl shell masses so the skyline reads as a layered silhouette instead of pale spear proxies', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V16_PearlArchitecturalShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const controlPearl = MeshBuilder.CreateBox('V56_SpawnCanopyPearlVault_L', { size: 1 }, scene);
+    controlPearl.material = sharedPearlMaterial;
+
+    const obeliskCore = MeshBuilder.CreateBox('V52_CrownObeliskPearlCore', { size: 1 }, scene);
+    obeliskCore.material = sharedPearlMaterial;
+
+    const leftBlade = MeshBuilder.CreateBox('V52_CrownSpirePearlBlade_L', { size: 1 }, scene);
+    leftBlade.material = sharedPearlMaterial;
+
+    const rightBlade = MeshBuilder.CreateBox('V52_CrownSpirePearlBlade_R', { size: 1 }, scene);
+    rightBlade.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, obeliskCore, leftBlade, rightBlade]);
+
+    expect(controlPearl.material).toBe(sharedPearlMaterial);
+    expect(obeliskCore.material).toBeInstanceOf(PBRMaterial);
+    expect(leftBlade.material).toBeInstanceOf(PBRMaterial);
+    expect(rightBlade.material).toBeInstanceOf(PBRMaterial);
+    expect(obeliskCore.material).not.toBe(sharedPearlMaterial);
+    expect(leftBlade.material).not.toBe(sharedPearlMaterial);
+    expect(rightBlade.material).not.toBe(sharedPearlMaterial);
+    expect(leftBlade.material).toBe(obeliskCore.material);
+    expect(rightBlade.material).toBe(obeliskCore.material);
+
+    const shellMaterial = obeliskCore.material as PBRMaterial;
+    expect(shellMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(shellMaterial.metadata?.mainStageMaterialOverride).toBe('crown-obelisk-pearl-shell');
+    expect(shellMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(shellMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(shellMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(shellMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(shellMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(shellMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the spawn gallery pier pearl shells so the arrival buttresses read as carved support architecture instead of bright side slabs', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
