@@ -172,6 +172,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V116_ProsceniumShadowPocketArray_')) {
+      const cacheKey = `${material.uniqueId}:proscenium-shadow-pocket`;
+      let pocketMaterial = clonedMaterials.get(cacheKey);
+      if (!pocketMaterial) {
+        pocketMaterial = material.clone(`${material.name}__proscenium-shadow-pocket`);
+        applyProsceniumShadowPocketOverride(pocketMaterial);
+        clonedMaterials.set(cacheKey, pocketMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pocketMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V87_WingFacadeGoldLintelArray_')) {
       const cacheKey = `${material.uniqueId}:wing-facade-gold-lintel`;
       let lintelMaterial = clonedMaterials.get(cacheKey);
@@ -1002,6 +1015,22 @@ function applyWingFacadeShadowFrameOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-facade-shadow-frame',
+  };
+}
+
+function applyProsceniumShadowPocketOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.08;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.28;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'proscenium-shadow-pocket',
   };
 }
 

@@ -558,6 +558,44 @@ describe('polishMainStageMaterials', () => {
     expect(vaultMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
   });
 
+  it('neutralizes the proscenium shadow pockets so the hero portal surround reads as recessed depth instead of bright cyan inserts', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedShadowMaterial = new PBRMaterial('V20_RecessedWarmShadow', scene);
+    sharedShadowMaterial.albedoColor.set(0.46, 0.84, 0.98);
+    sharedShadowMaterial.emissiveColor.set(0.18, 0.36, 0.44);
+    sharedShadowMaterial.emissiveIntensity = 0.32;
+
+    const controlShadow = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    controlShadow.material = sharedShadowMaterial;
+
+    const leftPocket = MeshBuilder.CreateBox('V116_ProsceniumShadowPocketArray_L', { size: 1 }, scene);
+    leftPocket.material = sharedShadowMaterial;
+
+    const rightPocket = MeshBuilder.CreateBox('V116_ProsceniumShadowPocketArray_R', { size: 1 }, scene);
+    rightPocket.material = sharedShadowMaterial;
+
+    polishMainStageMaterials([controlShadow, leftPocket, rightPocket]);
+
+    expect(controlShadow.material).toBe(sharedShadowMaterial);
+    expect(leftPocket.material).toBeInstanceOf(PBRMaterial);
+    expect(rightPocket.material).toBeInstanceOf(PBRMaterial);
+    expect(leftPocket.material).not.toBe(sharedShadowMaterial);
+    expect(rightPocket.material).not.toBe(sharedShadowMaterial);
+    expect(rightPocket.material).toBe(leftPocket.material);
+
+    const pocketMaterial = leftPocket.material as PBRMaterial;
+    expect(pocketMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(pocketMaterial.metadata?.mainStageMaterialOverride).toBe('proscenium-shadow-pocket');
+    expect(pocketMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
+    expect(pocketMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
+    expect(pocketMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
+    expect(pocketMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
+    expect(pocketMaterial.roughness).toBeGreaterThanOrEqual(0.78);
+    expect(pocketMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+  });
+
   it('tones down the V87 wing-facade gold lintel arrays so the terrace soffits keep depth instead of reading as bright foil bars', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
