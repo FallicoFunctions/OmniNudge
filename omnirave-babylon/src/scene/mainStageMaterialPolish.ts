@@ -519,6 +519,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V45_PyroPodPearlShell') {
+      const cacheKey = `${material.uniqueId}:pyro-pod-pearl-shell`;
+      let pyroMaterial = clonedMaterials.get(cacheKey);
+      if (!pyroMaterial) {
+        pyroMaterial = material.clone(`${material.name}__pyro-pod-pearl-shell`);
+        applyPyroPodPearlShellOverride(pyroMaterial);
+        clonedMaterials.set(cacheKey, pyroMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pyroMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V60_SpawnGateSentinelPearl_')) {
       const cacheKey = `${material.uniqueId}:spawn-gate-sentinel-pearl`;
       let sentinelMaterial = clonedMaterials.get(cacheKey);
@@ -1328,6 +1341,23 @@ function applyWayfindingPylonPearlShellOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wayfinding-pylon-pearl-shell',
+  };
+}
+
+function applyPyroPodPearlShellOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.21, 0.23, 0.27);
+  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'pyro-pod-pearl-shell',
   };
 }
 

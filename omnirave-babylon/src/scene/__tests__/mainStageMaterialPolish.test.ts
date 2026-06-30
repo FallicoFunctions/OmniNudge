@@ -1492,6 +1492,40 @@ describe('polishMainStageMaterials', () => {
     expect(pylonMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the pyro pod pearl shells so the stage-edge practicals read as finished housings instead of bright pearl bulbs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V15_PearlShellBeveled', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const controlPearl = MeshBuilder.CreateBox('V80_OvalScreenPedestalShell_L', { size: 1 }, scene);
+    controlPearl.material = sharedPearlMaterial;
+
+    const pyroPod = MeshBuilder.CreateBox('V45_PyroPodPearlShell', { size: 1 }, scene);
+    pyroPod.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, pyroPod]);
+
+    expect(controlPearl.material).toBe(sharedPearlMaterial);
+    expect(pyroPod.material).toBeInstanceOf(PBRMaterial);
+    expect(pyroPod.material).not.toBe(sharedPearlMaterial);
+
+    const pyroMaterial = pyroPod.material as PBRMaterial;
+    expect(pyroMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(pyroMaterial.metadata?.mainStageMaterialOverride).toBe('pyro-pod-pearl-shell');
+    expect(pyroMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(pyroMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(pyroMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(pyroMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(pyroMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(pyroMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(pyroMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the spawn gallery arcade pearl shells so the VIP long view reads as layered arrival architecture instead of a white side slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
