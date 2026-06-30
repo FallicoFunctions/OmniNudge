@@ -1458,6 +1458,40 @@ describe('polishMainStageMaterials', () => {
     expect(basinMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the wayfinding pylon pearl shells so the spawn reveal reads as authored entry markers instead of bright ivory totems', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const controlIvory = MeshBuilder.CreateBox('V34_BackPlazaGatewayPearl_L', { size: 1 }, scene);
+    controlIvory.material = sharedIvoryMaterial;
+
+    const pylonShell = MeshBuilder.CreateBox('V43_WayfindingPylonPearlShell', { size: 1 }, scene);
+    pylonShell.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([controlIvory, pylonShell]);
+
+    expect(controlIvory.material).toBe(sharedIvoryMaterial);
+    expect(pylonShell.material).toBeInstanceOf(PBRMaterial);
+    expect(pylonShell.material).not.toBe(sharedIvoryMaterial);
+
+    const pylonMaterial = pylonShell.material as PBRMaterial;
+    expect(pylonMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(pylonMaterial.metadata?.mainStageMaterialOverride).toBe('wayfinding-pylon-pearl-shell');
+    expect(pylonMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(pylonMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(pylonMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(pylonMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(pylonMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(pylonMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(pylonMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the spawn gallery arcade pearl shells so the VIP long view reads as layered arrival architecture instead of a white side slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
