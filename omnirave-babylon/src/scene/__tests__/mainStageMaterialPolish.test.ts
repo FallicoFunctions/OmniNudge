@@ -1110,6 +1110,41 @@ describe('polishMainStageMaterials', () => {
     expect(promenadeRunwayMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
 
+  it('darkens the promenade gold shoulders so the central route reads as embedded ceremonial metal instead of bright runway rails', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V19_ArrivalBrushedGold', scene);
+    sharedGoldMaterial.albedoColor.set(0.92, 0.76, 0.32);
+    sharedGoldMaterial.emissiveColor.set(0.24, 0.16, 0.06);
+    sharedGoldMaterial.emissiveIntensity = 0.26;
+    sharedGoldMaterial.metallic = 0.9;
+    sharedGoldMaterial.roughness = 0.22;
+
+    const controlGold = MeshBuilder.CreateBox('TestGoldControlMesh', { size: 1 }, scene);
+    controlGold.material = sharedGoldMaterial;
+
+    const promenadeShoulders = MeshBuilder.CreateBox('V70_PromenadeGoldShoulders', { size: 1 }, scene);
+    promenadeShoulders.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([controlGold, promenadeShoulders]);
+
+    expect(controlGold.material).toBe(sharedGoldMaterial);
+    expect(promenadeShoulders.material).toBeInstanceOf(PBRMaterial);
+    expect(promenadeShoulders.material).not.toBe(sharedGoldMaterial);
+
+    const shoulderMaterial = promenadeShoulders.material as PBRMaterial;
+    expect(shoulderMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(shoulderMaterial.metadata?.mainStageMaterialOverride).toBe('promenade-gold-shoulders');
+    expect(shoulderMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(shoulderMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(shoulderMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(shoulderMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(shoulderMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(shoulderMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(shoulderMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the crown screen keystone so the crest reads as a recessed accent instead of a hot gold beacon over the coffer', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
