@@ -203,7 +203,7 @@ export default function ImageCropModal({
   };
 
   // ── Touch events ──────────────────────────────────────────────────────────
-  const getCanvasTouchPos = (touch: Touch) => {
+  const getCanvasTouchPos = (touch: { clientX: number; clientY: number }) => {
     const rect = canvasRef.current!.getBoundingClientRect();
     const scaleX = CANVAS_W / rect.width;
     const scaleY = CANVAS_H / rect.height;
