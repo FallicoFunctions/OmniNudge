@@ -354,6 +354,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V109_WingFacadeArchInlayArray_')) {
+      const cacheKey = `${material.uniqueId}:wing-facade-arch-inlay`;
+      let inlayMaterial = clonedMaterials.get(cacheKey);
+      if (!inlayMaterial) {
+        inlayMaterial = material.clone(`${material.name}__wing-facade-arch-inlay`);
+        applyWingFacadeArchInlayOverride(inlayMaterial);
+        clonedMaterials.set(cacheKey, inlayMaterial);
+      }
+
+      assignOverrideMaterial(mesh, inlayMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V127_CrownScreenShadowCoffer') {
       const cacheKey = `${material.uniqueId}:crown-screen-shadow-coffer`;
       let cofferMaterial = clonedMaterials.get(cacheKey);
@@ -1293,6 +1306,23 @@ function applyOuterWingButtressShellOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'outer-wing-buttress-shell',
+  };
+}
+
+function applyWingFacadeArchInlayOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-facade-arch-inlay',
   };
 }
 
