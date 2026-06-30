@@ -949,6 +949,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V25_HeroPortalShadowVault') {
+      const cacheKey = `${material.uniqueId}:hero-portal-shadow-vault`;
+      let vaultMaterial = clonedMaterials.get(cacheKey);
+      if (!vaultMaterial) {
+        vaultMaterial = material.clone(`${material.name}__hero-portal-shadow-vault`);
+        applyHeroPortalShadowVaultOverride(vaultMaterial);
+        clonedMaterials.set(cacheKey, vaultMaterial);
+      }
+
+      assignOverrideMaterial(mesh, vaultMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V26_VipTerraceOuterSweep_')) {
       const cacheKey = `${material.uniqueId}:vip-terrace-outer-sweep`;
       let sweepMaterial = clonedMaterials.get(cacheKey);
@@ -2340,6 +2353,22 @@ function applyHeroPortalPearlApronOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'hero-portal-pearl-apron',
+  };
+}
+
+function applyHeroPortalShadowVaultOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.08;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.28;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'hero-portal-shadow-vault',
   };
 }
 
