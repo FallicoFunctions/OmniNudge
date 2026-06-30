@@ -64,19 +64,88 @@ function ProfileInfoCard({ location, t }: { location: string; t: TFunction }) {
   );
 }
 
-function PhotosWidget({ media, t }: { media: WallPostMedia[]; t: TFunction }) {
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const photos = useMemo(() => media.slice(0, 9), [media]);
+type PhotoAlbum = 'all' | 'wall' | 'avatar' | 'cover';
 
-  if (photos.length === 0) return null;
+function PhotosWidget({
+  media,
+  avatarUrl,
+  bannerUrl,
+  t,
+}: {
+  media: WallPostMedia[];
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
+  t: TFunction;
+}) {
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [album, setAlbum] = useState<PhotoAlbum>('all');
+
+  const avatarItems = useMemo<WallPostMedia[]>(
+    () => (avatarUrl ? [{ url: avatarUrl, media_type: 'image' }] : []),
+    [avatarUrl],
+  );
+  const bannerItems = useMemo<WallPostMedia[]>(
+    () => (bannerUrl ? [{ url: bannerUrl, media_type: 'image' }] : []),
+    [bannerUrl],
+  );
+
+  const allItems = useMemo<WallPostMedia[]>(
+    () => [...avatarItems, ...bannerItems, ...media],
+    [avatarItems, bannerItems, media],
+  );
+
+  const albumItems = useMemo<WallPostMedia[]>(() => {
+    const source =
+      album === 'wall' ? media :
+      album === 'avatar' ? avatarItems :
+      album === 'cover' ? bannerItems :
+      allItems;
+    return source.slice(0, 9);
+  }, [album, media, avatarItems, bannerItems, allItems]);
+
+  if (allItems.length === 0) return null;
+
+  const tabs: { key: PhotoAlbum; label: string; count: number }[] = [
+    { key: 'all',    label: 'All',    count: allItems.length },
+    { key: 'wall',   label: 'Wall',   count: media.length },
+    { key: 'avatar', label: 'Avatar', count: avatarItems.length },
+    { key: 'cover',  label: 'Cover',  count: bannerItems.length },
+  ].filter((tab) => tab.key === 'all' || tab.count > 0);
 
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
       <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
         {t('userProfilePage.headings.photos')}
       </h3>
+
+      {/* Album tabs — only render if there's more than one album */}
+      {tabs.length > 1 && (
+        <div className="flex flex-wrap gap-1 mb-3">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => {
+                setAlbum(tab.key);
+                setLightboxIndex(null);
+              }}
+              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold transition ${
+                album === tab.key
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              }`}
+            >
+              {tab.label}
+              {tab.count > 1 && (
+                <span className="ml-1 opacity-70">{tab.count}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-1.5">
-        {photos.map((photo, idx) => (
+        {albumItems.map((photo, idx) => (
           <button
             key={idx}
             type="button"
@@ -89,7 +158,7 @@ function PhotosWidget({ media, t }: { media: WallPostMedia[]; t: TFunction }) {
               <img
                 src={resolveMediaUrl(photo.thumbnail_url || photo.url)}
                 alt=""
-                className="h-full w-full object-cover transition group-hover:opacity-90"
+                className="h-full w-full object-cover"
                 loading="lazy"
               />
             )}
@@ -99,7 +168,7 @@ function PhotosWidget({ media, t }: { media: WallPostMedia[]; t: TFunction }) {
 
       {lightboxIndex !== null && (
         <MediaLightbox
-          items={photos}
+          items={albumItems}
           index={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onIndexChange={setLightboxIndex}
@@ -620,7 +689,12 @@ export default function UserProfilePage() {
               <MutualFriendsWidget username={username} t={t} />
             )}
 
-            <PhotosWidget media={wallMedia} t={t} />
+            <PhotosWidget
+              media={wallMedia}
+              avatarUrl={profile.avatar_url}
+              bannerUrl={profile.banner_url}
+              t={t}
+            />
           </aside>
         </div>
       </div>
