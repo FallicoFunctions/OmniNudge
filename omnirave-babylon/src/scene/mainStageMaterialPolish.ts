@@ -1014,6 +1014,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V28_WingArcadePearlArch_L' || mesh.name === 'V28_WingArcadePearlArch_R') {
+      const cacheKey = `${material.uniqueId}:wing-arcade-pearl-arch`;
+      let archMaterial = clonedMaterials.get(cacheKey);
+      if (!archMaterial) {
+        archMaterial = material.clone(`${material.name}__wing-arcade-pearl-arch`);
+        applyWingArcadePearlArchOverride(archMaterial);
+        clonedMaterials.set(cacheKey, archMaterial);
+      }
+
+      assignOverrideMaterial(mesh, archMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V26_VipTerraceOuterSweep_')) {
       const cacheKey = `${material.uniqueId}:vip-terrace-outer-sweep`;
       let sweepMaterial = clonedMaterials.get(cacheKey);
@@ -2489,6 +2502,23 @@ function applyPerformanceDaisUpperOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'performance-dais-upper',
+  };
+}
+
+function applyWingArcadePearlArchOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.24, 0.26, 0.3);
+  material.emissiveColor = new Color3(0.006, 0.01, 0.014);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-arcade-pearl-arch',
   };
 }
 
