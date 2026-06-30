@@ -518,7 +518,7 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, lockoutService, cfg.AppEnv)
-	oauthHandler := handlers.NewOAuthHandler(authService, userRepo, db.Pool, cfg.FrontendURL, cfg.OAuth.BackendURL, cfg.OAuth.GoogleClientID, cfg.OAuth.GoogleClientSecret, cfg.OAuth.DiscordClientID, cfg.OAuth.DiscordClientSecret, cfg.AppEnv)
+	oauthHandler := handlers.NewOAuthHandler(authService, userRepo, db.Pool, cfg.FrontendURL, cfg.OAuth.BackendURL, cfg.OAuth.GoogleClientID, cfg.OAuth.GoogleClientSecret, cfg.OAuth.DiscordClientID, cfg.OAuth.DiscordClientSecret, cfg.OAuth.GitHubClientID, cfg.OAuth.GitHubClientSecret, cfg.OAuth.SteamAPIKey, cfg.AppEnv)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo, autoDeleteSvc)
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo, hubSettingsRepo)
 	postsHandler.SetLinkPreviewService(linkpreviewsvc.NewService(nil, storageService, virusScanner))

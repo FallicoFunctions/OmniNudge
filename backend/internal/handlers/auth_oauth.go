@@ -32,7 +32,9 @@ type oauthUserInfo struct {
 	AvatarURL      string
 }
 
-// OAuthHandler handles social login via Google and Discord.
+// OAuthHandler handles social login via Google, Discord, GitHub, and Steam.
+// Steam uses OpenID 2.0, not OAuth2, so it's handled separately from the
+// oauth2.Config-based providers throughout this file.
 type OAuthHandler struct {
 	authService  *services.AuthService
 	userRepo     ports.UserRepository
@@ -42,9 +44,12 @@ type OAuthHandler struct {
 	secureCookie bool // true in production (HTTPS)
 	google       *oauth2.Config
 	discord      *oauth2.Config
+	github       *oauth2.Config
+	steamAPIKey  string
 }
 
-// NewOAuthHandler creates the handler. Pass empty client IDs to disable a provider.
+// NewOAuthHandler creates the handler. Pass empty client IDs (or an empty Steam API
+// key) to disable a provider.
 func NewOAuthHandler(
 	authService *services.AuthService,
 	userRepo ports.UserRepository,
@@ -52,6 +57,8 @@ func NewOAuthHandler(
 	frontendURL, backendURL string,
 	googleClientID, googleClientSecret string,
 	discordClientID, discordClientSecret string,
+	githubClientID, githubClientSecret string,
+	steamAPIKey string,
 	appEnv string,
 ) *OAuthHandler {
 	h := &OAuthHandler{
@@ -61,6 +68,7 @@ func NewOAuthHandler(
 		frontendURL:  frontendURL,
 		backendURL:   backendURL,
 		secureCookie: appEnv == "production",
+		steamAPIKey:  steamAPIKey,
 	}
 
 	if googleClientID != "" {
@@ -86,6 +94,19 @@ func NewOAuthHandler(
 		}
 	}
 
+	if githubClientID != "" {
+		h.github = &oauth2.Config{
+			ClientID:     githubClientID,
+			ClientSecret: githubClientSecret,
+			RedirectURL:  backendURL + "/api/v1/auth/oauth/github/callback",
+			Scopes:       []string{"read:user", "user:email"},
+			Endpoint: oauth2.Endpoint{
+				AuthURL:  "https://github.com/login/oauth/authorize",
+				TokenURL: "https://github.com/login/oauth/access_token",
+			},
+		}
+	}
+
 	return h
 }
 
@@ -98,6 +119,12 @@ func (h *OAuthHandler) oauthErrorURL(reason string) string {
 // Initiate handles GET /auth/oauth/:provider — sets state cookie and redirects to provider.
 func (h *OAuthHandler) Initiate(c *gin.Context) {
 	provider := c.Param("provider")
+
+	if provider == "steam" {
+		h.initiateSteam(c)
+		return
+	}
+
 	cfg := h.configFor(provider)
 	if cfg == nil {
 		c.Redirect(http.StatusFound, h.oauthErrorURL("unknown_provider"))
@@ -114,9 +141,35 @@ func (h *OAuthHandler) Initiate(c *gin.Context) {
 	c.Redirect(http.StatusFound, cfg.AuthCodeURL(state, oauth2.AccessTypeOnline))
 }
 
+// initiateSteam redirects to Steam's OpenID 2.0 login endpoint. Steam's protocol
+// verifies the round-trip itself via check_authentication, so no CSRF state cookie
+// is needed here the way it is for the oauth2.Config-based providers.
+func (h *OAuthHandler) initiateSteam(c *gin.Context) {
+	if h.steamAPIKey == "" {
+		c.Redirect(http.StatusFound, h.oauthErrorURL("unknown_provider"))
+		return
+	}
+
+	params := url.Values{
+		"openid.ns":         {"http://specs.openid.net/auth/2.0"},
+		"openid.mode":       {"checkid_setup"},
+		"openid.return_to":  {h.backendURL + "/api/v1/auth/oauth/steam/callback"},
+		"openid.realm":      {h.backendURL},
+		"openid.identity":   {"http://specs.openid.net/auth/2.0/identifier_select"},
+		"openid.claimed_id": {"http://specs.openid.net/auth/2.0/identifier_select"},
+	}
+	c.Redirect(http.StatusFound, "https://steamcommunity.com/openid/login?"+params.Encode())
+}
+
 // Callback handles GET /auth/oauth/:provider/callback — exchanges code, finds/creates user, issues JWT.
 func (h *OAuthHandler) Callback(c *gin.Context) {
 	provider := c.Param("provider")
+
+	if provider == "steam" {
+		h.callbackSteam(c)
+		return
+	}
+
 	cfg := h.configFor(provider)
 	if cfg == nil {
 		c.Redirect(http.StatusFound, h.oauthErrorURL("unknown_provider"))
@@ -153,8 +206,38 @@ func (h *OAuthHandler) Callback(c *gin.Context) {
 		return
 	}
 
-	// Find an existing account to log into, or stage a pending signup that
-	// requires the user to pick a username before the account is created.
+	h.finishOAuthLogin(c, provider, info)
+}
+
+// callbackSteam handles GET /auth/oauth/steam/callback. Steam never provides an
+// email address, so Steam identities always go through the pending-signup path
+// on first login.
+func (h *OAuthHandler) callbackSteam(c *gin.Context) {
+	if h.steamAPIKey == "" {
+		c.Redirect(http.StatusFound, h.oauthErrorURL("unknown_provider"))
+		return
+	}
+
+	steamID, err := h.verifySteamCallback(c.Request)
+	if err != nil {
+		log.Printf("[oauth] steam verification failed: %v", err)
+		c.Redirect(http.StatusFound, h.oauthErrorURL("token_exchange"))
+		return
+	}
+
+	info, err := h.fetchSteamUserInfo(c.Request.Context(), steamID)
+	if err != nil {
+		log.Printf("[oauth] steam fetchUserInfo failed: %v", err)
+		c.Redirect(http.StatusFound, h.oauthErrorURL("user_info"))
+		return
+	}
+
+	h.finishOAuthLogin(c, "steam", info)
+}
+
+// finishOAuthLogin finds/creates the local account for a verified provider identity
+// and either redirects to the choose-username flow (new identity) or issues a JWT.
+func (h *OAuthHandler) finishOAuthLogin(c *gin.Context, provider string, info *oauthUserInfo) {
 	user, pending, err := h.findOrPrepareUser(c.Request.Context(), provider, info)
 	if err != nil {
 		log.Printf("[oauth] findOrPrepareUser failed (provider=%s): %v", provider, err)
@@ -177,6 +260,94 @@ func (h *OAuthHandler) Callback(c *gin.Context) {
 	}
 
 	c.Redirect(http.StatusFound, h.frontendURL+"/auth/callback?token="+jwtToken+"&provider="+provider)
+}
+
+// verifySteamCallback validates a Steam OpenID 2.0 callback by POSTing the
+// assertion back to Steam with openid.mode=check_authentication, and returns the
+// authenticated SteamID64 on success.
+func (h *OAuthHandler) verifySteamCallback(r *http.Request) (string, error) {
+	q := r.URL.Query()
+	if q.Get("openid.mode") != "id_res" {
+		return "", fmt.Errorf("unexpected openid.mode %q", q.Get("openid.mode"))
+	}
+
+	steamID, err := extractSteamID(q.Get("openid.claimed_id"))
+	if err != nil {
+		return "", err
+	}
+
+	verifyParams := url.Values{}
+	for k, v := range q {
+		verifyParams[k] = v
+	}
+	verifyParams.Set("openid.mode", "check_authentication")
+
+	resp, err := http.PostForm("https://steamcommunity.com/openid/login", verifyParams)
+	if err != nil {
+		return "", fmt.Errorf("check_authentication request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read check_authentication response: %w", err)
+	}
+	if !strings.Contains(string(body), "is_valid:true") {
+		return "", fmt.Errorf("steam rejected the assertion")
+	}
+
+	return steamID, nil
+}
+
+var steamClaimedIDPattern = regexp.MustCompile(`^https://steamcommunity\.com/openid/id/(\d+)$`)
+
+func extractSteamID(claimedID string) (string, error) {
+	m := steamClaimedIDPattern.FindStringSubmatch(claimedID)
+	if m == nil {
+		return "", fmt.Errorf("invalid claimed_id %q", claimedID)
+	}
+	return m[1], nil
+}
+
+// fetchSteamUserInfo calls the Steam Web API's GetPlayerSummaries to get the
+// player's display name and avatar. Steam never exposes an email address.
+func (h *OAuthHandler) fetchSteamUserInfo(ctx context.Context, steamID string) (*oauthUserInfo, error) {
+	apiURL := fmt.Sprintf(
+		"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=%s&steamids=%s",
+		url.QueryEscape(h.steamAPIKey), url.QueryEscape(steamID),
+	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("GetPlayerSummaries: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var parsed struct {
+		Response struct {
+			Players []struct {
+				SteamID     string `json:"steamid"`
+				PersonaName string `json:"personaname"`
+				AvatarFull  string `json:"avatarfull"`
+			} `json:"players"`
+		} `json:"response"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, fmt.Errorf("decode GetPlayerSummaries response: %w", err)
+	}
+	if len(parsed.Response.Players) == 0 {
+		return nil, fmt.Errorf("steam returned no player for steamid %s", steamID)
+	}
+
+	p := parsed.Response.Players[0]
+	return &oauthUserInfo{
+		ProviderUserID: p.SteamID,
+		Name:           p.PersonaName,
+		AvatarURL:      p.AvatarFull,
+	}, nil
 }
 
 // completeSignupRequest is the body for POST /auth/oauth/complete.
@@ -262,12 +433,18 @@ func (h *OAuthHandler) configFor(provider string) *oauth2.Config {
 		return h.google
 	case "discord":
 		return h.discord
+	case "github":
+		return h.github
 	default:
 		return nil
 	}
 }
 
 func (h *OAuthHandler) fetchUserInfo(ctx context.Context, provider string, token *oauth2.Token) (*oauthUserInfo, error) {
+	if provider == "github" {
+		return h.fetchGitHubUserInfo(ctx, token)
+	}
+
 	var url string
 	switch provider {
 	case "google":
@@ -316,6 +493,85 @@ func (h *OAuthHandler) fetchUserInfo(ctx context.Context, provider string, token
 		return nil, fmt.Errorf("provider %q returned empty user id", provider)
 	}
 	return info, nil
+}
+
+// fetchGitHubUserInfo fetches the GitHub profile and, if the public email field
+// is empty (common when a user has set their email to private), falls back to
+// GET /user/emails to find a verified primary address.
+func (h *OAuthHandler) fetchGitHubUserInfo(ctx context.Context, token *oauth2.Token) (*oauthUserInfo, error) {
+	client := oauth2.NewClient(ctx, oauth2.StaticTokenSource(token))
+
+	resp, err := client.Get("https://api.github.com/user")
+	if err != nil {
+		return nil, fmt.Errorf("GET /user: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read /user body: %w", err)
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("unmarshal /user: %w", err)
+	}
+
+	idFloat, ok := raw["id"].(float64)
+	if !ok || idFloat == 0 {
+		return nil, fmt.Errorf("github returned empty user id")
+	}
+
+	info := &oauthUserInfo{
+		ProviderUserID: fmt.Sprintf("%.0f", idFloat),
+		Name:           stringField(raw, "login"),
+		AvatarURL:      stringField(raw, "avatar_url"),
+		Email:          stringField(raw, "email"),
+	}
+
+	if info.Email == "" {
+		if email, emailErr := h.fetchGitHubPrimaryEmail(client); emailErr == nil {
+			info.Email = email
+		}
+	}
+
+	return info, nil
+}
+
+// fetchGitHubPrimaryEmail calls GET /user/emails and returns the primary verified
+// address, falling back to any verified address if no primary one is flagged.
+func (h *OAuthHandler) fetchGitHubPrimaryEmail(client *http.Client) (string, error) {
+	resp, err := client.Get("https://api.github.com/user/emails")
+	if err != nil {
+		return "", fmt.Errorf("GET /user/emails: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read /user/emails body: %w", err)
+	}
+
+	var emails []struct {
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
+	}
+	if err := json.Unmarshal(body, &emails); err != nil {
+		return "", fmt.Errorf("unmarshal /user/emails: %w", err)
+	}
+
+	for _, e := range emails {
+		if e.Primary && e.Verified {
+			return e.Email, nil
+		}
+	}
+	for _, e := range emails {
+		if e.Verified {
+			return e.Email, nil
+		}
+	}
+	return "", fmt.Errorf("no verified email found")
 }
 
 // pendingSignup holds a staged OAuth profile awaiting username selection.
