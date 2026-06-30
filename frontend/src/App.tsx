@@ -51,6 +51,7 @@ const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
 const LoadingStatesShowcasePage = lazy(() => import('./pages/LoadingStatesShowcasePage'));
 const DonatePage = lazy(() => import('./pages/DonatePage'));
+const OAuthCallbackPage = lazy(() => import('./pages/OAuthCallbackPage'));
 
 // Initialize analytics on app load
 function AnalyticsWrapper({ children }: { children: React.ReactNode }) {
@@ -131,6 +132,7 @@ function App() {
                             <Route path="/ccpa" element={<CCPAPage />} />
                             <Route path="/reset-password" element={<ResetPasswordPage />} />
                             <Route path="/verify-email" element={<VerifyEmailPage />} />
+                            <Route path="/auth/callback" element={<OAuthCallbackPage />} />
                             {import.meta.env.DEV && (
                               <Route path="/dev/loading-states" element={<LoadingStatesShowcasePage />} />
                             )}

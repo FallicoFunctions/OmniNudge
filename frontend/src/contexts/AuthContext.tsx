@@ -14,6 +14,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (data: RegisterRequest) => Promise<void>;
+  loginWithToken: (token: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   refreshUser: () => Promise<void>;
@@ -166,6 +167,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const loginWithToken = async (token: string) => {
+    localStorage.setItem('auth_token', token);
+    sessionStorage.removeItem('auth_token');
+    const userData = await api.get<User>('/auth/me');
+    setUser(userData);
+    persistOmniFeedStateForUser(userData.id, resolveDefaultOmniFeedState());
+    analyticsService.identify(userData.id.toString(), { username: userData.username });
+    analyticsService.track('user_login', { method: 'oauth' });
+  };
+
   const refreshUser = async () => {
     try {
       const userData = await api.get<User>('/auth/me');
@@ -182,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         register,
+        loginWithToken,
         logout,
         isAuthenticated: !!user,
         refreshUser,
