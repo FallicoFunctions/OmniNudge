@@ -426,6 +426,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V128_CenterScreenGoldInterruptRailArray') {
+      const cacheKey = `${material.uniqueId}:center-screen-gold-interrupt-rail`;
+      let railMaterial = clonedMaterials.get(cacheKey);
+      if (!railMaterial) {
+        railMaterial = material.clone(`${material.name}__center-screen-gold-interrupt-rail`);
+        applyCenterScreenGoldInterruptRailOverride(railMaterial);
+        clonedMaterials.set(cacheKey, railMaterial);
+      }
+
+      assignOverrideMaterial(mesh, railMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V70_PromenadePearlRunway') {
       const cacheKey = `${material.uniqueId}:promenade-pearl-runway`;
       let runwayMaterial = clonedMaterials.get(cacheKey);
@@ -1434,6 +1447,23 @@ function applyCrownScreenVerticalKeystoneOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-screen-vertical-keystone',
+  };
+}
+
+function applyCenterScreenGoldInterruptRailOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'center-screen-gold-interrupt-rail',
   };
 }
 
