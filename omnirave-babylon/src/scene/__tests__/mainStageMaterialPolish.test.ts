@@ -722,4 +722,44 @@ describe('polishMainStageMaterials', () => {
     expect(causewayMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(causewayMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
+
+  it('darkens the basin garden terraces so the spawn reveal flanks read as grounded architecture instead of bright ivory shelves', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const otherIvory = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherIvory.material = sharedIvoryMaterial;
+
+    const leftTerrace = MeshBuilder.CreateBox('V63_BasinGardenTerrace_L', { size: 1 }, scene);
+    leftTerrace.material = sharedIvoryMaterial;
+
+    const rightTerrace = MeshBuilder.CreateBox('V63_BasinGardenTerrace_R', { size: 1 }, scene);
+    rightTerrace.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([otherIvory, leftTerrace, rightTerrace]);
+
+    expect(otherIvory.material).toBe(sharedIvoryMaterial);
+    expect(leftTerrace.material).toBeInstanceOf(PBRMaterial);
+    expect(rightTerrace.material).toBeInstanceOf(PBRMaterial);
+    expect(leftTerrace.material).not.toBe(sharedIvoryMaterial);
+    expect(rightTerrace.material).not.toBe(sharedIvoryMaterial);
+    expect(rightTerrace.material).toBe(leftTerrace.material);
+
+    const terraceMaterial = leftTerrace.material as PBRMaterial;
+    expect(terraceMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(terraceMaterial.metadata?.mainStageMaterialOverride).toBe('basin-garden-terrace');
+    expect(terraceMaterial.albedoColor.r).toBeLessThanOrEqual(0.23);
+    expect(terraceMaterial.albedoColor.g).toBeLessThanOrEqual(0.25);
+    expect(terraceMaterial.albedoColor.b).toBeLessThanOrEqual(0.29);
+    expect(terraceMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(terraceMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(terraceMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(terraceMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
 });
