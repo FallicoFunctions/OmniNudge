@@ -413,6 +413,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V127_CrownScreenVerticalKeystone') {
+      const cacheKey = `${material.uniqueId}:crown-screen-vertical-keystone`;
+      let keystoneMaterial = clonedMaterials.get(cacheKey);
+      if (!keystoneMaterial) {
+        keystoneMaterial = material.clone(`${material.name}__crown-screen-vertical-keystone`);
+        applyCrownScreenVerticalKeystoneOverride(keystoneMaterial);
+        clonedMaterials.set(cacheKey, keystoneMaterial);
+      }
+
+      assignOverrideMaterial(mesh, keystoneMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V70_PromenadePearlRunway') {
       const cacheKey = `${material.uniqueId}:promenade-pearl-runway`;
       let runwayMaterial = clonedMaterials.get(cacheKey);
@@ -1404,6 +1417,23 @@ function applyCrownScreenShadowCofferOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-screen-shadow-coffer',
+  };
+}
+
+function applyCrownScreenVerticalKeystoneOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.17, 0.13, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.76;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-screen-vertical-keystone',
   };
 }
 
