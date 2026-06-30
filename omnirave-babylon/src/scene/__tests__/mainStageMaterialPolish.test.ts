@@ -143,6 +143,46 @@ describe('polishMainStageMaterials', () => {
     expect(housingMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the oval screen mullion shell arrays so the side-screen stacks read as finished architecture instead of pale pearl ribs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V15_PearlShellBeveled', scene);
+    sharedPearlMaterial.albedoColor.set(0.8, 0.78, 0.74);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const otherPearl = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherPearl.material = sharedPearlMaterial;
+
+    const leftMullionShell = MeshBuilder.CreateBox('V81_OvalScreenMullionShellArray_L', { size: 1 }, scene);
+    leftMullionShell.material = sharedPearlMaterial;
+
+    const rightMullionShell = MeshBuilder.CreateBox('V81_OvalScreenMullionShellArray_R', { size: 1 }, scene);
+    rightMullionShell.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, leftMullionShell, rightMullionShell]);
+
+    expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(leftMullionShell.material).toBeInstanceOf(PBRMaterial);
+    expect(rightMullionShell.material).toBeInstanceOf(PBRMaterial);
+    expect(leftMullionShell.material).not.toBe(sharedPearlMaterial);
+    expect(rightMullionShell.material).not.toBe(sharedPearlMaterial);
+    expect(rightMullionShell.material).toBe(leftMullionShell.material);
+
+    const mullionMaterial = leftMullionShell.material as PBRMaterial;
+    expect(mullionMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(mullionMaterial.metadata?.mainStageMaterialOverride).toBe('oval-screen-mullion-shell');
+    expect(mullionMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(mullionMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(mullionMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(mullionMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(mullionMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(mullionMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(mullionMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('neutralizes the V87 wing-facade shadow frames so they do not inherit the bright cyan shadow texture read in the VIP terrace view', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
