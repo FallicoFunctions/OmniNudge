@@ -803,6 +803,46 @@ describe('polishMainStageMaterials', () => {
     expect(sentinelMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the spawn gallery arcade pearl shells so the VIP long view reads as layered arrival architecture instead of a white side slab', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V16_PearlArchitecturalShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const otherPearl = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherPearl.material = sharedPearlMaterial;
+
+    const leftArcade = MeshBuilder.CreateBox('V53_SpawnGalleryArcadePearl_L', { size: 1 }, scene);
+    leftArcade.material = sharedPearlMaterial;
+
+    const rightArcade = MeshBuilder.CreateBox('V53_SpawnGalleryArcadePearl_R', { size: 1 }, scene);
+    rightArcade.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, leftArcade, rightArcade]);
+
+    expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(leftArcade.material).toBeInstanceOf(PBRMaterial);
+    expect(rightArcade.material).toBeInstanceOf(PBRMaterial);
+    expect(leftArcade.material).not.toBe(sharedPearlMaterial);
+    expect(rightArcade.material).not.toBe(sharedPearlMaterial);
+    expect(rightArcade.material).toBe(leftArcade.material);
+
+    const arcadeMaterial = leftArcade.material as PBRMaterial;
+    expect(arcadeMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(arcadeMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-gallery-arcade-pearl');
+    expect(arcadeMaterial.albedoColor.r).toBeLessThanOrEqual(0.23);
+    expect(arcadeMaterial.albedoColor.g).toBeLessThanOrEqual(0.25);
+    expect(arcadeMaterial.albedoColor.b).toBeLessThanOrEqual(0.29);
+    expect(arcadeMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(arcadeMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(arcadeMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(arcadeMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('smokes the wing glass balustrades so the promenade side shells stop reading as flat cyan cards', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
