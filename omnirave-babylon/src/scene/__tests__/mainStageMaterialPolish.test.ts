@@ -362,6 +362,46 @@ describe('polishMainStageMaterials', () => {
     expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the basin wall reliefs so the basin cheeks read as carved stonework instead of bright pearl side slabs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V15_PearlShellBeveled', scene);
+    sharedPearlMaterial.albedoColor.set(0.8, 0.78, 0.74);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const otherPearl = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherPearl.material = sharedPearlMaterial;
+
+    const leftWall = MeshBuilder.CreateBox('V118_BasinWallRelief_L', { size: 1 }, scene);
+    leftWall.material = sharedPearlMaterial;
+
+    const rightWall = MeshBuilder.CreateBox('V118_BasinWallRelief_R', { size: 1 }, scene);
+    rightWall.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, leftWall, rightWall]);
+
+    expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(leftWall.material).toBeInstanceOf(PBRMaterial);
+    expect(rightWall.material).toBeInstanceOf(PBRMaterial);
+    expect(leftWall.material).not.toBe(sharedPearlMaterial);
+    expect(rightWall.material).not.toBe(sharedPearlMaterial);
+    expect(rightWall.material).toBe(leftWall.material);
+
+    const reliefMaterial = leftWall.material as PBRMaterial;
+    expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the stage-front portal apron and shoulder relief shells so the spawn reveal does not collapse into giant white pearl slabs', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
