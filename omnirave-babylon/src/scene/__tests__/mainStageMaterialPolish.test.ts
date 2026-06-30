@@ -2908,4 +2908,44 @@ describe('polishMainStageMaterials', () => {
     expect(balustradeMaterial.roughness).toBeGreaterThanOrEqual(0.68);
     expect(balustradeMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
   });
+
+  it('tones down the VIP terrace gold inlays so the podium edge reads as carved support detail instead of bright foil seams', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V20_ChasedGoldFiligree', scene);
+    sharedGoldMaterial.albedoColor.set(0.76, 0.62, 0.24);
+    sharedGoldMaterial.emissiveColor.set(0.12, 0.08, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.18;
+    sharedGoldMaterial.metallic = 0.9;
+    sharedGoldMaterial.roughness = 0.28;
+
+    const otherGold = MeshBuilder.CreateBox('V68_PortalArcadeGoldCrest_L', { size: 1 }, scene);
+    otherGold.material = sharedGoldMaterial;
+
+    const leftInlay = MeshBuilder.CreateBox('V26_VipTerraceGoldInlay_L', { size: 1 }, scene);
+    leftInlay.material = sharedGoldMaterial;
+
+    const rightInlay = MeshBuilder.CreateBox('V26_VipTerraceGoldInlay_R', { size: 1 }, scene);
+    rightInlay.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, leftInlay, rightInlay]);
+
+    expect(otherGold.material).toBe(sharedGoldMaterial);
+    expect(leftInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(rightInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(leftInlay.material).not.toBe(sharedGoldMaterial);
+    expect(rightInlay.material).not.toBe(sharedGoldMaterial);
+    expect(rightInlay.material).toBe(leftInlay.material);
+
+    const inlayMaterial = leftInlay.material as PBRMaterial;
+    expect(inlayMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(inlayMaterial.metadata?.mainStageMaterialOverride).toBe('vip-terrace-gold-inlay');
+    expect(inlayMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(inlayMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(inlayMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(inlayMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(inlayMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(inlayMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
 });
