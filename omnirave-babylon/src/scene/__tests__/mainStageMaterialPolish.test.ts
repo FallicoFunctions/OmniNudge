@@ -3098,6 +3098,38 @@ describe('polishMainStageMaterials', () => {
     expect(crystalMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
   });
 
+  it('neutralizes the performance dais lower tier so the stage base reads as recessed mass instead of a bright cyan slab', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedShadowMaterial = new PBRMaterial('V20_RecessedWarmShadow', scene);
+    sharedShadowMaterial.albedoColor.set(0.46, 0.84, 0.98);
+    sharedShadowMaterial.emissiveColor.set(0.18, 0.36, 0.44);
+    sharedShadowMaterial.emissiveIntensity = 0.32;
+
+    const controlShadow = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    controlShadow.material = sharedShadowMaterial;
+
+    const lowerDais = MeshBuilder.CreateBox('V27_PerformanceDaisLower', { size: 1 }, scene);
+    lowerDais.material = sharedShadowMaterial;
+
+    polishMainStageMaterials([controlShadow, lowerDais]);
+
+    expect(controlShadow.material).toBe(sharedShadowMaterial);
+    expect(lowerDais.material).toBeInstanceOf(PBRMaterial);
+    expect(lowerDais.material).not.toBe(sharedShadowMaterial);
+
+    const daisMaterial = lowerDais.material as PBRMaterial;
+    expect(daisMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(daisMaterial.metadata?.mainStageMaterialOverride).toBe('performance-dais-lower');
+    expect(daisMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
+    expect(daisMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
+    expect(daisMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
+    expect(daisMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
+    expect(daisMaterial.roughness).toBeGreaterThanOrEqual(0.78);
+    expect(daisMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+  });
+
   it('tones down the VIP terrace gold inlays so the podium edge reads as carved support detail instead of bright foil seams', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
