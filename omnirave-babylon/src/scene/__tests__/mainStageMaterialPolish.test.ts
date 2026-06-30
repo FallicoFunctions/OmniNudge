@@ -970,6 +970,46 @@ describe('polishMainStageMaterials', () => {
     expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the outer wing buttress shells so the side skyline reads as carved depth instead of bright pearl fins', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V20_LayeredPearlShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.78, 0.72, 0.6);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.05);
+    sharedPearlMaterial.emissiveIntensity = 0.18;
+    sharedPearlMaterial.roughness = 0.36;
+
+    const controlPearl = MeshBuilder.CreateBox('V16_ArchitecturalPearlControl', { size: 1 }, scene);
+    controlPearl.material = sharedPearlMaterial;
+
+    const leftButtress = MeshBuilder.CreateBox('V107_OuterWingButtressArray_L', { size: 1 }, scene);
+    leftButtress.material = sharedPearlMaterial;
+
+    const rightButtress = MeshBuilder.CreateBox('V107_OuterWingButtressArray_R', { size: 1 }, scene);
+    rightButtress.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, leftButtress, rightButtress]);
+
+    expect(controlPearl.material).toBe(sharedPearlMaterial);
+    expect(leftButtress.material).toBeInstanceOf(PBRMaterial);
+    expect(rightButtress.material).toBeInstanceOf(PBRMaterial);
+    expect(leftButtress.material).not.toBe(sharedPearlMaterial);
+    expect(rightButtress.material).not.toBe(sharedPearlMaterial);
+    expect(rightButtress.material).toBe(leftButtress.material);
+
+    const buttressMaterial = leftButtress.material as PBRMaterial;
+    expect(buttressMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(buttressMaterial.metadata?.mainStageMaterialOverride).toBe('outer-wing-buttress-shell');
+    expect(buttressMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(buttressMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(buttressMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(buttressMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(buttressMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(buttressMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(buttressMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('rebalances the crown screen coffers and promenade runway into lower-glare night finishes so the basin view stage face reads with depth instead of dead black bars and pearl slab washout', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
