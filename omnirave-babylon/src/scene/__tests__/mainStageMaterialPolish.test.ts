@@ -1252,6 +1252,52 @@ describe('polishMainStageMaterials', () => {
     expect(plazaMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the hero portal pearl arcade family so the first central stage reveal reads as layered architecture instead of bright ivory slabs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const controlIvory = MeshBuilder.CreateBox('V57_BackPlazaSentinelPearl_L', { size: 1 }, scene);
+    controlIvory.material = sharedIvoryMaterial;
+
+    const portalArcade = MeshBuilder.CreateBox('V68_PortalArcadePearl_L', { size: 1 }, scene);
+    portalArcade.material = sharedIvoryMaterial;
+
+    const colonnade = MeshBuilder.CreateBox('V68_GrandArcadePearlColonnade_L', { size: 1 }, scene);
+    colonnade.material = sharedIvoryMaterial;
+
+    const heroApron = MeshBuilder.CreateBox('V68_HeroPortalPearlApron', { size: 1 }, scene);
+    heroApron.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([controlIvory, portalArcade, colonnade, heroApron]);
+
+    expect(controlIvory.material).toBe(sharedIvoryMaterial);
+    expect(portalArcade.material).toBeInstanceOf(PBRMaterial);
+    expect(colonnade.material).toBeInstanceOf(PBRMaterial);
+    expect(heroApron.material).toBeInstanceOf(PBRMaterial);
+    expect(portalArcade.material).not.toBe(sharedIvoryMaterial);
+    expect(colonnade.material).not.toBe(sharedIvoryMaterial);
+    expect(heroApron.material).not.toBe(sharedIvoryMaterial);
+    expect(colonnade.material).toBe(portalArcade.material);
+    expect(heroApron.material).toBe(portalArcade.material);
+
+    const portalMaterial = portalArcade.material as PBRMaterial;
+    expect(portalMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(portalMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-pearl-arcade');
+    expect(portalMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
+    expect(portalMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(portalMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(portalMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(portalMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(portalMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(portalMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the spawn gallery arcade pearl shells so the VIP long view reads as layered arrival architecture instead of a white side slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
