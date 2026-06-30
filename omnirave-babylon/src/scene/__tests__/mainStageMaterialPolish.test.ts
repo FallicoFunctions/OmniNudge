@@ -1110,6 +1110,40 @@ describe('polishMainStageMaterials', () => {
     expect(pylonMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the arrival runway pearl bands so the forward route foreground stops reading as repeated bright proxy slabs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const otherIvory = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherIvory.material = sharedIvoryMaterial;
+
+    const runwayBands = MeshBuilder.CreateBox('V65_ArrivalRunwayPearlBands', { size: 1 }, scene);
+    runwayBands.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([otherIvory, runwayBands]);
+
+    expect(otherIvory.material).toBe(sharedIvoryMaterial);
+    expect(runwayBands.material).toBeInstanceOf(PBRMaterial);
+    expect(runwayBands.material).not.toBe(sharedIvoryMaterial);
+
+    const runwayMaterial = runwayBands.material as PBRMaterial;
+    expect(runwayMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(runwayMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-runway-pearl-bands');
+    expect(runwayMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
+    expect(runwayMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(runwayMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(runwayMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(runwayMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(runwayMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(runwayMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the spawn gallery arcade pearl shells so the VIP long view reads as layered arrival architecture instead of a white side slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
