@@ -3030,6 +3030,38 @@ describe('polishMainStageMaterials', () => {
     expect(apronMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('neutralizes the hero portal shadow vault so the stage mouth reads as recessed depth instead of a bright cyan insert', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedShadowMaterial = new PBRMaterial('V20_RecessedWarmShadow', scene);
+    sharedShadowMaterial.albedoColor.set(0.46, 0.84, 0.98);
+    sharedShadowMaterial.emissiveColor.set(0.18, 0.36, 0.44);
+    sharedShadowMaterial.emissiveIntensity = 0.32;
+
+    const controlShadow = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    controlShadow.material = sharedShadowMaterial;
+
+    const shadowVault = MeshBuilder.CreateBox('V25_HeroPortalShadowVault', { size: 1 }, scene);
+    shadowVault.material = sharedShadowMaterial;
+
+    polishMainStageMaterials([controlShadow, shadowVault]);
+
+    expect(controlShadow.material).toBe(sharedShadowMaterial);
+    expect(shadowVault.material).toBeInstanceOf(PBRMaterial);
+    expect(shadowVault.material).not.toBe(sharedShadowMaterial);
+
+    const vaultMaterial = shadowVault.material as PBRMaterial;
+    expect(vaultMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(vaultMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-shadow-vault');
+    expect(vaultMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
+    expect(vaultMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
+    expect(vaultMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
+    expect(vaultMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
+    expect(vaultMaterial.roughness).toBeGreaterThanOrEqual(0.78);
+    expect(vaultMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+  });
+
   it('tones down the VIP terrace gold inlays so the podium edge reads as carved support detail instead of bright foil seams', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
