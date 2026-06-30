@@ -242,6 +242,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V53_SpawnGalleryArcadePearl_')) {
+      const cacheKey = `${material.uniqueId}:spawn-gallery-arcade-pearl`;
+      let arcadeMaterial = clonedMaterials.get(cacheKey);
+      if (!arcadeMaterial) {
+        arcadeMaterial = material.clone(`${material.name}__spawn-gallery-arcade-pearl`);
+        applySpawnGalleryArcadePearlOverride(arcadeMaterial);
+        clonedMaterials.set(cacheKey, arcadeMaterial);
+      }
+
+      mesh.material = arcadeMaterial;
+      continue;
+    }
+
     if (mesh.name.startsWith('V56_SpawnCanopyPearlVault_')) {
       const cacheKey = `${material.uniqueId}:spawn-canopy-pearl-vault`;
       let canopyVaultMaterial = clonedMaterials.get(cacheKey);
@@ -714,6 +727,23 @@ function applyStageMassIvoryOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'stage-mass-ivory',
+  };
+}
+
+function applySpawnGalleryArcadePearlOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-gallery-arcade-pearl',
   };
 }
 
