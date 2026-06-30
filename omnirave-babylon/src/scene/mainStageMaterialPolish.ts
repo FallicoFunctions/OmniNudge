@@ -465,6 +465,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V132_WingScreenShadowCofferArray_L' || mesh.name === 'V132_WingScreenShadowCofferArray_R') {
+      const cacheKey = `${material.uniqueId}:wing-screen-shadow-coffer-array`;
+      let cofferMaterial = clonedMaterials.get(cacheKey);
+      if (!cofferMaterial) {
+        cofferMaterial = material.clone(`${material.name}__wing-screen-shadow-coffer-array`);
+        applyWingScreenShadowCofferArrayOverride(cofferMaterial);
+        clonedMaterials.set(cacheKey, cofferMaterial);
+      }
+
+      assignOverrideMaterial(mesh, cofferMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V130_CenterScreenShadowCofferArray') {
       const cacheKey = `${material.uniqueId}:center-screen-shadow-coffer-array`;
       let cofferMaterial = clonedMaterials.get(cacheKey);
@@ -1537,6 +1550,23 @@ function applyWingScreenDepthBaffleArrayOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-screen-depth-baffle-array',
+  };
+}
+
+function applyWingScreenShadowCofferArrayOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.04, 0.06, 0.08);
+  material.emissiveColor = new Color3(0.008, 0.04, 0.06);
+  material.emissiveIntensity = 0.06;
+  material.metallic = 0.05;
+  material.roughness = 0.78;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.18;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-screen-shadow-coffer-array',
   };
 }
 
