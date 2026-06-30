@@ -564,6 +564,48 @@ describe('polishMainStageMaterials', () => {
     expect(basinCopingMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('realizes instanced crown-shell lamella meshes before applying a mesh-specific override so the live stage does not keep the shared bright pearl source material', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V20_LayeredPearlShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.78, 0.72, 0.6);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.05);
+    sharedPearlMaterial.emissiveIntensity = 0.18;
+    sharedPearlMaterial.roughness = 0.36;
+
+    const untouchedSource = MeshBuilder.CreateBox('V24_OuterCrownLamella_L', { size: 1 }, scene);
+    untouchedSource.material = sharedPearlMaterial;
+
+    const crownLamellaSource = MeshBuilder.CreateBox('crown-shell-source', { size: 1 }, scene);
+    crownLamellaSource.material = sharedPearlMaterial;
+
+    const instancedLamella = crownLamellaSource.createInstance('V113_CrownShellLamellaArray_L');
+
+    polishMainStageMaterials([untouchedSource, instancedLamella]);
+
+    const realizedLamella = scene.getMeshByName('V113_CrownShellLamellaArray_L');
+    expect(realizedLamella).toBeDefined();
+    expect(realizedLamella).not.toBe(instancedLamella);
+    expect(realizedLamella?.getClassName()).toBe('Mesh');
+    expect(instancedLamella.isDisposed()).toBe(true);
+
+    expect(untouchedSource.material).toBe(sharedPearlMaterial);
+    expect(crownLamellaSource.material).toBe(sharedPearlMaterial);
+    expect(realizedLamella?.material).toBeInstanceOf(PBRMaterial);
+    expect(realizedLamella?.material).not.toBe(sharedPearlMaterial);
+
+    const crownShellMaterial = realizedLamella?.material as PBRMaterial;
+    expect(crownShellMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(crownShellMaterial.metadata?.mainStageMaterialOverride).toBe('crown-shell-lamella');
+    expect(crownShellMaterial.albedoColor.r).toBeLessThanOrEqual(0.3);
+    expect(crownShellMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(crownShellMaterial.albedoColor.b).toBeLessThanOrEqual(0.14);
+    expect(crownShellMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
+    expect(crownShellMaterial.roughness).toBeGreaterThanOrEqual(0.72);
+    expect(crownShellMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
+  });
+
   it('rebalances the crown screen coffers and promenade runway into lower-glare night finishes so the basin view stage face reads with depth instead of dead black bars and pearl slab washout', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);

@@ -1,5 +1,6 @@
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
+import { InstancedMesh } from '@babylonjs/core/Meshes/instancedMesh.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 
 export interface MainStageMaterialPolishSummary {
@@ -66,7 +67,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, canopyMaterial);
       }
 
-      mesh.material = canopyMaterial;
+      assignOverrideMaterial(mesh, canopyMaterial);
       continue;
     }
 
@@ -83,7 +84,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, housingMaterial);
       }
 
-      mesh.material = housingMaterial;
+      assignOverrideMaterial(mesh, housingMaterial);
       continue;
     }
 
@@ -96,7 +97,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, mullionMaterial);
       }
 
-      mesh.material = mullionMaterial;
+      assignOverrideMaterial(mesh, mullionMaterial);
       continue;
     }
 
@@ -114,7 +115,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, trimMaterial);
       }
 
-      mesh.material = trimMaterial;
+      assignOverrideMaterial(mesh, trimMaterial);
       continue;
     }
 
@@ -127,7 +128,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, retainingMaterial);
       }
 
-      mesh.material = retainingMaterial;
+      assignOverrideMaterial(mesh, retainingMaterial);
       continue;
     }
 
@@ -143,7 +144,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, reliefMaterial);
       }
 
-      mesh.material = reliefMaterial;
+      assignOverrideMaterial(mesh, reliefMaterial);
       continue;
     }
 
@@ -156,7 +157,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, frameMaterial);
       }
 
-      mesh.material = frameMaterial;
+      assignOverrideMaterial(mesh, frameMaterial);
       continue;
     }
 
@@ -169,7 +170,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, fasciaMaterial);
       }
 
-      mesh.material = fasciaMaterial;
+      assignOverrideMaterial(mesh, fasciaMaterial);
       continue;
     }
 
@@ -182,7 +183,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, fieldMaterial);
       }
 
-      mesh.material = fieldMaterial;
+      assignOverrideMaterial(mesh, fieldMaterial);
       continue;
     }
 
@@ -195,7 +196,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, paverMaterial);
       }
 
-      mesh.material = paverMaterial;
+      assignOverrideMaterial(mesh, paverMaterial);
       continue;
     }
 
@@ -208,7 +209,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, reflectionMaterial);
       }
 
-      mesh.material = reflectionMaterial;
+      assignOverrideMaterial(mesh, reflectionMaterial);
       continue;
     }
 
@@ -221,7 +222,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, lamellaMaterial);
       }
 
-      mesh.material = lamellaMaterial;
+      assignOverrideMaterial(mesh, lamellaMaterial);
       continue;
     }
 
@@ -234,7 +235,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, copingMaterial);
       }
 
-      mesh.material = copingMaterial;
+      assignOverrideMaterial(mesh, copingMaterial);
       continue;
     }
 
@@ -247,7 +248,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, cofferMaterial);
       }
 
-      mesh.material = cofferMaterial;
+      assignOverrideMaterial(mesh, cofferMaterial);
       continue;
     }
 
@@ -260,7 +261,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, runwayMaterial);
       }
 
-      mesh.material = runwayMaterial;
+      assignOverrideMaterial(mesh, runwayMaterial);
       continue;
     }
 
@@ -273,7 +274,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, balustradeMaterial);
       }
 
-      mesh.material = balustradeMaterial;
+      assignOverrideMaterial(mesh, balustradeMaterial);
       continue;
     }
 
@@ -286,7 +287,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, balustradeMaterial);
       }
 
-      mesh.material = balustradeMaterial;
+      assignOverrideMaterial(mesh, balustradeMaterial);
       continue;
     }
 
@@ -299,7 +300,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, canopyMaterial);
       }
 
-      mesh.material = canopyMaterial;
+      assignOverrideMaterial(mesh, canopyMaterial);
       continue;
     }
 
@@ -315,7 +316,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, stageMassMaterial);
       }
 
-      mesh.material = stageMassMaterial;
+      assignOverrideMaterial(mesh, stageMassMaterial);
       continue;
     }
 
@@ -328,7 +329,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, arcadeMaterial);
       }
 
-      mesh.material = arcadeMaterial;
+      assignOverrideMaterial(mesh, arcadeMaterial);
       continue;
     }
 
@@ -341,7 +342,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, canopyVaultMaterial);
       }
 
-      mesh.material = canopyVaultMaterial;
+      assignOverrideMaterial(mesh, canopyVaultMaterial);
       continue;
     }
 
@@ -354,7 +355,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, causewayMaterial);
       }
 
-      mesh.material = causewayMaterial;
+      assignOverrideMaterial(mesh, causewayMaterial);
       continue;
     }
 
@@ -367,7 +368,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, terraceMaterial);
       }
 
-      mesh.material = terraceMaterial;
+      assignOverrideMaterial(mesh, terraceMaterial);
       continue;
     }
 
@@ -380,7 +381,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, sentinelMaterial);
       }
 
-      mesh.material = sentinelMaterial;
+      assignOverrideMaterial(mesh, sentinelMaterial);
       continue;
     }
 
@@ -393,7 +394,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, revealMaterial);
       }
 
-      mesh.material = revealMaterial;
+      assignOverrideMaterial(mesh, revealMaterial);
       continue;
     }
 
@@ -406,7 +407,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, terraceGoldMaterial);
       }
 
-      mesh.material = terraceGoldMaterial;
+      assignOverrideMaterial(mesh, terraceGoldMaterial);
       continue;
     }
 
@@ -419,7 +420,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, terraceFasciaMaterial);
       }
 
-      mesh.material = terraceFasciaMaterial;
+      assignOverrideMaterial(mesh, terraceFasciaMaterial);
       continue;
     }
 
@@ -432,7 +433,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, wingCanopyMaterial);
       }
 
-      mesh.material = wingCanopyMaterial;
+      assignOverrideMaterial(mesh, wingCanopyMaterial);
       continue;
     }
 
@@ -445,9 +446,45 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
         clonedMaterials.set(cacheKey, lensMaterial);
       }
 
-      mesh.material = lensMaterial;
+      assignOverrideMaterial(mesh, lensMaterial);
     }
   }
+}
+
+function assignOverrideMaterial(mesh: AbstractMesh, material: PBRMaterial) {
+  const targetMesh = realizeUniqueMaterialTarget(mesh);
+  targetMesh.material = material;
+}
+
+function realizeUniqueMaterialTarget(mesh: AbstractMesh) {
+  if (!(mesh instanceof InstancedMesh)) {
+    return mesh;
+  }
+
+  const realizedMesh = mesh.sourceMesh.clone(mesh.name, mesh.parent ?? null, false);
+  if (!realizedMesh) {
+    return mesh.sourceMesh;
+  }
+
+  realizedMesh.position.copyFrom(mesh.position);
+  realizedMesh.scaling.copyFrom(mesh.scaling);
+  realizedMesh.rotation.copyFrom(mesh.rotation);
+  realizedMesh.rotationQuaternion = mesh.rotationQuaternion?.clone() ?? null;
+  realizedMesh.visibility = mesh.visibility;
+  realizedMesh.isVisible = mesh.isVisible;
+  realizedMesh.isPickable = mesh.isPickable;
+  realizedMesh.checkCollisions = mesh.checkCollisions;
+  realizedMesh.receiveShadows = mesh.receiveShadows;
+  realizedMesh.renderingGroupId = mesh.renderingGroupId;
+  realizedMesh.alphaIndex = mesh.alphaIndex;
+  realizedMesh.layerMask = mesh.layerMask;
+  realizedMesh.alwaysSelectAsActiveMesh = mesh.alwaysSelectAsActiveMesh;
+  realizedMesh.metadata = mesh.metadata;
+  realizedMesh.setEnabled(mesh.isEnabled());
+
+  mesh.dispose();
+
+  return realizedMesh;
 }
 
 function resolveMainStageMaterialFamily(materialName: string): MainStageMaterialFamily | null {
