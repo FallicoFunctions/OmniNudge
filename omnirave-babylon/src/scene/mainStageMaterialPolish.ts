@@ -242,6 +242,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V62_BasinCausewayPearlSpan') {
+      const cacheKey = `${material.uniqueId}:basin-causeway-pearl-span`;
+      let causewayMaterial = clonedMaterials.get(cacheKey);
+      if (!causewayMaterial) {
+        causewayMaterial = material.clone(`${material.name}__basin-causeway-pearl-span`);
+        applyBasinCausewayPearlSpanOverride(causewayMaterial);
+        clonedMaterials.set(cacheKey, causewayMaterial);
+      }
+
+      mesh.material = causewayMaterial;
+      continue;
+    }
+
     if (mesh.name.startsWith('V106_RearShellShadowRevealArray_')) {
       const cacheKey = `${material.uniqueId}:rear-shell-shadow-reveal`;
       let revealMaterial = clonedMaterials.get(cacheKey);
@@ -661,6 +674,23 @@ function applySpawnCanopyPearlVaultOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-canopy-pearl-vault',
+  };
+}
+
+function applyBasinCausewayPearlSpanOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.22, 0.23, 0.27);
+  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-causeway-pearl-span',
   };
 }
 
