@@ -988,6 +988,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V27_PerformanceDaisMid') {
+      const cacheKey = `${material.uniqueId}:performance-dais-mid`;
+      let daisMaterial = clonedMaterials.get(cacheKey);
+      if (!daisMaterial) {
+        daisMaterial = material.clone(`${material.name}__performance-dais-mid`);
+        applyPerformanceDaisMidOverride(daisMaterial);
+        clonedMaterials.set(cacheKey, daisMaterial);
+      }
+
+      assignOverrideMaterial(mesh, daisMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V26_VipTerraceOuterSweep_')) {
       const cacheKey = `${material.uniqueId}:vip-terrace-outer-sweep`;
       let sweepMaterial = clonedMaterials.get(cacheKey);
@@ -2429,6 +2442,23 @@ function applyPerformanceDaisLowerOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'performance-dais-lower',
+  };
+}
+
+function applyPerformanceDaisMidOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.24, 0.26, 0.3);
+  material.emissiveColor = new Color3(0.006, 0.01, 0.014);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'performance-dais-mid',
   };
 }
 
