@@ -2909,6 +2909,46 @@ describe('polishMainStageMaterials', () => {
     expect(balustradeMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
   });
 
+  it('darkens the hero portal outer ogives so the stage mouth reads as carved shell architecture instead of bright pearl walls', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V20_LayeredPearlShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.78, 0.74, 0.68);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.05);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.36;
+
+    const otherPearl = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherPearl.material = sharedPearlMaterial;
+
+    const leftOgive = MeshBuilder.CreateBox('V25_HeroPortalOuterOgive_L', { size: 1 }, scene);
+    leftOgive.material = sharedPearlMaterial;
+
+    const rightOgive = MeshBuilder.CreateBox('V25_HeroPortalOuterOgive_R', { size: 1 }, scene);
+    rightOgive.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, leftOgive, rightOgive]);
+
+    expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(leftOgive.material).toBeInstanceOf(PBRMaterial);
+    expect(rightOgive.material).toBeInstanceOf(PBRMaterial);
+    expect(leftOgive.material).not.toBe(sharedPearlMaterial);
+    expect(rightOgive.material).not.toBe(sharedPearlMaterial);
+    expect(rightOgive.material).toBe(leftOgive.material);
+
+    const ogiveMaterial = leftOgive.material as PBRMaterial;
+    expect(ogiveMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(ogiveMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-outer-ogive');
+    expect(ogiveMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(ogiveMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(ogiveMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(ogiveMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(ogiveMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(ogiveMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(ogiveMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('tones down the VIP terrace gold inlays so the podium edge reads as carved support detail instead of bright foil seams', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
