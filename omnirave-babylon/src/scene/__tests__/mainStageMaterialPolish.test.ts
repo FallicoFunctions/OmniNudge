@@ -3062,6 +3062,42 @@ describe('polishMainStageMaterials', () => {
     expect(vaultMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
   });
 
+  it('smokes the crown apex crystal so the portal crest reads as a subdued jewel instead of a bright cyan card', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedCyanGlass = new PBRMaterial('V20_CelestialCyanGlass', scene);
+    sharedCyanGlass.albedoColor.set(0.42, 0.86, 0.98);
+    sharedCyanGlass.emissiveColor.set(0.08, 0.3, 0.4);
+    sharedCyanGlass.emissiveIntensity = 0.34;
+    sharedCyanGlass.alpha = 1;
+    sharedCyanGlass.environmentIntensity = 0.82;
+
+    const controlGlass = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    controlGlass.material = sharedCyanGlass;
+
+    const apexCrystal = MeshBuilder.CreateBox('V25_CrownApexCrystal', { size: 1 }, scene);
+    apexCrystal.material = sharedCyanGlass;
+
+    polishMainStageMaterials([controlGlass, apexCrystal]);
+
+    expect(controlGlass.material).toBe(sharedCyanGlass);
+    expect(apexCrystal.material).toBeInstanceOf(PBRMaterial);
+    expect(apexCrystal.material).not.toBe(sharedCyanGlass);
+
+    const crystalMaterial = apexCrystal.material as PBRMaterial;
+    expect(crystalMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(crystalMaterial.metadata?.mainStageMaterialOverride).toBe('crown-apex-crystal');
+    expect(crystalMaterial.alpha).toBeLessThanOrEqual(0.42);
+    expect(crystalMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(crystalMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(crystalMaterial.albedoColor.b).toBeLessThanOrEqual(0.34);
+    expect(crystalMaterial.emissiveIntensity).toBeLessThanOrEqual(0.14);
+    expect(crystalMaterial.roughness).toBeGreaterThanOrEqual(0.12);
+    expect(crystalMaterial.environmentIntensity).toBeLessThanOrEqual(0.44);
+    expect(crystalMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+  });
+
   it('tones down the VIP terrace gold inlays so the podium edge reads as carved support detail instead of bright foil seams', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
