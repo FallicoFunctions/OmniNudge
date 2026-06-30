@@ -762,4 +762,44 @@ describe('polishMainStageMaterials', () => {
     expect(terraceMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(terraceMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
+
+  it('darkens the spawn-gate sentinel pearl shells so the promenade approach does not collapse into two bright proxy monoliths', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const otherIvory = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherIvory.material = sharedIvoryMaterial;
+
+    const leftSentinel = MeshBuilder.CreateBox('V60_SpawnGateSentinelPearl_L', { size: 1 }, scene);
+    leftSentinel.material = sharedIvoryMaterial;
+
+    const rightSentinel = MeshBuilder.CreateBox('V60_SpawnGateSentinelPearl_R', { size: 1 }, scene);
+    rightSentinel.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([otherIvory, leftSentinel, rightSentinel]);
+
+    expect(otherIvory.material).toBe(sharedIvoryMaterial);
+    expect(leftSentinel.material).toBeInstanceOf(PBRMaterial);
+    expect(rightSentinel.material).toBeInstanceOf(PBRMaterial);
+    expect(leftSentinel.material).not.toBe(sharedIvoryMaterial);
+    expect(rightSentinel.material).not.toBe(sharedIvoryMaterial);
+    expect(rightSentinel.material).toBe(leftSentinel.material);
+
+    const sentinelMaterial = leftSentinel.material as PBRMaterial;
+    expect(sentinelMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(sentinelMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-gate-sentinel-pearl');
+    expect(sentinelMaterial.albedoColor.r).toBeLessThanOrEqual(0.23);
+    expect(sentinelMaterial.albedoColor.g).toBeLessThanOrEqual(0.25);
+    expect(sentinelMaterial.albedoColor.b).toBeLessThanOrEqual(0.29);
+    expect(sentinelMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(sentinelMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(sentinelMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(sentinelMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
 });
