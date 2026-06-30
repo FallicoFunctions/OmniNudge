@@ -1218,6 +1218,42 @@ describe('polishMainStageMaterials', () => {
     expect(cofferMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
   });
 
+  it('darkens the center screen depth baffles so the hero wall keeps layered shadow blades instead of glossy black slats', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedBlackMaterial = new PBRMaterial('V14_MatteBlackProductionRig', scene);
+    sharedBlackMaterial.albedoColor.set(0.01, 0.01, 0.01);
+    sharedBlackMaterial.emissiveColor.set(0, 0, 0);
+    sharedBlackMaterial.emissiveIntensity = 0;
+    sharedBlackMaterial.metallic = 0.22;
+    sharedBlackMaterial.roughness = 0.48;
+
+    const otherRig = MeshBuilder.CreateBox('V24_CrownHaloBackplate', { size: 1 }, scene);
+    otherRig.material = sharedBlackMaterial;
+
+    const baffles = MeshBuilder.CreateBox('V129_CenterScreenDepthBaffleArray', { size: 1 }, scene);
+    baffles.material = sharedBlackMaterial;
+
+    polishMainStageMaterials([otherRig, baffles]);
+
+    expect(otherRig.material).toBe(sharedBlackMaterial);
+    expect(baffles.material).toBeInstanceOf(PBRMaterial);
+    expect(baffles.material).not.toBe(sharedBlackMaterial);
+
+    const baffleMaterial = baffles.material as PBRMaterial;
+    expect(baffleMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(baffleMaterial.metadata?.mainStageMaterialOverride).toBe('center-screen-depth-baffle-array');
+    expect(baffleMaterial.albedoColor.r).toBeLessThanOrEqual(0.05);
+    expect(baffleMaterial.albedoColor.g).toBeLessThanOrEqual(0.07);
+    expect(baffleMaterial.albedoColor.b).toBeLessThanOrEqual(0.09);
+    expect(baffleMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.04);
+    expect(baffleMaterial.emissiveIntensity).toBeLessThanOrEqual(0.09);
+    expect(baffleMaterial.metallic).toBeLessThanOrEqual(0.08);
+    expect(baffleMaterial.roughness).toBeGreaterThanOrEqual(0.76);
+    expect(baffleMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+  });
+
   it('tones down the wide hero screen gold frame cluster so the stage face keeps depth instead of bright metallic rails', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
