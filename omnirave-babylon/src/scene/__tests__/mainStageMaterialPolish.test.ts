@@ -1070,6 +1070,46 @@ describe('polishMainStageMaterials', () => {
     expect(sentinelMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the spawn-pylon pearl shells so the forward route views stop reading them as bright ivory proxy totems', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const otherIvory = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherIvory.material = sharedIvoryMaterial;
+
+    const leftPylonShell = MeshBuilder.CreateBox('V55_SpawnPylonPearlShell_L', { size: 1 }, scene);
+    leftPylonShell.material = sharedIvoryMaterial;
+
+    const rightPylonShell = MeshBuilder.CreateBox('V55_SpawnPylonPearlShell_R', { size: 1 }, scene);
+    rightPylonShell.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([otherIvory, leftPylonShell, rightPylonShell]);
+
+    expect(otherIvory.material).toBe(sharedIvoryMaterial);
+    expect(leftPylonShell.material).toBeInstanceOf(PBRMaterial);
+    expect(rightPylonShell.material).toBeInstanceOf(PBRMaterial);
+    expect(leftPylonShell.material).not.toBe(sharedIvoryMaterial);
+    expect(rightPylonShell.material).not.toBe(sharedIvoryMaterial);
+    expect(rightPylonShell.material).toBe(leftPylonShell.material);
+
+    const pylonMaterial = leftPylonShell.material as PBRMaterial;
+    expect(pylonMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(pylonMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-pylon-pearl-shell');
+    expect(pylonMaterial.albedoColor.r).toBeLessThanOrEqual(0.25);
+    expect(pylonMaterial.albedoColor.g).toBeLessThanOrEqual(0.27);
+    expect(pylonMaterial.albedoColor.b).toBeLessThanOrEqual(0.31);
+    expect(pylonMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(pylonMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(pylonMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(pylonMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('darkens the spawn gallery arcade pearl shells so the VIP long view reads as layered arrival architecture instead of a white side slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
