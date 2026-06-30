@@ -930,6 +930,46 @@ describe('polishMainStageMaterials', () => {
     expect(inlayMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('darkens the crown buttress relief shells so the skyline reads as carved massing instead of bright pearl wedges', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V16_PearlArchitecturalShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const controlPearl = MeshBuilder.CreateBox('V16_ArchitecturalPearlControl', { size: 1 }, scene);
+    controlPearl.material = sharedPearlMaterial;
+
+    const leftRelief = MeshBuilder.CreateBox('V98_CrownButtressRelief_L', { size: 1 }, scene);
+    leftRelief.material = sharedPearlMaterial;
+
+    const rightRelief = MeshBuilder.CreateBox('V98_CrownButtressRelief_R', { size: 1 }, scene);
+    rightRelief.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, leftRelief, rightRelief]);
+
+    expect(controlPearl.material).toBe(sharedPearlMaterial);
+    expect(leftRelief.material).toBeInstanceOf(PBRMaterial);
+    expect(rightRelief.material).toBeInstanceOf(PBRMaterial);
+    expect(leftRelief.material).not.toBe(sharedPearlMaterial);
+    expect(rightRelief.material).not.toBe(sharedPearlMaterial);
+    expect(rightRelief.material).toBe(leftRelief.material);
+
+    const reliefMaterial = leftRelief.material as PBRMaterial;
+    expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('crown-buttress-relief');
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('rebalances the crown screen coffers and promenade runway into lower-glare night finishes so the basin view stage face reads with depth instead of dead black bars and pearl slab washout', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
