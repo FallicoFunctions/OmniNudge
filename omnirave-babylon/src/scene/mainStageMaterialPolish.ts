@@ -558,6 +558,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V82_OvalPortalGlowShell_')) {
+      const cacheKey = `${material.uniqueId}:oval-portal-glow-shell`;
+      let shellMaterial = clonedMaterials.get(cacheKey);
+      if (!shellMaterial) {
+        shellMaterial = material.clone(`${material.name}__oval-portal-glow-shell`);
+        applyOvalPortalGlowShellOverride(shellMaterial);
+        clonedMaterials.set(cacheKey, shellMaterial);
+      }
+
+      assignOverrideMaterial(mesh, shellMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V60_SpawnGateSentinelPearl_')) {
       const cacheKey = `${material.uniqueId}:spawn-gate-sentinel-pearl`;
       let sentinelMaterial = clonedMaterials.get(cacheKey);
@@ -1418,6 +1431,23 @@ function applySpawnGalleryPierPearlOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-gallery-pier-pearl',
+  };
+}
+
+function applyOvalPortalGlowShellOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-portal-glow-shell',
   };
 }
 
