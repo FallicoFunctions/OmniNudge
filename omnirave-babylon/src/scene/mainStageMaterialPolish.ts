@@ -156,7 +156,10 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (mesh.name.startsWith('V87_WingFacadeShadowFrameArray_')) {
+    if (
+      mesh.name.startsWith('V87_WingFacadeShadowFrameArray_') ||
+      mesh.name.startsWith('V87_WingFacadeShadowVaultArray_')
+    ) {
       const cacheKey = `${material.uniqueId}:wing-facade-shadow-frame`;
       let frameMaterial = clonedMaterials.get(cacheKey);
       if (!frameMaterial) {
