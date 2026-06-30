@@ -1842,6 +1842,46 @@ describe('polishMainStageMaterials', () => {
     expect(terraceGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('tones down the VIP terrace gold arrays so the near promenade edges read as support detailing instead of bright foil ribbons', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V20_ChasedGoldFiligree', scene);
+    sharedGoldMaterial.albedoColor.set(0.76, 0.62, 0.24);
+    sharedGoldMaterial.emissiveColor.set(0.12, 0.08, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.18;
+    sharedGoldMaterial.metallic = 0.9;
+    sharedGoldMaterial.roughness = 0.28;
+
+    const otherGold = MeshBuilder.CreateBox('V68_PortalArcadeGoldCrest_L', { size: 1 }, scene);
+    otherGold.material = sharedGoldMaterial;
+
+    const leftVipTerrace = MeshBuilder.CreateBox('V133_VipTerraceGoldArray_L', { size: 1 }, scene);
+    leftVipTerrace.material = sharedGoldMaterial;
+
+    const rightVipTerrace = MeshBuilder.CreateBox('V133_VipTerraceGoldArray_R', { size: 1 }, scene);
+    rightVipTerrace.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, leftVipTerrace, rightVipTerrace]);
+
+    expect(otherGold.material).toBe(sharedGoldMaterial);
+    expect(leftVipTerrace.material).toBeInstanceOf(PBRMaterial);
+    expect(rightVipTerrace.material).toBeInstanceOf(PBRMaterial);
+    expect(leftVipTerrace.material).not.toBe(sharedGoldMaterial);
+    expect(rightVipTerrace.material).not.toBe(sharedGoldMaterial);
+    expect(rightVipTerrace.material).toBe(leftVipTerrace.material);
+
+    const terraceGoldMaterial = leftVipTerrace.material as PBRMaterial;
+    expect(terraceGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(terraceGoldMaterial.metadata?.mainStageMaterialOverride).toBe('vip-terrace-gold');
+    expect(terraceGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(terraceGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(terraceGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(terraceGoldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(terraceGoldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(terraceGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the wing terrace fascia so the promenade flanks stop reading as bright pearl slabs', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
