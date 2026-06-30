@@ -1110,6 +1110,42 @@ describe('polishMainStageMaterials', () => {
     expect(promenadeRunwayMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
 
+  it('darkens the crown screen keystone so the crest reads as a recessed accent instead of a hot gold beacon over the coffer', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V14_BurnishedCelestialGold', scene);
+    sharedGoldMaterial.albedoColor.set(0.76, 0.68, 0.42);
+    sharedGoldMaterial.emissiveColor.set(0.08, 0.06, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.16;
+    sharedGoldMaterial.metallic = 0.78;
+    sharedGoldMaterial.roughness = 0.24;
+
+    const otherGold = MeshBuilder.CreateBox('V68_PortalArcadeGoldCrest_L', { size: 1 }, scene);
+    otherGold.material = sharedGoldMaterial;
+
+    const keystone = MeshBuilder.CreateBox('V127_CrownScreenVerticalKeystone', { size: 1 }, scene);
+    keystone.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, keystone]);
+
+    expect(otherGold.material).toBe(sharedGoldMaterial);
+    expect(keystone.material).toBeInstanceOf(PBRMaterial);
+    expect(keystone.material).not.toBe(sharedGoldMaterial);
+
+    const keystoneMaterial = keystone.material as PBRMaterial;
+    expect(keystoneMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(keystoneMaterial.metadata?.mainStageMaterialOverride).toBe('crown-screen-vertical-keystone');
+    expect(keystoneMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(keystoneMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(keystoneMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(keystoneMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(keystoneMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(keystoneMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(keystoneMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(keystoneMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('tones down the wide hero screen gold frame cluster so the stage face keeps depth instead of bright metallic rails', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
