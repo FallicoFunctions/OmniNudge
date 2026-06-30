@@ -3130,6 +3130,40 @@ describe('polishMainStageMaterials', () => {
     expect(daisMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
   });
 
+  it('darkens the performance dais mid tier so the stage body reads as carved support mass instead of a bright ivory slab', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const controlIvory = MeshBuilder.CreateBox('TestPearlControlMesh', { size: 1 }, scene);
+    controlIvory.material = sharedIvoryMaterial;
+
+    const midDais = MeshBuilder.CreateBox('V27_PerformanceDaisMid', { size: 1 }, scene);
+    midDais.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([controlIvory, midDais]);
+
+    expect(controlIvory.material).toBe(sharedIvoryMaterial);
+    expect(midDais.material).toBeInstanceOf(PBRMaterial);
+    expect(midDais.material).not.toBe(sharedIvoryMaterial);
+
+    const daisMaterial = midDais.material as PBRMaterial;
+    expect(daisMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(daisMaterial.metadata?.mainStageMaterialOverride).toBe('performance-dais-mid');
+    expect(daisMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
+    expect(daisMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(daisMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(daisMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(daisMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(daisMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(daisMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('tones down the VIP terrace gold inlays so the podium edge reads as carved support detail instead of bright foil seams', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
