@@ -1040,6 +1040,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V28_WingArcadeCyanInlay_L' || mesh.name === 'V28_WingArcadeCyanInlay_R') {
+      const cacheKey = `${material.uniqueId}:wing-arcade-cyan-inlay`;
+      let inlayMaterial = clonedMaterials.get(cacheKey);
+      if (!inlayMaterial) {
+        inlayMaterial = material.clone(`${material.name}__wing-arcade-cyan-inlay`);
+        applyWingArcadeCyanInlayOverride(inlayMaterial);
+        clonedMaterials.set(cacheKey, inlayMaterial);
+      }
+
+      assignOverrideMaterial(mesh, inlayMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V26_VipTerraceOuterSweep_')) {
       const cacheKey = `${material.uniqueId}:vip-terrace-outer-sweep`;
       let sweepMaterial = clonedMaterials.get(cacheKey);
@@ -2546,6 +2559,24 @@ function applyWingArcadeGoldRevealOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-arcade-gold-reveal',
+  };
+}
+
+function applyWingArcadeCyanInlayOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.12, 0.24, 0.3);
+  material.emissiveColor = new Color3(0.015, 0.045, 0.06);
+  material.emissiveIntensity = 0.1;
+  material.alpha = 0.38;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.18;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.06;
+  material.clearCoat.roughness = 0.6;
+  material.environmentIntensity = 0.34;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-arcade-cyan-inlay',
   };
 }
 
