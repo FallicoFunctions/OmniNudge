@@ -529,4 +529,44 @@ describe('polishMainStageMaterials', () => {
     expect(stageMassMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.08);
     expect(stageMassMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
+
+  it('darkens the rear shell shadow reveal arrays so the promenade flanks stop reading as white oval proxies', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const otherIvory = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherIvory.material = sharedIvoryMaterial;
+
+    const leftReveal = MeshBuilder.CreateBox('V106_RearShellShadowRevealArray_L', { size: 1 }, scene);
+    leftReveal.material = sharedIvoryMaterial;
+
+    const rightReveal = MeshBuilder.CreateBox('V106_RearShellShadowRevealArray_R', { size: 1 }, scene);
+    rightReveal.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([otherIvory, leftReveal, rightReveal]);
+
+    expect(otherIvory.material).toBe(sharedIvoryMaterial);
+    expect(leftReveal.material).toBeInstanceOf(PBRMaterial);
+    expect(rightReveal.material).toBeInstanceOf(PBRMaterial);
+    expect(leftReveal.material).not.toBe(sharedIvoryMaterial);
+    expect(rightReveal.material).not.toBe(sharedIvoryMaterial);
+    expect(rightReveal.material).toBe(leftReveal.material);
+
+    const revealMaterial = leftReveal.material as PBRMaterial;
+    expect(revealMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(revealMaterial.metadata?.mainStageMaterialOverride).toBe('rear-shell-shadow-reveal');
+    expect(revealMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(revealMaterial.albedoColor.g).toBeLessThanOrEqual(0.22);
+    expect(revealMaterial.albedoColor.b).toBeLessThanOrEqual(0.26);
+    expect(revealMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(revealMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.04);
+    expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+  });
 });

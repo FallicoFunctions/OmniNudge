@@ -229,6 +229,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V106_RearShellShadowRevealArray_')) {
+      const cacheKey = `${material.uniqueId}:rear-shell-shadow-reveal`;
+      let revealMaterial = clonedMaterials.get(cacheKey);
+      if (!revealMaterial) {
+        revealMaterial = material.clone(`${material.name}__rear-shell-shadow-reveal`);
+        applyRearShellShadowRevealOverride(revealMaterial);
+        clonedMaterials.set(cacheKey, revealMaterial);
+      }
+
+      mesh.material = revealMaterial;
+      continue;
+    }
+
     if (mesh.name.startsWith('V117_WingCanopyLamellaGoldArray_')) {
       const cacheKey = `${material.uniqueId}:wing-canopy-lamella-gold`;
       let wingCanopyMaterial = clonedMaterials.get(cacheKey);
@@ -592,6 +605,23 @@ function applyStageMassIvoryOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'stage-mass-ivory',
+  };
+}
+
+function applyRearShellShadowRevealOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.18, 0.22);
+  material.emissiveColor = new Color3(0.004, 0.007, 0.01);
+  material.emissiveIntensity = 0.01;
+  material.metallic = 0.02;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.74;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'rear-shell-shadow-reveal',
   };
 }
 
