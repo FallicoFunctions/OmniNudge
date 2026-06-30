@@ -119,7 +119,12 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (mesh.name.startsWith('V121_BasinRetainingRelief_')) {
+    if (
+      mesh.name.startsWith('V121_BasinRetainingRelief_') ||
+      mesh.name === 'V121_BasinBridgeRelief_North' ||
+      mesh.name === 'V121_BasinBridgeRelief_South' ||
+      mesh.name === 'V121_BasinBridgeRelief_Center'
+    ) {
       const cacheKey = `${material.uniqueId}:basin-retaining-relief`;
       let retainingMaterial = clonedMaterials.get(cacheKey);
       if (!retainingMaterial) {
