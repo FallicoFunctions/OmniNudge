@@ -276,6 +276,52 @@ describe('polishMainStageMaterials', () => {
     expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the stage-front portal apron and shoulder relief shells so the spawn reveal does not collapse into giant white pearl slabs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V15_PearlShellBeveled', scene);
+    sharedPearlMaterial.albedoColor.set(0.8, 0.78, 0.74);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const otherPearl = MeshBuilder.CreateBox('V68_HeroPortalPearlApron_L', { size: 1 }, scene);
+    otherPearl.material = sharedPearlMaterial;
+
+    const portalApron = MeshBuilder.CreateBox('V122_PortalApronRelief', { size: 1 }, scene);
+    portalApron.material = sharedPearlMaterial;
+
+    const leftShoulder = MeshBuilder.CreateBox('V122_StageShoulderRelief_L', { size: 1 }, scene);
+    leftShoulder.material = sharedPearlMaterial;
+
+    const rightShoulder = MeshBuilder.CreateBox('V122_StageShoulderRelief_R', { size: 1 }, scene);
+    rightShoulder.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, portalApron, leftShoulder, rightShoulder]);
+
+    expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(portalApron.material).toBeInstanceOf(PBRMaterial);
+    expect(leftShoulder.material).toBeInstanceOf(PBRMaterial);
+    expect(rightShoulder.material).toBeInstanceOf(PBRMaterial);
+    expect(portalApron.material).not.toBe(sharedPearlMaterial);
+    expect(leftShoulder.material).not.toBe(sharedPearlMaterial);
+    expect(rightShoulder.material).not.toBe(sharedPearlMaterial);
+    expect(leftShoulder.material).toBe(portalApron.material);
+    expect(rightShoulder.material).toBe(portalApron.material);
+
+    const reliefMaterial = portalApron.material as PBRMaterial;
+    expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('stage-front-relief-shell');
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
   it('neutralizes the V87 wing-facade shadow frames so they do not inherit the bright cyan shadow texture read in the VIP terrace view', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
