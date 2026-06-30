@@ -1206,6 +1206,44 @@ describe('polishMainStageMaterials', () => {
     expect(lancetMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('neutralizes the rear-cathedral lancet frames so the skyline reads as structural depth instead of bright cyan inserts', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedShadowMaterial = new PBRMaterial('V20_RecessedWarmShadow', scene);
+    sharedShadowMaterial.albedoColor.set(0.46, 0.84, 0.98);
+    sharedShadowMaterial.emissiveColor.set(0.18, 0.36, 0.44);
+    sharedShadowMaterial.emissiveIntensity = 0.32;
+
+    const controlShadow = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    controlShadow.material = sharedShadowMaterial;
+
+    const leftFrame = MeshBuilder.CreateBox('V88_RearCathedralLancetFrameArray_L', { size: 1 }, scene);
+    leftFrame.material = sharedShadowMaterial;
+
+    const rightFrame = MeshBuilder.CreateBox('V88_RearCathedralLancetFrameArray_R', { size: 1 }, scene);
+    rightFrame.material = sharedShadowMaterial;
+
+    polishMainStageMaterials([controlShadow, leftFrame, rightFrame]);
+
+    expect(controlShadow.material).toBe(sharedShadowMaterial);
+    expect(leftFrame.material).toBeInstanceOf(PBRMaterial);
+    expect(rightFrame.material).toBeInstanceOf(PBRMaterial);
+    expect(leftFrame.material).not.toBe(sharedShadowMaterial);
+    expect(rightFrame.material).not.toBe(sharedShadowMaterial);
+    expect(rightFrame.material).toBe(leftFrame.material);
+
+    const frameMaterial = leftFrame.material as PBRMaterial;
+    expect(frameMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(frameMaterial.metadata?.mainStageMaterialOverride).toBe('rear-cathedral-lancet-frame');
+    expect(frameMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
+    expect(frameMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
+    expect(frameMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
+    expect(frameMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
+    expect(frameMaterial.roughness).toBeGreaterThanOrEqual(0.78);
+    expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+  });
+
   it('darkens the rear shell shadow reveal arrays so the promenade flanks stop reading as white oval proxies', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);

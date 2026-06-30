@@ -224,6 +224,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V88_RearCathedralLancetFrameArray_')) {
+      const cacheKey = `${material.uniqueId}:rear-cathedral-lancet-frame`;
+      let frameMaterial = clonedMaterials.get(cacheKey);
+      if (!frameMaterial) {
+        frameMaterial = material.clone(`${material.name}__rear-cathedral-lancet-frame`);
+        applyRearCathedralLancetFrameOverride(frameMaterial);
+        clonedMaterials.set(cacheKey, frameMaterial);
+      }
+
+      assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
     if (mesh.name === 'FestivalField') {
       const cacheKey = `${material.uniqueId}:festival-field-night`;
       let fieldMaterial = clonedMaterials.get(cacheKey);
@@ -1346,6 +1359,22 @@ function applyRearCathedralLancetPearlOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'rear-cathedral-lancet-pearl',
+  };
+}
+
+function applyRearCathedralLancetFrameOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.08;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.28;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'rear-cathedral-lancet-frame',
   };
 }
 
