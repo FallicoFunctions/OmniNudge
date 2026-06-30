@@ -367,6 +367,23 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name === 'V126_WideHeroScreenGoldFrame' ||
+      mesh.name === 'V126_WideHeroScreenGoldMullionArray' ||
+      mesh.name === 'V126_WideHeroScreenGoldCrossbarArray'
+    ) {
+      const cacheKey = `${material.uniqueId}:wide-hero-screen-gold-frame`;
+      let frameMaterial = clonedMaterials.get(cacheKey);
+      if (!frameMaterial) {
+        frameMaterial = material.clone(`${material.name}__wide-hero-screen-gold-frame`);
+        applyWideHeroScreenGoldFrameOverride(frameMaterial);
+        clonedMaterials.set(cacheKey, frameMaterial);
+      }
+
+      assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V127_CrownScreenShadowCoffer') {
       const cacheKey = `${material.uniqueId}:crown-screen-shadow-coffer`;
       let cofferMaterial = clonedMaterials.get(cacheKey);
@@ -1323,6 +1340,23 @@ function applyWingFacadeArchInlayOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-facade-arch-inlay',
+  };
+}
+
+function applyWideHeroScreenGoldFrameOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wide-hero-screen-gold-frame',
   };
 }
 
