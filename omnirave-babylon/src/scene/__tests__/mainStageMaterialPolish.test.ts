@@ -1157,6 +1157,46 @@ describe('polishMainStageMaterials', () => {
     expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('darkens the wide hero screen ivory shells so the stage face reads as framed depth instead of bright moonstone caps', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V14_PolishedMoonstoneShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const controlPearl = MeshBuilder.CreateBox('V16_ArchitecturalPearlControl', { size: 1 }, scene);
+    controlPearl.material = sharedPearlMaterial;
+
+    const header = MeshBuilder.CreateBox('V126_WideHeroScreenIvoryHeader', { size: 1 }, scene);
+    header.material = sharedPearlMaterial;
+
+    const footer = MeshBuilder.CreateBox('V126_WideHeroScreenIvoryFooter', { size: 1 }, scene);
+    footer.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, header, footer]);
+
+    expect(controlPearl.material).toBe(sharedPearlMaterial);
+    expect(header.material).toBeInstanceOf(PBRMaterial);
+    expect(footer.material).toBeInstanceOf(PBRMaterial);
+    expect(header.material).not.toBe(sharedPearlMaterial);
+    expect(footer.material).not.toBe(sharedPearlMaterial);
+    expect(footer.material).toBe(header.material);
+
+    const shellMaterial = header.material as PBRMaterial;
+    expect(shellMaterial.metadata?.mainStageMaterialPolish).toBe('wet');
+    expect(shellMaterial.metadata?.mainStageMaterialOverride).toBe('wide-hero-screen-ivory-shell');
+    expect(shellMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(shellMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(shellMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(shellMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(shellMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(shellMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the VIP terrace balustrade and canopy metals so the terrace read stops collapsing into a cyan roof slab and flat gold wall', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
