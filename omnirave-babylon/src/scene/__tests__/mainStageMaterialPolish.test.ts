@@ -2466,6 +2466,41 @@ describe('polishMainStageMaterials', () => {
     expect(capMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('smokes the hero portal cyan plinth so the celestial colonnade terminus reads as inset jewel glass instead of a bright cyan slab', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedCyanGlass = new PBRMaterial('V19_ArrivalCyanGlow', scene);
+    sharedCyanGlass.albedoColor.set(0.42, 0.86, 0.98);
+    sharedCyanGlass.emissiveColor.set(0.08, 0.3, 0.4);
+    sharedCyanGlass.emissiveIntensity = 0.34;
+    sharedCyanGlass.alpha = 1;
+    sharedCyanGlass.environmentIntensity = 0.82;
+
+    const controlGlass = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    controlGlass.material = sharedCyanGlass;
+
+    const heroPlinth = MeshBuilder.CreateBox('V68_HeroPortalCyanPlinth', { size: 1 }, scene);
+    heroPlinth.material = sharedCyanGlass;
+
+    polishMainStageMaterials([controlGlass, heroPlinth]);
+
+    expect(controlGlass.material).toBe(sharedCyanGlass);
+    expect(heroPlinth.material).toBeInstanceOf(PBRMaterial);
+    expect(heroPlinth.material).not.toBe(sharedCyanGlass);
+
+    const plinthMaterial = heroPlinth.material as PBRMaterial;
+    expect(plinthMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(plinthMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-cyan-plinth');
+    expect(plinthMaterial.alpha).toBeLessThanOrEqual(0.4);
+    expect(plinthMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(plinthMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(plinthMaterial.albedoColor.b).toBeLessThanOrEqual(0.34);
+    expect(plinthMaterial.emissiveIntensity).toBeLessThanOrEqual(0.12);
+    expect(plinthMaterial.roughness).toBeGreaterThanOrEqual(0.16);
+    expect(plinthMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
+  });
+
   it('darkens the promenade pearl ribbon so the central route reads as authored night inlay instead of a repeated bright ivory strip', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
