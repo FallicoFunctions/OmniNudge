@@ -42,12 +42,23 @@ describe('createMainStagePresentationRig', () => {
     expect(scene.getMeshByName('main-stage-horizon-aura')?.parent?.name).toBe(
       'main-stage-presentation-backdrop',
     );
+    expect(scene.getMeshByName('main-stage-side-aura-left')?.parent?.name).toBe(
+      'main-stage-presentation-backdrop',
+    );
+    expect(scene.getMeshByName('main-stage-side-aura-right')?.parent?.name).toBe(
+      'main-stage-presentation-backdrop',
+    );
+    expect(scene.getMeshByName('main-stage-arrival-mist-band')?.parent?.name).toBe(
+      'main-stage-presentation-backdrop',
+    );
     expect(scene.getMaterialByName('main-stage-celestial-vault-material')?.getClassName()).toBe(
       'PBRMaterial',
     );
     expect(scene.getMaterialByName('main-stage-arrival-void-veil-material')).not.toBeNull();
     expect(scene.getMaterialByName('main-stage-crown-halo-material')).not.toBeNull();
     expect(scene.getMaterialByName('main-stage-horizon-aura-material')).not.toBeNull();
+    expect(scene.getMaterialByName('main-stage-side-aura-material')).not.toBeNull();
+    expect(scene.getMaterialByName('main-stage-arrival-mist-band-material')).not.toBeNull();
     expect(rig.pipeline.name).toBe('main-stage-presentation-pipeline');
     expect(rig.pipeline.bloomEnabled).toBe(true);
     expect(rig.pipeline.fxaaEnabled).toBe(true);
@@ -57,5 +68,11 @@ describe('createMainStagePresentationRig', () => {
     expect(rig.pipeline.bloomKernel).toBeLessThanOrEqual(28);
     expect(rig.pipeline.depthOfFieldEnabled).toBe(false);
     expect(rig.pipeline.chromaticAberrationEnabled).toBe(false);
+
+    const sideAuraMaterial = scene.getMaterialByName('main-stage-side-aura-material');
+    expect(sideAuraMaterial?.alpha).toBeGreaterThanOrEqual(0.16);
+
+    const mistBandMaterial = scene.getMaterialByName('main-stage-arrival-mist-band-material');
+    expect(mistBandMaterial?.alpha).toBeGreaterThanOrEqual(0.2);
   });
 });
