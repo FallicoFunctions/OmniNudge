@@ -1897,6 +1897,46 @@ describe('polishMainStageMaterials', () => {
     expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the proscenium pearl reveals so the portal surround reads as framed depth instead of bright ivory cheek panels', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V16_PearlArchitecturalShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const controlPearl = MeshBuilder.CreateBox('V16_ArchitecturalPearlControl', { size: 1 }, scene);
+    controlPearl.material = sharedPearlMaterial;
+
+    const leftReveal = MeshBuilder.CreateBox('V116_ProsceniumPearlRevealArray_L', { size: 1 }, scene);
+    leftReveal.material = sharedPearlMaterial;
+
+    const rightReveal = MeshBuilder.CreateBox('V116_ProsceniumPearlRevealArray_R', { size: 1 }, scene);
+    rightReveal.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, leftReveal, rightReveal]);
+
+    expect(controlPearl.material).toBe(sharedPearlMaterial);
+    expect(leftReveal.material).toBeInstanceOf(PBRMaterial);
+    expect(rightReveal.material).toBeInstanceOf(PBRMaterial);
+    expect(leftReveal.material).not.toBe(sharedPearlMaterial);
+    expect(rightReveal.material).not.toBe(sharedPearlMaterial);
+    expect(rightReveal.material).toBe(leftReveal.material);
+
+    const revealMaterial = leftReveal.material as PBRMaterial;
+    expect(revealMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(revealMaterial.metadata?.mainStageMaterialOverride).toBe('proscenium-pearl-reveal');
+    expect(revealMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(revealMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(revealMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(revealMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(revealMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the inner portal pearl shell masses so the hero portal reads as carved depth instead of bright ivory pylons', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
