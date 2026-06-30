@@ -88,18 +88,24 @@ func NewOAuthHandler(
 	return h
 }
 
+// oauthErrorURL returns the frontend /auth/callback URL with an error param so the
+// OAuthCallbackPage can display user-facing feedback.
+func (h *OAuthHandler) oauthErrorURL(reason string) string {
+	return h.frontendURL + "/auth/callback?auth_error=" + reason
+}
+
 // Initiate handles GET /auth/oauth/:provider — sets state cookie and redirects to provider.
 func (h *OAuthHandler) Initiate(c *gin.Context) {
 	provider := c.Param("provider")
 	cfg := h.configFor(provider)
 	if cfg == nil {
-		c.Redirect(http.StatusFound, h.frontendURL+"?auth_error=unknown_provider")
+		c.Redirect(http.StatusFound, h.oauthErrorURL("unknown_provider"))
 		return
 	}
 
 	state, err := randomHex(16)
 	if err != nil {
-		c.Redirect(http.StatusFound, h.frontendURL+"?auth_error=server_error")
+		c.Redirect(http.StatusFound, h.oauthErrorURL("server_error"))
 		return
 	}
 
@@ -112,14 +118,14 @@ func (h *OAuthHandler) Callback(c *gin.Context) {
 	provider := c.Param("provider")
 	cfg := h.configFor(provider)
 	if cfg == nil {
-		c.Redirect(http.StatusFound, h.frontendURL+"?auth_error=unknown_provider")
+		c.Redirect(http.StatusFound, h.oauthErrorURL("unknown_provider"))
 		return
 	}
 
 	// CSRF state check
 	cookieState, _ := c.Cookie("oauth_state")
 	if cookieState == "" || cookieState != c.Query("state") {
-		c.Redirect(http.StatusFound, h.frontendURL+"?auth_error=invalid_state")
+		c.Redirect(http.StatusFound, h.oauthErrorURL("invalid_state"))
 		return
 	}
 	c.SetCookie("oauth_state", "", -1, "/", "", h.secureCookie, true)
@@ -127,14 +133,14 @@ func (h *OAuthHandler) Callback(c *gin.Context) {
 	// Exchange authorisation code for token
 	code := c.Query("code")
 	if code == "" {
-		c.Redirect(http.StatusFound, h.frontendURL+"?auth_error=no_code")
+		c.Redirect(http.StatusFound, h.oauthErrorURL("no_code"))
 		return
 	}
 
 	token, err := cfg.Exchange(c.Request.Context(), code)
 	if err != nil {
 		log.Printf("[oauth] token exchange failed (provider=%s): %v", provider, err)
-		c.Redirect(http.StatusFound, h.frontendURL+"?auth_error=token_exchange")
+		c.Redirect(http.StatusFound, h.oauthErrorURL("token_exchange"))
 		return
 	}
 
@@ -142,7 +148,7 @@ func (h *OAuthHandler) Callback(c *gin.Context) {
 	info, err := h.fetchUserInfo(c.Request.Context(), provider, token)
 	if err != nil {
 		log.Printf("[oauth] fetchUserInfo failed (provider=%s): %v", provider, err)
-		c.Redirect(http.StatusFound, h.frontendURL+"?auth_error=user_info")
+		c.Redirect(http.StatusFound, h.oauthErrorURL("user_info"))
 		return
 	}
 
@@ -150,7 +156,7 @@ func (h *OAuthHandler) Callback(c *gin.Context) {
 	user, err := h.findOrCreateUser(c.Request.Context(), provider, info)
 	if err != nil {
 		log.Printf("[oauth] findOrCreateUser failed (provider=%s): %v", provider, err)
-		c.Redirect(http.StatusFound, h.frontendURL+"?auth_error=account_error")
+		c.Redirect(http.StatusFound, h.oauthErrorURL("account_error"))
 		return
 	}
 
@@ -158,7 +164,7 @@ func (h *OAuthHandler) Callback(c *gin.Context) {
 	jwtToken, err := h.authService.GenerateJWT(user.ID, user.Username, user.Role)
 	if err != nil {
 		log.Printf("[oauth] GenerateJWT failed: %v", err)
-		c.Redirect(http.StatusFound, h.frontendURL+"?auth_error=server_error")
+		c.Redirect(http.StatusFound, h.oauthErrorURL("server_error"))
 		return
 	}
 
@@ -318,7 +324,7 @@ func (h *OAuthHandler) generateUsername(ctx context.Context, name, email string)
 	if len(base) > 20 {
 		base = base[:20]
 	}
-	if base == "" {
+	if len(base) < 3 {
 		base = "user"
 	}
 
