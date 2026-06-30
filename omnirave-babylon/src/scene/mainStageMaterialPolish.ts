@@ -910,6 +910,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V25_HeroPortalOuterOgive_L' || mesh.name === 'V25_HeroPortalOuterOgive_R') {
+      const cacheKey = `${material.uniqueId}:hero-portal-outer-ogive`;
+      let ogiveMaterial = clonedMaterials.get(cacheKey);
+      if (!ogiveMaterial) {
+        ogiveMaterial = material.clone(`${material.name}__hero-portal-outer-ogive`);
+        applyHeroPortalOuterOgiveOverride(ogiveMaterial);
+        clonedMaterials.set(cacheKey, ogiveMaterial);
+      }
+
+      assignOverrideMaterial(mesh, ogiveMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V26_VipTerraceOuterSweep_')) {
       const cacheKey = `${material.uniqueId}:vip-terrace-outer-sweep`;
       let sweepMaterial = clonedMaterials.get(cacheKey);
@@ -2253,6 +2266,23 @@ function applyWingTerraceGoldOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-terrace-gold',
+  };
+}
+
+function applyHeroPortalOuterOgiveOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'hero-portal-outer-ogive',
   };
 }
 
