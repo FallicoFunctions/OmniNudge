@@ -40,6 +40,8 @@ describe('createMainStageProductionSurfaces', () => {
         'main-stage-crown-lattice-tracer-right',
         'main-stage-center-portal-jamb-left',
         'main-stage-center-portal-jamb-right',
+        'main-stage-threshold-spine-left',
+        'main-stage-threshold-spine-right',
       ]),
     );
     expect(rig.surfaces.every((surface) => surface.parent === rig.root)).toBe(true);
@@ -121,6 +123,15 @@ describe('createMainStageProductionSurfaces', () => {
     expect(scene?.getMeshByName('main-stage-center-portal-header-glow')).not.toBeNull();
     expect(scene?.getMeshByName('main-stage-center-portal-sill')).not.toBeNull();
     expect(scene?.getMeshByName('main-stage-center-portal-sill-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-threshold-spine-left')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-threshold-spine-right')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-threshold-spine-left-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-threshold-spine-right-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-threshold-bar-01')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-threshold-bar-02')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-threshold-bar-03')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-threshold-bar-01-glow')).not.toBeNull();
+    expect(scene?.getMeshByName('main-stage-threshold-bar-03-glow')).not.toBeNull();
 
     const wingHousing = scene?.getMeshByName('main-stage-wing-screen-right-housing');
     expect(wingHousing?.metadata).toMatchObject({
@@ -175,7 +186,7 @@ describe('createMainStageProductionSurfaces', () => {
     const stageBeaconCount = scene?.meshes.filter(
       (mesh) => mesh.metadata?.productionRole === 'stage-beacon',
     ).length;
-    expect(stageBeaconCount).toBeGreaterThanOrEqual(18);
+    expect(stageBeaconCount).toBeGreaterThanOrEqual(27);
 
     const mullionCount = scene?.meshes.filter((mesh) => mesh.metadata?.productionRole === 'screen-mullion').length;
     expect(mullionCount).toBeGreaterThanOrEqual(7);
