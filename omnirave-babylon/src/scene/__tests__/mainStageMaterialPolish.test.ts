@@ -2267,7 +2267,7 @@ describe('polishMainStageMaterials', () => {
     sharedIvoryMaterial.emissiveIntensity = 0.16;
     sharedIvoryMaterial.roughness = 0.34;
 
-    const controlIvory = MeshBuilder.CreateBox('V57_BackPlazaSentinelPearl_L', { size: 1 }, scene);
+    const controlIvory = MeshBuilder.CreateBox('TestPearlControlMesh', { size: 1 }, scene);
     controlIvory.material = sharedIvoryMaterial;
 
     const portalArcade = MeshBuilder.CreateBox('V68_PortalArcadePearl_L', { size: 1 }, scene);
@@ -2313,7 +2313,7 @@ describe('polishMainStageMaterials', () => {
     sharedIvoryMaterial.emissiveIntensity = 0.16;
     sharedIvoryMaterial.roughness = 0.34;
 
-    const controlIvory = MeshBuilder.CreateBox('V57_BackPlazaSentinelPearl_L', { size: 1 }, scene);
+    const controlIvory = MeshBuilder.CreateBox('TestPearlControlMesh', { size: 1 }, scene);
     controlIvory.material = sharedIvoryMaterial;
 
     const leftAurora = MeshBuilder.CreateBox('V61_RearMassAuroraPearl_L', { size: 1 }, scene);
@@ -2988,6 +2988,46 @@ describe('polishMainStageMaterials', () => {
     expect(revealMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
+  it('darkens the hero portal pearl aprons so the stage mouth base reads as carved shell architecture instead of a bright ivory ledge', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedIvoryMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedIvoryMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedIvoryMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedIvoryMaterial.emissiveIntensity = 0.16;
+    sharedIvoryMaterial.roughness = 0.34;
+
+    const controlIvory = MeshBuilder.CreateBox('TestPearlControlMesh', { size: 1 }, scene);
+    controlIvory.material = sharedIvoryMaterial;
+
+    const leftApron = MeshBuilder.CreateBox('V25_HeroPortalPearlApron_L', { size: 1 }, scene);
+    leftApron.material = sharedIvoryMaterial;
+
+    const rightApron = MeshBuilder.CreateBox('V25_HeroPortalPearlApron_R', { size: 1 }, scene);
+    rightApron.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([controlIvory, leftApron, rightApron]);
+
+    expect(controlIvory.material).toBe(sharedIvoryMaterial);
+    expect(leftApron.material).toBeInstanceOf(PBRMaterial);
+    expect(rightApron.material).toBeInstanceOf(PBRMaterial);
+    expect(leftApron.material).not.toBe(sharedIvoryMaterial);
+    expect(rightApron.material).not.toBe(sharedIvoryMaterial);
+    expect(rightApron.material).toBe(leftApron.material);
+
+    const apronMaterial = leftApron.material as PBRMaterial;
+    expect(apronMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(apronMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-pearl-apron');
+    expect(apronMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(apronMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(apronMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(apronMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(apronMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(apronMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(apronMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
   it('tones down the VIP terrace gold inlays so the podium edge reads as carved support detail instead of bright foil seams', () => {
