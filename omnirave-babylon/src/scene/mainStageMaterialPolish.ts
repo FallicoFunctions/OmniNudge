@@ -517,6 +517,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V70_PromenadeCyanSpine') {
+      const cacheKey = `${material.uniqueId}:promenade-cyan-spine`;
+      let spineMaterial = clonedMaterials.get(cacheKey);
+      if (!spineMaterial) {
+        spineMaterial = material.clone(`${material.name}__promenade-cyan-spine`);
+        applyPromenadeCyanSpineOverride(spineMaterial);
+        clonedMaterials.set(cacheKey, spineMaterial);
+      }
+
+      assignOverrideMaterial(mesh, spineMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V30_VipGlassBalustrade_')) {
       const cacheKey = `${material.uniqueId}:vip-glass-balustrade`;
       let balustradeMaterial = clonedMaterials.get(cacheKey);
@@ -1914,6 +1927,24 @@ function applyPromenadeGoldShouldersOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'promenade-gold-shoulders',
+  };
+}
+
+function applyPromenadeCyanSpineOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.12, 0.24, 0.3);
+  material.emissiveColor = new Color3(0.015, 0.045, 0.06);
+  material.emissiveIntensity = 0.1;
+  material.alpha = 0.38;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.18;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.06;
+  material.clearCoat.roughness = 0.6;
+  material.environmentIntensity = 0.34;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'promenade-cyan-spine',
   };
 }
 
