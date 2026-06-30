@@ -520,6 +520,44 @@ describe('polishMainStageMaterials', () => {
     expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
   });
 
+  it('neutralizes the V87 wing-facade shadow vault arrays so the terrace soffits read as shadow architecture instead of bright cyan inserts', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedShadowMaterial = new PBRMaterial('V20_RecessedWarmShadow', scene);
+    sharedShadowMaterial.albedoColor.set(0.46, 0.84, 0.98);
+    sharedShadowMaterial.emissiveColor.set(0.18, 0.36, 0.44);
+    sharedShadowMaterial.emissiveIntensity = 0.32;
+
+    const controlShadow = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    controlShadow.material = sharedShadowMaterial;
+
+    const leftVault = MeshBuilder.CreateBox('V87_WingFacadeShadowVaultArray_L', { size: 1 }, scene);
+    leftVault.material = sharedShadowMaterial;
+
+    const rightVault = MeshBuilder.CreateBox('V87_WingFacadeShadowVaultArray_R', { size: 1 }, scene);
+    rightVault.material = sharedShadowMaterial;
+
+    polishMainStageMaterials([controlShadow, leftVault, rightVault]);
+
+    expect(controlShadow.material).toBe(sharedShadowMaterial);
+    expect(leftVault.material).toBeInstanceOf(PBRMaterial);
+    expect(rightVault.material).toBeInstanceOf(PBRMaterial);
+    expect(leftVault.material).not.toBe(sharedShadowMaterial);
+    expect(rightVault.material).not.toBe(sharedShadowMaterial);
+    expect(rightVault.material).toBe(leftVault.material);
+
+    const vaultMaterial = leftVault.material as PBRMaterial;
+    expect(vaultMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(vaultMaterial.metadata?.mainStageMaterialOverride).toBe('wing-facade-shadow-frame');
+    expect(vaultMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
+    expect(vaultMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
+    expect(vaultMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
+    expect(vaultMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
+    expect(vaultMaterial.roughness).toBeGreaterThanOrEqual(0.78);
+    expect(vaultMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+  });
+
   it('gives the VIP shell fascia its own stone-shell finish so the terrace fascia does not read as a cyan slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
