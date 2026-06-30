@@ -774,6 +774,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V68_HeroPortalShadowDais') {
+      const cacheKey = `${material.uniqueId}:hero-portal-shadow-dais`;
+      let daisMaterial = clonedMaterials.get(cacheKey);
+      if (!daisMaterial) {
+        daisMaterial = material.clone(`${material.name}__hero-portal-shadow-dais`);
+        applyHeroPortalShadowDaisOverride(daisMaterial);
+        clonedMaterials.set(cacheKey, daisMaterial);
+      }
+
+      assignOverrideMaterial(mesh, daisMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V61_RearMassAuroraPearl_')) {
       const cacheKey = `${material.uniqueId}:rear-mass-aurora-pearl`;
       let auroraMaterial = clonedMaterials.get(cacheKey);
@@ -2269,6 +2282,22 @@ function applyHeroPortalCyanPlinthOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'hero-portal-cyan-plinth',
+  };
+}
+
+function applyHeroPortalShadowDaisOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.08;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.28;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'hero-portal-shadow-dais',
   };
 }
 
