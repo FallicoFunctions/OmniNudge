@@ -802,4 +802,44 @@ describe('polishMainStageMaterials', () => {
     expect(sentinelMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(sentinelMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
+
+  it('smokes the wing glass balustrades so the promenade side shells stop reading as flat cyan cards', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedCyanGlass = new PBRMaterial('V20_CelestialCyanGlass', scene);
+    sharedCyanGlass.albedoColor.set(0.44, 0.86, 0.98);
+    sharedCyanGlass.emissiveColor.set(0.08, 0.28, 0.36);
+    sharedCyanGlass.emissiveIntensity = 0.28;
+    sharedCyanGlass.alpha = 1;
+    sharedCyanGlass.roughness = 0.22;
+
+    const otherGlass = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    otherGlass.material = sharedCyanGlass;
+
+    const leftBalustrade = MeshBuilder.CreateBox('V30_WingGlassBalustrade_L', { size: 1 }, scene);
+    leftBalustrade.material = sharedCyanGlass;
+
+    const rightBalustrade = MeshBuilder.CreateBox('V30_WingGlassBalustrade_R', { size: 1 }, scene);
+    rightBalustrade.material = sharedCyanGlass;
+
+    polishMainStageMaterials([otherGlass, leftBalustrade, rightBalustrade]);
+
+    expect(otherGlass.material).toBe(sharedCyanGlass);
+    expect(leftBalustrade.material).toBeInstanceOf(PBRMaterial);
+    expect(rightBalustrade.material).toBeInstanceOf(PBRMaterial);
+    expect(leftBalustrade.material).not.toBe(sharedCyanGlass);
+    expect(rightBalustrade.material).not.toBe(sharedCyanGlass);
+    expect(rightBalustrade.material).toBe(leftBalustrade.material);
+
+    const balustradeMaterial = leftBalustrade.material as PBRMaterial;
+    expect(balustradeMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(balustradeMaterial.metadata?.mainStageMaterialOverride).toBe('wing-glass-balustrade');
+    expect(balustradeMaterial.albedoColor.r).toBeLessThanOrEqual(0.08);
+    expect(balustradeMaterial.albedoColor.g).toBeLessThanOrEqual(0.1);
+    expect(balustradeMaterial.albedoColor.b).toBeLessThanOrEqual(0.12);
+    expect(balustradeMaterial.alpha).toBeLessThanOrEqual(0.24);
+    expect(balustradeMaterial.roughness).toBeGreaterThanOrEqual(0.68);
+    expect(balustradeMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+  });
 });

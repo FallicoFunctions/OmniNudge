@@ -200,6 +200,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V30_WingGlassBalustrade_')) {
+      const cacheKey = `${material.uniqueId}:wing-glass-balustrade`;
+      let balustradeMaterial = clonedMaterials.get(cacheKey);
+      if (!balustradeMaterial) {
+        balustradeMaterial = material.clone(`${material.name}__wing-glass-balustrade`);
+        applyWingGlassBalustradeOverride(balustradeMaterial);
+        clonedMaterials.set(cacheKey, balustradeMaterial);
+      }
+
+      mesh.material = balustradeMaterial;
+      continue;
+    }
+
     if (mesh.name.startsWith('V51_OculusCanopy_')) {
       const cacheKey = `${material.uniqueId}:oculus-canopy`;
       let canopyMaterial = clonedMaterials.get(cacheKey);
@@ -632,6 +645,24 @@ function applyVipGlassBalustradeOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'vip-glass-balustrade',
+  };
+}
+
+function applyWingGlassBalustradeOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.05, 0.08, 0.1);
+  material.emissiveColor = new Color3(0, 0.012, 0.018);
+  material.emissiveIntensity = 0.015;
+  material.alpha = 0.22;
+  material.metallic = 0.02;
+  material.roughness = 0.72;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.9;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-glass-balustrade',
   };
 }
 
