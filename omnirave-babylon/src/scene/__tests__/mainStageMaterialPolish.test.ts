@@ -3164,6 +3164,41 @@ describe('polishMainStageMaterials', () => {
     expect(daisMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('tones down the performance dais upper tier so the stage crown reads as carved metal detail instead of a bright foil slab', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V20_ChasedGoldFiligree', scene);
+    sharedGoldMaterial.albedoColor.set(0.92, 0.76, 0.32);
+    sharedGoldMaterial.emissiveColor.set(0.24, 0.16, 0.06);
+    sharedGoldMaterial.emissiveIntensity = 0.26;
+    sharedGoldMaterial.metallic = 0.9;
+    sharedGoldMaterial.roughness = 0.22;
+
+    const controlGold = MeshBuilder.CreateBox('TestGoldControlMesh', { size: 1 }, scene);
+    controlGold.material = sharedGoldMaterial;
+
+    const upperDais = MeshBuilder.CreateBox('V27_PerformanceDaisUpper', { size: 1 }, scene);
+    upperDais.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([controlGold, upperDais]);
+
+    expect(controlGold.material).toBe(sharedGoldMaterial);
+    expect(upperDais.material).toBeInstanceOf(PBRMaterial);
+    expect(upperDais.material).not.toBe(sharedGoldMaterial);
+
+    const daisMaterial = upperDais.material as PBRMaterial;
+    expect(daisMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(daisMaterial.metadata?.mainStageMaterialOverride).toBe('performance-dais-upper');
+    expect(daisMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(daisMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(daisMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(daisMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(daisMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(daisMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(daisMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('tones down the VIP terrace gold inlays so the podium edge reads as carved support detail instead of bright foil seams', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
