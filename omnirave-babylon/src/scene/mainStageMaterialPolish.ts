@@ -315,6 +315,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V98_CrownButtressGoldInlay_')) {
+      const cacheKey = `${material.uniqueId}:crown-buttress-gold-inlay`;
+      let inlayMaterial = clonedMaterials.get(cacheKey);
+      if (!inlayMaterial) {
+        inlayMaterial = material.clone(`${material.name}__crown-buttress-gold-inlay`);
+        applyCrownButtressGoldInlayOverride(inlayMaterial);
+        clonedMaterials.set(cacheKey, inlayMaterial);
+      }
+
+      assignOverrideMaterial(mesh, inlayMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V127_CrownScreenShadowCoffer') {
       const cacheKey = `${material.uniqueId}:crown-screen-shadow-coffer`;
       let cofferMaterial = clonedMaterials.get(cacheKey);
@@ -1203,6 +1216,23 @@ function applyBasinStoneCopingOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-stone-coping',
+  };
+}
+
+function applyCrownButtressGoldInlayOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-buttress-gold-inlay',
   };
 }
 
