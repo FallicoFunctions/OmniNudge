@@ -120,6 +120,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
     }
 
     if (
+      mesh.name.startsWith('V118_BasinWallRelief_') ||
       mesh.name.startsWith('V121_BasinRetainingRelief_') ||
       mesh.name.startsWith('V120_BasinDeckRelief_') ||
       mesh.name === 'V121_BasinBridgeRelief_North' ||
