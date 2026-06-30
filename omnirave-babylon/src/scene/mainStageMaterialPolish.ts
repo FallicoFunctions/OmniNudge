@@ -1027,6 +1027,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V28_WingArcadeGoldReveal_L' || mesh.name === 'V28_WingArcadeGoldReveal_R') {
+      const cacheKey = `${material.uniqueId}:wing-arcade-gold-reveal`;
+      let revealMaterial = clonedMaterials.get(cacheKey);
+      if (!revealMaterial) {
+        revealMaterial = material.clone(`${material.name}__wing-arcade-gold-reveal`);
+        applyWingArcadeGoldRevealOverride(revealMaterial);
+        clonedMaterials.set(cacheKey, revealMaterial);
+      }
+
+      assignOverrideMaterial(mesh, revealMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V26_VipTerraceOuterSweep_')) {
       const cacheKey = `${material.uniqueId}:vip-terrace-outer-sweep`;
       let sweepMaterial = clonedMaterials.get(cacheKey);
@@ -2519,6 +2532,20 @@ function applyWingArcadePearlArchOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-arcade-pearl-arch',
+  };
+}
+
+function applyWingArcadeGoldRevealOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.07);
+  material.emissiveColor = new Color3(0.018, 0.012, 0.005);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.18;
+  material.roughness = 0.88;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-arcade-gold-reveal',
   };
 }
 
