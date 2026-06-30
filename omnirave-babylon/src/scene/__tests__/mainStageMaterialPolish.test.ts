@@ -1566,6 +1566,46 @@ describe('polishMainStageMaterials', () => {
     expect(gatewayMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('darkens the spawn gallery pier pearl shells so the arrival buttresses read as carved support architecture instead of bright side slabs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V16_PearlArchitecturalShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const controlPearl = MeshBuilder.CreateBox('V56_SpawnCanopyPearlVault_L', { size: 1 }, scene);
+    controlPearl.material = sharedPearlMaterial;
+
+    const leftPier = MeshBuilder.CreateBox('V54_SpawnGalleryPierPearl_L', { size: 1 }, scene);
+    leftPier.material = sharedPearlMaterial;
+
+    const rightPier = MeshBuilder.CreateBox('V54_SpawnGalleryPierPearl_R', { size: 1 }, scene);
+    rightPier.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, leftPier, rightPier]);
+
+    expect(controlPearl.material).toBe(sharedPearlMaterial);
+    expect(leftPier.material).toBeInstanceOf(PBRMaterial);
+    expect(rightPier.material).toBeInstanceOf(PBRMaterial);
+    expect(leftPier.material).not.toBe(sharedPearlMaterial);
+    expect(rightPier.material).not.toBe(sharedPearlMaterial);
+    expect(rightPier.material).toBe(leftPier.material);
+
+    const pierMaterial = leftPier.material as PBRMaterial;
+    expect(pierMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(pierMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-gallery-pier-pearl');
+    expect(pierMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(pierMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(pierMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(pierMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(pierMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(pierMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(pierMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the spawn gallery arcade pearl shells so the VIP long view reads as layered arrival architecture instead of a white side slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
