@@ -1,5 +1,6 @@
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import ImageCropModal from './ImageCropModal';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -44,6 +45,12 @@ export default function EditProfileModal({
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Crop modal state
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [cropType, setCropType] = useState<'avatar' | 'banner' | null>(null);
+  const pendingUploadRef = useRef<((file: File) => Promise<string>) | null>(null);
+  const cropObjectUrl = useRef<string | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
     setBio(initialBio ?? '');
@@ -56,46 +63,66 @@ export default function EditProfileModal({
 
   if (!isOpen) return null;
 
-  const handleAvatarFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !onUploadAvatar) {
-      return;
-    }
+  const openCropModal = (
+    file: File,
+    type: 'avatar' | 'banner',
+    uploadFn: (f: File) => Promise<string>,
+    inputEl: HTMLInputElement,
+  ) => {
+    if (cropObjectUrl.current) URL.revokeObjectURL(cropObjectUrl.current);
+    const url = URL.createObjectURL(file);
+    cropObjectUrl.current = url;
+    pendingUploadRef.current = uploadFn;
+    setCropType(type);
+    setCropSrc(url);
+    inputEl.value = '';
+  };
+
+  const handleCropConfirm = async (croppedFile: File) => {
+    if (!pendingUploadRef.current || !cropType) return;
+    const uploadFn = pendingUploadRef.current;
+    const type = cropType;
+    closeCropModal();
+
+    if (type === 'avatar') setIsUploadingAvatar(true);
+    else setIsUploadingBanner(true);
     setError(null);
-    setIsUploadingAvatar(true);
     try {
-      const uploadedUrl = await onUploadAvatar(file);
-      setAvatarUrl(uploadedUrl);
+      const url = await uploadFn(croppedFile);
+      if (type === 'avatar') setAvatarUrl(url);
+      else setBannerUrl(url);
     } catch (err) {
       setError(
         t('userProfilePage.edit.errors.uploadFailed', {
           message: err instanceof Error ? err.message : t('common.error'),
-        })
+        }),
       );
     } finally {
-      setIsUploadingAvatar(false);
-      event.target.value = '';
+      if (type === 'avatar') setIsUploadingAvatar(false);
+      else setIsUploadingBanner(false);
     }
   };
 
-  const handleBannerFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+  const closeCropModal = () => {
+    setCropSrc(null);
+    setCropType(null);
+    pendingUploadRef.current = null;
+    if (cropObjectUrl.current) {
+      URL.revokeObjectURL(cropObjectUrl.current);
+      cropObjectUrl.current = null;
+    }
+  };
+
+  const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !onUploadAvatar) return;
+    openCropModal(file, 'avatar', onUploadAvatar, event.target);
+  };
+
+  const handleBannerFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !onUploadBanner) return;
-    setError(null);
-    setIsUploadingBanner(true);
-    try {
-      const uploadedUrl = await onUploadBanner(file);
-      setBannerUrl(uploadedUrl);
-    } catch (err) {
-      setError(
-        t('userProfilePage.edit.errors.uploadFailed', {
-          message: err instanceof Error ? err.message : t('common.error'),
-        })
-      );
-    } finally {
-      setIsUploadingBanner(false);
-      event.target.value = '';
-    }
+    openCropModal(file, 'banner', onUploadBanner, event.target);
   };
 
   const handleSave = async () => {
@@ -147,6 +174,19 @@ export default function EditProfileModal({
   };
 
   return (
+    <>
+    {cropSrc && cropType && (
+      <ImageCropModal
+        src={cropSrc}
+        aspect={cropType === 'avatar' ? 1 : 3}
+        shape={cropType === 'avatar' ? 'circle' : 'rect'}
+        outputWidth={cropType === 'avatar' ? 800 : 1500}
+        outputHeight={cropType === 'avatar' ? 800 : 500}
+        title={cropType === 'avatar' ? 'Crop profile photo' : 'Crop cover photo'}
+        onConfirm={(file) => { void handleCropConfirm(file); }}
+        onCancel={closeCropModal}
+      />
+    )}
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl">
         <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
@@ -188,9 +228,7 @@ export default function EditProfileModal({
                   accept="image/png,image/jpeg,image/gif,image/webp"
                   className="hidden"
                   disabled={isUploadingAvatar}
-                  onChange={(event) => {
-                    void handleAvatarFileChange(event);
-                  }}
+                  onChange={handleAvatarFileChange}
                 />
                 <span className="text-xs text-[var(--color-text-secondary)]">
                   {t('userProfilePage.edit.avatarUploadHint')}
@@ -336,5 +374,6 @@ export default function EditProfileModal({
         </div>
       </div>
     </div>
+    </>
   );
 }
