@@ -255,6 +255,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V30_WingTerraceFascia_')) {
+      const cacheKey = `${material.uniqueId}:wing-terrace-fascia`;
+      let terraceFasciaMaterial = clonedMaterials.get(cacheKey);
+      if (!terraceFasciaMaterial) {
+        terraceFasciaMaterial = material.clone(`${material.name}__wing-terrace-fascia`);
+        applyWingTerraceFasciaOverride(terraceFasciaMaterial);
+        clonedMaterials.set(cacheKey, terraceFasciaMaterial);
+      }
+
+      mesh.material = terraceFasciaMaterial;
+      continue;
+    }
+
     if (mesh.name.startsWith('V117_WingCanopyLamellaGoldArray_')) {
       const cacheKey = `${material.uniqueId}:wing-canopy-lamella-gold`;
       let wingCanopyMaterial = clonedMaterials.get(cacheKey);
@@ -652,6 +665,23 @@ function applyWingTerraceGoldOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-terrace-gold',
+  };
+}
+
+function applyWingTerraceFasciaOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.006, 0.007, 0.01);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-terrace-fascia',
   };
 }
 
