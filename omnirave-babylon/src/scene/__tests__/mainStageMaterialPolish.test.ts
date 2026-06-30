@@ -1166,6 +1166,46 @@ describe('polishMainStageMaterials', () => {
     expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
+  it('darkens the rear-cathedral lancet pearl arrays so the skyline reads as carved recesses instead of bright ivory blades', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V16_PearlArchitecturalShell', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.8, 0.76);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const controlPearl = MeshBuilder.CreateBox('V16_ArchitecturalPearlControl', { size: 1 }, scene);
+    controlPearl.material = sharedPearlMaterial;
+
+    const leftLancet = MeshBuilder.CreateBox('V88_RearCathedralLancetPearlArray_L', { size: 1 }, scene);
+    leftLancet.material = sharedPearlMaterial;
+
+    const rightLancet = MeshBuilder.CreateBox('V88_RearCathedralLancetPearlArray_R', { size: 1 }, scene);
+    rightLancet.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, leftLancet, rightLancet]);
+
+    expect(controlPearl.material).toBe(sharedPearlMaterial);
+    expect(leftLancet.material).toBeInstanceOf(PBRMaterial);
+    expect(rightLancet.material).toBeInstanceOf(PBRMaterial);
+    expect(leftLancet.material).not.toBe(sharedPearlMaterial);
+    expect(rightLancet.material).not.toBe(sharedPearlMaterial);
+    expect(rightLancet.material).toBe(leftLancet.material);
+
+    const lancetMaterial = leftLancet.material as PBRMaterial;
+    expect(lancetMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(lancetMaterial.metadata?.mainStageMaterialOverride).toBe('rear-cathedral-lancet-pearl');
+    expect(lancetMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(lancetMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(lancetMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(lancetMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(lancetMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(lancetMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(lancetMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
+
   it('darkens the rear shell shadow reveal arrays so the promenade flanks stop reading as white oval proxies', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
