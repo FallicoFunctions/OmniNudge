@@ -108,7 +108,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 	query := `
 		INSERT INTO users (username, username_normalized, email, email_encrypted, password_hash, avatar_url, bio, nsfw)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING id, created_at, last_seen, role, nsfw
+		RETURNING id, created_at, last_seen, role, nsfw, token_version
 	`
 
 	return r.pool.QueryRow(ctx, query,
@@ -120,7 +120,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 		user.AvatarURL,
 		user.Bio,
 		user.NSFW,
-	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW)
+	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW, &user.TokenVersion)
 }
 
 // GetByID retrieves a user by their internal ID
