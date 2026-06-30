@@ -1284,8 +1284,8 @@ func main() {
 			protected.GET("/users/me/storage", storageHandler.GetMyStorage)
 			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
 			protected.PUT("/users/me/top-friends", usersHandler.SetTopFriends)
-			protected.POST("/users/me/avatar", usersHandler.UploadMyAvatar)
-			protected.POST("/users/me/banner", usersHandler.UploadMyBanner)
+			protected.POST("/users/me/avatar", middleware.RequestSizeLimiter(5<<20), usersHandler.UploadMyAvatar)
+			protected.POST("/users/me/banner", middleware.RequestSizeLimiter(10<<20), usersHandler.UploadMyBanner)
 
 			// Profile wall
 			protected.GET("/users/me/wall/pending", wallHandler.GetPendingWallPosts)
