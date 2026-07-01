@@ -39,6 +39,21 @@ func NewThumbnailService() *ThumbnailService {
 	}
 }
 
+// safeOpenImage decodes an image file, recovering from decoder panics.
+// github.com/disintegration/imaging (and the format decoders it registers,
+// e.g. CVE-2023-36308 for TIFF) can panic on malformed input with no upstream
+// fix available; since this decodes attacker-supplied uploads, a panic here
+// must not be allowed to escape as a process crash.
+func safeOpenImage(path string) (img image.Image, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			img = nil
+			err = fmt.Errorf("panic while decoding image %s: %v", path, r)
+		}
+	}()
+	return imaging.Open(path)
+}
+
 // GenerateThumbnail creates a thumbnail for an image file
 // Returns the thumbnail path and any error
 func (s *ThumbnailService) GenerateThumbnail(sourcePath string) (string, error) {
@@ -48,7 +63,7 @@ func (s *ThumbnailService) GenerateThumbnail(sourcePath string) (string, error) 
 	}
 
 	// Open the image
-	src, err := imaging.Open(sourcePath)
+	src, err := safeOpenImage(sourcePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to open image: %w", err)
 	}
@@ -87,7 +102,7 @@ func (s *ThumbnailService) GenerateImageThumbnails(sourcePath string) (*ImageThu
 		return nil, fmt.Errorf("source file does not exist: %w", err)
 	}
 
-	src, err := imaging.Open(sourcePath)
+	src, err := safeOpenImage(sourcePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open image: %w", err)
 	}
@@ -128,7 +143,7 @@ func (s *ThumbnailService) GenerateSquareThumbnail(sourcePath string, size int) 
 		return "", fmt.Errorf("source file does not exist: %w", err)
 	}
 
-	src, err := imaging.Open(sourcePath)
+	src, err := safeOpenImage(sourcePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to open image: %w", err)
 	}
@@ -349,7 +364,7 @@ func saveOptimizedJPEG(img image.Image, path string, maxBytes int64) error {
 }
 
 func optimizeJPEGFile(path string, maxBytes int64) error {
-	img, err := imaging.Open(path)
+	img, err := safeOpenImage(path)
 	if err != nil {
 		return fmt.Errorf("open generated thumbnail: %w", err)
 	}
