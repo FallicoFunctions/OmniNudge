@@ -71,6 +71,733 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V91_SupportTentFrame_')) {
+      const cacheKey = `${material.uniqueId}:support-tent-frame`;
+      let frameMaterial = clonedMaterials.get(cacheKey);
+      if (!frameMaterial) {
+        frameMaterial = material.clone(`${material.name}__support-tent-frame`);
+        applySupportTentFrameOverride(frameMaterial);
+        clonedMaterials.set(cacheKey, frameMaterial);
+      }
+
+      assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V91_SupportTentCrest_')) {
+      const cacheKey = `${material.uniqueId}:support-tent-crest`;
+      let crestMaterial = clonedMaterials.get(cacheKey);
+      if (!crestMaterial) {
+        crestMaterial = material.clone(`${material.name}__support-tent-crest`);
+        applySupportTentCrestOverride(crestMaterial);
+        clonedMaterials.set(cacheKey, crestMaterial);
+      }
+
+      assignOverrideMaterial(mesh, crestMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V92_ServiceCaseBank_')) {
+      const cacheKey = `${material.uniqueId}:service-case-bank`;
+      let bankMaterial = clonedMaterials.get(cacheKey);
+      if (!bankMaterial) {
+        bankMaterial = material.clone(`${material.name}__service-case-bank`);
+        applyServiceCaseBankOverride(bankMaterial);
+        clonedMaterials.set(cacheKey, bankMaterial);
+      }
+
+      assignOverrideMaterial(mesh, bankMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V92_ServiceCaseTopper_')) {
+      const cacheKey = `${material.uniqueId}:service-case-topper`;
+      let topperMaterial = clonedMaterials.get(cacheKey);
+      if (!topperMaterial) {
+        topperMaterial = material.clone(`${material.name}__service-case-topper`);
+        applyServiceCaseTopperOverride(topperMaterial);
+        clonedMaterials.set(cacheKey, topperMaterial);
+      }
+
+      assignOverrideMaterial(mesh, topperMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V93_ServiceCaseArray_')) {
+      const cacheKey = `${material.uniqueId}:wing-service-case-array`;
+      let arrayMaterial = clonedMaterials.get(cacheKey);
+      if (!arrayMaterial) {
+        arrayMaterial = material.clone(`${material.name}__wing-service-case-array`);
+        applyWingServiceCaseArrayOverride(arrayMaterial);
+        clonedMaterials.set(cacheKey, arrayMaterial);
+      }
+
+      assignOverrideMaterial(mesh, arrayMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V95_PyroPylonArray_')) {
+      const cacheKey = `${material.uniqueId}:pyro-pylon-array`;
+      let pylonMaterial = clonedMaterials.get(cacheKey);
+      if (!pylonMaterial) {
+        pylonMaterial = material.clone(`${material.name}__pyro-pylon-array`);
+        applyPyroPylonArrayOverride(pylonMaterial);
+        clonedMaterials.set(cacheKey, pylonMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pylonMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V95_PyroNozzleArray_')) {
+      const cacheKey = `${material.uniqueId}:pyro-nozzle-array`;
+      let nozzleMaterial = clonedMaterials.get(cacheKey);
+      if (!nozzleMaterial) {
+        nozzleMaterial = material.clone(`${material.name}__pyro-nozzle-array`);
+        applyPyroNozzleArrayOverride(nozzleMaterial);
+        clonedMaterials.set(cacheKey, nozzleMaterial);
+      }
+
+      assignOverrideMaterial(mesh, nozzleMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V96_RearMassGoldBandArray_')) {
+      const cacheKey = `${material.uniqueId}:rear-mass-gold-band`;
+      let goldMaterial = clonedMaterials.get(cacheKey);
+      if (!goldMaterial) {
+        goldMaterial = material.clone(`${material.name}__rear-mass-gold-band`);
+        applyRearMassGoldBandOverride(goldMaterial);
+        clonedMaterials.set(cacheKey, goldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V96_RearMassShadowChannelArray_')) {
+      const cacheKey = `${material.uniqueId}:rear-mass-shadow-channel`;
+      let shadowMaterial = clonedMaterials.get(cacheKey);
+      if (!shadowMaterial) {
+        shadowMaterial = material.clone(`${material.name}__rear-mass-shadow-channel`);
+        applyRearMassShadowChannelOverride(shadowMaterial);
+        clonedMaterials.set(cacheKey, shadowMaterial);
+      }
+
+      assignOverrideMaterial(mesh, shadowMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V97_WetRouteStoneBandArray') {
+      const cacheKey = `${material.uniqueId}:wet-route-stone-band`;
+      let stoneMaterial = clonedMaterials.get(cacheKey);
+      if (!stoneMaterial) {
+        stoneMaterial = material.clone(`${material.name}__wet-route-stone-band`);
+        applyWetRouteStoneBandOverride(stoneMaterial);
+        clonedMaterials.set(cacheKey, stoneMaterial);
+      }
+
+      assignOverrideMaterial(mesh, stoneMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V97_WetRouteGoldSeamArray') {
+      const cacheKey = `${material.uniqueId}:wet-route-gold-seam`;
+      let seamMaterial = clonedMaterials.get(cacheKey);
+      if (!seamMaterial) {
+        seamMaterial = material.clone(`${material.name}__wet-route-gold-seam`);
+        applyWetRouteGoldSeamOverride(seamMaterial);
+        clonedMaterials.set(cacheKey, seamMaterial);
+      }
+
+      assignOverrideMaterial(mesh, seamMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V76_SideScreenAnchorGoldSpine_L' || mesh.name === 'V76_SideScreenAnchorGoldSpine_R') {
+      const cacheKey = `${material.uniqueId}:side-screen-anchor-gold-spine`;
+      let spineMaterial = clonedMaterials.get(cacheKey);
+      if (!spineMaterial) {
+        spineMaterial = material.clone(`${material.name}__side-screen-anchor-gold-spine`);
+        applySideScreenAnchorGoldSpineOverride(spineMaterial);
+        clonedMaterials.set(cacheKey, spineMaterial);
+      }
+
+      assignOverrideMaterial(mesh, spineMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V75_ArcAnchorGoldCluster_L' || mesh.name === 'V75_ArcAnchorGoldCluster_R') {
+      const cacheKey = `${material.uniqueId}:arc-anchor-gold-cluster`;
+      let clusterMaterial = clonedMaterials.get(cacheKey);
+      if (!clusterMaterial) {
+        clusterMaterial = material.clone(`${material.name}__arc-anchor-gold-cluster`);
+        applyArcAnchorGoldClusterOverride(clusterMaterial);
+        clonedMaterials.set(cacheKey, clusterMaterial);
+      }
+
+      assignOverrideMaterial(mesh, clusterMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V74_SweepOuterAnchorGoldCrown_L' ||
+      mesh.name === 'V74_SweepOuterAnchorGoldCrown_R' ||
+      mesh.name === 'V74_SweepInnerAnchorGoldCrown_L' ||
+      mesh.name === 'V74_SweepInnerAnchorGoldCrown_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:sweep-anchor-gold-crown`;
+      let crownMaterial = clonedMaterials.get(cacheKey);
+      if (!crownMaterial) {
+        crownMaterial = material.clone(`${material.name}__sweep-anchor-gold-crown`);
+        applySweepAnchorGoldCrownOverride(crownMaterial);
+        clonedMaterials.set(cacheKey, crownMaterial);
+      }
+
+      assignOverrideMaterial(mesh, crownMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V74_SweepOuterAnchorShadowCore_L' ||
+      mesh.name === 'V74_SweepOuterAnchorShadowCore_R' ||
+      mesh.name === 'V74_SweepInnerAnchorShadowCore_L' ||
+      mesh.name === 'V74_SweepInnerAnchorShadowCore_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:sweep-anchor-shadow-core`;
+      let coreMaterial = clonedMaterials.get(cacheKey);
+      if (!coreMaterial) {
+        coreMaterial = material.clone(`${material.name}__sweep-anchor-shadow-core`);
+        applySweepAnchorShadowCoreOverride(coreMaterial);
+        clonedMaterials.set(cacheKey, coreMaterial);
+      }
+
+      assignOverrideMaterial(mesh, coreMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V73_HeroPortalServiceDoorFrameCluster_L' ||
+      mesh.name === 'V73_HeroPortalServiceDoorFrameCluster_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:hero-portal-service-door-frame`;
+      let frameMaterial = clonedMaterials.get(cacheKey);
+      if (!frameMaterial) {
+        frameMaterial = material.clone(`${material.name}__hero-portal-service-door-frame`);
+        applyHeroPortalServiceDoorFrameOverride(frameMaterial);
+        clonedMaterials.set(cacheKey, frameMaterial);
+      }
+
+      assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V73_HeroPortalServiceDoorLeafCluster_L' ||
+      mesh.name === 'V73_HeroPortalServiceDoorLeafCluster_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:hero-portal-service-door-leaf`;
+      let leafMaterial = clonedMaterials.get(cacheKey);
+      if (!leafMaterial) {
+        leafMaterial = material.clone(`${material.name}__hero-portal-service-door-leaf`);
+        applyHeroPortalServiceDoorLeafOverride(leafMaterial);
+        clonedMaterials.set(cacheKey, leafMaterial);
+      }
+
+      assignOverrideMaterial(mesh, leafMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V72_CrownRiggingGoldBosses') {
+      const cacheKey = `${material.uniqueId}:crown-rigging-gold-boss`;
+      let bossMaterial = clonedMaterials.get(cacheKey);
+      if (!bossMaterial) {
+        bossMaterial = material.clone(`${material.name}__crown-rigging-gold-boss`);
+        applyCrownRiggingGoldBossOverride(bossMaterial);
+        clonedMaterials.set(cacheKey, bossMaterial);
+      }
+
+      assignOverrideMaterial(mesh, bossMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V47_CrownGoldLatticeBraceA' ||
+      mesh.name === 'V47_CrownGoldLatticeBraceB'
+    ) {
+      const cacheKey = `${material.uniqueId}:crown-gold-lattice`;
+      let latticeMaterial = clonedMaterials.get(cacheKey);
+      if (!latticeMaterial) {
+        latticeMaterial = material.clone(`${material.name}__crown-gold-lattice`);
+        applyCrownGoldLatticeOverride(latticeMaterial);
+        clonedMaterials.set(cacheKey, latticeMaterial);
+      }
+
+      assignOverrideMaterial(mesh, latticeMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V29_MainLineArrayCabinet_L_00' ||
+      mesh.name === 'V29_MainLineArrayCabinet_R_00' ||
+      mesh.name === 'V29_MainLineArrayDriver_L_00' ||
+      mesh.name === 'V29_MainLineArrayDriver_R_00' ||
+      mesh.name === 'V29_FrontSubCabinet_L_00' ||
+      mesh.name === 'V29_FrontSubCabinet_R_00'
+    ) {
+      const cacheKey = `${material.uniqueId}:line-array-graphite`;
+      let graphiteMaterial = clonedMaterials.get(cacheKey);
+      if (!graphiteMaterial) {
+        graphiteMaterial = material.clone(`${material.name}__line-array-graphite`);
+        applyLineArrayGraphiteOverride(graphiteMaterial);
+        clonedMaterials.set(cacheKey, graphiteMaterial);
+      }
+
+      assignOverrideMaterial(mesh, graphiteMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V29_MainLineArrayGrille_L_00' ||
+      mesh.name === 'V29_MainLineArrayGrille_R_00' ||
+      mesh.name === 'V29_MainLineArrayHorn_L_00' ||
+      mesh.name === 'V29_MainLineArrayHorn_R_00' ||
+      mesh.name === 'V29_FrontSubPort_L_00' ||
+      mesh.name === 'V29_FrontSubPort_R_00'
+    ) {
+      const cacheKey = `${material.uniqueId}:line-array-acoustic-black`;
+      let blackMaterial = clonedMaterials.get(cacheKey);
+      if (!blackMaterial) {
+        blackMaterial = material.clone(`${material.name}__line-array-acoustic-black`);
+        applyLineArrayAcousticBlackOverride(blackMaterial);
+        clonedMaterials.set(cacheKey, blackMaterial);
+      }
+
+      assignOverrideMaterial(mesh, blackMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V29_MainLineArrayYoke_L' ||
+      mesh.name === 'V29_MainLineArrayYoke_R' ||
+      mesh.name === 'V29_MainLineArraySideRail_L' ||
+      mesh.name === 'V29_MainLineArraySideRail_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:line-array-suspension-hardware`;
+      let hardwareMaterial = clonedMaterials.get(cacheKey);
+      if (!hardwareMaterial) {
+        hardwareMaterial = material.clone(`${material.name}__line-array-suspension-hardware`);
+        applyLineArraySuspensionHardwareOverride(hardwareMaterial);
+        clonedMaterials.set(cacheKey, hardwareMaterial);
+      }
+
+      assignOverrideMaterial(mesh, hardwareMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V29_MainLineArrayPinBars_L' || mesh.name === 'V29_MainLineArrayPinBars_R') {
+      const cacheKey = `${material.uniqueId}:line-array-pin-bars`;
+      let pinBarMaterial = clonedMaterials.get(cacheKey);
+      if (!pinBarMaterial) {
+        pinBarMaterial = material.clone(`${material.name}__line-array-pin-bars`);
+        applyLineArrayPinBarsOverride(pinBarMaterial);
+        clonedMaterials.set(cacheKey, pinBarMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pinBarMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V35_BasinFountainMist_L' || mesh.name === 'V35_BasinFountainMist_R') {
+      const cacheKey = `${material.uniqueId}:basin-fountain-mist`;
+      let mistMaterial = clonedMaterials.get(cacheKey);
+      if (!mistMaterial) {
+        mistMaterial = material.clone(`${material.name}__basin-fountain-mist`);
+        applyBasinFountainMistOverride(mistMaterial);
+        clonedMaterials.set(cacheKey, mistMaterial);
+      }
+
+      assignOverrideMaterial(mesh, mistMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V35_BasinFountainNozzleArray_L' || mesh.name === 'V35_BasinFountainNozzleArray_R') {
+      const cacheKey = `${material.uniqueId}:basin-fountain-nozzle-array`;
+      let nozzleMaterial = clonedMaterials.get(cacheKey);
+      if (!nozzleMaterial) {
+        nozzleMaterial = material.clone(`${material.name}__basin-fountain-nozzle-array`);
+        applyBasinFountainNozzleArrayOverride(nozzleMaterial);
+        clonedMaterials.set(cacheKey, nozzleMaterial);
+      }
+
+      assignOverrideMaterial(mesh, nozzleMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V35_BasinPlantingIslandRim_L' || mesh.name === 'V35_BasinPlantingIslandRim_R') {
+      const cacheKey = `${material.uniqueId}:basin-planting-island-rim`;
+      let islandMaterial = clonedMaterials.get(cacheKey);
+      if (!islandMaterial) {
+        islandMaterial = material.clone(`${material.name}__basin-planting-island-rim`);
+        applyBasinPlantingIslandRimOverride(islandMaterial);
+        clonedMaterials.set(cacheKey, islandMaterial);
+      }
+
+      assignOverrideMaterial(mesh, islandMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V36_ForegroundBarricadeFrame_L' || mesh.name === 'V36_ForegroundBarricadeFrame_R') {
+      const cacheKey = `${material.uniqueId}:foreground-barricade-frame`;
+      let frameMaterial = clonedMaterials.get(cacheKey);
+      if (!frameMaterial) {
+        frameMaterial = material.clone(`${material.name}__foreground-barricade-frame`);
+        applyForegroundBarricadeFrameOverride(frameMaterial);
+        clonedMaterials.set(cacheKey, frameMaterial);
+      }
+
+      assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V36_ForegroundBarricadeGoldRail_L' || mesh.name === 'V36_ForegroundBarricadeGoldRail_R') {
+      const cacheKey = `${material.uniqueId}:foreground-barricade-gold-rail`;
+      let railMaterial = clonedMaterials.get(cacheKey);
+      if (!railMaterial) {
+        railMaterial = material.clone(`${material.name}__foreground-barricade-gold-rail`);
+        applyForegroundBarricadeGoldRailOverride(railMaterial);
+        clonedMaterials.set(cacheKey, railMaterial);
+      }
+
+      assignOverrideMaterial(mesh, railMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V24_CelestialCrownFrontArch_L' ||
+      mesh.name === 'V24_CelestialCrownFrontArch_R' ||
+      mesh.name === 'V24_ProsceniumFlyingButtress_L' ||
+      mesh.name === 'V24_ProsceniumFlyingButtress_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:v24-crown-pearl-shell`;
+      let pearlMaterial = clonedMaterials.get(cacheKey);
+      if (!pearlMaterial) {
+        pearlMaterial = material.clone(`${material.name}__v24-crown-pearl-shell`);
+        applyV24CrownPearlShellOverride(pearlMaterial);
+        clonedMaterials.set(cacheKey, pearlMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pearlMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V24_CelestialCrownGoldReveal_L' ||
+      mesh.name === 'V24_CelestialCrownGoldReveal_R' ||
+      mesh.name === 'V24_CrownSpireDepthRib_0' ||
+      mesh.name === 'V24_CrownSpireDepthRib_1' ||
+      mesh.name === 'V24_CrownSpireDepthRib_R_1' ||
+      mesh.name === 'V24_CrownSpireDepthRib_2' ||
+      mesh.name === 'V24_CrownSpireDepthRib_R_2' ||
+      mesh.name === 'V24_ProsceniumButtressGoldReveal_L' ||
+      mesh.name === 'V24_ProsceniumButtressGoldReveal_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:v24-crown-gold-reveal`;
+      let goldMaterial = clonedMaterials.get(cacheKey);
+      if (!goldMaterial) {
+        goldMaterial = material.clone(`${material.name}__v24-crown-gold-reveal`);
+        applyV24CrownGoldRevealOverride(goldMaterial);
+        clonedMaterials.set(cacheKey, goldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V33_BasinLanternStem_L' || mesh.name === 'V33_BasinLanternStem_R') {
+      const cacheKey = `${material.uniqueId}:basin-lantern-stem`;
+      let stemMaterial = clonedMaterials.get(cacheKey);
+      if (!stemMaterial) {
+        stemMaterial = material.clone(`${material.name}__basin-lantern-stem`);
+        applyBasinLanternStemOverride(stemMaterial);
+        clonedMaterials.set(cacheKey, stemMaterial);
+      }
+
+      assignOverrideMaterial(mesh, stemMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V33_BasinLanternHousing_L' || mesh.name === 'V33_BasinLanternHousing_R') {
+      const cacheKey = `${material.uniqueId}:basin-lantern-housing`;
+      let housingMaterial = clonedMaterials.get(cacheKey);
+      if (!housingMaterial) {
+        housingMaterial = material.clone(`${material.name}__basin-lantern-housing`);
+        applyBasinLanternHousingOverride(housingMaterial);
+        clonedMaterials.set(cacheKey, housingMaterial);
+      }
+
+      assignOverrideMaterial(mesh, housingMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V33_BasinLanternCore_L' || mesh.name === 'V33_BasinLanternCore_R') {
+      const cacheKey = `${material.uniqueId}:basin-lantern-warm-core`;
+      let coreMaterial = clonedMaterials.get(cacheKey);
+      if (!coreMaterial) {
+        coreMaterial = material.clone(`${material.name}__basin-lantern-warm-core`);
+        applyBasinLanternWarmCoreOverride(coreMaterial);
+        clonedMaterials.set(cacheKey, coreMaterial);
+      }
+
+      assignOverrideMaterial(mesh, coreMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V32_CrowdCluster_L_Near' ||
+      mesh.name === 'V32_CrowdCluster_R_Near' ||
+      mesh.name === 'V32_CrowdCluster_L_Mid' ||
+      mesh.name === 'V32_CrowdCluster_R_Mid'
+    ) {
+      const cacheKey = `${material.uniqueId}:crowd-cluster-graphite`;
+      let crowdMaterial = clonedMaterials.get(cacheKey);
+      if (!crowdMaterial) {
+        crowdMaterial = material.clone(`${material.name}__crowd-cluster-graphite`);
+        applyCrowdClusterGraphiteOverride(crowdMaterial);
+        clonedMaterials.set(cacheKey, crowdMaterial);
+      }
+
+      assignOverrideMaterial(mesh, crowdMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V32_CrowdWearableGlow_L_Near' ||
+      mesh.name === 'V32_CrowdWearableGlow_R_Near' ||
+      mesh.name === 'V32_CrowdWearableGlow_L_Mid' ||
+      mesh.name === 'V32_CrowdWearableGlow_R_Mid'
+    ) {
+      const cacheKey = `${material.uniqueId}:crowd-wearable-glow`;
+      let glowMaterial = clonedMaterials.get(cacheKey);
+      if (!glowMaterial) {
+        glowMaterial = material.clone(`${material.name}__crowd-wearable-glow`);
+        applyCrowdWearableGlowOverride(glowMaterial);
+        clonedMaterials.set(cacheKey, glowMaterial);
+      }
+
+      assignOverrideMaterial(mesh, glowMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V72_CrownRiggingFrontTruss' ||
+      mesh.name === 'V72_CrownRiggingRearTruss' ||
+      mesh.name === 'V72_CrownRiggingCenterSpine'
+    ) {
+      const cacheKey = `${material.uniqueId}:crown-rigging-structure`;
+      let structureMaterial = clonedMaterials.get(cacheKey);
+      if (!structureMaterial) {
+        structureMaterial = material.clone(`${material.name}__crown-rigging-structure`);
+        applyCrownRiggingStructureOverride(structureMaterial);
+        clonedMaterials.set(cacheKey, structureMaterial);
+      }
+
+      assignOverrideMaterial(mesh, structureMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V83_MainTrussTowerGoldCrossbarArray_L' ||
+      mesh.name === 'V83_MainTrussTowerGoldCrossbarArray_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:main-truss-tower-gold-crossbar`;
+      let crossbarMaterial = clonedMaterials.get(cacheKey);
+      if (!crossbarMaterial) {
+        crossbarMaterial = material.clone(`${material.name}__main-truss-tower-gold-crossbar`);
+        applyMainTrussTowerGoldCrossbarOverride(crossbarMaterial);
+        clonedMaterials.set(cacheKey, crossbarMaterial);
+      }
+
+      assignOverrideMaterial(mesh, crossbarMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V83_MainTrussTowerShellArray_L' ||
+      mesh.name === 'V83_MainTrussTowerShellArray_R' ||
+      mesh.name === 'V83_MainTrussTowerDiagonalArray_L' ||
+      mesh.name === 'V83_MainTrussTowerDiagonalArray_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:main-truss-tower-rig`;
+      let rigMaterial = clonedMaterials.get(cacheKey);
+      if (!rigMaterial) {
+        rigMaterial = material.clone(`${material.name}__main-truss-tower-rig`);
+        applyMainTrussTowerRigOverride(rigMaterial);
+        clonedMaterials.set(cacheKey, rigMaterial);
+      }
+
+      assignOverrideMaterial(mesh, rigMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V85_WetPaverStoneBands') {
+      const cacheKey = `${material.uniqueId}:wet-paver-stone-band`;
+      let stoneMaterial = clonedMaterials.get(cacheKey);
+      if (!stoneMaterial) {
+        stoneMaterial = material.clone(`${material.name}__wet-paver-stone-band`);
+        applyWetPaverStoneBandOverride(stoneMaterial);
+        clonedMaterials.set(cacheKey, stoneMaterial);
+      }
+
+      assignOverrideMaterial(mesh, stoneMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V85_WetPaverGoldSeamBands') {
+      const cacheKey = `${material.uniqueId}:wet-paver-gold-seam`;
+      let seamMaterial = clonedMaterials.get(cacheKey);
+      if (!seamMaterial) {
+        seamMaterial = material.clone(`${material.name}__wet-paver-gold-seam`);
+        applyWetPaverGoldSeamOverride(seamMaterial);
+        clonedMaterials.set(cacheKey, seamMaterial);
+      }
+
+      assignOverrideMaterial(mesh, seamMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V86_SpawnWetInsetPoolArray_L' ||
+      mesh.name === 'V86_SpawnWetInsetPoolArray_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:spawn-wet-inset-pool`;
+      let poolMaterial = clonedMaterials.get(cacheKey);
+      if (!poolMaterial) {
+        poolMaterial = material.clone(`${material.name}__spawn-wet-inset-pool`);
+        applySpawnWetInsetPoolOverride(poolMaterial);
+        clonedMaterials.set(cacheKey, poolMaterial);
+      }
+
+      assignOverrideMaterial(mesh, poolMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V86_GardenStoneEdgeArray_L' ||
+      mesh.name === 'V86_GardenStoneEdgeArray_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:garden-stone-edge`;
+      let edgeMaterial = clonedMaterials.get(cacheKey);
+      if (!edgeMaterial) {
+        edgeMaterial = material.clone(`${material.name}__garden-stone-edge`);
+        applyGardenStoneEdgeOverride(edgeMaterial);
+        clonedMaterials.set(cacheKey, edgeMaterial);
+      }
+
+      assignOverrideMaterial(mesh, edgeMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V89_BasinFountainPedestalArray_L' ||
+      mesh.name === 'V89_BasinFountainPedestalArray_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:basin-fountain-pedestal`;
+      let pedestalMaterial = clonedMaterials.get(cacheKey);
+      if (!pedestalMaterial) {
+        pedestalMaterial = material.clone(`${material.name}__basin-fountain-pedestal`);
+        applyBasinFountainPedestalOverride(pedestalMaterial);
+        clonedMaterials.set(cacheKey, pedestalMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pedestalMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V89_BasinFountainLightArray_L' ||
+      mesh.name === 'V89_BasinFountainLightArray_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:basin-fountain-light`;
+      let lightMaterial = clonedMaterials.get(cacheKey);
+      if (!lightMaterial) {
+        lightMaterial = material.clone(`${material.name}__basin-fountain-light`);
+        applyBasinFountainLightOverride(lightMaterial);
+        clonedMaterials.set(cacheKey, lightMaterial);
+      }
+
+      assignOverrideMaterial(mesh, lightMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V89_BasinFountainJetArray_L' ||
+      mesh.name === 'V89_BasinFountainJetArray_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:basin-fountain-jet`;
+      let jetMaterial = clonedMaterials.get(cacheKey);
+      if (!jetMaterial) {
+        jetMaterial = material.clone(`${material.name}__basin-fountain-jet`);
+        applyBasinFountainJetOverride(jetMaterial);
+        clonedMaterials.set(cacheKey, jetMaterial);
+      }
+
+      assignOverrideMaterial(mesh, jetMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V75_ArcAnchorShadowCluster_L' || mesh.name === 'V75_ArcAnchorShadowCluster_R') {
+      const cacheKey = `${material.uniqueId}:arc-anchor-shadow-cluster`;
+      let clusterMaterial = clonedMaterials.get(cacheKey);
+      if (!clusterMaterial) {
+        clusterMaterial = material.clone(`${material.name}__arc-anchor-shadow-cluster`);
+        applyArcAnchorShadowClusterOverride(clusterMaterial);
+        clonedMaterials.set(cacheKey, clusterMaterial);
+      }
+
+      assignOverrideMaterial(mesh, clusterMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V76_SideScreenAnchorShadowBrace_L' || mesh.name === 'V76_SideScreenAnchorShadowBrace_R') {
+      const cacheKey = `${material.uniqueId}:side-screen-anchor-shadow-brace`;
+      let braceMaterial = clonedMaterials.get(cacheKey);
+      if (!braceMaterial) {
+        braceMaterial = material.clone(`${material.name}__side-screen-anchor-shadow-brace`);
+        applySideScreenAnchorShadowBraceOverride(braceMaterial);
+        clonedMaterials.set(cacheKey, braceMaterial);
+      }
+
+      assignOverrideMaterial(mesh, braceMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V77_OvalScreenRecessGoldFrame_L' || mesh.name === 'V77_OvalScreenRecessGoldFrame_R') {
+      const cacheKey = `${material.uniqueId}:oval-screen-recess-gold-frame`;
+      let frameMaterial = clonedMaterials.get(cacheKey);
+      if (!frameMaterial) {
+        frameMaterial = material.clone(`${material.name}__oval-screen-recess-gold-frame`);
+        applyOvalScreenRecessGoldFrameOverride(frameMaterial);
+        clonedMaterials.set(cacheKey, frameMaterial);
+      }
+
+      assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V77_OvalScreenRecessShadowPocket_L' || mesh.name === 'V77_OvalScreenRecessShadowPocket_R') {
+      const cacheKey = `${material.uniqueId}:oval-screen-recess-shadow-pocket`;
+      let pocketMaterial = clonedMaterials.get(cacheKey);
+      if (!pocketMaterial) {
+        pocketMaterial = material.clone(`${material.name}__oval-screen-recess-shadow-pocket`);
+        applyOvalScreenRecessShadowPocketOverride(pocketMaterial);
+        clonedMaterials.set(cacheKey, pocketMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pocketMaterial);
+      continue;
+    }
+
     if (
       mesh.name.startsWith('V80_OvalScreenPedestalShell_') ||
       mesh.name.startsWith('V80_OvalScreenCanopyShell_') ||
@@ -140,6 +867,45 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V100_CentralWaterLightHousingArray') {
+      const cacheKey = `${material.uniqueId}:central-water-light-housing`;
+      let housingMaterial = clonedMaterials.get(cacheKey);
+      if (!housingMaterial) {
+        housingMaterial = material.clone(`${material.name}__central-water-light-housing`);
+        applyCentralWaterLightHousingOverride(housingMaterial);
+        clonedMaterials.set(cacheKey, housingMaterial);
+      }
+
+      assignOverrideMaterial(mesh, housingMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V100_CentralWaterLightGoldTrimArray') {
+      const cacheKey = `${material.uniqueId}:central-water-light-gold-trim`;
+      let trimMaterial = clonedMaterials.get(cacheKey);
+      if (!trimMaterial) {
+        trimMaterial = material.clone(`${material.name}__central-water-light-gold-trim`);
+        applyCentralWaterLightGoldTrimOverride(trimMaterial);
+        clonedMaterials.set(cacheKey, trimMaterial);
+      }
+
+      assignOverrideMaterial(mesh, trimMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V100_CentralWaterLightLensArray') {
+      const cacheKey = `${material.uniqueId}:central-water-light-lens`;
+      let lensMaterial = clonedMaterials.get(cacheKey);
+      if (!lensMaterial) {
+        lensMaterial = material.clone(`${material.name}__central-water-light-lens`);
+        applyCentralWaterLightLensOverride(lensMaterial);
+        clonedMaterials.set(cacheKey, lensMaterial);
+      }
+
+      assignOverrideMaterial(mesh, lensMaterial);
+      continue;
+    }
+
     if (
       mesh.name === 'V122_PortalApronRelief' ||
       mesh.name.startsWith('V122_StageShoulderRelief_')
@@ -153,6 +919,409 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, reliefMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V123_CentralStairGoldNosingArray' ||
+      mesh.name.startsWith('V123_SpawnRouteGoldEdgeArray_')
+    ) {
+      const cacheKey = `${material.uniqueId}:processional-route-gold-trim`;
+      let goldTrimMaterial = clonedMaterials.get(cacheKey);
+      if (!goldTrimMaterial) {
+        goldTrimMaterial = material.clone(`${material.name}__processional-route-gold-trim`);
+        applyProcessionalRouteGoldTrimOverride(goldTrimMaterial);
+        clonedMaterials.set(cacheKey, goldTrimMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldTrimMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V123_SpawnRouteWetCenterInlayArray') {
+      const cacheKey = `${material.uniqueId}:spawn-route-wet-center-inlay`;
+      let wetInlayMaterial = clonedMaterials.get(cacheKey);
+      if (!wetInlayMaterial) {
+        wetInlayMaterial = material.clone(`${material.name}__spawn-route-wet-center-inlay`);
+        applySpawnRouteWetCenterInlayOverride(wetInlayMaterial);
+        clonedMaterials.set(cacheKey, wetInlayMaterial);
+      }
+
+      assignOverrideMaterial(mesh, wetInlayMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V124_CrowdControlFrameArray_')) {
+      const cacheKey = `${material.uniqueId}:crowd-control-frame`;
+      let frameMaterial = clonedMaterials.get(cacheKey);
+      if (!frameMaterial) {
+        frameMaterial = material.clone(`${material.name}__crowd-control-frame`);
+        applyCrowdControlFrameOverride(frameMaterial);
+        clonedMaterials.set(cacheKey, frameMaterial);
+      }
+
+      assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V124_CrowdControlRailArray_')) {
+      const cacheKey = `${material.uniqueId}:crowd-control-rail`;
+      let railMaterial = clonedMaterials.get(cacheKey);
+      if (!railMaterial) {
+        railMaterial = material.clone(`${material.name}__crowd-control-rail`);
+        applyCrowdControlRailOverride(railMaterial);
+        clonedMaterials.set(cacheKey, railMaterial);
+      }
+
+      assignOverrideMaterial(mesh, railMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V125_CrowdBarrierBaseArray_')) {
+      const cacheKey = `${material.uniqueId}:crowd-barrier-base`;
+      let baseMaterial = clonedMaterials.get(cacheKey);
+      if (!baseMaterial) {
+        baseMaterial = material.clone(`${material.name}__crowd-barrier-base`);
+        applyCrowdBarrierBaseOverride(baseMaterial);
+        clonedMaterials.set(cacheKey, baseMaterial);
+      }
+
+      assignOverrideMaterial(mesh, baseMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V125_CrowdBarrierRailArray_')) {
+      const cacheKey = `${material.uniqueId}:crowd-barrier-rail`;
+      let railMaterial = clonedMaterials.get(cacheKey);
+      if (!railMaterial) {
+        railMaterial = material.clone(`${material.name}__crowd-barrier-rail`);
+        applyCrowdBarrierRailOverride(railMaterial);
+        clonedMaterials.set(cacheKey, railMaterial);
+      }
+
+      assignOverrideMaterial(mesh, railMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V48_SpawnCableTroughBlackShell') {
+      const cacheKey = `${material.uniqueId}:spawn-cable-trough-shell`;
+      let shellMaterial = clonedMaterials.get(cacheKey);
+      if (!shellMaterial) {
+        shellMaterial = material.clone(`${material.name}__spawn-cable-trough-shell`);
+        applyCrowdBarrierBaseOverride(shellMaterial);
+        shellMaterial.metadata = {
+          ...shellMaterial.metadata,
+          mainStageMaterialOverride: 'spawn-cable-trough-shell',
+        };
+        clonedMaterials.set(cacheKey, shellMaterial);
+      }
+
+      assignOverrideMaterial(mesh, shellMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V48_SpawnCableTroughGoldCollar') {
+      const cacheKey = `${material.uniqueId}:spawn-cable-trough-collar`;
+      let collarMaterial = clonedMaterials.get(cacheKey);
+      if (!collarMaterial) {
+        collarMaterial = material.clone(`${material.name}__spawn-cable-trough-collar`);
+        applyProcessionalRouteGoldTrimOverride(collarMaterial);
+        collarMaterial.metadata = {
+          ...collarMaterial.metadata,
+          mainStageMaterialOverride: 'spawn-cable-trough-collar',
+        };
+        clonedMaterials.set(cacheKey, collarMaterial);
+      }
+
+      assignOverrideMaterial(mesh, collarMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V48_SpawnCableTroughWetInset') {
+      const cacheKey = `${material.uniqueId}:spawn-cable-trough-wet-inset`;
+      let insetMaterial = clonedMaterials.get(cacheKey);
+      if (!insetMaterial) {
+        insetMaterial = material.clone(`${material.name}__spawn-cable-trough-wet-inset`);
+        applySpawnRouteWetCenterInlayOverride(insetMaterial);
+        insetMaterial.metadata = {
+          ...insetMaterial.metadata,
+          mainStageMaterialOverride: 'spawn-cable-trough-wet-inset',
+        };
+        clonedMaterials.set(cacheKey, insetMaterial);
+      }
+
+      assignOverrideMaterial(mesh, insetMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V49_ScreenServiceCatwalkBlackFrame' ||
+      mesh.name === 'V49_ScreenServiceCatwalkCableLoom'
+    ) {
+      const cacheKey = `${material.uniqueId}:screen-service-catwalk-frame`;
+      let frameMaterial = clonedMaterials.get(cacheKey);
+      if (!frameMaterial) {
+        frameMaterial = material.clone(`${material.name}__screen-service-catwalk-frame`);
+        applyCrowdBarrierBaseOverride(frameMaterial);
+        frameMaterial.metadata = {
+          ...frameMaterial.metadata,
+          mainStageMaterialOverride: 'screen-service-catwalk-frame',
+        };
+        clonedMaterials.set(cacheKey, frameMaterial);
+      }
+
+      assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V49_ScreenServiceCatwalkGoldGuardrail') {
+      const cacheKey = `${material.uniqueId}:screen-service-catwalk-guardrail`;
+      let guardrailMaterial = clonedMaterials.get(cacheKey);
+      if (!guardrailMaterial) {
+        guardrailMaterial = material.clone(`${material.name}__screen-service-catwalk-guardrail`);
+        applyProcessionalRouteGoldTrimOverride(guardrailMaterial);
+        guardrailMaterial.metadata = {
+          ...guardrailMaterial.metadata,
+          mainStageMaterialOverride: 'screen-service-catwalk-guardrail',
+        };
+        clonedMaterials.set(cacheKey, guardrailMaterial);
+      }
+
+      assignOverrideMaterial(mesh, guardrailMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V49_ScreenServiceCatwalkCyanPracticals') {
+      const cacheKey = `${material.uniqueId}:screen-service-catwalk-practicals`;
+      let practicalMaterial = clonedMaterials.get(cacheKey);
+      if (!practicalMaterial) {
+        practicalMaterial = material.clone(`${material.name}__screen-service-catwalk-practicals`);
+        applyArrivalRunwayCyanThreadsOverride(practicalMaterial);
+        practicalMaterial.metadata = {
+          ...practicalMaterial.metadata,
+          mainStageMaterialOverride: 'screen-service-catwalk-practicals',
+        };
+        clonedMaterials.set(cacheKey, practicalMaterial);
+      }
+
+      assignOverrideMaterial(mesh, practicalMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V39_CrownSideRibGoldCluster_')) {
+      const cacheKey = `${material.uniqueId}:crown-side-rib-gold`;
+      let goldMaterial = clonedMaterials.get(cacheKey);
+      if (!goldMaterial) {
+        goldMaterial = material.clone(`${material.name}__crown-side-rib-gold`);
+        applyCelestialHaloOuterRingOverride(goldMaterial);
+        goldMaterial.metadata = {
+          ...goldMaterial.metadata,
+          mainStageMaterialOverride: 'crown-side-rib-gold',
+        };
+        clonedMaterials.set(cacheKey, goldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V39_CrownSideRibCyanInset_')) {
+      const cacheKey = `${material.uniqueId}:crown-side-rib-cyan`;
+      let cyanMaterial = clonedMaterials.get(cacheKey);
+      if (!cyanMaterial) {
+        cyanMaterial = material.clone(`${material.name}__crown-side-rib-cyan`);
+        applyCelestialHaloCyanEdgeOverride(cyanMaterial);
+        cyanMaterial.metadata = {
+          ...cyanMaterial.metadata,
+          mainStageMaterialOverride: 'crown-side-rib-cyan',
+        };
+        clonedMaterials.set(cacheKey, cyanMaterial);
+      }
+
+      assignOverrideMaterial(mesh, cyanMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V41_CrownBladePearlLamellaCluster_')) {
+      const cacheKey = `${material.uniqueId}:crown-blade-lamella-pearl`;
+      let pearlMaterial = clonedMaterials.get(cacheKey);
+      if (!pearlMaterial) {
+        pearlMaterial = material.clone(`${material.name}__crown-blade-lamella-pearl`);
+        applyCrownBladeLamellaPearlOverride(pearlMaterial);
+        clonedMaterials.set(cacheKey, pearlMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pearlMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V41_CrownBladeGoldRevealCluster_')) {
+      const cacheKey = `${material.uniqueId}:crown-blade-gold-reveal`;
+      let goldMaterial = clonedMaterials.get(cacheKey);
+      if (!goldMaterial) {
+        goldMaterial = material.clone(`${material.name}__crown-blade-gold-reveal`);
+        applyCrownBladeGoldRevealOverride(goldMaterial);
+        clonedMaterials.set(cacheKey, goldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V41_CrownBladeCyanInsetCluster_')) {
+      const cacheKey = `${material.uniqueId}:crown-blade-cyan-inset`;
+      let cyanMaterial = clonedMaterials.get(cacheKey);
+      if (!cyanMaterial) {
+        cyanMaterial = material.clone(`${material.name}__crown-blade-cyan-inset`);
+        applyCrownBladeCyanInsetOverride(cyanMaterial);
+        clonedMaterials.set(cacheKey, cyanMaterial);
+      }
+
+      assignOverrideMaterial(mesh, cyanMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name.startsWith('V42_TrussDiagonalBraceA_') ||
+      mesh.name.startsWith('V42_TrussDiagonalBraceB_')
+    ) {
+      const cacheKey = `${material.uniqueId}:truss-diagonal-brace`;
+      let braceMaterial = clonedMaterials.get(cacheKey);
+      if (!braceMaterial) {
+        braceMaterial = material.clone(`${material.name}__truss-diagonal-brace`);
+        applyTrussDiagonalBraceOverride(braceMaterial);
+        clonedMaterials.set(cacheKey, braceMaterial);
+      }
+
+      assignOverrideMaterial(mesh, braceMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V37_ProductionTrussTowerFrame_')) {
+      const cacheKey = `${material.uniqueId}:production-truss-tower-frame`;
+      let frameMaterial = clonedMaterials.get(cacheKey);
+      if (!frameMaterial) {
+        frameMaterial = material.clone(`${material.name}__production-truss-tower-frame`);
+        applyProductionTrussTowerFrameOverride(frameMaterial);
+        clonedMaterials.set(cacheKey, frameMaterial);
+      }
+
+      assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V37_ProductionTrussCrossBrace_')) {
+      const cacheKey = `${material.uniqueId}:production-truss-cross-brace`;
+      let braceMaterial = clonedMaterials.get(cacheKey);
+      if (!braceMaterial) {
+        braceMaterial = material.clone(`${material.name}__production-truss-cross-brace`);
+        applyProductionTrussCrossBraceOverride(braceMaterial);
+        clonedMaterials.set(cacheKey, braceMaterial);
+      }
+
+      assignOverrideMaterial(mesh, braceMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V37_ProductionTowerServiceLadder_')) {
+      const cacheKey = `${material.uniqueId}:production-tower-service-ladder`;
+      let ladderMaterial = clonedMaterials.get(cacheKey);
+      if (!ladderMaterial) {
+        ladderMaterial = material.clone(`${material.name}__production-tower-service-ladder`);
+        applyProductionTowerServiceLadderOverride(ladderMaterial);
+        clonedMaterials.set(cacheKey, ladderMaterial);
+      }
+
+      assignOverrideMaterial(mesh, ladderMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V37_ProductionTowerBeaconArray_')) {
+      const cacheKey = `${material.uniqueId}:production-tower-beacon`;
+      let beaconMaterial = clonedMaterials.get(cacheKey);
+      if (!beaconMaterial) {
+        beaconMaterial = material.clone(`${material.name}__production-tower-beacon`);
+        applyProductionTowerBeaconOverride(beaconMaterial);
+        clonedMaterials.set(cacheKey, beaconMaterial);
+      }
+
+      assignOverrideMaterial(mesh, beaconMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V38_WingFacadeArcadePierCluster_')) {
+      const cacheKey = `${material.uniqueId}:wing-facade-arcade-pier`;
+      let pierMaterial = clonedMaterials.get(cacheKey);
+      if (!pierMaterial) {
+        pierMaterial = material.clone(`${material.name}__wing-facade-arcade-pier`);
+        applyWingFacadeArcadePierOverride(pierMaterial);
+        clonedMaterials.set(cacheKey, pierMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pierMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V38_WingFacadeGoldCapital_')) {
+      const cacheKey = `${material.uniqueId}:wing-facade-gold-capital`;
+      let capitalMaterial = clonedMaterials.get(cacheKey);
+      if (!capitalMaterial) {
+        capitalMaterial = material.clone(`${material.name}__wing-facade-gold-capital`);
+        applyWingFacadeGoldCapitalOverride(capitalMaterial);
+        clonedMaterials.set(cacheKey, capitalMaterial);
+      }
+
+      assignOverrideMaterial(mesh, capitalMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V38_WingFacadeShadowReveal_')) {
+      const cacheKey = `${material.uniqueId}:wing-facade-shadow-reveal`;
+      let shadowMaterial = clonedMaterials.get(cacheKey);
+      if (!shadowMaterial) {
+        shadowMaterial = material.clone(`${material.name}__wing-facade-shadow-reveal`);
+        applyWingFacadeShadowRevealOverride(shadowMaterial);
+        clonedMaterials.set(cacheKey, shadowMaterial);
+      }
+
+      assignOverrideMaterial(mesh, shadowMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V46_CrownLightDropCableCluster' ||
+      mesh.name === 'V46_CrownMovingLightHousingCluster'
+    ) {
+      const cacheKey = `${material.uniqueId}:crown-moving-light-hardware`;
+      let hardwareMaterial = clonedMaterials.get(cacheKey);
+      if (!hardwareMaterial) {
+        hardwareMaterial = material.clone(`${material.name}__crown-moving-light-hardware`);
+        applyCrowdBarrierBaseOverride(hardwareMaterial);
+        hardwareMaterial.metadata = {
+          ...hardwareMaterial.metadata,
+          mainStageMaterialOverride: 'crown-moving-light-hardware',
+        };
+        clonedMaterials.set(cacheKey, hardwareMaterial);
+      }
+
+      assignOverrideMaterial(mesh, hardwareMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V46_CrownCyanLensCluster') {
+      const cacheKey = `${material.uniqueId}:crown-moving-light-lens`;
+      let lensMaterial = clonedMaterials.get(cacheKey);
+      if (!lensMaterial) {
+        lensMaterial = material.clone(`${material.name}__crown-moving-light-lens`);
+        applyCelestialHaloCyanEdgeOverride(lensMaterial);
+        lensMaterial.metadata = {
+          ...lensMaterial.metadata,
+          mainStageMaterialOverride: 'crown-moving-light-lens',
+        };
+        clonedMaterials.set(cacheKey, lensMaterial);
+      }
+
+      assignOverrideMaterial(mesh, lensMaterial);
       continue;
     }
 
@@ -289,6 +1458,50 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name === 'V34_ApproachGoldInlayNetwork' ||
+      mesh.name.startsWith('V34_ApproachEdgeRail_') ||
+      mesh.name.startsWith('V34_BackPlazaGatewayGoldCrown_') ||
+      mesh.name.startsWith('V34_BackPlazaBannerRail_')
+    ) {
+      const cacheKey = `${material.uniqueId}:approach-gold-inlay-network`;
+      let goldMaterial = clonedMaterials.get(cacheKey);
+      if (!goldMaterial) {
+        goldMaterial = material.clone(`${material.name}__approach-gold-inlay-network`);
+        applyApproachGoldInlayNetworkOverride(goldMaterial);
+        clonedMaterials.set(cacheKey, goldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V34_BarricadeAssembly_')) {
+      const cacheKey = `${material.uniqueId}:approach-barricade-assembly`;
+      let barricadeMaterial = clonedMaterials.get(cacheKey);
+      if (!barricadeMaterial) {
+        barricadeMaterial = material.clone(`${material.name}__approach-barricade-assembly`);
+        applyApproachBarricadeAssemblyOverride(barricadeMaterial);
+        clonedMaterials.set(cacheKey, barricadeMaterial);
+      }
+
+      assignOverrideMaterial(mesh, barricadeMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V112_CrownCrystalGoldEdgeArray') {
+      const cacheKey = `${material.uniqueId}:crown-crystal-gold-edge`;
+      let goldEdgeMaterial = clonedMaterials.get(cacheKey);
+      if (!goldEdgeMaterial) {
+        goldEdgeMaterial = material.clone(`${material.name}__crown-crystal-gold-edge`);
+        applyCrownCrystalGoldEdgeOverride(goldEdgeMaterial);
+        clonedMaterials.set(cacheKey, goldEdgeMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldEdgeMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V113_CrownShellLamellaArray_')) {
       const cacheKey = `${material.uniqueId}:crown-shell-lamella`;
       let lamellaMaterial = clonedMaterials.get(cacheKey);
@@ -299,6 +1512,136 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, lamellaMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V113_CrownShellGoldSeamArray_')) {
+      const cacheKey = `${material.uniqueId}:crown-shell-gold-seam`;
+      let goldSeamMaterial = clonedMaterials.get(cacheKey);
+      if (!goldSeamMaterial) {
+        goldSeamMaterial = material.clone(`${material.name}__crown-shell-gold-seam`);
+        applyCrownShellGoldSeamOverride(goldSeamMaterial);
+        clonedMaterials.set(cacheKey, goldSeamMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldSeamMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V114_CelestialHaloOuterRingArray') {
+      const cacheKey = `${material.uniqueId}:celestial-halo-outer-ring`;
+      let outerRingMaterial = clonedMaterials.get(cacheKey);
+      if (!outerRingMaterial) {
+        outerRingMaterial = material.clone(`${material.name}__celestial-halo-outer-ring`);
+        applyCelestialHaloOuterRingOverride(outerRingMaterial);
+        clonedMaterials.set(cacheKey, outerRingMaterial);
+      }
+
+      assignOverrideMaterial(mesh, outerRingMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V114_CelestialHaloInnerRingArray') {
+      const cacheKey = `${material.uniqueId}:celestial-halo-inner-ring`;
+      let innerRingMaterial = clonedMaterials.get(cacheKey);
+      if (!innerRingMaterial) {
+        innerRingMaterial = material.clone(`${material.name}__celestial-halo-inner-ring`);
+        applyCelestialHaloInnerRingOverride(innerRingMaterial);
+        clonedMaterials.set(cacheKey, innerRingMaterial);
+      }
+
+      assignOverrideMaterial(mesh, innerRingMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V114_CelestialHaloCyanEdgeArray') {
+      const cacheKey = `${material.uniqueId}:celestial-halo-cyan-edge`;
+      let cyanEdgeMaterial = clonedMaterials.get(cacheKey);
+      if (!cyanEdgeMaterial) {
+        cyanEdgeMaterial = material.clone(`${material.name}__celestial-halo-cyan-edge`);
+        applyCelestialHaloCyanEdgeOverride(cyanEdgeMaterial);
+        clonedMaterials.set(cacheKey, cyanEdgeMaterial);
+      }
+
+      assignOverrideMaterial(mesh, cyanEdgeMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V115_CenterScreenMullionArray') {
+      const cacheKey = `${material.uniqueId}:center-screen-mullion`;
+      let mullionMaterial = clonedMaterials.get(cacheKey);
+      if (!mullionMaterial) {
+        mullionMaterial = material.clone(`${material.name}__center-screen-mullion`);
+        applyCenterScreenMullionOverride(mullionMaterial);
+        clonedMaterials.set(cacheKey, mullionMaterial);
+      }
+
+      assignOverrideMaterial(mesh, mullionMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V115_CenterScreenCyanEdgeArray') {
+      const cacheKey = `${material.uniqueId}:center-screen-cyan-edge`;
+      let cyanEdgeMaterial = clonedMaterials.get(cacheKey);
+      if (!cyanEdgeMaterial) {
+        cyanEdgeMaterial = material.clone(`${material.name}__center-screen-cyan-edge`);
+        applyCenterScreenCyanEdgeOverride(cyanEdgeMaterial);
+        clonedMaterials.set(cacheKey, cyanEdgeMaterial);
+      }
+
+      assignOverrideMaterial(mesh, cyanEdgeMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V118_BasinWaterSheet_')) {
+      const cacheKey = `${material.uniqueId}:basin-water-sheet`;
+      let waterSheetMaterial = clonedMaterials.get(cacheKey);
+      if (!waterSheetMaterial) {
+        waterSheetMaterial = material.clone(`${material.name}__basin-water-sheet`);
+        applyBasinWaterSheetOverride(waterSheetMaterial);
+        clonedMaterials.set(cacheKey, waterSheetMaterial);
+      }
+
+      assignOverrideMaterial(mesh, waterSheetMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V119_OvalPortalGlowGoldArray_')) {
+      const cacheKey = `${material.uniqueId}:oval-portal-glow-gold`;
+      let goldMaterial = clonedMaterials.get(cacheKey);
+      if (!goldMaterial) {
+        goldMaterial = material.clone(`${material.name}__oval-portal-glow-gold`);
+        applyOvalPortalGlowGoldOverride(goldMaterial);
+        clonedMaterials.set(cacheKey, goldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V119_OvalPortalGlowEmissionArray_')) {
+      const cacheKey = `${material.uniqueId}:oval-portal-glow-emission`;
+      let emissionMaterial = clonedMaterials.get(cacheKey);
+      if (!emissionMaterial) {
+        emissionMaterial = material.clone(`${material.name}__oval-portal-glow-emission`);
+        applyOvalPortalGlowEmissionOverride(emissionMaterial);
+        clonedMaterials.set(cacheKey, emissionMaterial);
+      }
+
+      assignOverrideMaterial(mesh, emissionMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V111_RearShellPanelArray_')) {
+      const cacheKey = `${material.uniqueId}:rear-shell-panel`;
+      let panelMaterial = clonedMaterials.get(cacheKey);
+      if (!panelMaterial) {
+        panelMaterial = material.clone(`${material.name}__rear-shell-panel`);
+        applyRearShellPanelOverride(panelMaterial);
+        clonedMaterials.set(cacheKey, panelMaterial);
+      }
+
+      assignOverrideMaterial(mesh, panelMaterial);
       continue;
     }
 
@@ -367,6 +1710,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V110_WingFacadeInsetGlowArray_')) {
+      const cacheKey = `${material.uniqueId}:wing-facade-inset-glow`;
+      let glowMaterial = clonedMaterials.get(cacheKey);
+      if (!glowMaterial) {
+        glowMaterial = material.clone(`${material.name}__wing-facade-inset-glow`);
+        applyWingFacadeInsetGlowOverride(glowMaterial);
+        clonedMaterials.set(cacheKey, glowMaterial);
+      }
+
+      assignOverrideMaterial(mesh, glowMaterial);
+      continue;
+    }
+
     if (
       mesh.name === 'V126_WideHeroScreenGoldFrame' ||
       mesh.name === 'V126_WideHeroScreenGoldMullionArray' ||
@@ -423,6 +1779,32 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, keystoneMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V78_CenterScreenSidePierGoldFrame_L' || mesh.name === 'V78_CenterScreenSidePierGoldFrame_R') {
+      const cacheKey = `${material.uniqueId}:center-screen-side-pier-gold-frame`;
+      let frameMaterial = clonedMaterials.get(cacheKey);
+      if (!frameMaterial) {
+        frameMaterial = material.clone(`${material.name}__center-screen-side-pier-gold-frame`);
+        applyCenterScreenSidePierGoldFrameOverride(frameMaterial);
+        clonedMaterials.set(cacheKey, frameMaterial);
+      }
+
+      assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V78_CenterScreenSidePierCyanCore_L' || mesh.name === 'V78_CenterScreenSidePierCyanCore_R') {
+      const cacheKey = `${material.uniqueId}:center-screen-side-pier-cyan-core`;
+      let coreMaterial = clonedMaterials.get(cacheKey);
+      if (!coreMaterial) {
+        coreMaterial = material.clone(`${material.name}__center-screen-side-pier-cyan-core`);
+        applyCenterScreenSidePierCyanCoreOverride(coreMaterial);
+        clonedMaterials.set(cacheKey, coreMaterial);
+      }
+
+      assignOverrideMaterial(mesh, coreMaterial);
       continue;
     }
 
@@ -530,6 +1912,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V70_PromenadeShadowKeel') {
+      const cacheKey = `${material.uniqueId}:promenade-shadow-keel`;
+      let keelMaterial = clonedMaterials.get(cacheKey);
+      if (!keelMaterial) {
+        keelMaterial = material.clone(`${material.name}__promenade-shadow-keel`);
+        applyPromenadeShadowKeelOverride(keelMaterial);
+        clonedMaterials.set(cacheKey, keelMaterial);
+      }
+
+      assignOverrideMaterial(mesh, keelMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V30_VipGlassBalustrade_')) {
       const cacheKey = `${material.uniqueId}:vip-glass-balustrade`;
       let balustradeMaterial = clonedMaterials.get(cacheKey);
@@ -614,6 +2009,48 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name.startsWith('V53_SpawnGalleryCorniceGold_') ||
+      mesh.name.startsWith('V53_SpawnGalleryHaloGold_')
+    ) {
+      const cacheKey = `${material.uniqueId}:spawn-gallery-arcade-gold`;
+      let arcadeGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!arcadeGoldMaterial) {
+        arcadeGoldMaterial = material.clone(`${material.name}__spawn-gallery-arcade-gold`);
+        applySpawnGalleryArcadeGoldOverride(arcadeGoldMaterial);
+        clonedMaterials.set(cacheKey, arcadeGoldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, arcadeGoldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V53_SpawnGalleryShadowSpine_')) {
+      const cacheKey = `${material.uniqueId}:spawn-gallery-arcade-shadow`;
+      let arcadeShadowMaterial = clonedMaterials.get(cacheKey);
+      if (!arcadeShadowMaterial) {
+        arcadeShadowMaterial = material.clone(`${material.name}__spawn-gallery-arcade-shadow`);
+        applySpawnGalleryArcadeShadowOverride(arcadeShadowMaterial);
+        clonedMaterials.set(cacheKey, arcadeShadowMaterial);
+      }
+
+      assignOverrideMaterial(mesh, arcadeShadowMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V53_SpawnGalleryCyanLancets_')) {
+      const cacheKey = `${material.uniqueId}:spawn-gallery-arcade-cyan`;
+      let arcadeCyanMaterial = clonedMaterials.get(cacheKey);
+      if (!arcadeCyanMaterial) {
+        arcadeCyanMaterial = material.clone(`${material.name}__spawn-gallery-arcade-cyan`);
+        applySpawnGalleryArcadeCyanOverride(arcadeCyanMaterial);
+        clonedMaterials.set(cacheKey, arcadeCyanMaterial);
+      }
+
+      assignOverrideMaterial(mesh, arcadeCyanMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V55_SpawnPylonPearlShell_')) {
       const cacheKey = `${material.uniqueId}:spawn-pylon-pearl-shell`;
       let pylonMaterial = clonedMaterials.get(cacheKey);
@@ -627,6 +2064,45 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V55_SpawnPylonGoldCrown_')) {
+      const cacheKey = `${material.uniqueId}:spawn-pylon-gold-crown`;
+      let pylonGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!pylonGoldMaterial) {
+        pylonGoldMaterial = material.clone(`${material.name}__spawn-pylon-gold-crown`);
+        applySpawnPylonGoldCrownOverride(pylonGoldMaterial);
+        clonedMaterials.set(cacheKey, pylonGoldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pylonGoldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V55_SpawnPylonShadowSpine_')) {
+      const cacheKey = `${material.uniqueId}:spawn-pylon-shadow-spine`;
+      let pylonShadowMaterial = clonedMaterials.get(cacheKey);
+      if (!pylonShadowMaterial) {
+        pylonShadowMaterial = material.clone(`${material.name}__spawn-pylon-shadow-spine`);
+        applySpawnPylonShadowSpineOverride(pylonShadowMaterial);
+        clonedMaterials.set(cacheKey, pylonShadowMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pylonShadowMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V55_SpawnPylonCyanCore_')) {
+      const cacheKey = `${material.uniqueId}:spawn-pylon-cyan-core`;
+      let pylonCyanMaterial = clonedMaterials.get(cacheKey);
+      if (!pylonCyanMaterial) {
+        pylonCyanMaterial = material.clone(`${material.name}__spawn-pylon-cyan-core`);
+        applySpawnPylonCyanCoreOverride(pylonCyanMaterial);
+        clonedMaterials.set(cacheKey, pylonCyanMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pylonCyanMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V56_SpawnCanopyPearlVault_')) {
       const cacheKey = `${material.uniqueId}:spawn-canopy-pearl-vault`;
       let canopyVaultMaterial = clonedMaterials.get(cacheKey);
@@ -637,6 +2113,45 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, canopyVaultMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V56_SpawnCanopyGoldCrest_')) {
+      const cacheKey = `${material.uniqueId}:spawn-canopy-gold-crest`;
+      let canopyGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!canopyGoldMaterial) {
+        canopyGoldMaterial = material.clone(`${material.name}__spawn-canopy-gold-crest`);
+        applySpawnCanopyGoldCrestOverride(canopyGoldMaterial);
+        clonedMaterials.set(cacheKey, canopyGoldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, canopyGoldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V56_SpawnCanopyShadowSoffit_')) {
+      const cacheKey = `${material.uniqueId}:spawn-canopy-shadow-soffit`;
+      let canopyShadowMaterial = clonedMaterials.get(cacheKey);
+      if (!canopyShadowMaterial) {
+        canopyShadowMaterial = material.clone(`${material.name}__spawn-canopy-shadow-soffit`);
+        applySpawnCanopyShadowSoffitOverride(canopyShadowMaterial);
+        clonedMaterials.set(cacheKey, canopyShadowMaterial);
+      }
+
+      assignOverrideMaterial(mesh, canopyShadowMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V56_SpawnCanopyCyanLantern_')) {
+      const cacheKey = `${material.uniqueId}:spawn-canopy-cyan-lantern`;
+      let canopyCyanMaterial = clonedMaterials.get(cacheKey);
+      if (!canopyCyanMaterial) {
+        canopyCyanMaterial = material.clone(`${material.name}__spawn-canopy-cyan-lantern`);
+        applySpawnCanopyCyanLanternOverride(canopyCyanMaterial);
+        clonedMaterials.set(cacheKey, canopyCyanMaterial);
+      }
+
+      assignOverrideMaterial(mesh, canopyCyanMaterial);
       continue;
     }
 
@@ -679,6 +2194,181 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V65_ArrivalRunwayGoldBands' || mesh.name === 'V65_ArrivalThresholdGoldBands') {
+      const cacheKey = `${material.uniqueId}:arrival-runway-gold-bands`;
+      let goldMaterial = clonedMaterials.get(cacheKey);
+      if (!goldMaterial) {
+        goldMaterial = material.clone(`${material.name}__arrival-runway-gold-bands`);
+        applyArrivalRunwayGoldBandsOverride(goldMaterial);
+        clonedMaterials.set(cacheKey, goldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V65_ArrivalRunwayCyanThreads') {
+      const cacheKey = `${material.uniqueId}:arrival-runway-cyan-threads`;
+      let cyanMaterial = clonedMaterials.get(cacheKey);
+      if (!cyanMaterial) {
+        cyanMaterial = material.clone(`${material.name}__arrival-runway-cyan-threads`);
+        applyArrivalRunwayCyanThreadsOverride(cyanMaterial);
+        clonedMaterials.set(cacheKey, cyanMaterial);
+      }
+
+      assignOverrideMaterial(mesh, cyanMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V65_ArrivalThresholdShadowGrooves') {
+      const cacheKey = `${material.uniqueId}:arrival-threshold-shadow-grooves`;
+      let shadowMaterial = clonedMaterials.get(cacheKey);
+      if (!shadowMaterial) {
+        shadowMaterial = material.clone(`${material.name}__arrival-threshold-shadow-grooves`);
+        applyArrivalThresholdShadowGroovesOverride(shadowMaterial);
+        clonedMaterials.set(cacheKey, shadowMaterial);
+      }
+
+      assignOverrideMaterial(mesh, shadowMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V44_PlazaLanternStemCluster') {
+      const cacheKey = `${material.uniqueId}:plaza-lantern-stem`;
+      let stemMaterial = clonedMaterials.get(cacheKey);
+      if (!stemMaterial) {
+        stemMaterial = material.clone(`${material.name}__plaza-lantern-stem`);
+        applyBackPlazaLanternStemOverride(stemMaterial);
+        stemMaterial.metadata = {
+          ...stemMaterial.metadata,
+          mainStageMaterialOverride: 'plaza-lantern-stem',
+        };
+        clonedMaterials.set(cacheKey, stemMaterial);
+      }
+
+      assignOverrideMaterial(mesh, stemMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V44_PlazaLanternGoldHardware') {
+      const cacheKey = `${material.uniqueId}:plaza-lantern-gold-hardware`;
+      let hardwareMaterial = clonedMaterials.get(cacheKey);
+      if (!hardwareMaterial) {
+        hardwareMaterial = material.clone(`${material.name}__plaza-lantern-gold-hardware`);
+        applyBackPlazaLanternGoldCageOverride(hardwareMaterial);
+        hardwareMaterial.metadata = {
+          ...hardwareMaterial.metadata,
+          mainStageMaterialOverride: 'plaza-lantern-gold-hardware',
+        };
+        clonedMaterials.set(cacheKey, hardwareMaterial);
+      }
+
+      assignOverrideMaterial(mesh, hardwareMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V44_PlazaLanternWarmCore') {
+      const cacheKey = `${material.uniqueId}:plaza-lantern-warm-core`;
+      let coreMaterial = clonedMaterials.get(cacheKey);
+      if (!coreMaterial) {
+        coreMaterial = material.clone(`${material.name}__plaza-lantern-warm-core`);
+        applyBackPlazaLanternWarmCoreOverride(coreMaterial);
+        coreMaterial.metadata = {
+          ...coreMaterial.metadata,
+          mainStageMaterialOverride: 'plaza-lantern-warm-core',
+        };
+        clonedMaterials.set(cacheKey, coreMaterial);
+      }
+
+      assignOverrideMaterial(mesh, coreMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V44_PlazaLanternHaloRim') {
+      const cacheKey = `${material.uniqueId}:plaza-lantern-halo-rim`;
+      let haloMaterial = clonedMaterials.get(cacheKey);
+      if (!haloMaterial) {
+        haloMaterial = material.clone(`${material.name}__plaza-lantern-halo-rim`);
+        applyBackPlazaLanternHaloRimOverride(haloMaterial);
+        haloMaterial.metadata = {
+          ...haloMaterial.metadata,
+          mainStageMaterialOverride: 'plaza-lantern-halo-rim',
+        };
+        clonedMaterials.set(cacheKey, haloMaterial);
+      }
+
+      assignOverrideMaterial(mesh, haloMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V40_ApproachLightStem_')) {
+      const cacheKey = `${material.uniqueId}:approach-light-stem`;
+      let stemMaterial = clonedMaterials.get(cacheKey);
+      if (!stemMaterial) {
+        stemMaterial = material.clone(`${material.name}__approach-light-stem`);
+        applyBackPlazaLanternStemOverride(stemMaterial);
+        stemMaterial.metadata = {
+          ...stemMaterial.metadata,
+          mainStageMaterialOverride: 'approach-light-stem',
+        };
+        clonedMaterials.set(cacheKey, stemMaterial);
+      }
+
+      assignOverrideMaterial(mesh, stemMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V40_ApproachLightHousing_')) {
+      const cacheKey = `${material.uniqueId}:approach-light-housing`;
+      let housingMaterial = clonedMaterials.get(cacheKey);
+      if (!housingMaterial) {
+        housingMaterial = material.clone(`${material.name}__approach-light-housing`);
+        applyBackPlazaLanternGoldCageOverride(housingMaterial);
+        housingMaterial.metadata = {
+          ...housingMaterial.metadata,
+          mainStageMaterialOverride: 'approach-light-housing',
+        };
+        clonedMaterials.set(cacheKey, housingMaterial);
+      }
+
+      assignOverrideMaterial(mesh, housingMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V40_ApproachLightCore_')) {
+      const cacheKey = `${material.uniqueId}:approach-light-core`;
+      let coreMaterial = clonedMaterials.get(cacheKey);
+      if (!coreMaterial) {
+        coreMaterial = material.clone(`${material.name}__approach-light-core`);
+        applyArrivalRunwayCyanThreadsOverride(coreMaterial);
+        coreMaterial.metadata = {
+          ...coreMaterial.metadata,
+          mainStageMaterialOverride: 'approach-light-core',
+        };
+        clonedMaterials.set(cacheKey, coreMaterial);
+      }
+
+      assignOverrideMaterial(mesh, coreMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V40_ApproachLightHalo_')) {
+      const cacheKey = `${material.uniqueId}:approach-light-halo`;
+      let haloMaterial = clonedMaterials.get(cacheKey);
+      if (!haloMaterial) {
+        haloMaterial = material.clone(`${material.name}__approach-light-halo`);
+        applyBackPlazaLanternHaloRimOverride(haloMaterial);
+        haloMaterial.metadata = {
+          ...haloMaterial.metadata,
+          mainStageMaterialOverride: 'approach-light-halo',
+        };
+        clonedMaterials.set(cacheKey, haloMaterial);
+      }
+
+      assignOverrideMaterial(mesh, haloMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V58_ArrivalPlinthPearlDais_')) {
       const cacheKey = `${material.uniqueId}:arrival-plinth-pearl-dais`;
       let plinthMaterial = clonedMaterials.get(cacheKey);
@@ -689,6 +2379,97 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, plinthMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V58_ArrivalPlinthGoldInlay_')) {
+      const cacheKey = `${material.uniqueId}:arrival-plinth-gold-inlay`;
+      let plinthGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!plinthGoldMaterial) {
+        plinthGoldMaterial = material.clone(`${material.name}__arrival-plinth-gold-inlay`);
+        applyArrivalPlinthGoldInlayOverride(plinthGoldMaterial);
+        clonedMaterials.set(cacheKey, plinthGoldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, plinthGoldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V58_ArrivalPlinthCyanSpine_')) {
+      const cacheKey = `${material.uniqueId}:arrival-plinth-cyan-spine`;
+      let plinthCyanMaterial = clonedMaterials.get(cacheKey);
+      if (!plinthCyanMaterial) {
+        plinthCyanMaterial = material.clone(`${material.name}__arrival-plinth-cyan-spine`);
+        applyArrivalPlinthCyanSpineOverride(plinthCyanMaterial);
+        clonedMaterials.set(cacheKey, plinthCyanMaterial);
+      }
+
+      assignOverrideMaterial(mesh, plinthCyanMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V58_ArrivalPlinthShadowReveal_')) {
+      const cacheKey = `${material.uniqueId}:arrival-plinth-shadow-reveal`;
+      let plinthShadowMaterial = clonedMaterials.get(cacheKey);
+      if (!plinthShadowMaterial) {
+        plinthShadowMaterial = material.clone(`${material.name}__arrival-plinth-shadow-reveal`);
+        applyArrivalPlinthShadowRevealOverride(plinthShadowMaterial);
+        clonedMaterials.set(cacheKey, plinthShadowMaterial);
+      }
+
+      assignOverrideMaterial(mesh, plinthShadowMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V59_BackPlazaLanternStemCluster_')) {
+      const cacheKey = `${material.uniqueId}:back-plaza-lantern-stem`;
+      let stemMaterial = clonedMaterials.get(cacheKey);
+      if (!stemMaterial) {
+        stemMaterial = material.clone(`${material.name}__back-plaza-lantern-stem`);
+        applyBackPlazaLanternStemOverride(stemMaterial);
+        clonedMaterials.set(cacheKey, stemMaterial);
+      }
+
+      assignOverrideMaterial(mesh, stemMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V59_BackPlazaLanternGoldCage_')) {
+      const cacheKey = `${material.uniqueId}:back-plaza-lantern-gold-cage`;
+      let cageMaterial = clonedMaterials.get(cacheKey);
+      if (!cageMaterial) {
+        cageMaterial = material.clone(`${material.name}__back-plaza-lantern-gold-cage`);
+        applyBackPlazaLanternGoldCageOverride(cageMaterial);
+        clonedMaterials.set(cacheKey, cageMaterial);
+      }
+
+      assignOverrideMaterial(mesh, cageMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V59_BackPlazaLanternWarmCore_')) {
+      const cacheKey = `${material.uniqueId}:back-plaza-lantern-warm-core`;
+      let coreMaterial = clonedMaterials.get(cacheKey);
+      if (!coreMaterial) {
+        coreMaterial = material.clone(`${material.name}__back-plaza-lantern-warm-core`);
+        applyBackPlazaLanternWarmCoreOverride(coreMaterial);
+        clonedMaterials.set(cacheKey, coreMaterial);
+      }
+
+      assignOverrideMaterial(mesh, coreMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V59_BackPlazaLanternHaloRim_')) {
+      const cacheKey = `${material.uniqueId}:back-plaza-lantern-halo-rim`;
+      let haloMaterial = clonedMaterials.get(cacheKey);
+      if (!haloMaterial) {
+        haloMaterial = material.clone(`${material.name}__back-plaza-lantern-halo-rim`);
+        applyBackPlazaLanternHaloRimOverride(haloMaterial);
+        clonedMaterials.set(cacheKey, haloMaterial);
+      }
+
+      assignOverrideMaterial(mesh, haloMaterial);
       continue;
     }
 
@@ -852,6 +2633,45 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V61_RearMassAuroraGoldSpine_')) {
+      const cacheKey = `${material.uniqueId}:rear-mass-aurora-gold-spine`;
+      let auroraMaterial = clonedMaterials.get(cacheKey);
+      if (!auroraMaterial) {
+        auroraMaterial = material.clone(`${material.name}__rear-mass-aurora-gold-spine`);
+        applyRearMassAuroraGoldSpineOverride(auroraMaterial);
+        clonedMaterials.set(cacheKey, auroraMaterial);
+      }
+
+      assignOverrideMaterial(mesh, auroraMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V61_RearMassAuroraCyanCore_')) {
+      const cacheKey = `${material.uniqueId}:rear-mass-aurora-cyan-core`;
+      let auroraMaterial = clonedMaterials.get(cacheKey);
+      if (!auroraMaterial) {
+        auroraMaterial = material.clone(`${material.name}__rear-mass-aurora-cyan-core`);
+        applyRearMassAuroraCyanCoreOverride(auroraMaterial);
+        clonedMaterials.set(cacheKey, auroraMaterial);
+      }
+
+      assignOverrideMaterial(mesh, auroraMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V61_RearMassAuroraShadowRibbon_')) {
+      const cacheKey = `${material.uniqueId}:rear-mass-aurora-shadow-ribbon`;
+      let auroraMaterial = clonedMaterials.get(cacheKey);
+      if (!auroraMaterial) {
+        auroraMaterial = material.clone(`${material.name}__rear-mass-aurora-shadow-ribbon`);
+        applyRearMassAuroraShadowRibbonOverride(auroraMaterial);
+        clonedMaterials.set(cacheKey, auroraMaterial);
+      }
+
+      assignOverrideMaterial(mesh, auroraMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V57_BackPlazaSentinelPearl_')) {
       const cacheKey = `${material.uniqueId}:back-plaza-sentinel-pearl`;
       let sentinelMaterial = clonedMaterials.get(cacheKey);
@@ -862,6 +2682,45 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, sentinelMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V57_BackPlazaSentinelGoldCrown_')) {
+      const cacheKey = `${material.uniqueId}:back-plaza-sentinel-gold-crown`;
+      let sentinelGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!sentinelGoldMaterial) {
+        sentinelGoldMaterial = material.clone(`${material.name}__back-plaza-sentinel-gold-crown`);
+        applyBackPlazaSentinelGoldCrownOverride(sentinelGoldMaterial);
+        clonedMaterials.set(cacheKey, sentinelGoldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, sentinelGoldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V57_BackPlazaSentinelCyanSpine_')) {
+      const cacheKey = `${material.uniqueId}:back-plaza-sentinel-cyan-spine`;
+      let sentinelCyanMaterial = clonedMaterials.get(cacheKey);
+      if (!sentinelCyanMaterial) {
+        sentinelCyanMaterial = material.clone(`${material.name}__back-plaza-sentinel-cyan-spine`);
+        applyBackPlazaSentinelCyanSpineOverride(sentinelCyanMaterial);
+        clonedMaterials.set(cacheKey, sentinelCyanMaterial);
+      }
+
+      assignOverrideMaterial(mesh, sentinelCyanMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V57_BackPlazaSentinelShadowCore_')) {
+      const cacheKey = `${material.uniqueId}:back-plaza-sentinel-shadow-core`;
+      let sentinelShadowMaterial = clonedMaterials.get(cacheKey);
+      if (!sentinelShadowMaterial) {
+        sentinelShadowMaterial = material.clone(`${material.name}__back-plaza-sentinel-shadow-core`);
+        applyBackPlazaSentinelShadowCoreOverride(sentinelShadowMaterial);
+        clonedMaterials.set(cacheKey, sentinelShadowMaterial);
+      }
+
+      assignOverrideMaterial(mesh, sentinelShadowMaterial);
       continue;
     }
 
@@ -904,6 +2763,32 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V43_WayfindingPylonGoldCrown') {
+      const cacheKey = `${material.uniqueId}:wayfinding-pylon-gold-crown`;
+      let goldMaterial = clonedMaterials.get(cacheKey);
+      if (!goldMaterial) {
+        goldMaterial = material.clone(`${material.name}__wayfinding-pylon-gold-crown`);
+        applyWayfindingPylonGoldCrownOverride(goldMaterial);
+        clonedMaterials.set(cacheKey, goldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V43_WayfindingPylonCyanGlyph') {
+      const cacheKey = `${material.uniqueId}:wayfinding-pylon-cyan-glyph`;
+      let glyphMaterial = clonedMaterials.get(cacheKey);
+      if (!glyphMaterial) {
+        glyphMaterial = material.clone(`${material.name}__wayfinding-pylon-cyan-glyph`);
+        applyWayfindingPylonCyanGlyphOverride(glyphMaterial);
+        clonedMaterials.set(cacheKey, glyphMaterial);
+      }
+
+      assignOverrideMaterial(mesh, glyphMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V45_PyroPodPearlShell') {
       const cacheKey = `${material.uniqueId}:pyro-pod-pearl-shell`;
       let pyroMaterial = clonedMaterials.get(cacheKey);
@@ -917,6 +2802,32 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V45_PyroPodGoldNozzle') {
+      const cacheKey = `${material.uniqueId}:pyro-pod-gold-nozzle`;
+      let nozzleMaterial = clonedMaterials.get(cacheKey);
+      if (!nozzleMaterial) {
+        nozzleMaterial = material.clone(`${material.name}__pyro-pod-gold-nozzle`);
+        applyPyroPodGoldNozzleOverride(nozzleMaterial);
+        clonedMaterials.set(cacheKey, nozzleMaterial);
+      }
+
+      assignOverrideMaterial(mesh, nozzleMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V45_PyroPodRedGlass') {
+      const cacheKey = `${material.uniqueId}:pyro-pod-red-glass`;
+      let glassMaterial = clonedMaterials.get(cacheKey);
+      if (!glassMaterial) {
+        glassMaterial = material.clone(`${material.name}__pyro-pod-red-glass`);
+        applyPyroPodRedGlassOverride(glassMaterial);
+        clonedMaterials.set(cacheKey, glassMaterial);
+      }
+
+      assignOverrideMaterial(mesh, glassMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V34_BackPlazaGatewayPearl_')) {
       const cacheKey = `${material.uniqueId}:back-plaza-gateway-pearl`;
       let gatewayMaterial = clonedMaterials.get(cacheKey);
@@ -927,6 +2838,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, gatewayMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V34_BackPlazaGatewayCyanInlay_')) {
+      const cacheKey = `${material.uniqueId}:back-plaza-gateway-cyan-inlay`;
+      let cyanMaterial = clonedMaterials.get(cacheKey);
+      if (!cyanMaterial) {
+        cyanMaterial = material.clone(`${material.name}__back-plaza-gateway-cyan-inlay`);
+        applyBackPlazaGatewayCyanInlayOverride(cyanMaterial);
+        clonedMaterials.set(cacheKey, cyanMaterial);
+      }
+
+      assignOverrideMaterial(mesh, cyanMaterial);
       continue;
     }
 
@@ -973,6 +2897,22 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
     }
 
     if (
+      mesh.name.startsWith('V50_InnerPortalGoldReveal_') ||
+      mesh.name.startsWith('V50_OuterSweepSpire_')
+    ) {
+      const cacheKey = `${material.uniqueId}:inner-portal-gold-reveal`;
+      let goldMaterial = clonedMaterials.get(cacheKey);
+      if (!goldMaterial) {
+        goldMaterial = material.clone(`${material.name}__inner-portal-gold-reveal`);
+        applyInnerPortalGoldRevealOverride(goldMaterial);
+        clonedMaterials.set(cacheKey, goldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldMaterial);
+      continue;
+    }
+
+    if (
       mesh.name === 'V52_CrownObeliskPearlCore' ||
       mesh.name.startsWith('V52_CrownSpirePearlBlade_')
     ) {
@@ -988,6 +2928,49 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name === 'V52_CrownObeliskGoldTracery' ||
+      mesh.name.startsWith('V52_CrownSpireGoldFin_') ||
+      mesh.name === 'V52_CrownApexPedestal'
+    ) {
+      const cacheKey = `${material.uniqueId}:crown-obelisk-gold-tracery`;
+      let goldMaterial = clonedMaterials.get(cacheKey);
+      if (!goldMaterial) {
+        goldMaterial = material.clone(`${material.name}__crown-obelisk-gold-tracery`);
+        applyCrownObeliskGoldTraceryOverride(goldMaterial);
+        clonedMaterials.set(cacheKey, goldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V52_CrownObeliskShadowSpine') {
+      const cacheKey = `${material.uniqueId}:crown-obelisk-shadow-spine`;
+      let shadowMaterial = clonedMaterials.get(cacheKey);
+      if (!shadowMaterial) {
+        shadowMaterial = material.clone(`${material.name}__crown-obelisk-shadow-spine`);
+        applyCrownObeliskShadowSpineOverride(shadowMaterial);
+        clonedMaterials.set(cacheKey, shadowMaterial);
+      }
+
+      assignOverrideMaterial(mesh, shadowMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V52_CrownApexCrystal') {
+      const cacheKey = `${material.uniqueId}:crown-obelisk-apex-crystal`;
+      let crystalMaterial = clonedMaterials.get(cacheKey);
+      if (!crystalMaterial) {
+        crystalMaterial = material.clone(`${material.name}__crown-obelisk-apex-crystal`);
+        applyCrownObeliskApexCrystalOverride(crystalMaterial);
+        clonedMaterials.set(cacheKey, crystalMaterial);
+      }
+
+      assignOverrideMaterial(mesh, crystalMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V71_CrownBladePearlSocket_')) {
       const cacheKey = `${material.uniqueId}:crown-jewel-pearl-socket`;
       let socketMaterial = clonedMaterials.get(cacheKey);
@@ -998,6 +2981,45 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, socketMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V71_CrownJewelGoldCradle') {
+      const cacheKey = `${material.uniqueId}:crown-jewel-gold-cradle`;
+      let cradleMaterial = clonedMaterials.get(cacheKey);
+      if (!cradleMaterial) {
+        cradleMaterial = material.clone(`${material.name}__crown-jewel-gold-cradle`);
+        applyCrownJewelGoldCradleOverride(cradleMaterial);
+        clonedMaterials.set(cacheKey, cradleMaterial);
+      }
+
+      assignOverrideMaterial(mesh, cradleMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V71_CrownJewelShadowCore') {
+      const cacheKey = `${material.uniqueId}:crown-jewel-shadow-core`;
+      let shadowMaterial = clonedMaterials.get(cacheKey);
+      if (!shadowMaterial) {
+        shadowMaterial = material.clone(`${material.name}__crown-jewel-shadow-core`);
+        applyCrownJewelShadowCoreOverride(shadowMaterial);
+        clonedMaterials.set(cacheKey, shadowMaterial);
+      }
+
+      assignOverrideMaterial(mesh, shadowMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V71_CrownTopCyanJewel') {
+      const cacheKey = `${material.uniqueId}:crown-jewel-cyan`;
+      let jewelMaterial = clonedMaterials.get(cacheKey);
+      if (!jewelMaterial) {
+        jewelMaterial = material.clone(`${material.name}__crown-jewel-cyan`);
+        applyCrownJewelCyanOverride(jewelMaterial);
+        clonedMaterials.set(cacheKey, jewelMaterial);
+      }
+
+      assignOverrideMaterial(mesh, jewelMaterial);
       continue;
     }
 
@@ -1020,6 +3042,45 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       if (!sentinelMaterial) {
         sentinelMaterial = material.clone(`${material.name}__spawn-gate-sentinel-pearl`);
         applySpawnGateSentinelPearlOverride(sentinelMaterial);
+        clonedMaterials.set(cacheKey, sentinelMaterial);
+      }
+
+      assignOverrideMaterial(mesh, sentinelMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V60_SpawnGateSentinelGoldCrown_')) {
+      const cacheKey = `${material.uniqueId}:spawn-gate-sentinel-gold-crown`;
+      let sentinelMaterial = clonedMaterials.get(cacheKey);
+      if (!sentinelMaterial) {
+        sentinelMaterial = material.clone(`${material.name}__spawn-gate-sentinel-gold-crown`);
+        applySpawnGateSentinelGoldCrownOverride(sentinelMaterial);
+        clonedMaterials.set(cacheKey, sentinelMaterial);
+      }
+
+      assignOverrideMaterial(mesh, sentinelMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V60_SpawnGateSentinelCyanCore_')) {
+      const cacheKey = `${material.uniqueId}:spawn-gate-sentinel-cyan-core`;
+      let sentinelMaterial = clonedMaterials.get(cacheKey);
+      if (!sentinelMaterial) {
+        sentinelMaterial = material.clone(`${material.name}__spawn-gate-sentinel-cyan-core`);
+        applySpawnGateSentinelCyanCoreOverride(sentinelMaterial);
+        clonedMaterials.set(cacheKey, sentinelMaterial);
+      }
+
+      assignOverrideMaterial(mesh, sentinelMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V60_SpawnGateSentinelShadowKeel_')) {
+      const cacheKey = `${material.uniqueId}:spawn-gate-sentinel-shadow-keel`;
+      let sentinelMaterial = clonedMaterials.get(cacheKey);
+      if (!sentinelMaterial) {
+        sentinelMaterial = material.clone(`${material.name}__spawn-gate-sentinel-shadow-keel`);
+        applySpawnGateSentinelShadowKeelOverride(sentinelMaterial);
         clonedMaterials.set(cacheKey, sentinelMaterial);
       }
 
@@ -1206,6 +3267,110 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, inlayMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V101_VipBalustradeLowerChordArray_')) {
+      const cacheKey = `${material.uniqueId}:vip-balustrade-lower-chord`;
+      let chordMaterial = clonedMaterials.get(cacheKey);
+      if (!chordMaterial) {
+        chordMaterial = material.clone(`${material.name}__vip-balustrade-lower-chord`);
+        applyVipBalustradeLowerChordOverride(chordMaterial);
+        clonedMaterials.set(cacheKey, chordMaterial);
+      }
+
+      assignOverrideMaterial(mesh, chordMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V102_VipBalustradeFiligreeArray_')) {
+      const cacheKey = `${material.uniqueId}:vip-balustrade-filigree`;
+      let filigreeMaterial = clonedMaterials.get(cacheKey);
+      if (!filigreeMaterial) {
+        filigreeMaterial = material.clone(`${material.name}__vip-balustrade-filigree`);
+        applyVipBalustradeFiligreeOverride(filigreeMaterial);
+        clonedMaterials.set(cacheKey, filigreeMaterial);
+      }
+
+      assignOverrideMaterial(mesh, filigreeMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V103_PearlSurfaceGoldRelief_')) {
+      const cacheKey = `${material.uniqueId}:vip-pearl-surface-gold-relief`;
+      let reliefMaterial = clonedMaterials.get(cacheKey);
+      if (!reliefMaterial) {
+        reliefMaterial = material.clone(`${material.name}__vip-pearl-surface-gold-relief`);
+        applyVipPearlSurfaceGoldReliefOverride(reliefMaterial);
+        clonedMaterials.set(cacheKey, reliefMaterial);
+      }
+
+      assignOverrideMaterial(mesh, reliefMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V103_PearlSurfaceCyanInset_')) {
+      const cacheKey = `${material.uniqueId}:vip-pearl-surface-cyan-inset`;
+      let insetMaterial = clonedMaterials.get(cacheKey);
+      if (!insetMaterial) {
+        insetMaterial = material.clone(`${material.name}__vip-pearl-surface-cyan-inset`);
+        applyVipPearlSurfaceCyanInsetOverride(insetMaterial);
+        clonedMaterials.set(cacheKey, insetMaterial);
+      }
+
+      assignOverrideMaterial(mesh, insetMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V104_OuterWingGoldSpineArray_')) {
+      const cacheKey = `${material.uniqueId}:outer-wing-gold-spine`;
+      let spineMaterial = clonedMaterials.get(cacheKey);
+      if (!spineMaterial) {
+        spineMaterial = material.clone(`${material.name}__outer-wing-gold-spine`);
+        applyOuterWingGoldSpineOverride(spineMaterial);
+        clonedMaterials.set(cacheKey, spineMaterial);
+      }
+
+      assignOverrideMaterial(mesh, spineMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V105_RearShellGoldSeamArray_')) {
+      const cacheKey = `${material.uniqueId}:rear-shell-gold-seam`;
+      let seamMaterial = clonedMaterials.get(cacheKey);
+      if (!seamMaterial) {
+        seamMaterial = material.clone(`${material.name}__rear-shell-gold-seam`);
+        applyRearShellGoldSeamOverride(seamMaterial);
+        clonedMaterials.set(cacheKey, seamMaterial);
+      }
+
+      assignOverrideMaterial(mesh, seamMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V108_ForegroundBarricadeGoldRun') {
+      const cacheKey = `${material.uniqueId}:foreground-barricade-gold-run`;
+      let goldRunMaterial = clonedMaterials.get(cacheKey);
+      if (!goldRunMaterial) {
+        goldRunMaterial = material.clone(`${material.name}__foreground-barricade-gold-run`);
+        applyForegroundBarricadeGoldRunOverride(goldRunMaterial);
+        clonedMaterials.set(cacheKey, goldRunMaterial);
+      }
+
+      assignOverrideMaterial(mesh, goldRunMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V108_ForegroundBarricadePearlRun') {
+      const cacheKey = `${material.uniqueId}:foreground-barricade-pearl-run`;
+      let pearlRunMaterial = clonedMaterials.get(cacheKey);
+      if (!pearlRunMaterial) {
+        pearlRunMaterial = material.clone(`${material.name}__foreground-barricade-pearl-run`);
+        applyForegroundBarricadePearlRunOverride(pearlRunMaterial);
+        clonedMaterials.set(cacheKey, pearlRunMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pearlRunMaterial);
       continue;
     }
 
@@ -1444,6 +3609,808 @@ function applySupportTentCanopyOverride(material: PBRMaterial) {
   };
 }
 
+function applySupportTentFrameOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.06, 0.07, 0.09);
+  material.emissiveColor = new Color3(0.004, 0.004, 0.006);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.04;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'support-tent-frame',
+  };
+}
+
+function applySupportTentCrestOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.21, 0.16, 0.06);
+  material.emissiveColor = new Color3(0.005, 0.004, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.14;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.78;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'support-tent-crest',
+  };
+}
+
+function applyServiceCaseBankOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.06, 0.07, 0.08);
+  material.emissiveColor = new Color3(0.004, 0.004, 0.005);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.04;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'service-case-bank',
+  };
+}
+
+function applyServiceCaseTopperOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.19, 0.15, 0.06);
+  material.emissiveColor = new Color3(0.005, 0.004, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.14;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.8;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'service-case-topper',
+  };
+}
+
+function applyWingServiceCaseArrayOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.06, 0.07, 0.08);
+  material.emissiveColor = new Color3(0.004, 0.004, 0.005);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.04;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-service-case-array',
+  };
+}
+
+function applyPyroPylonArrayOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.22, 0.24, 0.28);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.01);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'pyro-pylon-array',
+  };
+}
+
+function applyPyroNozzleArrayOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.19, 0.15, 0.06);
+  material.emissiveColor = new Color3(0.005, 0.004, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.8;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'pyro-nozzle-array',
+  };
+}
+
+function applyRearMassGoldBandOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.19, 0.15, 0.06);
+  material.emissiveColor = new Color3(0.005, 0.004, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.8;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'rear-mass-gold-band',
+  };
+}
+
+function applyRearMassShadowChannelOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.04, 0.06, 0.08);
+  material.emissiveColor = new Color3(0.006, 0.012, 0.016);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.04;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.18;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'rear-mass-shadow-channel',
+  };
+}
+
+function applyWetRouteStoneBandOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.22;
+  material.clearCoat.roughness = 0.34;
+  material.environmentIntensity = 0.22;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wet-route-stone-band',
+  };
+}
+
+function applyWetRouteGoldSeamOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.19, 0.15, 0.06);
+  material.emissiveColor = new Color3(0.005, 0.004, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.8;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wet-route-gold-seam',
+  };
+}
+
+function applyCentralWaterLightHousingOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.21, 0.23, 0.27);
+  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'central-water-light-housing',
+  };
+}
+
+function applyCentralWaterLightGoldTrimOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.19, 0.15, 0.06);
+  material.emissiveColor = new Color3(0.005, 0.004, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.8;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'central-water-light-gold-trim',
+  };
+}
+
+function applyCentralWaterLightLensOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.08, 0.18, 0.24);
+  material.emissiveColor = new Color3(0.01, 0.04, 0.06);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.42;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.18;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.3;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'central-water-light-lens',
+  };
+}
+
+function applySideScreenAnchorGoldSpineOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'side-screen-anchor-gold-spine',
+  };
+}
+
+function applyArcAnchorGoldClusterOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arc-anchor-gold-cluster',
+  };
+}
+
+function applySweepAnchorGoldCrownOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'sweep-anchor-gold-crown',
+  };
+}
+
+function applySweepAnchorShadowCoreOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.03, 0.05, 0.07);
+  material.emissiveColor = new Color3(0.01, 0.06, 0.09);
+  material.emissiveIntensity = 0.08;
+  material.metallic = 0.04;
+  material.roughness = 0.74;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'sweep-anchor-shadow-core',
+  };
+}
+
+function applyHeroPortalServiceDoorFrameOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'hero-portal-service-door-frame',
+  };
+}
+
+function applyHeroPortalServiceDoorLeafOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.03, 0.05, 0.07);
+  material.emissiveColor = new Color3(0.01, 0.06, 0.09);
+  material.emissiveIntensity = 0.08;
+  material.metallic = 0.04;
+  material.roughness = 0.74;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'hero-portal-service-door-leaf',
+  };
+}
+
+function applyCrownRiggingGoldBossOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-rigging-gold-boss',
+  };
+}
+
+function applyCrownGoldLatticeOverride(material: PBRMaterial) {
+  applyCrownRiggingGoldBossOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-gold-lattice',
+  };
+}
+
+function applyCrownBladeLamellaPearlOverride(material: PBRMaterial) {
+  applyCrownShellLamellaOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-blade-lamella-pearl',
+  };
+}
+
+function applyCrownBladeGoldRevealOverride(material: PBRMaterial) {
+  applyCelestialHaloOuterRingOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-blade-gold-reveal',
+  };
+}
+
+function applyCrownBladeCyanInsetOverride(material: PBRMaterial) {
+  applyCelestialHaloCyanEdgeOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-blade-cyan-inset',
+  };
+}
+
+function applyTrussDiagonalBraceOverride(material: PBRMaterial) {
+  applyMainTrussTowerRigOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'truss-diagonal-brace',
+  };
+}
+
+function applyProductionTrussTowerFrameOverride(material: PBRMaterial) {
+  applyBackPlazaLanternStemOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'production-truss-tower-frame',
+  };
+}
+
+function applyProductionTrussCrossBraceOverride(material: PBRMaterial) {
+  applyMainTrussTowerRigOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'production-truss-cross-brace',
+  };
+}
+
+function applyProductionTowerServiceLadderOverride(material: PBRMaterial) {
+  applyMainTrussTowerGoldCrossbarOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'production-tower-service-ladder',
+  };
+}
+
+function applyProductionTowerBeaconOverride(material: PBRMaterial) {
+  applyArrivalRunwayCyanThreadsOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'production-tower-beacon',
+  };
+}
+
+function applyWingFacadeArcadePierOverride(material: PBRMaterial) {
+  applyWingArcadePearlArchOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-facade-arcade-pier',
+  };
+}
+
+function applyWingFacadeGoldCapitalOverride(material: PBRMaterial) {
+  applyWingFacadeGoldLintelOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-facade-gold-capital',
+  };
+}
+
+function applyWingFacadeShadowRevealOverride(material: PBRMaterial) {
+  applyWingFacadeShadowFrameOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-facade-shadow-reveal',
+  };
+}
+
+function applyCrownRiggingStructureOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.03, 0.05, 0.07);
+  material.emissiveColor = new Color3(0.01, 0.06, 0.09);
+  material.emissiveIntensity = 0.08;
+  material.metallic = 0.04;
+  material.roughness = 0.74;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-rigging-structure',
+  };
+}
+
+function applyLineArrayGraphiteOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.18, 0.22);
+  material.emissiveColor = new Color3(0.008, 0.01, 0.012);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.08;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'line-array-graphite',
+  };
+}
+
+function applyCrowdClusterGraphiteOverride(material: PBRMaterial) {
+  applyLineArrayGraphiteOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crowd-cluster-graphite',
+  };
+}
+
+function applyLineArrayAcousticBlackOverride(material: PBRMaterial) {
+  applyMainTrussTowerRigOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'line-array-acoustic-black',
+  };
+}
+
+function applyMainTrussTowerGoldCrossbarOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'main-truss-tower-gold-crossbar',
+  };
+}
+
+function applyMainTrussTowerRigOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.03, 0.05, 0.07);
+  material.emissiveColor = new Color3(0.01, 0.06, 0.09);
+  material.emissiveIntensity = 0.08;
+  material.metallic = 0.04;
+  material.roughness = 0.74;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'main-truss-tower-rig',
+  };
+}
+
+function applyLineArraySuspensionHardwareOverride(material: PBRMaterial) {
+  applyBackPlazaLanternStemOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'line-array-suspension-hardware',
+  };
+}
+
+function applyLineArrayPinBarsOverride(material: PBRMaterial) {
+  applyProcessionalRouteGoldTrimOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'line-array-pin-bars',
+  };
+}
+
+function applyBasinFountainMistOverride(material: PBRMaterial) {
+  applySpawnWetInsetPoolOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-fountain-mist',
+  };
+}
+
+function applyBasinFountainNozzleArrayOverride(material: PBRMaterial) {
+  applyForegroundBarricadeGoldRunOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-fountain-nozzle-array',
+  };
+}
+
+function applyBasinPlantingIslandRimOverride(material: PBRMaterial) {
+  applyForegroundBarricadePearlRunOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-planting-island-rim',
+  };
+}
+
+function applyForegroundBarricadeFrameOverride(material: PBRMaterial) {
+  applyCrowdControlFrameOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'foreground-barricade-frame',
+  };
+}
+
+function applyForegroundBarricadeGoldRailOverride(material: PBRMaterial) {
+  applyCrowdControlRailOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'foreground-barricade-gold-rail',
+  };
+}
+
+function applyV24CrownPearlShellOverride(material: PBRMaterial) {
+  applyOuterWingButtressShellOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'v24-crown-pearl-shell',
+  };
+}
+
+function applyV24CrownGoldRevealOverride(material: PBRMaterial) {
+  applyWingArcadeGoldRevealOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'v24-crown-gold-reveal',
+  };
+}
+
+function applyBasinLanternStemOverride(material: PBRMaterial) {
+  applyBackPlazaLanternStemOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-lantern-stem',
+  };
+}
+
+function applyBasinLanternHousingOverride(material: PBRMaterial) {
+  applyBackPlazaLanternGoldCageOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-lantern-housing',
+  };
+}
+
+function applyBasinLanternWarmCoreOverride(material: PBRMaterial) {
+  applyBackPlazaLanternWarmCoreOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-lantern-warm-core',
+  };
+}
+
+function applyWetPaverStoneBandOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.21, 0.23, 0.27);
+  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wet-paver-stone-band',
+  };
+}
+
+function applyWetPaverGoldSeamOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wet-paver-gold-seam',
+  };
+}
+
+function applySpawnWetInsetPoolOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.04, 0.06, 0.08);
+  material.emissiveColor = new Color3(0.01, 0.025, 0.035);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.98;
+  material.metallic = 0.02;
+  material.roughness = 0.22;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.7;
+  material.clearCoat.roughness = 0.08;
+  material.environmentIntensity = 0.86;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-wet-inset-pool',
+  };
+}
+
+function applyGardenStoneEdgeOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.21, 0.23, 0.27);
+  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'garden-stone-edge',
+  };
+}
+
+function applyBasinFountainPedestalOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.21, 0.23, 0.27);
+  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-fountain-pedestal',
+  };
+}
+
+function applyBasinFountainLightOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.8, 0.56, 0.24);
+  material.emissiveColor = new Color3(1, 0.68, 0.24);
+  material.emissiveIntensity = 0.7;
+  material.metallic = 0.02;
+  material.roughness = 0.32;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.18;
+  material.clearCoat.roughness = 0.24;
+  material.environmentIntensity = 0.42;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-fountain-light',
+  };
+}
+
+function applyBasinFountainJetOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.04, 0.06, 0.08);
+  material.emissiveColor = new Color3(0.02, 0.16, 0.24);
+  material.emissiveIntensity = 0.4;
+  material.alpha = 0.94;
+  material.metallic = 0.01;
+  material.roughness = 0.38;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.4;
+  material.clearCoat.roughness = 0.18;
+  material.environmentIntensity = 0.62;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-fountain-jet',
+  };
+}
+
+function applyArcAnchorShadowClusterOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.03, 0.05, 0.07);
+  material.emissiveColor = new Color3(0.01, 0.06, 0.09);
+  material.emissiveIntensity = 0.08;
+  material.metallic = 0.04;
+  material.roughness = 0.74;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arc-anchor-shadow-cluster',
+  };
+}
+
+function applySideScreenAnchorShadowBraceOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.03, 0.05, 0.07);
+  material.emissiveColor = new Color3(0.01, 0.06, 0.09);
+  material.emissiveIntensity = 0.08;
+  material.metallic = 0.04;
+  material.roughness = 0.74;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'side-screen-anchor-shadow-brace',
+  };
+}
+
+function applyOvalScreenRecessGoldFrameOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-screen-recess-gold-frame',
+  };
+}
+
+function applyOvalScreenRecessShadowPocketOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.03, 0.05, 0.07);
+  material.emissiveColor = new Color3(0.01, 0.06, 0.09);
+  material.emissiveIntensity = 0.08;
+  material.metallic = 0.04;
+  material.roughness = 0.74;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-screen-recess-shadow-pocket',
+  };
+}
+
 function applyOvalScreenShellHousingOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.22, 0.24, 0.28);
@@ -1526,6 +4493,109 @@ function applyStageFrontReliefShellOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'stage-front-relief-shell',
+  };
+}
+
+function applyProcessionalRouteGoldTrimOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'processional-route-gold-trim',
+  };
+}
+
+function applySpawnRouteWetCenterInlayOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.04, 0.06, 0.08);
+  material.emissiveColor = new Color3(0.01, 0.025, 0.035);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.98;
+  material.metallic = 0.02;
+  material.roughness = 0.22;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.7;
+  material.clearCoat.roughness = 0.08;
+  material.environmentIntensity = 0.86;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-route-wet-center-inlay',
+  };
+}
+
+function applyCrowdControlFrameOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.08;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.28;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crowd-control-frame',
+  };
+}
+
+function applyCrowdControlRailOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crowd-control-rail',
+  };
+}
+
+function applyCrowdBarrierBaseOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.08;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.28;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crowd-barrier-base',
+  };
+}
+
+function applyCrowdBarrierRailOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crowd-barrier-rail',
   };
 }
 
@@ -1647,6 +4717,30 @@ function applyApproachReflectionUnderlayOverride(material: PBRMaterial) {
   };
 }
 
+function applyApproachGoldInlayNetworkOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'approach-gold-inlay-network',
+  };
+}
+
+function applyApproachEdgeRailOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'approach-edge-rail',
+  };
+}
+
+function applyApproachBarricadeAssemblyOverride(material: PBRMaterial) {
+  applyCrowdBarrierBaseOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'approach-barricade-assembly',
+  };
+}
+
 function applyCrownShellLamellaOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.22, 0.18, 0.08);
@@ -1749,6 +4843,24 @@ function applyWingFacadeArchInlayOverride(material: PBRMaterial) {
   };
 }
 
+function applyWingFacadeInsetGlowOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.12, 0.24, 0.3);
+  material.emissiveColor = new Color3(0.01, 0.05, 0.07);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.36;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.18;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.3;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-facade-inset-glow',
+  };
+}
+
 function applyWideHeroScreenGoldFrameOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.16, 0.12, 0.05);
@@ -1811,6 +4923,41 @@ function applyCrownScreenVerticalKeystoneOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-screen-vertical-keystone',
+  };
+}
+
+function applyCenterScreenSidePierGoldFrameOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'center-screen-side-pier-gold-frame',
+  };
+}
+
+function applyCenterScreenSidePierCyanCoreOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.12, 0.24, 0.3);
+  material.emissiveColor = new Color3(0.015, 0.045, 0.06);
+  material.emissiveIntensity = 0.1;
+  material.alpha = 0.38;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.18;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.06;
+  material.clearCoat.roughness = 0.6;
+  material.environmentIntensity = 0.34;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'center-screen-side-pier-cyan-core',
   };
 }
 
@@ -1945,6 +5092,22 @@ function applyPromenadeCyanSpineOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'promenade-cyan-spine',
+  };
+}
+
+function applyPromenadeShadowKeelOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.08;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.28;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'promenade-shadow-keel',
   };
 }
 
@@ -2136,6 +5299,30 @@ function applySpawnGalleryArcadePearlOverride(material: PBRMaterial) {
   };
 }
 
+function applySpawnGalleryArcadeGoldOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-gallery-arcade-gold',
+  };
+}
+
+function applySpawnGalleryArcadeShadowOverride(material: PBRMaterial) {
+  applyHeroPortalShadowVaultOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-gallery-arcade-shadow',
+  };
+}
+
+function applySpawnGalleryArcadeCyanOverride(material: PBRMaterial) {
+  applyCrownApexCrystalOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-gallery-arcade-cyan',
+  };
+}
+
 function applySpawnPylonPearlShellOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.24, 0.26, 0.3);
@@ -2153,6 +5340,30 @@ function applySpawnPylonPearlShellOverride(material: PBRMaterial) {
   };
 }
 
+function applySpawnPylonGoldCrownOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-pylon-gold-crown',
+  };
+}
+
+function applySpawnPylonShadowSpineOverride(material: PBRMaterial) {
+  applyHeroPortalShadowVaultOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-pylon-shadow-spine',
+  };
+}
+
+function applySpawnPylonCyanCoreOverride(material: PBRMaterial) {
+  applyCrownApexCrystalOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-pylon-cyan-core',
+  };
+}
+
 function applySpawnCanopyPearlVaultOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.22, 0.24, 0.28);
@@ -2167,6 +5378,30 @@ function applySpawnCanopyPearlVaultOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-canopy-pearl-vault',
+  };
+}
+
+function applySpawnCanopyGoldCrestOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-canopy-gold-crest',
+  };
+}
+
+function applySpawnCanopyShadowSoffitOverride(material: PBRMaterial) {
+  applyHeroPortalShadowVaultOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-canopy-shadow-soffit',
+  };
+}
+
+function applySpawnCanopyCyanLanternOverride(material: PBRMaterial) {
+  applyCrownApexCrystalOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-canopy-cyan-lantern',
   };
 }
 
@@ -2221,6 +5456,57 @@ function applyArrivalRunwayPearlBandsOverride(material: PBRMaterial) {
   };
 }
 
+function applyArrivalRunwayGoldBandsOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-runway-gold-bands',
+  };
+}
+
+function applyArrivalRunwayCyanThreadsOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.12, 0.24, 0.3);
+  material.emissiveColor = new Color3(0.01, 0.05, 0.07);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.36;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.18;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.3;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-runway-cyan-threads',
+  };
+}
+
+function applyArrivalThresholdShadowGroovesOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.08;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.28;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-threshold-shadow-grooves',
+  };
+}
+
 function applyArrivalPlinthPearlDaisOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.24, 0.26, 0.3);
@@ -2235,6 +5521,98 @@ function applyArrivalPlinthPearlDaisOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'arrival-plinth-pearl-dais',
+  };
+}
+
+function applyArrivalPlinthGoldInlayOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-plinth-gold-inlay',
+  };
+}
+
+function applyArrivalPlinthCyanSpineOverride(material: PBRMaterial) {
+  applyCrownApexCrystalOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-plinth-cyan-spine',
+  };
+}
+
+function applyArrivalPlinthShadowRevealOverride(material: PBRMaterial) {
+  applyHeroPortalShadowVaultOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-plinth-shadow-reveal',
+  };
+}
+
+function applyBackPlazaLanternStemOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.08;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.28;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'back-plaza-lantern-stem',
+  };
+}
+
+function applyBackPlazaLanternGoldCageOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'back-plaza-lantern-gold-cage',
+  };
+}
+
+function applyBackPlazaLanternWarmCoreOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.8, 0.56, 0.24);
+  material.emissiveColor = new Color3(1, 0.68, 0.24);
+  material.emissiveIntensity = 0.7;
+  material.metallic = 0.02;
+  material.roughness = 0.32;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.18;
+  material.clearCoat.roughness = 0.24;
+  material.environmentIntensity = 0.42;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'back-plaza-lantern-warm-core',
+  };
+}
+
+function applyBackPlazaLanternHaloRimOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.22, 0.17, 0.08);
+  material.emissiveColor = new Color3(0.12, 0.08, 0.03);
+  material.emissiveIntensity = 0.08;
+  material.metallic = 0.1;
+  material.roughness = 0.78;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.52;
+  material.environmentIntensity = 0.22;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'back-plaza-lantern-halo-rim',
   };
 }
 
@@ -2430,6 +5808,30 @@ function applyRearMassAuroraPearlOverride(material: PBRMaterial) {
   };
 }
 
+function applyRearMassAuroraGoldSpineOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'rear-mass-aurora-gold-spine',
+  };
+}
+
+function applyRearMassAuroraCyanCoreOverride(material: PBRMaterial) {
+  applyCrownApexCrystalOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'rear-mass-aurora-cyan-core',
+  };
+}
+
+function applyRearMassAuroraShadowRibbonOverride(material: PBRMaterial) {
+  applyHeroPortalShadowVaultOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'rear-mass-aurora-shadow-ribbon',
+  };
+}
+
 function applyBackPlazaSentinelPearlOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.21, 0.23, 0.27);
@@ -2444,6 +5846,30 @@ function applyBackPlazaSentinelPearlOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'back-plaza-sentinel-pearl',
+  };
+}
+
+function applyBackPlazaSentinelGoldCrownOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'back-plaza-sentinel-gold-crown',
+  };
+}
+
+function applyBackPlazaSentinelCyanSpineOverride(material: PBRMaterial) {
+  applyCrownApexCrystalOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'back-plaza-sentinel-cyan-spine',
+  };
+}
+
+function applyBackPlazaSentinelShadowCoreOverride(material: PBRMaterial) {
+  applyHeroPortalShadowVaultOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'back-plaza-sentinel-shadow-core',
   };
 }
 
@@ -2498,6 +5924,22 @@ function applyWayfindingPylonPearlShellOverride(material: PBRMaterial) {
   };
 }
 
+function applyWayfindingPylonGoldCrownOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wayfinding-pylon-gold-crown',
+  };
+}
+
+function applyWayfindingPylonCyanGlyphOverride(material: PBRMaterial) {
+  applyWingFacadeInsetGlowOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wayfinding-pylon-cyan-glyph',
+  };
+}
+
 function applyPyroPodPearlShellOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.21, 0.23, 0.27);
@@ -2515,6 +5957,32 @@ function applyPyroPodPearlShellOverride(material: PBRMaterial) {
   };
 }
 
+function applyPyroPodGoldNozzleOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'pyro-pod-gold-nozzle',
+  };
+}
+
+function applyPyroPodRedGlassOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.2, 0.06, 0.06);
+  material.emissiveColor = new Color3(0.22, 0.04, 0.03);
+  material.emissiveIntensity = 0.16;
+  material.alpha = 0.44;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.24;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.06;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.26;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'pyro-pod-red-glass',
+  };
+}
+
 function applyBackPlazaGatewayPearlOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.21, 0.23, 0.27);
@@ -2529,6 +5997,30 @@ function applyBackPlazaGatewayPearlOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'back-plaza-gateway-pearl',
+  };
+}
+
+function applyBackPlazaGatewayCyanInlayOverride(material: PBRMaterial) {
+  applyWingFacadeInsetGlowOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'back-plaza-gateway-cyan-inlay',
+  };
+}
+
+function applyBackPlazaGatewayGoldCrownOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'back-plaza-gateway-gold-crown',
+  };
+}
+
+function applyBackPlazaBannerRailOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'back-plaza-banner-rail',
   };
 }
 
@@ -2566,6 +6058,14 @@ function applyInnerPortalPearlShellOverride(material: PBRMaterial) {
   };
 }
 
+function applyInnerPortalGoldRevealOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'inner-portal-gold-reveal',
+  };
+}
+
 function applyProsceniumPearlRevealOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.2, 0.22, 0.26);
@@ -2600,6 +6100,30 @@ function applyCrownObeliskPearlShellOverride(material: PBRMaterial) {
   };
 }
 
+function applyCrownObeliskGoldTraceryOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-obelisk-gold-tracery',
+  };
+}
+
+function applyCrownObeliskShadowSpineOverride(material: PBRMaterial) {
+  applyHeroPortalShadowVaultOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-obelisk-shadow-spine',
+  };
+}
+
+function applyCrownObeliskApexCrystalOverride(material: PBRMaterial) {
+  applyCrownApexCrystalOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-obelisk-apex-crystal',
+  };
+}
+
 function applyCrownJewelPearlSocketOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.2, 0.22, 0.26);
@@ -2614,6 +6138,30 @@ function applyCrownJewelPearlSocketOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-jewel-pearl-socket',
+  };
+}
+
+function applyCrownJewelGoldCradleOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-jewel-gold-cradle',
+  };
+}
+
+function applyCrownJewelShadowCoreOverride(material: PBRMaterial) {
+  applyHeroPortalShadowVaultOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-jewel-shadow-core',
+  };
+}
+
+function applyCrownJewelCyanOverride(material: PBRMaterial) {
+  applyCrownApexCrystalOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-jewel-cyan',
   };
 }
 
@@ -2648,6 +6196,30 @@ function applySpawnGateSentinelPearlOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-gate-sentinel-pearl',
+  };
+}
+
+function applySpawnGateSentinelGoldCrownOverride(material: PBRMaterial) {
+  applyWingFacadeArchInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-gate-sentinel-gold-crown',
+  };
+}
+
+function applySpawnGateSentinelCyanCoreOverride(material: PBRMaterial) {
+  applyCrownApexCrystalOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-gate-sentinel-cyan-core',
+  };
+}
+
+function applySpawnGateSentinelShadowKeelOverride(material: PBRMaterial) {
+  applyHeroPortalShadowVaultOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-gate-sentinel-shadow-keel',
   };
 }
 
@@ -2866,6 +6438,14 @@ function applyWingArcadeCyanInlayOverride(material: PBRMaterial) {
   };
 }
 
+function applyCrowdWearableGlowOverride(material: PBRMaterial) {
+  applyWingArcadeCyanInlayOverride(material);
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crowd-wearable-glow',
+  };
+}
+
 function applyVipTerraceOuterSweepOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.2, 0.22, 0.26);
@@ -2897,6 +6477,334 @@ function applyVipTerraceGoldInlayOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'vip-terrace-gold-inlay',
+  };
+}
+
+function applyVipBalustradeLowerChordOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'vip-balustrade-lower-chord',
+  };
+}
+
+function applyVipBalustradeFiligreeOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'vip-balustrade-filigree',
+  };
+}
+
+function applyVipPearlSurfaceGoldReliefOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'vip-pearl-surface-gold-relief',
+  };
+}
+
+function applyVipPearlSurfaceCyanInsetOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.12, 0.24, 0.3);
+  material.emissiveColor = new Color3(0.01, 0.05, 0.07);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.36;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.18;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.3;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'vip-pearl-surface-cyan-inset',
+  };
+}
+
+function applyOuterWingGoldSpineOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'outer-wing-gold-spine',
+  };
+}
+
+function applyRearShellGoldSeamOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'rear-shell-gold-seam',
+  };
+}
+
+function applyForegroundBarricadeGoldRunOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'foreground-barricade-gold-run',
+  };
+}
+
+function applyForegroundBarricadePearlRunOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.24, 0.26, 0.3);
+  material.emissiveColor = new Color3(0.006, 0.01, 0.014);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'foreground-barricade-pearl-run',
+  };
+}
+
+function applyRearShellPanelOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.24, 0.26, 0.3);
+  material.emissiveColor = new Color3(0.006, 0.01, 0.014);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'rear-shell-panel',
+  };
+}
+
+function applyCrownCrystalGoldEdgeOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-crystal-gold-edge',
+  };
+}
+
+function applyCrownShellGoldSeamOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-shell-gold-seam',
+  };
+}
+
+function applyCelestialHaloOuterRingOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'celestial-halo-outer-ring',
+  };
+}
+
+function applyCelestialHaloInnerRingOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'celestial-halo-inner-ring',
+  };
+}
+
+function applyCelestialHaloCyanEdgeOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.12, 0.24, 0.3);
+  material.emissiveColor = new Color3(0.01, 0.05, 0.07);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.36;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.18;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.3;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'celestial-halo-cyan-edge',
+  };
+}
+
+function applyCenterScreenMullionOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'center-screen-mullion',
+  };
+}
+
+function applyCenterScreenCyanEdgeOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.12, 0.24, 0.3);
+  material.emissiveColor = new Color3(0.01, 0.05, 0.07);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.36;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.18;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.3;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'center-screen-cyan-edge',
+  };
+}
+
+function applyBasinWaterSheetOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.04, 0.06, 0.08);
+  material.emissiveColor = new Color3(0.01, 0.025, 0.035);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.98;
+  material.metallic = 0.02;
+  material.roughness = 0.22;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.7;
+  material.clearCoat.roughness = 0.08;
+  material.environmentIntensity = 0.86;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-water-sheet',
+  };
+}
+
+function applyOvalPortalGlowGoldOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-portal-glow-gold',
+  };
+}
+
+function applyOvalPortalGlowEmissionOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.12, 0.24, 0.3);
+  material.emissiveColor = new Color3(0.01, 0.05, 0.07);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.36;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.18;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.3;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-portal-glow-emission',
   };
 }
 
