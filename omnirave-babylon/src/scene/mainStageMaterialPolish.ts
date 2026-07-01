@@ -6619,15 +6619,15 @@ function applyForegroundBarricadePearlRunOverride(material: PBRMaterial) {
 
 function applyRearShellPanelOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.24, 0.26, 0.3);
-  material.emissiveColor = new Color3(0.006, 0.01, 0.014);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.33, 0.35, 0.39);
+  material.emissiveColor = new Color3(0.008, 0.012, 0.016);
+  material.emissiveIntensity = 0.03;
   material.metallic = 0.02;
-  material.roughness = 0.84;
+  material.roughness = 0.78;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.62;
-  material.environmentIntensity = 0.14;
+  material.clearCoat.intensity = 0.05;
+  material.clearCoat.roughness = 0.56;
+  material.environmentIntensity = 0.24;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'rear-shell-panel',
