@@ -93,12 +93,24 @@ export default function OmniChatPage() {
     },
     onError: (error) => {
       setStreamingText('');
-      const status = (error as Error & { status?: number }).status;
-      if (status === 429) {
-        setRateLimitError(t('omnichat.chat.rateLimited'));
+      const err = error as Error & { status?: number };
+      if (err.status === 429) {
+        setRateLimitError('rateLimited');
       } else {
         setRateLimitError(null);
       }
+      // Roll back the optimistic user message so it doesn't linger as a
+      // ghost message (and avoid duplicate React keys on resubmit).
+      queryClient.setQueryData<BotConversationDetail | undefined>(
+        omnichatQueryKeys.conversation(id),
+        (prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            messages: prev.messages.filter((m) => m.id > 0 || m.role !== 'user'),
+          };
+        }
+      );
     },
   });
 
@@ -236,7 +248,7 @@ export default function OmniChatPage() {
         <form onSubmit={handleSubmit} className="flex gap-2 border-t border-[var(--color-border)] py-3">
           <div className="relative flex-1">
             {rateLimitError && (
-              <p className="absolute -top-6 left-0 text-xs text-red-400">{rateLimitError}</p>
+              <p className="absolute -top-6 left-0 text-xs text-red-400">{t(`omnichat.chat.${rateLimitError}`)}</p>
             )}
             <input
               type="text"
