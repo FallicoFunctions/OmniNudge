@@ -1382,7 +1382,7 @@ describe('polishMainStageMaterials', () => {
     expect(glowMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
   });
 
-  it('darkens the rear-shell panel arrays so the skyline mass reads as carved shell architecture instead of broad bright pearl slabs', () => {
+  it('keeps the rear-shell panel arrays subdued but still legible so the skyline mass reads as carved shell architecture instead of dead-black slabs', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -1412,12 +1412,18 @@ describe('polishMainStageMaterials', () => {
     expect(panelMaterial.name).toContain('rear-shell-panel');
     expect(panelMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(panelMaterial.metadata?.mainStageMaterialOverride).toBe('rear-shell-panel');
-    expect(panelMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
-    expect(panelMaterial.albedoColor.g).toBeLessThanOrEqual(0.3);
-    expect(panelMaterial.albedoColor.b).toBeLessThanOrEqual(0.34);
-    expect(panelMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(panelMaterial.roughness).toBeGreaterThanOrEqual(0.82);
-    expect(panelMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(panelMaterial.albedoColor.r).toBeGreaterThanOrEqual(0.3);
+    expect(panelMaterial.albedoColor.g).toBeGreaterThanOrEqual(0.32);
+    expect(panelMaterial.albedoColor.b).toBeGreaterThanOrEqual(0.36);
+    expect(panelMaterial.albedoColor.r).toBeLessThanOrEqual(0.38);
+    expect(panelMaterial.albedoColor.g).toBeLessThanOrEqual(0.4);
+    expect(panelMaterial.albedoColor.b).toBeLessThanOrEqual(0.44);
+    expect(panelMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.025);
+    expect(panelMaterial.emissiveIntensity).toBeLessThanOrEqual(0.05);
+    expect(panelMaterial.roughness).toBeGreaterThanOrEqual(0.74);
+    expect(panelMaterial.roughness).toBeLessThanOrEqual(0.86);
+    expect(panelMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.22);
+    expect(panelMaterial.environmentIntensity).toBeLessThanOrEqual(0.34);
   });
 
   it('tones down the crown crystal gold edge array so the halo crown reads as carved metal detail instead of a bright foil comb', () => {
