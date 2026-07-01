@@ -2064,7 +2064,7 @@ describe('polishMainStageMaterials', () => {
     expect(shadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
   });
 
-  it('rebalances the main line-array and front-sub assemblies so the stage flanks read as finished show audio hardware instead of proxy black boxes with bright gold hang bars', () => {
+  it('keeps the main line-array and front-sub assemblies dark but readable so the stage flanks read as finished show audio hardware instead of dead-black boxes with bright gold hang bars', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -2205,24 +2205,34 @@ describe('polishMainStageMaterials', () => {
     expect(graphiteMaterial.name).toContain('line-array-graphite');
     expect(graphiteMaterial.metadata?.mainStageMaterialPolish).toBe('black');
     expect(graphiteMaterial.metadata?.mainStageMaterialOverride).toBe('line-array-graphite');
+    expect(graphiteMaterial.albedoColor.r).toBeGreaterThanOrEqual(0.18);
+    expect(graphiteMaterial.albedoColor.g).toBeGreaterThanOrEqual(0.2);
+    expect(graphiteMaterial.albedoColor.b).toBeGreaterThanOrEqual(0.24);
     expect(graphiteMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
     expect(graphiteMaterial.albedoColor.g).toBeLessThanOrEqual(0.22);
     expect(graphiteMaterial.albedoColor.b).toBeLessThanOrEqual(0.26);
+    expect(graphiteMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.02);
     expect(graphiteMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
     expect(graphiteMaterial.metallic).toBeLessThanOrEqual(0.08);
-    expect(graphiteMaterial.roughness).toBeGreaterThanOrEqual(0.84);
-    expect(graphiteMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+    expect(graphiteMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(graphiteMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.18);
+    expect(graphiteMaterial.environmentIntensity).toBeLessThanOrEqual(0.22);
 
     expect(blackMaterial.name).toContain('line-array-acoustic-black');
     expect(blackMaterial.metadata?.mainStageMaterialPolish).toBe('black');
     expect(blackMaterial.metadata?.mainStageMaterialOverride).toBe('line-array-acoustic-black');
-    expect(blackMaterial.albedoColor.r).toBeLessThanOrEqual(0.06);
-    expect(blackMaterial.albedoColor.g).toBeLessThanOrEqual(0.08);
-    expect(blackMaterial.albedoColor.b).toBeLessThanOrEqual(0.1);
+    expect(blackMaterial.albedoColor.r).toBeGreaterThanOrEqual(0.05);
+    expect(blackMaterial.albedoColor.g).toBeGreaterThanOrEqual(0.07);
+    expect(blackMaterial.albedoColor.b).toBeGreaterThanOrEqual(0.09);
+    expect(blackMaterial.albedoColor.r).toBeLessThanOrEqual(0.09);
+    expect(blackMaterial.albedoColor.g).toBeLessThanOrEqual(0.11);
+    expect(blackMaterial.albedoColor.b).toBeLessThanOrEqual(0.13);
+    expect(blackMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.08);
     expect(blackMaterial.emissiveIntensity).toBeLessThanOrEqual(0.1);
     expect(blackMaterial.metallic).toBeLessThanOrEqual(0.08);
-    expect(blackMaterial.roughness).toBeGreaterThanOrEqual(0.74);
-    expect(blackMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
+    expect(blackMaterial.roughness).toBeGreaterThanOrEqual(0.72);
+    expect(blackMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.2);
+    expect(blackMaterial.environmentIntensity).toBeLessThanOrEqual(0.24);
 
     expect(hardwareMaterial.name).toContain('line-array-suspension-hardware');
     expect(hardwareMaterial.metadata?.mainStageMaterialPolish).toBe('black');
