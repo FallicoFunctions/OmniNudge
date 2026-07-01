@@ -22,6 +22,7 @@ import type {
   WsReactionAddedPayload,
   WsReactionRemovedPayload,
 } from '../types/reactions';
+import type { BotConversationDetail, BotMessage } from '../types/omnichat';
 import { friendsQueryKeys } from '../services/friendsService';
 
 interface WebSocketMessage {
@@ -653,6 +654,38 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               new CustomEvent('ws-call-event', {
                 detail: { type: data.type, payload: data.payload },
               })
+            );
+            break;
+          }
+
+          case 'omnichat_token': {
+            // Streamed token from an in-progress OmniChat generation — the chat
+            // page owns its own streaming buffer, so just forward it as an event
+            // rather than writing every token into the query cache.
+            window.dispatchEvent(
+              new CustomEvent('omnichat-token', {
+                detail: data.payload as { conversation_id: number; token: string },
+              })
+            );
+            break;
+          }
+
+          case 'omnichat_message_complete': {
+            // Final assistant message for an OmniChat conversation — append it to
+            // the cached message list (if loaded) and let the chat page clear its
+            // streaming buffer via the forwarded event.
+            const message = data.payload as BotMessage;
+            queryClient.setQueryData<BotConversationDetail | undefined>(
+              ['omnichat', 'conversation', message.conversation_id],
+              (prev) => {
+                if (!prev) return prev;
+                if (prev.messages.some((m) => m.id === message.id)) return prev;
+                return { ...prev, messages: [...prev.messages, message] };
+              }
+            );
+            queryClient.invalidateQueries({ queryKey: ['omnichat', 'conversations'] });
+            window.dispatchEvent(
+              new CustomEvent('omnichat-message-complete', { detail: message })
             );
             break;
           }

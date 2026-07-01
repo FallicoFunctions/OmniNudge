@@ -1,12 +1,25 @@
 /* Import Altered Carbon theme */
 @import './styles/altered-carbon-theme.css';
 
+/* Import OmniChat theme */
+@import './styles/omnichat-theme.css';
+
 /* Import RTL support */
 @import './styles/rtl.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer utilities {
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
 
 /* Root CSS Variables - Default Theme */
 :root {
