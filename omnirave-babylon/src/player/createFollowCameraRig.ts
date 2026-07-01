@@ -27,6 +27,7 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
   camera.minZ = 0.05;
 
   const applyCheckpointView = (view: ReviewCheckpointCamera) => {
+    target.computeWorldMatrix(true);
     checkpointWorldTarget.copyFrom(target.getAbsolutePosition());
     checkpointWorldTarget.x += view.focusOffset.x;
     checkpointWorldTarget.y += view.focusOffset.y;
@@ -40,6 +41,7 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
       checkpointWorldPosition.z += view.positionOffset.z;
       camera.position.copyFrom(checkpointWorldPosition);
       camera.setTarget(checkpointWorldTarget);
+      camera.rebuildAnglesAndRadius();
       return resolveZoomState(camera.radius);
     }
 
