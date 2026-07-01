@@ -305,6 +305,26 @@ func TestCalculateThumbnailDimensions(t *testing.T) {
 	}
 }
 
+func TestSafeOpenImage(t *testing.T) {
+	t.Run("valid image decodes normally", func(t *testing.T) {
+		path := createTestImage(t, 10, 10)
+		img, err := safeOpenImage(path)
+		require.NoError(t, err)
+		require.NotNil(t, img)
+		assert.Equal(t, 10, img.Bounds().Dx())
+	})
+
+	t.Run("corrupt file returns an error, not a panic", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		corruptPath := filepath.Join(tmpDir, "corrupt.png")
+		require.NoError(t, os.WriteFile(corruptPath, []byte("not an image"), 0o600))
+
+		img, err := safeOpenImage(corruptPath)
+		assert.Error(t, err)
+		assert.Nil(t, img)
+	})
+}
+
 func TestIsVideoType(t *testing.T) {
 	testCases := []struct {
 		contentType string
