@@ -9204,7 +9204,7 @@ describe('polishMainStageMaterials', () => {
     expect(crystalMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
   });
 
-  it('neutralizes the performance dais lower tier so the stage base reads as recessed mass instead of a bright cyan slab', () => {
+  it('keeps the performance dais lower tier grounded but readable so the stage base reads as recessed support mass instead of a dead-black cyan slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -9228,15 +9228,20 @@ describe('polishMainStageMaterials', () => {
     const daisMaterial = lowerDais.material as PBRMaterial;
     expect(daisMaterial.metadata?.mainStageMaterialPolish).toBe('black');
     expect(daisMaterial.metadata?.mainStageMaterialOverride).toBe('performance-dais-lower');
+    expect(daisMaterial.albedoColor.r).toBeGreaterThanOrEqual(0.16);
+    expect(daisMaterial.albedoColor.g).toBeGreaterThanOrEqual(0.19);
+    expect(daisMaterial.albedoColor.b).toBeGreaterThanOrEqual(0.23);
     expect(daisMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
     expect(daisMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
     expect(daisMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
+    expect(daisMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.02);
     expect(daisMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
-    expect(daisMaterial.roughness).toBeGreaterThanOrEqual(0.78);
+    expect(daisMaterial.roughness).toBeGreaterThanOrEqual(0.8);
+    expect(daisMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.3);
     expect(daisMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
   });
 
-  it('darkens the performance dais mid tier so the stage body reads as carved support mass instead of a bright ivory slab', () => {
+  it('keeps the performance dais mid tier shaded but readable so the stage body reads as carved support mass instead of a dead-black ivory slab', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -9261,13 +9266,18 @@ describe('polishMainStageMaterials', () => {
     const daisMaterial = midDais.material as PBRMaterial;
     expect(daisMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(daisMaterial.metadata?.mainStageMaterialOverride).toBe('performance-dais-mid');
+    expect(daisMaterial.albedoColor.r).toBeGreaterThanOrEqual(0.26);
+    expect(daisMaterial.albedoColor.g).toBeGreaterThanOrEqual(0.28);
+    expect(daisMaterial.albedoColor.b).toBeGreaterThanOrEqual(0.32);
     expect(daisMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
-    expect(daisMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
-    expect(daisMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(daisMaterial.albedoColor.g).toBeLessThanOrEqual(0.3);
+    expect(daisMaterial.albedoColor.b).toBeLessThanOrEqual(0.34);
+    expect(daisMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.02);
     expect(daisMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(daisMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(daisMaterial.roughness).toBeGreaterThanOrEqual(0.8);
     expect(daisMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(daisMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(daisMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.16);
+    expect(daisMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
   });
 
   it('tones down the performance dais upper tier so the stage crown reads as carved metal detail instead of a bright foil slab', () => {
