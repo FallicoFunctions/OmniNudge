@@ -40,7 +40,7 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
     id: 'promenade_mid',
     x: 0,
     y: 1.7,
-    z: -18,
+    z: -30,
     camera: {
       alpha: -Math.PI / 2,
       beta: 1.06,
