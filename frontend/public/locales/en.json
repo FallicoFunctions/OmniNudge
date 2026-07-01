@@ -3955,7 +3955,8 @@
       "loading": "Loading conversation...",
       "loadError": "Unable to load this conversation.",
       "inputPlaceholder": "Say or do something...",
-      "send": "Send message"
+      "send": "Send message",
+      "rateLimited": "You're moving too fast — please wait a moment before sending another message."
     },
     "exitToSite": "Exit to OmniNudge"
   }
