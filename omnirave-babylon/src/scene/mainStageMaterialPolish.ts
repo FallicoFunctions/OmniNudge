@@ -4897,12 +4897,12 @@ function applyWideHeroScreenIvoryShellOverride(material: PBRMaterial) {
 
 function applyCrownScreenShadowCofferOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.03, 0.05, 0.07);
-  material.emissiveColor = new Color3(0.01, 0.06, 0.09);
-  material.emissiveIntensity = 0.08;
+  material.albedoColor = new Color3(0.06, 0.08, 0.1);
+  material.emissiveColor = new Color3(0.012, 0.052, 0.076);
+  material.emissiveIntensity = 0.09;
   material.metallic = 0.04;
-  material.roughness = 0.72;
-  material.environmentIntensity = 0.16;
+  material.roughness = 0.74;
+  material.environmentIntensity = 0.22;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-screen-shadow-coffer',
@@ -4980,15 +4980,15 @@ function applyCenterScreenGoldInterruptRailOverride(material: PBRMaterial) {
 
 function applyCenterScreenDepthBaffleArrayOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.03, 0.05, 0.07);
-  material.emissiveColor = new Color3(0.006, 0.03, 0.05);
-  material.emissiveIntensity = 0.05;
+  material.albedoColor = new Color3(0.06, 0.08, 0.1);
+  material.emissiveColor = new Color3(0.008, 0.032, 0.05);
+  material.emissiveIntensity = 0.06;
   material.metallic = 0.04;
-  material.roughness = 0.8;
+  material.roughness = 0.76;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.02;
-  material.clearCoat.roughness = 0.74;
-  material.environmentIntensity = 0.16;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.22;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'center-screen-depth-baffle-array',
@@ -5031,15 +5031,15 @@ function applyWingScreenShadowCofferArrayOverride(material: PBRMaterial) {
 
 function applyCenterScreenShadowCofferArrayOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.04, 0.06, 0.08);
-  material.emissiveColor = new Color3(0.008, 0.04, 0.06);
-  material.emissiveIntensity = 0.06;
+  material.albedoColor = new Color3(0.07, 0.09, 0.11);
+  material.emissiveColor = new Color3(0.01, 0.042, 0.06);
+  material.emissiveIntensity = 0.07;
   material.metallic = 0.05;
-  material.roughness = 0.78;
+  material.roughness = 0.74;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.02;
-  material.clearCoat.roughness = 0.72;
-  material.environmentIntensity = 0.18;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.24;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'center-screen-shadow-coffer-array',

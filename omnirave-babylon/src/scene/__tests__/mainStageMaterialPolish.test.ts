@@ -4029,7 +4029,7 @@ describe('polishMainStageMaterials', () => {
     expect(inlayMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
-  it('rebalances the crown screen coffers and promenade runway into lower-glare night finishes so the basin view stage face reads with depth instead of dead black bars and pearl slab washout', () => {
+  it('keeps the crown screen coffer smoky but readable so the basin-view hero wall reads as layered shadow architecture instead of a dead-black cap', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -4071,12 +4071,17 @@ describe('polishMainStageMaterials', () => {
 
     expect(screenCofferMaterial.metadata?.mainStageMaterialPolish).toBe('black');
     expect(screenCofferMaterial.metadata?.mainStageMaterialOverride).toBe('crown-screen-shadow-coffer');
-    expect(screenCofferMaterial.albedoColor.r).toBeLessThanOrEqual(0.05);
-    expect(screenCofferMaterial.albedoColor.g).toBeLessThanOrEqual(0.07);
-    expect(screenCofferMaterial.albedoColor.b).toBeLessThanOrEqual(0.09);
+    expect(screenCofferMaterial.albedoColor.r).toBeGreaterThanOrEqual(0.05);
+    expect(screenCofferMaterial.albedoColor.g).toBeGreaterThanOrEqual(0.07);
+    expect(screenCofferMaterial.albedoColor.b).toBeGreaterThanOrEqual(0.09);
+    expect(screenCofferMaterial.albedoColor.r).toBeLessThanOrEqual(0.09);
+    expect(screenCofferMaterial.albedoColor.g).toBeLessThanOrEqual(0.11);
+    expect(screenCofferMaterial.albedoColor.b).toBeLessThanOrEqual(0.13);
     expect(screenCofferMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.04);
     expect(screenCofferMaterial.emissiveIntensity).toBeLessThanOrEqual(0.12);
-    expect(screenCofferMaterial.environmentIntensity).toBeLessThanOrEqual(0.22);
+    expect(screenCofferMaterial.roughness).toBeGreaterThanOrEqual(0.7);
+    expect(screenCofferMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.2);
+    expect(screenCofferMaterial.environmentIntensity).toBeLessThanOrEqual(0.26);
 
     expect(promenadeRunwayMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(promenadeRunwayMaterial.metadata?.mainStageMaterialOverride).toBe('promenade-pearl-runway');
@@ -4337,7 +4342,7 @@ describe('polishMainStageMaterials', () => {
     expect(railMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
-  it('darkens the center screen shadow coffer array so the hero wall frame reads as depth instead of a flat glossy black border', () => {
+  it('keeps the center screen shadow coffer array smoky but still readable so the hero wall frame reads as depth instead of a dead-black border', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -4363,17 +4368,21 @@ describe('polishMainStageMaterials', () => {
     const cofferMaterial = coffer.material as PBRMaterial;
     expect(cofferMaterial.metadata?.mainStageMaterialPolish).toBe('black');
     expect(cofferMaterial.metadata?.mainStageMaterialOverride).toBe('center-screen-shadow-coffer-array');
-    expect(cofferMaterial.albedoColor.r).toBeLessThanOrEqual(0.06);
-    expect(cofferMaterial.albedoColor.g).toBeLessThanOrEqual(0.08);
-    expect(cofferMaterial.albedoColor.b).toBeLessThanOrEqual(0.1);
+    expect(cofferMaterial.albedoColor.r).toBeGreaterThanOrEqual(0.06);
+    expect(cofferMaterial.albedoColor.g).toBeGreaterThanOrEqual(0.08);
+    expect(cofferMaterial.albedoColor.b).toBeGreaterThanOrEqual(0.1);
+    expect(cofferMaterial.albedoColor.r).toBeLessThanOrEqual(0.1);
+    expect(cofferMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(cofferMaterial.albedoColor.b).toBeLessThanOrEqual(0.14);
     expect(cofferMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.04);
     expect(cofferMaterial.emissiveIntensity).toBeLessThanOrEqual(0.1);
     expect(cofferMaterial.metallic).toBeLessThanOrEqual(0.08);
-    expect(cofferMaterial.roughness).toBeGreaterThanOrEqual(0.74);
-    expect(cofferMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
+    expect(cofferMaterial.roughness).toBeGreaterThanOrEqual(0.7);
+    expect(cofferMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.22);
+    expect(cofferMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
   });
 
-  it('darkens the center screen depth baffles so the hero wall keeps layered shadow blades instead of glossy black slats', () => {
+  it('keeps the center screen depth baffles smoky but readable so the hero wall keeps layered shadow blades instead of dead-black slats', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -4399,14 +4408,18 @@ describe('polishMainStageMaterials', () => {
     const baffleMaterial = baffles.material as PBRMaterial;
     expect(baffleMaterial.metadata?.mainStageMaterialPolish).toBe('black');
     expect(baffleMaterial.metadata?.mainStageMaterialOverride).toBe('center-screen-depth-baffle-array');
-    expect(baffleMaterial.albedoColor.r).toBeLessThanOrEqual(0.05);
-    expect(baffleMaterial.albedoColor.g).toBeLessThanOrEqual(0.07);
-    expect(baffleMaterial.albedoColor.b).toBeLessThanOrEqual(0.09);
+    expect(baffleMaterial.albedoColor.r).toBeGreaterThanOrEqual(0.05);
+    expect(baffleMaterial.albedoColor.g).toBeGreaterThanOrEqual(0.07);
+    expect(baffleMaterial.albedoColor.b).toBeGreaterThanOrEqual(0.09);
+    expect(baffleMaterial.albedoColor.r).toBeLessThanOrEqual(0.09);
+    expect(baffleMaterial.albedoColor.g).toBeLessThanOrEqual(0.11);
+    expect(baffleMaterial.albedoColor.b).toBeLessThanOrEqual(0.13);
     expect(baffleMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.04);
     expect(baffleMaterial.emissiveIntensity).toBeLessThanOrEqual(0.09);
     expect(baffleMaterial.metallic).toBeLessThanOrEqual(0.08);
-    expect(baffleMaterial.roughness).toBeGreaterThanOrEqual(0.76);
-    expect(baffleMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+    expect(baffleMaterial.roughness).toBeGreaterThanOrEqual(0.72);
+    expect(baffleMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.2);
+    expect(baffleMaterial.environmentIntensity).toBeLessThanOrEqual(0.26);
   });
 
   it('darkens the wing screen depth baffles so the side screens keep carved shadow blades instead of glossy black ribs', () => {
