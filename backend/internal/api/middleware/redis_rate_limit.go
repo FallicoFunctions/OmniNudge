@@ -202,3 +202,11 @@ func AIDesignRateLimiter(cache services.Cache) *RedisRateLimiter {
 func ChatDesignRateLimiter(cache services.Cache) *RedisRateLimiter {
 	return NewRedisRateLimiter(cache, 60, time.Hour, "rate:ai_design_chat")
 }
+
+// OmniChatRateLimiter creates a distributed rate limiter for OmniChat bot
+// messages. The upstream OpenRouter free tier is a shared, low daily quota
+// across the whole app, so this is deliberately tight per user.
+// 20 messages per hour per user.
+func OmniChatRateLimiter(cache services.Cache) *RedisRateLimiter {
+	return NewRedisRateLimiter(cache, 20, time.Hour, "rate:omnichat")
+}
