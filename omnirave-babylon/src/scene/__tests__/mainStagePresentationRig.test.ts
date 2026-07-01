@@ -1,4 +1,4 @@
-import { ArcRotateCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
+import { ArcRotateCamera, NullEngine, Scene, ShaderStore, Vector3 } from '@babylonjs/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createMainStagePresentationRig } from '../createMainStagePresentationRig';
@@ -74,5 +74,18 @@ describe('createMainStagePresentationRig', () => {
 
     const mistBandMaterial = scene.getMaterialByName('main-stage-arrival-mist-band-material');
     expect(mistBandMaterial?.alpha).toBeGreaterThanOrEqual(0.2);
+  });
+
+  it('registers the presentation pipeline shaders needed by the dev runtime', () => {
+    engine = new NullEngine();
+    scene = new Scene(engine);
+    const camera = new ArcRotateCamera('review-camera', 0, 1, 12, Vector3.Zero(), scene);
+
+    createMainStagePresentationRig(scene, camera);
+
+    expect(ShaderStore.ShadersStore.imageProcessingPixelShader).toBeTypeOf('string');
+    expect(ShaderStore.ShadersStore.extractHighlightsPixelShader).toBeTypeOf('string');
+    expect(ShaderStore.ShadersStore.kernelBlurPixelShader).toBeTypeOf('string');
+    expect(ShaderStore.ShadersStore.kernelBlurVertexShader).toBeTypeOf('string');
   });
 });
