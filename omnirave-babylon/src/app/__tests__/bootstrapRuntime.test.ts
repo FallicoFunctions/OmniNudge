@@ -219,7 +219,7 @@ describe('createRuntime', () => {
     expect(engineDispose).not.toHaveBeenCalled();
   });
 
-  it('registers the Babylon PBR shaders required by imported GLB materials', async () => {
+  it('registers the Babylon runtime shaders required by GLB materials and presentation post-processes', async () => {
     const { ShaderStore } = await import('@babylonjs/core/Engines/shaderStore.js');
 
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
@@ -239,5 +239,12 @@ describe('createRuntime', () => {
     expect(ShaderStore.ShadersStore.pbrVertexShader).toEqual(expect.any(String));
     expect(ShaderStore.ShadersStore.pbrPixelShader).toEqual(expect.any(String));
     expect(ShaderStore.ShadersStore.rgbdDecodePixelShader).toEqual(expect.any(String));
+    expect(ShaderStore.ShadersStore.imageProcessingPixelShader).toEqual(expect.any(String));
+    expect(ShaderStore.ShadersStore.extractHighlightsPixelShader).toEqual(expect.any(String));
+    expect(ShaderStore.ShadersStore.kernelBlurPixelShader).toEqual(expect.any(String));
+    expect(ShaderStore.ShadersStore.kernelBlurVertexShader).toEqual(expect.any(String));
+    expect(ShaderStore.ShadersStore.bloomMergePixelShader).toEqual(expect.any(String));
+    expect(ShaderStore.ShadersStore.fxaaPixelShader).toEqual(expect.any(String));
+    expect(ShaderStore.ShadersStore.fxaaVertexShader).toEqual(expect.any(String));
   });
 });
