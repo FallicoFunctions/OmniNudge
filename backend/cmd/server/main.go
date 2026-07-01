@@ -42,6 +42,7 @@ import (
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
 	linkpreviewsvc "github.com/omninudge/backend/internal/services/linkpreview"
+	"github.com/omninudge/backend/internal/services/openrouter"
 	"github.com/omninudge/backend/internal/tracing"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/omninudge/backend/internal/websocket"
@@ -517,7 +518,14 @@ func main() {
 	emailVerificationRepo := repository.NewPostgresEmailVerificationRepository(db.Pool)
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, lockoutService, cfg.AppEnv)
+	// Use nil lockoutService in dev to bypass brute-force protection locally
+	var devLockoutService *services.AccountLockoutService
+	if cfg.AppEnv == "development" {
+		devLockoutService = nil
+	} else {
+		devLockoutService = lockoutService
+	}
+	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, devLockoutService, cfg.AppEnv)
 	oauthHandler := handlers.NewOAuthHandler(authService, userRepo, db.Pool, cfg.FrontendURL, cfg.OAuth.BackendURL, cfg.OAuth.GoogleClientID, cfg.OAuth.GoogleClientSecret, cfg.OAuth.DiscordClientID, cfg.OAuth.DiscordClientSecret, cfg.OAuth.GitHubClientID, cfg.OAuth.GitHubClientSecret, cfg.OAuth.SteamAPIKey, cfg.AppEnv)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo, autoDeleteSvc)
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo, hubSettingsRepo)
@@ -609,6 +617,16 @@ func main() {
 		db.Pool, hubSettingsRepo,
 		cfg.Gemini.APIKey, cfg.Gemini.Model,
 	)
+
+	// OmniChat: AI chat bot personas, backed by OpenRouter.
+	zlog.Info().Bool("openrouter_key_set", cfg.OpenRouter.APIKey != "").Str("openrouter_model", cfg.OpenRouter.Model).Msg("OmniChat config")
+	botPersonaRepo := models.NewBotPersonaRepository(db.Pool)
+	botConversationRepo := models.NewBotConversationRepository(db.Pool)
+	botMessageRepo := models.NewBotMessageRepository(db.Pool)
+	openrouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey, cfg.OpenRouter.Model)
+	chatbotService := services.NewChatbotService(db.Pool, botPersonaRepo, botConversationRepo, botMessageRepo, openrouterClient, hub)
+	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService)
+	omniChatRateLimiter := middleware.OmniChatRateLimiter(cache)
 
 	// Feature 1: Message Reactions handler + rate limiter
 	reactionsHandler := handlers.NewReactionsHandler(reactionService)
@@ -825,8 +843,13 @@ func main() {
 		auth := api.Group("/auth")
 		{
 			// Username/password authentication — 5 attempts per 15 min per IP
-			auth.POST("/register", authRateLimiter.Middleware(), authHandler.Register)
-			auth.POST("/login", authRateLimiter.Middleware(), authHandler.Login)
+			if cfg.AppEnv == "development" {
+				auth.POST("/register", authHandler.Register)
+				auth.POST("/login", authHandler.Login)
+			} else {
+				auth.POST("/register", authRateLimiter.Middleware(), authHandler.Register)
+				auth.POST("/login", authRateLimiter.Middleware(), authHandler.Login)
+			}
 
 			// Password reset — 3 requests per hour per IP
 			auth.POST("/forgot-password", passwordResetRateLimiter.Middleware(), authHandler.ForgotPassword)
@@ -1153,6 +1176,14 @@ func main() {
 			protected.DELETE("/conversations/:id", conversationsHandler.DeleteConversation)
 			protected.GET("/conversations/:id/settings", conversationsHandler.GetChatSettings)
 			protected.PATCH("/conversations/:id/settings", conversationsHandler.UpdateChatSettings)
+
+			// OmniChat: AI chat bot personas and conversations
+			protected.GET("/omnichat/personas", omniChatHandler.ListPersonas)
+			protected.POST("/omnichat/conversations", omniChatHandler.CreateConversation)
+			protected.GET("/omnichat/conversations", omniChatHandler.ListConversations)
+			protected.GET("/omnichat/conversations/:id", omniChatHandler.GetConversation)
+			protected.POST("/omnichat/conversations/:id/messages", omniChatRateLimiter.Middleware(), omniChatHandler.SendMessage)
+
 			protected.POST("/folders", foldersHandler.CreateFolder)
 			protected.GET("/folders", foldersHandler.ListFolders)
 			protected.PATCH("/folders/:id", foldersHandler.UpdateFolder)
@@ -1519,7 +1550,7 @@ func main() {
 
 	// Give outstanding requests 30 seconds to complete (draining window).
 	shutdownStart := time.Now()
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {

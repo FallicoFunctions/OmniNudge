@@ -31,6 +31,7 @@ type Config struct {
 	AsynqmonToken string // Bearer token for /admin/queues dashboard; empty = unrestricted (dev only)
 	TURN          TURNConfig
 	Gemini        GeminiConfig
+	OpenRouter    OpenRouterConfig
 	Crypto        CryptoConfig
 	OAuth         OAuthConfig
 }
@@ -61,6 +62,13 @@ type CryptoConfig struct {
 type GeminiConfig struct {
 	APIKey string // GEMINI_API_KEY
 	Model  string // GEMINI_MODEL — defaults to gemini-2.5-flash
+}
+
+// OpenRouterConfig holds OpenRouter API configuration for OmniChat bot personas.
+// When APIKey is empty the generate endpoint returns a 503.
+type OpenRouterConfig struct {
+	APIKey string // OPENROUTER_API_KEY
+	Model  string // OPENROUTER_MODEL — defaults to openrouter/free
 }
 
 // TURNConfig holds coturn TURN server configuration for WebRTC relay
@@ -288,6 +296,10 @@ func Load() (*Config, error) {
 		Gemini: GeminiConfig{
 			APIKey: getEnv("GEMINI_API_KEY", ""),
 			Model:  getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
+		},
+		OpenRouter: OpenRouterConfig{
+			APIKey: getEnv("OPENROUTER_API_KEY", ""),
+			Model:  getEnv("OPENROUTER_MODEL", "openrouter/free"),
 		},
 		OAuth: OAuthConfig{
 			GoogleClientID:      getEnv("GOOGLE_CLIENT_ID", ""),
