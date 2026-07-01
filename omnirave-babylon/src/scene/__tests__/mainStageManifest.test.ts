@@ -9976,4 +9976,34 @@ describe('reviewRouteData', () => {
     expect(zSteps).toEqual([...zSteps].sort((a, b) => a - b));
     expect(zSteps.at(-1)).toBeGreaterThan(BACK_PLAZA_SPAWN.z);
   });
+
+  it('keeps the promenade and VIP review cameras close enough to judge stage detail instead of collapsing into long silhouette shots', () => {
+    const promenadeCheckpoint = MAIN_STAGE_REVIEW_ROUTE.find((checkpoint) => checkpoint.id === 'promenade_mid');
+    const vipCheckpoint = MAIN_STAGE_REVIEW_ROUTE.find((checkpoint) => checkpoint.id === 'vip_terrace');
+
+    expect(promenadeCheckpoint).toBeDefined();
+    expect(vipCheckpoint).toBeDefined();
+
+    const readableFramingDistance = (checkpoint: NonNullable<typeof promenadeCheckpoint>) => {
+      const focusTarget = {
+        x: checkpoint.x + checkpoint.camera.focusOffset.x,
+        y: checkpoint.y + checkpoint.camera.focusOffset.y,
+        z: checkpoint.z + checkpoint.camera.focusOffset.z,
+      };
+      const cameraPosition = {
+        x: checkpoint.x + (checkpoint.camera.positionOffset?.x ?? 0),
+        y: checkpoint.y + (checkpoint.camera.positionOffset?.y ?? 0),
+        z: checkpoint.z + (checkpoint.camera.positionOffset?.z ?? 0),
+      };
+
+      return Math.hypot(
+        cameraPosition.x - focusTarget.x,
+        cameraPosition.y - focusTarget.y,
+        cameraPosition.z - focusTarget.z,
+      );
+    };
+
+    expect(readableFramingDistance(promenadeCheckpoint!)).toBeLessThanOrEqual(90);
+    expect(readableFramingDistance(vipCheckpoint!)).toBeLessThanOrEqual(75);
+  });
 });
