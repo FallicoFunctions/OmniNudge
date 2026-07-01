@@ -59,4 +59,38 @@ describe('createFollowCameraRig', () => {
     expect(rig.camera.position.y).toBeCloseTo(11);
     expect(rig.camera.position.z).toBeCloseTo(-64);
   });
+
+  it('keeps authored checkpoint framing stable across sequential position-offset views after zoom sync', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const target = new TransformNode('player-root', scene);
+    const rig = createFollowCameraRig(scene, target);
+
+    target.position.set(0, 1.7, 0);
+    rig.applyCheckpointView({
+      alpha: -Math.PI / 2,
+      beta: 1.02,
+      radius: 50,
+      focusOffset: { x: 4, y: 10.3, z: 20 },
+      positionOffset: { x: 34, y: 18.3, z: -70 },
+    });
+
+    target.position.set(0, 1.7, -18);
+    rig.applyCheckpointView({
+      alpha: -Math.PI / 2,
+      beta: 1.06,
+      radius: 52,
+      focusOffset: { x: 0, y: 10.3, z: 36 },
+      positionOffset: { x: 10, y: 20.3, z: -48 },
+    });
+
+    rig.syncZoomState();
+
+    expect(rig.targetAnchor.position.x).toBeCloseTo(0);
+    expect(rig.targetAnchor.position.y).toBeCloseTo(12);
+    expect(rig.targetAnchor.position.z).toBeCloseTo(18);
+    expect(rig.camera.position.x).toBeCloseTo(10);
+    expect(rig.camera.position.y).toBeCloseTo(22);
+    expect(rig.camera.position.z).toBeCloseTo(-66);
+  });
 });
