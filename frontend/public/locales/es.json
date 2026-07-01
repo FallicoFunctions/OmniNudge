@@ -3955,7 +3955,8 @@
       "loading": "Cargando conversación...",
       "loadError": "No se pudo cargar esta conversación.",
       "inputPlaceholder": "Di o haz algo...",
-      "send": "Enviar mensaje"
+      "send": "Enviar mensaje",
+      "rateLimited": "Te estás moviendo demasiado rápido — espera un momento antes de enviar otro mensaje."
     },
     "exitToSite": "Salir a OmniNudge"
   }

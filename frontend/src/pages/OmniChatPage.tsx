@@ -62,6 +62,7 @@ export default function OmniChatPage() {
 
   const [draft, setDraft] = useState('');
   const [streamingText, setStreamingText] = useState('');
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Monotonically decrementing counter for optimistic message ids — safer
   // than -Date.now(), which can collide if two sends land in the same
@@ -90,8 +91,14 @@ export default function OmniChatPage() {
       queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
       setStreamingText('');
     },
-    onError: () => {
+    onError: (error) => {
       setStreamingText('');
+      const status = (error as Error & { status?: number }).status;
+      if (status === 429) {
+        setRateLimitError(t('omnichat.chat.rateLimited'));
+      } else {
+        setRateLimitError(null);
+      }
     },
   });
 
@@ -227,14 +234,22 @@ export default function OmniChatPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="flex gap-2 border-t border-[var(--color-border)] py-3">
-          <input
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={t('omnichat.chat.inputPlaceholder')}
-            disabled={isGenerating}
-            className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20"
-          />
+          <div className="relative flex-1">
+            {rateLimitError && (
+              <p className="absolute -top-6 left-0 text-xs text-red-400">{rateLimitError}</p>
+            )}
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                if (rateLimitError) setRateLimitError(null);
+              }}
+              placeholder={rateLimitError ? '' : t('omnichat.chat.inputPlaceholder')}
+              disabled={isGenerating}
+              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20"
+            />
+          </div>
           <button
             type="submit"
             disabled={isGenerating || !draft.trim()}
