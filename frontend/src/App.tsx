@@ -36,6 +36,8 @@ const TermsPage = lazy(() => import('./pages/TermsPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const CCPAPage = lazy(() => import('./pages/CCPAPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
+const OmniChatDiscoverPage = lazy(() => import('./pages/OmniChatDiscoverPage'));
+const OmniChatPage = lazy(() => import('./pages/OmniChatPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const BlockedUsersPage = lazy(() => import('./pages/BlockedUsersPage'));
 const FriendsPage = lazy(() => import('./pages/FriendsPage'));
@@ -218,6 +220,22 @@ function App() {
                               element={
                                 <ProtectedRoute>
                                   <MessagesPage />
+                                </ProtectedRoute>
+                              }
+                            />
+                            <Route
+                              path="/omnichat"
+                              element={
+                                <ProtectedRoute>
+                                  <OmniChatDiscoverPage />
+                                </ProtectedRoute>
+                              }
+                            />
+                            <Route
+                              path="/omnichat/c/:conversationId"
+                              element={
+                                <ProtectedRoute>
+                                  <OmniChatPage />
                                 </ProtectedRoute>
                               }
                             />

@@ -18,6 +18,7 @@ import { HamburgerMenu } from '../components/navigation/HamburgerMenu';
 import { AccountMenu } from '../components/navigation/AccountMenu';
 import { ConnectionStatusIndicator } from '../components/common/ConnectionStatusIndicator';
 import { useNotificationSound } from '../hooks/useNotificationSound';
+import { useOmniChatLayoutMode } from '../hooks/useOmniChatLayoutMode';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { MobileTabBar } from '../components/mobile/MobileTabBar';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -37,6 +38,7 @@ const prefetchRoutes = {
   createPost: () => import('../pages/CreatePostPage'),
   hubs: () => import('../pages/HubsAndSubsPage'),
   messages: () => import('../pages/MessagesPage'),
+  omnichat: () => import('../pages/OmniChatDiscoverPage'),
   settings: () => import('../pages/SettingsPage'),
   themes: () => import('../pages/ThemesPage'),
   admin: () => import('../pages/AdminPage'),
@@ -75,6 +77,10 @@ export default function MainLayout() {
   useNotificationSound();
 
   const isAIPreview = /^\/h\/[^/]+\/ai-design\/preview\//.test(location.pathname);
+  const { mode: omniChatLayoutMode } = useOmniChatLayoutMode();
+  const isOmniChatImmersive =
+    location.pathname.startsWith('/omnichat') && omniChatLayoutMode === 'immersive';
+  const hideNav = isAIPreview || isOmniChatImmersive;
 
   // Determine if slim mode
   const isSlimMode =
@@ -210,7 +216,7 @@ export default function MainLayout() {
 
       {/* Navigation Bar */}
       <nav
-        className={`sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)] transition-all duration-200${isAIPreview ? ' hidden' : ''}`}
+        className={`sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)] transition-all duration-200${hideNav ? ' hidden' : ''}`}
         style={{ height: isSlimMode ? '36px' : '64px' }}
       >
         <div className="mx-auto max-w-7xl px-4 h-full">
@@ -256,6 +262,21 @@ export default function MainLayout() {
                     >
                       {t('menu.hubs')}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (user) {
+                          navigate('/omnichat');
+                        } else {
+                          setPendingRedirect({ to: '/omnichat' });
+                          setAuthModal('login');
+                        }
+                      }}
+                      onMouseEnter={() => prefetchRoutes.omnichat()}
+                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                    >
+                      {t('nav.omnichat')}
+                    </button>
                   </div>
 
                   {/* Divider */}
@@ -300,6 +321,10 @@ export default function MainLayout() {
                         {
                           label: t('menu.hubs'),
                           to: '/hubs',
+                        },
+                        {
+                          label: t('nav.omnichat'),
+                          to: '/omnichat',
                         },
                         {
                           label: t('menu.about'),
@@ -494,8 +519,8 @@ export default function MainLayout() {
         <Outlet />
       </main>
 
-      {/* Mobile tab bar - only shows on mobile (<768px), not on AI preview */}
-      {isMobile && !isAIPreview && (
+      {/* Mobile tab bar - only shows on mobile (<768px), not on AI preview or immersive OmniChat */}
+      {isMobile && !hideNav && (
         <ErrorBoundary
           fallback={
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800 text-center">

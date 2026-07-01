@@ -13,6 +13,7 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 import { accountService } from '../services/accountService';
 import { userSettingsService } from '../services/userSettingsService';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
+import { useOmniChatLayoutMode } from '../hooks/useOmniChatLayoutMode';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 import type { AutoDeleteDuration } from '../types/messages';
 import { secondsToDuration, durationToSeconds, isDurationNever } from '../types/messages';
@@ -27,6 +28,7 @@ import {
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const location = useLocation();
+  const { mode: omniChatLayoutMode, setMode: setOmniChatLayoutMode } = useOmniChatLayoutMode();
   const {
     useRelativeTime,
     setUseRelativeTime,
@@ -1103,6 +1105,73 @@ export default function SettingsPage() {
                     className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
                     checked={autoCloseThemeSelector}
                     onChange={() => setAutoCloseThemeSelector(true)}
+                  />
+                </div>
+              </label>
+            </div>
+          </Panel>
+
+          <Panel as="section">
+            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.omniChatLayout.title')}
+            </h2>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.omniChatLayout.description')}
+            </p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label
+                htmlFor="omnichat-layout-immersive"
+                className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
+                  omniChatLayoutMode === 'immersive'
+                    ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
+                    : 'border-[var(--color-border)]'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                      {t('settings.omniChatLayout.immersive')}
+                    </p>
+                    <p className="text-sm text-[var(--color-text-secondary)]">
+                      {t('settings.omniChatLayout.immersiveHelp')}
+                    </p>
+                  </div>
+                  <input
+                    id="omnichat-layout-immersive"
+                    type="radio"
+                    name="omnichat-layout-mode"
+                    className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                    checked={omniChatLayoutMode === 'immersive'}
+                    onChange={() => setOmniChatLayoutMode('immersive')}
+                  />
+                </div>
+              </label>
+
+              <label
+                htmlFor="omnichat-layout-shared-nav"
+                className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
+                  omniChatLayoutMode === 'shared-nav'
+                    ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
+                    : 'border-[var(--color-border)]'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                      {t('settings.omniChatLayout.sharedNav')}
+                    </p>
+                    <p className="text-sm text-[var(--color-text-secondary)]">
+                      {t('settings.omniChatLayout.sharedNavHelp')}
+                    </p>
+                  </div>
+                  <input
+                    id="omnichat-layout-shared-nav"
+                    type="radio"
+                    name="omnichat-layout-mode"
+                    className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                    checked={omniChatLayoutMode === 'shared-nav'}
+                    onChange={() => setOmniChatLayoutMode('shared-nav')}
                   />
                 </div>
               </label>

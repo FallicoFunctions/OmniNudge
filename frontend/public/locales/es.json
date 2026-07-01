@@ -129,7 +129,8 @@
     "games": "Juegos",
     "search": "Buscar",
     "create": "Crear",
-    "menu": "Menú"
+    "menu": "Menú",
+    "omnichat": "OmniChat"
   },
   "menu": {
     "profile": "Perfil",
@@ -2305,6 +2306,14 @@
       "title": "Usuarios Bloqueados",
       "description": "Gestiona las personas que has bloqueado. Los usuarios bloqueados no pueden enviarte mensajes ni iniciar nuevas conversaciones contigo.",
       "manageButton": "Gestionar Usuarios Bloqueados"
+    },
+    "omniChatLayout": {
+      "title": "Diseño de OmniChat",
+      "description": "Elige cómo se muestra OmniChat al abrirlo.",
+      "immersive": "Vista inmersiva completa (predeterminado)",
+      "immersiveHelp": "OmniChat ocupa toda la pantalla con su propio estilo oscuro, sin la barra de navegación del sitio.",
+      "sharedNav": "Mantener la navegación del sitio",
+      "sharedNavHelp": "OmniChat conserva su propio estilo oscuro, pero la barra de navegación de OmniNudge sigue visible arriba."
     }
   },
   "blockedUsersPage": {
@@ -3915,5 +3924,39 @@
       "declined": "Solicitud rechazada",
       "topFriendsUpdated": "Top friends updated"
     }
+  },
+  "omnichat": {
+    "categories": {
+      "all": "Todos",
+      "roleplay": "Rol",
+      "helper": "Asistente",
+      "romance": "Romance",
+      "original": "Original",
+      "animeGame": "Anime y videojuegos",
+      "fictionMedia": "Ficción y medios"
+    },
+    "discover": {
+      "featuredEyebrow": "Destacado",
+      "featuredTitle": "Encuentra tu próxima historia",
+      "allPersonas": "Todos los personajes",
+      "loading": "Cargando personajes...",
+      "loadError": "No se pudieron cargar los personajes.",
+      "startError": "No se pudo iniciar ese chat. Inténtalo de nuevo.",
+      "empty": "Aún no hay personajes en esta categoría.",
+      "startingChat": "Iniciando chat...",
+      "continueChatting": "Continuar chateando",
+      "conversationsLoadError": "No se pudieron cargar tus conversaciones."
+    },
+    "chat": {
+      "invalidConversation": "No se pudo encontrar esta conversación.",
+      "back": "Volver a Descubrir",
+      "loadingPersona": "Cargando...",
+      "nsfwTag": "18+",
+      "loading": "Cargando conversación...",
+      "loadError": "No se pudo cargar esta conversación.",
+      "inputPlaceholder": "Di o haz algo...",
+      "send": "Enviar mensaje"
+    },
+    "exitToSite": "Salir a OmniNudge"
   }
 }

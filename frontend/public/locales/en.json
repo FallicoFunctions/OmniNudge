@@ -129,7 +129,8 @@
     "games": "Games",
     "search": "Search",
     "create": "Create",
-    "menu": "Menu"
+    "menu": "Menu",
+    "omnichat": "OmniChat"
   },
   "menu": {
     "profile": "Profile",
@@ -2305,6 +2306,14 @@
       "title": "Blocked Users",
       "description": "Manage people you have blocked. Blocked users cannot message you or start new conversations with you.",
       "manageButton": "Manage Blocked Users"
+    },
+    "omniChatLayout": {
+      "title": "OmniChat Layout",
+      "description": "Choose how OmniChat appears when you open it.",
+      "immersive": "Full Immersive View (Default)",
+      "immersiveHelp": "OmniChat takes over the screen with its own dark, book-like look and no site navigation bar.",
+      "sharedNav": "Keep Site Navigation",
+      "sharedNavHelp": "OmniChat still gets its own dark look, but the OmniNudge navigation bar stays visible above it."
     }
   },
   "blockedUsersPage": {
@@ -3915,5 +3924,39 @@
       "declined": "Request declined",
       "topFriendsUpdated": "Top friends updated"
     }
+  },
+  "omnichat": {
+    "categories": {
+      "all": "All",
+      "roleplay": "Roleplay",
+      "helper": "Helper",
+      "romance": "Romance",
+      "original": "Original",
+      "animeGame": "Anime & Game",
+      "fictionMedia": "Fiction & Media"
+    },
+    "discover": {
+      "featuredEyebrow": "Featured",
+      "featuredTitle": "Find your next story",
+      "allPersonas": "All personas",
+      "loading": "Loading personas...",
+      "loadError": "Unable to load personas.",
+      "startError": "Unable to start that chat. Try again.",
+      "empty": "No personas in this category yet.",
+      "startingChat": "Starting chat...",
+      "continueChatting": "Continue Chatting",
+      "conversationsLoadError": "Unable to load your conversations."
+    },
+    "chat": {
+      "invalidConversation": "This conversation could not be found.",
+      "back": "Back to Discover",
+      "loadingPersona": "Loading...",
+      "nsfwTag": "18+",
+      "loading": "Loading conversation...",
+      "loadError": "Unable to load this conversation.",
+      "inputPlaceholder": "Say or do something...",
+      "send": "Send message"
+    },
+    "exitToSite": "Exit to OmniNudge"
   }
 }

@@ -129,7 +129,8 @@
     "games": "الألعاب",
     "search": "بحث",
     "create": "إنشاء",
-    "menu": "القائمة"
+    "menu": "القائمة",
+    "omnichat": "OmniChat"
   },
   "menu": {
     "profile": "الملف الشخصي",
@@ -2305,6 +2306,14 @@
       "title": "المستخدمون المحظورون",
       "description": "قم بإدارة الأشخاص الذين قمت بحظرهم. لا يمكن للمستخدمين المحظورين مراسلتك أو بدء محادثات جديدة معك.",
       "manageButton": "إدارة المستخدمين المحظورين"
+    },
+    "omniChatLayout": {
+      "title": "تخطيط OmniChat",
+      "description": "اختر كيفية ظهور OmniChat عند فتحه.",
+      "immersive": "عرض غامر بالكامل (افتراضي)",
+      "immersiveHelp": "يستحوذ OmniChat على الشاشة بالكامل بمظهره الداكن الخاص، دون شريط تنقل الموقع.",
+      "sharedNav": "الإبقاء على تنقل الموقع",
+      "sharedNavHelp": "يحتفظ OmniChat بمظهره الداكن الخاص، لكن يبقى شريط تنقل OmniNudge ظاهرًا أعلاه."
     }
   },
   "blockedUsersPage": {
@@ -3915,5 +3924,39 @@
       "declined": "تم رفض الطلب",
       "topFriendsUpdated": "Top friends updated"
     }
+  },
+  "omnichat": {
+    "categories": {
+      "all": "الكل",
+      "roleplay": "تقمص أدوار",
+      "helper": "مساعد",
+      "romance": "رومانسي",
+      "original": "أصلي",
+      "animeGame": "أنمي وألعاب",
+      "fictionMedia": "قصص وإعلام"
+    },
+    "discover": {
+      "featuredEyebrow": "مميز",
+      "featuredTitle": "ابحث عن قصتك التالية",
+      "allPersonas": "جميع الشخصيات",
+      "loading": "جارٍ تحميل الشخصيات...",
+      "loadError": "تعذّر تحميل الشخصيات.",
+      "startError": "تعذّر بدء هذه المحادثة. حاول مرة أخرى.",
+      "empty": "لا توجد شخصيات في هذه الفئة بعد.",
+      "startingChat": "جارٍ بدء المحادثة...",
+      "continueChatting": "متابعة المحادثة",
+      "conversationsLoadError": "تعذّر تحميل محادثاتك."
+    },
+    "chat": {
+      "invalidConversation": "تعذّر العثور على هذه المحادثة.",
+      "back": "العودة إلى الاستكشاف",
+      "loadingPersona": "جارٍ التحميل...",
+      "nsfwTag": "+18",
+      "loading": "جارٍ تحميل المحادثة...",
+      "loadError": "تعذّر تحميل هذه المحادثة.",
+      "inputPlaceholder": "قل أو افعل شيئًا...",
+      "send": "إرسال الرسالة"
+    },
+    "exitToSite": "الخروج إلى OmniNudge"
   }
 }
