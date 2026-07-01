@@ -4073,15 +4073,15 @@ function applyCrownRiggingStructureOverride(material: PBRMaterial) {
 
 function applyLineArrayGraphiteOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.16, 0.18, 0.22);
-  material.emissiveColor = new Color3(0.008, 0.01, 0.012);
+  material.albedoColor = new Color3(0.18, 0.2, 0.24);
+  material.emissiveColor = new Color3(0.01, 0.012, 0.014);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.08;
-  material.roughness = 0.86;
+  material.roughness = 0.84;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.02;
-  material.clearCoat.roughness = 0.68;
-  material.environmentIntensity = 0.16;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.2;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'line-array-graphite',
@@ -4090,6 +4090,7 @@ function applyLineArrayGraphiteOverride(material: PBRMaterial) {
 
 function applyCrowdClusterGraphiteOverride(material: PBRMaterial) {
   applyLineArrayGraphiteOverride(material);
+  material.environmentIntensity = 0.18;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crowd-cluster-graphite',
@@ -4098,6 +4099,11 @@ function applyCrowdClusterGraphiteOverride(material: PBRMaterial) {
 
 function applyLineArrayAcousticBlackOverride(material: PBRMaterial) {
   applyMainTrussTowerRigOverride(material);
+  material.albedoColor = new Color3(0.05, 0.07, 0.09);
+  material.emissiveColor = new Color3(0.01, 0.052, 0.074);
+  material.emissiveIntensity = 0.08;
+  material.roughness = 0.74;
+  material.environmentIntensity = 0.22;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'line-array-acoustic-black',
