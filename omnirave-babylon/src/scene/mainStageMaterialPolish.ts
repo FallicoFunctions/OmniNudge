@@ -4721,15 +4721,15 @@ function applyWingFacadeGoldLintelOverride(material: PBRMaterial) {
 
 function applyVipShellFasciaOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.22, 0.25, 0.3);
+  material.albedoColor = new Color3(0.18, 0.21, 0.25);
   material.emissiveColor = new Color3(0.01, 0.015, 0.02);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.02;
-  material.roughness = 0.86;
+  material.roughness = 0.9;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.04;
   material.clearCoat.roughness = 0.54;
-  material.environmentIntensity = 0.24;
+  material.environmentIntensity = 0.12;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'vip-shell-fascia',
