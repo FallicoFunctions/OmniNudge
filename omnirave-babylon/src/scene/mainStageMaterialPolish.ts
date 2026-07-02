@@ -4869,15 +4869,15 @@ function applyCrownButtressReliefOverride(material: PBRMaterial) {
 
 function applyOuterWingButtressShellOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.albedoColor = new Color3(0.18, 0.2, 0.24);
   material.emissiveColor = new Color3(0.005, 0.007, 0.011);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.02;
-  material.roughness = 0.88;
+  material.roughness = 0.9;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.04;
   material.clearCoat.roughness = 0.72;
-  material.environmentIntensity = 0.13;
+  material.environmentIntensity = 0.1;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'outer-wing-buttress-shell',
