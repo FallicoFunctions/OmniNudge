@@ -7033,17 +7033,17 @@ function applySideScreenGlassLensOverride(material: PBRMaterial) {
 
 function applySideLedTileFieldOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.03, 0.06, 0.08);
-  material.emissiveColor = new Color3(0.002, 0.012, 0.018);
-  material.emissiveIntensity = 0.03;
-  material.alpha = 0.12;
+  material.albedoColor = new Color3(0.02, 0.05, 0.07);
+  material.emissiveColor = new Color3(0.001, 0.008, 0.012);
+  material.emissiveIntensity = 0.016;
+  material.alpha = 0.08;
   material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
   material.metallic = 0.02;
-  material.roughness = 0.24;
+  material.roughness = 0.32;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0;
   material.clearCoat.roughness = 0.84;
-  material.environmentIntensity = 0.06;
+  material.environmentIntensity = 0.04;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'side-led-tile-field',
