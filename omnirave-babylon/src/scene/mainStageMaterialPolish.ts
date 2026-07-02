@@ -6313,15 +6313,15 @@ function applyRearShellShadowRevealOverride(material: PBRMaterial) {
 
 function applyWingTerraceGoldOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.albedoColor = new Color3(0.16, 0.12, 0.06);
   material.emissiveColor = new Color3(0.01, 0.007, 0.002);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.16;
-  material.roughness = 0.9;
+  material.roughness = 0.92;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0;
   material.clearCoat.roughness = 0.86;
-  material.environmentIntensity = 0.12;
+  material.environmentIntensity = 0.08;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-terrace-gold',
