@@ -1322,13 +1322,13 @@ describe('polishMainStageMaterials', () => {
     expect(goldRunMaterial.name).toContain('foreground-barricade-gold-run');
     expect(goldRunMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(goldRunMaterial.metadata?.mainStageMaterialOverride).toBe('foreground-barricade-gold-run');
-    expect(goldRunMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(goldRunMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(goldRunMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
-    expect(goldRunMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(goldRunMaterial.metallic).toBeLessThanOrEqual(0.2);
-    expect(goldRunMaterial.roughness).toBeGreaterThanOrEqual(0.88);
-    expect(goldRunMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(goldRunMaterial.albedoColor.r).toBeLessThanOrEqual(0.12);
+    expect(goldRunMaterial.albedoColor.g).toBeLessThanOrEqual(0.1);
+    expect(goldRunMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(goldRunMaterial.emissiveIntensity).toBeLessThanOrEqual(0.01);
+    expect(goldRunMaterial.metallic).toBeLessThanOrEqual(0.12);
+    expect(goldRunMaterial.roughness).toBeGreaterThanOrEqual(0.94);
+    expect(goldRunMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
 
     const pearlRunMaterial = pearlRun.material as PBRMaterial;
     expect(pearlRunMaterial.name).toContain('foreground-barricade-pearl-run');
