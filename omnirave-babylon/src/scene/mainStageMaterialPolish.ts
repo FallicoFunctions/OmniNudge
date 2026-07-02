@@ -3464,7 +3464,10 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (mesh.name.startsWith('V30_VipSoffitShadow_')) {
+    if (
+      mesh.name.startsWith('V30_VipSoffitShadow_') ||
+      mesh.name.startsWith('V30_VipUndersideRib_')
+    ) {
       const cacheKey = `${material.uniqueId}:vip-soffit-shadow`;
       let soffitShadowMaterial = clonedMaterials.get(cacheKey);
       if (!soffitShadowMaterial) {
