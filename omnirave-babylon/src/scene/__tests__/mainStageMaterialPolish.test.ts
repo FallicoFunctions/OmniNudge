@@ -3706,6 +3706,46 @@ describe('polishMainStageMaterials', () => {
     expect(sideLensMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
   });
 
+  it('smokes the side led tile fields so the basin-edge and VIP terrace views keep the side screens as dim scenic reflections instead of broad cyan slabs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedLedMaterial = new PBRMaterial('V14_CosmicScreenEmission', scene);
+    sharedLedMaterial.albedoColor.set(0.42, 0.86, 0.98);
+    sharedLedMaterial.emissiveColor.set(0.08, 0.3, 0.4);
+    sharedLedMaterial.emissiveIntensity = 0.34;
+    sharedLedMaterial.alpha = 1;
+    sharedLedMaterial.environmentIntensity = 0.82;
+
+    const centerLed = MeshBuilder.CreateBox('V31_CenterLedTileField', { size: 1 }, scene);
+    centerLed.material = sharedLedMaterial;
+
+    const leftLed = MeshBuilder.CreateBox('V31_SideLedTileField_L', { size: 1 }, scene);
+    leftLed.material = sharedLedMaterial;
+
+    const rightLed = MeshBuilder.CreateBox('V31_SideLedTileField_R', { size: 1 }, scene);
+    rightLed.material = sharedLedMaterial;
+
+    polishMainStageMaterials([centerLed, leftLed, rightLed]);
+
+    expect(centerLed.material).toBe(sharedLedMaterial);
+    expect(leftLed.material).toBeInstanceOf(PBRMaterial);
+    expect(rightLed.material).toBe(leftLed.material);
+
+    const sideLedMaterial = leftLed.material as PBRMaterial;
+    expect(sideLedMaterial.name).toContain('side-led-tile-field');
+    expect(sideLedMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(sideLedMaterial.metadata?.mainStageMaterialOverride).toBe('side-led-tile-field');
+    expect(sideLedMaterial.albedoColor.r).toBeLessThanOrEqual(0.05);
+    expect(sideLedMaterial.albedoColor.g).toBeLessThanOrEqual(0.08);
+    expect(sideLedMaterial.albedoColor.b).toBeLessThanOrEqual(0.1);
+    expect(sideLedMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(sideLedMaterial.alpha).toBeLessThanOrEqual(0.14);
+    expect(sideLedMaterial.roughness).toBeGreaterThanOrEqual(0.2);
+    expect(sideLedMaterial.environmentIntensity).toBeLessThanOrEqual(0.08);
+    expect(sideLedMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+  });
+
   it('regrades the spawn field and approach deck into authored night materials so the entry view does not read as muddy proxy texture', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
@@ -6136,6 +6176,82 @@ describe('polishMainStageMaterials', () => {
     expect(terraceMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(terraceMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(terraceMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+  });
+
+  it('smokes the basin water parterre so the basin-edge view reads as a dark reflective pool instead of a giant cyan slab', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedWaterMaterial = new PBRMaterial('V14_DeepReflectingWater', scene);
+    sharedWaterMaterial.albedoColor.set(0.16, 0.22, 0.28);
+    sharedWaterMaterial.emissiveColor.set(0.02, 0.04, 0.05);
+    sharedWaterMaterial.emissiveIntensity = 0.08;
+    sharedWaterMaterial.alpha = 0.98;
+    sharedWaterMaterial.metallic = 0.04;
+    sharedWaterMaterial.roughness = 0.24;
+    sharedWaterMaterial.environmentIntensity = 0.82;
+
+    const controlWater = MeshBuilder.CreateBox('TestBasinWaterParterreControl', { size: 1 }, scene);
+    controlWater.material = sharedWaterMaterial;
+
+    const parterre = MeshBuilder.CreateBox('V63_BasinWaterParterre', { size: 1 }, scene);
+    parterre.material = sharedWaterMaterial;
+
+    polishMainStageMaterials([controlWater, parterre]);
+
+    expect(controlWater.material).toBe(sharedWaterMaterial);
+    expect(parterre.material).toBeInstanceOf(PBRMaterial);
+    expect(parterre.material).not.toBe(sharedWaterMaterial);
+
+    const parterreMaterial = parterre.material as PBRMaterial;
+    expect(parterreMaterial.name).toContain('basin-water-parterre');
+    expect(parterreMaterial.metadata?.mainStageMaterialPolish).toBe('wet');
+    expect(parterreMaterial.metadata?.mainStageMaterialOverride).toBe('basin-water-parterre');
+    expect(parterreMaterial.albedoColor.r).toBeLessThanOrEqual(0.04);
+    expect(parterreMaterial.albedoColor.g).toBeLessThanOrEqual(0.06);
+    expect(parterreMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(parterreMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(parterreMaterial.alpha).toBeLessThanOrEqual(0.78);
+    expect(parterreMaterial.clearCoat.intensity).toBeGreaterThanOrEqual(0.5);
+    expect(parterreMaterial.roughness).toBeLessThanOrEqual(0.2);
+    expect(parterreMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+  });
+
+  it('smokes the basin screen reflection veil so the basin-edge view keeps a dim reflected sheen instead of a bright cyan lid', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedEmissionMaterial = new PBRMaterial('V14_CosmicScreenEmission', scene);
+    sharedEmissionMaterial.albedoColor.set(0.42, 0.86, 0.98);
+    sharedEmissionMaterial.emissiveColor.set(0.08, 0.3, 0.4);
+    sharedEmissionMaterial.emissiveIntensity = 0.34;
+    sharedEmissionMaterial.alpha = 1;
+    sharedEmissionMaterial.environmentIntensity = 0.82;
+
+    const controlEmission = MeshBuilder.CreateBox('TestBasinReflectionVeilControl', { size: 1 }, scene);
+    controlEmission.material = sharedEmissionMaterial;
+
+    const reflectionVeil = MeshBuilder.CreateBox('V63_BasinScreenReflectionVeil', { size: 1 }, scene);
+    reflectionVeil.material = sharedEmissionMaterial;
+
+    polishMainStageMaterials([controlEmission, reflectionVeil]);
+
+    expect(controlEmission.material).toBe(sharedEmissionMaterial);
+    expect(reflectionVeil.material).toBeInstanceOf(PBRMaterial);
+    expect(reflectionVeil.material).not.toBe(sharedEmissionMaterial);
+
+    const veilMaterial = reflectionVeil.material as PBRMaterial;
+    expect(veilMaterial.name).toContain('basin-screen-reflection-veil');
+    expect(veilMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(veilMaterial.metadata?.mainStageMaterialOverride).toBe('basin-screen-reflection-veil');
+    expect(veilMaterial.albedoColor.r).toBeLessThanOrEqual(0.06);
+    expect(veilMaterial.albedoColor.g).toBeLessThanOrEqual(0.09);
+    expect(veilMaterial.albedoColor.b).toBeLessThanOrEqual(0.12);
+    expect(veilMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
+    expect(veilMaterial.alpha).toBeLessThanOrEqual(0.16);
+    expect(veilMaterial.roughness).toBeGreaterThanOrEqual(0.18);
+    expect(veilMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    expect(veilMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
   });
 
   it('darkens the spawn-gate sentinel pearl shells so the promenade approach does not collapse into two bright proxy monoliths', () => {

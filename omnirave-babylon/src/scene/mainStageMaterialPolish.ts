@@ -2181,6 +2181,32 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V63_BasinWaterParterre') {
+      const cacheKey = `${material.uniqueId}:basin-water-parterre`;
+      let parterreMaterial = clonedMaterials.get(cacheKey);
+      if (!parterreMaterial) {
+        parterreMaterial = material.clone(`${material.name}__basin-water-parterre`);
+        applyBasinWaterParterreOverride(parterreMaterial);
+        clonedMaterials.set(cacheKey, parterreMaterial);
+      }
+
+      assignOverrideMaterial(mesh, parterreMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V63_BasinScreenReflectionVeil') {
+      const cacheKey = `${material.uniqueId}:basin-screen-reflection-veil`;
+      let reflectionVeilMaterial = clonedMaterials.get(cacheKey);
+      if (!reflectionVeilMaterial) {
+        reflectionVeilMaterial = material.clone(`${material.name}__basin-screen-reflection-veil`);
+        applyBasinScreenReflectionVeilOverride(reflectionVeilMaterial);
+        clonedMaterials.set(cacheKey, reflectionVeilMaterial);
+      }
+
+      assignOverrideMaterial(mesh, reflectionVeilMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V65_ArrivalRunwayPearlBands') {
       const cacheKey = `${material.uniqueId}:arrival-runway-pearl-bands`;
       let runwayMaterial = clonedMaterials.get(cacheKey);
@@ -3449,6 +3475,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, lensMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V31_SideLedTileField_')) {
+      const cacheKey = `${material.uniqueId}:side-led-tile-field`;
+      let ledFieldMaterial = clonedMaterials.get(cacheKey);
+      if (!ledFieldMaterial) {
+        ledFieldMaterial = material.clone(`${material.name}__side-led-tile-field`);
+        applySideLedTileFieldOverride(ledFieldMaterial);
+        clonedMaterials.set(cacheKey, ledFieldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, ledFieldMaterial);
     }
   }
 }
@@ -6779,6 +6818,43 @@ function applyBasinWaterSheetOverride(material: PBRMaterial) {
   };
 }
 
+function applyBasinWaterParterreOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.02, 0.04, 0.06);
+  material.emissiveColor = new Color3(0.004, 0.012, 0.018);
+  material.emissiveIntensity = 0.025;
+  material.alpha = 0.74;
+  material.metallic = 0.02;
+  material.roughness = 0.18;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.62;
+  material.clearCoat.roughness = 0.1;
+  material.environmentIntensity = 0.38;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-water-parterre',
+  };
+}
+
+function applyBasinScreenReflectionVeilOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.04, 0.07, 0.09);
+  material.emissiveColor = new Color3(0.002, 0.012, 0.018);
+  material.emissiveIntensity = 0.03;
+  material.alpha = 0.12;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.22;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.82;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-screen-reflection-veil',
+  };
+}
+
 function applyOvalPortalGlowGoldOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.18, 0.14, 0.06);
@@ -6863,5 +6939,24 @@ function applySideScreenGlassLensOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'side-screen-glass-lens',
+  };
+}
+
+function applySideLedTileFieldOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.03, 0.06, 0.08);
+  material.emissiveColor = new Color3(0.002, 0.012, 0.018);
+  material.emissiveIntensity = 0.03;
+  material.alpha = 0.12;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.24;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.06;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'side-led-tile-field',
   };
 }
