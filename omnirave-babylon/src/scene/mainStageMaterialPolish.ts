@@ -846,11 +846,23 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name.startsWith('V120_BasinDeckRelief_')) {
+      const cacheKey = `${material.uniqueId}:basin-deck-relief`;
+      let deckReliefMaterial = clonedMaterials.get(cacheKey);
+      if (!deckReliefMaterial) {
+        deckReliefMaterial = material.clone(`${material.name}__basin-deck-relief`);
+        applyBasinDeckReliefOverride(deckReliefMaterial);
+        clonedMaterials.set(cacheKey, deckReliefMaterial);
+      }
+
+      assignOverrideMaterial(mesh, deckReliefMaterial);
+      continue;
+    }
+
     if (
       mesh.name.startsWith('V99_BasinParapetRelief_') ||
       mesh.name.startsWith('V118_BasinWallRelief_') ||
       mesh.name.startsWith('V121_BasinRetainingRelief_') ||
-      mesh.name.startsWith('V120_BasinDeckRelief_') ||
       mesh.name === 'V121_BasinBridgeRelief_North' ||
       mesh.name === 'V121_BasinBridgeRelief_South' ||
       mesh.name === 'V121_BasinBridgeRelief_Center'
@@ -4547,6 +4559,23 @@ function applyBasinRetainingReliefOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-retaining-relief',
+  };
+}
+
+function applyBasinDeckReliefOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.11, 0.13, 0.17);
+  material.emissiveColor = new Color3(0.002, 0.003, 0.006);
+  material.emissiveIntensity = 0.008;
+  material.metallic = 0.02;
+  material.roughness = 0.96;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.78;
+  material.environmentIntensity = 0.04;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-deck-relief',
   };
 }
 
