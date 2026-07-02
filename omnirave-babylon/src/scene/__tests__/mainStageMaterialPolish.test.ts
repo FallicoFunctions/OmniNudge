@@ -3659,13 +3659,13 @@ describe('polishMainStageMaterials', () => {
     expect(fasciaMaterial.metadata?.mainStageMaterialOverride).toBe('vip-shell-fascia');
     expect(otherPearlMaterial.albedoTexture).toBe(sharedAlbedoTexture);
     expect(fasciaMaterial.albedoTexture).toBeNull();
-    expect(fasciaMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
-    expect(fasciaMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
-    expect(fasciaMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
+    expect(fasciaMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(fasciaMaterial.albedoColor.g).toBeLessThanOrEqual(0.21);
+    expect(fasciaMaterial.albedoColor.b).toBeLessThanOrEqual(0.25);
     expect(fasciaMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(fasciaMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(fasciaMaterial.roughness).toBeGreaterThanOrEqual(0.9);
     expect(fasciaMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(fasciaMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
+    expect(fasciaMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
   });
 
   it('gives the side screen glass lens a smoked transparent finish so the VIP terrace view does not read as a cyan card', () => {
