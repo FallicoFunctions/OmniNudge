@@ -1032,6 +1032,14 @@ func main() {
 			jobs.GET("/:queue/:id", jobsHandler.GetJobStatus)
 		}
 
+		// OmniChat public routes (no auth required)
+		omniChatPublic := api.Group("/omnichat")
+		omniChatPublic.Use(middleware.AuthOptional(authService))
+		{
+			omniChatPublic.GET("/personas", omniChatHandler.ListPersonas)
+			omniChatPublic.POST("/anonymous/messages", omniChatRateLimiter.Middleware(), omniChatHandler.AnonymousSendMessage)
+		}
+
 		// Protected routes (auth required)
 		protected := api.Group("")
 		protected.Use(middleware.AuthRequired(authService))
@@ -1178,10 +1186,11 @@ func main() {
 			protected.PATCH("/conversations/:id/settings", conversationsHandler.UpdateChatSettings)
 
 			// OmniChat: AI chat bot personas and conversations
-			protected.GET("/omnichat/personas", omniChatHandler.ListPersonas)
 			protected.POST("/omnichat/conversations", omniChatHandler.CreateConversation)
 			protected.GET("/omnichat/conversations", omniChatHandler.ListConversations)
 			protected.GET("/omnichat/conversations/:id", omniChatHandler.GetConversation)
+			protected.PUT("/omnichat/conversations/:id/settings", omniChatHandler.UpdateConversationSettings)
+			protected.POST("/omnichat/conversations/:id/fork", omniChatHandler.ForkConversation)
 			protected.POST("/omnichat/conversations/:id/messages", omniChatRateLimiter.Middleware(), omniChatHandler.SendMessage)
 
 			protected.POST("/folders", foldersHandler.CreateFolder)
