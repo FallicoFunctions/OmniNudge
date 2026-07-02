@@ -6932,13 +6932,13 @@ describe('polishMainStageMaterials', () => {
     const revealMaterial = leftReveal.material as PBRMaterial;
     expect(revealMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(revealMaterial.metadata?.mainStageMaterialOverride).toBe('wing-arcade-gold-reveal');
-    expect(revealMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(revealMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(revealMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(revealMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(revealMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(revealMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
     expect(revealMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(revealMaterial.metallic).toBeLessThanOrEqual(0.2);
-    expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(revealMaterial.metallic).toBeLessThanOrEqual(0.16);
+    expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('smokes the wing arcade cyan inlays so the side portals read as inset jewel glass instead of bright cyan cards', () => {
