@@ -4535,15 +4535,15 @@ function applyOvalScreenGoldTrimOverride(material: PBRMaterial) {
 
 function applyBasinRetainingReliefOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.2, 0.24);
-  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.15, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.004, 0.006, 0.01);
+  material.emissiveIntensity = 0.01;
   material.metallic = 0.02;
-  material.roughness = 0.9;
+  material.roughness = 0.94;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.7;
-  material.environmentIntensity = 0.1;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.74;
+  material.environmentIntensity = 0.06;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-retaining-relief',

@@ -675,13 +675,13 @@ describe('polishMainStageMaterials', () => {
     const reliefMaterial = leftRelief.material as PBRMaterial;
     expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
-    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
-    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
-    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
-    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.17);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.21);
+    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.94);
     expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
   });
 
   it('darkens the basin bridge relief spans so the central water crossings read as carved stonework instead of bright pearl strips', () => {
@@ -721,13 +721,13 @@ describe('polishMainStageMaterials', () => {
     const reliefMaterial = northBridge.material as PBRMaterial;
     expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
-    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
-    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
-    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
-    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.17);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.21);
+    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.94);
     expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
   });
 
   it('darkens the basin deck reliefs so the route-facing basin ledges read as carved stonework instead of bright pearl slabs', () => {
@@ -761,13 +761,13 @@ describe('polishMainStageMaterials', () => {
     const reliefMaterial = leftDeck.material as PBRMaterial;
     expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
-    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
-    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
-    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
-    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.17);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.21);
+    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.94);
     expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
   });
 
   it('darkens the basin wall reliefs so the basin cheeks read as carved stonework instead of bright pearl side slabs', () => {
@@ -955,13 +955,13 @@ describe('polishMainStageMaterials', () => {
     const reliefMaterial = leftParapet.material as PBRMaterial;
     expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
-    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
-    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
-    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
-    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.17);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.21);
+    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.94);
     expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
   });
 
   it('retones the central water-light housings, trim, and lenses into practical in-basin fixtures so the promenade spine reads as embedded lighting instead of bright gold-and-cyan proxy bars', () => {
