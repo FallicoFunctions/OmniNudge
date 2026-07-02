@@ -5452,15 +5452,15 @@ function applySpawnCanopyCyanLanternOverride(material: PBRMaterial) {
 
 function applyBasinCausewayPearlSpanOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.22, 0.23, 0.27);
-  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
+  material.albedoColor = new Color3(0.18, 0.19, 0.23);
+  material.emissiveColor = new Color3(0.004, 0.006, 0.01);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.02;
-  material.roughness = 0.86;
+  material.roughness = 0.9;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.68;
-  material.environmentIntensity = 0.14;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.76;
+  material.environmentIntensity = 0.08;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-causeway-pearl-span',

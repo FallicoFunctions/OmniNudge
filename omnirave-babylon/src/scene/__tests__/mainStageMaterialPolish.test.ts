@@ -6129,13 +6129,13 @@ describe('polishMainStageMaterials', () => {
     const causewayMaterial = causewaySpan.material as PBRMaterial;
     expect(causewayMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(causewayMaterial.metadata?.mainStageMaterialOverride).toBe('basin-causeway-pearl-span');
-    expect(causewayMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
-    expect(causewayMaterial.albedoColor.g).toBeLessThanOrEqual(0.25);
-    expect(causewayMaterial.albedoColor.b).toBeLessThanOrEqual(0.29);
+    expect(causewayMaterial.albedoColor.r).toBeLessThanOrEqual(0.19);
+    expect(causewayMaterial.albedoColor.g).toBeLessThanOrEqual(0.2);
+    expect(causewayMaterial.albedoColor.b).toBeLessThanOrEqual(0.24);
     expect(causewayMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(causewayMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(causewayMaterial.roughness).toBeGreaterThanOrEqual(0.88);
     expect(causewayMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(causewayMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(causewayMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('darkens the basin garden terraces so the spawn reveal flanks read as grounded architecture instead of bright ivory shelves', () => {
