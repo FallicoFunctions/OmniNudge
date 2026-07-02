@@ -3952,12 +3952,59 @@
       "back": "Back to Discover",
       "loadingPersona": "Loading...",
       "nsfwTag": "18+",
+      "signInPrompt": "Sign in to save your chat",
+      "noPersonaSelected": "Select a persona from Discover to start chatting",
+      "personaNotFound": "This persona could not be found.",
       "loading": "Loading conversation...",
       "loadError": "Unable to load this conversation.",
       "inputPlaceholder": "Say or do something...",
       "send": "Send message",
-      "rateLimited": "You're moving too fast — please wait a moment before sending another message."
+      "rateLimited": "You're moving too fast — please wait a moment before sending another message.",
+      "settings": "Chat settings",
+      "settingsName": "Name",
+      "settingsAge": "Age",
+      "settingsGender": "Gender",
+      "settingsGenderM": "Male",
+      "settingsGenderF": "Female",
+      "settingsGenderT": "Transgender",
+      "settingsGenderA": "Androgynous",
+      "settingsGenderN": "Prefer not to say",
+      "settingsSave": "Save settings",
+      "settingsSaved": "Settings saved",
+      "settingsSaveError": "Failed to save settings",
+      "newChat": "New chat",
+      "newChatConfirm": "Start a new conversation?",
+      "forkChat": "Fork this chat",
+      "forkChatDesc": "Create a copy of this conversation with all messages",
+      "history": "Chat history",
+      "historyEmpty": "No other conversations with this character",
+      "historyLoadError": "Failed to load chat history"
     },
-    "exitToSite": "Exit to OmniNudge"
+    "exitToSite": "Exit to OmniNudge",
+    "sidebar": {
+      "discover": "Discover",
+      "search": "Search",
+      "conversations": "Conversations",
+      "searchPlaceholder": "Search personas...",
+      "noResults": "No results found",
+      "collapse": "Collapse sidebar",
+      "expand": "Expand sidebar",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu",
+      "signInToViewConversations": "Sign in to view your conversations",
+      "noConversations": "No conversations yet"
+    },
+    "conversationsPage": {
+      "title": "Chat",
+      "searchPlaceholder": "Search for a profile...",
+      "filters": {
+        "all": "All",
+        "unread": "Unread",
+        "favorites": "Favorites"
+      },
+      "empty": "No conversations yet. Start chatting with a persona!",
+      "lastMessage": "Last message",
+      "noMessages": "No messages yet"
+    }
   }
 }
