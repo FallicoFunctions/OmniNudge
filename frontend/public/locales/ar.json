@@ -3952,12 +3952,59 @@
       "back": "العودة إلى الاستكشاف",
       "loadingPersona": "جارٍ التحميل...",
       "nsfwTag": "+18",
+      "signInPrompt": "سجّل الدخول لحفظ محادثتك",
+      "newChat": "محادثة جديدة",
+      "settings": "إعدادات الدردشة",
+      "settingsName": "اسمك",
+      "settingsAge": "العمر",
+      "settingsGender": "النوع",
+      "settingsGenderM": "ذكر",
+      "settingsGenderF": "أنثى",
+      "settingsGenderT": "متحول جنسيًا",
+      "settingsGenderA": "مخنث",
+      "settingsGenderN": "أفضل عدم الإفصاح",
+      "settingsSave": "حفظ الإعدادات",
+      "settingsSaved": "تم حفظ الإعدادات",
+      "settingsSaveError": "تعذّر حفظ الإعدادات",
+      "noPersonaSelected": "اختر شخصية من اكتشف لبدء الدردشة",
+      "personaNotFound": "تعذّر العثور على هذه الشخصية.",
       "loading": "جارٍ تحميل المحادثة...",
       "loadError": "تعذّر تحميل هذه المحادثة.",
       "inputPlaceholder": "قل أو افعل شيئًا...",
       "send": "إرسال الرسالة",
-      "rateLimited": "أنت تتحرك بسرعة كبيرة — يُرجى الانتظار لحظة قبل إرسال رسالة أخرى."
+      "rateLimited": "أنت تتحرك بسرعة كبيرة — يُرجى الانتظار لحظة قبل إرسال رسالة أخرى.",
+      "newChatConfirm": "بدء محادثة جديدة؟",
+      "forkChat": "تشعيب هذه المحادثة",
+      "forkChatDesc": "إنشاء نسخة من هذه المحادثة بكل الرسائل",
+      "history": "سجل المحادثة",
+      "historyEmpty": "لا توجد محادثات أخرى مع هذه الشخصية",
+      "historyLoadError": "تعذّر تحميل سجل المحادثة"
     },
-    "exitToSite": "الخروج إلى OmniNudge"
+    "exitToSite": "الخروج إلى OmniNudge",
+    "sidebar": {
+      "discover": "اكتشف",
+      "search": "بحث",
+      "conversations": "المحادثات",
+      "searchPlaceholder": "البحث عن شخصيات...",
+      "noResults": "لم يتم العثور على نتائج",
+      "collapse": "طي الشريط الجانبي",
+      "expand": "توسيع الشريط الجانبي",
+      "openMenu": "فتح القائمة",
+      "closeMenu": "إغلاق القائمة",
+      "signInToViewConversations": "سجّل الدخول لعرض محادثاتك",
+      "noConversations": "لا توجد محادثات بعد"
+    },
+    "conversationsPage": {
+      "title": "الدردشة",
+      "searchPlaceholder": "البحث عن ملف شخصي...",
+      "filters": {
+        "all": "الكل",
+        "unread": "غير مقروء",
+        "favorites": "المفضلة"
+      },
+      "empty": "لا توجد محادثات بعد. ابدأ الدردشة مع شخصية!",
+      "lastMessage": "آخر رسالة",
+      "noMessages": "لا توجد رسائل بعد"
+    }
   }
 }

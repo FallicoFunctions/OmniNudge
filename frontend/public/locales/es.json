@@ -3952,12 +3952,59 @@
       "back": "Volver a Descubrir",
       "loadingPersona": "Cargando...",
       "nsfwTag": "18+",
+      "signInPrompt": "Inicia sesión para guardar tu chat",
+      "newChat": "Nuevo chat",
+      "settings": "Ajustes del chat",
+      "settingsName": "Tu nombre",
+      "settingsAge": "Edad",
+      "settingsGender": "Género",
+      "settingsGenderM": "Masculino",
+      "settingsGenderF": "Femenino",
+      "settingsGenderT": "Transgénero",
+      "settingsGenderA": "Andrógino",
+      "settingsGenderN": "Prefiero no decirlo",
+      "settingsSave": "Guardar ajustes",
+      "settingsSaved": "Ajustes guardados",
+      "settingsSaveError": "No se pudieron guardar los ajustes",
+      "noPersonaSelected": "Selecciona una persona de Descubrir para empezar a chatear",
+      "personaNotFound": "No se pudo encontrar esta persona.",
       "loading": "Cargando conversación...",
       "loadError": "No se pudo cargar esta conversación.",
       "inputPlaceholder": "Di o haz algo...",
       "send": "Enviar mensaje",
-      "rateLimited": "Te estás moviendo demasiado rápido — espera un momento antes de enviar otro mensaje."
+      "rateLimited": "Te estás moviendo demasiado rápido — espera un momento antes de enviar otro mensaje.",
+      "newChatConfirm": "¿Iniciar una conversación nueva?",
+      "forkChat": "Bifurcar este chat",
+      "forkChatDesc": "Crear una copia de esta conversación con todos los mensajes",
+      "history": "Historial del chat",
+      "historyEmpty": "No hay otras conversaciones con este personaje",
+      "historyLoadError": "No se pudo cargar el historial del chat"
     },
-    "exitToSite": "Salir a OmniNudge"
+    "exitToSite": "Salir a OmniNudge",
+    "sidebar": {
+      "discover": "Descubrir",
+      "search": "Buscar",
+      "conversations": "Conversaciones",
+      "searchPlaceholder": "Buscar personas...",
+      "noResults": "No se encontraron resultados",
+      "collapse": "Contraer barra lateral",
+      "expand": "Expandir barra lateral",
+      "openMenu": "Abrir menú",
+      "closeMenu": "Cerrar menú",
+      "signInToViewConversations": "Inicia sesión para ver tus conversaciones",
+      "noConversations": "Aún no hay conversaciones"
+    },
+    "conversationsPage": {
+      "title": "Chat",
+      "searchPlaceholder": "Buscar un perfil...",
+      "filters": {
+        "all": "Todos",
+        "unread": "No leídos",
+        "favorites": "Favoritos"
+      },
+      "empty": "Aún no hay conversaciones. ¡Empieza a chatear con un personaje!",
+      "lastMessage": "Último mensaje",
+      "noMessages": "Aún no hay mensajes"
+    }
   }
 }

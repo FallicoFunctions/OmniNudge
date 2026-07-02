@@ -1,9 +1,12 @@
 import { api } from '../lib/api';
 import type {
+  AnonymousMessageRequest,
+  AnonymousMessageResponse,
   BotConversation,
   BotConversationDetail,
   BotMessage,
   BotPersona,
+  ConversationSettings,
   PersonaCategory,
 } from '../types/omnichat';
 
@@ -14,15 +17,23 @@ export const omnichatService = {
     return res.personas;
   },
 
-  async listConversations(): Promise<BotConversation[]> {
-    const res = await api.get<{ conversations: BotConversation[] }>('/omnichat/conversations');
+  async listConversations(personaId?: number): Promise<BotConversation[]> {
+    const query = personaId ? `?persona_id=${personaId}` : '';
+    const res = await api.get<{ conversations: BotConversation[] }>(`/omnichat/conversations${query}`);
     return res.conversations ?? [];
   },
 
-  async createConversation(personaId: number, title?: string): Promise<BotConversation> {
+  async createConversation(
+    personaId: number,
+    title?: string,
+    forceNew?: boolean,
+    settings?: ConversationSettings,
+  ): Promise<BotConversation> {
     return api.post<BotConversation>('/omnichat/conversations', {
       persona_id: personaId,
       title,
+      force_new: forceNew,
+      settings,
     });
   },
 
@@ -33,6 +44,33 @@ export const omnichatService = {
   async sendMessage(conversationId: number, content: string): Promise<BotMessage> {
     return api.post<BotMessage>(`/omnichat/conversations/${conversationId}/messages`, {
       content,
+    });
+  },
+
+  async updateSettings(conversationId: number, settings: ConversationSettings): Promise<void> {
+    await api.put(`/omnichat/conversations/${conversationId}/settings`, { settings });
+  },
+
+  async forkConversation(conversationId: number): Promise<BotConversation> {
+    return api.post<BotConversation>(`/omnichat/conversations/${conversationId}/fork`);
+  },
+
+  async sendAnonymousMessage(req: AnonymousMessageRequest): Promise<AnonymousMessageResponse> {
+    return api.post<AnonymousMessageResponse>('/omnichat/anonymous/messages', req);
+  },
+
+  async createConversationWithMessages(
+    personaId: number,
+    messages: BotMessage[],
+    title?: string,
+    settings?: ConversationSettings,
+  ): Promise<BotConversation> {
+    return api.post<BotConversation>('/omnichat/conversations', {
+      persona_id: personaId,
+      title,
+      force_new: true,
+      settings,
+      messages,
     });
   },
 };

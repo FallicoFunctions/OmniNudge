@@ -264,14 +264,7 @@ export default function MainLayout() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (user) {
-                          navigate('/omnichat');
-                        } else {
-                          setPendingRedirect({ to: '/omnichat' });
-                          setAuthModal('login');
-                        }
-                      }}
+                      onClick={() => navigate('/omnichat')}
                       onMouseEnter={() => prefetchRoutes.omnichat()}
                       className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                     >
