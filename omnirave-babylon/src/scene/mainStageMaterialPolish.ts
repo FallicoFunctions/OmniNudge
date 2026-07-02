@@ -4831,15 +4831,15 @@ function applyCrownShellLamellaOverride(material: PBRMaterial) {
 
 function applyBasinStoneCopingOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.44, 0.42, 0.38);
+  material.albedoColor = new Color3(0.38, 0.36, 0.32);
   material.emissiveColor = new Color3(0, 0, 0);
   material.emissiveIntensity = 0;
   material.metallic = 0.02;
-  material.roughness = 0.92;
+  material.roughness = 0.94;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0;
   material.clearCoat.roughness = 0.64;
-  material.environmentIntensity = 0.08;
+  material.environmentIntensity = 0.06;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-stone-coping',
