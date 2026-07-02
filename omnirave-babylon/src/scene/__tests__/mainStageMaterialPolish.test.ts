@@ -6027,6 +6027,46 @@ describe('polishMainStageMaterials', () => {
     expect(rightSoffit.material).toBe(leftSoffit.material);
   });
 
+  it('gives the VIP underside ribs the same subdued shadow-architecture finish so the Basin Edge ramp edge does not keep bright proxy slats under the terrace', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedShadowMaterial = new PBRMaterial('V20_RecessedWarmShadow', scene);
+    sharedShadowMaterial.albedoColor.set(0.52, 0.86, 0.98);
+    sharedShadowMaterial.emissiveColor.set(0.18, 0.32, 0.4);
+    sharedShadowMaterial.emissiveIntensity = 0.28;
+    sharedShadowMaterial.metallic = 0.12;
+    sharedShadowMaterial.roughness = 0.38;
+
+    const otherShadow = MeshBuilder.CreateBox('TestVipUndersideRibControl', { size: 1 }, scene);
+    otherShadow.material = sharedShadowMaterial;
+
+    const leftRib = MeshBuilder.CreateBox('V30_VipUndersideRib_L_00', { size: 1 }, scene);
+    leftRib.material = sharedShadowMaterial;
+
+    const rightRib = MeshBuilder.CreateBox('V30_VipUndersideRib_R_00', { size: 1 }, scene);
+    rightRib.material = sharedShadowMaterial;
+
+    polishMainStageMaterials([otherShadow, leftRib, rightRib]);
+
+    expect(otherShadow.material).toBe(sharedShadowMaterial);
+    expect(leftRib.material).toBeInstanceOf(PBRMaterial);
+    expect(rightRib.material).toBeInstanceOf(PBRMaterial);
+    expect(leftRib.material).not.toBe(sharedShadowMaterial);
+    expect(rightRib.material).not.toBe(sharedShadowMaterial);
+    expect(rightRib.material).toBe(leftRib.material);
+
+    const ribMaterial = leftRib.material as PBRMaterial;
+    expect(ribMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(ribMaterial.metadata?.mainStageMaterialOverride).toBe('vip-soffit-shadow');
+    expect(ribMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(ribMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
+    expect(ribMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
+    expect(ribMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(ribMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(ribMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+  });
+
   it('darkens the spawn canopy pearl vaults so the far reveal reads as authored arrival architecture instead of white proxy shells', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
