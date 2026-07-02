@@ -4767,15 +4767,15 @@ function applyVipShellFasciaOverride(material: PBRMaterial) {
 
 function applyFestivalFieldOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.08, 0.1, 0.14);
-  material.emissiveColor = new Color3(0.005, 0.01, 0.014);
-  material.emissiveIntensity = 0.06;
+  material.albedoColor = new Color3(0.06, 0.08, 0.1);
+  material.emissiveColor = new Color3(0.003, 0.006, 0.009);
+  material.emissiveIntensity = 0.02;
   material.metallic = 0.02;
-  material.roughness = 0.88;
+  material.roughness = 0.94;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.12;
-  material.clearCoat.roughness = 0.42;
-  material.environmentIntensity = 0.24;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.56;
+  material.environmentIntensity = 0.12;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'festival-field-night',
