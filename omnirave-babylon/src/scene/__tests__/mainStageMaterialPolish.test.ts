@@ -3792,11 +3792,12 @@ describe('polishMainStageMaterials', () => {
     expect(festivalFieldMaterial.metadata?.mainStageMaterialPolish).toBe('wet');
     expect(festivalFieldMaterial.metadata?.mainStageMaterialOverride).toBe('festival-field-night');
     expect(festivalFieldMaterial.albedoTexture).toBeNull();
-    expect(festivalFieldMaterial.albedoColor.r).toBeLessThanOrEqual(0.12);
-    expect(festivalFieldMaterial.albedoColor.g).toBeLessThanOrEqual(0.13);
-    expect(festivalFieldMaterial.albedoColor.b).toBeLessThanOrEqual(0.16);
-    expect(festivalFieldMaterial.roughness).toBeGreaterThanOrEqual(0.8);
-    expect(festivalFieldMaterial.environmentIntensity).toBeLessThanOrEqual(0.32);
+    expect(festivalFieldMaterial.albedoColor.r).toBeLessThanOrEqual(0.06);
+    expect(festivalFieldMaterial.albedoColor.g).toBeLessThanOrEqual(0.08);
+    expect(festivalFieldMaterial.albedoColor.b).toBeLessThanOrEqual(0.1);
+    expect(festivalFieldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(festivalFieldMaterial.roughness).toBeGreaterThanOrEqual(0.94);
+    expect(festivalFieldMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
 
     expect(approachPaverMaterial.metadata?.mainStageMaterialPolish).toBe('wet');
     expect(approachPaverMaterial.metadata?.mainStageMaterialOverride).toBe('approach-paver-field');
