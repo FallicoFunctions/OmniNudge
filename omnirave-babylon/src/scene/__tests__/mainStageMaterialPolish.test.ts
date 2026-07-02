@@ -5528,11 +5528,11 @@ describe('polishMainStageMaterials', () => {
 
     expect(oculusCanopyMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(oculusCanopyMaterial.metadata?.mainStageMaterialOverride).toBe('oculus-canopy');
-    expect(oculusCanopyMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
-    expect(oculusCanopyMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(oculusCanopyMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
-    expect(oculusCanopyMaterial.roughness).toBeGreaterThanOrEqual(0.8);
-    expect(oculusCanopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(oculusCanopyMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
+    expect(oculusCanopyMaterial.albedoColor.g).toBeLessThanOrEqual(0.11);
+    expect(oculusCanopyMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(oculusCanopyMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(oculusCanopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.08);
 
     expect(wingCanopyMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(wingCanopyMaterial.metadata?.mainStageMaterialOverride).toBe('wing-canopy-lamella-gold');
