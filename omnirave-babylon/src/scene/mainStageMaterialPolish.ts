@@ -6453,12 +6453,12 @@ function applyWingArcadePearlArchOverride(material: PBRMaterial) {
 
 function applyWingArcadeGoldRevealOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.07);
-  material.emissiveColor = new Color3(0.018, 0.012, 0.005);
-  material.emissiveIntensity = 0.02;
-  material.metallic = 0.18;
-  material.roughness = 0.88;
-  material.environmentIntensity = 0.13;
+  material.albedoColor = new Color3(0.14, 0.11, 0.05);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.015;
+  material.metallic = 0.14;
+  material.roughness = 0.92;
+  material.environmentIntensity = 0.08;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-arcade-gold-reveal',
