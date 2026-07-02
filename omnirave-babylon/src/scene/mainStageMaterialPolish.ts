@@ -5785,15 +5785,15 @@ function applyPortalArcadeCyanSpineOverride(material: PBRMaterial) {
 }
 
 function applyPortalArcadeShadowCoreOverride(material: PBRMaterial) {
-  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.albedoColor = new Color3(0.12, 0.15, 0.19);
   material.emissiveColor = new Color3(0.01, 0.015, 0.02);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.08;
-  material.roughness = 0.84;
+  material.roughness = 0.88;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.04;
   material.clearCoat.roughness = 0.58;
-  material.environmentIntensity = 0.28;
+  material.environmentIntensity = 0.18;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'portal-arcade-shadow-core',
