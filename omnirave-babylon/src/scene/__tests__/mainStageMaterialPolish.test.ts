@@ -4029,13 +4029,13 @@ describe('polishMainStageMaterials', () => {
     const buttressMaterial = leftButtress.material as PBRMaterial;
     expect(buttressMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(buttressMaterial.metadata?.mainStageMaterialOverride).toBe('outer-wing-buttress-shell');
-    expect(buttressMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
-    expect(buttressMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
-    expect(buttressMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(buttressMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(buttressMaterial.albedoColor.g).toBeLessThanOrEqual(0.2);
+    expect(buttressMaterial.albedoColor.b).toBeLessThanOrEqual(0.24);
     expect(buttressMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(buttressMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(buttressMaterial.roughness).toBeGreaterThanOrEqual(0.9);
     expect(buttressMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(buttressMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(buttressMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('tones down the wing-facade arch inlays so the terrace arches keep shadow depth instead of bright gold ribbons', () => {
