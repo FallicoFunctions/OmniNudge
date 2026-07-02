@@ -6891,13 +6891,13 @@ describe('polishMainStageMaterials', () => {
     const archMaterial = leftArch.material as PBRMaterial;
     expect(archMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(archMaterial.metadata?.mainStageMaterialOverride).toBe('wing-arcade-pearl-arch');
-    expect(archMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
-    expect(archMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
-    expect(archMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(archMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(archMaterial.albedoColor.g).toBeLessThanOrEqual(0.22);
+    expect(archMaterial.albedoColor.b).toBeLessThanOrEqual(0.26);
     expect(archMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(archMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(archMaterial.roughness).toBeGreaterThanOrEqual(0.88);
     expect(archMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(archMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(archMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('tones down the wing arcade gold reveals so the side portals read as carved metal detailing instead of bright foil seams', () => {
