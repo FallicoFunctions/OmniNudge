@@ -4135,12 +4135,12 @@ describe('polishMainStageMaterials', () => {
 
     expect(promenadeRunwayMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(promenadeRunwayMaterial.metadata?.mainStageMaterialOverride).toBe('promenade-pearl-runway');
-    expect(promenadeRunwayMaterial.albedoColor.r).toBeLessThanOrEqual(0.34);
-    expect(promenadeRunwayMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
-    expect(promenadeRunwayMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(promenadeRunwayMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
+    expect(promenadeRunwayMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(promenadeRunwayMaterial.albedoColor.b).toBeLessThanOrEqual(0.22);
     expect(promenadeRunwayMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
-    expect(promenadeRunwayMaterial.roughness).toBeGreaterThanOrEqual(0.84);
-    expect(promenadeRunwayMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+    expect(promenadeRunwayMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(promenadeRunwayMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('darkens the promenade gold shoulders so the central route reads as embedded ceremonial metal instead of bright runway rails', () => {

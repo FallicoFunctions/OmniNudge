@@ -5093,15 +5093,15 @@ function applyCenterScreenShadowCofferArrayOverride(material: PBRMaterial) {
 
 function applyPromenadePearlRunwayOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.3, 0.28, 0.24);
+  material.albedoColor = new Color3(0.24, 0.22, 0.2);
   material.emissiveColor = new Color3(0, 0, 0);
   material.emissiveIntensity = 0;
   material.metallic = 0.02;
-  material.roughness = 0.9;
+  material.roughness = 0.92;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0;
-  material.clearCoat.roughness = 0.72;
-  material.environmentIntensity = 0.12;
+  material.clearCoat.roughness = 0.76;
+  material.environmentIntensity = 0.08;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'promenade-pearl-runway',
