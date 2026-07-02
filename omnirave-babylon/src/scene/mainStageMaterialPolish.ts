@@ -6462,15 +6462,15 @@ function applyPerformanceDaisUpperOverride(material: PBRMaterial) {
 
 function applyWingArcadePearlArchOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.2, 0.24);
+  material.albedoColor = new Color3(0.16, 0.18, 0.22);
   material.emissiveColor = new Color3(0.004, 0.007, 0.01);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.02;
-  material.roughness = 0.9;
+  material.roughness = 0.92;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.02;
   material.clearCoat.roughness = 0.72;
-  material.environmentIntensity = 0.08;
+  material.environmentIntensity = 0.06;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-arcade-pearl-arch',
