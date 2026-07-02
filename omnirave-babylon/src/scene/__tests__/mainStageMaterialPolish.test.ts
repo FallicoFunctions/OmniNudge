@@ -5939,12 +5939,12 @@ describe('polishMainStageMaterials', () => {
     const wingFasciaMaterial = leftWingFascia.material as PBRMaterial;
     expect(wingFasciaMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(wingFasciaMaterial.metadata?.mainStageMaterialOverride).toBe('wing-terrace-fascia');
-    expect(wingFasciaMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
-    expect(wingFasciaMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
-    expect(wingFasciaMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(wingFasciaMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(wingFasciaMaterial.albedoColor.g).toBeLessThanOrEqual(0.2);
+    expect(wingFasciaMaterial.albedoColor.b).toBeLessThanOrEqual(0.24);
     expect(wingFasciaMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(wingFasciaMaterial.roughness).toBeGreaterThanOrEqual(0.84);
-    expect(wingFasciaMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(wingFasciaMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(wingFasciaMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('gives the wing soffit shadow slabs their own subdued shadow-architecture finish so the Basin Edge garden flank stops reading as a bright proxy panel', () => {
