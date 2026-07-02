@@ -7385,13 +7385,13 @@ describe('polishMainStageMaterials', () => {
     const portalMaterial = portalArcade.material as PBRMaterial;
     expect(portalMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(portalMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-pearl-arcade');
-    expect(portalMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
-    expect(portalMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
-    expect(portalMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(portalMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(portalMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(portalMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
     expect(portalMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(portalMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(portalMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(portalMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(portalMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(portalMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
   });
 
   it('darkens the rear mass aurora pearl fins so the stage backdrop keeps silhouette depth instead of reading as two bright ivory blades', () => {
