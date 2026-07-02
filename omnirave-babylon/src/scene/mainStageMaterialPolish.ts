@@ -4645,15 +4645,15 @@ function applyCrowdBarrierRailOverride(material: PBRMaterial) {
 }
 
 function applyWingFacadeShadowFrameOverride(material: PBRMaterial) {
-  material.albedoColor = new Color3(0.14, 0.17, 0.21);
-  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.albedoColor = new Color3(0.12, 0.15, 0.19);
+  material.emissiveColor = new Color3(0.008, 0.012, 0.016);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.08;
-  material.roughness = 0.84;
+  material.roughness = 0.9;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.58;
-  material.environmentIntensity = 0.28;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.14;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-facade-shadow-frame',
