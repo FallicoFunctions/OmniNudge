@@ -801,13 +801,13 @@ describe('polishMainStageMaterials', () => {
     const reliefMaterial = leftWall.material as PBRMaterial;
     expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
-    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
-    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
-    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.19);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.21);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.25);
     expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.88);
     expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('regrades the basin water sheets so the side basins read as dark reflective water planes instead of bright flat cyan cards', () => {
