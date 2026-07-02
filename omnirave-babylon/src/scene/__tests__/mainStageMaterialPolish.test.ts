@@ -3500,12 +3500,12 @@ describe('polishMainStageMaterials', () => {
     const frameMaterial = frame.material as PBRMaterial;
     expect(frameMaterial.metadata?.mainStageMaterialPolish).toBe('black');
     expect(frameMaterial.metadata?.mainStageMaterialOverride).toBe('wing-facade-shadow-frame');
-    expect(frameMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
-    expect(frameMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
-    expect(frameMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
+    expect(frameMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(frameMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
+    expect(frameMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
     expect(frameMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
-    expect(frameMaterial.roughness).toBeGreaterThanOrEqual(0.78);
-    expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+    expect(frameMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
 
   it('neutralizes the V87 wing-facade shadow vault arrays so the terrace soffits read as shadow architecture instead of bright cyan inserts', () => {
@@ -3538,12 +3538,12 @@ describe('polishMainStageMaterials', () => {
     const vaultMaterial = leftVault.material as PBRMaterial;
     expect(vaultMaterial.metadata?.mainStageMaterialPolish).toBe('black');
     expect(vaultMaterial.metadata?.mainStageMaterialOverride).toBe('wing-facade-shadow-frame');
-    expect(vaultMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
-    expect(vaultMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
-    expect(vaultMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
+    expect(vaultMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(vaultMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
+    expect(vaultMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
     expect(vaultMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
-    expect(vaultMaterial.roughness).toBeGreaterThanOrEqual(0.78);
-    expect(vaultMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+    expect(vaultMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(vaultMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
 
   it('neutralizes the proscenium shadow pockets so the hero portal surround reads as recessed depth instead of bright cyan inserts', () => {
