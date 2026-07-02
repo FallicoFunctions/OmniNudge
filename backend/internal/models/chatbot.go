@@ -33,7 +33,7 @@ type BotPersona struct {
 	Name         string    `json:"name"`
 	Description  *string   `json:"description,omitempty"`
 	Category     string    `json:"category"` // genre/content tag: see PersonaCategory* constants
-	SystemPrompt string    `json:"system_prompt"`
+	SystemPrompt string    `json:"-"`
 	AvatarURL    *string   `json:"avatar_url,omitempty"`
 	IsNSFW       bool      `json:"is_nsfw"`
 	IsActive     bool      `json:"is_active"`
@@ -41,16 +41,26 @@ type BotPersona struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+// ConversationSettings holds per-conversation user metadata that the persona
+// is aware of (name, age, gender). Populated from user defaults on creation
+// and can be overridden per conversation in the chat settings modal.
+type ConversationSettings struct {
+	UserName   string `json:"user_name"`
+	UserAge    string `json:"user_age"`
+	UserGender string `json:"user_gender"`
+}
+
 // BotConversation is a chat session between a user and a BotPersona.
 type BotConversation struct {
-	ID            int         `json:"id"`
-	UserID        int         `json:"user_id"`
-	PersonaID     int         `json:"persona_id"`
-	Persona       *BotPersona `json:"persona,omitempty"` // Optional populated persona info
-	Title         *string     `json:"title,omitempty"`
-	CreatedAt     time.Time   `json:"created_at"`
-	LastMessageAt time.Time   `json:"last_message_at"`
-	ArchivedAt    *time.Time  `json:"archived_at,omitempty"`
+	ID            int                   `json:"id"`
+	UserID        int                   `json:"user_id"`
+	PersonaID     int                   `json:"persona_id"`
+	Persona       *BotPersona           `json:"persona,omitempty"` // Optional populated persona info
+	Title         *string               `json:"title,omitempty"`
+	Settings      *ConversationSettings `json:"settings,omitempty"`
+	CreatedAt     time.Time             `json:"created_at"`
+	LastMessageAt time.Time             `json:"last_message_at"`
+	ArchivedAt    *time.Time            `json:"archived_at,omitempty"`
 }
 
 // BotMessage is a single turn (user or assistant) within a BotConversation.
@@ -147,34 +157,106 @@ func NewBotConversationRepository(pool *pgxpool.Pool) *BotConversationRepository
 }
 
 // Create starts a new conversation between a user and a persona.
-func (r *BotConversationRepository) Create(ctx context.Context, userID, personaID int, title *string) (*BotConversation, error) {
+func (r *BotConversationRepository) Create(ctx context.Context, userID, personaID int, title *string, settings *ConversationSettings) (*BotConversation, error) {
 	c := &BotConversation{UserID: userID, PersonaID: personaID, Title: title}
+	if settings == nil {
+		settings = &ConversationSettings{}
+	}
+	c.Settings = settings
 	query := `
-		INSERT INTO bot_conversations (user_id, persona_id, title)
-		VALUES ($1, $2, $3)
+		INSERT INTO bot_conversations (user_id, persona_id, title, settings_user_name, settings_user_age, settings_user_gender)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, last_message_at
 	`
-	err := r.pool.QueryRow(ctx, query, userID, personaID, title).Scan(&c.ID, &c.CreatedAt, &c.LastMessageAt)
+	err := r.pool.QueryRow(ctx, query, userID, personaID, title,
+		settings.UserName, settings.UserAge, settings.UserGender,
+	).Scan(&c.ID, &c.CreatedAt, &c.LastMessageAt)
 	if err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
+// CreateWithMessages creates a conversation and any initial messages in a
+// single transaction so partial guest-import failures cannot leave orphaned
+// conversations behind.
+func (r *BotConversationRepository) CreateWithMessages(ctx context.Context, userID, personaID int, title *string, settings *ConversationSettings, messages []*BotMessage) (*BotConversation, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	c := &BotConversation{UserID: userID, PersonaID: personaID, Title: title}
+	if settings == nil {
+		settings = &ConversationSettings{}
+	}
+	c.Settings = settings
+
+	query := `
+		INSERT INTO bot_conversations (user_id, persona_id, title, settings_user_name, settings_user_age, settings_user_gender)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, created_at, last_message_at
+	`
+	err = tx.QueryRow(ctx, query, userID, personaID, title,
+		settings.UserName, settings.UserAge, settings.UserGender,
+	).Scan(&c.ID, &c.CreatedAt, &c.LastMessageAt)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(messages) > 0 {
+		insertMessageQuery := `
+			INSERT INTO bot_messages (conversation_id, role, content, failed)
+			VALUES ($1, $2, $3, $4)
+		`
+		for _, m := range messages {
+			if _, err := tx.Exec(ctx, insertMessageQuery, c.ID, m.Role, m.Content, m.Failed); err != nil {
+				return nil, err
+			}
+		}
+		if _, err := tx.Exec(ctx, `UPDATE bot_conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = $1`, c.ID); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// scanConversation scans a row with settings columns into a BotConversation.
+// Expects columns in order: id, user_id, persona_id, title, settings_user_name,
+// settings_user_age, settings_user_gender, created_at, last_message_at, archived_at.
+func scanConversation(scanner interface {
+	Scan(dest ...interface{}) error
+}) (*BotConversation, error) {
+	c := &BotConversation{}
+	s := &ConversationSettings{}
+	err := scanner.Scan(
+		&c.ID, &c.UserID, &c.PersonaID, &c.Title,
+		&s.UserName, &s.UserAge, &s.UserGender,
+		&c.CreatedAt, &c.LastMessageAt, &c.ArchivedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	c.Settings = s
+	return c, nil
+}
+
 // GetActiveByUserAndPersonaID returns the user's most recently active
 // non-archived conversation with the given persona, if one exists.
 func (r *BotConversationRepository) GetActiveByUserAndPersonaID(ctx context.Context, userID, personaID int) (*BotConversation, error) {
-	c := &BotConversation{}
 	query := `
-		SELECT id, user_id, persona_id, title, created_at, last_message_at, archived_at
+		SELECT id, user_id, persona_id, title, settings_user_name, settings_user_age, settings_user_gender, created_at, last_message_at, archived_at
 		FROM bot_conversations
 		WHERE user_id = $1 AND persona_id = $2 AND archived_at IS NULL
 		ORDER BY last_message_at DESC
 		LIMIT 1
 	`
-	err := r.pool.QueryRow(ctx, query, userID, personaID).Scan(
-		&c.ID, &c.UserID, &c.PersonaID, &c.Title, &c.CreatedAt, &c.LastMessageAt, &c.ArchivedAt,
-	)
+	c, err := scanConversation(r.pool.QueryRow(ctx, query, userID, personaID))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -186,15 +268,12 @@ func (r *BotConversationRepository) GetActiveByUserAndPersonaID(ctx context.Cont
 
 // GetByID retrieves a conversation by ID, scoped to the owning user.
 func (r *BotConversationRepository) GetByID(ctx context.Context, id, userID int) (*BotConversation, error) {
-	c := &BotConversation{}
 	query := `
-		SELECT id, user_id, persona_id, title, created_at, last_message_at, archived_at
+		SELECT id, user_id, persona_id, title, settings_user_name, settings_user_age, settings_user_gender, created_at, last_message_at, archived_at
 		FROM bot_conversations
 		WHERE id = $1 AND user_id = $2
 	`
-	err := r.pool.QueryRow(ctx, query, id, userID).Scan(
-		&c.ID, &c.UserID, &c.PersonaID, &c.Title, &c.CreatedAt, &c.LastMessageAt, &c.ArchivedAt,
-	)
+	c, err := scanConversation(r.pool.QueryRow(ctx, query, id, userID))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -210,7 +289,9 @@ func (r *BotConversationRepository) GetByID(ctx context.Context, id, userID int)
 func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, limit, offset int) ([]*BotConversation, error) {
 	query := `
 		SELECT
-			c.id, c.user_id, c.persona_id, c.title, c.created_at, c.last_message_at, c.archived_at,
+			c.id, c.user_id, c.persona_id, c.title,
+			c.settings_user_name, c.settings_user_age, c.settings_user_gender,
+			c.created_at, c.last_message_at, c.archived_at,
 			p.id, p.slug, p.name, p.description, p.category, p.system_prompt, p.avatar_url,
 			p.is_nsfw, p.is_active, p.created_at, p.updated_at
 		FROM bot_conversations c
@@ -228,24 +309,123 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 	conversations := []*BotConversation{}
 	for rows.Next() {
 		c := &BotConversation{}
+		s := &ConversationSettings{}
 		p := &BotPersona{}
 		if err := rows.Scan(
-			&c.ID, &c.UserID, &c.PersonaID, &c.Title, &c.CreatedAt, &c.LastMessageAt, &c.ArchivedAt,
+			&c.ID, &c.UserID, &c.PersonaID, &c.Title,
+			&s.UserName, &s.UserAge, &s.UserGender,
+			&c.CreatedAt, &c.LastMessageAt, &c.ArchivedAt,
 			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.SystemPrompt, &p.AvatarURL,
 			&p.IsNSFW, &p.IsActive, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
+		c.Settings = s
 		c.Persona = p
 		conversations = append(conversations, c)
 	}
 	return conversations, rows.Err()
 }
 
+// ListByUserIDAndPersonaID retrieves a user's conversations with a specific
+// persona, newest first. Used for the chat history drawer.
+func (r *BotConversationRepository) ListByUserIDAndPersonaID(ctx context.Context, userID, personaID, limit, offset int) ([]*BotConversation, error) {
+	query := `
+		SELECT id, user_id, persona_id, title, settings_user_name, settings_user_age, settings_user_gender, created_at, last_message_at, archived_at
+		FROM bot_conversations
+		WHERE user_id = $1 AND persona_id = $2 AND archived_at IS NULL
+		ORDER BY last_message_at DESC
+		LIMIT $3 OFFSET $4
+	`
+	rows, err := r.pool.Query(ctx, query, userID, personaID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	conversations := []*BotConversation{}
+	for rows.Next() {
+		c, err := scanConversation(rows)
+		if err != nil {
+			return nil, err
+		}
+		conversations = append(conversations, c)
+	}
+	return conversations, rows.Err()
+}
+
+// UpdateSettings updates the per-conversation user settings.
+func (r *BotConversationRepository) UpdateSettings(ctx context.Context, conversationID int, settings *ConversationSettings) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE bot_conversations
+		SET settings_user_name = $1, settings_user_age = $2, settings_user_gender = $3
+		WHERE id = $4
+	`, settings.UserName, settings.UserAge, settings.UserGender, conversationID)
+	return err
+}
+
+// ForkConversation creates a new conversation for the same persona, copying
+// all messages from the original. Returns the new conversation.
+func (r *BotConversationRepository) ForkConversation(ctx context.Context, userID int, original *BotConversation) (*BotConversation, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Create new conversation with same persona, title, and settings
+	title := "Copy of " + coalesceString(original.Title, original.Persona.Name)
+	settings := original.Settings
+	if settings == nil {
+		settings = &ConversationSettings{}
+	}
+
+	query := `
+		INSERT INTO bot_conversations (user_id, persona_id, title, settings_user_name, settings_user_age, settings_user_gender)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, created_at, last_message_at
+	`
+	newConv := &BotConversation{UserID: userID, PersonaID: original.PersonaID, Title: &title}
+	err = tx.QueryRow(ctx, query, userID, original.PersonaID, &title,
+		settings.UserName, settings.UserAge, settings.UserGender,
+	).Scan(&newConv.ID, &newConv.CreatedAt, &newConv.LastMessageAt)
+	if err != nil {
+		return nil, err
+	}
+	newConv.Settings = settings
+
+	// Copy all messages from the original conversation
+	_, err = tx.Exec(ctx, `
+		INSERT INTO bot_messages (conversation_id, role, content, failed, created_at)
+		SELECT $1, role, content, failed, created_at
+		FROM bot_messages
+		WHERE conversation_id = $2
+		ORDER BY id
+	`, newConv.ID, original.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := tx.Exec(ctx, `UPDATE bot_conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = $1`, newConv.ID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return newConv, nil
+}
+
 // UpdateLastMessageAt bumps the conversation's last_message_at to now.
 func (r *BotConversationRepository) UpdateLastMessageAt(ctx context.Context, conversationID int) error {
 	_, err := r.pool.Exec(ctx, `UPDATE bot_conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = $1`, conversationID)
 	return err
+}
+
+func coalesceString(s *string, fallback string) string {
+	if s != nil && *s != "" {
+		return *s
+	}
+	return fallback
 }
 
 // BotMessageRepository handles database operations for bot messages.
@@ -271,6 +451,34 @@ func (r *BotMessageRepository) Create(ctx context.Context, conversationID int, r
 		return nil, err
 	}
 	return m, nil
+}
+
+// BulkCreateMessages inserts multiple messages in a single batch for a conversation.
+func (r *BotMessageRepository) BulkCreateMessages(ctx context.Context, conversationID int, messages []*BotMessage) ([]*BotMessage, error) {
+	if len(messages) == 0 {
+		return messages, nil
+	}
+	query := `
+		INSERT INTO bot_messages (conversation_id, role, content, failed)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, created_at
+	`
+	created := make([]*BotMessage, len(messages))
+	for i, m := range messages {
+		m.ConversationID = conversationID
+		created[i] = &BotMessage{
+			ConversationID: conversationID,
+			Role:           m.Role,
+			Content:        m.Content,
+			Failed:         false,
+		}
+		err := r.pool.QueryRow(ctx, query, conversationID, m.Role, m.Content, false).
+			Scan(&created[i].ID, &created[i].CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("bulk insert message %d: %w", i, err)
+		}
+	}
+	return created, nil
 }
 
 // ListByConversationID retrieves messages for a conversation in chronological order.
