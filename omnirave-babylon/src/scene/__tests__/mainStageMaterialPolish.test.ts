@@ -5900,12 +5900,12 @@ describe('polishMainStageMaterials', () => {
     const terraceGoldMaterial = leftVipTerrace.material as PBRMaterial;
     expect(terraceGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(terraceGoldMaterial.metadata?.mainStageMaterialOverride).toBe('vip-terrace-gold');
-    expect(terraceGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(terraceGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(terraceGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(terraceGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(terraceGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(terraceGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
     expect(terraceGoldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(terraceGoldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(terraceGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(terraceGoldMaterial.roughness).toBeGreaterThanOrEqual(0.92);
+    expect(terraceGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.08);
   });
 
   it('darkens the wing terrace fascia so the promenade flanks stop reading as bright pearl slabs', () => {
