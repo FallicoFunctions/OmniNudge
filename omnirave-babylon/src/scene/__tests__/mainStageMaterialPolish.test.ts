@@ -5947,6 +5947,46 @@ describe('polishMainStageMaterials', () => {
     expect(wingFasciaMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
+  it('gives the wing soffit shadow slabs their own subdued shadow-architecture finish so the Basin Edge garden flank stops reading as a bright proxy panel', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedShadowMaterial = new PBRMaterial('V20_RecessedWarmShadow', scene);
+    sharedShadowMaterial.albedoColor.set(0.52, 0.86, 0.98);
+    sharedShadowMaterial.emissiveColor.set(0.18, 0.32, 0.4);
+    sharedShadowMaterial.emissiveIntensity = 0.28;
+    sharedShadowMaterial.metallic = 0.12;
+    sharedShadowMaterial.roughness = 0.38;
+
+    const otherShadow = MeshBuilder.CreateBox('TestWingSoffitShadowControl', { size: 1 }, scene);
+    otherShadow.material = sharedShadowMaterial;
+
+    const leftSoffit = MeshBuilder.CreateBox('V30_WingSoffitShadow_L', { size: 1 }, scene);
+    leftSoffit.material = sharedShadowMaterial;
+
+    const rightSoffit = MeshBuilder.CreateBox('V30_WingSoffitShadow_R', { size: 1 }, scene);
+    rightSoffit.material = sharedShadowMaterial;
+
+    polishMainStageMaterials([otherShadow, leftSoffit, rightSoffit]);
+
+    expect(otherShadow.material).toBe(sharedShadowMaterial);
+    expect(leftSoffit.material).toBeInstanceOf(PBRMaterial);
+    expect(rightSoffit.material).toBeInstanceOf(PBRMaterial);
+    expect(leftSoffit.material).not.toBe(sharedShadowMaterial);
+    expect(rightSoffit.material).not.toBe(sharedShadowMaterial);
+    expect(rightSoffit.material).toBe(leftSoffit.material);
+
+    const soffitMaterial = leftSoffit.material as PBRMaterial;
+    expect(soffitMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(soffitMaterial.metadata?.mainStageMaterialOverride).toBe('wing-soffit-shadow');
+    expect(soffitMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(soffitMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
+    expect(soffitMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
+    expect(soffitMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(soffitMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(soffitMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
+  });
+
   it('darkens the spawn canopy pearl vaults so the far reveal reads as authored arrival architecture instead of white proxy shells', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
