@@ -7173,12 +7173,12 @@ describe('polishMainStageMaterials', () => {
     const coreMaterial = leftCore.material as PBRMaterial;
     expect(coreMaterial.metadata?.mainStageMaterialPolish).toBe('black');
     expect(coreMaterial.metadata?.mainStageMaterialOverride).toBe('portal-arcade-shadow-core');
-    expect(coreMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
-    expect(coreMaterial.albedoColor.g).toBeLessThanOrEqual(0.32);
-    expect(coreMaterial.albedoColor.b).toBeLessThanOrEqual(0.38);
+    expect(coreMaterial.albedoColor.r).toBeLessThanOrEqual(0.12);
+    expect(coreMaterial.albedoColor.g).toBeLessThanOrEqual(0.15);
+    expect(coreMaterial.albedoColor.b).toBeLessThanOrEqual(0.19);
     expect(coreMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
-    expect(coreMaterial.roughness).toBeGreaterThanOrEqual(0.78);
-    expect(coreMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+    expect(coreMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(coreMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
 
   it('tones down the hero portal gold cap so the celestial colonnade terminus reads as carved metal detailing instead of a bright foil crown', () => {
