@@ -5194,15 +5194,15 @@ function applyWingGlassBalustradeOverride(material: PBRMaterial) {
 
 function applyOculusCanopyOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.14, 0.1, 0.04);
+  material.albedoColor = new Color3(0.11, 0.08, 0.035);
   material.emissiveColor = new Color3(0, 0, 0);
   material.emissiveIntensity = 0.01;
   material.metallic = 0.14;
-  material.roughness = 0.9;
+  material.roughness = 0.92;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0;
   material.clearCoat.roughness = 0.88;
-  material.environmentIntensity = 0.08;
+  material.environmentIntensity = 0.06;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'oculus-canopy',
