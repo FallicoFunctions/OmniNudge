@@ -3867,12 +3867,12 @@ describe('polishMainStageMaterials', () => {
 
     expect(basinCopingMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(basinCopingMaterial.metadata?.mainStageMaterialOverride).toBe('basin-stone-coping');
-    expect(basinCopingMaterial.albedoColor.r).toBeLessThanOrEqual(0.5);
-    expect(basinCopingMaterial.albedoColor.g).toBeLessThanOrEqual(0.48);
-    expect(basinCopingMaterial.albedoColor.b).toBeLessThanOrEqual(0.44);
+    expect(basinCopingMaterial.albedoColor.r).toBeLessThanOrEqual(0.38);
+    expect(basinCopingMaterial.albedoColor.g).toBeLessThanOrEqual(0.36);
+    expect(basinCopingMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
     expect(basinCopingMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
-    expect(basinCopingMaterial.roughness).toBeGreaterThanOrEqual(0.84);
-    expect(basinCopingMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(basinCopingMaterial.roughness).toBeGreaterThanOrEqual(0.94);
+    expect(basinCopingMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
   });
 
   it('realizes instanced crown-shell lamella meshes before applying a mesh-specific override so the live stage does not keep the shared bright pearl source material', () => {
