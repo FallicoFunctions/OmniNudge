@@ -3736,13 +3736,13 @@ describe('polishMainStageMaterials', () => {
     expect(sideLedMaterial.name).toContain('side-led-tile-field');
     expect(sideLedMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
     expect(sideLedMaterial.metadata?.mainStageMaterialOverride).toBe('side-led-tile-field');
-    expect(sideLedMaterial.albedoColor.r).toBeLessThanOrEqual(0.05);
-    expect(sideLedMaterial.albedoColor.g).toBeLessThanOrEqual(0.08);
-    expect(sideLedMaterial.albedoColor.b).toBeLessThanOrEqual(0.1);
-    expect(sideLedMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(sideLedMaterial.alpha).toBeLessThanOrEqual(0.14);
-    expect(sideLedMaterial.roughness).toBeGreaterThanOrEqual(0.2);
-    expect(sideLedMaterial.environmentIntensity).toBeLessThanOrEqual(0.08);
+    expect(sideLedMaterial.albedoColor.r).toBeLessThanOrEqual(0.03);
+    expect(sideLedMaterial.albedoColor.g).toBeLessThanOrEqual(0.05);
+    expect(sideLedMaterial.albedoColor.b).toBeLessThanOrEqual(0.07);
+    expect(sideLedMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(sideLedMaterial.alpha).toBeLessThanOrEqual(0.08);
+    expect(sideLedMaterial.roughness).toBeGreaterThanOrEqual(0.32);
+    expect(sideLedMaterial.environmentIntensity).toBeLessThanOrEqual(0.04);
     expect(sideLedMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
   });
 
