@@ -760,14 +760,14 @@ describe('polishMainStageMaterials', () => {
 
     const reliefMaterial = leftDeck.material as PBRMaterial;
     expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
-    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
-    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.17);
-    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.21);
-    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.94);
+    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-deck-relief');
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.11);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.13);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.17);
+    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.01);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.96);
     expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.04);
   });
 
   it('darkens the basin wall reliefs so the basin cheeks read as carved stonework instead of bright pearl side slabs', () => {
