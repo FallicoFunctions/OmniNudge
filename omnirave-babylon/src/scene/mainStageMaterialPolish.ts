@@ -2820,6 +2820,22 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
     }
 
     if (
+      mesh.name === 'V67_VipGardenReflectingPool_L' ||
+      mesh.name === 'V67_VipGardenReflectingPool_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:vip-garden-reflecting-pool`;
+      let poolMaterial = clonedMaterials.get(cacheKey);
+      if (!poolMaterial) {
+        poolMaterial = material.clone(`${material.name}__vip-garden-reflecting-pool`);
+        applyVipGardenReflectingPoolOverride(poolMaterial);
+        clonedMaterials.set(cacheKey, poolMaterial);
+      }
+
+      assignOverrideMaterial(mesh, poolMaterial);
+      continue;
+    }
+
+    if (
       mesh.name === 'V67_VipGardenGoldRibCanopy_L' ||
       mesh.name === 'V67_VipGardenGoldRibCanopy_R'
     ) {
@@ -6274,6 +6290,24 @@ function applyVipGardenPearlBasinOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'vip-garden-pearl-basin',
+  };
+}
+
+function applyVipGardenReflectingPoolOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.006, 0.01, 0.014);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.04;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialPolish: 'black',
+    mainStageMaterialOverride: 'vip-garden-reflecting-pool',
   };
 }
 
