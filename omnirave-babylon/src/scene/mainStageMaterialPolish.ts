@@ -1553,12 +1553,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V34_ApproachGoldInlayNetwork' ||
-      mesh.name.startsWith('V34_ApproachEdgeRail_') ||
-      mesh.name.startsWith('V34_BackPlazaGatewayGoldCrown_') ||
-      mesh.name.startsWith('V34_BackPlazaBannerRail_')
-    ) {
+    if (mesh.name === 'V34_ApproachGoldInlayNetwork') {
       const cacheKey = `${material.uniqueId}:approach-gold-inlay-network`;
       let goldMaterial = clonedMaterials.get(cacheKey);
       if (!goldMaterial) {
@@ -1568,6 +1563,45 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, goldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V34_ApproachEdgeRail_')) {
+      const cacheKey = `${material.uniqueId}:approach-edge-rail`;
+      let railMaterial = clonedMaterials.get(cacheKey);
+      if (!railMaterial) {
+        railMaterial = material.clone(`${material.name}__approach-edge-rail`);
+        applyApproachEdgeRailOverride(railMaterial);
+        clonedMaterials.set(cacheKey, railMaterial);
+      }
+
+      assignOverrideMaterial(mesh, railMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V34_BackPlazaGatewayGoldCrown_')) {
+      const cacheKey = `${material.uniqueId}:back-plaza-gateway-gold-crown`;
+      let crownMaterial = clonedMaterials.get(cacheKey);
+      if (!crownMaterial) {
+        crownMaterial = material.clone(`${material.name}__back-plaza-gateway-gold-crown`);
+        applyBackPlazaGatewayGoldCrownOverride(crownMaterial);
+        clonedMaterials.set(cacheKey, crownMaterial);
+      }
+
+      assignOverrideMaterial(mesh, crownMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V34_BackPlazaBannerRail_')) {
+      const cacheKey = `${material.uniqueId}:back-plaza-banner-rail`;
+      let bannerMaterial = clonedMaterials.get(cacheKey);
+      if (!bannerMaterial) {
+        bannerMaterial = material.clone(`${material.name}__back-plaza-banner-rail`);
+        applyBackPlazaBannerRailOverride(bannerMaterial);
+        clonedMaterials.set(cacheKey, bannerMaterial);
+      }
+
+      assignOverrideMaterial(mesh, bannerMaterial);
       continue;
     }
 
@@ -5219,6 +5253,10 @@ function applyApproachGoldInlayNetworkOverride(material: PBRMaterial) {
 
 function applyApproachEdgeRailOverride(material: PBRMaterial) {
   applyWingFacadeArchInlayOverride(material);
+  material.albedoColor = new Color3(0.2, 0.16, 0.07);
+  material.metallic = 0.2;
+  material.roughness = 0.82;
+  material.environmentIntensity = 0.14;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'approach-edge-rail',
@@ -6537,6 +6575,10 @@ function applyBackPlazaGatewayCyanInlayOverride(material: PBRMaterial) {
 
 function applyBackPlazaGatewayGoldCrownOverride(material: PBRMaterial) {
   applyWingFacadeArchInlayOverride(material);
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.metallic = 0.18;
+  material.roughness = 0.86;
+  material.environmentIntensity = 0.12;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'back-plaza-gateway-gold-crown',
@@ -6545,6 +6587,9 @@ function applyBackPlazaGatewayGoldCrownOverride(material: PBRMaterial) {
 
 function applyBackPlazaBannerRailOverride(material: PBRMaterial) {
   applyWingFacadeArchInlayOverride(material);
+  material.albedoColor = new Color3(0.14, 0.11, 0.05);
+  material.roughness = 0.9;
+  material.environmentIntensity = 0.1;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'back-plaza-banner-rail',

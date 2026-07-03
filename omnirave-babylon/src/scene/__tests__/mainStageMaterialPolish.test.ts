@@ -8481,12 +8481,18 @@ describe('polishMainStageMaterials', () => {
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(goldInlay.material).toBeInstanceOf(PBRMaterial);
-    expect(leftEdgeRail.material).toBe(goldInlay.material);
-    expect(rightEdgeRail.material).toBe(goldInlay.material);
-    expect(leftGatewayCrown.material).toBe(goldInlay.material);
-    expect(rightGatewayCrown.material).toBe(goldInlay.material);
-    expect(leftBannerRail.material).toBe(goldInlay.material);
-    expect(rightBannerRail.material).toBe(goldInlay.material);
+    expect(leftEdgeRail.material).toBeInstanceOf(PBRMaterial);
+    expect(rightEdgeRail.material).toBe(leftEdgeRail.material);
+    expect(leftGatewayCrown.material).toBeInstanceOf(PBRMaterial);
+    expect(rightGatewayCrown.material).toBe(leftGatewayCrown.material);
+    expect(leftBannerRail.material).toBeInstanceOf(PBRMaterial);
+    expect(rightBannerRail.material).toBe(leftBannerRail.material);
+    expect(leftEdgeRail.material).not.toBe(goldInlay.material);
+    expect(leftGatewayCrown.material).not.toBe(goldInlay.material);
+    expect(leftBannerRail.material).not.toBe(goldInlay.material);
+    expect(leftGatewayCrown.material).not.toBe(leftEdgeRail.material);
+    expect(leftBannerRail.material).not.toBe(leftEdgeRail.material);
+    expect(leftBannerRail.material).not.toBe(leftGatewayCrown.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftGatewayCyan.material).toBeInstanceOf(PBRMaterial);
@@ -8494,6 +8500,9 @@ describe('polishMainStageMaterials', () => {
 
     const barricadeMaterial = leftBarricade.material as PBRMaterial;
     const goldMaterial = goldInlay.material as PBRMaterial;
+    const edgeRailMaterial = leftEdgeRail.material as PBRMaterial;
+    const gatewayCrownMaterial = leftGatewayCrown.material as PBRMaterial;
+    const bannerRailMaterial = leftBannerRail.material as PBRMaterial;
     const cyanMaterial = leftGatewayCyan.material as PBRMaterial;
 
     expect(barricadeMaterial.name).toContain('approach-barricade-assembly');
@@ -8517,6 +8526,39 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.metallic).toBeLessThanOrEqual(0.14);
     expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
     expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.08);
+
+    expect(edgeRailMaterial.name).toContain('approach-edge-rail');
+    expect(edgeRailMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(edgeRailMaterial.metadata?.mainStageMaterialOverride).toBe('approach-edge-rail');
+    expect(edgeRailMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(edgeRailMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(edgeRailMaterial.albedoColor.b).toBeLessThanOrEqual(0.07);
+    expect(edgeRailMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(edgeRailMaterial.metallic).toBeGreaterThanOrEqual(0.18);
+    expect(edgeRailMaterial.roughness).toBeLessThanOrEqual(0.84);
+    expect(edgeRailMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.12);
+
+    expect(gatewayCrownMaterial.name).toContain('back-plaza-gateway-gold-crown');
+    expect(gatewayCrownMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(gatewayCrownMaterial.metadata?.mainStageMaterialOverride).toBe('back-plaza-gateway-gold-crown');
+    expect(gatewayCrownMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(gatewayCrownMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
+    expect(gatewayCrownMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(gatewayCrownMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(gatewayCrownMaterial.metallic).toBeGreaterThanOrEqual(0.16);
+    expect(gatewayCrownMaterial.roughness).toBeLessThanOrEqual(0.88);
+    expect(gatewayCrownMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.1);
+
+    expect(bannerRailMaterial.name).toContain('back-plaza-banner-rail');
+    expect(bannerRailMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(bannerRailMaterial.metadata?.mainStageMaterialOverride).toBe('back-plaza-banner-rail');
+    expect(bannerRailMaterial.albedoColor.r).toBeLessThanOrEqual(0.14);
+    expect(bannerRailMaterial.albedoColor.g).toBeLessThanOrEqual(0.11);
+    expect(bannerRailMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(bannerRailMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(bannerRailMaterial.metallic).toBeLessThanOrEqual(0.14);
+    expect(bannerRailMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(bannerRailMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
 
     expect(cyanMaterial.name).toContain('back-plaza-gateway-cyan-inlay');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
