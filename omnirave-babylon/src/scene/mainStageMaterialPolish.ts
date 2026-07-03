@@ -863,20 +863,42 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V80_OvalScreenPedestalShell_') ||
-      mesh.name.startsWith('V80_OvalScreenCanopyShell_') ||
-      mesh.name.startsWith('V80_OvalScreenSideButtressShellArray_')
-    ) {
-      const cacheKey = `${material.uniqueId}:oval-screen-shell-housing`;
-      let housingMaterial = clonedMaterials.get(cacheKey);
-      if (!housingMaterial) {
-        housingMaterial = material.clone(`${material.name}__oval-screen-shell-housing`);
-        applyOvalScreenShellHousingOverride(housingMaterial);
-        clonedMaterials.set(cacheKey, housingMaterial);
+    if (mesh.name.startsWith('V80_OvalScreenPedestalShell_')) {
+      const cacheKey = `${material.uniqueId}:oval-screen-pedestal-shell`;
+      let pedestalMaterial = clonedMaterials.get(cacheKey);
+      if (!pedestalMaterial) {
+        pedestalMaterial = material.clone(`${material.name}__oval-screen-pedestal-shell`);
+        applyOvalScreenPedestalShellOverride(pedestalMaterial);
+        clonedMaterials.set(cacheKey, pedestalMaterial);
       }
 
-      assignOverrideMaterial(mesh, housingMaterial);
+      assignOverrideMaterial(mesh, pedestalMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V80_OvalScreenCanopyShell_')) {
+      const cacheKey = `${material.uniqueId}:oval-screen-canopy-shell`;
+      let canopyMaterial = clonedMaterials.get(cacheKey);
+      if (!canopyMaterial) {
+        canopyMaterial = material.clone(`${material.name}__oval-screen-canopy-shell`);
+        applyOvalScreenCanopyShellOverride(canopyMaterial);
+        clonedMaterials.set(cacheKey, canopyMaterial);
+      }
+
+      assignOverrideMaterial(mesh, canopyMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V80_OvalScreenSideButtressShellArray_')) {
+      const cacheKey = `${material.uniqueId}:oval-screen-buttress-shell`;
+      let buttressMaterial = clonedMaterials.get(cacheKey);
+      if (!buttressMaterial) {
+        buttressMaterial = material.clone(`${material.name}__oval-screen-buttress-shell`);
+        applyOvalScreenButtressShellOverride(buttressMaterial);
+        clonedMaterials.set(cacheKey, buttressMaterial);
+      }
+
+      assignOverrideMaterial(mesh, buttressMaterial);
       continue;
     }
 
@@ -4923,7 +4945,7 @@ function applyOvalScreenRecessShadowPocketOverride(material: PBRMaterial) {
   };
 }
 
-function applyOvalScreenShellHousingOverride(material: PBRMaterial) {
+function applyOvalScreenCanopyShellOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.22, 0.24, 0.28);
   material.emissiveColor = new Color3(0.006, 0.008, 0.012);
@@ -4936,7 +4958,41 @@ function applyOvalScreenShellHousingOverride(material: PBRMaterial) {
   material.environmentIntensity = 0.14;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'oval-screen-shell-housing',
+    mainStageMaterialOverride: 'oval-screen-canopy-shell',
+  };
+}
+
+function applyOvalScreenPedestalShellOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-screen-pedestal-shell',
+  };
+}
+
+function applyOvalScreenButtressShellOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.21, 0.23, 0.27);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.02;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-screen-buttress-shell',
   };
 }
 
