@@ -9830,4 +9830,57 @@ describe('polishMainStageMaterials', () => {
     expect(ribMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(ribMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
+
+  it('darkens the basin channel relief, runway spine, and retaining wall so the basin structure reads as carved stonework instead of bright pearl slabs', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V15_PearlShellBeveled', scene);
+    sharedPearlMaterial.albedoColor.set(0.8, 0.78, 0.74);
+    sharedPearlMaterial.emissiveColor.set(0.08, 0.07, 0.06);
+    sharedPearlMaterial.emissiveIntensity = 0.16;
+    sharedPearlMaterial.roughness = 0.34;
+
+    const otherPearl = MeshBuilder.CreateBox('V24_OuterCrownLamella_L', { size: 1 }, scene);
+    otherPearl.material = sharedPearlMaterial;
+
+    const channelRelief = MeshBuilder.CreateBox('V99_BasinChannelRelief', { size: 1 }, scene);
+    channelRelief.material = sharedPearlMaterial;
+
+    const runwaySpine = MeshBuilder.CreateBox('V99_BasinRunwaySpine', { size: 1 }, scene);
+    runwaySpine.material = sharedPearlMaterial;
+
+    const retainingWallL = MeshBuilder.CreateBox('V99_BasinRetainingWall_L', { size: 1 }, scene);
+    retainingWallL.material = sharedPearlMaterial;
+
+    const retainingWallR = MeshBuilder.CreateBox('V99_BasinRetainingWall_R', { size: 1 }, scene);
+    retainingWallR.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, channelRelief, runwaySpine, retainingWallL, retainingWallR]);
+
+    expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(channelRelief.material).toBeInstanceOf(PBRMaterial);
+    expect(runwaySpine.material).toBeInstanceOf(PBRMaterial);
+    expect(retainingWallL.material).toBeInstanceOf(PBRMaterial);
+    expect(retainingWallR.material).toBeInstanceOf(PBRMaterial);
+    expect(channelRelief.material).not.toBe(sharedPearlMaterial);
+    expect(runwaySpine.material).not.toBe(sharedPearlMaterial);
+    expect(retainingWallL.material).not.toBe(sharedPearlMaterial);
+    expect(retainingWallR.material).not.toBe(sharedPearlMaterial);
+    expect(channelRelief.material).toBe(runwaySpine.material);
+    expect(channelRelief.material).toBe(retainingWallL.material);
+    expect(retainingWallR.material).toBe(channelRelief.material);
+
+    const basinStoneMaterial = channelRelief.material as PBRMaterial;
+    expect(basinStoneMaterial.name).toContain('basin-stone-relief');
+    expect(basinStoneMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(basinStoneMaterial.metadata?.mainStageMaterialOverride).toBe('basin-stone-relief');
+    expect(basinStoneMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(basinStoneMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
+    expect(basinStoneMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
+    expect(basinStoneMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(basinStoneMaterial.metallic).toBeLessThanOrEqual(0.05);
+    expect(basinStoneMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(basinStoneMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+  });
 });
