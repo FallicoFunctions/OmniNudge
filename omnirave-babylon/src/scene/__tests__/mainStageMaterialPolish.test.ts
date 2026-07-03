@@ -2847,11 +2847,16 @@ describe('polishMainStageMaterials', () => {
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftReveal.material).toBeInstanceOf(PBRMaterial);
-    expect(rib0.material).toBe(leftReveal.material);
-    expect(leftButtressReveal.material).toBe(leftReveal.material);
+    expect(rib0.material).toBeInstanceOf(PBRMaterial);
+    expect(leftButtressReveal.material).toBeInstanceOf(PBRMaterial);
+    expect(rib0.material).not.toBe(leftReveal.material);
+    expect(leftButtressReveal.material).not.toBe(leftReveal.material);
+    expect(leftButtressReveal.material).not.toBe(rib0.material);
 
     const pearlMaterial = leftArch.material as PBRMaterial;
-    const goldMaterial = leftReveal.material as PBRMaterial;
+    const revealMaterial = leftReveal.material as PBRMaterial;
+    const ribMaterial = rib0.material as PBRMaterial;
+    const buttressRevealMaterial = leftButtressReveal.material as PBRMaterial;
 
     expect(pearlMaterial.name).toContain('v24-crown-pearl-shell');
     expect(pearlMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
@@ -2863,16 +2868,38 @@ describe('polishMainStageMaterials', () => {
     expect(pearlMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(pearlMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
 
-    expect(goldMaterial.name).toContain('v24-crown-gold-reveal');
-    expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
-    expect(goldMaterial.metadata?.mainStageMaterialOverride).toBe('v24-crown-gold-reveal');
-    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
-    expect(goldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
-    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(revealMaterial.name).toContain('v24-crown-gold-reveal');
+    expect(revealMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(revealMaterial.metadata?.mainStageMaterialOverride).toBe('v24-crown-gold-reveal');
+    expect(revealMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(revealMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(revealMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(revealMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(revealMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+
+    expect(ribMaterial.name).toContain('v24-crown-depth-rib');
+    expect(ribMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(ribMaterial.metadata?.mainStageMaterialOverride).toBe('v24-crown-depth-rib');
+    expect(ribMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(ribMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(ribMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(ribMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(ribMaterial.metallic).toBeLessThanOrEqual(0.14);
+    expect(ribMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(ribMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+
+    expect(buttressRevealMaterial.name).toContain('v24-buttress-gold-reveal');
+    expect(buttressRevealMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(buttressRevealMaterial.metadata?.mainStageMaterialOverride).toBe('v24-buttress-gold-reveal');
+    expect(buttressRevealMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(buttressRevealMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
+    expect(buttressRevealMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(buttressRevealMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(buttressRevealMaterial.metallic).toBeGreaterThanOrEqual(0.16);
+    expect(buttressRevealMaterial.roughness).toBeLessThanOrEqual(0.88);
+    expect(buttressRevealMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.1);
   });
 
   it('rebalances the center-screen mullion and cyan-edge arrays so the hero wall crown reads as framed depth instead of bright gold slats wrapped around cyan cards', () => {

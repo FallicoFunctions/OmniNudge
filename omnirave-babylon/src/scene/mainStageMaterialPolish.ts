@@ -507,26 +507,48 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V24_CelestialCrownGoldReveal_L' || mesh.name === 'V24_CelestialCrownGoldReveal_R') {
+      const cacheKey = `${material.uniqueId}:v24-crown-gold-reveal`;
+      let revealMaterial = clonedMaterials.get(cacheKey);
+      if (!revealMaterial) {
+        revealMaterial = material.clone(`${material.name}__v24-crown-gold-reveal`);
+        applyV24CrownGoldRevealOverride(revealMaterial);
+        clonedMaterials.set(cacheKey, revealMaterial);
+      }
+
+      assignOverrideMaterial(mesh, revealMaterial);
+      continue;
+    }
+
     if (
-      mesh.name === 'V24_CelestialCrownGoldReveal_L' ||
-      mesh.name === 'V24_CelestialCrownGoldReveal_R' ||
       mesh.name === 'V24_CrownSpireDepthRib_0' ||
       mesh.name === 'V24_CrownSpireDepthRib_1' ||
       mesh.name === 'V24_CrownSpireDepthRib_R_1' ||
       mesh.name === 'V24_CrownSpireDepthRib_2' ||
-      mesh.name === 'V24_CrownSpireDepthRib_R_2' ||
-      mesh.name === 'V24_ProsceniumButtressGoldReveal_L' ||
-      mesh.name === 'V24_ProsceniumButtressGoldReveal_R'
+      mesh.name === 'V24_CrownSpireDepthRib_R_2'
     ) {
-      const cacheKey = `${material.uniqueId}:v24-crown-gold-reveal`;
-      let goldMaterial = clonedMaterials.get(cacheKey);
-      if (!goldMaterial) {
-        goldMaterial = material.clone(`${material.name}__v24-crown-gold-reveal`);
-        applyV24CrownGoldRevealOverride(goldMaterial);
-        clonedMaterials.set(cacheKey, goldMaterial);
+      const cacheKey = `${material.uniqueId}:v24-crown-depth-rib`;
+      let ribMaterial = clonedMaterials.get(cacheKey);
+      if (!ribMaterial) {
+        ribMaterial = material.clone(`${material.name}__v24-crown-depth-rib`);
+        applyV24CrownDepthRibOverride(ribMaterial);
+        clonedMaterials.set(cacheKey, ribMaterial);
       }
 
-      assignOverrideMaterial(mesh, goldMaterial);
+      assignOverrideMaterial(mesh, ribMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V24_ProsceniumButtressGoldReveal_L' || mesh.name === 'V24_ProsceniumButtressGoldReveal_R') {
+      const cacheKey = `${material.uniqueId}:v24-buttress-gold-reveal`;
+      let buttressRevealMaterial = clonedMaterials.get(cacheKey);
+      if (!buttressRevealMaterial) {
+        buttressRevealMaterial = material.clone(`${material.name}__v24-buttress-gold-reveal`);
+        applyV24ButtressGoldRevealOverride(buttressRevealMaterial);
+        clonedMaterials.set(cacheKey, buttressRevealMaterial);
+      }
+
+      assignOverrideMaterial(mesh, buttressRevealMaterial);
       continue;
     }
 
@@ -4779,6 +4801,40 @@ function applyV24CrownGoldRevealOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'v24-crown-gold-reveal',
+  };
+}
+
+function applyV24CrownDepthRibOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.15, 0.11, 0.045);
+  material.emissiveColor = new Color3(0.006, 0.004, 0.0015);
+  material.emissiveIntensity = 0.015;
+  material.metallic = 0.12;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'v24-crown-depth-rib',
+  };
+}
+
+function applyV24ButtressGoldRevealOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.175, 0.135, 0.058);
+  material.emissiveColor = new Color3(0.008, 0.006, 0.002);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.18;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.11;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'v24-buttress-gold-reveal',
   };
 }
 
