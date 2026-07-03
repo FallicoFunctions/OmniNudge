@@ -4207,16 +4207,27 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       assignOverrideMaterial(mesh, ledFieldMaterial);
     }
 
+    if (mesh.name === 'V31_CenterParallaxStarfield') {
+      const cacheKey = `${material.uniqueId}:center-parallax-starfield`;
+      let parallaxMaterial = clonedMaterials.get(cacheKey);
+      if (!parallaxMaterial) {
+        parallaxMaterial = material.clone(`${material.name}__center-parallax-starfield`);
+        applyCenterParallaxStarfieldOverride(parallaxMaterial);
+        clonedMaterials.set(cacheKey, parallaxMaterial);
+      }
+
+      assignOverrideMaterial(mesh, parallaxMaterial);
+    }
+
     if (
-      mesh.name === 'V31_CenterParallaxStarfield' ||
       mesh.name === 'V31_SideParallaxOrbitalContent_L' ||
       mesh.name === 'V31_SideParallaxOrbitalContent_R'
     ) {
-      const cacheKey = `${material.uniqueId}:parallax-screen-cyan-glow`;
+      const cacheKey = `${material.uniqueId}:side-parallax-orbital-content`;
       let parallaxMaterial = clonedMaterials.get(cacheKey);
       if (!parallaxMaterial) {
-        parallaxMaterial = material.clone(`${material.name}__parallax-screen-cyan-glow`);
-        applyParallaxScreenCyanGlowOverride(parallaxMaterial);
+        parallaxMaterial = material.clone(`${material.name}__side-parallax-orbital-content`);
+        applySideParallaxOrbitalContentOverride(parallaxMaterial);
         clonedMaterials.set(cacheKey, parallaxMaterial);
       }
 
@@ -8666,7 +8677,27 @@ function applySideLedTileFieldOverride(material: PBRMaterial) {
   };
 }
 
-function applyParallaxScreenCyanGlowOverride(material: PBRMaterial) {
+function applyCenterParallaxStarfieldOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.035, 0.072, 0.098);
+  material.emissiveColor = new Color3(0.01, 0.024, 0.032);
+  material.emissiveIntensity = 0.072;
+  material.alpha = 0.5;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.04;
+  material.roughness = 0.46;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.74;
+  material.environmentIntensity = 0.2;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialPolish: 'smoked',
+    mainStageMaterialOverride: 'center-parallax-starfield',
+  };
+}
+
+function applySideParallaxOrbitalContentOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.04, 0.08, 0.11);
   material.emissiveColor = new Color3(0.012, 0.028, 0.038);
@@ -8682,6 +8713,6 @@ function applyParallaxScreenCyanGlowOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialPolish: 'smoked',
-    mainStageMaterialOverride: 'parallax-screen-cyan-glow',
+    mainStageMaterialOverride: 'side-parallax-orbital-content',
   };
 }
