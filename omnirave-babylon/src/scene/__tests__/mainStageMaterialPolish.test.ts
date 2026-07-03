@@ -2622,7 +2622,7 @@ describe('polishMainStageMaterials', () => {
     expect(glowMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
   });
 
-  it('rebalances the crown moving-light cables, housings, and cyan lenses so the upper rig reads as practical show hardware instead of black proxy drops with hot cyan bulbs', () => {
+  it('rebalances the crown moving-light cables, housings, and cyan lenses so the upper rig reads as practical show hardware instead of one repeated black proxy drop finish with hot cyan bulbs', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -2660,23 +2660,37 @@ describe('polishMainStageMaterials', () => {
 
     expect(blackControl.material).toBe(sharedBlackMaterial);
     expect(drops.material).toBeInstanceOf(PBRMaterial);
-    expect(housings.material).toBe(drops.material);
+    expect(housings.material).toBeInstanceOf(PBRMaterial);
+    expect(drops.material).not.toBe(sharedBlackMaterial);
+    expect(housings.material).not.toBe(sharedBlackMaterial);
+    expect(housings.material).not.toBe(drops.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(lenses.material).toBeInstanceOf(PBRMaterial);
 
-    const hardwareMaterial = drops.material as PBRMaterial;
+    const cableMaterial = drops.material as PBRMaterial;
+    const housingMaterial = housings.material as PBRMaterial;
     const lensMaterial = lenses.material as PBRMaterial;
 
-    expect(hardwareMaterial.name).toContain('crown-moving-light-hardware');
-    expect(hardwareMaterial.metadata?.mainStageMaterialPolish).toBe('black');
-    expect(hardwareMaterial.metadata?.mainStageMaterialOverride).toBe('crown-moving-light-hardware');
-    expect(hardwareMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(hardwareMaterial.albedoColor.g).toBeLessThanOrEqual(0.2);
-    expect(hardwareMaterial.albedoColor.b).toBeLessThanOrEqual(0.24);
-    expect(hardwareMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(hardwareMaterial.roughness).toBeGreaterThanOrEqual(0.82);
-    expect(hardwareMaterial.environmentIntensity).toBeLessThanOrEqual(0.32);
+    expect(cableMaterial.name).toContain('crown-light-drop-cable');
+    expect(cableMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(cableMaterial.metadata?.mainStageMaterialOverride).toBe('crown-light-drop-cable');
+    expect(cableMaterial.albedoColor.r).toBeLessThanOrEqual(0.14);
+    expect(cableMaterial.albedoColor.g).toBeLessThanOrEqual(0.18);
+    expect(cableMaterial.albedoColor.b).toBeLessThanOrEqual(0.22);
+    expect(cableMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(cableMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(cableMaterial.environmentIntensity).toBeLessThanOrEqual(0.24);
+
+    expect(housingMaterial.name).toContain('crown-moving-light-housing');
+    expect(housingMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(housingMaterial.metadata?.mainStageMaterialOverride).toBe('crown-moving-light-housing');
+    expect(housingMaterial.albedoColor.r).toBeLessThanOrEqual(0.17);
+    expect(housingMaterial.albedoColor.g).toBeLessThanOrEqual(0.21);
+    expect(housingMaterial.albedoColor.b).toBeLessThanOrEqual(0.25);
+    expect(housingMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(housingMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(housingMaterial.environmentIntensity).toBeLessThanOrEqual(0.32);
 
     expect(lensMaterial.name).toContain('crown-moving-light-lens');
     expect(lensMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
