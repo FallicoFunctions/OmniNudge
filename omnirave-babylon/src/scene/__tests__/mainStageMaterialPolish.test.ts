@@ -8888,7 +8888,7 @@ describe('polishMainStageMaterials', () => {
     expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
-  it('darkens the inner portal pearl shell masses so the hero portal reads as carved depth instead of bright ivory pylons', () => {
+  it('regrades the inner portal pylons and shell cascades into distinct pearl masses so the hero portal stops reading like one repeated ivory shell proxy', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -8925,19 +8925,30 @@ describe('polishMainStageMaterials', () => {
     expect(leftCascade.material).not.toBe(sharedPearlMaterial);
     expect(rightCascade.material).not.toBe(sharedPearlMaterial);
     expect(rightPylon.material).toBe(leftPylon.material);
-    expect(leftCascade.material).toBe(leftPylon.material);
-    expect(rightCascade.material).toBe(leftPylon.material);
+    expect(rightCascade.material).toBe(leftCascade.material);
+    expect(leftCascade.material).not.toBe(leftPylon.material);
 
-    const shellMaterial = leftPylon.material as PBRMaterial;
-    expect(shellMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(shellMaterial.metadata?.mainStageMaterialOverride).toBe('inner-portal-pearl-shell');
-    expect(shellMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
-    expect(shellMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
-    expect(shellMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
-    expect(shellMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(shellMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(shellMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    const pylonMaterial = leftPylon.material as PBRMaterial;
+    expect(pylonMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(pylonMaterial.metadata?.mainStageMaterialOverride).toBe('inner-portal-pylon-shell');
+    expect(pylonMaterial.albedoColor.r).toBeLessThanOrEqual(0.21);
+    expect(pylonMaterial.albedoColor.g).toBeLessThanOrEqual(0.23);
+    expect(pylonMaterial.albedoColor.b).toBeLessThanOrEqual(0.27);
+    expect(pylonMaterial.emissiveIntensity).toBeLessThanOrEqual(0.025);
+    expect(pylonMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(pylonMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.05);
+    expect(pylonMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+
+    const cascadeMaterial = leftCascade.material as PBRMaterial;
+    expect(cascadeMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(cascadeMaterial.metadata?.mainStageMaterialOverride).toBe('inner-shell-cascade');
+    expect(cascadeMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(cascadeMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(cascadeMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(cascadeMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(cascadeMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(cascadeMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.07);
+    expect(cascadeMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
   it('rebalances the inner portal gold reveals and outer sweep spires so the hero portal shoulders read as carved metal structure instead of bright foil braces', () => {
