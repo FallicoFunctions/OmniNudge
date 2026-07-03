@@ -2881,6 +2881,8 @@ describe('polishMainStageMaterials', () => {
     goldControl.material = sharedGoldMaterial;
     const leftReveal = MeshBuilder.CreateBox('V24_CelestialCrownGoldReveal_L', { size: 1 }, scene);
     leftReveal.material = sharedGoldMaterial;
+    const wingArcadeReveal = MeshBuilder.CreateBox('V28_WingArcadeGoldReveal_L', { size: 1 }, scene);
+    wingArcadeReveal.material = sharedGoldMaterial;
     const rib0 = MeshBuilder.CreateBox('V24_CrownSpireDepthRib_0', { size: 1 }, scene);
     rib0.material = sharedGoldMaterial;
     const leftButtressReveal = MeshBuilder.CreateBox('V24_ProsceniumButtressGoldReveal_L', { size: 1 }, scene);
@@ -2893,6 +2895,7 @@ describe('polishMainStageMaterials', () => {
       outerWingButtress,
       goldControl,
       leftReveal,
+      wingArcadeReveal,
       rib0,
       leftButtressReveal,
     ]);
@@ -2908,8 +2911,10 @@ describe('polishMainStageMaterials', () => {
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftReveal.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArcadeReveal.material).toBeInstanceOf(PBRMaterial);
     expect(rib0.material).toBeInstanceOf(PBRMaterial);
     expect(leftButtressReveal.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArcadeReveal.material).not.toBe(leftReveal.material);
     expect(rib0.material).not.toBe(leftReveal.material);
     expect(leftButtressReveal.material).not.toBe(leftReveal.material);
     expect(leftButtressReveal.material).not.toBe(rib0.material);
@@ -2918,6 +2923,7 @@ describe('polishMainStageMaterials', () => {
     const buttressMaterial = leftButtress.material as PBRMaterial;
     const outerWingButtressMaterial = outerWingButtress.material as PBRMaterial;
     const revealMaterial = leftReveal.material as PBRMaterial;
+    const wingArcadeRevealMaterial = wingArcadeReveal.material as PBRMaterial;
     const ribMaterial = rib0.material as PBRMaterial;
     const buttressRevealMaterial = leftButtressReveal.material as PBRMaterial;
 
@@ -2954,6 +2960,9 @@ describe('polishMainStageMaterials', () => {
     expect(revealMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(revealMaterial.albedoColor.r).toBeGreaterThan(wingArcadeRevealMaterial.albedoColor.r);
+    expect(revealMaterial.metallic ?? 0).toBeGreaterThan(wingArcadeRevealMaterial.metallic ?? 0);
+    expect(revealMaterial.roughness ?? 0).toBeLessThan(wingArcadeRevealMaterial.roughness ?? 0);
 
     expect(ribMaterial.name).toContain('v24-crown-depth-rib');
     expect(ribMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
