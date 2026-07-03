@@ -8994,9 +8994,12 @@ describe('polishMainStageMaterials', () => {
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(goldTracery.material).toBeInstanceOf(PBRMaterial);
-    expect(leftGoldFin.material).toBe(goldTracery.material);
-    expect(rightGoldFin.material).toBe(goldTracery.material);
-    expect(apexPedestal.material).toBe(goldTracery.material);
+    expect(leftGoldFin.material).toBeInstanceOf(PBRMaterial);
+    expect(rightGoldFin.material).toBe(leftGoldFin.material);
+    expect(apexPedestal.material).toBeInstanceOf(PBRMaterial);
+    expect(leftGoldFin.material).not.toBe(goldTracery.material);
+    expect(apexPedestal.material).not.toBe(goldTracery.material);
+    expect(apexPedestal.material).not.toBe(leftGoldFin.material);
 
     expect(shadowControl.material).toBe(sharedShadowMaterial);
     expect(shadowSpine.material).toBeInstanceOf(PBRMaterial);
@@ -9006,20 +9009,44 @@ describe('polishMainStageMaterials', () => {
     expect(apexCrystal.material).toBeInstanceOf(PBRMaterial);
     expect(apexCrystal.material).not.toBe(sharedCyanMaterial);
 
-    const goldMaterial = goldTracery.material as PBRMaterial;
+    const traceryMaterial = goldTracery.material as PBRMaterial;
+    const finMaterial = leftGoldFin.material as PBRMaterial;
+    const pedestalMaterial = apexPedestal.material as PBRMaterial;
     const shadowMaterial = shadowSpine.material as PBRMaterial;
     const cyanMaterial = apexCrystal.material as PBRMaterial;
 
-    expect(goldMaterial.name).toContain('crown-obelisk-gold-tracery');
-    expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
-    expect(goldMaterial.metadata?.mainStageMaterialOverride).toBe('crown-obelisk-gold-tracery');
-    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
-    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
-    expect(goldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
-    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    expect(traceryMaterial.name).toContain('crown-obelisk-gold-tracery');
+    expect(traceryMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(traceryMaterial.metadata?.mainStageMaterialOverride).toBe('crown-obelisk-gold-tracery');
+    expect(traceryMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(traceryMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(traceryMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(traceryMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(traceryMaterial.metallic).toBeLessThanOrEqual(0.16);
+    expect(traceryMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(traceryMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+
+    expect(finMaterial.name).toContain('crown-obelisk-gold-fin');
+    expect(finMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(finMaterial.metadata?.mainStageMaterialOverride).toBe('crown-obelisk-gold-fin');
+    expect(finMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(finMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
+    expect(finMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(finMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(finMaterial.metallic).toBeGreaterThanOrEqual(0.16);
+    expect(finMaterial.roughness).toBeLessThanOrEqual(0.88);
+    expect(finMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.1);
+
+    expect(pedestalMaterial.name).toContain('crown-obelisk-apex-pedestal');
+    expect(pedestalMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(pedestalMaterial.metadata?.mainStageMaterialOverride).toBe('crown-obelisk-apex-pedestal');
+    expect(pedestalMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
+    expect(pedestalMaterial.albedoColor.g).toBeLessThanOrEqual(0.11);
+    expect(pedestalMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(pedestalMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(pedestalMaterial.metallic).toBeLessThanOrEqual(0.14);
+    expect(pedestalMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(pedestalMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
 
     expect(shadowMaterial.name).toContain('crown-obelisk-shadow-spine');
     expect(shadowMaterial.metadata?.mainStageMaterialPolish).toBe('black');
