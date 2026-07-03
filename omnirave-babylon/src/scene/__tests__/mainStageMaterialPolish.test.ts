@@ -9736,4 +9736,58 @@ describe('polishMainStageMaterials', () => {
     expect(railMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(railMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
+
+  it('darkens the basin causeway gold rails, garden gold crests, promenade gold inlay, and sightline gold rails so the arrival approach reads as carved metal detailing instead of bright gold strips', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V19_ArrivalBrushedGold', scene);
+    sharedGoldMaterial.albedoColor.set(0.82, 0.68, 0.30);
+    sharedGoldMaterial.emissiveColor.set(0.10, 0.07, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.20;
+    sharedGoldMaterial.metallic = 0.85;
+    sharedGoldMaterial.roughness = 0.24;
+
+    const goldControl = MeshBuilder.CreateBox('TestArrivalGoldControl', { size: 1 }, scene);
+    goldControl.material = sharedGoldMaterial;
+
+    const causewayRail = MeshBuilder.CreateBox('V62_BasinCausewayGoldRail_L', { size: 1 }, scene);
+    causewayRail.material = sharedGoldMaterial;
+
+    const gardenCrest = MeshBuilder.CreateBox('V63_BasinGardenGoldCrest_R', { size: 1 }, scene);
+    gardenCrest.material = sharedGoldMaterial;
+
+    const promenadeInlay = MeshBuilder.CreateBox('V64_PromenadeGoldInlay', { size: 1 }, scene);
+    promenadeInlay.material = sharedGoldMaterial;
+
+    const sightlineRail = MeshBuilder.CreateBox('V66_BackPlazaSightlineGoldRail_L', { size: 1 }, scene);
+    sightlineRail.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([goldControl, causewayRail, gardenCrest, promenadeInlay, sightlineRail]);
+
+    expect(goldControl.material).toBe(sharedGoldMaterial);
+    expect(causewayRail.material).toBeInstanceOf(PBRMaterial);
+    expect(gardenCrest.material).toBeInstanceOf(PBRMaterial);
+    expect(promenadeInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(sightlineRail.material).toBeInstanceOf(PBRMaterial);
+    expect(causewayRail.material).not.toBe(sharedGoldMaterial);
+    expect(gardenCrest.material).not.toBe(sharedGoldMaterial);
+    expect(promenadeInlay.material).not.toBe(sharedGoldMaterial);
+    expect(sightlineRail.material).not.toBe(sharedGoldMaterial);
+    expect(causewayRail.material).toBe(gardenCrest.material);
+    expect(causewayRail.material).toBe(promenadeInlay.material);
+    expect(causewayRail.material).toBe(sightlineRail.material);
+
+    const arrivalGoldMaterial = causewayRail.material as PBRMaterial;
+    expect(arrivalGoldMaterial.name).toContain('arrival-gold-rail');
+    expect(arrivalGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(arrivalGoldMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-gold-rail');
+    expect(arrivalGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(arrivalGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(arrivalGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(arrivalGoldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(arrivalGoldMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(arrivalGoldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(arrivalGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
 });
