@@ -6929,7 +6929,8 @@ describe('polishMainStageMaterials', () => {
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(runwayGold.material).toBeInstanceOf(PBRMaterial);
-    expect(thresholdGold.material).toBe(runwayGold.material);
+    expect(thresholdGold.material).toBeInstanceOf(PBRMaterial);
+    expect(thresholdGold.material).not.toBe(runwayGold.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(runwayCyan.material).toBeInstanceOf(PBRMaterial);
@@ -6937,20 +6938,32 @@ describe('polishMainStageMaterials', () => {
     expect(shadowControl.material).toBe(sharedShadowMaterial);
     expect(thresholdShadow.material).toBeInstanceOf(PBRMaterial);
 
-    const goldMaterial = runwayGold.material as PBRMaterial;
+    const runwayGoldMaterial = runwayGold.material as PBRMaterial;
+    const thresholdGoldMaterial = thresholdGold.material as PBRMaterial;
     const cyanMaterial = runwayCyan.material as PBRMaterial;
     const shadowMaterial = thresholdShadow.material as PBRMaterial;
 
-    expect(goldMaterial.name).toContain('arrival-runway-gold-bands');
-    expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
-    expect(goldMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-runway-gold-bands');
-    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
-    expect(goldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
-    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(runwayGoldMaterial.name).toContain('arrival-runway-gold-bands');
+    expect(runwayGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(runwayGoldMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-runway-gold-bands');
+    expect(runwayGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(runwayGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(runwayGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(runwayGoldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(runwayGoldMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(runwayGoldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(runwayGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+
+    expect(thresholdGoldMaterial.name).toContain('arrival-threshold-gold-bands');
+    expect(thresholdGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(thresholdGoldMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-threshold-gold-bands');
+    expect(thresholdGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(thresholdGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(thresholdGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(thresholdGoldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(thresholdGoldMaterial.metallic).toBeLessThanOrEqual(0.14);
+    expect(thresholdGoldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(thresholdGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
 
     expect(cyanMaterial.name).toContain('arrival-runway-cyan-threads');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');

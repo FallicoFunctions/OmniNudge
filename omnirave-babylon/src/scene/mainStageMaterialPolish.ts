@@ -2483,16 +2483,29 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (mesh.name === 'V65_ArrivalRunwayGoldBands' || mesh.name === 'V65_ArrivalThresholdGoldBands') {
+    if (mesh.name === 'V65_ArrivalRunwayGoldBands') {
       const cacheKey = `${material.uniqueId}:arrival-runway-gold-bands`;
-      let goldMaterial = clonedMaterials.get(cacheKey);
-      if (!goldMaterial) {
-        goldMaterial = material.clone(`${material.name}__arrival-runway-gold-bands`);
-        applyArrivalRunwayGoldBandsOverride(goldMaterial);
-        clonedMaterials.set(cacheKey, goldMaterial);
+      let runwayGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!runwayGoldMaterial) {
+        runwayGoldMaterial = material.clone(`${material.name}__arrival-runway-gold-bands`);
+        applyArrivalRunwayGoldBandsOverride(runwayGoldMaterial);
+        clonedMaterials.set(cacheKey, runwayGoldMaterial);
       }
 
-      assignOverrideMaterial(mesh, goldMaterial);
+      assignOverrideMaterial(mesh, runwayGoldMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V65_ArrivalThresholdGoldBands') {
+      const cacheKey = `${material.uniqueId}:arrival-threshold-gold-bands`;
+      let thresholdGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!thresholdGoldMaterial) {
+        thresholdGoldMaterial = material.clone(`${material.name}__arrival-threshold-gold-bands`);
+        applyArrivalThresholdGoldBandsOverride(thresholdGoldMaterial);
+        clonedMaterials.set(cacheKey, thresholdGoldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, thresholdGoldMaterial);
       continue;
     }
 
@@ -6401,6 +6414,23 @@ function applyArrivalRunwayGoldBandsOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'arrival-runway-gold-bands',
+  };
+}
+
+function applyArrivalThresholdGoldBandsOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.15, 0.11, 0.045);
+  material.emissiveColor = new Color3(0.006, 0.004, 0.0015);
+  material.emissiveIntensity = 0.015;
+  material.metallic = 0.12;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-threshold-gold-bands',
   };
 }
 
