@@ -3027,6 +3027,22 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name === 'V31_SideParallaxGoldOrbit_L' ||
+      mesh.name === 'V31_SideParallaxGoldOrbit_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:side-parallax-gold-orbit`;
+      let orbitMaterial = clonedMaterials.get(cacheKey);
+      if (!orbitMaterial) {
+        orbitMaterial = material.clone(`${material.name}__side-parallax-gold-orbit`);
+        applySideParallaxGoldOrbitOverride(orbitMaterial);
+        clonedMaterials.set(cacheKey, orbitMaterial);
+      }
+
+      assignOverrideMaterial(mesh, orbitMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V116_ProsceniumPearlRevealArray_')) {
       const cacheKey = `${material.uniqueId}:proscenium-pearl-reveal`;
       let revealMaterial = clonedMaterials.get(cacheKey);
@@ -6441,6 +6457,23 @@ function applyPlazaCrossBandsOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'plaza-cross-bands',
+  };
+}
+
+function applySideParallaxGoldOrbitOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'side-parallax-gold-orbit',
   };
 }
 
