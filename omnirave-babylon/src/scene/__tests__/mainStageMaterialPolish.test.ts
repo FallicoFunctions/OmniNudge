@@ -9682,4 +9682,58 @@ describe('polishMainStageMaterials', () => {
     expect(ribMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(ribMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
+
+  it('darkens the VIP and wing terrace gold balusters and handrails so the podium rails read as carved metal hardware instead of bright gold strips', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V20_ChasedGoldFiligree', scene);
+    sharedGoldMaterial.albedoColor.set(0.78, 0.64, 0.26);
+    sharedGoldMaterial.emissiveColor.set(0.08, 0.06, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.16;
+    sharedGoldMaterial.metallic = 0.8;
+    sharedGoldMaterial.roughness = 0.26;
+
+    const goldControl = MeshBuilder.CreateBox('TestTerraceGoldControl', { size: 1 }, scene);
+    goldControl.material = sharedGoldMaterial;
+
+    const vipBaluster = MeshBuilder.CreateBox('V30_VipGoldBaluster_L_00', { size: 1 }, scene);
+    vipBaluster.material = sharedGoldMaterial;
+
+    const wingBaluster = MeshBuilder.CreateBox('V30_WingGoldBaluster_R_05', { size: 1 }, scene);
+    wingBaluster.material = sharedGoldMaterial;
+
+    const vipHandrail = MeshBuilder.CreateBox('V30_VipGoldHandrail_L', { size: 1 }, scene);
+    vipHandrail.material = sharedGoldMaterial;
+
+    const wingHandrail = MeshBuilder.CreateBox('V30_WingGoldHandrail_R', { size: 1 }, scene);
+    wingHandrail.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([goldControl, vipBaluster, wingBaluster, vipHandrail, wingHandrail]);
+
+    expect(goldControl.material).toBe(sharedGoldMaterial);
+    expect(vipBaluster.material).toBeInstanceOf(PBRMaterial);
+    expect(wingBaluster.material).toBeInstanceOf(PBRMaterial);
+    expect(vipHandrail.material).toBeInstanceOf(PBRMaterial);
+    expect(wingHandrail.material).toBeInstanceOf(PBRMaterial);
+    expect(vipBaluster.material).not.toBe(sharedGoldMaterial);
+    expect(wingBaluster.material).not.toBe(sharedGoldMaterial);
+    expect(vipHandrail.material).not.toBe(sharedGoldMaterial);
+    expect(wingHandrail.material).not.toBe(sharedGoldMaterial);
+    expect(vipBaluster.material).toBe(wingBaluster.material);
+    expect(vipHandrail.material).toBe(wingHandrail.material);
+    expect(vipBaluster.material).toBe(vipHandrail.material);
+
+    const railMaterial = vipBaluster.material as PBRMaterial;
+    expect(railMaterial.name).toContain('terrace-gold-rail');
+    expect(railMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(railMaterial.metadata?.mainStageMaterialOverride).toBe('terrace-gold-rail');
+    expect(railMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(railMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(railMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(railMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(railMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(railMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(railMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
 });
