@@ -915,21 +915,55 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V80_OvalScreenPedestalGoldTrim_') ||
-      mesh.name.startsWith('V80_OvalScreenCanopyGoldTrim_') ||
-      mesh.name.startsWith('V80_OvalScreenSideButtressGoldTrimArray_') ||
-      mesh.name.startsWith('V81_OvalScreenMullionGoldTrimArray_')
-    ) {
-      const cacheKey = `${material.uniqueId}:oval-screen-gold-trim`;
-      let trimMaterial = clonedMaterials.get(cacheKey);
-      if (!trimMaterial) {
-        trimMaterial = material.clone(`${material.name}__oval-screen-gold-trim`);
-        applyOvalScreenGoldTrimOverride(trimMaterial);
-        clonedMaterials.set(cacheKey, trimMaterial);
+    if (mesh.name.startsWith('V80_OvalScreenPedestalGoldTrim_')) {
+      const cacheKey = `${material.uniqueId}:oval-screen-pedestal-gold-trim`;
+      let pedestalTrimMaterial = clonedMaterials.get(cacheKey);
+      if (!pedestalTrimMaterial) {
+        pedestalTrimMaterial = material.clone(`${material.name}__oval-screen-pedestal-gold-trim`);
+        applyOvalScreenPedestalGoldTrimOverride(pedestalTrimMaterial);
+        clonedMaterials.set(cacheKey, pedestalTrimMaterial);
       }
 
-      assignOverrideMaterial(mesh, trimMaterial);
+      assignOverrideMaterial(mesh, pedestalTrimMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V80_OvalScreenCanopyGoldTrim_')) {
+      const cacheKey = `${material.uniqueId}:oval-screen-canopy-gold-trim`;
+      let canopyTrimMaterial = clonedMaterials.get(cacheKey);
+      if (!canopyTrimMaterial) {
+        canopyTrimMaterial = material.clone(`${material.name}__oval-screen-canopy-gold-trim`);
+        applyOvalScreenCanopyGoldTrimOverride(canopyTrimMaterial);
+        clonedMaterials.set(cacheKey, canopyTrimMaterial);
+      }
+
+      assignOverrideMaterial(mesh, canopyTrimMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V80_OvalScreenSideButtressGoldTrimArray_')) {
+      const cacheKey = `${material.uniqueId}:oval-screen-buttress-gold-trim`;
+      let buttressTrimMaterial = clonedMaterials.get(cacheKey);
+      if (!buttressTrimMaterial) {
+        buttressTrimMaterial = material.clone(`${material.name}__oval-screen-buttress-gold-trim`);
+        applyOvalScreenButtressGoldTrimOverride(buttressTrimMaterial);
+        clonedMaterials.set(cacheKey, buttressTrimMaterial);
+      }
+
+      assignOverrideMaterial(mesh, buttressTrimMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V81_OvalScreenMullionGoldTrimArray_')) {
+      const cacheKey = `${material.uniqueId}:oval-screen-mullion-gold-trim`;
+      let mullionTrimMaterial = clonedMaterials.get(cacheKey);
+      if (!mullionTrimMaterial) {
+        mullionTrimMaterial = material.clone(`${material.name}__oval-screen-mullion-gold-trim`);
+        applyOvalScreenMullionGoldTrimOverride(mullionTrimMaterial);
+        clonedMaterials.set(cacheKey, mullionTrimMaterial);
+      }
+
+      assignOverrideMaterial(mesh, mullionTrimMaterial);
       continue;
     }
 
@@ -5013,20 +5047,71 @@ function applyOvalScreenMullionShellOverride(material: PBRMaterial) {
   };
 }
 
-function applyOvalScreenGoldTrimOverride(material: PBRMaterial) {
+function applyOvalScreenPedestalGoldTrimOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.06);
-  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
-  material.emissiveIntensity = 0.02;
-  material.metallic = 0.16;
-  material.roughness = 0.9;
+  material.albedoColor = new Color3(0.15, 0.11, 0.045);
+  material.emissiveColor = new Color3(0.006, 0.004, 0.0015);
+  material.emissiveIntensity = 0.015;
+  material.metallic = 0.12;
+  material.roughness = 0.92;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0;
-  material.clearCoat.roughness = 0.86;
-  material.environmentIntensity = 0.12;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'oval-screen-gold-trim',
+    mainStageMaterialOverride: 'oval-screen-pedestal-gold-trim',
+  };
+}
+
+function applyOvalScreenCanopyGoldTrimOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.19, 0.15, 0.075);
+  material.emissiveColor = new Color3(0.012, 0.009, 0.003);
+  material.emissiveIntensity = 0.025;
+  material.metallic = 0.22;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.8;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-screen-canopy-gold-trim',
+  };
+}
+
+function applyOvalScreenButtressGoldTrimOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.175, 0.135, 0.058);
+  material.emissiveColor = new Color3(0.009, 0.006, 0.002);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.18;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.11;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-screen-buttress-gold-trim',
+  };
+}
+
+function applyOvalScreenMullionGoldTrimOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.13, 0.1, 0.045);
+  material.emissiveColor = new Color3(0.005, 0.0035, 0.0012);
+  material.emissiveIntensity = 0.014;
+  material.metallic = 0.12;
+  material.roughness = 0.93;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.9;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'oval-screen-mullion-gold-trim',
   };
 }
 
