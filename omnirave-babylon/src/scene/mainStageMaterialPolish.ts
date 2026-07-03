@@ -7924,7 +7924,16 @@ function applyCrownSpirePearlBladeOverride(material: PBRMaterial) {
 }
 
 function applyCrownObeliskGoldTraceryOverride(material: PBRMaterial) {
-  applyWingFacadeArchInlayOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.145, 0.06);
+  material.emissiveColor = new Color3(0.009, 0.006, 0.0018);
+  material.emissiveIntensity = 0.014;
+  material.metallic = 0.18;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.8;
+  material.environmentIntensity = 0.11;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-obelisk-gold-tracery',
