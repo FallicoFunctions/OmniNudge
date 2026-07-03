@@ -9162,34 +9162,43 @@ describe('polishMainStageMaterials', () => {
     const rightReveal = MeshBuilder.CreateBox('V50_InnerPortalGoldReveal_R', { size: 1 }, scene);
     rightReveal.material = sharedGoldMaterial;
 
+    const wingArchInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_L', { size: 1 }, scene);
+    wingArchInlay.material = sharedGoldMaterial;
+
     const leftSpire = MeshBuilder.CreateBox('V50_OuterSweepSpire_L', { size: 1 }, scene);
     leftSpire.material = sharedGoldMaterial;
 
     const rightSpire = MeshBuilder.CreateBox('V50_OuterSweepSpire_R', { size: 1 }, scene);
     rightSpire.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([goldControl, leftReveal, rightReveal, leftSpire, rightSpire]);
+    polishMainStageMaterials([goldControl, leftReveal, rightReveal, wingArchInlay, leftSpire, rightSpire]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftReveal.material).toBeInstanceOf(PBRMaterial);
     expect(rightReveal.material).toBe(leftReveal.material);
+    expect(wingArchInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArchInlay.material).not.toBe(leftReveal.material);
     expect(leftSpire.material).toBeInstanceOf(PBRMaterial);
     expect(rightSpire.material).toBe(leftSpire.material);
     expect(leftSpire.material).not.toBe(leftReveal.material);
 
     const revealMaterial = leftReveal.material as PBRMaterial;
+    const wingArchInlayMaterial = wingArchInlay.material as PBRMaterial;
     const spireMaterial = leftSpire.material as PBRMaterial;
 
     expect(revealMaterial.name).toContain('inner-portal-gold-reveal');
     expect(revealMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(revealMaterial.metadata?.mainStageMaterialOverride).toBe('inner-portal-gold-reveal');
-    expect(revealMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(revealMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
-    expect(revealMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(revealMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(revealMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(revealMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
     expect(revealMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(revealMaterial.metallic).toBeLessThanOrEqual(0.16);
-    expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(revealMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    expect(revealMaterial.albedoColor.r).toBeGreaterThan(wingArchInlayMaterial.albedoColor.r);
+    expect(revealMaterial.metallic ?? 0).toBeGreaterThan(wingArchInlayMaterial.metallic ?? 0);
+    expect(revealMaterial.roughness ?? 0).toBeLessThan(wingArchInlayMaterial.roughness ?? 0);
 
     expect(spireMaterial.name).toContain('outer-sweep-spire');
     expect(spireMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
