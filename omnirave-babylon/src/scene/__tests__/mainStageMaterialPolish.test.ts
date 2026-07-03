@@ -6451,6 +6451,9 @@ describe('polishMainStageMaterials', () => {
     const rightCrest = MeshBuilder.CreateBox('V56_SpawnCanopyGoldCrest_R', { size: 1 }, scene);
     rightCrest.material = sharedGoldMaterial;
 
+    const wingArchInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_L', { size: 1 }, scene);
+    wingArchInlay.material = sharedGoldMaterial;
+
     const shadowControl = MeshBuilder.CreateBox('TestSpawnCanopyShadowControl', { size: 1 }, scene);
     shadowControl.material = sharedShadowMaterial;
 
@@ -6459,6 +6462,9 @@ describe('polishMainStageMaterials', () => {
 
     const rightSoffit = MeshBuilder.CreateBox('V56_SpawnCanopyShadowSoffit_R', { size: 1 }, scene);
     rightSoffit.material = sharedShadowMaterial;
+
+    const heroVault = MeshBuilder.CreateBox('V25_HeroPortalShadowVault', { size: 1 }, scene);
+    heroVault.material = sharedShadowMaterial;
 
     const cyanControl = MeshBuilder.CreateBox('TestSpawnCanopyCyanControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
@@ -6469,33 +6475,48 @@ describe('polishMainStageMaterials', () => {
     const rightLantern = MeshBuilder.CreateBox('V56_SpawnCanopyCyanLantern_R', { size: 1 }, scene);
     rightLantern.material = sharedCyanMaterial;
 
+    const crownApexCrystal = MeshBuilder.CreateBox('V25_CrownApexCrystal', { size: 1 }, scene);
+    crownApexCrystal.material = sharedCyanMaterial;
+
     polishMainStageMaterials([
       goldControl,
       leftCrest,
       rightCrest,
+      wingArchInlay,
       shadowControl,
       leftSoffit,
       rightSoffit,
+      heroVault,
       cyanControl,
       leftLantern,
       rightLantern,
+      crownApexCrystal,
     ]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftCrest.material).toBeInstanceOf(PBRMaterial);
     expect(rightCrest.material).toBe(leftCrest.material);
+    expect(wingArchInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArchInlay.material).not.toBe(leftCrest.material);
 
     expect(shadowControl.material).toBe(sharedShadowMaterial);
     expect(leftSoffit.material).toBeInstanceOf(PBRMaterial);
     expect(rightSoffit.material).toBe(leftSoffit.material);
+    expect(heroVault.material).toBeInstanceOf(PBRMaterial);
+    expect(heroVault.material).not.toBe(leftSoffit.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftLantern.material).toBeInstanceOf(PBRMaterial);
     expect(rightLantern.material).toBe(leftLantern.material);
+    expect(crownApexCrystal.material).toBeInstanceOf(PBRMaterial);
+    expect(crownApexCrystal.material).not.toBe(leftLantern.material);
 
     const goldMaterial = leftCrest.material as PBRMaterial;
+    const wingArchInlayMaterial = wingArchInlay.material as PBRMaterial;
     const shadowMaterial = leftSoffit.material as PBRMaterial;
+    const heroVaultMaterial = heroVault.material as PBRMaterial;
     const cyanMaterial = leftLantern.material as PBRMaterial;
+    const crownApexCrystalMaterial = crownApexCrystal.material as PBRMaterial;
 
     expect(goldMaterial.name).toContain('spawn-canopy-gold-crest');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -6507,6 +6528,9 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(goldMaterial.albedoColor.r).toBeGreaterThan(wingArchInlayMaterial.albedoColor.r);
+    expect(goldMaterial.metallic ?? 0).toBeGreaterThan(wingArchInlayMaterial.metallic ?? 0);
+    expect(goldMaterial.roughness ?? 0).toBeLessThan(wingArchInlayMaterial.roughness ?? 0);
 
     expect(shadowMaterial.name).toContain('spawn-canopy-shadow-soffit');
     expect(shadowMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -6518,6 +6542,9 @@ describe('polishMainStageMaterials', () => {
     expect(shadowMaterial.metallic).toBeLessThanOrEqual(0.08);
     expect(shadowMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(shadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
+    expect(shadowMaterial.albedoColor.r).toBeLessThan(heroVaultMaterial.albedoColor.r);
+    expect(shadowMaterial.emissiveIntensity).toBeLessThan(heroVaultMaterial.emissiveIntensity);
+    expect(shadowMaterial.environmentIntensity).toBeLessThan(heroVaultMaterial.environmentIntensity);
 
     expect(cyanMaterial.name).toContain('spawn-canopy-cyan-lantern');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -6530,6 +6557,9 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.18);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.34);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(cyanMaterial.alpha).toBeLessThan(crownApexCrystalMaterial.alpha);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThan(crownApexCrystalMaterial.emissiveIntensity);
+    expect(cyanMaterial.environmentIntensity).toBeLessThan(crownApexCrystalMaterial.environmentIntensity);
   });
 
   it('darkens the basin causeway pearl span so the spawn reveal keeps runway depth instead of a white threshold bar', () => {
