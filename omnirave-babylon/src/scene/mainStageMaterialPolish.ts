@@ -2982,6 +2982,21 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name.startsWith('V54_SpawnGalleryBeaconCyan_')
+    ) {
+      const cacheKey = `${material.uniqueId}:spawn-beacon-cyan`;
+      let beaconMaterial = clonedMaterials.get(cacheKey);
+      if (!beaconMaterial) {
+        beaconMaterial = material.clone(`${material.name}__spawn-beacon-cyan`);
+        applySpawnBeaconCyanOverride(beaconMaterial);
+        clonedMaterials.set(cacheKey, beaconMaterial);
+      }
+
+      assignOverrideMaterial(mesh, beaconMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V116_ProsceniumPearlRevealArray_')) {
       const cacheKey = `${material.uniqueId}:proscenium-pearl-reveal`;
       let revealMaterial = clonedMaterials.get(cacheKey);
@@ -6343,6 +6358,24 @@ function applySpawnShadowSeamOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-shadow-seam',
+  };
+}
+
+function applySpawnBeaconCyanOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.04, 0.12, 0.18);
+  material.emissiveColor = new Color3(0.008, 0.03, 0.05);
+  material.emissiveIntensity = 0.06;
+  material.alpha = 0.55;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.42;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.22;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-beacon-cyan',
   };
 }
 
