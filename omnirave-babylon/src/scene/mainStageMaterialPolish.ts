@@ -6806,7 +6806,16 @@ function applySpawnCanopyPearlVaultOverride(material: PBRMaterial) {
 }
 
 function applySpawnCanopyGoldCrestOverride(material: PBRMaterial) {
-  applyWingFacadeArchInlayOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.145, 0.065);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.16;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.12;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-canopy-gold-crest',
@@ -6814,7 +6823,15 @@ function applySpawnCanopyGoldCrestOverride(material: PBRMaterial) {
 }
 
 function applySpawnCanopyShadowSoffitOverride(material: PBRMaterial) {
-  applyHeroPortalShadowVaultOverride(material);
+  material.albedoColor = new Color3(0.12, 0.145, 0.18);
+  material.emissiveColor = new Color3(0.008, 0.012, 0.016);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.04;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.22;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-canopy-shadow-soffit',
@@ -6822,7 +6839,17 @@ function applySpawnCanopyShadowSoffitOverride(material: PBRMaterial) {
 }
 
 function applySpawnCanopyCyanLanternOverride(material: PBRMaterial) {
-  applyCrownApexCrystalOverride(material);
+  material.albedoColor = new Color3(0.09, 0.2, 0.25);
+  material.emissiveColor = new Color3(0.008, 0.028, 0.038);
+  material.emissiveIntensity = 0.07;
+  material.alpha = 0.32;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.01;
+  material.roughness = 0.22;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.66;
+  material.environmentIntensity = 0.26;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-canopy-cyan-lantern',
