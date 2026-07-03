@@ -879,6 +879,24 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name === 'V99_BasinChannelRelief' ||
+      mesh.name === 'V99_BasinRunwaySpine' ||
+      mesh.name === 'V99_BasinRetainingWall_L' ||
+      mesh.name === 'V99_BasinRetainingWall_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:basin-stone-relief`;
+      let basinStoneMaterial = clonedMaterials.get(cacheKey);
+      if (!basinStoneMaterial) {
+        basinStoneMaterial = material.clone(`${material.name}__basin-stone-relief`);
+        applyBasinStoneReliefOverride(basinStoneMaterial);
+        clonedMaterials.set(cacheKey, basinStoneMaterial);
+      }
+
+      assignOverrideMaterial(mesh, basinStoneMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V100_CentralWaterLightHousingArray') {
       const cacheKey = `${material.uniqueId}:central-water-light-housing`;
       let housingMaterial = clonedMaterials.get(cacheKey);
@@ -4617,6 +4635,23 @@ function applyBasinRetainingReliefOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-retaining-relief',
+  };
+}
+
+function applyBasinStoneReliefOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.14, 0.16, 0.20);
+  material.emissiveColor = new Color3(0.004, 0.006, 0.008);
+  material.emissiveIntensity = 0.01;
+  material.metallic = 0.02;
+  material.roughness = 0.94;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.74;
+  material.environmentIntensity = 0.06;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-stone-relief',
   };
 }
 
