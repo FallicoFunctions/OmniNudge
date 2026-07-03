@@ -10694,7 +10694,7 @@ describe('polishMainStageMaterials', () => {
     expect(revealMaterial.metadata?.mainStageMaterialOverride).toBe('basin-causeway-shadow-reveal');
   });
 
-  it('smokes the cyan edge glow on parallax screens so the orbital content reads as recessed backlight instead of bright emissive strips', () => {
+  it('regrades the center starfield and side orbital parallax glows into distinct smoked cyan materials so the screen content stops reading like one repeated emissive strip finish', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -10724,18 +10724,24 @@ describe('polishMainStageMaterials', () => {
     expect(centerStarfield.material).not.toBe(sharedCyanMaterial);
     expect(sideOrbitalL.material).not.toBe(sharedCyanMaterial);
     expect(sideOrbitalR.material).not.toBe(sharedCyanMaterial);
+    expect(sideOrbitalR.material).toBe(sideOrbitalL.material);
+    expect(sideOrbitalL.material).not.toBe(centerStarfield.material);
 
-    for (const mesh of [centerStarfield, sideOrbitalL, sideOrbitalR]) {
-      expect(mesh.material).not.toBeNull();
-      expect(mesh.material!.metadata?.mainStageMaterialPolish).toBe('smoked');
-      expect(mesh.material!.metadata?.mainStageMaterialOverride).toBe('parallax-screen-cyan-glow');
+    const centerMaterial = centerStarfield.material as PBRMaterial;
+    expect(centerMaterial.metadata?.mainStageMaterialPolish).toBe('smoked');
+    expect(centerMaterial.metadata?.mainStageMaterialOverride).toBe('center-parallax-starfield');
+    expect(centerMaterial.emissiveIntensity).toBeLessThanOrEqual(0.14);
+    expect(centerMaterial.alpha).toBeLessThanOrEqual(0.54);
+    expect(centerMaterial.roughness).toBeGreaterThanOrEqual(0.42);
+    expect(centerMaterial.environmentIntensity).toBeLessThanOrEqual(0.24);
 
-      const mat = mesh.material as PBRMaterial;
-      expect(mat.emissiveIntensity).toBeLessThanOrEqual(0.16);
-      expect(mat.alpha).toBeLessThanOrEqual(0.58);
-      expect(mat.roughness).toBeGreaterThanOrEqual(0.38);
-      expect(mat.environmentIntensity).toBeLessThanOrEqual(0.28);
-    }
+    const sideMaterial = sideOrbitalL.material as PBRMaterial;
+    expect(sideMaterial.metadata?.mainStageMaterialPolish).toBe('smoked');
+    expect(sideMaterial.metadata?.mainStageMaterialOverride).toBe('side-parallax-orbital-content');
+    expect(sideMaterial.emissiveIntensity).toBeLessThanOrEqual(0.16);
+    expect(sideMaterial.alpha).toBeLessThanOrEqual(0.58);
+    expect(sideMaterial.roughness).toBeGreaterThanOrEqual(0.38);
+    expect(sideMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
   });
 
   it('darkens the plaza stone spine so the gateway ivory reads as recessed depth instead of bright pearl strips', () => {
