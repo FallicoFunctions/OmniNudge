@@ -8964,6 +8964,9 @@ describe('polishMainStageMaterials', () => {
     const rightBannerRail = MeshBuilder.CreateBox('V34_BackPlazaBannerRail_R', { size: 1 }, scene);
     rightBannerRail.material = sharedGoldMaterial;
 
+    const wingArchInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_L', { size: 1 }, scene);
+    wingArchInlay.material = sharedGoldMaterial;
+
     const cyanControl = MeshBuilder.CreateBox('TestV34ArrivalCyanControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
 
@@ -8972,6 +8975,9 @@ describe('polishMainStageMaterials', () => {
 
     const rightGatewayCyan = MeshBuilder.CreateBox('V34_BackPlazaGatewayCyanInlay_R', { size: 1 }, scene);
     rightGatewayCyan.material = sharedCyanMaterial;
+
+    const wingInsetGlow = MeshBuilder.CreateBox('V109_WingFacadeInsetGlowArray_L', { size: 1 }, scene);
+    wingInsetGlow.material = sharedCyanMaterial;
 
     polishMainStageMaterials([
       blackControl,
@@ -8985,9 +8991,11 @@ describe('polishMainStageMaterials', () => {
       rightGatewayCrown,
       leftBannerRail,
       rightBannerRail,
+      wingArchInlay,
       cyanControl,
       leftGatewayCyan,
       rightGatewayCyan,
+      wingInsetGlow,
     ]);
 
     expect(blackControl.material).toBe(sharedBlackMaterial);
@@ -9002,6 +9010,8 @@ describe('polishMainStageMaterials', () => {
     expect(rightGatewayCrown.material).toBe(leftGatewayCrown.material);
     expect(leftBannerRail.material).toBeInstanceOf(PBRMaterial);
     expect(rightBannerRail.material).toBe(leftBannerRail.material);
+    expect(wingArchInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArchInlay.material).not.toBe(goldInlay.material);
     expect(leftEdgeRail.material).not.toBe(goldInlay.material);
     expect(leftGatewayCrown.material).not.toBe(goldInlay.material);
     expect(leftBannerRail.material).not.toBe(goldInlay.material);
@@ -9012,6 +9022,8 @@ describe('polishMainStageMaterials', () => {
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftGatewayCyan.material).toBeInstanceOf(PBRMaterial);
     expect(rightGatewayCyan.material).toBe(leftGatewayCyan.material);
+    expect(wingInsetGlow.material).toBeInstanceOf(PBRMaterial);
+    expect(wingInsetGlow.material).not.toBe(leftGatewayCyan.material);
 
     const barricadeMaterial = leftBarricade.material as PBRMaterial;
     const goldMaterial = goldInlay.material as PBRMaterial;
@@ -9019,6 +9031,8 @@ describe('polishMainStageMaterials', () => {
     const gatewayCrownMaterial = leftGatewayCrown.material as PBRMaterial;
     const bannerRailMaterial = leftBannerRail.material as PBRMaterial;
     const cyanMaterial = leftGatewayCyan.material as PBRMaterial;
+    const wingArchInlayMaterial = wingArchInlay.material as PBRMaterial;
+    const wingInsetGlowMaterial = wingInsetGlow.material as PBRMaterial;
 
     expect(barricadeMaterial.name).toContain('approach-barricade-assembly');
     expect(barricadeMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -9041,6 +9055,9 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.metallic).toBeLessThanOrEqual(0.14);
     expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
     expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.08);
+    expect(goldMaterial.albedoColor.r).toBeLessThan(wingArchInlayMaterial.albedoColor.r);
+    expect(goldMaterial.metallic ?? 0).toBeLessThan(wingArchInlayMaterial.metallic ?? 0);
+    expect(goldMaterial.roughness ?? 0).toBeGreaterThan(wingArchInlayMaterial.roughness ?? 0);
 
     expect(edgeRailMaterial.name).toContain('approach-edge-rail');
     expect(edgeRailMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -9086,6 +9103,9 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.18);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(cyanMaterial.alpha).toBeLessThan(wingInsetGlowMaterial.alpha);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThan(wingInsetGlowMaterial.emissiveIntensity);
+    expect(cyanMaterial.environmentIntensity).toBeLessThan(wingInsetGlowMaterial.environmentIntensity);
   });
 
   it('darkens the oval portal glow shells so the arrival-side portals read as carved architecture instead of bright pearl side slabs', () => {
