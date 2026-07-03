@@ -10423,4 +10423,45 @@ describe('polishMainStageMaterials', () => {
       expect(mat.environmentIntensity).toBeLessThanOrEqual(0.18);
     }
   });
+
+  it('darkens the basin and VIP foliage understory so the deep planting reads as dense shadow instead of bright groundcover', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedUnderstoryMaterial = new PBRMaterial('V16_DeepGardenPlanting', scene);
+    sharedUnderstoryMaterial.albedoColor.set(0.18, 0.28, 0.14);
+    sharedUnderstoryMaterial.emissiveColor.set(0.02, 0.03, 0.01);
+    sharedUnderstoryMaterial.emissiveIntensity = 0.1;
+    sharedUnderstoryMaterial.metallic = 0.04;
+    sharedUnderstoryMaterial.roughness = 0.54;
+
+    const otherUnderstory = MeshBuilder.CreateBox('TestFoliageUnderstoryControl', { size: 1 }, scene);
+    otherUnderstory.material = sharedUnderstoryMaterial;
+
+    const understoryBL = MeshBuilder.CreateBox('V33_BasinFoliageUnderstory_L', { size: 1 }, scene);
+    understoryBL.material = sharedUnderstoryMaterial;
+    const understoryBR = MeshBuilder.CreateBox('V33_BasinFoliageUnderstory_R', { size: 1 }, scene);
+    understoryBR.material = sharedUnderstoryMaterial;
+    const understoryVL = MeshBuilder.CreateBox('V33_VipFoliageUnderstory_L', { size: 1 }, scene);
+    understoryVL.material = sharedUnderstoryMaterial;
+    const understoryVR = MeshBuilder.CreateBox('V33_VipFoliageUnderstory_R', { size: 1 }, scene);
+    understoryVR.material = sharedUnderstoryMaterial;
+
+    polishMainStageMaterials([otherUnderstory, understoryBL, understoryBR, understoryVL, understoryVR]);
+
+    expect(otherUnderstory.material).toBe(sharedUnderstoryMaterial);
+
+    for (const mesh of [understoryBL, understoryBR, understoryVL, understoryVR]) {
+      expect(mesh.material).not.toBe(sharedUnderstoryMaterial);
+      const mat = mesh.material as PBRMaterial;
+      expect(mat.metadata?.mainStageMaterialPolish).toBe('black');
+      expect(mat.metadata?.mainStageMaterialOverride).toBe('deep-foliage-understory');
+      expect(mat.albedoColor.r).toBeLessThanOrEqual(0.14);
+      expect(mat.albedoColor.g).toBeLessThanOrEqual(0.17);
+      expect(mat.albedoColor.b).toBeLessThanOrEqual(0.12);
+      expect(mat.emissiveIntensity).toBeLessThanOrEqual(0.03);
+      expect(mat.roughness).toBeGreaterThanOrEqual(0.84);
+      expect(mat.environmentIntensity).toBeLessThanOrEqual(0.18);
+    }
+  });
 });
