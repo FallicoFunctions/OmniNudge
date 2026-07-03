@@ -2968,25 +2968,37 @@ describe('polishMainStageMaterials', () => {
     expect(stairNosing.material).toBeInstanceOf(PBRMaterial);
     expect(routeGoldL.material).toBeInstanceOf(PBRMaterial);
     expect(routeGoldR.material).toBeInstanceOf(PBRMaterial);
-    expect(routeGoldL.material).toBe(stairNosing.material);
-    expect(routeGoldR.material).toBe(stairNosing.material);
+    expect(routeGoldR.material).toBe(routeGoldL.material);
+    expect(routeGoldL.material).not.toBe(stairNosing.material);
 
     expect(wetControl.material).toBe(sharedWetMaterial);
     expect(wetInlay.material).toBeInstanceOf(PBRMaterial);
 
-    const goldMaterial = stairNosing.material as PBRMaterial;
+    const stairGoldMaterial = stairNosing.material as PBRMaterial;
+    const routeGoldMaterial = routeGoldL.material as PBRMaterial;
     const wetMaterial = wetInlay.material as PBRMaterial;
 
-    expect(goldMaterial.name).toContain('processional-route-gold-trim');
-    expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
-    expect(goldMaterial.metadata?.mainStageMaterialOverride).toBe('processional-route-gold-trim');
-    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
-    expect(goldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
-    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(stairGoldMaterial.name).toContain('central-stair-gold-nosing');
+    expect(stairGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(stairGoldMaterial.metadata?.mainStageMaterialOverride).toBe('central-stair-gold-nosing');
+    expect(stairGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(stairGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(stairGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(stairGoldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(stairGoldMaterial.metallic).toBeGreaterThanOrEqual(0.18);
+    expect(stairGoldMaterial.roughness).toBeLessThanOrEqual(0.88);
+    expect(stairGoldMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.12);
+
+    expect(routeGoldMaterial.name).toContain('spawn-route-gold-edge');
+    expect(routeGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(routeGoldMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-route-gold-edge');
+    expect(routeGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(routeGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(routeGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(routeGoldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(routeGoldMaterial.metallic).toBeLessThanOrEqual(0.14);
+    expect(routeGoldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(routeGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
 
     expect(wetMaterial.name).toContain('spawn-route-wet-center-inlay');
     expect(wetMaterial.metadata?.mainStageMaterialPolish).toBe('wet');
