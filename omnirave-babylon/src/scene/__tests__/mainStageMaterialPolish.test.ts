@@ -2865,6 +2865,8 @@ describe('polishMainStageMaterials', () => {
     leftArch.material = sharedPearlMaterial;
     const leftButtress = MeshBuilder.CreateBox('V24_ProsceniumFlyingButtress_L', { size: 1 }, scene);
     leftButtress.material = sharedPearlMaterial;
+    const outerWingButtress = MeshBuilder.CreateBox('V107_OuterWingButtressArray_L', { size: 1 }, scene);
+    outerWingButtress.material = sharedPearlMaterial;
 
     const goldControl = MeshBuilder.CreateBox('TestV24GoldControl', { size: 1 }, scene);
     goldControl.material = sharedGoldMaterial;
@@ -2879,6 +2881,7 @@ describe('polishMainStageMaterials', () => {
       pearlControl,
       leftArch,
       leftButtress,
+      outerWingButtress,
       goldControl,
       leftReveal,
       rib0,
@@ -2888,9 +2891,11 @@ describe('polishMainStageMaterials', () => {
     expect(pearlControl.material).toBe(sharedPearlMaterial);
     expect(leftArch.material).toBeInstanceOf(PBRMaterial);
     expect(leftButtress.material).toBeInstanceOf(PBRMaterial);
+    expect(outerWingButtress.material).toBeInstanceOf(PBRMaterial);
     expect(leftArch.material).not.toBe(sharedPearlMaterial);
     expect(leftButtress.material).not.toBe(sharedPearlMaterial);
     expect(leftButtress.material).not.toBe(leftArch.material);
+    expect(outerWingButtress.material).not.toBe(leftArch.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftReveal.material).toBeInstanceOf(PBRMaterial);
@@ -2902,6 +2907,7 @@ describe('polishMainStageMaterials', () => {
 
     const archMaterial = leftArch.material as PBRMaterial;
     const buttressMaterial = leftButtress.material as PBRMaterial;
+    const outerWingButtressMaterial = outerWingButtress.material as PBRMaterial;
     const revealMaterial = leftReveal.material as PBRMaterial;
     const ribMaterial = rib0.material as PBRMaterial;
     const buttressRevealMaterial = leftButtressReveal.material as PBRMaterial;
@@ -2915,6 +2921,9 @@ describe('polishMainStageMaterials', () => {
     expect(archMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(archMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(archMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(archMaterial.albedoColor.r).toBeGreaterThan(outerWingButtressMaterial.albedoColor.r);
+    expect(archMaterial.roughness ?? 0).toBeLessThan(outerWingButtressMaterial.roughness ?? 0);
+    expect(archMaterial.environmentIntensity).toBeGreaterThan(outerWingButtressMaterial.environmentIntensity);
 
     expect(buttressMaterial.name).toContain('v24-proscenium-flying-buttress');
     expect(buttressMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');

@@ -5040,7 +5040,16 @@ function applyForegroundBarricadeGoldRailOverride(material: PBRMaterial) {
 }
 
 function applyV24CelestialCrownFrontArchOverride(material: PBRMaterial) {
-  applyOuterWingButtressShellOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.22, 0.24, 0.28);
+  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
+  material.emissiveIntensity = 0.022;
+  material.metallic = 0.02;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.05;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.14;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'v24-celestial-crown-front-arch',
