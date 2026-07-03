@@ -3043,6 +3043,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V51_PortalCrestBridge') {
+      const cacheKey = `${material.uniqueId}:portal-crest-bridge`;
+      let bridgeMaterial = clonedMaterials.get(cacheKey);
+      if (!bridgeMaterial) {
+        bridgeMaterial = material.clone(`${material.name}__portal-crest-bridge`);
+        applyPortalCrestBridgeOverride(bridgeMaterial);
+        clonedMaterials.set(cacheKey, bridgeMaterial);
+      }
+
+      assignOverrideMaterial(mesh, bridgeMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V116_ProsceniumPearlRevealArray_')) {
       const cacheKey = `${material.uniqueId}:proscenium-pearl-reveal`;
       let revealMaterial = clonedMaterials.get(cacheKey);
@@ -6474,6 +6487,23 @@ function applySideParallaxGoldOrbitOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'side-parallax-gold-orbit',
+  };
+}
+
+function applyPortalCrestBridgeOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'portal-crest-bridge',
   };
 }
 
