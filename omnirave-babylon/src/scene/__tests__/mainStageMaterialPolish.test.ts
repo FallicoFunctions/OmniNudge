@@ -9302,6 +9302,9 @@ describe('polishMainStageMaterials', () => {
     const goldTracery = MeshBuilder.CreateBox('V52_CrownObeliskGoldTracery', { size: 1 }, scene);
     goldTracery.material = sharedGoldMaterial;
 
+    const wingArchInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_L', { size: 1 }, scene);
+    wingArchInlay.material = sharedGoldMaterial;
+
     const leftGoldFin = MeshBuilder.CreateBox('V52_CrownSpireGoldFin_L', { size: 1 }, scene);
     leftGoldFin.material = sharedGoldMaterial;
 
@@ -9330,6 +9333,7 @@ describe('polishMainStageMaterials', () => {
     polishMainStageMaterials([
       goldControl,
       goldTracery,
+      wingArchInlay,
       leftGoldFin,
       rightGoldFin,
       apexPedestal,
@@ -9343,9 +9347,11 @@ describe('polishMainStageMaterials', () => {
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(goldTracery.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArchInlay.material).toBeInstanceOf(PBRMaterial);
     expect(leftGoldFin.material).toBeInstanceOf(PBRMaterial);
     expect(rightGoldFin.material).toBe(leftGoldFin.material);
     expect(apexPedestal.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArchInlay.material).not.toBe(goldTracery.material);
     expect(leftGoldFin.material).not.toBe(goldTracery.material);
     expect(apexPedestal.material).not.toBe(goldTracery.material);
     expect(apexPedestal.material).not.toBe(leftGoldFin.material);
@@ -9363,6 +9369,7 @@ describe('polishMainStageMaterials', () => {
     expect(crownApexCrystal.material).not.toBe(apexCrystal.material);
 
     const traceryMaterial = goldTracery.material as PBRMaterial;
+    const wingArchInlayMaterial = wingArchInlay.material as PBRMaterial;
     const finMaterial = leftGoldFin.material as PBRMaterial;
     const pedestalMaterial = apexPedestal.material as PBRMaterial;
     const shadowMaterial = shadowSpine.material as PBRMaterial;
@@ -9373,13 +9380,16 @@ describe('polishMainStageMaterials', () => {
     expect(traceryMaterial.name).toContain('crown-obelisk-gold-tracery');
     expect(traceryMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(traceryMaterial.metadata?.mainStageMaterialOverride).toBe('crown-obelisk-gold-tracery');
-    expect(traceryMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(traceryMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
-    expect(traceryMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(traceryMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(traceryMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(traceryMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
     expect(traceryMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(traceryMaterial.metallic).toBeLessThanOrEqual(0.16);
-    expect(traceryMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(traceryMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(traceryMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(traceryMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    expect(traceryMaterial.albedoColor.r).toBeGreaterThan(wingArchInlayMaterial.albedoColor.r);
+    expect(traceryMaterial.metallic ?? 0).toBeGreaterThan(wingArchInlayMaterial.metallic ?? 0);
+    expect(traceryMaterial.roughness ?? 0).toBeLessThan(wingArchInlayMaterial.roughness ?? 0);
 
     expect(finMaterial.name).toContain('crown-obelisk-gold-fin');
     expect(finMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
