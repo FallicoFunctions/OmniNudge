@@ -8850,20 +8850,34 @@ describe('polishMainStageMaterials', () => {
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftReveal.material).toBeInstanceOf(PBRMaterial);
     expect(rightReveal.material).toBe(leftReveal.material);
-    expect(leftSpire.material).toBe(leftReveal.material);
-    expect(rightSpire.material).toBe(leftReveal.material);
+    expect(leftSpire.material).toBeInstanceOf(PBRMaterial);
+    expect(rightSpire.material).toBe(leftSpire.material);
+    expect(leftSpire.material).not.toBe(leftReveal.material);
 
-    const goldMaterial = leftReveal.material as PBRMaterial;
-    expect(goldMaterial.name).toContain('inner-portal-gold-reveal');
-    expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
-    expect(goldMaterial.metadata?.mainStageMaterialOverride).toBe('inner-portal-gold-reveal');
-    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
-    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
-    expect(goldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
-    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    const revealMaterial = leftReveal.material as PBRMaterial;
+    const spireMaterial = leftSpire.material as PBRMaterial;
+
+    expect(revealMaterial.name).toContain('inner-portal-gold-reveal');
+    expect(revealMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(revealMaterial.metadata?.mainStageMaterialOverride).toBe('inner-portal-gold-reveal');
+    expect(revealMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(revealMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(revealMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(revealMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(revealMaterial.metallic).toBeLessThanOrEqual(0.16);
+    expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+
+    expect(spireMaterial.name).toContain('outer-sweep-spire');
+    expect(spireMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(spireMaterial.metadata?.mainStageMaterialOverride).toBe('outer-sweep-spire');
+    expect(spireMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(spireMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
+    expect(spireMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(spireMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(spireMaterial.metallic).toBeGreaterThanOrEqual(0.16);
+    expect(spireMaterial.roughness).toBeLessThanOrEqual(0.88);
+    expect(spireMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.1);
   });
 
   it('darkens the crown obelisk pearl shell masses so the skyline reads as a layered silhouette instead of pale spear proxies', () => {

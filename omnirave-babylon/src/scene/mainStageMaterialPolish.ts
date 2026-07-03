@@ -3305,19 +3305,29 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V50_InnerPortalGoldReveal_') ||
-      mesh.name.startsWith('V50_OuterSweepSpire_')
-    ) {
+    if (mesh.name.startsWith('V50_InnerPortalGoldReveal_')) {
       const cacheKey = `${material.uniqueId}:inner-portal-gold-reveal`;
-      let goldMaterial = clonedMaterials.get(cacheKey);
-      if (!goldMaterial) {
-        goldMaterial = material.clone(`${material.name}__inner-portal-gold-reveal`);
-        applyInnerPortalGoldRevealOverride(goldMaterial);
-        clonedMaterials.set(cacheKey, goldMaterial);
+      let revealMaterial = clonedMaterials.get(cacheKey);
+      if (!revealMaterial) {
+        revealMaterial = material.clone(`${material.name}__inner-portal-gold-reveal`);
+        applyInnerPortalGoldRevealOverride(revealMaterial);
+        clonedMaterials.set(cacheKey, revealMaterial);
       }
 
-      assignOverrideMaterial(mesh, goldMaterial);
+      assignOverrideMaterial(mesh, revealMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V50_OuterSweepSpire_')) {
+      const cacheKey = `${material.uniqueId}:outer-sweep-spire`;
+      let spireMaterial = clonedMaterials.get(cacheKey);
+      if (!spireMaterial) {
+        spireMaterial = material.clone(`${material.name}__outer-sweep-spire`);
+        applyOuterSweepSpireOverride(spireMaterial);
+        clonedMaterials.set(cacheKey, spireMaterial);
+      }
+
+      assignOverrideMaterial(mesh, spireMaterial);
       continue;
     }
 
@@ -7050,6 +7060,23 @@ function applyInnerPortalGoldRevealOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'inner-portal-gold-reveal',
+  };
+}
+
+function applyOuterSweepSpireOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.175, 0.135, 0.058);
+  material.emissiveColor = new Color3(0.008, 0.006, 0.002);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.18;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.11;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'outer-sweep-spire',
   };
 }
 
