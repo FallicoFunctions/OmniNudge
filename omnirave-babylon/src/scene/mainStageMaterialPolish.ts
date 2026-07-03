@@ -3347,20 +3347,42 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V52_CrownObeliskGoldTracery' ||
-      mesh.name.startsWith('V52_CrownSpireGoldFin_') ||
-      mesh.name === 'V52_CrownApexPedestal'
-    ) {
+    if (mesh.name === 'V52_CrownObeliskGoldTracery') {
       const cacheKey = `${material.uniqueId}:crown-obelisk-gold-tracery`;
-      let goldMaterial = clonedMaterials.get(cacheKey);
-      if (!goldMaterial) {
-        goldMaterial = material.clone(`${material.name}__crown-obelisk-gold-tracery`);
-        applyCrownObeliskGoldTraceryOverride(goldMaterial);
-        clonedMaterials.set(cacheKey, goldMaterial);
+      let traceryMaterial = clonedMaterials.get(cacheKey);
+      if (!traceryMaterial) {
+        traceryMaterial = material.clone(`${material.name}__crown-obelisk-gold-tracery`);
+        applyCrownObeliskGoldTraceryOverride(traceryMaterial);
+        clonedMaterials.set(cacheKey, traceryMaterial);
       }
 
-      assignOverrideMaterial(mesh, goldMaterial);
+      assignOverrideMaterial(mesh, traceryMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V52_CrownSpireGoldFin_')) {
+      const cacheKey = `${material.uniqueId}:crown-obelisk-gold-fin`;
+      let finMaterial = clonedMaterials.get(cacheKey);
+      if (!finMaterial) {
+        finMaterial = material.clone(`${material.name}__crown-obelisk-gold-fin`);
+        applyCrownObeliskGoldFinOverride(finMaterial);
+        clonedMaterials.set(cacheKey, finMaterial);
+      }
+
+      assignOverrideMaterial(mesh, finMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V52_CrownApexPedestal') {
+      const cacheKey = `${material.uniqueId}:crown-obelisk-apex-pedestal`;
+      let pedestalMaterial = clonedMaterials.get(cacheKey);
+      if (!pedestalMaterial) {
+        pedestalMaterial = material.clone(`${material.name}__crown-obelisk-apex-pedestal`);
+        applyCrownObeliskApexPedestalOverride(pedestalMaterial);
+        clonedMaterials.set(cacheKey, pedestalMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pedestalMaterial);
       continue;
     }
 
@@ -7119,6 +7141,40 @@ function applyCrownObeliskGoldTraceryOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-obelisk-gold-tracery',
+  };
+}
+
+function applyCrownObeliskGoldFinOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.175, 0.135, 0.058);
+  material.emissiveColor = new Color3(0.008, 0.006, 0.002);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.18;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.11;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-obelisk-gold-fin',
+  };
+}
+
+function applyCrownObeliskApexPedestalOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.15, 0.11, 0.045);
+  material.emissiveColor = new Color3(0.006, 0.004, 0.0015);
+  material.emissiveIntensity = 0.015;
+  material.metallic = 0.12;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-obelisk-apex-pedestal',
   };
 }
 
