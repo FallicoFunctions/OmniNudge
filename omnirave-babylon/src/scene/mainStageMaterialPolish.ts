@@ -5999,7 +5999,16 @@ function applyApproachReflectionUnderlayOverride(material: PBRMaterial) {
 }
 
 function applyApproachGoldInlayNetworkOverride(material: PBRMaterial) {
-  applyWingFacadeArchInlayOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.145, 0.11, 0.045);
+  material.emissiveColor = new Color3(0.008, 0.005, 0.002);
+  material.emissiveIntensity = 0.014;
+  material.metallic = 0.1;
+  material.roughness = 0.94;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.9;
+  material.environmentIntensity = 0.06;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'approach-gold-inlay-network',
@@ -7619,7 +7628,17 @@ function applyBackPlazaGatewayPearlOverride(material: PBRMaterial) {
 }
 
 function applyBackPlazaGatewayCyanInlayOverride(material: PBRMaterial) {
-  applyWingFacadeInsetGlowOverride(material);
+  material.albedoColor = new Color3(0.09, 0.2, 0.25);
+  material.emissiveColor = new Color3(0.008, 0.032, 0.042);
+  material.emissiveIntensity = 0.065;
+  material.alpha = 0.3;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.01;
+  material.roughness = 0.22;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.66;
+  material.environmentIntensity = 0.24;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'back-plaza-gateway-cyan-inlay',
