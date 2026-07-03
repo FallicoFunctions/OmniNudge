@@ -2788,6 +2788,22 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name === 'V67_VipGardenGoldRibCanopy_L' ||
+      mesh.name === 'V67_VipGardenGoldRibCanopy_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:vip-garden-gold-rib-canopy`;
+      let ribMaterial = clonedMaterials.get(cacheKey);
+      if (!ribMaterial) {
+        ribMaterial = material.clone(`${material.name}__vip-garden-gold-rib-canopy`);
+        applyVipGardenGoldRibCanopyOverride(ribMaterial);
+        clonedMaterials.set(cacheKey, ribMaterial);
+      }
+
+      assignOverrideMaterial(mesh, ribMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V43_WayfindingPylonPearlShell') {
       const cacheKey = `${material.uniqueId}:wayfinding-pylon-pearl-shell`;
       let pylonMaterial = clonedMaterials.get(cacheKey);
@@ -6007,6 +6023,23 @@ function applyVipGardenPearlBasinOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'vip-garden-pearl-basin',
+  };
+}
+
+function applyVipGardenGoldRibCanopyOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'vip-garden-gold-rib-canopy',
   };
 }
 

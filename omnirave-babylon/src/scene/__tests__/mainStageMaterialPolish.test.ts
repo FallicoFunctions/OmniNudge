@@ -9640,4 +9640,46 @@ describe('polishMainStageMaterials', () => {
     expect(sweepMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(sweepMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
+
+  it('darkens the VIP garden gold rib canopies so they read as carved architectural ribwork instead of bright gold proxy hoops', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V20_ChasedGoldFiligree', scene);
+    sharedGoldMaterial.albedoColor.set(0.78, 0.64, 0.26);
+    sharedGoldMaterial.emissiveColor.set(0.08, 0.06, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.16;
+    sharedGoldMaterial.metallic = 0.8;
+    sharedGoldMaterial.roughness = 0.26;
+
+    const goldControl = MeshBuilder.CreateBox('TestVipGardenGoldRibCanopyControl', { size: 1 }, scene);
+    goldControl.material = sharedGoldMaterial;
+
+    const leftRib = MeshBuilder.CreateBox('V67_VipGardenGoldRibCanopy_L', { size: 1 }, scene);
+    leftRib.material = sharedGoldMaterial;
+
+    const rightRib = MeshBuilder.CreateBox('V67_VipGardenGoldRibCanopy_R', { size: 1 }, scene);
+    rightRib.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([goldControl, leftRib, rightRib]);
+
+    expect(goldControl.material).toBe(sharedGoldMaterial);
+    expect(leftRib.material).toBeInstanceOf(PBRMaterial);
+    expect(rightRib.material).toBeInstanceOf(PBRMaterial);
+    expect(leftRib.material).not.toBe(sharedGoldMaterial);
+    expect(rightRib.material).not.toBe(sharedGoldMaterial);
+    expect(rightRib.material).toBe(leftRib.material);
+
+    const ribMaterial = leftRib.material as PBRMaterial;
+    expect(ribMaterial.name).toContain('vip-garden-gold-rib-canopy');
+    expect(ribMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(ribMaterial.metadata?.mainStageMaterialOverride).toBe('vip-garden-gold-rib-canopy');
+    expect(ribMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(ribMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(ribMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(ribMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(ribMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(ribMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(ribMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
 });
