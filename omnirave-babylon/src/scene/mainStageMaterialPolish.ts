@@ -3246,16 +3246,38 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V62_BasinCausewayCyanInlay' ||
-      mesh.name === 'V64_PromenadeCyanThread' ||
-      mesh.name.startsWith('V66_BackPlazaSightlineCyanThread_')
-    ) {
-      const cacheKey = `${material.uniqueId}:arrival-cyan-glow`;
+    if (mesh.name === 'V62_BasinCausewayCyanInlay') {
+      const cacheKey = `${material.uniqueId}:arrival-causeway-cyan-inlay`;
       let cyanMaterial = clonedMaterials.get(cacheKey);
       if (!cyanMaterial) {
-        cyanMaterial = material.clone(`${material.name}__arrival-cyan-glow`);
-        applyArrivalCyanGlowOverride(cyanMaterial);
+        cyanMaterial = material.clone(`${material.name}__arrival-causeway-cyan-inlay`);
+        applyArrivalCausewayCyanInlayOverride(cyanMaterial);
+        clonedMaterials.set(cacheKey, cyanMaterial);
+      }
+
+      assignOverrideMaterial(mesh, cyanMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V64_PromenadeCyanThread') {
+      const cacheKey = `${material.uniqueId}:arrival-promenade-cyan-thread`;
+      let cyanMaterial = clonedMaterials.get(cacheKey);
+      if (!cyanMaterial) {
+        cyanMaterial = material.clone(`${material.name}__arrival-promenade-cyan-thread`);
+        applyArrivalPromenadeCyanThreadOverride(cyanMaterial);
+        clonedMaterials.set(cacheKey, cyanMaterial);
+      }
+
+      assignOverrideMaterial(mesh, cyanMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V66_BackPlazaSightlineCyanThread_')) {
+      const cacheKey = `${material.uniqueId}:arrival-sightline-cyan-thread`;
+      let cyanMaterial = clonedMaterials.get(cacheKey);
+      if (!cyanMaterial) {
+        cyanMaterial = material.clone(`${material.name}__arrival-sightline-cyan-thread`);
+        applyArrivalSightlineCyanThreadOverride(cyanMaterial);
         clonedMaterials.set(cacheKey, cyanMaterial);
       }
 
@@ -7130,11 +7152,47 @@ function applySpawnBeaconCyanOverride(material: PBRMaterial) {
   };
 }
 
-function applyArrivalCyanGlowOverride(material: PBRMaterial) {
-  material.albedoColor = new Color3(0.04, 0.12, 0.18);
-  material.emissiveColor = new Color3(0.008, 0.03, 0.05);
-  material.emissiveIntensity = 0.06;
+function applyArrivalCausewayCyanInlayOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.035, 0.11, 0.18);
+  material.emissiveColor = new Color3(0.007, 0.026, 0.046);
+  material.emissiveIntensity = 0.055;
   material.alpha = 0.55;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.44;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.2;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-causeway-cyan-inlay',
+  };
+}
+
+function applyArrivalPromenadeCyanThreadOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.03, 0.1, 0.17);
+  material.emissiveColor = new Color3(0.006, 0.024, 0.042);
+  material.emissiveIntensity = 0.048;
+  material.alpha = 0.52;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.46;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.66;
+  material.environmentIntensity = 0.18;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-promenade-cyan-thread',
+  };
+}
+
+function applyArrivalSightlineCyanThreadOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.04, 0.12, 0.2);
+  material.emissiveColor = new Color3(0.008, 0.029, 0.048);
+  material.emissiveIntensity = 0.058;
+  material.alpha = 0.56;
   material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
   material.metallic = 0.02;
   material.roughness = 0.42;
@@ -7144,7 +7202,7 @@ function applyArrivalCyanGlowOverride(material: PBRMaterial) {
   material.environmentIntensity = 0.22;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'arrival-cyan-glow',
+    mainStageMaterialOverride: 'arrival-sightline-cyan-thread',
   };
 }
 

@@ -10340,7 +10340,7 @@ describe('polishMainStageMaterials', () => {
     expect(beaconMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
   });
 
-  it('smokes the arrival cyan inlay and thread elements so the basin causeway and promenade read as inset jewel glass instead of bright cyan strips', () => {
+  it('smokes the basin causeway cyan inlay, promenade cyan thread, and sightline cyan thread so each arrival accent reads as site-specific inset jewel glass instead of one repeated cyan strip material', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -10371,19 +10371,42 @@ describe('polishMainStageMaterials', () => {
     expect(causewayCyan.material).not.toBe(sharedCyanMaterial);
     expect(promenadeCyan.material).not.toBe(sharedCyanMaterial);
     expect(sightlineCyan.material).not.toBe(sharedCyanMaterial);
-    expect(causewayCyan.material).toBe(promenadeCyan.material);
-    expect(causewayCyan.material).toBe(sightlineCyan.material);
+    expect(causewayCyan.material).not.toBe(promenadeCyan.material);
+    expect(causewayCyan.material).not.toBe(sightlineCyan.material);
+    expect(promenadeCyan.material).not.toBe(sightlineCyan.material);
 
-    const cyanMaterial = causewayCyan.material as PBRMaterial;
-    expect(cyanMaterial.name).toContain('arrival-cyan-glow');
-    expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
-    expect(cyanMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-cyan-glow');
-    expect(cyanMaterial.albedoColor.r).toBeLessThanOrEqual(0.08);
-    expect(cyanMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(cyanMaterial.albedoColor.b).toBeLessThanOrEqual(0.24);
-    expect(cyanMaterial.emissiveIntensity).toBeLessThanOrEqual(0.08);
-    expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.38);
-    expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
+    const causewayCyanMaterial = causewayCyan.material as PBRMaterial;
+    expect(causewayCyanMaterial.name).toContain('arrival-causeway-cyan-inlay');
+    expect(causewayCyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(causewayCyanMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-causeway-cyan-inlay');
+    expect(causewayCyanMaterial.albedoColor.r).toBeLessThanOrEqual(0.07);
+    expect(causewayCyanMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
+    expect(causewayCyanMaterial.albedoColor.b).toBeLessThanOrEqual(0.2);
+    expect(causewayCyanMaterial.emissiveIntensity).toBeLessThanOrEqual(0.06);
+    expect(causewayCyanMaterial.roughness).toBeGreaterThanOrEqual(0.42);
+    expect(causewayCyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.22);
+
+    const promenadeCyanMaterial = promenadeCyan.material as PBRMaterial;
+    expect(promenadeCyanMaterial.name).toContain('arrival-promenade-cyan-thread');
+    expect(promenadeCyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(promenadeCyanMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-promenade-cyan-thread');
+    expect(promenadeCyanMaterial.albedoColor.r).toBeLessThanOrEqual(0.06);
+    expect(promenadeCyanMaterial.albedoColor.g).toBeLessThanOrEqual(0.13);
+    expect(promenadeCyanMaterial.albedoColor.b).toBeLessThanOrEqual(0.19);
+    expect(promenadeCyanMaterial.emissiveIntensity).toBeLessThanOrEqual(0.05);
+    expect(promenadeCyanMaterial.roughness).toBeGreaterThanOrEqual(0.44);
+    expect(promenadeCyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
+
+    const sightlineCyanMaterial = sightlineCyan.material as PBRMaterial;
+    expect(sightlineCyanMaterial.name).toContain('arrival-sightline-cyan-thread');
+    expect(sightlineCyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(sightlineCyanMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-sightline-cyan-thread');
+    expect(sightlineCyanMaterial.albedoColor.r).toBeLessThanOrEqual(0.08);
+    expect(sightlineCyanMaterial.albedoColor.g).toBeLessThanOrEqual(0.15);
+    expect(sightlineCyanMaterial.albedoColor.b).toBeLessThanOrEqual(0.22);
+    expect(sightlineCyanMaterial.emissiveIntensity).toBeLessThanOrEqual(0.06);
+    expect(sightlineCyanMaterial.roughness).toBeGreaterThanOrEqual(0.4);
+    expect(sightlineCyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.24);
   });
 
   it('darkens the plaza cross bands gold so the route approach reads as carved metal inlay instead of bright gold strips', () => {
