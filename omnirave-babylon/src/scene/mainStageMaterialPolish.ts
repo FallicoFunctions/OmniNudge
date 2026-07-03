@@ -489,17 +489,25 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V24_CelestialCrownFrontArch_L' ||
-      mesh.name === 'V24_CelestialCrownFrontArch_R' ||
-      mesh.name === 'V24_ProsceniumFlyingButtress_L' ||
-      mesh.name === 'V24_ProsceniumFlyingButtress_R'
-    ) {
-      const cacheKey = `${material.uniqueId}:v24-crown-pearl-shell`;
+    if (mesh.name === 'V24_CelestialCrownFrontArch_L' || mesh.name === 'V24_CelestialCrownFrontArch_R') {
+      const cacheKey = `${material.uniqueId}:v24-celestial-crown-front-arch`;
       let pearlMaterial = clonedMaterials.get(cacheKey);
       if (!pearlMaterial) {
-        pearlMaterial = material.clone(`${material.name}__v24-crown-pearl-shell`);
-        applyV24CrownPearlShellOverride(pearlMaterial);
+        pearlMaterial = material.clone(`${material.name}__v24-celestial-crown-front-arch`);
+        applyV24CelestialCrownFrontArchOverride(pearlMaterial);
+        clonedMaterials.set(cacheKey, pearlMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pearlMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V24_ProsceniumFlyingButtress_L' || mesh.name === 'V24_ProsceniumFlyingButtress_R') {
+      const cacheKey = `${material.uniqueId}:v24-proscenium-flying-buttress`;
+      let pearlMaterial = clonedMaterials.get(cacheKey);
+      if (!pearlMaterial) {
+        pearlMaterial = material.clone(`${material.name}__v24-proscenium-flying-buttress`);
+        applyV24ProsceniumFlyingButtressOverride(pearlMaterial);
         clonedMaterials.set(cacheKey, pearlMaterial);
       }
 
@@ -4982,11 +4990,28 @@ function applyForegroundBarricadeGoldRailOverride(material: PBRMaterial) {
   };
 }
 
-function applyV24CrownPearlShellOverride(material: PBRMaterial) {
+function applyV24CelestialCrownFrontArchOverride(material: PBRMaterial) {
   applyOuterWingButtressShellOverride(material);
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'v24-crown-pearl-shell',
+    mainStageMaterialOverride: 'v24-celestial-crown-front-arch',
+  };
+}
+
+function applyV24ProsceniumFlyingButtressOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'v24-proscenium-flying-buttress',
   };
 }
 
