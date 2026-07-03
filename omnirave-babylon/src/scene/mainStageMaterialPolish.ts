@@ -1017,19 +1017,29 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V123_CentralStairGoldNosingArray' ||
-      mesh.name.startsWith('V123_SpawnRouteGoldEdgeArray_')
-    ) {
-      const cacheKey = `${material.uniqueId}:processional-route-gold-trim`;
-      let goldTrimMaterial = clonedMaterials.get(cacheKey);
-      if (!goldTrimMaterial) {
-        goldTrimMaterial = material.clone(`${material.name}__processional-route-gold-trim`);
-        applyProcessionalRouteGoldTrimOverride(goldTrimMaterial);
-        clonedMaterials.set(cacheKey, goldTrimMaterial);
+    if (mesh.name === 'V123_CentralStairGoldNosingArray') {
+      const cacheKey = `${material.uniqueId}:central-stair-gold-nosing`;
+      let stairGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!stairGoldMaterial) {
+        stairGoldMaterial = material.clone(`${material.name}__central-stair-gold-nosing`);
+        applyCentralStairGoldNosingOverride(stairGoldMaterial);
+        clonedMaterials.set(cacheKey, stairGoldMaterial);
       }
 
-      assignOverrideMaterial(mesh, goldTrimMaterial);
+      assignOverrideMaterial(mesh, stairGoldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V123_SpawnRouteGoldEdgeArray_')) {
+      const cacheKey = `${material.uniqueId}:spawn-route-gold-edge`;
+      let routeGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!routeGoldMaterial) {
+        routeGoldMaterial = material.clone(`${material.name}__spawn-route-gold-edge`);
+        applySpawnRouteGoldEdgeOverride(routeGoldMaterial);
+        clonedMaterials.set(cacheKey, routeGoldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, routeGoldMaterial);
       continue;
     }
 
@@ -5022,6 +5032,23 @@ function applyStageFrontReliefShellOverride(material: PBRMaterial) {
   };
 }
 
+function applyCentralStairGoldNosingOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.16, 0.08);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.2;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'central-stair-gold-nosing',
+  };
+}
+
 function applyProcessionalRouteGoldTrimOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.18, 0.14, 0.06);
@@ -5036,6 +5063,23 @@ function applyProcessionalRouteGoldTrimOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'processional-route-gold-trim',
+  };
+}
+
+function applySpawnRouteGoldEdgeOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0.008, 0.005, 0.001);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.14;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-route-gold-edge',
   };
 }
 
