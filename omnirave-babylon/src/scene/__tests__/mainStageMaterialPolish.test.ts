@@ -7632,7 +7632,7 @@ describe('polishMainStageMaterials', () => {
     expect(filigreeMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
-  it('darkens the hero portal pearl arcade family so the first central stage reveal reads as layered architecture instead of bright ivory slabs', () => {
+  it('darkens the portal arcade pearl shells, grand colonnade pearl shells, and hero portal pearl apron so the first central stage reveal keeps layered architecture instead of one repeated ivory shell finish', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -7663,19 +7663,42 @@ describe('polishMainStageMaterials', () => {
     expect(portalArcade.material).not.toBe(sharedIvoryMaterial);
     expect(colonnade.material).not.toBe(sharedIvoryMaterial);
     expect(heroApron.material).not.toBe(sharedIvoryMaterial);
-    expect(colonnade.material).toBe(portalArcade.material);
-    expect(heroApron.material).toBe(portalArcade.material);
+    expect(colonnade.material).not.toBe(portalArcade.material);
+    expect(heroApron.material).not.toBe(portalArcade.material);
+    expect(heroApron.material).not.toBe(colonnade.material);
 
-    const portalMaterial = portalArcade.material as PBRMaterial;
-    expect(portalMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(portalMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-pearl-arcade');
-    expect(portalMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
-    expect(portalMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
-    expect(portalMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
-    expect(portalMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(portalMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(portalMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(portalMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    const portalArcadeMaterial = portalArcade.material as PBRMaterial;
+    expect(portalArcadeMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(portalArcadeMaterial.metadata?.mainStageMaterialOverride).toBe('portal-arcade-pearl-shell');
+    expect(portalArcadeMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(portalArcadeMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(portalArcadeMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(portalArcadeMaterial.emissiveIntensity).toBeLessThanOrEqual(0.025);
+    expect(portalArcadeMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(portalArcadeMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.05);
+    expect(portalArcadeMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+
+    const colonnadeMaterial = colonnade.material as PBRMaterial;
+    expect(colonnadeMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(colonnadeMaterial.metadata?.mainStageMaterialOverride).toBe('grand-arcade-pearl-colonnade');
+    expect(colonnadeMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(colonnadeMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(colonnadeMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(colonnadeMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(colonnadeMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(colonnadeMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(colonnadeMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+
+    const heroApronMaterial = heroApron.material as PBRMaterial;
+    expect(heroApronMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(heroApronMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-pearl-apron');
+    expect(heroApronMaterial.albedoColor.r).toBeLessThanOrEqual(0.19);
+    expect(heroApronMaterial.albedoColor.g).toBeLessThanOrEqual(0.22);
+    expect(heroApronMaterial.albedoColor.b).toBeLessThanOrEqual(0.26);
+    expect(heroApronMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(heroApronMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(heroApronMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.04);
+    expect(heroApronMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('darkens the rear mass aurora pearl fins so the stage backdrop keeps silhouette depth instead of reading as two bright ivory blades', () => {

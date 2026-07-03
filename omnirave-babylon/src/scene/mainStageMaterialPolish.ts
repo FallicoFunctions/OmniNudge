@@ -2814,20 +2814,42 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V68_PortalArcadePearl_') ||
-      mesh.name.startsWith('V68_GrandArcadePearlColonnade_') ||
-      mesh.name === 'V68_HeroPortalPearlApron'
-    ) {
-      const cacheKey = `${material.uniqueId}:hero-portal-pearl-arcade`;
+    if (mesh.name.startsWith('V68_PortalArcadePearl_')) {
+      const cacheKey = `${material.uniqueId}:portal-arcade-pearl-shell`;
       let portalMaterial = clonedMaterials.get(cacheKey);
       if (!portalMaterial) {
-        portalMaterial = material.clone(`${material.name}__hero-portal-pearl-arcade`);
-        applyHeroPortalPearlArcadeOverride(portalMaterial);
+        portalMaterial = material.clone(`${material.name}__portal-arcade-pearl-shell`);
+        applyPortalArcadePearlShellOverride(portalMaterial);
         clonedMaterials.set(cacheKey, portalMaterial);
       }
 
       assignOverrideMaterial(mesh, portalMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V68_GrandArcadePearlColonnade_')) {
+      const cacheKey = `${material.uniqueId}:grand-arcade-pearl-colonnade`;
+      let colonnadeMaterial = clonedMaterials.get(cacheKey);
+      if (!colonnadeMaterial) {
+        colonnadeMaterial = material.clone(`${material.name}__grand-arcade-pearl-colonnade`);
+        applyGrandArcadePearlColonnadeOverride(colonnadeMaterial);
+        clonedMaterials.set(cacheKey, colonnadeMaterial);
+      }
+
+      assignOverrideMaterial(mesh, colonnadeMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V68_HeroPortalPearlApron') {
+      const cacheKey = `${material.uniqueId}:hero-portal-pearl-apron`;
+      let apronMaterial = clonedMaterials.get(cacheKey);
+      if (!apronMaterial) {
+        apronMaterial = material.clone(`${material.name}__hero-portal-pearl-apron`);
+        applyHeroPortalPearlApronOverride(apronMaterial);
+        clonedMaterials.set(cacheKey, apronMaterial);
+      }
+
+      assignOverrideMaterial(mesh, apronMaterial);
       continue;
     }
 
@@ -6681,20 +6703,54 @@ function applyPlazaPaverGoldFiligreeOverride(material: PBRMaterial) {
   };
 }
 
-function applyHeroPortalPearlArcadeOverride(material: PBRMaterial) {
+function applyPortalArcadePearlShellOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.2, 0.22, 0.26);
   material.emissiveColor = new Color3(0.006, 0.01, 0.014);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.02;
-  material.roughness = 0.88;
+  material.roughness = 0.89;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.62;
-  material.environmentIntensity = 0.1;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.09;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'hero-portal-pearl-arcade',
+    mainStageMaterialOverride: 'portal-arcade-pearl-shell',
+  };
+}
+
+function applyGrandArcadePearlColonnadeOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.22, 0.24, 0.28);
+  material.emissiveColor = new Color3(0.008, 0.012, 0.017);
+  material.emissiveIntensity = 0.025;
+  material.metallic = 0.02;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.05;
+  material.clearCoat.roughness = 0.6;
+  material.environmentIntensity = 0.11;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'grand-arcade-pearl-colonnade',
+  };
+}
+
+function applyHeroPortalPearlApronOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.2, 0.24);
+  material.emissiveColor = new Color3(0.005, 0.008, 0.012);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.02;
+  material.roughness = 0.91;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.66;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'hero-portal-pearl-apron',
   };
 }
 
@@ -7587,23 +7643,6 @@ function applyHeroPortalGoldRevealOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'hero-portal-gold-reveal',
-  };
-}
-
-function applyHeroPortalPearlApronOverride(material: PBRMaterial) {
-  material.albedoTexture = null;
-  material.albedoColor = new Color3(0.2, 0.22, 0.26);
-  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
-  material.emissiveIntensity = 0.02;
-  material.metallic = 0.02;
-  material.roughness = 0.88;
-  material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.72;
-  material.environmentIntensity = 0.13;
-  material.metadata = {
-    ...material.metadata,
-    mainStageMaterialOverride: 'hero-portal-pearl-apron',
   };
 }
 
