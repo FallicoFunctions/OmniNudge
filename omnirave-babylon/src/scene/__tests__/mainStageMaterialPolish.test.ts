@@ -9925,4 +9925,44 @@ describe('polishMainStageMaterials', () => {
     expect(filigreeMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(filigreeMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
+
+  it('darkens the spawn gallery shadow seams so the arcade joints read as recessed shadow architecture instead of bright proxy seams', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedShadowMaterial = new PBRMaterial('V20_RecessedWarmShadow', scene);
+    sharedShadowMaterial.albedoColor.set(0.52, 0.86, 0.98);
+    sharedShadowMaterial.emissiveColor.set(0.18, 0.32, 0.4);
+    sharedShadowMaterial.emissiveIntensity = 0.28;
+    sharedShadowMaterial.metallic = 0.12;
+    sharedShadowMaterial.roughness = 0.38;
+
+    const otherShadow = MeshBuilder.CreateBox('TestSpawnShadowSeamControl', { size: 1 }, scene);
+    otherShadow.material = sharedShadowMaterial;
+
+    const leftSeam = MeshBuilder.CreateBox('V54_SpawnGalleryShadowSeam_L', { size: 1 }, scene);
+    leftSeam.material = sharedShadowMaterial;
+
+    const rightSeam = MeshBuilder.CreateBox('V54_SpawnGalleryShadowSeam_R', { size: 1 }, scene);
+    rightSeam.material = sharedShadowMaterial;
+
+    polishMainStageMaterials([otherShadow, leftSeam, rightSeam]);
+
+    expect(otherShadow.material).toBe(sharedShadowMaterial);
+    expect(leftSeam.material).toBeInstanceOf(PBRMaterial);
+    expect(rightSeam.material).toBeInstanceOf(PBRMaterial);
+    expect(leftSeam.material).not.toBe(sharedShadowMaterial);
+    expect(rightSeam.material).not.toBe(sharedShadowMaterial);
+    expect(rightSeam.material).toBe(leftSeam.material);
+
+    const seamMaterial = leftSeam.material as PBRMaterial;
+    expect(seamMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(seamMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-shadow-seam');
+    expect(seamMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(seamMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
+    expect(seamMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
+    expect(seamMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(seamMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(seamMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+  });
 });

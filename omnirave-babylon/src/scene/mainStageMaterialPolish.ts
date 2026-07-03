@@ -2954,6 +2954,21 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name.startsWith('V54_SpawnGalleryShadowSeam_')
+    ) {
+      const cacheKey = `${material.uniqueId}:spawn-shadow-seam`;
+      let seamMaterial = clonedMaterials.get(cacheKey);
+      if (!seamMaterial) {
+        seamMaterial = material.clone(`${material.name}__spawn-shadow-seam`);
+        applySpawnShadowSeamOverride(seamMaterial);
+        clonedMaterials.set(cacheKey, seamMaterial);
+      }
+
+      assignOverrideMaterial(mesh, seamMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V116_ProsceniumPearlRevealArray_')) {
       const cacheKey = `${material.uniqueId}:proscenium-pearl-reveal`;
       let revealMaterial = clonedMaterials.get(cacheKey);
@@ -6280,6 +6295,23 @@ function applySpawnFiligreeGoldOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-filigree-gold',
+  };
+}
+
+function applySpawnShadowSeamOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.008, 0.012, 0.016);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.04;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-shadow-seam',
   };
 }
 
