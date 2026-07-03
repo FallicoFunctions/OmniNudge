@@ -10039,4 +10039,50 @@ describe('polishMainStageMaterials', () => {
     expect(beaconMaterial.roughness).toBeGreaterThanOrEqual(0.38);
     expect(beaconMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
   });
+
+  it('smokes the arrival cyan inlay and thread elements so the basin causeway and promenade read as inset jewel glass instead of bright cyan strips', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedCyanMaterial = new PBRMaterial('V19_ArrivalCyanGlow', scene);
+    sharedCyanMaterial.albedoColor.set(0.02, 0.32, 0.44);
+    sharedCyanMaterial.emissiveColor.set(0.08, 0.42, 0.62);
+    sharedCyanMaterial.emissiveIntensity = 0.38;
+    sharedCyanMaterial.roughness = 0.16;
+
+    const otherCyan = MeshBuilder.CreateBox('TestArrivalCyanControl', { size: 1 }, scene);
+    otherCyan.material = sharedCyanMaterial;
+
+    const causewayCyan = MeshBuilder.CreateBox('V62_BasinCausewayCyanInlay', { size: 1 }, scene);
+    causewayCyan.material = sharedCyanMaterial;
+
+    const promenadeCyan = MeshBuilder.CreateBox('V64_PromenadeCyanThread', { size: 1 }, scene);
+    promenadeCyan.material = sharedCyanMaterial;
+
+    const sightlineCyan = MeshBuilder.CreateBox('V66_BackPlazaSightlineCyanThread_L', { size: 1 }, scene);
+    sightlineCyan.material = sharedCyanMaterial;
+
+    polishMainStageMaterials([otherCyan, causewayCyan, promenadeCyan, sightlineCyan]);
+
+    expect(otherCyan.material).toBe(sharedCyanMaterial);
+    expect(causewayCyan.material).toBeInstanceOf(PBRMaterial);
+    expect(promenadeCyan.material).toBeInstanceOf(PBRMaterial);
+    expect(sightlineCyan.material).toBeInstanceOf(PBRMaterial);
+    expect(causewayCyan.material).not.toBe(sharedCyanMaterial);
+    expect(promenadeCyan.material).not.toBe(sharedCyanMaterial);
+    expect(sightlineCyan.material).not.toBe(sharedCyanMaterial);
+    expect(causewayCyan.material).toBe(promenadeCyan.material);
+    expect(causewayCyan.material).toBe(sightlineCyan.material);
+
+    const cyanMaterial = causewayCyan.material as PBRMaterial;
+    expect(cyanMaterial.name).toContain('arrival-cyan-glow');
+    expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(cyanMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-cyan-glow');
+    expect(cyanMaterial.albedoColor.r).toBeLessThanOrEqual(0.08);
+    expect(cyanMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(cyanMaterial.albedoColor.b).toBeLessThanOrEqual(0.24);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThanOrEqual(0.08);
+    expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.38);
+    expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
+  });
 });
