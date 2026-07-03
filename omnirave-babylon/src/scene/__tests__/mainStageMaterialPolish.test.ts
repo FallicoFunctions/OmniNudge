@@ -9226,12 +9226,16 @@ describe('polishMainStageMaterials', () => {
 
     const shadowSpine = MeshBuilder.CreateBox('V52_CrownObeliskShadowSpine', { size: 1 }, scene);
     shadowSpine.material = sharedShadowMaterial;
+    const heroPortalShadowVault = MeshBuilder.CreateBox('V25_HeroPortalShadowVault', { size: 1 }, scene);
+    heroPortalShadowVault.material = sharedShadowMaterial;
 
     const cyanControl = MeshBuilder.CreateBox('TestCrownObeliskCyanControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
 
     const apexCrystal = MeshBuilder.CreateBox('V52_CrownApexCrystal', { size: 1 }, scene);
     apexCrystal.material = sharedCyanMaterial;
+    const crownApexCrystal = MeshBuilder.CreateBox('V25_CrownApexCrystal', { size: 1 }, scene);
+    crownApexCrystal.material = sharedCyanMaterial;
 
     polishMainStageMaterials([
       goldControl,
@@ -9241,8 +9245,10 @@ describe('polishMainStageMaterials', () => {
       apexPedestal,
       shadowControl,
       shadowSpine,
+      heroPortalShadowVault,
       cyanControl,
       apexCrystal,
+      crownApexCrystal,
     ]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
@@ -9257,16 +9263,22 @@ describe('polishMainStageMaterials', () => {
     expect(shadowControl.material).toBe(sharedShadowMaterial);
     expect(shadowSpine.material).toBeInstanceOf(PBRMaterial);
     expect(shadowSpine.material).not.toBe(sharedShadowMaterial);
+    expect(heroPortalShadowVault.material).toBeInstanceOf(PBRMaterial);
+    expect(heroPortalShadowVault.material).not.toBe(shadowSpine.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(apexCrystal.material).toBeInstanceOf(PBRMaterial);
     expect(apexCrystal.material).not.toBe(sharedCyanMaterial);
+    expect(crownApexCrystal.material).toBeInstanceOf(PBRMaterial);
+    expect(crownApexCrystal.material).not.toBe(apexCrystal.material);
 
     const traceryMaterial = goldTracery.material as PBRMaterial;
     const finMaterial = leftGoldFin.material as PBRMaterial;
     const pedestalMaterial = apexPedestal.material as PBRMaterial;
     const shadowMaterial = shadowSpine.material as PBRMaterial;
+    const heroPortalShadowVaultMaterial = heroPortalShadowVault.material as PBRMaterial;
     const cyanMaterial = apexCrystal.material as PBRMaterial;
+    const crownApexCrystalMaterial = crownApexCrystal.material as PBRMaterial;
 
     expect(traceryMaterial.name).toContain('crown-obelisk-gold-tracery');
     expect(traceryMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -9311,6 +9323,9 @@ describe('polishMainStageMaterials', () => {
     expect(shadowMaterial.metallic).toBeLessThanOrEqual(0.08);
     expect(shadowMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(shadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
+    expect(shadowMaterial.albedoColor.r).toBeLessThan(heroPortalShadowVaultMaterial.albedoColor.r);
+    expect(shadowMaterial.emissiveIntensity).toBeLessThan(heroPortalShadowVaultMaterial.emissiveIntensity);
+    expect(shadowMaterial.environmentIntensity).toBeLessThan(heroPortalShadowVaultMaterial.environmentIntensity);
 
     expect(cyanMaterial.name).toContain('crown-obelisk-apex-crystal');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -9323,6 +9338,9 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.18);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.34);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(cyanMaterial.alpha).toBeLessThan(crownApexCrystalMaterial.alpha);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThan(crownApexCrystalMaterial.emissiveIntensity);
+    expect(cyanMaterial.environmentIntensity).toBeLessThan(crownApexCrystalMaterial.environmentIntensity);
   });
 
   it('darkens the crown jewel pearl sockets so the apex framing reads as carved shell work instead of pale gem pedestals', () => {
