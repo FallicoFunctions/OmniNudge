@@ -4885,7 +4885,16 @@ function applyProductionTowerBeaconOverride(material: PBRMaterial) {
 }
 
 function applyWingFacadeArcadePierOverride(material: PBRMaterial) {
-  applyWingArcadePearlArchOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.19, 0.205, 0.24);
+  material.emissiveColor = new Color3(0.005, 0.008, 0.011);
+  material.emissiveIntensity = 0.022;
+  material.metallic = 0.03;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.1;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-facade-arcade-pier',
@@ -4893,7 +4902,16 @@ function applyWingFacadeArcadePierOverride(material: PBRMaterial) {
 }
 
 function applyWingFacadeGoldCapitalOverride(material: PBRMaterial) {
-  applyWingFacadeGoldLintelOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.19, 0.152, 0.066);
+  material.emissiveColor = new Color3(0.011, 0.008, 0.0023);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.19;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.82;
+  material.environmentIntensity = 0.13;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-facade-gold-capital',
@@ -4901,7 +4919,15 @@ function applyWingFacadeGoldCapitalOverride(material: PBRMaterial) {
 }
 
 function applyWingFacadeShadowRevealOverride(material: PBRMaterial) {
-  applyWingFacadeShadowFrameOverride(material);
+  material.albedoColor = new Color3(0.1, 0.125, 0.16);
+  material.emissiveColor = new Color3(0.006, 0.009, 0.012);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.06;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.78;
+  material.environmentIntensity = 0.1;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-facade-shadow-reveal',
