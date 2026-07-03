@@ -9999,4 +9999,44 @@ describe('polishMainStageMaterials', () => {
     expect(inlayMaterial.roughness).toBeGreaterThanOrEqual(0.38);
     expect(inlayMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
   });
+
+  it('smokes the spawn gallery beacon cyan so the arcade accent reads as inset jewel glass instead of a bright cyan beacon', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedCyanMaterial = new PBRMaterial('V20_CelestialCyanGlass', scene);
+    sharedCyanMaterial.albedoColor.set(0.02, 0.32, 0.44);
+    sharedCyanMaterial.emissiveColor.set(0.08, 0.42, 0.62);
+    sharedCyanMaterial.emissiveIntensity = 0.38;
+    sharedCyanMaterial.roughness = 0.16;
+
+    const otherCyan = MeshBuilder.CreateBox('V20_CelestialCyanGlass-mesh', { size: 1 }, scene);
+    otherCyan.material = sharedCyanMaterial;
+
+    const leftBeacon = MeshBuilder.CreateBox('V54_SpawnGalleryBeaconCyan_L', { size: 1 }, scene);
+    leftBeacon.material = sharedCyanMaterial;
+
+    const rightBeacon = MeshBuilder.CreateBox('V54_SpawnGalleryBeaconCyan_R', { size: 1 }, scene);
+    rightBeacon.material = sharedCyanMaterial;
+
+    polishMainStageMaterials([otherCyan, leftBeacon, rightBeacon]);
+
+    expect(otherCyan.material).toBe(sharedCyanMaterial);
+    expect(leftBeacon.material).toBeInstanceOf(PBRMaterial);
+    expect(rightBeacon.material).toBeInstanceOf(PBRMaterial);
+    expect(leftBeacon.material).not.toBe(sharedCyanMaterial);
+    expect(rightBeacon.material).not.toBe(sharedCyanMaterial);
+    expect(rightBeacon.material).toBe(leftBeacon.material);
+
+    const beaconMaterial = leftBeacon.material as PBRMaterial;
+    expect(beaconMaterial.name).toContain('spawn-beacon-cyan');
+    expect(beaconMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(beaconMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-beacon-cyan');
+    expect(beaconMaterial.albedoColor.r).toBeLessThanOrEqual(0.08);
+    expect(beaconMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(beaconMaterial.albedoColor.b).toBeLessThanOrEqual(0.24);
+    expect(beaconMaterial.emissiveIntensity).toBeLessThanOrEqual(0.08);
+    expect(beaconMaterial.roughness).toBeGreaterThanOrEqual(0.38);
+    expect(beaconMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
+  });
 });
