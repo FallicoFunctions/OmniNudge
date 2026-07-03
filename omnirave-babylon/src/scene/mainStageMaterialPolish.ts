@@ -8111,7 +8111,16 @@ function applySpawnGateSentinelPearlOverride(material: PBRMaterial) {
 }
 
 function applySpawnGateSentinelGoldCrownOverride(material: PBRMaterial) {
-  applyWingFacadeArchInlayOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.145, 0.06);
+  material.emissiveColor = new Color3(0.008, 0.0055, 0.0018);
+  material.emissiveIntensity = 0.013;
+  material.metallic = 0.18;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.8;
+  material.environmentIntensity = 0.11;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-gate-sentinel-gold-crown',
@@ -8119,7 +8128,17 @@ function applySpawnGateSentinelGoldCrownOverride(material: PBRMaterial) {
 }
 
 function applySpawnGateSentinelCyanCoreOverride(material: PBRMaterial) {
-  applyCrownApexCrystalOverride(material);
+  material.albedoColor = new Color3(0.1, 0.21, 0.27);
+  material.emissiveColor = new Color3(0.012, 0.036, 0.048);
+  material.emissiveIntensity = 0.085;
+  material.alpha = 0.3;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.24;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.05;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.26;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-gate-sentinel-cyan-core',
@@ -8127,7 +8146,15 @@ function applySpawnGateSentinelCyanCoreOverride(material: PBRMaterial) {
 }
 
 function applySpawnGateSentinelShadowKeelOverride(material: PBRMaterial) {
-  applyHeroPortalShadowVaultOverride(material);
+  material.albedoColor = new Color3(0.11, 0.14, 0.18);
+  material.emissiveColor = new Color3(0.008, 0.011, 0.015);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.06;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.18;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-gate-sentinel-shadow-keel',
