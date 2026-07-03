@@ -2812,7 +2812,7 @@ describe('polishMainStageMaterials', () => {
     expect(railMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
-  it('rebalances the V24 celestial crown front-arch and buttress assemblies so the hero crest reads as carved pearl shells with gilded structural ribbing instead of bright library stand-ins', () => {
+  it('regrades the V24 celestial front arches and flying buttresses into distinct pearl masses so the hero crest stops reading like one repeated library shell finish', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -2857,7 +2857,10 @@ describe('polishMainStageMaterials', () => {
 
     expect(pearlControl.material).toBe(sharedPearlMaterial);
     expect(leftArch.material).toBeInstanceOf(PBRMaterial);
-    expect(leftButtress.material).toBe(leftArch.material);
+    expect(leftButtress.material).toBeInstanceOf(PBRMaterial);
+    expect(leftArch.material).not.toBe(sharedPearlMaterial);
+    expect(leftButtress.material).not.toBe(sharedPearlMaterial);
+    expect(leftButtress.material).not.toBe(leftArch.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftReveal.material).toBeInstanceOf(PBRMaterial);
@@ -2867,20 +2870,31 @@ describe('polishMainStageMaterials', () => {
     expect(leftButtressReveal.material).not.toBe(leftReveal.material);
     expect(leftButtressReveal.material).not.toBe(rib0.material);
 
-    const pearlMaterial = leftArch.material as PBRMaterial;
+    const archMaterial = leftArch.material as PBRMaterial;
+    const buttressMaterial = leftButtress.material as PBRMaterial;
     const revealMaterial = leftReveal.material as PBRMaterial;
     const ribMaterial = rib0.material as PBRMaterial;
     const buttressRevealMaterial = leftButtressReveal.material as PBRMaterial;
 
-    expect(pearlMaterial.name).toContain('v24-crown-pearl-shell');
-    expect(pearlMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(pearlMaterial.metadata?.mainStageMaterialOverride).toBe('v24-crown-pearl-shell');
-    expect(pearlMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
-    expect(pearlMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
-    expect(pearlMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
-    expect(pearlMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(pearlMaterial.roughness).toBeGreaterThanOrEqual(0.84);
-    expect(pearlMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(archMaterial.name).toContain('v24-celestial-crown-front-arch');
+    expect(archMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(archMaterial.metadata?.mainStageMaterialOverride).toBe('v24-celestial-crown-front-arch');
+    expect(archMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(archMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(archMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(archMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(archMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(archMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+
+    expect(buttressMaterial.name).toContain('v24-proscenium-flying-buttress');
+    expect(buttressMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(buttressMaterial.metadata?.mainStageMaterialOverride).toBe('v24-proscenium-flying-buttress');
+    expect(buttressMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(buttressMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(buttressMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(buttressMaterial.emissiveIntensity).toBeLessThanOrEqual(0.025);
+    expect(buttressMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(buttressMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
 
     expect(revealMaterial.name).toContain('v24-crown-gold-reveal');
     expect(revealMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
