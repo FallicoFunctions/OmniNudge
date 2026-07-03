@@ -2994,7 +2994,7 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
   });
 
-  it('darkens the stage-front portal apron and shoulder relief shells so the spawn reveal does not collapse into giant white pearl slabs', () => {
+  it('regrades the stage-front portal apron and shoulder relief shells into distinct pearl masses so the spawn reveal stops reading like one repeated white apron proxy finish', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -3025,19 +3025,30 @@ describe('polishMainStageMaterials', () => {
     expect(portalApron.material).not.toBe(sharedPearlMaterial);
     expect(leftShoulder.material).not.toBe(sharedPearlMaterial);
     expect(rightShoulder.material).not.toBe(sharedPearlMaterial);
-    expect(leftShoulder.material).toBe(portalApron.material);
-    expect(rightShoulder.material).toBe(portalApron.material);
+    expect(rightShoulder.material).toBe(leftShoulder.material);
+    expect(leftShoulder.material).not.toBe(portalApron.material);
 
-    const reliefMaterial = portalApron.material as PBRMaterial;
-    expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('stage-front-relief-shell');
-    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
-    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
-    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
-    expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.84);
-    expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    const apronMaterial = portalApron.material as PBRMaterial;
+    expect(apronMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(apronMaterial.metadata?.mainStageMaterialOverride).toBe('portal-apron-relief-shell');
+    expect(apronMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(apronMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(apronMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(apronMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(apronMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(apronMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(apronMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+
+    const shoulderMaterial = leftShoulder.material as PBRMaterial;
+    expect(shoulderMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(shoulderMaterial.metadata?.mainStageMaterialOverride).toBe('stage-shoulder-relief-shell');
+    expect(shoulderMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(shoulderMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(shoulderMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(shoulderMaterial.emissiveIntensity).toBeLessThanOrEqual(0.025);
+    expect(shoulderMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(shoulderMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.05);
+    expect(shoulderMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
   it('rebalances the processional stair nosing, route gold edges, and wet center inlay so the spawn approach reads as carved ceremonial paving instead of bright gold rails around a flat glossy strip', () => {
