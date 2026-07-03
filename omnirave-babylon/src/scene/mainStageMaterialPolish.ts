@@ -2997,6 +2997,23 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name === 'V62_BasinCausewayCyanInlay' ||
+      mesh.name === 'V64_PromenadeCyanThread' ||
+      mesh.name.startsWith('V66_BackPlazaSightlineCyanThread_')
+    ) {
+      const cacheKey = `${material.uniqueId}:arrival-cyan-glow`;
+      let cyanMaterial = clonedMaterials.get(cacheKey);
+      if (!cyanMaterial) {
+        cyanMaterial = material.clone(`${material.name}__arrival-cyan-glow`);
+        applyArrivalCyanGlowOverride(cyanMaterial);
+        clonedMaterials.set(cacheKey, cyanMaterial);
+      }
+
+      assignOverrideMaterial(mesh, cyanMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V116_ProsceniumPearlRevealArray_')) {
       const cacheKey = `${material.uniqueId}:proscenium-pearl-reveal`;
       let revealMaterial = clonedMaterials.get(cacheKey);
@@ -6376,6 +6393,24 @@ function applySpawnBeaconCyanOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-beacon-cyan',
+  };
+}
+
+function applyArrivalCyanGlowOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.04, 0.12, 0.18);
+  material.emissiveColor = new Color3(0.008, 0.03, 0.05);
+  material.emissiveIntensity = 0.06;
+  material.alpha = 0.55;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.42;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.22;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-cyan-glow',
   };
 }
 
