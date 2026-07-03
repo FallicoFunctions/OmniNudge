@@ -5519,7 +5519,7 @@ describe('polishMainStageMaterials', () => {
     expect(shadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
   });
 
-  it('tones down the wide hero screen gold frame cluster so the stage face keeps depth instead of bright metallic rails', () => {
+  it('tones down the wide hero screen frame, mullion, and crossbar gold families so the stage face keeps layered depth instead of one repeated metallic rail finish', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -5551,19 +5551,42 @@ describe('polishMainStageMaterials', () => {
     expect(frame.material).not.toBe(sharedGoldMaterial);
     expect(mullions.material).not.toBe(sharedGoldMaterial);
     expect(crossbars.material).not.toBe(sharedGoldMaterial);
-    expect(mullions.material).toBe(frame.material);
-    expect(crossbars.material).toBe(frame.material);
+    expect(mullions.material).not.toBe(frame.material);
+    expect(crossbars.material).not.toBe(frame.material);
+    expect(crossbars.material).not.toBe(mullions.material);
 
     const frameMaterial = frame.material as PBRMaterial;
     expect(frameMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(frameMaterial.metadata?.mainStageMaterialOverride).toBe('wide-hero-screen-gold-frame');
-    expect(frameMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(frameMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(frameMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
-    expect(frameMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(frameMaterial.metallic).toBeLessThanOrEqual(0.2);
-    expect(frameMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(frameMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(frameMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
+    expect(frameMaterial.albedoColor.b).toBeLessThanOrEqual(0.07);
+    expect(frameMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(frameMaterial.metallic).toBeLessThanOrEqual(0.18);
+    expect(frameMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+
+    const mullionMaterial = mullions.material as PBRMaterial;
+    expect(mullionMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(mullionMaterial.metadata?.mainStageMaterialOverride).toBe('wide-hero-screen-gold-mullion');
+    expect(mullionMaterial.albedoColor.r).toBeLessThanOrEqual(0.17);
+    expect(mullionMaterial.albedoColor.g).toBeLessThanOrEqual(0.13);
+    expect(mullionMaterial.albedoColor.b).toBeLessThanOrEqual(0.065);
+    expect(mullionMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(mullionMaterial.metallic).toBeLessThanOrEqual(0.16);
+    expect(mullionMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(mullionMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+
+    const crossbarMaterial = crossbars.material as PBRMaterial;
+    expect(crossbarMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(crossbarMaterial.metadata?.mainStageMaterialOverride).toBe('wide-hero-screen-gold-crossbar');
+    expect(crossbarMaterial.albedoColor.r).toBeLessThanOrEqual(0.19);
+    expect(crossbarMaterial.albedoColor.g).toBeLessThanOrEqual(0.15);
+    expect(crossbarMaterial.albedoColor.b).toBeLessThanOrEqual(0.075);
+    expect(crossbarMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(crossbarMaterial.metallic).toBeLessThanOrEqual(0.18);
+    expect(crossbarMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(crossbarMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
   });
 
   it('darkens the wide hero screen ivory shells so the stage face reads as framed depth instead of bright moonstone caps', () => {
