@@ -10304,4 +10304,43 @@ describe('polishMainStageMaterials', () => {
     expect(spineMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(spineMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
+
+  it('darkens the VIP garden reflecting pool so the deep water reads as still depth instead of bright reflective surfaces', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedWaterMaterial = new PBRMaterial('V14_DeepReflectingWater', scene);
+    sharedWaterMaterial.albedoColor.set(0.24, 0.36, 0.42);
+    sharedWaterMaterial.emissiveColor.set(0.04, 0.08, 0.12);
+    sharedWaterMaterial.emissiveIntensity = 0.18;
+    sharedWaterMaterial.metallic = 0.12;
+    sharedWaterMaterial.roughness = 0.14;
+
+    const otherWater = MeshBuilder.CreateBox('TestVipGardenReflectingPoolControl', { size: 1 }, scene);
+    otherWater.material = sharedWaterMaterial;
+
+    const poolL = MeshBuilder.CreateBox('V67_VipGardenReflectingPool_L', { size: 1 }, scene);
+    poolL.material = sharedWaterMaterial;
+
+    const poolR = MeshBuilder.CreateBox('V67_VipGardenReflectingPool_R', { size: 1 }, scene);
+    poolR.material = sharedWaterMaterial;
+
+    polishMainStageMaterials([otherWater, poolL, poolR]);
+
+    expect(otherWater.material).toBe(sharedWaterMaterial);
+    expect(poolL.material).not.toBe(sharedWaterMaterial);
+    expect(poolR.material).not.toBe(sharedWaterMaterial);
+
+    for (const mesh of [poolL, poolR]) {
+      const mat = mesh.material as PBRMaterial;
+      expect(mat.metadata?.mainStageMaterialPolish).toBe('black');
+      expect(mat.metadata?.mainStageMaterialOverride).toBe('vip-garden-reflecting-pool');
+      expect(mat.albedoColor.r).toBeLessThanOrEqual(0.14);
+      expect(mat.albedoColor.g).toBeLessThanOrEqual(0.17);
+      expect(mat.albedoColor.b).toBeLessThanOrEqual(0.21);
+      expect(mat.emissiveIntensity).toBeLessThanOrEqual(0.03);
+      expect(mat.roughness).toBeGreaterThanOrEqual(0.84);
+      expect(mat.environmentIntensity).toBeLessThanOrEqual(0.18);
+    }
+  });
 });
