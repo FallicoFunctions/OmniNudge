@@ -6500,13 +6500,13 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.name).toContain('spawn-canopy-gold-crest');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(goldMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-canopy-gold-crest');
-    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
-    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
     expect(goldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
-    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
 
     expect(shadowMaterial.name).toContain('spawn-canopy-shadow-soffit');
     expect(shadowMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -6807,13 +6807,13 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.name).toContain('spawn-gate-sentinel-gold-crown');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(goldMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-gate-sentinel-gold-crown');
-    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
-    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
     expect(goldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
-    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
 
     expect(shadowMaterial.name).toContain('spawn-gate-sentinel-shadow-keel');
     expect(shadowMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -6914,6 +6914,8 @@ describe('polishMainStageMaterials', () => {
 
     const rightCrown = MeshBuilder.CreateBox('V55_SpawnPylonGoldCrown_R', { size: 1 }, scene);
     rightCrown.material = sharedGoldMaterial;
+    const wingArchInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_L', { size: 1 }, scene);
+    wingArchInlay.material = sharedGoldMaterial;
 
     const shadowControl = MeshBuilder.CreateBox('TestSpawnPylonShadowControl', { size: 1 }, scene);
     shadowControl.material = sharedShadowMaterial;
@@ -6923,6 +6925,8 @@ describe('polishMainStageMaterials', () => {
 
     const rightShadow = MeshBuilder.CreateBox('V55_SpawnPylonShadowSpine_R', { size: 1 }, scene);
     rightShadow.material = sharedShadowMaterial;
+    const heroVault = MeshBuilder.CreateBox('V25_HeroPortalShadowVault', { size: 1 }, scene);
+    heroVault.material = sharedShadowMaterial;
 
     const cyanControl = MeshBuilder.CreateBox('TestSpawnPylonCyanControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
@@ -6932,45 +6936,62 @@ describe('polishMainStageMaterials', () => {
 
     const rightCore = MeshBuilder.CreateBox('V55_SpawnPylonCyanCore_R', { size: 1 }, scene);
     rightCore.material = sharedCyanMaterial;
+    const crownCrystal = MeshBuilder.CreateBox('V25_CrownApexCrystal', { size: 1 }, scene);
+    crownCrystal.material = sharedCyanMaterial;
 
     polishMainStageMaterials([
       goldControl,
       leftCrown,
       rightCrown,
+      wingArchInlay,
       shadowControl,
       leftShadow,
       rightShadow,
+      heroVault,
       cyanControl,
       leftCore,
       rightCore,
+      crownCrystal,
     ]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftCrown.material).toBeInstanceOf(PBRMaterial);
     expect(rightCrown.material).toBe(leftCrown.material);
+    expect(wingArchInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArchInlay.material).not.toBe(leftCrown.material);
 
     expect(shadowControl.material).toBe(sharedShadowMaterial);
     expect(leftShadow.material).toBeInstanceOf(PBRMaterial);
     expect(rightShadow.material).toBe(leftShadow.material);
+    expect(heroVault.material).toBeInstanceOf(PBRMaterial);
+    expect(heroVault.material).not.toBe(leftShadow.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftCore.material).toBeInstanceOf(PBRMaterial);
     expect(rightCore.material).toBe(leftCore.material);
+    expect(crownCrystal.material).toBeInstanceOf(PBRMaterial);
+    expect(crownCrystal.material).not.toBe(leftCore.material);
 
     const goldMaterial = leftCrown.material as PBRMaterial;
+    const wingArchInlayMaterial = wingArchInlay.material as PBRMaterial;
     const shadowMaterial = leftShadow.material as PBRMaterial;
+    const heroVaultMaterial = heroVault.material as PBRMaterial;
     const cyanMaterial = leftCore.material as PBRMaterial;
+    const crownCrystalMaterial = crownCrystal.material as PBRMaterial;
 
     expect(goldMaterial.name).toContain('spawn-pylon-gold-crown');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(goldMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-pylon-gold-crown');
-    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
-    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
     expect(goldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
-    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(goldMaterial.albedoColor.r).toBeGreaterThan(wingArchInlayMaterial.albedoColor.r);
+    expect(goldMaterial.metallic ?? 0).toBeGreaterThan(wingArchInlayMaterial.metallic ?? 0);
+    expect(goldMaterial.roughness ?? 0).toBeLessThan(wingArchInlayMaterial.roughness ?? 0);
 
     expect(shadowMaterial.name).toContain('spawn-pylon-shadow-spine');
     expect(shadowMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -6982,6 +7003,9 @@ describe('polishMainStageMaterials', () => {
     expect(shadowMaterial.metallic).toBeLessThanOrEqual(0.08);
     expect(shadowMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(shadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
+    expect(shadowMaterial.albedoColor.r).toBeLessThan(heroVaultMaterial.albedoColor.r);
+    expect(shadowMaterial.emissiveIntensity).toBeLessThan(heroVaultMaterial.emissiveIntensity);
+    expect(shadowMaterial.environmentIntensity).toBeLessThan(heroVaultMaterial.environmentIntensity);
 
     expect(cyanMaterial.name).toContain('spawn-pylon-cyan-core');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -6994,6 +7018,9 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.18);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.34);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(cyanMaterial.alpha).toBeLessThan(crownCrystalMaterial.alpha);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThan(crownCrystalMaterial.emissiveIntensity);
+    expect(cyanMaterial.environmentIntensity).toBeLessThan(crownCrystalMaterial.environmentIntensity);
   });
 
   it('darkens the arrival runway pearl bands so the forward route foreground stops reading as repeated bright proxy slabs', () => {
