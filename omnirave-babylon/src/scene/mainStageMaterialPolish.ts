@@ -1159,10 +1159,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V49_ScreenServiceCatwalkBlackFrame' ||
-      mesh.name === 'V49_ScreenServiceCatwalkCableLoom'
-    ) {
+    if (mesh.name === 'V49_ScreenServiceCatwalkBlackFrame') {
       const cacheKey = `${material.uniqueId}:screen-service-catwalk-frame`;
       let frameMaterial = clonedMaterials.get(cacheKey);
       if (!frameMaterial) {
@@ -1176,6 +1173,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V49_ScreenServiceCatwalkCableLoom') {
+      const cacheKey = `${material.uniqueId}:screen-service-catwalk-cable-loom`;
+      let loomMaterial = clonedMaterials.get(cacheKey);
+      if (!loomMaterial) {
+        loomMaterial = material.clone(`${material.name}__screen-service-catwalk-cable-loom`);
+        applyScreenServiceCatwalkCableLoomOverride(loomMaterial);
+        clonedMaterials.set(cacheKey, loomMaterial);
+      }
+
+      assignOverrideMaterial(mesh, loomMaterial);
       continue;
     }
 
@@ -5098,6 +5108,23 @@ function applySpawnRouteWetCenterInlayOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-route-wet-center-inlay',
+  };
+}
+
+function applyScreenServiceCatwalkCableLoomOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.12, 0.14, 0.18);
+  material.emissiveColor = new Color3(0.006, 0.008, 0.01);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.04;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.18;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'screen-service-catwalk-cable-loom',
   };
 }
 
