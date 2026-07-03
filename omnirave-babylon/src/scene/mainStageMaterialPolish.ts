@@ -3503,15 +3503,25 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V52_CrownObeliskPearlCore' ||
-      mesh.name.startsWith('V52_CrownSpirePearlBlade_')
-    ) {
-      const cacheKey = `${material.uniqueId}:crown-obelisk-pearl-shell`;
+    if (mesh.name === 'V52_CrownObeliskPearlCore') {
+      const cacheKey = `${material.uniqueId}:crown-obelisk-core-shell`;
       let shellMaterial = clonedMaterials.get(cacheKey);
       if (!shellMaterial) {
-        shellMaterial = material.clone(`${material.name}__crown-obelisk-pearl-shell`);
-        applyCrownObeliskPearlShellOverride(shellMaterial);
+        shellMaterial = material.clone(`${material.name}__crown-obelisk-core-shell`);
+        applyCrownObeliskCoreShellOverride(shellMaterial);
+        clonedMaterials.set(cacheKey, shellMaterial);
+      }
+
+      assignOverrideMaterial(mesh, shellMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V52_CrownSpirePearlBlade_')) {
+      const cacheKey = `${material.uniqueId}:crown-spire-pearl-blade`;
+      let shellMaterial = clonedMaterials.get(cacheKey);
+      if (!shellMaterial) {
+        shellMaterial = material.clone(`${material.name}__crown-spire-pearl-blade`);
+        applyCrownSpirePearlBladeOverride(shellMaterial);
         clonedMaterials.set(cacheKey, shellMaterial);
       }
 
@@ -7618,20 +7628,37 @@ function applyProsceniumPearlRevealOverride(material: PBRMaterial) {
   };
 }
 
-function applyCrownObeliskPearlShellOverride(material: PBRMaterial) {
+function applyCrownObeliskCoreShellOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.2, 0.22, 0.26);
   material.emissiveColor = new Color3(0.005, 0.007, 0.011);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.02;
-  material.roughness = 0.88;
+  material.roughness = 0.9;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.72;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.74;
   material.environmentIntensity = 0.13;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'crown-obelisk-pearl-shell',
+    mainStageMaterialOverride: 'crown-obelisk-core-shell',
+  };
+}
+
+function applyCrownSpirePearlBladeOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.22, 0.24, 0.28);
+  material.emissiveColor = new Color3(0.007, 0.009, 0.013);
+  material.emissiveIntensity = 0.024;
+  material.metallic = 0.02;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.05;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.15;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-spire-pearl-blade',
   };
 }
 
