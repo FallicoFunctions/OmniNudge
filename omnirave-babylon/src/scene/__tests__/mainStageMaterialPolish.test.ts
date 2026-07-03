@@ -10199,4 +10199,38 @@ describe('polishMainStageMaterials', () => {
     expect(bridgeMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(bridgeMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
+
+  it('darkens the basin causeway shadow reveal so the water crossing reads as recessed depth instead of bright shadow strips', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedShadowMaterial = new PBRMaterial('V20_RecessedWarmShadow', scene);
+    sharedShadowMaterial.albedoColor.set(0.52, 0.86, 0.98);
+    sharedShadowMaterial.emissiveColor.set(0.18, 0.32, 0.4);
+    sharedShadowMaterial.emissiveIntensity = 0.28;
+    sharedShadowMaterial.metallic = 0.12;
+    sharedShadowMaterial.roughness = 0.38;
+
+    const otherShadow = MeshBuilder.CreateBox('TestBasinCausewayShadowControl', { size: 1 }, scene);
+    otherShadow.material = sharedShadowMaterial;
+
+    const shadowReveal = MeshBuilder.CreateBox('V62_BasinCausewayShadowReveal', { size: 1 }, scene);
+    shadowReveal.material = sharedShadowMaterial;
+
+    polishMainStageMaterials([otherShadow, shadowReveal]);
+
+    expect(otherShadow.material).toBe(sharedShadowMaterial);
+    expect(shadowReveal.material).toBeInstanceOf(PBRMaterial);
+    expect(shadowReveal.material).not.toBe(sharedShadowMaterial);
+
+    const revealMaterial = shadowReveal.material as PBRMaterial;
+    expect(revealMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(revealMaterial.metadata?.mainStageMaterialOverride).toBe('basin-causeway-shadow-reveal');
+    expect(revealMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(revealMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
+    expect(revealMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
+    expect(revealMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+  });
 });
