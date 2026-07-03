@@ -4782,40 +4782,67 @@ describe('polishMainStageMaterials', () => {
     expect(controlGold.material).toBe(sharedGoldMaterial);
     expect(outerLeftGold.material).toBeInstanceOf(PBRMaterial);
     expect(outerRightGold.material).toBe(outerLeftGold.material);
-    expect(innerLeftGold.material).toBe(outerLeftGold.material);
-    expect(innerRightGold.material).toBe(outerLeftGold.material);
+    expect(innerLeftGold.material).toBeInstanceOf(PBRMaterial);
+    expect(innerRightGold.material).toBe(innerLeftGold.material);
+    expect(innerLeftGold.material).not.toBe(outerLeftGold.material);
 
     expect(controlShadow.material).toBe(sharedShadowMaterial);
     expect(outerLeftShadow.material).toBeInstanceOf(PBRMaterial);
     expect(outerRightShadow.material).toBe(outerLeftShadow.material);
-    expect(innerLeftShadow.material).toBe(outerLeftShadow.material);
-    expect(innerRightShadow.material).toBe(outerLeftShadow.material);
+    expect(innerLeftShadow.material).toBeInstanceOf(PBRMaterial);
+    expect(innerRightShadow.material).toBe(innerLeftShadow.material);
+    expect(innerLeftShadow.material).not.toBe(outerLeftShadow.material);
 
-    const goldMaterial = outerLeftGold.material as PBRMaterial;
-    const shadowMaterial = outerLeftShadow.material as PBRMaterial;
+    const outerGoldMaterial = outerLeftGold.material as PBRMaterial;
+    const innerGoldMaterial = innerLeftGold.material as PBRMaterial;
+    const outerShadowMaterial = outerLeftShadow.material as PBRMaterial;
+    const innerShadowMaterial = innerLeftShadow.material as PBRMaterial;
 
-    expect(goldMaterial.name).toContain('sweep-anchor-gold-crown');
-    expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
-    expect(goldMaterial.metadata?.mainStageMaterialOverride).toBe('sweep-anchor-gold-crown');
-    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
-    expect(goldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
-    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(outerGoldMaterial.name).toContain('sweep-anchor-outer-gold-crown');
+    expect(outerGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(outerGoldMaterial.metadata?.mainStageMaterialOverride).toBe('sweep-anchor-outer-gold-crown');
+    expect(outerGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(outerGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(outerGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(outerGoldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(outerGoldMaterial.metallic).toBeLessThanOrEqual(0.14);
+    expect(outerGoldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(outerGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
 
-    expect(shadowMaterial.name).toContain('sweep-anchor-shadow-core');
-    expect(shadowMaterial.metadata?.mainStageMaterialPolish).toBe('black');
-    expect(shadowMaterial.metadata?.mainStageMaterialOverride).toBe('sweep-anchor-shadow-core');
-    expect(shadowMaterial.albedoColor.r).toBeLessThanOrEqual(0.06);
-    expect(shadowMaterial.albedoColor.g).toBeLessThanOrEqual(0.08);
-    expect(shadowMaterial.albedoColor.b).toBeLessThanOrEqual(0.1);
-    expect(shadowMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.04);
-    expect(shadowMaterial.emissiveIntensity).toBeLessThanOrEqual(0.1);
-    expect(shadowMaterial.metallic).toBeLessThanOrEqual(0.08);
-    expect(shadowMaterial.roughness).toBeGreaterThanOrEqual(0.74);
-    expect(shadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
+    expect(innerGoldMaterial.name).toContain('sweep-anchor-inner-gold-crown');
+    expect(innerGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(innerGoldMaterial.metadata?.mainStageMaterialOverride).toBe('sweep-anchor-inner-gold-crown');
+    expect(innerGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(innerGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
+    expect(innerGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(innerGoldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(innerGoldMaterial.metallic).toBeGreaterThanOrEqual(0.16);
+    expect(innerGoldMaterial.roughness).toBeLessThanOrEqual(0.88);
+    expect(innerGoldMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.1);
+
+    expect(outerShadowMaterial.name).toContain('sweep-anchor-outer-shadow-core');
+    expect(outerShadowMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(outerShadowMaterial.metadata?.mainStageMaterialOverride).toBe('sweep-anchor-outer-shadow-core');
+    expect(outerShadowMaterial.albedoColor.r).toBeLessThanOrEqual(0.04);
+    expect(outerShadowMaterial.albedoColor.g).toBeLessThanOrEqual(0.06);
+    expect(outerShadowMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(outerShadowMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.06);
+    expect(outerShadowMaterial.emissiveIntensity).toBeLessThanOrEqual(0.1);
+    expect(outerShadowMaterial.metallic).toBeLessThanOrEqual(0.06);
+    expect(outerShadowMaterial.roughness).toBeGreaterThanOrEqual(0.78);
+    expect(outerShadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+
+    expect(innerShadowMaterial.name).toContain('sweep-anchor-inner-shadow-core');
+    expect(innerShadowMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(innerShadowMaterial.metadata?.mainStageMaterialOverride).toBe('sweep-anchor-inner-shadow-core');
+    expect(innerShadowMaterial.albedoColor.r).toBeLessThanOrEqual(0.06);
+    expect(innerShadowMaterial.albedoColor.g).toBeLessThanOrEqual(0.08);
+    expect(innerShadowMaterial.albedoColor.b).toBeLessThanOrEqual(0.1);
+    expect(innerShadowMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.04);
+    expect(innerShadowMaterial.emissiveIntensity).toBeLessThanOrEqual(0.08);
+    expect(innerShadowMaterial.metallic).toBeLessThanOrEqual(0.08);
+    expect(innerShadowMaterial.roughness).toBeGreaterThanOrEqual(0.74);
+    expect(innerShadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
   });
 
   it('rebalances the hero-portal service door clusters so the side access reads as integrated architecture instead of bright gold trims around flat black leaves', () => {
