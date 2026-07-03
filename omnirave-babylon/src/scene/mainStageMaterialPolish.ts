@@ -4784,7 +4784,16 @@ function applyCrownGoldLatticeOverride(material: PBRMaterial) {
 }
 
 function applyCrownBladeLamellaPearlOverride(material: PBRMaterial) {
-  applyCrownShellLamellaOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.24, 0.2, 0.1);
+  material.emissiveColor = new Color3(0.012, 0.009, 0.004);
+  material.emissiveIntensity = 0.022;
+  material.metallic = 0.14;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.82;
+  material.environmentIntensity = 0.16;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-blade-lamella-pearl',
@@ -4792,7 +4801,16 @@ function applyCrownBladeLamellaPearlOverride(material: PBRMaterial) {
 }
 
 function applyCrownBladeGoldRevealOverride(material: PBRMaterial) {
-  applyCelestialHaloOuterRingOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.15, 0.11, 0.04);
+  material.emissiveColor = new Color3(0.008, 0.005, 0.001);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.12;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.9;
+  material.environmentIntensity = 0.08;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-blade-gold-reveal',
@@ -4800,7 +4818,17 @@ function applyCrownBladeGoldRevealOverride(material: PBRMaterial) {
 }
 
 function applyCrownBladeCyanInsetOverride(material: PBRMaterial) {
-  applyCelestialHaloCyanEdgeOverride(material);
+  material.albedoColor = new Color3(0.1, 0.2, 0.26);
+  material.emissiveColor = new Color3(0.008, 0.036, 0.052);
+  material.emissiveIntensity = 0.06;
+  material.alpha = 0.3;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.24;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.24;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-blade-cyan-inset',

@@ -1749,6 +1749,9 @@ describe('polishMainStageMaterials', () => {
     const rightPearl = MeshBuilder.CreateBox('V41_CrownBladePearlLamellaCluster_R', { size: 1 }, scene);
     rightPearl.material = sharedPearlMaterial;
 
+    const shellPearl = MeshBuilder.CreateBox('V113_CrownShellLamellaArray_L', { size: 1 }, scene);
+    shellPearl.material = sharedPearlMaterial;
+
     const goldControl = MeshBuilder.CreateBox('TestCrownBladeGoldControl', { size: 1 }, scene);
     goldControl.material = sharedGoldMaterial;
 
@@ -1757,6 +1760,9 @@ describe('polishMainStageMaterials', () => {
 
     const rightGold = MeshBuilder.CreateBox('V41_CrownBladeGoldRevealCluster_R', { size: 1 }, scene);
     rightGold.material = sharedGoldMaterial;
+
+    const haloGold = MeshBuilder.CreateBox('V114_CelestialHaloOuterRingArray', { size: 1 }, scene);
+    haloGold.material = sharedGoldMaterial;
 
     const cyanControl = MeshBuilder.CreateBox('TestCrownBladeCyanControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
@@ -1767,33 +1773,48 @@ describe('polishMainStageMaterials', () => {
     const rightCyan = MeshBuilder.CreateBox('V41_CrownBladeCyanInsetCluster_R', { size: 1 }, scene);
     rightCyan.material = sharedCyanMaterial;
 
+    const haloCyan = MeshBuilder.CreateBox('V114_CelestialHaloCyanEdgeArray', { size: 1 }, scene);
+    haloCyan.material = sharedCyanMaterial;
+
     polishMainStageMaterials([
       pearlControl,
       leftPearl,
       rightPearl,
+      shellPearl,
       goldControl,
       leftGold,
       rightGold,
+      haloGold,
       cyanControl,
       leftCyan,
       rightCyan,
+      haloCyan,
     ]);
 
     expect(pearlControl.material).toBe(sharedPearlMaterial);
     expect(leftPearl.material).toBeInstanceOf(PBRMaterial);
     expect(rightPearl.material).toBe(leftPearl.material);
+    expect(shellPearl.material).toBeInstanceOf(PBRMaterial);
+    expect(shellPearl.material).not.toBe(leftPearl.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftGold.material).toBeInstanceOf(PBRMaterial);
     expect(rightGold.material).toBe(leftGold.material);
+    expect(haloGold.material).toBeInstanceOf(PBRMaterial);
+    expect(haloGold.material).not.toBe(leftGold.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftCyan.material).toBeInstanceOf(PBRMaterial);
     expect(rightCyan.material).toBe(leftCyan.material);
+    expect(haloCyan.material).toBeInstanceOf(PBRMaterial);
+    expect(haloCyan.material).not.toBe(leftCyan.material);
 
     const pearlMaterial = leftPearl.material as PBRMaterial;
+    const shellPearlMaterial = shellPearl.material as PBRMaterial;
     const goldMaterial = leftGold.material as PBRMaterial;
+    const haloGoldMaterial = haloGold.material as PBRMaterial;
     const cyanMaterial = leftCyan.material as PBRMaterial;
+    const haloCyanMaterial = haloCyan.material as PBRMaterial;
 
     expect(pearlMaterial.name).toContain('crown-blade-lamella-pearl');
     expect(pearlMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
@@ -1804,6 +1825,9 @@ describe('polishMainStageMaterials', () => {
     expect(pearlMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(pearlMaterial.roughness).toBeGreaterThanOrEqual(0.8);
     expect(pearlMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
+    expect(pearlMaterial.albedoColor.r).toBeGreaterThan(shellPearlMaterial.albedoColor.r);
+    expect(pearlMaterial.metallic ?? 0).toBeLessThan(shellPearlMaterial.metallic ?? 0);
+    expect(pearlMaterial.roughness ?? 0).toBeGreaterThan(shellPearlMaterial.roughness ?? 0);
 
     expect(goldMaterial.name).toContain('crown-blade-gold-reveal');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -1815,6 +1839,9 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.88);
     expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(goldMaterial.albedoColor.r).toBeLessThan(haloGoldMaterial.albedoColor.r);
+    expect(goldMaterial.metallic ?? 0).toBeLessThan(haloGoldMaterial.metallic ?? 0);
+    expect(goldMaterial.environmentIntensity).toBeLessThan(haloGoldMaterial.environmentIntensity);
 
     expect(cyanMaterial.name).toContain('crown-blade-cyan-inset');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -1827,6 +1854,9 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.16);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(cyanMaterial.alpha).toBeLessThan(haloCyanMaterial.alpha);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThan(haloCyanMaterial.emissiveIntensity);
+    expect(cyanMaterial.roughness ?? 0).toBeGreaterThan(haloCyanMaterial.roughness ?? 0);
   });
 
   it('rebalances the crown truss diagonal braces so the upper support cage reads as structural depth instead of flat black proxy X bars', () => {
