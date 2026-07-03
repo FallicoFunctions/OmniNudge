@@ -3014,6 +3014,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V64_PlazaCrossBands') {
+      const cacheKey = `${material.uniqueId}:plaza-cross-bands`;
+      let crossBandMaterial = clonedMaterials.get(cacheKey);
+      if (!crossBandMaterial) {
+        crossBandMaterial = material.clone(`${material.name}__plaza-cross-bands`);
+        applyPlazaCrossBandsOverride(crossBandMaterial);
+        clonedMaterials.set(cacheKey, crossBandMaterial);
+      }
+
+      assignOverrideMaterial(mesh, crossBandMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V116_ProsceniumPearlRevealArray_')) {
       const cacheKey = `${material.uniqueId}:proscenium-pearl-reveal`;
       let revealMaterial = clonedMaterials.get(cacheKey);
@@ -6411,6 +6424,23 @@ function applyArrivalCyanGlowOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'arrival-cyan-glow',
+  };
+}
+
+function applyPlazaCrossBandsOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'plaza-cross-bands',
   };
 }
 

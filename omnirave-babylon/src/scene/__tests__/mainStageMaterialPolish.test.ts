@@ -10085,4 +10085,40 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.38);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
   });
+
+  it('darkens the plaza cross bands gold so the route approach reads as carved metal inlay instead of bright gold strips', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V19_ArrivalBrushedGold', scene);
+    sharedGoldMaterial.albedoColor.set(0.82, 0.68, 0.30);
+    sharedGoldMaterial.emissiveColor.set(0.10, 0.07, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.20;
+    sharedGoldMaterial.metallic = 0.85;
+    sharedGoldMaterial.roughness = 0.24;
+
+    const goldControl = MeshBuilder.CreateBox('TestPlazaCrossBandsControl', { size: 1 }, scene);
+    goldControl.material = sharedGoldMaterial;
+
+    const crossBands = MeshBuilder.CreateBox('V64_PlazaCrossBands', { size: 1 }, scene);
+    crossBands.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([goldControl, crossBands]);
+
+    expect(goldControl.material).toBe(sharedGoldMaterial);
+    expect(crossBands.material).toBeInstanceOf(PBRMaterial);
+    expect(crossBands.material).not.toBe(sharedGoldMaterial);
+
+    const bandMaterial = crossBands.material as PBRMaterial;
+    expect(bandMaterial.name).toContain('plaza-cross-bands');
+    expect(bandMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(bandMaterial.metadata?.mainStageMaterialOverride).toBe('plaza-cross-bands');
+    expect(bandMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(bandMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(bandMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(bandMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(bandMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(bandMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(bandMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
 });
