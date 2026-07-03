@@ -7277,6 +7277,9 @@ describe('polishMainStageMaterials', () => {
     const rightInlay = MeshBuilder.CreateBox('V58_ArrivalPlinthGoldInlay_R', { size: 1 }, scene);
     rightInlay.material = sharedGoldMaterial;
 
+    const wingArchInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_L', { size: 1 }, scene);
+    wingArchInlay.material = sharedGoldMaterial;
+
     const shadowControl = MeshBuilder.CreateBox('TestArrivalPlinthShadowControl', { size: 1 }, scene);
     shadowControl.material = sharedShadowMaterial;
 
@@ -7285,6 +7288,9 @@ describe('polishMainStageMaterials', () => {
 
     const rightReveal = MeshBuilder.CreateBox('V58_ArrivalPlinthShadowReveal_R', { size: 1 }, scene);
     rightReveal.material = sharedShadowMaterial;
+
+    const heroVault = MeshBuilder.CreateBox('V25_HeroPortalShadowVault', { size: 1 }, scene);
+    heroVault.material = sharedShadowMaterial;
 
     const cyanControl = MeshBuilder.CreateBox('TestArrivalPlinthCyanControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
@@ -7295,33 +7301,48 @@ describe('polishMainStageMaterials', () => {
     const rightSpine = MeshBuilder.CreateBox('V58_ArrivalPlinthCyanSpine_R', { size: 1 }, scene);
     rightSpine.material = sharedCyanMaterial;
 
+    const crownApexCrystal = MeshBuilder.CreateBox('V25_CrownApexCrystal', { size: 1 }, scene);
+    crownApexCrystal.material = sharedCyanMaterial;
+
     polishMainStageMaterials([
       goldControl,
       leftInlay,
       rightInlay,
+      wingArchInlay,
       shadowControl,
       leftReveal,
       rightReveal,
+      heroVault,
       cyanControl,
       leftSpine,
       rightSpine,
+      crownApexCrystal,
     ]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftInlay.material).toBeInstanceOf(PBRMaterial);
     expect(rightInlay.material).toBe(leftInlay.material);
+    expect(wingArchInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArchInlay.material).not.toBe(leftInlay.material);
 
     expect(shadowControl.material).toBe(sharedShadowMaterial);
     expect(leftReveal.material).toBeInstanceOf(PBRMaterial);
     expect(rightReveal.material).toBe(leftReveal.material);
+    expect(heroVault.material).toBeInstanceOf(PBRMaterial);
+    expect(heroVault.material).not.toBe(leftReveal.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftSpine.material).toBeInstanceOf(PBRMaterial);
     expect(rightSpine.material).toBe(leftSpine.material);
+    expect(crownApexCrystal.material).toBeInstanceOf(PBRMaterial);
+    expect(crownApexCrystal.material).not.toBe(leftSpine.material);
 
     const goldMaterial = leftInlay.material as PBRMaterial;
+    const wingArchInlayMaterial = wingArchInlay.material as PBRMaterial;
     const shadowMaterial = leftReveal.material as PBRMaterial;
+    const heroVaultMaterial = heroVault.material as PBRMaterial;
     const cyanMaterial = leftSpine.material as PBRMaterial;
+    const crownApexCrystalMaterial = crownApexCrystal.material as PBRMaterial;
 
     expect(goldMaterial.name).toContain('arrival-plinth-gold-inlay');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -7333,6 +7354,9 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(goldMaterial.albedoColor.r).toBeGreaterThan(wingArchInlayMaterial.albedoColor.r);
+    expect(goldMaterial.metallic ?? 0).toBeGreaterThan(wingArchInlayMaterial.metallic ?? 0);
+    expect(goldMaterial.roughness ?? 0).toBeLessThan(wingArchInlayMaterial.roughness ?? 0);
 
     expect(shadowMaterial.name).toContain('arrival-plinth-shadow-reveal');
     expect(shadowMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -7344,6 +7368,9 @@ describe('polishMainStageMaterials', () => {
     expect(shadowMaterial.metallic).toBeLessThanOrEqual(0.08);
     expect(shadowMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(shadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
+    expect(shadowMaterial.albedoColor.r).toBeLessThan(heroVaultMaterial.albedoColor.r);
+    expect(shadowMaterial.emissiveIntensity).toBeLessThan(heroVaultMaterial.emissiveIntensity);
+    expect(shadowMaterial.environmentIntensity).toBeLessThan(heroVaultMaterial.environmentIntensity);
 
     expect(cyanMaterial.name).toContain('arrival-plinth-cyan-spine');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -7356,6 +7383,9 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.18);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.34);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(cyanMaterial.alpha).toBeLessThan(crownApexCrystalMaterial.alpha);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThan(crownApexCrystalMaterial.emissiveIntensity);
+    expect(cyanMaterial.environmentIntensity).toBeLessThan(crownApexCrystalMaterial.environmentIntensity);
   });
 
   it('darkens the wing arcade pearl arches so the side portals read as carved support shells instead of bright ivory frames', () => {
