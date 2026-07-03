@@ -3309,7 +3309,8 @@ describe('polishMainStageMaterials', () => {
 
     expect(blackControl.material).toBe(sharedBlackMaterial);
     expect(frame.material).toBeInstanceOf(PBRMaterial);
-    expect(loom.material).toBe(frame.material);
+    expect(loom.material).toBeInstanceOf(PBRMaterial);
+    expect(loom.material).not.toBe(frame.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(guardrail.material).toBeInstanceOf(PBRMaterial);
@@ -3318,6 +3319,7 @@ describe('polishMainStageMaterials', () => {
     expect(practicals.material).toBeInstanceOf(PBRMaterial);
 
     const frameMaterial = frame.material as PBRMaterial;
+    const loomMaterial = loom.material as PBRMaterial;
     const guardrailMaterial = guardrail.material as PBRMaterial;
     const practicalMaterial = practicals.material as PBRMaterial;
 
@@ -3330,6 +3332,17 @@ describe('polishMainStageMaterials', () => {
     expect(frameMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(frameMaterial.roughness).toBeGreaterThanOrEqual(0.82);
     expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.32);
+
+    expect(loomMaterial.name).toContain('screen-service-catwalk-cable-loom');
+    expect(loomMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(loomMaterial.metadata?.mainStageMaterialOverride).toBe('screen-service-catwalk-cable-loom');
+    expect(loomMaterial.albedoColor.r).toBeLessThanOrEqual(0.12);
+    expect(loomMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
+    expect(loomMaterial.albedoColor.b).toBeLessThanOrEqual(0.18);
+    expect(loomMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(loomMaterial.metallic).toBeLessThanOrEqual(0.06);
+    expect(loomMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(loomMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
 
     expect(guardrailMaterial.name).toContain('screen-service-catwalk-guardrail');
     expect(guardrailMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
