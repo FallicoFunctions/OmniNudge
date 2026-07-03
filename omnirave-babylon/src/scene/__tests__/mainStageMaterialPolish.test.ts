@@ -9394,8 +9394,9 @@ describe('polishMainStageMaterials', () => {
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftCornice.material).toBeInstanceOf(PBRMaterial);
     expect(rightCornice.material).toBe(leftCornice.material);
-    expect(leftHalo.material).toBe(leftCornice.material);
-    expect(rightHalo.material).toBe(leftCornice.material);
+    expect(leftHalo.material).toBeInstanceOf(PBRMaterial);
+    expect(rightHalo.material).toBe(leftHalo.material);
+    expect(leftHalo.material).not.toBe(leftCornice.material);
 
     expect(shadowControl.material).toBe(sharedShadowMaterial);
     expect(leftShadow.material).toBeInstanceOf(PBRMaterial);
@@ -9405,20 +9406,32 @@ describe('polishMainStageMaterials', () => {
     expect(leftLancet.material).toBeInstanceOf(PBRMaterial);
     expect(rightLancet.material).toBe(leftLancet.material);
 
-    const goldMaterial = leftCornice.material as PBRMaterial;
+    const corniceGoldMaterial = leftCornice.material as PBRMaterial;
+    const haloGoldMaterial = leftHalo.material as PBRMaterial;
     const shadowMaterial = leftShadow.material as PBRMaterial;
     const cyanMaterial = leftLancet.material as PBRMaterial;
 
-    expect(goldMaterial.name).toContain('spawn-gallery-arcade-gold');
-    expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
-    expect(goldMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-gallery-arcade-gold');
-    expect(goldMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
-    expect(goldMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
-    expect(goldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(goldMaterial.metallic).toBeLessThanOrEqual(0.16);
-    expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
-    expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    expect(corniceGoldMaterial.name).toContain('spawn-gallery-cornice-gold');
+    expect(corniceGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(corniceGoldMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-gallery-cornice-gold');
+    expect(corniceGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(corniceGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(corniceGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(corniceGoldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(corniceGoldMaterial.metallic).toBeLessThanOrEqual(0.16);
+    expect(corniceGoldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(corniceGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+
+    expect(haloGoldMaterial.name).toContain('spawn-gallery-halo-gold');
+    expect(haloGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(haloGoldMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-gallery-halo-gold');
+    expect(haloGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(haloGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
+    expect(haloGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(haloGoldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(haloGoldMaterial.metallic).toBeGreaterThanOrEqual(0.16);
+    expect(haloGoldMaterial.roughness).toBeLessThanOrEqual(0.88);
+    expect(haloGoldMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.1);
 
     expect(shadowMaterial.name).toContain('spawn-gallery-arcade-shadow');
     expect(shadowMaterial.metadata?.mainStageMaterialPolish).toBe('black');
