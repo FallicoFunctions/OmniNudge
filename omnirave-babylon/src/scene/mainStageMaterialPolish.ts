@@ -2260,15 +2260,25 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V51_ShoulderCrownMass_') ||
-      mesh.name.startsWith('V51_RearCathedralMass_')
-    ) {
-      const cacheKey = `${material.uniqueId}:stage-mass-ivory`;
+    if (mesh.name.startsWith('V51_ShoulderCrownMass_')) {
+      const cacheKey = `${material.uniqueId}:shoulder-crown-mass-ivory`;
       let stageMassMaterial = clonedMaterials.get(cacheKey);
       if (!stageMassMaterial) {
-        stageMassMaterial = material.clone(`${material.name}__stage-mass-ivory`);
-        applyStageMassIvoryOverride(stageMassMaterial);
+        stageMassMaterial = material.clone(`${material.name}__shoulder-crown-mass-ivory`);
+        applyShoulderCrownMassIvoryOverride(stageMassMaterial);
+        clonedMaterials.set(cacheKey, stageMassMaterial);
+      }
+
+      assignOverrideMaterial(mesh, stageMassMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V51_RearCathedralMass_')) {
+      const cacheKey = `${material.uniqueId}:rear-cathedral-mass-ivory`;
+      let stageMassMaterial = clonedMaterials.get(cacheKey);
+      if (!stageMassMaterial) {
+        stageMassMaterial = material.clone(`${material.name}__rear-cathedral-mass-ivory`);
+        applyRearCathedralMassIvoryOverride(stageMassMaterial);
         clonedMaterials.set(cacheKey, stageMassMaterial);
       }
 
@@ -6343,20 +6353,37 @@ function applyWingCanopyLamellaPearlOverride(material: PBRMaterial) {
   };
 }
 
-function applyStageMassIvoryOverride(material: PBRMaterial) {
+function applyShoulderCrownMassIvoryOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.24, 0.26, 0.3);
   material.emissiveColor = new Color3(0.006, 0.01, 0.014);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.02;
-  material.roughness = 0.84;
+  material.roughness = 0.86;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.62;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.66;
   material.environmentIntensity = 0.14;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'stage-mass-ivory',
+    mainStageMaterialOverride: 'shoulder-crown-mass-ivory',
+  };
+}
+
+function applyRearCathedralMassIvoryOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.26, 0.28, 0.32);
+  material.emissiveColor = new Color3(0.008, 0.012, 0.016);
+  material.emissiveIntensity = 0.024;
+  material.metallic = 0.02;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.05;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'rear-cathedral-mass-ivory',
   };
 }
 
