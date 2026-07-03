@@ -3496,6 +3496,24 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (
+      mesh.name.startsWith('V30_VipGoldBaluster_') ||
+      mesh.name.startsWith('V30_WingGoldBaluster_') ||
+      mesh.name.startsWith('V30_VipGoldHandrail_') ||
+      mesh.name.startsWith('V30_WingGoldHandrail_')
+    ) {
+      const cacheKey = `${material.uniqueId}:terrace-gold-rail`;
+      let railMaterial = clonedMaterials.get(cacheKey);
+      if (!railMaterial) {
+        railMaterial = material.clone(`${material.name}__terrace-gold-rail`);
+        applyTerraceGoldRailOverride(railMaterial);
+        clonedMaterials.set(cacheKey, railMaterial);
+      }
+
+      assignOverrideMaterial(mesh, railMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V117_WingCanopyLamellaGoldArray_')) {
       const cacheKey = `${material.uniqueId}:wing-canopy-lamella-gold`;
       let wingCanopyMaterial = clonedMaterials.get(cacheKey);
@@ -7046,6 +7064,23 @@ function applyVipSoffitShadowOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'vip-soffit-shadow',
+  };
+}
+
+function applyTerraceGoldRailOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.16;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'terrace-gold-rail',
   };
 }
 
