@@ -3733,6 +3733,22 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
 
       assignOverrideMaterial(mesh, ledFieldMaterial);
     }
+
+    if (
+      mesh.name === 'V31_CenterParallaxStarfield' ||
+      mesh.name === 'V31_SideParallaxOrbitalContent_L' ||
+      mesh.name === 'V31_SideParallaxOrbitalContent_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:parallax-screen-cyan-glow`;
+      let parallaxMaterial = clonedMaterials.get(cacheKey);
+      if (!parallaxMaterial) {
+        parallaxMaterial = material.clone(`${material.name}__parallax-screen-cyan-glow`);
+        applyParallaxScreenCyanGlowOverride(parallaxMaterial);
+        clonedMaterials.set(cacheKey, parallaxMaterial);
+      }
+
+      assignOverrideMaterial(mesh, parallaxMaterial);
+    }
   }
 }
 
@@ -7477,5 +7493,25 @@ function applySideLedTileFieldOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'side-led-tile-field',
+  };
+}
+
+function applyParallaxScreenCyanGlowOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.04, 0.08, 0.11);
+  material.emissiveColor = new Color3(0.012, 0.028, 0.038);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.52;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.04;
+  material.roughness = 0.42;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.22;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialPolish: 'smoked',
+    mainStageMaterialOverride: 'parallax-screen-cyan-glow',
   };
 }
