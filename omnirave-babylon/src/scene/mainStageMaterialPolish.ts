@@ -3467,7 +3467,10 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (mesh.name.startsWith('V30_WingSoffitShadow_')) {
+    if (
+      mesh.name.startsWith('V30_WingSoffitShadow_') ||
+      mesh.name.startsWith('V30_WingUndersideRib_')
+    ) {
       const cacheKey = `${material.uniqueId}:wing-soffit-shadow`;
       let soffitShadowMaterial = clonedMaterials.get(cacheKey);
       if (!soffitShadowMaterial) {
