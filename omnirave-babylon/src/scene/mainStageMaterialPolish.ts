@@ -240,17 +240,12 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V74_SweepOuterAnchorGoldCrown_L' ||
-      mesh.name === 'V74_SweepOuterAnchorGoldCrown_R' ||
-      mesh.name === 'V74_SweepInnerAnchorGoldCrown_L' ||
-      mesh.name === 'V74_SweepInnerAnchorGoldCrown_R'
-    ) {
-      const cacheKey = `${material.uniqueId}:sweep-anchor-gold-crown`;
+    if (mesh.name === 'V74_SweepOuterAnchorGoldCrown_L' || mesh.name === 'V74_SweepOuterAnchorGoldCrown_R') {
+      const cacheKey = `${material.uniqueId}:sweep-anchor-outer-gold-crown`;
       let crownMaterial = clonedMaterials.get(cacheKey);
       if (!crownMaterial) {
-        crownMaterial = material.clone(`${material.name}__sweep-anchor-gold-crown`);
-        applySweepAnchorGoldCrownOverride(crownMaterial);
+        crownMaterial = material.clone(`${material.name}__sweep-anchor-outer-gold-crown`);
+        applySweepAnchorOuterGoldCrownOverride(crownMaterial);
         clonedMaterials.set(cacheKey, crownMaterial);
       }
 
@@ -258,17 +253,38 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V74_SweepOuterAnchorShadowCore_L' ||
-      mesh.name === 'V74_SweepOuterAnchorShadowCore_R' ||
-      mesh.name === 'V74_SweepInnerAnchorShadowCore_L' ||
-      mesh.name === 'V74_SweepInnerAnchorShadowCore_R'
-    ) {
-      const cacheKey = `${material.uniqueId}:sweep-anchor-shadow-core`;
+    if (mesh.name === 'V74_SweepInnerAnchorGoldCrown_L' || mesh.name === 'V74_SweepInnerAnchorGoldCrown_R') {
+      const cacheKey = `${material.uniqueId}:sweep-anchor-inner-gold-crown`;
+      let crownMaterial = clonedMaterials.get(cacheKey);
+      if (!crownMaterial) {
+        crownMaterial = material.clone(`${material.name}__sweep-anchor-inner-gold-crown`);
+        applySweepAnchorInnerGoldCrownOverride(crownMaterial);
+        clonedMaterials.set(cacheKey, crownMaterial);
+      }
+
+      assignOverrideMaterial(mesh, crownMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V74_SweepOuterAnchorShadowCore_L' || mesh.name === 'V74_SweepOuterAnchorShadowCore_R') {
+      const cacheKey = `${material.uniqueId}:sweep-anchor-outer-shadow-core`;
       let coreMaterial = clonedMaterials.get(cacheKey);
       if (!coreMaterial) {
-        coreMaterial = material.clone(`${material.name}__sweep-anchor-shadow-core`);
-        applySweepAnchorShadowCoreOverride(coreMaterial);
+        coreMaterial = material.clone(`${material.name}__sweep-anchor-outer-shadow-core`);
+        applySweepAnchorOuterShadowCoreOverride(coreMaterial);
+        clonedMaterials.set(cacheKey, coreMaterial);
+      }
+
+      assignOverrideMaterial(mesh, coreMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V74_SweepInnerAnchorShadowCore_L' || mesh.name === 'V74_SweepInnerAnchorShadowCore_R') {
+      const cacheKey = `${material.uniqueId}:sweep-anchor-inner-shadow-core`;
+      let coreMaterial = clonedMaterials.get(cacheKey);
+      if (!coreMaterial) {
+        coreMaterial = material.clone(`${material.name}__sweep-anchor-inner-shadow-core`);
+        applySweepAnchorInnerShadowCoreOverride(coreMaterial);
         clonedMaterials.set(cacheKey, coreMaterial);
       }
 
@@ -4372,7 +4388,7 @@ function applyArcAnchorGoldClusterOverride(material: PBRMaterial) {
   };
 }
 
-function applySweepAnchorGoldCrownOverride(material: PBRMaterial) {
+function applySweepAnchorOuterGoldCrownOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.16, 0.12, 0.05);
   material.emissiveColor = new Color3(0, 0, 0);
@@ -4385,21 +4401,52 @@ function applySweepAnchorGoldCrownOverride(material: PBRMaterial) {
   material.environmentIntensity = 0.08;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'sweep-anchor-gold-crown',
+    mainStageMaterialOverride: 'sweep-anchor-outer-gold-crown',
   };
 }
 
-function applySweepAnchorShadowCoreOverride(material: PBRMaterial) {
+function applySweepAnchorInnerGoldCrownOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.175, 0.135, 0.058);
+  material.emissiveColor = new Color3(0.008, 0.006, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.18;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.11;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'sweep-anchor-inner-gold-crown',
+  };
+}
+
+function applySweepAnchorOuterShadowCoreOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.03, 0.05, 0.07);
   material.emissiveColor = new Color3(0.01, 0.06, 0.09);
   material.emissiveIntensity = 0.08;
   material.metallic = 0.04;
-  material.roughness = 0.74;
-  material.environmentIntensity = 0.16;
+  material.roughness = 0.8;
+  material.environmentIntensity = 0.14;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'sweep-anchor-shadow-core',
+    mainStageMaterialOverride: 'sweep-anchor-outer-shadow-core',
+  };
+}
+
+function applySweepAnchorInnerShadowCoreOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.04, 0.06, 0.08);
+  material.emissiveColor = new Color3(0.008, 0.045, 0.07);
+  material.emissiveIntensity = 0.06;
+  material.metallic = 0.05;
+  material.roughness = 0.76;
+  material.environmentIntensity = 0.18;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'sweep-anchor-inner-shadow-core',
   };
 }
 
