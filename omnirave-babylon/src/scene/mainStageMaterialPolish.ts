@@ -514,6 +514,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V24_CrownHaloCyanInlay') {
+      const cacheKey = `${material.uniqueId}:crown-halo-cyan-inlay`;
+      let inlayMaterial = clonedMaterials.get(cacheKey);
+      if (!inlayMaterial) {
+        inlayMaterial = material.clone(`${material.name}__crown-halo-cyan-inlay`);
+        applyCrownHaloCyanInlayOverride(inlayMaterial);
+        clonedMaterials.set(cacheKey, inlayMaterial);
+      }
+
+      assignOverrideMaterial(mesh, inlayMaterial);
+      continue;
+    }
+
     if (mesh.name === 'V33_BasinLanternStem_L' || mesh.name === 'V33_BasinLanternStem_R') {
       const cacheKey = `${material.uniqueId}:basin-lantern-stem`;
       let stemMaterial = clonedMaterials.get(cacheKey);
@@ -4393,6 +4406,24 @@ function applyV24CrownGoldRevealOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'v24-crown-gold-reveal',
+  };
+}
+
+function applyCrownHaloCyanInlayOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.04, 0.12, 0.18);
+  material.emissiveColor = new Color3(0.008, 0.03, 0.05);
+  material.emissiveIntensity = 0.06;
+  material.alpha = 0.55;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.42;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.22;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-halo-cyan-inlay',
   };
 }
 

@@ -9965,4 +9965,38 @@ describe('polishMainStageMaterials', () => {
     expect(seamMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(seamMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
+
+  it('smokes the crown halo cyan inlay so the skyline halo reads as inset jewel glass instead of a bright cyan ring', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedCyanMaterial = new PBRMaterial('V20_CelestialCyanGlass', scene);
+    sharedCyanMaterial.albedoColor.set(0.02, 0.32, 0.44);
+    sharedCyanMaterial.emissiveColor.set(0.08, 0.42, 0.62);
+    sharedCyanMaterial.emissiveIntensity = 0.38;
+    sharedCyanMaterial.roughness = 0.16;
+
+    const otherCyan = MeshBuilder.CreateBox('V20_CelestialCyanGlass-mesh', { size: 1 }, scene);
+    otherCyan.material = sharedCyanMaterial;
+
+    const cyanInlay = MeshBuilder.CreateBox('V24_CrownHaloCyanInlay', { size: 1 }, scene);
+    cyanInlay.material = sharedCyanMaterial;
+
+    polishMainStageMaterials([otherCyan, cyanInlay]);
+
+    expect(otherCyan.material).toBe(sharedCyanMaterial);
+    expect(cyanInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(cyanInlay.material).not.toBe(sharedCyanMaterial);
+
+    const inlayMaterial = cyanInlay.material as PBRMaterial;
+    expect(inlayMaterial.name).toContain('crown-halo-cyan-inlay');
+    expect(inlayMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(inlayMaterial.metadata?.mainStageMaterialOverride).toBe('crown-halo-cyan-inlay');
+    expect(inlayMaterial.albedoColor.r).toBeLessThanOrEqual(0.08);
+    expect(inlayMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(inlayMaterial.albedoColor.b).toBeLessThanOrEqual(0.24);
+    expect(inlayMaterial.emissiveIntensity).toBeLessThanOrEqual(0.08);
+    expect(inlayMaterial.roughness).toBeGreaterThanOrEqual(0.38);
+    expect(inlayMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
+  });
 });
