@@ -1124,15 +1124,25 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V122_PortalApronRelief' ||
-      mesh.name.startsWith('V122_StageShoulderRelief_')
-    ) {
-      const cacheKey = `${material.uniqueId}:stage-front-relief-shell`;
+    if (mesh.name === 'V122_PortalApronRelief') {
+      const cacheKey = `${material.uniqueId}:portal-apron-relief-shell`;
       let reliefMaterial = clonedMaterials.get(cacheKey);
       if (!reliefMaterial) {
-        reliefMaterial = material.clone(`${material.name}__stage-front-relief-shell`);
-        applyStageFrontReliefShellOverride(reliefMaterial);
+        reliefMaterial = material.clone(`${material.name}__portal-apron-relief-shell`);
+        applyPortalApronReliefShellOverride(reliefMaterial);
+        clonedMaterials.set(cacheKey, reliefMaterial);
+      }
+
+      assignOverrideMaterial(mesh, reliefMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V122_StageShoulderRelief_')) {
+      const cacheKey = `${material.uniqueId}:stage-shoulder-relief-shell`;
+      let reliefMaterial = clonedMaterials.get(cacheKey);
+      if (!reliefMaterial) {
+        reliefMaterial = material.clone(`${material.name}__stage-shoulder-relief-shell`);
+        applyStageShoulderReliefShellOverride(reliefMaterial);
         clonedMaterials.set(cacheKey, reliefMaterial);
       }
 
@@ -5554,7 +5564,7 @@ function applyBasinDeckReliefOverride(material: PBRMaterial) {
   };
 }
 
-function applyStageFrontReliefShellOverride(material: PBRMaterial) {
+function applyPortalApronReliefShellOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.21, 0.23, 0.27);
   material.emissiveColor = new Color3(0.006, 0.008, 0.012);
@@ -5567,7 +5577,24 @@ function applyStageFrontReliefShellOverride(material: PBRMaterial) {
   material.environmentIntensity = 0.14;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'stage-front-relief-shell',
+    mainStageMaterialOverride: 'portal-apron-relief-shell',
+  };
+}
+
+function applyStageShoulderReliefShellOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.13;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'stage-shoulder-relief-shell',
   };
 }
 
