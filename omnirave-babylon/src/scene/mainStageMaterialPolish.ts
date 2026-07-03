@@ -6618,7 +6618,16 @@ function applySpawnGalleryArcadePearlOverride(material: PBRMaterial) {
 }
 
 function applySpawnGalleryCorniceGoldOverride(material: PBRMaterial) {
-  applyWingFacadeArchInlayOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.145, 0.105, 0.042);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.1;
+  material.roughness = 0.94;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.9;
+  material.environmentIntensity = 0.08;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-gallery-cornice-gold',

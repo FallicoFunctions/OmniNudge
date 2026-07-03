@@ -9543,6 +9543,9 @@ describe('polishMainStageMaterials', () => {
     const rightCornice = MeshBuilder.CreateBox('V53_SpawnGalleryCorniceGold_R', { size: 1 }, scene);
     rightCornice.material = sharedGoldMaterial;
 
+    const wingArchInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_L', { size: 1 }, scene);
+    wingArchInlay.material = sharedGoldMaterial;
+
     const leftHalo = MeshBuilder.CreateBox('V53_SpawnGalleryHaloGold_L', { size: 1 }, scene);
     leftHalo.material = sharedGoldMaterial;
 
@@ -9577,6 +9580,7 @@ describe('polishMainStageMaterials', () => {
       goldControl,
       leftCornice,
       rightCornice,
+      wingArchInlay,
       leftHalo,
       rightHalo,
       shadowControl,
@@ -9592,6 +9596,8 @@ describe('polishMainStageMaterials', () => {
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftCornice.material).toBeInstanceOf(PBRMaterial);
     expect(rightCornice.material).toBe(leftCornice.material);
+    expect(wingArchInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArchInlay.material).not.toBe(leftCornice.material);
     expect(leftHalo.material).toBeInstanceOf(PBRMaterial);
     expect(rightHalo.material).toBe(leftHalo.material);
     expect(leftHalo.material).not.toBe(leftCornice.material);
@@ -9609,6 +9615,7 @@ describe('polishMainStageMaterials', () => {
     expect(crownCrystal.material).not.toBe(leftLancet.material);
 
     const corniceGoldMaterial = leftCornice.material as PBRMaterial;
+    const wingArchInlayMaterial = wingArchInlay.material as PBRMaterial;
     const haloGoldMaterial = leftHalo.material as PBRMaterial;
     const shadowMaterial = leftShadow.material as PBRMaterial;
     const heroVaultMaterial = heroVault.material as PBRMaterial;
@@ -9625,6 +9632,9 @@ describe('polishMainStageMaterials', () => {
     expect(corniceGoldMaterial.metallic).toBeLessThanOrEqual(0.16);
     expect(corniceGoldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
     expect(corniceGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    expect(corniceGoldMaterial.albedoColor.r).toBeLessThan(wingArchInlayMaterial.albedoColor.r);
+    expect(corniceGoldMaterial.metallic ?? 0).toBeLessThan(wingArchInlayMaterial.metallic ?? 0);
+    expect(corniceGoldMaterial.roughness ?? 0).toBeGreaterThan(wingArchInlayMaterial.roughness ?? 0);
 
     expect(haloGoldMaterial.name).toContain('spawn-gallery-halo-gold');
     expect(haloGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
