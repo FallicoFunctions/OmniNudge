@@ -3451,15 +3451,25 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V50_InnerPortalPylon_') ||
-      mesh.name.startsWith('V50_InnerShellCascade_')
-    ) {
-      const cacheKey = `${material.uniqueId}:inner-portal-pearl-shell`;
+    if (mesh.name.startsWith('V50_InnerPortalPylon_')) {
+      const cacheKey = `${material.uniqueId}:inner-portal-pylon-shell`;
       let shellMaterial = clonedMaterials.get(cacheKey);
       if (!shellMaterial) {
-        shellMaterial = material.clone(`${material.name}__inner-portal-pearl-shell`);
-        applyInnerPortalPearlShellOverride(shellMaterial);
+        shellMaterial = material.clone(`${material.name}__inner-portal-pylon-shell`);
+        applyInnerPortalPylonShellOverride(shellMaterial);
+        clonedMaterials.set(cacheKey, shellMaterial);
+      }
+
+      assignOverrideMaterial(mesh, shellMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V50_InnerShellCascade_')) {
+      const cacheKey = `${material.uniqueId}:inner-shell-cascade`;
+      let shellMaterial = clonedMaterials.get(cacheKey);
+      if (!shellMaterial) {
+        shellMaterial = material.clone(`${material.name}__inner-shell-cascade`);
+        applyInnerShellCascadeOverride(shellMaterial);
         clonedMaterials.set(cacheKey, shellMaterial);
       }
 
@@ -7532,20 +7542,37 @@ function applyBasinCausewayShadowRevealOverride(material: PBRMaterial) {
   };
 }
 
-function applyInnerPortalPearlShellOverride(material: PBRMaterial) {
+function applyInnerPortalPylonShellOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.2, 0.22, 0.26);
   material.emissiveColor = new Color3(0.005, 0.007, 0.011);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.02;
-  material.roughness = 0.88;
+  material.roughness = 0.9;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.72;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.74;
   material.environmentIntensity = 0.13;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'inner-portal-pearl-shell',
+    mainStageMaterialOverride: 'inner-portal-pylon-shell',
+  };
+}
+
+function applyInnerShellCascadeOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.22, 0.24, 0.28);
+  material.emissiveColor = new Color3(0.007, 0.009, 0.013);
+  material.emissiveIntensity = 0.024;
+  material.metallic = 0.02;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.05;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.15;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'inner-shell-cascade',
   };
 }
 
