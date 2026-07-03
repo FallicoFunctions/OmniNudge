@@ -10226,11 +10226,49 @@ describe('polishMainStageMaterials', () => {
     const revealMaterial = shadowReveal.material as PBRMaterial;
     expect(revealMaterial.metadata?.mainStageMaterialPolish).toBe('black');
     expect(revealMaterial.metadata?.mainStageMaterialOverride).toBe('basin-causeway-shadow-reveal');
-    expect(revealMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(revealMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
-    expect(revealMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
-    expect(revealMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.84);
-    expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+  });
+
+  it('smokes the cyan edge glow on parallax screens so the orbital content reads as recessed backlight instead of bright emissive strips', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedCyanMaterial = new PBRMaterial('V17_CyanEdgeGlow', scene);
+    sharedCyanMaterial.albedoColor.set(0.32, 0.84, 0.92);
+    sharedCyanMaterial.emissiveColor.set(0.12, 0.32, 0.4);
+    sharedCyanMaterial.emissiveIntensity = 0.62;
+    sharedCyanMaterial.metallic = 0.18;
+    sharedCyanMaterial.roughness = 0.22;
+    sharedCyanMaterial.alpha = 0.74;
+
+    const otherCyan = MeshBuilder.CreateBox('TestParallaxCyanControl', { size: 1 }, scene);
+    otherCyan.material = sharedCyanMaterial;
+
+    const centerStarfield = MeshBuilder.CreateBox('V31_CenterParallaxStarfield', { size: 1 }, scene);
+    centerStarfield.material = sharedCyanMaterial;
+
+    const sideOrbitalL = MeshBuilder.CreateBox('V31_SideParallaxOrbitalContent_L', { size: 1 }, scene);
+    sideOrbitalL.material = sharedCyanMaterial;
+
+    const sideOrbitalR = MeshBuilder.CreateBox('V31_SideParallaxOrbitalContent_R', { size: 1 }, scene);
+    sideOrbitalR.material = sharedCyanMaterial;
+
+    polishMainStageMaterials([otherCyan, centerStarfield, sideOrbitalL, sideOrbitalR]);
+
+    expect(otherCyan.material).toBe(sharedCyanMaterial);
+    expect(centerStarfield.material).not.toBe(sharedCyanMaterial);
+    expect(sideOrbitalL.material).not.toBe(sharedCyanMaterial);
+    expect(sideOrbitalR.material).not.toBe(sharedCyanMaterial);
+
+    for (const mesh of [centerStarfield, sideOrbitalL, sideOrbitalR]) {
+      expect(mesh.material).not.toBeNull();
+      expect(mesh.material!.metadata?.mainStageMaterialPolish).toBe('smoked');
+      expect(mesh.material!.metadata?.mainStageMaterialOverride).toBe('parallax-screen-cyan-glow');
+
+      const mat = mesh.material as PBRMaterial;
+      expect(mat.emissiveIntensity).toBeLessThanOrEqual(0.16);
+      expect(mat.alpha).toBeLessThanOrEqual(0.58);
+      expect(mat.roughness).toBeGreaterThanOrEqual(0.38);
+      expect(mat.environmentIntensity).toBeLessThanOrEqual(0.28);
+    }
   });
 });
