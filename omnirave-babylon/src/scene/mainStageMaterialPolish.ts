@@ -1038,17 +1038,38 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V99_BasinChannelRelief' ||
-      mesh.name === 'V99_BasinRunwaySpine' ||
-      mesh.name === 'V99_BasinRetainingWall_L' ||
-      mesh.name === 'V99_BasinRetainingWall_R'
-    ) {
-      const cacheKey = `${material.uniqueId}:basin-stone-relief`;
+    if (mesh.name === 'V99_BasinChannelRelief') {
+      const cacheKey = `${material.uniqueId}:basin-channel-relief`;
       let basinStoneMaterial = clonedMaterials.get(cacheKey);
       if (!basinStoneMaterial) {
-        basinStoneMaterial = material.clone(`${material.name}__basin-stone-relief`);
-        applyBasinStoneReliefOverride(basinStoneMaterial);
+        basinStoneMaterial = material.clone(`${material.name}__basin-channel-relief`);
+        applyBasinChannelReliefOverride(basinStoneMaterial);
+        clonedMaterials.set(cacheKey, basinStoneMaterial);
+      }
+
+      assignOverrideMaterial(mesh, basinStoneMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V99_BasinRunwaySpine') {
+      const cacheKey = `${material.uniqueId}:basin-runway-spine`;
+      let basinStoneMaterial = clonedMaterials.get(cacheKey);
+      if (!basinStoneMaterial) {
+        basinStoneMaterial = material.clone(`${material.name}__basin-runway-spine`);
+        applyBasinRunwaySpineOverride(basinStoneMaterial);
+        clonedMaterials.set(cacheKey, basinStoneMaterial);
+      }
+
+      assignOverrideMaterial(mesh, basinStoneMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V99_BasinRetainingWall_L' || mesh.name === 'V99_BasinRetainingWall_R') {
+      const cacheKey = `${material.uniqueId}:basin-retaining-wall`;
+      let basinStoneMaterial = clonedMaterials.get(cacheKey);
+      if (!basinStoneMaterial) {
+        basinStoneMaterial = material.clone(`${material.name}__basin-retaining-wall`);
+        applyBasinRetainingWallOverride(basinStoneMaterial);
         clonedMaterials.set(cacheKey, basinStoneMaterial);
       }
 
@@ -5378,7 +5399,7 @@ function applyBasinRetainingReliefOverride(material: PBRMaterial) {
   };
 }
 
-function applyBasinStoneReliefOverride(material: PBRMaterial) {
+function applyBasinChannelReliefOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.14, 0.16, 0.20);
   material.emissiveColor = new Color3(0.004, 0.006, 0.008);
@@ -5391,7 +5412,41 @@ function applyBasinStoneReliefOverride(material: PBRMaterial) {
   material.environmentIntensity = 0.06;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'basin-stone-relief',
+    mainStageMaterialOverride: 'basin-channel-relief',
+  };
+}
+
+function applyBasinRunwaySpineOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.12, 0.15, 0.19);
+  material.emissiveColor = new Color3(0.003, 0.004, 0.007);
+  material.emissiveIntensity = 0.008;
+  material.metallic = 0.02;
+  material.roughness = 0.96;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.78;
+  material.environmentIntensity = 0.05;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-runway-spine',
+  };
+}
+
+function applyBasinRetainingWallOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.19, 0.23);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.01);
+  material.emissiveIntensity = 0.012;
+  material.metallic = 0.02;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-retaining-wall',
   };
 }
 
