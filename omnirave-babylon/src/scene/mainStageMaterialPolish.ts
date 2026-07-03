@@ -6738,7 +6738,16 @@ function applySpawnPylonPearlShellOverride(material: PBRMaterial) {
 }
 
 function applySpawnPylonGoldCrownOverride(material: PBRMaterial) {
-  applyWingFacadeArchInlayOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.145, 0.062);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.017;
+  material.metallic = 0.18;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.11;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-pylon-gold-crown',
@@ -6746,7 +6755,15 @@ function applySpawnPylonGoldCrownOverride(material: PBRMaterial) {
 }
 
 function applySpawnPylonShadowSpineOverride(material: PBRMaterial) {
-  applyHeroPortalShadowVaultOverride(material);
+  material.albedoColor = new Color3(0.11, 0.135, 0.17);
+  material.emissiveColor = new Color3(0.007, 0.01, 0.013);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.06;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.16;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-pylon-shadow-spine',
@@ -6754,7 +6771,17 @@ function applySpawnPylonShadowSpineOverride(material: PBRMaterial) {
 }
 
 function applySpawnPylonCyanCoreOverride(material: PBRMaterial) {
-  applyCrownApexCrystalOverride(material);
+  material.albedoColor = new Color3(0.09, 0.19, 0.24);
+  material.emissiveColor = new Color3(0.01, 0.03, 0.042);
+  material.emissiveIntensity = 0.076;
+  material.alpha = 0.32;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.24;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.05;
+  material.clearCoat.roughness = 0.66;
+  material.environmentIntensity = 0.28;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-pylon-cyan-core',
