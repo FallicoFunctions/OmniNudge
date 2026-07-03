@@ -5795,19 +5795,30 @@ describe('polishMainStageMaterials', () => {
     expect(cathedralCore.material).not.toBe(sharedPearlMaterial);
     expect(leftPylon.material).not.toBe(sharedPearlMaterial);
     expect(rightPylon.material).not.toBe(sharedPearlMaterial);
-    expect(leftPylon.material).toBe(cathedralCore.material);
-    expect(rightPylon.material).toBe(cathedralCore.material);
+    expect(rightPylon.material).toBe(leftPylon.material);
+    expect(leftPylon.material).not.toBe(cathedralCore.material);
 
-    const shellMaterial = cathedralCore.material as PBRMaterial;
-    expect(shellMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(shellMaterial.metadata?.mainStageMaterialOverride).toBe('rear-cathedral-pearl-core');
-    expect(shellMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
-    expect(shellMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
-    expect(shellMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
-    expect(shellMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(shellMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(shellMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    const cathedralCoreMaterial = cathedralCore.material as PBRMaterial;
+    const pylonMaterial = leftPylon.material as PBRMaterial;
+    expect(cathedralCoreMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(cathedralCoreMaterial.metadata?.mainStageMaterialOverride).toBe('rear-cathedral-pearl-core');
+    expect(cathedralCoreMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(cathedralCoreMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(cathedralCoreMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(cathedralCoreMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(cathedralCoreMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(cathedralCoreMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(cathedralCoreMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+
+    expect(pylonMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(pylonMaterial.metadata?.mainStageMaterialOverride).toBe('proscenium-pylon-pearl-shell');
+    expect(pylonMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(pylonMaterial.albedoColor.g).toBeLessThanOrEqual(0.22);
+    expect(pylonMaterial.albedoColor.b).toBeLessThanOrEqual(0.26);
+    expect(pylonMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(pylonMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(pylonMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.04);
+    expect(pylonMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
   });
 
   it('darkens the rear-cathedral lancet pearl arrays so the skyline reads as carved recesses instead of bright ivory blades', () => {
