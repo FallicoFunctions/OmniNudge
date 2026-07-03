@@ -2252,19 +2252,29 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V53_SpawnGalleryCorniceGold_') ||
-      mesh.name.startsWith('V53_SpawnGalleryHaloGold_')
-    ) {
-      const cacheKey = `${material.uniqueId}:spawn-gallery-arcade-gold`;
-      let arcadeGoldMaterial = clonedMaterials.get(cacheKey);
-      if (!arcadeGoldMaterial) {
-        arcadeGoldMaterial = material.clone(`${material.name}__spawn-gallery-arcade-gold`);
-        applySpawnGalleryArcadeGoldOverride(arcadeGoldMaterial);
-        clonedMaterials.set(cacheKey, arcadeGoldMaterial);
+    if (mesh.name.startsWith('V53_SpawnGalleryCorniceGold_')) {
+      const cacheKey = `${material.uniqueId}:spawn-gallery-cornice-gold`;
+      let corniceGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!corniceGoldMaterial) {
+        corniceGoldMaterial = material.clone(`${material.name}__spawn-gallery-cornice-gold`);
+        applySpawnGalleryCorniceGoldOverride(corniceGoldMaterial);
+        clonedMaterials.set(cacheKey, corniceGoldMaterial);
       }
 
-      assignOverrideMaterial(mesh, arcadeGoldMaterial);
+      assignOverrideMaterial(mesh, corniceGoldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V53_SpawnGalleryHaloGold_')) {
+      const cacheKey = `${material.uniqueId}:spawn-gallery-halo-gold`;
+      let haloGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!haloGoldMaterial) {
+        haloGoldMaterial = material.clone(`${material.name}__spawn-gallery-halo-gold`);
+        applySpawnGalleryHaloGoldOverride(haloGoldMaterial);
+        clonedMaterials.set(cacheKey, haloGoldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, haloGoldMaterial);
       continue;
     }
 
@@ -6176,11 +6186,28 @@ function applySpawnGalleryArcadePearlOverride(material: PBRMaterial) {
   };
 }
 
-function applySpawnGalleryArcadeGoldOverride(material: PBRMaterial) {
+function applySpawnGalleryCorniceGoldOverride(material: PBRMaterial) {
   applyWingFacadeArchInlayOverride(material);
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'spawn-gallery-arcade-gold',
+    mainStageMaterialOverride: 'spawn-gallery-cornice-gold',
+  };
+}
+
+function applySpawnGalleryHaloGoldOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.175, 0.135, 0.058);
+  material.emissiveColor = new Color3(0.008, 0.006, 0.002);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.18;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.11;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-gallery-halo-gold',
   };
 }
 
