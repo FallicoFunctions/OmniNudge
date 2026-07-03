@@ -10382,4 +10382,45 @@ describe('polishMainStageMaterials', () => {
       expect(mat.environmentIntensity).toBeLessThanOrEqual(0.18);
     }
   });
+
+  it('darkens the basin and VIP foliage canopy so the layered planting reads as dense shadow instead of bright green leaves', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedCanopyMaterial = new PBRMaterial('V14_LayeredGardenPlanting', scene);
+    sharedCanopyMaterial.albedoColor.set(0.28, 0.42, 0.22);
+    sharedCanopyMaterial.emissiveColor.set(0.02, 0.04, 0.01);
+    sharedCanopyMaterial.emissiveIntensity = 0.14;
+    sharedCanopyMaterial.metallic = 0.04;
+    sharedCanopyMaterial.roughness = 0.56;
+
+    const otherCanopy = MeshBuilder.CreateBox('TestFoliageCanopyControl', { size: 1 }, scene);
+    otherCanopy.material = sharedCanopyMaterial;
+
+    const canopyBL = MeshBuilder.CreateBox('V33_BasinFoliageCanopy_L', { size: 1 }, scene);
+    canopyBL.material = sharedCanopyMaterial;
+    const canopyBR = MeshBuilder.CreateBox('V33_BasinFoliageCanopy_R', { size: 1 }, scene);
+    canopyBR.material = sharedCanopyMaterial;
+    const canopyVL = MeshBuilder.CreateBox('V33_VipFoliageCanopy_L', { size: 1 }, scene);
+    canopyVL.material = sharedCanopyMaterial;
+    const canopyVR = MeshBuilder.CreateBox('V33_VipFoliageCanopy_R', { size: 1 }, scene);
+    canopyVR.material = sharedCanopyMaterial;
+
+    polishMainStageMaterials([otherCanopy, canopyBL, canopyBR, canopyVL, canopyVR]);
+
+    expect(otherCanopy.material).toBe(sharedCanopyMaterial);
+
+    for (const mesh of [canopyBL, canopyBR, canopyVL, canopyVR]) {
+      expect(mesh.material).not.toBe(sharedCanopyMaterial);
+      const mat = mesh.material as PBRMaterial;
+      expect(mat.metadata?.mainStageMaterialPolish).toBe('black');
+      expect(mat.metadata?.mainStageMaterialOverride).toBe('layered-foliage-canopy');
+      expect(mat.albedoColor.r).toBeLessThanOrEqual(0.14);
+      expect(mat.albedoColor.g).toBeLessThanOrEqual(0.17);
+      expect(mat.albedoColor.b).toBeLessThanOrEqual(0.12);
+      expect(mat.emissiveIntensity).toBeLessThanOrEqual(0.03);
+      expect(mat.roughness).toBeGreaterThanOrEqual(0.84);
+      expect(mat.environmentIntensity).toBeLessThanOrEqual(0.18);
+    }
+  });
 });
