@@ -6634,7 +6634,15 @@ function applySpawnGalleryHaloGoldOverride(material: PBRMaterial) {
 }
 
 function applySpawnGalleryArcadeShadowOverride(material: PBRMaterial) {
-  applyHeroPortalShadowVaultOverride(material);
+  material.albedoColor = new Color3(0.12, 0.16, 0.2);
+  material.emissiveColor = new Color3(0.008, 0.012, 0.016);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.06;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.22;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-gallery-arcade-shadow',
@@ -6642,7 +6650,17 @@ function applySpawnGalleryArcadeShadowOverride(material: PBRMaterial) {
 }
 
 function applySpawnGalleryArcadeCyanOverride(material: PBRMaterial) {
-  applyCrownApexCrystalOverride(material);
+  material.albedoColor = new Color3(0.1, 0.21, 0.27);
+  material.emissiveColor = new Color3(0.012, 0.038, 0.052);
+  material.emissiveIntensity = 0.082;
+  material.alpha = 0.34;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.22;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.05;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.3;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-gallery-arcade-cyan',
