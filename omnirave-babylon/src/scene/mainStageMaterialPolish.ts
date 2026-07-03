@@ -3959,21 +3959,55 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V62_BasinCausewayGoldRail_') ||
-      mesh.name.startsWith('V63_BasinGardenGoldCrest_') ||
-      mesh.name === 'V64_PromenadeGoldInlay' ||
-      mesh.name.startsWith('V66_BackPlazaSightlineGoldRail_')
-    ) {
-      const cacheKey = `${material.uniqueId}:arrival-gold-rail`;
-      let arrivalGoldMaterial = clonedMaterials.get(cacheKey);
-      if (!arrivalGoldMaterial) {
-        arrivalGoldMaterial = material.clone(`${material.name}__arrival-gold-rail`);
-        applyArrivalGoldRailOverride(arrivalGoldMaterial);
-        clonedMaterials.set(cacheKey, arrivalGoldMaterial);
+    if (mesh.name.startsWith('V62_BasinCausewayGoldRail_')) {
+      const cacheKey = `${material.uniqueId}:arrival-causeway-gold-rail`;
+      let causewayGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!causewayGoldMaterial) {
+        causewayGoldMaterial = material.clone(`${material.name}__arrival-causeway-gold-rail`);
+        applyArrivalCausewayGoldRailOverride(causewayGoldMaterial);
+        clonedMaterials.set(cacheKey, causewayGoldMaterial);
       }
 
-      assignOverrideMaterial(mesh, arrivalGoldMaterial);
+      assignOverrideMaterial(mesh, causewayGoldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V63_BasinGardenGoldCrest_')) {
+      const cacheKey = `${material.uniqueId}:arrival-garden-gold-crest`;
+      let gardenGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!gardenGoldMaterial) {
+        gardenGoldMaterial = material.clone(`${material.name}__arrival-garden-gold-crest`);
+        applyArrivalGardenGoldCrestOverride(gardenGoldMaterial);
+        clonedMaterials.set(cacheKey, gardenGoldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, gardenGoldMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V64_PromenadeGoldInlay') {
+      const cacheKey = `${material.uniqueId}:arrival-promenade-gold-inlay`;
+      let promenadeGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!promenadeGoldMaterial) {
+        promenadeGoldMaterial = material.clone(`${material.name}__arrival-promenade-gold-inlay`);
+        applyArrivalPromenadeGoldInlayOverride(promenadeGoldMaterial);
+        clonedMaterials.set(cacheKey, promenadeGoldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, promenadeGoldMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V66_BackPlazaSightlineGoldRail_')) {
+      const cacheKey = `${material.uniqueId}:arrival-sightline-gold-rail`;
+      let sightlineGoldMaterial = clonedMaterials.get(cacheKey);
+      if (!sightlineGoldMaterial) {
+        sightlineGoldMaterial = material.clone(`${material.name}__arrival-sightline-gold-rail`);
+        applyArrivalSightlineGoldRailOverride(sightlineGoldMaterial);
+        clonedMaterials.set(cacheKey, sightlineGoldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, sightlineGoldMaterial);
       continue;
     }
 
@@ -8140,20 +8174,71 @@ function applyTerraceGoldRailOverride(material: PBRMaterial) {
   };
 }
 
-function applyArrivalGoldRailOverride(material: PBRMaterial) {
+function applyArrivalCausewayGoldRailOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.06);
-  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
-  material.emissiveIntensity = 0.02;
-  material.metallic = 0.16;
-  material.roughness = 0.9;
+  material.albedoColor = new Color3(0.15, 0.11, 0.045);
+  material.emissiveColor = new Color3(0.006, 0.004, 0.0015);
+  material.emissiveIntensity = 0.015;
+  material.metallic = 0.12;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-causeway-gold-rail',
+  };
+}
+
+function applyArrivalGardenGoldCrestOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.175, 0.135, 0.058);
+  material.emissiveColor = new Color3(0.008, 0.006, 0.002);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.18;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.11;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-garden-gold-crest',
+  };
+}
+
+function applyArrivalPromenadeGoldInlayOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.15, 0.11, 0.045);
+  material.emissiveColor = new Color3(0.006, 0.004, 0.0015);
+  material.emissiveIntensity = 0.015;
+  material.metallic = 0.12;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'arrival-promenade-gold-inlay',
+  };
+}
+
+function applyArrivalSightlineGoldRailOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.17, 0.13, 0.055);
+  material.emissiveColor = new Color3(0.007, 0.005, 0.0018);
+  material.emissiveIntensity = 0.017;
+  material.metallic = 0.15;
+  material.roughness = 0.89;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0;
   material.clearCoat.roughness = 0.86;
-  material.environmentIntensity = 0.12;
+  material.environmentIntensity = 0.1;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'arrival-gold-rail',
+    mainStageMaterialOverride: 'arrival-sightline-gold-rail',
   };
 }
 

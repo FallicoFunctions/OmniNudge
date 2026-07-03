@@ -10034,21 +10034,61 @@ describe('polishMainStageMaterials', () => {
     expect(gardenCrest.material).not.toBe(sharedGoldMaterial);
     expect(promenadeInlay.material).not.toBe(sharedGoldMaterial);
     expect(sightlineRail.material).not.toBe(sharedGoldMaterial);
-    expect(causewayRail.material).toBe(gardenCrest.material);
-    expect(causewayRail.material).toBe(promenadeInlay.material);
-    expect(causewayRail.material).toBe(sightlineRail.material);
+    expect(causewayRail.material).not.toBe(gardenCrest.material);
+    expect(causewayRail.material).not.toBe(promenadeInlay.material);
+    expect(causewayRail.material).not.toBe(sightlineRail.material);
+    expect(gardenCrest.material).not.toBe(promenadeInlay.material);
+    expect(gardenCrest.material).not.toBe(sightlineRail.material);
+    expect(promenadeInlay.material).not.toBe(sightlineRail.material);
 
-    const arrivalGoldMaterial = causewayRail.material as PBRMaterial;
-    expect(arrivalGoldMaterial.name).toContain('arrival-gold-rail');
-    expect(arrivalGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
-    expect(arrivalGoldMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-gold-rail');
-    expect(arrivalGoldMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(arrivalGoldMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(arrivalGoldMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
-    expect(arrivalGoldMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(arrivalGoldMaterial.metallic).toBeLessThanOrEqual(0.2);
-    expect(arrivalGoldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(arrivalGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    const causewayRailMaterial = causewayRail.material as PBRMaterial;
+    const gardenCrestMaterial = gardenCrest.material as PBRMaterial;
+    const promenadeInlayMaterial = promenadeInlay.material as PBRMaterial;
+    const sightlineRailMaterial = sightlineRail.material as PBRMaterial;
+
+    expect(causewayRailMaterial.name).toContain('arrival-causeway-gold-rail');
+    expect(causewayRailMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(causewayRailMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-causeway-gold-rail');
+    expect(causewayRailMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(causewayRailMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(causewayRailMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(causewayRailMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(causewayRailMaterial.metallic).toBeLessThanOrEqual(0.14);
+    expect(causewayRailMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(causewayRailMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+
+    expect(gardenCrestMaterial.name).toContain('arrival-garden-gold-crest');
+    expect(gardenCrestMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(gardenCrestMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-garden-gold-crest');
+    expect(gardenCrestMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(gardenCrestMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
+    expect(gardenCrestMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(gardenCrestMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(gardenCrestMaterial.metallic).toBeGreaterThanOrEqual(0.16);
+    expect(gardenCrestMaterial.roughness).toBeLessThanOrEqual(0.88);
+    expect(gardenCrestMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.1);
+
+    expect(promenadeInlayMaterial.name).toContain('arrival-promenade-gold-inlay');
+    expect(promenadeInlayMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(promenadeInlayMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-promenade-gold-inlay');
+    expect(promenadeInlayMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
+    expect(promenadeInlayMaterial.albedoColor.g).toBeLessThanOrEqual(0.11);
+    expect(promenadeInlayMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(promenadeInlayMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(promenadeInlayMaterial.metallic).toBeLessThanOrEqual(0.14);
+    expect(promenadeInlayMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(promenadeInlayMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+
+    expect(sightlineRailMaterial.name).toContain('arrival-sightline-gold-rail');
+    expect(sightlineRailMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(sightlineRailMaterial.metadata?.mainStageMaterialOverride).toBe('arrival-sightline-gold-rail');
+    expect(sightlineRailMaterial.albedoColor.r).toBeLessThanOrEqual(0.17);
+    expect(sightlineRailMaterial.albedoColor.g).toBeLessThanOrEqual(0.13);
+    expect(sightlineRailMaterial.albedoColor.b).toBeLessThanOrEqual(0.055);
+    expect(sightlineRailMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(sightlineRailMaterial.metallic).toBeGreaterThanOrEqual(0.14);
+    expect(sightlineRailMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(sightlineRailMaterial.environmentIntensity).toBeLessThanOrEqual(0.11);
   });
 
   it('darkens the wing underside ribs so the basin edge flanks read as shadow architecture instead of bright proxy slats', () => {
