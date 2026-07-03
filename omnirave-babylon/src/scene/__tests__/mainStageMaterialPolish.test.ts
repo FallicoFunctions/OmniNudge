@@ -5761,7 +5761,7 @@ describe('polishMainStageMaterials', () => {
     expect(lamellaMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
-  it('regrades the V51 shoulder and cathedral masses into darker night-shell forms so the route views stop reading them as white proxy monoliths', () => {
+  it('regrades the V51 shoulder and cathedral masses into distinct darker night-shell forms so the route views stop reading them as one repeated white proxy monolith finish', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -5787,18 +5787,29 @@ describe('polishMainStageMaterials', () => {
     expect(cathedralMass.material).toBeInstanceOf(PBRMaterial);
     expect(shoulderMass.material).not.toBe(sharedIvoryMaterial);
     expect(cathedralMass.material).not.toBe(sharedIvoryMaterial);
-    expect(cathedralMass.material).toBe(shoulderMass.material);
+    expect(cathedralMass.material).not.toBe(shoulderMass.material);
 
-    const stageMassMaterial = shoulderMass.material as PBRMaterial;
-    expect(stageMassMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(stageMassMaterial.metadata?.mainStageMaterialOverride).toBe('stage-mass-ivory');
-    expect(stageMassMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
-    expect(stageMassMaterial.albedoColor.g).toBeLessThanOrEqual(0.3);
-    expect(stageMassMaterial.albedoColor.b).toBeLessThanOrEqual(0.34);
-    expect(stageMassMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(stageMassMaterial.roughness).toBeGreaterThanOrEqual(0.8);
-    expect(stageMassMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.08);
-    expect(stageMassMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+    const shoulderMassMaterial = shoulderMass.material as PBRMaterial;
+    expect(shoulderMassMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(shoulderMassMaterial.metadata?.mainStageMaterialOverride).toBe('shoulder-crown-mass-ivory');
+    expect(shoulderMassMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
+    expect(shoulderMassMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(shoulderMassMaterial.albedoColor.b).toBeLessThanOrEqual(0.32);
+    expect(shoulderMassMaterial.emissiveIntensity).toBeLessThanOrEqual(0.025);
+    expect(shoulderMassMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(shoulderMassMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(shoulderMassMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+
+    const cathedralMassMaterial = cathedralMass.material as PBRMaterial;
+    expect(cathedralMassMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(cathedralMassMaterial.metadata?.mainStageMaterialOverride).toBe('rear-cathedral-mass-ivory');
+    expect(cathedralMassMaterial.albedoColor.r).toBeLessThanOrEqual(0.28);
+    expect(cathedralMassMaterial.albedoColor.g).toBeLessThanOrEqual(0.3);
+    expect(cathedralMassMaterial.albedoColor.b).toBeLessThanOrEqual(0.34);
+    expect(cathedralMassMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(cathedralMassMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(cathedralMassMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.08);
+    expect(cathedralMassMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
 
   it('darkens the V51 cathedral core and proscenium pylon shells so the stage crown reads as carved depth instead of bright centerline pylons', () => {
