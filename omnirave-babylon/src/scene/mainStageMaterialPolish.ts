@@ -3027,6 +3027,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V64_PlazaStoneSpine') {
+      const cacheKey = `${material.uniqueId}:plaza-stone-spine`;
+      let spineMaterial = clonedMaterials.get(cacheKey);
+      if (!spineMaterial) {
+        spineMaterial = material.clone(`${material.name}__plaza-stone-spine`);
+        applyPlazaStoneSpineOverride(spineMaterial);
+        clonedMaterials.set(cacheKey, spineMaterial);
+      }
+
+      assignOverrideMaterial(mesh, spineMaterial);
+      continue;
+    }
+
     if (
       mesh.name === 'V31_SideParallaxGoldOrbit_L' ||
       mesh.name === 'V31_SideParallaxGoldOrbit_R'
@@ -6499,6 +6512,24 @@ function applyPlazaCrossBandsOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'plaza-cross-bands',
+  };
+}
+
+function applyPlazaStoneSpineOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.14, 0.17, 0.21);
+  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.04;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialPolish: 'black',
+    mainStageMaterialOverride: 'plaza-stone-spine',
   };
 }
 
