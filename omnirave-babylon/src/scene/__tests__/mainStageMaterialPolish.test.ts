@@ -9549,6 +9549,9 @@ describe('polishMainStageMaterials', () => {
     const rightShadow = MeshBuilder.CreateBox('V53_SpawnGalleryShadowSpine_R', { size: 1 }, scene);
     rightShadow.material = sharedShadowMaterial;
 
+    const heroVault = MeshBuilder.CreateBox('V25_HeroPortalShadowVault', { size: 1 }, scene);
+    heroVault.material = sharedShadowMaterial;
+
     const cyanControl = MeshBuilder.CreateBox('TestSpawnGalleryCyanControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
 
@@ -9557,6 +9560,9 @@ describe('polishMainStageMaterials', () => {
 
     const rightLancet = MeshBuilder.CreateBox('V53_SpawnGalleryCyanLancets_R', { size: 1 }, scene);
     rightLancet.material = sharedCyanMaterial;
+
+    const crownCrystal = MeshBuilder.CreateBox('V25_CrownApexCrystal', { size: 1 }, scene);
+    crownCrystal.material = sharedCyanMaterial;
 
     polishMainStageMaterials([
       goldControl,
@@ -9567,9 +9573,11 @@ describe('polishMainStageMaterials', () => {
       shadowControl,
       leftShadow,
       rightShadow,
+      heroVault,
       cyanControl,
       leftLancet,
       rightLancet,
+      crownCrystal,
     ]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
@@ -9582,15 +9590,21 @@ describe('polishMainStageMaterials', () => {
     expect(shadowControl.material).toBe(sharedShadowMaterial);
     expect(leftShadow.material).toBeInstanceOf(PBRMaterial);
     expect(rightShadow.material).toBe(leftShadow.material);
+    expect(heroVault.material).toBeInstanceOf(PBRMaterial);
+    expect(heroVault.material).not.toBe(leftShadow.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftLancet.material).toBeInstanceOf(PBRMaterial);
     expect(rightLancet.material).toBe(leftLancet.material);
+    expect(crownCrystal.material).toBeInstanceOf(PBRMaterial);
+    expect(crownCrystal.material).not.toBe(leftLancet.material);
 
     const corniceGoldMaterial = leftCornice.material as PBRMaterial;
     const haloGoldMaterial = leftHalo.material as PBRMaterial;
     const shadowMaterial = leftShadow.material as PBRMaterial;
+    const heroVaultMaterial = heroVault.material as PBRMaterial;
     const cyanMaterial = leftLancet.material as PBRMaterial;
+    const crownCrystalMaterial = crownCrystal.material as PBRMaterial;
 
     expect(corniceGoldMaterial.name).toContain('spawn-gallery-cornice-gold');
     expect(corniceGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -9624,6 +9638,9 @@ describe('polishMainStageMaterials', () => {
     expect(shadowMaterial.metallic).toBeLessThanOrEqual(0.08);
     expect(shadowMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(shadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
+    expect(shadowMaterial.albedoColor.r).toBeLessThan(heroVaultMaterial.albedoColor.r);
+    expect(shadowMaterial.roughness ?? 0).toBeGreaterThan(heroVaultMaterial.roughness ?? 0);
+    expect(shadowMaterial.environmentIntensity).toBeLessThan(heroVaultMaterial.environmentIntensity);
 
     expect(cyanMaterial.name).toContain('spawn-gallery-arcade-cyan');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -9636,6 +9653,9 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.18);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.34);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(cyanMaterial.alpha).toBeLessThan(crownCrystalMaterial.alpha);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThan(crownCrystalMaterial.emissiveIntensity);
+    expect(cyanMaterial.environmentIntensity).toBeLessThan(crownCrystalMaterial.environmentIntensity);
   });
 
   it('smokes the wing glass balustrades so the promenade side shells stop reading as flat cyan cards', () => {
