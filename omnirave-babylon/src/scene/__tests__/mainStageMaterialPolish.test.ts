@@ -6758,6 +6758,9 @@ describe('polishMainStageMaterials', () => {
     const rightCrown = MeshBuilder.CreateBox('V60_SpawnGateSentinelGoldCrown_R', { size: 1 }, scene);
     rightCrown.material = sharedGoldMaterial;
 
+    const wingArchInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_L', { size: 1 }, scene);
+    wingArchInlay.material = sharedGoldMaterial;
+
     const shadowControl = MeshBuilder.CreateBox('TestSpawnGateSentinelShadowControl', { size: 1 }, scene);
     shadowControl.material = sharedShadowMaterial;
 
@@ -6766,6 +6769,9 @@ describe('polishMainStageMaterials', () => {
 
     const rightKeel = MeshBuilder.CreateBox('V60_SpawnGateSentinelShadowKeel_R', { size: 1 }, scene);
     rightKeel.material = sharedShadowMaterial;
+
+    const heroVault = MeshBuilder.CreateBox('V25_HeroPortalShadowVault', { size: 1 }, scene);
+    heroVault.material = sharedShadowMaterial;
 
     const cyanControl = MeshBuilder.CreateBox('TestSpawnGateSentinelCyanControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
@@ -6776,33 +6782,48 @@ describe('polishMainStageMaterials', () => {
     const rightCore = MeshBuilder.CreateBox('V60_SpawnGateSentinelCyanCore_R', { size: 1 }, scene);
     rightCore.material = sharedCyanMaterial;
 
+    const crownApexCrystal = MeshBuilder.CreateBox('V25_CrownApexCrystal', { size: 1 }, scene);
+    crownApexCrystal.material = sharedCyanMaterial;
+
     polishMainStageMaterials([
       goldControl,
       leftCrown,
       rightCrown,
+      wingArchInlay,
       shadowControl,
       leftKeel,
       rightKeel,
+      heroVault,
       cyanControl,
       leftCore,
       rightCore,
+      crownApexCrystal,
     ]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftCrown.material).toBeInstanceOf(PBRMaterial);
     expect(rightCrown.material).toBe(leftCrown.material);
+    expect(wingArchInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArchInlay.material).not.toBe(leftCrown.material);
 
     expect(shadowControl.material).toBe(sharedShadowMaterial);
     expect(leftKeel.material).toBeInstanceOf(PBRMaterial);
     expect(rightKeel.material).toBe(leftKeel.material);
+    expect(heroVault.material).toBeInstanceOf(PBRMaterial);
+    expect(heroVault.material).not.toBe(leftKeel.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftCore.material).toBeInstanceOf(PBRMaterial);
     expect(rightCore.material).toBe(leftCore.material);
+    expect(crownApexCrystal.material).toBeInstanceOf(PBRMaterial);
+    expect(crownApexCrystal.material).not.toBe(leftCore.material);
 
     const goldMaterial = leftCrown.material as PBRMaterial;
+    const wingArchInlayMaterial = wingArchInlay.material as PBRMaterial;
     const shadowMaterial = leftKeel.material as PBRMaterial;
+    const heroVaultMaterial = heroVault.material as PBRMaterial;
     const cyanMaterial = leftCore.material as PBRMaterial;
+    const crownApexCrystalMaterial = crownApexCrystal.material as PBRMaterial;
 
     expect(goldMaterial.name).toContain('spawn-gate-sentinel-gold-crown');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -6814,6 +6835,9 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(goldMaterial.albedoColor.r).toBeGreaterThan(wingArchInlayMaterial.albedoColor.r);
+    expect(goldMaterial.metallic ?? 0).toBeGreaterThan(wingArchInlayMaterial.metallic ?? 0);
+    expect(goldMaterial.roughness ?? 0).toBeLessThan(wingArchInlayMaterial.roughness ?? 0);
 
     expect(shadowMaterial.name).toContain('spawn-gate-sentinel-shadow-keel');
     expect(shadowMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -6825,6 +6849,9 @@ describe('polishMainStageMaterials', () => {
     expect(shadowMaterial.metallic).toBeLessThanOrEqual(0.08);
     expect(shadowMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(shadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
+    expect(shadowMaterial.albedoColor.r).toBeLessThan(heroVaultMaterial.albedoColor.r);
+    expect(shadowMaterial.emissiveIntensity).toBeLessThan(heroVaultMaterial.emissiveIntensity);
+    expect(shadowMaterial.environmentIntensity).toBeLessThan(heroVaultMaterial.environmentIntensity);
 
     expect(cyanMaterial.name).toContain('spawn-gate-sentinel-cyan-core');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -6837,6 +6864,9 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.18);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.34);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(cyanMaterial.alpha).toBeLessThan(crownApexCrystalMaterial.alpha);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThan(crownApexCrystalMaterial.emissiveIntensity);
+    expect(cyanMaterial.environmentIntensity).toBeLessThan(crownApexCrystalMaterial.environmentIntensity);
   });
 
   it('darkens the spawn-pylon pearl shells so the forward route views stop reading them as bright ivory proxy totems', () => {
