@@ -4776,7 +4776,16 @@ function applyCrownRiggingGoldBossOverride(material: PBRMaterial) {
 }
 
 function applyCrownGoldLatticeOverride(material: PBRMaterial) {
-  applyCrownRiggingGoldBossOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.14, 0.1, 0.04);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.1;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.9;
+  material.environmentIntensity = 0.06;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-gold-lattice',

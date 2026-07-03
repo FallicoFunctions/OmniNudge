@@ -2755,13 +2755,19 @@ describe('polishMainStageMaterials', () => {
     const braceB = MeshBuilder.CreateBox('V47_CrownGoldLatticeBraceB', { size: 1 }, scene);
     braceB.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([goldControl, braceA, braceB]);
+    const goldBoss = MeshBuilder.CreateBox('V72_CrownRiggingGoldBosses', { size: 1 }, scene);
+    goldBoss.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([goldControl, braceA, braceB, goldBoss]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(braceA.material).toBeInstanceOf(PBRMaterial);
     expect(braceB.material).toBe(braceA.material);
+    expect(goldBoss.material).toBeInstanceOf(PBRMaterial);
+    expect(goldBoss.material).not.toBe(braceA.material);
 
     const latticeMaterial = braceA.material as PBRMaterial;
+    const bossMaterial = goldBoss.material as PBRMaterial;
     expect(latticeMaterial.name).toContain('crown-gold-lattice');
     expect(latticeMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(latticeMaterial.metadata?.mainStageMaterialOverride).toBe('crown-gold-lattice');
@@ -2772,6 +2778,9 @@ describe('polishMainStageMaterials', () => {
     expect(latticeMaterial.metallic).toBeLessThanOrEqual(0.16);
     expect(latticeMaterial.roughness).toBeGreaterThanOrEqual(0.88);
     expect(latticeMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+    expect(latticeMaterial.albedoColor.r).toBeLessThan(bossMaterial.albedoColor.r);
+    expect(latticeMaterial.metallic ?? 0).toBeLessThan(bossMaterial.metallic ?? 0);
+    expect(latticeMaterial.roughness ?? 0).toBeGreaterThan(bossMaterial.roughness ?? 0);
   });
 
   it('rebalances the foreground barricade frames and gold rails so the entry flanks read as authored ceremonial barriers instead of flat black strips capped with bright foil', () => {
