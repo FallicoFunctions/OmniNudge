@@ -9013,7 +9013,7 @@ describe('polishMainStageMaterials', () => {
     expect(spireMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.1);
   });
 
-  it('darkens the crown obelisk pearl shell masses so the skyline reads as a layered silhouette instead of pale spear proxies', () => {
+  it('regrades the crown obelisk core and spire blades into distinct pearl masses so the skyline stops reading like one repeated pale spear proxy finish', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -9044,19 +9044,30 @@ describe('polishMainStageMaterials', () => {
     expect(obeliskCore.material).not.toBe(sharedPearlMaterial);
     expect(leftBlade.material).not.toBe(sharedPearlMaterial);
     expect(rightBlade.material).not.toBe(sharedPearlMaterial);
-    expect(leftBlade.material).toBe(obeliskCore.material);
-    expect(rightBlade.material).toBe(obeliskCore.material);
+    expect(rightBlade.material).toBe(leftBlade.material);
+    expect(leftBlade.material).not.toBe(obeliskCore.material);
 
-    const shellMaterial = obeliskCore.material as PBRMaterial;
-    expect(shellMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(shellMaterial.metadata?.mainStageMaterialOverride).toBe('crown-obelisk-pearl-shell');
-    expect(shellMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
-    expect(shellMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
-    expect(shellMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
-    expect(shellMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(shellMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(shellMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    const coreMaterial = obeliskCore.material as PBRMaterial;
+    expect(coreMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(coreMaterial.metadata?.mainStageMaterialOverride).toBe('crown-obelisk-core-shell');
+    expect(coreMaterial.albedoColor.r).toBeLessThanOrEqual(0.21);
+    expect(coreMaterial.albedoColor.g).toBeLessThanOrEqual(0.23);
+    expect(coreMaterial.albedoColor.b).toBeLessThanOrEqual(0.27);
+    expect(coreMaterial.emissiveIntensity).toBeLessThanOrEqual(0.025);
+    expect(coreMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(coreMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.05);
+    expect(coreMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+
+    const bladeMaterial = leftBlade.material as PBRMaterial;
+    expect(bladeMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(bladeMaterial.metadata?.mainStageMaterialOverride).toBe('crown-spire-pearl-blade');
+    expect(bladeMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(bladeMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(bladeMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(bladeMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(bladeMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(bladeMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.07);
+    expect(bladeMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
   });
 
   it('rebalances the crown obelisk tracery, shadow spine, and apex jewel so the skyline crest reads as carved metal and smoked crystal instead of bright gold strips around a flat cyan spike', () => {
