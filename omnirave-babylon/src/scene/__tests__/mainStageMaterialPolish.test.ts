@@ -9883,4 +9883,46 @@ describe('polishMainStageMaterials', () => {
     expect(basinStoneMaterial.roughness).toBeGreaterThanOrEqual(0.9);
     expect(basinStoneMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
+
+  it('darkens the spawn gallery filigree gold so the arcade detailing reads as carved night metal instead of bright gold lace bands', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V20_ChasedGoldFiligree', scene);
+    sharedGoldMaterial.albedoColor.set(0.78, 0.64, 0.26);
+    sharedGoldMaterial.emissiveColor.set(0.08, 0.06, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.16;
+    sharedGoldMaterial.metallic = 0.8;
+    sharedGoldMaterial.roughness = 0.26;
+
+    const goldControl = MeshBuilder.CreateBox('TestSpawnFiligreeGoldControl', { size: 1 }, scene);
+    goldControl.material = sharedGoldMaterial;
+
+    const leftFiligree = MeshBuilder.CreateBox('V54_SpawnGalleryFiligreeGold_L', { size: 1 }, scene);
+    leftFiligree.material = sharedGoldMaterial;
+
+    const rightFiligree = MeshBuilder.CreateBox('V54_SpawnGalleryFiligreeGold_R', { size: 1 }, scene);
+    rightFiligree.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([goldControl, leftFiligree, rightFiligree]);
+
+    expect(goldControl.material).toBe(sharedGoldMaterial);
+    expect(leftFiligree.material).toBeInstanceOf(PBRMaterial);
+    expect(rightFiligree.material).toBeInstanceOf(PBRMaterial);
+    expect(leftFiligree.material).not.toBe(sharedGoldMaterial);
+    expect(rightFiligree.material).not.toBe(sharedGoldMaterial);
+    expect(rightFiligree.material).toBe(leftFiligree.material);
+
+    const filigreeMaterial = leftFiligree.material as PBRMaterial;
+    expect(filigreeMaterial.name).toContain('spawn-filigree-gold');
+    expect(filigreeMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(filigreeMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-filigree-gold');
+    expect(filigreeMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(filigreeMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(filigreeMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(filigreeMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(filigreeMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(filigreeMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(filigreeMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
 });
