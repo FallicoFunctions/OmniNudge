@@ -1522,14 +1522,24 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       mesh.name === 'V46_CrownLightDropCableCluster' ||
       mesh.name === 'V46_CrownMovingLightHousingCluster'
     ) {
-      const cacheKey = `${material.uniqueId}:crown-moving-light-hardware`;
+      const isCableCluster = mesh.name === 'V46_CrownLightDropCableCluster';
+      const cacheKey = isCableCluster
+        ? `${material.uniqueId}:crown-light-drop-cable`
+        : `${material.uniqueId}:crown-moving-light-housing`;
       let hardwareMaterial = clonedMaterials.get(cacheKey);
       if (!hardwareMaterial) {
-        hardwareMaterial = material.clone(`${material.name}__crown-moving-light-hardware`);
-        applyCrowdBarrierBaseOverride(hardwareMaterial);
+        hardwareMaterial = material.clone(
+          isCableCluster
+            ? `${material.name}__crown-light-drop-cable`
+            : `${material.name}__crown-moving-light-housing`,
+        );
+        if (isCableCluster) {
+          applyCrownLightDropCableOverride(hardwareMaterial);
+        } else {
+          applyCrownMovingLightHousingOverride(hardwareMaterial);
+        }
         hardwareMaterial.metadata = {
           ...hardwareMaterial.metadata,
-          mainStageMaterialOverride: 'crown-moving-light-hardware',
         };
         clonedMaterials.set(cacheKey, hardwareMaterial);
       }
@@ -5601,6 +5611,42 @@ function applyCrowdControlRailOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crowd-control-rail',
+  };
+}
+
+function applyCrownLightDropCableOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.12, 0.16, 0.2);
+  material.emissiveColor = new Color3(0.004, 0.005, 0.007);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.02;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.76;
+  material.environmentIntensity = 0.18;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialPolish: 'black',
+    mainStageMaterialOverride: 'crown-light-drop-cable',
+  };
+}
+
+function applyCrownMovingLightHousingOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.15, 0.19, 0.23);
+  material.emissiveColor = new Color3(0.008, 0.01, 0.013);
+  material.emissiveIntensity = 0.024;
+  material.metallic = 0.05;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.66;
+  material.environmentIntensity = 0.28;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialPolish: 'black',
+    mainStageMaterialOverride: 'crown-moving-light-housing',
   };
 }
 
