@@ -601,6 +601,24 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
     }
 
     if (
+      mesh.name === 'V33_BasinFoliageUnderstory_L' ||
+      mesh.name === 'V33_BasinFoliageUnderstory_R' ||
+      mesh.name === 'V33_VipFoliageUnderstory_L' ||
+      mesh.name === 'V33_VipFoliageUnderstory_R'
+    ) {
+      const cacheKey = `${material.uniqueId}:deep-foliage-understory`;
+      let understoryMaterial = clonedMaterials.get(cacheKey);
+      if (!understoryMaterial) {
+        understoryMaterial = material.clone(`${material.name}__deep-foliage-understory`);
+        applyDeepFoliageUnderstoryOverride(understoryMaterial);
+        clonedMaterials.set(cacheKey, understoryMaterial);
+      }
+
+      assignOverrideMaterial(mesh, understoryMaterial);
+      continue;
+    }
+
+    if (
       mesh.name === 'V32_CrowdCluster_L_Near' ||
       mesh.name === 'V32_CrowdCluster_R_Near' ||
       mesh.name === 'V32_CrowdCluster_L_Mid' ||
@@ -4650,6 +4668,24 @@ function applyLayeredFoliageCanopyOverride(material: PBRMaterial) {
     ...material.metadata,
     mainStageMaterialPolish: 'black',
     mainStageMaterialOverride: 'layered-foliage-canopy',
+  };
+}
+
+function applyDeepFoliageUnderstoryOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.06, 0.08, 0.04);
+  material.emissiveColor = new Color3(0.004, 0.006, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialPolish: 'black',
+    mainStageMaterialOverride: 'deep-foliage-understory',
   };
 }
 
