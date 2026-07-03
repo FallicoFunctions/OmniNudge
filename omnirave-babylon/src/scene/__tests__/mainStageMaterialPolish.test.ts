@@ -10163,4 +10163,40 @@ describe('polishMainStageMaterials', () => {
     expect(orbitMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(orbitMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
+
+  it('darkens the portal crest bridge gold so the hero portal crest reads as carved metal structure instead of a bright gold brace', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V20_ChasedGoldFiligree', scene);
+    sharedGoldMaterial.albedoColor.set(0.78, 0.64, 0.26);
+    sharedGoldMaterial.emissiveColor.set(0.08, 0.06, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.16;
+    sharedGoldMaterial.metallic = 0.8;
+    sharedGoldMaterial.roughness = 0.26;
+
+    const goldControl = MeshBuilder.CreateBox('TestPortalCrestBridgeControl', { size: 1 }, scene);
+    goldControl.material = sharedGoldMaterial;
+
+    const bridge = MeshBuilder.CreateBox('V51_PortalCrestBridge', { size: 1 }, scene);
+    bridge.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([goldControl, bridge]);
+
+    expect(goldControl.material).toBe(sharedGoldMaterial);
+    expect(bridge.material).toBeInstanceOf(PBRMaterial);
+    expect(bridge.material).not.toBe(sharedGoldMaterial);
+
+    const bridgeMaterial = bridge.material as PBRMaterial;
+    expect(bridgeMaterial.name).toContain('portal-crest-bridge');
+    expect(bridgeMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(bridgeMaterial.metadata?.mainStageMaterialOverride).toBe('portal-crest-bridge');
+    expect(bridgeMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(bridgeMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(bridgeMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(bridgeMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(bridgeMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(bridgeMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(bridgeMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
 });
