@@ -10271,4 +10271,37 @@ describe('polishMainStageMaterials', () => {
       expect(mat.environmentIntensity).toBeLessThanOrEqual(0.28);
     }
   });
+
+  it('darkens the plaza stone spine so the gateway ivory reads as recessed depth instead of bright pearl strips', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedPearlMaterial = new PBRMaterial('V19_GatewayPearlIvory', scene);
+    sharedPearlMaterial.albedoColor.set(0.82, 0.78, 0.68);
+    sharedPearlMaterial.emissiveColor.set(0.12, 0.1, 0.08);
+    sharedPearlMaterial.emissiveIntensity = 0.14;
+    sharedPearlMaterial.metallic = 0.06;
+    sharedPearlMaterial.roughness = 0.38;
+
+    const otherPearl = MeshBuilder.CreateBox('TestPlazaStoneSpineControl', { size: 1 }, scene);
+    otherPearl.material = sharedPearlMaterial;
+
+    const stoneSpine = MeshBuilder.CreateBox('V64_PlazaStoneSpine', { size: 1 }, scene);
+    stoneSpine.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, stoneSpine]);
+
+    expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(stoneSpine.material).not.toBe(sharedPearlMaterial);
+
+    const spineMaterial = stoneSpine.material as PBRMaterial;
+    expect(spineMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(spineMaterial.metadata?.mainStageMaterialOverride).toBe('plaza-stone-spine');
+    expect(spineMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(spineMaterial.albedoColor.g).toBeLessThanOrEqual(0.18);
+    expect(spineMaterial.albedoColor.b).toBeLessThanOrEqual(0.22);
+    expect(spineMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(spineMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(spineMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+  });
 });
