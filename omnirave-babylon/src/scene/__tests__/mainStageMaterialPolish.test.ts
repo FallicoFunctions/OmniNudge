@@ -2079,6 +2079,8 @@ describe('polishMainStageMaterials', () => {
     leftPier.material = sharedPearlMaterial;
     const rightPier = MeshBuilder.CreateBox('V38_WingFacadeArcadePierCluster_R', { size: 1 }, scene);
     rightPier.material = sharedPearlMaterial;
+    const wingArcadeArch = MeshBuilder.CreateBox('V28_WingArcadePearlArch_L', { size: 1 }, scene);
+    wingArcadeArch.material = sharedPearlMaterial;
 
     const goldControl = MeshBuilder.CreateBox('TestWingFacadeGoldControl', { size: 1 }, scene);
     goldControl.material = sharedGoldMaterial;
@@ -2086,6 +2088,8 @@ describe('polishMainStageMaterials', () => {
     leftCapital.material = sharedGoldMaterial;
     const rightCapital = MeshBuilder.CreateBox('V38_WingFacadeGoldCapital_R', { size: 1 }, scene);
     rightCapital.material = sharedGoldMaterial;
+    const wingFacadeLintel = MeshBuilder.CreateBox('V87_WingFacadeGoldLintelArray_L', { size: 1 }, scene);
+    wingFacadeLintel.material = sharedGoldMaterial;
 
     const shadowControl = MeshBuilder.CreateBox('TestWingFacadeShadowControl', { size: 1 }, scene);
     shadowControl.material = sharedShadowMaterial;
@@ -2093,34 +2097,48 @@ describe('polishMainStageMaterials', () => {
     leftShadow.material = sharedShadowMaterial;
     const rightShadow = MeshBuilder.CreateBox('V38_WingFacadeShadowReveal_R', { size: 1 }, scene);
     rightShadow.material = sharedShadowMaterial;
+    const wingFacadeShadowFrame = MeshBuilder.CreateBox('V87_WingFacadeShadowFrameArray_L', { size: 1 }, scene);
+    wingFacadeShadowFrame.material = sharedShadowMaterial;
 
     polishMainStageMaterials([
       pearlControl,
       leftPier,
       rightPier,
+      wingArcadeArch,
       goldControl,
       leftCapital,
       rightCapital,
+      wingFacadeLintel,
       shadowControl,
       leftShadow,
       rightShadow,
+      wingFacadeShadowFrame,
     ]);
 
     expect(pearlControl.material).toBe(sharedPearlMaterial);
     expect(leftPier.material).toBeInstanceOf(PBRMaterial);
     expect(rightPier.material).toBe(leftPier.material);
+    expect(wingArcadeArch.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArcadeArch.material).not.toBe(leftPier.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftCapital.material).toBeInstanceOf(PBRMaterial);
     expect(rightCapital.material).toBe(leftCapital.material);
+    expect(wingFacadeLintel.material).toBeInstanceOf(PBRMaterial);
+    expect(wingFacadeLintel.material).not.toBe(leftCapital.material);
 
     expect(shadowControl.material).toBe(sharedShadowMaterial);
     expect(leftShadow.material).toBeInstanceOf(PBRMaterial);
     expect(rightShadow.material).toBe(leftShadow.material);
+    expect(wingFacadeShadowFrame.material).toBeInstanceOf(PBRMaterial);
+    expect(wingFacadeShadowFrame.material).not.toBe(leftShadow.material);
 
     const pierMaterial = leftPier.material as PBRMaterial;
+    const wingArcadeArchMaterial = wingArcadeArch.material as PBRMaterial;
     const capitalMaterial = leftCapital.material as PBRMaterial;
+    const wingFacadeLintelMaterial = wingFacadeLintel.material as PBRMaterial;
     const shadowMaterial = leftShadow.material as PBRMaterial;
+    const wingFacadeShadowFrameMaterial = wingFacadeShadowFrame.material as PBRMaterial;
 
     expect(pierMaterial.name).toContain('wing-facade-arcade-pier');
     expect(pierMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
@@ -2132,6 +2150,9 @@ describe('polishMainStageMaterials', () => {
     expect(pierMaterial.roughness).toBeGreaterThanOrEqual(0.82);
     expect(pierMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(pierMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(pierMaterial.albedoColor.r).toBeGreaterThan(wingArcadeArchMaterial.albedoColor.r);
+    expect(pierMaterial.roughness ?? 0).toBeLessThan(wingArcadeArchMaterial.roughness ?? 0);
+    expect(pierMaterial.environmentIntensity).toBeGreaterThan(wingArcadeArchMaterial.environmentIntensity);
 
     expect(capitalMaterial.name).toContain('wing-facade-gold-capital');
     expect(capitalMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -2143,6 +2164,9 @@ describe('polishMainStageMaterials', () => {
     expect(capitalMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(capitalMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(capitalMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(capitalMaterial.albedoColor.r).toBeGreaterThan(wingFacadeLintelMaterial.albedoColor.r);
+    expect(capitalMaterial.metallic ?? 0).toBeGreaterThan(wingFacadeLintelMaterial.metallic ?? 0);
+    expect(capitalMaterial.roughness ?? 0).toBeLessThan(wingFacadeLintelMaterial.roughness ?? 0);
 
     expect(shadowMaterial.name).toContain('wing-facade-shadow-reveal');
     expect(shadowMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -2153,6 +2177,9 @@ describe('polishMainStageMaterials', () => {
     expect(shadowMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
     expect(shadowMaterial.roughness).toBeGreaterThanOrEqual(0.78);
     expect(shadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.42);
+    expect(shadowMaterial.albedoColor.r).toBeLessThan(wingFacadeShadowFrameMaterial.albedoColor.r);
+    expect(shadowMaterial.emissiveIntensity).toBeLessThan(wingFacadeShadowFrameMaterial.emissiveIntensity);
+    expect(shadowMaterial.environmentIntensity).toBeLessThan(wingFacadeShadowFrameMaterial.environmentIntensity);
   });
 
   it('keeps the main line-array and front-sub assemblies dark but readable so the stage flanks read as finished show audio hardware instead of dead-black boxes with bright gold hang bars', () => {
