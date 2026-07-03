@@ -1997,11 +1997,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V126_WideHeroScreenGoldFrame' ||
-      mesh.name === 'V126_WideHeroScreenGoldMullionArray' ||
-      mesh.name === 'V126_WideHeroScreenGoldCrossbarArray'
-    ) {
+    if (mesh.name === 'V126_WideHeroScreenGoldFrame') {
       const cacheKey = `${material.uniqueId}:wide-hero-screen-gold-frame`;
       let frameMaterial = clonedMaterials.get(cacheKey);
       if (!frameMaterial) {
@@ -2011,6 +2007,32 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V126_WideHeroScreenGoldMullionArray') {
+      const cacheKey = `${material.uniqueId}:wide-hero-screen-gold-mullion`;
+      let mullionMaterial = clonedMaterials.get(cacheKey);
+      if (!mullionMaterial) {
+        mullionMaterial = material.clone(`${material.name}__wide-hero-screen-gold-mullion`);
+        applyWideHeroScreenGoldMullionOverride(mullionMaterial);
+        clonedMaterials.set(cacheKey, mullionMaterial);
+      }
+
+      assignOverrideMaterial(mesh, mullionMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V126_WideHeroScreenGoldCrossbarArray') {
+      const cacheKey = `${material.uniqueId}:wide-hero-screen-gold-crossbar`;
+      let crossbarMaterial = clonedMaterials.get(cacheKey);
+      if (!crossbarMaterial) {
+        crossbarMaterial = material.clone(`${material.name}__wide-hero-screen-gold-crossbar`);
+        applyWideHeroScreenGoldCrossbarOverride(crossbarMaterial);
+        clonedMaterials.set(cacheKey, crossbarMaterial);
+      }
+
+      assignOverrideMaterial(mesh, crossbarMaterial);
       continue;
     }
 
@@ -5964,6 +5986,40 @@ function applyWideHeroScreenGoldFrameOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wide-hero-screen-gold-frame',
+  };
+}
+
+function applyWideHeroScreenGoldMullionOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.15, 0.11, 0.045);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.14;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.9;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wide-hero-screen-gold-mullion',
+  };
+}
+
+function applyWideHeroScreenGoldCrossbarOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.17, 0.13, 0.055);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
+  material.metallic = 0.16;
+  material.roughness = 0.89;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.86;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wide-hero-screen-gold-crossbar',
   };
 }
 
