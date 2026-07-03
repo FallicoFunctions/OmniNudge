@@ -10343,4 +10343,43 @@ describe('polishMainStageMaterials', () => {
       expect(mat.environmentIntensity).toBeLessThanOrEqual(0.18);
     }
   });
+
+  it('darkens the basin foliage midstory so the lush planting reads as dense shadow instead of bright green leaves', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedFoliageMaterial = new PBRMaterial('V13_LushGardenPlanting', scene);
+    sharedFoliageMaterial.albedoColor.set(0.24, 0.38, 0.18);
+    sharedFoliageMaterial.emissiveColor.set(0.02, 0.04, 0.01);
+    sharedFoliageMaterial.emissiveIntensity = 0.12;
+    sharedFoliageMaterial.metallic = 0.04;
+    sharedFoliageMaterial.roughness = 0.58;
+
+    const otherFoliage = MeshBuilder.CreateBox('TestBasinFoliageMidstoryControl', { size: 1 }, scene);
+    otherFoliage.material = sharedFoliageMaterial;
+
+    const midstoryL = MeshBuilder.CreateBox('V33_BasinFoliageMidstory_L', { size: 1 }, scene);
+    midstoryL.material = sharedFoliageMaterial;
+
+    const midstoryR = MeshBuilder.CreateBox('V33_BasinFoliageMidstory_R', { size: 1 }, scene);
+    midstoryR.material = sharedFoliageMaterial;
+
+    polishMainStageMaterials([otherFoliage, midstoryL, midstoryR]);
+
+    expect(otherFoliage.material).toBe(sharedFoliageMaterial);
+    expect(midstoryL.material).not.toBe(sharedFoliageMaterial);
+    expect(midstoryR.material).not.toBe(sharedFoliageMaterial);
+
+    for (const mesh of [midstoryL, midstoryR]) {
+      const mat = mesh.material as PBRMaterial;
+      expect(mat.metadata?.mainStageMaterialPolish).toBe('black');
+      expect(mat.metadata?.mainStageMaterialOverride).toBe('basin-foliage-midstory');
+      expect(mat.albedoColor.r).toBeLessThanOrEqual(0.14);
+      expect(mat.albedoColor.g).toBeLessThanOrEqual(0.17);
+      expect(mat.albedoColor.b).toBeLessThanOrEqual(0.12);
+      expect(mat.emissiveIntensity).toBeLessThanOrEqual(0.03);
+      expect(mat.roughness).toBeGreaterThanOrEqual(0.84);
+      expect(mat.environmentIntensity).toBeLessThanOrEqual(0.18);
+    }
+  });
 });
