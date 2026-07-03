@@ -652,20 +652,57 @@ describe('polishMainStageMaterials', () => {
     expect(canopyTrim.material).not.toBe(sharedGoldMaterial);
     expect(buttressTrim.material).not.toBe(sharedGoldMaterial);
     expect(mullionTrim.material).not.toBe(sharedGoldMaterial);
-    expect(canopyTrim.material).toBe(pedestalTrim.material);
-    expect(buttressTrim.material).toBe(pedestalTrim.material);
-    expect(mullionTrim.material).toBe(pedestalTrim.material);
+    expect(canopyTrim.material).not.toBe(pedestalTrim.material);
+    expect(buttressTrim.material).not.toBe(pedestalTrim.material);
+    expect(mullionTrim.material).not.toBe(pedestalTrim.material);
+    expect(buttressTrim.material).not.toBe(canopyTrim.material);
+    expect(mullionTrim.material).not.toBe(canopyTrim.material);
+    expect(mullionTrim.material).not.toBe(buttressTrim.material);
 
-    const trimMaterial = pedestalTrim.material as PBRMaterial;
-    expect(trimMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
-    expect(trimMaterial.metadata?.mainStageMaterialOverride).toBe('oval-screen-gold-trim');
-    expect(trimMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(trimMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(trimMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
-    expect(trimMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(trimMaterial.metallic).toBeLessThanOrEqual(0.2);
-    expect(trimMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(trimMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    const pedestalTrimMaterial = pedestalTrim.material as PBRMaterial;
+    const canopyTrimMaterial = canopyTrim.material as PBRMaterial;
+    const buttressTrimMaterial = buttressTrim.material as PBRMaterial;
+    const mullionTrimMaterial = mullionTrim.material as PBRMaterial;
+
+    expect(pedestalTrimMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(pedestalTrimMaterial.metadata?.mainStageMaterialOverride).toBe('oval-screen-pedestal-gold-trim');
+    expect(pedestalTrimMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(pedestalTrimMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(pedestalTrimMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(pedestalTrimMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(pedestalTrimMaterial.metallic).toBeLessThanOrEqual(0.14);
+    expect(pedestalTrimMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(pedestalTrimMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+
+    expect(canopyTrimMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(canopyTrimMaterial.metadata?.mainStageMaterialOverride).toBe('oval-screen-canopy-gold-trim');
+    expect(canopyTrimMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(canopyTrimMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(canopyTrimMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(canopyTrimMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(canopyTrimMaterial.metallic).toBeGreaterThanOrEqual(0.18);
+    expect(canopyTrimMaterial.roughness).toBeLessThanOrEqual(0.88);
+    expect(canopyTrimMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.12);
+
+    expect(buttressTrimMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(buttressTrimMaterial.metadata?.mainStageMaterialOverride).toBe('oval-screen-buttress-gold-trim');
+    expect(buttressTrimMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(buttressTrimMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
+    expect(buttressTrimMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(buttressTrimMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(buttressTrimMaterial.metallic).toBeGreaterThanOrEqual(0.16);
+    expect(buttressTrimMaterial.roughness).toBeLessThanOrEqual(0.88);
+    expect(buttressTrimMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.1);
+
+    expect(mullionTrimMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(mullionTrimMaterial.metadata?.mainStageMaterialOverride).toBe('oval-screen-mullion-gold-trim');
+    expect(mullionTrimMaterial.albedoColor.r).toBeLessThanOrEqual(0.14);
+    expect(mullionTrimMaterial.albedoColor.g).toBeLessThanOrEqual(0.11);
+    expect(mullionTrimMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(mullionTrimMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(mullionTrimMaterial.metallic).toBeLessThanOrEqual(0.14);
+    expect(mullionTrimMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(mullionTrimMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('darkens the basin retaining reliefs so the basin-edge sidewalls read as grounded architecture instead of bright pearl sheets', () => {
