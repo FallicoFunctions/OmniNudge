@@ -10154,7 +10154,7 @@ describe('polishMainStageMaterials', () => {
     expect(ribMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
 
-  it('darkens the basin channel relief, runway spine, and retaining wall so the basin structure reads as carved stonework instead of bright pearl slabs', () => {
+  it('darkens the basin channel relief, runway spine, and retaining walls with distinct stone reads so the basin structure keeps layered depth instead of one repeated pearl shell finish', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -10190,21 +10190,46 @@ describe('polishMainStageMaterials', () => {
     expect(runwaySpine.material).not.toBe(sharedPearlMaterial);
     expect(retainingWallL.material).not.toBe(sharedPearlMaterial);
     expect(retainingWallR.material).not.toBe(sharedPearlMaterial);
-    expect(channelRelief.material).toBe(runwaySpine.material);
-    expect(channelRelief.material).toBe(retainingWallL.material);
-    expect(retainingWallR.material).toBe(channelRelief.material);
+    expect(channelRelief.material).not.toBe(runwaySpine.material);
+    expect(channelRelief.material).not.toBe(retainingWallL.material);
+    expect(runwaySpine.material).not.toBe(retainingWallL.material);
+    expect(retainingWallR.material).toBe(retainingWallL.material);
 
-    const basinStoneMaterial = channelRelief.material as PBRMaterial;
-    expect(basinStoneMaterial.name).toContain('basin-stone-relief');
-    expect(basinStoneMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(basinStoneMaterial.metadata?.mainStageMaterialOverride).toBe('basin-stone-relief');
-    expect(basinStoneMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(basinStoneMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
-    expect(basinStoneMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
-    expect(basinStoneMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(basinStoneMaterial.metallic).toBeLessThanOrEqual(0.05);
-    expect(basinStoneMaterial.roughness).toBeGreaterThanOrEqual(0.9);
-    expect(basinStoneMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+    const channelMaterial = channelRelief.material as PBRMaterial;
+    expect(channelMaterial.name).toContain('basin-channel-relief');
+    expect(channelMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(channelMaterial.metadata?.mainStageMaterialOverride).toBe('basin-channel-relief');
+    expect(channelMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
+    expect(channelMaterial.albedoColor.g).toBeLessThanOrEqual(0.18);
+    expect(channelMaterial.albedoColor.b).toBeLessThanOrEqual(0.22);
+    expect(channelMaterial.emissiveIntensity).toBeLessThanOrEqual(0.012);
+    expect(channelMaterial.metallic).toBeLessThanOrEqual(0.04);
+    expect(channelMaterial.roughness).toBeGreaterThanOrEqual(0.93);
+    expect(channelMaterial.environmentIntensity).toBeLessThanOrEqual(0.08);
+
+    const runwayMaterial = runwaySpine.material as PBRMaterial;
+    expect(runwayMaterial.name).toContain('basin-runway-spine');
+    expect(runwayMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(runwayMaterial.metadata?.mainStageMaterialOverride).toBe('basin-runway-spine');
+    expect(runwayMaterial.albedoColor.r).toBeLessThanOrEqual(0.13);
+    expect(runwayMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(runwayMaterial.albedoColor.b).toBeLessThanOrEqual(0.2);
+    expect(runwayMaterial.emissiveIntensity).toBeLessThanOrEqual(0.01);
+    expect(runwayMaterial.metallic).toBeLessThanOrEqual(0.04);
+    expect(runwayMaterial.roughness).toBeGreaterThanOrEqual(0.95);
+    expect(runwayMaterial.environmentIntensity).toBeLessThanOrEqual(0.07);
+
+    const retainingMaterial = retainingWallL.material as PBRMaterial;
+    expect(retainingMaterial.name).toContain('basin-retaining-wall');
+    expect(retainingMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(retainingMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-wall');
+    expect(retainingMaterial.albedoColor.r).toBeLessThanOrEqual(0.17);
+    expect(retainingMaterial.albedoColor.g).toBeLessThanOrEqual(0.2);
+    expect(retainingMaterial.albedoColor.b).toBeLessThanOrEqual(0.24);
+    expect(retainingMaterial.emissiveIntensity).toBeLessThanOrEqual(0.014);
+    expect(retainingMaterial.metallic).toBeLessThanOrEqual(0.05);
+    expect(retainingMaterial.roughness).toBeGreaterThanOrEqual(0.91);
+    expect(retainingMaterial.environmentIntensity).toBeLessThanOrEqual(0.09);
   });
 
   it('darkens the spawn gallery filigree gold so the arcade detailing reads as carved night metal instead of bright gold lace bands', () => {
