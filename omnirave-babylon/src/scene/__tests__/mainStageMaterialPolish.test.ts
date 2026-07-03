@@ -536,19 +536,43 @@ describe('polishMainStageMaterials', () => {
     expect(pedestalShell.material).not.toBe(sharedPearlMaterial);
     expect(canopyShell.material).not.toBe(sharedPearlMaterial);
     expect(buttressShell.material).not.toBe(sharedPearlMaterial);
-    expect(canopyShell.material).toBe(pedestalShell.material);
-    expect(buttressShell.material).toBe(pedestalShell.material);
+    expect(canopyShell.material).not.toBe(pedestalShell.material);
+    expect(buttressShell.material).not.toBe(pedestalShell.material);
+    expect(buttressShell.material).not.toBe(canopyShell.material);
 
-    const housingMaterial = pedestalShell.material as PBRMaterial;
-    expect(housingMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(housingMaterial.metadata?.mainStageMaterialOverride).toBe('oval-screen-shell-housing');
-    expect(housingMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
-    expect(housingMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
-    expect(housingMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
-    expect(housingMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(housingMaterial.roughness).toBeGreaterThanOrEqual(0.84);
-    expect(housingMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(housingMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    const pedestalMaterial = pedestalShell.material as PBRMaterial;
+    const canopyMaterial = canopyShell.material as PBRMaterial;
+    const buttressMaterial = buttressShell.material as PBRMaterial;
+
+    expect(pedestalMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(pedestalMaterial.metadata?.mainStageMaterialOverride).toBe('oval-screen-pedestal-shell');
+    expect(pedestalMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(pedestalMaterial.albedoColor.g).toBeLessThanOrEqual(0.22);
+    expect(pedestalMaterial.albedoColor.b).toBeLessThanOrEqual(0.26);
+    expect(pedestalMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(pedestalMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(pedestalMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.04);
+    expect(pedestalMaterial.environmentIntensity).toBeLessThanOrEqual(0.13);
+
+    expect(canopyMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(canopyMaterial.metadata?.mainStageMaterialOverride).toBe('oval-screen-canopy-shell');
+    expect(canopyMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(canopyMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(canopyMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(canopyMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(canopyMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(canopyMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(canopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+
+    expect(buttressMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(buttressMaterial.metadata?.mainStageMaterialOverride).toBe('oval-screen-buttress-shell');
+    expect(buttressMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(buttressMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(buttressMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(buttressMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(buttressMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(buttressMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.04);
+    expect(buttressMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
   it('darkens the oval screen mullion shell arrays so the side-screen stacks read as finished architecture instead of pale pearl ribs', () => {
