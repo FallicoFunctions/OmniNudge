@@ -10121,4 +10121,46 @@ describe('polishMainStageMaterials', () => {
     expect(bandMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(bandMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
+
+  it('darkens the side parallax gold orbit so the side-screen decorative accents read as carved metal trim instead of bright gold rings', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedGoldMaterial = new PBRMaterial('V20_ChasedGoldFiligree', scene);
+    sharedGoldMaterial.albedoColor.set(0.78, 0.64, 0.26);
+    sharedGoldMaterial.emissiveColor.set(0.08, 0.06, 0.02);
+    sharedGoldMaterial.emissiveIntensity = 0.16;
+    sharedGoldMaterial.metallic = 0.8;
+    sharedGoldMaterial.roughness = 0.26;
+
+    const goldControl = MeshBuilder.CreateBox('TestSideParallaxOrbitControl', { size: 1 }, scene);
+    goldControl.material = sharedGoldMaterial;
+
+    const leftOrbit = MeshBuilder.CreateBox('V31_SideParallaxGoldOrbit_L', { size: 1 }, scene);
+    leftOrbit.material = sharedGoldMaterial;
+
+    const rightOrbit = MeshBuilder.CreateBox('V31_SideParallaxGoldOrbit_R', { size: 1 }, scene);
+    rightOrbit.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([goldControl, leftOrbit, rightOrbit]);
+
+    expect(goldControl.material).toBe(sharedGoldMaterial);
+    expect(leftOrbit.material).toBeInstanceOf(PBRMaterial);
+    expect(rightOrbit.material).toBeInstanceOf(PBRMaterial);
+    expect(leftOrbit.material).not.toBe(sharedGoldMaterial);
+    expect(rightOrbit.material).not.toBe(sharedGoldMaterial);
+    expect(rightOrbit.material).toBe(leftOrbit.material);
+
+    const orbitMaterial = leftOrbit.material as PBRMaterial;
+    expect(orbitMaterial.name).toContain('side-parallax-gold-orbit');
+    expect(orbitMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(orbitMaterial.metadata?.mainStageMaterialOverride).toBe('side-parallax-gold-orbit');
+    expect(orbitMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(orbitMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(orbitMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
+    expect(orbitMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(orbitMaterial.metallic).toBeLessThanOrEqual(0.2);
+    expect(orbitMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(orbitMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+  });
 });
