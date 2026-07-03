@@ -2223,19 +2223,29 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V51_RearCathedralCore' ||
-      mesh.name.startsWith('V51_ProsceniumPylon_')
-    ) {
+    if (mesh.name === 'V51_RearCathedralCore') {
       const cacheKey = `${material.uniqueId}:rear-cathedral-pearl-core`;
-      let coreMaterial = clonedMaterials.get(cacheKey);
-      if (!coreMaterial) {
-        coreMaterial = material.clone(`${material.name}__rear-cathedral-pearl-core`);
-        applyRearCathedralPearlCoreOverride(coreMaterial);
-        clonedMaterials.set(cacheKey, coreMaterial);
+      let cathedralCoreMaterial = clonedMaterials.get(cacheKey);
+      if (!cathedralCoreMaterial) {
+        cathedralCoreMaterial = material.clone(`${material.name}__rear-cathedral-pearl-core`);
+        applyRearCathedralPearlCoreOverride(cathedralCoreMaterial);
+        clonedMaterials.set(cacheKey, cathedralCoreMaterial);
       }
 
-      assignOverrideMaterial(mesh, coreMaterial);
+      assignOverrideMaterial(mesh, cathedralCoreMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V51_ProsceniumPylon_')) {
+      const cacheKey = `${material.uniqueId}:proscenium-pylon-pearl-shell`;
+      let pylonMaterial = clonedMaterials.get(cacheKey);
+      if (!pylonMaterial) {
+        pylonMaterial = material.clone(`${material.name}__proscenium-pylon-pearl-shell`);
+        applyProsceniumPylonPearlShellOverride(pylonMaterial);
+        clonedMaterials.set(cacheKey, pylonMaterial);
+      }
+
+      assignOverrideMaterial(mesh, pylonMaterial);
       continue;
     }
 
@@ -6116,6 +6126,23 @@ function applyRearCathedralPearlCoreOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'rear-cathedral-pearl-core',
+  };
+}
+
+function applyProsceniumPylonPearlShellOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.2, 0.24);
+  material.emissiveColor = new Color3(0.004, 0.006, 0.009);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.02;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.76;
+  material.environmentIntensity = 0.11;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'proscenium-pylon-pearl-shell',
   };
 }
 
