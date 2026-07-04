@@ -693,11 +693,16 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       mesh.name === 'V32_CrowdWearableGlow_L_Mid' ||
       mesh.name === 'V32_CrowdWearableGlow_R_Mid'
     ) {
-      const cacheKey = `${material.uniqueId}:crowd-wearable-glow`;
+      const isMidBand = mesh.name.endsWith('_Mid');
+      const cacheKey = `${material.uniqueId}:${isMidBand ? 'crowd-wearable-glow-mid' : 'crowd-wearable-glow-near'}`;
       let glowMaterial = clonedMaterials.get(cacheKey);
       if (!glowMaterial) {
-        glowMaterial = material.clone(`${material.name}__crowd-wearable-glow`);
-        applyCrowdWearableGlowOverride(glowMaterial);
+        glowMaterial = material.clone(`${material.name}__${isMidBand ? 'crowd-wearable-glow-mid' : 'crowd-wearable-glow-near'}`);
+        if (isMidBand) {
+          applyCrowdWearableGlowMidOverride(glowMaterial);
+        } else {
+          applyCrowdWearableGlowNearOverride(glowMaterial);
+        }
         clonedMaterials.set(cacheKey, glowMaterial);
       }
 
@@ -8834,7 +8839,7 @@ function applyWingArcadeCyanInlayOverride(material: PBRMaterial) {
   };
 }
 
-function applyCrowdWearableGlowOverride(material: PBRMaterial) {
+function applyCrowdWearableGlowNearOverride(material: PBRMaterial) {
   material.albedoColor = new Color3(0.1, 0.22, 0.28);
   material.emissiveColor = new Color3(0.01, 0.032, 0.042);
   material.emissiveIntensity = 0.08;
@@ -8848,7 +8853,25 @@ function applyCrowdWearableGlowOverride(material: PBRMaterial) {
   material.environmentIntensity = 0.26;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'crowd-wearable-glow',
+    mainStageMaterialOverride: 'crowd-wearable-glow-near',
+  };
+}
+
+function applyCrowdWearableGlowMidOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.085, 0.19, 0.25);
+  material.emissiveColor = new Color3(0.008, 0.024, 0.032);
+  material.emissiveIntensity = 0.06;
+  material.alpha = 0.26;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.01;
+  material.roughness = 0.28;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.2;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crowd-wearable-glow-mid',
   };
 }
 
