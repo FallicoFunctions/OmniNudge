@@ -10352,16 +10352,23 @@ describe('polishMainStageMaterials', () => {
     const rightOgive = MeshBuilder.CreateBox('V25_HeroPortalOuterOgive_R', { size: 1 }, scene);
     rightOgive.material = sharedPearlMaterial;
 
-    polishMainStageMaterials([otherPearl, leftOgive, rightOgive]);
+    const wideHeroShell = MeshBuilder.CreateBox('V126_WideHeroScreenIvoryHeader', { size: 1 }, scene);
+    wideHeroShell.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, leftOgive, rightOgive, wideHeroShell]);
 
     expect(otherPearl.material).toBe(sharedPearlMaterial);
     expect(leftOgive.material).toBeInstanceOf(PBRMaterial);
     expect(rightOgive.material).toBeInstanceOf(PBRMaterial);
+    expect(wideHeroShell.material).toBeInstanceOf(PBRMaterial);
     expect(leftOgive.material).not.toBe(sharedPearlMaterial);
     expect(rightOgive.material).not.toBe(sharedPearlMaterial);
+    expect(wideHeroShell.material).not.toBe(sharedPearlMaterial);
     expect(rightOgive.material).toBe(leftOgive.material);
+    expect(wideHeroShell.material).not.toBe(leftOgive.material);
 
     const ogiveMaterial = leftOgive.material as PBRMaterial;
+    const wideHeroShellMaterial = wideHeroShell.material as PBRMaterial;
     expect(ogiveMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(ogiveMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-outer-ogive');
     expect(ogiveMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
@@ -10371,6 +10378,9 @@ describe('polishMainStageMaterials', () => {
     expect(ogiveMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(ogiveMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(ogiveMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(ogiveMaterial.albedoColor.r).toBeLessThan(wideHeroShellMaterial.albedoColor.r);
+    expect(ogiveMaterial.emissiveIntensity).toBeGreaterThan(wideHeroShellMaterial.emissiveIntensity);
+    expect(ogiveMaterial.roughness ?? 0).toBeGreaterThan(wideHeroShellMaterial.roughness ?? 0);
   });
 
   it('tones down the hero portal gold reveals so the stage mouth reads as carved metal detailing instead of bright foil seams', () => {
