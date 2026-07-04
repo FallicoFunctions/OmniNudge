@@ -1002,7 +1002,7 @@ describe('polishMainStageMaterials', () => {
     expect(emissionMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
   });
 
-  it('darkens the basin parapet reliefs so the route-edge basin crowns read as carved stonework instead of bright pearl ledges', () => {
+  it('splits the basin parapet reliefs away from the retaining reliefs so the basin crowns keep their own ledge read instead of sharing the wall-panel finish', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -1015,31 +1015,48 @@ describe('polishMainStageMaterials', () => {
     const otherPearl = MeshBuilder.CreateBox('V24_OuterCrownLamella_L', { size: 1 }, scene);
     otherPearl.material = sharedPearlMaterial;
 
+    const retainingRelief = MeshBuilder.CreateBox('V121_BasinRetainingRelief_L', { size: 1 }, scene);
+    retainingRelief.material = sharedPearlMaterial;
+
     const leftParapet = MeshBuilder.CreateBox('V99_BasinParapetRelief_L', { size: 1 }, scene);
     leftParapet.material = sharedPearlMaterial;
 
     const rightParapet = MeshBuilder.CreateBox('V99_BasinParapetRelief_R', { size: 1 }, scene);
     rightParapet.material = sharedPearlMaterial;
 
-    polishMainStageMaterials([otherPearl, leftParapet, rightParapet]);
+    polishMainStageMaterials([otherPearl, retainingRelief, leftParapet, rightParapet]);
 
     expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(retainingRelief.material).toBeInstanceOf(PBRMaterial);
     expect(leftParapet.material).toBeInstanceOf(PBRMaterial);
     expect(rightParapet.material).toBeInstanceOf(PBRMaterial);
+    expect(retainingRelief.material).not.toBe(sharedPearlMaterial);
     expect(leftParapet.material).not.toBe(sharedPearlMaterial);
     expect(rightParapet.material).not.toBe(sharedPearlMaterial);
     expect(rightParapet.material).toBe(leftParapet.material);
+    expect(leftParapet.material).not.toBe(retainingRelief.material);
+
+    const retainingMaterial = retainingRelief.material as PBRMaterial;
+    expect(retainingMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(retainingMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
+    expect(retainingMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
+    expect(retainingMaterial.albedoColor.g).toBeLessThanOrEqual(0.17);
+    expect(retainingMaterial.albedoColor.b).toBeLessThanOrEqual(0.21);
+    expect(retainingMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(retainingMaterial.roughness).toBeGreaterThanOrEqual(0.94);
+    expect(retainingMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(retainingMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
 
     const reliefMaterial = leftParapet.material as PBRMaterial;
     expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
-    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
-    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.17);
-    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.21);
+    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-parapet-relief');
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.22);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.26);
     expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.94);
-    expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.08);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('retones the central water-light housings, trim, and lenses into practical in-basin fixtures so the promenade spine reads as embedded lighting instead of bright gold-and-cyan proxy bars', () => {
