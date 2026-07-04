@@ -9887,16 +9887,23 @@ describe('polishMainStageMaterials', () => {
     const rightSocket = MeshBuilder.CreateBox('V71_CrownBladePearlSocket_R', { size: 1 }, scene);
     rightSocket.material = sharedPearlMaterial;
 
-    polishMainStageMaterials([controlPearl, leftSocket, rightSocket]);
+    const wideHeroShell = MeshBuilder.CreateBox('V126_WideHeroScreenIvoryHeader', { size: 1 }, scene);
+    wideHeroShell.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, leftSocket, rightSocket, wideHeroShell]);
 
     expect(controlPearl.material).toBe(sharedPearlMaterial);
     expect(leftSocket.material).toBeInstanceOf(PBRMaterial);
     expect(rightSocket.material).toBeInstanceOf(PBRMaterial);
+    expect(wideHeroShell.material).toBeInstanceOf(PBRMaterial);
     expect(leftSocket.material).not.toBe(sharedPearlMaterial);
     expect(rightSocket.material).not.toBe(sharedPearlMaterial);
+    expect(wideHeroShell.material).not.toBe(sharedPearlMaterial);
     expect(rightSocket.material).toBe(leftSocket.material);
+    expect(wideHeroShell.material).not.toBe(leftSocket.material);
 
     const socketMaterial = leftSocket.material as PBRMaterial;
+    const wideHeroShellMaterial = wideHeroShell.material as PBRMaterial;
     expect(socketMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(socketMaterial.metadata?.mainStageMaterialOverride).toBe('crown-jewel-pearl-socket');
     expect(socketMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
@@ -9906,6 +9913,9 @@ describe('polishMainStageMaterials', () => {
     expect(socketMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(socketMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(socketMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(socketMaterial.albedoColor.r).toBeLessThan(wideHeroShellMaterial.albedoColor.r);
+    expect(socketMaterial.emissiveIntensity).toBeGreaterThan(wideHeroShellMaterial.emissiveIntensity);
+    expect(socketMaterial.roughness ?? 0).toBeGreaterThan(wideHeroShellMaterial.roughness ?? 0);
   });
 
   it('rebalances the crown jewel cradle, shadow core, and cyan jewel so the apex reads as a controlled celestial focal point instead of bright foil around a flat cyan gem', () => {

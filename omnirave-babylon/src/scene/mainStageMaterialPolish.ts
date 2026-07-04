@@ -8274,15 +8274,15 @@ function applyCrownObeliskApexCrystalOverride(material: PBRMaterial) {
 
 function applyCrownJewelPearlSocketOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.2, 0.22, 0.26);
-  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.186, 0.208, 0.25);
+  material.emissiveColor = new Color3(0.0061, 0.0084, 0.013);
+  material.emissiveIntensity = 0.024;
   material.metallic = 0.02;
-  material.roughness = 0.88;
+  material.roughness = 0.91;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.72;
-  material.environmentIntensity = 0.13;
+  material.clearCoat.roughness = 0.76;
+  material.environmentIntensity = 0.12;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-jewel-pearl-socket',
