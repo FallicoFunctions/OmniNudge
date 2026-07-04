@@ -2458,6 +2458,8 @@ describe('polishMainStageMaterials', () => {
     leftMist.material = sharedMistMaterial;
     const rightMist = MeshBuilder.CreateBox('V35_BasinFountainMist_R', { size: 1 }, scene);
     rightMist.material = sharedMistMaterial;
+    const spawnWetPool = MeshBuilder.CreateBox('V86_SpawnWetInsetPoolArray_L', { size: 1 }, scene);
+    spawnWetPool.material = sharedMistMaterial;
 
     const goldControl = MeshBuilder.CreateBox('TestBasinFountainNozzleControl', { size: 1 }, scene);
     goldControl.material = sharedGoldMaterial;
@@ -2465,6 +2467,8 @@ describe('polishMainStageMaterials', () => {
     leftNozzles.material = sharedGoldMaterial;
     const rightNozzles = MeshBuilder.CreateBox('V35_BasinFountainNozzleArray_R', { size: 1 }, scene);
     rightNozzles.material = sharedGoldMaterial;
+    const goldRun = MeshBuilder.CreateBox('V108_ForegroundBarricadeGoldRun', { size: 1 }, scene);
+    goldRun.material = sharedGoldMaterial;
 
     const pearlControl = MeshBuilder.CreateBox('TestBasinPlantingIslandRimControl', { size: 1 }, scene);
     pearlControl.material = sharedPearlMaterial;
@@ -2472,34 +2476,48 @@ describe('polishMainStageMaterials', () => {
     leftIsland.material = sharedPearlMaterial;
     const rightIsland = MeshBuilder.CreateBox('V35_BasinPlantingIslandRim_R', { size: 1 }, scene);
     rightIsland.material = sharedPearlMaterial;
+    const pearlRun = MeshBuilder.CreateBox('V108_ForegroundBarricadePearlRun', { size: 1 }, scene);
+    pearlRun.material = sharedPearlMaterial;
 
     polishMainStageMaterials([
       mistControl,
       leftMist,
       rightMist,
+      spawnWetPool,
       goldControl,
       leftNozzles,
       rightNozzles,
+      goldRun,
       pearlControl,
       leftIsland,
       rightIsland,
+      pearlRun,
     ]);
 
     expect(mistControl.material).toBe(sharedMistMaterial);
     expect(leftMist.material).toBeInstanceOf(PBRMaterial);
     expect(rightMist.material).toBe(leftMist.material);
+    expect(spawnWetPool.material).toBeInstanceOf(PBRMaterial);
+    expect(spawnWetPool.material).not.toBe(leftMist.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftNozzles.material).toBeInstanceOf(PBRMaterial);
     expect(rightNozzles.material).toBe(leftNozzles.material);
+    expect(goldRun.material).toBeInstanceOf(PBRMaterial);
+    expect(goldRun.material).not.toBe(leftNozzles.material);
 
     expect(pearlControl.material).toBe(sharedPearlMaterial);
     expect(leftIsland.material).toBeInstanceOf(PBRMaterial);
     expect(rightIsland.material).toBe(leftIsland.material);
+    expect(pearlRun.material).toBeInstanceOf(PBRMaterial);
+    expect(pearlRun.material).not.toBe(leftIsland.material);
 
     const mistMaterial = leftMist.material as PBRMaterial;
+    const spawnWetPoolMaterial = spawnWetPool.material as PBRMaterial;
     const nozzleMaterial = leftNozzles.material as PBRMaterial;
+    const goldRunMaterial = goldRun.material as PBRMaterial;
     const islandMaterial = leftIsland.material as PBRMaterial;
+    const pearlRunMaterial = pearlRun.material as PBRMaterial;
 
     expect(mistMaterial.name).toContain('basin-fountain-mist');
     expect(mistMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -2511,6 +2529,9 @@ describe('polishMainStageMaterials', () => {
     expect(mistMaterial.clearCoat.intensity).toBeGreaterThanOrEqual(0.6);
     expect(mistMaterial.roughness).toBeLessThanOrEqual(0.3);
     expect(mistMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.8);
+    expect(mistMaterial.alpha).toBeLessThan(spawnWetPoolMaterial.alpha);
+    expect(mistMaterial.emissiveIntensity).toBeGreaterThan(spawnWetPoolMaterial.emissiveIntensity);
+    expect(mistMaterial.roughness ?? 0).toBeGreaterThan(spawnWetPoolMaterial.roughness ?? 0);
 
     expect(nozzleMaterial.name).toContain('basin-fountain-nozzle-array');
     expect(nozzleMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -2522,6 +2543,9 @@ describe('polishMainStageMaterials', () => {
     expect(nozzleMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(nozzleMaterial.roughness).toBeGreaterThanOrEqual(0.88);
     expect(nozzleMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(nozzleMaterial.albedoColor.r).toBeGreaterThan(goldRunMaterial.albedoColor.r);
+    expect(nozzleMaterial.metallic ?? 0).toBeGreaterThan(goldRunMaterial.metallic ?? 0);
+    expect(nozzleMaterial.roughness ?? 0).toBeLessThan(goldRunMaterial.roughness ?? 0);
 
     expect(islandMaterial.name).toContain('basin-planting-island-rim');
     expect(islandMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
@@ -2532,6 +2556,9 @@ describe('polishMainStageMaterials', () => {
     expect(islandMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(islandMaterial.roughness).toBeGreaterThanOrEqual(0.82);
     expect(islandMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(islandMaterial.albedoColor.r).toBeGreaterThan(pearlRunMaterial.albedoColor.r);
+    expect(islandMaterial.roughness ?? 0).toBeLessThan(pearlRunMaterial.roughness ?? 0);
+    expect(islandMaterial.environmentIntensity).toBeGreaterThan(pearlRunMaterial.environmentIntensity);
   });
 
   it('rebalances the basin lantern stems, housings, and warm cores so the garden edge reads as grounded practical lighting instead of bright gold proxies with hot flat bulbs', () => {
