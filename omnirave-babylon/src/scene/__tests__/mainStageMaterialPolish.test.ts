@@ -2424,8 +2424,9 @@ describe('polishMainStageMaterials', () => {
     expect(rightGrille.material).toBe(leftGrille.material);
     expect(leftHorn.material).toBe(leftGrille.material);
     expect(rightHorn.material).toBe(leftGrille.material);
-    expect(leftPort.material).toBe(leftGrille.material);
-    expect(rightPort.material).toBe(leftGrille.material);
+    expect(leftPort.material).toBeInstanceOf(PBRMaterial);
+    expect(rightPort.material).toBe(leftPort.material);
+    expect(leftPort.material).not.toBe(leftGrille.material);
 
     expect(hardwareControl.material).toBe(sharedHardwareMaterial);
     expect(leftYoke.material).toBeInstanceOf(PBRMaterial);
@@ -2444,6 +2445,7 @@ describe('polishMainStageMaterials', () => {
     const graphiteMaterial = leftCabinet.material as PBRMaterial;
     const subGraphiteMaterial = leftSub.material as PBRMaterial;
     const blackMaterial = leftGrille.material as PBRMaterial;
+    const subPortMaterial = leftPort.material as PBRMaterial;
     const hardwareMaterial = leftYoke.material as PBRMaterial;
     const lanternStemMaterial = lanternStem.material as PBRMaterial;
     const goldMaterial = leftPin.material as PBRMaterial;
@@ -2497,6 +2499,23 @@ describe('polishMainStageMaterials', () => {
     expect(blackMaterial.roughness).toBeGreaterThanOrEqual(0.72);
     expect(blackMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.2);
     expect(blackMaterial.environmentIntensity).toBeLessThanOrEqual(0.24);
+
+    expect(subPortMaterial.name).toContain('front-sub-port-black');
+    expect(subPortMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(subPortMaterial.metadata?.mainStageMaterialOverride).toBe('front-sub-port-black');
+    expect(subPortMaterial.albedoColor.r).toBeGreaterThanOrEqual(0.04);
+    expect(subPortMaterial.albedoColor.g).toBeGreaterThanOrEqual(0.055);
+    expect(subPortMaterial.albedoColor.b).toBeGreaterThanOrEqual(0.07);
+    expect(subPortMaterial.albedoColor.r).toBeLessThanOrEqual(0.07);
+    expect(subPortMaterial.albedoColor.g).toBeLessThanOrEqual(0.085);
+    expect(subPortMaterial.albedoColor.b).toBeLessThanOrEqual(0.1);
+    expect(subPortMaterial.emissiveIntensity).toBeLessThanOrEqual(0.07);
+    expect(subPortMaterial.metallic).toBeLessThanOrEqual(0.06);
+    expect(subPortMaterial.roughness).toBeGreaterThanOrEqual(0.8);
+    expect(subPortMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+    expect(subPortMaterial.albedoColor.r).toBeLessThan(blackMaterial.albedoColor.r);
+    expect(subPortMaterial.environmentIntensity).toBeLessThan(blackMaterial.environmentIntensity);
+    expect(subPortMaterial.roughness ?? 0).toBeGreaterThan(blackMaterial.roughness ?? 0);
 
     expect(hardwareMaterial.name).toContain('line-array-suspension-hardware');
     expect(hardwareMaterial.metadata?.mainStageMaterialPolish).toBe('black');
