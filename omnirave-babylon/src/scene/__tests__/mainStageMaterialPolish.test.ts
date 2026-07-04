@@ -4330,6 +4330,50 @@ describe('polishMainStageMaterials', () => {
     expect(sideLedMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
   });
 
+  it('splits the center screen lens away from the side-screen smoked treatment so the hero wall keeps a brighter focal core than the flanking scenic cards', () => {
+    engine ??= new NullEngine();
+    scene ??= new Scene(engine);
+
+    const sharedLensMaterial = new PBRMaterial('V20_CelestialCyanGlass', scene);
+    sharedLensMaterial.albedoColor.set(0.42, 0.86, 0.98);
+    sharedLensMaterial.emissiveColor.set(0.08, 0.3, 0.4);
+    sharedLensMaterial.emissiveIntensity = 0.34;
+    sharedLensMaterial.alpha = 1;
+    sharedLensMaterial.environmentIntensity = 0.82;
+
+    const centerLens = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
+    centerLens.material = sharedLensMaterial;
+
+    const sideLens = MeshBuilder.CreateBox('V31_SideGlassLens_L', { size: 1 }, scene);
+    sideLens.material = sharedLensMaterial;
+
+    polishMainStageMaterials([centerLens, sideLens]);
+
+    expect(centerLens.material).toBeInstanceOf(PBRMaterial);
+    expect(sideLens.material).toBeInstanceOf(PBRMaterial);
+    expect(centerLens.material).not.toBe(sharedLensMaterial);
+    expect(sideLens.material).not.toBe(sharedLensMaterial);
+    expect(centerLens.material).not.toBe(sideLens.material);
+
+    const centerLensMaterial = centerLens.material as PBRMaterial;
+    const sideLensMaterial = sideLens.material as PBRMaterial;
+
+    expect(centerLensMaterial.name).toContain('center-screen-glass-lens');
+    expect(centerLensMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(centerLensMaterial.metadata?.mainStageMaterialOverride).toBe('center-screen-glass-lens');
+    expect(centerLensMaterial.alpha).toBeLessThanOrEqual(0.64);
+    expect(centerLensMaterial.alpha).toBeGreaterThan(sideLensMaterial.alpha);
+    expect(centerLensMaterial.albedoColor.r).toBeLessThanOrEqual(0.14);
+    expect(centerLensMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(centerLensMaterial.albedoColor.b).toBeLessThanOrEqual(0.34);
+    expect(centerLensMaterial.emissiveIntensity).toBeLessThanOrEqual(0.14);
+    expect(centerLensMaterial.emissiveIntensity).toBeGreaterThan(sideLensMaterial.emissiveIntensity);
+    expect(centerLensMaterial.roughness).toBeGreaterThanOrEqual(0.12);
+    expect(centerLensMaterial.environmentIntensity).toBeLessThanOrEqual(0.44);
+    expect(centerLensMaterial.environmentIntensity).toBeGreaterThan(sideLensMaterial.environmentIntensity);
+    expect(centerLensMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+  });
+
   it('regrades the spawn field and approach deck into authored night materials so the entry view does not read as muddy proxy texture', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);

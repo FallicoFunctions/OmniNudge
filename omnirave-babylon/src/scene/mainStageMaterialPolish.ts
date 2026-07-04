@@ -4353,6 +4353,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V31_CenterGlassLens') {
+      const cacheKey = `${material.uniqueId}:center-screen-glass-lens`;
+      let lensMaterial = clonedMaterials.get(cacheKey);
+      if (!lensMaterial) {
+        lensMaterial = material.clone(`${material.name}__center-screen-glass-lens`);
+        applyCenterScreenGlassLensOverride(lensMaterial);
+        clonedMaterials.set(cacheKey, lensMaterial);
+      }
+
+      assignOverrideMaterial(mesh, lensMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V31_SideGlassLens_')) {
       const cacheKey = `${material.uniqueId}:side-screen-glass-lens`;
       let lensMaterial = clonedMaterials.get(cacheKey);
@@ -9675,6 +9688,24 @@ function applySideScreenGlassLensOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'side-screen-glass-lens',
+  };
+}
+
+function applyCenterScreenGlassLensOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.1, 0.22, 0.28);
+  material.emissiveColor = new Color3(0.014, 0.052, 0.074);
+  material.emissiveIntensity = 0.11;
+  material.alpha = 0.56;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.16;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.06;
+  material.clearCoat.roughness = 0.56;
+  material.environmentIntensity = 0.38;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'center-screen-glass-lens',
   };
 }
 
