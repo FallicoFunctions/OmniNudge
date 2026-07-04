@@ -3938,7 +3938,7 @@ describe('polishMainStageMaterials', () => {
     expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
   });
 
-  it('neutralizes the V87 wing-facade shadow vault arrays so the terrace soffits read as shadow architecture instead of bright cyan inserts', () => {
+  it('splits the V87 wing-facade shadow vault arrays away from the shadow frames so the terrace vaults keep a deeper recess read than the facade trim frames', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -3950,30 +3950,46 @@ describe('polishMainStageMaterials', () => {
     const controlShadow = MeshBuilder.CreateBox('V31_CenterGlassLens', { size: 1 }, scene);
     controlShadow.material = sharedShadowMaterial;
 
+    const frame = MeshBuilder.CreateBox('V87_WingFacadeShadowFrameArray_L', { size: 1 }, scene);
+    frame.material = sharedShadowMaterial;
+
     const leftVault = MeshBuilder.CreateBox('V87_WingFacadeShadowVaultArray_L', { size: 1 }, scene);
     leftVault.material = sharedShadowMaterial;
 
     const rightVault = MeshBuilder.CreateBox('V87_WingFacadeShadowVaultArray_R', { size: 1 }, scene);
     rightVault.material = sharedShadowMaterial;
 
-    polishMainStageMaterials([controlShadow, leftVault, rightVault]);
+    polishMainStageMaterials([controlShadow, frame, leftVault, rightVault]);
 
     expect(controlShadow.material).toBe(sharedShadowMaterial);
+    expect(frame.material).toBeInstanceOf(PBRMaterial);
+    expect(frame.material).not.toBe(sharedShadowMaterial);
     expect(leftVault.material).toBeInstanceOf(PBRMaterial);
     expect(rightVault.material).toBeInstanceOf(PBRMaterial);
     expect(leftVault.material).not.toBe(sharedShadowMaterial);
     expect(rightVault.material).not.toBe(sharedShadowMaterial);
     expect(rightVault.material).toBe(leftVault.material);
+    expect(leftVault.material).not.toBe(frame.material);
+
+    const frameMaterial = frame.material as PBRMaterial;
+    expect(frameMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(frameMaterial.metadata?.mainStageMaterialOverride).toBe('wing-facade-shadow-frame');
+    expect(frameMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(frameMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
+    expect(frameMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
+    expect(frameMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
+    expect(frameMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
 
     const vaultMaterial = leftVault.material as PBRMaterial;
     expect(vaultMaterial.metadata?.mainStageMaterialPolish).toBe('black');
-    expect(vaultMaterial.metadata?.mainStageMaterialOverride).toBe('wing-facade-shadow-frame');
-    expect(vaultMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(vaultMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
-    expect(vaultMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
-    expect(vaultMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
-    expect(vaultMaterial.roughness).toBeGreaterThanOrEqual(0.88);
-    expect(vaultMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+    expect(vaultMaterial.metadata?.mainStageMaterialOverride).toBe('wing-facade-shadow-vault');
+    expect(vaultMaterial.albedoColor.r).toBeLessThanOrEqual(0.12);
+    expect(vaultMaterial.albedoColor.g).toBeLessThanOrEqual(0.15);
+    expect(vaultMaterial.albedoColor.b).toBeLessThanOrEqual(0.19);
+    expect(vaultMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(vaultMaterial.roughness).toBeGreaterThanOrEqual(0.92);
+    expect(vaultMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('neutralizes the proscenium shadow pockets so the hero portal surround reads as recessed depth instead of bright cyan inserts', () => {

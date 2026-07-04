@@ -1583,10 +1583,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V87_WingFacadeShadowFrameArray_') ||
-      mesh.name.startsWith('V87_WingFacadeShadowVaultArray_')
-    ) {
+    if (mesh.name.startsWith('V87_WingFacadeShadowFrameArray_')) {
       const cacheKey = `${material.uniqueId}:wing-facade-shadow-frame`;
       let frameMaterial = clonedMaterials.get(cacheKey);
       if (!frameMaterial) {
@@ -1596,6 +1593,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, frameMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V87_WingFacadeShadowVaultArray_')) {
+      const cacheKey = `${material.uniqueId}:wing-facade-shadow-vault`;
+      let vaultMaterial = clonedMaterials.get(cacheKey);
+      if (!vaultMaterial) {
+        vaultMaterial = material.clone(`${material.name}__wing-facade-shadow-vault`);
+        applyWingFacadeShadowVaultOverride(vaultMaterial);
+        clonedMaterials.set(cacheKey, vaultMaterial);
+      }
+
+      assignOverrideMaterial(mesh, vaultMaterial);
       continue;
     }
 
@@ -6059,6 +6069,23 @@ function applyWingFacadeShadowFrameOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-facade-shadow-frame',
+  };
+}
+
+function applyWingFacadeShadowVaultOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.11, 0.14, 0.18);
+  material.emissiveColor = new Color3(0.004, 0.006, 0.009);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.02;
+  material.roughness = 0.94;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.78;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-facade-shadow-vault',
   };
 }
 
