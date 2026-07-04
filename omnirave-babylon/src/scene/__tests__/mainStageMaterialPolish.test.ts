@@ -11052,9 +11052,10 @@ describe('polishMainStageMaterials', () => {
     expect(wingBaluster.material).not.toBe(sharedGoldMaterial);
     expect(vipHandrail.material).not.toBe(sharedGoldMaterial);
     expect(wingHandrail.material).not.toBe(sharedGoldMaterial);
-    expect(vipBaluster.material).toBe(vipHandrail.material);
-    expect(wingBaluster.material).toBe(wingHandrail.material);
+    expect(vipBaluster.material).not.toBe(vipHandrail.material);
+    expect(wingBaluster.material).not.toBe(wingHandrail.material);
     expect(vipBaluster.material).not.toBe(wingBaluster.material);
+    expect(vipHandrail.material).not.toBe(wingHandrail.material);
 
     const vipRailMaterial = vipBaluster.material as PBRMaterial;
     expect(vipRailMaterial.name).toContain('vip-terrace-gold-rail');

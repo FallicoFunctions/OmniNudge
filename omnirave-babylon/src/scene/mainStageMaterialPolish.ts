@@ -5021,7 +5021,7 @@ function applyTrussDiagonalBraceOverride(material: PBRMaterial) {
   material.emissiveColor = new Color3(0.004, 0.014, 0.02);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.06;
-  material.roughness = 0.82;
+  material.roughness = 0.88;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.02;
   material.clearCoat.roughness = 0.72;
@@ -5055,7 +5055,7 @@ function applyProductionTrussCrossBraceOverride(material: PBRMaterial) {
   material.emissiveColor = new Color3(0.006, 0.018, 0.026);
   material.emissiveIntensity = 0.02;
   material.metallic = 0.06;
-  material.roughness = 0.82;
+  material.roughness = 0.88;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.02;
   material.clearCoat.roughness = 0.72;

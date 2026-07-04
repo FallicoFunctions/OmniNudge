@@ -22,10 +22,52 @@ body,
 
 .review-hud,
 .debug-panel,
-.perf-overlay {
+.perf-overlay,
+.runtime-loading-overlay {
   position: absolute;
   color: #f4efe2;
   z-index: 4;
+}
+
+.runtime-loading-overlay {
+  inset: 24px auto auto 24px;
+  max-width: 360px;
+  padding: 20px 22px;
+  border: 1px solid rgba(104, 216, 255, 0.28);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(104, 216, 255, 0.18), transparent 44%),
+    linear-gradient(145deg, rgba(4, 12, 23, 0.92), rgba(5, 24, 37, 0.8));
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
+}
+
+.runtime-loading-overlay__eyebrow,
+.runtime-loading-overlay__title,
+.runtime-loading-overlay__copy {
+  margin: 0;
+}
+
+.runtime-loading-overlay__eyebrow {
+  color: #68d8ff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.runtime-loading-overlay__title {
+  margin-top: 10px;
+  color: #fff8df;
+  font-size: 1.35rem;
+  letter-spacing: 0.01em;
+}
+
+.runtime-loading-overlay__copy {
+  margin-top: 10px;
+  color: rgba(244, 239, 226, 0.76);
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .review-hud {
