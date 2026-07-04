@@ -7449,16 +7449,22 @@ describe('polishMainStageMaterials', () => {
     const rightSentinel = MeshBuilder.CreateBox('V60_SpawnGateSentinelPearl_R', { size: 1 }, scene);
     rightSentinel.material = sharedIvoryMaterial;
 
-    polishMainStageMaterials([otherIvory, leftSentinel, rightSentinel]);
+    const backPlazaSentinel = MeshBuilder.CreateBox('V57_BackPlazaSentinelPearl_L', { size: 1 }, scene);
+    backPlazaSentinel.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([otherIvory, leftSentinel, rightSentinel, backPlazaSentinel]);
 
     expect(otherIvory.material).toBe(sharedIvoryMaterial);
     expect(leftSentinel.material).toBeInstanceOf(PBRMaterial);
     expect(rightSentinel.material).toBeInstanceOf(PBRMaterial);
+    expect(backPlazaSentinel.material).toBeInstanceOf(PBRMaterial);
     expect(leftSentinel.material).not.toBe(sharedIvoryMaterial);
     expect(rightSentinel.material).not.toBe(sharedIvoryMaterial);
     expect(rightSentinel.material).toBe(leftSentinel.material);
+    expect(backPlazaSentinel.material).not.toBe(leftSentinel.material);
 
     const sentinelMaterial = leftSentinel.material as PBRMaterial;
+    const backPlazaMaterial = backPlazaSentinel.material as PBRMaterial;
     expect(sentinelMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(sentinelMaterial.metadata?.mainStageMaterialOverride).toBe('spawn-gate-sentinel-pearl');
     expect(sentinelMaterial.albedoColor.r).toBeLessThanOrEqual(0.23);
@@ -7468,6 +7474,9 @@ describe('polishMainStageMaterials', () => {
     expect(sentinelMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(sentinelMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(sentinelMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(sentinelMaterial.albedoColor.r).toBeLessThan(backPlazaMaterial.albedoColor.r);
+    expect(sentinelMaterial.roughness ?? 0).toBeLessThan(backPlazaMaterial.roughness ?? 0);
+    expect(sentinelMaterial.clearCoat.roughness ?? 0).toBeLessThan(backPlazaMaterial.clearCoat.roughness ?? 0);
   });
 
   it('rebalances the spawn-gate sentinel crowns, cyan cores, and shadow keels so the promenade threshold reads as carved night markers instead of bright foil fins around flat cyan glow bars', () => {
