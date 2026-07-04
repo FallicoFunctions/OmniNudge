@@ -8484,24 +8484,36 @@ describe('polishMainStageMaterials', () => {
     const goldCrown = MeshBuilder.CreateBox('V43_WayfindingPylonGoldCrown', { size: 1 }, scene);
     goldCrown.material = sharedGoldMaterial;
 
+    const wingArchInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_L', { size: 1 }, scene);
+    wingArchInlay.material = sharedGoldMaterial;
+
     const cyanControl = MeshBuilder.CreateBox('TestWayfindingPylonCyanControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
 
     const cyanGlyph = MeshBuilder.CreateBox('V43_WayfindingPylonCyanGlyph', { size: 1 }, scene);
     cyanGlyph.material = sharedCyanMaterial;
 
-    polishMainStageMaterials([goldControl, goldCrown, cyanControl, cyanGlyph]);
+    const wingInsetGlow = MeshBuilder.CreateBox('V109_WingFacadeInsetGlowArray_L', { size: 1 }, scene);
+    wingInsetGlow.material = sharedCyanMaterial;
+
+    polishMainStageMaterials([goldControl, goldCrown, wingArchInlay, cyanControl, cyanGlyph, wingInsetGlow]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(goldCrown.material).toBeInstanceOf(PBRMaterial);
     expect(goldCrown.material).not.toBe(sharedGoldMaterial);
+    expect(wingArchInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArchInlay.material).not.toBe(goldCrown.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(cyanGlyph.material).toBeInstanceOf(PBRMaterial);
     expect(cyanGlyph.material).not.toBe(sharedCyanMaterial);
+    expect(wingInsetGlow.material).toBeInstanceOf(PBRMaterial);
+    expect(wingInsetGlow.material).not.toBe(cyanGlyph.material);
 
     const goldMaterial = goldCrown.material as PBRMaterial;
     const cyanMaterial = cyanGlyph.material as PBRMaterial;
+    const wingArchInlayMaterial = wingArchInlay.material as PBRMaterial;
+    const wingInsetGlowMaterial = wingInsetGlow.material as PBRMaterial;
 
     expect(goldMaterial.name).toContain('wayfinding-pylon-gold-crown');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -8513,6 +8525,9 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    expect(goldMaterial.albedoColor.r).toBeGreaterThan(wingArchInlayMaterial.albedoColor.r);
+    expect(goldMaterial.metallic ?? 0).toBeGreaterThan(wingArchInlayMaterial.metallic ?? 0);
+    expect(goldMaterial.roughness ?? 0).toBeLessThan(wingArchInlayMaterial.roughness ?? 0);
 
     expect(cyanMaterial.name).toContain('wayfinding-pylon-cyan-glyph');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -8525,6 +8540,9 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.18);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(cyanMaterial.alpha).toBeLessThan(wingInsetGlowMaterial.alpha);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThan(wingInsetGlowMaterial.emissiveIntensity);
+    expect(cyanMaterial.environmentIntensity).toBeLessThan(wingInsetGlowMaterial.environmentIntensity);
   });
 
   it('rebalances the plaza lantern cluster so the route approach reads as grounded practical hardware instead of a bright gold cage around a hot bulb', () => {

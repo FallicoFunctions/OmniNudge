@@ -7552,7 +7552,16 @@ function applyWayfindingPylonPearlShellOverride(material: PBRMaterial) {
 }
 
 function applyWayfindingPylonGoldCrownOverride(material: PBRMaterial) {
-  applyWingFacadeArchInlayOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.145, 0.065);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.17;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.11;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wayfinding-pylon-gold-crown',
@@ -7560,7 +7569,17 @@ function applyWayfindingPylonGoldCrownOverride(material: PBRMaterial) {
 }
 
 function applyWayfindingPylonCyanGlyphOverride(material: PBRMaterial) {
-  applyWingFacadeInsetGlowOverride(material);
+  material.albedoColor = new Color3(0.09, 0.2, 0.25);
+  material.emissiveColor = new Color3(0.008, 0.03, 0.04);
+  material.emissiveIntensity = 0.07;
+  material.alpha = 0.32;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.01;
+  material.roughness = 0.22;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.66;
+  material.environmentIntensity = 0.26;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wayfinding-pylon-cyan-glyph',
