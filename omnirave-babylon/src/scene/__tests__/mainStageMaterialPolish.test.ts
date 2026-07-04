@@ -2415,8 +2415,9 @@ describe('polishMainStageMaterials', () => {
     expect(rightCabinet.material).toBe(leftCabinet.material);
     expect(leftDriver.material).toBe(leftCabinet.material);
     expect(rightDriver.material).toBe(leftCabinet.material);
-    expect(leftSub.material).toBe(leftCabinet.material);
-    expect(rightSub.material).toBe(leftCabinet.material);
+    expect(leftSub.material).toBeInstanceOf(PBRMaterial);
+    expect(rightSub.material).toBe(leftSub.material);
+    expect(leftSub.material).not.toBe(leftCabinet.material);
 
     expect(blackControl.material).toBe(sharedBlackMaterial);
     expect(leftGrille.material).toBeInstanceOf(PBRMaterial);
@@ -2441,6 +2442,7 @@ describe('polishMainStageMaterials', () => {
     expect(catwalkGuardrail.material).not.toBe(leftPin.material);
 
     const graphiteMaterial = leftCabinet.material as PBRMaterial;
+    const subGraphiteMaterial = leftSub.material as PBRMaterial;
     const blackMaterial = leftGrille.material as PBRMaterial;
     const hardwareMaterial = leftYoke.material as PBRMaterial;
     const lanternStemMaterial = lanternStem.material as PBRMaterial;
@@ -2462,6 +2464,23 @@ describe('polishMainStageMaterials', () => {
     expect(graphiteMaterial.roughness).toBeGreaterThanOrEqual(0.82);
     expect(graphiteMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.18);
     expect(graphiteMaterial.environmentIntensity).toBeLessThanOrEqual(0.22);
+
+    expect(subGraphiteMaterial.name).toContain('front-sub-graphite');
+    expect(subGraphiteMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(subGraphiteMaterial.metadata?.mainStageMaterialOverride).toBe('front-sub-graphite');
+    expect(subGraphiteMaterial.albedoColor.r).toBeGreaterThanOrEqual(0.15);
+    expect(subGraphiteMaterial.albedoColor.g).toBeGreaterThanOrEqual(0.17);
+    expect(subGraphiteMaterial.albedoColor.b).toBeGreaterThanOrEqual(0.2);
+    expect(subGraphiteMaterial.albedoColor.r).toBeLessThanOrEqual(0.17);
+    expect(subGraphiteMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
+    expect(subGraphiteMaterial.albedoColor.b).toBeLessThanOrEqual(0.22);
+    expect(subGraphiteMaterial.emissiveIntensity).toBeLessThanOrEqual(0.016);
+    expect(subGraphiteMaterial.metallic).toBeLessThanOrEqual(0.06);
+    expect(subGraphiteMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(subGraphiteMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(subGraphiteMaterial.albedoColor.r).toBeLessThan(graphiteMaterial.albedoColor.r);
+    expect(subGraphiteMaterial.environmentIntensity).toBeLessThan(graphiteMaterial.environmentIntensity);
+    expect(subGraphiteMaterial.roughness ?? 0).toBeGreaterThan(graphiteMaterial.roughness ?? 0);
 
     expect(blackMaterial.name).toContain('line-array-acoustic-black');
     expect(blackMaterial.metadata?.mainStageMaterialPolish).toBe('black');
