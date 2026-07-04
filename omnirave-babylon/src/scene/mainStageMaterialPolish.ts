@@ -388,15 +388,26 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       mesh.name === 'V29_MainLineArrayGrille_L_00' ||
       mesh.name === 'V29_MainLineArrayGrille_R_00' ||
       mesh.name === 'V29_MainLineArrayHorn_L_00' ||
-      mesh.name === 'V29_MainLineArrayHorn_R_00' ||
-      mesh.name === 'V29_FrontSubPort_L_00' ||
-      mesh.name === 'V29_FrontSubPort_R_00'
+      mesh.name === 'V29_MainLineArrayHorn_R_00'
     ) {
       const cacheKey = `${material.uniqueId}:line-array-acoustic-black`;
       let blackMaterial = clonedMaterials.get(cacheKey);
       if (!blackMaterial) {
         blackMaterial = material.clone(`${material.name}__line-array-acoustic-black`);
         applyLineArrayAcousticBlackOverride(blackMaterial);
+        clonedMaterials.set(cacheKey, blackMaterial);
+      }
+
+      assignOverrideMaterial(mesh, blackMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V29_FrontSubPort_L_00' || mesh.name === 'V29_FrontSubPort_R_00') {
+      const cacheKey = `${material.uniqueId}:front-sub-port-black`;
+      let blackMaterial = clonedMaterials.get(cacheKey);
+      if (!blackMaterial) {
+        blackMaterial = material.clone(`${material.name}__front-sub-port-black`);
+        applyFrontSubPortBlackOverride(blackMaterial);
         clonedMaterials.set(cacheKey, blackMaterial);
       }
 
@@ -5196,6 +5207,19 @@ function applyLineArrayAcousticBlackOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'line-array-acoustic-black',
+  };
+}
+
+function applyFrontSubPortBlackOverride(material: PBRMaterial) {
+  applyLineArrayAcousticBlackOverride(material);
+  material.albedoColor = new Color3(0.04, 0.055, 0.07);
+  material.emissiveColor = new Color3(0.008, 0.04, 0.058);
+  material.emissiveIntensity = 0.06;
+  material.roughness = 0.82;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'front-sub-port-black',
   };
 }
 
