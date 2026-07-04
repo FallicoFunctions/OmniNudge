@@ -8967,6 +8967,9 @@ describe('polishMainStageMaterials', () => {
     const rightBarricade = MeshBuilder.CreateBox('V34_BarricadeAssembly_R', { size: 1 }, scene);
     rightBarricade.material = sharedBlackMaterial;
 
+    const crowdBarrierBase = MeshBuilder.CreateBox('V125_CrowdBarrierBaseArray_L', { size: 1 }, scene);
+    crowdBarrierBase.material = sharedBlackMaterial;
+
     const goldControl = MeshBuilder.CreateBox('TestV34ArrivalGoldControl', { size: 1 }, scene);
     goldControl.material = sharedGoldMaterial;
 
@@ -9010,6 +9013,7 @@ describe('polishMainStageMaterials', () => {
       blackControl,
       leftBarricade,
       rightBarricade,
+      crowdBarrierBase,
       goldControl,
       goldInlay,
       leftEdgeRail,
@@ -9028,6 +9032,8 @@ describe('polishMainStageMaterials', () => {
     expect(blackControl.material).toBe(sharedBlackMaterial);
     expect(leftBarricade.material).toBeInstanceOf(PBRMaterial);
     expect(rightBarricade.material).toBe(leftBarricade.material);
+    expect(crowdBarrierBase.material).toBeInstanceOf(PBRMaterial);
+    expect(crowdBarrierBase.material).not.toBe(leftBarricade.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(goldInlay.material).toBeInstanceOf(PBRMaterial);
@@ -9053,6 +9059,7 @@ describe('polishMainStageMaterials', () => {
     expect(wingInsetGlow.material).not.toBe(leftGatewayCyan.material);
 
     const barricadeMaterial = leftBarricade.material as PBRMaterial;
+    const crowdBarrierBaseMaterial = crowdBarrierBase.material as PBRMaterial;
     const goldMaterial = goldInlay.material as PBRMaterial;
     const edgeRailMaterial = leftEdgeRail.material as PBRMaterial;
     const gatewayCrownMaterial = leftGatewayCrown.material as PBRMaterial;
@@ -9071,6 +9078,9 @@ describe('polishMainStageMaterials', () => {
     expect(barricadeMaterial.metallic).toBeLessThanOrEqual(0.08);
     expect(barricadeMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(barricadeMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
+    expect(barricadeMaterial.albedoColor.r).toBeLessThan(crowdBarrierBaseMaterial.albedoColor.r);
+    expect(barricadeMaterial.roughness ?? 0).toBeGreaterThan(crowdBarrierBaseMaterial.roughness ?? 0);
+    expect(barricadeMaterial.environmentIntensity).toBeLessThan(crowdBarrierBaseMaterial.environmentIntensity);
 
     expect(goldMaterial.name).toContain('approach-gold-inlay-network');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
