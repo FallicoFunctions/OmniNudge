@@ -9087,6 +9087,8 @@ describe('polishMainStageMaterials', () => {
     expect(edgeRailMaterial.metallic).toBeGreaterThanOrEqual(0.18);
     expect(edgeRailMaterial.roughness).toBeLessThanOrEqual(0.84);
     expect(edgeRailMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.12);
+    expect(edgeRailMaterial.clearCoat.roughness).toBeLessThan(wingArchInlayMaterial.clearCoat.roughness);
+    expect(edgeRailMaterial.environmentIntensity).toBeGreaterThan(wingArchInlayMaterial.environmentIntensity);
 
     expect(gatewayCrownMaterial.name).toContain('back-plaza-gateway-gold-crown');
     expect(gatewayCrownMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -9098,6 +9100,8 @@ describe('polishMainStageMaterials', () => {
     expect(gatewayCrownMaterial.metallic).toBeGreaterThanOrEqual(0.16);
     expect(gatewayCrownMaterial.roughness).toBeLessThanOrEqual(0.88);
     expect(gatewayCrownMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.1);
+    expect(gatewayCrownMaterial.clearCoat.roughness).toBeLessThan(wingArchInlayMaterial.clearCoat.roughness);
+    expect(gatewayCrownMaterial.environmentIntensity).toBeGreaterThan(wingArchInlayMaterial.environmentIntensity);
 
     expect(bannerRailMaterial.name).toContain('back-plaza-banner-rail');
     expect(bannerRailMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -9109,6 +9113,8 @@ describe('polishMainStageMaterials', () => {
     expect(bannerRailMaterial.metallic).toBeLessThanOrEqual(0.14);
     expect(bannerRailMaterial.roughness).toBeGreaterThanOrEqual(0.88);
     expect(bannerRailMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+    expect(bannerRailMaterial.emissiveIntensity).toBeGreaterThan(wingArchInlayMaterial.emissiveIntensity);
+    expect(bannerRailMaterial.clearCoat.roughness).toBeLessThan(wingArchInlayMaterial.clearCoat.roughness);
 
     expect(cyanMaterial.name).toContain('back-plaza-gateway-cyan-inlay');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
