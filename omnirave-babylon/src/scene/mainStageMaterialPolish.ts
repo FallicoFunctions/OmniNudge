@@ -6343,15 +6343,15 @@ function applyWideHeroScreenGoldMullionOverride(material: PBRMaterial) {
 
 function applyWideHeroScreenGoldCrossbarOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.17, 0.13, 0.055);
-  material.emissiveColor = new Color3(0, 0, 0);
-  material.emissiveIntensity = 0;
-  material.metallic = 0.16;
-  material.roughness = 0.89;
+  material.albedoColor = new Color3(0.178, 0.136, 0.058);
+  material.emissiveColor = new Color3(0.005, 0.0032, 0.0011);
+  material.emissiveIntensity = 0.012;
+  material.metallic = 0.17;
+  material.roughness = 0.88;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0;
-  material.clearCoat.roughness = 0.86;
-  material.environmentIntensity = 0.1;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.82;
+  material.environmentIntensity = 0.11;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wide-hero-screen-gold-crossbar',
