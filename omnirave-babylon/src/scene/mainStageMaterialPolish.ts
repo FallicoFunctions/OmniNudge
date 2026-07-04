@@ -8848,15 +8848,15 @@ function applyCrownCrystalGoldEdgeOverride(material: PBRMaterial) {
 
 function applyCrownShellGoldSeamOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.06);
-  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
-  material.emissiveIntensity = 0.02;
-  material.metallic = 0.16;
-  material.roughness = 0.9;
+  material.albedoColor = new Color3(0.164, 0.126, 0.052);
+  material.emissiveColor = new Color3(0.006, 0.0042, 0.0014);
+  material.emissiveIntensity = 0.012;
+  material.metallic = 0.13;
+  material.roughness = 0.93;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0;
-  material.clearCoat.roughness = 0.86;
-  material.environmentIntensity = 0.12;
+  material.clearCoat.roughness = 0.9;
+  material.environmentIntensity = 0.09;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-shell-gold-seam',
