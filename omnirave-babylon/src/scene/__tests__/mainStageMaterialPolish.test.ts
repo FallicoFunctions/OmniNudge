@@ -2592,6 +2592,8 @@ describe('polishMainStageMaterials', () => {
     leftStem.material = sharedStemMaterial;
     const rightStem = MeshBuilder.CreateBox('V33_BasinLanternStem_R', { size: 1 }, scene);
     rightStem.material = sharedStemMaterial;
+    const backPlazaStem = MeshBuilder.CreateBox('V59_BackPlazaLanternStemCluster_L', { size: 1 }, scene);
+    backPlazaStem.material = sharedStemMaterial;
 
     const housingControl = MeshBuilder.CreateBox('TestBasinLanternHousingControl', { size: 1 }, scene);
     housingControl.material = sharedHousingMaterial;
@@ -2599,6 +2601,8 @@ describe('polishMainStageMaterials', () => {
     leftHousing.material = sharedHousingMaterial;
     const rightHousing = MeshBuilder.CreateBox('V33_BasinLanternHousing_R', { size: 1 }, scene);
     rightHousing.material = sharedHousingMaterial;
+    const backPlazaCage = MeshBuilder.CreateBox('V59_BackPlazaLanternGoldCage_L', { size: 1 }, scene);
+    backPlazaCage.material = sharedHousingMaterial;
 
     const coreControl = MeshBuilder.CreateBox('TestBasinLanternCoreControl', { size: 1 }, scene);
     coreControl.material = sharedCoreMaterial;
@@ -2606,34 +2610,48 @@ describe('polishMainStageMaterials', () => {
     leftCore.material = sharedCoreMaterial;
     const rightCore = MeshBuilder.CreateBox('V33_BasinLanternCore_R', { size: 1 }, scene);
     rightCore.material = sharedCoreMaterial;
+    const backPlazaCore = MeshBuilder.CreateBox('V59_BackPlazaLanternWarmCore_L', { size: 1 }, scene);
+    backPlazaCore.material = sharedCoreMaterial;
 
     polishMainStageMaterials([
       stemControl,
       leftStem,
       rightStem,
+      backPlazaStem,
       housingControl,
       leftHousing,
       rightHousing,
+      backPlazaCage,
       coreControl,
       leftCore,
       rightCore,
+      backPlazaCore,
     ]);
 
     expect(stemControl.material).toBe(sharedStemMaterial);
     expect(leftStem.material).toBeInstanceOf(PBRMaterial);
     expect(rightStem.material).toBe(leftStem.material);
+    expect(backPlazaStem.material).toBeInstanceOf(PBRMaterial);
+    expect(backPlazaStem.material).not.toBe(leftStem.material);
 
     expect(housingControl.material).toBe(sharedHousingMaterial);
     expect(leftHousing.material).toBeInstanceOf(PBRMaterial);
     expect(rightHousing.material).toBe(leftHousing.material);
+    expect(backPlazaCage.material).toBeInstanceOf(PBRMaterial);
+    expect(backPlazaCage.material).not.toBe(leftHousing.material);
 
     expect(coreControl.material).toBe(sharedCoreMaterial);
     expect(leftCore.material).toBeInstanceOf(PBRMaterial);
     expect(rightCore.material).toBe(leftCore.material);
+    expect(backPlazaCore.material).toBeInstanceOf(PBRMaterial);
+    expect(backPlazaCore.material).not.toBe(leftCore.material);
 
     const stemMaterial = leftStem.material as PBRMaterial;
+    const backPlazaStemMaterial = backPlazaStem.material as PBRMaterial;
     const housingMaterial = leftHousing.material as PBRMaterial;
+    const backPlazaCageMaterial = backPlazaCage.material as PBRMaterial;
     const coreMaterial = leftCore.material as PBRMaterial;
+    const backPlazaCoreMaterial = backPlazaCore.material as PBRMaterial;
 
     expect(stemMaterial.name).toContain('basin-lantern-stem');
     expect(stemMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -2644,6 +2662,9 @@ describe('polishMainStageMaterials', () => {
     expect(stemMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(stemMaterial.roughness).toBeGreaterThanOrEqual(0.82);
     expect(stemMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
+    expect(stemMaterial.albedoColor.r).toBeGreaterThan(backPlazaStemMaterial.albedoColor.r);
+    expect(stemMaterial.emissiveIntensity).toBeGreaterThan(backPlazaStemMaterial.emissiveIntensity);
+    expect(stemMaterial.roughness ?? 0).toBeLessThan(backPlazaStemMaterial.roughness ?? 0);
 
     expect(housingMaterial.name).toContain('basin-lantern-housing');
     expect(housingMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -2655,6 +2676,9 @@ describe('polishMainStageMaterials', () => {
     expect(housingMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(housingMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(housingMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(housingMaterial.albedoColor.r).toBeGreaterThan(backPlazaCageMaterial.albedoColor.r);
+    expect(housingMaterial.metallic ?? 0).toBeGreaterThan(backPlazaCageMaterial.metallic ?? 0);
+    expect(housingMaterial.roughness ?? 0).toBeLessThan(backPlazaCageMaterial.roughness ?? 0);
 
     expect(coreMaterial.name).toContain('basin-lantern-warm-core');
     expect(coreMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -2665,6 +2689,9 @@ describe('polishMainStageMaterials', () => {
     expect(coreMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.55);
     expect(coreMaterial.roughness).toBeLessThanOrEqual(0.36);
     expect(coreMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.36);
+    expect(coreMaterial.albedoColor.r).toBeGreaterThan(backPlazaCoreMaterial.albedoColor.r);
+    expect(coreMaterial.emissiveIntensity).toBeLessThan(backPlazaCoreMaterial.emissiveIntensity);
+    expect(coreMaterial.roughness ?? 0).toBeGreaterThan(backPlazaCoreMaterial.roughness ?? 0);
   });
 
   it('rebalances the crowd clusters and wearable glows so the arrival lanes read as grounded silhouettes with subdued festival accents instead of flat black figures wrapped in hot cyan cards', () => {
