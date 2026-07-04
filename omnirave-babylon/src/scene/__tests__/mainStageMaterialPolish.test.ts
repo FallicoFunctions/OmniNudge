@@ -1747,7 +1747,10 @@ describe('polishMainStageMaterials', () => {
     const rightCyan = MeshBuilder.CreateBox('V39_CrownSideRibCyanInset_R', { size: 1 }, scene);
     rightCyan.material = sharedCyanMaterial;
 
-    polishMainStageMaterials([goldControl, leftGold, rightGold, cyanControl, leftCyan, rightCyan]);
+    const haloCyan = MeshBuilder.CreateBox('V114_CelestialHaloCyanEdgeArray', { size: 1 }, scene);
+    haloCyan.material = sharedCyanMaterial;
+
+    polishMainStageMaterials([goldControl, leftGold, rightGold, cyanControl, leftCyan, rightCyan, haloCyan]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftGold.material).toBeInstanceOf(PBRMaterial);
@@ -1756,9 +1759,13 @@ describe('polishMainStageMaterials', () => {
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftCyan.material).toBeInstanceOf(PBRMaterial);
     expect(rightCyan.material).toBe(leftCyan.material);
+    expect(haloCyan.material).toBeInstanceOf(PBRMaterial);
+    expect(haloCyan.material).not.toBe(sharedCyanMaterial);
+    expect(haloCyan.material).not.toBe(leftCyan.material);
 
     const goldMaterial = leftGold.material as PBRMaterial;
     const cyanMaterial = leftCyan.material as PBRMaterial;
+    const haloMaterial = haloCyan.material as PBRMaterial;
 
     expect(goldMaterial.name).toContain('crown-side-rib-gold');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -1782,6 +1789,10 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.16);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(cyanMaterial.alpha).toBeGreaterThan(haloMaterial.alpha);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThan(haloMaterial.emissiveIntensity);
+    expect(cyanMaterial.roughness ?? 0).toBeGreaterThan(haloMaterial.roughness ?? 0);
+    expect(cyanMaterial.environmentIntensity).toBeLessThan(haloMaterial.environmentIntensity);
   });
 
   it('rebalances the crown blade lamella clusters so the skyline blades read as layered carved pearl, metal, and smoked-glass forms instead of bright crown strips', () => {
