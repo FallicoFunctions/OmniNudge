@@ -6646,15 +6646,15 @@ function applyOculusCanopyOverride(material: PBRMaterial) {
 
 function applyWingCanopyLamellaGoldOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.16, 0.12, 0.05);
-  material.emissiveColor = new Color3(0, 0, 0);
-  material.emissiveIntensity = 0;
-  material.metallic = 0.14;
-  material.roughness = 0.9;
+  material.albedoColor = new Color3(0.149, 0.111, 0.047);
+  material.emissiveColor = new Color3(0.0038, 0.0025, 0.0009);
+  material.emissiveIntensity = 0.008;
+  material.metallic = 0.12;
+  material.roughness = 0.93;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0;
-  material.clearCoat.roughness = 0.88;
-  material.environmentIntensity = 0.08;
+  material.clearCoat.roughness = 0.9;
+  material.environmentIntensity = 0.07;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-canopy-lamella-gold',
