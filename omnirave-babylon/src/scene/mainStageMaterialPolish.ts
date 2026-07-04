@@ -357,15 +357,26 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       mesh.name === 'V29_MainLineArrayCabinet_L_00' ||
       mesh.name === 'V29_MainLineArrayCabinet_R_00' ||
       mesh.name === 'V29_MainLineArrayDriver_L_00' ||
-      mesh.name === 'V29_MainLineArrayDriver_R_00' ||
-      mesh.name === 'V29_FrontSubCabinet_L_00' ||
-      mesh.name === 'V29_FrontSubCabinet_R_00'
+      mesh.name === 'V29_MainLineArrayDriver_R_00'
     ) {
       const cacheKey = `${material.uniqueId}:line-array-graphite`;
       let graphiteMaterial = clonedMaterials.get(cacheKey);
       if (!graphiteMaterial) {
         graphiteMaterial = material.clone(`${material.name}__line-array-graphite`);
         applyLineArrayGraphiteOverride(graphiteMaterial);
+        clonedMaterials.set(cacheKey, graphiteMaterial);
+      }
+
+      assignOverrideMaterial(mesh, graphiteMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V29_FrontSubCabinet_L_00' || mesh.name === 'V29_FrontSubCabinet_R_00') {
+      const cacheKey = `${material.uniqueId}:front-sub-graphite`;
+      let graphiteMaterial = clonedMaterials.get(cacheKey);
+      if (!graphiteMaterial) {
+        graphiteMaterial = material.clone(`${material.name}__front-sub-graphite`);
+        applyFrontSubGraphiteOverride(graphiteMaterial);
         clonedMaterials.set(cacheKey, graphiteMaterial);
       }
 
@@ -5144,6 +5155,20 @@ function applyCrowdClusterNearGraphiteOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crowd-cluster-near-graphite',
+  };
+}
+
+function applyFrontSubGraphiteOverride(material: PBRMaterial) {
+  applyLineArrayGraphiteOverride(material);
+  material.albedoColor = new Color3(0.16, 0.18, 0.21);
+  material.emissiveColor = new Color3(0.007, 0.0085, 0.01);
+  material.emissiveIntensity = 0.014;
+  material.metallic = 0.05;
+  material.roughness = 0.9;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'front-sub-graphite',
   };
 }
 
