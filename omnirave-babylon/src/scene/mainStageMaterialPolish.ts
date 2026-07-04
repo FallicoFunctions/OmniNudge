@@ -5114,7 +5114,16 @@ function applyBasinPlantingIslandRimOverride(material: PBRMaterial) {
 }
 
 function applyForegroundBarricadeFrameOverride(material: PBRMaterial) {
-  applyCrowdControlFrameOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.19, 0.23);
+  material.emissiveColor = new Color3(0.012, 0.018, 0.024);
+  material.emissiveIntensity = 0.026;
+  material.metallic = 0.1;
+  material.roughness = 0.82;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.56;
+  material.environmentIntensity = 0.24;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'foreground-barricade-frame',
@@ -5122,7 +5131,16 @@ function applyForegroundBarricadeFrameOverride(material: PBRMaterial) {
 }
 
 function applyForegroundBarricadeGoldRailOverride(material: PBRMaterial) {
-  applyCrowdControlRailOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.16, 0.08);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.2;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.82;
+  material.environmentIntensity = 0.14;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'foreground-barricade-gold-rail',
