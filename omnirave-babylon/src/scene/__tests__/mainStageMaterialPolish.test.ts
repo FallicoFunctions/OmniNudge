@@ -6021,6 +6021,9 @@ describe('polishMainStageMaterials', () => {
     const wingCanopy = MeshBuilder.CreateBox('V117_WingCanopyLamellaGoldArray_L_Front', { size: 1 }, scene);
     wingCanopy.material = sharedCrownGold;
 
+    const wideHeroFrame = MeshBuilder.CreateBox('V126_WideHeroScreenGoldFrame', { size: 1 }, scene);
+    wideHeroFrame.material = sharedCrownGold;
+
     polishMainStageMaterials([
       otherGlass,
       vipBalustrade,
@@ -6028,6 +6031,7 @@ describe('polishMainStageMaterials', () => {
       oculusCanopy,
       otherCrownGold,
       wingCanopy,
+      wideHeroFrame,
     ]);
 
     expect(otherGlass.material).toBe(sharedCyanGlass);
@@ -6041,10 +6045,14 @@ describe('polishMainStageMaterials', () => {
     expect(otherCrownGold.material).toBe(sharedCrownGold);
     expect(wingCanopy.material).toBeInstanceOf(PBRMaterial);
     expect(wingCanopy.material).not.toBe(sharedCrownGold);
+    expect(wideHeroFrame.material).toBeInstanceOf(PBRMaterial);
+    expect(wideHeroFrame.material).not.toBe(sharedCrownGold);
+    expect(wideHeroFrame.material).not.toBe(wingCanopy.material);
 
     const vipBalustradeMaterial = vipBalustrade.material as PBRMaterial;
     const oculusCanopyMaterial = oculusCanopy.material as PBRMaterial;
     const wingCanopyMaterial = wingCanopy.material as PBRMaterial;
+    const wideHeroFrameMaterial = wideHeroFrame.material as PBRMaterial;
 
     expect(vipBalustradeMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
     expect(vipBalustradeMaterial.metadata?.mainStageMaterialOverride).toBe('vip-glass-balustrade');
@@ -6070,6 +6078,9 @@ describe('polishMainStageMaterials', () => {
     expect(wingCanopyMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
     expect(wingCanopyMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(wingCanopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    expect(wingCanopyMaterial.albedoColor.r).toBeLessThan(wideHeroFrameMaterial.albedoColor.r);
+    expect(wingCanopyMaterial.metallic ?? 0).toBeLessThan(wideHeroFrameMaterial.metallic ?? 0);
+    expect(wingCanopyMaterial.roughness ?? 0).toBeGreaterThan(wideHeroFrameMaterial.roughness ?? 0);
   });
 
   it('darkens the wing-canopy pearl lamellae so the side crowns read as layered depth instead of bright ivory fins', () => {
