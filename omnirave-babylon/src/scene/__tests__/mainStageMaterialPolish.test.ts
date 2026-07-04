@@ -2997,7 +2997,10 @@ describe('polishMainStageMaterials', () => {
     const lenses = MeshBuilder.CreateBox('V46_CrownCyanLensCluster', { size: 1 }, scene);
     lenses.material = sharedCyanMaterial;
 
-    polishMainStageMaterials([blackControl, drops, housings, cyanControl, lenses]);
+    const haloCyan = MeshBuilder.CreateBox('V114_CelestialHaloCyanEdgeArray', { size: 1 }, scene);
+    haloCyan.material = sharedCyanMaterial;
+
+    polishMainStageMaterials([blackControl, drops, housings, cyanControl, lenses, haloCyan]);
 
     expect(blackControl.material).toBe(sharedBlackMaterial);
     expect(drops.material).toBeInstanceOf(PBRMaterial);
@@ -3008,10 +3011,14 @@ describe('polishMainStageMaterials', () => {
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(lenses.material).toBeInstanceOf(PBRMaterial);
+    expect(haloCyan.material).toBeInstanceOf(PBRMaterial);
+    expect(haloCyan.material).not.toBe(sharedCyanMaterial);
+    expect(haloCyan.material).not.toBe(lenses.material);
 
     const cableMaterial = drops.material as PBRMaterial;
     const housingMaterial = housings.material as PBRMaterial;
     const lensMaterial = lenses.material as PBRMaterial;
+    const haloMaterial = haloCyan.material as PBRMaterial;
 
     expect(cableMaterial.name).toContain('crown-light-drop-cable');
     expect(cableMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -3044,6 +3051,10 @@ describe('polishMainStageMaterials', () => {
     expect(lensMaterial.roughness).toBeGreaterThanOrEqual(0.16);
     expect(lensMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
     expect(lensMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(lensMaterial.alpha).toBeLessThan(haloMaterial.alpha);
+    expect(lensMaterial.emissiveIntensity).toBeGreaterThan(haloMaterial.emissiveIntensity);
+    expect(lensMaterial.roughness ?? 0).toBeLessThan(haloMaterial.roughness ?? 0);
+    expect(lensMaterial.environmentIntensity).toBeGreaterThan(haloMaterial.environmentIntensity);
   });
 
   it('rebalances the crown gold lattice braces so the skyline rig reads as structural gilded lattice instead of bright gold X sticks', () => {
