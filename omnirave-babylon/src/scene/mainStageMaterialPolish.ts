@@ -1346,11 +1346,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let shellMaterial = clonedMaterials.get(cacheKey);
       if (!shellMaterial) {
         shellMaterial = material.clone(`${material.name}__spawn-cable-trough-shell`);
-        applyCrowdBarrierBaseOverride(shellMaterial);
-        shellMaterial.metadata = {
-          ...shellMaterial.metadata,
-          mainStageMaterialOverride: 'spawn-cable-trough-shell',
-        };
+        applySpawnCableTroughShellOverride(shellMaterial);
         clonedMaterials.set(cacheKey, shellMaterial);
       }
 
@@ -1363,11 +1359,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let collarMaterial = clonedMaterials.get(cacheKey);
       if (!collarMaterial) {
         collarMaterial = material.clone(`${material.name}__spawn-cable-trough-collar`);
-        applyProcessionalRouteGoldTrimOverride(collarMaterial);
-        collarMaterial.metadata = {
-          ...collarMaterial.metadata,
-          mainStageMaterialOverride: 'spawn-cable-trough-collar',
-        };
+        applySpawnCableTroughCollarOverride(collarMaterial);
         clonedMaterials.set(cacheKey, collarMaterial);
       }
 
@@ -1380,11 +1372,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let insetMaterial = clonedMaterials.get(cacheKey);
       if (!insetMaterial) {
         insetMaterial = material.clone(`${material.name}__spawn-cable-trough-wet-inset`);
-        applySpawnRouteWetCenterInlayOverride(insetMaterial);
-        insetMaterial.metadata = {
-          ...insetMaterial.metadata,
-          mainStageMaterialOverride: 'spawn-cable-trough-wet-inset',
-        };
+        applySpawnCableTroughWetInsetOverride(insetMaterial);
         clonedMaterials.set(cacheKey, insetMaterial);
       }
 
@@ -6220,6 +6208,58 @@ function applySpawnRouteWetCenterInlayOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-route-wet-center-inlay',
+  };
+}
+
+function applySpawnCableTroughShellOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.12, 0.15, 0.19);
+  material.emissiveColor = new Color3(0.008, 0.011, 0.015);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.05;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.22;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-cable-trough-shell',
+  };
+}
+
+function applySpawnCableTroughCollarOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.15, 0.11, 0.045);
+  material.emissiveColor = new Color3(0.007, 0.004, 0.0012);
+  material.emissiveIntensity = 0.015;
+  material.metallic = 0.12;
+  material.roughness = 0.94;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.9;
+  material.environmentIntensity = 0.09;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-cable-trough-collar',
+  };
+}
+
+function applySpawnCableTroughWetInsetOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.03, 0.05, 0.07);
+  material.emissiveColor = new Color3(0.008, 0.02, 0.03);
+  material.emissiveIntensity = 0.065;
+  material.alpha = 0.98;
+  material.metallic = 0.02;
+  material.roughness = 0.26;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.64;
+  material.clearCoat.roughness = 0.1;
+  material.environmentIntensity = 0.82;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'spawn-cable-trough-wet-inset',
   };
 }
 
