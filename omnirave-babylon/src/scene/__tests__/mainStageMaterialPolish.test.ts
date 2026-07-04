@@ -2627,6 +2627,9 @@ describe('polishMainStageMaterials', () => {
     const glowRightMid = MeshBuilder.CreateBox('V32_CrowdWearableGlow_R_Mid', { size: 1 }, scene);
     glowRightMid.material = sharedGlowMaterial;
 
+    const wingArcadeCyanInset = MeshBuilder.CreateBox('V28_WingArcadeCyanInlay_L', { size: 1 }, scene);
+    wingArcadeCyanInset.material = sharedGlowMaterial;
+
     polishMainStageMaterials([
       crowdControl,
       leftNear,
@@ -2638,6 +2641,7 @@ describe('polishMainStageMaterials', () => {
       glowRightNear,
       glowLeftMid,
       glowRightMid,
+      wingArcadeCyanInset,
     ]);
 
     expect(crowdControl.material).toBe(sharedCrowdMaterial);
@@ -2651,9 +2655,12 @@ describe('polishMainStageMaterials', () => {
     expect(glowRightNear.material).toBe(glowLeftNear.material);
     expect(glowLeftMid.material).toBe(glowLeftNear.material);
     expect(glowRightMid.material).toBe(glowLeftNear.material);
+    expect(wingArcadeCyanInset.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArcadeCyanInset.material).not.toBe(glowLeftNear.material);
 
     const crowdMaterial = leftNear.material as PBRMaterial;
     const glowMaterial = glowLeftNear.material as PBRMaterial;
+    const wingArcadeCyanInsetMaterial = wingArcadeCyanInset.material as PBRMaterial;
 
     expect(crowdMaterial.name).toContain('crowd-cluster-graphite');
     expect(crowdMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -2677,6 +2684,9 @@ describe('polishMainStageMaterials', () => {
     expect(glowMaterial.roughness).toBeGreaterThanOrEqual(0.16);
     expect(glowMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
     expect(glowMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(glowMaterial.alpha).toBeLessThan(wingArcadeCyanInsetMaterial.alpha);
+    expect(glowMaterial.emissiveIntensity).toBeLessThan(wingArcadeCyanInsetMaterial.emissiveIntensity);
+    expect(glowMaterial.environmentIntensity).toBeLessThan(wingArcadeCyanInsetMaterial.environmentIntensity);
   });
 
   it('rebalances the crown moving-light cables, housings, and cyan lenses so the upper rig reads as practical show hardware instead of one repeated black proxy drop finish with hot cyan bulbs', () => {
