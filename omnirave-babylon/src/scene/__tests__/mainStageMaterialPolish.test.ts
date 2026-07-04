@@ -4350,16 +4350,23 @@ describe('polishMainStageMaterials', () => {
     const rightInlay = MeshBuilder.CreateBox('V98_CrownButtressGoldInlay_R', { size: 1 }, scene);
     rightInlay.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([otherGold, leftInlay, rightInlay]);
+    const wideHeroFrame = MeshBuilder.CreateBox('V126_WideHeroScreenGoldFrame', { size: 1 }, scene);
+    wideHeroFrame.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, leftInlay, rightInlay, wideHeroFrame]);
 
     expect(otherGold.material).toBe(sharedGoldMaterial);
     expect(leftInlay.material).toBeInstanceOf(PBRMaterial);
     expect(rightInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(wideHeroFrame.material).toBeInstanceOf(PBRMaterial);
     expect(leftInlay.material).not.toBe(sharedGoldMaterial);
     expect(rightInlay.material).not.toBe(sharedGoldMaterial);
+    expect(wideHeroFrame.material).not.toBe(sharedGoldMaterial);
     expect(rightInlay.material).toBe(leftInlay.material);
+    expect(wideHeroFrame.material).not.toBe(leftInlay.material);
 
     const inlayMaterial = leftInlay.material as PBRMaterial;
+    const wideHeroFrameMaterial = wideHeroFrame.material as PBRMaterial;
     expect(inlayMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(inlayMaterial.metadata?.mainStageMaterialOverride).toBe('crown-buttress-gold-inlay');
     expect(inlayMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
@@ -4369,6 +4376,9 @@ describe('polishMainStageMaterials', () => {
     expect(inlayMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(inlayMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(inlayMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(inlayMaterial.albedoColor.r).toBeLessThan(wideHeroFrameMaterial.albedoColor.r);
+    expect(inlayMaterial.metallic ?? 0).toBeLessThan(wideHeroFrameMaterial.metallic ?? 0);
+    expect(inlayMaterial.roughness ?? 0).toBeGreaterThan(wideHeroFrameMaterial.roughness ?? 0);
   });
 
   it('darkens the crown buttress relief shells so the skyline reads as carved massing instead of bright pearl wedges', () => {
