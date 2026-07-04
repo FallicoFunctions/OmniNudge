@@ -2841,14 +2841,16 @@ describe('polishMainStageMaterials', () => {
     expect(glowControl.material).toBe(sharedGlowMaterial);
     expect(glowLeftNear.material).toBeInstanceOf(PBRMaterial);
     expect(glowRightNear.material).toBe(glowLeftNear.material);
-    expect(glowLeftMid.material).toBe(glowLeftNear.material);
-    expect(glowRightMid.material).toBe(glowLeftNear.material);
+    expect(glowLeftMid.material).toBeInstanceOf(PBRMaterial);
+    expect(glowRightMid.material).toBe(glowLeftMid.material);
+    expect(glowLeftMid.material).not.toBe(glowLeftNear.material);
     expect(wingArcadeCyanInset.material).toBeInstanceOf(PBRMaterial);
     expect(wingArcadeCyanInset.material).not.toBe(glowLeftNear.material);
 
     const nearCrowdMaterial = leftNear.material as PBRMaterial;
     const midCrowdMaterial = leftMid.material as PBRMaterial;
-    const glowMaterial = glowLeftNear.material as PBRMaterial;
+    const nearGlowMaterial = glowLeftNear.material as PBRMaterial;
+    const midGlowMaterial = glowLeftMid.material as PBRMaterial;
     const wingArcadeCyanInsetMaterial = wingArcadeCyanInset.material as PBRMaterial;
 
     expect(nearCrowdMaterial.name).toContain('crowd-cluster-near-graphite');
@@ -2876,20 +2878,35 @@ describe('polishMainStageMaterials', () => {
     expect(midCrowdMaterial.environmentIntensity).toBeLessThan(nearCrowdMaterial.environmentIntensity);
     expect(midCrowdMaterial.roughness ?? 0).toBeGreaterThan(nearCrowdMaterial.roughness ?? 0);
 
-    expect(glowMaterial.name).toContain('crowd-wearable-glow');
-    expect(glowMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
-    expect(glowMaterial.metadata?.mainStageMaterialOverride).toBe('crowd-wearable-glow');
-    expect(glowMaterial.alpha).toBeLessThanOrEqual(0.4);
-    expect(glowMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(glowMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
-    expect(glowMaterial.albedoColor.b).toBeLessThanOrEqual(0.34);
-    expect(glowMaterial.emissiveIntensity).toBeLessThanOrEqual(0.12);
-    expect(glowMaterial.roughness).toBeGreaterThanOrEqual(0.16);
-    expect(glowMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
-    expect(glowMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
-    expect(glowMaterial.alpha).toBeLessThan(wingArcadeCyanInsetMaterial.alpha);
-    expect(glowMaterial.emissiveIntensity).toBeLessThan(wingArcadeCyanInsetMaterial.emissiveIntensity);
-    expect(glowMaterial.environmentIntensity).toBeLessThan(wingArcadeCyanInsetMaterial.environmentIntensity);
+    expect(nearGlowMaterial.name).toContain('crowd-wearable-glow-near');
+    expect(nearGlowMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(nearGlowMaterial.metadata?.mainStageMaterialOverride).toBe('crowd-wearable-glow-near');
+    expect(nearGlowMaterial.alpha).toBeLessThanOrEqual(0.4);
+    expect(nearGlowMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(nearGlowMaterial.albedoColor.g).toBeLessThanOrEqual(0.28);
+    expect(nearGlowMaterial.albedoColor.b).toBeLessThanOrEqual(0.34);
+    expect(nearGlowMaterial.emissiveIntensity).toBeLessThanOrEqual(0.12);
+    expect(nearGlowMaterial.roughness).toBeGreaterThanOrEqual(0.16);
+    expect(nearGlowMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
+    expect(nearGlowMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(nearGlowMaterial.alpha).toBeLessThan(wingArcadeCyanInsetMaterial.alpha);
+    expect(nearGlowMaterial.emissiveIntensity).toBeLessThan(wingArcadeCyanInsetMaterial.emissiveIntensity);
+    expect(nearGlowMaterial.environmentIntensity).toBeLessThan(wingArcadeCyanInsetMaterial.environmentIntensity);
+
+    expect(midGlowMaterial.name).toContain('crowd-wearable-glow-mid');
+    expect(midGlowMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
+    expect(midGlowMaterial.metadata?.mainStageMaterialOverride).toBe('crowd-wearable-glow-mid');
+    expect(midGlowMaterial.alpha).toBeLessThanOrEqual(0.3);
+    expect(midGlowMaterial.albedoColor.r).toBeLessThanOrEqual(0.13);
+    expect(midGlowMaterial.albedoColor.g).toBeLessThanOrEqual(0.22);
+    expect(midGlowMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(midGlowMaterial.emissiveIntensity).toBeLessThanOrEqual(0.08);
+    expect(midGlowMaterial.roughness).toBeGreaterThanOrEqual(0.24);
+    expect(midGlowMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
+    expect(midGlowMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(midGlowMaterial.alpha).toBeLessThan(nearGlowMaterial.alpha);
+    expect(midGlowMaterial.emissiveIntensity).toBeLessThan(nearGlowMaterial.emissiveIntensity);
+    expect(midGlowMaterial.environmentIntensity).toBeLessThan(nearGlowMaterial.environmentIntensity);
   });
 
   it('rebalances the crown moving-light cables, housings, and cyan lenses so the upper rig reads as practical show hardware instead of one repeated black proxy drop finish with hot cyan bulbs', () => {
