@@ -1397,11 +1397,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let frameMaterial = clonedMaterials.get(cacheKey);
       if (!frameMaterial) {
         frameMaterial = material.clone(`${material.name}__screen-service-catwalk-frame`);
-        applyCrowdBarrierBaseOverride(frameMaterial);
-        frameMaterial.metadata = {
-          ...frameMaterial.metadata,
-          mainStageMaterialOverride: 'screen-service-catwalk-frame',
-        };
+        applyScreenServiceCatwalkFrameOverride(frameMaterial);
         clonedMaterials.set(cacheKey, frameMaterial);
       }
 
@@ -1427,11 +1423,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let guardrailMaterial = clonedMaterials.get(cacheKey);
       if (!guardrailMaterial) {
         guardrailMaterial = material.clone(`${material.name}__screen-service-catwalk-guardrail`);
-        applyProcessionalRouteGoldTrimOverride(guardrailMaterial);
-        guardrailMaterial.metadata = {
-          ...guardrailMaterial.metadata,
-          mainStageMaterialOverride: 'screen-service-catwalk-guardrail',
-        };
+        applyScreenServiceCatwalkGuardrailOverride(guardrailMaterial);
         clonedMaterials.set(cacheKey, guardrailMaterial);
       }
 
@@ -1444,11 +1436,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let practicalMaterial = clonedMaterials.get(cacheKey);
       if (!practicalMaterial) {
         practicalMaterial = material.clone(`${material.name}__screen-service-catwalk-practicals`);
-        applyArrivalRunwayCyanThreadsOverride(practicalMaterial);
-        practicalMaterial.metadata = {
-          ...practicalMaterial.metadata,
-          mainStageMaterialOverride: 'screen-service-catwalk-practicals',
-        };
+        applyScreenServiceCatwalkPracticalsOverride(practicalMaterial);
         clonedMaterials.set(cacheKey, practicalMaterial);
       }
 
@@ -6253,6 +6241,58 @@ function applyScreenServiceCatwalkCableLoomOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'screen-service-catwalk-cable-loom',
+  };
+}
+
+function applyScreenServiceCatwalkFrameOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.13, 0.16, 0.2);
+  material.emissiveColor = new Color3(0.008, 0.011, 0.015);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.05;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.22;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'screen-service-catwalk-frame',
+  };
+}
+
+function applyScreenServiceCatwalkGuardrailOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0.008, 0.005, 0.0015);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.14;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.9;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'screen-service-catwalk-guardrail',
+  };
+}
+
+function applyScreenServiceCatwalkPracticalsOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.1, 0.22, 0.28);
+  material.emissiveColor = new Color3(0.008, 0.038, 0.052);
+  material.emissiveIntensity = 0.05;
+  material.alpha = 0.39;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.26;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.66;
+  material.environmentIntensity = 0.2;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'screen-service-catwalk-practicals',
   };
 }
 
