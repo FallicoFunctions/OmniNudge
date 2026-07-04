@@ -5090,7 +5090,18 @@ function applyLineArrayPinBarsOverride(material: PBRMaterial) {
 }
 
 function applyBasinFountainMistOverride(material: PBRMaterial) {
-  applySpawnWetInsetPoolOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.06, 0.09, 0.11);
+  material.emissiveColor = new Color3(0.014, 0.036, 0.05);
+  material.emissiveIntensity = 0.1;
+  material.alpha = 0.86;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.28;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.62;
+  material.clearCoat.roughness = 0.16;
+  material.environmentIntensity = 0.82;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-fountain-mist',
@@ -5098,7 +5109,16 @@ function applyBasinFountainMistOverride(material: PBRMaterial) {
 }
 
 function applyBasinFountainNozzleArrayOverride(material: PBRMaterial) {
-  applyForegroundBarricadeGoldRunOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.13, 0.06);
+  material.emissiveColor = new Color3(0.006, 0.004, 0.001);
+  material.emissiveIntensity = 0.012;
+  material.metallic = 0.16;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.12;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-fountain-nozzle-array',
@@ -5106,7 +5126,16 @@ function applyBasinFountainNozzleArrayOverride(material: PBRMaterial) {
 }
 
 function applyBasinPlantingIslandRimOverride(material: PBRMaterial) {
-  applyForegroundBarricadePearlRunOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.26, 0.28, 0.32);
+  material.emissiveColor = new Color3(0.008, 0.012, 0.016);
+  material.emissiveIntensity = 0.024;
+  material.metallic = 0.02;
+  material.roughness = 0.82;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.56;
+  material.environmentIntensity = 0.16;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-planting-island-rim',
