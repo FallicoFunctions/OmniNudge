@@ -10779,7 +10779,7 @@ describe('polishMainStageMaterials', () => {
     expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
-  it('darkens the hero portal pearl aprons so the stage mouth base reads as carved shell architecture instead of a bright ivory ledge', () => {
+  it('splits the center hero portal pearl apron away from the side aprons so the stage mouth keeps a weightier central dais than the flanking shell ledges', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -10798,25 +10798,48 @@ describe('polishMainStageMaterials', () => {
     const rightApron = MeshBuilder.CreateBox('V25_HeroPortalPearlApron_R', { size: 1 }, scene);
     rightApron.material = sharedIvoryMaterial;
 
-    polishMainStageMaterials([controlIvory, leftApron, rightApron]);
+    const centerApron = MeshBuilder.CreateBox('V68_HeroPortalPearlApron', { size: 1 }, scene);
+    centerApron.material = sharedIvoryMaterial;
+
+    polishMainStageMaterials([controlIvory, leftApron, rightApron, centerApron]);
 
     expect(controlIvory.material).toBe(sharedIvoryMaterial);
     expect(leftApron.material).toBeInstanceOf(PBRMaterial);
     expect(rightApron.material).toBeInstanceOf(PBRMaterial);
+    expect(centerApron.material).toBeInstanceOf(PBRMaterial);
     expect(leftApron.material).not.toBe(sharedIvoryMaterial);
     expect(rightApron.material).not.toBe(sharedIvoryMaterial);
+    expect(centerApron.material).not.toBe(sharedIvoryMaterial);
     expect(rightApron.material).toBe(leftApron.material);
+    expect(centerApron.material).not.toBe(leftApron.material);
 
-    const apronMaterial = leftApron.material as PBRMaterial;
-    expect(apronMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(apronMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-pearl-apron');
-    expect(apronMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
-    expect(apronMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
-    expect(apronMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
-    expect(apronMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(apronMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(apronMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(apronMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    const sideApronMaterial = leftApron.material as PBRMaterial;
+    const centerApronMaterial = centerApron.material as PBRMaterial;
+
+    expect(sideApronMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(sideApronMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-side-pearl-apron');
+    expect(sideApronMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
+    expect(sideApronMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(sideApronMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
+    expect(sideApronMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(sideApronMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(sideApronMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(sideApronMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+
+    expect(centerApronMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(centerApronMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-center-pearl-apron');
+    expect(centerApronMaterial.albedoColor.r).toBeLessThanOrEqual(0.19);
+    expect(centerApronMaterial.albedoColor.g).toBeLessThanOrEqual(0.22);
+    expect(centerApronMaterial.albedoColor.b).toBeLessThanOrEqual(0.26);
+    expect(centerApronMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(centerApronMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(centerApronMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.04);
+    expect(centerApronMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+
+    expect(centerApronMaterial.albedoColor.r).toBeLessThan(sideApronMaterial.albedoColor.r);
+    expect(centerApronMaterial.emissiveIntensity).toBeLessThan(sideApronMaterial.emissiveIntensity);
+    expect(centerApronMaterial.roughness ?? 0).toBeGreaterThan(sideApronMaterial.roughness ?? 0);
+    expect(centerApronMaterial.environmentIntensity).toBeLessThan(sideApronMaterial.environmentIntensity);
   });
 
   it('neutralizes the hero portal shadow vault so the stage mouth reads as recessed depth instead of a bright cyan insert', () => {
