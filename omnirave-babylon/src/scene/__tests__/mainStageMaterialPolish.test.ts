@@ -2431,10 +2431,12 @@ describe('polishMainStageMaterials', () => {
     expect(hardwareControl.material).toBe(sharedHardwareMaterial);
     expect(leftYoke.material).toBeInstanceOf(PBRMaterial);
     expect(rightYoke.material).toBe(leftYoke.material);
-    expect(leftRail.material).toBe(leftYoke.material);
-    expect(rightRail.material).toBe(leftYoke.material);
+    expect(leftRail.material).toBeInstanceOf(PBRMaterial);
+    expect(rightRail.material).toBe(leftRail.material);
+    expect(leftRail.material).not.toBe(leftYoke.material);
     expect(lanternStem.material).toBeInstanceOf(PBRMaterial);
     expect(lanternStem.material).not.toBe(leftYoke.material);
+    expect(lanternStem.material).not.toBe(leftRail.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftPin.material).toBeInstanceOf(PBRMaterial);
@@ -2447,6 +2449,7 @@ describe('polishMainStageMaterials', () => {
     const blackMaterial = leftGrille.material as PBRMaterial;
     const subPortMaterial = leftPort.material as PBRMaterial;
     const hardwareMaterial = leftYoke.material as PBRMaterial;
+    const railHardwareMaterial = leftRail.material as PBRMaterial;
     const lanternStemMaterial = lanternStem.material as PBRMaterial;
     const goldMaterial = leftPin.material as PBRMaterial;
     const catwalkGuardrailMaterial = catwalkGuardrail.material as PBRMaterial;
@@ -2529,6 +2532,19 @@ describe('polishMainStageMaterials', () => {
     expect(hardwareMaterial.albedoColor.r).toBeGreaterThan(lanternStemMaterial.albedoColor.r);
     expect(hardwareMaterial.emissiveIntensity).toBeGreaterThan(lanternStemMaterial.emissiveIntensity);
     expect(hardwareMaterial.roughness ?? 0).toBeLessThan(lanternStemMaterial.roughness ?? 0);
+
+    expect(railHardwareMaterial.name).toContain('line-array-side-rail-hardware');
+    expect(railHardwareMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(railHardwareMaterial.metadata?.mainStageMaterialOverride).toBe('line-array-side-rail-hardware');
+    expect(railHardwareMaterial.albedoColor.r).toBeLessThanOrEqual(0.12);
+    expect(railHardwareMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(railHardwareMaterial.albedoColor.b).toBeLessThanOrEqual(0.2);
+    expect(railHardwareMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(railHardwareMaterial.roughness).toBeGreaterThanOrEqual(0.86);
+    expect(railHardwareMaterial.environmentIntensity).toBeLessThanOrEqual(0.22);
+    expect(railHardwareMaterial.albedoColor.r).toBeLessThan(hardwareMaterial.albedoColor.r);
+    expect(railHardwareMaterial.environmentIntensity).toBeLessThan(hardwareMaterial.environmentIntensity);
+    expect(railHardwareMaterial.roughness ?? 0).toBeGreaterThan(hardwareMaterial.roughness ?? 0);
 
     expect(goldMaterial.name).toContain('line-array-pin-bars');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');

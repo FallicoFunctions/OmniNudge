@@ -417,15 +417,26 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
 
     if (
       mesh.name === 'V29_MainLineArrayYoke_L' ||
-      mesh.name === 'V29_MainLineArrayYoke_R' ||
-      mesh.name === 'V29_MainLineArraySideRail_L' ||
-      mesh.name === 'V29_MainLineArraySideRail_R'
+      mesh.name === 'V29_MainLineArrayYoke_R'
     ) {
       const cacheKey = `${material.uniqueId}:line-array-suspension-hardware`;
       let hardwareMaterial = clonedMaterials.get(cacheKey);
       if (!hardwareMaterial) {
         hardwareMaterial = material.clone(`${material.name}__line-array-suspension-hardware`);
         applyLineArraySuspensionHardwareOverride(hardwareMaterial);
+        clonedMaterials.set(cacheKey, hardwareMaterial);
+      }
+
+      assignOverrideMaterial(mesh, hardwareMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V29_MainLineArraySideRail_L' || mesh.name === 'V29_MainLineArraySideRail_R') {
+      const cacheKey = `${material.uniqueId}:line-array-side-rail-hardware`;
+      let hardwareMaterial = clonedMaterials.get(cacheKey);
+      if (!hardwareMaterial) {
+        hardwareMaterial = material.clone(`${material.name}__line-array-side-rail-hardware`);
+        applyLineArraySideRailHardwareOverride(hardwareMaterial);
         clonedMaterials.set(cacheKey, hardwareMaterial);
       }
 
@@ -5268,6 +5279,23 @@ function applyLineArraySuspensionHardwareOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'line-array-suspension-hardware',
+  };
+}
+
+function applyLineArraySideRailHardwareOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.11, 0.145, 0.18);
+  material.emissiveColor = new Color3(0.008, 0.014, 0.02);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.08;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.18;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'line-array-side-rail-hardware',
   };
 }
 
