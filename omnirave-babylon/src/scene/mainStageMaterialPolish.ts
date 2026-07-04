@@ -8831,15 +8831,15 @@ function applyRearShellPanelOverride(material: PBRMaterial) {
 
 function applyCrownCrystalGoldEdgeOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.06);
-  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
-  material.emissiveIntensity = 0.02;
-  material.metallic = 0.16;
-  material.roughness = 0.9;
+  material.albedoColor = new Color3(0.192, 0.149, 0.064);
+  material.emissiveColor = new Color3(0.012, 0.0084, 0.0026);
+  material.emissiveIntensity = 0.024;
+  material.metallic = 0.18;
+  material.roughness = 0.88;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0;
-  material.clearCoat.roughness = 0.86;
-  material.environmentIntensity = 0.12;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.82;
+  material.environmentIntensity = 0.13;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-crystal-gold-edge',
