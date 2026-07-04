@@ -8836,23 +8836,29 @@ describe('polishMainStageMaterials', () => {
     const nozzle = MeshBuilder.CreateBox('V45_PyroPodGoldNozzle', { size: 1 }, scene);
     nozzle.material = sharedGoldMaterial;
 
+    const wingArchInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_L', { size: 1 }, scene);
+    wingArchInlay.material = sharedGoldMaterial;
+
     const redControl = MeshBuilder.CreateBox('TestPyroPodRedControl', { size: 1 }, scene);
     redControl.material = sharedRedMaterial;
 
     const emberGlass = MeshBuilder.CreateBox('V45_PyroPodRedGlass', { size: 1 }, scene);
     emberGlass.material = sharedRedMaterial;
 
-    polishMainStageMaterials([goldControl, nozzle, redControl, emberGlass]);
+    polishMainStageMaterials([goldControl, nozzle, wingArchInlay, redControl, emberGlass]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(nozzle.material).toBeInstanceOf(PBRMaterial);
     expect(nozzle.material).not.toBe(sharedGoldMaterial);
+    expect(wingArchInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArchInlay.material).not.toBe(nozzle.material);
 
     expect(redControl.material).toBe(sharedRedMaterial);
     expect(emberGlass.material).toBeInstanceOf(PBRMaterial);
     expect(emberGlass.material).not.toBe(sharedRedMaterial);
 
     const nozzleMaterial = nozzle.material as PBRMaterial;
+    const wingArchInlayMaterial = wingArchInlay.material as PBRMaterial;
     const emberMaterial = emberGlass.material as PBRMaterial;
 
     expect(nozzleMaterial.name).toContain('pyro-pod-gold-nozzle');
@@ -8865,6 +8871,9 @@ describe('polishMainStageMaterials', () => {
     expect(nozzleMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(nozzleMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(nozzleMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(nozzleMaterial.albedoColor.r).toBeGreaterThan(wingArchInlayMaterial.albedoColor.r);
+    expect(nozzleMaterial.metallic ?? 0).toBeGreaterThan(wingArchInlayMaterial.metallic ?? 0);
+    expect(nozzleMaterial.roughness ?? 0).toBeLessThan(wingArchInlayMaterial.roughness ?? 0);
 
     expect(emberMaterial.name).toContain('pyro-pod-red-glass');
     expect(emberMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
