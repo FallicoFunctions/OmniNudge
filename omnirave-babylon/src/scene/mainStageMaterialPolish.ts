@@ -8461,15 +8461,15 @@ function applyWingTerraceGoldOverride(material: PBRMaterial) {
 
 function applyHeroPortalOuterOgiveOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.2, 0.22, 0.26);
-  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.184, 0.206, 0.248);
+  material.emissiveColor = new Color3(0.0062, 0.0086, 0.0132);
+  material.emissiveIntensity = 0.024;
   material.metallic = 0.02;
-  material.roughness = 0.88;
+  material.roughness = 0.91;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.72;
-  material.environmentIntensity = 0.13;
+  material.clearCoat.roughness = 0.76;
+  material.environmentIntensity = 0.12;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'hero-portal-outer-ogive',
