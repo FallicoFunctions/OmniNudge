@@ -2899,6 +2899,8 @@ describe('polishMainStageMaterials', () => {
     leftFrame.material = sharedFrameMaterial;
     const rightFrame = MeshBuilder.CreateBox('V36_ForegroundBarricadeFrame_R', { size: 1 }, scene);
     rightFrame.material = sharedFrameMaterial;
+    const crowdControlFrame = MeshBuilder.CreateBox('V124_CrowdControlFrameArray_L', { size: 1 }, scene);
+    crowdControlFrame.material = sharedFrameMaterial;
 
     const railControl = MeshBuilder.CreateBox('TestForegroundBarricadeRailControl', { size: 1 }, scene);
     railControl.material = sharedRailMaterial;
@@ -2906,19 +2908,36 @@ describe('polishMainStageMaterials', () => {
     leftRail.material = sharedRailMaterial;
     const rightRail = MeshBuilder.CreateBox('V36_ForegroundBarricadeGoldRail_R', { size: 1 }, scene);
     rightRail.material = sharedRailMaterial;
+    const crowdControlRail = MeshBuilder.CreateBox('V124_CrowdControlRailArray_L', { size: 1 }, scene);
+    crowdControlRail.material = sharedRailMaterial;
 
-    polishMainStageMaterials([frameControl, leftFrame, rightFrame, railControl, leftRail, rightRail]);
+    polishMainStageMaterials([
+      frameControl,
+      leftFrame,
+      rightFrame,
+      crowdControlFrame,
+      railControl,
+      leftRail,
+      rightRail,
+      crowdControlRail,
+    ]);
 
     expect(frameControl.material).toBe(sharedFrameMaterial);
     expect(leftFrame.material).toBeInstanceOf(PBRMaterial);
     expect(rightFrame.material).toBe(leftFrame.material);
+    expect(crowdControlFrame.material).toBeInstanceOf(PBRMaterial);
+    expect(crowdControlFrame.material).not.toBe(leftFrame.material);
 
     expect(railControl.material).toBe(sharedRailMaterial);
     expect(leftRail.material).toBeInstanceOf(PBRMaterial);
     expect(rightRail.material).toBe(leftRail.material);
+    expect(crowdControlRail.material).toBeInstanceOf(PBRMaterial);
+    expect(crowdControlRail.material).not.toBe(leftRail.material);
 
     const frameMaterial = leftFrame.material as PBRMaterial;
+    const crowdControlFrameMaterial = crowdControlFrame.material as PBRMaterial;
     const railMaterial = leftRail.material as PBRMaterial;
+    const crowdControlRailMaterial = crowdControlRail.material as PBRMaterial;
 
     expect(frameMaterial.name).toContain('foreground-barricade-frame');
     expect(frameMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -2929,6 +2948,9 @@ describe('polishMainStageMaterials', () => {
     expect(frameMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(frameMaterial.roughness).toBeGreaterThanOrEqual(0.82);
     expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
+    expect(frameMaterial.albedoColor.r).toBeGreaterThan(crowdControlFrameMaterial.albedoColor.r);
+    expect(frameMaterial.emissiveIntensity).toBeGreaterThan(crowdControlFrameMaterial.emissiveIntensity);
+    expect(frameMaterial.roughness ?? 0).toBeLessThan(crowdControlFrameMaterial.roughness ?? 0);
 
     expect(railMaterial.name).toContain('foreground-barricade-gold-rail');
     expect(railMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -2940,6 +2962,9 @@ describe('polishMainStageMaterials', () => {
     expect(railMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(railMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(railMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(railMaterial.albedoColor.r).toBeGreaterThan(crowdControlRailMaterial.albedoColor.r);
+    expect(railMaterial.metallic ?? 0).toBeGreaterThan(crowdControlRailMaterial.metallic ?? 0);
+    expect(railMaterial.roughness ?? 0).toBeLessThan(crowdControlRailMaterial.roughness ?? 0);
   });
 
   it('regrades the V24 celestial front arches and flying buttresses into distinct pearl masses so the hero crest stops reading like one repeated library shell finish', () => {
