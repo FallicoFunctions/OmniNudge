@@ -2292,6 +2292,8 @@ describe('polishMainStageMaterials', () => {
     leftRail.material = sharedHardwareMaterial;
     const rightRail = MeshBuilder.CreateBox('V29_MainLineArraySideRail_R', { size: 1 }, scene);
     rightRail.material = sharedHardwareMaterial;
+    const lanternStem = MeshBuilder.CreateBox('V59_BackPlazaLanternStemCluster_L', { size: 1 }, scene);
+    lanternStem.material = sharedHardwareMaterial;
 
     const goldControl = MeshBuilder.CreateBox('TestLineArrayGoldControl', { size: 1 }, scene);
     goldControl.material = sharedGoldMaterial;
@@ -2299,6 +2301,8 @@ describe('polishMainStageMaterials', () => {
     leftPin.material = sharedGoldMaterial;
     const rightPin = MeshBuilder.CreateBox('V29_MainLineArrayPinBars_R', { size: 1 }, scene);
     rightPin.material = sharedGoldMaterial;
+    const catwalkGuardrail = MeshBuilder.CreateBox('V49_ScreenServiceCatwalkGoldGuardrail', { size: 1 }, scene);
+    catwalkGuardrail.material = sharedGoldMaterial;
 
     polishMainStageMaterials([
       graphiteControl,
@@ -2320,9 +2324,11 @@ describe('polishMainStageMaterials', () => {
       rightYoke,
       leftRail,
       rightRail,
+      lanternStem,
       goldControl,
       leftPin,
       rightPin,
+      catwalkGuardrail,
     ]);
 
     expect(graphiteControl.material).toBe(sharedGraphiteMaterial);
@@ -2346,15 +2352,21 @@ describe('polishMainStageMaterials', () => {
     expect(rightYoke.material).toBe(leftYoke.material);
     expect(leftRail.material).toBe(leftYoke.material);
     expect(rightRail.material).toBe(leftYoke.material);
+    expect(lanternStem.material).toBeInstanceOf(PBRMaterial);
+    expect(lanternStem.material).not.toBe(leftYoke.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftPin.material).toBeInstanceOf(PBRMaterial);
     expect(rightPin.material).toBe(leftPin.material);
+    expect(catwalkGuardrail.material).toBeInstanceOf(PBRMaterial);
+    expect(catwalkGuardrail.material).not.toBe(leftPin.material);
 
     const graphiteMaterial = leftCabinet.material as PBRMaterial;
     const blackMaterial = leftGrille.material as PBRMaterial;
     const hardwareMaterial = leftYoke.material as PBRMaterial;
+    const lanternStemMaterial = lanternStem.material as PBRMaterial;
     const goldMaterial = leftPin.material as PBRMaterial;
+    const catwalkGuardrailMaterial = catwalkGuardrail.material as PBRMaterial;
 
     expect(graphiteMaterial.name).toContain('line-array-graphite');
     expect(graphiteMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -2397,6 +2409,9 @@ describe('polishMainStageMaterials', () => {
     expect(hardwareMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(hardwareMaterial.roughness).toBeGreaterThanOrEqual(0.8);
     expect(hardwareMaterial.environmentIntensity).toBeLessThanOrEqual(0.32);
+    expect(hardwareMaterial.albedoColor.r).toBeGreaterThan(lanternStemMaterial.albedoColor.r);
+    expect(hardwareMaterial.emissiveIntensity).toBeGreaterThan(lanternStemMaterial.emissiveIntensity);
+    expect(hardwareMaterial.roughness ?? 0).toBeLessThan(lanternStemMaterial.roughness ?? 0);
 
     expect(goldMaterial.name).toContain('line-array-pin-bars');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -2408,6 +2423,9 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(goldMaterial.albedoColor.r).toBeGreaterThan(catwalkGuardrailMaterial.albedoColor.r);
+    expect(goldMaterial.metallic ?? 0).toBeGreaterThan(catwalkGuardrailMaterial.metallic ?? 0);
+    expect(goldMaterial.roughness ?? 0).toBeLessThan(catwalkGuardrailMaterial.roughness ?? 0);
   });
 
   it('rebalances the basin fountain mist, nozzles, and island rims so the side basins read as grounded water practicals instead of hot cyan plumes over bright gold and pearl proxies', () => {
