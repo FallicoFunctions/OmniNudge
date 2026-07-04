@@ -3765,11 +3765,17 @@ describe('polishMainStageMaterials', () => {
     const shell = MeshBuilder.CreateBox('V48_SpawnCableTroughBlackShell', { size: 1 }, scene);
     shell.material = sharedShellMaterial;
 
+    const crowdBarrierBase = MeshBuilder.CreateBox('V125_CrowdBarrierBaseArray_L', { size: 1 }, scene);
+    crowdBarrierBase.material = sharedShellMaterial;
+
     const goldControl = MeshBuilder.CreateBox('TestSpawnCableTroughGoldControl', { size: 1 }, scene);
     goldControl.material = sharedGoldMaterial;
 
     const collar = MeshBuilder.CreateBox('V48_SpawnCableTroughGoldCollar', { size: 1 }, scene);
     collar.material = sharedGoldMaterial;
+
+    const spawnRouteGold = MeshBuilder.CreateBox('V123_SpawnRouteGoldEdgeArray_L', { size: 1 }, scene);
+    spawnRouteGold.material = sharedGoldMaterial;
 
     const wetControl = MeshBuilder.CreateBox('TestSpawnCableTroughWetControl', { size: 1 }, scene);
     wetControl.material = sharedWetMaterial;
@@ -3777,20 +3783,42 @@ describe('polishMainStageMaterials', () => {
     const inset = MeshBuilder.CreateBox('V48_SpawnCableTroughWetInset', { size: 1 }, scene);
     inset.material = sharedWetMaterial;
 
-    polishMainStageMaterials([shellControl, shell, goldControl, collar, wetControl, inset]);
+    const spawnRouteWet = MeshBuilder.CreateBox('V123_SpawnRouteWetCenterInlayArray', { size: 1 }, scene);
+    spawnRouteWet.material = sharedWetMaterial;
+
+    polishMainStageMaterials([
+      shellControl,
+      shell,
+      crowdBarrierBase,
+      goldControl,
+      collar,
+      spawnRouteGold,
+      wetControl,
+      inset,
+      spawnRouteWet,
+    ]);
 
     expect(shellControl.material).toBe(sharedShellMaterial);
     expect(shell.material).toBeInstanceOf(PBRMaterial);
+    expect(crowdBarrierBase.material).toBeInstanceOf(PBRMaterial);
+    expect(crowdBarrierBase.material).not.toBe(shell.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(collar.material).toBeInstanceOf(PBRMaterial);
+    expect(spawnRouteGold.material).toBeInstanceOf(PBRMaterial);
+    expect(spawnRouteGold.material).not.toBe(collar.material);
 
     expect(wetControl.material).toBe(sharedWetMaterial);
     expect(inset.material).toBeInstanceOf(PBRMaterial);
+    expect(spawnRouteWet.material).toBeInstanceOf(PBRMaterial);
+    expect(spawnRouteWet.material).not.toBe(inset.material);
 
     const shellMaterial = shell.material as PBRMaterial;
+    const crowdBarrierBaseMaterial = crowdBarrierBase.material as PBRMaterial;
     const collarMaterial = collar.material as PBRMaterial;
+    const spawnRouteGoldMaterial = spawnRouteGold.material as PBRMaterial;
     const insetMaterial = inset.material as PBRMaterial;
+    const spawnRouteWetMaterial = spawnRouteWet.material as PBRMaterial;
 
     expect(shellMaterial.name).toContain('spawn-cable-trough-shell');
     expect(shellMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -3801,6 +3829,9 @@ describe('polishMainStageMaterials', () => {
     expect(shellMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(shellMaterial.roughness).toBeGreaterThanOrEqual(0.82);
     expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.32);
+    expect(shellMaterial.metallic ?? 0).toBeLessThan(crowdBarrierBaseMaterial.metallic ?? 0);
+    expect(shellMaterial.roughness ?? 0).toBeGreaterThan(crowdBarrierBaseMaterial.roughness ?? 0);
+    expect(shellMaterial.environmentIntensity).toBeLessThan(crowdBarrierBaseMaterial.environmentIntensity);
 
     expect(collarMaterial.name).toContain('spawn-cable-trough-collar');
     expect(collarMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -3812,6 +3843,9 @@ describe('polishMainStageMaterials', () => {
     expect(collarMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(collarMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(collarMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(collarMaterial.albedoColor.r).toBeLessThan(spawnRouteGoldMaterial.albedoColor.r);
+    expect(collarMaterial.roughness ?? 0).toBeGreaterThan(spawnRouteGoldMaterial.roughness ?? 0);
+    expect(collarMaterial.environmentIntensity).toBeLessThan(spawnRouteGoldMaterial.environmentIntensity);
 
     expect(insetMaterial.name).toContain('spawn-cable-trough-wet-inset');
     expect(insetMaterial.metadata?.mainStageMaterialPolish).toBe('wet');
@@ -3823,6 +3857,10 @@ describe('polishMainStageMaterials', () => {
     expect(insetMaterial.clearCoat.intensity).toBeGreaterThanOrEqual(0.6);
     expect(insetMaterial.roughness).toBeLessThanOrEqual(0.3);
     expect(insetMaterial.environmentIntensity).toBeGreaterThanOrEqual(0.8);
+    expect(insetMaterial.albedoColor.r).toBeLessThan(spawnRouteWetMaterial.albedoColor.r);
+    expect(insetMaterial.emissiveIntensity).toBeLessThan(spawnRouteWetMaterial.emissiveIntensity);
+    expect(insetMaterial.clearCoat.intensity).toBeLessThan(spawnRouteWetMaterial.clearCoat.intensity);
+    expect(insetMaterial.environmentIntensity).toBeLessThan(spawnRouteWetMaterial.environmentIntensity);
   });
 
   it('rebalances the screen service catwalk frame, guardrail, cable loom, and practicals so the hero-screen service band reads as integrated production hardware instead of bright gold rails over flat black bars with hot cyan bulbs', () => {
