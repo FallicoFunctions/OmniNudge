@@ -8486,7 +8486,17 @@ function applyWingArcadeCyanInlayOverride(material: PBRMaterial) {
 }
 
 function applyCrowdWearableGlowOverride(material: PBRMaterial) {
-  applyWingArcadeCyanInlayOverride(material);
+  material.albedoColor = new Color3(0.1, 0.22, 0.28);
+  material.emissiveColor = new Color3(0.01, 0.032, 0.042);
+  material.emissiveIntensity = 0.08;
+  material.alpha = 0.32;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.01;
+  material.roughness = 0.2;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.64;
+  material.environmentIntensity = 0.26;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crowd-wearable-glow',
