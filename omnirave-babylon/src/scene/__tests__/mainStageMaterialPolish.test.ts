@@ -6085,7 +6085,7 @@ describe('polishMainStageMaterials', () => {
     expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
-  it('darkens the VIP terrace balustrade and canopy metals so the terrace read stops collapsing into a cyan roof slab and flat gold wall', () => {
+  it('darkens the VIP terrace balustrade and splits the wing canopy gold lamellae so the terrace read keeps a clearer front-to-rear metal cadence', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -6123,8 +6123,11 @@ describe('polishMainStageMaterials', () => {
     const otherCrownGold = MeshBuilder.CreateBox('V24_CrownHaloBackplate', { size: 1 }, scene);
     otherCrownGold.material = sharedCrownGold;
 
-    const wingCanopy = MeshBuilder.CreateBox('V117_WingCanopyLamellaGoldArray_L_Front', { size: 1 }, scene);
-    wingCanopy.material = sharedCrownGold;
+    const wingCanopyFront = MeshBuilder.CreateBox('V117_WingCanopyLamellaGoldArray_L_Front', { size: 1 }, scene);
+    wingCanopyFront.material = sharedCrownGold;
+
+    const wingCanopyRear = MeshBuilder.CreateBox('V117_WingCanopyLamellaGoldArray_L_Rear', { size: 1 }, scene);
+    wingCanopyRear.material = sharedCrownGold;
 
     const wideHeroFrame = MeshBuilder.CreateBox('V126_WideHeroScreenGoldFrame', { size: 1 }, scene);
     wideHeroFrame.material = sharedCrownGold;
@@ -6135,7 +6138,8 @@ describe('polishMainStageMaterials', () => {
       otherGold,
       oculusCanopy,
       otherCrownGold,
-      wingCanopy,
+      wingCanopyFront,
+      wingCanopyRear,
       wideHeroFrame,
     ]);
 
@@ -6148,15 +6152,19 @@ describe('polishMainStageMaterials', () => {
     expect(oculusCanopy.material).not.toBe(sharedGold);
 
     expect(otherCrownGold.material).toBe(sharedCrownGold);
-    expect(wingCanopy.material).toBeInstanceOf(PBRMaterial);
-    expect(wingCanopy.material).not.toBe(sharedCrownGold);
+    expect(wingCanopyFront.material).toBeInstanceOf(PBRMaterial);
+    expect(wingCanopyFront.material).not.toBe(sharedCrownGold);
+    expect(wingCanopyRear.material).toBeInstanceOf(PBRMaterial);
+    expect(wingCanopyRear.material).not.toBe(sharedCrownGold);
     expect(wideHeroFrame.material).toBeInstanceOf(PBRMaterial);
     expect(wideHeroFrame.material).not.toBe(sharedCrownGold);
-    expect(wideHeroFrame.material).not.toBe(wingCanopy.material);
+    expect(wideHeroFrame.material).not.toBe(wingCanopyFront.material);
+    expect(wingCanopyRear.material).not.toBe(wingCanopyFront.material);
 
     const vipBalustradeMaterial = vipBalustrade.material as PBRMaterial;
     const oculusCanopyMaterial = oculusCanopy.material as PBRMaterial;
-    const wingCanopyMaterial = wingCanopy.material as PBRMaterial;
+    const wingCanopyFrontMaterial = wingCanopyFront.material as PBRMaterial;
+    const wingCanopyRearMaterial = wingCanopyRear.material as PBRMaterial;
     const wideHeroFrameMaterial = wideHeroFrame.material as PBRMaterial;
 
     expect(vipBalustradeMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -6176,16 +6184,27 @@ describe('polishMainStageMaterials', () => {
     expect(oculusCanopyMaterial.roughness).toBeGreaterThanOrEqual(0.9);
     expect(oculusCanopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
 
-    expect(wingCanopyMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
-    expect(wingCanopyMaterial.metadata?.mainStageMaterialOverride).toBe('wing-canopy-lamella-gold');
-    expect(wingCanopyMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(wingCanopyMaterial.albedoColor.g).toBeLessThanOrEqual(0.14);
-    expect(wingCanopyMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
-    expect(wingCanopyMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(wingCanopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
-    expect(wingCanopyMaterial.albedoColor.r).toBeLessThan(wideHeroFrameMaterial.albedoColor.r);
-    expect(wingCanopyMaterial.metallic ?? 0).toBeLessThan(wideHeroFrameMaterial.metallic ?? 0);
-    expect(wingCanopyMaterial.roughness ?? 0).toBeGreaterThan(wideHeroFrameMaterial.roughness ?? 0);
+    expect(wingCanopyFrontMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(wingCanopyFrontMaterial.metadata?.mainStageMaterialOverride).toBe('wing-canopy-lamella-gold-front');
+    expect(wingCanopyFrontMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(wingCanopyFrontMaterial.albedoColor.g).toBeLessThanOrEqual(0.12);
+    expect(wingCanopyFrontMaterial.albedoColor.b).toBeLessThanOrEqual(0.05);
+    expect(wingCanopyFrontMaterial.roughness).toBeGreaterThanOrEqual(0.92);
+    expect(wingCanopyFrontMaterial.environmentIntensity).toBeLessThanOrEqual(0.08);
+    expect(wingCanopyFrontMaterial.albedoColor.r).toBeLessThan(wideHeroFrameMaterial.albedoColor.r);
+    expect(wingCanopyFrontMaterial.metallic ?? 0).toBeLessThan(wideHeroFrameMaterial.metallic ?? 0);
+    expect(wingCanopyFrontMaterial.roughness ?? 0).toBeGreaterThan(wideHeroFrameMaterial.roughness ?? 0);
+
+    expect(wingCanopyRearMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(wingCanopyRearMaterial.metadata?.mainStageMaterialOverride).toBe('wing-canopy-lamella-gold-rear');
+    expect(wingCanopyRearMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(wingCanopyRearMaterial.albedoColor.g).toBeLessThanOrEqual(0.135);
+    expect(wingCanopyRearMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(wingCanopyRearMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(wingCanopyRearMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+    expect(wingCanopyRearMaterial.albedoColor.r).toBeGreaterThan(wingCanopyFrontMaterial.albedoColor.r);
+    expect(wingCanopyRearMaterial.metallic ?? 0).toBeGreaterThan(wingCanopyFrontMaterial.metallic ?? 0);
+    expect(wingCanopyRearMaterial.roughness ?? 0).toBeLessThan(wingCanopyFrontMaterial.roughness ?? 0);
   });
 
   it('darkens the wing-canopy pearl lamellae so the side crowns read as layered depth instead of bright ivory fins', () => {

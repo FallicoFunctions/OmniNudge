@@ -4257,11 +4257,18 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
     }
 
     if (mesh.name.startsWith('V117_WingCanopyLamellaGoldArray_')) {
-      const cacheKey = `${material.uniqueId}:wing-canopy-lamella-gold`;
+      const isRearLamella = mesh.name.endsWith('_Rear');
+      const cacheKey = `${material.uniqueId}:${isRearLamella ? 'wing-canopy-lamella-gold-rear' : 'wing-canopy-lamella-gold-front'}`;
       let wingCanopyMaterial = clonedMaterials.get(cacheKey);
       if (!wingCanopyMaterial) {
-        wingCanopyMaterial = material.clone(`${material.name}__wing-canopy-lamella-gold`);
-        applyWingCanopyLamellaGoldOverride(wingCanopyMaterial);
+        wingCanopyMaterial = material.clone(
+          `${material.name}__${isRearLamella ? 'wing-canopy-lamella-gold-rear' : 'wing-canopy-lamella-gold-front'}`,
+        );
+        if (isRearLamella) {
+          applyWingCanopyLamellaGoldRearOverride(wingCanopyMaterial);
+        } else {
+          applyWingCanopyLamellaGoldFrontOverride(wingCanopyMaterial);
+        }
         clonedMaterials.set(cacheKey, wingCanopyMaterial);
       }
 
@@ -6812,7 +6819,7 @@ function applyOculusCanopyOverride(material: PBRMaterial) {
   };
 }
 
-function applyWingCanopyLamellaGoldOverride(material: PBRMaterial) {
+function applyWingCanopyLamellaGoldFrontOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.149, 0.111, 0.047);
   material.emissiveColor = new Color3(0.0038, 0.0025, 0.0009);
@@ -6825,7 +6832,24 @@ function applyWingCanopyLamellaGoldOverride(material: PBRMaterial) {
   material.environmentIntensity = 0.07;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'wing-canopy-lamella-gold',
+    mainStageMaterialOverride: 'wing-canopy-lamella-gold-front',
+  };
+}
+
+function applyWingCanopyLamellaGoldRearOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.172, 0.13, 0.055);
+  material.emissiveColor = new Color3(0.0052, 0.0035, 0.0012);
+  material.emissiveIntensity = 0.01;
+  material.metallic = 0.15;
+  material.roughness = 0.89;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.82;
+  material.environmentIntensity = 0.09;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-canopy-lamella-gold-rear',
   };
 }
 
