@@ -1,5 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+function createDeferredPromise<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
 async function loadBootstrapRuntime(
   createRuntimeImpl: (host: HTMLElement) => Promise<unknown>,
 ) {
@@ -215,6 +226,51 @@ describe('createRuntime', () => {
       focusOffset: { x: 0, y: 8, z: 44 },
       positionOffset: { x: 0, y: 26.3, z: -57 },
     });
+    expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
+    expect(engineDispose).not.toHaveBeenCalled();
+  });
+
+  it('shows a loading overlay until the scene finishes booting', async () => {
+    const engineDispose = vi.fn();
+    const engineRunRenderLoop = vi.fn();
+    const engineResize = vi.fn();
+    const deferredScene = createDeferredPromise<{
+      metadata: { reviewRuntime: Record<string, never> };
+      pick: ReturnType<typeof vi.fn>;
+      render: ReturnType<typeof vi.fn>;
+    }>();
+
+    vi.doMock('@babylonjs/core/Engines/engine', () => ({
+      Engine: vi.fn(() => ({
+        dispose: engineDispose,
+        runRenderLoop: engineRunRenderLoop,
+        resize: engineResize,
+      })),
+    }));
+
+    vi.doMock('../../scene/createMainStageScene', () => ({
+      createMainStageScene: vi.fn(() => deferredScene.promise),
+    }));
+
+    const { createRuntime } = await import('../createRuntime');
+    const host = document.createElement('div');
+
+    const runtimePromise = createRuntime(host);
+    await Promise.resolve();
+
+    expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).not.toBeNull();
+    expect(host.textContent).toContain('Loading Main Stage');
+    expect(host.querySelector('[data-testid="review-hud"]')).toBeNull();
+
+    deferredScene.resolve({
+      metadata: { reviewRuntime: {} },
+      pick: vi.fn(() => null),
+      render: vi.fn(),
+    });
+
+    await runtimePromise;
+
+    expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).toBeNull();
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
     expect(engineDispose).not.toHaveBeenCalled();
   });
