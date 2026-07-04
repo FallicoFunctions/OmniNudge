@@ -6130,16 +6130,23 @@ describe('polishMainStageMaterials', () => {
     const rightLamella = MeshBuilder.CreateBox('V117_WingCanopyLamellaPearlArray_R_Mid', { size: 1 }, scene);
     rightLamella.material = sharedPearlMaterial;
 
-    polishMainStageMaterials([controlPearl, leftLamella, rightLamella]);
+    const wideHeroShell = MeshBuilder.CreateBox('V126_WideHeroScreenIvoryHeader', { size: 1 }, scene);
+    wideHeroShell.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([controlPearl, leftLamella, rightLamella, wideHeroShell]);
 
     expect(controlPearl.material).toBe(sharedPearlMaterial);
     expect(leftLamella.material).toBeInstanceOf(PBRMaterial);
     expect(rightLamella.material).toBeInstanceOf(PBRMaterial);
+    expect(wideHeroShell.material).toBeInstanceOf(PBRMaterial);
     expect(leftLamella.material).not.toBe(sharedPearlMaterial);
     expect(rightLamella.material).not.toBe(sharedPearlMaterial);
+    expect(wideHeroShell.material).not.toBe(sharedPearlMaterial);
     expect(rightLamella.material).toBe(leftLamella.material);
+    expect(wideHeroShell.material).not.toBe(leftLamella.material);
 
     const lamellaMaterial = leftLamella.material as PBRMaterial;
+    const wideHeroShellMaterial = wideHeroShell.material as PBRMaterial;
     expect(lamellaMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(lamellaMaterial.metadata?.mainStageMaterialOverride).toBe('wing-canopy-lamella-pearl');
     expect(lamellaMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
@@ -6149,6 +6156,9 @@ describe('polishMainStageMaterials', () => {
     expect(lamellaMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(lamellaMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(lamellaMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(lamellaMaterial.albedoColor.r).toBeLessThan(wideHeroShellMaterial.albedoColor.r);
+    expect(lamellaMaterial.emissiveIntensity).toBeGreaterThan(wideHeroShellMaterial.emissiveIntensity);
+    expect(lamellaMaterial.roughness ?? 0).toBeGreaterThan(wideHeroShellMaterial.roughness ?? 0);
   });
 
   it('regrades the V51 shoulder and cathedral masses into distinct darker night-shell forms so the route views stop reading them as one repeated white proxy monolith finish', () => {

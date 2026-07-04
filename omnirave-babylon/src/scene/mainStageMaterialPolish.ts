@@ -6663,15 +6663,15 @@ function applyWingCanopyLamellaGoldOverride(material: PBRMaterial) {
 
 function applyWingCanopyLamellaPearlOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.2, 0.22, 0.26);
-  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.18, 0.2, 0.24);
+  material.emissiveColor = new Color3(0.006, 0.008, 0.012);
+  material.emissiveIntensity = 0.024;
   material.metallic = 0.02;
-  material.roughness = 0.88;
+  material.roughness = 0.9;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.72;
-  material.environmentIntensity = 0.13;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.76;
+  material.environmentIntensity = 0.12;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-canopy-lamella-pearl',
