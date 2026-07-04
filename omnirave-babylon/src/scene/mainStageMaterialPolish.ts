@@ -6391,15 +6391,15 @@ function applyCrownScreenShadowCofferOverride(material: PBRMaterial) {
 
 function applyCrownScreenVerticalKeystoneOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.17, 0.13, 0.06);
-  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
-  material.emissiveIntensity = 0.02;
-  material.metallic = 0.14;
-  material.roughness = 0.9;
+  material.albedoColor = new Color3(0.158, 0.12, 0.054);
+  material.emissiveColor = new Color3(0.008, 0.0055, 0.0018);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.12;
+  material.roughness = 0.92;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.76;
-  material.environmentIntensity = 0.1;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.8;
+  material.environmentIntensity = 0.09;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crown-screen-vertical-keystone',

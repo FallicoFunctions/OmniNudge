@@ -4675,13 +4675,19 @@ describe('polishMainStageMaterials', () => {
     const keystone = MeshBuilder.CreateBox('V127_CrownScreenVerticalKeystone', { size: 1 }, scene);
     keystone.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([otherGold, keystone]);
+    const wideHeroCrossbar = MeshBuilder.CreateBox('V126_WideHeroScreenGoldCrossbarArray', { size: 1 }, scene);
+    wideHeroCrossbar.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, keystone, wideHeroCrossbar]);
 
     expect(otherGold.material).toBe(sharedGoldMaterial);
     expect(keystone.material).toBeInstanceOf(PBRMaterial);
     expect(keystone.material).not.toBe(sharedGoldMaterial);
+    expect(wideHeroCrossbar.material).toBeInstanceOf(PBRMaterial);
+    expect(wideHeroCrossbar.material).not.toBe(keystone.material);
 
     const keystoneMaterial = keystone.material as PBRMaterial;
+    const wideHeroCrossbarMaterial = wideHeroCrossbar.material as PBRMaterial;
     expect(keystoneMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(keystoneMaterial.metadata?.mainStageMaterialOverride).toBe('crown-screen-vertical-keystone');
     expect(keystoneMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
@@ -4692,6 +4698,9 @@ describe('polishMainStageMaterials', () => {
     expect(keystoneMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(keystoneMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(keystoneMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(keystoneMaterial.albedoColor.r).toBeLessThan(wideHeroCrossbarMaterial.albedoColor.r);
+    expect(keystoneMaterial.metallic ?? 0).toBeLessThan(wideHeroCrossbarMaterial.metallic ?? 0);
+    expect(keystoneMaterial.roughness ?? 0).toBeGreaterThan(wideHeroCrossbarMaterial.roughness ?? 0);
   });
 
   it('rebalances the center-screen side pier clusters so the hero wall reads as framed depth instead of bright gold bars wrapped around cyan cards', () => {
