@@ -634,11 +634,16 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       mesh.name === 'V33_VipFoliageCanopy_L' ||
       mesh.name === 'V33_VipFoliageCanopy_R'
     ) {
-      const cacheKey = `${material.uniqueId}:layered-foliage-canopy`;
+      const isVipCanopy = mesh.name.startsWith('V33_VipFoliageCanopy_');
+      const cacheKey = `${material.uniqueId}:${isVipCanopy ? 'vip-foliage-canopy' : 'basin-foliage-canopy'}`;
       let canopyMaterial = clonedMaterials.get(cacheKey);
       if (!canopyMaterial) {
-        canopyMaterial = material.clone(`${material.name}__layered-foliage-canopy`);
-        applyLayeredFoliageCanopyOverride(canopyMaterial);
+        canopyMaterial = material.clone(`${material.name}__${isVipCanopy ? 'vip-foliage-canopy' : 'basin-foliage-canopy'}`);
+        if (isVipCanopy) {
+          applyVipFoliageCanopyOverride(canopyMaterial);
+        } else {
+          applyBasinFoliageCanopyOverride(canopyMaterial);
+        }
         clonedMaterials.set(cacheKey, canopyMaterial);
       }
 
@@ -5488,7 +5493,7 @@ function applyBasinFoliageMidstoryOverride(material: PBRMaterial) {
   };
 }
 
-function applyLayeredFoliageCanopyOverride(material: PBRMaterial) {
+function applyBasinFoliageCanopyOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.06, 0.08, 0.04);
   material.emissiveColor = new Color3(0.004, 0.006, 0.002);
@@ -5502,7 +5507,25 @@ function applyLayeredFoliageCanopyOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialPolish: 'black',
-    mainStageMaterialOverride: 'layered-foliage-canopy',
+    mainStageMaterialOverride: 'basin-foliage-canopy',
+  };
+}
+
+function applyVipFoliageCanopyOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.05, 0.07, 0.035);
+  material.emissiveColor = new Color3(0.003, 0.005, 0.0016);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.02;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.78;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialPolish: 'black',
+    mainStageMaterialOverride: 'vip-foliage-canopy',
   };
 }
 
