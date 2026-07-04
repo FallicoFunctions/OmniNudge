@@ -1026,10 +1026,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V118_BasinWallRelief_') ||
-      mesh.name.startsWith('V121_BasinRetainingRelief_')
-    ) {
+    if (mesh.name.startsWith('V121_BasinRetainingRelief_')) {
       const cacheKey = `${material.uniqueId}:basin-retaining-relief`;
       let retainingMaterial = clonedMaterials.get(cacheKey);
       if (!retainingMaterial) {
@@ -1039,6 +1036,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, retainingMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V118_BasinWallRelief_')) {
+      const cacheKey = `${material.uniqueId}:basin-wall-relief`;
+      let wallReliefMaterial = clonedMaterials.get(cacheKey);
+      if (!wallReliefMaterial) {
+        wallReliefMaterial = material.clone(`${material.name}__basin-wall-relief`);
+        applyBasinWallReliefOverride(wallReliefMaterial);
+        clonedMaterials.set(cacheKey, wallReliefMaterial);
+      }
+
+      assignOverrideMaterial(mesh, wallReliefMaterial);
       continue;
     }
 
@@ -5787,6 +5797,23 @@ function applyBasinRetainingReliefOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-retaining-relief',
+  };
+}
+
+function applyBasinWallReliefOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.17, 0.19, 0.23);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.02;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.76;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-wall-relief',
   };
 }
 
