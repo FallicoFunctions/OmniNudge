@@ -5911,26 +5911,33 @@ describe('polishMainStageMaterials', () => {
     const crossbars = MeshBuilder.CreateBox('V126_WideHeroScreenGoldCrossbarArray', { size: 1 }, scene);
     crossbars.material = sharedGoldMaterial;
 
+    const serviceDoorFrame = MeshBuilder.CreateBox('V73_HeroPortalServiceDoorFrameCluster_L', { size: 1 }, scene);
+    serviceDoorFrame.material = sharedGoldMaterial;
+
     const arrivalSightlineRail = MeshBuilder.CreateBox('V66_BackPlazaSightlineGoldRail_L', { size: 1 }, scene);
     arrivalSightlineRail.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([otherGold, frame, mullions, crossbars, arrivalSightlineRail]);
+    polishMainStageMaterials([otherGold, frame, mullions, crossbars, serviceDoorFrame, arrivalSightlineRail]);
 
     expect(otherGold.material).toBe(sharedGoldMaterial);
     expect(frame.material).toBeInstanceOf(PBRMaterial);
     expect(mullions.material).toBeInstanceOf(PBRMaterial);
     expect(crossbars.material).toBeInstanceOf(PBRMaterial);
+    expect(serviceDoorFrame.material).toBeInstanceOf(PBRMaterial);
     expect(arrivalSightlineRail.material).toBeInstanceOf(PBRMaterial);
     expect(frame.material).not.toBe(sharedGoldMaterial);
     expect(mullions.material).not.toBe(sharedGoldMaterial);
     expect(crossbars.material).not.toBe(sharedGoldMaterial);
+    expect(serviceDoorFrame.material).not.toBe(sharedGoldMaterial);
     expect(arrivalSightlineRail.material).not.toBe(sharedGoldMaterial);
     expect(mullions.material).not.toBe(frame.material);
     expect(crossbars.material).not.toBe(frame.material);
     expect(crossbars.material).not.toBe(mullions.material);
+    expect(serviceDoorFrame.material).not.toBe(frame.material);
     expect(arrivalSightlineRail.material).not.toBe(crossbars.material);
 
     const frameMaterial = frame.material as PBRMaterial;
+    const serviceDoorFrameMaterial = serviceDoorFrame.material as PBRMaterial;
     expect(frameMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(frameMaterial.metadata?.mainStageMaterialOverride).toBe('wide-hero-screen-gold-frame');
     expect(frameMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
@@ -5940,6 +5947,9 @@ describe('polishMainStageMaterials', () => {
     expect(frameMaterial.metallic).toBeLessThanOrEqual(0.18);
     expect(frameMaterial.roughness).toBeGreaterThanOrEqual(0.88);
     expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+    expect(frameMaterial.albedoColor.r).toBeGreaterThan(serviceDoorFrameMaterial.albedoColor.r);
+    expect(frameMaterial.emissiveIntensity).toBeGreaterThan(serviceDoorFrameMaterial.emissiveIntensity);
+    expect(frameMaterial.roughness ?? 0).toBeLessThan(serviceDoorFrameMaterial.roughness ?? 0);
 
     const mullionMaterial = mullions.material as PBRMaterial;
     expect(mullionMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
