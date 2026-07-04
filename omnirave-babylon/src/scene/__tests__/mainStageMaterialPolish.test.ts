@@ -6636,7 +6636,7 @@ describe('polishMainStageMaterials', () => {
     expect(rightSoffit.material).toBe(leftSoffit.material);
   });
 
-  it('gives the VIP underside ribs the same subdued shadow-architecture finish so the Basin Edge ramp edge does not keep bright proxy slats under the terrace', () => {
+  it('splits the VIP underside ribs away from the soffit wedges so the terrace undercarriage keeps a finer rib read instead of one broad shadow slab finish', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -6650,30 +6650,52 @@ describe('polishMainStageMaterials', () => {
     const otherShadow = MeshBuilder.CreateBox('TestVipUndersideRibControl', { size: 1 }, scene);
     otherShadow.material = sharedShadowMaterial;
 
+    const leftSoffit = MeshBuilder.CreateBox('V30_VipSoffitShadow_L', { size: 1 }, scene);
+    leftSoffit.material = sharedShadowMaterial;
+
+    const rightSoffit = MeshBuilder.CreateBox('V30_VipSoffitShadow_R', { size: 1 }, scene);
+    rightSoffit.material = sharedShadowMaterial;
+
     const leftRib = MeshBuilder.CreateBox('V30_VipUndersideRib_L_00', { size: 1 }, scene);
     leftRib.material = sharedShadowMaterial;
 
     const rightRib = MeshBuilder.CreateBox('V30_VipUndersideRib_R_00', { size: 1 }, scene);
     rightRib.material = sharedShadowMaterial;
 
-    polishMainStageMaterials([otherShadow, leftRib, rightRib]);
+    polishMainStageMaterials([otherShadow, leftSoffit, rightSoffit, leftRib, rightRib]);
 
     expect(otherShadow.material).toBe(sharedShadowMaterial);
+    expect(leftSoffit.material).toBeInstanceOf(PBRMaterial);
+    expect(rightSoffit.material).toBeInstanceOf(PBRMaterial);
+    expect(leftSoffit.material).not.toBe(sharedShadowMaterial);
+    expect(rightSoffit.material).not.toBe(sharedShadowMaterial);
+    expect(rightSoffit.material).toBe(leftSoffit.material);
     expect(leftRib.material).toBeInstanceOf(PBRMaterial);
     expect(rightRib.material).toBeInstanceOf(PBRMaterial);
     expect(leftRib.material).not.toBe(sharedShadowMaterial);
     expect(rightRib.material).not.toBe(sharedShadowMaterial);
     expect(rightRib.material).toBe(leftRib.material);
+    expect(leftRib.material).not.toBe(leftSoffit.material);
+
+    const soffitMaterial = leftSoffit.material as PBRMaterial;
+    expect(soffitMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(soffitMaterial.metadata?.mainStageMaterialOverride).toBe('vip-soffit-shadow');
+    expect(soffitMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
+    expect(soffitMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
+    expect(soffitMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
+    expect(soffitMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(soffitMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(soffitMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
 
     const ribMaterial = leftRib.material as PBRMaterial;
     expect(ribMaterial.metadata?.mainStageMaterialPolish).toBe('black');
-    expect(ribMaterial.metadata?.mainStageMaterialOverride).toBe('vip-soffit-shadow');
-    expect(ribMaterial.albedoColor.r).toBeLessThanOrEqual(0.16);
-    expect(ribMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
-    expect(ribMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
-    expect(ribMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(ribMaterial.roughness).toBeGreaterThanOrEqual(0.84);
-    expect(ribMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+    expect(ribMaterial.metadata?.mainStageMaterialOverride).toBe('vip-underside-rib');
+    expect(ribMaterial.albedoColor.r).toBeLessThanOrEqual(0.13);
+    expect(ribMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
+    expect(ribMaterial.albedoColor.b).toBeLessThanOrEqual(0.2);
+    expect(ribMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(ribMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(ribMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
   });
 
   it('darkens the spawn canopy pearl vaults so the far reveal reads as authored arrival architecture instead of white proxy shells', () => {
