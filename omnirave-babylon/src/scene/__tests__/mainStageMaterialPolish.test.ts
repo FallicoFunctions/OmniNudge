@@ -5873,18 +5873,24 @@ describe('polishMainStageMaterials', () => {
     const crossbars = MeshBuilder.CreateBox('V126_WideHeroScreenGoldCrossbarArray', { size: 1 }, scene);
     crossbars.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([otherGold, frame, mullions, crossbars]);
+    const arrivalSightlineRail = MeshBuilder.CreateBox('V66_BackPlazaSightlineGoldRail_L', { size: 1 }, scene);
+    arrivalSightlineRail.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, frame, mullions, crossbars, arrivalSightlineRail]);
 
     expect(otherGold.material).toBe(sharedGoldMaterial);
     expect(frame.material).toBeInstanceOf(PBRMaterial);
     expect(mullions.material).toBeInstanceOf(PBRMaterial);
     expect(crossbars.material).toBeInstanceOf(PBRMaterial);
+    expect(arrivalSightlineRail.material).toBeInstanceOf(PBRMaterial);
     expect(frame.material).not.toBe(sharedGoldMaterial);
     expect(mullions.material).not.toBe(sharedGoldMaterial);
     expect(crossbars.material).not.toBe(sharedGoldMaterial);
+    expect(arrivalSightlineRail.material).not.toBe(sharedGoldMaterial);
     expect(mullions.material).not.toBe(frame.material);
     expect(crossbars.material).not.toBe(frame.material);
     expect(crossbars.material).not.toBe(mullions.material);
+    expect(arrivalSightlineRail.material).not.toBe(crossbars.material);
 
     const frameMaterial = frame.material as PBRMaterial;
     expect(frameMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -5909,6 +5915,7 @@ describe('polishMainStageMaterials', () => {
     expect(mullionMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
 
     const crossbarMaterial = crossbars.material as PBRMaterial;
+    const arrivalSightlineRailMaterial = arrivalSightlineRail.material as PBRMaterial;
     expect(crossbarMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(crossbarMaterial.metadata?.mainStageMaterialOverride).toBe('wide-hero-screen-gold-crossbar');
     expect(crossbarMaterial.albedoColor.r).toBeLessThanOrEqual(0.19);
@@ -5918,6 +5925,9 @@ describe('polishMainStageMaterials', () => {
     expect(crossbarMaterial.metallic).toBeLessThanOrEqual(0.18);
     expect(crossbarMaterial.roughness).toBeGreaterThanOrEqual(0.88);
     expect(crossbarMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+    expect(crossbarMaterial.albedoColor.r).toBeGreaterThan(arrivalSightlineRailMaterial.albedoColor.r);
+    expect(crossbarMaterial.metallic ?? 0).toBeGreaterThan(arrivalSightlineRailMaterial.metallic ?? 0);
+    expect(crossbarMaterial.roughness ?? 0).toBeLessThan(arrivalSightlineRailMaterial.roughness ?? 0);
   });
 
   it('darkens the wide hero screen ivory shells so the stage face reads as framed depth instead of bright moonstone caps', () => {
