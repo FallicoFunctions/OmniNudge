@@ -670,11 +670,16 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       mesh.name === 'V32_CrowdCluster_L_Mid' ||
       mesh.name === 'V32_CrowdCluster_R_Mid'
     ) {
-      const cacheKey = `${material.uniqueId}:crowd-cluster-graphite`;
+      const isMidBand = mesh.name.endsWith('_Mid');
+      const cacheKey = `${material.uniqueId}:${isMidBand ? 'crowd-cluster-mid-graphite' : 'crowd-cluster-near-graphite'}`;
       let crowdMaterial = clonedMaterials.get(cacheKey);
       if (!crowdMaterial) {
-        crowdMaterial = material.clone(`${material.name}__crowd-cluster-graphite`);
-        applyCrowdClusterGraphiteOverride(crowdMaterial);
+        crowdMaterial = material.clone(`${material.name}__${isMidBand ? 'crowd-cluster-mid-graphite' : 'crowd-cluster-near-graphite'}`);
+        if (isMidBand) {
+          applyCrowdClusterMidGraphiteOverride(crowdMaterial);
+        } else {
+          applyCrowdClusterNearGraphiteOverride(crowdMaterial);
+        }
         clonedMaterials.set(cacheKey, crowdMaterial);
       }
 
@@ -5118,12 +5123,26 @@ function applyLineArrayGraphiteOverride(material: PBRMaterial) {
   };
 }
 
-function applyCrowdClusterGraphiteOverride(material: PBRMaterial) {
+function applyCrowdClusterNearGraphiteOverride(material: PBRMaterial) {
   applyLineArrayGraphiteOverride(material);
   material.environmentIntensity = 0.18;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'crowd-cluster-graphite',
+    mainStageMaterialOverride: 'crowd-cluster-near-graphite',
+  };
+}
+
+function applyCrowdClusterMidGraphiteOverride(material: PBRMaterial) {
+  applyLineArrayGraphiteOverride(material);
+  material.albedoColor = new Color3(0.155, 0.175, 0.215);
+  material.emissiveColor = new Color3(0.008, 0.01, 0.012);
+  material.emissiveIntensity = 0.012;
+  material.metallic = 0.04;
+  material.roughness = 0.9;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crowd-cluster-mid-graphite',
   };
 }
 
