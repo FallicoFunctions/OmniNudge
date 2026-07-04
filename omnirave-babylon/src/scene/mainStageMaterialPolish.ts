@@ -6016,10 +6016,15 @@ function applyApproachGoldInlayNetworkOverride(material: PBRMaterial) {
 }
 
 function applyApproachEdgeRailOverride(material: PBRMaterial) {
-  applyWingFacadeArchInlayOverride(material);
+  material.albedoTexture = null;
   material.albedoColor = new Color3(0.2, 0.16, 0.07);
+  material.emissiveColor = new Color3(0.012, 0.009, 0.003);
+  material.emissiveIntensity = 0.018;
   material.metallic = 0.2;
   material.roughness = 0.82;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.72;
   material.environmentIntensity = 0.14;
   material.metadata = {
     ...material.metadata,
@@ -7665,10 +7670,15 @@ function applyBackPlazaGatewayCyanInlayOverride(material: PBRMaterial) {
 }
 
 function applyBackPlazaGatewayGoldCrownOverride(material: PBRMaterial) {
-  applyWingFacadeArchInlayOverride(material);
+  material.albedoTexture = null;
   material.albedoColor = new Color3(0.18, 0.14, 0.06);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.016;
   material.metallic = 0.18;
   material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.76;
   material.environmentIntensity = 0.12;
   material.metadata = {
     ...material.metadata,
@@ -7677,9 +7687,15 @@ function applyBackPlazaGatewayGoldCrownOverride(material: PBRMaterial) {
 }
 
 function applyBackPlazaBannerRailOverride(material: PBRMaterial) {
-  applyWingFacadeArchInlayOverride(material);
+  material.albedoTexture = null;
   material.albedoColor = new Color3(0.14, 0.11, 0.05);
+  material.emissiveColor = new Color3(0.008, 0.006, 0.002);
+  material.emissiveIntensity = 0.012;
+  material.metallic = 0.12;
   material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.8;
   material.environmentIntensity = 0.1;
   material.metadata = {
     ...material.metadata,
