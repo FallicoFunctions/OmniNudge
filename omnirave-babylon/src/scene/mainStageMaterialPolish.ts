@@ -8917,15 +8917,15 @@ function applyCelestialHaloCyanEdgeOverride(material: PBRMaterial) {
 
 function applyCenterScreenMullionOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.06);
-  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
-  material.emissiveIntensity = 0.02;
-  material.metallic = 0.16;
-  material.roughness = 0.9;
+  material.albedoColor = new Color3(0.2, 0.155, 0.068);
+  material.emissiveColor = new Color3(0.012, 0.008, 0.0025);
+  material.emissiveIntensity = 0.022;
+  material.metallic = 0.18;
+  material.roughness = 0.88;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0;
-  material.clearCoat.roughness = 0.86;
-  material.environmentIntensity = 0.12;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.82;
+  material.environmentIntensity = 0.14;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'center-screen-mullion',
@@ -8933,17 +8933,17 @@ function applyCenterScreenMullionOverride(material: PBRMaterial) {
 }
 
 function applyCenterScreenCyanEdgeOverride(material: PBRMaterial) {
-  material.albedoColor = new Color3(0.12, 0.24, 0.3);
-  material.emissiveColor = new Color3(0.01, 0.05, 0.07);
-  material.emissiveIntensity = 0.08;
-  material.alpha = 0.36;
+  material.albedoColor = new Color3(0.1, 0.22, 0.28);
+  material.emissiveColor = new Color3(0.014, 0.058, 0.082);
+  material.emissiveIntensity = 0.1;
+  material.alpha = 0.32;
   material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
   material.metallic = 0.02;
-  material.roughness = 0.18;
+  material.roughness = 0.2;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.62;
-  material.environmentIntensity = 0.3;
+  material.clearCoat.intensity = 0.06;
+  material.clearCoat.roughness = 0.58;
+  material.environmentIntensity = 0.34;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'center-screen-cyan-edge',
