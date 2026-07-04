@@ -2801,11 +2801,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let stemMaterial = clonedMaterials.get(cacheKey);
       if (!stemMaterial) {
         stemMaterial = material.clone(`${material.name}__approach-light-stem`);
-        applyBackPlazaLanternStemOverride(stemMaterial);
-        stemMaterial.metadata = {
-          ...stemMaterial.metadata,
-          mainStageMaterialOverride: 'approach-light-stem',
-        };
+        applyApproachLightStemOverride(stemMaterial);
         clonedMaterials.set(cacheKey, stemMaterial);
       }
 
@@ -2818,11 +2814,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let housingMaterial = clonedMaterials.get(cacheKey);
       if (!housingMaterial) {
         housingMaterial = material.clone(`${material.name}__approach-light-housing`);
-        applyBackPlazaLanternGoldCageOverride(housingMaterial);
-        housingMaterial.metadata = {
-          ...housingMaterial.metadata,
-          mainStageMaterialOverride: 'approach-light-housing',
-        };
+        applyApproachLightHousingOverride(housingMaterial);
         clonedMaterials.set(cacheKey, housingMaterial);
       }
 
@@ -2835,11 +2827,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let coreMaterial = clonedMaterials.get(cacheKey);
       if (!coreMaterial) {
         coreMaterial = material.clone(`${material.name}__approach-light-core`);
-        applyArrivalRunwayCyanThreadsOverride(coreMaterial);
-        coreMaterial.metadata = {
-          ...coreMaterial.metadata,
-          mainStageMaterialOverride: 'approach-light-core',
-        };
+        applyApproachLightCoreOverride(coreMaterial);
         clonedMaterials.set(cacheKey, coreMaterial);
       }
 
@@ -2852,11 +2840,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let haloMaterial = clonedMaterials.get(cacheKey);
       if (!haloMaterial) {
         haloMaterial = material.clone(`${material.name}__approach-light-halo`);
-        applyBackPlazaLanternHaloRimOverride(haloMaterial);
-        haloMaterial.metadata = {
-          ...haloMaterial.metadata,
-          mainStageMaterialOverride: 'approach-light-halo',
-        };
+        applyApproachLightHaloOverride(haloMaterial);
         clonedMaterials.set(cacheKey, haloMaterial);
       }
 
@@ -7678,6 +7662,75 @@ function applyBackPlazaLanternHaloRimOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'back-plaza-lantern-halo-rim',
+  };
+}
+
+function applyApproachLightStemOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.12, 0.15, 0.19);
+  material.emissiveColor = new Color3(0.008, 0.012, 0.018);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.12;
+  material.roughness = 0.8;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.05;
+  material.clearCoat.roughness = 0.5;
+  material.environmentIntensity = 0.24;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'approach-light-stem',
+  };
+}
+
+function applyApproachLightHousingOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.055);
+  material.emissiveColor = new Color3(0.008, 0.005, 0.0018);
+  material.emissiveIntensity = 0.014;
+  material.metallic = 0.18;
+  material.roughness = 0.88;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.8;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'approach-light-housing',
+  };
+}
+
+function applyApproachLightCoreOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.1, 0.22, 0.28);
+  material.emissiveColor = new Color3(0.008, 0.04, 0.056);
+  material.emissiveIntensity = 0.056;
+  material.alpha = 0.39;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.28;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.2;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'approach-light-core',
+  };
+}
+
+function applyApproachLightHaloOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.14, 0.065);
+  material.emissiveColor = new Color3(0.07, 0.046, 0.016);
+  material.emissiveIntensity = 0.05;
+  material.metallic = 0.12;
+  material.roughness = 0.84;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.56;
+  material.environmentIntensity = 0.16;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'approach-light-halo',
   };
 }
 

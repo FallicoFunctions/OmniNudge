@@ -9318,6 +9318,8 @@ describe('polishMainStageMaterials', () => {
     leftStem.material = sharedStemMaterial;
     const rightStem = MeshBuilder.CreateBox('V40_ApproachLightStem_R', { size: 1 }, scene);
     rightStem.material = sharedStemMaterial;
+    const plazaStem = MeshBuilder.CreateBox('V44_PlazaLanternStemCluster', { size: 1 }, scene);
+    plazaStem.material = sharedStemMaterial;
 
     const goldControl = MeshBuilder.CreateBox('TestApproachLightGoldControl', { size: 1 }, scene);
     goldControl.material = sharedGoldMaterial;
@@ -9325,10 +9327,14 @@ describe('polishMainStageMaterials', () => {
     leftHousing.material = sharedGoldMaterial;
     const rightHousing = MeshBuilder.CreateBox('V40_ApproachLightHousing_R', { size: 1 }, scene);
     rightHousing.material = sharedGoldMaterial;
+    const plazaHousing = MeshBuilder.CreateBox('V44_PlazaLanternGoldHardware', { size: 1 }, scene);
+    plazaHousing.material = sharedGoldMaterial;
     const leftHalo = MeshBuilder.CreateBox('V40_ApproachLightHalo_L', { size: 1 }, scene);
     leftHalo.material = sharedGoldMaterial;
     const rightHalo = MeshBuilder.CreateBox('V40_ApproachLightHalo_R', { size: 1 }, scene);
     rightHalo.material = sharedGoldMaterial;
+    const plazaHalo = MeshBuilder.CreateBox('V44_PlazaLanternHaloRim', { size: 1 }, scene);
+    plazaHalo.material = sharedGoldMaterial;
 
     const cyanControl = MeshBuilder.CreateBox('TestApproachLightCoreControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
@@ -9336,39 +9342,57 @@ describe('polishMainStageMaterials', () => {
     leftCore.material = sharedCyanMaterial;
     const rightCore = MeshBuilder.CreateBox('V40_ApproachLightCore_R', { size: 1 }, scene);
     rightCore.material = sharedCyanMaterial;
+    const arrivalCyan = MeshBuilder.CreateBox('V65_ArrivalRunwayCyanThreads', { size: 1 }, scene);
+    arrivalCyan.material = sharedCyanMaterial;
 
     polishMainStageMaterials([
       stemControl,
       leftStem,
       rightStem,
+      plazaStem,
       goldControl,
       leftHousing,
       rightHousing,
+      plazaHousing,
       leftHalo,
       rightHalo,
+      plazaHalo,
       cyanControl,
       leftCore,
       rightCore,
+      arrivalCyan,
     ]);
 
     expect(stemControl.material).toBe(sharedStemMaterial);
     expect(leftStem.material).toBeInstanceOf(PBRMaterial);
     expect(rightStem.material).toBe(leftStem.material);
+    expect(plazaStem.material).toBeInstanceOf(PBRMaterial);
+    expect(plazaStem.material).not.toBe(leftStem.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftHousing.material).toBeInstanceOf(PBRMaterial);
     expect(rightHousing.material).toBe(leftHousing.material);
+    expect(plazaHousing.material).toBeInstanceOf(PBRMaterial);
+    expect(plazaHousing.material).not.toBe(leftHousing.material);
     expect(leftHalo.material).toBeInstanceOf(PBRMaterial);
     expect(rightHalo.material).toBe(leftHalo.material);
+    expect(plazaHalo.material).toBeInstanceOf(PBRMaterial);
+    expect(plazaHalo.material).not.toBe(leftHalo.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftCore.material).toBeInstanceOf(PBRMaterial);
     expect(rightCore.material).toBe(leftCore.material);
+    expect(arrivalCyan.material).toBeInstanceOf(PBRMaterial);
+    expect(arrivalCyan.material).not.toBe(leftCore.material);
 
     const stemMaterial = leftStem.material as PBRMaterial;
+    const plazaStemMaterial = plazaStem.material as PBRMaterial;
     const housingMaterial = leftHousing.material as PBRMaterial;
+    const plazaHousingMaterial = plazaHousing.material as PBRMaterial;
     const haloMaterial = leftHalo.material as PBRMaterial;
+    const plazaHaloMaterial = plazaHalo.material as PBRMaterial;
     const coreMaterial = leftCore.material as PBRMaterial;
+    const arrivalCyanMaterial = arrivalCyan.material as PBRMaterial;
 
     expect(stemMaterial.name).toContain('approach-light-stem');
     expect(stemMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -9379,6 +9403,8 @@ describe('polishMainStageMaterials', () => {
     expect(stemMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(stemMaterial.roughness).toBeGreaterThanOrEqual(0.8);
     expect(stemMaterial.environmentIntensity).toBeLessThanOrEqual(0.32);
+    expect(stemMaterial.metallic ?? 0).toBeGreaterThan(plazaStemMaterial.metallic ?? 0);
+    expect(stemMaterial.roughness ?? 0).toBeLessThan(plazaStemMaterial.roughness ?? 0);
 
     expect(housingMaterial.name).toContain('approach-light-housing');
     expect(housingMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -9390,6 +9416,8 @@ describe('polishMainStageMaterials', () => {
     expect(housingMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(housingMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(housingMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(housingMaterial.albedoColor.r).toBeLessThan(plazaHousingMaterial.albedoColor.r);
+    expect(housingMaterial.emissiveIntensity).toBeLessThan(plazaHousingMaterial.emissiveIntensity);
 
     expect(haloMaterial.name).toContain('approach-light-halo');
     expect(haloMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -9400,6 +9428,8 @@ describe('polishMainStageMaterials', () => {
     expect(haloMaterial.emissiveIntensity).toBeLessThanOrEqual(0.1);
     expect(haloMaterial.roughness).toBeGreaterThanOrEqual(0.72);
     expect(haloMaterial.environmentIntensity).toBeLessThanOrEqual(0.24);
+    expect(haloMaterial.emissiveIntensity).toBeLessThan(plazaHaloMaterial.emissiveIntensity);
+    expect(haloMaterial.environmentIntensity).toBeLessThan(plazaHaloMaterial.environmentIntensity);
 
     expect(coreMaterial.name).toContain('approach-light-core');
     expect(coreMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -9412,6 +9442,10 @@ describe('polishMainStageMaterials', () => {
     expect(coreMaterial.roughness).toBeGreaterThanOrEqual(0.16);
     expect(coreMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
     expect(coreMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(coreMaterial.alpha).toBeGreaterThan(arrivalCyanMaterial.alpha);
+    expect(coreMaterial.emissiveIntensity).toBeLessThan(arrivalCyanMaterial.emissiveIntensity);
+    expect(coreMaterial.roughness ?? 0).toBeGreaterThan(arrivalCyanMaterial.roughness ?? 0);
+    expect(coreMaterial.environmentIntensity).toBeLessThan(arrivalCyanMaterial.environmentIntensity);
   });
 
   it('darkens the pyro pod pearl shells so the stage-edge practicals read as finished housings instead of bright pearl bulbs', () => {
