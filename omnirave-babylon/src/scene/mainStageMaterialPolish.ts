@@ -1671,11 +1671,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let lensMaterial = clonedMaterials.get(cacheKey);
       if (!lensMaterial) {
         lensMaterial = material.clone(`${material.name}__crown-moving-light-lens`);
-        applyCelestialHaloCyanEdgeOverride(lensMaterial);
-        lensMaterial.metadata = {
-          ...lensMaterial.metadata,
-          mainStageMaterialOverride: 'crown-moving-light-lens',
-        };
+        applyCrownMovingLightLensOverride(lensMaterial);
         clonedMaterials.set(cacheKey, lensMaterial);
       }
 
@@ -9364,6 +9360,24 @@ function applyCelestialHaloCyanEdgeOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'celestial-halo-cyan-edge',
+  };
+}
+
+function applyCrownMovingLightLensOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.11, 0.23, 0.29);
+  material.emissiveColor = new Color3(0.012, 0.056, 0.078);
+  material.emissiveIntensity = 0.096;
+  material.alpha = 0.28;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.16;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.06;
+  material.clearCoat.roughness = 0.56;
+  material.environmentIntensity = 0.34;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-moving-light-lens',
   };
 }
 
