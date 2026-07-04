@@ -4853,7 +4853,16 @@ function applyTrussDiagonalBraceOverride(material: PBRMaterial) {
 }
 
 function applyProductionTrussTowerFrameOverride(material: PBRMaterial) {
-  applyBackPlazaLanternStemOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.19, 0.23);
+  material.emissiveColor = new Color3(0.012, 0.02, 0.028);
+  material.emissiveIntensity = 0.03;
+  material.metallic = 0.1;
+  material.roughness = 0.8;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.56;
+  material.environmentIntensity = 0.24;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'production-truss-tower-frame',
@@ -4861,7 +4870,16 @@ function applyProductionTrussTowerFrameOverride(material: PBRMaterial) {
 }
 
 function applyProductionTrussCrossBraceOverride(material: PBRMaterial) {
-  applyMainTrussTowerRigOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.04, 0.06, 0.08);
+  material.emissiveColor = new Color3(0.006, 0.018, 0.026);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.06;
+  material.roughness = 0.82;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.18;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'production-truss-cross-brace',
@@ -4869,7 +4887,16 @@ function applyProductionTrussCrossBraceOverride(material: PBRMaterial) {
 }
 
 function applyProductionTowerServiceLadderOverride(material: PBRMaterial) {
-  applyMainTrussTowerGoldCrossbarOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.16, 0.08);
+  material.emissiveColor = new Color3(0.008, 0.005, 0.001);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.2;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.78;
+  material.environmentIntensity = 0.12;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'production-tower-service-ladder',
@@ -4877,7 +4904,17 @@ function applyProductionTowerServiceLadderOverride(material: PBRMaterial) {
 }
 
 function applyProductionTowerBeaconOverride(material: PBRMaterial) {
-  applyArrivalRunwayCyanThreadsOverride(material);
+  material.albedoColor = new Color3(0.1, 0.21, 0.26);
+  material.emissiveColor = new Color3(0.008, 0.028, 0.038);
+  material.emissiveIntensity = 0.06;
+  material.alpha = 0.28;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.2;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.22;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'production-tower-beacon',
