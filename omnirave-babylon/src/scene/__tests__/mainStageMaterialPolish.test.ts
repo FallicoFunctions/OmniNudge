@@ -11885,7 +11885,7 @@ describe('polishMainStageMaterials', () => {
     }
   });
 
-  it('darkens the basin and VIP foliage canopy so the layered planting reads as dense shadow instead of bright green leaves', () => {
+  it('splits the basin and VIP foliage canopy so the layered planting keeps distinct garden-mass depth instead of one repeated dark-green finish', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -11912,18 +11912,34 @@ describe('polishMainStageMaterials', () => {
 
     expect(otherCanopy.material).toBe(sharedCanopyMaterial);
 
-    for (const mesh of [canopyBL, canopyBR, canopyVL, canopyVR]) {
-      expect(mesh.material).not.toBe(sharedCanopyMaterial);
-      const mat = mesh.material as PBRMaterial;
-      expect(mat.metadata?.mainStageMaterialPolish).toBe('black');
-      expect(mat.metadata?.mainStageMaterialOverride).toBe('layered-foliage-canopy');
-      expect(mat.albedoColor.r).toBeLessThanOrEqual(0.14);
-      expect(mat.albedoColor.g).toBeLessThanOrEqual(0.17);
-      expect(mat.albedoColor.b).toBeLessThanOrEqual(0.12);
-      expect(mat.emissiveIntensity).toBeLessThanOrEqual(0.03);
-      expect(mat.roughness).toBeGreaterThanOrEqual(0.84);
-      expect(mat.environmentIntensity).toBeLessThanOrEqual(0.18);
-    }
+    expect(canopyBL.material).not.toBe(sharedCanopyMaterial);
+    expect(canopyBR.material).toBe(canopyBL.material);
+    expect(canopyVL.material).not.toBe(sharedCanopyMaterial);
+    expect(canopyVR.material).toBe(canopyVL.material);
+    expect(canopyVL.material).not.toBe(canopyBL.material);
+
+    const basinCanopyMaterial = canopyBL.material as PBRMaterial;
+    expect(basinCanopyMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(basinCanopyMaterial.metadata?.mainStageMaterialOverride).toBe('basin-foliage-canopy');
+    expect(basinCanopyMaterial.albedoColor.r).toBeLessThanOrEqual(0.14);
+    expect(basinCanopyMaterial.albedoColor.g).toBeLessThanOrEqual(0.17);
+    expect(basinCanopyMaterial.albedoColor.b).toBeLessThanOrEqual(0.12);
+    expect(basinCanopyMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(basinCanopyMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(basinCanopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+
+    const vipCanopyMaterial = canopyVL.material as PBRMaterial;
+    expect(vipCanopyMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(vipCanopyMaterial.metadata?.mainStageMaterialOverride).toBe('vip-foliage-canopy');
+    expect(vipCanopyMaterial.albedoColor.r).toBeLessThanOrEqual(0.12);
+    expect(vipCanopyMaterial.albedoColor.g).toBeLessThanOrEqual(0.15);
+    expect(vipCanopyMaterial.albedoColor.b).toBeLessThanOrEqual(0.1);
+    expect(vipCanopyMaterial.emissiveIntensity).toBeLessThanOrEqual(0.024);
+    expect(vipCanopyMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(vipCanopyMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(vipCanopyMaterial.albedoColor.g).toBeLessThan(basinCanopyMaterial.albedoColor.g);
+    expect(vipCanopyMaterial.environmentIntensity).toBeLessThan(basinCanopyMaterial.environmentIntensity);
+    expect(vipCanopyMaterial.roughness ?? 0).toBeGreaterThan(basinCanopyMaterial.roughness ?? 0);
   });
 
   it('darkens the basin and VIP foliage understory so the deep planting reads as dense shadow instead of bright groundcover', () => {
