@@ -1946,6 +1946,8 @@ describe('polishMainStageMaterials', () => {
     leftFrame.material = sharedFrameMaterial;
     const rightFrame = MeshBuilder.CreateBox('V37_ProductionTrussTowerFrame_R', { size: 1 }, scene);
     rightFrame.material = sharedFrameMaterial;
+    const lanternStem = MeshBuilder.CreateBox('V59_BackPlazaLanternStemCluster_L', { size: 1 }, scene);
+    lanternStem.material = sharedFrameMaterial;
 
     const braceControl = MeshBuilder.CreateBox('TestProductionTowerBraceControl', { size: 1 }, scene);
     braceControl.material = sharedBraceMaterial;
@@ -1953,6 +1955,8 @@ describe('polishMainStageMaterials', () => {
     leftBrace.material = sharedBraceMaterial;
     const rightBrace = MeshBuilder.CreateBox('V37_ProductionTrussCrossBrace_R', { size: 1 }, scene);
     rightBrace.material = sharedBraceMaterial;
+    const mainTrussRig = MeshBuilder.CreateBox('V83_MainTrussTowerDiagonalArray_L', { size: 1 }, scene);
+    mainTrussRig.material = sharedBraceMaterial;
 
     const goldControl = MeshBuilder.CreateBox('TestProductionTowerGoldControl', { size: 1 }, scene);
     goldControl.material = sharedGoldMaterial;
@@ -1960,6 +1964,8 @@ describe('polishMainStageMaterials', () => {
     leftLadder.material = sharedGoldMaterial;
     const rightLadder = MeshBuilder.CreateBox('V37_ProductionTowerServiceLadder_R', { size: 1 }, scene);
     rightLadder.material = sharedGoldMaterial;
+    const mainTrussGoldCrossbar = MeshBuilder.CreateBox('V83_MainTrussTowerGoldCrossbarArray_L', { size: 1 }, scene);
+    mainTrussGoldCrossbar.material = sharedGoldMaterial;
 
     const cyanControl = MeshBuilder.CreateBox('TestProductionTowerBeaconControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
@@ -1967,42 +1973,60 @@ describe('polishMainStageMaterials', () => {
     leftBeacon.material = sharedCyanMaterial;
     const rightBeacon = MeshBuilder.CreateBox('V37_ProductionTowerBeaconArray_R', { size: 1 }, scene);
     rightBeacon.material = sharedCyanMaterial;
+    const arrivalRunwayCyanThreads = MeshBuilder.CreateBox('V65_ArrivalRunwayCyanThreads', { size: 1 }, scene);
+    arrivalRunwayCyanThreads.material = sharedCyanMaterial;
 
     polishMainStageMaterials([
       frameControl,
       leftFrame,
       rightFrame,
+      lanternStem,
       braceControl,
       leftBrace,
       rightBrace,
+      mainTrussRig,
       goldControl,
       leftLadder,
       rightLadder,
+      mainTrussGoldCrossbar,
       cyanControl,
       leftBeacon,
       rightBeacon,
+      arrivalRunwayCyanThreads,
     ]);
 
     expect(frameControl.material).toBe(sharedFrameMaterial);
     expect(leftFrame.material).toBeInstanceOf(PBRMaterial);
     expect(rightFrame.material).toBe(leftFrame.material);
+    expect(lanternStem.material).toBeInstanceOf(PBRMaterial);
+    expect(lanternStem.material).not.toBe(leftFrame.material);
 
     expect(braceControl.material).toBe(sharedBraceMaterial);
     expect(leftBrace.material).toBeInstanceOf(PBRMaterial);
     expect(rightBrace.material).toBe(leftBrace.material);
+    expect(mainTrussRig.material).toBeInstanceOf(PBRMaterial);
+    expect(mainTrussRig.material).not.toBe(leftBrace.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftLadder.material).toBeInstanceOf(PBRMaterial);
     expect(rightLadder.material).toBe(leftLadder.material);
+    expect(mainTrussGoldCrossbar.material).toBeInstanceOf(PBRMaterial);
+    expect(mainTrussGoldCrossbar.material).not.toBe(leftLadder.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftBeacon.material).toBeInstanceOf(PBRMaterial);
     expect(rightBeacon.material).toBe(leftBeacon.material);
+    expect(arrivalRunwayCyanThreads.material).toBeInstanceOf(PBRMaterial);
+    expect(arrivalRunwayCyanThreads.material).not.toBe(leftBeacon.material);
 
     const frameMaterial = leftFrame.material as PBRMaterial;
+    const lanternStemMaterial = lanternStem.material as PBRMaterial;
     const braceMaterial = leftBrace.material as PBRMaterial;
+    const mainTrussRigMaterial = mainTrussRig.material as PBRMaterial;
     const ladderMaterial = leftLadder.material as PBRMaterial;
+    const mainTrussGoldCrossbarMaterial = mainTrussGoldCrossbar.material as PBRMaterial;
     const beaconMaterial = leftBeacon.material as PBRMaterial;
+    const arrivalRunwayCyanThreadsMaterial = arrivalRunwayCyanThreads.material as PBRMaterial;
 
     expect(frameMaterial.name).toContain('production-truss-tower-frame');
     expect(frameMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -2013,6 +2037,9 @@ describe('polishMainStageMaterials', () => {
     expect(frameMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(frameMaterial.roughness).toBeGreaterThanOrEqual(0.8);
     expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.32);
+    expect(frameMaterial.albedoColor.r).toBeGreaterThan(lanternStemMaterial.albedoColor.r);
+    expect(frameMaterial.emissiveIntensity).toBeGreaterThan(lanternStemMaterial.emissiveIntensity);
+    expect(frameMaterial.roughness ?? 0).toBeLessThan(lanternStemMaterial.roughness ?? 0);
 
     expect(braceMaterial.name).toContain('production-truss-cross-brace');
     expect(braceMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -2024,6 +2051,9 @@ describe('polishMainStageMaterials', () => {
     expect(braceMaterial.metallic).toBeLessThanOrEqual(0.08);
     expect(braceMaterial.roughness).toBeGreaterThanOrEqual(0.74);
     expect(braceMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
+    expect(braceMaterial.metallic ?? 0).toBeGreaterThan(mainTrussRigMaterial.metallic ?? 0);
+    expect(braceMaterial.roughness ?? 0).toBeGreaterThan(mainTrussRigMaterial.roughness ?? 0);
+    expect(braceMaterial.environmentIntensity).toBeGreaterThan(mainTrussRigMaterial.environmentIntensity);
 
     expect(ladderMaterial.name).toContain('production-tower-service-ladder');
     expect(ladderMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -2035,6 +2065,9 @@ describe('polishMainStageMaterials', () => {
     expect(ladderMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(ladderMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(ladderMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(ladderMaterial.albedoColor.r).toBeGreaterThan(mainTrussGoldCrossbarMaterial.albedoColor.r);
+    expect(ladderMaterial.metallic ?? 0).toBeGreaterThan(mainTrussGoldCrossbarMaterial.metallic ?? 0);
+    expect(ladderMaterial.roughness ?? 0).toBeLessThan(mainTrussGoldCrossbarMaterial.roughness ?? 0);
 
     expect(beaconMaterial.name).toContain('production-tower-beacon');
     expect(beaconMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -2047,6 +2080,9 @@ describe('polishMainStageMaterials', () => {
     expect(beaconMaterial.roughness).toBeGreaterThanOrEqual(0.16);
     expect(beaconMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
     expect(beaconMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(beaconMaterial.alpha).toBeLessThan(arrivalRunwayCyanThreadsMaterial.alpha);
+    expect(beaconMaterial.emissiveIntensity).toBeLessThan(arrivalRunwayCyanThreadsMaterial.emissiveIntensity);
+    expect(beaconMaterial.environmentIntensity).toBeLessThan(arrivalRunwayCyanThreadsMaterial.environmentIntensity);
   });
 
   it('rebalances the wing-facade arcade piers, capitals, and shadow reveals so the side portal masses read as carved architecture instead of bright pearl sticks capped with foil and cyan recesses', () => {
