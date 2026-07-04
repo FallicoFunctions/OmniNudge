@@ -4152,7 +4152,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (mesh.name.startsWith('V30_VipGoldBaluster_') || mesh.name.startsWith('V30_VipGoldHandrail_')) {
+    if (mesh.name.startsWith('V30_VipGoldBaluster_')) {
       const cacheKey = `${material.uniqueId}:vip-terrace-gold-rail`;
       let railMaterial = clonedMaterials.get(cacheKey);
       if (!railMaterial) {
@@ -4162,6 +4162,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, railMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V30_VipGoldHandrail_')) {
+      const cacheKey = `${material.uniqueId}:vip-terrace-gold-handrail`;
+      let handrailMaterial = clonedMaterials.get(cacheKey);
+      if (!handrailMaterial) {
+        handrailMaterial = material.clone(`${material.name}__vip-terrace-gold-handrail`);
+        applyVipTerraceGoldHandrailOverride(handrailMaterial);
+        clonedMaterials.set(cacheKey, handrailMaterial);
+      }
+
+      assignOverrideMaterial(mesh, handrailMaterial);
       continue;
     }
 
@@ -9298,6 +9311,23 @@ function applyVipTerraceGoldRailOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'vip-terrace-gold-rail',
+  };
+}
+
+function applyVipTerraceGoldHandrailOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.232, 0.184, 0.08);
+  material.emissiveColor = new Color3(0.015, 0.0105, 0.0033);
+  material.emissiveIntensity = 0.026;
+  material.metallic = 0.24;
+  material.roughness = 0.82;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.18;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'vip-terrace-gold-handrail',
   };
 }
 
