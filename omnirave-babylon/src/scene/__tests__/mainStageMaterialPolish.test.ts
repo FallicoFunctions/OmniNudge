@@ -3850,11 +3850,17 @@ describe('polishMainStageMaterials', () => {
     const loom = MeshBuilder.CreateBox('V49_ScreenServiceCatwalkCableLoom', { size: 1 }, scene);
     loom.material = sharedBlackMaterial;
 
+    const troughShell = MeshBuilder.CreateBox('V48_SpawnCableTroughBlackShell', { size: 1 }, scene);
+    troughShell.material = sharedBlackMaterial;
+
     const goldControl = MeshBuilder.CreateBox('TestScreenServiceCatwalkGoldControl', { size: 1 }, scene);
     goldControl.material = sharedGoldMaterial;
 
     const guardrail = MeshBuilder.CreateBox('V49_ScreenServiceCatwalkGoldGuardrail', { size: 1 }, scene);
     guardrail.material = sharedGoldMaterial;
+
+    const troughCollar = MeshBuilder.CreateBox('V48_SpawnCableTroughGoldCollar', { size: 1 }, scene);
+    troughCollar.material = sharedGoldMaterial;
 
     const cyanControl = MeshBuilder.CreateBox('TestScreenServiceCatwalkCyanControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
@@ -3862,31 +3868,46 @@ describe('polishMainStageMaterials', () => {
     const practicals = MeshBuilder.CreateBox('V49_ScreenServiceCatwalkCyanPracticals', { size: 1 }, scene);
     practicals.material = sharedCyanMaterial;
 
+    const arrivalRunwayCyan = MeshBuilder.CreateBox('V65_ArrivalRunwayCyanThreads', { size: 1 }, scene);
+    arrivalRunwayCyan.material = sharedCyanMaterial;
+
     polishMainStageMaterials([
       blackControl,
       frame,
       loom,
+      troughShell,
       goldControl,
       guardrail,
+      troughCollar,
       cyanControl,
       practicals,
+      arrivalRunwayCyan,
     ]);
 
     expect(blackControl.material).toBe(sharedBlackMaterial);
     expect(frame.material).toBeInstanceOf(PBRMaterial);
     expect(loom.material).toBeInstanceOf(PBRMaterial);
     expect(loom.material).not.toBe(frame.material);
+    expect(troughShell.material).toBeInstanceOf(PBRMaterial);
+    expect(troughShell.material).not.toBe(frame.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(guardrail.material).toBeInstanceOf(PBRMaterial);
+    expect(troughCollar.material).toBeInstanceOf(PBRMaterial);
+    expect(troughCollar.material).not.toBe(guardrail.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(practicals.material).toBeInstanceOf(PBRMaterial);
+    expect(arrivalRunwayCyan.material).toBeInstanceOf(PBRMaterial);
+    expect(arrivalRunwayCyan.material).not.toBe(practicals.material);
 
     const frameMaterial = frame.material as PBRMaterial;
     const loomMaterial = loom.material as PBRMaterial;
+    const troughShellMaterial = troughShell.material as PBRMaterial;
     const guardrailMaterial = guardrail.material as PBRMaterial;
+    const troughCollarMaterial = troughCollar.material as PBRMaterial;
     const practicalMaterial = practicals.material as PBRMaterial;
+    const arrivalRunwayCyanMaterial = arrivalRunwayCyan.material as PBRMaterial;
 
     expect(frameMaterial.name).toContain('screen-service-catwalk-frame');
     expect(frameMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -3897,6 +3918,9 @@ describe('polishMainStageMaterials', () => {
     expect(frameMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(frameMaterial.roughness).toBeGreaterThanOrEqual(0.82);
     expect(frameMaterial.environmentIntensity).toBeLessThanOrEqual(0.32);
+    expect(frameMaterial.metallic ?? 0).toBeLessThan(troughShellMaterial.metallic ?? 0);
+    expect(frameMaterial.roughness ?? 0).toBeGreaterThan(troughShellMaterial.roughness ?? 0);
+    expect(frameMaterial.environmentIntensity).toBeLessThan(troughShellMaterial.environmentIntensity);
 
     expect(loomMaterial.name).toContain('screen-service-catwalk-cable-loom');
     expect(loomMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -3919,6 +3943,9 @@ describe('polishMainStageMaterials', () => {
     expect(guardrailMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(guardrailMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(guardrailMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(guardrailMaterial.albedoColor.r).toBeLessThan(troughCollarMaterial.albedoColor.r);
+    expect(guardrailMaterial.roughness ?? 0).toBeGreaterThan(troughCollarMaterial.roughness ?? 0);
+    expect(guardrailMaterial.environmentIntensity).toBeLessThan(troughCollarMaterial.environmentIntensity);
 
     expect(practicalMaterial.name).toContain('screen-service-catwalk-practicals');
     expect(practicalMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -3931,6 +3958,10 @@ describe('polishMainStageMaterials', () => {
     expect(practicalMaterial.roughness).toBeGreaterThanOrEqual(0.16);
     expect(practicalMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
     expect(practicalMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(practicalMaterial.alpha).toBeGreaterThan(arrivalRunwayCyanMaterial.alpha);
+    expect(practicalMaterial.emissiveIntensity).toBeLessThan(arrivalRunwayCyanMaterial.emissiveIntensity);
+    expect(practicalMaterial.roughness ?? 0).toBeGreaterThan(arrivalRunwayCyanMaterial.roughness ?? 0);
+    expect(practicalMaterial.environmentIntensity).toBeLessThan(arrivalRunwayCyanMaterial.environmentIntensity);
   });
 
   it('rebalances the back-plaza lantern clusters so the arrival frame reads as grounded night practicals instead of bright gold cages around hot flat bulbs', () => {
