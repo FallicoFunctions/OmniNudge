@@ -2773,7 +2773,7 @@ describe('polishMainStageMaterials', () => {
     expect(coreMaterial.roughness ?? 0).toBeGreaterThan(backPlazaCoreMaterial.roughness ?? 0);
   });
 
-  it('rebalances the crowd clusters and wearable glows so the arrival lanes read as grounded silhouettes with subdued festival accents instead of flat black figures wrapped in hot cyan cards', () => {
+  it('splits the crowd clusters by depth band and rebalances the wearable glows so the arrival lanes keep a clearer near-to-mid silhouette read', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -2834,8 +2834,9 @@ describe('polishMainStageMaterials', () => {
     expect(crowdControl.material).toBe(sharedCrowdMaterial);
     expect(leftNear.material).toBeInstanceOf(PBRMaterial);
     expect(rightNear.material).toBe(leftNear.material);
-    expect(leftMid.material).toBe(leftNear.material);
-    expect(rightMid.material).toBe(leftNear.material);
+    expect(leftMid.material).toBeInstanceOf(PBRMaterial);
+    expect(rightMid.material).toBe(leftMid.material);
+    expect(leftMid.material).not.toBe(leftNear.material);
 
     expect(glowControl.material).toBe(sharedGlowMaterial);
     expect(glowLeftNear.material).toBeInstanceOf(PBRMaterial);
@@ -2845,20 +2846,35 @@ describe('polishMainStageMaterials', () => {
     expect(wingArcadeCyanInset.material).toBeInstanceOf(PBRMaterial);
     expect(wingArcadeCyanInset.material).not.toBe(glowLeftNear.material);
 
-    const crowdMaterial = leftNear.material as PBRMaterial;
+    const nearCrowdMaterial = leftNear.material as PBRMaterial;
+    const midCrowdMaterial = leftMid.material as PBRMaterial;
     const glowMaterial = glowLeftNear.material as PBRMaterial;
     const wingArcadeCyanInsetMaterial = wingArcadeCyanInset.material as PBRMaterial;
 
-    expect(crowdMaterial.name).toContain('crowd-cluster-graphite');
-    expect(crowdMaterial.metadata?.mainStageMaterialPolish).toBe('black');
-    expect(crowdMaterial.metadata?.mainStageMaterialOverride).toBe('crowd-cluster-graphite');
-    expect(crowdMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(crowdMaterial.albedoColor.g).toBeLessThanOrEqual(0.22);
-    expect(crowdMaterial.albedoColor.b).toBeLessThanOrEqual(0.26);
-    expect(crowdMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(crowdMaterial.metallic).toBeLessThanOrEqual(0.08);
-    expect(crowdMaterial.roughness).toBeGreaterThanOrEqual(0.84);
-    expect(crowdMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+    expect(nearCrowdMaterial.name).toContain('crowd-cluster-near-graphite');
+    expect(nearCrowdMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(nearCrowdMaterial.metadata?.mainStageMaterialOverride).toBe('crowd-cluster-near-graphite');
+    expect(nearCrowdMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(nearCrowdMaterial.albedoColor.g).toBeLessThanOrEqual(0.22);
+    expect(nearCrowdMaterial.albedoColor.b).toBeLessThanOrEqual(0.26);
+    expect(nearCrowdMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(nearCrowdMaterial.metallic).toBeLessThanOrEqual(0.08);
+    expect(nearCrowdMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(nearCrowdMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+
+    expect(midCrowdMaterial.name).toContain('crowd-cluster-mid-graphite');
+    expect(midCrowdMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(midCrowdMaterial.metadata?.mainStageMaterialOverride).toBe('crowd-cluster-mid-graphite');
+    expect(midCrowdMaterial.albedoColor.r).toBeLessThanOrEqual(0.17);
+    expect(midCrowdMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
+    expect(midCrowdMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
+    expect(midCrowdMaterial.emissiveIntensity).toBeLessThanOrEqual(0.016);
+    expect(midCrowdMaterial.metallic).toBeLessThanOrEqual(0.06);
+    expect(midCrowdMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(midCrowdMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(midCrowdMaterial.albedoColor.r).toBeLessThan(nearCrowdMaterial.albedoColor.r);
+    expect(midCrowdMaterial.environmentIntensity).toBeLessThan(nearCrowdMaterial.environmentIntensity);
+    expect(midCrowdMaterial.roughness ?? 0).toBeGreaterThan(nearCrowdMaterial.roughness ?? 0);
 
     expect(glowMaterial.name).toContain('crowd-wearable-glow');
     expect(glowMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
