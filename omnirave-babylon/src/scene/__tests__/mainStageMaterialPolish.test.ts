@@ -3190,22 +3190,39 @@ describe('polishMainStageMaterials', () => {
 
     const mullion = MeshBuilder.CreateBox('V115_CenterScreenMullionArray', { size: 1 }, scene);
     mullion.material = sharedGoldMaterial;
+    const outerWingGoldSpine = MeshBuilder.CreateBox('V104_OuterWingGoldSpineArray_L', { size: 1 }, scene);
+    outerWingGoldSpine.material = sharedGoldMaterial;
 
     const cyanControl = MeshBuilder.CreateBox('TestCenterScreenCyanEdgeControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
 
     const cyanEdge = MeshBuilder.CreateBox('V115_CenterScreenCyanEdgeArray', { size: 1 }, scene);
     cyanEdge.material = sharedCyanMaterial;
+    const arrivalRunwayCyanThreads = MeshBuilder.CreateBox('V65_ArrivalRunwayCyanThreads', { size: 1 }, scene);
+    arrivalRunwayCyanThreads.material = sharedCyanMaterial;
 
-    polishMainStageMaterials([goldControl, mullion, cyanControl, cyanEdge]);
+    polishMainStageMaterials([
+      goldControl,
+      mullion,
+      outerWingGoldSpine,
+      cyanControl,
+      cyanEdge,
+      arrivalRunwayCyanThreads,
+    ]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(mullion.material).toBeInstanceOf(PBRMaterial);
+    expect(outerWingGoldSpine.material).toBeInstanceOf(PBRMaterial);
+    expect(outerWingGoldSpine.material).not.toBe(mullion.material);
     expect(cyanEdge.material).toBeInstanceOf(PBRMaterial);
+    expect(arrivalRunwayCyanThreads.material).toBeInstanceOf(PBRMaterial);
+    expect(arrivalRunwayCyanThreads.material).not.toBe(cyanEdge.material);
 
     const mullionMaterial = mullion.material as PBRMaterial;
+    const outerWingGoldSpineMaterial = outerWingGoldSpine.material as PBRMaterial;
     const cyanMaterial = cyanEdge.material as PBRMaterial;
+    const arrivalRunwayCyanThreadsMaterial = arrivalRunwayCyanThreads.material as PBRMaterial;
 
     expect(mullionMaterial.name).toContain('center-screen-mullion');
     expect(mullionMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -3217,6 +3234,9 @@ describe('polishMainStageMaterials', () => {
     expect(mullionMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(mullionMaterial.roughness).toBeGreaterThanOrEqual(0.88);
     expect(mullionMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(mullionMaterial.albedoColor.r).toBeGreaterThan(outerWingGoldSpineMaterial.albedoColor.r);
+    expect(mullionMaterial.metallic ?? 0).toBeGreaterThan(outerWingGoldSpineMaterial.metallic ?? 0);
+    expect(mullionMaterial.roughness ?? 0).toBeLessThan(outerWingGoldSpineMaterial.roughness ?? 0);
 
     expect(cyanMaterial.name).toContain('center-screen-cyan-edge');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -3229,6 +3249,9 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.16);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(cyanMaterial.alpha).toBeLessThan(arrivalRunwayCyanThreadsMaterial.alpha);
+    expect(cyanMaterial.emissiveIntensity).toBeGreaterThan(arrivalRunwayCyanThreadsMaterial.emissiveIntensity);
+    expect(cyanMaterial.environmentIntensity).toBeGreaterThan(arrivalRunwayCyanThreadsMaterial.environmentIntensity);
   });
 
   it('regrades the stage-front portal apron and shoulder relief shells into distinct pearl masses so the spawn reveal stops reading like one repeated white apron proxy finish', () => {
