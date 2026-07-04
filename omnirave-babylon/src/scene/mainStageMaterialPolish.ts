@@ -5280,7 +5280,16 @@ function applyCrownHaloCyanInlayOverride(material: PBRMaterial) {
 }
 
 function applyBasinLanternStemOverride(material: PBRMaterial) {
-  applyBackPlazaLanternStemOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.19, 0.23);
+  material.emissiveColor = new Color3(0.012, 0.018, 0.024);
+  material.emissiveIntensity = 0.026;
+  material.metallic = 0.1;
+  material.roughness = 0.82;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.56;
+  material.environmentIntensity = 0.24;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-lantern-stem',
@@ -5288,7 +5297,16 @@ function applyBasinLanternStemOverride(material: PBRMaterial) {
 }
 
 function applyBasinLanternHousingOverride(material: PBRMaterial) {
-  applyBackPlazaLanternGoldCageOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.16, 0.08);
+  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.2;
+  material.roughness = 0.86;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.82;
+  material.environmentIntensity = 0.14;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-lantern-housing',
@@ -5296,7 +5314,16 @@ function applyBasinLanternHousingOverride(material: PBRMaterial) {
 }
 
 function applyBasinLanternWarmCoreOverride(material: PBRMaterial) {
-  applyBackPlazaLanternWarmCoreOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.84, 0.62, 0.28);
+  material.emissiveColor = new Color3(0.96, 0.7, 0.26);
+  material.emissiveIntensity = 0.62;
+  material.metallic = 0.02;
+  material.roughness = 0.34;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.16;
+  material.clearCoat.roughness = 0.26;
+  material.environmentIntensity = 0.38;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-lantern-warm-core',
