@@ -4499,7 +4499,7 @@ function applyPyroNozzleArrayOverride(material: PBRMaterial) {
   material.albedoColor = new Color3(0.19, 0.15, 0.06);
   material.emissiveColor = new Color3(0.005, 0.004, 0.002);
   material.emissiveIntensity = 0.02;
-  material.metallic = 0.16;
+  material.metallic = 0.15;
   material.roughness = 0.88;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.02;
@@ -4516,7 +4516,7 @@ function applyRearMassGoldBandOverride(material: PBRMaterial) {
   material.albedoColor = new Color3(0.19, 0.15, 0.06);
   material.emissiveColor = new Color3(0.005, 0.004, 0.002);
   material.emissiveIntensity = 0.02;
-  material.metallic = 0.16;
+  material.metallic = 0.15;
   material.roughness = 0.88;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.02;
@@ -6309,15 +6309,15 @@ function applyWingFacadeInsetGlowOverride(material: PBRMaterial) {
 
 function applyWideHeroScreenGoldFrameOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.16, 0.12, 0.05);
-  material.emissiveColor = new Color3(0, 0, 0);
-  material.emissiveIntensity = 0;
-  material.metallic = 0.14;
-  material.roughness = 0.9;
+  material.albedoColor = new Color3(0.174, 0.132, 0.056);
+  material.emissiveColor = new Color3(0.004, 0.0024, 0.0009);
+  material.emissiveIntensity = 0.012;
+  material.metallic = 0.15;
+  material.roughness = 0.89;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0;
-  material.clearCoat.roughness = 0.88;
-  material.environmentIntensity = 0.08;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.84;
+  material.environmentIntensity = 0.09;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wide-hero-screen-gold-frame',
