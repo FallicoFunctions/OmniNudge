@@ -4086,17 +4086,25 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V30_VipGoldBaluster_') ||
-      mesh.name.startsWith('V30_WingGoldBaluster_') ||
-      mesh.name.startsWith('V30_VipGoldHandrail_') ||
-      mesh.name.startsWith('V30_WingGoldHandrail_')
-    ) {
-      const cacheKey = `${material.uniqueId}:terrace-gold-rail`;
+    if (mesh.name.startsWith('V30_VipGoldBaluster_') || mesh.name.startsWith('V30_VipGoldHandrail_')) {
+      const cacheKey = `${material.uniqueId}:vip-terrace-gold-rail`;
       let railMaterial = clonedMaterials.get(cacheKey);
       if (!railMaterial) {
-        railMaterial = material.clone(`${material.name}__terrace-gold-rail`);
-        applyTerraceGoldRailOverride(railMaterial);
+        railMaterial = material.clone(`${material.name}__vip-terrace-gold-rail`);
+        applyVipTerraceGoldRailOverride(railMaterial);
+        clonedMaterials.set(cacheKey, railMaterial);
+      }
+
+      assignOverrideMaterial(mesh, railMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V30_WingGoldBaluster_') || mesh.name.startsWith('V30_WingGoldHandrail_')) {
+      const cacheKey = `${material.uniqueId}:wing-terrace-gold-rail`;
+      let railMaterial = clonedMaterials.get(cacheKey);
+      if (!railMaterial) {
+        railMaterial = material.clone(`${material.name}__wing-terrace-gold-rail`);
+        applyWingTerraceGoldRailOverride(railMaterial);
         clonedMaterials.set(cacheKey, railMaterial);
       }
 
@@ -9108,20 +9116,37 @@ function applyVipSoffitShadowOverride(material: PBRMaterial) {
   };
 }
 
-function applyTerraceGoldRailOverride(material: PBRMaterial) {
+function applyVipTerraceGoldRailOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.06);
-  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
-  material.emissiveIntensity = 0.02;
-  material.metallic = 0.16;
-  material.roughness = 0.9;
+  material.albedoColor = new Color3(0.2, 0.156, 0.068);
+  material.emissiveColor = new Color3(0.012, 0.008, 0.0026);
+  material.emissiveIntensity = 0.022;
+  material.metallic = 0.18;
+  material.roughness = 0.88;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0;
-  material.clearCoat.roughness = 0.86;
-  material.environmentIntensity = 0.12;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.82;
+  material.environmentIntensity = 0.14;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'terrace-gold-rail',
+    mainStageMaterialOverride: 'vip-terrace-gold-rail',
+  };
+}
+
+function applyWingTerraceGoldRailOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.124, 0.054);
+  material.emissiveColor = new Color3(0.008, 0.0054, 0.0018);
+  material.emissiveIntensity = 0.015;
+  material.metallic = 0.14;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-terrace-gold-rail',
   };
 }
 
