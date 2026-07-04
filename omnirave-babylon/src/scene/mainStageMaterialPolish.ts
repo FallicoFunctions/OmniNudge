@@ -6424,17 +6424,17 @@ function applyCenterScreenSidePierGoldFrameOverride(material: PBRMaterial) {
 }
 
 function applyCenterScreenSidePierCyanCoreOverride(material: PBRMaterial) {
-  material.albedoColor = new Color3(0.12, 0.24, 0.3);
-  material.emissiveColor = new Color3(0.015, 0.045, 0.06);
-  material.emissiveIntensity = 0.1;
-  material.alpha = 0.38;
+  material.albedoColor = new Color3(0.1, 0.22, 0.28);
+  material.emissiveColor = new Color3(0.012, 0.042, 0.056);
+  material.emissiveIntensity = 0.088;
+  material.alpha = 0.34;
   material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
   material.metallic = 0.02;
-  material.roughness = 0.18;
+  material.roughness = 0.22;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.06;
-  material.clearCoat.roughness = 0.6;
-  material.environmentIntensity = 0.34;
+  material.clearCoat.intensity = 0.08;
+  material.clearCoat.roughness = 0.56;
+  material.environmentIntensity = 0.36;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'center-screen-side-pier-cyan-core',
