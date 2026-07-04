@@ -4845,7 +4845,16 @@ function applyCrownBladeCyanInsetOverride(material: PBRMaterial) {
 }
 
 function applyTrussDiagonalBraceOverride(material: PBRMaterial) {
-  applyMainTrussTowerRigOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.05, 0.07, 0.09);
+  material.emissiveColor = new Color3(0.004, 0.014, 0.02);
+  material.emissiveIntensity = 0.02;
+  material.metallic = 0.06;
+  material.roughness = 0.82;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.18;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'truss-diagonal-brace',
