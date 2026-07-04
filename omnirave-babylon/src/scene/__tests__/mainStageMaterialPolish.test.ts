@@ -4733,7 +4733,19 @@ describe('polishMainStageMaterials', () => {
     const rightCyan = MeshBuilder.CreateBox('V78_CenterScreenSidePierCyanCore_R', { size: 1 }, scene);
     rightCyan.material = sharedCyanMaterial;
 
-    polishMainStageMaterials([controlGold, leftGold, rightGold, wideHeroFrame, controlCyan, leftCyan, rightCyan]);
+    const wingArcadeCyanInset = MeshBuilder.CreateBox('V28_WingArcadeCyanInlay_L', { size: 1 }, scene);
+    wingArcadeCyanInset.material = sharedCyanMaterial;
+
+    polishMainStageMaterials([
+      controlGold,
+      leftGold,
+      rightGold,
+      wideHeroFrame,
+      controlCyan,
+      leftCyan,
+      rightCyan,
+      wingArcadeCyanInset,
+    ]);
 
     expect(controlGold.material).toBe(sharedGoldMaterial);
     expect(leftGold.material).toBeInstanceOf(PBRMaterial);
@@ -4746,10 +4758,13 @@ describe('polishMainStageMaterials', () => {
     expect(leftCyan.material).toBeInstanceOf(PBRMaterial);
     expect(rightCyan.material).toBeInstanceOf(PBRMaterial);
     expect(rightCyan.material).toBe(leftCyan.material);
+    expect(wingArcadeCyanInset.material).toBeInstanceOf(PBRMaterial);
+    expect(wingArcadeCyanInset.material).not.toBe(leftCyan.material);
 
     const goldMaterial = leftGold.material as PBRMaterial;
     const wideHeroFrameMaterial = wideHeroFrame.material as PBRMaterial;
     const cyanMaterial = leftCyan.material as PBRMaterial;
+    const wingArcadeCyanInsetMaterial = wingArcadeCyanInset.material as PBRMaterial;
 
     expect(goldMaterial.name).toContain('center-screen-side-pier-gold-frame');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -4776,6 +4791,10 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.16);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.38);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+    expect(cyanMaterial.alpha).toBeLessThan(wingArcadeCyanInsetMaterial.alpha);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThan(wingArcadeCyanInsetMaterial.emissiveIntensity);
+    expect(cyanMaterial.roughness ?? 0).toBeGreaterThan(wingArcadeCyanInsetMaterial.roughness ?? 0);
+    expect(cyanMaterial.environmentIntensity).toBeGreaterThan(wingArcadeCyanInsetMaterial.environmentIntensity);
   });
 
   it('darkens the center screen interrupt rails so the hero wall reads with layered depth instead of three bright gold bars', () => {
