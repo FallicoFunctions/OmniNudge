@@ -13,6 +13,7 @@ import { createMainStageScene } from '../scene/createMainStageScene';
 import { createDebugPanel } from '../ui/createDebugPanel';
 import { createPerfOverlay } from '../ui/createPerfOverlay';
 import { createReviewHud } from '../ui/createReviewHud';
+import { createRuntimeLoadingOverlay } from '../ui/createRuntimeLoadingOverlay';
 import { RUNTIME_CONFIG } from './runtimeConfig';
 
 declare global {
@@ -48,6 +49,7 @@ export async function createRuntime(host: HTMLElement) {
   let hud: HTMLElement | undefined;
   let perfOverlay: HTMLElement | undefined;
   let debugPanel: HTMLElement | undefined;
+  const loadingOverlay = createRuntimeLoadingOverlay(host);
   let handleCanvasPick: ((event: MouseEvent) => void) | undefined;
 
   try {
@@ -86,6 +88,7 @@ export async function createRuntime(host: HTMLElement) {
       perfOverlay,
       scene,
     };
+    loadingOverlay.remove();
 
     engine.runRenderLoop(() => {
       scene.render();
@@ -104,6 +107,7 @@ export async function createRuntime(host: HTMLElement) {
     debugPanel?.remove();
     perfOverlay?.remove();
     hud?.remove();
+    loadingOverlay.remove();
     canvas.remove();
     throw error;
   }
