@@ -1029,10 +1029,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
     if (
       mesh.name.startsWith('V99_BasinParapetRelief_') ||
       mesh.name.startsWith('V118_BasinWallRelief_') ||
-      mesh.name.startsWith('V121_BasinRetainingRelief_') ||
-      mesh.name === 'V121_BasinBridgeRelief_North' ||
-      mesh.name === 'V121_BasinBridgeRelief_South' ||
-      mesh.name === 'V121_BasinBridgeRelief_Center'
+      mesh.name.startsWith('V121_BasinRetainingRelief_')
     ) {
       const cacheKey = `${material.uniqueId}:basin-retaining-relief`;
       let retainingMaterial = clonedMaterials.get(cacheKey);
@@ -1043,6 +1040,23 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, retainingMaterial);
+      continue;
+    }
+
+    if (
+      mesh.name === 'V121_BasinBridgeRelief_North' ||
+      mesh.name === 'V121_BasinBridgeRelief_South' ||
+      mesh.name === 'V121_BasinBridgeRelief_Center'
+    ) {
+      const cacheKey = `${material.uniqueId}:basin-bridge-relief`;
+      let bridgeMaterial = clonedMaterials.get(cacheKey);
+      if (!bridgeMaterial) {
+        bridgeMaterial = material.clone(`${material.name}__basin-bridge-relief`);
+        applyBasinBridgeReliefOverride(bridgeMaterial);
+        clonedMaterials.set(cacheKey, bridgeMaterial);
+      }
+
+      assignOverrideMaterial(mesh, bridgeMaterial);
       continue;
     }
 
@@ -5761,6 +5775,23 @@ function applyBasinRetainingReliefOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-retaining-relief',
+  };
+}
+
+function applyBasinBridgeReliefOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.2, 0.24);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
+  material.emissiveIntensity = 0.014;
+  material.metallic = 0.02;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.7;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-bridge-relief',
   };
 }
 

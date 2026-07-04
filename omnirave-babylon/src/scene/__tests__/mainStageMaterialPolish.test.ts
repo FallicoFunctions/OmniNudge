@@ -745,7 +745,7 @@ describe('polishMainStageMaterials', () => {
     expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
   });
 
-  it('darkens the basin bridge relief spans so the central water crossings read as carved stonework instead of bright pearl strips', () => {
+  it('splits the basin bridge relief spans away from the retaining reliefs so the central crossings keep a distinct carved span read instead of sharing the wall-panel finish', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -758,6 +758,9 @@ describe('polishMainStageMaterials', () => {
     const otherPearl = MeshBuilder.CreateBox('V24_OuterCrownLamella_L', { size: 1 }, scene);
     otherPearl.material = sharedPearlMaterial;
 
+    const retainingRelief = MeshBuilder.CreateBox('V121_BasinRetainingRelief_L', { size: 1 }, scene);
+    retainingRelief.material = sharedPearlMaterial;
+
     const northBridge = MeshBuilder.CreateBox('V121_BasinBridgeRelief_North', { size: 1 }, scene);
     northBridge.material = sharedPearlMaterial;
 
@@ -767,28 +770,42 @@ describe('polishMainStageMaterials', () => {
     const centerBridge = MeshBuilder.CreateBox('V121_BasinBridgeRelief_Center', { size: 1 }, scene);
     centerBridge.material = sharedPearlMaterial;
 
-    polishMainStageMaterials([otherPearl, northBridge, southBridge, centerBridge]);
+    polishMainStageMaterials([otherPearl, retainingRelief, northBridge, southBridge, centerBridge]);
 
     expect(otherPearl.material).toBe(sharedPearlMaterial);
+    expect(retainingRelief.material).toBeInstanceOf(PBRMaterial);
     expect(northBridge.material).toBeInstanceOf(PBRMaterial);
     expect(southBridge.material).toBeInstanceOf(PBRMaterial);
     expect(centerBridge.material).toBeInstanceOf(PBRMaterial);
+    expect(retainingRelief.material).not.toBe(sharedPearlMaterial);
     expect(northBridge.material).not.toBe(sharedPearlMaterial);
     expect(southBridge.material).not.toBe(sharedPearlMaterial);
     expect(centerBridge.material).not.toBe(sharedPearlMaterial);
     expect(southBridge.material).toBe(northBridge.material);
     expect(centerBridge.material).toBe(northBridge.material);
+    expect(northBridge.material).not.toBe(retainingRelief.material);
+
+    const retainingMaterial = retainingRelief.material as PBRMaterial;
+    expect(retainingMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(retainingMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
+    expect(retainingMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
+    expect(retainingMaterial.albedoColor.g).toBeLessThanOrEqual(0.17);
+    expect(retainingMaterial.albedoColor.b).toBeLessThanOrEqual(0.21);
+    expect(retainingMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(retainingMaterial.roughness).toBeGreaterThanOrEqual(0.94);
+    expect(retainingMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
+    expect(retainingMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
 
     const reliefMaterial = northBridge.material as PBRMaterial;
     expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
-    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
-    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.17);
-    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.21);
+    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-bridge-relief');
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.2);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.24);
     expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
-    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.94);
-    expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.08);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('darkens the basin deck reliefs so the route-facing basin ledges read as carved stonework instead of bright pearl slabs', () => {
