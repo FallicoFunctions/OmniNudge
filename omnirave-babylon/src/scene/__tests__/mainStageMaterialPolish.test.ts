@@ -848,7 +848,7 @@ describe('polishMainStageMaterials', () => {
     expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.04);
   });
 
-  it('darkens the basin wall reliefs so the basin cheeks read as carved stonework instead of bright pearl side slabs', () => {
+  it('splits the basin wall reliefs away from the retaining reliefs so the basin cheeks keep a distinct carved-stone read', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -867,25 +867,42 @@ describe('polishMainStageMaterials', () => {
     const rightWall = MeshBuilder.CreateBox('V118_BasinWallRelief_R', { size: 1 }, scene);
     rightWall.material = sharedPearlMaterial;
 
-    polishMainStageMaterials([otherPearl, leftWall, rightWall]);
+    const retainingRelief = MeshBuilder.CreateBox('V121_BasinRetainingRelief_L', { size: 1 }, scene);
+    retainingRelief.material = sharedPearlMaterial;
+
+    polishMainStageMaterials([otherPearl, leftWall, rightWall, retainingRelief]);
 
     expect(otherPearl.material).toBe(sharedPearlMaterial);
     expect(leftWall.material).toBeInstanceOf(PBRMaterial);
     expect(rightWall.material).toBeInstanceOf(PBRMaterial);
+    expect(retainingRelief.material).toBeInstanceOf(PBRMaterial);
     expect(leftWall.material).not.toBe(sharedPearlMaterial);
     expect(rightWall.material).not.toBe(sharedPearlMaterial);
+    expect(retainingRelief.material).not.toBe(sharedPearlMaterial);
     expect(rightWall.material).toBe(leftWall.material);
+    expect(retainingRelief.material).not.toBe(leftWall.material);
 
     const reliefMaterial = leftWall.material as PBRMaterial;
     expect(reliefMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
-    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
-    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.19);
-    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.21);
-    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.25);
+    expect(reliefMaterial.metadata?.mainStageMaterialOverride).toBe('basin-wall-relief');
+    expect(reliefMaterial.albedoColor.r).toBeLessThanOrEqual(0.17);
+    expect(reliefMaterial.albedoColor.g).toBeLessThanOrEqual(0.19);
+    expect(reliefMaterial.albedoColor.b).toBeLessThanOrEqual(0.23);
     expect(reliefMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(reliefMaterial.roughness).toBeGreaterThanOrEqual(0.92);
     expect(reliefMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+    expect(reliefMaterial.environmentIntensity).toBeLessThanOrEqual(0.08);
+
+    const retainingMaterial = retainingRelief.material as PBRMaterial;
+    expect(retainingMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
+    expect(retainingMaterial.metadata?.mainStageMaterialOverride).toBe('basin-retaining-relief');
+    expect(retainingMaterial.albedoColor.r).toBeLessThanOrEqual(0.15);
+    expect(retainingMaterial.albedoColor.g).toBeLessThanOrEqual(0.17);
+    expect(retainingMaterial.albedoColor.b).toBeLessThanOrEqual(0.21);
+    expect(retainingMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(retainingMaterial.roughness).toBeGreaterThanOrEqual(0.94);
+    expect(retainingMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.05);
+    expect(retainingMaterial.environmentIntensity).toBeLessThanOrEqual(0.06);
   });
 
   it('regrades the basin water sheets so the side basins read as dark reflective water planes instead of bright flat cyan cards', () => {
