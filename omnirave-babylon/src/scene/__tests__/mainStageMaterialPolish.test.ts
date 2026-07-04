@@ -1885,16 +1885,21 @@ describe('polishMainStageMaterials', () => {
 
     const rightBraceB = MeshBuilder.CreateBox('V42_TrussDiagonalBraceB_R', { size: 1 }, scene);
     rightBraceB.material = sharedRigMaterial;
+    const mainTrussRig = MeshBuilder.CreateBox('V83_MainTrussTowerDiagonalArray_L', { size: 1 }, scene);
+    mainTrussRig.material = sharedRigMaterial;
 
-    polishMainStageMaterials([rigControl, leftBraceA, leftBraceB, rightBraceA, rightBraceB]);
+    polishMainStageMaterials([rigControl, leftBraceA, leftBraceB, rightBraceA, rightBraceB, mainTrussRig]);
 
     expect(rigControl.material).toBe(sharedRigMaterial);
     expect(leftBraceA.material).toBeInstanceOf(PBRMaterial);
     expect(leftBraceB.material).toBe(leftBraceA.material);
     expect(rightBraceA.material).toBe(leftBraceA.material);
     expect(rightBraceB.material).toBe(leftBraceA.material);
+    expect(mainTrussRig.material).toBeInstanceOf(PBRMaterial);
+    expect(mainTrussRig.material).not.toBe(leftBraceA.material);
 
     const braceMaterial = leftBraceA.material as PBRMaterial;
+    const mainTrussRigMaterial = mainTrussRig.material as PBRMaterial;
     expect(braceMaterial.name).toContain('truss-diagonal-brace');
     expect(braceMaterial.metadata?.mainStageMaterialPolish).toBe('black');
     expect(braceMaterial.metadata?.mainStageMaterialOverride).toBe('truss-diagonal-brace');
@@ -1905,6 +1910,11 @@ describe('polishMainStageMaterials', () => {
     expect(braceMaterial.metallic).toBeLessThanOrEqual(0.08);
     expect(braceMaterial.roughness).toBeGreaterThanOrEqual(0.74);
     expect(braceMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
+    expect(braceMaterial.albedoColor.r).toBeGreaterThan(mainTrussRigMaterial.albedoColor.r);
+    expect(braceMaterial.emissiveIntensity).toBeLessThan(mainTrussRigMaterial.emissiveIntensity);
+    expect(braceMaterial.metallic ?? 0).toBeGreaterThan(mainTrussRigMaterial.metallic ?? 0);
+    expect(braceMaterial.roughness ?? 0).toBeGreaterThan(mainTrussRigMaterial.roughness ?? 0);
+    expect(braceMaterial.environmentIntensity).toBeGreaterThan(mainTrussRigMaterial.environmentIntensity);
   });
 
   it('rebalances the production truss tower arrays so the stage flanks read as integrated support hardware instead of bright ladders and hot cyan beacons on flat proxy towers', () => {
