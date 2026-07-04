@@ -4721,6 +4721,9 @@ describe('polishMainStageMaterials', () => {
     const rightGold = MeshBuilder.CreateBox('V78_CenterScreenSidePierGoldFrame_R', { size: 1 }, scene);
     rightGold.material = sharedGoldMaterial;
 
+    const wideHeroFrame = MeshBuilder.CreateBox('V126_WideHeroScreenGoldFrame', { size: 1 }, scene);
+    wideHeroFrame.material = sharedGoldMaterial;
+
     const controlCyan = MeshBuilder.CreateBox('TestCenterPierCyanControl', { size: 1 }, scene);
     controlCyan.material = sharedCyanMaterial;
 
@@ -4730,12 +4733,14 @@ describe('polishMainStageMaterials', () => {
     const rightCyan = MeshBuilder.CreateBox('V78_CenterScreenSidePierCyanCore_R', { size: 1 }, scene);
     rightCyan.material = sharedCyanMaterial;
 
-    polishMainStageMaterials([controlGold, leftGold, rightGold, controlCyan, leftCyan, rightCyan]);
+    polishMainStageMaterials([controlGold, leftGold, rightGold, wideHeroFrame, controlCyan, leftCyan, rightCyan]);
 
     expect(controlGold.material).toBe(sharedGoldMaterial);
     expect(leftGold.material).toBeInstanceOf(PBRMaterial);
     expect(rightGold.material).toBeInstanceOf(PBRMaterial);
     expect(rightGold.material).toBe(leftGold.material);
+    expect(wideHeroFrame.material).toBeInstanceOf(PBRMaterial);
+    expect(wideHeroFrame.material).not.toBe(leftGold.material);
 
     expect(controlCyan.material).toBe(sharedCyanMaterial);
     expect(leftCyan.material).toBeInstanceOf(PBRMaterial);
@@ -4743,6 +4748,7 @@ describe('polishMainStageMaterials', () => {
     expect(rightCyan.material).toBe(leftCyan.material);
 
     const goldMaterial = leftGold.material as PBRMaterial;
+    const wideHeroFrameMaterial = wideHeroFrame.material as PBRMaterial;
     const cyanMaterial = leftCyan.material as PBRMaterial;
 
     expect(goldMaterial.name).toContain('center-screen-side-pier-gold-frame');
@@ -4755,6 +4761,9 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(goldMaterial.albedoColor.r).toBeGreaterThan(wideHeroFrameMaterial.albedoColor.r);
+    expect(goldMaterial.metallic ?? 0).toBeGreaterThan(wideHeroFrameMaterial.metallic ?? 0);
+    expect(goldMaterial.roughness ?? 0).toBeLessThan(wideHeroFrameMaterial.roughness ?? 0);
 
     expect(cyanMaterial.name).toContain('center-screen-side-pier-cyan-core');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -4786,13 +4795,19 @@ describe('polishMainStageMaterials', () => {
     const rails = MeshBuilder.CreateBox('V128_CenterScreenGoldInterruptRailArray', { size: 1 }, scene);
     rails.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([otherGold, rails]);
+    const wideHeroFrame = MeshBuilder.CreateBox('V126_WideHeroScreenGoldFrame', { size: 1 }, scene);
+    wideHeroFrame.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([otherGold, rails, wideHeroFrame]);
 
     expect(otherGold.material).toBe(sharedGoldMaterial);
     expect(rails.material).toBeInstanceOf(PBRMaterial);
     expect(rails.material).not.toBe(sharedGoldMaterial);
+    expect(wideHeroFrame.material).toBeInstanceOf(PBRMaterial);
+    expect(wideHeroFrame.material).not.toBe(rails.material);
 
     const railMaterial = rails.material as PBRMaterial;
+    const wideHeroFrameMaterial = wideHeroFrame.material as PBRMaterial;
     expect(railMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(railMaterial.metadata?.mainStageMaterialOverride).toBe('center-screen-gold-interrupt-rail');
     expect(railMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
@@ -4803,6 +4818,9 @@ describe('polishMainStageMaterials', () => {
     expect(railMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(railMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(railMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(railMaterial.albedoColor.r).toBeLessThan(wideHeroFrameMaterial.albedoColor.r);
+    expect(railMaterial.metallic ?? 0).toBeLessThan(wideHeroFrameMaterial.metallic ?? 0);
+    expect(railMaterial.roughness ?? 0).toBeGreaterThan(wideHeroFrameMaterial.roughness ?? 0);
   });
 
   it('keeps the center screen shadow coffer array smoky but still readable so the hero wall frame reads as depth instead of a dead-black border', () => {
