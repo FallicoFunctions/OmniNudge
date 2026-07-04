@@ -2705,11 +2705,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let stemMaterial = clonedMaterials.get(cacheKey);
       if (!stemMaterial) {
         stemMaterial = material.clone(`${material.name}__plaza-lantern-stem`);
-        applyBackPlazaLanternStemOverride(stemMaterial);
-        stemMaterial.metadata = {
-          ...stemMaterial.metadata,
-          mainStageMaterialOverride: 'plaza-lantern-stem',
-        };
+        applyPlazaLanternStemOverride(stemMaterial);
         clonedMaterials.set(cacheKey, stemMaterial);
       }
 
@@ -2722,11 +2718,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let hardwareMaterial = clonedMaterials.get(cacheKey);
       if (!hardwareMaterial) {
         hardwareMaterial = material.clone(`${material.name}__plaza-lantern-gold-hardware`);
-        applyBackPlazaLanternGoldCageOverride(hardwareMaterial);
-        hardwareMaterial.metadata = {
-          ...hardwareMaterial.metadata,
-          mainStageMaterialOverride: 'plaza-lantern-gold-hardware',
-        };
+        applyPlazaLanternGoldHardwareOverride(hardwareMaterial);
         clonedMaterials.set(cacheKey, hardwareMaterial);
       }
 
@@ -2739,11 +2731,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let coreMaterial = clonedMaterials.get(cacheKey);
       if (!coreMaterial) {
         coreMaterial = material.clone(`${material.name}__plaza-lantern-warm-core`);
-        applyBackPlazaLanternWarmCoreOverride(coreMaterial);
-        coreMaterial.metadata = {
-          ...coreMaterial.metadata,
-          mainStageMaterialOverride: 'plaza-lantern-warm-core',
-        };
+        applyPlazaLanternWarmCoreOverride(coreMaterial);
         clonedMaterials.set(cacheKey, coreMaterial);
       }
 
@@ -2756,11 +2744,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let haloMaterial = clonedMaterials.get(cacheKey);
       if (!haloMaterial) {
         haloMaterial = material.clone(`${material.name}__plaza-lantern-halo-rim`);
-        applyBackPlazaLanternHaloRimOverride(haloMaterial);
-        haloMaterial.metadata = {
-          ...haloMaterial.metadata,
-          mainStageMaterialOverride: 'plaza-lantern-halo-rim',
-        };
+        applyPlazaLanternHaloRimOverride(haloMaterial);
         clonedMaterials.set(cacheKey, haloMaterial);
       }
 
@@ -7690,6 +7674,23 @@ function applyBackPlazaLanternStemOverride(material: PBRMaterial) {
   };
 }
 
+function applyPlazaLanternStemOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.15, 0.18, 0.22);
+  material.emissiveColor = new Color3(0.01, 0.015, 0.02);
+  material.emissiveIntensity = 0.022;
+  material.metallic = 0.1;
+  material.roughness = 0.8;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.05;
+  material.clearCoat.roughness = 0.54;
+  material.environmentIntensity = 0.3;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'plaza-lantern-stem',
+  };
+}
+
 function applyBackPlazaLanternGoldCageOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.18, 0.14, 0.06);
@@ -7704,6 +7705,23 @@ function applyBackPlazaLanternGoldCageOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'back-plaza-lantern-gold-cage',
+  };
+}
+
+function applyPlazaLanternGoldHardwareOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0.008, 0.005, 0.0015);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.14;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.88;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'plaza-lantern-gold-hardware',
   };
 }
 
@@ -7724,6 +7742,23 @@ function applyBackPlazaLanternWarmCoreOverride(material: PBRMaterial) {
   };
 }
 
+function applyPlazaLanternWarmCoreOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.86, 0.62, 0.3);
+  material.emissiveColor = new Color3(1, 0.74, 0.28);
+  material.emissiveIntensity = 0.78;
+  material.metallic = 0.02;
+  material.roughness = 0.28;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.2;
+  material.clearCoat.roughness = 0.22;
+  material.environmentIntensity = 0.46;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'plaza-lantern-warm-core',
+  };
+}
+
 function applyBackPlazaLanternHaloRimOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.22, 0.17, 0.08);
@@ -7738,6 +7773,23 @@ function applyBackPlazaLanternHaloRimOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'back-plaza-lantern-halo-rim',
+  };
+}
+
+function applyPlazaLanternHaloRimOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.24, 0.18, 0.085);
+  material.emissiveColor = new Color3(0.14, 0.095, 0.036);
+  material.emissiveIntensity = 0.092;
+  material.metallic = 0.1;
+  material.roughness = 0.74;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.05;
+  material.clearCoat.roughness = 0.48;
+  material.environmentIntensity = 0.24;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'plaza-lantern-halo-rim',
   };
 }
 
