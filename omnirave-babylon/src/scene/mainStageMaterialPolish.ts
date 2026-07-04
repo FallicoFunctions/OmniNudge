@@ -1027,7 +1027,6 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
     }
 
     if (
-      mesh.name.startsWith('V99_BasinParapetRelief_') ||
       mesh.name.startsWith('V118_BasinWallRelief_') ||
       mesh.name.startsWith('V121_BasinRetainingRelief_')
     ) {
@@ -1040,6 +1039,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, retainingMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V99_BasinParapetRelief_')) {
+      const cacheKey = `${material.uniqueId}:basin-parapet-relief`;
+      let parapetMaterial = clonedMaterials.get(cacheKey);
+      if (!parapetMaterial) {
+        parapetMaterial = material.clone(`${material.name}__basin-parapet-relief`);
+        applyBasinParapetReliefOverride(parapetMaterial);
+        clonedMaterials.set(cacheKey, parapetMaterial);
+      }
+
+      assignOverrideMaterial(mesh, parapetMaterial);
       continue;
     }
 
@@ -5792,6 +5804,23 @@ function applyBasinBridgeReliefOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'basin-bridge-relief',
+  };
+}
+
+function applyBasinParapetReliefOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.2, 0.22, 0.26);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.01);
+  material.emissiveIntensity = 0.014;
+  material.metallic = 0.02;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.04;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'basin-parapet-relief',
   };
 }
 
