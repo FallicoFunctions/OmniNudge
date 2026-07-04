@@ -1478,11 +1478,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let cyanMaterial = clonedMaterials.get(cacheKey);
       if (!cyanMaterial) {
         cyanMaterial = material.clone(`${material.name}__crown-side-rib-cyan`);
-        applyCelestialHaloCyanEdgeOverride(cyanMaterial);
-        cyanMaterial.metadata = {
-          ...cyanMaterial.metadata,
-          mainStageMaterialOverride: 'crown-side-rib-cyan',
-        };
+        applyCrownSideRibCyanOverride(cyanMaterial);
         clonedMaterials.set(cacheKey, cyanMaterial);
       }
 
@@ -9360,6 +9356,24 @@ function applyCelestialHaloCyanEdgeOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'celestial-halo-cyan-edge',
+  };
+}
+
+function applyCrownSideRibCyanOverride(material: PBRMaterial) {
+  material.albedoColor = new Color3(0.11, 0.23, 0.29);
+  material.emissiveColor = new Color3(0.008, 0.04, 0.056);
+  material.emissiveIntensity = 0.06;
+  material.alpha = 0.39;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.24;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.22;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-side-rib-cyan',
   };
 }
 
