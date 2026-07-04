@@ -6033,7 +6033,16 @@ function applyApproachEdgeRailOverride(material: PBRMaterial) {
 }
 
 function applyApproachBarricadeAssemblyOverride(material: PBRMaterial) {
-  applyCrowdBarrierBaseOverride(material);
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.12, 0.145, 0.18);
+  material.emissiveColor = new Color3(0.008, 0.012, 0.016);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.06;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.22;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'approach-barricade-assembly',
