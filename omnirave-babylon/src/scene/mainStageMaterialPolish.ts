@@ -4178,7 +4178,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (mesh.name.startsWith('V30_WingGoldBaluster_') || mesh.name.startsWith('V30_WingGoldHandrail_')) {
+    if (mesh.name.startsWith('V30_WingGoldBaluster_')) {
       const cacheKey = `${material.uniqueId}:wing-terrace-gold-rail`;
       let railMaterial = clonedMaterials.get(cacheKey);
       if (!railMaterial) {
@@ -4188,6 +4188,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, railMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V30_WingGoldHandrail_')) {
+      const cacheKey = `${material.uniqueId}:wing-terrace-gold-handrail`;
+      let handrailMaterial = clonedMaterials.get(cacheKey);
+      if (!handrailMaterial) {
+        handrailMaterial = material.clone(`${material.name}__wing-terrace-gold-handrail`);
+        applyWingTerraceGoldHandrailOverride(handrailMaterial);
+        clonedMaterials.set(cacheKey, handrailMaterial);
+      }
+
+      assignOverrideMaterial(mesh, handrailMaterial);
       continue;
     }
 
@@ -9345,6 +9358,23 @@ function applyWingTerraceGoldRailOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-terrace-gold-rail',
+  };
+}
+
+function applyWingTerraceGoldHandrailOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.186, 0.142, 0.062);
+  material.emissiveColor = new Color3(0.0094, 0.0064, 0.0021);
+  material.emissiveIntensity = 0.017;
+  material.metallic = 0.17;
+  material.roughness = 0.87;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.01;
+  material.clearCoat.roughness = 0.8;
+  material.environmentIntensity = 0.11;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-terrace-gold-handrail',
   };
 }
 
