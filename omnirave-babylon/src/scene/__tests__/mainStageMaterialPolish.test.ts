@@ -11942,7 +11942,7 @@ describe('polishMainStageMaterials', () => {
     expect(vipCanopyMaterial.roughness ?? 0).toBeGreaterThan(basinCanopyMaterial.roughness ?? 0);
   });
 
-  it('darkens the basin and VIP foliage understory so the deep planting reads as dense shadow instead of bright groundcover', () => {
+  it('splits the basin and VIP foliage understory so the deep planting keeps distinct basin-garden and VIP-garden shadow reads', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -11969,17 +11969,33 @@ describe('polishMainStageMaterials', () => {
 
     expect(otherUnderstory.material).toBe(sharedUnderstoryMaterial);
 
-    for (const mesh of [understoryBL, understoryBR, understoryVL, understoryVR]) {
-      expect(mesh.material).not.toBe(sharedUnderstoryMaterial);
-      const mat = mesh.material as PBRMaterial;
-      expect(mat.metadata?.mainStageMaterialPolish).toBe('black');
-      expect(mat.metadata?.mainStageMaterialOverride).toBe('deep-foliage-understory');
-      expect(mat.albedoColor.r).toBeLessThanOrEqual(0.14);
-      expect(mat.albedoColor.g).toBeLessThanOrEqual(0.17);
-      expect(mat.albedoColor.b).toBeLessThanOrEqual(0.12);
-      expect(mat.emissiveIntensity).toBeLessThanOrEqual(0.03);
-      expect(mat.roughness).toBeGreaterThanOrEqual(0.84);
-      expect(mat.environmentIntensity).toBeLessThanOrEqual(0.18);
-    }
+    expect(understoryBL.material).not.toBe(sharedUnderstoryMaterial);
+    expect(understoryBR.material).toBe(understoryBL.material);
+    expect(understoryVL.material).not.toBe(sharedUnderstoryMaterial);
+    expect(understoryVR.material).toBe(understoryVL.material);
+    expect(understoryVL.material).not.toBe(understoryBL.material);
+
+    const basinUnderstoryMaterial = understoryBL.material as PBRMaterial;
+    expect(basinUnderstoryMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(basinUnderstoryMaterial.metadata?.mainStageMaterialOverride).toBe('basin-foliage-understory');
+    expect(basinUnderstoryMaterial.albedoColor.r).toBeLessThanOrEqual(0.14);
+    expect(basinUnderstoryMaterial.albedoColor.g).toBeLessThanOrEqual(0.17);
+    expect(basinUnderstoryMaterial.albedoColor.b).toBeLessThanOrEqual(0.12);
+    expect(basinUnderstoryMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(basinUnderstoryMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(basinUnderstoryMaterial.environmentIntensity).toBeLessThanOrEqual(0.18);
+
+    const vipUnderstoryMaterial = understoryVL.material as PBRMaterial;
+    expect(vipUnderstoryMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(vipUnderstoryMaterial.metadata?.mainStageMaterialOverride).toBe('vip-foliage-understory');
+    expect(vipUnderstoryMaterial.albedoColor.r).toBeLessThanOrEqual(0.12);
+    expect(vipUnderstoryMaterial.albedoColor.g).toBeLessThanOrEqual(0.15);
+    expect(vipUnderstoryMaterial.albedoColor.b).toBeLessThanOrEqual(0.1);
+    expect(vipUnderstoryMaterial.emissiveIntensity).toBeLessThanOrEqual(0.024);
+    expect(vipUnderstoryMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(vipUnderstoryMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(vipUnderstoryMaterial.albedoColor.g).toBeLessThan(basinUnderstoryMaterial.albedoColor.g);
+    expect(vipUnderstoryMaterial.environmentIntensity).toBeLessThan(basinUnderstoryMaterial.environmentIntensity);
+    expect(vipUnderstoryMaterial.roughness ?? 0).toBeGreaterThan(basinUnderstoryMaterial.roughness ?? 0);
   });
 });

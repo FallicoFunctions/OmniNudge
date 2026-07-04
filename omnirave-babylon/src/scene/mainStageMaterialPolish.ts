@@ -657,11 +657,16 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       mesh.name === 'V33_VipFoliageUnderstory_L' ||
       mesh.name === 'V33_VipFoliageUnderstory_R'
     ) {
-      const cacheKey = `${material.uniqueId}:deep-foliage-understory`;
+      const isVipUnderstory = mesh.name.startsWith('V33_VipFoliageUnderstory_');
+      const cacheKey = `${material.uniqueId}:${isVipUnderstory ? 'vip-foliage-understory' : 'basin-foliage-understory'}`;
       let understoryMaterial = clonedMaterials.get(cacheKey);
       if (!understoryMaterial) {
-        understoryMaterial = material.clone(`${material.name}__deep-foliage-understory`);
-        applyDeepFoliageUnderstoryOverride(understoryMaterial);
+        understoryMaterial = material.clone(`${material.name}__${isVipUnderstory ? 'vip-foliage-understory' : 'basin-foliage-understory'}`);
+        if (isVipUnderstory) {
+          applyVipFoliageUnderstoryOverride(understoryMaterial);
+        } else {
+          applyBasinFoliageUnderstoryOverride(understoryMaterial);
+        }
         clonedMaterials.set(cacheKey, understoryMaterial);
       }
 
@@ -5529,7 +5534,7 @@ function applyVipFoliageCanopyOverride(material: PBRMaterial) {
   };
 }
 
-function applyDeepFoliageUnderstoryOverride(material: PBRMaterial) {
+function applyBasinFoliageUnderstoryOverride(material: PBRMaterial) {
   material.albedoTexture = null;
   material.albedoColor = new Color3(0.06, 0.08, 0.04);
   material.emissiveColor = new Color3(0.004, 0.006, 0.002);
@@ -5543,7 +5548,25 @@ function applyDeepFoliageUnderstoryOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialPolish: 'black',
-    mainStageMaterialOverride: 'deep-foliage-understory',
+    mainStageMaterialOverride: 'basin-foliage-understory',
+  };
+}
+
+function applyVipFoliageUnderstoryOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.05, 0.07, 0.035);
+  material.emissiveColor = new Color3(0.003, 0.005, 0.0016);
+  material.emissiveIntensity = 0.018;
+  material.metallic = 0.02;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.78;
+  material.environmentIntensity = 0.12;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialPolish: 'black',
+    mainStageMaterialOverride: 'vip-foliage-understory',
   };
 }
 
