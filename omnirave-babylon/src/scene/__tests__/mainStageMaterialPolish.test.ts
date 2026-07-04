@@ -9293,14 +9293,23 @@ describe('polishMainStageMaterials', () => {
     const stem = MeshBuilder.CreateBox('V44_PlazaLanternStemCluster', { size: 1 }, scene);
     stem.material = sharedStemMaterial;
 
+    const lanternStem = MeshBuilder.CreateBox('V59_BackPlazaLanternStemCluster_L', { size: 1 }, scene);
+    lanternStem.material = sharedStemMaterial;
+
     const goldControl = MeshBuilder.CreateBox('TestPlazaLanternGoldControl', { size: 1 }, scene);
     goldControl.material = sharedGoldMaterial;
 
     const gold = MeshBuilder.CreateBox('V44_PlazaLanternGoldHardware', { size: 1 }, scene);
     gold.material = sharedGoldMaterial;
 
+    const lanternCage = MeshBuilder.CreateBox('V59_BackPlazaLanternGoldCage_L', { size: 1 }, scene);
+    lanternCage.material = sharedGoldMaterial;
+
     const halo = MeshBuilder.CreateBox('V44_PlazaLanternHaloRim', { size: 1 }, scene);
     halo.material = sharedGoldMaterial;
+
+    const lanternHalo = MeshBuilder.CreateBox('V59_BackPlazaLanternHaloRim_L', { size: 1 }, scene);
+    lanternHalo.material = sharedGoldMaterial;
 
     const coreControl = MeshBuilder.CreateBox('TestPlazaLanternCoreControl', { size: 1 }, scene);
     coreControl.material = sharedCoreMaterial;
@@ -9308,22 +9317,49 @@ describe('polishMainStageMaterials', () => {
     const core = MeshBuilder.CreateBox('V44_PlazaLanternWarmCore', { size: 1 }, scene);
     core.material = sharedCoreMaterial;
 
-    polishMainStageMaterials([stemControl, stem, goldControl, gold, halo, coreControl, core]);
+    const lanternCore = MeshBuilder.CreateBox('V59_BackPlazaLanternWarmCore_L', { size: 1 }, scene);
+    lanternCore.material = sharedCoreMaterial;
+
+    polishMainStageMaterials([
+      stemControl,
+      stem,
+      lanternStem,
+      goldControl,
+      gold,
+      lanternCage,
+      halo,
+      lanternHalo,
+      coreControl,
+      core,
+      lanternCore,
+    ]);
 
     expect(stemControl.material).toBe(sharedStemMaterial);
     expect(stem.material).toBeInstanceOf(PBRMaterial);
+    expect(lanternStem.material).toBeInstanceOf(PBRMaterial);
+    expect(lanternStem.material).not.toBe(stem.material);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(gold.material).toBeInstanceOf(PBRMaterial);
+    expect(lanternCage.material).toBeInstanceOf(PBRMaterial);
+    expect(lanternCage.material).not.toBe(gold.material);
     expect(halo.material).toBeInstanceOf(PBRMaterial);
+    expect(lanternHalo.material).toBeInstanceOf(PBRMaterial);
+    expect(lanternHalo.material).not.toBe(halo.material);
 
     expect(coreControl.material).toBe(sharedCoreMaterial);
     expect(core.material).toBeInstanceOf(PBRMaterial);
+    expect(lanternCore.material).toBeInstanceOf(PBRMaterial);
+    expect(lanternCore.material).not.toBe(core.material);
 
     const stemMaterial = stem.material as PBRMaterial;
+    const lanternStemMaterial = lanternStem.material as PBRMaterial;
     const goldMaterial = gold.material as PBRMaterial;
+    const lanternCageMaterial = lanternCage.material as PBRMaterial;
     const haloMaterial = halo.material as PBRMaterial;
+    const lanternHaloMaterial = lanternHalo.material as PBRMaterial;
     const coreMaterial = core.material as PBRMaterial;
+    const lanternCoreMaterial = lanternCore.material as PBRMaterial;
 
     expect(stemMaterial.name).toContain('plaza-lantern-stem');
     expect(stemMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -9334,6 +9370,9 @@ describe('polishMainStageMaterials', () => {
     expect(stemMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(stemMaterial.roughness).toBeGreaterThanOrEqual(0.8);
     expect(stemMaterial.environmentIntensity).toBeLessThanOrEqual(0.32);
+    expect(stemMaterial.metallic ?? 0).toBeGreaterThan(lanternStemMaterial.metallic ?? 0);
+    expect(stemMaterial.roughness ?? 0).toBeLessThan(lanternStemMaterial.roughness ?? 0);
+    expect(stemMaterial.environmentIntensity).toBeGreaterThan(lanternStemMaterial.environmentIntensity);
 
     expect(goldMaterial.name).toContain('plaza-lantern-gold-hardware');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -9345,6 +9384,9 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(goldMaterial.albedoColor.r).toBeLessThan(lanternCageMaterial.albedoColor.r);
+    expect(goldMaterial.roughness ?? 0).toBeGreaterThan(lanternCageMaterial.roughness ?? 0);
+    expect(goldMaterial.environmentIntensity).toBeLessThan(lanternCageMaterial.environmentIntensity);
 
     expect(haloMaterial.name).toContain('plaza-lantern-halo-rim');
     expect(haloMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -9355,6 +9397,9 @@ describe('polishMainStageMaterials', () => {
     expect(haloMaterial.emissiveIntensity).toBeLessThanOrEqual(0.1);
     expect(haloMaterial.roughness).toBeGreaterThanOrEqual(0.72);
     expect(haloMaterial.environmentIntensity).toBeLessThanOrEqual(0.24);
+    expect(haloMaterial.emissiveIntensity).toBeGreaterThan(lanternHaloMaterial.emissiveIntensity);
+    expect(haloMaterial.roughness ?? 0).toBeLessThan(lanternHaloMaterial.roughness ?? 0);
+    expect(haloMaterial.environmentIntensity).toBeGreaterThan(lanternHaloMaterial.environmentIntensity);
 
     expect(coreMaterial.name).toContain('plaza-lantern-warm-core');
     expect(coreMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
@@ -9365,6 +9410,9 @@ describe('polishMainStageMaterials', () => {
     expect(coreMaterial.emissiveIntensity).toBeLessThanOrEqual(0.9);
     expect(coreMaterial.roughness).toBeLessThanOrEqual(0.4);
     expect(coreMaterial.environmentIntensity).toBeLessThanOrEqual(0.5);
+    expect(coreMaterial.albedoColor.r).toBeGreaterThan(lanternCoreMaterial.albedoColor.r);
+    expect(coreMaterial.emissiveIntensity).toBeGreaterThan(lanternCoreMaterial.emissiveIntensity);
+    expect(coreMaterial.environmentIntensity).toBeGreaterThan(lanternCoreMaterial.environmentIntensity);
   });
 
   it('rebalances the approach-light stems, housings, cores, and halos so the route edge reads as authored practical lighting instead of bright gold beacons with flat cyan bulbs', () => {
