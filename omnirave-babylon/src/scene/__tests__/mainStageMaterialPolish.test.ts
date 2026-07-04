@@ -10804,7 +10804,7 @@ describe('polishMainStageMaterials', () => {
     expect(ribMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
   });
 
-  it('darkens the VIP and wing terrace gold balusters and handrails so the podium rails read as carved metal hardware instead of bright gold strips', () => {
+  it('splits the VIP and wing terrace gold rails so the promenade-side balusters keep their own authored metal reads instead of collapsing into one generic gold strip', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -10841,21 +10841,33 @@ describe('polishMainStageMaterials', () => {
     expect(wingBaluster.material).not.toBe(sharedGoldMaterial);
     expect(vipHandrail.material).not.toBe(sharedGoldMaterial);
     expect(wingHandrail.material).not.toBe(sharedGoldMaterial);
-    expect(vipBaluster.material).toBe(wingBaluster.material);
-    expect(vipHandrail.material).toBe(wingHandrail.material);
     expect(vipBaluster.material).toBe(vipHandrail.material);
+    expect(wingBaluster.material).toBe(wingHandrail.material);
+    expect(vipBaluster.material).not.toBe(wingBaluster.material);
 
-    const railMaterial = vipBaluster.material as PBRMaterial;
-    expect(railMaterial.name).toContain('terrace-gold-rail');
-    expect(railMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
-    expect(railMaterial.metadata?.mainStageMaterialOverride).toBe('terrace-gold-rail');
-    expect(railMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
-    expect(railMaterial.albedoColor.g).toBeLessThanOrEqual(0.16);
-    expect(railMaterial.albedoColor.b).toBeLessThanOrEqual(0.08);
-    expect(railMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(railMaterial.metallic).toBeLessThanOrEqual(0.2);
-    expect(railMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(railMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    const vipRailMaterial = vipBaluster.material as PBRMaterial;
+    expect(vipRailMaterial.name).toContain('vip-terrace-gold-rail');
+    expect(vipRailMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(vipRailMaterial.metadata?.mainStageMaterialOverride).toBe('vip-terrace-gold-rail');
+    expect(vipRailMaterial.albedoColor.r).toBeLessThanOrEqual(0.21);
+    expect(vipRailMaterial.albedoColor.g).toBeLessThanOrEqual(0.165);
+    expect(vipRailMaterial.albedoColor.b).toBeLessThanOrEqual(0.075);
+    expect(vipRailMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(vipRailMaterial.metallic).toBeLessThanOrEqual(0.22);
+    expect(vipRailMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(vipRailMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+
+    const wingRailMaterial = wingBaluster.material as PBRMaterial;
+    expect(wingRailMaterial.name).toContain('wing-terrace-gold-rail');
+    expect(wingRailMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
+    expect(wingRailMaterial.metadata?.mainStageMaterialOverride).toBe('wing-terrace-gold-rail');
+    expect(wingRailMaterial.albedoColor.r).toBeLessThanOrEqual(0.17);
+    expect(wingRailMaterial.albedoColor.g).toBeLessThanOrEqual(0.13);
+    expect(wingRailMaterial.albedoColor.b).toBeLessThanOrEqual(0.06);
+    expect(wingRailMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(wingRailMaterial.metallic).toBeLessThanOrEqual(0.16);
+    expect(wingRailMaterial.roughness).toBeGreaterThanOrEqual(0.9);
+    expect(wingRailMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
   });
 
   it('darkens the basin causeway gold rails, garden gold crests, promenade gold inlay, and sightline gold rails so the arrival approach reads as carved metal detailing instead of bright gold strips', () => {
