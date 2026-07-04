@@ -4070,10 +4070,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V30_VipSoffitShadow_') ||
-      mesh.name.startsWith('V30_VipUndersideRib_')
-    ) {
+    if (mesh.name.startsWith('V30_VipSoffitShadow_')) {
       const cacheKey = `${material.uniqueId}:vip-soffit-shadow`;
       let soffitShadowMaterial = clonedMaterials.get(cacheKey);
       if (!soffitShadowMaterial) {
@@ -4083,6 +4080,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, soffitShadowMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V30_VipUndersideRib_')) {
+      const cacheKey = `${material.uniqueId}:vip-underside-rib`;
+      let ribMaterial = clonedMaterials.get(cacheKey);
+      if (!ribMaterial) {
+        ribMaterial = material.clone(`${material.name}__vip-underside-rib`);
+        applyVipUndersideRibOverride(ribMaterial);
+        clonedMaterials.set(cacheKey, ribMaterial);
+      }
+
+      assignOverrideMaterial(mesh, ribMaterial);
       continue;
     }
 
@@ -9113,6 +9123,23 @@ function applyVipSoffitShadowOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'vip-soffit-shadow',
+  };
+}
+
+function applyVipUndersideRibOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.12, 0.15, 0.19);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.01);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.02;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.76;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'vip-underside-rib',
   };
 }
 
