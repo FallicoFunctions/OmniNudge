@@ -1738,6 +1738,9 @@ describe('polishMainStageMaterials', () => {
     const rightGold = MeshBuilder.CreateBox('V39_CrownSideRibGoldCluster_R', { size: 1 }, scene);
     rightGold.material = sharedGoldMaterial;
 
+    const haloGold = MeshBuilder.CreateBox('V114_CelestialHaloOuterRingArray', { size: 1 }, scene);
+    haloGold.material = sharedGoldMaterial;
+
     const cyanControl = MeshBuilder.CreateBox('TestCrownSideRibCyanControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
 
@@ -1750,11 +1753,14 @@ describe('polishMainStageMaterials', () => {
     const haloCyan = MeshBuilder.CreateBox('V114_CelestialHaloCyanEdgeArray', { size: 1 }, scene);
     haloCyan.material = sharedCyanMaterial;
 
-    polishMainStageMaterials([goldControl, leftGold, rightGold, cyanControl, leftCyan, rightCyan, haloCyan]);
+    polishMainStageMaterials([goldControl, leftGold, rightGold, haloGold, cyanControl, leftCyan, rightCyan, haloCyan]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftGold.material).toBeInstanceOf(PBRMaterial);
     expect(rightGold.material).toBe(leftGold.material);
+    expect(haloGold.material).toBeInstanceOf(PBRMaterial);
+    expect(haloGold.material).not.toBe(sharedGoldMaterial);
+    expect(haloGold.material).not.toBe(leftGold.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftCyan.material).toBeInstanceOf(PBRMaterial);
@@ -1764,6 +1770,7 @@ describe('polishMainStageMaterials', () => {
     expect(haloCyan.material).not.toBe(leftCyan.material);
 
     const goldMaterial = leftGold.material as PBRMaterial;
+    const haloGoldMaterial = haloGold.material as PBRMaterial;
     const cyanMaterial = leftCyan.material as PBRMaterial;
     const haloMaterial = haloCyan.material as PBRMaterial;
 
@@ -1777,6 +1784,9 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(goldMaterial.albedoColor.r).toBeLessThan(haloGoldMaterial.albedoColor.r);
+    expect(goldMaterial.roughness ?? 0).toBeGreaterThan(haloGoldMaterial.roughness ?? 0);
+    expect(goldMaterial.environmentIntensity).toBeLessThan(haloGoldMaterial.environmentIntensity);
 
     expect(cyanMaterial.name).toContain('crown-side-rib-cyan');
     expect(cyanMaterial.metadata?.mainStageMaterialPolish).toBe('emissive');
