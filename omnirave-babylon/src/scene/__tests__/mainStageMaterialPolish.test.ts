@@ -5142,6 +5142,9 @@ describe('polishMainStageMaterials', () => {
     const innerRightGold = MeshBuilder.CreateBox('V74_SweepInnerAnchorGoldCrown_R', { size: 1 }, scene);
     innerRightGold.material = sharedGoldMaterial;
 
+    const wideHeroFrame = MeshBuilder.CreateBox('V126_WideHeroScreenGoldFrame', { size: 1 }, scene);
+    wideHeroFrame.material = sharedGoldMaterial;
+
     const controlShadow = MeshBuilder.CreateBox('TestSweepAnchorShadowControl', { size: 1 }, scene);
     controlShadow.material = sharedShadowMaterial;
 
@@ -5163,6 +5166,7 @@ describe('polishMainStageMaterials', () => {
       outerRightGold,
       innerLeftGold,
       innerRightGold,
+      wideHeroFrame,
       controlShadow,
       outerLeftShadow,
       outerRightShadow,
@@ -5176,6 +5180,8 @@ describe('polishMainStageMaterials', () => {
     expect(innerLeftGold.material).toBeInstanceOf(PBRMaterial);
     expect(innerRightGold.material).toBe(innerLeftGold.material);
     expect(innerLeftGold.material).not.toBe(outerLeftGold.material);
+    expect(wideHeroFrame.material).toBeInstanceOf(PBRMaterial);
+    expect(wideHeroFrame.material).not.toBe(outerLeftGold.material);
 
     expect(controlShadow.material).toBe(sharedShadowMaterial);
     expect(outerLeftShadow.material).toBeInstanceOf(PBRMaterial);
@@ -5186,6 +5192,7 @@ describe('polishMainStageMaterials', () => {
 
     const outerGoldMaterial = outerLeftGold.material as PBRMaterial;
     const innerGoldMaterial = innerLeftGold.material as PBRMaterial;
+    const wideHeroFrameMaterial = wideHeroFrame.material as PBRMaterial;
     const outerShadowMaterial = outerLeftShadow.material as PBRMaterial;
     const innerShadowMaterial = innerLeftShadow.material as PBRMaterial;
 
@@ -5199,6 +5206,9 @@ describe('polishMainStageMaterials', () => {
     expect(outerGoldMaterial.metallic).toBeLessThanOrEqual(0.14);
     expect(outerGoldMaterial.roughness).toBeGreaterThanOrEqual(0.9);
     expect(outerGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.1);
+    expect(outerGoldMaterial.albedoColor.r).toBeLessThan(wideHeroFrameMaterial.albedoColor.r);
+    expect(outerGoldMaterial.metallic ?? 0).toBeLessThan(wideHeroFrameMaterial.metallic ?? 0);
+    expect(outerGoldMaterial.roughness ?? 0).toBeGreaterThan(wideHeroFrameMaterial.roughness ?? 0);
 
     expect(innerGoldMaterial.name).toContain('sweep-anchor-inner-gold-crown');
     expect(innerGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
