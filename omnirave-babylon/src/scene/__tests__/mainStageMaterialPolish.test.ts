@@ -1504,12 +1504,18 @@ describe('polishMainStageMaterials', () => {
     const goldEdge = MeshBuilder.CreateBox('V112_CrownCrystalGoldEdgeArray', { size: 1 }, scene);
     goldEdge.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([goldControl, goldEdge]);
+    const wingFacadeLintel = MeshBuilder.CreateBox('V87_WingFacadeGoldLintelArray_L', { size: 1 }, scene);
+    wingFacadeLintel.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([goldControl, goldEdge, wingFacadeLintel]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(goldEdge.material).toBeInstanceOf(PBRMaterial);
+    expect(wingFacadeLintel.material).toBeInstanceOf(PBRMaterial);
+    expect(wingFacadeLintel.material).not.toBe(goldEdge.material);
 
     const edgeMaterial = goldEdge.material as PBRMaterial;
+    const wingFacadeLintelMaterial = wingFacadeLintel.material as PBRMaterial;
     expect(edgeMaterial.name).toContain('crown-crystal-gold-edge');
     expect(edgeMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(edgeMaterial.metadata?.mainStageMaterialOverride).toBe('crown-crystal-gold-edge');
@@ -1520,6 +1526,9 @@ describe('polishMainStageMaterials', () => {
     expect(edgeMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(edgeMaterial.roughness).toBeGreaterThanOrEqual(0.88);
     expect(edgeMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(edgeMaterial.albedoColor.r).toBeGreaterThan(wingFacadeLintelMaterial.albedoColor.r);
+    expect(edgeMaterial.metallic ?? 0).toBeGreaterThan(wingFacadeLintelMaterial.metallic ?? 0);
+    expect(edgeMaterial.roughness ?? 0).toBeLessThan(wingFacadeLintelMaterial.roughness ?? 0);
   });
 
   it('tones down the crown-shell gold seam arrays so the halo shell keeps layered relief instead of bright foil ribbons between the pearl lamellae', () => {
