@@ -1542,14 +1542,20 @@ describe('polishMainStageMaterials', () => {
     const rightSeam = MeshBuilder.CreateBox('V113_CrownShellGoldSeamArray_R', { size: 1 }, scene);
     rightSeam.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([goldControl, leftSeam, rightSeam]);
+    const crownCrystalEdge = MeshBuilder.CreateBox('V112_CrownCrystalGoldEdgeArray', { size: 1 }, scene);
+    crownCrystalEdge.material = sharedGoldMaterial;
+
+    polishMainStageMaterials([goldControl, leftSeam, rightSeam, crownCrystalEdge]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftSeam.material).toBeInstanceOf(PBRMaterial);
     expect(rightSeam.material).toBeInstanceOf(PBRMaterial);
+    expect(crownCrystalEdge.material).toBeInstanceOf(PBRMaterial);
     expect(rightSeam.material).toBe(leftSeam.material);
+    expect(crownCrystalEdge.material).not.toBe(leftSeam.material);
 
     const seamMaterial = leftSeam.material as PBRMaterial;
+    const crownCrystalEdgeMaterial = crownCrystalEdge.material as PBRMaterial;
     expect(seamMaterial.name).toContain('crown-shell-gold-seam');
     expect(seamMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(seamMaterial.metadata?.mainStageMaterialOverride).toBe('crown-shell-gold-seam');
@@ -1560,6 +1566,9 @@ describe('polishMainStageMaterials', () => {
     expect(seamMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(seamMaterial.roughness).toBeGreaterThanOrEqual(0.88);
     expect(seamMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(seamMaterial.albedoColor.r).toBeLessThan(crownCrystalEdgeMaterial.albedoColor.r);
+    expect(seamMaterial.metallic ?? 0).toBeLessThan(crownCrystalEdgeMaterial.metallic ?? 0);
+    expect(seamMaterial.roughness ?? 0).toBeGreaterThan(crownCrystalEdgeMaterial.roughness ?? 0);
   });
 
   it('rebalances the celestial halo ring arrays so the crown keeps layered carved-metal and smoked-glass separation instead of bright gold hoops wrapped around cyan strips', () => {
