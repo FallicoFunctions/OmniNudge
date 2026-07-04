@@ -4054,10 +4054,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name.startsWith('V30_WingSoffitShadow_') ||
-      mesh.name.startsWith('V30_WingUndersideRib_')
-    ) {
+    if (mesh.name.startsWith('V30_WingSoffitShadow_')) {
       const cacheKey = `${material.uniqueId}:wing-soffit-shadow`;
       let soffitShadowMaterial = clonedMaterials.get(cacheKey);
       if (!soffitShadowMaterial) {
@@ -4067,6 +4064,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       }
 
       assignOverrideMaterial(mesh, soffitShadowMaterial);
+      continue;
+    }
+
+    if (mesh.name.startsWith('V30_WingUndersideRib_')) {
+      const cacheKey = `${material.uniqueId}:wing-underside-rib`;
+      let ribMaterial = clonedMaterials.get(cacheKey);
+      if (!ribMaterial) {
+        ribMaterial = material.clone(`${material.name}__wing-underside-rib`);
+        applyWingUndersideRibOverride(ribMaterial);
+        clonedMaterials.set(cacheKey, ribMaterial);
+      }
+
+      assignOverrideMaterial(mesh, ribMaterial);
       continue;
     }
 
@@ -9106,6 +9116,23 @@ function applyWingSoffitShadowOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'wing-soffit-shadow',
+  };
+}
+
+function applyWingUndersideRibOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.12, 0.15, 0.19);
+  material.emissiveColor = new Color3(0.005, 0.007, 0.01);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.02;
+  material.roughness = 0.92;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.76;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wing-underside-rib',
   };
 }
 
