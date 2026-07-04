@@ -5617,11 +5617,13 @@ describe('polishMainStageMaterials', () => {
     expect(controlRig.material).toBe(sharedRigMaterial);
     expect(leftShell.material).toBeInstanceOf(PBRMaterial);
     expect(rightShell.material).toBe(leftShell.material);
-    expect(leftDiagonal.material).toBe(leftShell.material);
-    expect(rightDiagonal.material).toBe(leftShell.material);
+    expect(leftDiagonal.material).toBeInstanceOf(PBRMaterial);
+    expect(rightDiagonal.material).toBe(leftDiagonal.material);
+    expect(leftDiagonal.material).not.toBe(leftShell.material);
 
     const goldMaterial = leftGold.material as PBRMaterial;
     const rigMaterial = leftShell.material as PBRMaterial;
+    const diagonalMaterial = leftDiagonal.material as PBRMaterial;
 
     expect(goldMaterial.name).toContain('main-truss-tower-gold-crossbar');
     expect(goldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
@@ -5645,6 +5647,20 @@ describe('polishMainStageMaterials', () => {
     expect(rigMaterial.metallic).toBeLessThanOrEqual(0.08);
     expect(rigMaterial.roughness).toBeGreaterThanOrEqual(0.74);
     expect(rigMaterial.environmentIntensity).toBeLessThanOrEqual(0.2);
+
+    expect(diagonalMaterial.name).toContain('main-truss-tower-diagonal');
+    expect(diagonalMaterial.metadata?.mainStageMaterialPolish).toBe('black');
+    expect(diagonalMaterial.metadata?.mainStageMaterialOverride).toBe('main-truss-tower-diagonal');
+    expect(diagonalMaterial.albedoColor.r).toBeLessThanOrEqual(0.05);
+    expect(diagonalMaterial.albedoColor.g).toBeLessThanOrEqual(0.07);
+    expect(diagonalMaterial.albedoColor.b).toBeLessThanOrEqual(0.09);
+    expect(diagonalMaterial.emissiveIntensity).toBeLessThanOrEqual(0.06);
+    expect(diagonalMaterial.metallic).toBeLessThanOrEqual(0.06);
+    expect(diagonalMaterial.roughness).toBeGreaterThanOrEqual(0.82);
+    expect(diagonalMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(diagonalMaterial.albedoColor.r).toBeLessThan(rigMaterial.albedoColor.r);
+    expect(diagonalMaterial.environmentIntensity).toBeLessThan(rigMaterial.environmentIntensity);
+    expect(diagonalMaterial.roughness ?? 0).toBeGreaterThan(rigMaterial.roughness ?? 0);
   });
 
   it('regrades the wet paver bands so the spawn approach reads as grounded night stone instead of bright gold seams over flat proxy slabs', () => {

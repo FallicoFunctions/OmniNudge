@@ -788,15 +788,26 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
 
     if (
       mesh.name === 'V83_MainTrussTowerShellArray_L' ||
-      mesh.name === 'V83_MainTrussTowerShellArray_R' ||
-      mesh.name === 'V83_MainTrussTowerDiagonalArray_L' ||
-      mesh.name === 'V83_MainTrussTowerDiagonalArray_R'
+      mesh.name === 'V83_MainTrussTowerShellArray_R'
     ) {
       const cacheKey = `${material.uniqueId}:main-truss-tower-rig`;
       let rigMaterial = clonedMaterials.get(cacheKey);
       if (!rigMaterial) {
         rigMaterial = material.clone(`${material.name}__main-truss-tower-rig`);
         applyMainTrussTowerRigOverride(rigMaterial);
+        clonedMaterials.set(cacheKey, rigMaterial);
+      }
+
+      assignOverrideMaterial(mesh, rigMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V83_MainTrussTowerDiagonalArray_L' || mesh.name === 'V83_MainTrussTowerDiagonalArray_R') {
+      const cacheKey = `${material.uniqueId}:main-truss-tower-diagonal`;
+      let rigMaterial = clonedMaterials.get(cacheKey);
+      if (!rigMaterial) {
+        rigMaterial = material.clone(`${material.name}__main-truss-tower-diagonal`);
+        applyMainTrussTowerDiagonalOverride(rigMaterial);
         clonedMaterials.set(cacheKey, rigMaterial);
       }
 
@@ -5262,6 +5273,20 @@ function applyMainTrussTowerRigOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'main-truss-tower-rig',
+  };
+}
+
+function applyMainTrussTowerDiagonalOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.025, 0.04, 0.055);
+  material.emissiveColor = new Color3(0.008, 0.038, 0.056);
+  material.emissiveIntensity = 0.05;
+  material.metallic = 0.03;
+  material.roughness = 0.84;
+  material.environmentIntensity = 0.14;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'main-truss-tower-diagonal',
   };
 }
 
