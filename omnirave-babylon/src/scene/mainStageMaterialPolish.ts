@@ -1449,11 +1449,7 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       let goldMaterial = clonedMaterials.get(cacheKey);
       if (!goldMaterial) {
         goldMaterial = material.clone(`${material.name}__crown-side-rib-gold`);
-        applyCelestialHaloOuterRingOverride(goldMaterial);
-        goldMaterial.metadata = {
-          ...goldMaterial.metadata,
-          mainStageMaterialOverride: 'crown-side-rib-gold',
-        };
+        applyCrownSideRibGoldOverride(goldMaterial);
         clonedMaterials.set(cacheKey, goldMaterial);
       }
 
@@ -9414,6 +9410,23 @@ function applyCelestialHaloOuterRingOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'celestial-halo-outer-ring',
+  };
+}
+
+function applyCrownSideRibGoldOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.16, 0.12, 0.05);
+  material.emissiveColor = new Color3(0.008, 0.005, 0.0015);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.14;
+  material.roughness = 0.94;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0;
+  material.clearCoat.roughness = 0.9;
+  material.environmentIntensity = 0.1;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'crown-side-rib-gold',
   };
 }
 
