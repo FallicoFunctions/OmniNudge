@@ -4379,6 +4379,19 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
+    if (mesh.name === 'V31_CenterLedTileField') {
+      const cacheKey = `${material.uniqueId}:center-led-tile-field`;
+      let ledFieldMaterial = clonedMaterials.get(cacheKey);
+      if (!ledFieldMaterial) {
+        ledFieldMaterial = material.clone(`${material.name}__center-led-tile-field`);
+        applyCenterLedTileFieldOverride(ledFieldMaterial);
+        clonedMaterials.set(cacheKey, ledFieldMaterial);
+      }
+
+      assignOverrideMaterial(mesh, ledFieldMaterial);
+      continue;
+    }
+
     if (mesh.name.startsWith('V31_SideLedTileField_')) {
       const cacheKey = `${material.uniqueId}:side-led-tile-field`;
       let ledFieldMaterial = clonedMaterials.get(cacheKey);
@@ -9725,6 +9738,25 @@ function applySideLedTileFieldOverride(material: PBRMaterial) {
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'side-led-tile-field',
+  };
+}
+
+function applyCenterLedTileFieldOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.03, 0.07, 0.095);
+  material.emissiveColor = new Color3(0.0025, 0.016, 0.022);
+  material.emissiveIntensity = 0.032;
+  material.alpha = 0.16;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  material.metallic = 0.02;
+  material.roughness = 0.24;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.02;
+  material.clearCoat.roughness = 0.72;
+  material.environmentIntensity = 0.08;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'center-led-tile-field',
   };
 }
 
