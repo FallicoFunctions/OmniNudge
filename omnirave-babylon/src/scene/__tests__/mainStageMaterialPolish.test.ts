@@ -6236,7 +6236,7 @@ describe('polishMainStageMaterials', () => {
     expect(crossbarMaterial.roughness ?? 0).toBeLessThan(arrivalSightlineRailMaterial.roughness ?? 0);
   });
 
-  it('darkens the wide hero screen ivory shells so the stage face reads as framed depth instead of bright moonstone caps', () => {
+  it('splits the wide hero screen ivory header away from the footer so the hero wall keeps a lighter crown cap over a more grounded base shell', () => {
     engine ??= new NullEngine();
     scene ??= new Scene(engine);
 
@@ -6262,18 +6262,35 @@ describe('polishMainStageMaterials', () => {
     expect(footer.material).toBeInstanceOf(PBRMaterial);
     expect(header.material).not.toBe(sharedPearlMaterial);
     expect(footer.material).not.toBe(sharedPearlMaterial);
-    expect(footer.material).toBe(header.material);
+    expect(footer.material).not.toBe(header.material);
 
-    const shellMaterial = header.material as PBRMaterial;
-    expect(shellMaterial.metadata?.mainStageMaterialPolish).toBe('wet');
-    expect(shellMaterial.metadata?.mainStageMaterialOverride).toBe('wide-hero-screen-ivory-shell');
-    expect(shellMaterial.albedoColor.r).toBeLessThanOrEqual(0.22);
-    expect(shellMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
-    expect(shellMaterial.albedoColor.b).toBeLessThanOrEqual(0.28);
-    expect(shellMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
-    expect(shellMaterial.roughness).toBeGreaterThanOrEqual(0.86);
-    expect(shellMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
-    expect(shellMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    const headerMaterial = header.material as PBRMaterial;
+    const footerMaterial = footer.material as PBRMaterial;
+
+    expect(headerMaterial.metadata?.mainStageMaterialPolish).toBe('wet');
+    expect(headerMaterial.metadata?.mainStageMaterialOverride).toBe('wide-hero-screen-ivory-header');
+    expect(headerMaterial.albedoColor.r).toBeLessThanOrEqual(0.24);
+    expect(headerMaterial.albedoColor.g).toBeLessThanOrEqual(0.26);
+    expect(headerMaterial.albedoColor.b).toBeLessThanOrEqual(0.3);
+    expect(headerMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
+    expect(headerMaterial.roughness).toBeGreaterThanOrEqual(0.84);
+    expect(headerMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.08);
+    expect(headerMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+
+    expect(footerMaterial.metadata?.mainStageMaterialPolish).toBe('wet');
+    expect(footerMaterial.metadata?.mainStageMaterialOverride).toBe('wide-hero-screen-ivory-footer');
+    expect(footerMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
+    expect(footerMaterial.albedoColor.g).toBeLessThanOrEqual(0.22);
+    expect(footerMaterial.albedoColor.b).toBeLessThanOrEqual(0.26);
+    expect(footerMaterial.emissiveIntensity).toBeLessThanOrEqual(0.02);
+    expect(footerMaterial.roughness).toBeGreaterThanOrEqual(0.88);
+    expect(footerMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.04);
+    expect(footerMaterial.environmentIntensity).toBeLessThanOrEqual(0.12);
+
+    expect(headerMaterial.albedoColor.r).toBeGreaterThan(footerMaterial.albedoColor.r);
+    expect(headerMaterial.emissiveIntensity).toBeGreaterThan(footerMaterial.emissiveIntensity);
+    expect(headerMaterial.roughness ?? 0).toBeLessThan(footerMaterial.roughness ?? 0);
+    expect(headerMaterial.environmentIntensity).toBeGreaterThan(footerMaterial.environmentIntensity);
   });
 
   it('darkens the VIP terrace balustrade and splits the wing canopy gold lamellae so the terrace read keeps a clearer front-to-rear metal cadence', () => {

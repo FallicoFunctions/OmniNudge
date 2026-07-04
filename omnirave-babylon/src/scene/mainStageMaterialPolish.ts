@@ -2164,15 +2164,25 @@ function applyMeshSpecificOverrides(meshes: AbstractMesh[]) {
       continue;
     }
 
-    if (
-      mesh.name === 'V126_WideHeroScreenIvoryHeader' ||
-      mesh.name === 'V126_WideHeroScreenIvoryFooter'
-    ) {
-      const cacheKey = `${material.uniqueId}:wide-hero-screen-ivory-shell`;
+    if (mesh.name === 'V126_WideHeroScreenIvoryHeader') {
+      const cacheKey = `${material.uniqueId}:wide-hero-screen-ivory-header`;
       let shellMaterial = clonedMaterials.get(cacheKey);
       if (!shellMaterial) {
-        shellMaterial = material.clone(`${material.name}__wide-hero-screen-ivory-shell`);
-        applyWideHeroScreenIvoryShellOverride(shellMaterial);
+        shellMaterial = material.clone(`${material.name}__wide-hero-screen-ivory-header`);
+        applyWideHeroScreenIvoryHeaderOverride(shellMaterial);
+        clonedMaterials.set(cacheKey, shellMaterial);
+      }
+
+      assignOverrideMaterial(mesh, shellMaterial);
+      continue;
+    }
+
+    if (mesh.name === 'V126_WideHeroScreenIvoryFooter') {
+      const cacheKey = `${material.uniqueId}:wide-hero-screen-ivory-footer`;
+      let shellMaterial = clonedMaterials.get(cacheKey);
+      if (!shellMaterial) {
+        shellMaterial = material.clone(`${material.name}__wide-hero-screen-ivory-footer`);
+        applyWideHeroScreenIvoryFooterOverride(shellMaterial);
         clonedMaterials.set(cacheKey, shellMaterial);
       }
 
@@ -6731,20 +6741,37 @@ function applyWideHeroScreenGoldCrossbarOverride(material: PBRMaterial) {
   };
 }
 
-function applyWideHeroScreenIvoryShellOverride(material: PBRMaterial) {
+function applyWideHeroScreenIvoryHeaderOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.2, 0.22, 0.26);
-  material.emissiveColor = new Color3(0.005, 0.007, 0.011);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.22, 0.24, 0.28);
+  material.emissiveColor = new Color3(0.006, 0.009, 0.014);
+  material.emissiveIntensity = 0.024;
   material.metallic = 0.02;
-  material.roughness = 0.88;
+  material.roughness = 0.86;
   material.clearCoat.isEnabled = true;
-  material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.72;
-  material.environmentIntensity = 0.13;
+  material.clearCoat.intensity = 0.06;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.15;
   material.metadata = {
     ...material.metadata,
-    mainStageMaterialOverride: 'wide-hero-screen-ivory-shell',
+    mainStageMaterialOverride: 'wide-hero-screen-ivory-header',
+  };
+}
+
+function applyWideHeroScreenIvoryFooterOverride(material: PBRMaterial) {
+  material.albedoTexture = null;
+  material.albedoColor = new Color3(0.18, 0.2, 0.24);
+  material.emissiveColor = new Color3(0.004, 0.005, 0.008);
+  material.emissiveIntensity = 0.016;
+  material.metallic = 0.02;
+  material.roughness = 0.9;
+  material.clearCoat.isEnabled = true;
+  material.clearCoat.intensity = 0.03;
+  material.clearCoat.roughness = 0.74;
+  material.environmentIntensity = 0.11;
+  material.metadata = {
+    ...material.metadata,
+    mainStageMaterialOverride: 'wide-hero-screen-ivory-footer',
   };
 }
 
