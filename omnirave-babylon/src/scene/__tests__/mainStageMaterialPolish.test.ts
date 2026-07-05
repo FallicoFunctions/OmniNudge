@@ -11334,17 +11334,23 @@ describe('polishMainStageMaterials', () => {
 
     const rightInlay = MeshBuilder.CreateBox('V26_VipTerraceGoldInlay_R', { size: 1 }, scene);
     rightInlay.material = sharedGoldMaterial;
+    const performanceDaisDonor = MeshBuilder.CreateBox('V27_PerformanceDaisUpper', { size: 1 }, scene);
+    performanceDaisDonor.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([otherGold, leftInlay, rightInlay]);
+    polishMainStageMaterials([otherGold, leftInlay, rightInlay, performanceDaisDonor]);
 
     expect(otherGold.material).toBe(sharedGoldMaterial);
     expect(leftInlay.material).toBeInstanceOf(PBRMaterial);
     expect(rightInlay.material).toBeInstanceOf(PBRMaterial);
+    expect(performanceDaisDonor.material).toBeInstanceOf(PBRMaterial);
     expect(leftInlay.material).not.toBe(sharedGoldMaterial);
     expect(rightInlay.material).not.toBe(sharedGoldMaterial);
+    expect(performanceDaisDonor.material).not.toBe(sharedGoldMaterial);
     expect(rightInlay.material).toBe(leftInlay.material);
+    expect(performanceDaisDonor.material).not.toBe(leftInlay.material);
 
     const inlayMaterial = leftInlay.material as PBRMaterial;
+    const performanceDaisDonorMaterial = performanceDaisDonor.material as PBRMaterial;
     expect(inlayMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(inlayMaterial.metadata?.mainStageMaterialOverride).toBe('vip-terrace-gold-inlay');
     expect(inlayMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
@@ -11353,6 +11359,11 @@ describe('polishMainStageMaterials', () => {
     expect(inlayMaterial.emissiveIntensity).toBeLessThanOrEqual(0.03);
     expect(inlayMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(inlayMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(performanceDaisDonorMaterial.metadata?.mainStageMaterialOverride).toBe('performance-dais-upper');
+    expect(inlayMaterial.albedoColor.r).toBeLessThan(performanceDaisDonorMaterial.albedoColor.r);
+    expect(inlayMaterial.emissiveIntensity).toBeLessThan(performanceDaisDonorMaterial.emissiveIntensity);
+    expect(inlayMaterial.roughness ?? 0).toBeGreaterThan(performanceDaisDonorMaterial.roughness ?? 0);
+    expect(inlayMaterial.environmentIntensity).toBeLessThan(performanceDaisDonorMaterial.environmentIntensity);
   });
 
   it('darkens the VIP terrace outer sweeps so the podium flanks read as carved support shells instead of bright pearl slabs', () => {
