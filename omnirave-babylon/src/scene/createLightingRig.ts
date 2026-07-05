@@ -55,6 +55,14 @@ export function createLightingRig(scene: Scene) {
 const PRACTICAL_POOL_SOURCE = /LanternCore|LanternWarmCore|FountainLightArray/;
 const POOL_RANGE = 18;
 
+function hashUnit(name: string) {
+  let h = 2166136261;
+  for (let i = 0; i < name.length; i++) {
+    h = Math.imul(h ^ name.charCodeAt(i), 16777619);
+  }
+  return ((h >>> 0) % 1000) / 999;
+}
+
 function createPracticalPoolLights(scene: Scene) {
   const sources = scene.meshes.filter((mesh) => PRACTICAL_POOL_SOURCE.test(mesh.name));
   const pools: PointLight[] = [];
@@ -62,9 +70,12 @@ function createPracticalPoolLights(scene: Scene) {
   for (const source of sources) {
     const center = source.getBoundingInfo().boundingBox.centerWorld;
     const pool = new PointLight(`practical-pool-${source.name}`, center.clone(), scene);
-    pool.diffuse = new Color3(1, 0.62, 0.24);
+    // No two real lamps burn identically: deterministic per-lamp variance
+    // in brightness and warmth so mirrored pairs stop reading as clones.
+    const jitter = hashUnit(source.name);
+    pool.diffuse = new Color3(1, 0.58 + jitter * 0.09, 0.21 + jitter * 0.07);
     pool.specular = new Color3(1, 0.5, 0.2);
-    pool.intensity = 160;
+    pool.intensity = 128 + jitter * 64;
     pool.range = POOL_RANGE;
 
     // Scope each pool to nearby meshes: keeps every mesh within the
