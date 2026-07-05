@@ -9085,12 +9085,12 @@ function applyHeroPortalOuterOgiveOverride(material: PBRMaterial) {
 
 function applyHeroPortalGoldRevealOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.07);
-  material.emissiveColor = new Color3(0.018, 0.012, 0.005);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.162, 0.125, 0.057);
+  material.emissiveColor = new Color3(0.012, 0.0076, 0.0031);
+  material.emissiveIntensity = 0.014;
   material.metallic = 0.18;
-  material.roughness = 0.88;
-  material.environmentIntensity = 0.13;
+  material.roughness = 0.93;
+  material.environmentIntensity = 0.09;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'hero-portal-gold-reveal',

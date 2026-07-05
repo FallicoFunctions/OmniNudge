@@ -11029,17 +11029,23 @@ describe('polishMainStageMaterials', () => {
 
     const rightReveal = MeshBuilder.CreateBox('V25_HeroPortalGoldReveal_R', { size: 1 }, scene);
     rightReveal.material = sharedGoldMaterial;
+    const grandArcadeDonor = MeshBuilder.CreateBox('V68_GrandArcadeGoldBands_L', { size: 1 }, scene);
+    grandArcadeDonor.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([controlGold, leftReveal, rightReveal]);
+    polishMainStageMaterials([controlGold, leftReveal, rightReveal, grandArcadeDonor]);
 
     expect(controlGold.material).toBe(sharedGoldMaterial);
     expect(leftReveal.material).toBeInstanceOf(PBRMaterial);
     expect(rightReveal.material).toBeInstanceOf(PBRMaterial);
+    expect(grandArcadeDonor.material).toBeInstanceOf(PBRMaterial);
     expect(leftReveal.material).not.toBe(sharedGoldMaterial);
     expect(rightReveal.material).not.toBe(sharedGoldMaterial);
+    expect(grandArcadeDonor.material).not.toBe(sharedGoldMaterial);
     expect(rightReveal.material).toBe(leftReveal.material);
+    expect(grandArcadeDonor.material).not.toBe(leftReveal.material);
 
     const revealMaterial = leftReveal.material as PBRMaterial;
+    const grandArcadeDonorMaterial = grandArcadeDonor.material as PBRMaterial;
     expect(revealMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(revealMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-gold-reveal');
     expect(revealMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
@@ -11049,6 +11055,11 @@ describe('polishMainStageMaterials', () => {
     expect(revealMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(revealMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(revealMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(grandArcadeDonorMaterial.metadata?.mainStageMaterialOverride).toBe('grand-arcade-gold-bands');
+    expect(revealMaterial.albedoColor.r).toBeLessThan(grandArcadeDonorMaterial.albedoColor.r);
+    expect(revealMaterial.emissiveIntensity).toBeLessThan(grandArcadeDonorMaterial.emissiveIntensity);
+    expect(revealMaterial.roughness ?? 0).toBeGreaterThan(grandArcadeDonorMaterial.roughness ?? 0);
+    expect(revealMaterial.environmentIntensity).toBeLessThan(grandArcadeDonorMaterial.environmentIntensity);
   });
 
   it('splits the center hero portal pearl apron away from the side aprons so the stage mouth keeps a weightier central dais than the flanking shell ledges', () => {
