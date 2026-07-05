@@ -31,9 +31,9 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   pipeline.imageProcessingEnabled = true;
   pipeline.fxaaEnabled = true;
   pipeline.bloomEnabled = true;
-  pipeline.bloomThreshold = 0.86;
-  pipeline.bloomWeight = 0.09;
-  pipeline.bloomKernel = 26;
+  pipeline.bloomThreshold = 0.55;
+  pipeline.bloomWeight = 0.5;
+  pipeline.bloomKernel = 64;
   pipeline.bloomScale = 0.5;
   pipeline.depthOfFieldEnabled = false;
   pipeline.chromaticAberrationEnabled = false;
