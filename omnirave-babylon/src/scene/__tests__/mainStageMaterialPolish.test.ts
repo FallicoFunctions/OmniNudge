@@ -449,7 +449,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
   },
   {
     key: 'line-array-graphite',
-    meshNames: ['V29_MainLineArrayCabinet_L_00', 'V29_MainLineArrayCabinet_R_00', 'V29_MainLineArrayDriver_L_00', 'V29_MainLineArrayDriver_R_00'],
+    meshNames: ['V29_MainLineArrayCabinet_L_00', 'V29_MainLineArrayCabinet_R_07', 'V29_MainLineArrayDriver_L_03', 'V29_MainLineArrayDriver_R_00'],
     expected: {
       albedoTextureCleared: true,
       albedoColor: [0.18, 0.2, 0.24],
@@ -468,7 +468,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
   },
   {
     key: 'front-sub-graphite',
-    meshNames: ['V29_FrontSubCabinet_L_00', 'V29_FrontSubCabinet_R_00'],
+    meshNames: ['V29_FrontSubCabinet_L_00', 'V29_FrontSubCabinet_R_03'],
     expected: {
       albedoTextureCleared: true,
       albedoColor: [0.16, 0.18, 0.21],
@@ -487,7 +487,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
   },
   {
     key: 'line-array-acoustic-black',
-    meshNames: ['V29_MainLineArrayGrille_L_00', 'V29_MainLineArrayGrille_R_00', 'V29_MainLineArrayHorn_L_00', 'V29_MainLineArrayHorn_R_00'],
+    meshNames: ['V29_MainLineArrayGrille_L_00', 'V29_MainLineArrayGrille_R_06', 'V29_MainLineArrayHorn_L_04', 'V29_MainLineArrayHorn_R_00'],
     expected: {
       albedoTextureCleared: true,
       albedoColor: [0.05, 0.07, 0.09],
@@ -506,7 +506,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
   },
   {
     key: 'front-sub-port-black',
-    meshNames: ['V29_FrontSubPort_L_00', 'V29_FrontSubPort_R_00'],
+    meshNames: ['V29_FrontSubPort_L_00', 'V29_FrontSubPort_R_05'],
     expected: {
       albedoTextureCleared: true,
       albedoColor: [0.04, 0.055, 0.07],
