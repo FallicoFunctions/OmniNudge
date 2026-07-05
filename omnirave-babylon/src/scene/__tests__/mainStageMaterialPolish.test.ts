@@ -7701,6 +7701,8 @@ describe('polishMainStageMaterials', () => {
 
     const rightCrown = MeshBuilder.CreateBox('V55_SpawnPylonGoldCrown_R', { size: 1 }, scene);
     rightCrown.material = sharedGoldMaterial;
+    const backPlazaDonor = MeshBuilder.CreateBox('V57_BackPlazaSentinelGoldCrown_L', { size: 1 }, scene);
+    backPlazaDonor.material = sharedGoldMaterial;
     const wingArchInlay = MeshBuilder.CreateBox('V109_WingFacadeArchInlayArray_L', { size: 1 }, scene);
     wingArchInlay.material = sharedGoldMaterial;
 
@@ -7730,6 +7732,7 @@ describe('polishMainStageMaterials', () => {
       goldControl,
       leftCrown,
       rightCrown,
+      backPlazaDonor,
       wingArchInlay,
       shadowControl,
       leftShadow,
@@ -7744,6 +7747,8 @@ describe('polishMainStageMaterials', () => {
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(leftCrown.material).toBeInstanceOf(PBRMaterial);
     expect(rightCrown.material).toBe(leftCrown.material);
+    expect(backPlazaDonor.material).toBeInstanceOf(PBRMaterial);
+    expect(backPlazaDonor.material).not.toBe(leftCrown.material);
     expect(wingArchInlay.material).toBeInstanceOf(PBRMaterial);
     expect(wingArchInlay.material).not.toBe(leftCrown.material);
 
@@ -7760,6 +7765,7 @@ describe('polishMainStageMaterials', () => {
     expect(crownCrystal.material).not.toBe(leftCore.material);
 
     const goldMaterial = leftCrown.material as PBRMaterial;
+    const backPlazaDonorMaterial = backPlazaDonor.material as PBRMaterial;
     const wingArchInlayMaterial = wingArchInlay.material as PBRMaterial;
     const shadowMaterial = leftShadow.material as PBRMaterial;
     const heroVaultMaterial = heroVault.material as PBRMaterial;
@@ -7776,6 +7782,12 @@ describe('polishMainStageMaterials', () => {
     expect(goldMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(goldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(goldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(backPlazaDonorMaterial.name).toContain('back-plaza-sentinel-gold-crown');
+    expect(backPlazaDonorMaterial.metadata?.mainStageMaterialOverride).toBe('back-plaza-sentinel-gold-crown');
+    expect(goldMaterial.albedoColor.r).toBeLessThan(backPlazaDonorMaterial.albedoColor.r);
+    expect(goldMaterial.emissiveIntensity).toBeLessThan(backPlazaDonorMaterial.emissiveIntensity);
+    expect(goldMaterial.roughness ?? 0).toBeLessThan(backPlazaDonorMaterial.roughness ?? 0);
+    expect(goldMaterial.environmentIntensity).toBeLessThan(backPlazaDonorMaterial.environmentIntensity);
     expect(goldMaterial.albedoColor.r).toBeGreaterThan(wingArchInlayMaterial.albedoColor.r);
     expect(goldMaterial.metallic ?? 0).toBeGreaterThan(wingArchInlayMaterial.metallic ?? 0);
     expect(goldMaterial.roughness ?? 0).toBeLessThan(wingArchInlayMaterial.roughness ?? 0);
