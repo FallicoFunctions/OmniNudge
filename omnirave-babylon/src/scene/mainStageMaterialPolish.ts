@@ -8591,15 +8591,15 @@ function applyArrivalSightlineCyanThreadOverride(material: PBRMaterial) {
 
 function applyPlazaCrossBandsOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.06);
-  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.164, 0.126, 0.052);
+  material.emissiveColor = new Color3(0.0082, 0.0054, 0.0017);
+  material.emissiveIntensity = 0.014;
   material.metallic = 0.16;
-  material.roughness = 0.9;
+  material.roughness = 0.94;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0;
   material.clearCoat.roughness = 0.86;
-  material.environmentIntensity = 0.12;
+  material.environmentIntensity = 0.09;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'plaza-cross-bands',

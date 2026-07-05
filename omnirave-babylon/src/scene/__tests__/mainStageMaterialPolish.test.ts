@@ -12102,14 +12102,20 @@ describe('polishMainStageMaterials', () => {
 
     const crossBands = MeshBuilder.CreateBox('V64_PlazaCrossBands', { size: 1 }, scene);
     crossBands.material = sharedGoldMaterial;
+    const sideParallaxDonor = MeshBuilder.CreateBox('V31_SideParallaxGoldOrbit_L', { size: 1 }, scene);
+    sideParallaxDonor.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([goldControl, crossBands]);
+    polishMainStageMaterials([goldControl, crossBands, sideParallaxDonor]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(crossBands.material).toBeInstanceOf(PBRMaterial);
+    expect(sideParallaxDonor.material).toBeInstanceOf(PBRMaterial);
     expect(crossBands.material).not.toBe(sharedGoldMaterial);
+    expect(sideParallaxDonor.material).not.toBe(sharedGoldMaterial);
+    expect(sideParallaxDonor.material).not.toBe(crossBands.material);
 
     const bandMaterial = crossBands.material as PBRMaterial;
+    const sideParallaxDonorMaterial = sideParallaxDonor.material as PBRMaterial;
     expect(bandMaterial.name).toContain('plaza-cross-bands');
     expect(bandMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(bandMaterial.metadata?.mainStageMaterialOverride).toBe('plaza-cross-bands');
@@ -12120,6 +12126,11 @@ describe('polishMainStageMaterials', () => {
     expect(bandMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(bandMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(bandMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(sideParallaxDonorMaterial.metadata?.mainStageMaterialOverride).toBe('side-parallax-gold-orbit');
+    expect(bandMaterial.albedoColor.r).toBeLessThan(sideParallaxDonorMaterial.albedoColor.r);
+    expect(bandMaterial.emissiveIntensity).toBeLessThan(sideParallaxDonorMaterial.emissiveIntensity);
+    expect(bandMaterial.roughness ?? 0).toBeGreaterThan(sideParallaxDonorMaterial.roughness ?? 0);
+    expect(bandMaterial.environmentIntensity).toBeLessThan(sideParallaxDonorMaterial.environmentIntensity);
   });
 
   it('darkens the side parallax gold orbit so the side-screen decorative accents read as carved metal trim instead of bright gold rings', () => {
