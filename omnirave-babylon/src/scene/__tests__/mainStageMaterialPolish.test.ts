@@ -12180,14 +12180,20 @@ describe('polishMainStageMaterials', () => {
 
     const bridge = MeshBuilder.CreateBox('V51_PortalCrestBridge', { size: 1 }, scene);
     bridge.material = sharedGoldMaterial;
+    const sideParallaxDonor = MeshBuilder.CreateBox('V31_SideParallaxGoldOrbit_L', { size: 1 }, scene);
+    sideParallaxDonor.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([goldControl, bridge]);
+    polishMainStageMaterials([goldControl, bridge, sideParallaxDonor]);
 
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(bridge.material).toBeInstanceOf(PBRMaterial);
+    expect(sideParallaxDonor.material).toBeInstanceOf(PBRMaterial);
     expect(bridge.material).not.toBe(sharedGoldMaterial);
+    expect(sideParallaxDonor.material).not.toBe(sharedGoldMaterial);
+    expect(sideParallaxDonor.material).not.toBe(bridge.material);
 
     const bridgeMaterial = bridge.material as PBRMaterial;
+    const sideParallaxDonorMaterial = sideParallaxDonor.material as PBRMaterial;
     expect(bridgeMaterial.name).toContain('portal-crest-bridge');
     expect(bridgeMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(bridgeMaterial.metadata?.mainStageMaterialOverride).toBe('portal-crest-bridge');
@@ -12198,6 +12204,11 @@ describe('polishMainStageMaterials', () => {
     expect(bridgeMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(bridgeMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(bridgeMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(sideParallaxDonorMaterial.metadata?.mainStageMaterialOverride).toBe('side-parallax-gold-orbit');
+    expect(bridgeMaterial.albedoColor.r).toBeLessThan(sideParallaxDonorMaterial.albedoColor.r);
+    expect(bridgeMaterial.emissiveIntensity).toBeLessThan(sideParallaxDonorMaterial.emissiveIntensity);
+    expect(bridgeMaterial.roughness ?? 0).toBeGreaterThan(sideParallaxDonorMaterial.roughness ?? 0);
+    expect(bridgeMaterial.environmentIntensity).toBeLessThan(sideParallaxDonorMaterial.environmentIntensity);
   });
 
   it('darkens the basin causeway shadow reveal so the water crossing reads as recessed depth instead of bright shadow strips', () => {
