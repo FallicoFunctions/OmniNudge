@@ -8322,17 +8322,23 @@ describe('polishMainStageMaterials', () => {
 
     const rightCrest = MeshBuilder.CreateBox('V68_PortalArcadeGoldCrest_R', { size: 1 }, scene);
     rightCrest.material = sharedGoldMaterial;
+    const heroCapDonor = MeshBuilder.CreateBox('V68_HeroPortalGoldCap', { size: 1 }, scene);
+    heroCapDonor.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([controlGold, leftCrest, rightCrest]);
+    polishMainStageMaterials([controlGold, leftCrest, rightCrest, heroCapDonor]);
 
     expect(controlGold.material).toBe(sharedGoldMaterial);
     expect(leftCrest.material).toBeInstanceOf(PBRMaterial);
     expect(rightCrest.material).toBeInstanceOf(PBRMaterial);
+    expect(heroCapDonor.material).toBeInstanceOf(PBRMaterial);
     expect(leftCrest.material).not.toBe(sharedGoldMaterial);
     expect(rightCrest.material).not.toBe(sharedGoldMaterial);
+    expect(heroCapDonor.material).not.toBe(sharedGoldMaterial);
     expect(rightCrest.material).toBe(leftCrest.material);
+    expect(heroCapDonor.material).not.toBe(leftCrest.material);
 
     const crestMaterial = leftCrest.material as PBRMaterial;
+    const heroCapDonorMaterial = heroCapDonor.material as PBRMaterial;
     expect(crestMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(crestMaterial.metadata?.mainStageMaterialOverride).toBe('portal-arcade-gold-crest');
     expect(crestMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
@@ -8342,6 +8348,11 @@ describe('polishMainStageMaterials', () => {
     expect(crestMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(crestMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(crestMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(heroCapDonorMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-gold-cap');
+    expect(crestMaterial.albedoColor.r).toBeLessThan(heroCapDonorMaterial.albedoColor.r);
+    expect(crestMaterial.emissiveIntensity).toBeLessThan(heroCapDonorMaterial.emissiveIntensity);
+    expect(crestMaterial.roughness ?? 0).toBeGreaterThan(heroCapDonorMaterial.roughness ?? 0);
+    expect(crestMaterial.environmentIntensity).toBeLessThan(heroCapDonorMaterial.environmentIntensity);
   });
 
   it('smokes the portal arcade cyan spines so the celestial colonnade reads as inset jewel glass instead of bright cyan strips', () => {
