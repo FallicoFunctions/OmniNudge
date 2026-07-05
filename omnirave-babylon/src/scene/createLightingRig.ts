@@ -2,6 +2,7 @@ import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js';
+import { PointLight } from '@babylonjs/core/Lights/pointLight.js';
 import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.js';
 import { RenderTargetTexture } from '@babylonjs/core/Materials/Textures/renderTargetTexture.js';
 import type { Scene } from '@babylonjs/core/scene.js';
@@ -45,8 +46,46 @@ export function createLightingRig(scene: Scene) {
   fill.position = new Vector3(0, 24, -84);
 
   const shadowGenerator = createKeyShadowGenerator(scene, key);
+  const practicalPools = createPracticalPoolLights(scene);
 
-  return { hemi, key, rim, fill, shadowGenerator };
+  return { hemi, key, rim, fill, shadowGenerator, practicalPools };
+}
+
+// Discrete practical cores that should visibly light their surroundings.
+const PRACTICAL_POOL_SOURCE = /LanternCore|LanternWarmCore|FountainLightArray/;
+const POOL_RANGE = 18;
+
+function createPracticalPoolLights(scene: Scene) {
+  const sources = scene.meshes.filter((mesh) => PRACTICAL_POOL_SOURCE.test(mesh.name));
+  const pools: PointLight[] = [];
+
+  for (const source of sources) {
+    const center = source.getBoundingInfo().boundingBox.centerWorld;
+    const pool = new PointLight(`practical-pool-${source.name}`, center.clone(), scene);
+    pool.diffuse = new Color3(1, 0.62, 0.24);
+    pool.specular = new Color3(1, 0.5, 0.2);
+    pool.intensity = 160;
+    pool.range = POOL_RANGE;
+
+    // Scope each pool to nearby meshes: keeps every mesh within the
+    // per-material light-slot budget and off-loads distant geometry.
+    pool.includedOnlyMeshes = scene.meshes.filter((mesh) => {
+      const meshCenter = mesh.getBoundingInfo().boundingBox.centerWorld;
+      return meshCenter.subtract(center).length() <= POOL_RANGE * 1.2;
+    });
+
+    pools.push(pool);
+  }
+
+  if (pools.length > 0) {
+    for (const material of scene.materials) {
+      if ('maxSimultaneousLights' in material) {
+        material.maxSimultaneousLights = 8;
+      }
+    }
+  }
+
+  return pools;
 }
 
 function createKeyShadowGenerator(scene: Scene, key: DirectionalLight) {
