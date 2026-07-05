@@ -37,8 +37,12 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   pipeline.bloomScale = 0.5;
   pipeline.depthOfFieldEnabled = false;
   pipeline.chromaticAberrationEnabled = false;
-  pipeline.grainEnabled = false;
   pipeline.sharpenEnabled = true;
+  pipeline.imageProcessing.vignetteEnabled = true;
+  pipeline.imageProcessing.vignetteWeight = 1.5;
+  pipeline.grainEnabled = true;
+  pipeline.grain.intensity = 9;
+  pipeline.grain.animated = true;
 
   return {
     backdropRoot,
