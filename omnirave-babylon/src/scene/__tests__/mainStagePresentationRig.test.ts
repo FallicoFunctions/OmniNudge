@@ -62,10 +62,12 @@ describe('createMainStagePresentationRig', () => {
     expect(rig.pipeline.name).toBe('main-stage-presentation-pipeline');
     expect(rig.pipeline.bloomEnabled).toBe(true);
     expect(rig.pipeline.fxaaEnabled).toBe(true);
-    expect(rig.pipeline.bloomThreshold).toBeGreaterThanOrEqual(0.86);
-    expect(rig.pipeline.bloomWeight).toBeGreaterThan(0.03);
-    expect(rig.pipeline.bloomWeight).toBeLessThanOrEqual(0.1);
-    expect(rig.pipeline.bloomKernel).toBeLessThanOrEqual(28);
+    expect(rig.pipeline.bloomThreshold).toBeGreaterThanOrEqual(0.4);
+    expect(rig.pipeline.bloomThreshold).toBeLessThanOrEqual(0.7);
+    expect(rig.pipeline.bloomWeight).toBeGreaterThanOrEqual(0.35);
+    expect(rig.pipeline.bloomWeight).toBeLessThanOrEqual(0.7);
+    expect(rig.pipeline.bloomKernel).toBeGreaterThanOrEqual(48);
+    expect(rig.pipeline.bloomKernel).toBeLessThanOrEqual(96);
     expect(rig.pipeline.depthOfFieldEnabled).toBe(false);
     expect(rig.pipeline.chromaticAberrationEnabled).toBe(false);
 
