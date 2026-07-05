@@ -8028,12 +8028,12 @@ function applyPortalArcadeShadowCoreOverride(material: PBRMaterial) {
 
 function applyHeroPortalGoldCapOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.07);
-  material.emissiveColor = new Color3(0.018, 0.012, 0.005);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.164, 0.127, 0.058);
+  material.emissiveColor = new Color3(0.0125, 0.008, 0.0033);
+  material.emissiveIntensity = 0.015;
   material.metallic = 0.18;
-  material.roughness = 0.88;
-  material.environmentIntensity = 0.13;
+  material.roughness = 0.92;
+  material.environmentIntensity = 0.095;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'hero-portal-gold-cap',
