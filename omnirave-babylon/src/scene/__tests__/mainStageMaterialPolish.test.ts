@@ -4943,14 +4943,20 @@ describe('polishMainStageMaterials', () => {
 
     const promenadeShoulders = MeshBuilder.CreateBox('V70_PromenadeGoldShoulders', { size: 1 }, scene);
     promenadeShoulders.material = sharedGoldMaterial;
+    const grandArcadeDonor = MeshBuilder.CreateBox('V68_GrandArcadeGoldBands_L', { size: 1 }, scene);
+    grandArcadeDonor.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([controlGold, promenadeShoulders]);
+    polishMainStageMaterials([controlGold, promenadeShoulders, grandArcadeDonor]);
 
     expect(controlGold.material).toBe(sharedGoldMaterial);
     expect(promenadeShoulders.material).toBeInstanceOf(PBRMaterial);
+    expect(grandArcadeDonor.material).toBeInstanceOf(PBRMaterial);
     expect(promenadeShoulders.material).not.toBe(sharedGoldMaterial);
+    expect(grandArcadeDonor.material).not.toBe(sharedGoldMaterial);
+    expect(grandArcadeDonor.material).not.toBe(promenadeShoulders.material);
 
     const shoulderMaterial = promenadeShoulders.material as PBRMaterial;
+    const grandArcadeDonorMaterial = grandArcadeDonor.material as PBRMaterial;
     expect(shoulderMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(shoulderMaterial.metadata?.mainStageMaterialOverride).toBe('promenade-gold-shoulders');
     expect(shoulderMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
@@ -4960,6 +4966,11 @@ describe('polishMainStageMaterials', () => {
     expect(shoulderMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(shoulderMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(shoulderMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(grandArcadeDonorMaterial.metadata?.mainStageMaterialOverride).toBe('grand-arcade-gold-bands');
+    expect(shoulderMaterial.albedoColor.r).toBeLessThan(grandArcadeDonorMaterial.albedoColor.r);
+    expect(shoulderMaterial.emissiveIntensity).toBeLessThan(grandArcadeDonorMaterial.emissiveIntensity);
+    expect(shoulderMaterial.roughness ?? 0).toBeGreaterThan(grandArcadeDonorMaterial.roughness ?? 0);
+    expect(shoulderMaterial.environmentIntensity).toBeLessThan(grandArcadeDonorMaterial.environmentIntensity);
   });
 
   it('smokes the promenade cyan spine so the central route reads as inset jewel glass instead of a bright runway stripe', () => {
