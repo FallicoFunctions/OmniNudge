@@ -53,8 +53,8 @@ describe('createMainStageScene', () => {
     const scene = await createMainStageScene(engine);
 
     expect(scene.collisionsEnabled).toBe(true);
-    expect(scene.fogDensity).toBeGreaterThanOrEqual(0.0045);
-    expect(scene.fogDensity).toBeLessThanOrEqual(0.0065);
+    expect(scene.fogDensity).toBeGreaterThanOrEqual(0.007);
+    expect(scene.fogDensity).toBeLessThanOrEqual(0.009);
     expect(scene.fogColor.b).toBeGreaterThan(scene.fogColor.r);
     expect(scene.activeCamera?.name).toBe('review-camera');
     expect(scene.getTransformNodeByName('player-root')).not.toBeNull();
