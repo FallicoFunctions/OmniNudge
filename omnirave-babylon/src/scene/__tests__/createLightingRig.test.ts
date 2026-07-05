@@ -61,4 +61,36 @@ describe('createLightingRig', () => {
       RenderTargetTexture.REFRESHRATE_RENDER_ONCE,
     );
   });
+
+  it('drops a warm scoped pool light on each discrete practical core so lamps light their surroundings', () => {
+    engine = new NullEngine();
+    scene = new Scene(engine);
+
+    const core = MeshBuilder.CreateBox('V33_BasinLanternCore_L', { size: 0.4 }, scene);
+    core.position.set(16, 2.5, -15);
+    core.computeWorldMatrix(true);
+
+    const nearGround = MeshBuilder.CreateBox('V90_NearPaving', { size: 2 }, scene);
+    nearGround.position.set(14, 0, -14);
+    nearGround.computeWorldMatrix(true);
+
+    const farTower = MeshBuilder.CreateBox('V24_FarTower', { size: 2 }, scene);
+    farTower.position.set(0, 30, 120);
+    farTower.computeWorldMatrix(true);
+
+    const solidMaterial = new PBRMaterial('pool-test-mat', scene);
+    nearGround.material = solidMaterial;
+
+    const rig = createLightingRig(scene);
+
+    expect(rig.practicalPools.length).toBe(1);
+    const pool = rig.practicalPools[0];
+    expect(pool.diffuse.r).toBeGreaterThan(pool.diffuse.b);
+    expect(pool.intensity).toBeGreaterThanOrEqual(100);
+    expect(pool.range).toBeGreaterThanOrEqual(12);
+    const included = pool.includedOnlyMeshes.map((mesh) => mesh.name);
+    expect(included).toContain('V90_NearPaving');
+    expect(included).not.toContain('V24_FarTower');
+    expect(solidMaterial.maxSimultaneousLights).toBeGreaterThanOrEqual(6);
+  });
 });
