@@ -7385,17 +7385,17 @@ function applySpawnPylonShadowSpineOverride(material: PBRMaterial) {
 }
 
 function applySpawnPylonCyanCoreOverride(material: PBRMaterial) {
-  material.albedoColor = new Color3(0.09, 0.19, 0.24);
-  material.emissiveColor = new Color3(0.01, 0.03, 0.042);
-  material.emissiveIntensity = 0.076;
-  material.alpha = 0.32;
+  material.albedoColor = new Color3(0.076, 0.168, 0.214);
+  material.emissiveColor = new Color3(0.0085, 0.026, 0.036);
+  material.emissiveIntensity = 0.067;
+  material.alpha = 0.28;
   material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
   material.metallic = 0.02;
-  material.roughness = 0.24;
+  material.roughness = 0.28;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.05;
-  material.clearCoat.roughness = 0.66;
-  material.environmentIntensity = 0.28;
+  material.clearCoat.roughness = 0.62;
+  material.environmentIntensity = 0.22;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-pylon-cyan-core',
