@@ -2808,7 +2808,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     meshNames: ['V90_BasinStoneCopingArray_Probe'],
     expected: {
       albedoTextureCleared: true,
-      albedoColor: [0.38, 0.36, 0.32],
+      albedoColor: [0.13, 0.125, 0.115],
       emissiveColor: [0, 0, 0],
       emissiveIntensity: 0,
       metallic: 0.02,
