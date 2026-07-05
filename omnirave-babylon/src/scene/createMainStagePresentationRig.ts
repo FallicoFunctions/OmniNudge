@@ -20,8 +20,7 @@ import { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import type { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 
-const ENVIRONMENT_TEXTURE_SIZE = 1;
-const rgb = (red: number, green: number, blue: number) => new Uint8Array([red, green, blue]);
+const ENVIRONMENT_TEXTURE_SIZE = 16;
 
 export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   const environmentTexture = createEnvironmentTexture(scene);
@@ -198,15 +197,62 @@ function createLedWallContentTexture(scene: Scene) {
   }
 }
 
+// Night-sky gradient cube: deep zenith blue falling to a lifted horizon
+// band, a warm amber lobe toward the stage (+z), and a dark floor, so
+// specular surfaces reflect a structured environment instead of six
+// flat colours.
 function createEnvironmentTexture(scene: Scene) {
-  const faceData = [
-    rgb(34, 44, 70),
-    rgb(10, 16, 30),
-    rgb(28, 42, 74),
-    rgb(5, 8, 15),
-    rgb(17, 30, 54),
-    rgb(54, 42, 24),
+  const size = ENVIRONMENT_TEXTURE_SIZE;
+  const faceDirs: Array<(u: number, v: number) => [number, number, number]> = [
+    (u, v) => [1, -v, -u],
+    (u, v) => [-1, -v, u],
+    (u, v) => [u, 1, v],
+    (u, v) => [u, -1, -v],
+    (u, v) => [u, -v, 1],
+    (u, v) => [-u, -v, -1],
   ];
+
+  const faceData = faceDirs.map((toDir) => {
+    const data = new Uint8Array(size * size * 3);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const u = (2 * (x + 0.5)) / size - 1;
+        const v = (2 * (y + 0.5)) / size - 1;
+        const [dx, dy, dz] = toDir(u, v);
+        const len = Math.hypot(dx, dy, dz);
+        const ny = dy / len;
+        const nz = dz / len;
+
+        // Vertical gradient: zenith -> horizon -> floor.
+        let r: number;
+        let g: number;
+        let b: number;
+        if (ny >= 0) {
+          const t = Math.pow(ny, 0.6);
+          r = 0.1 * (1 - t) + 0.02 * t;
+          g = 0.13 * (1 - t) + 0.04 * t;
+          b = 0.22 * (1 - t) + 0.09 * t;
+        } else {
+          const t = Math.pow(-ny, 0.7);
+          r = 0.1 * (1 - t) + 0.015 * t;
+          g = 0.13 * (1 - t) + 0.02 * t;
+          b = 0.22 * (1 - t) + 0.03 * t;
+        }
+
+        // Warm stage-glow lobe toward +z, hugging the horizon.
+        const lobe = Math.pow(Math.max(0, nz), 2) * Math.pow(1 - Math.abs(ny), 1.5);
+        r += 0.35 * lobe;
+        g += 0.22 * lobe;
+        b += 0.08 * lobe;
+
+        const i = (y * size + x) * 3;
+        data[i] = Math.min(255, Math.round(r * 255));
+        data[i + 1] = Math.min(255, Math.round(g * 255));
+        data[i + 2] = Math.min(255, Math.round(b * 255));
+      }
+    }
+    return data;
+  });
 
   try {
     return new RawCubeTexture(
