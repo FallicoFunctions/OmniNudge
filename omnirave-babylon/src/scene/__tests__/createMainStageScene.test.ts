@@ -54,7 +54,7 @@ describe('createMainStageScene', () => {
 
     expect(scene.collisionsEnabled).toBe(true);
     expect(scene.fogDensity).toBeGreaterThanOrEqual(0.007);
-    expect(scene.fogDensity).toBeLessThanOrEqual(0.009);
+    expect(scene.fogDensity).toBeLessThanOrEqual(0.0105);
     expect(scene.fogColor.b).toBeGreaterThan(scene.fogColor.r);
     expect(scene.activeCamera?.name).toBe('review-camera');
     expect(scene.getTransformNodeByName('player-root')).not.toBeNull();

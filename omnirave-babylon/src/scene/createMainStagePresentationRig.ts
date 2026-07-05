@@ -41,9 +41,9 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   pipeline.imageProcessingEnabled = true;
   pipeline.fxaaEnabled = true;
   pipeline.bloomEnabled = true;
-  pipeline.bloomThreshold = 0.55;
+  pipeline.bloomThreshold = 0.65;
   pipeline.bloomWeight = 0.5;
-  pipeline.bloomKernel = 64;
+  pipeline.bloomKernel = 84;
   pipeline.bloomScale = 0.5;
   pipeline.depthOfFieldEnabled = false;
   pipeline.chromaticAberrationEnabled = false;
@@ -87,8 +87,8 @@ function createEmissiveSpillLights(scene: Scene, heroScreenPanels: Mesh[]) {
       `${panel.name}-spill`,
       panel.position.add(new Vector3(0, -1.5, -2.5)),
       new Color3(0.72, 0.3, 0.85),
-      85,
-      16,
+      150,
+      22,
     );
   }
 
@@ -102,8 +102,8 @@ function createEmissiveSpillLights(scene: Scene, heroScreenPanels: Mesh[]) {
       `led-deck-spill-${side}`,
       new Vector3(center.x, center.y + 2.2, center.z),
       new Color3(0.16, 0.6, 0.95),
-      70,
-      14,
+      130,
+      20,
     );
   }
 
