@@ -7369,15 +7369,15 @@ function applySpawnPylonGoldCrownOverride(material: PBRMaterial) {
 }
 
 function applySpawnPylonShadowSpineOverride(material: PBRMaterial) {
-  material.albedoColor = new Color3(0.11, 0.135, 0.17);
-  material.emissiveColor = new Color3(0.007, 0.01, 0.013);
-  material.emissiveIntensity = 0.016;
+  material.albedoColor = new Color3(0.098, 0.122, 0.156);
+  material.emissiveColor = new Color3(0.0055, 0.008, 0.011);
+  material.emissiveIntensity = 0.013;
   material.metallic = 0.06;
-  material.roughness = 0.9;
+  material.roughness = 0.88;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.02;
-  material.clearCoat.roughness = 0.72;
-  material.environmentIntensity = 0.16;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.13;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-pylon-shadow-spine',

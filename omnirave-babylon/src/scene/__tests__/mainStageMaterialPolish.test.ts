@@ -7714,6 +7714,8 @@ describe('polishMainStageMaterials', () => {
 
     const rightShadow = MeshBuilder.CreateBox('V55_SpawnPylonShadowSpine_R', { size: 1 }, scene);
     rightShadow.material = sharedShadowMaterial;
+    const backPlazaShadowDonor = MeshBuilder.CreateBox('V57_BackPlazaSentinelShadowCore_L', { size: 1 }, scene);
+    backPlazaShadowDonor.material = sharedShadowMaterial;
     const heroVault = MeshBuilder.CreateBox('V25_HeroPortalShadowVault', { size: 1 }, scene);
     heroVault.material = sharedShadowMaterial;
 
@@ -7737,6 +7739,7 @@ describe('polishMainStageMaterials', () => {
       shadowControl,
       leftShadow,
       rightShadow,
+      backPlazaShadowDonor,
       heroVault,
       cyanControl,
       leftCore,
@@ -7755,6 +7758,8 @@ describe('polishMainStageMaterials', () => {
     expect(shadowControl.material).toBe(sharedShadowMaterial);
     expect(leftShadow.material).toBeInstanceOf(PBRMaterial);
     expect(rightShadow.material).toBe(leftShadow.material);
+    expect(backPlazaShadowDonor.material).toBeInstanceOf(PBRMaterial);
+    expect(backPlazaShadowDonor.material).not.toBe(leftShadow.material);
     expect(heroVault.material).toBeInstanceOf(PBRMaterial);
     expect(heroVault.material).not.toBe(leftShadow.material);
 
@@ -7768,6 +7773,7 @@ describe('polishMainStageMaterials', () => {
     const backPlazaDonorMaterial = backPlazaDonor.material as PBRMaterial;
     const wingArchInlayMaterial = wingArchInlay.material as PBRMaterial;
     const shadowMaterial = leftShadow.material as PBRMaterial;
+    const backPlazaShadowDonorMaterial = backPlazaShadowDonor.material as PBRMaterial;
     const heroVaultMaterial = heroVault.material as PBRMaterial;
     const cyanMaterial = leftCore.material as PBRMaterial;
     const crownCrystalMaterial = crownCrystal.material as PBRMaterial;
@@ -7802,6 +7808,12 @@ describe('polishMainStageMaterials', () => {
     expect(shadowMaterial.metallic).toBeLessThanOrEqual(0.08);
     expect(shadowMaterial.roughness).toBeGreaterThanOrEqual(0.84);
     expect(shadowMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
+    expect(backPlazaShadowDonorMaterial.name).toContain('back-plaza-sentinel-shadow-core');
+    expect(backPlazaShadowDonorMaterial.metadata?.mainStageMaterialOverride).toBe('back-plaza-sentinel-shadow-core');
+    expect(shadowMaterial.albedoColor.r).toBeLessThan(backPlazaShadowDonorMaterial.albedoColor.r);
+    expect(shadowMaterial.emissiveIntensity).toBeLessThan(backPlazaShadowDonorMaterial.emissiveIntensity);
+    expect(shadowMaterial.roughness ?? 0).toBeLessThan(backPlazaShadowDonorMaterial.roughness ?? 0);
+    expect(shadowMaterial.environmentIntensity).toBeLessThan(backPlazaShadowDonorMaterial.environmentIntensity);
     expect(shadowMaterial.albedoColor.r).toBeLessThan(heroVaultMaterial.albedoColor.r);
     expect(shadowMaterial.emissiveIntensity).toBeLessThan(heroVaultMaterial.emissiveIntensity);
     expect(shadowMaterial.environmentIntensity).toBeLessThan(heroVaultMaterial.environmentIntensity);
