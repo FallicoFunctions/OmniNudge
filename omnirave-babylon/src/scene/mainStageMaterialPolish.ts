@@ -7864,15 +7864,15 @@ function applyApproachLightHaloOverride(material: PBRMaterial) {
 
 function applyPromenadePearlRibbonOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.24, 0.26, 0.3);
-  material.emissiveColor = new Color3(0.006, 0.01, 0.014);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.215, 0.235, 0.274);
+  material.emissiveColor = new Color3(0.004, 0.007, 0.01);
+  material.emissiveIntensity = 0.016;
   material.metallic = 0.02;
-  material.roughness = 0.84;
+  material.roughness = 0.88;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.04;
-  material.clearCoat.roughness = 0.62;
-  material.environmentIntensity = 0.14;
+  material.clearCoat.roughness = 0.68;
+  material.environmentIntensity = 0.11;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'promenade-pearl-ribbon',
