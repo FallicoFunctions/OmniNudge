@@ -7922,6 +7922,8 @@ describe('polishMainStageMaterials', () => {
 
     const thresholdGold = MeshBuilder.CreateBox('V65_ArrivalThresholdGoldBands', { size: 1 }, scene);
     thresholdGold.material = sharedGoldMaterial;
+    const sideParallaxDonor = MeshBuilder.CreateBox('V31_SideParallaxGoldOrbit_L', { size: 1 }, scene);
+    sideParallaxDonor.material = sharedGoldMaterial;
 
     const cyanControl = MeshBuilder.CreateBox('TestArrivalRunwayCyanControl', { size: 1 }, scene);
     cyanControl.material = sharedCyanMaterial;
@@ -7939,6 +7941,7 @@ describe('polishMainStageMaterials', () => {
       goldControl,
       runwayGold,
       thresholdGold,
+      sideParallaxDonor,
       cyanControl,
       runwayCyan,
       shadowControl,
@@ -7948,7 +7951,9 @@ describe('polishMainStageMaterials', () => {
     expect(goldControl.material).toBe(sharedGoldMaterial);
     expect(runwayGold.material).toBeInstanceOf(PBRMaterial);
     expect(thresholdGold.material).toBeInstanceOf(PBRMaterial);
+    expect(sideParallaxDonor.material).toBeInstanceOf(PBRMaterial);
     expect(thresholdGold.material).not.toBe(runwayGold.material);
+    expect(sideParallaxDonor.material).not.toBe(runwayGold.material);
 
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(runwayCyan.material).toBeInstanceOf(PBRMaterial);
@@ -7958,6 +7963,7 @@ describe('polishMainStageMaterials', () => {
 
     const runwayGoldMaterial = runwayGold.material as PBRMaterial;
     const thresholdGoldMaterial = thresholdGold.material as PBRMaterial;
+    const sideParallaxDonorMaterial = sideParallaxDonor.material as PBRMaterial;
     const cyanMaterial = runwayCyan.material as PBRMaterial;
     const shadowMaterial = thresholdShadow.material as PBRMaterial;
 
@@ -7971,6 +7977,11 @@ describe('polishMainStageMaterials', () => {
     expect(runwayGoldMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(runwayGoldMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(runwayGoldMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(sideParallaxDonorMaterial.metadata?.mainStageMaterialOverride).toBe('side-parallax-gold-orbit');
+    expect(runwayGoldMaterial.albedoColor.r).toBeLessThan(sideParallaxDonorMaterial.albedoColor.r);
+    expect(runwayGoldMaterial.emissiveIntensity).toBeLessThan(sideParallaxDonorMaterial.emissiveIntensity);
+    expect(runwayGoldMaterial.roughness ?? 0).toBeGreaterThan(sideParallaxDonorMaterial.roughness ?? 0);
+    expect(runwayGoldMaterial.environmentIntensity).toBeLessThan(sideParallaxDonorMaterial.environmentIntensity);
 
     expect(thresholdGoldMaterial.name).toContain('arrival-threshold-gold-bands');
     expect(thresholdGoldMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
