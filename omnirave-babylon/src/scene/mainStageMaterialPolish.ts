@@ -7353,15 +7353,15 @@ function applySpawnPylonPearlShellOverride(material: PBRMaterial) {
 
 function applySpawnPylonGoldCrownOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.145, 0.062);
-  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
-  material.emissiveIntensity = 0.017;
+  material.albedoColor = new Color3(0.168, 0.136, 0.056);
+  material.emissiveColor = new Color3(0.008, 0.0055, 0.0015);
+  material.emissiveIntensity = 0.014;
   material.metallic = 0.18;
-  material.roughness = 0.88;
+  material.roughness = 0.86;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0.01;
-  material.clearCoat.roughness = 0.84;
-  material.environmentIntensity = 0.11;
+  material.clearCoat.roughness = 0.8;
+  material.environmentIntensity = 0.09;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'spawn-pylon-gold-crown',
