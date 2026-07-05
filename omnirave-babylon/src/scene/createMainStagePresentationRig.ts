@@ -7,6 +7,7 @@ import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { BaseTexture } from '@babylonjs/core/Materials/Textures/baseTexture.js';
 import { RawCubeTexture } from '@babylonjs/core/Materials/Textures/rawCubeTexture.js';
+import { RawTexture } from '@babylonjs/core/Materials/Textures/rawTexture.js';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import type { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
@@ -21,6 +22,7 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   scene.environmentTexture = environmentTexture;
   scene.environmentIntensity = 0.9;
   const backdropRoot = createPresentationBackdrop(scene);
+  const heroScreenPanels = createHeroScreenPanels(scene);
 
   const pipeline = new DefaultRenderingPipeline(
     'main-stage-presentation-pipeline',
@@ -47,8 +49,96 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   return {
     backdropRoot,
     environmentTexture,
+    heroScreenPanels,
     pipeline,
   };
+}
+
+// The GLB's screen faces are dark backer geometry merged into neighbouring
+// mega-meshes, so the visible proscenium rectangles cannot emit. Mount a
+// pair of LED content panels just route-side of those faces instead.
+function createHeroScreenPanels(scene: Scene) {
+  const contentTexture = createLedWallContentTexture(scene);
+
+  const panels: Mesh[] = [];
+  for (const side of [-1, 1]) {
+    const panel = MeshBuilder.CreatePlane(
+      side < 0 ? 'main-stage-hero-screen-panel-l' : 'main-stage-hero-screen-panel-r',
+      {
+        width: 8,
+        height: 6.5,
+        sideOrientation: Mesh.DOUBLESIDE,
+      },
+      scene,
+    );
+    panel.position.set(side * 6.8, 17.9, -3.2);
+    panel.rotation.y = Math.PI;
+    panel.isPickable = false;
+
+    const material = new PBRMaterial(
+      side < 0 ? 'main-stage-hero-screen-material-l' : 'main-stage-hero-screen-material-r',
+      scene,
+    );
+    material.unlit = true;
+    material.albedoColor = new Color3(0.01, 0.015, 0.02);
+    material.emissiveColor = new Color3(1, 1, 1);
+    material.emissiveTexture = contentTexture;
+    material.emissiveIntensity = 4.6;
+    panel.material = material;
+
+    panels.push(panel);
+  }
+
+  return panels;
+}
+
+// Procedural LED-wall still: cyan-to-magenta energy gradient with scanline
+// structure so the panels read as a video surface rather than a flat glow.
+function createLedWallContentTexture(scene: Scene) {
+  const width = 128;
+  const height = 96;
+  const data = new Uint8Array(width * height * 4);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const u = x / (width - 1);
+      const v = y / (height - 1);
+
+      // Diagonal energy sweep: cyan lower-left rising into magenta upper-right.
+      const sweep = Math.min(1, Math.max(0, u * 0.7 + (1 - v) * 0.55));
+      const pulse = 0.55 + 0.45 * Math.sin(u * Math.PI * 3 + v * Math.PI * 1.5);
+      let r = 30 + sweep * 190 * pulse;
+      let g = 60 + (1 - sweep) * 165 * pulse;
+      let b = 150 + 105 * pulse * (0.4 + 0.6 * sweep);
+
+      // Horizontal scanlines every other row for LED tile structure.
+      if (y % 2 === 1) {
+        r *= 0.62;
+        g *= 0.62;
+        b *= 0.62;
+      }
+      // Vertical tile seams.
+      if (x % 16 === 0) {
+        r *= 0.7;
+        g *= 0.7;
+        b *= 0.7;
+      }
+
+      const i = (y * width + x) * 4;
+      data[i] = Math.min(255, r);
+      data[i + 1] = Math.min(255, g);
+      data[i + 2] = Math.min(255, b);
+      data[i + 3] = 255;
+    }
+  }
+
+  try {
+    const texture = RawTexture.CreateRGBATexture(data, width, height, scene, false, false, Texture.BILINEAR_SAMPLINGMODE);
+    texture.name = 'main-stage-hero-screen-content';
+    return texture;
+  } catch {
+    return null;
+  }
 }
 
 function createEnvironmentTexture(scene: Scene) {
