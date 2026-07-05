@@ -1,8 +1,13 @@
+// Post-process fragment shaders are not pulled in transitively by the ESM
+// pipeline modules; without these side-effect imports Babylon falls back to
+// fetching raw .fx files over HTTP, Vite answers with index.html, the GLSL
+// compile fails, and the whole post chain silently detaches.
+import '@babylonjs/core/Shaders/grain.fragment.js';
+
 import type { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline.js';
-import { SSAO2RenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssao2RenderingPipeline.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
@@ -47,40 +52,12 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   pipeline.grain.intensity = 9;
   pipeline.grain.animated = true;
 
-  const ssao = createAmbientOcclusion(scene, camera);
-
   return {
     backdropRoot,
     environmentTexture,
     heroScreenPanels,
     pipeline,
-    ssao,
   };
-}
-
-// Screen-space AO: the proxy meshes have no UVs, so baked or textured
-// micro-shading is off the table - SSAO is the only contact-shading
-// path and it does the most to break the flat clay read.
-function createAmbientOcclusion(scene: Scene, camera: Camera) {
-  if (!SSAO2RenderingPipeline.IsSupported) {
-    return null;
-  }
-
-  try {
-    const ssao = new SSAO2RenderingPipeline(
-      'main-stage-ssao',
-      scene,
-      { ssaoRatio: 0.75, blurRatio: 1 },
-      [camera],
-    );
-    ssao.radius = 1.8;
-    ssao.totalStrength = 1.15;
-    ssao.samples = 8;
-    ssao.expensiveBlur = false;
-    return ssao;
-  } catch {
-    return null;
-  }
 }
 
 // The GLB's screen faces are dark backer geometry merged into neighbouring
