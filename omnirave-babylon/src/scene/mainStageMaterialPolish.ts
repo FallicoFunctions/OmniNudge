@@ -6981,12 +6981,12 @@ function applyPromenadePearlRunwayOverride(material: PBRMaterial) {
 
 function applyPromenadeGoldShouldersOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.07);
-  material.emissiveColor = new Color3(0.018, 0.012, 0.005);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.16, 0.123, 0.055);
+  material.emissiveColor = new Color3(0.0115, 0.0072, 0.003);
+  material.emissiveIntensity = 0.013;
   material.metallic = 0.18;
-  material.roughness = 0.88;
-  material.environmentIntensity = 0.13;
+  material.roughness = 0.94;
+  material.environmentIntensity = 0.085;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'promenade-gold-shoulders',
