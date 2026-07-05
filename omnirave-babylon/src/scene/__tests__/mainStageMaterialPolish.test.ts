@@ -8661,14 +8661,20 @@ describe('polishMainStageMaterials', () => {
 
     const goldFiligree = MeshBuilder.CreateBox('V69_PlazaPaverGoldFiligree', { size: 1 }, scene);
     goldFiligree.material = sharedGoldMaterial;
+    const portalArcadeDonor = MeshBuilder.CreateBox('V68_PortalArcadeGoldCrest_L', { size: 1 }, scene);
+    portalArcadeDonor.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([controlGold, goldFiligree]);
+    polishMainStageMaterials([controlGold, goldFiligree, portalArcadeDonor]);
 
     expect(controlGold.material).toBe(sharedGoldMaterial);
     expect(goldFiligree.material).toBeInstanceOf(PBRMaterial);
     expect(goldFiligree.material).not.toBe(sharedGoldMaterial);
+    expect(portalArcadeDonor.material).toBeInstanceOf(PBRMaterial);
+    expect(portalArcadeDonor.material).not.toBe(sharedGoldMaterial);
+    expect(portalArcadeDonor.material).not.toBe(goldFiligree.material);
 
     const filigreeMaterial = goldFiligree.material as PBRMaterial;
+    const portalArcadeDonorMaterial = portalArcadeDonor.material as PBRMaterial;
     expect(filigreeMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(filigreeMaterial.metadata?.mainStageMaterialOverride).toBe('plaza-paver-gold-filigree');
     expect(filigreeMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
@@ -8678,6 +8684,11 @@ describe('polishMainStageMaterials', () => {
     expect(filigreeMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(filigreeMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(filigreeMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(portalArcadeDonorMaterial.metadata?.mainStageMaterialOverride).toBe('portal-arcade-gold-crest');
+    expect(filigreeMaterial.albedoColor.r).toBeLessThan(portalArcadeDonorMaterial.albedoColor.r);
+    expect(filigreeMaterial.emissiveIntensity).toBeLessThan(portalArcadeDonorMaterial.emissiveIntensity);
+    expect(filigreeMaterial.roughness ?? 0).toBeGreaterThan(portalArcadeDonorMaterial.roughness ?? 0);
+    expect(filigreeMaterial.environmentIntensity).toBeLessThan(portalArcadeDonorMaterial.environmentIntensity);
   });
 
   it('darkens the portal arcade pearl shells, grand colonnade pearl shells, and hero portal pearl apron so the first central stage reveal keeps layered architecture instead of one repeated ivory shell finish', () => {

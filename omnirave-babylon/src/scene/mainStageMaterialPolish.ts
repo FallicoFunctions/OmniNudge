@@ -7898,12 +7898,12 @@ function applyPlazaPaverPearlBandsOverride(material: PBRMaterial) {
 
 function applyPlazaPaverGoldFiligreeOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.07);
-  material.emissiveColor = new Color3(0.018, 0.012, 0.005);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.165, 0.128, 0.06);
+  material.emissiveColor = new Color3(0.013, 0.0085, 0.0035);
+  material.emissiveIntensity = 0.016;
   material.metallic = 0.18;
-  material.roughness = 0.88;
-  material.environmentIntensity = 0.13;
+  material.roughness = 0.91;
+  material.environmentIntensity = 0.1;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'plaza-paver-gold-filigree',
