@@ -66,6 +66,11 @@ describe('createMainStagePresentationRig', () => {
     expect(rig.pipeline.bloomThreshold).toBeLessThanOrEqual(0.7);
     expect(rig.pipeline.bloomWeight).toBeGreaterThanOrEqual(0.35);
     expect(rig.pipeline.bloomWeight).toBeLessThanOrEqual(0.7);
+    expect(rig.pipeline.imageProcessing.vignetteEnabled).toBe(true);
+    expect(rig.pipeline.imageProcessing.vignetteWeight).toBeGreaterThanOrEqual(1);
+    expect(rig.pipeline.grainEnabled).toBe(true);
+    expect(rig.pipeline.grain.animated).toBe(true);
+    expect(rig.pipeline.grain.intensity).toBeLessThanOrEqual(14);
     expect(rig.pipeline.bloomKernel).toBeGreaterThanOrEqual(48);
     expect(rig.pipeline.bloomKernel).toBeLessThanOrEqual(96);
     expect(rig.pipeline.depthOfFieldEnabled).toBe(false);
