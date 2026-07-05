@@ -8581,14 +8581,20 @@ describe('polishMainStageMaterials', () => {
 
     const promenadeRibbon = MeshBuilder.CreateBox('V64_PromenadePearlRibbon', { size: 1 }, scene);
     promenadeRibbon.material = sharedIvoryMaterial;
+    const plazaDonor = MeshBuilder.CreateBox('V69_PlazaPaverPearlBands', { size: 1 }, scene);
+    plazaDonor.material = sharedIvoryMaterial;
 
-    polishMainStageMaterials([otherIvory, promenadeRibbon]);
+    polishMainStageMaterials([otherIvory, promenadeRibbon, plazaDonor]);
 
     expect(otherIvory.material).toBe(sharedIvoryMaterial);
     expect(promenadeRibbon.material).toBeInstanceOf(PBRMaterial);
     expect(promenadeRibbon.material).not.toBe(sharedIvoryMaterial);
+    expect(plazaDonor.material).toBeInstanceOf(PBRMaterial);
+    expect(plazaDonor.material).not.toBe(sharedIvoryMaterial);
+    expect(plazaDonor.material).not.toBe(promenadeRibbon.material);
 
     const ribbonMaterial = promenadeRibbon.material as PBRMaterial;
+    const plazaDonorMaterial = plazaDonor.material as PBRMaterial;
     expect(ribbonMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(ribbonMaterial.metadata?.mainStageMaterialOverride).toBe('promenade-pearl-ribbon');
     expect(ribbonMaterial.albedoColor.r).toBeLessThanOrEqual(0.26);
@@ -8598,6 +8604,11 @@ describe('polishMainStageMaterials', () => {
     expect(ribbonMaterial.roughness).toBeGreaterThanOrEqual(0.82);
     expect(ribbonMaterial.clearCoat.intensity).toBeLessThanOrEqual(0.06);
     expect(ribbonMaterial.environmentIntensity).toBeLessThanOrEqual(0.16);
+    expect(plazaDonorMaterial.metadata?.mainStageMaterialOverride).toBe('plaza-paver-pearl-bands');
+    expect(ribbonMaterial.albedoColor.r).toBeLessThan(plazaDonorMaterial.albedoColor.r);
+    expect(ribbonMaterial.emissiveIntensity).toBeLessThan(plazaDonorMaterial.emissiveIntensity);
+    expect(ribbonMaterial.roughness ?? 0).toBeGreaterThan(plazaDonorMaterial.roughness ?? 0);
+    expect(ribbonMaterial.environmentIntensity).toBeLessThan(plazaDonorMaterial.environmentIntensity);
   });
 
   it('darkens the plaza paver pearl bands so the route approach stops reading as stacked bright ivory bars', () => {
