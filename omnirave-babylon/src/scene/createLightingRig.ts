@@ -2,7 +2,11 @@ import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js';
+import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.js';
+import { RenderTargetTexture } from '@babylonjs/core/Materials/Textures/renderTargetTexture.js';
 import type { Scene } from '@babylonjs/core/scene.js';
+
+import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 
 export function createLightingRig(scene: Scene) {
   const hemi = new HemisphericLight('main-stage-hemi-light', new Vector3(0, 1, 0), scene);
@@ -40,5 +44,43 @@ export function createLightingRig(scene: Scene) {
   fill.intensity = 1.08;
   fill.position = new Vector3(0, 24, -84);
 
-  return { hemi, key, rim, fill };
+  const shadowGenerator = createKeyShadowGenerator(scene, key);
+
+  return { hemi, key, rim, fill, shadowGenerator };
+}
+
+function createKeyShadowGenerator(scene: Scene, key: DirectionalLight) {
+  key.autoCalcShadowZBounds = true;
+
+  const shadowGenerator = new ShadowGenerator(2048, key);
+  shadowGenerator.usePercentageCloserFiltering = true;
+  shadowGenerator.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+  shadowGenerator.bias = 0.0022;
+  shadowGenerator.normalBias = 0.012;
+
+  for (const mesh of scene.meshes) {
+    if (!mesh.isVisible) {
+      continue;
+    }
+
+    mesh.receiveShadows = true;
+
+    const material = mesh.material;
+    const isBlended =
+      material !== null &&
+      (material.alpha < 1 || (material.transparencyMode !== null && material.transparencyMode !== 0));
+    if (isBlended) {
+      continue;
+    }
+
+    shadowGenerator.addShadowCaster(mesh, false);
+  }
+
+  // The stage set is static; render the shadow map once instead of every frame.
+  const shadowMap = shadowGenerator.getShadowMap();
+  if (shadowMap) {
+    shadowMap.refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
+  }
+
+  return shadowGenerator;
 }
