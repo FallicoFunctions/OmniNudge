@@ -11296,14 +11296,20 @@ describe('polishMainStageMaterials', () => {
 
     const upperDais = MeshBuilder.CreateBox('V27_PerformanceDaisUpper', { size: 1 }, scene);
     upperDais.material = sharedGoldMaterial;
+    const sideParallaxDonor = MeshBuilder.CreateBox('V31_SideParallaxGoldOrbit_L', { size: 1 }, scene);
+    sideParallaxDonor.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([controlGold, upperDais]);
+    polishMainStageMaterials([controlGold, upperDais, sideParallaxDonor]);
 
     expect(controlGold.material).toBe(sharedGoldMaterial);
     expect(upperDais.material).toBeInstanceOf(PBRMaterial);
+    expect(sideParallaxDonor.material).toBeInstanceOf(PBRMaterial);
     expect(upperDais.material).not.toBe(sharedGoldMaterial);
+    expect(sideParallaxDonor.material).not.toBe(sharedGoldMaterial);
+    expect(sideParallaxDonor.material).not.toBe(upperDais.material);
 
     const daisMaterial = upperDais.material as PBRMaterial;
+    const sideParallaxDonorMaterial = sideParallaxDonor.material as PBRMaterial;
     expect(daisMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(daisMaterial.metadata?.mainStageMaterialOverride).toBe('performance-dais-upper');
     expect(daisMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
@@ -11313,6 +11319,11 @@ describe('polishMainStageMaterials', () => {
     expect(daisMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(daisMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(daisMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(sideParallaxDonorMaterial.metadata?.mainStageMaterialOverride).toBe('side-parallax-gold-orbit');
+    expect(daisMaterial.albedoColor.r).toBeLessThan(sideParallaxDonorMaterial.albedoColor.r);
+    expect(daisMaterial.emissiveIntensity).toBeLessThan(sideParallaxDonorMaterial.emissiveIntensity);
+    expect(daisMaterial.roughness ?? 0).toBeGreaterThan(sideParallaxDonorMaterial.roughness ?? 0);
+    expect(daisMaterial.environmentIntensity).toBeLessThan(sideParallaxDonorMaterial.environmentIntensity);
   });
 
   it('tones down the VIP terrace gold inlays so the podium edge reads as carved support detail instead of bright foil seams', () => {
