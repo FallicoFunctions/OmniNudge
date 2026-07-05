@@ -6335,15 +6335,15 @@ function applyCrowdControlFrameOverride(material: PBRMaterial) {
 
 function applyCrowdControlRailOverride(material: PBRMaterial) {
   material.albedoTexture = null;
-  material.albedoColor = new Color3(0.18, 0.14, 0.06);
-  material.emissiveColor = new Color3(0.01, 0.007, 0.002);
-  material.emissiveIntensity = 0.02;
+  material.albedoColor = new Color3(0.161, 0.124, 0.051);
+  material.emissiveColor = new Color3(0.008, 0.0052, 0.0016);
+  material.emissiveIntensity = 0.013;
   material.metallic = 0.16;
-  material.roughness = 0.9;
+  material.roughness = 0.95;
   material.clearCoat.isEnabled = true;
   material.clearCoat.intensity = 0;
   material.clearCoat.roughness = 0.86;
-  material.environmentIntensity = 0.12;
+  material.environmentIntensity = 0.088;
   material.metadata = {
     ...material.metadata,
     mainStageMaterialOverride: 'crowd-control-rail',
