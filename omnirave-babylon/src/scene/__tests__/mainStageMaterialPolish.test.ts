@@ -7727,6 +7727,8 @@ describe('polishMainStageMaterials', () => {
 
     const rightCore = MeshBuilder.CreateBox('V55_SpawnPylonCyanCore_R', { size: 1 }, scene);
     rightCore.material = sharedCyanMaterial;
+    const backPlazaCyanDonor = MeshBuilder.CreateBox('V57_BackPlazaSentinelCyanSpine_L', { size: 1 }, scene);
+    backPlazaCyanDonor.material = sharedCyanMaterial;
     const crownCrystal = MeshBuilder.CreateBox('V25_CrownApexCrystal', { size: 1 }, scene);
     crownCrystal.material = sharedCyanMaterial;
 
@@ -7744,6 +7746,7 @@ describe('polishMainStageMaterials', () => {
       cyanControl,
       leftCore,
       rightCore,
+      backPlazaCyanDonor,
       crownCrystal,
     ]);
 
@@ -7766,6 +7769,8 @@ describe('polishMainStageMaterials', () => {
     expect(cyanControl.material).toBe(sharedCyanMaterial);
     expect(leftCore.material).toBeInstanceOf(PBRMaterial);
     expect(rightCore.material).toBe(leftCore.material);
+    expect(backPlazaCyanDonor.material).toBeInstanceOf(PBRMaterial);
+    expect(backPlazaCyanDonor.material).not.toBe(leftCore.material);
     expect(crownCrystal.material).toBeInstanceOf(PBRMaterial);
     expect(crownCrystal.material).not.toBe(leftCore.material);
 
@@ -7776,6 +7781,7 @@ describe('polishMainStageMaterials', () => {
     const backPlazaShadowDonorMaterial = backPlazaShadowDonor.material as PBRMaterial;
     const heroVaultMaterial = heroVault.material as PBRMaterial;
     const cyanMaterial = leftCore.material as PBRMaterial;
+    const backPlazaCyanDonorMaterial = backPlazaCyanDonor.material as PBRMaterial;
     const crownCrystalMaterial = crownCrystal.material as PBRMaterial;
 
     expect(goldMaterial.name).toContain('spawn-pylon-gold-crown');
@@ -7828,6 +7834,12 @@ describe('polishMainStageMaterials', () => {
     expect(cyanMaterial.emissiveIntensity).toBeLessThanOrEqual(0.1);
     expect(cyanMaterial.roughness).toBeGreaterThanOrEqual(0.18);
     expect(cyanMaterial.environmentIntensity).toBeLessThanOrEqual(0.34);
+    expect(backPlazaCyanDonorMaterial.name).toContain('back-plaza-sentinel-cyan-spine');
+    expect(backPlazaCyanDonorMaterial.metadata?.mainStageMaterialOverride).toBe('back-plaza-sentinel-cyan-spine');
+    expect(cyanMaterial.albedoColor.r).toBeLessThan(backPlazaCyanDonorMaterial.albedoColor.r);
+    expect(cyanMaterial.emissiveIntensity).toBeLessThan(backPlazaCyanDonorMaterial.emissiveIntensity);
+    expect(cyanMaterial.alpha ?? 0).toBeLessThan(backPlazaCyanDonorMaterial.alpha ?? 0);
+    expect(cyanMaterial.environmentIntensity).toBeLessThan(backPlazaCyanDonorMaterial.environmentIntensity);
     expect(cyanMaterial.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
     expect(cyanMaterial.alpha).toBeLessThan(crownCrystalMaterial.alpha);
     expect(cyanMaterial.emissiveIntensity).toBeLessThan(crownCrystalMaterial.emissiveIntensity);
