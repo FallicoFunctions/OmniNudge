@@ -9,6 +9,8 @@ import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
+import { PointLight } from '@babylonjs/core/Lights/pointLight.js';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { BaseTexture } from '@babylonjs/core/Materials/Textures/baseTexture.js';
@@ -29,6 +31,7 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   scene.environmentIntensity = 0.9;
   const backdropRoot = createPresentationBackdrop(scene);
   const heroScreenPanels = createHeroScreenPanels(scene);
+  const emissiveSpillLights = createEmissiveSpillLights(scene, heroScreenPanels);
 
   const pipeline = new DefaultRenderingPipeline(
     'main-stage-presentation-pipeline',
@@ -54,10 +57,58 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
 
   return {
     backdropRoot,
+    emissiveSpillLights,
     environmentTexture,
     heroScreenPanels,
     pipeline,
   };
+}
+
+// Real LED surfaces wash their surroundings with colored light; the
+// emissive materials alone cannot, so pair each major emissive cluster
+// with a scoped point light matched to its content colour.
+function createEmissiveSpillLights(scene: Scene, heroScreenPanels: Mesh[]) {
+  const lights: PointLight[] = [];
+
+  const addSpill = (name: string, position: Vector3, color: Color3, intensity: number, range: number) => {
+    const light = new PointLight(name, position, scene);
+    light.diffuse = color;
+    light.specular = color;
+    light.intensity = intensity;
+    light.range = range;
+    light.includedOnlyMeshes = scene.meshes.filter((mesh) => {
+      const center = mesh.getBoundingInfo().boundingBox.centerWorld;
+      return center.subtract(position).length() <= range * 1.2;
+    });
+    lights.push(light);
+  };
+
+  for (const panel of heroScreenPanels) {
+    addSpill(
+      `${panel.name}-spill`,
+      panel.position.add(new Vector3(0, -1.5, -2.5)),
+      new Color3(0.72, 0.3, 0.85),
+      85,
+      16,
+    );
+  }
+
+  for (const side of ['L', 'R']) {
+    const platter = scene.getMeshByName(`V31_SideLedTileField_${side}`);
+    if (!platter) {
+      continue;
+    }
+    const center = platter.getBoundingInfo().boundingBox.centerWorld;
+    addSpill(
+      `led-deck-spill-${side}`,
+      new Vector3(center.x, center.y + 2.2, center.z),
+      new Color3(0.16, 0.6, 0.95),
+      70,
+      14,
+    );
+  }
+
+  return lights;
 }
 
 // The GLB's screen faces are dark backer geometry merged into neighbouring

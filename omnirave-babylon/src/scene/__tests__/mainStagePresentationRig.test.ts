@@ -73,6 +73,15 @@ describe('createMainStagePresentationRig', () => {
     expect(rig.pipeline.grain.intensity).toBeLessThanOrEqual(14);
     expect(rig.pipeline.bloomKernel).toBeGreaterThanOrEqual(48);
 
+    const spills = rig.emissiveSpillLights;
+    expect(spills.length).toBeGreaterThanOrEqual(2);
+    for (const spill of spills) {
+      expect(spill.intensity).toBeGreaterThanOrEqual(40);
+      expect(spill.range).toBeGreaterThanOrEqual(10);
+      expect(spill.includedOnlyMeshes.length).toBeGreaterThanOrEqual(0);
+      expect(spill.diffuse.b).toBeGreaterThan(spill.diffuse.g);
+    }
+
     const screens = rig.heroScreenPanels;
     expect(screens.length).toBe(2);
     for (const panel of screens) {
