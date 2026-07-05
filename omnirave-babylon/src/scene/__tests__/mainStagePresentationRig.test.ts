@@ -1,4 +1,4 @@
-import { ArcRotateCamera, NullEngine, Scene, ShaderStore, Vector3 } from '@babylonjs/core';
+import { ArcRotateCamera, NullEngine, PBRMaterial, Scene, ShaderStore, Vector3 } from '@babylonjs/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createMainStagePresentationRig } from '../createMainStagePresentationRig';
@@ -72,6 +72,18 @@ describe('createMainStagePresentationRig', () => {
     expect(rig.pipeline.grain.animated).toBe(true);
     expect(rig.pipeline.grain.intensity).toBeLessThanOrEqual(14);
     expect(rig.pipeline.bloomKernel).toBeGreaterThanOrEqual(48);
+
+    const screens = rig.heroScreenPanels;
+    expect(screens.length).toBe(2);
+    for (const panel of screens) {
+      expect(Math.abs(panel.position.x)).toBeCloseTo(6.8);
+      expect(panel.position.y).toBeCloseTo(17.9);
+      expect(panel.position.z).toBeCloseTo(-3.2);
+      const material = panel.material as PBRMaterial;
+      expect(material.unlit).toBe(true);
+      expect(material.emissiveIntensity).toBeGreaterThanOrEqual(2.5);
+      expect(material.emissiveTexture).not.toBeNull();
+    }
     expect(rig.pipeline.bloomKernel).toBeLessThanOrEqual(96);
     expect(rig.pipeline.depthOfFieldEnabled).toBe(false);
     expect(rig.pipeline.chromaticAberrationEnabled).toBe(false);
