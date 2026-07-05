@@ -3623,8 +3623,10 @@ describe('polishMainStageMaterials', () => {
 
     const rightRail = MeshBuilder.CreateBox('V124_CrowdControlRailArray_R', { size: 1 }, scene);
     rightRail.material = sharedRailMaterial;
+    const sideParallaxDonor = MeshBuilder.CreateBox('V31_SideParallaxGoldOrbit_L', { size: 1 }, scene);
+    sideParallaxDonor.material = sharedRailMaterial;
 
-    polishMainStageMaterials([frameControl, leftFrame, rightFrame, railControl, leftRail, rightRail]);
+    polishMainStageMaterials([frameControl, leftFrame, rightFrame, railControl, leftRail, rightRail, sideParallaxDonor]);
 
     expect(frameControl.material).toBe(sharedFrameMaterial);
     expect(leftFrame.material).toBeInstanceOf(PBRMaterial);
@@ -3633,9 +3635,12 @@ describe('polishMainStageMaterials', () => {
     expect(railControl.material).toBe(sharedRailMaterial);
     expect(leftRail.material).toBeInstanceOf(PBRMaterial);
     expect(rightRail.material).toBe(leftRail.material);
+    expect(sideParallaxDonor.material).toBeInstanceOf(PBRMaterial);
+    expect(sideParallaxDonor.material).not.toBe(leftRail.material);
 
     const frameMaterial = leftFrame.material as PBRMaterial;
     const railMaterial = leftRail.material as PBRMaterial;
+    const sideParallaxDonorMaterial = sideParallaxDonor.material as PBRMaterial;
 
     expect(frameMaterial.name).toContain('crowd-control-frame');
     expect(frameMaterial.metadata?.mainStageMaterialPolish).toBe('black');
@@ -3657,6 +3662,11 @@ describe('polishMainStageMaterials', () => {
     expect(railMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(railMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(railMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(sideParallaxDonorMaterial.metadata?.mainStageMaterialOverride).toBe('side-parallax-gold-orbit');
+    expect(railMaterial.albedoColor.r).toBeLessThan(sideParallaxDonorMaterial.albedoColor.r);
+    expect(railMaterial.emissiveIntensity).toBeLessThan(sideParallaxDonorMaterial.emissiveIntensity);
+    expect(railMaterial.roughness ?? 0).toBeGreaterThan(sideParallaxDonorMaterial.roughness ?? 0);
+    expect(railMaterial.environmentIntensity).toBeLessThan(sideParallaxDonorMaterial.environmentIntensity);
   });
 
   it('rebalances the crowd-barrier base and rail arrays so the route-edge barriers read as grounded ceremonial hardware instead of low black slabs capped with bright gold ribbons', () => {
