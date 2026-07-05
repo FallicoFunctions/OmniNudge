@@ -386,7 +386,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
   },
   {
     key: 'line-array-graphite',
-    match: [{ exact: 'V29_MainLineArrayCabinet_L_00' }, { exact: 'V29_MainLineArrayCabinet_R_00' }, { exact: 'V29_MainLineArrayDriver_L_00' }, { exact: 'V29_MainLineArrayDriver_R_00' }],
+    match: [{ prefix: 'V29_MainLineArrayCabinet_' }, { prefix: 'V29_MainLineArrayDriver_' }],
     params: {
       clearAlbedoTexture: true,
       albedoColor: [0.18, 0.2, 0.24],
@@ -400,7 +400,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
   },
   {
     key: 'front-sub-graphite',
-    match: [{ exact: 'V29_FrontSubCabinet_L_00' }, { exact: 'V29_FrontSubCabinet_R_00' }],
+    match: [{ prefix: 'V29_FrontSubCabinet_' }],
     params: {
       clearAlbedoTexture: true,
       albedoColor: [0.16, 0.18, 0.21],
@@ -414,7 +414,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
   },
   {
     key: 'line-array-acoustic-black',
-    match: [{ exact: 'V29_MainLineArrayGrille_L_00' }, { exact: 'V29_MainLineArrayGrille_R_00' }, { exact: 'V29_MainLineArrayHorn_L_00' }, { exact: 'V29_MainLineArrayHorn_R_00' }],
+    match: [{ prefix: 'V29_MainLineArrayGrille_' }, { prefix: 'V29_MainLineArrayHorn_' }],
     params: {
       clearAlbedoTexture: true,
       albedoColor: [0.05, 0.07, 0.09],
@@ -427,7 +427,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
   },
   {
     key: 'front-sub-port-black',
-    match: [{ exact: 'V29_FrontSubPort_L_00' }, { exact: 'V29_FrontSubPort_R_00' }],
+    match: [{ prefix: 'V29_FrontSubPort_' }],
     params: {
       clearAlbedoTexture: true,
       albedoColor: [0.04, 0.055, 0.07],
