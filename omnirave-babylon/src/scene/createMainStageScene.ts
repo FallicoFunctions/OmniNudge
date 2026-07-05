@@ -24,7 +24,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
   scene.collisionsEnabled = true;
   scene.fogMode = Scene.FOGMODE_EXP2;
   scene.fogDensity = 0.008;
-  scene.fogColor = new Color3(0.065, 0.09, 0.145);
+  scene.fogColor = new Color3(0.11, 0.14, 0.21);
 
   const stageAssets = await loadMainStageAssets(scene);
   const lightingRig = createLightingRig(scene);
