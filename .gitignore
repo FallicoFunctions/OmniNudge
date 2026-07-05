@@ -101,6 +101,8 @@ frontend/storybook-static/
 # Local generated / non-product artifacts
 .git-lfs/
 .superpowers/
+.opencode/
+opencode.json
 TMP_MAIN_STAGE_TEST.glb
 docs/superpowers/plans/
 frontend/playwright-report/
