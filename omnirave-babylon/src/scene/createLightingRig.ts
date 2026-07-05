@@ -13,7 +13,7 @@ export function createLightingRig(scene: Scene) {
   const hemi = new HemisphericLight('main-stage-hemi-light', new Vector3(0, 1, 0), scene);
   hemi.diffuse = new Color3(0.36, 0.41, 0.52);
   hemi.groundColor = new Color3(0.05, 0.06, 0.08);
-  hemi.intensity = 0.86;
+  hemi.intensity = 0.42;
 
   const key = new DirectionalLight(
     'main-stage-key-light',
@@ -32,7 +32,7 @@ export function createLightingRig(scene: Scene) {
   );
   rim.diffuse = new Color3(0.28, 0.52, 0.9);
   rim.specular = new Color3(0.18, 0.44, 0.86);
-  rim.intensity = 1.22;
+  rim.intensity = 1.05;
   rim.position = new Vector3(-30, 26, -72);
 
   const fill = new DirectionalLight(
@@ -42,7 +42,7 @@ export function createLightingRig(scene: Scene) {
   );
   fill.diffuse = new Color3(0.22, 0.34, 0.58);
   fill.specular = new Color3(0.1, 0.18, 0.34);
-  fill.intensity = 1.08;
+  fill.intensity = 0.72;
   fill.position = new Vector3(0, 24, -84);
 
   const shadowGenerator = createKeyShadowGenerator(scene, key);
