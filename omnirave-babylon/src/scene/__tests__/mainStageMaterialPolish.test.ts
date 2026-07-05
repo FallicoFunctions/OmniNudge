@@ -8450,14 +8450,20 @@ describe('polishMainStageMaterials', () => {
 
     const heroCap = MeshBuilder.CreateBox('V68_HeroPortalGoldCap', { size: 1 }, scene);
     heroCap.material = sharedGoldMaterial;
+    const grandArcadeDonor = MeshBuilder.CreateBox('V68_GrandArcadeGoldBands_L', { size: 1 }, scene);
+    grandArcadeDonor.material = sharedGoldMaterial;
 
-    polishMainStageMaterials([controlGold, heroCap]);
+    polishMainStageMaterials([controlGold, heroCap, grandArcadeDonor]);
 
     expect(controlGold.material).toBe(sharedGoldMaterial);
     expect(heroCap.material).toBeInstanceOf(PBRMaterial);
+    expect(grandArcadeDonor.material).toBeInstanceOf(PBRMaterial);
     expect(heroCap.material).not.toBe(sharedGoldMaterial);
+    expect(grandArcadeDonor.material).not.toBe(sharedGoldMaterial);
+    expect(grandArcadeDonor.material).not.toBe(heroCap.material);
 
     const capMaterial = heroCap.material as PBRMaterial;
+    const grandArcadeDonorMaterial = grandArcadeDonor.material as PBRMaterial;
     expect(capMaterial.metadata?.mainStageMaterialPolish).toBe('gold');
     expect(capMaterial.metadata?.mainStageMaterialOverride).toBe('hero-portal-gold-cap');
     expect(capMaterial.albedoColor.r).toBeLessThanOrEqual(0.2);
@@ -8467,6 +8473,11 @@ describe('polishMainStageMaterials', () => {
     expect(capMaterial.metallic).toBeLessThanOrEqual(0.2);
     expect(capMaterial.roughness).toBeGreaterThanOrEqual(0.86);
     expect(capMaterial.environmentIntensity).toBeLessThanOrEqual(0.14);
+    expect(grandArcadeDonorMaterial.metadata?.mainStageMaterialOverride).toBe('grand-arcade-gold-bands');
+    expect(capMaterial.albedoColor.r).toBeLessThan(grandArcadeDonorMaterial.albedoColor.r);
+    expect(capMaterial.emissiveIntensity).toBeLessThan(grandArcadeDonorMaterial.emissiveIntensity);
+    expect(capMaterial.roughness ?? 0).toBeGreaterThan(grandArcadeDonorMaterial.roughness ?? 0);
+    expect(capMaterial.environmentIntensity).toBeLessThan(grandArcadeDonorMaterial.environmentIntensity);
   });
 
   it('smokes the hero portal cyan plinth so the celestial colonnade terminus reads as inset jewel glass instead of a bright cyan slab', () => {
