@@ -73,6 +73,8 @@ describe('createMainStagePresentationRig', () => {
     expect(rig.pipeline.grain.intensity).toBeLessThanOrEqual(14);
     expect(rig.pipeline.bloomKernel).toBeGreaterThanOrEqual(48);
 
+    expect('ssao' in rig).toBe(true);
+
     const screens = rig.heroScreenPanels;
     expect(screens.length).toBe(2);
     for (const panel of screens) {
