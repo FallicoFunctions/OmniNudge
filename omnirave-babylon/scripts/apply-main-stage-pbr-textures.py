@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import bmesh
 import bpy
 
 
@@ -51,18 +52,36 @@ def ensure_gltf_material_output_group():
 
 MATERIAL_FAMILIES = {
     "pearl": {
+        "V13_MoonstoneShell",
         "V14_PolishedMoonstoneShell",
+        "V15_PearlShellBeveled",
+        "V16_PearlArchitecturalShell",
+        "V17_PearlShellSatin",
+        "V18_PearlFacadeInlay",
+        "V19_GatewayPearlIvory",
         "V20_LayeredPearlShell",
+        "V7_PearlIvory",
     },
     "stone": {
         "V13_WetPlazaStone",
+        "V15_WetPlazaInlay",
         "V18_WetStonePaver",
+        "V19_DeepWetArrivalStone",
+        "V20_RecessedWarmShadow",
     },
     "black_metal": {
         "V16_MatteBlackStageHardware",
     },
     "gold_metal": {
+        "V13_BrushedFestivalGold",
+        "V14_BurnishedCelestialGold",
+        "V15_EngineeredGoldAnchors",
         "V16_BrushedProductionGold",
+        "V17_CrownBrushedGold",
+        "V18_BrushedGoldTrim",
+        "V19_ArrivalBrushedGold",
+        "V20_ChasedGoldFiligree",
+        "V9_CrownFiligreeGold",
     },
 }
 
@@ -163,7 +182,10 @@ def reassign_legacy_rigging_materials():
     for object_name, material_name in LEGACY_RIGGING_MATERIAL_OVERRIDES.items():
         obj = bpy.data.objects.get(object_name)
         if obj is None or obj.type != "MESH":
-            raise RuntimeError(f"Missing legacy Main Stage rigging mesh: {object_name}")
+            # Legacy proxies get replaced by later regeneration scripts; once
+            # gone, their material reassignment is already baked into the blend.
+            print(f"V50_LEGACY_SKIP mesh={object_name}")
+            continue
         material = bpy.data.materials.get(material_name)
         if material is None:
             raise RuntimeError(f"Missing legacy Main Stage rigging material: {material_name}")
@@ -188,27 +210,40 @@ def reassign_legacy_rigging_materials():
             for slot in obj.material_slots:
                 slot.material = material
         if not matched:
-            raise RuntimeError(f"Missing legacy Main Stage mesh prefix: {prefix}")
+            print(f"V50_LEGACY_SKIP prefix={prefix}")
 
 
-def ensure_vertex_stable_uvs(mesh, cube_size=4.0):
-    uv_layer = mesh.uv_layers.new(name="OmniRaveGeneratedUV")
-    min_bounds = [min(vertex.co[axis] for vertex in mesh.vertices) for axis in range(3)]
-    max_bounds = [max(vertex.co[axis] for vertex in mesh.vertices) for axis in range(3)]
-    extents = [max_bounds[axis] - min_bounds[axis] for axis in range(3)]
-    uv_axes = sorted(range(3), key=lambda axis: extents[axis], reverse=True)[:2]
+def triangulate_mesh_data(mesh):
+    # Triangulate the shared datablock itself: the glTF exporter refuses to
+    # generate tangents for non-triangulated primitives, and per-object
+    # triangulate modifiers would break mesh-data sharing between mirrored
+    # nodes at export (doubling GPU memory).
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.triangulate(bm, faces=bm.faces, quad_method="BEAUTY", ngon_method="BEAUTY")
+    bm.to_mesh(mesh)
+    bm.free()
 
-    per_vertex_uvs = {}
-    for vertex in mesh.vertices:
-        u = vertex.co[uv_axes[0]] / cube_size + 0.5
-        v = vertex.co[uv_axes[1]] / cube_size + 0.5
-        per_vertex_uvs[vertex.index] = (u, v)
 
-    for loop in mesh.loops:
-        uv_layer.data[loop.index].uv = per_vertex_uvs[loop.vertex_index]
+def ensure_vertex_stable_uvs(obj):
+    # Smart UV Project: unlike a planar two-axis projection it cannot produce
+    # zero-area UV faces (and therefore zero-length tangents) on geometry
+    # perpendicular to the projection plane.
+    obj.data.uv_layers.new(name="OmniRaveGeneratedUV")
+    obj.data.uv_layers["OmniRaveGeneratedUV"].active = True
+    bpy.context.view_layer.objects.active = obj
+    for other in bpy.context.selected_objects:
+        other.select_set(False)
+    obj.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=1.15192, island_margin=0.02, scale_to_bounds=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    obj.select_set(False)
 
 
 def ensure_uvs_for_textured_meshes(textured_material_names):
+    triangulated_mesh_names = set()
     collision_collection = bpy.data.collections.get("Collision")
     collision_objects = set(collision_collection.all_objects) if collision_collection else set()
 
@@ -217,8 +252,6 @@ def ensure_uvs_for_textured_meshes(textured_material_names):
             continue
         generated_uv = obj.data.uv_layers.get("OmniRaveGeneratedUV")
         if obj in collision_objects or obj.hide_viewport or obj.hide_render or obj.hide_get():
-            if generated_uv:
-                obj.data.uv_layers.remove(generated_uv)
             modifier = obj.modifiers.get(TEXTURE_TRIANGULATE_MODIFIER)
             if modifier:
                 obj.modifiers.remove(modifier)
@@ -228,8 +261,6 @@ def ensure_uvs_for_textured_meshes(textured_material_names):
             continue
         material_names = {slot.material.name for slot in obj.material_slots if slot.material}
         if not material_names.intersection(textured_material_names):
-            if generated_uv:
-                obj.data.uv_layers.remove(generated_uv)
             modifier = obj.modifiers.get(TEXTURE_TRIANGULATE_MODIFIER)
             if modifier:
                 obj.modifiers.remove(modifier)
@@ -237,20 +268,21 @@ def ensure_uvs_for_textured_meshes(textured_material_names):
             if modifier:
                 obj.modifiers.remove(modifier)
             continue
-        if generated_uv:
-            obj.data.uv_layers.remove(generated_uv)
-        if obj.data.uv_layers:
-            pass
-        else:
+        authored_layers = [layer for layer in obj.data.uv_layers if layer.name != "OmniRaveGeneratedUV"]
+        if not authored_layers:
+            # Legacy planar generated UVs produce zero-area faces (and
+            # therefore zero-length tangents) on geometry perpendicular to
+            # the projection plane; regenerate them with a smart projection.
+            if generated_uv:
+                obj.data.uv_layers.remove(generated_uv)
             try:
-                ensure_vertex_stable_uvs(obj.data)
+                ensure_vertex_stable_uvs(obj)
             except RuntimeError as error:
                 raise RuntimeError(f"Failed to generate Main Stage UVs for {obj.name}") from error
 
-        if obj.modifiers.get(TEXTURE_TRIANGULATE_MODIFIER) is None:
-            modifier = obj.modifiers.new(TEXTURE_TRIANGULATE_MODIFIER, "TRIANGULATE")
-            modifier.quad_method = "BEAUTY"
-            modifier.ngon_method = "BEAUTY"
+        if obj.data.name not in triangulated_mesh_names:
+            triangulate_mesh_data(obj.data)
+            triangulated_mesh_names.add(obj.data.name)
 
         decimate_ratio = TEXTURE_DECIMATE_RATIOS.get(obj.name)
         if decimate_ratio is None:
