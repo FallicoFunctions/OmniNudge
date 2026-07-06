@@ -27,6 +27,13 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
   camera.minZ = 0.05;
 
   const applyCheckpointView = (view: ReviewCheckpointCamera) => {
+    // Kill residual inertial motion: a teleporting checkpoint jump must land
+    // exactly, not drift through nearby geometry for the first frames.
+    camera.inertialAlphaOffset = 0;
+    camera.inertialBetaOffset = 0;
+    camera.inertialRadiusOffset = 0;
+    camera.inertialPanningX = 0;
+    camera.inertialPanningY = 0;
     target.computeWorldMatrix(true);
     checkpointWorldTarget.copyFrom(target.getAbsolutePosition());
     checkpointWorldTarget.x += view.focusOffset.x;
