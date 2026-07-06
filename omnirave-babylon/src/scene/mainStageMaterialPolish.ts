@@ -84,7 +84,8 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'support-tent-canopy',
     match: [{ prefix: 'V91_SupportTentCanopy_' }],
     params: {
-      albedoColor: [0.34, 0.38, 0.44],
+      clearAlbedoTexture: true,
+      albedoColor: [0.272, 0.304, 0.352],
       emissiveColor: [0, 0, 0],
       emissiveIntensity: 0,
       metallic: 0.01,
@@ -972,7 +973,8 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'oval-screen-canopy-shell',
     match: [{ prefix: 'V80_OvalScreenCanopyShell_' }],
     params: {
-      albedoColor: [0.275, 0.3, 0.35],
+      clearAlbedoTexture: true,
+      albedoColor: [0.22, 0.24, 0.28],
       emissiveColor: [0.006, 0.008, 0.012],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -2355,7 +2357,8 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'oculus-canopy',
     match: [{ prefix: 'V51_OculusCanopy_' }],
     params: {
-      albedoColor: [0.1375, 0.1, 0.0438],
+      clearAlbedoTexture: true,
+      albedoColor: [0.11, 0.08, 0.035],
       emissiveColor: [0, 0, 0],
       emissiveIntensity: 0.01,
       metallic: 0.14,
@@ -2541,7 +2544,8 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'spawn-canopy-pearl-vault',
     match: [{ prefix: 'V56_SpawnCanopyPearlVault_' }],
     params: {
-      albedoColor: [0.275, 0.3, 0.35],
+      clearAlbedoTexture: true,
+      albedoColor: [0.22, 0.24, 0.28],
       emissiveColor: [0.006, 0.008, 0.012],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -4324,7 +4328,8 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'wing-canopy-lamella-pearl',
     match: [{ prefix: 'V117_WingCanopyLamellaPearlArray_' }],
     params: {
-      albedoColor: [0.225, 0.25, 0.3],
+      clearAlbedoTexture: true,
+      albedoColor: [0.18, 0.2, 0.24],
       emissiveColor: [0.006, 0.008, 0.012],
       emissiveIntensity: 0.024,
       metallic: 0.02,
