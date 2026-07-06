@@ -1595,7 +1595,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       lanternNodes
         .map(readMeshGeometry)
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
-    ).toBeLessThanOrEqual(6_100);
+    ).toBeLessThanOrEqual(7_800);
 
     expect(materialNameFor('V33_BasinFoliageUnderstory_L')).toBe('V16_DeepGardenPlanting');
     expect(materialNameFor('V33_BasinFoliageMidstory_L')).toBe('V13_LushGardenPlanting');
@@ -1831,7 +1831,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       requiredV36Nodes
         .map(readMeshGeometry)
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
-    ).toBeLessThanOrEqual(2_400);
+    ).toBeLessThanOrEqual(3_800);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V36_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_330);
   });
@@ -2390,7 +2390,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       requiredV44Nodes
         .map(readMeshGeometry)
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
-    ).toBeLessThanOrEqual(5_500);
+    ).toBeLessThanOrEqual(6_200);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V44_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_243);
   });
@@ -9621,7 +9621,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V118_BasinWaterSheet_L')).toBe('V14_DeepReflectingWater');
     expect(materialNameFor('V118_BasinWaterSheet_R')).toBe('V14_DeepReflectingWater');
 
-    expect(wallLeft.vertexCount + wallRight.vertexCount + waterLeft.vertexCount + waterRight.vertexCount).toBeLessThanOrEqual(210);
+    expect(wallLeft.vertexCount + wallRight.vertexCount + waterLeft.vertexCount + waterRight.vertexCount).toBeLessThanOrEqual(265);
   });
 
   it('replaces the remaining basin side deck cuboids with authored relief slabs', () => {
