@@ -212,6 +212,9 @@ function createHeroScreenPanels(scene: Scene) {
     haze.position.copyFrom(panel.position);
     haze.position.z -= 1.4;
     haze.isPickable = false;
+    // Always face the camera: seen edge-on from side checkpoints the flat
+    // glow sheet reads as a pink glass pane instead of air.
+    haze.billboardMode = Mesh.BILLBOARDMODE_ALL;
     const hazeMaterial = new PBRMaterial(`${panel.name}-haze-material`, scene);
     hazeMaterial.unlit = true;
     hazeMaterial.albedoColor = new Color3(0, 0, 0);
