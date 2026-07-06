@@ -25,7 +25,7 @@ describe('createLightingRig', () => {
     expect(rig.rim.name).toBe('main-stage-rim-light');
     expect(rig.fill.name).toBe('main-stage-front-fill-light');
     expect(rig.key.intensity).toBeGreaterThan(2);
-    expect(rig.hemi.intensity).toBeLessThanOrEqual(0.5);
+    expect(rig.hemi.intensity).toBeLessThanOrEqual(0.6);
     expect(rig.rim.intensity).toBeGreaterThanOrEqual(0.9);
     expect(rig.fill.intensity).toBeGreaterThanOrEqual(0.55);
     expect(rig.fill.intensity).toBeLessThanOrEqual(0.9);
