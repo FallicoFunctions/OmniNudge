@@ -71,6 +71,7 @@ MATERIAL_FAMILIES = {
     },
     "black_metal": {
         "V13_BlackStageRigging",
+        "V14_CosmicScreenEmission",
         "V14_MatteBlackProductionRig",
         "V15_MatteProductionBlack",
         "V16_MatteBlackStageHardware",
