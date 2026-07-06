@@ -105,7 +105,7 @@ function createScreenLightScattering(scene: Scene, camera: Camera, panels: Mesh[
         scene.getEngine(),
         false,
       );
-      scattering.exposure = 0.16;
+      scattering.exposure = 0.24;
       scattering.decay = 0.955;
       scattering.weight = 0.5;
       effects.push(scattering);
@@ -206,7 +206,7 @@ function createHeroScreenPanels(scene: Scene) {
   for (const panel of panels) {
     const haze = MeshBuilder.CreatePlane(
       `${panel.name}-haze`,
-      { width: 13, height: 10, sideOrientation: Mesh.DOUBLESIDE },
+      { width: 17, height: 13, sideOrientation: Mesh.DOUBLESIDE },
       scene,
     );
     haze.position.copyFrom(panel.position);
@@ -217,7 +217,7 @@ function createHeroScreenPanels(scene: Scene) {
     hazeMaterial.albedoColor = new Color3(0, 0, 0);
     hazeMaterial.emissiveColor = new Color3(0.5, 0.22, 0.62);
     hazeMaterial.emissiveIntensity = 0.5;
-    hazeMaterial.alpha = 0.12;
+    hazeMaterial.alpha = 0.2;
     hazeMaterial.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
     haze.material = hazeMaterial;
   }
