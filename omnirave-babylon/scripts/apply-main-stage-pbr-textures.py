@@ -70,7 +70,10 @@ MATERIAL_FAMILIES = {
         "V20_RecessedWarmShadow",
     },
     "black_metal": {
+        "V13_BlackStageRigging",
+        "V14_MatteBlackProductionRig",
         "V16_MatteBlackStageHardware",
+        "V18_LineArrayGraphite",
     },
     "gold_metal": {
         "V13_BrushedFestivalGold",
