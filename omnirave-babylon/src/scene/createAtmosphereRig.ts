@@ -5,8 +5,8 @@ export function createAtmosphereRig(scene: Scene) {
   const imageProcessing = scene.imageProcessingConfiguration;
   imageProcessing.toneMappingEnabled = true;
   imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
-  imageProcessing.exposure = 1.2;
-  imageProcessing.contrast = 1.52;
+  imageProcessing.exposure = 1.7;
+  imageProcessing.contrast = 1.38;
 
   return {
     imageProcessing,
