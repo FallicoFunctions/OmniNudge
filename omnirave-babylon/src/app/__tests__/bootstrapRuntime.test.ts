@@ -145,6 +145,11 @@ describe('createRuntime', () => {
     const scene = {
       pick: scenePick,
       render: sceneRender,
+      onAfterRenderObservable: {
+        // The runtime defers checkpoint camera application by one frame;
+        // in the mock, run it immediately.
+        addOnce: (callback: () => void) => callback(),
+      },
       metadata: {
         reviewRuntime: {
           checkpoints: [

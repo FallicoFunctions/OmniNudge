@@ -60,7 +60,12 @@ export async function createRuntime(host: HTMLElement) {
       onSelectCheckpoint(checkpoint) {
         reviewRuntime?.playerRig?.root.position.set(checkpoint.x, checkpoint.y, checkpoint.z);
         if (checkpoint.camera) {
-          reviewRuntime?.cameraRig?.applyCheckpointView(checkpoint.camera);
+          // Defer one frame: the player's ground-height snap runs in the next
+          // onBeforeRender, and applying the camera from the pre-snap player
+          // position intermittently lands it inside nearby geometry.
+          scene.onAfterRenderObservable.addOnce(() => {
+            reviewRuntime?.cameraRig?.applyCheckpointView(checkpoint.camera);
+          });
         }
       },
     });
