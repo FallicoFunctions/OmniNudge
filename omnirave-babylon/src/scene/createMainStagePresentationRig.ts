@@ -100,8 +100,8 @@ function createEmissiveSpillLights(scene: Scene, heroScreenPanels: Mesh[]) {
       `${panel.name}-spill`,
       panel.position.add(new Vector3(0, -1.5, -2.5)),
       new Color3(0.72, 0.3, 0.85),
-      300,
-      34,
+      560,
+      40,
     );
   }
 
@@ -160,6 +160,25 @@ function createHeroScreenPanels(scene: Scene) {
     panel.material = material;
 
     panels.push(panel);
+  }
+
+  for (const panel of panels) {
+    const haze = MeshBuilder.CreatePlane(
+      `${panel.name}-haze`,
+      { width: 13, height: 10, sideOrientation: Mesh.DOUBLESIDE },
+      scene,
+    );
+    haze.position.copyFrom(panel.position);
+    haze.position.z -= 1.4;
+    haze.isPickable = false;
+    const hazeMaterial = new PBRMaterial(`${panel.name}-haze-material`, scene);
+    hazeMaterial.unlit = true;
+    hazeMaterial.albedoColor = new Color3(0, 0, 0);
+    hazeMaterial.emissiveColor = new Color3(0.5, 0.22, 0.62);
+    hazeMaterial.emissiveIntensity = 0.5;
+    hazeMaterial.alpha = 0.12;
+    hazeMaterial.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+    haze.material = hazeMaterial;
   }
 
   return panels;
