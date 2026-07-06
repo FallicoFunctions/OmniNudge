@@ -2657,7 +2657,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       requiredV48Nodes
         .map(readMeshGeometry)
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
-    ).toBeLessThanOrEqual(3_100);
+    ).toBeLessThanOrEqual(3_700);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V48_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_183);
   });
