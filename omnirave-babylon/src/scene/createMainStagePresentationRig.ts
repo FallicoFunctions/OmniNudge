@@ -88,8 +88,9 @@ function createEmissiveSpillLights(scene: Scene, heroScreenPanels: Mesh[]) {
     light.intensity = intensity;
     light.range = range;
     light.includedOnlyMeshes = scene.meshes.filter((mesh) => {
-      const center = mesh.getBoundingInfo().boundingBox.centerWorld;
-      return center.subtract(position).length() <= range * 1.2;
+      const bounds = mesh.getBoundingInfo();
+      const centerDistance = bounds.boundingBox.centerWorld.subtract(position).length();
+      return centerDistance - bounds.boundingSphere.radiusWorld <= range * 1.2;
     });
     lights.push(light);
   };
@@ -99,8 +100,8 @@ function createEmissiveSpillLights(scene: Scene, heroScreenPanels: Mesh[]) {
       `${panel.name}-spill`,
       panel.position.add(new Vector3(0, -1.5, -2.5)),
       new Color3(0.72, 0.3, 0.85),
-      150,
-      22,
+      240,
+      30,
     );
   }
 
@@ -114,8 +115,8 @@ function createEmissiveSpillLights(scene: Scene, heroScreenPanels: Mesh[]) {
       `led-deck-spill-${side}`,
       new Vector3(center.x, center.y + 2.2, center.z),
       new Color3(0.16, 0.6, 0.95),
-      130,
-      20,
+      200,
+      26,
     );
   }
 
