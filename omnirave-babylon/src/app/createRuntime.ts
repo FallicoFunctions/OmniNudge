@@ -102,7 +102,10 @@ export async function createRuntime(host: HTMLElement) {
       if (perfFrameCounter % 30 === 0 && perfOverlay) {
         const fps = engine.getFps();
         const activeFx = scene.activeCamera?._postProcesses?.filter(Boolean).length ?? 0;
-        updatePerfOverlay(perfOverlay, fps, fps > 0 ? 1000 / fps : 0, activeFx);
+        const shadowCasters =
+          scene.metadata?.reviewRuntime?.lightingRig?.shadowGenerator?.getShadowMap()?.renderList?.length ?? 0;
+        const readyTextures = scene.textures.filter((texture) => texture.isReady()).length;
+        updatePerfOverlay(perfOverlay, fps, fps > 0 ? 1000 / fps : 0, activeFx, shadowCasters, readyTextures);
       }
     });
 
