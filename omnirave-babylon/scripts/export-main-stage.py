@@ -36,13 +36,63 @@ def strip_unused_tangents(glb_path):
     materials = glb_json.get("materials", [])
     removed = 0
 
+    binary_probe_length, binary_probe_type = struct.unpack_from("<II", data, json_end)
+    binary_probe_start = json_end + 8
+
+    def tangents_degenerate(primitive):
+        accessor = glb_json["accessors"][primitive["attributes"]["TANGENT"]]
+        view = glb_json["bufferViews"][accessor["bufferView"]]
+        stride = view.get("byteStride", 16)
+        base = binary_probe_start + view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+        for index in range(accessor["count"]):
+            offset = base + index * stride
+            x, y, z = struct.unpack_from("<fff", data, offset)
+            if (x * x + y * y + z * z) < 0.998:
+                return True
+        return False
+
+    def repair_degenerate_tangents(primitive):
+        accessor = glb_json["accessors"][primitive["attributes"]["TANGENT"]]
+        view = glb_json["bufferViews"][accessor["bufferView"]]
+        stride = view.get("byteStride", 16)
+        base = binary_probe_start + view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+        normal_accessor = glb_json["accessors"][primitive["attributes"]["NORMAL"]]
+        normal_view = glb_json["bufferViews"][normal_accessor["bufferView"]]
+        normal_stride = normal_view.get("byteStride", 12)
+        normal_base = binary_probe_start + normal_view.get("byteOffset", 0) + normal_accessor.get("byteOffset", 0)
+        repaired_count = 0
+        for index in range(accessor["count"]):
+            offset = base + index * stride
+            x, y, z = struct.unpack_from("<fff", data, offset)
+            if (x * x + y * y + z * z) >= 0.998:
+                continue
+            nx, ny, nz = struct.unpack_from("<fff", data, normal_base + index * normal_stride)
+            # Any unit vector orthogonal to the normal is a valid tangent for
+            # a sliver face mikktspace could not solve.
+            if abs(ny) < 0.9:
+                tx, ty, tz = nz, 0.0, -nx
+            else:
+                tx, ty, tz = 0.0, nz, -ny
+            length = (tx * tx + ty * ty + tz * tz) ** 0.5 or 1.0
+            struct.pack_into("<ffff", data, offset, tx / length, ty / length, tz / length, 1.0)
+            repaired_count += 1
+        return repaired_count
+
+    degenerate = 0
     for mesh in glb_json.get("meshes", []):
         for primitive in mesh.get("primitives", []):
             material_index = primitive.get("material")
             material = materials[material_index] if material_index is not None else {}
-            if material.get("normalTexture") is None and "TANGENT" in primitive.get("attributes", {}):
+            if "TANGENT" not in primitive.get("attributes", {}):
+                continue
+            if material.get("normalTexture") is None:
                 del primitive["attributes"]["TANGENT"]
                 removed += 1
+            elif tangents_degenerate(primitive):
+                # Sliver triangles in authored trim make mikktspace emit
+                # zero-length tangents; substitute a valid orthonormal basis
+                # so tangent-space shading stays defined on those faces.
+                degenerate += repair_degenerate_tangents(primitive)
 
     binary_chunk_length, binary_chunk_type = struct.unpack_from("<II", data, json_end)
     if binary_chunk_type != 0x004E4942:
@@ -67,6 +117,8 @@ def strip_unused_tangents(glb_path):
     glb_path.write_bytes(rewritten)
     if removed:
         print(f"Stripped unused tangents from {removed} Main Stage primitives")
+    if degenerate:
+        print(f"Repaired {degenerate} degenerate Main Stage tangents")
 
 
 def ensure_temp_tangent_triangulation(objects):
