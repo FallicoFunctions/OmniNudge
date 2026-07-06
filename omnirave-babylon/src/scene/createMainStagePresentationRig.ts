@@ -115,9 +115,13 @@ function createEmissiveSpillLights(scene: Scene, heroScreenPanels: Mesh[]) {
       `led-deck-spill-${side}`,
       new Vector3(center.x, center.y + 2.2, center.z),
       new Color3(0.16, 0.6, 0.95),
-      200,
-      26,
+      140,
+      22,
     );
+    // The deck is the emitter: lighting it with its own spill on top of
+    // emissive + bloom blows it out to a white slab.
+    const spill = lights[lights.length - 1];
+    spill.includedOnlyMeshes = spill.includedOnlyMeshes.filter((mesh) => !mesh.name.startsWith('V31_SideLedTileField_') && !mesh.name.startsWith('V31_SideGlassLens_') && !mesh.name.startsWith('V31_SideParallaxOrbitalContent_'));
   }
 
   return lights;
