@@ -68,6 +68,7 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   pipeline.depthOfFieldEnabled = false;
   pipeline.chromaticAberrationEnabled = false;
   pipeline.sharpenEnabled = true;
+  pipeline.samples = 4;
   pipeline.imageProcessing.vignetteEnabled = true;
   pipeline.imageProcessing.vignetteWeight = 1.5;
   pipeline.grainEnabled = true;
