@@ -33,7 +33,7 @@ describe('createLightingRig', () => {
     expect(rig.rim.diffuse.b).toBeGreaterThan(rig.rim.diffuse.r);
   });
 
-  it('casts key-light shadows from the loaded stage meshes once, skipping blended and invisible meshes', () => {
+  it('casts key-light shadows from the loaded stage meshes once, skipping blended and invisible meshes', async () => {
     engine = new NullEngine();
     scene = new Scene(engine);
 
@@ -58,6 +58,7 @@ describe('createLightingRig', () => {
     expect(casterNames).not.toContain('V02_GlassLens');
     expect(casterNames).not.toContain('CollisionProxy');
     expect(solid.receiveShadows).toBe(true);
+    await scene.whenReadyAsync();
     expect(rig.shadowGenerator.getShadowMap()?.refreshRate).toBe(
       RenderTargetTexture.REFRESHRATE_RENDER_ONCE,
     );
