@@ -17,7 +17,7 @@ export function createLightingRig(scene: Scene) {
 
   const key = new DirectionalLight(
     'main-stage-key-light',
-    new Vector3(-0.14, -1, -0.18),
+    new Vector3(-0.48, -1, -0.4),
     scene,
   );
   key.diffuse = new Color3(1, 0.95, 0.88);
@@ -75,7 +75,7 @@ function createPracticalPoolLights(scene: Scene) {
     const jitter = hashUnit(source.name);
     pool.diffuse = new Color3(1, 0.58 + jitter * 0.09, 0.21 + jitter * 0.07);
     pool.specular = new Color3(1, 0.5, 0.2);
-    pool.intensity = 128 + jitter * 64;
+    pool.intensity = 180 + jitter * 90;
     pool.range = POOL_RANGE;
 
     // Scope each pool to nearby meshes: keeps every mesh within the
@@ -106,7 +106,7 @@ function createPracticalPoolLights(scene: Scene) {
 function createKeyShadowGenerator(scene: Scene, key: DirectionalLight) {
   key.autoCalcShadowZBounds = true;
 
-  const shadowGenerator = new ShadowGenerator(2048, key);
+  const shadowGenerator = new ShadowGenerator(4096, key);
   shadowGenerator.usePercentageCloserFiltering = true;
   shadowGenerator.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
   shadowGenerator.bias = 0.0022;
