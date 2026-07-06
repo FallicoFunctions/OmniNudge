@@ -11,7 +11,7 @@ import '@babylonjs/core/Shaders/pbr.vertex';
 import '@babylonjs/core/Shaders/rgbdDecode.fragment';
 import { createMainStageScene } from '../scene/createMainStageScene';
 import { createDebugPanel } from '../ui/createDebugPanel';
-import { createPerfOverlay } from '../ui/createPerfOverlay';
+import { createPerfOverlay, updatePerfOverlay } from '../ui/createPerfOverlay';
 import { createReviewHud } from '../ui/createReviewHud';
 import { createRuntimeLoadingOverlay } from '../ui/createRuntimeLoadingOverlay';
 import { RUNTIME_CONFIG } from './runtimeConfig';
@@ -90,8 +90,15 @@ export async function createRuntime(host: HTMLElement) {
     };
     loadingOverlay.remove();
 
+    let perfFrameCounter = 0;
     engine.runRenderLoop(() => {
       scene.render();
+      perfFrameCounter += 1;
+      if (perfFrameCounter % 30 === 0 && perfOverlay) {
+        const fps = engine.getFps();
+        const activeFx = scene.activeCamera?._postProcesses?.filter(Boolean).length ?? 0;
+        updatePerfOverlay(perfOverlay, fps, fps > 0 ? 1000 / fps : 0, activeFx);
+      }
     });
 
     window.addEventListener('resize', handleResize);
