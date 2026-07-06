@@ -869,7 +869,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'wet-paver-stone-band',
     match: [{ exact: 'V85_WetPaverStoneBands' }],
     params: {
-      albedoColor: [0.378, 0.414, 0.486],
+      albedoColor: [0.263, 0.287, 0.337],
       emissiveColor: [0.006, 0.008, 0.012],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -2138,7 +2138,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'basin-stone-coping',
     match: [{ prefix: 'V90_BasinStoneCopingArray_' }],
     params: {
-      albedoColor: [0.234, 0.225, 0.207],
+      albedoColor: [0.163, 0.156, 0.144],
       emissiveColor: [0, 0, 0],
       emissiveIntensity: 0,
       metallic: 0.02,
@@ -2418,7 +2418,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'promenade-pearl-runway',
     match: [{ exact: 'V70_PromenadePearlRunway' }],
     params: {
-      albedoColor: [0.432, 0.396, 0.36],
+      albedoColor: [0.3, 0.275, 0.25],
       emissiveColor: [0, 0, 0],
       emissiveIntensity: 0,
       metallic: 0.02,
@@ -2754,7 +2754,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'basin-causeway-pearl-span',
     match: [{ exact: 'V62_BasinCausewayPearlSpan' }],
     params: {
-      albedoColor: [0.324, 0.342, 0.414],
+      albedoColor: [0.225, 0.237, 0.287],
       emissiveColor: [0.004, 0.006, 0.01],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -2812,7 +2812,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'arrival-runway-pearl-bands',
     match: [{ exact: 'V65_ArrivalRunwayPearlBands' }],
     params: {
-      albedoColor: [0.432, 0.468, 0.54],
+      albedoColor: [0.3, 0.325, 0.375],
       emissiveColor: [0.006, 0.01, 0.014],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -3120,7 +3120,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'plaza-paver-pearl-bands',
     match: [{ exact: 'V69_PlazaPaverPearlBands' }],
     params: {
-      albedoColor: [0.432, 0.468, 0.54],
+      albedoColor: [0.3, 0.325, 0.375],
       emissiveColor: [0.006, 0.01, 0.014],
       emissiveIntensity: 0.02,
       metallic: 0.02,
