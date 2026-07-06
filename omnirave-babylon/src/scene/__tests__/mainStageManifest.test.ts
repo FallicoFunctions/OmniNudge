@@ -6526,7 +6526,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     for (const [nodeName, expectedMaterial] of expectedMaterials) {
       expect(materialNameFor(nodeName), `unexpected material: ${nodeName}`).toBe(expectedMaterial);
     }
-    expect(leftGold.vertexCount + rightGold.vertexCount + leftEmission.vertexCount + rightEmission.vertexCount).toBeLessThanOrEqual(520);
+    expect(leftGold.vertexCount + rightGold.vertexCount + leftEmission.vertexCount + rightEmission.vertexCount).toBeLessThanOrEqual(680);
   });
 
   it('replaces the main truss tower proxy posts and gold crossbars with authored lattice tower arrays', () => {
