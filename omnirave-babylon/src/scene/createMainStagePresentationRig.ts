@@ -100,8 +100,8 @@ function createEmissiveSpillLights(scene: Scene, heroScreenPanels: Mesh[]) {
       `${panel.name}-spill`,
       panel.position.add(new Vector3(0, -1.5, -2.5)),
       new Color3(0.72, 0.3, 0.85),
-      240,
-      30,
+      300,
+      34,
     );
   }
 
@@ -152,7 +152,7 @@ function createHeroScreenPanels(scene: Scene) {
     material.albedoColor = new Color3(0.01, 0.015, 0.02);
     material.emissiveColor = new Color3(1, 1, 1);
     material.emissiveTexture = contentTexture;
-    material.emissiveIntensity = 4.6;
+    material.emissiveIntensity = 6.5;
     panel.material = material;
 
     panels.push(panel);
