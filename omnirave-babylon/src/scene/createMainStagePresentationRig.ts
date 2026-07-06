@@ -60,7 +60,10 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   pipeline.bloomEnabled = true;
   pipeline.bloomThreshold = 0.5;
   pipeline.bloomWeight = 0.62;
-  pipeline.bloomKernel = 84;
+  // Bloom kernel is in pixels: normalise to render height so halos keep
+  // the same angular size on any viewport instead of shrinking on large
+  // windows (reviews from bigger tabs kept reporting 'no bloom').
+  pipeline.bloomKernel = Math.max(48, Math.round((84 * scene.getEngine().getRenderHeight()) / 825));
   pipeline.bloomScale = 0.5;
   pipeline.depthOfFieldEnabled = false;
   pipeline.chromaticAberrationEnabled = false;
