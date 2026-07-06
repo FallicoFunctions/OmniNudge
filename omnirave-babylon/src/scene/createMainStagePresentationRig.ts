@@ -274,7 +274,7 @@ function createLedWallContentTexture(scene: Scene) {
   }
 
   try {
-    const texture = RawTexture.CreateRGBATexture(data, width, height, scene, false, false, Texture.BILINEAR_SAMPLINGMODE);
+    const texture = RawTexture.CreateRGBATexture(data, width, height, scene, true, false, Texture.TRILINEAR_SAMPLINGMODE);
     texture.name = 'main-stage-hero-screen-content';
     return texture;
   } catch {
