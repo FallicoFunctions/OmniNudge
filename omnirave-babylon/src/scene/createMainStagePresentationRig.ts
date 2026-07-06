@@ -224,8 +224,8 @@ function createHeroScreenPanels(scene: Scene) {
 // Procedural LED-wall still: cyan-to-magenta energy gradient with scanline
 // structure so the panels read as a video surface rather than a flat glow.
 function createLedWallContentTexture(scene: Scene) {
-  const width = 128;
-  const height = 96;
+  const width = 256;
+  const height = 192;
   const data = new Uint8Array(width * height * 4);
 
   for (let y = 0; y < height; y++) {
