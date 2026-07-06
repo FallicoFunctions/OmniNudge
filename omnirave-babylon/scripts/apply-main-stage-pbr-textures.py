@@ -15,6 +15,13 @@ TEXTURE_DECIMATE_RATIOS = {
 }
 
 
+NORMAL_STRENGTHS = {
+    "pearl": 1.6,
+    "stone": 1.7,
+    "black_metal": 2.4,
+    "gold_metal": 1.8,
+}
+
 TEXTURE_SETS = {
     "pearl": {
         "diffuse": "marble_01_diff_1k.jpg",
@@ -146,7 +153,9 @@ def apply_texture_set(material_name, texture_set_name):
     normal_image.image = load_image(textures["normal"], non_color=True)
     normal_map = nodes.new("ShaderNodeNormalMap")
     normal_map.name = f"OmniRaveTexture_{texture_set_name}_normal_map"
-    normal_map.inputs["Strength"].default_value = 1.3
+    # Per-family relief: dark hardware needs far stronger normals to read at
+    # night light levels; reviews called plate structure invisible below ~2x.
+    normal_map.inputs["Strength"].default_value = NORMAL_STRENGTHS[texture_set_name]
     links.new(normal_image.outputs["Color"], normal_map.inputs["Color"])
     links.new(normal_map.outputs["Normal"], principled_input(principled, "Normal"))
 
