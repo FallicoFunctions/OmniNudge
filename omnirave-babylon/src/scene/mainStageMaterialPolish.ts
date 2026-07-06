@@ -4369,7 +4369,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     params: {
       albedoColor: [0.0375, 0.0875, 0.1187],
       emissiveColor: [0.1, 0.5, 0.72],
-      emissiveIntensity: 1.4,
+      emissiveIntensity: 1.0,
       metallic: 0.02,
       roughness: 0.24,
       alpha: 0.72,
@@ -4384,7 +4384,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     params: {
       albedoColor: [0.025, 0.0625, 0.0875],
       emissiveColor: [0.1, 0.5, 0.72],
-      emissiveIntensity: 1.4,
+      emissiveIntensity: 1.0,
       metallic: 0.02,
       roughness: 0.32,
       alpha: 0.72,
