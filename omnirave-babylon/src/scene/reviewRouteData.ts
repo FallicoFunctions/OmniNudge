@@ -59,7 +59,9 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
       beta: 1.35,
       radius: 26,
       focusOffset: { x: -2, y: 14, z: 26 },
-      positionOffset: { x: 8, y: 2.6, z: -26 },
+      // Clears the route-edge tent roofline: at y 2.6 the camera grazed the
+      // canopy and ground-snap variance decided whether it clipped inside.
+      positionOffset: { x: 10, y: 5.5, z: -25 },
     },
   },
   {
