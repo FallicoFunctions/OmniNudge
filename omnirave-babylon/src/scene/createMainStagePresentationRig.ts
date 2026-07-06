@@ -2,7 +2,19 @@
 // pipeline modules; without these side-effect imports Babylon falls back to
 // fetching raw .fx files over HTTP, Vite answers with index.html, the GLSL
 // compile fails, and the whole post chain silently detaches.
+// Eagerly register every shader the pipeline needs: a lazily fetched
+// shader can 404 into Vite's index.html fallback, and one failed GLSL
+// compile silently detaches the camera's entire post chain.
+import '@babylonjs/core/Shaders/bloomMerge.fragment.js';
+import '@babylonjs/core/Shaders/extractHighlights.fragment.js';
+import '@babylonjs/core/Shaders/fxaa.fragment.js';
+import '@babylonjs/core/Shaders/fxaa.vertex.js';
 import '@babylonjs/core/Shaders/grain.fragment.js';
+import '@babylonjs/core/Shaders/imageProcessing.fragment.js';
+import '@babylonjs/core/Shaders/kernelBlur.fragment.js';
+import '@babylonjs/core/Shaders/kernelBlur.vertex.js';
+import '@babylonjs/core/Shaders/postprocess.vertex.js';
+import '@babylonjs/core/Shaders/sharpen.fragment.js';
 
 import type { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
@@ -167,17 +179,25 @@ function createLedWallContentTexture(scene: Scene) {
       let g = 60 + (1 - sweep) * 165 * pulse;
       let b = 150 + 105 * pulse * (0.4 + 0.6 * sweep);
 
-      // Horizontal scanlines every other row for LED tile structure.
-      if (y % 2 === 1) {
-        r *= 0.62;
-        g *= 0.62;
-        b *= 0.62;
+      // LED module structure: dark gutters between 4px modules both ways,
+      // with per-module brightness variance so the wall reads as discrete
+      // emitters instead of a smooth gradient.
+      if (x % 4 === 0 || y % 4 === 0) {
+        r *= 0.35;
+        g *= 0.35;
+        b *= 0.35;
+      } else {
+        const moduleSeed = Math.sin((Math.floor(x / 4) * 73 + Math.floor(y / 4) * 149) * 12.9898) * 43758.5453;
+        const moduleJitter = 0.75 + 0.45 * (moduleSeed - Math.floor(moduleSeed));
+        r *= moduleJitter;
+        g *= moduleJitter;
+        b *= moduleJitter;
       }
-      // Vertical tile seams.
-      if (x % 16 === 0) {
-        r *= 0.7;
-        g *= 0.7;
-        b *= 0.7;
+      // Panel seams every 16px.
+      if (x % 16 === 0 || y % 16 === 0) {
+        r *= 0.55;
+        g *= 0.55;
+        b *= 0.55;
       }
 
       const i = (y * width + x) * 4;
