@@ -315,6 +315,25 @@ def ensure_uvs_for_textured_meshes(textured_material_names):
             obj.modifiers[TEXTURE_DECIMATE_MODIFIER].ratio = decimate_ratio
 
 
+def smooth_curved_shading():
+    # Reviews consistently flag hard polygon facets on curved hero forms as
+    # the loudest CG tell. Smooth shading by angle keeps authored hard edges
+    # (>35 degrees) while letting curved silhouettes shade continuously.
+    collision_collection = bpy.data.collections.get("Collision")
+    collision_objects = set(collision_collection.all_objects) if collision_collection else set()
+    smoothed_mesh_names = set()
+    for obj in bpy.data.objects:
+        if obj.type != "MESH" or obj in collision_objects or obj.hide_render:
+            continue
+        if obj.data.name in smoothed_mesh_names:
+            continue
+        smoothed_mesh_names.add(obj.data.name)
+        for polygon in obj.data.polygons:
+            polygon.use_smooth = True
+        obj.data.set_sharp_from_angle(angle=0.6108652)
+    print(f"V50_SMOOTH_SHADING meshes={len(smoothed_mesh_names)}")
+
+
 target_material_names = {material_name for material_names in MATERIAL_FAMILIES.values() for material_name in material_names}
 clean_non_target_materials(target_material_names)
 reassign_legacy_rigging_materials()
@@ -326,6 +345,7 @@ for texture_set_name, material_names in MATERIAL_FAMILIES.items():
             applied.append(material_name)
 
 ensure_uvs_for_textured_meshes(set(applied))
+smooth_curved_shading()
 
 if len(applied) != len(target_material_names):
     raise RuntimeError(f"Expected {len(target_material_names)} textured materials, got {len(applied)}")
