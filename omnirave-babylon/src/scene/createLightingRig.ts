@@ -81,8 +81,12 @@ function createPracticalPoolLights(scene: Scene) {
     // Scope each pool to nearby meshes: keeps every mesh within the
     // per-material light-slot budget and off-loads distant geometry.
     pool.includedOnlyMeshes = scene.meshes.filter((mesh) => {
-      const meshCenter = mesh.getBoundingInfo().boundingBox.centerWorld;
-      return meshCenter.subtract(center).length() <= POOL_RANGE * 1.2;
+      // Bounding-sphere distance, not centre distance: the mega-mesh floors
+      // span the whole venue, so their centres sit far from every lamp even
+      // where the surface passes directly beneath one.
+      const bounds = mesh.getBoundingInfo();
+      const centerDistance = bounds.boundingBox.centerWorld.subtract(center).length();
+      return centerDistance - bounds.boundingSphere.radiusWorld <= POOL_RANGE * 1.2;
     });
 
     pools.push(pool);
