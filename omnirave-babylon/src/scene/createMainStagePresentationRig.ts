@@ -53,8 +53,8 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   pipeline.imageProcessingEnabled = true;
   pipeline.fxaaEnabled = true;
   pipeline.bloomEnabled = true;
-  pipeline.bloomThreshold = 0.65;
-  pipeline.bloomWeight = 0.5;
+  pipeline.bloomThreshold = 0.5;
+  pipeline.bloomWeight = 0.62;
   pipeline.bloomKernel = 84;
   pipeline.bloomScale = 0.5;
   pipeline.depthOfFieldEnabled = false;
@@ -156,7 +156,7 @@ function createHeroScreenPanels(scene: Scene) {
     material.albedoColor = new Color3(0.01, 0.015, 0.02);
     material.emissiveColor = new Color3(1, 1, 1);
     material.emissiveTexture = contentTexture;
-    material.emissiveIntensity = 6.5;
+    material.emissiveIntensity = 8;
     panel.material = material;
 
     panels.push(panel);
@@ -437,8 +437,8 @@ function createCelestialVaultMaterial(scene: Scene) {
   material.backFaceCulling = false;
   material.unlit = true;
   material.albedoColor = new Color3(0.022, 0.038, 0.072);
-  material.emissiveColor = new Color3(0.016, 0.03, 0.054);
-  material.emissiveIntensity = 0.38;
+  material.emissiveColor = new Color3(0.024, 0.042, 0.075);
+  material.emissiveIntensity = 0.6;
   material.reflectivityColor = new Color3(0, 0, 0);
 
   return material;

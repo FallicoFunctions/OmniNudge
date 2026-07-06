@@ -95,7 +95,7 @@ function createPracticalPoolLights(scene: Scene) {
   if (pools.length > 0) {
     for (const material of scene.materials) {
       if ('maxSimultaneousLights' in material) {
-        material.maxSimultaneousLights = 8;
+        material.maxSimultaneousLights = 12;
       }
     }
   }
