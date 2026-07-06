@@ -237,7 +237,12 @@ def ensure_vertex_stable_uvs(obj):
     obj.select_set(True)
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.uv.smart_project(angle_limit=1.15192, island_margin=0.02, scale_to_bounds=False)
+    # Cube projection at a fixed world scale: keeps ~one texture tile per
+    # 4m (Smart UV normalises islands to the 0-1 square, which stretched a
+    # single tile across whole meshes and made the maps invisible), and its
+    # per-face dominant-axis mapping cannot emit the zero-area UV faces the
+    # old two-axis planar projection produced.
+    bpy.ops.uv.cube_project(cube_size=4.0, correct_aspect=True, scale_to_bounds=False)
     bpy.ops.object.mode_set(mode="OBJECT")
     obj.select_set(False)
 
