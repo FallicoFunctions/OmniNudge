@@ -72,6 +72,7 @@ MATERIAL_FAMILIES = {
     "black_metal": {
         "V13_BlackStageRigging",
         "V14_MatteBlackProductionRig",
+        "V15_MatteProductionBlack",
         "V16_MatteBlackStageHardware",
         "V18_LineArrayGraphite",
     },
@@ -245,7 +246,7 @@ def ensure_vertex_stable_uvs(obj):
     # single tile across whole meshes and made the maps invisible), and its
     # per-face dominant-axis mapping cannot emit the zero-area UV faces the
     # old two-axis planar projection produced.
-    bpy.ops.uv.cube_project(cube_size=4.0, correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.uv.cube_project(cube_size=2.5, correct_aspect=True, scale_to_bounds=False)
     bpy.ops.object.mode_set(mode="OBJECT")
     obj.select_set(False)
 
