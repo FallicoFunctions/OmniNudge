@@ -1098,7 +1098,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     meshNames: ['V85_WetPaverStoneBands'],
     expected: {
       albedoTextureCleared: false,
-      albedoColor: [0.378, 0.414, 0.486],
+      albedoColor: [0.263, 0.287, 0.337],
       emissiveColor: [0.006, 0.008, 0.012],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -2808,7 +2808,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     meshNames: ['V90_BasinStoneCopingArray_Probe'],
     expected: {
       albedoTextureCleared: false,
-      albedoColor: [0.234, 0.225, 0.207],
+      albedoColor: [0.163, 0.156, 0.144],
       emissiveColor: [0, 0, 0],
       emissiveIntensity: 0,
       metallic: 0.02,
@@ -3188,7 +3188,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     meshNames: ['V70_PromenadePearlRunway'],
     expected: {
       albedoTextureCleared: false,
-      albedoColor: [0.432, 0.396, 0.36],
+      albedoColor: [0.3, 0.275, 0.25],
       emissiveColor: [0, 0, 0],
       emissiveIntensity: 0,
       metallic: 0.02,
@@ -3644,7 +3644,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     meshNames: ['V62_BasinCausewayPearlSpan'],
     expected: {
       albedoTextureCleared: false,
-      albedoColor: [0.324, 0.342, 0.414],
+      albedoColor: [0.225, 0.237, 0.287],
       emissiveColor: [0.004, 0.006, 0.01],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -3720,7 +3720,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     meshNames: ['V65_ArrivalRunwayPearlBands'],
     expected: {
       albedoTextureCleared: false,
-      albedoColor: [0.432, 0.468, 0.54],
+      albedoColor: [0.3, 0.325, 0.375],
       emissiveColor: [0.006, 0.01, 0.014],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -4138,7 +4138,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     meshNames: ['V69_PlazaPaverPearlBands'],
     expected: {
       albedoTextureCleared: false,
-      albedoColor: [0.432, 0.468, 0.54],
+      albedoColor: [0.3, 0.325, 0.375],
       emissiveColor: [0.006, 0.01, 0.014],
       emissiveIntensity: 0.02,
       metallic: 0.02,

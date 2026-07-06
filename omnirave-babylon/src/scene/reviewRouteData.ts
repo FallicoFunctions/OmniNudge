@@ -50,6 +50,19 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
     },
   },
   {
+    id: 'crowd_pit',
+    x: 6,
+    y: 1.7,
+    z: -16,
+    camera: {
+      alpha: -Math.PI / 2,
+      beta: 1.35,
+      radius: 26,
+      focusOffset: { x: -2, y: 14, z: 26 },
+      positionOffset: { x: 8, y: 2.6, z: -26 },
+    },
+  },
+  {
     id: 'basin_edge',
     x: 0,
     y: 1.7,
