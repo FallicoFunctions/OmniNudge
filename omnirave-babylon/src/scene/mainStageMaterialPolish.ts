@@ -869,8 +869,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'wet-paver-stone-band',
     match: [{ exact: 'V85_WetPaverStoneBands' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.21, 0.23, 0.27],
+      albedoColor: [0.378, 0.414, 0.486],
       emissiveColor: [0.006, 0.008, 0.012],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -2139,8 +2138,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'basin-stone-coping',
     match: [{ prefix: 'V90_BasinStoneCopingArray_' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.13, 0.125, 0.115],
+      albedoColor: [0.234, 0.225, 0.207],
       emissiveColor: [0, 0, 0],
       emissiveIntensity: 0,
       metallic: 0.02,
@@ -2420,8 +2418,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'promenade-pearl-runway',
     match: [{ exact: 'V70_PromenadePearlRunway' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.24, 0.22, 0.2],
+      albedoColor: [0.432, 0.396, 0.36],
       emissiveColor: [0, 0, 0],
       emissiveIntensity: 0,
       metallic: 0.02,
@@ -2757,8 +2754,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'basin-causeway-pearl-span',
     match: [{ exact: 'V62_BasinCausewayPearlSpan' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.18, 0.19, 0.23],
+      albedoColor: [0.324, 0.342, 0.414],
       emissiveColor: [0.004, 0.006, 0.01],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -2816,8 +2812,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'arrival-runway-pearl-bands',
     match: [{ exact: 'V65_ArrivalRunwayPearlBands' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.24, 0.26, 0.3],
+      albedoColor: [0.432, 0.468, 0.54],
       emissiveColor: [0.006, 0.01, 0.014],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -3125,8 +3120,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'plaza-paver-pearl-bands',
     match: [{ exact: 'V69_PlazaPaverPearlBands' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.24, 0.26, 0.3],
+      albedoColor: [0.432, 0.468, 0.54],
       emissiveColor: [0.006, 0.01, 0.014],
       emissiveIntensity: 0.02,
       metallic: 0.02,
