@@ -15,11 +15,15 @@ import '@babylonjs/core/Shaders/kernelBlur.fragment.js';
 import '@babylonjs/core/Shaders/kernelBlur.vertex.js';
 import '@babylonjs/core/Shaders/postprocess.vertex.js';
 import '@babylonjs/core/Shaders/sharpen.fragment.js';
+import '@babylonjs/core/Shaders/volumetricLightScattering.fragment.js';
+import '@babylonjs/core/Shaders/volumetricLightScatteringPass.fragment.js';
+import '@babylonjs/core/Shaders/volumetricLightScatteringPass.vertex.js';
 
 import type { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline.js';
+import { VolumetricLightScatteringPostProcess } from '@babylonjs/core/PostProcesses/volumetricLightScatteringPostProcess.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { PointLight } from '@babylonjs/core/Lights/pointLight.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
@@ -43,6 +47,7 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   const backdropRoot = createPresentationBackdrop(scene);
   const heroScreenPanels = createHeroScreenPanels(scene);
   const emissiveSpillLights = createEmissiveSpillLights(scene, heroScreenPanels);
+  const screenScattering = createScreenLightScattering(scene, camera, heroScreenPanels);
 
   const pipeline = new DefaultRenderingPipeline(
     'main-stage-presentation-pipeline',
@@ -72,7 +77,39 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
     environmentTexture,
     heroScreenPanels,
     pipeline,
+    screenScattering,
   };
+}
+
+// Festival air scatters screen light into visible haze; volumetric
+// scattering from each LED panel puts that glow in the air itself
+// instead of only on emitter surfaces.
+function createScreenLightScattering(scene: Scene, camera: Camera, panels: Mesh[]) {
+  const effects: VolumetricLightScatteringPostProcess[] = [];
+  // One occlusion pass re-renders the whole scene; a single dominant
+  // scattering source keeps the cost of that pass bounded and matches
+  // how one wall usually owns the haze in a real frame.
+  for (const panel of panels.slice(0, 1)) {
+    try {
+      const scattering = new VolumetricLightScatteringPostProcess(
+        `${panel.name}-scattering`,
+        { postProcessRatio: 0.5, passRatio: 0.2 },
+        camera,
+        panel,
+        32,
+        Texture.BILINEAR_SAMPLINGMODE,
+        scene.getEngine(),
+        false,
+      );
+      scattering.exposure = 0.16;
+      scattering.decay = 0.955;
+      scattering.weight = 0.5;
+      effects.push(scattering);
+    } catch {
+      // Engines without the required caps simply skip the haze.
+    }
+  }
+  return effects;
 }
 
 // Real LED surfaces wash their surroundings with colored light; the
