@@ -232,6 +232,19 @@ export default function OmniChatChatPage() {
     });
   }, [directoryQuery, guestPersonaIds, personasQuery.data]);
 
+  const guestMessagePreviews = useMemo(() => {
+    const previews = new Map<number, string>();
+    for (const id of guestPersonaIds) {
+      const messages = loadGuestMessages(id);
+      const last = messages.at(-1);
+      if (last?.content) {
+        const text = getOmniChatPreviewText(last.content);
+        if (text) previews.set(id, text);
+      }
+    }
+    return previews;
+  }, [guestPersonaIds]);
+
   const selectedConversation = useMemo(
     () =>
       selectedConversationId === null
@@ -637,7 +650,7 @@ export default function OmniChatChatPage() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-base font-semibold text-white">{persona.name}</p>
                         <p className="mt-0.5 truncate text-sm text-white/58">
-                          {persona.description || t('omnichat.conversationsPage.noMessages')}
+                          {guestMessagePreviews.get(persona.id) || t('omnichat.conversationsPage.noMessages')}
                         </p>
                       </div>
                     </button>
