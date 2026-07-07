@@ -17,6 +17,14 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
   const targetAnchor = new TransformNode('review-camera-target', scene);
   const checkpointWorldTarget = new Vector3();
   const checkpointWorldPosition = new Vector3();
+  const followWorldTarget = new Vector3();
+  // The offset last authored by a checkpoint view, re-applied to the player's
+  // CURRENT position every frame in syncZoomState. Without this, the anchor
+  // only ever moved at the instant a checkpoint button was clicked, so free
+  // WASD movement walked the player out from under a camera that never
+  // followed - it just sat at wherever the last checkpoint (or scene load)
+  // had left it. Defaults to zero: look directly at the player.
+  const activeFocusOffset = new Vector3(0, 0, 0);
 
   const camera = new ArcRotateCamera('review-camera', Math.PI, 1.1, 6, targetAnchor.position, scene);
   camera.lockedTarget = targetAnchor;
@@ -34,11 +42,10 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
     camera.inertialRadiusOffset = 0;
     camera.inertialPanningX = 0;
     camera.inertialPanningY = 0;
+    activeFocusOffset.set(view.focusOffset.x, view.focusOffset.y, view.focusOffset.z);
     target.computeWorldMatrix(true);
     checkpointWorldTarget.copyFrom(target.getAbsolutePosition());
-    checkpointWorldTarget.x += view.focusOffset.x;
-    checkpointWorldTarget.y += view.focusOffset.y;
-    checkpointWorldTarget.z += view.focusOffset.z;
+    checkpointWorldTarget.addInPlace(activeFocusOffset);
     targetAnchor.position.copyFrom(checkpointWorldTarget);
 
     if (view.positionOffset) {
@@ -62,6 +69,13 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
     applyCheckpointView,
     camera,
     syncZoomState() {
+      // Re-anchor to the player's live position every frame so WASD movement
+      // keeps the camera attached instead of leaving it behind.
+      target.computeWorldMatrix(true);
+      followWorldTarget.copyFrom(target.getAbsolutePosition());
+      followWorldTarget.addInPlace(activeFocusOffset);
+      targetAnchor.position.copyFrom(followWorldTarget);
+
       const zoomState = resolveZoomState(camera.radius);
       camera.radius = zoomState.distance;
       return zoomState;

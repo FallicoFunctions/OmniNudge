@@ -93,4 +93,53 @@ describe('createFollowCameraRig', () => {
     expect(rig.camera.position.y).toBeCloseTo(22);
     expect(rig.camera.position.z).toBeCloseTo(-66);
   });
+
+  it('keeps the camera anchored to the player root as it moves after a checkpoint view, instead of staying fixed at the old position', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const target = new TransformNode('player-root', scene);
+    target.position.set(0, 1.7, 0);
+    const rig = createFollowCameraRig(scene, target);
+
+    rig.applyCheckpointView({
+      alpha: -Math.PI / 2,
+      beta: 1.08,
+      radius: 6,
+      focusOffset: { x: 0, y: 0, z: 0 },
+    });
+
+    expect(rig.targetAnchor.position.x).toBeCloseTo(0);
+    expect(rig.targetAnchor.position.z).toBeCloseTo(0);
+
+    // Simulate WASD movement: the player walks forward without any further
+    // checkpoint interaction.
+    target.position.set(5, 1.7, 12);
+    rig.syncZoomState();
+
+    expect(rig.targetAnchor.position.x).toBeCloseTo(5);
+    expect(rig.targetAnchor.position.y).toBeCloseTo(1.7);
+    expect(rig.targetAnchor.position.z).toBeCloseTo(12);
+  });
+
+  it('preserves the checkpoint focus offset while following the player root on subsequent frames', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const target = new TransformNode('player-root', scene);
+    target.position.set(0, 1.7, 0);
+    const rig = createFollowCameraRig(scene, target);
+
+    rig.applyCheckpointView({
+      alpha: -Math.PI / 2,
+      beta: 1.02,
+      radius: 50,
+      focusOffset: { x: 4, y: 10.3, z: 20 },
+    });
+
+    target.position.set(3, 1.7, 5);
+    rig.syncZoomState();
+
+    expect(rig.targetAnchor.position.x).toBeCloseTo(7);
+    expect(rig.targetAnchor.position.y).toBeCloseTo(12);
+    expect(rig.targetAnchor.position.z).toBeCloseTo(25);
+  });
 });
