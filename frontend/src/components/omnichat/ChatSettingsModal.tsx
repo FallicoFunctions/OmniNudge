@@ -29,6 +29,7 @@ export default function ChatSettingsModal({
   const [age, setAge] = useState(currentSettings?.user_age ?? '');
   const [gender, setGender] = useState(currentSettings?.user_gender ?? '');
   const [localSaveSuccess, setLocalSaveSuccess] = useState(false);
+  const [rightHoveredId, setRightHoveredId] = useState<number | null>(null);
 
   // Sync form state with currentSettings when modal opens or conversation changes
   useEffect(() => {
@@ -210,7 +211,13 @@ export default function ChatSettingsModal({
                   <ul className="space-y-2">
                     {otherConversations.map((conv) => (
                       <li key={conv.id}>
-                        <div className="flex w-full items-stretch rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] text-left text-sm">
+                        <div
+                          className={`flex w-full items-stretch rounded-md border border-[var(--color-border)] text-left text-sm ${
+                            rightHoveredId === conv.id
+                              ? 'bg-red-500/10'
+                              : 'bg-[var(--color-surface)]'
+                          }`}
+                        >
                           <button
                             type="button"
                             onClick={() => {
@@ -234,11 +241,13 @@ export default function ChatSettingsModal({
                           <button
                             type="button"
                             onClick={(e) => e.stopPropagation()}
-                            className="flex items-center rounded-r-md px-3 py-2 hover:bg-red-500/10"
+                            onPointerEnter={() => setRightHoveredId(conv.id)}
+                            onPointerLeave={() => setRightHoveredId(null)}
+                            className="group flex items-center rounded-r-md px-3 py-2"
                           >
                             <Trash2
                               size={14}
-                              className="text-[var(--color-text-muted)] hover:text-red-500"
+                              className="text-[var(--color-text-muted)] group-hover:text-red-500"
                             />
                           </button>
                         </div>
