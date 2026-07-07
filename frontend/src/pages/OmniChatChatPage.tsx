@@ -415,7 +415,7 @@ export default function OmniChatChatPage() {
       personaId,
       undefined,
       true,
-      loadOmniChatDefaults(isAuthenticated ? 'authenticated' : 'guest')
+      loadOmniChatDefaults('authenticated')
     ).then((conversation) => {
       queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
       navigate(`/omnichat/c/${conversation.id}`);
@@ -700,45 +700,34 @@ export default function OmniChatChatPage() {
             <div className="border-t border-white/10 px-5 py-4">
               <form
                 onSubmit={handleSubmit}
-                className="rounded-[28px] border border-white/10 bg-white/[0.06] p-3.5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]"
+                className="rounded-[28px] border border-white/10 bg-white/[0.06] p-2 shadow-[0_20px_60px_rgba(0,0,0,0.22)]"
               >
                 <div className="relative">
                   {rateLimitError && (
                     <p className="mb-3 text-xs text-rose-400">{t(`omnichat.chat.${rateLimitError}`)}</p>
                   )}
-                  <textarea
-                    value={draft}
-                    onChange={(event) => {
-                      setDraft(event.target.value);
-                      if (rateLimitError) setRateLimitError(null);
-                    }}
-                    placeholder={t('omnichat.chat.inputPlaceholder')}
-                    disabled={isGenerating || (isGuest && !guestPersona)}
-                    rows={2}
-                    className="w-full resize-none bg-transparent px-2 text-base text-white placeholder:text-white/35 outline-none"
-                  />
-                </div>
-
-                <div className="mt-3 flex items-center justify-between gap-4">
-                  <div className="flex flex-wrap gap-2.5">
-                    <button type="button" className="rounded-full border border-white/10 px-3.5 py-1.5 text-sm text-white/70">
-                      <ImageIcon size={15} className="mr-2 inline-flex" />
-                      Image
-                    </button>
-                    <button type="button" className="rounded-full border border-white/10 px-3.5 py-1.5 text-sm text-white/70">
-                      <Video size={15} className="mr-2 inline-flex" />
-                      Video
+                  <div className="flex items-center gap-2">
+                    <textarea
+                      value={draft}
+                      onChange={(event) => {
+                        setDraft(event.target.value);
+                        if (rateLimitError) setRateLimitError(null);
+                      }}
+                      placeholder={t('omnichat.chat.inputPlaceholder')}
+                      disabled={isGenerating || (isGuest && !guestPersona)}
+                      rows={1}
+                      style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
+                      className="flex-1 resize-none border-0 bg-transparent px-3 py-0 text-sm leading-9 text-white placeholder:text-white/35 outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isGenerating || !draft.trim()}
+                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white transition hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                      aria-label={t('omnichat.chat.send')}
+                    >
+                      {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                     </button>
                   </div>
-
-                  <button
-                    type="submit"
-                    disabled={isGenerating || !draft.trim()}
-                    className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-primary)] text-white transition hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
-                    aria-label={t('omnichat.chat.send')}
-                  >
-                    {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                  </button>
                 </div>
               </form>
             </div>
