@@ -892,13 +892,13 @@ export default function OmniChatChatPage() {
         </div>
       </div>
 
-      {!isGuest && activePersona && selectedConversationId !== null && (
+      {activePersona && (selectedConversationId !== null || isGuest) && (
         <ChatSettingsModal
           isOpen={showSettings}
           onClose={() => setShowSettings(false)}
           conversationId={selectedConversationId}
           persona={activePersona}
-          currentSettings={activeConversationSettings}
+          currentSettings={isGuest ? loadOmniChatDefaults('guest') : activeConversationSettings}
         />
       )}
 

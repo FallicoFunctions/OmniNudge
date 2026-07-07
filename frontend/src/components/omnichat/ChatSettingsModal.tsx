@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Copy, History, Loader2, MessageSquare, Save, ArrowRight } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { omnichatService, omnichatQueryKeys } from '../../services/omnichatService';
+import { saveOmniChatDefaults } from '../../utils/omnichatDefaults';
 import type { BotPersona, ConversationSettings } from '../../types/omnichat';
 
 export default function ChatSettingsModal({
@@ -16,7 +17,7 @@ export default function ChatSettingsModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  conversationId: number;
+  conversationId: number | null;
   persona: BotPersona;
   currentSettings?: ConversationSettings;
 }) {
@@ -27,6 +28,7 @@ export default function ChatSettingsModal({
   const [name, setName] = useState(currentSettings?.user_name ?? '');
   const [age, setAge] = useState(currentSettings?.user_age ?? '');
   const [gender, setGender] = useState(currentSettings?.user_gender ?? '');
+  const [localSaveSuccess, setLocalSaveSuccess] = useState(false);
 
   // Sync form state with currentSettings when modal opens or conversation changes
   useEffect(() => {
@@ -40,19 +42,19 @@ export default function ChatSettingsModal({
   const historyQuery = useQuery({
     queryKey: [...omnichatQueryKeys.conversations, 'persona', persona.id],
     queryFn: () => omnichatService.listConversations(persona.id),
-    enabled: isOpen,
+    enabled: isOpen && conversationId !== null,
   });
 
   const updateSettingsMutation = useMutation({
     mutationFn: (settings: ConversationSettings) =>
-      omnichatService.updateSettings(conversationId, settings),
+      omnichatService.updateSettings(conversationId as number, settings),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversation(conversationId) });
+      queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversation(conversationId as number) });
     },
   });
 
   const forkMutation = useMutation({
-    mutationFn: () => omnichatService.forkConversation(conversationId),
+    mutationFn: () => omnichatService.forkConversation(conversationId as number),
     onSuccess: (newConv) => {
       queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
       navigate(`/omnichat/c/${newConv.id}`);
@@ -61,7 +63,13 @@ export default function ChatSettingsModal({
   });
 
   const handleSave = () => {
-    updateSettingsMutation.mutate({ user_name: name, user_age: age, user_gender: gender });
+    const settings: ConversationSettings = { user_name: name, user_age: age, user_gender: gender };
+    if (conversationId === null) {
+      saveOmniChatDefaults(settings, 'guest');
+      setLocalSaveSuccess(true);
+    } else {
+      updateSettingsMutation.mutate(settings);
+    }
   };
 
   const otherConversations = (historyQuery.data ?? []).filter((c) => c.id !== conversationId);
@@ -138,7 +146,7 @@ export default function ChatSettingsModal({
               {t('omnichat.chat.settingsSave')}
             </button>
 
-            {updateSettingsMutation.isSuccess && (
+            {(updateSettingsMutation.isSuccess || localSaveSuccess) && (
               <p className="text-center text-xs text-green-500">{t('omnichat.chat.settingsSaved')}</p>
             )}
             {updateSettingsMutation.isError && (
@@ -146,88 +154,88 @@ export default function ChatSettingsModal({
             )}
           </div>
 
-          {/* Divider */}
-          <div className="border-t border-[var(--color-border)]" />
+          {conversationId !== null && (
+            <>
+              <div className="border-t border-[var(--color-border)]" />
 
-          {/* Fork button */}
-          <div>
-            <button
-              type="button"
-              onClick={() => forkMutation.mutate()}
-              disabled={forkMutation.isPending}
-              className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left text-sm hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
-            >
-              <Copy size={18} className="text-[var(--color-text-secondary)]" />
-              <div className="flex-1">
-                <p className="font-medium text-[var(--color-text-primary)]">
-                  {t('omnichat.chat.forkChat')}
-                </p>
-                <p className="text-xs text-[var(--color-text-muted)]">
-                  {t('omnichat.chat.forkChatDesc')}
-                </p>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => forkMutation.mutate()}
+                  disabled={forkMutation.isPending}
+                  className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left text-sm hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+                >
+                  <Copy size={18} className="text-[var(--color-text-secondary)]" />
+                  <div className="flex-1">
+                    <p className="font-medium text-[var(--color-text-primary)]">
+                      {t('omnichat.chat.forkChat')}
+                    </p>
+                    <p className="text-xs text-[var(--color-text-muted)]">
+                      {t('omnichat.chat.forkChatDesc')}
+                    </p>
+                  </div>
+                  {forkMutation.isPending ? (
+                    <Loader2 size={16} className="animate-spin text-[var(--color-text-secondary)]" />
+                  ) : (
+                    <ArrowRight size={16} className="text-[var(--color-text-secondary)]" />
+                  )}
+                </button>
               </div>
-              {forkMutation.isPending ? (
-                <Loader2 size={16} className="animate-spin text-[var(--color-text-secondary)]" />
-              ) : (
-                <ArrowRight size={16} className="text-[var(--color-text-secondary)]" />
-              )}
-            </button>
-          </div>
 
-          {/* Divider */}
-          <div className="border-t border-[var(--color-border)]" />
+              <div className="border-t border-[var(--color-border)]" />
 
-          {/* Chat history */}
-          <div>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
-              <History size={16} />
-              {t('omnichat.chat.history')}
-            </h3>
+              <div>
+                <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
+                  <History size={16} />
+                  {t('omnichat.chat.history')}
+                </h3>
 
-            {historyQuery.isLoading && (
-              <div className="flex justify-center py-4">
-                <Loader2 size={20} className="animate-spin text-[var(--color-text-muted)]" />
+                {historyQuery.isLoading && (
+                  <div className="flex justify-center py-4">
+                    <Loader2 size={20} className="animate-spin text-[var(--color-text-muted)]" />
+                  </div>
+                )}
+
+                {historyQuery.isError && (
+                  <p className="text-xs text-red-500">{t('omnichat.chat.historyLoadError')}</p>
+                )}
+
+                {historyQuery.isSuccess && otherConversations.length === 0 && (
+                  <p className="py-4 text-center text-xs text-[var(--color-text-muted)]">
+                    {t('omnichat.chat.historyEmpty')}
+                  </p>
+                )}
+
+                {otherConversations.length > 0 && (
+                  <ul className="space-y-2">
+                    {otherConversations.map((conv) => (
+                      <li key={conv.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigate(`/omnichat/c/${conv.id}`);
+                            onClose();
+                          }}
+                          className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-hover)]"
+                        >
+                          <MessageSquare size={16} className="flex-shrink-0 text-[var(--color-text-muted)]" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium text-[var(--color-text-primary)]">
+                              {conv.title ?? persona.name}
+                            </p>
+                            <p className="text-xs text-[var(--color-text-muted)]">
+                              {formatRelativeTime(conv.last_message_at)}
+                            </p>
+                          </div>
+                          <ArrowRight size={14} className="flex-shrink-0 text-[var(--color-text-muted)]" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            )}
-
-            {historyQuery.isError && (
-              <p className="text-xs text-red-500">{t('omnichat.chat.historyLoadError')}</p>
-            )}
-
-            {historyQuery.isSuccess && otherConversations.length === 0 && (
-              <p className="py-4 text-center text-xs text-[var(--color-text-muted)]">
-                {t('omnichat.chat.historyEmpty')}
-              </p>
-            )}
-
-            {otherConversations.length > 0 && (
-              <ul className="space-y-2">
-                {otherConversations.map((conv) => (
-                  <li key={conv.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigate(`/omnichat/c/${conv.id}`);
-                        onClose();
-                      }}
-                      className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-hover)]"
-                    >
-                      <MessageSquare size={16} className="flex-shrink-0 text-[var(--color-text-muted)]" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-[var(--color-text-primary)]">
-                          {conv.title ?? persona.name}
-                        </p>
-                        <p className="text-xs text-[var(--color-text-muted)]">
-                          {formatRelativeTime(conv.last_message_at)}
-                        </p>
-                      </div>
-                      <ArrowRight size={14} className="flex-shrink-0 text-[var(--color-text-muted)]" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
     </Modal>
