@@ -10,10 +10,12 @@ export default function OmniChatHeader({
   defaults,
   onSaveDefaults,
   isSavingDefaults = false,
+  onSignIn,
 }: {
   defaults: ConversationSettings;
   onSaveDefaults: (settings: ConversationSettings) => Promise<void> | void;
   isSavingDefaults?: boolean;
+  onSignIn: () => void;
 }) {
   const { t } = useTranslation();
   const { user, logout, isAuthenticated } = useAuth();
@@ -32,19 +34,34 @@ export default function OmniChatHeader({
 
           <div className="flex items-center gap-2.5">
             <div className="relative">
-              <button
-                type="button"
-                onClick={() => setMenuOpen((open) => !open)}
-                className="flex h-9 items-center gap-2.5 rounded-[18px] border border-white/10 bg-white/5 px-3 text-white transition hover:bg-white/10"
-              >
-                <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[var(--color-primary)]/20 text-[11px] font-semibold text-[var(--color-primary-light)]">
-                  {isAuthenticated ? initials : <UserRound size={16} />}
-                </span>
-                <span className="hidden text-sm font-medium text-white/80 sm:inline">
-                  {isAuthenticated ? user?.username : t('auth.buttons.signIn')}
-                </span>
-                <ChevronDown size={16} className="text-white/50" />
-              </button>
+              {isAuthenticated ? (
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((open) => !open)}
+                  className="flex h-9 items-center gap-2.5 rounded-[18px] border border-white/10 bg-white/5 px-3 text-white transition hover:bg-white/10"
+                >
+                  <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[var(--color-primary)]/20 text-[11px] font-semibold text-[var(--color-primary-light)]">
+                    {initials}
+                  </span>
+                  <span className="hidden text-sm font-medium text-white/80 sm:inline">
+                    {user?.username}
+                  </span>
+                  <ChevronDown size={16} className="text-white/50" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onSignIn}
+                  className="flex h-9 items-center gap-2.5 rounded-[18px] border border-white/10 bg-white/5 px-3 text-white transition hover:bg-white/10"
+                >
+                  <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[var(--color-primary)]/20 text-[11px] font-semibold text-[var(--color-primary-light)]">
+                    <UserRound size={16} />
+                  </span>
+                  <span className="hidden text-sm font-medium text-white/80 sm:inline">
+                    {t('auth.buttons.signIn')}
+                  </span>
+                </button>
+              )}
 
               {menuOpen && (
                 <div className="absolute right-0 top-[calc(100%+12px)] w-60 rounded-3xl border border-white/10 bg-[#191920] p-2 shadow-2xl">
@@ -59,19 +76,17 @@ export default function OmniChatHeader({
                     <Settings2 size={16} />
                     {t('omnichat.header.defaults')}
                   </button>
-                  {isAuthenticated && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        logout();
-                        setMenuOpen(false);
-                      }}
-                      className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
-                    >
-                      <LogOut size={16} />
-                      {t('auth.buttons.logOut')}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      setMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
+                  >
+                    <LogOut size={16} />
+                    {t('auth.buttons.logout')}
+                  </button>
                 </div>
               )}
             </div>
