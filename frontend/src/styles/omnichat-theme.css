@@ -9,6 +9,7 @@
   --oc-bg: #0f0f12;
   --oc-surface: #1a1a1f;
   --oc-surface-elevated: #232329;
+  --oc-surface-hover: #222228;
   --oc-text-primary: #f5f5f7;
   --oc-text-secondary: #a1a1aa;
   --oc-text-muted: #71717a;
@@ -26,6 +27,7 @@
   --color-background: var(--oc-bg);
   --color-surface: var(--oc-surface);
   --color-surface-elevated: var(--oc-surface-elevated);
+  --color-surface-hover: var(--oc-surface-hover);
   --color-text-primary: var(--oc-text-primary);
   --color-text-secondary: var(--oc-text-secondary);
   --color-text-muted: var(--oc-text-muted);
