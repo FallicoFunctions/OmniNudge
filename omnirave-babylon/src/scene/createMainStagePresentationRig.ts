@@ -73,9 +73,12 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   pipeline.samples = 1;
   pipeline.imageProcessing.vignetteEnabled = true;
   pipeline.imageProcessing.vignetteWeight = 1.5;
+  // A faint, static film grain breaks up flat gradients; the previous
+  // intensity (9, animated) overlaid shimmering noise that read as TV static
+  // across every surface once the image rendered at full crisp density.
   pipeline.grainEnabled = true;
-  pipeline.grain.intensity = 9;
-  pipeline.grain.animated = true;
+  pipeline.grain.intensity = 1.5;
+  pipeline.grain.animated = false;
 
   return {
     backdropRoot,
