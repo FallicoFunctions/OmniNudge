@@ -25,6 +25,7 @@ import { omnichatService, omnichatQueryKeys } from '../services/omnichatService'
 import type { BotConversation, BotConversationDetail, BotMessage, BotPersona, OmniChatTokenPayload } from '../types/omnichat';
 import {
   clearGuestMessages,
+  getGuestPersonaIds,
   loadGuestMessages,
   saveGuestMessages,
 } from '../utils/omnichatGuestStorage';
@@ -214,9 +215,13 @@ export default function OmniChatChatPage() {
     });
   }, [conversationsQuery.data, directoryQuery]);
 
+  const guestPersonaIds = useMemo(() => getGuestPersonaIds(), [guestMessages]);
+
   const filteredGuestPersonas = useMemo(() => {
+    if (guestPersonaIds.length === 0) return [];
     const all = personasQuery.data ?? [];
     return all.filter((persona) => {
+      if (!guestPersonaIds.includes(persona.id)) return false;
       if (!directoryQuery.trim()) return true;
       const query = directoryQuery.toLowerCase();
       return (
@@ -224,7 +229,7 @@ export default function OmniChatChatPage() {
         (persona.description || '').toLowerCase().includes(query)
       );
     });
-  }, [directoryQuery, personasQuery.data]);
+  }, [directoryQuery, guestPersonaIds, personasQuery.data]);
 
   const selectedConversation = useMemo(
     () =>
