@@ -5,10 +5,14 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import OmniChatConversationsPage from '../OmniChatConversationsPage';
 
-const { mockListConversations, mockListPersonas } = vi.hoisted(() => ({
-  mockListConversations: vi.fn(),
-  mockListPersonas: vi.fn(),
-}));
+const { mockListConversations, mockListPersonas, mockGetGuestPersonaIds } = vi.hoisted(() => {
+  const mockGetGuestPersonaIds = vi.fn<() => number[]>(() => []);
+  return {
+    mockListConversations: vi.fn(),
+    mockListPersonas: vi.fn(),
+    mockGetGuestPersonaIds,
+  };
+});
 
 let mockIsAuthenticated = true;
 
@@ -32,6 +36,13 @@ vi.mock('../../components/omnichat/OmniChatSidebar', () => ({
 
 vi.mock('../../components/omnichat/PersonaAvatar', () => ({
   default: () => <div data-testid="persona-avatar" />,
+}));
+
+vi.mock('../../utils/omnichatGuestStorage', () => ({
+  clearGuestMessages: vi.fn(),
+  getGuestPersonaIds: () => mockGetGuestPersonaIds(),
+  loadGuestMessages: vi.fn(() => []),
+  saveGuestMessages: vi.fn(),
 }));
 
 vi.mock('../../services/omnichatService', () => ({
@@ -95,6 +106,7 @@ describe('OmniChatConversationsPage', () => {
         user_id: 1,
         persona_id: 9,
         title: 'Campfire Thread',
+        last_message_preview: 'Hello?',
         created_at: '2026-07-02T10:00:00Z',
         last_message_at: '2026-07-02T10:15:00Z',
         persona: {
@@ -144,6 +156,7 @@ describe('OmniChatConversationsPage', () => {
 
   it('shows a guest chat directory instead of a sign-in blocker', async () => {
     mockIsAuthenticated = false;
+    mockGetGuestPersonaIds.mockReturnValueOnce([9]);
     mockListPersonas.mockResolvedValueOnce([
       {
         id: 9,
