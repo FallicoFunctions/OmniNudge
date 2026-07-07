@@ -3184,6 +3184,25 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     },
   },
   {
+    key: 'wide-hero-screen-shadow-coffer',
+    meshNames: ['V126_WideHeroScreenShadowCoffer'],
+    expected: {
+      albedoTextureCleared: false,
+      albedoColor: [0.0875, 0.1125, 0.1375],
+      emissiveColor: [0.03, 0.06, 0.09],
+      emissiveIntensity: 1.2,
+      metallic: 0.05,
+      roughness: 0.3,
+      alpha: 1,
+      transparencyMode: null,
+      clearCoatEnabled: true,
+      clearCoatIntensity: 0.5,
+      clearCoatRoughness: 0.12,
+      environmentIntensity: 0.5,
+      metaPolish: null,
+    },
+  },
+  {
     key: 'promenade-pearl-runway',
     meshNames: ['V70_PromenadePearlRunway'],
     expected: {
