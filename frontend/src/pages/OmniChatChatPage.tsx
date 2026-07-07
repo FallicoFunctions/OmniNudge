@@ -681,8 +681,8 @@ export default function OmniChatChatPage() {
           </aside>
 
           <section className={`relative flex min-h-0 flex-col bg-[#121216] ${profilePaneCollapsed ? '' : 'border-r border-white/10'}`}>
-            <div className="border-b border-white/10 px-5 py-4">
-              <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center border-b border-white/10 px-5 h-16">
+              <div className="flex w-full items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   {activePersona && (
                     <PersonaAvatar persona={activePersona} className="h-14 w-14 rounded-full" />
@@ -839,7 +839,7 @@ export default function OmniChatChatPage() {
               profilePaneCollapsed ? 'translate-x-full' : 'translate-x-0'
             }`}
           >
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 h-16">
               <div className="flex gap-7">
                 <button
                   type="button"
