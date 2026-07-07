@@ -5,6 +5,7 @@ import type {
   HubModerator,
   UpdateRoleRequest,
   BanHistoryItem,
+  AdminOmniChatPersona,
 } from '../types/admin';
 
 export const adminService = {
@@ -205,5 +206,23 @@ export const adminService = {
     }>;
   }> {
     return api.get('/admin/retention/history');
+  },
+
+  // ===== OMNICHAT PERSONAS =====
+
+  async listOmniChatPersonas(): Promise<AdminOmniChatPersona[]> {
+    const response = await api.get<{ personas: AdminOmniChatPersona[] }>('/admin/omnichat/personas');
+    return response.personas;
+  },
+
+  async updateOmniChatPersonaMedia(
+    personaId: number,
+    data: { avatar_url?: string; preview_video_url?: string }
+  ): Promise<AdminOmniChatPersona> {
+    const response = await api.put<{ persona: AdminOmniChatPersona }>(
+      `/admin/omnichat/personas/${personaId}`,
+      data
+    );
+    return response.persona;
   },
 };

@@ -626,6 +626,7 @@ func main() {
 	openrouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey, cfg.OpenRouter.Model)
 	chatbotService := services.NewChatbotService(db.Pool, botPersonaRepo, botConversationRepo, botMessageRepo, openrouterClient, hub)
 	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService)
+	adminPersonaHandler := handlers.NewAdminPersonaHandler(botPersonaRepo)
 	omniChatRateLimiter := middleware.OmniChatRateLimiter(cache)
 
 	// Feature 1: Message Reactions handler + rate limiter
@@ -1475,6 +1476,10 @@ func main() {
 				admin.GET("/retention/policy", dataRetentionHandler.GetRetentionPolicy)
 				admin.PUT("/retention/policy/:data_type", dataRetentionHandler.UpdateRetentionPolicy)
 				admin.GET("/retention/history", dataRetentionHandler.GetRetentionHistory)
+
+				// OmniChat persona media management
+				admin.GET("/omnichat/personas", adminPersonaHandler.ListPersonas)
+				admin.PUT("/omnichat/personas/:id", adminPersonaHandler.UpdatePersonaMedia)
 			}
 
 			// WebSocket endpoint for real-time messaging
