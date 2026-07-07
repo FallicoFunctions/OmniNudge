@@ -43,6 +43,16 @@ export async function createMainStageScene(engine: AbstractEngine) {
   const presentationRig = createMainStagePresentationRig(scene, cameraRig.camera);
   const productionSurfaces = createMainStageProductionSurfaces(scene);
 
+  // The venue geometry never moves, so freeze it: skip per-frame world-matrix
+  // recompute, bounding-info sync, and material state churn across ~700 static
+  // meshes. This is the single biggest CPU saving and lets the scene render at
+  // a crisp resolution without dropping frames. The avatar is excluded — it is
+  // parented to the moving player rig.
+  freezeStaticStage(stageAssets.mainMeshes);
+  for (const material of scene.materials) {
+    material.freeze();
+  }
+
   const canvas = engine.getRenderingCanvas?.();
   if (canvas) {
     cameraRig.camera.attachControl(canvas, true);
@@ -93,6 +103,13 @@ export async function createMainStageScene(engine: AbstractEngine) {
   });
 
   return scene;
+}
+
+function freezeStaticStage(meshes: AbstractMesh[]) {
+  for (const mesh of meshes) {
+    mesh.freezeWorldMatrix();
+    mesh.doNotSyncBoundingInfo = true;
+  }
 }
 
 function resolveGroundHeight(collisionMeshes: AbstractMesh[], position: Vector3) {
