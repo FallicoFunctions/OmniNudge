@@ -658,6 +658,7 @@ export default function OmniChatChatPage() {
                   <button
                     type="button"
                     onClick={() => setShowSettings(true)}
+                    title={t('omnichat.chat.settings')}
                     className="rounded-full p-2.5 text-white/75 hover:bg-white/5 hover:text-white"
                   >
                     <Settings size={20} />
@@ -735,9 +736,18 @@ export default function OmniChatChatPage() {
                       type="submit"
                       disabled={isGenerating || !draft.trim()}
                       className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white transition hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                      title={t('omnichat.chat.send')}
                       aria-label={t('omnichat.chat.send')}
                     >
                       {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNewChat}
+                      title={t('omnichat.chat.newChat')}
+                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/6 text-white/75 transition hover:bg-white/10 hover:text-white"
+                    >
+                      <Plus size={14} />
                     </button>
                   </div>
                 </div>
@@ -817,22 +827,7 @@ export default function OmniChatChatPage() {
               )}
             </div>
 
-            <div className="flex justify-end gap-2.5 border-t border-white/10 px-5 py-4">
-              <button
-                type="button"
-                onClick={handleNewChat}
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-primary)] text-white shadow-[0_20px_60px_rgba(59,130,246,0.28)]"
-              >
-                <Plus size={20} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowSettings(true)}
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-white/6 text-white/75"
-              >
-                <Settings size={18} />
-              </button>
-            </div>
+            <div className="flex justify-end border-t border-white/10 px-5 py-4" />
           </aside>
         </div>
       </div>
