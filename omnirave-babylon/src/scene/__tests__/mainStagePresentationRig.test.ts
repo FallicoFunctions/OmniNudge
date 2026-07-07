@@ -69,8 +69,10 @@ describe('createMainStagePresentationRig', () => {
     expect(rig.pipeline.imageProcessing.vignetteEnabled).toBe(true);
     expect(rig.pipeline.imageProcessing.vignetteWeight).toBeGreaterThanOrEqual(1);
     expect(rig.pipeline.grainEnabled).toBe(true);
-    expect(rig.pipeline.grain.animated).toBe(true);
-    expect(rig.pipeline.grain.intensity).toBeLessThanOrEqual(14);
+    // Static (non-animated), faint grain: animated grain read as TV static
+    // across every surface once the scene rendered at full crisp density.
+    expect(rig.pipeline.grain.animated).toBe(false);
+    expect(rig.pipeline.grain.intensity).toBeLessThanOrEqual(3);
     expect(rig.pipeline.bloomKernel).toBeGreaterThanOrEqual(48);
 
     const spills = rig.emissiveSpillLights;

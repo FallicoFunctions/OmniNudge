@@ -5,6 +5,7 @@
 - Texture provenance and checksums: `textures/polyhaven/README.md`
 - Regeneration scripts:
   - `scripts/generate-main-stage-metal-tints.py`
+  - `scripts/generate-main-stage-subtle-textures.py`
   - `scripts/apply-main-stage-pbr-textures.py`
   - `scripts/export-main-stage.py`
 - Runtime exports:
