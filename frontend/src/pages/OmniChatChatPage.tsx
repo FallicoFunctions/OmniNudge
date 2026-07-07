@@ -215,7 +215,7 @@ export default function OmniChatChatPage() {
     });
   }, [conversationsQuery.data, directoryQuery]);
 
-  const guestPersonaIds = useMemo(() => getGuestPersonaIds(), [guestMessages]);
+  const guestPersonaIds = getGuestPersonaIds();
 
   const filteredGuestPersonas = useMemo(() => {
     if (guestPersonaIds.length === 0) return [];
@@ -234,7 +234,7 @@ export default function OmniChatChatPage() {
   const guestMessagePreviews = useMemo(() => {
     const previews = new Map<number, string>();
     for (const id of guestPersonaIds) {
-      const messages = loadGuestMessages(id);
+      const messages = id === guestPersonaId ? guestMessages : loadGuestMessages(id);
       const last = messages.at(-1);
       if (last?.content) {
         const text = getOmniChatPreviewText(last.content);
@@ -242,7 +242,7 @@ export default function OmniChatChatPage() {
       }
     }
     return previews;
-  }, [guestPersonaIds]);
+  }, [guestPersonaIds, guestMessages, guestPersonaId]);
 
   const selectedConversation = useMemo(
     () =>
@@ -695,6 +695,14 @@ export default function OmniChatChatPage() {
                 </div>
 
                 <div className="hidden items-center gap-3 lg:flex">
+                  <button
+                    type="button"
+                    onClick={() => setShowSettings(true)}
+                    title={t('omnichat.chat.settings')}
+                    className="rounded-full p-2.5 text-white/75 hover:bg-white/5 hover:text-white"
+                  >
+                    <Settings size={20} />
+                  </button>
                   {profilePaneCollapsed && (
                     <button
                       type="button"
@@ -705,14 +713,6 @@ export default function OmniChatChatPage() {
                       <ChevronLeft size={20} />
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setShowSettings(true)}
-                    title={t('omnichat.chat.settings')}
-                    className="rounded-full p-2.5 text-white/75 hover:bg-white/5 hover:text-white"
-                  >
-                    <Settings size={20} />
-                  </button>
                 </div>
               </div>
             </div>
