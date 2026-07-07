@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import {
   ChevronLeft,
   ChevronRight,
-  Heart,
   Image as ImageIcon,
   Loader2,
   Plus,
@@ -883,9 +882,6 @@ export default function OmniChatChatPage() {
                         <p className="mt-3 text-base leading-7 text-white/62">{activePersona.description}</p>
                       )}
                     </div>
-                    <button type="button" className="rounded-full border border-white/10 p-2.5 text-white/75">
-                      <Heart size={18} />
-                    </button>
                   </div>
 
                   {galleryTab === 'gallery' && (
