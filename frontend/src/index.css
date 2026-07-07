@@ -33,6 +33,7 @@
   --color-background: #ffffff;
   --color-surface: #f9fafb;
   --color-surface-elevated: #ffffff;
+  --color-surface-hover: #f3f4f6;
 
   /* Text Colors */
   --color-text-primary: #111827; /* ~16:1 contrast on white - WCAG AAA */
@@ -106,6 +107,7 @@
   --color-background: #111827;
   --color-surface: #1f2937;
   --color-surface-elevated: #374151;
+  --color-surface-hover: #2d3748;
   --color-text-primary: #f9fafb;
   --color-text-secondary: #d1d5db;
   --color-text-muted: #9ca3af;
