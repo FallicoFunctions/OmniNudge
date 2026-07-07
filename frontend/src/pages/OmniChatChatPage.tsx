@@ -683,7 +683,7 @@ export default function OmniChatChatPage() {
                     <div
                       className={`max-w-[72%] rounded-[26px] px-4 py-3 text-[0.95rem] ${
                         message.role === 'user'
-                          ? 'bg-gradient-to-br from-violet-500 to-violet-600 text-white'
+                          ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
                           : 'border border-white/8 bg-white/[0.06] text-white'
                       }`}
                     >
@@ -821,7 +821,7 @@ export default function OmniChatChatPage() {
               <button
                 type="button"
                 onClick={handleNewChat}
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-primary)] text-white shadow-[0_20px_60px_rgba(124,58,237,0.28)]"
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-primary)] text-white shadow-[0_20px_60px_rgba(59,130,246,0.28)]"
               >
                 <Plus size={20} />
               </button>
