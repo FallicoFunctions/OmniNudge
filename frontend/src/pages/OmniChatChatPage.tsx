@@ -902,7 +902,6 @@ export default function OmniChatChatPage() {
               )}
             </div>
 
-            <div className="flex justify-end border-t border-white/10 px-5 py-4" />
           </aside>
         </div>
       </div>
