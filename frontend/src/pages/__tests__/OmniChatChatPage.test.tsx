@@ -133,7 +133,7 @@ describe('OmniChatChatPage', () => {
     expect(profilePane).toHaveClass('translate-x-0');
   });
 
-  it('shows all conversations per persona in the sidebar', async () => {
+  it('shows only one chat row per persona and uses the latest message preview', async () => {
     const sharedPersona = {
       id: 9,
       slug: 'narrator',
@@ -174,9 +174,9 @@ describe('OmniChatChatPage', () => {
     renderPage();
 
     expect(await screen.findByText('Campfire Thread')).toBeInTheDocument();
-    expect(screen.getByText('Older Thread')).toBeInTheDocument();
+    expect(screen.queryByText('Older Thread')).not.toBeInTheDocument();
     expect(screen.getByText('Newest preview. Extra sentence.')).toBeInTheDocument();
-    expect(screen.getByText('Older preview should be hidden.')).toBeInTheDocument();
+    expect(screen.queryByText('Older preview should be hidden.')).not.toBeInTheDocument();
   });
 
   it('falls back to the latest conversation message when the list preview is missing', async () => {
