@@ -28,17 +28,18 @@ const (
 
 // BotPersona is a catalog entry for an OmniChat character.
 type BotPersona struct {
-	ID           int       `json:"id"`
-	Slug         string    `json:"slug"`
-	Name         string    `json:"name"`
-	Description  *string   `json:"description,omitempty"`
-	Category     string    `json:"category"` // genre/content tag: see PersonaCategory* constants
-	SystemPrompt string    `json:"-"`
-	AvatarURL    *string   `json:"avatar_url,omitempty"`
-	IsNSFW       bool      `json:"is_nsfw"`
-	IsActive     bool      `json:"is_active"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID              int       `json:"id"`
+	Slug            string    `json:"slug"`
+	Name            string    `json:"name"`
+	Description     *string   `json:"description,omitempty"`
+	Category        string    `json:"category"` // genre/content tag: see PersonaCategory* constants
+	SystemPrompt    string    `json:"-"`
+	AvatarURL       *string   `json:"avatar_url,omitempty"`
+	PreviewVideoURL *string   `json:"preview_video_url,omitempty"`
+	IsNSFW          bool      `json:"is_nsfw"`
+	IsActive        bool      `json:"is_active"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // ConversationSettings holds per-conversation user metadata that the persona
@@ -52,15 +53,16 @@ type ConversationSettings struct {
 
 // BotConversation is a chat session between a user and a BotPersona.
 type BotConversation struct {
-	ID            int                   `json:"id"`
-	UserID        int                   `json:"user_id"`
-	PersonaID     int                   `json:"persona_id"`
-	Persona       *BotPersona           `json:"persona,omitempty"` // Optional populated persona info
-	Title         *string               `json:"title,omitempty"`
-	Settings      *ConversationSettings `json:"settings,omitempty"`
-	CreatedAt     time.Time             `json:"created_at"`
-	LastMessageAt time.Time             `json:"last_message_at"`
-	ArchivedAt    *time.Time            `json:"archived_at,omitempty"`
+	ID                 int                   `json:"id"`
+	UserID             int                   `json:"user_id"`
+	PersonaID          int                   `json:"persona_id"`
+	Persona            *BotPersona           `json:"persona,omitempty"` // Optional populated persona info
+	Title              *string               `json:"title,omitempty"`
+	LastMessagePreview *string               `json:"last_message_preview,omitempty"`
+	Settings           *ConversationSettings `json:"settings,omitempty"`
+	CreatedAt          time.Time             `json:"created_at"`
+	LastMessageAt      time.Time             `json:"last_message_at"`
+	ArchivedAt         *time.Time            `json:"archived_at,omitempty"`
 }
 
 // BotMessage is a single turn (user or assistant) within a BotConversation.
@@ -91,7 +93,7 @@ const maxPersonaListSize = 500
 // ListActive returns all active personas, optionally filtered by category.
 func (r *BotPersonaRepository) ListActive(ctx context.Context, category string) ([]*BotPersona, error) {
 	query := `
-		SELECT id, slug, name, description, category, system_prompt, avatar_url, is_nsfw, is_active, created_at, updated_at
+		SELECT id, slug, name, description, category, system_prompt, avatar_url, preview_video_url, is_nsfw, is_active, created_at, updated_at
 		FROM bot_personas
 		WHERE is_active
 	`
@@ -114,7 +116,7 @@ func (r *BotPersonaRepository) ListActive(ctx context.Context, category string) 
 		p := &BotPersona{}
 		if err := rows.Scan(
 			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category,
-			&p.SystemPrompt, &p.AvatarURL, &p.IsNSFW, &p.IsActive,
+			&p.SystemPrompt, &p.AvatarURL, &p.PreviewVideoURL, &p.IsNSFW, &p.IsActive,
 			&p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -128,13 +130,67 @@ func (r *BotPersonaRepository) ListActive(ctx context.Context, category string) 
 func (r *BotPersonaRepository) GetByID(ctx context.Context, id int) (*BotPersona, error) {
 	p := &BotPersona{}
 	query := `
-		SELECT id, slug, name, description, category, system_prompt, avatar_url, is_nsfw, is_active, created_at, updated_at
+		SELECT id, slug, name, description, category, system_prompt, avatar_url, preview_video_url, is_nsfw, is_active, created_at, updated_at
 		FROM bot_personas
 		WHERE id = $1
 	`
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category,
-		&p.SystemPrompt, &p.AvatarURL, &p.IsNSFW, &p.IsActive,
+		&p.SystemPrompt, &p.AvatarURL, &p.PreviewVideoURL, &p.IsNSFW, &p.IsActive,
+		&p.CreatedAt, &p.UpdatedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return p, nil
+}
+
+// ListAll returns all personas, active or inactive, for admin management.
+func (r *BotPersonaRepository) ListAll(ctx context.Context) ([]*BotPersona, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, slug, name, description, category, system_prompt, avatar_url, preview_video_url, is_nsfw, is_active, created_at, updated_at
+		FROM bot_personas
+		ORDER BY name
+		LIMIT $1
+	`, maxPersonaListSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	personas := []*BotPersona{}
+	for rows.Next() {
+		p := &BotPersona{}
+		if err := rows.Scan(
+			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category,
+			&p.SystemPrompt, &p.AvatarURL, &p.PreviewVideoURL, &p.IsNSFW, &p.IsActive,
+			&p.CreatedAt, &p.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		personas = append(personas, p)
+	}
+	return personas, rows.Err()
+}
+
+// UpdateMedia updates avatar and preview video URLs for an admin-curated persona.
+func (r *BotPersonaRepository) UpdateMedia(ctx context.Context, id int, avatarURL *string, previewVideoURL *string) (*BotPersona, error) {
+	query := `
+		UPDATE bot_personas
+		SET avatar_url = $2,
+		    preview_video_url = $3,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+		RETURNING id, slug, name, description, category, system_prompt, avatar_url, preview_video_url, is_nsfw, is_active, created_at, updated_at
+	`
+
+	p := &BotPersona{}
+	err := r.pool.QueryRow(ctx, query, id, avatarURL, previewVideoURL).Scan(
+		&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category,
+		&p.SystemPrompt, &p.AvatarURL, &p.PreviewVideoURL, &p.IsNSFW, &p.IsActive,
 		&p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
@@ -290,12 +346,20 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 	query := `
 		SELECT
 			c.id, c.user_id, c.persona_id, c.title,
+			lm.content,
 			c.settings_user_name, c.settings_user_age, c.settings_user_gender,
 			c.created_at, c.last_message_at, c.archived_at,
-			p.id, p.slug, p.name, p.description, p.category, p.system_prompt, p.avatar_url,
+			p.id, p.slug, p.name, p.description, p.category, p.system_prompt, p.avatar_url, p.preview_video_url,
 			p.is_nsfw, p.is_active, p.created_at, p.updated_at
 		FROM bot_conversations c
 		INNER JOIN bot_personas p ON p.id = c.persona_id
+		LEFT JOIN LATERAL (
+			SELECT content
+			FROM bot_messages
+			WHERE conversation_id = c.id
+			ORDER BY created_at DESC, id DESC
+			LIMIT 1
+		) lm ON TRUE
 		WHERE c.user_id = $1 AND c.archived_at IS NULL
 		ORDER BY c.last_message_at DESC
 		LIMIT $2 OFFSET $3
@@ -313,9 +377,10 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 		p := &BotPersona{}
 		if err := rows.Scan(
 			&c.ID, &c.UserID, &c.PersonaID, &c.Title,
+			&c.LastMessagePreview,
 			&s.UserName, &s.UserAge, &s.UserGender,
 			&c.CreatedAt, &c.LastMessageAt, &c.ArchivedAt,
-			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.SystemPrompt, &p.AvatarURL,
+			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.SystemPrompt, &p.AvatarURL, &p.PreviewVideoURL,
 			&p.IsNSFW, &p.IsActive, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, err

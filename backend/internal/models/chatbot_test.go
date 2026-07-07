@@ -72,3 +72,84 @@ func TestBotConversationRepositoryCreateWithMessagesRollsBackOnFailure(t *testin
 	require.NoError(t, err)
 	require.Zero(t, messageCount)
 }
+
+func TestBotPersonaRepositoryPersistsPreviewVideoURL(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	repo := NewBotPersonaRepository(db.Pool)
+	avatarURL := "/uploads/test-avatar.png"
+	previewVideoURL := "/uploads/test-preview.mp4"
+
+	var personaID int
+	err = db.Pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug, name, description, category, system_prompt, avatar_url, preview_video_url, is_nsfw, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, false, true)
+		RETURNING id
+	`, fmt.Sprintf("preview-persona-%d", time.Now().UnixNano()), "Preview Persona", "desc", PersonaCategoryRoleplay, "prompt", avatarURL, previewVideoURL).
+		Scan(&personaID)
+	require.NoError(t, err)
+
+	persona, err := repo.GetByID(ctx, personaID)
+	require.NoError(t, err)
+	require.NotNil(t, persona)
+	require.NotNil(t, persona.PreviewVideoURL)
+	require.Equal(t, previewVideoURL, *persona.PreviewVideoURL)
+
+	allPersonas, err := repo.ListAll(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, allPersonas)
+
+	var found *BotPersona
+	for _, candidate := range allPersonas {
+		if candidate.ID == personaID {
+			found = candidate
+			break
+		}
+	}
+	require.NotNil(t, found)
+	require.NotNil(t, found.PreviewVideoURL)
+	require.Equal(t, previewVideoURL, *found.PreviewVideoURL)
+}
+
+func TestBotPersonaRepositoryUpdateMedia(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	repo := NewBotPersonaRepository(db.Pool)
+
+	var personaID int
+	err = db.Pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug, name, description, category, system_prompt, is_nsfw, is_active)
+		VALUES ($1, $2, $3, $4, $5, false, true)
+		RETURNING id
+	`, fmt.Sprintf("persona-update-%d", time.Now().UnixNano()), "Updatable Persona", "desc", PersonaCategoryHelper, "prompt").
+		Scan(&personaID)
+	require.NoError(t, err)
+
+	avatarURL := "/uploads/updated-avatar.png"
+	previewVideoURL := "/uploads/updated-preview.mp4"
+	updated, err := repo.UpdateMedia(ctx, personaID, &avatarURL, &previewVideoURL)
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	require.NotNil(t, updated.AvatarURL)
+	require.NotNil(t, updated.PreviewVideoURL)
+	require.Equal(t, avatarURL, *updated.AvatarURL)
+	require.Equal(t, previewVideoURL, *updated.PreviewVideoURL)
+
+	cleared, err := repo.UpdateMedia(ctx, personaID, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, cleared)
+	require.Nil(t, cleared.AvatarURL)
+	require.Nil(t, cleared.PreviewVideoURL)
+}
