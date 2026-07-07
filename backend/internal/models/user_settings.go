@@ -66,6 +66,11 @@ type UserSettings struct {
 	// Auto-delete: nil means Never (default)
 	DefaultAutoDeleteAfter *time.Duration `json:"default_auto_delete_after,omitempty"`
 
+	// OmniChat global identity defaults for new conversations.
+	OmniChatDefaultUserName   string `json:"omnichat_default_user_name"`
+	OmniChatDefaultUserAge    string `json:"omnichat_default_user_age"`
+	OmniChatDefaultUserGender string `json:"omnichat_default_user_gender"`
+
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -97,7 +102,9 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		       notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		       notify_comment_milestone, notify_comment_velocity, daily_digest,
 		       media_gallery_filter, active_theme_id, advanced_mode_enabled,
-		       default_auto_delete_after, updated_at
+		       default_auto_delete_after,
+		       omnichat_default_user_name, omnichat_default_user_age, omnichat_default_user_gender,
+		       updated_at
 		FROM user_settings
 		WHERE user_id = $1
 	`
@@ -149,6 +156,9 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		&settings.ActiveThemeID,
 		&settings.AdvancedModeEnabled,
 		&settings.DefaultAutoDeleteAfter,
+		&settings.OmniChatDefaultUserName,
+		&settings.OmniChatDefaultUserAge,
+		&settings.OmniChatDefaultUserGender,
 		&settings.UpdatedAt,
 	)
 	if err != nil {
@@ -182,7 +192,9 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
 		          media_gallery_filter, active_theme_id, advanced_mode_enabled,
-		          default_auto_delete_after, updated_at
+		          default_auto_delete_after,
+		          omnichat_default_user_name, omnichat_default_user_age, omnichat_default_user_gender,
+		          updated_at
 	`
 
 	settings := &UserSettings{}
@@ -232,6 +244,9 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		&settings.ActiveThemeID,
 		&settings.AdvancedModeEnabled,
 		&settings.DefaultAutoDeleteAfter,
+		&settings.OmniChatDefaultUserName,
+		&settings.OmniChatDefaultUserAge,
+		&settings.OmniChatDefaultUserGender,
 		&settings.UpdatedAt,
 	)
 
@@ -293,6 +308,9 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		    active_theme_id = $42,
 		    advanced_mode_enabled = $43,
 		    wall_post_permission = $44,
+		    omnichat_default_user_name = $45,
+		    omnichat_default_user_age = $46,
+		    omnichat_default_user_gender = $47,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = $1
 		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators, show_last_seen,
@@ -310,7 +328,9 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
 		          media_gallery_filter, active_theme_id, advanced_mode_enabled,
-		          default_auto_delete_after, updated_at
+		          default_auto_delete_after,
+		          omnichat_default_user_name, omnichat_default_user_age, omnichat_default_user_gender,
+		          updated_at
 	`
 
 	updated := &UserSettings{}
@@ -359,6 +379,9 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		settings.ActiveThemeID,
 		settings.AdvancedModeEnabled,
 		settings.WallPostPermission,
+		settings.OmniChatDefaultUserName,
+		settings.OmniChatDefaultUserAge,
+		settings.OmniChatDefaultUserGender,
 	).Scan(
 		&updated.UserID,
 		&updated.NotificationSound,
@@ -405,6 +428,9 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		&updated.ActiveThemeID,
 		&updated.AdvancedModeEnabled,
 		&updated.DefaultAutoDeleteAfter,
+		&updated.OmniChatDefaultUserName,
+		&updated.OmniChatDefaultUserAge,
+		&updated.OmniChatDefaultUserGender,
 		&updated.UpdatedAt,
 	)
 	if err != nil {

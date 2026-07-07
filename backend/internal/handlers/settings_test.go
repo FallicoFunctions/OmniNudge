@@ -216,6 +216,37 @@ func TestUpdateSettings_PersistsBatchNotifications(t *testing.T) {
 	assert.False(t, settings.BatchNotifications)
 }
 
+func TestUpdateSettings_PersistsOmniChatDefaultIdentity(t *testing.T) {
+	handler, settingsRepo, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"omnichat_default_user_name":   "Riley",
+		"omnichat_default_user_age":    "28",
+		"omnichat_default_user_gender": "F",
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	settings, err := settingsRepo.GetByUserID(context.Background(), userID)
+	require.NoError(t, err)
+	require.NotNil(t, settings)
+	assert.Equal(t, "Riley", settings.OmniChatDefaultUserName)
+	assert.Equal(t, "28", settings.OmniChatDefaultUserAge)
+	assert.Equal(t, "F", settings.OmniChatDefaultUserGender)
+}
+
 func TestUpdateSettings_RejectsInvalidQuietHoursTimezone(t *testing.T) {
 	handler, _, userID, cleanup := setupSettingsHandlerTest(t)
 	defer cleanup()
