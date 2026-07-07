@@ -12,6 +12,7 @@ import { OffsetPaginationControls } from '../components/common/OffsetPaginationC
 import { resolveMediaUrl } from '../utils/mediaUrl';
 import { useFormat } from '../hooks/useFormat';
 import { useTranslation } from 'react-i18next';
+import AdminPersonasTab from '../components/admin/AdminPersonasTab';
 
 type TabType =
   | 'stats'
@@ -20,7 +21,8 @@ type TabType =
   | 'ban-activity'
   | 'bug-reports'
   | 'analytics'
-  | 'retention';
+  | 'retention'
+  | 'personas';
 
 export default function AdminPage() {
   const { t } = useTranslation();
@@ -43,7 +45,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="border-b border-[var(--color-border)] mb-6">
-        <nav className="flex space-x-8">
+        <nav className="flex flex-wrap gap-x-8 gap-y-2 pb-2">
           <button
             onClick={() => setActiveTab('stats')}
             className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
@@ -95,6 +97,16 @@ export default function AdminPage() {
             {t('adminPage.tabs.bugReports')}
           </button>
           <button
+            onClick={() => setActiveTab('personas')}
+            className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
+              activeTab === 'personas'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)]'
+            }`}
+          >
+            OmniChat Personas
+          </button>
+          <button
             onClick={() => setActiveTab('analytics')}
             className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
               activeTab === 'analytics'
@@ -128,6 +140,7 @@ export default function AdminPage() {
       {activeTab === 'moderators' && <ModeratorsTab />}
       {activeTab === 'ban-activity' && <BanActivityTab />}
       {activeTab === 'bug-reports' && <BugReportsTab />}
+      {activeTab === 'personas' && <AdminPersonasTab />}
       {activeTab === 'analytics' && <AnalyticsTab />}
       {activeTab === 'retention' && <RetentionTab />}
     </div>
