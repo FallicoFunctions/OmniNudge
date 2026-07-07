@@ -184,9 +184,10 @@ export default function OmniChatChatPage() {
 
   const filteredConversations = useMemo(() => {
     const all = conversationsQuery.data ?? [];
+    const withMessages = all.filter((c) => c.last_message_preview);
     const newestByPersona = new Map<number, BotConversation>();
 
-    for (const conversation of all) {
+    for (const conversation of withMessages) {
       const existing = newestByPersona.get(conversation.persona_id);
       if (!existing) {
         newestByPersona.set(conversation.persona_id, conversation);
