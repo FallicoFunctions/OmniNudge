@@ -1,32 +1,63 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Compass, Search, MessageSquare, ChevronLeft, ChevronRight, Menu, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Compass, Menu, MessageSquare, Search, X } from 'lucide-react';
 
-export type SidebarTab = 'discover' | 'search' | 'conversations';
-
-const COLLAPSED_STORAGE_KEY = 'omnichat_sidebar_collapsed';
+export type SidebarTab = 'discover' | 'search' | 'chat';
 
 interface OmniChatSidebarProps {
   activeTab: SidebarTab;
   onTabChange: (tab: SidebarTab) => void;
   isAuthenticated: boolean;
   onSignIn: () => void;
-  /** Mobile only: whether the slide-out overlay is open */
   mobileOpen: boolean;
   onMobileOpen: () => void;
   onMobileClose: () => void;
-}
-
-function readCollapsedDefault(): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem(COLLAPSED_STORAGE_KEY) === 'true';
+  desktopCollapsed: boolean;
+  onDesktopCollapsedChange: (collapsed: boolean) => void;
 }
 
 const TABS: { id: SidebarTab; icon: typeof Compass; labelKey: string }[] = [
   { id: 'discover', icon: Compass, labelKey: 'omnichat.sidebar.discover' },
   { id: 'search', icon: Search, labelKey: 'omnichat.sidebar.search' },
-  { id: 'conversations', icon: MessageSquare, labelKey: 'omnichat.sidebar.conversations' },
+  { id: 'chat', icon: MessageSquare, labelKey: 'omnichat.sidebar.chat' },
 ];
+
+function SidebarNav({
+  activeTab,
+  onTabChange,
+  collapsed,
+}: {
+  activeTab: SidebarTab;
+  onTabChange: (tab: SidebarTab) => void;
+  collapsed: boolean;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <nav className="flex flex-1 flex-col gap-2">
+      {TABS.map(({ id, icon: Icon, labelKey }) => {
+        const active = activeTab === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onTabChange(id)}
+            title={collapsed ? t(labelKey) : undefined}
+            className={`flex items-center rounded-2xl border transition ${
+              collapsed ? 'h-10 w-10 self-center justify-center px-0 rounded-[18px]' : 'h-14 justify-start px-4'
+            } gap-3 ${
+              active
+                ? 'border-white/15 bg-white/[0.08] text-white shadow-[0_16px_40px_rgba(0,0,0,0.18)]'
+                : 'border-transparent bg-transparent text-[rgba(255,255,255,0.68)] hover:border-white/10 hover:bg-white/[0.04] hover:text-white'
+            }`}
+          >
+            <Icon size={20} className="flex-shrink-0" />
+            {!collapsed && <span className="truncate text-sm font-medium">{t(labelKey)}</span>}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
 
 export default function OmniChatSidebar({
   activeTab,
@@ -36,129 +67,94 @@ export default function OmniChatSidebar({
   mobileOpen,
   onMobileOpen,
   onMobileClose,
+  desktopCollapsed,
+  onDesktopCollapsedChange,
 }: OmniChatSidebarProps) {
   const { t } = useTranslation();
-  const [collapsed, setCollapsed] = useState(readCollapsedDefault);
-
-  useEffect(() => {
-    localStorage.setItem(COLLAPSED_STORAGE_KEY, String(collapsed));
-  }, [collapsed]);
-
-  // Auto-expand sidebar when conversations tab is clicked while collapsed
-  useEffect(() => {
-    if (activeTab === 'conversations' && collapsed) {
-      setCollapsed(false);
-    }
-  }, [activeTab, collapsed]);
-
-  const sidebarWidth = collapsed ? 'w-16' : 'w-60';
-
-  const sidebarContent = (
-    <div
-      className={`flex h-full flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] transition-[width] duration-200 ${sidebarWidth}`}
-    >
-      {/* Collapse toggle */}
-      <div className="flex items-center justify-end border-b border-[var(--color-border)] px-2 py-2">
-        <button
-          type="button"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-label={collapsed ? t('omnichat.sidebar.expand') : t('omnichat.sidebar.collapse')}
-          className="hidden lg:flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
-        >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <nav className="flex-1 space-y-1 px-2 py-3">
-        {TABS.map(({ id, icon: Icon, labelKey }) => {
-          const active = activeTab === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => {
-                onTabChange(id);
-                onMobileClose();
-              }}
-              title={collapsed ? t(labelKey) : undefined}
-              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]'
-              }`}
-            >
-              <Icon size={20} className="flex-shrink-0" />
-              {!collapsed && <span className="truncate">{t(labelKey)}</span>}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Sign-in CTA — only when not authenticated */}
-      {!isAuthenticated && (
-        <div className="border-t border-[var(--color-border)] p-3">
-          {collapsed ? (
-            <button
-              type="button"
-              onClick={onSignIn}
-              title={t('omnichat.chat.signInPrompt')}
-              className="flex h-9 w-full items-center justify-center rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)]"
-            >
-              <span className="text-xs font-bold">SI</span>
-            </button>
-          ) : (
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-3">
-              <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
-                {t('omnichat.chat.signInPrompt')}
-              </p>
-              <button
-                type="button"
-                onClick={onSignIn}
-                className="w-full rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--color-primary-dark)]"
-              >
-                {t('auth.buttons.signIn')}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <>
-      {/* Desktop sidebar — hidden on mobile, only shown on lg+ */}
-      <div className="hidden lg:block">{sidebarContent}</div>
+      <aside
+        className={`hidden h-full border-r border-white/10 bg-[#17171c]/95 py-4 backdrop-blur-xl lg:flex lg:flex-col ${
+          desktopCollapsed ? 'w-[72px] px-2' : 'w-[248px] px-3'
+        }`}
+      >
+        <div className={`mb-4 flex items-center ${desktopCollapsed ? 'justify-center' : 'justify-between gap-3'}`}>
+          {!desktopCollapsed && <span className="px-2 text-xs font-semibold uppercase tracking-[0.24em] text-white/35">Menu</span>}
+          <button
+            type="button"
+            onClick={() => onDesktopCollapsedChange(!desktopCollapsed)}
+            aria-label={desktopCollapsed ? t('omnichat.sidebar.openMenu') : t('omnichat.sidebar.closeMenu')}
+            className={`flex items-center justify-center border border-white/10 bg-white/[0.04] text-white/65 transition hover:bg-white/[0.08] hover:text-white ${
+              desktopCollapsed ? 'h-10 w-10 rounded-[18px]' : 'h-10 w-10 rounded-2xl'
+            }`}
+          >
+            {desktopCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+        </div>
 
-      {/* Mobile hamburger button */}
+        <SidebarNav activeTab={activeTab} onTabChange={onTabChange} collapsed={desktopCollapsed} />
+
+        {!isAuthenticated && !desktopCollapsed && (
+          <div className="mt-4">
+            <p className="mb-3 px-1 text-sm text-white/45">{t('omnichat.chat.signInPrompt')}</p>
+            <button
+              type="button"
+              onClick={onSignIn}
+              className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-sm font-medium text-[rgba(255,255,255,0.72)] transition hover:bg-white/[0.08] hover:text-white"
+            >
+              {t('auth.buttons.signIn')}
+            </button>
+          </div>
+        )}
+      </aside>
+
       <button
         type="button"
         onClick={onMobileOpen}
         aria-label={t('omnichat.sidebar.openMenu')}
-        className="fixed left-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--color-surface)] text-[var(--color-text-secondary)] shadow-md lg:hidden"
+        className="fixed left-4 top-[84px] z-30 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-[#191920] text-white shadow-md lg:hidden"
         style={{ display: mobileOpen ? 'none' : undefined }}
       >
-        <Menu size={20} />
+        <Menu size={18} />
       </button>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <>
-          <div
-            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-            onClick={onMobileClose}
-          />
-          <div className="fixed inset-y-0 left-0 z-50 flex w-64 lg:hidden">
-            {sidebarContent}
-            <button
-              type="button"
-              onClick={onMobileClose}
-              aria-label={t('omnichat.sidebar.closeMenu')}
-              className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
-            >
-              <X size={16} />
-            </button>
+          <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={onMobileClose} />
+          <div className="fixed inset-y-0 left-0 z-50 w-[248px] border-r border-white/10 bg-[#17171c]/95 p-4 backdrop-blur-xl lg:hidden">
+            <div className="mb-5 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/35">Menu</span>
+              <button
+                type="button"
+                onClick={onMobileClose}
+                aria-label={t('omnichat.sidebar.closeMenu')}
+                className="flex h-9 w-9 items-center justify-center rounded-2xl text-white/65 hover:bg-white/5"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <SidebarNav
+              activeTab={activeTab}
+              onTabChange={(tab) => {
+                onTabChange(tab);
+                onMobileClose();
+              }}
+              collapsed={false}
+            />
+
+            {!isAuthenticated && (
+              <div className="mt-4">
+                <p className="mb-3 px-1 text-sm text-white/45">{t('omnichat.chat.signInPrompt')}</p>
+                <button
+                  type="button"
+                  onClick={onSignIn}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-sm font-medium text-[rgba(255,255,255,0.72)] transition hover:bg-white/[0.08] hover:text-white"
+                >
+                  {t('auth.buttons.signIn')}
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}

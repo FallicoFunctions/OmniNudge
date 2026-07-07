@@ -3978,13 +3978,19 @@
       "forkChatDesc": "Create a copy of this conversation with all messages",
       "history": "Chat history",
       "historyEmpty": "No other conversations with this character",
-      "historyLoadError": "Failed to load chat history"
+      "historyLoadError": "Failed to load chat history",
+      "emptyWorkspace": "No active chat yet"
     },
     "exitToSite": "Exit to OmniNudge",
+    "header": {
+      "defaults": "Defaults",
+      "defaultsDescription": "Set the name, age, and profile details OmniChat should use by default.",
+      "saveDefaults": "Save defaults"
+    },
     "sidebar": {
       "discover": "Discover",
       "search": "Search",
-      "conversations": "Conversations",
+      "chat": "Chat",
       "searchPlaceholder": "Search personas...",
       "noResults": "No results found",
       "collapse": "Collapse sidebar",
@@ -3992,6 +3998,7 @@
       "openMenu": "Open menu",
       "closeMenu": "Close menu",
       "signInToViewConversations": "Sign in to view your conversations",
+      "signInToViewChat": "Sign in to view your chat list",
       "noConversations": "No conversations yet"
     },
     "conversationsPage": {

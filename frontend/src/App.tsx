@@ -228,10 +228,7 @@ function App() {
                               path="/omnichat"
                               element={<OmniChatDiscoverPage />}
                             />
-                            <Route
-                              path="/omnichat/conversations"
-                              element={<OmniChatConversationsPage />}
-                            />
+                            <Route path="/omnichat/chat" element={<OmniChatConversationsPage />} />
                             <Route
                               path="/omnichat/c/:conversationId"
                               element={<OmniChatPage />}

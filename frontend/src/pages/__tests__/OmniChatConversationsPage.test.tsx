@@ -5,12 +5,15 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import OmniChatConversationsPage from '../OmniChatConversationsPage';
 
-const { mockListConversations } = vi.hoisted(() => ({
+const { mockListConversations, mockListPersonas } = vi.hoisted(() => ({
   mockListConversations: vi.fn(),
+  mockListPersonas: vi.fn(),
 }));
 
+let mockIsAuthenticated = true;
+
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ isAuthenticated: true }),
+  useAuth: () => ({ isAuthenticated: mockIsAuthenticated }),
 }));
 
 vi.mock('../../hooks/useOmniChatLayoutMode', () => ({
@@ -18,7 +21,7 @@ vi.mock('../../hooks/useOmniChatLayoutMode', () => ({
 }));
 
 vi.mock('../../components/omnichat/OmniChatSidebar', () => ({
-  default: ({ onTabChange }: { onTabChange: (tab: 'discover' | 'search' | 'conversations') => void }) => (
+  default: ({ onTabChange }: { onTabChange: (tab: 'discover' | 'search' | 'chat') => void }) => (
     <div data-testid="omnichat-sidebar">
       <button type="button" onClick={() => onTabChange('search')}>
         Sidebar Search
@@ -33,10 +36,13 @@ vi.mock('../../components/omnichat/PersonaAvatar', () => ({
 
 vi.mock('../../services/omnichatService', () => ({
   omnichatService: {
+    listPersonas: (...args: unknown[]) => mockListPersonas(...args),
     listConversations: (...args: unknown[]) => mockListConversations(...args),
   },
   omnichatQueryKeys: {
+    personas: () => ['omnichat', 'personas'],
     conversations: ['omnichat', 'conversations'],
+    conversation: (id: number) => ['omnichat', 'conversation', id],
   },
 }));
 
@@ -54,9 +60,9 @@ function renderPage() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/omnichat/conversations']}>
+      <MemoryRouter initialEntries={['/omnichat/chat']}>
         <Routes>
-          <Route path="/omnichat/conversations" element={<OmniChatConversationsPage />} />
+          <Route path="/omnichat/chat" element={<OmniChatConversationsPage />} />
           <Route path="/omnichat" element={<LocationProbe />} />
         </Routes>
       </MemoryRouter>
@@ -67,16 +73,19 @@ function renderPage() {
 describe('OmniChatConversationsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIsAuthenticated = true;
+    mockListPersonas.mockResolvedValue([]);
   });
 
-  it('does not render placeholder unread or favorites filters', async () => {
+  it('labels the page as Chat and renders the visible filter pills', async () => {
     mockListConversations.mockResolvedValueOnce([]);
 
     renderPage();
 
+    expect(await screen.findByText('Chat')).toBeInTheDocument();
     expect(await screen.findByText('No conversations yet. Start chatting with a persona!')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Unread' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Favorites' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unread' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Favorites' })).toBeInTheDocument();
   });
 
   it('shows persona description as the row subtitle', async () => {
@@ -106,16 +115,54 @@ describe('OmniChatConversationsPage', () => {
     renderPage();
 
     expect(await screen.findByText('Campfire Thread')).toBeInTheDocument();
-    expect(screen.getByText('A terse, old-school text-adventure narrator.')).toBeInTheDocument();
+    expect(screen.getAllByText('A terse, old-school text-adventure narrator.').length).toBeGreaterThan(0);
   });
 
-  it('routes the search tab to the discover page with the search overlay flag', async () => {
+  it('opens the search overlay from the sidebar search action', async () => {
     mockListConversations.mockResolvedValueOnce([]);
+    mockListPersonas.mockResolvedValueOnce([
+      {
+        id: 9,
+        slug: 'narrator',
+        name: 'Narrator',
+        description: 'A terse, old-school text-adventure narrator.',
+        category: 'roleplay',
+        avatar_url: undefined,
+        is_nsfw: false,
+        is_active: true,
+        created_at: '2026-07-01T10:00:00Z',
+        updated_at: '2026-07-01T10:00:00Z',
+      },
+    ]);
 
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Sidebar Search' }));
 
-    expect(screen.getByTestId('location-probe')).toHaveTextContent('/omnichat?search=1');
+    expect(await screen.findByPlaceholderText('Search personas...')).toBeInTheDocument();
+  });
+
+  it('shows a guest chat directory instead of a sign-in blocker', async () => {
+    mockIsAuthenticated = false;
+    mockListPersonas.mockResolvedValueOnce([
+      {
+        id: 9,
+        slug: 'narrator',
+        name: 'Narrator',
+        description: 'A terse, old-school text-adventure narrator.',
+        category: 'roleplay',
+        avatar_url: undefined,
+        is_nsfw: false,
+        is_active: true,
+        created_at: '2026-07-01T10:00:00Z',
+        updated_at: '2026-07-01T10:00:00Z',
+      },
+    ]);
+    mockListConversations.mockResolvedValueOnce([]);
+
+    renderPage();
+
+    expect(await screen.findByText('Narrator')).toBeInTheDocument();
+    expect(screen.queryByText('Sign in to view your chat list')).not.toBeInTheDocument();
   });
 });
