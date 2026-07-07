@@ -58,6 +58,17 @@ export function saveGuestMessages(personaId: number | null, messages: BotMessage
   sessionStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(next));
 }
 
+export function getGuestPersonaIds(): number[] {
+  if (typeof sessionStorage === 'undefined') return [];
+
+  const stored = parseStoredValue(sessionStorage.getItem(GUEST_STORAGE_KEY));
+  if (!isStorageMap(stored)) return [];
+
+  return Object.keys(stored)
+    .map(Number)
+    .filter((id) => (stored[id]?.length ?? 0) > 0);
+}
+
 export function clearGuestMessages(personaId: number | null) {
   if (typeof sessionStorage === 'undefined') return;
 
