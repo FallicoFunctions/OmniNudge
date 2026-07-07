@@ -80,7 +80,8 @@ export default function MainLayout() {
   const { mode: omniChatLayoutMode } = useOmniChatLayoutMode();
   const isOmniChatImmersive =
     location.pathname.startsWith('/omnichat') && omniChatLayoutMode === 'immersive';
-  const hideNav = isAIPreview || isOmniChatImmersive;
+  const isOmniChatRoute = location.pathname.startsWith('/omnichat');
+  const hideNav = isAIPreview || isOmniChatImmersive || isOmniChatRoute;
 
   // Determine if slim mode
   const isSlimMode =
@@ -198,11 +199,15 @@ export default function MainLayout() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isOmniChatRoute) {
+      setShowAboutModal(false);
+      return;
+    }
     const dismissed = localStorage.getItem(aboutModalStorageKey) === 'true';
     if (!dismissed) {
       setShowAboutModal(true);
     }
-  }, [aboutModalStorageKey]);
+  }, [aboutModalStorageKey, isOmniChatRoute]);
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
@@ -527,7 +532,7 @@ export default function MainLayout() {
         </ErrorBoundary>
       )}
 
-      {showAboutModal && (
+      {showAboutModal && !isOmniChatRoute && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 py-6">
           <div className="w-full max-w-4xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl">
             <div className="max-h-[70vh] overflow-y-auto pr-2">

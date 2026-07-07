@@ -3978,13 +3978,19 @@
       "forkChatDesc": "إنشاء نسخة من هذه المحادثة بكل الرسائل",
       "history": "سجل المحادثة",
       "historyEmpty": "لا توجد محادثات أخرى مع هذه الشخصية",
-      "historyLoadError": "تعذّر تحميل سجل المحادثة"
+      "historyLoadError": "تعذّر تحميل سجل المحادثة",
+      "emptyWorkspace": "لا توجد محادثة نشطة بعد"
     },
     "exitToSite": "الخروج إلى OmniNudge",
+    "header": {
+      "defaults": "الإعدادات الافتراضية",
+      "defaultsDescription": "حدّد الاسم والعمر وتفاصيل الملف الشخصي التي يجب أن يستخدمها OmniChat افتراضيًا.",
+      "saveDefaults": "حفظ الإعدادات الافتراضية"
+    },
     "sidebar": {
       "discover": "اكتشف",
       "search": "بحث",
-      "conversations": "المحادثات",
+      "chat": "الدردشة",
       "searchPlaceholder": "البحث عن شخصيات...",
       "noResults": "لم يتم العثور على نتائج",
       "collapse": "طي الشريط الجانبي",
@@ -3992,6 +3998,7 @@
       "openMenu": "فتح القائمة",
       "closeMenu": "إغلاق القائمة",
       "signInToViewConversations": "سجّل الدخول لعرض محادثاتك",
+      "signInToViewChat": "سجّل الدخول لعرض قائمة الدردشة",
       "noConversations": "لا توجد محادثات بعد"
     },
     "conversationsPage": {
