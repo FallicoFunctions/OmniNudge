@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import bmesh
 import bpy
 
 
@@ -14,13 +13,6 @@ TEXTURE_DECIMATE_RATIOS = {
     "V49_ScreenServiceCatwalkCableLoom": 0.84,
 }
 
-
-NORMAL_STRENGTHS = {
-    "pearl": 1.6,
-    "stone": 1.7,
-    "black_metal": 2.4,
-    "gold_metal": 1.8,
-}
 
 TEXTURE_SETS = {
     "pearl": {
@@ -59,41 +51,18 @@ def ensure_gltf_material_output_group():
 
 MATERIAL_FAMILIES = {
     "pearl": {
-        "V13_MoonstoneShell",
         "V14_PolishedMoonstoneShell",
-        "V15_PearlShellBeveled",
-        "V16_PearlArchitecturalShell",
-        "V17_PearlShellSatin",
-        "V18_PearlFacadeInlay",
-        "V19_GatewayPearlIvory",
         "V20_LayeredPearlShell",
-        "V7_PearlIvory",
     },
     "stone": {
         "V13_WetPlazaStone",
-        "V15_WetPlazaInlay",
         "V18_WetStonePaver",
-        "V19_DeepWetArrivalStone",
-        "V20_RecessedWarmShadow",
     },
     "black_metal": {
-        "V13_BlackStageRigging",
-        "V14_CosmicScreenEmission",
-        "V14_MatteBlackProductionRig",
-        "V15_MatteProductionBlack",
         "V16_MatteBlackStageHardware",
-        "V18_LineArrayGraphite",
     },
     "gold_metal": {
-        "V13_BrushedFestivalGold",
-        "V14_BurnishedCelestialGold",
-        "V15_EngineeredGoldAnchors",
         "V16_BrushedProductionGold",
-        "V17_CrownBrushedGold",
-        "V18_BrushedGoldTrim",
-        "V19_ArrivalBrushedGold",
-        "V20_ChasedGoldFiligree",
-        "V9_CrownFiligreeGold",
     },
 }
 
@@ -153,9 +122,7 @@ def apply_texture_set(material_name, texture_set_name):
     normal_image.image = load_image(textures["normal"], non_color=True)
     normal_map = nodes.new("ShaderNodeNormalMap")
     normal_map.name = f"OmniRaveTexture_{texture_set_name}_normal_map"
-    # Per-family relief: dark hardware needs far stronger normals to read at
-    # night light levels; reviews called plate structure invisible below ~2x.
-    normal_map.inputs["Strength"].default_value = NORMAL_STRENGTHS[texture_set_name]
+    normal_map.inputs["Strength"].default_value = 0.42
     links.new(normal_image.outputs["Color"], normal_map.inputs["Color"])
     links.new(normal_map.outputs["Normal"], principled_input(principled, "Normal"))
 
@@ -196,10 +163,7 @@ def reassign_legacy_rigging_materials():
     for object_name, material_name in LEGACY_RIGGING_MATERIAL_OVERRIDES.items():
         obj = bpy.data.objects.get(object_name)
         if obj is None or obj.type != "MESH":
-            # Legacy proxies get replaced by later regeneration scripts; once
-            # gone, their material reassignment is already baked into the blend.
-            print(f"V50_LEGACY_SKIP mesh={object_name}")
-            continue
+            raise RuntimeError(f"Missing legacy Main Stage rigging mesh: {object_name}")
         material = bpy.data.materials.get(material_name)
         if material is None:
             raise RuntimeError(f"Missing legacy Main Stage rigging material: {material_name}")
@@ -224,45 +188,27 @@ def reassign_legacy_rigging_materials():
             for slot in obj.material_slots:
                 slot.material = material
         if not matched:
-            print(f"V50_LEGACY_SKIP prefix={prefix}")
+            raise RuntimeError(f"Missing legacy Main Stage mesh prefix: {prefix}")
 
 
-def triangulate_mesh_data(mesh):
-    # Triangulate the shared datablock itself: the glTF exporter refuses to
-    # generate tangents for non-triangulated primitives, and per-object
-    # triangulate modifiers would break mesh-data sharing between mirrored
-    # nodes at export (doubling GPU memory).
-    bm = bmesh.new()
-    bm.from_mesh(mesh)
-    bmesh.ops.triangulate(bm, faces=bm.faces, quad_method="BEAUTY", ngon_method="BEAUTY")
-    bm.to_mesh(mesh)
-    bm.free()
+def ensure_vertex_stable_uvs(mesh, cube_size=4.0):
+    uv_layer = mesh.uv_layers.new(name="OmniRaveGeneratedUV")
+    min_bounds = [min(vertex.co[axis] for vertex in mesh.vertices) for axis in range(3)]
+    max_bounds = [max(vertex.co[axis] for vertex in mesh.vertices) for axis in range(3)]
+    extents = [max_bounds[axis] - min_bounds[axis] for axis in range(3)]
+    uv_axes = sorted(range(3), key=lambda axis: extents[axis], reverse=True)[:2]
 
+    per_vertex_uvs = {}
+    for vertex in mesh.vertices:
+        u = vertex.co[uv_axes[0]] / cube_size + 0.5
+        v = vertex.co[uv_axes[1]] / cube_size + 0.5
+        per_vertex_uvs[vertex.index] = (u, v)
 
-def ensure_vertex_stable_uvs(obj):
-    # Smart UV Project: unlike a planar two-axis projection it cannot produce
-    # zero-area UV faces (and therefore zero-length tangents) on geometry
-    # perpendicular to the projection plane.
-    obj.data.uv_layers.new(name="OmniRaveGeneratedUV")
-    obj.data.uv_layers["OmniRaveGeneratedUV"].active = True
-    bpy.context.view_layer.objects.active = obj
-    for other in bpy.context.selected_objects:
-        other.select_set(False)
-    obj.select_set(True)
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
-    # Cube projection at a fixed world scale: keeps ~one texture tile per
-    # 4m (Smart UV normalises islands to the 0-1 square, which stretched a
-    # single tile across whole meshes and made the maps invisible), and its
-    # per-face dominant-axis mapping cannot emit the zero-area UV faces the
-    # old two-axis planar projection produced.
-    bpy.ops.uv.cube_project(cube_size=2.5, correct_aspect=True, scale_to_bounds=False)
-    bpy.ops.object.mode_set(mode="OBJECT")
-    obj.select_set(False)
+    for loop in mesh.loops:
+        uv_layer.data[loop.index].uv = per_vertex_uvs[loop.vertex_index]
 
 
 def ensure_uvs_for_textured_meshes(textured_material_names):
-    triangulated_mesh_names = set()
     collision_collection = bpy.data.collections.get("Collision")
     collision_objects = set(collision_collection.all_objects) if collision_collection else set()
 
@@ -271,6 +217,8 @@ def ensure_uvs_for_textured_meshes(textured_material_names):
             continue
         generated_uv = obj.data.uv_layers.get("OmniRaveGeneratedUV")
         if obj in collision_objects or obj.hide_viewport or obj.hide_render or obj.hide_get():
+            if generated_uv:
+                obj.data.uv_layers.remove(generated_uv)
             modifier = obj.modifiers.get(TEXTURE_TRIANGULATE_MODIFIER)
             if modifier:
                 obj.modifiers.remove(modifier)
@@ -280,6 +228,8 @@ def ensure_uvs_for_textured_meshes(textured_material_names):
             continue
         material_names = {slot.material.name for slot in obj.material_slots if slot.material}
         if not material_names.intersection(textured_material_names):
+            if generated_uv:
+                obj.data.uv_layers.remove(generated_uv)
             modifier = obj.modifiers.get(TEXTURE_TRIANGULATE_MODIFIER)
             if modifier:
                 obj.modifiers.remove(modifier)
@@ -287,21 +237,20 @@ def ensure_uvs_for_textured_meshes(textured_material_names):
             if modifier:
                 obj.modifiers.remove(modifier)
             continue
-        authored_layers = [layer for layer in obj.data.uv_layers if layer.name != "OmniRaveGeneratedUV"]
-        if not authored_layers:
-            # Legacy planar generated UVs produce zero-area faces (and
-            # therefore zero-length tangents) on geometry perpendicular to
-            # the projection plane; regenerate them with a smart projection.
-            if generated_uv:
-                obj.data.uv_layers.remove(generated_uv)
+        if generated_uv:
+            obj.data.uv_layers.remove(generated_uv)
+        if obj.data.uv_layers:
+            pass
+        else:
             try:
-                ensure_vertex_stable_uvs(obj)
+                ensure_vertex_stable_uvs(obj.data)
             except RuntimeError as error:
                 raise RuntimeError(f"Failed to generate Main Stage UVs for {obj.name}") from error
 
-        if obj.data.name not in triangulated_mesh_names:
-            triangulate_mesh_data(obj.data)
-            triangulated_mesh_names.add(obj.data.name)
+        if obj.modifiers.get(TEXTURE_TRIANGULATE_MODIFIER) is None:
+            modifier = obj.modifiers.new(TEXTURE_TRIANGULATE_MODIFIER, "TRIANGULATE")
+            modifier.quad_method = "BEAUTY"
+            modifier.ngon_method = "BEAUTY"
 
         decimate_ratio = TEXTURE_DECIMATE_RATIOS.get(obj.name)
         if decimate_ratio is None:
@@ -315,25 +264,6 @@ def ensure_uvs_for_textured_meshes(textured_material_names):
             obj.modifiers[TEXTURE_DECIMATE_MODIFIER].ratio = decimate_ratio
 
 
-def smooth_curved_shading():
-    # Reviews consistently flag hard polygon facets on curved hero forms as
-    # the loudest CG tell. Smooth shading by angle keeps authored hard edges
-    # (>35 degrees) while letting curved silhouettes shade continuously.
-    collision_collection = bpy.data.collections.get("Collision")
-    collision_objects = set(collision_collection.all_objects) if collision_collection else set()
-    smoothed_mesh_names = set()
-    for obj in bpy.data.objects:
-        if obj.type != "MESH" or obj in collision_objects or obj.hide_render:
-            continue
-        if obj.data.name in smoothed_mesh_names:
-            continue
-        smoothed_mesh_names.add(obj.data.name)
-        for polygon in obj.data.polygons:
-            polygon.use_smooth = True
-        obj.data.set_sharp_from_angle(angle=0.6108652)
-    print(f"V50_SMOOTH_SHADING meshes={len(smoothed_mesh_names)}")
-
-
 target_material_names = {material_name for material_names in MATERIAL_FAMILIES.values() for material_name in material_names}
 clean_non_target_materials(target_material_names)
 reassign_legacy_rigging_materials()
@@ -345,7 +275,6 @@ for texture_set_name, material_names in MATERIAL_FAMILIES.items():
             applied.append(material_name)
 
 ensure_uvs_for_textured_meshes(set(applied))
-smooth_curved_shading()
 
 if len(applied) != len(target_material_names):
     raise RuntimeError(f"Expected {len(target_material_names)} textured materials, got {len(applied)}")
