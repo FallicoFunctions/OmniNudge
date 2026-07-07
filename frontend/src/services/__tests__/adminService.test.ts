@@ -7,6 +7,7 @@ vi.mock('../../lib/api', () => ({
   api: {
     get: vi.fn(),
     post: vi.fn(),
+    put: vi.fn(),
     delete: vi.fn(),
   },
 }));
@@ -206,6 +207,52 @@ describe('adminService - Ban System', () => {
       vi.mocked(api.get).mockRejectedValue(mockError);
 
       await expect(adminService.getBanHistory(123)).rejects.toThrow('Unauthorized');
+    });
+  });
+
+  describe('persona media management', () => {
+    it('fetches admin personas', async () => {
+      const mockResponse = {
+        personas: [
+          {
+            id: 9,
+            slug: 'narrator',
+            name: 'Narrator',
+            category: 'roleplay',
+            preview_video_url: '/uploads/narrator-preview.mp4',
+          },
+        ],
+      };
+
+      vi.mocked(api.get).mockResolvedValue(mockResponse);
+
+      const result = await adminService.listOmniChatPersonas();
+
+      expect(api.get).toHaveBeenCalledWith('/admin/omnichat/personas');
+      expect(result).toEqual(mockResponse.personas);
+    });
+
+    it('updates persona avatar and preview media', async () => {
+      const mockResponse = {
+        persona: {
+          id: 9,
+          avatar_url: '/uploads/narrator-avatar.png',
+          preview_video_url: '/uploads/narrator-preview.mp4',
+        },
+      };
+
+      vi.mocked(api.put).mockResolvedValue(mockResponse);
+
+      const result = await adminService.updateOmniChatPersonaMedia(9, {
+        avatar_url: '/uploads/narrator-avatar.png',
+        preview_video_url: '/uploads/narrator-preview.mp4',
+      });
+
+      expect(api.put).toHaveBeenCalledWith('/admin/omnichat/personas/9', {
+        avatar_url: '/uploads/narrator-avatar.png',
+        preview_video_url: '/uploads/narrator-preview.mp4',
+      });
+      expect(result).toEqual(mockResponse.persona);
     });
   });
 });

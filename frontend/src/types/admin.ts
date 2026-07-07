@@ -1,3 +1,5 @@
+import type { PersonaCategory } from './omnichat';
+
 // Admin panel types
 
 export interface AdminUser {
@@ -60,4 +62,18 @@ export interface HubModerator {
 
 export interface UpdateRoleRequest {
   role: 'user' | 'admin';
+}
+
+export interface AdminOmniChatPersona {
+  id: number;
+  slug: string;
+  name: string;
+  description?: string;
+  category: PersonaCategory;
+  avatar_url?: string;
+  preview_video_url?: string;
+  is_nsfw: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
