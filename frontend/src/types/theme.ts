@@ -95,6 +95,9 @@ export interface UserSettings {
   notify_comment_velocity: boolean;
   daily_digest: boolean;
   media_gallery_filter: string;
+  omnichat_default_user_name: string;
+  omnichat_default_user_age: string;
+  omnichat_default_user_gender: string;
   // nanoseconds (Go time.Duration); null / omitted means Never
   default_auto_delete_after?: number | null;
   updated_at: string;
