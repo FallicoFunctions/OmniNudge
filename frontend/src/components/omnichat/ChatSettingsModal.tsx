@@ -224,18 +224,18 @@ export default function ChatSettingsModal({
                               navigate(`/omnichat/c/${conv.id}`);
                               onClose();
                             }}
-                            className="flex min-w-0 flex-1 items-center gap-3 rounded-l-md px-3 py-2 hover:bg-[var(--color-surface-hover)]"
+                            className="group/left flex min-w-0 flex-1 items-center gap-3 rounded-l-md px-3 py-2 hover:bg-[var(--color-surface-hover)]"
                           >
-                            <MessageSquare size={16} className="flex-shrink-0 text-[var(--color-text-muted)]" />
+                            <MessageSquare size={16} className="flex-shrink-0 text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]" />
                             <div className="min-w-0 flex-1">
-                              <p className="truncate font-medium text-[var(--color-text-primary)]">
+                              <p className="truncate font-medium text-[var(--color-text-primary)] group-hover/left:text-[var(--color-primary)]">
                                 {conv.title ?? persona.name}
                               </p>
-                              <p className="text-xs text-[var(--color-text-muted)]">
+                              <p className="text-xs text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]">
                                 {formatRelativeTime(conv.last_message_at)}
                               </p>
                             </div>
-                            <ArrowRight size={14} className="flex-shrink-0 text-[var(--color-text-muted)]" />
+                            <ArrowRight size={14} className="flex-shrink-0 text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]" />
                           </button>
                           <div className="h-4 w-px self-center bg-[var(--color-border)]" />
                           <button
