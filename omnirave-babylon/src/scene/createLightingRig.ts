@@ -95,7 +95,11 @@ function createPracticalPoolLights(scene: Scene) {
   if (pools.length > 0) {
     for (const material of scene.materials) {
       if ('maxSimultaneousLights' in material) {
-        material.maxSimultaneousLights = 12;
+        // Every material evaluates this many lights per fragment. 12 was the
+        // top of the budget; 6 (four rig lights + the two nearest scoped
+        // pools/spills) roughly halves the lighting shader cost with little
+        // visible loss, since distant pools contribute almost nothing.
+        material.maxSimultaneousLights = 6;
       }
     }
   }
@@ -106,7 +110,7 @@ function createPracticalPoolLights(scene: Scene) {
 function createKeyShadowGenerator(scene: Scene, key: DirectionalLight) {
   key.autoCalcShadowZBounds = true;
 
-  const shadowGenerator = new ShadowGenerator(4096, key);
+  const shadowGenerator = new ShadowGenerator(2048, key);
   shadowGenerator.usePercentageCloserFiltering = true;
   shadowGenerator.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
   shadowGenerator.bias = 0.0022;

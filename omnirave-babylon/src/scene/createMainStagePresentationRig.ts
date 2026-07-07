@@ -68,7 +68,9 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
   pipeline.depthOfFieldEnabled = false;
   pipeline.chromaticAberrationEnabled = false;
   pipeline.sharpenEnabled = true;
-  pipeline.samples = 4;
+  // High-DPI rendering already suppresses most edge aliasing, so 4x MSAA on
+  // top of it is largely redundant and expensive; FXAA handles the remainder.
+  pipeline.samples = 1;
   pipeline.imageProcessing.vignetteEnabled = true;
   pipeline.imageProcessing.vignetteWeight = 1.5;
   pipeline.grainEnabled = true;
@@ -90,10 +92,11 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
 // instead of only on emitter surfaces.
 function createScreenLightScattering(scene: Scene, camera: Camera, panels: Mesh[]) {
   const effects: VolumetricLightScatteringPostProcess[] = [];
-  // One occlusion pass re-renders the whole scene; a single dominant
-  // scattering source keeps the cost of that pass bounded and matches
-  // how one wall usually owns the haze in a real frame.
-  for (const panel of panels.slice(0, 1)) {
+  // Disabled for performance: the occlusion pass re-renders scene geometry
+  // every frame, and the haze it adds is marginal against the emitter-hugging
+  // glow billboards. Kept as a code path in case a lighter budget allows it.
+  const SCATTERING_SOURCES = 0;
+  for (const panel of panels.slice(0, SCATTERING_SOURCES)) {
     try {
       const scattering = new VolumetricLightScatteringPostProcess(
         `${panel.name}-scattering`,
