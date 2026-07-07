@@ -210,33 +210,38 @@ export default function ChatSettingsModal({
                   <ul className="space-y-2">
                     {otherConversations.map((conv) => (
                       <li key={conv.id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigate(`/omnichat/c/${conv.id}`);
-                            onClose();
-                          }}
-                          className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-hover)]"
-                        >
-                          <MessageSquare size={16} className="flex-shrink-0 text-[var(--color-text-muted)]" />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-[var(--color-text-primary)]">
-                              {conv.title ?? persona.name}
-                            </p>
-                            <p className="text-xs text-[var(--color-text-muted)]">
-                              {formatRelativeTime(conv.last_message_at)}
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            <ArrowRight size={14} className="text-[var(--color-text-muted)]" />
-                            <div className="h-4 w-px bg-[var(--color-border)]" />
+                        <div className="flex w-full items-stretch rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] text-left text-sm">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigate(`/omnichat/c/${conv.id}`);
+                              onClose();
+                            }}
+                            className="flex min-w-0 flex-1 items-center gap-3 rounded-l-md px-3 py-2 hover:bg-[var(--color-surface-hover)]"
+                          >
+                            <MessageSquare size={16} className="flex-shrink-0 text-[var(--color-text-muted)]" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium text-[var(--color-text-primary)]">
+                                {conv.title ?? persona.name}
+                              </p>
+                              <p className="text-xs text-[var(--color-text-muted)]">
+                                {formatRelativeTime(conv.last_message_at)}
+                              </p>
+                            </div>
+                            <ArrowRight size={14} className="flex-shrink-0 text-[var(--color-text-muted)]" />
+                          </button>
+                          <div className="h-4 w-px self-center bg-[var(--color-border)]" />
+                          <button
+                            type="button"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center rounded-r-md px-3 py-2 hover:bg-red-500/10"
+                          >
                             <Trash2
                               size={14}
-                              className="cursor-pointer text-[var(--color-text-muted)] hover:text-red-500"
-                              onClick={(e) => e.stopPropagation()}
+                              className="text-[var(--color-text-muted)] hover:text-red-500"
                             />
-                          </div>
-                        </button>
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
