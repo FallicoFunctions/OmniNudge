@@ -13,6 +13,7 @@ export interface BotPersona {
   description?: string;
   category: PersonaCategory;
   avatar_url?: string;
+  preview_video_url?: string;
   is_nsfw: boolean;
   is_active: boolean;
   created_at: string;
@@ -31,6 +32,7 @@ export interface BotConversation {
   persona_id: number;
   persona?: BotPersona;
   title?: string;
+  last_message_preview?: string;
   settings?: ConversationSettings;
   created_at: string;
   last_message_at: string;
