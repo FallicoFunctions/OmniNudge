@@ -49,11 +49,7 @@ export function saveGuestMessages(personaId: number | null, messages: BotMessage
   const stored = parseStoredValue(sessionStorage.getItem(GUEST_STORAGE_KEY));
   const next: GuestStorageMap = isStorageMap(stored) ? { ...stored } : {};
 
-  if (messages.length === 0) {
-    delete next[String(personaId)];
-  } else {
-    next[String(personaId)] = messages;
-  }
+  next[String(personaId)] = messages;
 
   sessionStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(next));
 }
@@ -64,9 +60,7 @@ export function getGuestPersonaIds(): number[] {
   const stored = parseStoredValue(sessionStorage.getItem(GUEST_STORAGE_KEY));
   if (!isStorageMap(stored)) return [];
 
-  return Object.keys(stored)
-    .map(Number)
-    .filter((id) => (stored[id]?.length ?? 0) > 0);
+  return Object.keys(stored).map(Number);
 }
 
 export function clearGuestMessages(personaId: number | null) {
