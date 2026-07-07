@@ -98,6 +98,7 @@ describe('OmniChatChatPage', () => {
         title: 'Campfire Thread',
         created_at: '2026-07-02T10:00:00Z',
         last_message_at: '2026-07-02T10:15:00Z',
+        last_message_preview: 'Default preview.',
         persona,
       },
     ]);
@@ -188,6 +189,7 @@ describe('OmniChatChatPage', () => {
         title: 'Campfire Thread',
         created_at: '2026-07-02T10:00:00Z',
         last_message_at: '2026-07-02T10:15:00Z',
+        last_message_preview: 'Latest fallback preview. Second sentence.',
         persona: {
           id: 9,
           slug: 'narrator',
@@ -291,7 +293,7 @@ describe('OmniChatChatPage', () => {
     renderPage();
 
     const botBubble = (await screen.findAllByText('Bot reply text'))[0].closest('div[class*="rounded-[26px]"]');
-    const userBubble = (screen.getAllByText('User reply text')[1]).closest('div[class*="rounded-[26px]"]');
+    const userBubble = (screen.getAllByText('User reply text')[0]).closest('div[class*="rounded-[26px]"]');
 
     expect(botBubble).toHaveClass('text-white');
     expect(userBubble).toHaveClass('text-white');
