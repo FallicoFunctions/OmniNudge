@@ -7,8 +7,6 @@ import { userSettingsService } from '../../services/userSettingsService';
 import {
   mapOmniChatDefaultsToUserSettings,
   mapUserSettingsToOmniChatDefaults,
-  loadOmniChatDefaults,
-  saveOmniChatDefaults,
 } from '../../utils/omnichatDefaults';
 import OmniChatHeader from './OmniChatHeader';
 import OmniChatSidebar, { type SidebarTab } from './OmniChatSidebar';
@@ -30,7 +28,7 @@ export default function OmniChatShell({
   const { isAuthenticated } = useAuth();
   const { t } = useTranslation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [defaults, setDefaults] = useState<ConversationSettings>(() => loadOmniChatDefaults('guest'));
+  const [defaults, setDefaults] = useState<ConversationSettings>({ user_name: '', user_age: '', user_gender: '' });
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(() => {
     if (typeof localStorage === 'undefined') return false;
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
@@ -44,29 +42,22 @@ export default function OmniChatShell({
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setDefaults(loadOmniChatDefaults('guest'));
+      setDefaults({ user_name: '', user_age: '', user_gender: '' });
       return;
     }
     if (settingsQuery.data) {
       const nextDefaults = mapUserSettingsToOmniChatDefaults(settingsQuery.data);
       setDefaults(nextDefaults);
-      saveOmniChatDefaults(nextDefaults, 'authenticated');
     }
   }, [isAuthenticated, settingsQuery.data]);
 
   const saveDefaultsMutation = useMutation({
     mutationFn: async (next: ConversationSettings) => {
-      if (!isAuthenticated) {
-        saveOmniChatDefaults(next, 'guest');
-        return next;
-      }
-
       const updated = await userSettingsService.update(mapOmniChatDefaultsToUserSettings(next));
       return mapUserSettingsToOmniChatDefaults(updated);
     },
     onSuccess: (next) => {
       setDefaults(next);
-      saveOmniChatDefaults(next, isAuthenticated ? 'authenticated' : 'guest');
     },
   });
 
@@ -85,6 +76,13 @@ export default function OmniChatShell({
             await saveDefaultsMutation.mutateAsync(next);
           }}
           isSavingDefaults={saveDefaultsMutation.isPending}
+          onSignIn={() => {
+            window.dispatchEvent(
+              new CustomEvent('open-auth-modal', {
+                detail: { mode: 'login', redirectTo: '/omnichat/chat' },
+              })
+            );
+          }}
         />
 
         <div className="fixed left-0 z-30" style={{ top: HEADER_HEIGHT, bottom: 0 }}>
