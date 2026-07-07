@@ -1,8 +1,6 @@
 import type { BotPersona } from '../types/omnichat';
 
 const SLUG_GRADIENTS: Record<string, string> = {
-  'after-dark':
-    'radial-gradient(ellipse at 30% 30%, #c46a1a 0%, #7a3a0a 55%, #3d1a06 100%)',
   'chat-buddy':
     'radial-gradient(ellipse at 40% 25%, #c0256e 0%, #7a1050 55%, #3a0830 100%)',
   'dungeon-master':
