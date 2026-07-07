@@ -184,24 +184,7 @@ export default function OmniChatChatPage() {
 
   const filteredConversations = useMemo(() => {
     const all = conversationsQuery.data ?? [];
-    const newestByPersona = new Map<number, BotConversation>();
-
-    for (const conversation of all) {
-      const existing = newestByPersona.get(conversation.persona_id);
-      if (!existing) {
-        newestByPersona.set(conversation.persona_id, conversation);
-        continue;
-      }
-
-      if (
-        new Date(conversation.last_message_at).getTime() >
-        new Date(existing.last_message_at).getTime()
-      ) {
-        newestByPersona.set(conversation.persona_id, conversation);
-      }
-    }
-
-    return Array.from(newestByPersona.values()).filter((conversation) => {
+    return all.filter((conversation) => {
       if (!directoryQuery.trim()) return true;
       const query = directoryQuery.toLowerCase();
       const preview = getConversationPreview(conversation.last_message_preview, '');
