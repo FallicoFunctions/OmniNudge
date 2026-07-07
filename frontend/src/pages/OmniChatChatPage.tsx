@@ -148,6 +148,7 @@ export default function OmniChatChatPage() {
   const [streamingText, setStreamingText] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
+  const [newChatMenuOpen, setNewChatMenuOpen] = useState(false);
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const [guestMessages, setGuestMessages] = useState<BotMessage[]>([]);
   const [guestPersona, setGuestPersona] = useState<BotPersona | null>(null);
@@ -273,8 +274,15 @@ export default function OmniChatChatPage() {
 
   useEffect(() => {
     if (!isGuest) return;
-    setGuestMessages(loadGuestMessages(guestPersonaId));
-  }, [isGuest, guestPersonaId]);
+    const state = location.state as { forkedMessages?: BotMessage[] } | null;
+    if (state?.forkedMessages) {
+      setGuestMessages(state.forkedMessages);
+      saveGuestMessages(guestPersonaId, state.forkedMessages);
+      window.history.replaceState({}, '');
+    } else {
+      setGuestMessages(loadGuestMessages(guestPersonaId));
+    }
+  }, [isGuest, guestPersonaId, location.state]);
 
   useEffect(() => {
     if (!isGuest || !guestPersonaId) return;
@@ -346,6 +354,17 @@ export default function OmniChatChatPage() {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem(PROFILE_PANE_COLLAPSED_KEY, String(profilePaneCollapsed));
   }, [profilePaneCollapsed]);
+
+  useEffect(() => {
+    if (!newChatMenuOpen) return;
+    const handler = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!target || !document.contains(target)) return;
+      setNewChatMenuOpen(false);
+    };
+    setTimeout(() => document.addEventListener('click', handler), 0);
+    return () => document.removeEventListener('click', handler);
+  }, [newChatMenuOpen]);
 
   const sendMessageMutation = useMutation({
     mutationFn: (content: string) => omnichatService.sendMessage(selectedConversationId as number, content),
@@ -426,6 +445,25 @@ export default function OmniChatChatPage() {
       navigate(`/omnichat/c/${conversation.id}`);
     });
   }, [conversationQuery.data?.conversation.persona_id, guestPersona, isAuthenticated, isGuest, navigate, queryClient, selectedConversation?.persona_id]);
+
+  const handleForkChat = useCallback(() => {
+    setNewChatMenuOpen(false);
+    if (isGuest && guestPersona) {
+      const forked = guestMessages;
+      if (guestPersonaId) clearGuestMessages(guestPersonaId);
+      navigate(`/omnichat/c/guest?persona=${guestPersona.id}`, {
+        state: { forkedMessages: forked },
+      });
+      return;
+    }
+    if (!selectedConversationId) return;
+    omnichatService
+      .forkConversation(selectedConversationId)
+      .then((conversation) => {
+        queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
+        navigate(`/omnichat/c/${conversation.id}`);
+      });
+  }, [isGuest, guestPersona, guestPersonaId, guestMessages, selectedConversationId, navigate, queryClient]);
 
   const handleSubmit = useCallback(
     (event: FormEvent) => {
@@ -741,14 +779,42 @@ export default function OmniChatChatPage() {
                     >
                       {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleNewChat}
-                      title={t('omnichat.chat.newChat')}
-                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/6 text-white/75 transition hover:bg-white/10 hover:text-white"
-                    >
-                      <Plus size={14} />
-                    </button>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setNewChatMenuOpen((open) => !open)}
+                        title={t('omnichat.chat.newChat')}
+                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/6 text-white/75 transition hover:bg-white/10 hover:text-white"
+                      >
+                        <Plus size={14} />
+                      </button>
+                      {newChatMenuOpen && (
+                        <div className="absolute bottom-full right-0 mb-2 w-48 rounded-2xl border border-white/10 bg-[#191920] p-2 shadow-2xl">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewChatMenuOpen(false);
+                              handleNewChat();
+                            }}
+                            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
+                          >
+                            {t('omnichat.chat.newChat')}
+                          </button>
+                          {activeMessages.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewChatMenuOpen(false);
+                                handleForkChat();
+                              }}
+                              className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
+                            >
+                              {t('omnichat.chat.forkChat')}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </form>
