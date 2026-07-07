@@ -156,7 +156,7 @@ describe('OmniChatConversationsPage', () => {
 
   it('shows a guest chat directory instead of a sign-in blocker', async () => {
     mockIsAuthenticated = false;
-    mockGetGuestPersonaIds.mockReturnValueOnce([9]);
+    mockGetGuestPersonaIds.mockReturnValue([9]);
     mockListPersonas.mockResolvedValueOnce([
       {
         id: 9,

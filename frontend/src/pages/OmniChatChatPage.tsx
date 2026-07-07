@@ -196,7 +196,12 @@ export default function OmniChatChatPage() {
     });
   }, [conversationsQuery.data, directoryQuery]);
 
-  const guestPersonaIds = getGuestPersonaIds();
+  const storedGuestPersonaIds = getGuestPersonaIds();
+  const guestPersonaIds = isGuest && guestPersonaId != null
+    ? (storedGuestPersonaIds.includes(guestPersonaId)
+        ? storedGuestPersonaIds
+        : [...storedGuestPersonaIds, guestPersonaId])
+    : storedGuestPersonaIds;
 
   const filteredGuestPersonas = useMemo(() => {
     if (guestPersonaIds.length === 0) return [];
