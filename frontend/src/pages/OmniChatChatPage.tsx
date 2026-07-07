@@ -5,13 +5,11 @@ import { useTranslation } from 'react-i18next';
 import {
   ChevronLeft,
   ChevronRight,
-  Image as ImageIcon,
   Loader2,
   Plus,
   Search,
   Send,
   Settings,
-  Video,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import PersonaAvatar from '../components/omnichat/PersonaAvatar';
