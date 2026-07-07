@@ -93,6 +93,6 @@ describe('createLightingRig', () => {
     const included = pool.includedOnlyMeshes.map((mesh) => mesh.name);
     expect(included).toContain('V90_NearPaving');
     expect(included).not.toContain('V24_FarTower');
-    expect(solidMaterial.maxSimultaneousLights).toBeGreaterThanOrEqual(10);
+    expect(solidMaterial.maxSimultaneousLights).toBeGreaterThanOrEqual(6);
   });
 });

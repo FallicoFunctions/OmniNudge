@@ -40,7 +40,20 @@ export async function createRuntime(host: HTMLElement) {
   const engine = new Engine(canvas, true, {
     preserveDrawingBuffer: true,
     stencil: true,
+    // Render at the display's true pixel density. Without this, Babylon
+    // defaults to CSS-pixel resolution and the browser upscales the buffer,
+    // so the whole scene renders soft/pixelated on high-DPI (retina) screens.
+    adaptToDeviceRatio: true,
   });
+
+  // Cap the effective render density: full retina (2x) quadruples the pixel
+  // cost of this heavy scene, but 1.5x is still visibly crisp at roughly half
+  // that cost — the sweet spot between "pixelated" and "unplayable".
+  const MAX_RENDER_RATIO = 1.5;
+  const deviceRatio = window.devicePixelRatio || 1;
+  if (deviceRatio > MAX_RENDER_RATIO) {
+    engine.setHardwareScalingLevel(1 / MAX_RENDER_RATIO);
+  }
 
   const handleResize = () => {
     engine.resize();
