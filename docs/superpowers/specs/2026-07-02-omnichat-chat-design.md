@@ -74,7 +74,15 @@ The page should no longer read as “a chat view with a side card.” It should 
 
 ### Existing Conversation Detail Route
 
-The existing active thread route `/omnichat/c/:conversationId` may remain in place. It can continue to represent a specific active conversation while `/omnichat/chat` serves as the inbox/workspace hub.
+The existing active thread route `/omnichat/c/:conversationId` should remain in place, but it must render the same OmniChat shell and the same three-column workspace as `/omnichat/chat`.
+
+Route behavior:
+
+- `/omnichat/chat` is the inbox/workspace hub route
+- `/omnichat/c/:conversationId` is the deep-linked active conversation route
+- both routes render the same fixed header, fixed rail, and three-column page architecture
+- when a user lands on `/omnichat/c/:conversationId`, the matching chat row must render as selected in the left directory column
+- when a user lands on `/omnichat/chat`, the center pane should load the user’s most recent available chat for authenticated users; if none exists, it should render the approved empty-state conversation surface
 
 ## Header Design
 
@@ -100,6 +108,12 @@ The header account area should own the user’s OmniChat defaults, such as:
 - default gender/profile metadata
 
 These defaults should be global to OmniChat and distinct from per-chat settings. Per-chat settings can continue to override them inside individual conversation flows.
+
+### Day-One Interaction
+
+The header account/avatar trigger should open a compact account menu. That menu should contain an explicit `Defaults` entry which opens a modal dialog for editing global OmniChat defaults such as name, age, and gender/profile metadata.
+
+This keeps the fixed header visually clean while still making the day-one settings interaction concrete and reusable.
 
 ## Left Rail Design
 
@@ -259,7 +273,14 @@ This scroll model is a hard requirement for the redesign.
 
 Desktop is the primary target for this redesign because the reference layout is desktop-first.
 
-Mobile/tablet should still function, but the desktop shell and three-column layout should drive the architecture. On smaller viewports, columns may collapse or become overlay/drawer surfaces as needed, but the desktop information architecture is the source of truth.
+Mobile/tablet should still function, but the desktop shell and three-column layout should drive the architecture.
+
+Responsive behavior should be explicit:
+
+- mobile defaults to the center conversation pane
+- the left `Chat` directory becomes a drawer opened from the OmniChat shell or conversation surface
+- the right profile/gallery rail becomes a separate drawer or sheet, not a permanently visible third column
+- desktop remains the source of truth for panel structure, but small-screen behavior must preserve the same information architecture rather than invent a different product model
 
 ## Data and State Expectations
 
