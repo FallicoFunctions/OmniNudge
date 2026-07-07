@@ -230,9 +230,7 @@ function PersonaCard({
             className={`overflow-hidden rounded-t-2xl border-t border-white/10 bg-black/60 px-3 text-xs text-white/85 backdrop-blur-sm transition-all duration-300 ${
               descriptionExpanded
                 ? 'max-h-24 translate-y-0 py-2 opacity-100'
-                : featured
-                  ? 'max-h-4 translate-y-0 py-0.5 opacity-100 truncate'
-                  : 'max-h-0 translate-y-2 py-0 opacity-0'
+                : 'max-h-0 translate-y-2 py-0 opacity-0'
             }`}
           >
             {persona.description}
@@ -327,6 +325,7 @@ export default function OmniChatDiscoverPage() {
     const items: Array<BotConversation & { persona: BotPersona }> = [];
 
     for (const conv of conversations) {
+      if (!conv.last_message_preview) continue;
       const persona =
         conv.persona ?? personas.find((p) => Number(p.id) === Number(conv.persona_id));
       if (!persona) continue;
