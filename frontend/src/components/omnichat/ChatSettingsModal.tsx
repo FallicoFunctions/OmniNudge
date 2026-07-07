@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Copy, History, Loader2, MessageSquare, Save, ArrowRight } from 'lucide-react';
+import { Copy, History, Loader2, MessageSquare, Save, ArrowRight, Trash2 } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { omnichatService, omnichatQueryKeys } from '../../services/omnichatService';
 import { saveOmniChatDefaults } from '../../utils/omnichatDefaults';
@@ -227,7 +227,15 @@ export default function ChatSettingsModal({
                               {formatRelativeTime(conv.last_message_at)}
                             </p>
                           </div>
-                          <ArrowRight size={14} className="flex-shrink-0 text-[var(--color-text-muted)]" />
+                          <div className="flex shrink-0 items-center gap-2">
+                            <ArrowRight size={14} className="text-[var(--color-text-muted)]" />
+                            <div className="h-4 w-px bg-[var(--color-border)]" />
+                            <Trash2
+                              size={14}
+                              className="cursor-pointer text-[var(--color-text-muted)] hover:text-red-500"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
                         </button>
                       </li>
                     ))}
