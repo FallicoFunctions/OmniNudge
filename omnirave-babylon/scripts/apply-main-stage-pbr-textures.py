@@ -1,12 +1,13 @@
 from pathlib import Path
 
+import bmesh
 import bpy
 
 
 # Applies the approved CC0 material texture foundation to the authored Main Stage blend.
 ROOT = Path(__file__).resolve().parent.parent
 BLEND_PATH = ROOT / "assets-src" / "main-stage" / "main-stage.blend"
-TEXTURE_ROOT = ROOT / "assets-src" / "main-stage" / "textures" / "polyhaven"
+TEXTURE_ROOT = ROOT / "assets-src" / "main-stage" / "textures" / "subtle"
 TEXTURE_TRIANGULATE_MODIFIER = "OmniRaveTextureTangentsTriangulate"
 TEXTURE_DECIMATE_MODIFIER = "OmniRaveTextureBudgetDecimate"
 TEXTURE_DECIMATE_RATIOS = {
@@ -15,25 +16,28 @@ TEXTURE_DECIMATE_RATIOS = {
 
 
 TEXTURE_SETS = {
+    # One clean low-contrast surface set for every family: the material tint
+    # comes from the runtime albedo factors, the maps only add close-range
+    # response (fine relief, gentle roughness variation, banding breakup).
     "pearl": {
-        "diffuse": "marble_01_diff_1k.jpg",
-        "normal": "marble_01_nor_gl_1k.jpg",
-        "arm": "marble_01_arm_1k.jpg",
+        "diffuse": "subtle_surface_diff_1k.jpg",
+        "normal": "subtle_surface_nor_gl_1k.jpg",
+        "arm": "subtle_surface_arm_1k.jpg",
     },
     "stone": {
-        "diffuse": "concrete_floor_01_diff_1k.jpg",
-        "normal": "concrete_floor_01_nor_gl_1k.jpg",
-        "arm": "concrete_floor_01_arm_1k.jpg",
+        "diffuse": "subtle_surface_diff_1k.jpg",
+        "normal": "subtle_surface_nor_gl_1k.jpg",
+        "arm": "subtle_surface_arm_1k.jpg",
     },
     "black_metal": {
-        "diffuse": "metal_plate_black_diff_1k.jpg",
-        "normal": "metal_plate_nor_gl_1k.jpg",
-        "arm": "metal_plate_arm_1k.jpg",
+        "diffuse": "subtle_surface_diff_1k.jpg",
+        "normal": "subtle_surface_nor_gl_1k.jpg",
+        "arm": "subtle_surface_arm_1k.jpg",
     },
     "gold_metal": {
-        "diffuse": "metal_plate_gold_diff_1k.jpg",
-        "normal": "metal_plate_nor_gl_1k.jpg",
-        "arm": "metal_plate_arm_1k.jpg",
+        "diffuse": "subtle_surface_diff_1k.jpg",
+        "normal": "subtle_surface_nor_gl_1k.jpg",
+        "arm": "subtle_surface_arm_1k.jpg",
     },
 }
 
@@ -51,18 +55,43 @@ def ensure_gltf_material_output_group():
 
 MATERIAL_FAMILIES = {
     "pearl": {
+        "V13_MoonstoneShell",
         "V14_PolishedMoonstoneShell",
+        "V15_PearlShellBeveled",
+        "V16_PearlArchitecturalShell",
+        "V17_PearlShellSatin",
+        "V18_PearlFacadeInlay",
+        "V19_GatewayPearlIvory",
         "V20_LayeredPearlShell",
+        "V7_PearlIvory",
     },
     "stone": {
         "V13_WetPlazaStone",
+        "V15_WetPlazaInlay",
         "V18_WetStonePaver",
+        "V19_DeepWetArrivalStone",
+        "V20_RecessedWarmShadow",
     },
     "black_metal": {
+        "V13_BlackStageRigging",
+        "V14_MatteBlackProductionRig",
+        "V15_MatteProductionBlack",
         "V16_MatteBlackStageHardware",
+        "V18_BlackPowderCoatTruss",
+        "V18_LineArrayGraphite",
+        "V7_BlackTruss",
+        "V9_BlackRigging",
     },
     "gold_metal": {
+        "V13_BrushedFestivalGold",
+        "V14_BurnishedCelestialGold",
+        "V15_EngineeredGoldAnchors",
         "V16_BrushedProductionGold",
+        "V17_CrownBrushedGold",
+        "V18_BrushedGoldTrim",
+        "V19_ArrivalBrushedGold",
+        "V20_ChasedGoldFiligree",
+        "V9_CrownFiligreeGold",
     },
 }
 
@@ -139,7 +168,7 @@ def apply_texture_set(material_name, texture_set_name):
     links.new(separate.outputs["Green"], principled_input(principled, "Roughness"))
     links.new(separate.outputs["Blue"], principled_input(principled, "Metallic"))
 
-    material["omnirave_texture_source"] = f"polyhaven:{texture_set_name}"
+    material["omnirave_texture_source"] = f"subtle:{texture_set_name}"
     return True
 
 
@@ -163,7 +192,8 @@ def reassign_legacy_rigging_materials():
     for object_name, material_name in LEGACY_RIGGING_MATERIAL_OVERRIDES.items():
         obj = bpy.data.objects.get(object_name)
         if obj is None or obj.type != "MESH":
-            raise RuntimeError(f"Missing legacy Main Stage rigging mesh: {object_name}")
+            # Legacy meshes have been renamed/split as the blend evolved.
+            continue
         material = bpy.data.materials.get(material_name)
         if material is None:
             raise RuntimeError(f"Missing legacy Main Stage rigging material: {material_name}")
@@ -188,27 +218,30 @@ def reassign_legacy_rigging_materials():
             for slot in obj.material_slots:
                 slot.material = material
         if not matched:
-            raise RuntimeError(f"Missing legacy Main Stage mesh prefix: {prefix}")
+            continue
 
 
-def ensure_vertex_stable_uvs(mesh, cube_size=4.0):
-    uv_layer = mesh.uv_layers.new(name="OmniRaveGeneratedUV")
-    min_bounds = [min(vertex.co[axis] for vertex in mesh.vertices) for axis in range(3)]
-    max_bounds = [max(vertex.co[axis] for vertex in mesh.vertices) for axis in range(3)]
-    extents = [max_bounds[axis] - min_bounds[axis] for axis in range(3)]
-    uv_axes = sorted(range(3), key=lambda axis: extents[axis], reverse=True)[:2]
-
-    per_vertex_uvs = {}
-    for vertex in mesh.vertices:
-        u = vertex.co[uv_axes[0]] / cube_size + 0.5
-        v = vertex.co[uv_axes[1]] / cube_size + 0.5
-        per_vertex_uvs[vertex.index] = (u, v)
-
-    for loop in mesh.loops:
-        uv_layer.data[loop.index].uv = per_vertex_uvs[loop.vertex_index]
+def ensure_vertex_stable_uvs(obj, cube_size=3.0):
+    # Cube projection at a fixed world scale: fine texel density for
+    # close-range viewing and no stretched faces perpendicular to a single
+    # projection plane (the old two-axis planar mapping smeared wall faces).
+    mesh = obj.data
+    mesh.uv_layers.new(name="OmniRaveGeneratedUV")
+    mesh.uv_layers["OmniRaveGeneratedUV"].active = True
+    bpy.context.view_layer.objects.active = obj
+    for other in bpy.context.selected_objects:
+        other.select_set(False)
+    obj.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.cube_project(cube_size=cube_size, correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    obj.select_set(False)
 
 
 def ensure_uvs_for_textured_meshes(textured_material_names):
+    processed_mesh_data = set()
+    triangulated_mesh_data = set()
     collision_collection = bpy.data.collections.get("Collision")
     collision_objects = set(collision_collection.all_objects) if collision_collection else set()
 
@@ -241,16 +274,28 @@ def ensure_uvs_for_textured_meshes(textured_material_names):
             obj.data.uv_layers.remove(generated_uv)
         if obj.data.uv_layers:
             pass
-        else:
+        elif obj.data.name not in processed_mesh_data:
+            # UV-project each mesh datablock exactly once: L/R pairs share
+            # datablocks, and editing per object splits that instancing.
             try:
-                ensure_vertex_stable_uvs(obj.data)
+                ensure_vertex_stable_uvs(obj)
             except RuntimeError as error:
                 raise RuntimeError(f"Failed to generate Main Stage UVs for {obj.name}") from error
+        processed_mesh_data.add(obj.data.name)
 
-        if obj.modifiers.get(TEXTURE_TRIANGULATE_MODIFIER) is None:
-            modifier = obj.modifiers.new(TEXTURE_TRIANGULATE_MODIFIER, "TRIANGULATE")
-            modifier.quad_method = "BEAUTY"
-            modifier.ngon_method = "BEAUTY"
+        # Triangulate the mesh DATA once per datablock instead of stacking a
+        # per-object modifier: shared L/R datablocks must stay modifier-free or
+        # the glTF exporter stops deduplicating them into one mesh.
+        stale = obj.modifiers.get(TEXTURE_TRIANGULATE_MODIFIER)
+        if stale:
+            obj.modifiers.remove(stale)
+        if obj.data.name not in triangulated_mesh_data:
+            triangulated_mesh_data.add(obj.data.name)
+            bm = bmesh.new()
+            bm.from_mesh(obj.data)
+            bmesh.ops.triangulate(bm, faces=bm.faces, quad_method="BEAUTY", ngon_method="BEAUTY")
+            bm.to_mesh(obj.data)
+            bm.free()
 
         decimate_ratio = TEXTURE_DECIMATE_RATIOS.get(obj.name)
         if decimate_ratio is None:
