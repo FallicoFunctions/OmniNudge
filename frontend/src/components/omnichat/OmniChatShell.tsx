@@ -79,7 +79,7 @@ export default function OmniChatShell({
           onSignIn={() => {
             window.dispatchEvent(
               new CustomEvent('open-auth-modal', {
-                detail: { mode: 'login', redirectTo: '/omnichat/chat' },
+                detail: { mode: 'login', redirectTo: window.location.pathname },
               })
             );
           }}
@@ -93,7 +93,7 @@ export default function OmniChatShell({
             onSignIn={() => {
               window.dispatchEvent(
                 new CustomEvent('open-auth-modal', {
-                  detail: { mode: 'login', redirectTo: '/omnichat/chat' },
+                  detail: { mode: 'login', redirectTo: window.location.pathname },
                 })
               );
             }}
