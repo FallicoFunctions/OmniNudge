@@ -5129,7 +5129,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     }
 
     const imageNames = images.flatMap(({ name, uri }) => [name, uri]).filter((value): value is string => Boolean(value));
-    for (const requiredSource of ['subtle_surface_diff', 'subtle_surface_nor_gl', 'subtle_surface_arm']) {
+    for (const requiredSource of ['subtle_pearl_diff', 'subtle_stone_diff', 'subtle_gold_diff', 'subtle_black_diff', 'subtle_pearl_nor_gl', 'subtle_gold_arm']) {
       expect(
         imageNames.some((name) => name.includes(requiredSource)),
         `missing venue texture source marker: ${requiredSource}`,
