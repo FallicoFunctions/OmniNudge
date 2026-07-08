@@ -110,9 +110,14 @@ function createPracticalPoolLights(scene: Scene) {
 function createKeyShadowGenerator(scene: Scene, key: DirectionalLight) {
   key.autoCalcShadowZBounds = true;
 
-  const shadowGenerator = new ShadowGenerator(2048, key);
-  shadowGenerator.usePercentageCloserFiltering = true;
-  shadowGenerator.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+  // Hard 1-tap shadows: PCF filtering was the single largest per-pixel cost
+  // in the whole frame (measured 11 -> 28 fps switching it off; even
+  // QUALITY_LOW halves the frame rate). At night, crisp edges read as clean
+  // moonlight and the soft ambient fill hides the hardness. The larger map
+  // keeps those hard edges clean, and it bakes once for the static set.
+  const shadowGenerator = new ShadowGenerator(4096, key);
+  shadowGenerator.usePercentageCloserFiltering = false;
+  shadowGenerator.usePoissonSampling = false;
   shadowGenerator.bias = 0.0022;
   shadowGenerator.normalBias = 0.012;
 
