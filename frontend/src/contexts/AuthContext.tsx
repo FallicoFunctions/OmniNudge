@@ -177,13 +177,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
     const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
+    // Clear auth state synchronously so that any in-flight or subsequent API
+    // calls that return 401 don't trigger the auth modal (the 401 interceptor
+    // only opens the modal if the token is still present at that point).
+    clearAuthState();
+
     void api
       .request('/auth/logout', { method: 'POST', headers })
       .catch(() => {
         // Ignore errors on logout
-      })
-      .finally(() => {
-        clearAuthState();
       });
   };
 

@@ -70,9 +70,9 @@ api.interceptors.response.use(
         localStorage.removeItem('auth_token');
         sessionStorage.removeItem('auth_token');
       }
-      // Don't open the auth modal for the initial auth check — AuthContext
-      // handles that silently so the whole app doesn't gate on a stale token.
-      if (typeof window !== 'undefined' && url !== '/auth/me') {
+      // Don't open the auth modal for the initial auth check or the logout
+      // endpoint — AuthContext handles those silently.
+      if (typeof window !== 'undefined' && url !== '/auth/me' && url !== '/auth/logout') {
         const redirectTo = window.location.pathname || '/';
         window.dispatchEvent(
           new CustomEvent('open-auth-modal', {
