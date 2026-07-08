@@ -55,6 +55,10 @@ export const omnichatService = {
     return api.post<BotConversation>(`/omnichat/conversations/${conversationId}/fork`);
   },
 
+  async deleteConversation(conversationId: number): Promise<void> {
+    await api.delete(`/omnichat/conversations/${conversationId}`);
+  },
+
   async sendAnonymousMessage(req: AnonymousMessageRequest): Promise<AnonymousMessageResponse> {
     return api.post<AnonymousMessageResponse>('/omnichat/anonymous/messages', req);
   },

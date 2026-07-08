@@ -149,6 +149,27 @@ func (h *OmniChatHandler) ListConversations(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"conversations": conversations})
 }
 
+// DeleteConversation soft-deletes (archives) an OmniChat conversation.
+func (h *OmniChatHandler) DeleteConversation(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid conversation id")
+		return
+	}
+
+	if err := h.convRepo.Archive(c.Request.Context(), conversationID, userID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to archive conversation")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "conversation archived"})
+}
+
 // OmniChatUpdateSettingsRequest is the request body for updating conversation settings.
 type OmniChatUpdateSettingsRequest struct {
 	Settings models.ConversationSettings `json:"settings" binding:"required"`

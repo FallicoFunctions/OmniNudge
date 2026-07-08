@@ -396,10 +396,20 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 // persona, newest first. Used for the chat history drawer.
 func (r *BotConversationRepository) ListByUserIDAndPersonaID(ctx context.Context, userID, personaID, limit, offset int) ([]*BotConversation, error) {
 	query := `
-		SELECT id, user_id, persona_id, title, settings_user_name, settings_user_age, settings_user_gender, created_at, last_message_at, archived_at
-		FROM bot_conversations
-		WHERE user_id = $1 AND persona_id = $2 AND archived_at IS NULL
-		ORDER BY last_message_at DESC
+		SELECT c.id, c.user_id, c.persona_id, c.title,
+		       lm.content,
+		       c.settings_user_name, c.settings_user_age, c.settings_user_gender,
+		       c.created_at, c.last_message_at, c.archived_at
+		FROM bot_conversations c
+		LEFT JOIN LATERAL (
+		    SELECT content
+		    FROM bot_messages
+		    WHERE conversation_id = c.id
+		    ORDER BY created_at DESC, id DESC
+		    LIMIT 1
+		) lm ON TRUE
+		WHERE c.user_id = $1 AND c.persona_id = $2 AND c.archived_at IS NULL
+		ORDER BY c.last_message_at DESC
 		LIMIT $3 OFFSET $4
 	`
 	rows, err := r.pool.Query(ctx, query, userID, personaID, limit, offset)
@@ -410,10 +420,18 @@ func (r *BotConversationRepository) ListByUserIDAndPersonaID(ctx context.Context
 
 	conversations := []*BotConversation{}
 	for rows.Next() {
-		c, err := scanConversation(rows)
+		c := &BotConversation{}
+		s := &ConversationSettings{}
+		err := rows.Scan(
+			&c.ID, &c.UserID, &c.PersonaID, &c.Title,
+			&c.LastMessagePreview,
+			&s.UserName, &s.UserAge, &s.UserGender,
+			&c.CreatedAt, &c.LastMessageAt, &c.ArchivedAt,
+		)
 		if err != nil {
 			return nil, err
 		}
+		c.Settings = s
 		conversations = append(conversations, c)
 	}
 	return conversations, rows.Err()
@@ -478,6 +496,12 @@ func (r *BotConversationRepository) ForkConversation(ctx context.Context, userID
 		return nil, err
 	}
 	return newConv, nil
+}
+
+// Archive soft-deletes a bot conversation by setting archived_at.
+func (r *BotConversationRepository) Archive(ctx context.Context, conversationID, userID int) error {
+	_, err := r.pool.Exec(ctx, `UPDATE bot_conversations SET archived_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2`, conversationID, userID)
+	return err
 }
 
 // UpdateLastMessageAt bumps the conversation's last_message_at to now.
