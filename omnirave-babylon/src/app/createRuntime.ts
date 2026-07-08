@@ -9,6 +9,11 @@ import '@babylonjs/core/Shaders/kernelBlur.vertex';
 import '@babylonjs/core/Shaders/pbr.fragment';
 import '@babylonjs/core/Shaders/pbr.vertex';
 import '@babylonjs/core/Shaders/rgbdDecode.fragment';
+import {
+  ADAPTIVE_RESOLUTION_DEFAULTS,
+  createAdaptiveResolutionState,
+  stepAdaptiveResolution,
+} from './adaptiveResolutionMath';
 import { createMainStageScene } from '../scene/createMainStageScene';
 import { createDebugPanel } from '../ui/createDebugPanel';
 import { createPerfOverlay, updatePerfOverlay } from '../ui/createPerfOverlay';
@@ -52,7 +57,8 @@ export async function createRuntime(host: HTMLElement) {
   const MAX_RENDER_RATIO = 1.5;
   const deviceRatio = window.devicePixelRatio || 1;
   if (deviceRatio > MAX_RENDER_RATIO) {
-    engine.setHardwareScalingLevel(1 / MAX_RENDER_RATIO);
+    // The adaptive controller's sharpest bound mirrors this same cap.
+    engine.setHardwareScalingLevel(ADAPTIVE_RESOLUTION_DEFAULTS.sharpestLevel);
   }
 
   const handleResize = () => {
@@ -109,16 +115,28 @@ export async function createRuntime(host: HTMLElement) {
     loadingOverlay.remove();
 
     let perfFrameCounter = 0;
+    let adaptiveState = createAdaptiveResolutionState(ADAPTIVE_RESOLUTION_DEFAULTS);
     engine.runRenderLoop(() => {
       scene.render();
       perfFrameCounter += 1;
-      if (perfFrameCounter % 30 === 0 && perfOverlay) {
+      if (perfFrameCounter % 30 === 0) {
         const fps = engine.getFps();
-        const activeFx = scene.activeCamera?._postProcesses?.filter(Boolean).length ?? 0;
-        const shadowCasters =
-          scene.metadata?.reviewRuntime?.lightingRig?.shadowGenerator?.getShadowMap()?.renderList?.length ?? 0;
-        const readyTextures = scene.textures.filter((texture) => texture.isReady()).length;
-        updatePerfOverlay(perfOverlay, fps, fps > 0 ? 1000 / fps : 0, activeFx, shadowCasters, readyTextures);
+
+        // Hold the FPS target by trading render scale, never frame pacing:
+        // sharp when the GPU can afford it, gracefully coarser when not.
+        const nextState = stepAdaptiveResolution(adaptiveState, ADAPTIVE_RESOLUTION_DEFAULTS, fps, performance.now());
+        if (nextState.level !== adaptiveState.level) {
+          engine.setHardwareScalingLevel(nextState.level);
+        }
+        adaptiveState = nextState;
+
+        if (perfOverlay) {
+          const activeFx = scene.activeCamera?._postProcesses?.filter(Boolean).length ?? 0;
+          const shadowCasters =
+            scene.metadata?.reviewRuntime?.lightingRig?.shadowGenerator?.getShadowMap()?.renderList?.length ?? 0;
+          const readyTextures = scene.textures.filter((texture) => texture.isReady()).length;
+          updatePerfOverlay(perfOverlay, fps, fps > 0 ? 1000 / fps : 0, activeFx, shadowCasters, readyTextures, adaptiveState.level);
+        }
       }
     });
 
