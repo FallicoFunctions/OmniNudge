@@ -62,6 +62,8 @@ export interface MainStageOverrideParams {
   alphaBlend?: boolean;
   clearCoat?: { readonly intensity: number; readonly roughness: number };
   environmentIntensity?: number;
+  /** Depth bias for trim that runs nearly coplanar with a surface beneath it. */
+  zOffset?: number;
   metadataPolish?: 'black' | 'smoked';
 }
 
@@ -3146,6 +3148,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       metallic: 0.18,
       roughness: 0.94,
       environmentIntensity: 0.08,
+      zOffset: -2,
     },
   },
   {
@@ -4772,6 +4775,9 @@ function applyOverrideParams(material: PBRMaterial, rule: MainStageOverrideRule)
   }
   if (params.environmentIntensity !== undefined) {
     material.environmentIntensity = params.environmentIntensity;
+  }
+  if (params.zOffset !== undefined) {
+    material.zOffset = params.zOffset;
   }
 
   material.metadata = {

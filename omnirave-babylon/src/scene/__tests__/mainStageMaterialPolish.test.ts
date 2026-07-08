@@ -24,6 +24,7 @@ interface OverrideExpectation {
     clearCoatIntensity: number;
     clearCoatRoughness: number;
     environmentIntensity: number;
+    zOffset?: number;
     metaPolish: string | null;
   };
 }
@@ -4168,6 +4169,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
       clearCoatIntensity: 1,
       clearCoatRoughness: 0,
       environmentIntensity: 0.08,
+      zOffset: -2,
       metaPolish: null,
     },
   },
@@ -6434,6 +6436,9 @@ describe('polishMainStageMaterials', () => {
       expect(overrideMaterial.clearCoat.intensity).toBe(expected.clearCoatIntensity);
       expect(overrideMaterial.clearCoat.roughness).toBe(expected.clearCoatRoughness);
       expect(overrideMaterial.environmentIntensity).toBe(expected.environmentIntensity);
+      if (expected.zOffset !== undefined) {
+        expect(overrideMaterial.zOffset).toBe(expected.zOffset);
+      }
     });
   });
 });
