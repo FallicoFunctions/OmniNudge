@@ -25,6 +25,12 @@ interface ScreenTreatmentMaterials {
 }
 
 export function createMainStageProductionSurfaces(scene: Scene) {
+  // Screen housings and treatments render in group 1 (after the venue), but
+  // Babylon clears the depth buffer between rendering groups by default -
+  // which painted every group-1 panel on top of the entire world regardless
+  // of occlusion. Keep the draw-order grouping, keep the depth buffer.
+  scene.setRenderingAutoClearDepthStencil(1, false, false, false);
+
   const root = new TransformNode('main-stage-production-surfaces', scene);
   const celestialMaterial = createCelestialScreenMaterial(scene);
   const accentMaterial = createCelestialAccentMaterial(scene);
