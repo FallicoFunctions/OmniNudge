@@ -233,7 +233,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.88,
       clearCoat: { intensity: 0.22, roughness: 0.34 },
       environmentIntensity: 0.22,
-      zOffset: -2,
+      zOffset: -0.8,
     },
   },
   {
@@ -248,7 +248,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.88,
       clearCoat: { intensity: 0.02, roughness: 0.8 },
       environmentIntensity: 0.1,
-      zOffset: -2,
+      zOffset: -1.0,
     },
   },
   {
@@ -277,6 +277,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.9,
       clearCoat: { intensity: 0, roughness: 0.88 },
       environmentIntensity: 0.08,
+      zOffset: -1,
     },
   },
   {
@@ -1154,6 +1155,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.96,
       clearCoat: { intensity: 0.02, roughness: 0.78 },
       environmentIntensity: 0.04,
+      zOffset: -1,
     },
   },
   {
@@ -1224,6 +1226,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.94,
       clearCoat: { intensity: 0.02, roughness: 0.74 },
       environmentIntensity: 0.06,
+      zOffset: -1.4,
     },
   },
   {
@@ -1296,6 +1299,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       alphaBlend: true,
       clearCoat: { intensity: 0.04, roughness: 0.62 },
       environmentIntensity: 0.3,
+      zOffset: -1,
     },
   },
   {
@@ -1454,6 +1458,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.94,
       clearCoat: { intensity: 0, roughness: 0.9 },
       environmentIntensity: 0.09,
+      zOffset: -1,
     },
   },
   {
@@ -1640,6 +1645,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.88,
       clearCoat: { intensity: 0.02, roughness: 0.72 },
       environmentIntensity: 0.18,
+      zOffset: -1,
     },
   },
   {
@@ -1894,6 +1900,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.58,
       clearCoat: { intensity: 0.26, roughness: 0.2 },
       environmentIntensity: 0.5,
+      zOffset: -0.5,
     },
   },
   {
@@ -2469,6 +2476,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       metallic: 0.18,
       roughness: 0.94,
       environmentIntensity: 0.085,
+      zOffset: -1,
     },
   },
   {
@@ -2497,6 +2505,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.84,
       clearCoat: { intensity: 0.04, roughness: 0.58 },
       environmentIntensity: 0.28,
+      zOffset: -0.5,
     },
   },
   {
@@ -2838,6 +2847,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       alphaBlend: true,
       clearCoat: { intensity: 0, roughness: 0.82 },
       environmentIntensity: 0.08,
+      zOffset: -1,
     },
   },
   {
@@ -2852,7 +2862,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.84,
       clearCoat: { intensity: 0.04, roughness: 0.62 },
       environmentIntensity: 0.14,
-      zOffset: -2,
+      zOffset: -1.4,
     },
   },
   {
@@ -2867,7 +2877,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.94,
       clearCoat: { intensity: 0, roughness: 0.86 },
       environmentIntensity: 0.09,
-      zOffset: -2,
+      zOffset: -1.7,
     },
   },
   {
@@ -3108,6 +3118,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.9,
       clearCoat: { intensity: 0, roughness: 0.86 },
       environmentIntensity: 0.12,
+      zOffset: -1,
     },
   },
   {
@@ -3150,6 +3161,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.88,
       clearCoat: { intensity: 0.04, roughness: 0.68 },
       environmentIntensity: 0.11,
+      zOffset: -2,
     },
   },
   {
@@ -3361,7 +3373,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       alphaBlend: true,
       clearCoat: { intensity: 0.05, roughness: 0.66 },
       environmentIntensity: 0.28,
-      zOffset: -2,
+      zOffset: -1.5,
     },
   },
   {
@@ -3721,6 +3733,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.94,
       clearCoat: { intensity: 0, roughness: 0.86 },
       environmentIntensity: 0.09,
+      zOffset: -1,
     },
   },
   {
@@ -4016,6 +4029,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.88,
       clearCoat: { intensity: 0.04, roughness: 0.72 },
       environmentIntensity: 0.13,
+      zOffset: -0.25,
     },
   },
   {
@@ -4059,6 +4073,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       alphaBlend: true,
       clearCoat: { intensity: 0.05, roughness: 0.64 },
       environmentIntensity: 0.26,
+      zOffset: -1,
     },
   },
   {
