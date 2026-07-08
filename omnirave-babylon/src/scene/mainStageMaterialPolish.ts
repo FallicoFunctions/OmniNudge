@@ -4831,7 +4831,16 @@ function applyOverrideParams(material: PBRMaterial, rule: MainStageOverrideRule)
     material.environmentIntensity = params.environmentIntensity;
   }
   if (params.zOffset !== undefined) {
-    material.zOffset = params.zOffset;
+    // Table values use WebGL polygon-offset semantics (negative pulls the
+    // trim toward the viewer). WebGPU's depth-bias direction is inverted in
+    // practice - shipping the raw value pushed every biased trim BEHIND its
+    // host there, striping the venue with view-dependent bleed lines
+    // (verified by live A/B: zeroing cleaned, inverting cleaned and
+    // restored correct trim-over-host layering). zOffsetUnits mirrors the
+    // bias in constant depth units, which WebGPU honors more strongly.
+    const flip = material.getScene().getEngine().isWebGPU ? -1 : 1;
+    material.zOffset = params.zOffset * flip;
+    material.zOffsetUnits = params.zOffset * flip * 16;
   }
 
   material.metadata = {
