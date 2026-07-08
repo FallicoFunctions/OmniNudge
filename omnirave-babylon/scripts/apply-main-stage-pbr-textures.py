@@ -16,28 +16,28 @@ TEXTURE_DECIMATE_RATIOS = {
 
 
 TEXTURE_SETS = {
-    # One clean low-contrast surface set for every family: the material tint
-    # comes from the runtime albedo factors, the maps only add close-range
-    # response (fine relief, gentle roughness variation, banding breakup).
+    # Per-family low-contrast sets from generate-main-stage-subtle-textures.py:
+    # neutral gray maps carrying only close-range character; tint comes from
+    # the runtime albedo factors.
     "pearl": {
-        "diffuse": "subtle_surface_diff_1k.jpg",
-        "normal": "subtle_surface_nor_gl_1k.jpg",
-        "arm": "subtle_surface_arm_1k.jpg",
+        "diffuse": "subtle_pearl_diff_1k.jpg",
+        "normal": "subtle_pearl_nor_gl_1k.jpg",
+        "arm": "subtle_pearl_arm_1k.jpg",
     },
     "stone": {
-        "diffuse": "subtle_surface_diff_1k.jpg",
-        "normal": "subtle_surface_nor_gl_1k.jpg",
-        "arm": "subtle_surface_arm_1k.jpg",
+        "diffuse": "subtle_stone_diff_1k.jpg",
+        "normal": "subtle_stone_nor_gl_1k.jpg",
+        "arm": "subtle_stone_arm_1k.jpg",
     },
     "black_metal": {
-        "diffuse": "subtle_surface_diff_1k.jpg",
-        "normal": "subtle_surface_nor_gl_1k.jpg",
-        "arm": "subtle_surface_arm_1k.jpg",
+        "diffuse": "subtle_black_diff_1k.jpg",
+        "normal": "subtle_black_nor_gl_1k.jpg",
+        "arm": "subtle_black_arm_1k.jpg",
     },
     "gold_metal": {
-        "diffuse": "subtle_surface_diff_1k.jpg",
-        "normal": "subtle_surface_nor_gl_1k.jpg",
-        "arm": "subtle_surface_arm_1k.jpg",
+        "diffuse": "subtle_gold_diff_1k.jpg",
+        "normal": "subtle_gold_nor_gl_1k.jpg",
+        "arm": "subtle_gold_arm_1k.jpg",
     },
 }
 
