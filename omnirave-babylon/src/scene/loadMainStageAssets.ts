@@ -1,6 +1,18 @@
 import '@babylonjs/loaders/glTF';
 
+import { DracoCompression } from '@babylonjs/core/Meshes/Compression/dracoCompression.js';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader.js';
+
+// Decode Draco-compressed venue geometry with the locally vendored decoder;
+// the default configuration fetches from the Babylon CDN at runtime, which
+// must never be a production dependency.
+DracoCompression.Configuration = {
+  decoder: {
+    wasmUrl: '/libs/draco/draco_wasm_wrapper_gltf.js',
+    wasmBinaryUrl: '/libs/draco/draco_decoder_gltf.wasm',
+    fallbackUrl: '/libs/draco/draco_wasm_wrapper_gltf.js',
+  },
+};
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
 import type { Scene } from '@babylonjs/core/scene';
