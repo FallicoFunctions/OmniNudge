@@ -76,7 +76,7 @@ export default function OmniChatSidebar({
     <>
       <aside
         className={`hidden h-full border-r border-white/10 bg-[#17171c]/95 py-4 backdrop-blur-xl lg:flex lg:flex-col ${
-          desktopCollapsed ? 'w-[72px] px-2' : 'w-[248px] px-3'
+          desktopCollapsed ? 'w-[72px] px-2' : 'w-[223px] px-3'
         }`}
       >
         <div className={`mb-4 flex items-center ${desktopCollapsed ? 'justify-center' : 'justify-between gap-3'}`}>
