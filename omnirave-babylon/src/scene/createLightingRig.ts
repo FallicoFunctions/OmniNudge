@@ -11,7 +11,7 @@ import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 
 import type { PerfFlags } from '../app/perfFlags';
 
-const PERF_DEFAULTS: PerfFlags = { noShadows: false, noPost: false, minimalLights: false, webgpu: false };
+const PERF_DEFAULTS: PerfFlags = { noShadows: false, noPost: false, minimalLights: false, webgpu: false, webgl: false };
 
 export function createLightingRig(scene: Scene, perfFlags: PerfFlags = PERF_DEFAULTS) {
   const hemi = new HemisphericLight('main-stage-hemi-light', new Vector3(0, 1, 0), scene);
@@ -49,7 +49,8 @@ export function createLightingRig(scene: Scene, perfFlags: PerfFlags = PERF_DEFA
   fill.intensity = 0.72;
   fill.position = new Vector3(0, 24, -84);
 
-  if (perfFlags.minimalLights || perfFlags.webgpu) {
+  const isWebGPU = scene.getEngine().isWebGPU;
+  if (perfFlags.minimalLights || isWebGPU) {
     // WebGPU: each light costs a per-stage uniform buffer and the device
     // limit is 12; dropping the two subtle shaping lights keeps the warm
     // practical pools - the defining night-look element - within budget.
@@ -62,7 +63,7 @@ export function createLightingRig(scene: Scene, perfFlags: PerfFlags = PERF_DEFA
   // is fully static, so the permanent plan is offline-baked lightmaps
   // (soft GI-quality shadows at zero runtime cost), replacing the runtime
   // generator on every engine.
-  const skipShadows = perfFlags.noShadows || perfFlags.webgpu;
+  const skipShadows = perfFlags.noShadows || isWebGPU;
   const shadowGenerator = skipShadows ? null : createKeyShadowGenerator(scene, key);
   const practicalPools = perfFlags.minimalLights ? [] : createPracticalPoolLights(scene, perfFlags);
 
@@ -121,7 +122,7 @@ function createPracticalPoolLights(scene: Scene, perfFlags: PerfFlags) {
         // the device limit is 12 total (3 base + 5 fixed + N lights), so the
         // budget there is 4 - which still covers hemi + key + the two
         // nearest pools since rim/fill are disabled under WebGPU.
-        material.maxSimultaneousLights = perfFlags.webgpu ? 4 : 6;
+        material.maxSimultaneousLights = scene.getEngine().isWebGPU ? 4 : 6;
       }
     }
   }

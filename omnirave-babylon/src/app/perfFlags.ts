@@ -10,6 +10,7 @@ export interface PerfFlags {
   noPost: boolean;
   minimalLights: boolean;
   webgpu: boolean;
+  webgl: boolean;
 }
 
 export function parsePerfFlags(search: string): PerfFlags {
@@ -25,5 +26,6 @@ export function parsePerfFlags(search: string): PerfFlags {
     noPost: tokens.has('nopost'),
     minimalLights: tokens.has('minimallights'),
     webgpu: tokens.has('webgpu'),
+    webgl: tokens.has('webgl'),
   };
 }
