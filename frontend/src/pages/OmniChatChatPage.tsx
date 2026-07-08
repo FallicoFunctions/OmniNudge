@@ -691,11 +691,11 @@ export default function OmniChatChatPage() {
           <section className={`relative flex min-h-0 flex-col bg-[#121216] ${profilePaneCollapsed ? '' : 'border-r border-white/10'}`}>
             <div className="flex items-center border-b border-white/10 px-5 h-16">
               <div className="flex w-full items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
+                <div className="flex min-w-0 items-center gap-4">
                   {activePersona && (
-                    <PersonaAvatar persona={activePersona} className="h-14 w-14 rounded-full" />
+                    <PersonaAvatar persona={activePersona} className="h-14 w-14 flex-shrink-0 rounded-full" />
                   )}
-                  <div>
+                  <div className="min-w-0 overflow-hidden">
                     <h2 className="truncate text-[2rem] font-semibold tracking-tight text-white">
                       {activePersona?.name ?? t('omnichat.chat.loadingPersona')}
                     </h2>
