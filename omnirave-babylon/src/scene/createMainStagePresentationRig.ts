@@ -115,8 +115,10 @@ function createScreenLightScattering(scene: Scene, camera: Camera, panels: Mesh[
       scattering.decay = 0.955;
       scattering.weight = 0.5;
       effects.push(scattering);
-    } catch {
-      // Engines without the required caps simply skip the haze.
+    } catch (error) {
+      // Engines without the required caps skip the haze - but log it, a
+      // silent skip once hid a real construction failure for days.
+      console.warn('screen light scattering unavailable:', error);
     }
   }
   return effects;

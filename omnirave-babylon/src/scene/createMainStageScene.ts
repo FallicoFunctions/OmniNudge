@@ -14,6 +14,7 @@ import { resolveMoveVector } from '../player/movementMath';
 import { createAtmosphereRig } from './createAtmosphereRig';
 import { createLightingRig } from './createLightingRig';
 import { createMainStagePresentationRig } from './createMainStagePresentationRig';
+import { freezeStaticScene } from './freezeStaticScene';
 import { createMainStageProductionSurfaces } from './createMainStageProductionSurfaces';
 import { loadMainStageAssets } from './loadMainStageAssets';
 import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from './reviewRouteData';
@@ -52,6 +53,13 @@ export async function createMainStageScene(engine: AbstractEngine) {
   for (const material of scene.materials) {
     material.freeze();
   }
+
+  // Everything authored is static: stop per-frame world-matrix and material
+  // dirty work for the whole venue. Only the player rig and avatar animate.
+  freezeStaticScene(scene, {
+    dynamicNamePatterns: [/^player-/],
+    dynamicMeshes: reviewAvatar.meshes,
+  });
 
   const canvas = engine.getRenderingCanvas?.();
   if (canvas) {
