@@ -57,7 +57,13 @@ export function createLightingRig(scene: Scene, perfFlags: PerfFlags = PERF_DEFA
     fill.setEnabled(false);
   }
 
-  const shadowGenerator = perfFlags.noShadows ? null : createKeyShadowGenerator(scene, key);
+  // Interim: no runtime shadow map under WebGPU - the hard 1-tap map reads
+  // blocky at player range and still shows residual acne there. The venue
+  // is fully static, so the permanent plan is offline-baked lightmaps
+  // (soft GI-quality shadows at zero runtime cost), replacing the runtime
+  // generator on every engine.
+  const skipShadows = perfFlags.noShadows || perfFlags.webgpu;
+  const shadowGenerator = skipShadows ? null : createKeyShadowGenerator(scene, key);
   const practicalPools = perfFlags.minimalLights ? [] : createPracticalPoolLights(scene, perfFlags);
 
   return { hemi, key, rim, fill, shadowGenerator, practicalPools };
