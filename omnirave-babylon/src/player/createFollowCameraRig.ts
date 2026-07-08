@@ -32,7 +32,11 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
   camera.upperRadiusLimit = MAX_ZOOM_DISTANCE;
   camera.wheelPrecision = 24;
   camera.panningSensibility = 0;
-  camera.minZ = 0.05;
+  // 0.18 instead of 0.05: depth precision scales with the near plane, and at
+  // 5cm the buffer had so little resolution 100m+ away that layered facade
+  // planes a few cm apart shredded into z-fighting. 18cm still clears
+  // first-person wall approaches while multiplying distant precision ~3.6x.
+  camera.minZ = 0.18;
 
   const applyCheckpointView = (view: ReviewCheckpointCamera) => {
     // Kill residual inertial motion: a teleporting checkpoint jump must land
