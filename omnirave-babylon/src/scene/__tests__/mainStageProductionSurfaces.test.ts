@@ -14,6 +14,16 @@ describe('createMainStageProductionSurfaces', () => {
     engine = undefined;
   });
 
+  it('keeps rendering group 1 depth-tested against the world so screen housings are occluded correctly', () => {
+    engine = new NullEngine();
+    scene = new Scene(engine);
+
+    createMainStageProductionSurfaces(scene);
+
+    const setup = scene.getAutoClearDepthStencilSetup(1);
+    expect(setup.autoClear).toBe(false);
+  });
+
   it('adds named lightweight emissive screen and approach surfaces for the Main Stage', () => {
     engine = new NullEngine();
     scene = new Scene(engine);
