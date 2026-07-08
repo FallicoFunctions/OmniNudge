@@ -589,7 +589,7 @@ export default function OmniChatChatPage() {
                 <button
                   type="button"
                   onClick={handleNewChat}
-                  className="rounded-full bg-white/8 px-4 py-2 text-[0.92rem] font-semibold text-white transition hover:bg-white/12"
+                  className="rounded-full bg-white/12 px-4 py-2 text-[0.92rem] font-semibold text-white transition hover:bg-[var(--color-primary)]"
                 >
                   + {t('omnichat.chat.newChat')}
                 </button>
@@ -800,7 +800,7 @@ export default function OmniChatChatPage() {
                         type="button"
                         onClick={() => setNewChatMenuOpen((open) => !open)}
                         title={t('omnichat.chat.newChat')}
-                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/6 text-white/75 transition hover:bg-white/10 hover:text-white"
+                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-white/75 transition hover:bg-[var(--color-primary)] hover:text-white"
                       >
                         <Plus size={14} />
                       </button>
