@@ -49,13 +49,16 @@ export function createLightingRig(scene: Scene, perfFlags: PerfFlags = PERF_DEFA
   fill.intensity = 0.72;
   fill.position = new Vector3(0, 24, -84);
 
-  if (perfFlags.minimalLights) {
+  if (perfFlags.minimalLights || perfFlags.webgpu) {
+    // WebGPU: each light costs a per-stage uniform buffer and the device
+    // limit is 12; dropping the two subtle shaping lights keeps the warm
+    // practical pools - the defining night-look element - within budget.
     rim.setEnabled(false);
     fill.setEnabled(false);
   }
 
   const shadowGenerator = perfFlags.noShadows ? null : createKeyShadowGenerator(scene, key);
-  const practicalPools = perfFlags.minimalLights ? [] : createPracticalPoolLights(scene);
+  const practicalPools = perfFlags.minimalLights ? [] : createPracticalPoolLights(scene, perfFlags);
 
   return { hemi, key, rim, fill, shadowGenerator, practicalPools };
 }
@@ -72,7 +75,7 @@ function hashUnit(name: string) {
   return ((h >>> 0) % 1000) / 999;
 }
 
-function createPracticalPoolLights(scene: Scene) {
+function createPracticalPoolLights(scene: Scene, perfFlags: PerfFlags) {
   const sources = scene.meshes.filter((mesh) => PRACTICAL_POOL_SOURCE.test(mesh.name));
   const pools: PointLight[] = [];
 
@@ -108,7 +111,11 @@ function createPracticalPoolLights(scene: Scene) {
         // top of the budget; 6 (four rig lights + the two nearest scoped
         // pools/spills) roughly halves the lighting shader cost with little
         // visible loss, since distant pools contribute almost nothing.
-        material.maxSimultaneousLights = 6;
+        // WebGPU: each effect light costs a vertex-stage uniform buffer and
+        // the device limit is 12 total (3 base + 5 fixed + N lights), so the
+        // budget there is 4 - which still covers hemi + key + the two
+        // nearest pools since rim/fill are disabled under WebGPU.
+        material.maxSimultaneousLights = perfFlags.webgpu ? 4 : 6;
       }
     }
   }
