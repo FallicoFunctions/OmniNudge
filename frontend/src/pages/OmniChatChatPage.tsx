@@ -557,7 +557,11 @@ export default function OmniChatChatPage() {
   );
 
   const activePersona = isGuest ? guestPersona : conversationQuery.data?.conversation.persona ?? selectedConversation?.persona ?? null;
-  const activeMessages = isGuest ? guestMessages : conversationQuery.data?.messages ?? [];
+  const activeMessages = isGuest
+    ? guestMessages
+    : selectedConversationId !== null
+      ? (conversationQuery.data?.messages ?? [])
+      : [];
   const activeConversationSettings = conversationQuery.data?.conversation.settings;
   const isLoadingConversation = isGuest ? guestPersonaLoading : conversationQuery.isLoading;
   const isGenerating = sendMessageMutation.isPending || guestIsGenerating;
