@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Copy, History, Loader2, MessageSquare, Save, ArrowRight, Trash2 } from 'lucide-react';
+import { Copy, History, Loader2, MessageSquare, Save, ArrowRight, Trash2, X } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { omnichatService, omnichatQueryKeys } from '../../services/omnichatService';
 import { saveOmniChatDefaults } from '../../utils/omnichatDefaults';
@@ -105,10 +105,17 @@ export default function ChatSettingsModal({
     >
       <div className="max-h-[80vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-background)] px-6 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-background)] px-6 py-4">
           <h2 className="text-lg font-bold text-[var(--color-text-primary)]">
             {t('omnichat.chat.settings')}
           </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <div className="space-y-6 px-6 py-4">
