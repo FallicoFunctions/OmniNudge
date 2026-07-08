@@ -1,6 +1,7 @@
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { WebGPUEngine } from '@babylonjs/core/Engines/webgpuEngine';
 import { parsePerfFlags } from './perfFlags';
+import './webgpuShaders';
 import '@babylonjs/core/Shaders/bloomMerge.fragment';
 import '@babylonjs/core/Shaders/extractHighlights.fragment';
 import '@babylonjs/core/Shaders/fxaa.fragment';
