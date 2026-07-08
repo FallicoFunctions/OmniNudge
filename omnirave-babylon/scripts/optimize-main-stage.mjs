@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(scriptDir, '..');
-const sceneGlb = path.join(rootDir, 'public/assets/venues/main-stage/main-stage.glb');
+const sceneGlb = path.join(rootDir, 'assets-src/main-stage/build/main-stage-validation.glb');
 const collisionGlb = path.join(rootDir, 'public/assets/venues/main-stage/main-stage-collision.glb');
 const textureDir = path.join(rootDir, 'assets-src/main-stage/textures/subtle');
 const requireExports = process.argv.includes('--require-exports');
