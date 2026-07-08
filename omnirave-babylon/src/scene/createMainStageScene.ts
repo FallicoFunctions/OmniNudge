@@ -15,6 +15,9 @@ import { createAtmosphereRig } from './createAtmosphereRig';
 import { createLightingRig } from './createLightingRig';
 import { createMainStagePresentationRig } from './createMainStagePresentationRig';
 import { freezeStaticScene } from './freezeStaticScene';
+import { deduplicateMaterials } from './deduplicateMaterials';
+import { mergeStaticMeshGroups } from './mergeStaticMeshGroups';
+import { parsePerfFlags } from '../app/perfFlags';
 import { createMainStageProductionSurfaces } from './createMainStageProductionSurfaces';
 import { loadMainStageAssets } from './loadMainStageAssets';
 import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from './reviewRouteData';
@@ -28,7 +31,18 @@ export async function createMainStageScene(engine: AbstractEngine) {
   scene.fogColor = new Color3(0.11, 0.14, 0.21);
 
   const stageAssets = await loadMainStageAssets(scene);
-  const lightingRig = createLightingRig(scene);
+  const perfFlags = parsePerfFlags(typeof window === 'undefined' ? '' : window.location.search);
+
+  // Collapse same-material static groups into single draw calls before any
+  // rig reads mesh positions. Draw submission was the measured frame floor.
+  // Practical cores stay individual: the pool lights locate them by name.
+  deduplicateMaterials(scene);
+  mergeStaticMeshGroups(scene, {
+    dynamicMeshes: [],
+    preserveNamePatterns: [/LanternCore|LanternWarmCore|FountainLightArray/],
+  });
+
+  const lightingRig = createLightingRig(scene, perfFlags);
   const atmosphereRig = createAtmosphereRig(scene);
   const input = createInputMap(window);
   const playerRig = createPlayerRig(
@@ -41,7 +55,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
   cameraRig.applyCheckpointView(MAIN_STAGE_REVIEW_ROUTE[0].camera);
 
   scene.activeCamera = cameraRig.camera;
-  const presentationRig = createMainStagePresentationRig(scene, cameraRig.camera);
+  const presentationRig = createMainStagePresentationRig(scene, cameraRig.camera, perfFlags);
   const productionSurfaces = createMainStageProductionSurfaces(scene);
 
   // The venue geometry never moves, so freeze it: skip per-frame world-matrix

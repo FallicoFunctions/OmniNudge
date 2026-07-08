@@ -1,4 +1,6 @@
 import { Engine } from '@babylonjs/core/Engines/engine';
+import { WebGPUEngine } from '@babylonjs/core/Engines/webgpuEngine';
+import { parsePerfFlags } from './perfFlags';
 import '@babylonjs/core/Shaders/bloomMerge.fragment';
 import '@babylonjs/core/Shaders/extractHighlights.fragment';
 import '@babylonjs/core/Shaders/fxaa.fragment';
@@ -26,7 +28,7 @@ declare global {
     __OMNIRAVE_RUNTIME__?: {
       canvas: HTMLCanvasElement;
       debugPanel?: HTMLElement;
-      engine: Engine;
+      engine: Engine | WebGPUEngine;
       host: HTMLElement;
       hud?: HTMLElement;
       perfOverlay?: HTMLElement;
@@ -42,14 +44,35 @@ export async function createRuntime(host: HTMLElement) {
   canvas.className = 'babylon-render-canvas';
   host.appendChild(canvas);
 
-  const engine = new Engine(canvas, true, {
-    preserveDrawingBuffer: true,
-    stencil: true,
-    // Render at the display's true pixel density. Without this, Babylon
-    // defaults to CSS-pixel resolution and the browser upscales the buffer,
-    // so the whole scene renders soft/pixelated on high-DPI (retina) screens.
-    adaptToDeviceRatio: true,
-  });
+  // WebGPU trial path (?perf=webgpu): the venue is draw-submission-bound
+  // and WebGPU's snapshot rendering replays recorded command buffers for
+  // static scenes, making submission nearly free. WebGL remains the default
+  // until the trial proves out.
+  const wantWebGPU = parsePerfFlags(window.location.search).webgpu;
+  let engine: Engine | WebGPUEngine;
+  if (wantWebGPU && (await WebGPUEngine.IsSupportedAsync)) {
+    // NOTE: the WGSL shader library must be made available before this
+    // trial can render - naive dynamic imports of ShadersWGSL/* split the
+    // Vite dep graph into dual Babylon instances and broke GLSL shader
+    // registration for the default path. Bundling strategy is part of the
+    // WebGPU migration work item; until then this branch boots black.
+    const webgpu = new WebGPUEngine(canvas, {
+      adaptToDeviceRatio: true,
+      antialias: true,
+    });
+    await webgpu.initAsync();
+    engine = webgpu;
+  } else {
+    engine = new Engine(canvas, true, {
+      preserveDrawingBuffer: true,
+      stencil: true,
+      // Render at the display's true pixel density. Without this, Babylon
+      // defaults to CSS-pixel resolution and the browser upscales the buffer,
+      // so the whole scene renders soft/pixelated on high-DPI (retina)
+      // screens.
+      adaptToDeviceRatio: true,
+    });
+  }
 
   // Cap the effective render density: full retina (2x) quadruples the pixel
   // cost of this heavy scene, but 1.5x is still visibly crisp at roughly half

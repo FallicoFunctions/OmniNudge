@@ -51,6 +51,8 @@ describe('createLightingRig', () => {
 
     const rig = createLightingRig(scene);
 
+    expect(rig.shadowGenerator).not.toBeNull();
+    if (!rig.shadowGenerator) throw new Error('unreachable');
     expect(rig.shadowGenerator.bias).toBeGreaterThan(0);
     const casters = rig.shadowGenerator.getShadowMap()?.renderList ?? [];
     const casterNames = casters.map((mesh) => mesh.name);
