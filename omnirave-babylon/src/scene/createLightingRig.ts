@@ -9,7 +9,11 @@ import type { Scene } from '@babylonjs/core/scene.js';
 
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 
-export function createLightingRig(scene: Scene) {
+import type { PerfFlags } from '../app/perfFlags';
+
+const PERF_DEFAULTS: PerfFlags = { noShadows: false, noPost: false, minimalLights: false, webgpu: false };
+
+export function createLightingRig(scene: Scene, perfFlags: PerfFlags = PERF_DEFAULTS) {
   const hemi = new HemisphericLight('main-stage-hemi-light', new Vector3(0, 1, 0), scene);
   hemi.diffuse = new Color3(0.36, 0.41, 0.52);
   hemi.groundColor = new Color3(0.05, 0.06, 0.08);
@@ -45,8 +49,13 @@ export function createLightingRig(scene: Scene) {
   fill.intensity = 0.72;
   fill.position = new Vector3(0, 24, -84);
 
-  const shadowGenerator = createKeyShadowGenerator(scene, key);
-  const practicalPools = createPracticalPoolLights(scene);
+  if (perfFlags.minimalLights) {
+    rim.setEnabled(false);
+    fill.setEnabled(false);
+  }
+
+  const shadowGenerator = perfFlags.noShadows ? null : createKeyShadowGenerator(scene, key);
+  const practicalPools = perfFlags.minimalLights ? [] : createPracticalPoolLights(scene);
 
   return { hemi, key, rim, fill, shadowGenerator, practicalPools };
 }

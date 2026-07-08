@@ -38,7 +38,11 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 
 const ENVIRONMENT_TEXTURE_SIZE = 16;
 
-export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
+import type { PerfFlags } from '../app/perfFlags';
+
+const PERF_DEFAULTS: PerfFlags = { noShadows: false, noPost: false, minimalLights: false, webgpu: false };
+
+export function createMainStagePresentationRig(scene: Scene, camera: Camera, perfFlags: PerfFlags = PERF_DEFAULTS) {
   const environmentTexture = createEnvironmentTexture(scene);
   environmentTexture.name = 'main-stage-night-reflection-env';
   environmentTexture.level = 0.9;
@@ -53,7 +57,7 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera) {
     'main-stage-presentation-pipeline',
     true,
     scene,
-    [camera],
+    perfFlags.noPost ? [] : [camera],
   );
   pipeline.imageProcessingEnabled = true;
   pipeline.fxaaEnabled = true;
@@ -309,7 +313,7 @@ function createEnvironmentTexture(scene: Scene) {
   ];
 
   const faceData = faceDirs.map((toDir) => {
-    const data = new Uint8Array(size * size * 3);
+    const data = new Uint8Array(size * size * 4);
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const u = (2 * (x + 0.5)) / size - 1;
@@ -341,10 +345,11 @@ function createEnvironmentTexture(scene: Scene) {
         g += 0.22 * lobe;
         b += 0.08 * lobe;
 
-        const i = (y * size + x) * 3;
+        const i = (y * size + x) * 4;
         data[i] = Math.min(255, Math.round(r * 255));
         data[i + 1] = Math.min(255, Math.round(g * 255));
         data[i + 2] = Math.min(255, Math.round(b * 255));
+        data[i + 3] = 255;
       }
     }
     return data;
@@ -355,7 +360,7 @@ function createEnvironmentTexture(scene: Scene) {
       scene,
       faceData,
       ENVIRONMENT_TEXTURE_SIZE,
-      Constants.TEXTUREFORMAT_RGB,
+      Constants.TEXTUREFORMAT_RGBA,
       Constants.TEXTURETYPE_UNSIGNED_BYTE,
       true,
       false,
