@@ -3,6 +3,8 @@ export interface MovementInput {
   backward: boolean;
   left: boolean;
   right: boolean;
+  up: boolean;
+  down: boolean;
 }
 
 export interface MoveVector {
@@ -26,4 +28,9 @@ export function resolveMoveVector(input: MovementInput): MoveVector {
     z: z / magnitude,
     magnitude: 1,
   };
+}
+
+/** -1 (descend), 0, or +1 (rise) from the held vertical review-flight keys. */
+export function resolveVerticalDirection(input: MovementInput): number {
+  return Number(input.up) - Number(input.down);
 }

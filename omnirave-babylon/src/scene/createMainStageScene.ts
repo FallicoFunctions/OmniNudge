@@ -10,7 +10,7 @@ import { createFollowCameraRig } from '../player/createFollowCameraRig';
 import { createInputMap } from '../player/createInputMap';
 import { createPlayerRig } from '../player/createPlayerRig';
 import { createReviewAvatar } from '../player/createReviewAvatar';
-import { resolveMoveVector } from '../player/movementMath';
+import { resolveMoveVector, resolveVerticalDirection } from '../player/movementMath';
 import { createAtmosphereRig } from './createAtmosphereRig';
 import { createLightingRig } from './createLightingRig';
 import { createMainStagePresentationRig } from './createMainStagePresentationRig';
@@ -95,6 +95,10 @@ export async function createMainStageScene(engine: AbstractEngine) {
     cameraRig.camera.attachControl(canvas, true);
   }
 
+  // Review flight: E/Q raise or lower the eye above ground level; the
+  // ground-follow keeps the elevation while walking over ramps and stairs.
+  let reviewFlightOffset = 0;
+
   scene.onBeforeRenderObservable.add(() => {
     const zoomState = cameraRig.syncZoomState();
     const avatarVisibility = zoomState.mode === 'first_person' ? 0 : zoomState.shoulderOpacity;
@@ -103,6 +107,14 @@ export async function createMainStageScene(engine: AbstractEngine) {
     }
 
     const move = resolveMoveVector(input.state);
+    const vertical = resolveVerticalDirection(input.state);
+    if (vertical !== 0) {
+      const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
+      reviewFlightOffset = Math.min(
+        60,
+        Math.max(0, reviewFlightOffset + vertical * playerRig.speedMetersPerSecond * deltaSeconds),
+      );
+    }
     if (move.magnitude > 0) {
       const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
       const distance = playerRig.speedMetersPerSecond * deltaSeconds;
@@ -113,7 +125,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
 
     const groundHeight = resolveGroundHeight(stageAssets.collisionMeshes, playerRig.root.position);
     if (groundHeight !== null) {
-      playerRig.root.position.y = groundHeight + playerRig.eyeHeightMeters;
+      playerRig.root.position.y = groundHeight + playerRig.eyeHeightMeters + reviewFlightOffset;
     }
   });
 

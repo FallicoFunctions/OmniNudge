@@ -10,6 +10,9 @@ const KEY_BINDINGS: Record<string, keyof MovementInput> = {
   KeyD: 'right',
   KeyS: 'backward',
   KeyW: 'forward',
+  // Review flight: hold to rise/descend; ground-follow keeps the offset.
+  KeyE: 'up',
+  KeyQ: 'down',
 };
 
 export function createInputMap(target: Window): InputMap {
@@ -18,6 +21,8 @@ export function createInputMap(target: Window): InputMap {
     backward: false,
     left: false,
     right: false,
+    up: false,
+    down: false,
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {
