@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, LogOut, Settings2, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,6 +18,7 @@ export default function OmniChatHeader({
   onSignIn: () => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { user, logout, isAuthenticated } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [defaultsOpen, setDefaultsOpen] = useState(false);
@@ -81,6 +82,7 @@ export default function OmniChatHeader({
                     onClick={() => {
                       logout();
                       setMenuOpen(false);
+                      navigate('/omnichat');
                     }}
                     className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
                   >
