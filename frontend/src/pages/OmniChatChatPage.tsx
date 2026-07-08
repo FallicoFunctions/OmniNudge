@@ -577,7 +577,7 @@ export default function OmniChatChatPage() {
     >
       <div className="h-[calc(100dvh-72px)] overflow-hidden bg-[#111114]">
         <div
-          className="grid h-full grid-cols-1 lg:grid-cols-[324px_minmax(0,1fr)_var(--omnichat-profile-pane-width)]"
+          className="grid h-full grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)_var(--omnichat-profile-pane-width)]"
           style={
             {
               ['--omnichat-profile-pane-width' as string]: `${profilePaneCollapsed ? 0 : PROFILE_PANE_WIDTH}px`,
