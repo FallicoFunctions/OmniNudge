@@ -24,13 +24,29 @@ TARGET_PATTERN = re.compile(
 )
 INFLATE_METERS = 0.02
 
+# Gentler treatment for lattice/louver frames: 2cm distorts thin members.
+GENTLE_PATTERN = re.compile(r"ProductionTruss")
+GENTLE_INFLATE_METERS = 0.008
+
+# Assemblies whose crests poke through their host covers: sink instead.
+SINK_PATTERN = re.compile(r"BasinBridgeRelief")
+SINK_METERS = 0.05
+
 sealed = 0
 for obj in bpy.data.objects:
-    if obj.type != "MESH" or not TARGET_PATTERN.search(obj.name):
+    if obj.type != "MESH":
+        continue
+    if SINK_PATTERN.search(obj.name):
+        obj.location.z -= SINK_METERS
+        sealed += 1
+        continue
+    gentle = GENTLE_PATTERN.search(obj.name)
+    if not gentle and not TARGET_PATTERN.search(obj.name):
         continue
     mesh = obj.data
+    amount = GENTLE_INFLATE_METERS if gentle else INFLATE_METERS
     # displace along per-vertex normals (world-scale assumed 1.0 per source rules)
-    offsets = [Vector(v.normal) * INFLATE_METERS for v in mesh.vertices]
+    offsets = [Vector(v.normal) * amount for v in mesh.vertices]
     for vertex, offset in zip(mesh.vertices, offsets):
         vertex.co += offset
     mesh.update()

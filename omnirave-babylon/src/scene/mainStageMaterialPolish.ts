@@ -4692,8 +4692,6 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       emissiveIntensity: 1.4,
       metallic: 0.02,
       roughness: 0.24,
-      alpha: 0.72,
-      alphaBlend: true,
       clearCoat: { intensity: 0.02, roughness: 0.72 },
       environmentIntensity: 0.08,
     },
@@ -4708,8 +4706,6 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       emissiveIntensity: 1.4,
       metallic: 0.02,
       roughness: 0.32,
-      alpha: 0.72,
-      alphaBlend: true,
       clearCoat: { intensity: 0, roughness: 0.84 },
       environmentIntensity: 0.04,
     },
@@ -4832,15 +4828,16 @@ function applyOverrideParams(material: PBRMaterial, rule: MainStageOverrideRule)
   }
   if (params.zOffset !== undefined) {
     // Table values use WebGL polygon-offset semantics (negative pulls the
-    // trim toward the viewer). WebGPU's depth-bias direction is inverted in
-    // practice - shipping the raw value pushed every biased trim BEHIND its
-    // host there, striping the venue with view-dependent bleed lines
-    // (verified by live A/B: zeroing cleaned, inverting cleaned and
-    // restored correct trim-over-host layering). zOffsetUnits mirrors the
-    // bias in constant depth units, which WebGPU honors more strongly.
-    const flip = material.getScene().getEngine().isWebGPU ? -1 : 1;
-    material.zOffset = params.zOffset * flip;
-    material.zOffsetUnits = params.zOffset * flip * 16;
+    // trim toward the viewer) and exist to fix WebGL's depth-precision
+    // fights. WebGPU renders with a 32-bit float depth buffer and does not
+    // exhibit those fights - but it scales polygon bias so aggressively
+    // that ANY nonzero value overshoots: negative striped trim behind
+    // hosts, inverted pushed rails behind their backings and floors behind
+    // their underlays (player-verified both ways). Bias is therefore
+    // WebGL-only; WebGPU renders unbiased geometry.
+    const isWebGPU = material.getScene().getEngine().isWebGPU;
+    material.zOffset = isWebGPU ? 0 : params.zOffset;
+    material.zOffsetUnits = 0;
   }
 
   material.metadata = {
