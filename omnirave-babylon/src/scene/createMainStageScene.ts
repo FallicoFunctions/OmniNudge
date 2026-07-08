@@ -17,6 +17,7 @@ import { createMainStagePresentationRig } from './createMainStagePresentationRig
 import { freezeStaticScene } from './freezeStaticScene';
 import { deduplicateMaterials } from './deduplicateMaterials';
 import { mergeStaticMeshGroups } from './mergeStaticMeshGroups';
+import { trimMeshLightBudget } from './trimMeshLightBudget';
 import { parsePerfFlags } from '../app/perfFlags';
 import { createMainStageProductionSurfaces } from './createMainStageProductionSurfaces';
 import { loadMainStageAssets } from './loadMainStageAssets';
@@ -57,6 +58,12 @@ export async function createMainStageScene(engine: AbstractEngine) {
   scene.activeCamera = cameraRig.camera;
   const presentationRig = createMainStagePresentationRig(scene, cameraRig.camera, perfFlags);
   const productionSurfaces = createMainStageProductionSurfaces(scene);
+
+  // After every scoped light exists (pools + screen spills): bound each mesh
+  // to its nearest point lights. WebGPU's 12-buffer vertex-stage limit
+  // allows 2 rig lights + 6 here (3 base UBOs + 8 lights = 11); WebGL gains
+  // proximity-correct slot filling.
+  trimMeshLightBudget(scene, 6);
 
   // The venue geometry never moves, so freeze it: skip per-frame world-matrix
   // recompute, bounding-info sync, and material state churn across ~700 static
