@@ -45,18 +45,14 @@ export async function createRuntime(host: HTMLElement) {
   canvas.className = 'babylon-render-canvas';
   host.appendChild(canvas);
 
-  // WebGPU trial path (?perf=webgpu): the venue is draw-submission-bound
-  // and WebGPU's snapshot rendering replays recorded command buffers for
-  // static scenes, making submission nearly free. WebGL remains the default
-  // until the trial proves out.
-  const wantWebGPU = parsePerfFlags(window.location.search).webgpu;
+  // WebGPU is the default engine where supported: the venue is
+  // draw-submission-bound and WebGPU removes that floor (validated
+  // in-session: 53fps shared-GPU where WebGL managed 45 solo). WebGL
+  // remains the automatic fallback, and ?perf=webgl forces it for
+  // debugging comparisons.
+  const perfFlags = parsePerfFlags(window.location.search);
   let engine: Engine | WebGPUEngine;
-  if (wantWebGPU && (await WebGPUEngine.IsSupportedAsync)) {
-    // NOTE: the WGSL shader library must be made available before this
-    // trial can render - naive dynamic imports of ShadersWGSL/* split the
-    // Vite dep graph into dual Babylon instances and broke GLSL shader
-    // registration for the default path. Bundling strategy is part of the
-    // WebGPU migration work item; until then this branch boots black.
+  if (!perfFlags.webgl && (await WebGPUEngine.IsSupportedAsync)) {
     const webgpu = new WebGPUEngine(canvas, {
       adaptToDeviceRatio: true,
       antialias: true,

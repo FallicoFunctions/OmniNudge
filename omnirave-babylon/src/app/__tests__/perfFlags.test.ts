@@ -9,10 +9,11 @@ describe('parsePerfFlags', () => {
       noPost: true,
       minimalLights: false,
       webgpu: false,
+      webgl: false,
     });
   });
 
   it('defaults everything off without the param', () => {
-    expect(parsePerfFlags('')).toEqual({ noShadows: false, noPost: false, minimalLights: false, webgpu: false });
+    expect(parsePerfFlags('')).toEqual({ noShadows: false, noPost: false, minimalLights: false, webgpu: false, webgl: false });
   });
 });
