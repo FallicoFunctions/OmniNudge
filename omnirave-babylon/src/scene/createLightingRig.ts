@@ -138,8 +138,15 @@ function createKeyShadowGenerator(scene: Scene, key: DirectionalLight) {
   // dashes on surfaces grazing the raked key (stage rear face, canopy
   // lips). The normal-offset bias is the grazing-angle acne killer and
   // needs to be meaningful in world units at this venue's scale.
-  shadowGenerator.bias = 0.003;
+  shadowGenerator.bias = 0.0015;
   shadowGenerator.normalBias = 0.05;
+  // Store back-face depths in the map: lit front faces then never compare
+  // against their own surface, which kills self-shadow acne structurally
+  // instead of chasing it with ever-larger biases (bias raises alone left
+  // residual banding on the curved awnings and the stage rear face). The
+  // venue's solids are closed, so the classic thin-wall light-leak
+  // trade-off of this technique does not apply.
+  shadowGenerator.forceBackFacesOnly = true;
 
   for (const mesh of scene.meshes) {
     if (!mesh.isVisible) {

@@ -1,0 +1,40 @@
+# Seals hairline gaps in segmented panel/canopy assemblies.
+#
+# Several blockout assemblies are authored as stacked plates with sub-2cm
+# clearances; at night lighting the dark interior reads through the slits
+# as rows of "bleeding" dashes (player-reported on the route awnings and
+# the spawn gallery / rear shell walls). Shadow bias and depth bias were
+# both ruled out empirically - the slits are real geometry. Displacing the
+# plates ~1.2cm along their vertex normals closes the clearances with no
+# visible silhouette change.
+#
+# Run headless: blender -b assets-src/main-stage/main-stage.blend \
+#   --python scripts/seal-main-stage-panel-gaps.py
+import re
+
+import bpy
+from mathutils import Vector
+
+TARGET_PATTERN = re.compile(
+    r"TentCanopy|RouteTent|RearShellPanelArray|OculusCanopy|SpawnGalleryArcadePearl|"
+    r"SpawnGalleryPierPearl|WingCanopyLamella|CrownShellLamella|"
+    # Route-edge segmented shells: the gold "awnings" flanking the promenade
+    # (player-reported bleeding lines along their segment overlaps).
+    r"PromenadeGoldShoulders|PromenadePearlRibbon|BasinRunwaySpine"
+)
+INFLATE_METERS = 0.02
+
+sealed = 0
+for obj in bpy.data.objects:
+    if obj.type != "MESH" or not TARGET_PATTERN.search(obj.name):
+        continue
+    mesh = obj.data
+    # displace along per-vertex normals (world-scale assumed 1.0 per source rules)
+    offsets = [Vector(v.normal) * INFLATE_METERS for v in mesh.vertices]
+    for vertex, offset in zip(mesh.vertices, offsets):
+        vertex.co += offset
+    mesh.update()
+    sealed += 1
+
+bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
+print(f"PANEL_GAPS_SEALED objects={sealed}")
