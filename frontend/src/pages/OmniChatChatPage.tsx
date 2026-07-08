@@ -696,7 +696,7 @@ export default function OmniChatChatPage() {
                     <PersonaAvatar persona={activePersona} className="h-14 w-14 rounded-full" />
                   )}
                   <div>
-                    <h2 className="text-[2rem] font-semibold tracking-tight text-white">
+                    <h2 className="truncate text-[2rem] font-semibold tracking-tight text-white">
                       {activePersona?.name ?? t('omnichat.chat.loadingPersona')}
                     </h2>
                   </div>
@@ -883,7 +883,7 @@ export default function OmniChatChatPage() {
 
                   <div className="mt-5 flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-[2.1rem] font-semibold leading-none text-white">
+                      <h3 className="truncate text-[2.1rem] font-semibold leading-none text-white">
                         {activePersona.name}
                       </h3>
                       {activePersona.description && (

@@ -11,7 +11,7 @@ import {
 import OmniChatHeader from './OmniChatHeader';
 import OmniChatSidebar, { type SidebarTab } from './OmniChatSidebar';
 
-const DESKTOP_EXPANDED_WIDTH = 248;
+const DESKTOP_EXPANDED_WIDTH = 223;
 const DESKTOP_COLLAPSED_WIDTH = 72;
 const HEADER_HEIGHT = 72;
 const SIDEBAR_COLLAPSED_KEY = 'omnichat_sidebar_collapsed';
