@@ -6,6 +6,8 @@ import { Copy, History, Loader2, MessageSquare, Save, ArrowRight, Trash2 } from 
 import { Modal } from '../common/Modal';
 import { omnichatService, omnichatQueryKeys } from '../../services/omnichatService';
 import { saveOmniChatDefaults } from '../../utils/omnichatDefaults';
+import { getOmniChatPreviewText } from '../../utils/omnichatMessageFormatting';
+import { useAuth } from '../../contexts/AuthContext';
 import type { BotPersona, ConversationSettings } from '../../types/omnichat';
 
 export default function ChatSettingsModal({
@@ -24,12 +26,14 @@ export default function ChatSettingsModal({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuth();
 
   const [name, setName] = useState(currentSettings?.user_name ?? '');
   const [age, setAge] = useState(currentSettings?.user_age ?? '');
   const [gender, setGender] = useState(currentSettings?.user_gender ?? '');
   const [localSaveSuccess, setLocalSaveSuccess] = useState(false);
-  const [rightHoveredId, setRightHoveredId] = useState<number | null>(null);
+  const [flippedId, setFlippedId] = useState<number | null>(null);
+  const [slidingOutId, setSlidingOutId] = useState<number | null>(null);
 
   // Sync form state with currentSettings when modal opens or conversation changes
   useEffect(() => {
@@ -60,6 +64,22 @@ export default function ChatSettingsModal({
       queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
       navigate(`/omnichat/c/${newConv.id}`);
       onClose();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (convId: number) => omnichatService.deleteConversation(convId),
+    onSuccess: (_data, convId) => {
+      setFlippedId(null);
+      setSlidingOutId(convId);
+      setTimeout(() => {
+        setSlidingOutId(null);
+        queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
+        queryClient.invalidateQueries({ queryKey: [...omnichatQueryKeys.conversations, 'persona', persona.id] });
+      }, 300);
+    },
+    onError: (err) => {
+      console.error('Delete failed:', err);
     },
   });
 
@@ -208,48 +228,90 @@ export default function ChatSettingsModal({
                 )}
 
                 {otherConversations.length > 0 && (
-                  <ul className="space-y-2">
+                  <ul className="space-y-2 overflow-hidden">
                     {otherConversations.map((conv) => (
-                      <li key={conv.id}>
-                        <div
-                          className={`flex w-full items-stretch rounded-md border border-[var(--color-border)] text-left text-sm ${
-                            rightHoveredId === conv.id
-                              ? 'bg-red-500/10'
-                              : 'bg-[var(--color-surface)]'
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigate(`/omnichat/c/${conv.id}`);
-                              onClose();
+                      <li key={conv.id} className={slidingOutId === conv.id ? 'transition-all duration-300 -translate-x-full opacity-0' : ''}>
+                        <div style={{ perspective: '1000px' }}>
+                          <div
+                            className="relative w-full transition-transform duration-500 ease-in-out"
+                            style={{
+                              transformStyle: 'preserve-3d',
+                              transform: flippedId === conv.id ? 'rotateX(-180deg)' : 'rotateX(0deg)',
                             }}
-                            className="group/left flex min-w-0 flex-1 items-center gap-3 rounded-l-md px-3 py-2 hover:bg-[var(--color-surface-hover)]"
                           >
-                            <MessageSquare size={16} className="flex-shrink-0 text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]" />
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate font-medium text-[var(--color-text-primary)] group-hover/left:text-[var(--color-primary)]">
-                                {conv.title ?? persona.name}
-                              </p>
-                              <p className="text-xs text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]">
-                                {formatRelativeTime(conv.last_message_at)}
-                              </p>
+                            {/* Front face */}
+                            <div
+                              className="flex w-full items-stretch rounded-md border border-[var(--color-border)] text-left text-sm"
+                              style={{ backfaceVisibility: 'hidden' }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigate(`/omnichat/c/${conv.id}`);
+                                  onClose();
+                                }}
+                                className="group/left flex min-w-0 flex-1 items-center gap-3 rounded-l-md px-3 py-2 hover:bg-[var(--color-surface-hover)]"
+                              >
+                                <MessageSquare size={16} className="flex-shrink-0 text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate font-medium text-[var(--color-text-primary)] group-hover/left:text-[var(--color-primary)]">
+                                    {conv.last_message_preview
+                                      ? getOmniChatPreviewText(conv.last_message_preview)
+                                      : (conv.title ?? persona.name)}
+                                  </p>
+                                  <p className="truncate text-xs text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]">
+                                    {conv.last_message_preview
+                                      ? formatRelativeTime(conv.last_message_at)
+                                      : conv.title ?? persona.name}
+                                  </p>
+                                </div>
+                                <ArrowRight size={14} className="flex-shrink-0 text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]" />
+                              </button>
+                              <div className="h-4 w-px self-center bg-[var(--color-border)]" />
+                              <button
+                                type="button"
+                                onClick={() => setFlippedId(conv.id)}
+                                className="group flex items-center rounded-r-md px-3 py-2"
+                              >
+                                {deleteMutation.isPending && deleteMutation.variables === conv.id ? (
+                                  <Loader2 size={14} className="animate-spin text-[var(--color-text-muted)]" />
+                                ) : (
+                                  <Trash2
+                                    size={14}
+                                    className="text-[var(--color-text-muted)] group-hover:text-red-500"
+                                  />
+                                )}
+                              </button>
                             </div>
-                            <ArrowRight size={14} className="flex-shrink-0 text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]" />
-                          </button>
-                          <div className="h-4 w-px self-center bg-[var(--color-border)]" />
-                          <button
-                            type="button"
-                            onClick={(e) => e.stopPropagation()}
-                            onPointerEnter={() => setRightHoveredId(conv.id)}
-                            onPointerLeave={() => setRightHoveredId(null)}
-                            className="group flex items-center rounded-r-md px-3 py-2"
-                          >
-                            <Trash2
-                              size={14}
-                              className="text-[var(--color-text-muted)] group-hover:text-red-500"
-                            />
-                          </button>
+
+                            {/* Back face */}
+                            <div
+                              className="absolute inset-0 flex items-center justify-center gap-3 rounded-md border border-[var(--color-border)] px-3 py-2"
+                              style={{ backfaceVisibility: 'hidden', transform: 'rotateX(180deg)', backgroundColor: 'var(--color-surface)' }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setFlippedId(null)}
+                                className="rounded-md px-4 py-1.5 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!isAuthenticated) return;
+                                  deleteMutation.mutate(conv.id);
+                                }}
+                                className="rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                              >
+                                {deleteMutation.isPending && deleteMutation.variables === conv.id ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  'Delete'
+                                )}
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </li>
                     ))}

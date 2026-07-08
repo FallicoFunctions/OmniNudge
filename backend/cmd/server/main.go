@@ -1192,6 +1192,7 @@ func main() {
 			protected.GET("/omnichat/conversations/:id", omniChatHandler.GetConversation)
 			protected.PUT("/omnichat/conversations/:id/settings", omniChatHandler.UpdateConversationSettings)
 			protected.POST("/omnichat/conversations/:id/fork", omniChatHandler.ForkConversation)
+			protected.DELETE("/omnichat/conversations/:id", omniChatHandler.DeleteConversation)
 			protected.POST("/omnichat/conversations/:id/messages", omniChatRateLimiter.Middleware(), omniChatHandler.SendMessage)
 
 			protected.POST("/folders", foldersHandler.CreateFolder)
