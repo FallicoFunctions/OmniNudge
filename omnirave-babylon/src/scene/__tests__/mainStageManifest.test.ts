@@ -10,9 +10,9 @@ const exportScript = readFileSync(path.join(projectRoot, 'scripts/export-main-st
 const exportShellScript = readFileSync(path.join(projectRoot, 'scripts/export-main-stage.sh'), 'utf8');
 const optimizeScript = readFileSync(path.join(projectRoot, 'scripts/optimize-main-stage.mjs'), 'utf8');
 const mainStageGlbText = readFileSync(
-  path.join(projectRoot, 'public/assets/venues/main-stage/main-stage.glb'),
+  path.join(projectRoot, 'assets-src/main-stage/build/main-stage-validation.glb'),
 ).toString('utf8');
-const mainStageGlbBuffer = readFileSync(path.join(projectRoot, 'public/assets/venues/main-stage/main-stage.glb'));
+const mainStageGlbBuffer = readFileSync(path.join(projectRoot, 'assets-src/main-stage/build/main-stage-validation.glb'));
 const mainStageCollisionGlbBuffer = readFileSync(
   path.join(projectRoot, 'public/assets/venues/main-stage/main-stage-collision.glb'),
 );
@@ -487,7 +487,10 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   it('keeps collision-only objects out of the visible scene export', () => {
     expect(exportScript).toContain('collision_object_names');
     expect(exportScript).toContain('visible_objects');
-    expect(exportScript).toMatch(/filepath=str\(scene_output\)[\s\S]*use_selection=True/);
+    // The selection flag moved into the shared option dict that both the
+    // validation and runtime exports spread.
+    expect(exportScript).toMatch(/common_gltf_options = dict\([\s\S]*use_selection=True/);
+    expect(exportScript).toMatch(/filepath=str\(scene_output\)[\s\S]*\*\*common_gltf_options/);
   });
 
   it('temporarily unhides collision objects for the collision-only export', () => {

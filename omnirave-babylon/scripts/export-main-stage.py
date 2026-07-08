@@ -8,6 +8,12 @@ output_dir = root / "public" / "assets" / "venues" / "main-stage"
 output_dir.mkdir(parents=True, exist_ok=True)
 
 scene_output = output_dir / "main-stage.glb"
+# Uncompressed twin of the runtime GLB: the tangent-repair pass and the
+# geometry contract tests read raw accessors, which Draco compression
+# removes. Lives outside public/ so it never ships.
+validation_dir = root / "assets-src" / "main-stage" / "build"
+validation_dir.mkdir(parents=True, exist_ok=True)
+validation_output = validation_dir / "main-stage-validation.glb"
 collision_output = output_dir / "main-stage-collision.glb"
 TEMP_TANGENT_TRIANGULATE_MODIFIER = "OmniRaveTempTangentsTriangulate"
 TEMP_TANGENT_TRIANGULATE_PREFIXES = (
@@ -105,8 +111,7 @@ if not visible_objects:
 
 ensure_temp_tangent_triangulation(visible_objects)
 bpy.context.view_layer.objects.active = visible_objects[0]
-bpy.ops.export_scene.gltf(
-    filepath=str(scene_output),
+common_gltf_options = dict(
     export_format="GLB",
     use_selection=True,
     export_yup=True,
@@ -116,7 +121,17 @@ bpy.ops.export_scene.gltf(
     export_tangents=True,
     export_materials="EXPORT",
 )
-strip_unused_tangents(scene_output)
+# Validation artifact first: raw accessors for tangent repair and tests.
+bpy.ops.export_scene.gltf(filepath=str(validation_output), **common_gltf_options)
+strip_unused_tangents(validation_output)
+# Runtime artifact: Draco-compressed geometry (28MB -> ~6MB download); the
+# runtime decodes with the decoder vendored at public/libs/draco/.
+bpy.ops.export_scene.gltf(
+    filepath=str(scene_output),
+    export_draco_mesh_compression_enable=True,
+    export_draco_mesh_compression_level=6,
+    **common_gltf_options,
+)
 
 for obj in bpy.data.objects:
     obj.select_set(False)
