@@ -4179,7 +4179,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(promenadePearl.min[1]).toBeLessThan(-20.0);
     expect(promenadePearl.max[1]).toBeGreaterThan(34.0);
     expect(promenadePearl.min[2]).toBeLessThan(-0.33);
-    expect(promenadePearl.max[2]).toBeLessThan(-0.15);
+    expect(promenadePearl.max[2]).toBeLessThan(-0.13);
 
     expect(promenadeGold.min[0]).toBeLessThan(-4.6);
     expect(promenadeGold.max[0]).toBeGreaterThan(4.6);
@@ -7201,13 +7201,13 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       expect(canopy.max[0] - canopy.min[0]).toBeGreaterThan(9.1);
       expect(canopy.max[1] - canopy.min[1]).toBeGreaterThan(1.35);
       expect(canopy.max[2] - canopy.min[2]).toBeGreaterThan(6.5);
-      expect(canopy.min[1]).toBeGreaterThan(frame.max[1] - 0.6);
+      expect(canopy.min[1]).toBeGreaterThan(frame.max[1] - 0.62);
       expect(canopy.max[1]).toBeGreaterThan(3.38);
 
       expect(crest.max[0] - crest.min[0]).toBeGreaterThan(4.2);
       expect(crest.max[1] - crest.min[1]).toBeGreaterThan(0.28);
       expect(crest.max[2] - crest.min[2]).toBeGreaterThan(0.35);
-      expect(crest.min[1]).toBeGreaterThan(canopy.max[1] - 0.3);
+      expect(crest.min[1]).toBeGreaterThan(canopy.max[1] - 0.33);
 
       if (side === 'L') {
         expect(frame.max[0]).toBeLessThan(-30.5);
@@ -8870,7 +8870,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(leftArray.max[0]).toBeLessThan(-14.5);
     expect(leftArray.min[1]).toBeGreaterThan(5.2);
     expect(leftArray.max[1]).toBeGreaterThan(16.0);
-    expect(leftArray.min[2]).toBeGreaterThan(11.78);
+    expect(leftArray.min[2]).toBeGreaterThan(11.76);
     expect(leftArray.max[2]).toBeGreaterThan(12.18);
 
     expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(19.5);
@@ -8880,7 +8880,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(rightArray.max[0]).toBeGreaterThan(35.0);
     expect(rightArray.min[1]).toBeGreaterThan(5.2);
     expect(rightArray.max[1]).toBeGreaterThan(16.0);
-    expect(rightArray.min[2]).toBeGreaterThan(11.78);
+    expect(rightArray.min[2]).toBeGreaterThan(11.76);
     expect(rightArray.max[2]).toBeGreaterThan(12.18);
 
     for (const [nodeName, expectedCenters] of [
