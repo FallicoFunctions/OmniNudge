@@ -4246,6 +4246,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
       roughness: 0.95,
       clearCoat: { intensity: 0, roughness: 0.86 },
       environmentIntensity: 0.082,
+      zOffset: -2,
     },
   },
   {

@@ -5648,6 +5648,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
       clearCoatIntensity: 0,
       clearCoatRoughness: 0.86,
       environmentIntensity: 0.082,
+      zOffset: -2,
       metaPolish: null,
     },
   },
