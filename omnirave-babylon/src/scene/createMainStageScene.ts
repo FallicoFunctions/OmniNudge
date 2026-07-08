@@ -65,6 +65,14 @@ export async function createMainStageScene(engine: AbstractEngine) {
   // proximity-correct slot filling.
   trimMeshLightBudget(scene, 6);
 
+  // Shallow viewing angles across the LED module grids and brushed maps
+  // alias into shimmer without anisotropic sampling.
+  for (const texture of scene.textures) {
+    if ('anisotropicFilteringLevel' in texture) {
+      (texture as { anisotropicFilteringLevel: number }).anisotropicFilteringLevel = 8;
+    }
+  }
+
   // The venue geometry never moves, so freeze it: skip per-frame world-matrix
   // recompute, bounding-info sync, and material state churn across ~700 static
   // meshes. This is the single biggest CPU saving and lets the scene render at

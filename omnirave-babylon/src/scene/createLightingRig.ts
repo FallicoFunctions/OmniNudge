@@ -134,8 +134,12 @@ function createKeyShadowGenerator(scene: Scene, key: DirectionalLight) {
   const shadowGenerator = new ShadowGenerator(4096, key);
   shadowGenerator.usePercentageCloserFiltering = false;
   shadowGenerator.usePoissonSampling = false;
-  shadowGenerator.bias = 0.0022;
-  shadowGenerator.normalBias = 0.012;
+  // Hard 1-tap shadows show acne that PCF's blur used to hide: banded
+  // dashes on surfaces grazing the raked key (stage rear face, canopy
+  // lips). The normal-offset bias is the grazing-angle acne killer and
+  // needs to be meaningful in world units at this venue's scale.
+  shadowGenerator.bias = 0.003;
+  shadowGenerator.normalBias = 0.05;
 
   for (const mesh of scene.meshes) {
     if (!mesh.isVisible) {

@@ -99,6 +99,12 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera, per
 // instead of only on emitter surfaces.
 function createScreenLightScattering(scene: Scene, camera: Camera, panels: Mesh[]) {
   const effects: VolumetricLightScatteringPostProcess[] = [];
+  // No WGSL variant exists for this post-process: under WebGPU the GLSL
+  // compile fails asynchronously every frame (the constructor try/catch
+  // cannot catch it) and floods the console. Skip cleanly instead.
+  if (scene.getEngine().isWebGPU) {
+    return effects;
+  }
   // Disabled for performance: the occlusion pass re-renders scene geometry
   // every frame, and the haze it adds is marginal against the emitter-hugging
   // glow billboards. Kept as a code path in case a lighter budget allows it.
