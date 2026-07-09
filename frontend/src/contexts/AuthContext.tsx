@@ -17,6 +17,7 @@ import {
 import { exportKeyPair } from '../utils/encryption';
 import { analyticsService } from '../services/analyticsService';
 import { clearOmniChatDefaults } from '../utils/omnichatDefaults';
+import { clearAllGuestMessages } from '../utils/omnichatGuestStorage';
 
 interface AuthContextType {
   user: User | null;
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem('auth_token');
     localStorage.removeItem(OMNI_FEED_STORAGE_KEY);
     clearOmniChatDefaults('authenticated');
+    clearAllGuestMessages();
     setUser(null);
   };
 
