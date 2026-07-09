@@ -1,16 +1,19 @@
 # Procedural tiered-cascade water court for the Main Stage flank pockets.
 #
-# Each flank pocket is a bare ~38x37 floor bounded by the elevated wing terrace
-# (front, blend Y~5, Z up to 7) and the spawn gallery/canopy (back, Y>42). This
-# builds a tiered cascade descending from the terrace-adjacent head down into the
-# pocket to a base collecting pool - designed architecture, not loose props.
+# Each flank pocket is a bare ~38x37 floor. This builds a VOLCANO-like tiered
+# fountain mound centered in each pocket: stacked irregular stepped tiers that
+# taper to a summit, so water can spill down all sides. Each tier is a distinct
+# irregular polygon (different size, side-count, orientation and jitter) so the
+# top-down silhouette never reads as a stack of concentric circles.
 #
-# Pass 1 authors the STONE SHELL only (tier pans: floor + walls + coping + spill
-# lips). Water, mist, planting and lighting are added by later passes under the
-# same V150_CascadeCourt* namespace.
+# Pass 1 authors the STONE SHELL only (the stepped mound). Water, mist, planting
+# and lighting are added by later passes under the same V150_CascadeCourt*
+# namespace.
 #
 # Run:  blender -b assets-src/main-stage/main-stage.blend \
 #         --python scripts/generate-cascade-court.py -- --write
+import math
+import random
 import sys
 
 import bpy
@@ -18,20 +21,22 @@ import bmesh
 
 GENERATED_PREFIX = "V150_CascadeCourt"  # own namespace; safe to clear+regen
 
-# Tiers in RIGHT-pocket coordinates (positive X); the left pocket is the mirror
-# (every vertex X negated). Envelope: X(31,67) Y(17,40) Z(0,4.2). Head starts at
-# Y17 to clear the pyro-pod shell (V45, which rises to Z5.6 out to Y15.5); base
-# ends at Y40, clear of the spawn canopy (Y>=42.7).
-# (x0, x1, y0, y1, floor_z, wall_top_z)
+# Mound center in RIGHT-pocket coordinates (left pocket mirrors X). Pocket
+# envelope X(31,67) Y(17,40); center it and keep the base radius inside that.
+CENTER = (48.5, 28.5)
+
+# Stacked tiers, base (widest, lowest) -> summit (smallest, highest). Each:
+# (radius_x, radius_y, z_bottom, z_top, n_sides, phase_rad, off_x, off_y, seed)
+# Distinct n_sides/phase/offset/seed per tier keeps the shapes irregular and
+# non-concentric. Base at Y18..39 clears the pyro pod (Y<=15.5) and spawn
+# canopy (Y>=42.7); summit at Z~4.0 stays under the envelope (Z<=4.2).
 TIERS = [
-    (37.0, 61.0, 17.0, 24.0, 2.8, 3.8),  # head tier (highest)
-    (35.0, 63.0, 23.0, 30.0, 1.9, 2.9),
-    (33.0, 65.0, 29.0, 35.0, 1.0, 2.0),
-    (32.0, 66.0, 34.0, 40.0, 0.1, 1.1),  # base collecting pool (lowest, widest)
+    (13.0, 10.6, 0.00, 0.80, 11, 0.15, 0.0, 0.0, 11),
+    (10.6, 8.6, 0.80, 1.60, 9, 0.55, 0.9, -0.6, 27),
+    (8.2, 6.6, 1.60, 2.40, 10, 1.10, -0.8, 0.7, 43),
+    (5.8, 4.7, 2.40, 3.20, 8, 0.30, 0.6, 0.5, 61),
+    (3.6, 3.0, 3.20, 4.00, 7, 0.90, -0.5, -0.4, 79),
 ]
-WALL_T = 0.7
-LIP_H = 0.25
-COP_T = 0.25
 
 
 def clear_previous():
@@ -45,38 +50,37 @@ def get_material(name, fallback):
     return m if m else bpy.data.materials.get(fallback)
 
 
-def add_box(bm, cx, cy, cz, sx, sy, sz):
-    """Axis-aligned box centered at (cx,cy,cz) with full sizes s*."""
-    hx, hy, hz = sx / 2, sy / 2, sz / 2
-    verts = []
-    for dx in (-hx, hx):
-        for dy in (-hy, hy):
-            for dz in (-hz, hz):
-                verts.append(bm.verts.new((cx + dx, cy + dy, cz + dz)))
+def tier_polygon(cx, cy, rx, ry, n, phase, seed):
+    """An irregular closed n-gon: per-vertex radius jitter, seeded so the shape
+    is deterministic but unique to this tier."""
+    rng = random.Random(seed)
+    pts = []
+    for k in range(n):
+        a = phase + 2.0 * math.pi * k / n
+        r_mult = 0.80 + 0.40 * rng.random()  # 0.80..1.20
+        pts.append((cx + rx * r_mult * math.cos(a), cy + ry * r_mult * math.sin(a)))
+    return pts
+
+
+def build_tier(bm, pts, z0, z1):
+    bottom = [bm.verts.new((x, y, z0)) for (x, y) in pts]
+    top = [bm.verts.new((x, y, z1)) for (x, y) in pts]
     bm.verts.ensure_lookup_table()
-    faces = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 2, 6, 4), (1, 5, 7, 3), (0, 4, 5, 1), (2, 3, 7, 6)]
-    for f in faces:
-        bm.faces.new([verts[i] for i in f])
-
-
-def build_tier(bm, x0, x1, y0, y1, floor_z, wall_top):
-    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-    wx, wy = x1 - x0, y1 - y0
-    wall_h = wall_top - floor_z
-    wall_cz = floor_z + wall_h / 2
-    # pan floor (top surface at floor_z)
-    add_box(bm, cx, cy, floor_z - 0.15, wx, wy, 0.3)
-    # full-height walls on front (y0), left (x0), right (x1)
-    add_box(bm, cx, y0 + WALL_T / 2, wall_cz, wx, WALL_T, wall_h)
-    add_box(bm, x0 + WALL_T / 2, cy, wall_cz, WALL_T, wy, wall_h)
-    add_box(bm, x1 - WALL_T / 2, cy, wall_cz, WALL_T, wy, wall_h)
-    # low spill lip on the downhill (y1) edge - water overflows here to next tier
-    add_box(bm, cx, y1 - WALL_T / 2, floor_z + LIP_H / 2, wx, WALL_T, LIP_H)
-    # coping capstones on the three full-height walls
-    cop_z = wall_top + COP_T / 2
-    add_box(bm, cx, y0 + WALL_T / 2, cop_z, wx + 0.4, WALL_T + 0.4, COP_T)
-    add_box(bm, x0 + WALL_T / 2, cy, cop_z, WALL_T + 0.4, wy + 0.4, COP_T)
-    add_box(bm, x1 - WALL_T / 2, cy, cop_z, WALL_T + 0.4, wy + 0.4, COP_T)
+    n = len(pts)
+    try:
+        bm.faces.new(list(reversed(bottom)))  # downward normal
+    except ValueError:
+        pass
+    try:
+        bm.faces.new(top)  # the step tread
+    except ValueError:
+        pass
+    for i in range(n):  # riser walls
+        j = (i + 1) % n
+        try:
+            bm.faces.new([bottom[i], bottom[j], top[j], top[i]])
+        except ValueError:
+            pass
 
 
 def _box_project_uvs(mesh, cube_size=1.5):
@@ -98,13 +102,15 @@ def _ensure_tangents(obj):
 
 
 def build_side(side, mat):
+    cx, cy = CENTER
     bm = bmesh.new()
-    for tier in TIERS:
-        build_tier(bm, *tier)
+    for (rx, ry, z0, z1, n, phase, ox, oy, seed) in TIERS:
+        pts = tier_polygon(cx + ox, cy + oy, rx, ry, n, phase, seed)
+        build_tier(bm, pts, z0, z1)
     if side == "L":
         for v in bm.verts:
             v.co.x = -v.co.x
-    # triangulate for a well-defined tangent basis on export
+    # triangulate n-gon caps for a well-defined tangent basis on export
     bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='BEAUTY', ngon_method='BEAUTY')
     mesh = bpy.data.meshes.new(f"{GENERATED_PREFIX}Shell_{side}_Mesh")
     bm.to_mesh(mesh)
