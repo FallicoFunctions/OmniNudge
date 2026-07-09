@@ -32,12 +32,25 @@ GENTLE_INFLATE_METERS = 0.008
 SINK_PATTERN = re.compile(r"BasinBridgeRelief")
 SINK_METERS = 0.05
 
+# Truly coplanar floor overlays: inlays and thread strips authored in the
+# exact plane of the deck beneath them. Depth bias cannot fix this on
+# WebGPU (any nonzero bias overshoots), so give them real separation.
+LIFT_PATTERN = re.compile(
+    r"PromenadeGoldInlay|PromenadeCyanThread|PromenadePearlRibbon|PlazaPaverGoldFiligree|"
+    r"PlazaPaverPearlBands|BackPlazaSightlineGoldRail"
+)
+LIFT_METERS = 0.006
+
 sealed = 0
 for obj in bpy.data.objects:
     if obj.type != "MESH":
         continue
     if SINK_PATTERN.search(obj.name):
         obj.location.z -= SINK_METERS
+        sealed += 1
+        continue
+    if LIFT_PATTERN.search(obj.name):
+        obj.location.z += LIFT_METERS
         sealed += 1
         continue
     gentle = GENTLE_PATTERN.search(obj.name)

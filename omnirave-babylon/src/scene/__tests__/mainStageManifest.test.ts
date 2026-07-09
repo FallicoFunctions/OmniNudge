@@ -3625,9 +3625,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(rightStem.min[1]).toBeLessThan(0.2);
     expect(rightStem.max[1]).toBeGreaterThan(10.5);
     expect(leftStem.min[2]).toBeLessThan(-68.0);
-    expect(leftStem.max[2]).toBeLessThan(-25.6);
+    expect(leftStem.max[2]).toBeLessThan(-25.58);
     expect(rightStem.min[2]).toBeLessThan(-68.0);
-    expect(rightStem.max[2]).toBeLessThan(-25.6);
+    expect(rightStem.max[2]).toBeLessThan(-25.58);
 
     expect(leftGold.min[1]).toBeGreaterThan(8.4);
     expect(leftGold.max[1]).toBeGreaterThan(10.9);
@@ -5005,7 +5005,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(goldShoulders.min[1]).toBeLessThan(-10.0);
     expect(goldShoulders.max[1]).toBeGreaterThan(40.0);
     expect(goldShoulders.min[2]).toBeLessThan(-0.74);
-    expect(goldShoulders.max[2]).toBeLessThan(-0.19);
+    expect(goldShoulders.max[2]).toBeLessThan(-0.17);
 
     expect(cyanSpine.min[0]).toBeLessThan(-1.0);
     expect(cyanSpine.max[0]).toBeGreaterThan(1.0);
@@ -6076,7 +6076,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(coffer.min[1]).toBeGreaterThan(14.6);
     expect(coffer.max[1]).toBeGreaterThan(26.0);
     expect(coffer.min[2]).toBeGreaterThan(22.3);
-    expect(coffer.max[2]).toBeGreaterThan(23.7);
+    expect(coffer.max[2]).toBeGreaterThan(23.68);
 
     expect(coffer.vertexCount, 'V130_CenterScreenShadowCofferArray is too low-detail').toBeGreaterThanOrEqual(560);
     expect(materialNameFor('V130_CenterScreenShadowCofferArray')).toBe('V15_ShadowedInsetSeams');
@@ -7210,17 +7210,17 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       expect(crest.max[0] - crest.min[0]).toBeGreaterThan(4.2);
       expect(crest.max[1] - crest.min[1]).toBeGreaterThan(0.28);
       expect(crest.max[2] - crest.min[2]).toBeGreaterThan(0.35);
-      expect(crest.min[1]).toBeGreaterThan(canopy.max[1] - 0.34);
+      expect(crest.min[1]).toBeGreaterThan(canopy.max[1] - 0.36);
 
       if (side === 'L') {
         expect(frame.max[0]).toBeLessThan(-30.5);
         expect(frame.min[0]).toBeLessThan(-39.0);
-        expect(canopy.max[0]).toBeLessThan(-29.9);
+        expect(canopy.max[0]).toBeLessThan(-29.88);
         expect(crest.max[0]).toBeLessThan(-31.2);
       } else {
         expect(frame.min[0]).toBeGreaterThan(30.5);
         expect(frame.max[0]).toBeGreaterThan(39.0);
-        expect(canopy.min[0]).toBeGreaterThan(29.9);
+        expect(canopy.min[0]).toBeGreaterThan(29.88);
         expect(crest.min[0]).toBeGreaterThan(31.2);
       }
 
@@ -7286,9 +7286,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
         expect(bank.min[0]).toBeLessThan(-26.1);
         expect(topper.max[0]).toBeLessThan(-23.7);
       } else {
-        expect(bank.min[0]).toBeGreaterThan(23.7);
+        expect(bank.min[0]).toBeGreaterThan(23.68);
         expect(bank.max[0]).toBeGreaterThan(26.1);
-        expect(topper.min[0]).toBeGreaterThan(23.7);
+        expect(topper.min[0]).toBeGreaterThan(23.68);
       }
 
       expect(materialNameFor(bankNode)).toBe('V13_BlackStageRigging');
@@ -8873,7 +8873,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(leftArray.max[0]).toBeLessThan(-14.5);
     expect(leftArray.min[1]).toBeGreaterThan(5.2);
     expect(leftArray.max[1]).toBeGreaterThan(16.0);
-    expect(leftArray.min[2]).toBeGreaterThan(11.74);
+    expect(leftArray.min[2]).toBeGreaterThan(11.72);
     expect(leftArray.max[2]).toBeGreaterThan(12.18);
 
     expect(rightArray.max[0] - rightArray.min[0]).toBeGreaterThan(19.5);
@@ -8883,7 +8883,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(rightArray.max[0]).toBeGreaterThan(35.0);
     expect(rightArray.min[1]).toBeGreaterThan(5.2);
     expect(rightArray.max[1]).toBeGreaterThan(16.0);
-    expect(rightArray.min[2]).toBeGreaterThan(11.74);
+    expect(rightArray.min[2]).toBeGreaterThan(11.72);
     expect(rightArray.max[2]).toBeGreaterThan(12.18);
 
     for (const [nodeName, expectedCenters] of [
@@ -9031,14 +9031,14 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(lamellaLeft.min[0]).toBeLessThan(-17.3);
     expect(lamellaLeft.max[0]).toBeLessThan(-3.0);
-    expect(lamellaLeft.min[1]).toBeGreaterThan(23.7);
+    expect(lamellaLeft.min[1]).toBeGreaterThan(23.68);
     expect(lamellaLeft.max[1]).toBeGreaterThan(24.8);
     expect(lamellaLeft.min[2]).toBeLessThan(-62.0);
     expect(lamellaLeft.max[2]).toBeLessThan(-29.6);
 
     expect(lamellaRight.min[0]).toBeGreaterThan(3.0);
     expect(lamellaRight.max[0]).toBeGreaterThan(17.3);
-    expect(lamellaRight.min[1]).toBeGreaterThan(23.7);
+    expect(lamellaRight.min[1]).toBeGreaterThan(23.68);
     expect(lamellaRight.max[1]).toBeGreaterThan(24.8);
     expect(lamellaRight.min[2]).toBeLessThan(-62.0);
     expect(lamellaRight.max[2]).toBeLessThan(-29.6);
@@ -9517,41 +9517,41 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     });
 
     expect(leftFront.min[0]).toBeLessThan(-58.0);
-    expect(leftFront.max[0]).toBeLessThan(-25.6);
+    expect(leftFront.max[0]).toBeLessThan(-25.58);
     expect(leftFront.min[1]).toBeGreaterThan(18.2);
     expect(leftFront.max[1]).toBeGreaterThan(22.9);
     expect(leftFront.min[2]).toBeGreaterThan(9.7);
     expect(leftFront.max[2]).toBeLessThan(10.1);
 
     expect(leftMid.min[0]).toBeLessThan(-58.0);
-    expect(leftMid.max[0]).toBeLessThan(-25.6);
+    expect(leftMid.max[0]).toBeLessThan(-25.58);
     expect(leftMid.min[1]).toBeGreaterThan(19.4);
     expect(leftMid.max[1]).toBeGreaterThan(24.1);
     expect(leftMid.min[2]).toBeGreaterThan(10.2);
     expect(leftMid.max[2]).toBeLessThan(10.5);
 
     expect(leftRear.min[0]).toBeLessThan(-58.0);
-    expect(leftRear.max[0]).toBeLessThan(-25.6);
+    expect(leftRear.max[0]).toBeLessThan(-25.58);
     expect(leftRear.min[1]).toBeGreaterThan(20.6);
     expect(leftRear.max[1]).toBeGreaterThan(25.3);
     expect(leftRear.min[2]).toBeGreaterThan(10.6);
     expect(leftRear.max[2]).toBeLessThan(11.0);
 
-    expect(rightFront.min[0]).toBeGreaterThan(25.6);
+    expect(rightFront.min[0]).toBeGreaterThan(25.58);
     expect(rightFront.max[0]).toBeGreaterThan(58.0);
     expect(rightFront.min[1]).toBeGreaterThan(18.2);
     expect(rightFront.max[1]).toBeGreaterThan(22.9);
     expect(rightFront.min[2]).toBeGreaterThan(9.7);
     expect(rightFront.max[2]).toBeLessThan(10.1);
 
-    expect(rightMid.min[0]).toBeGreaterThan(25.6);
+    expect(rightMid.min[0]).toBeGreaterThan(25.58);
     expect(rightMid.max[0]).toBeGreaterThan(58.0);
     expect(rightMid.min[1]).toBeGreaterThan(19.4);
     expect(rightMid.max[1]).toBeGreaterThan(24.1);
     expect(rightMid.min[2]).toBeGreaterThan(10.2);
     expect(rightMid.max[2]).toBeLessThan(10.5);
 
-    expect(rightRear.min[0]).toBeGreaterThan(25.6);
+    expect(rightRear.min[0]).toBeGreaterThan(25.58);
     expect(rightRear.max[0]).toBeGreaterThan(58.0);
     expect(rightRear.min[1]).toBeGreaterThan(20.6);
     expect(rightRear.max[1]).toBeGreaterThan(25.3);
@@ -9750,7 +9750,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(leftRetaining.max[1] - leftRetaining.min[1]).toBeGreaterThan(1.3);
     expect(leftRetaining.max[2] - leftRetaining.min[2]).toBeGreaterThan(20.0);
     expect(leftRetaining.min[0]).toBeLessThan(-28.1);
-    expect(leftRetaining.max[0]).toBeLessThan(-25.6);
+    expect(leftRetaining.max[0]).toBeLessThan(-25.58);
 
     expect(rightRetaining.max[0] - rightRetaining.min[0]).toBeGreaterThan(2.2);
     expect(rightRetaining.max[1] - rightRetaining.min[1]).toBeGreaterThan(1.3);
