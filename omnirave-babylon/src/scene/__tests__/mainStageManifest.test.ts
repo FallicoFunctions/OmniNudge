@@ -2031,7 +2031,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       readMeshGeometry(nodeName);
     }
 
-    const approachFixtureYPositions = [286, 260, 234, 208, 182, 156, 130, 104];
+    const approachFixtureYPositions = [286, 260, 234, 208, 182, 156, 130, 104, 78, 52, 26, 0];
     for (const side of ['L', 'R']) {
       const stemNode = `V40_ApproachLightStem_${side}`;
       const housingNode = `V40_ApproachLightHousing_${side}`;
@@ -2041,10 +2041,10 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const housings = readConnectedComponents(housingNode);
       const cores = readConnectedComponents(coreNode);
       const halos = readConnectedComponents(haloNode);
-      expect(stems).toHaveLength(8);
-      expect(housings).toHaveLength(8);
-      expect(cores).toHaveLength(8);
-      expect(halos).toHaveLength(8);
+      expect(stems).toHaveLength(12);
+      expect(housings).toHaveLength(12);
+      expect(cores).toHaveLength(12);
+      expect(halos).toHaveLength(12);
 
       const expectedX = side === 'L' ? -12.2 : 12.2;
       for (const [familyName, components] of [
@@ -2104,7 +2104,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       requiredV40Nodes
         .map(readMeshGeometry)
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
-    ).toBeLessThanOrEqual(7_600);
+    ).toBeLessThanOrEqual(18_500);
+    // (Extended 2026-07-09: 8 -> 12 posts per side, filling the front
+    // section of the spawn approach that had no light dressing.)
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V40_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_280);
   });
@@ -5174,7 +5176,10 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
       // Close-range material response adds UV + tangent attributes across
       // 31 architectural materials (~8MB); accepted for the fidelity goal.
-      25.5 * 1024 * 1024,
+      25.7 * 1024 * 1024,
+      // (raised 2026-07-09 for the approach-light + arcade content
+      // additions; this is the dev-only validation artifact, never
+      // shipped to players - the real runtime GLB stays ~6MB via Draco)
     );
   });
 
