@@ -60,10 +60,10 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
     z: -20,
     camera: {
       alpha: 0,
-      beta: 1.15,
-      radius: 30,
-      focusOffset: { x: 27, y: 1, z: -12 },
-      positionOffset: { x: 5, y: 11, z: 14 },
+      beta: 1.1,
+      radius: 36,
+      focusOffset: { x: 26.5, y: 1.3, z: -8.5 },
+      positionOffset: { x: 8, y: 20, z: 20 },
     },
   },
   {
