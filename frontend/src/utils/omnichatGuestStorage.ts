@@ -87,3 +87,8 @@ export function clearGuestMessages(personaId: number | null) {
 
   sessionStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(next));
 }
+
+export function clearAllGuestMessages() {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.removeItem(GUEST_STORAGE_KEY);
+}
