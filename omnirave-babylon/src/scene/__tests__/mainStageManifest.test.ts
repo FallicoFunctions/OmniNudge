@@ -10012,7 +10012,10 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(water.min[0]).toBeGreaterThan(31);
     expect(water.max[0]).toBeLessThan(67);
     expect(water.max[1]).toBeGreaterThan(3.5); // pools climb to the summit
-    expect(water.min[2]).toBeGreaterThan(-41);
+    // spill sheets flare outward past the stone and the catch basin rings the
+    // base, so the water runs slightly proud of the shell footprint (still
+    // well clear of the spawn canopy at Z<=-42.7)
+    expect(water.min[2]).toBeGreaterThan(-41.5);
     expect(water.max[2]).toBeLessThan(-16);
 
     const mist = readMeshGeometry('V150_CascadeCourtMist_R');
