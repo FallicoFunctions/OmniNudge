@@ -12,6 +12,7 @@ export default function PersonaAvatar({
   resetOnInactive = true,
   loopPreview = true,
   previewVersion = 0,
+  hideOverlay = false,
   onPreviewEnded,
 }: {
   persona: BotPersona;
@@ -22,6 +23,7 @@ export default function PersonaAvatar({
   resetOnInactive?: boolean;
   loopPreview?: boolean;
   previewVersion?: number;
+  hideOverlay?: boolean;
   onPreviewEnded?: () => void;
 }) {
   const gradient = getPersonaGradient(persona);
@@ -112,7 +114,7 @@ export default function PersonaAvatar({
           }`}
         />
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+      {!hideOverlay && <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />}
     </div>
   );
 }
