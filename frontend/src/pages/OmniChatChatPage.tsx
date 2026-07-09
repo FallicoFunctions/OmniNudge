@@ -8,7 +8,6 @@ import {
   Loader2,
   Plus,
   Search,
-  Send,
   Settings,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -811,11 +810,9 @@ export default function OmniChatChatPage() {
                     <button
                       type="submit"
                       disabled={isGenerating || !draft.trim()}
-                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white transition hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
-                      title={t('omnichat.chat.send')}
-                      aria-label={t('omnichat.chat.send')}
+                      className="flex h-9 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] px-5 text-sm font-medium text-white transition hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
                     >
-                      {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                      {isGenerating ? <Loader2 size={14} className="animate-spin" /> : 'Send'}
                     </button>
                     <div className="relative">
                       <button
