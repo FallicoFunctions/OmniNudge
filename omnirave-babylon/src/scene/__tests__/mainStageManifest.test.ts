@@ -1477,6 +1477,15 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       [-14.248, 39.106],
       [-14.902, 21.918],
       [-25.528, 22.534],
+      // Outer wing corridor: the inner VIP lantern scatter stopped at
+      // X=-26, leaving the wing terrace approach (X -30 to -60) with no
+      // ground-level lighting - extended the same module out to fill it.
+      [-34.0, -20.0],
+      [-42.0, -14.0],
+      [-48.0, -22.0],
+      [-54.0, -12.0],
+      [-58.0, -3.0],
+      [-38.0, 2.0],
     ];
     const pathLanternYPositions = [-18, -10, 0, 11, 23, 36, 48];
     const requiredV33Nodes = [...basinFoliageNodes, ...vipFoliageNodes, ...lanternNodes];
@@ -1537,9 +1546,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const stems = readConnectedComponents(stemNode);
       const housings = readConnectedComponents(housingNode);
       const cores = readConnectedComponents(coreNode);
-      expect(stems).toHaveLength(19);
-      expect(housings).toHaveLength(19);
-      expect(cores).toHaveLength(19);
+      expect(stems).toHaveLength(25);
+      expect(housings).toHaveLength(25);
+      expect(cores).toHaveLength(25);
       const expectedPositions = [
         ...islandPositionsLeft.map(([x, y]) => [side === 'L' ? x : -x, -y]),
         ...pathLanternYPositions.map((y) => [side === 'L' ? -6.2 : 6.2, -y]),
@@ -1598,7 +1607,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       lanternNodes
         .map(readMeshGeometry)
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
-    ).toBeLessThanOrEqual(7_800);
+      // Raised 2026-07-09: 6 new lantern positions per side fill the
+      // outer wing corridor, which previously had zero ground lighting.
+    ).toBeLessThanOrEqual(12_500);
 
     expect(materialNameFor('V33_BasinFoliageUnderstory_L')).toBe('V16_DeepGardenPlanting');
     expect(materialNameFor('V33_BasinFoliageMidstory_L')).toBe('V13_LushGardenPlanting');
@@ -5176,9 +5187,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
       // Close-range material response adds UV + tangent attributes across
       // 31 architectural materials (~8MB); accepted for the fidelity goal.
-      25.7 * 1024 * 1024,
-      // (raised 2026-07-09 for the approach-light + arcade content
-      // additions; this is the dev-only validation artifact, never
+      26.0 * 1024 * 1024,
+      // (raised 2026-07-09 for the approach-light + arcade + wing-lantern
+      // content additions; this is the dev-only validation artifact, never
       // shipped to players - the real runtime GLB stays ~6MB via Draco)
     );
   });
