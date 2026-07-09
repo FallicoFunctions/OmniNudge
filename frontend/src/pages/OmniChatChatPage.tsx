@@ -173,8 +173,9 @@ export default function OmniChatChatPage() {
   const selectedConversationId = useMemo(() => {
     if (isGuest) return null;
     if (Number.isFinite(routeConversationId)) return routeConversationId;
+    if (!isAuthenticated) return null;
     return conversationsQuery.data?.[0]?.id ?? null;
-  }, [isGuest, routeConversationId, conversationsQuery.data]);
+  }, [isGuest, routeConversationId, conversationsQuery.data, isAuthenticated]);
 
   const conversationQuery = useQuery({
     queryKey: omnichatQueryKeys.conversation(selectedConversationId ?? -1),
@@ -697,7 +698,7 @@ export default function OmniChatChatPage() {
                   )}
                   <div className="min-w-0 overflow-hidden">
                     <h2 className="truncate text-[2rem] font-semibold tracking-tight text-white">
-                      {activePersona?.name ?? t('omnichat.chat.loadingPersona')}
+                      {activePersona?.name ?? ''}
                     </h2>
                   </div>
                 </div>
