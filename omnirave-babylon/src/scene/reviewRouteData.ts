@@ -50,6 +50,23 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
     },
   },
   {
+    // Faces the right flank pocket's tiered cascade court. Runtime maps to
+    // blender as x=X, z=-Y, so the cascade (blender X31..67 Y17..40) sits at
+    // runtime x31..67 z-17..-40; stand inboard of it and look outward. Placed
+    // here to keep the route's z values ascending (between promenade and pit).
+    id: 'cascade_court',
+    x: 22,
+    y: 1.7,
+    z: -20,
+    camera: {
+      alpha: 0,
+      beta: 1.15,
+      radius: 30,
+      focusOffset: { x: 27, y: 1, z: -12 },
+      positionOffset: { x: 5, y: 11, z: 14 },
+    },
+  },
+  {
     id: 'crowd_pit',
     x: 6,
     y: 1.7,

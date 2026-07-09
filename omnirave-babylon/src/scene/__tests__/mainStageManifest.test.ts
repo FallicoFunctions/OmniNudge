@@ -9973,6 +9973,34 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     );
   });
 
+  it('builds the tiered cascade court shell in both flank pockets', () => {
+    // Pass 1: pearl-stone tier pans filling the empty flank pockets. Runtime
+    // maps to glTF as X=blenderX, Y=blenderZ, Z=-blenderY, so the right shell
+    // (blender X31..66 Y17..40 Z0..4.1) lands at glTF X(31,66) Y(0,4.1)
+    // Z(-40,-17); the left is the X-mirror.
+    expect(nodeNamesWithPrefix('V150_CascadeCourtShell_')).toHaveLength(2);
+    expectMainStageMarker('V150_CascadeCourtShell_R');
+    expectMainStageMarker('V150_CascadeCourtShell_L');
+
+    const right = readMeshGeometry('V150_CascadeCourtShell_R');
+    const left = readMeshGeometry('V150_CascadeCourtShell_L');
+
+    // right pocket footprint and floor-to-head height range
+    expect(right.min[0]).toBeGreaterThan(31);
+    expect(right.max[0]).toBeLessThan(67);
+    expect(right.min[1]).toBeLessThan(0.1);
+    expect(right.max[1]).toBeGreaterThan(3.5);
+    expect(right.min[2]).toBeGreaterThan(-41);
+    expect(right.max[2]).toBeLessThan(-16);
+
+    // left pocket is the X-mirror
+    expect(left.min[0]).toBeGreaterThan(-67);
+    expect(left.max[0]).toBeLessThan(-31);
+
+    expect(materialNameFor('V150_CascadeCourtShell_R')).toBe('V15_PearlShellBeveled');
+    expect(materialNameFor('V150_CascadeCourtShell_L')).toBe('V15_PearlShellBeveled');
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
