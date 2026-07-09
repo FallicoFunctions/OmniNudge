@@ -34,7 +34,7 @@ type ChatFilter = 'all' | 'unread' | 'favorites';
 type ProfileTab = 'profile' | 'gallery';
 
 const PROFILE_PANE_COLLAPSED_KEY = 'omnichat_profile_pane_collapsed';
-const PROFILE_PANE_WIDTH = 380;
+const PROFILE_PANE_WIDTH = 304;
 
 function MessageContent({ content }: { content: string }) {
   const segments = parseOmniChatMessage(content);
@@ -861,7 +861,7 @@ export default function OmniChatChatPage() {
 
           <aside
             data-testid="omnichat-profile-pane"
-            className={`hidden min-h-0 w-[380px] flex-col bg-[#121216] transition-transform duration-300 lg:flex ${
+            className={`hidden min-h-0 w-[304px] flex-col bg-[#121216] transition-transform duration-300 lg:flex ${
               profilePaneCollapsed ? 'translate-x-full' : 'translate-x-0'
             }`}
           >
