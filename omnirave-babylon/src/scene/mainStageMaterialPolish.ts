@@ -1187,6 +1187,22 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     },
   },
   {
+    // Tiered cascade court shell (Pass 1): pearl-stone tier pans, walls and
+    // coping. Night-tuned to match the venue's other basin stonework.
+    key: 'cascade-court-shell',
+    match: [{ prefix: 'V150_CascadeCourtShell_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.16, 0.18, 0.22],
+      emissiveColor: [0.004, 0.006, 0.01],
+      emissiveIntensity: 0.01,
+      metallic: 0.02,
+      roughness: 0.93,
+      clearCoat: { intensity: 0.03, roughness: 0.74 },
+      environmentIntensity: 0.07,
+    },
+  },
+  {
     key: 'basin-parapet-relief',
     match: [{ prefix: 'V99_BasinParapetRelief_' }],
     params: {
