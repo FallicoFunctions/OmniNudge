@@ -1203,6 +1203,44 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     },
   },
   {
+    // Cascade court water: reflecting sheets pooling on each tier and
+    // spilling down the risers. Mirrors the basin water-sheet treatment.
+    key: 'cascade-court-water',
+    match: [{ prefix: 'V150_CascadeCourtWater_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.04, 0.06, 0.08],
+      emissiveColor: [0.01, 0.025, 0.035],
+      emissiveIntensity: 0.08,
+      metallic: 0.02,
+      roughness: 0.22,
+      alpha: 0.98,
+      clearCoat: { intensity: 0.7, roughness: 0.08 },
+      environmentIntensity: 0.86,
+      zOffset: 1,
+    },
+  },
+  {
+    // Cascade court mist: cyan spray plumes ringing the base where the water
+    // collects. Mirrors the basin fountain-mist treatment.
+    key: 'cascade-court-mist',
+    match: [{ prefix: 'V150_CascadeCourtMist_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.06, 0.09, 0.11],
+      // Brighter, more translucent than the basin mist: at night the base
+      // plumes must read as glowing cyan spray, not dark solid fins.
+      emissiveColor: [0.05, 0.14, 0.19],
+      emissiveIntensity: 0.4,
+      metallic: 0.02,
+      roughness: 0.28,
+      alpha: 0.42,
+      alphaBlend: true,
+      clearCoat: { intensity: 0.62, roughness: 0.16 },
+      environmentIntensity: 0.82,
+    },
+  },
+  {
     key: 'basin-parapet-relief',
     match: [{ prefix: 'V99_BasinParapetRelief_' }],
     params: {

@@ -10001,6 +10001,31 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V150_CascadeCourtShell_L')).toBe('V15_PearlShellBeveled');
   });
 
+  it('fills the cascade court with reflecting water and base mist', () => {
+    // Pass 2: water sheets pool on each tier and spill down the risers, with
+    // cyan mist plumes ringing the base. Both families align to the shell
+    // footprint (glTF X 35..61, Z -40..-17); the left is the X-mirror.
+    expect(nodeNamesWithPrefix('V150_CascadeCourtWater_')).toHaveLength(2);
+    expect(nodeNamesWithPrefix('V150_CascadeCourtMist_')).toHaveLength(2);
+
+    const water = readMeshGeometry('V150_CascadeCourtWater_R');
+    expect(water.min[0]).toBeGreaterThan(31);
+    expect(water.max[0]).toBeLessThan(67);
+    expect(water.max[1]).toBeGreaterThan(3.5); // pools climb to the summit
+    expect(water.min[2]).toBeGreaterThan(-41);
+    expect(water.max[2]).toBeLessThan(-16);
+
+    const mist = readMeshGeometry('V150_CascadeCourtMist_R');
+    expect(mist.max[1]).toBeGreaterThan(1.4); // plumes rise above the base
+    expect(mist.min[2]).toBeGreaterThan(-41);
+    expect(mist.max[2]).toBeLessThan(-16);
+
+    expect(materialNameFor('V150_CascadeCourtWater_R')).toBe('V14_DeepReflectingWater');
+    expect(materialNameFor('V150_CascadeCourtWater_L')).toBe('V14_DeepReflectingWater');
+    expect(materialNameFor('V150_CascadeCourtMist_R')).toBe('V18_CyanWaterMistGlow');
+    expect(materialNameFor('V150_CascadeCourtMist_L')).toBe('V18_CyanWaterMistGlow');
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
