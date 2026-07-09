@@ -14,6 +14,7 @@ export interface BotPersona {
   category: PersonaCategory;
   avatar_url?: string;
   preview_video_url?: string;
+  gallery_urls?: string[];
   is_nsfw: boolean;
   is_active: boolean;
   created_at: string;

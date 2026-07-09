@@ -139,7 +139,7 @@ func TestBotPersonaRepositoryUpdateMedia(t *testing.T) {
 
 	avatarURL := "/uploads/updated-avatar.png"
 	previewVideoURL := "/uploads/updated-preview.mp4"
-	updated, err := repo.UpdateMedia(ctx, personaID, &avatarURL, &previewVideoURL)
+	updated, err := repo.UpdateMedia(ctx, personaID, &avatarURL, &previewVideoURL, []string{})
 	require.NoError(t, err)
 	require.NotNil(t, updated)
 	require.NotNil(t, updated.AvatarURL)
@@ -147,9 +147,49 @@ func TestBotPersonaRepositoryUpdateMedia(t *testing.T) {
 	require.Equal(t, avatarURL, *updated.AvatarURL)
 	require.Equal(t, previewVideoURL, *updated.PreviewVideoURL)
 
-	cleared, err := repo.UpdateMedia(ctx, personaID, nil, nil)
+	cleared, err := repo.UpdateMedia(ctx, personaID, nil, nil, []string{})
 	require.NoError(t, err)
 	require.NotNil(t, cleared)
 	require.Nil(t, cleared.AvatarURL)
 	require.Nil(t, cleared.PreviewVideoURL)
+}
+
+func TestBotPersonaRepositoryGalleryURLs(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	repo := NewBotPersonaRepository(db.Pool)
+
+	var personaID int
+	err = db.Pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug, name, description, category, system_prompt, is_nsfw, is_active)
+		VALUES ($1, $2, $3, $4, $5, false, true)
+		RETURNING id
+	`, fmt.Sprintf("persona-gallery-%d", time.Now().UnixNano()), "Gallery Persona", "desc", PersonaCategoryHelper, "prompt").
+		Scan(&personaID)
+	require.NoError(t, err)
+
+	gallery := []string{"/uploads/g1.png", "https://example.com/g2.jpg", "/uploads/g3.webp"}
+	updated, err := repo.UpdateMedia(ctx, personaID, nil, nil, gallery)
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	require.Equal(t, 3, len(updated.GalleryURLs))
+	require.Equal(t, gallery, updated.GalleryURLs)
+
+	// Verify gallery persists through GetByID.
+	fetched, err := repo.GetByID(ctx, personaID)
+	require.NoError(t, err)
+	require.NotNil(t, fetched)
+	require.Equal(t, gallery, fetched.GalleryURLs)
+
+	// Clear gallery.
+	cleared, err := repo.UpdateMedia(ctx, personaID, nil, nil, []string{})
+	require.NoError(t, err)
+	require.NotNil(t, cleared)
+	require.Equal(t, 0, len(cleared.GalleryURLs))
 }

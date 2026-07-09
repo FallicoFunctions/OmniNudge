@@ -3979,7 +3979,9 @@
       "history": "Chat history",
       "historyEmpty": "No other conversations with this character",
       "historyLoadError": "Failed to load chat history",
-      "emptyWorkspace": "No active chat yet"
+      "emptyWorkspace": "No active chat yet",
+      "profile": "Profile",
+      "gallery": "Gallery"
     },
     "exitToSite": "Exit to OmniNudge",
     "header": {

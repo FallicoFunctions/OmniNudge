@@ -3979,7 +3979,9 @@
       "history": "سجل المحادثة",
       "historyEmpty": "لا توجد محادثات أخرى مع هذه الشخصية",
       "historyLoadError": "تعذّر تحميل سجل المحادثة",
-      "emptyWorkspace": "لا توجد محادثة نشطة بعد"
+      "emptyWorkspace": "لا توجد محادثة نشطة بعد",
+      "profile": "الملف الشخصي",
+      "gallery": "المعرض"
     },
     "exitToSite": "الخروج إلى OmniNudge",
     "header": {
