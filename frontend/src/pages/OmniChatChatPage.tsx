@@ -28,6 +28,7 @@ import {
 } from '../utils/omnichatGuestStorage';
 import { getOmniChatPreviewText, parseOmniChatMessage } from '../utils/omnichatMessageFormatting';
 import { loadOmniChatDefaults } from '../utils/omnichatDefaults';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 type ChatFilter = 'all' | 'unread' | 'favorites';
 type ProfileTab = 'profile' | 'gallery';
@@ -558,6 +559,15 @@ export default function OmniChatChatPage() {
   );
 
   const activePersona = isGuest ? guestPersona : conversationQuery.data?.conversation.persona ?? selectedConversation?.persona ?? null;
+  const galleryUrls = (activePersona?.gallery_urls ?? []).filter(Boolean);
+  const hasGallery = galleryUrls.length > 0;
+
+  useEffect(() => {
+    if (!hasGallery && galleryTab === 'gallery') {
+      setGalleryTab('profile');
+    }
+  }, [hasGallery, galleryTab]);
+
   const activeMessages = isGuest
     ? guestMessages
     : selectedConversationId !== null
@@ -641,7 +651,7 @@ export default function OmniChatChatPage() {
                 {!isAuthenticated ? personasQuery.isLoading ? (
                   <LoadingMessage>{t('common.loading')}</LoadingMessage>
                 ) : personasQuery.isError ? (
-                  <ErrorMessage>{t('omnichat.discover.personasLoadError')}</ErrorMessage>
+                  <ErrorMessage>{t('omnichat.discover.loadError')}</ErrorMessage>
                 ) : filteredGuestPersonas.length === 0 ? (
                   <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 text-sm text-white/60">
                     {t('omnichat.conversationsPage.empty')}
@@ -855,15 +865,17 @@ export default function OmniChatChatPage() {
                   onClick={() => setGalleryTab('profile')}
                   className={`text-[1.8rem] font-semibold ${galleryTab === 'profile' ? 'text-white' : 'text-white/45'}`}
                 >
-                  Profile
+                  {t('omnichat.chat.profile')}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setGalleryTab('gallery')}
-                  className={`text-[1.8rem] font-semibold ${galleryTab === 'gallery' ? 'text-white' : 'text-white/45'}`}
-                >
-                  Gallery
-                </button>
+                {hasGallery && (
+                  <button
+                    type="button"
+                    onClick={() => setGalleryTab('gallery')}
+                    className={`text-[1.8rem] font-semibold ${galleryTab === 'gallery' ? 'text-white' : 'text-white/45'}`}
+                  >
+                    {t('omnichat.chat.gallery')}
+                  </button>
+                )}
               </div>
               <button
                 type="button"
@@ -895,12 +907,15 @@ export default function OmniChatChatPage() {
 
                   {galleryTab === 'gallery' && (
                     <div className="mt-6 grid grid-cols-2 gap-3">
-                      <div className="overflow-hidden rounded-[20px] border border-white/10">
-                        <PersonaAvatar persona={activePersona} className="aspect-[4/5] w-full" />
-                      </div>
-                      <div className="overflow-hidden rounded-[20px] border border-white/10">
-                        <PersonaAvatar persona={activePersona} className="aspect-[4/5] w-full" />
-                      </div>
+                      {galleryUrls.map((url, index) => (
+                        <div key={index} className="overflow-hidden rounded-[20px] border border-white/10">
+                          <img
+                            src={resolveMediaUrl(url)}
+                            alt={`${activePersona.name} gallery ${index + 1}`}
+                            className="aspect-[4/5] w-full object-cover"
+                          />
+                        </div>
+                      ))}
                     </div>
                   )}
                 </>

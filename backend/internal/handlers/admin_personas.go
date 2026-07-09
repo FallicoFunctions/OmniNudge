@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -16,14 +17,18 @@ type AdminPersonaHandler struct {
 	personaRepo *models.BotPersonaRepository
 }
 
+// maxGalleryURLs caps the number of gallery images a persona can have.
+const maxGalleryURLs = 50
+
 // NewAdminPersonaHandler creates a new admin persona handler.
 func NewAdminPersonaHandler(personaRepo *models.BotPersonaRepository) *AdminPersonaHandler {
 	return &AdminPersonaHandler{personaRepo: personaRepo}
 }
 
 type updateAdminPersonaMediaRequest struct {
-	AvatarURL       *string `json:"avatar_url"`
-	PreviewVideoURL *string `json:"preview_video_url"`
+	AvatarURL       *string  `json:"avatar_url"`
+	PreviewVideoURL *string  `json:"preview_video_url"`
+	GalleryURLs     []string `json:"gallery_urls,omitempty"`
 }
 
 // ListPersonas returns all personas for admin management.
@@ -70,7 +75,27 @@ func (h *AdminPersonaHandler) UpdatePersonaMedia(c *gin.Context) {
 		return
 	}
 
-	persona, err := h.personaRepo.UpdateMedia(c.Request.Context(), personaID, avatarURL, previewVideoURL)
+	galleryURLs := req.GalleryURLs
+	if galleryURLs == nil {
+		galleryURLs = []string{}
+	}
+	if len(galleryURLs) > maxGalleryURLs {
+		RespondError(c, http.StatusBadRequest, fmt.Sprintf("Gallery cannot exceed %d images", maxGalleryURLs))
+		return
+	}
+	normalizedGallery := make([]string, 0, len(galleryURLs))
+	for _, raw := range galleryURLs {
+		normalized, ok := normalizePersonaMediaURL(&raw)
+		if !ok {
+			RespondError(c, http.StatusBadRequest, "Gallery URL must be a valid HTTP(S) or upload URL")
+			return
+		}
+		if normalized != nil {
+			normalizedGallery = append(normalizedGallery, *normalized)
+		}
+	}
+
+	persona, err := h.personaRepo.UpdateMedia(c.Request.Context(), personaID, avatarURL, previewVideoURL, normalizedGallery)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update persona media")
 		return

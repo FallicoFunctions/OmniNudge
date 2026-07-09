@@ -3979,7 +3979,9 @@
       "history": "Historial del chat",
       "historyEmpty": "No hay otras conversaciones con este personaje",
       "historyLoadError": "No se pudo cargar el historial del chat",
-      "emptyWorkspace": "Todavía no hay un chat activo"
+      "emptyWorkspace": "Todavía no hay un chat activo",
+      "profile": "Perfil",
+      "gallery": "Galería"
     },
     "exitToSite": "Salir a OmniNudge",
     "header": {
