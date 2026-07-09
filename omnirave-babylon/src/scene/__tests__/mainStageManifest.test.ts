@@ -1534,9 +1534,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
       for (const layer of ['Understory', 'Canopy']) {
         const vipNode = `V33_VipFoliage${layer}_${side}`;
-        // 2 islands per vignette x 3 vignettes (original VIP garden plus
-        // the two outer-wing corridor garden pockets, 2026-07-09).
-        expect(readConnectedComponents(vipNode)).toHaveLength(6);
+        expect(readConnectedComponents(vipNode)).toHaveLength(2);
         expect(materialNameFor(vipNode)).toBe(
           layer === 'Understory' ? 'V16_DeepGardenPlanting' : 'V14_LayeredGardenPlanting',
         );
@@ -1604,9 +1602,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       [...basinFoliageNodes, ...vipFoliageNodes]
         .map(readMeshGeometry)
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
-      // Raised 2026-07-09: two outer-wing garden pockets triple the
-      // VIP foliage vertex count.
-    ).toBeLessThanOrEqual(13_000);
+    ).toBeLessThanOrEqual(9_000);
     expect(
       lanternNodes
         .map(readMeshGeometry)
@@ -1775,11 +1771,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const mist = readMeshGeometry(mistNode);
       const nozzles = readMeshGeometry(nozzleNode);
       const island = readMeshGeometry(islandNode);
-      // x3 vignettes: original VIP garden plus the two outer-wing corridor
-      // garden pockets (2026-07-09).
-      expect(readConnectedComponents(mistNode)).toHaveLength(9);
-      expect(readConnectedComponents(nozzleNode)).toHaveLength(9);
-      expect(readConnectedComponents(islandNode)).toHaveLength(3);
+      expect(readConnectedComponents(mistNode)).toHaveLength(3);
+      expect(readConnectedComponents(nozzleNode)).toHaveLength(3);
+      expect(readConnectedComponents(islandNode)).toHaveLength(1);
       expect(mist.max[1] - mist.min[1]).toBeGreaterThan(1.5);
       expect(mist.max[0] - mist.min[0]).toBeGreaterThan(5);
       expect(nozzles.max[1]).toBeLessThan(mist.max[1]);
@@ -1799,9 +1793,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       requiredV35Nodes
         .map(readMeshGeometry)
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
-      // Raised 2026-07-09: two outer-wing garden pockets triple the
-      // fountain/planting vertex count.
-    ).toBeLessThanOrEqual(14_000);
+    ).toBeLessThanOrEqual(3_600);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V35_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_340);
   });
@@ -4636,9 +4628,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       expect(pool.min[1]).toBeGreaterThan(3.2);
       expect(pool.max[1]).toBeLessThan(3.7);
       expect(pool.min[2]).toBeGreaterThan(6.2);
-      // Widened slightly: the outer-wing garden pockets (2026-07-09) shift
-      // the combined bbox by the pocket's small Y offset.
-      expect(pool.max[2]).toBeLessThan(9.4);
+      expect(pool.max[2]).toBeLessThan(9.0);
     }
 
     for (const canopy of [leftCanopy, rightCanopy]) {
@@ -4650,14 +4640,10 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(readConnectedComponents('V67_VipGardenPearlBasin_L')).toHaveLength(1);
     expect(readConnectedComponents('V67_VipGardenPearlBasin_R')).toHaveLength(1);
-    // x3 vignettes: original VIP garden plus the two outer-wing corridor
-    // garden pockets (2026-07-09).
-    expect(readConnectedComponents('V67_VipGardenReflectingPool_L')).toHaveLength(3);
-    expect(readConnectedComponents('V67_VipGardenReflectingPool_R')).toHaveLength(3);
-    // x7 ribs per vignette x 3 vignettes (original VIP garden plus the two
-    // outer-wing corridor garden pockets, 2026-07-09).
-    expect(readConnectedComponents('V67_VipGardenGoldRibCanopy_L')).toHaveLength(21);
-    expect(readConnectedComponents('V67_VipGardenGoldRibCanopy_R')).toHaveLength(21);
+    expect(readConnectedComponents('V67_VipGardenReflectingPool_L')).toHaveLength(1);
+    expect(readConnectedComponents('V67_VipGardenReflectingPool_R')).toHaveLength(1);
+    expect(readConnectedComponents('V67_VipGardenGoldRibCanopy_L')).toHaveLength(7);
+    expect(readConnectedComponents('V67_VipGardenGoldRibCanopy_R')).toHaveLength(7);
 
     const expectedLeftXs = [-32.9, -31.1, -29.3, -27.5, -25.7, -23.9, -22.1];
     const expectedRightXs = [22.1, 23.9, 25.7, 27.5, 29.3, 31.1, 32.9];
@@ -5201,11 +5187,10 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
       // Close-range material response adds UV + tangent attributes across
       // 31 architectural materials (~8MB); accepted for the fidelity goal.
-      34.0 * 1024 * 1024,
-      // (raised 2026-07-09 for the approach-light + arcade + wing-lantern +
-      // outer-wing garden pocket content additions; this is the dev-only
-      // validation artifact, never shipped to players - the real runtime
-      // GLB stays ~7MB via Draco)
+      26.0 * 1024 * 1024,
+      // (raised 2026-07-09 for the approach-light + arcade + wing-lantern
+      // content additions; this is the dev-only validation artifact, never
+      // shipped to players - the real runtime GLB stays ~6MB via Draco)
     );
   });
 
@@ -8086,9 +8071,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     for (const nodeName of replacementNodes) {
       expectMainStageMarker(nodeName);
       readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 90, minUniquePositions: 100, minVertexCount: 180 });
-      // x3 vignettes: original VIP garden plus the two outer-wing corridor
-      // garden pockets (2026-07-09).
-      expect(readConnectedComponents(nodeName)).toHaveLength(9);
+      expect(readConnectedComponents(nodeName)).toHaveLength(3);
       expect(materialNameFor(nodeName)).toBe('V20_ChasedGoldFiligree');
     }
 
@@ -8157,9 +8140,7 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     for (const nodeName of replacementNodes) {
       expectMainStageMarker(nodeName);
       readMeshGeometry(nodeName, { minNonZeroAreaTriangles: 140, minUniquePositions: 180, minVertexCount: 320 });
-      // x3 vignettes: original VIP garden plus the two outer-wing corridor
-      // garden pockets (2026-07-09).
-      expect(readConnectedComponents(nodeName)).toHaveLength(9);
+      expect(readConnectedComponents(nodeName)).toHaveLength(3);
       expect(materialNameFor(nodeName)).toBe('V20_ChasedGoldFiligree');
     }
 
