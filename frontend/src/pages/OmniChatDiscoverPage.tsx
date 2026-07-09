@@ -383,7 +383,7 @@ export default function OmniChatDiscoverPage() {
         <div className="mx-auto w-full max-w-[1600px] px-6 py-8 lg:px-10">
 
           {/* Continue Chatting section */}
-          {!conversationsQuery.isLoading && continueChatting.length > 0 && (
+          {isAuthenticated && !conversationsQuery.isLoading && continueChatting.length > 0 && (
             <section className="mb-8">
               <h2 className="mb-4 text-xl font-bold text-[var(--color-text-primary)]">
                 {t('omnichat.discover.continueChatting')}

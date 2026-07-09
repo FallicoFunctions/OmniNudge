@@ -883,8 +883,8 @@ export default function OmniChatChatPage() {
                   </div>
 
                   <div className="mt-5 flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="truncate text-[2.1rem] font-semibold leading-none text-white">
+                    <div className="overflow-hidden">
+                      <h3 className="break-words text-[2.1rem] font-semibold leading-none text-white">
                         {activePersona.name}
                       </h3>
                       {activePersona.description && (
