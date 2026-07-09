@@ -152,6 +152,8 @@ export default function OmniChatChatPage() {
   const [guestPersona, setGuestPersona] = useState<BotPersona | null>(null);
   const [guestPersonaLoading, setGuestPersonaLoading] = useState(false);
   const [guestIsGenerating, setGuestIsGenerating] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
+  const [isAvatarHovered, setIsAvatarHovered] = useState(false);
   const [profilePaneCollapsed, setProfilePaneCollapsed] = useState(() => {
     if (typeof localStorage === 'undefined') return false;
     return localStorage.getItem(PROFILE_PANE_COLLAPSED_KEY) === 'true';
@@ -561,12 +563,17 @@ export default function OmniChatChatPage() {
   const activePersona = isGuest ? guestPersona : conversationQuery.data?.conversation.persona ?? selectedConversation?.persona ?? null;
   const galleryUrls = (activePersona?.gallery_urls ?? []).filter(Boolean);
   const hasGallery = galleryUrls.length > 0;
+  const hasVideo = Boolean(activePersona?.preview_video_url);
 
   useEffect(() => {
     if (!hasGallery && galleryTab === 'gallery') {
       setGalleryTab('profile');
     }
   }, [hasGallery, galleryTab]);
+
+  useEffect(() => {
+    setShowVideo(false);
+  }, [activePersona?.id]);
 
   const activeMessages = isGuest
     ? guestMessages
@@ -890,8 +897,61 @@ export default function OmniChatChatPage() {
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
               {activePersona ? (
                 <>
-                  <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04]">
-                    <PersonaAvatar persona={activePersona} className="aspect-[4/5] w-full" />
+                  <div
+                    className="group/avatar relative overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04]"
+                    onMouseEnter={() => setIsAvatarHovered(true)}
+                    onMouseLeave={() => setIsAvatarHovered(false)}
+                  >
+                    {hasVideo ? (
+                      <div className="relative aspect-[4/5] w-full">
+                        <div
+                          className="absolute inset-0 transition-transform duration-500 ease-in-out"
+                          style={{ transform: `translateX(${showVideo ? '-100%' : '0%'})` }}
+                        >
+                          <PersonaAvatar
+                            persona={activePersona}
+                            className="h-full w-full rounded-none"
+                            hideOverlay
+                          />
+                        </div>
+                        <div
+                          className="absolute inset-0 transition-transform duration-500 ease-in-out"
+                          style={{ transform: `translateX(${showVideo ? '0%' : '100%'})` }}
+                        >
+                          <PersonaAvatar
+                            persona={activePersona}
+                            className="h-full w-full rounded-none"
+                            previewEnabled
+                            previewActive
+                            hideOverlay
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <PersonaAvatar
+                        persona={activePersona}
+                        className="aspect-[4/5] w-full"
+                      />
+                    )}
+                    <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                    {hasVideo && isAvatarHovered && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setShowVideo(false)}
+                          className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white/50 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white"
+                        >
+                          <ChevronLeft size={20} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowVideo(true)}
+                          className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white/50 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white"
+                        >
+                          <ChevronRight size={20} />
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   <div className="mt-5 flex items-start justify-between gap-3">
