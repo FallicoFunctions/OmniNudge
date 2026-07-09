@@ -25,7 +25,11 @@ TARGET_PATTERN = re.compile(
 INFLATE_METERS = 0.02
 
 # Gentler treatment for lattice/louver frames: 2cm distorts thin members.
-GENTLE_PATTERN = re.compile(r"ProductionTruss")
+# WingTerraceGoldArray is a trim band authored fully embedded in its host
+# fascia's volume (player-reported "objects inside one another") rather
+# than mounted proud on its face - normal-push separates it regardless of
+# which face it wraps, unlike an axis-locked lift.
+GENTLE_PATTERN = re.compile(r"ProductionTruss|WingTerraceGoldArray")
 GENTLE_INFLATE_METERS = 0.008
 
 # Assemblies whose crests poke through their host covers: sink instead.
