@@ -1534,9 +1534,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
       for (const layer of ['Understory', 'Canopy']) {
         const vipNode = `V33_VipFoliage${layer}_${side}`;
-        // 2 islands x 3 vignettes (VIP garden + two wing pockets) = 6, plus
-        // 2 promenade-border strips per side (2026-07-09) = 8.
-        expect(readConnectedComponents(vipNode)).toHaveLength(8);
+        // 2 islands per vignette x 3 vignettes (original VIP garden plus
+        // the two outer-wing corridor garden pockets, 2026-07-09).
+        expect(readConnectedComponents(vipNode)).toHaveLength(6);
         expect(materialNameFor(vipNode)).toBe(
           layer === 'Understory' ? 'V16_DeepGardenPlanting' : 'V14_LayeredGardenPlanting',
         );
@@ -1604,9 +1604,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       [...basinFoliageNodes, ...vipFoliageNodes]
         .map(readMeshGeometry)
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
-      // Raised 2026-07-09: two outer-wing garden pockets plus the
-      // promenade-border strips grow the VIP foliage vertex count.
-    ).toBeLessThanOrEqual(17_500);
+      // Raised 2026-07-09: two outer-wing garden pockets triple the
+      // VIP foliage vertex count.
+    ).toBeLessThanOrEqual(13_000);
     expect(
       lanternNodes
         .map(readMeshGeometry)
@@ -1779,20 +1779,16 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       // garden pockets (2026-07-09).
       expect(readConnectedComponents(mistNode)).toHaveLength(9);
       expect(readConnectedComponents(nozzleNode)).toHaveLength(9);
-      // Planting rim also seeds the promenade borders: 3 vignettes + 2
-      // border strips per side (2026-07-09) = 5.
-      expect(readConnectedComponents(islandNode)).toHaveLength(5);
+      expect(readConnectedComponents(islandNode)).toHaveLength(3);
       expect(mist.max[1] - mist.min[1]).toBeGreaterThan(1.5);
       expect(mist.max[0] - mist.min[0]).toBeGreaterThan(5);
       expect(nozzles.max[1]).toBeLessThan(mist.max[1]);
       expect(island.max[0] - island.min[0]).toBeGreaterThan(4);
       expect(island.max[2] - island.min[2]).toBeGreaterThan(1.2);
       if (side === 'L') {
-        // Border strips pull the left rim inward to the promenade lane
-        // (x approx -15.5) but it stays wholly on the left side.
-        expect(island.max[0]).toBeLessThan(-14);
+        expect(island.max[0]).toBeLessThan(-24);
       } else {
-        expect(island.min[0]).toBeGreaterThan(14);
+        expect(island.min[0]).toBeGreaterThan(24);
       }
       expect(materialNameFor(mistNode)).toBe('V18_CyanWaterMistGlow');
       expect(materialNameFor(nozzleNode)).toBe('V18_BrushedGoldTrim');
@@ -1803,9 +1799,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       requiredV35Nodes
         .map(readMeshGeometry)
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
-      // Raised 2026-07-09: outer-wing garden pockets plus the planting-rim
-      // promenade borders grow the fountain/planting vertex count.
-    ).toBeLessThanOrEqual(17_000);
+      // Raised 2026-07-09: two outer-wing garden pockets triple the
+      // fountain/planting vertex count.
+    ).toBeLessThanOrEqual(14_000);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V35_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_340);
   });
