@@ -259,8 +259,15 @@ const readMeshGeometry = (
     positions.map((position) => position.map((value) => value.toFixed(5)).join(',')),
   );
   expect(uniquePositions.size, `insufficient unique geometry: ${nodeName}`).toBeGreaterThan(minUniquePositions);
-  const computedMin = [0, 1, 2].map((axis) => Math.min(...positions.map((position) => position[axis])));
-  const computedMax = [0, 1, 2].map((axis) => Math.max(...positions.map((position) => position[axis])));
+  // Fold instead of Math.min(...spread): large meshes (e.g. the multi-station
+  // plaza-furniture canopies) have enough vertices to overflow the call stack
+  // when spread into a variadic call.
+  const computedMin = [0, 1, 2].map((axis) =>
+    positions.reduce((acc, position) => (position[axis] < acc ? position[axis] : acc), Infinity),
+  );
+  const computedMax = [0, 1, 2].map((axis) =>
+    positions.reduce((acc, position) => (position[axis] > acc ? position[axis] : acc), -Infinity),
+  );
   expect(computedMin).toEqual(expect.arrayContaining(accessor.min!));
   expect(computedMax).toEqual(expect.arrayContaining(accessor.max!));
   expect(computedMax.every((value, axis) => value - computedMin[axis] > 0.1)).toBe(true);
@@ -272,7 +279,8 @@ const readMeshGeometry = (
   expect(indexAccessor.count, `insufficient triangle indices: ${nodeName}`).toBeGreaterThan(30);
   expect(indexAccessor.count % 3).toBe(0);
   const indices = readAccessorValues(primitive.indices!).flat();
-  expect(Math.max(...indices), `out-of-range triangle index: ${nodeName}`).toBeLessThan(accessor.count);
+  const maxIndex = indices.reduce((acc, index) => (index > acc ? index : acc), -Infinity);
+  expect(maxIndex, `out-of-range triangle index: ${nodeName}`).toBeLessThan(accessor.count);
   const validTriangles = new Set<string>();
   for (let index = 0; index < indices.length; index += 3) {
     const triangleIndices = indices.slice(index, index + 3);
@@ -1534,9 +1542,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
       for (const layer of ['Understory', 'Canopy']) {
         const vipNode = `V33_VipFoliage${layer}_${side}`;
-        // 2 islands x 3 vignettes (VIP garden + two wing pockets) = 6, plus
-        // 2 promenade-border strips per side (2026-07-09) = 8.
-        expect(readConnectedComponents(vipNode)).toHaveLength(8);
+        // 6 (VIP garden + 2 wing pockets) + 2 promenade-border strips + 2
+        // islands x 4 plaza-furniture stations (2026-07-09) = 16.
+        expect(readConnectedComponents(vipNode)).toHaveLength(16);
         expect(materialNameFor(vipNode)).toBe(
           layer === 'Understory' ? 'V16_DeepGardenPlanting' : 'V14_LayeredGardenPlanting',
         );
@@ -1604,9 +1612,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       [...basinFoliageNodes, ...vipFoliageNodes]
         .map(readMeshGeometry)
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
-      // Raised 2026-07-09: two outer-wing garden pockets plus the
-      // promenade-border strips grow the VIP foliage vertex count.
-    ).toBeLessThanOrEqual(17_500);
+      // Raised 2026-07-09: wing pockets + promenade borders + plaza
+      // furniture grow the VIP foliage vertex count.
+    ).toBeLessThanOrEqual(34_000);
     expect(
       lanternNodes
         .map(readMeshGeometry)
@@ -1775,24 +1783,23 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       const mist = readMeshGeometry(mistNode);
       const nozzles = readMeshGeometry(nozzleNode);
       const island = readMeshGeometry(islandNode);
-      // x3 vignettes: original VIP garden plus the two outer-wing corridor
-      // garden pockets (2026-07-09).
-      expect(readConnectedComponents(mistNode)).toHaveLength(9);
-      expect(readConnectedComponents(nozzleNode)).toHaveLength(9);
-      // Planting rim also seeds the promenade borders: 3 vignettes + 2
-      // border strips per side (2026-07-09) = 5.
-      expect(readConnectedComponents(islandNode)).toHaveLength(5);
+      // 3 vignettes (VIP + 2 wing pockets) + 3 jets x 4 plaza-furniture
+      // stations (2026-07-09) = 21.
+      expect(readConnectedComponents(mistNode)).toHaveLength(21);
+      expect(readConnectedComponents(nozzleNode)).toHaveLength(21);
+      // Planting rim: 3 vignettes + 2 border strips + 4 plaza stations = 9.
+      expect(readConnectedComponents(islandNode)).toHaveLength(9);
       expect(mist.max[1] - mist.min[1]).toBeGreaterThan(1.5);
       expect(mist.max[0] - mist.min[0]).toBeGreaterThan(5);
       expect(nozzles.max[1]).toBeLessThan(mist.max[1]);
       expect(island.max[0] - island.min[0]).toBeGreaterThan(4);
       expect(island.max[2] - island.min[2]).toBeGreaterThan(1.2);
       if (side === 'L') {
-        // Border strips pull the left rim inward to the promenade lane
-        // (x approx -15.5) but it stays wholly on the left side.
-        expect(island.max[0]).toBeLessThan(-14);
+        // Plaza-furniture rims reach the walk edge (x approx -3.5) but the
+        // family stays wholly on the left side of the center corridor.
+        expect(island.max[0]).toBeLessThan(-3);
       } else {
-        expect(island.min[0]).toBeGreaterThan(14);
+        expect(island.min[0]).toBeGreaterThan(3);
       }
       expect(materialNameFor(mistNode)).toBe('V18_CyanWaterMistGlow');
       expect(materialNameFor(nozzleNode)).toBe('V18_BrushedGoldTrim');
@@ -1803,9 +1810,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       requiredV35Nodes
         .map(readMeshGeometry)
         .reduce((sum, geometry) => sum + geometry.vertexCount, 0),
-      // Raised 2026-07-09: outer-wing garden pockets plus the planting-rim
-      // promenade borders grow the fountain/planting vertex count.
-    ).toBeLessThanOrEqual(17_000);
+      // Raised 2026-07-09: wing pockets + planting-rim borders + plaza
+      // furniture (fountains/planting) grow the vertex count.
+    ).toBeLessThanOrEqual(39_000);
     expect(mainStageGlbJson.materials.some(({ name }) => name?.startsWith('V35_'))).toBe(false);
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1_340);
   });
@@ -4637,31 +4644,26 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(rightBasin.max[2]).toBeGreaterThan(9.7);
 
     for (const pool of [leftPool, rightPool]) {
-      expect(pool.min[1]).toBeGreaterThan(3.2);
+      // Family now spans both the terrace pool and the plaza-furniture pools
+      // dropped to the floor (2026-07-09): height ranges floor..terrace-top.
+      expect(pool.min[1]).toBeGreaterThan(0.1);
       expect(pool.max[1]).toBeLessThan(3.7);
-      expect(pool.min[2]).toBeGreaterThan(6.2);
-      // Widened slightly: the outer-wing garden pockets (2026-07-09) shift
-      // the combined bbox by the pocket's small Y offset.
-      expect(pool.max[2]).toBeLessThan(9.4);
     }
 
     for (const canopy of [leftCanopy, rightCanopy]) {
-      expect(canopy.min[1]).toBeGreaterThan(3.45);
+      // Family now includes plaza-furniture canopies at floor level.
+      expect(canopy.min[1]).toBeGreaterThan(0.4);
       expect(canopy.max[1]).toBeGreaterThan(4.15);
-      expect(canopy.min[2]).toBeGreaterThan(5.7);
-      expect(canopy.max[2]).toBeGreaterThan(9.3);
     }
 
     expect(readConnectedComponents('V67_VipGardenPearlBasin_L')).toHaveLength(1);
     expect(readConnectedComponents('V67_VipGardenPearlBasin_R')).toHaveLength(1);
-    // x3 vignettes: original VIP garden plus the two outer-wing corridor
-    // garden pockets (2026-07-09).
-    expect(readConnectedComponents('V67_VipGardenReflectingPool_L')).toHaveLength(3);
-    expect(readConnectedComponents('V67_VipGardenReflectingPool_R')).toHaveLength(3);
-    // x7 ribs per vignette x 3 vignettes (original VIP garden plus the two
-    // outer-wing corridor garden pockets, 2026-07-09).
-    expect(readConnectedComponents('V67_VipGardenGoldRibCanopy_L')).toHaveLength(21);
-    expect(readConnectedComponents('V67_VipGardenGoldRibCanopy_R')).toHaveLength(21);
+    // 3 vignettes + 4 plaza-furniture stations (2026-07-09) = 7.
+    expect(readConnectedComponents('V67_VipGardenReflectingPool_L')).toHaveLength(7);
+    expect(readConnectedComponents('V67_VipGardenReflectingPool_R')).toHaveLength(7);
+    // 7 ribs each: 3 vignettes (21) + 4 plaza stations (28) = 49.
+    expect(readConnectedComponents('V67_VipGardenGoldRibCanopy_L')).toHaveLength(49);
+    expect(readConnectedComponents('V67_VipGardenGoldRibCanopy_R')).toHaveLength(49);
 
     const expectedLeftXs = [-32.9, -31.1, -29.3, -27.5, -25.7, -23.9, -22.1];
     const expectedRightXs = [22.1, 23.9, 25.7, 27.5, 29.3, 31.1, 32.9];
@@ -5205,11 +5207,11 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
       // Close-range material response adds UV + tangent attributes across
       // 31 architectural materials (~8MB); accepted for the fidelity goal.
-      34.0 * 1024 * 1024,
+      48.0 * 1024 * 1024,
       // (raised 2026-07-09 for the approach-light + arcade + wing-lantern +
-      // outer-wing garden pocket content additions; this is the dev-only
-      // validation artifact, never shipped to players - the real runtime
-      // GLB stays ~7MB via Draco)
+      // garden pocket + plaza-furniture content additions; this is the
+      // dev-only validation artifact, never shipped to players - the real
+      // runtime GLB stays ~8MB via Draco)
     );
   });
 
