@@ -31,7 +31,12 @@ TIERS = [
 ]
 WATER_RISE = 0.02   # water sits a hair above the stone tread
 INSET = 0.45        # water pulls in from the stone edge
-OUTSET = 0.06       # spill curtain sits just outside the riser face
+OUTSET = 0.10       # spill curtain top sits just outside the riser lip
+SPILL_FLARE = 0.55  # spill curtain bottom flares outward - falling water is
+                    # visibly proud of the stone instead of shrink-wrapping it
+CATCH_RX = 14.2     # irregular catch basin pooling around the mound base
+CATCH_RY = 11.4
+CATCH_Z = 0.07
 
 
 def clear_previous():
@@ -45,12 +50,12 @@ def get_material(name, fallback):
     return m if m else bpy.data.materials.get(fallback)
 
 
-def tier_polygon(cx, cy, rx, ry, n, phase, seed):
+def tier_polygon(cx, cy, rx, ry, n, phase, seed, j_lo=0.80, j_hi=1.20):
     rng = random.Random(seed)
     pts = []
     for k in range(n):
         a = phase + 2.0 * math.pi * k / n
-        r_mult = 0.80 + 0.40 * rng.random()
+        r_mult = j_lo + (j_hi - j_lo) * rng.random()
         pts.append((cx + rx * r_mult * math.cos(a), cy + ry * r_mult * math.sin(a)))
     return pts
 
@@ -76,11 +81,11 @@ def add_ngon(bm, pts, z):
         pass
 
 
-def add_curtain(bm, pts, z_top, z_bottom):
-    top = [bm.verts.new((x, y, z_top)) for (x, y) in pts]
-    bot = [bm.verts.new((x, y, z_bottom)) for (x, y) in pts]
+def add_curtain(bm, pts_top, pts_bottom, z_top, z_bottom):
+    top = [bm.verts.new((x, y, z_top)) for (x, y) in pts_top]
+    bot = [bm.verts.new((x, y, z_bottom)) for (x, y) in pts_bottom]
     bm.verts.ensure_lookup_table()
-    n = len(pts)
+    n = len(pts_top)
     for i in range(n):
         j = (i + 1) % n
         try:
@@ -119,6 +124,20 @@ def _finalize(bm, name, mat, side):
         pass
 
 
+def jitter_polygon(pts, seed, amount=0.3):
+    """Radial jitter so water edges never run parallel to the stone edges."""
+    rng = random.Random(seed)
+    cx = sum(p[0] for p in pts) / len(pts)
+    cy = sum(p[1] for p in pts) / len(pts)
+    out = []
+    for (x, y) in pts:
+        dx, dy = x - cx, y - cy
+        d = math.hypot(dx, dy) or 1.0
+        delta = (rng.random() * 2.0 - 1.0) * amount
+        out.append((x + dx / d * delta, y + dy / d * delta))
+    return out
+
+
 def build_water(side, mat):
     cx, cy = CENTER
     bm = bmesh.new()
@@ -129,9 +148,22 @@ def build_water(side, mat):
         polys.append(pts)
         levels.append(z1 + WATER_RISE)
     for i, pts in enumerate(polys):
-        add_ngon(bm, offset_polygon(pts, -INSET), levels[i])          # tread pool
-        z_bottom = levels[i - 1] if i > 0 else 0.06                    # spill to tier below
-        add_curtain(bm, offset_polygon(pts, OUTSET), levels[i], z_bottom)
+        # tread pool, edge-jittered so it reads as water lapping the stone
+        add_ngon(bm, jitter_polygon(offset_polygon(pts, -INSET), 300 + i), levels[i])
+        # spill sheet: top hugs the riser lip, bottom flares outward and lands
+        # on the tier below (or the catch basin) - visibly falling water
+        z_bottom = levels[i - 1] if i > 0 else CATCH_Z + 0.02
+        add_curtain(
+            bm,
+            offset_polygon(pts, OUTSET),
+            offset_polygon(pts, OUTSET + SPILL_FLARE),
+            levels[i],
+            z_bottom,
+        )
+    # irregular catch basin pooling around the whole mound base (tight jitter
+    # so the pool stays inside the pocket envelope)
+    catch = tier_polygon(cx, cy, CATCH_RX, CATCH_RY, 13, 0.75, 113, j_lo=0.88, j_hi=1.06)
+    add_ngon(bm, catch, CATCH_Z)
     _finalize(bm, f"{GENERATED_PREFIX}Water_{side}", mat, side)
 
 
