@@ -50,6 +50,25 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     },
   },
   {
+    key: 'cascade-court-shell',
+    meshNames: ['V150_CascadeCourtShell_R', 'V150_CascadeCourtShell_L'],
+    expected: {
+      albedoTextureCleared: true,
+      albedoColor: [0.16, 0.18, 0.22],
+      emissiveColor: [0.004, 0.006, 0.01],
+      emissiveIntensity: 0.01,
+      metallic: 0.02,
+      roughness: 0.93,
+      alpha: 1,
+      transparencyMode: null,
+      clearCoatEnabled: true,
+      clearCoatIntensity: 0.03,
+      clearCoatRoughness: 0.74,
+      environmentIntensity: 0.07,
+      metaPolish: null,
+    },
+  },
+  {
     key: 'support-tent-frame',
     meshNames: ['V91_SupportTentFrame_Probe'],
     expected: {
