@@ -1240,6 +1240,101 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     },
   },
   {
+    // Cascade court planter walls: raised pearl bed curbs at the court's
+    // corners. Same treatment as the fountain coping so the stonework reads
+    // as one designed set.
+    key: 'cascade-court-planter',
+    match: [{ prefix: 'V150_CascadeCourtPlanter_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.4, 0.41, 0.44],
+      emissiveColor: [0.012, 0.014, 0.018],
+      emissiveIntensity: 0.03,
+      metallic: 0.04,
+      roughness: 0.5,
+      clearCoat: { intensity: 0.18, roughness: 0.4 },
+      environmentIntensity: 0.3,
+    },
+  },
+  {
+    // Cascade court understory: soil fill + low foliage mounds inside the
+    // planters. Mirrors the VIP garden understory treatment.
+    key: 'cascade-court-understory',
+    match: [{ prefix: 'V150_CascadeCourtUnderstory_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.036, 0.05, 0.026],
+      emissiveColor: [0.002, 0.0035, 0.0012],
+      emissiveIntensity: 0.014,
+      metallic: 0.02,
+      roughness: 0.92,
+      clearCoat: { intensity: 0.015, roughness: 0.8 },
+      environmentIntensity: 0.1,
+      metadataPolish: 'black',
+    },
+  },
+  {
+    // Cascade court canopy: upper foliage mounds. Mirrors the VIP garden
+    // canopy treatment.
+    key: 'cascade-court-canopy',
+    match: [{ prefix: 'V150_CascadeCourtCanopy_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.06, 0.085, 0.042],
+      emissiveColor: [0.004, 0.0065, 0.002],
+      emissiveIntensity: 0.02,
+      metallic: 0.02,
+      roughness: 0.88,
+      clearCoat: { intensity: 0.03, roughness: 0.74 },
+      environmentIntensity: 0.14,
+      metadataPolish: 'black',
+    },
+  },
+  {
+    // Cascade court lanterns: the venue's basin lantern vocabulary marking
+    // the approach gaps between the garden beds.
+    key: 'cascade-court-lantern-stem',
+    match: [{ prefix: 'V150_CascadeCourtLanternStem_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.16, 0.19, 0.23],
+      emissiveColor: [0.012, 0.018, 0.024],
+      emissiveIntensity: 0.026,
+      metallic: 0.1,
+      roughness: 0.82,
+      clearCoat: { intensity: 0.04, roughness: 0.56 },
+      environmentIntensity: 0.24,
+    },
+  },
+  {
+    key: 'cascade-court-lantern-housing',
+    match: [{ prefix: 'V150_CascadeCourtLanternHousing_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.2, 0.16, 0.08],
+      emissiveColor: [0.01, 0.007, 0.002],
+      emissiveIntensity: 0.02,
+      metallic: 0.2,
+      roughness: 0.86,
+      clearCoat: { intensity: 0, roughness: 0.82 },
+      environmentIntensity: 0.14,
+    },
+  },
+  {
+    key: 'cascade-court-lantern-core',
+    match: [{ prefix: 'V150_CascadeCourtLanternCore_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.84, 0.62, 0.28],
+      emissiveColor: [0.96, 0.7, 0.26],
+      emissiveIntensity: 4.6,
+      metallic: 0.02,
+      roughness: 0.34,
+      clearCoat: { intensity: 0.16, roughness: 0.26 },
+      environmentIntensity: 0.38,
+    },
+  },
+  {
     // Cascade court spill ribbons: the water pouring over each curb notch.
     // Translucent glowing cyan - falling water is aerated and bright; in the
     // dark pool material these read as broken shards (player-flagged).

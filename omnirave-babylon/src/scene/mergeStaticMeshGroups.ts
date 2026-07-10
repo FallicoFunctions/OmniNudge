@@ -39,7 +39,12 @@ export function mergeStaticMeshGroups(
       material.alpha < 1 || (material.transparencyMode !== null && material.transparencyMode !== 0);
     if (blended) continue;
 
-    const key = `${material.uniqueId}|${mesh.renderingGroupId}|${mesh.receiveShadows ? 1 : 0}`;
+    // MergeMeshes throws if members carry different vertex attribute sets
+    // (e.g. one authored with UVs+tangents, another position/normal only),
+    // which black-screens the whole venue. Subgroup by attribute kinds so
+    // mismatched meshes merge among themselves instead of crashing.
+    const attributeKinds = mesh.getVerticesDataKinds().slice().sort().join(',');
+    const key = `${material.uniqueId}|${mesh.renderingGroupId}|${mesh.receiveShadows ? 1 : 0}|${attributeKinds}`;
     (groups.get(key) ?? groups.set(key, []).get(key)!).push(mesh);
   }
 

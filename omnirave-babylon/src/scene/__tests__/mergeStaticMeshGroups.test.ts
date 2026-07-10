@@ -58,6 +58,32 @@ describe('mergeStaticMeshGroups', () => {
     expect(scene.getMeshByName('avatar-arm')).not.toBeNull();
   });
 
+  it('never merges meshes whose vertex attribute sets differ', () => {
+    // Regression: a same-material group mixing UV+tangent meshes with
+    // position/normal-only meshes made MergeMeshes throw and black-screened
+    // the venue. Mismatched meshes must subgroup, not crash.
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const shared = new PBRMaterial('shared', scene);
+    for (let i = 0; i < 2; i++) {
+      const withUv = MeshBuilder.CreateBox(`V33_WithUv_${i}`, { size: 1 }, scene);
+      withUv.material = shared;
+    }
+    for (let i = 0; i < 2; i++) {
+      const bare = MeshBuilder.CreateBox(`V150_Bare_${i}`, { size: 1 }, scene);
+      bare.material = shared;
+      bare.removeVerticesData('uv');
+    }
+
+    const summary = mergeStaticMeshGroups(scene, { dynamicMeshes: [] });
+
+    // two compatible pairs merge separately; nothing throws
+    expect(summary.groupsMerged).toBe(2);
+    expect(summary.meshesRemoved).toBe(2);
+    const mergedNames = scene.meshes.filter((m) => m.name.startsWith('merged:')).map((m) => m.name);
+    expect(mergedNames).toHaveLength(2);
+  });
+
   it('keeps per-group world positions intact after merging', () => {
     engine = new NullEngine();
     const scene = new Scene(engine);
