@@ -208,7 +208,7 @@ def _box_project_uvs(mesh, cube_size=1.5):
             uv_layer.data[li].uv = (co[u_axis] / cube_size, co[v_axis] / cube_size)
 
 
-def _finalize(bm, name, mat, side, with_uv=True):
+def _finalize(bm, name, mat, side, with_uv=True, smooth=False):
     if side == "L":
         for v in bm.verts:
             v.co.x = -v.co.x
@@ -221,6 +221,11 @@ def _finalize(bm, name, mat, side, with_uv=True):
     # same-material meshes and requires identical vertex attribute sets.
     if with_uv:
         _box_project_uvs(mesh)
+    if smooth:
+        # foliage reads as painted boulders when flat-shaded; smooth normals
+        # make the low-poly mounds read as soft plant mass
+        for poly in mesh.polygons:
+            poly.use_smooth = True
     obj = bpy.data.objects.new(name, mesh)
     obj.data.materials.append(mat)
     bpy.context.collection.objects.link(obj)
@@ -262,7 +267,7 @@ def build_side(side, mats):
             mx = (inner[k][0] + outer[k][0]) / 2.0
             my = (inner[k][1] + outer[k][1]) / 2.0
             add_blob(bm, mx, my, 0.95, SOIL_Z, 0.72 + 0.1 * rng.random(), 500 + bi * 10 + k)
-    _finalize(bm, f"{GENERATED_PREFIX}Understory_{side}", mats["understory"], side, with_uv=False)
+    _finalize(bm, f"{GENERATED_PREFIX}Understory_{side}", mats["understory"], side, with_uv=False, smooth=True)
 
     bm = bmesh.new()
     rng = random.Random(402)
@@ -276,7 +281,7 @@ def build_side(side, mats):
                 add_blob(bm, mx, my, 0.5, 0.45, 1.45 + 0.2 * rng.random(), 600 + bi * 10 + k)
             else:
                 add_blob(bm, mx, my, 0.62, 0.45, 1.1 + 0.25 * rng.random(), 600 + bi * 10 + k)
-    _finalize(bm, f"{GENERATED_PREFIX}Canopy_{side}", mats["canopy"], side, with_uv=False)
+    _finalize(bm, f"{GENERATED_PREFIX}Canopy_{side}", mats["canopy"], side, with_uv=False, smooth=True)
 
     posts = lantern_positions(base)
     bm = bmesh.new()
