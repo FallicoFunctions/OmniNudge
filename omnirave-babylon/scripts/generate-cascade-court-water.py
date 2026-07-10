@@ -2,12 +2,14 @@
 # generate-cascade-court.py. Tier geometry comes from cascade_court_params.py
 # (shared with the stone generator) so the water registers exactly:
 #   - a reflecting pool inside the coping curb on each tier tread
-#   - discrete spill ribbons pouring over the curb at 2-3 notches per tier
+#   - translucent glowing spill ribbons pouring over the curb at 2-3 notches
+#     per tier (falling water is aerated and bright, not dark glass)
 #   - a catch pool ringing the base, inside the floor curb
 #   - low spray panels where the bottom spills land
 #   - a summit crown: gold nozzle collar + rising translucent jet
 #
 # Families: V150_CascadeCourtWater_{L,R}  (V14_DeepReflectingWater)
+#           V150_CascadeCourtSpill_{L,R}  (V18_CyanWaterMistGlow)
 #           V150_CascadeCourtMist_{L,R}   (V18_CyanWaterMistGlow)
 #           V150_CascadeCourtCrown_{L,R}  (V18_BrushedGoldTrim)
 #           V150_CascadeCourtJet_{L,R}    (V18_CyanWaterMistGlow)
@@ -34,11 +36,14 @@ from cascade_court_params import (  # noqa: E402
     base_polygon,
     jitter_polygon,
     offset_polygon,
-    tier_polygon,
+    tier_polygons,
 )
 
 GENERATED_PREFIX = "V150_CascadeCourt"
-WATER_SUFFIXES = ("Water_R", "Water_L", "Mist_R", "Mist_L", "Crown_R", "Crown_L", "Jet_R", "Jet_L")
+WATER_SUFFIXES = (
+    "Water_R", "Water_L", "Spill_R", "Spill_L", "Mist_R", "Mist_L",
+    "Crown_R", "Crown_L", "Jet_R", "Jet_L",
+)
 
 WATER_RISE = 0.02                      # pool sits a hair above the stone tread
 POOL_INSET = BATTER + COPING_W + 0.12  # pool fills the tread inside the curb
@@ -98,25 +103,30 @@ def _finalize(bm, name, mat, side):
 
 
 def build_water(side, mat):
-    cx, cy = CENTER
     bm = bmesh.new()
-    levels = []
-    polys = []
-    for (rx, ry, z0, z1, n, phase, ox, oy, seed) in TIERS:
-        pts = tier_polygon(cx + ox, cy + oy, rx, ry, n, phase, seed)
-        polys.append(pts)
-        levels.append(z1 + WATER_RISE)
-    rng = random.Random(211)
-    for i, pts in enumerate(polys):
+    polys = tier_polygons()
+    for i, (pts, _z0, z1) in enumerate(polys):
         # tread pool inside the coping curb, edge-jittered so it reads as
         # water lapping the stone (pool surface sits below the curb top)
-        add_ngon(bm, jitter_polygon(offset_polygon(pts, -POOL_INSET), 300 + i, amount=0.18), levels[i])
-        # discrete spill ribbons through 2-3 notches per tier. A continuous
-        # flared skirt off every edge produced stray angular wedges that read
-        # as solid slabs (player-flagged); real cascades pour at a few points.
-        # Each ribbon starts just over the curb and lands on the tier below.
-        z_top = TIERS[i][3] + COPING_H + 0.03
-        z_bottom = levels[i - 1] if i > 0 else CATCH_Z + 0.02
+        add_ngon(bm, jitter_polygon(offset_polygon(pts, -POOL_INSET), 300 + i, amount=0.18), z1 + WATER_RISE)
+    # catch pool ringing the base, offset from the base stone so it always
+    # follows the mound's irregular footprint (edge concealed by the floor curb)
+    add_ngon(bm, offset_polygon(polys[0][0], BASE_POOL_OFF), CATCH_Z)
+    _finalize(bm, f"{GENERATED_PREFIX}Water_{side}", mat, side)
+
+
+def build_spill(side, mat):
+    """Discrete spill ribbons through 2-3 notches per tier, in the translucent
+    glowing mist material: falling water is aerated and bright, not the dark
+    pool glass (dark ribbons read as broken shards from above,
+    player-flagged). Each ribbon starts just over the curb and lands on the
+    tier below (or the catch pool)."""
+    bm = bmesh.new()
+    polys = tier_polygons()
+    rng = random.Random(211)
+    for i, (pts, _z0, z1) in enumerate(polys):
+        z_top = z1 + COPING_H + 0.03
+        z_bottom = (polys[i - 1][2] + WATER_RISE) if i > 0 else CATCH_Z + 0.02
         n = len(pts)
         cx0 = sum(p[0] for p in pts) / n
         cy0 = sum(p[1] for p in pts) / n
@@ -144,10 +154,7 @@ def build_water(side, mat):
                 bm.faces.new(vs)
             except ValueError:
                 pass
-    # catch pool ringing the base, offset from the base stone so it always
-    # follows the mound's irregular footprint (edge concealed by the floor curb)
-    add_ngon(bm, offset_polygon(polys[0], BASE_POOL_OFF), CATCH_Z)
-    _finalize(bm, f"{GENERATED_PREFIX}Water_{side}", mat, side)
+    _finalize(bm, f"{GENERATED_PREFIX}Spill_{side}", mat, side)
 
 
 def build_mist(side, mat):
@@ -250,6 +257,7 @@ def main():
     gold = bpy.data.materials.get("V18_BrushedGoldTrim")
     for side in ("R", "L"):
         build_water(side, water)
+        build_spill(side, mist)
         build_mist(side, mist)
         build_crown(side, gold, mist)
     count = len([o for o in bpy.data.objects

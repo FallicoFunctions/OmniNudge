@@ -26,6 +26,12 @@ TIERS = [
 # centroid so the mound reads as one carved form, not stacked prisms.
 BATTER = 0.35
 
+# Every tier must nest fully inside the tier below it: each vertex is clamped
+# to the lower tier's boundary minus this margin, so an upper tier can never
+# poke past a lower tier's coping (curbs visibly clipped, player-flagged).
+# Margin > BATTER + COPING_W keeps the upper tier base inside the lower curb.
+CLAMP_MARGIN = 1.0
+
 # Raised coping curb rimming each tread (and the catch basin at the floor).
 COPING_W = 0.5
 COPING_H = 0.09
@@ -53,12 +59,60 @@ def tier_polygon(cx, cy, rx, ry, n, phase, seed, j_lo=0.80, j_hi=1.20):
     return pts
 
 
-def base_polygon():
-    """The base (widest) tier's exact seeded polygon - the catch pool and
-    floor curb offset outward from this so they always follow the stone."""
+def _radial_support(poly, cx, cy, ux, uy):
+    """Distance from (cx,cy) along direction (ux,uy) to the polygon boundary.
+    The jittered tier polygons are star-shaped around the mound center, so
+    the crossing is unique; max() guards float-degenerate edges."""
+    best = 0.0
+    n = len(poly)
+    for i in range(n):
+        px, py = poly[i]
+        qx, qy = poly[(i + 1) % n]
+        ex, ey = qx - px, qy - py
+        det = ex * uy - ux * ey
+        if abs(det) < 1e-12:
+            continue
+        rel_x, rel_y = px - cx, py - cy
+        t = (ex * rel_y - rel_x * ey) / det
+        s = (ux * rel_y - rel_x * uy) / det
+        if t > 0.0 and -1e-9 <= s <= 1.0 + 1e-9:
+            best = max(best, t)
+    return best
+
+
+def tier_polygons():
+    """All tier polygons with nesting enforced: each vertex of a tier is
+    clamped to the tier below's boundary minus CLAMP_MARGIN, so upper tiers
+    can never overhang lower ones. Returns [(pts, z0, z1), ...]."""
     cx, cy = CENTER
-    (rx, ry, _z0, _z1, n, phase, ox, oy, seed) = TIERS[0]
-    return tier_polygon(cx + ox, cy + oy, rx, ry, n, phase, seed)
+    out = []
+    prev = None
+    for (rx, ry, z0, z1, n, phase, ox, oy, seed) in TIERS:
+        pts = tier_polygon(cx + ox, cy + oy, rx, ry, n, phase, seed)
+        if prev is not None:
+            clamped = []
+            for (x, y) in pts:
+                dx, dy = x - cx, y - cy
+                r = math.hypot(dx, dy)
+                if r < 1e-9:
+                    clamped.append((x, y))
+                    continue
+                ux, uy = dx / r, dy / r
+                limit = _radial_support(prev, cx, cy, ux, uy) - CLAMP_MARGIN
+                if r > limit:
+                    clamped.append((cx + ux * limit, cy + uy * limit))
+                else:
+                    clamped.append((x, y))
+            pts = clamped
+        out.append((pts, z0, z1))
+        prev = pts
+    return out
+
+
+def base_polygon():
+    """The base (widest) tier's exact polygon - the catch pool and floor
+    curb offset outward from this so they always follow the stone."""
+    return tier_polygons()[0][0]
 
 
 def offset_polygon(pts, delta):

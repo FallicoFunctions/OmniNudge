@@ -108,6 +108,25 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     },
   },
   {
+    key: 'cascade-court-spill',
+    meshNames: ['V150_CascadeCourtSpill_R', 'V150_CascadeCourtSpill_L'],
+    expected: {
+      albedoTextureCleared: true,
+      albedoColor: [0.06, 0.09, 0.11],
+      emissiveColor: [0.05, 0.14, 0.19],
+      emissiveIntensity: 0.45,
+      metallic: 0.02,
+      roughness: 0.28,
+      alpha: 0.34,
+      transparencyMode: 2,
+      clearCoatEnabled: true,
+      clearCoatIntensity: 0.62,
+      clearCoatRoughness: 0.16,
+      environmentIntensity: 0.82,
+      metaPolish: null,
+    },
+  },
+  {
     key: 'cascade-court-crown',
     meshNames: ['V150_CascadeCourtCrown_R', 'V150_CascadeCourtCrown_L'],
     expected: {
