@@ -256,7 +256,8 @@ def build_side(side, mats):
     for bi, (inner, outer) in enumerate(beds):
         boundary = bed_boundary(inner, outer)
         add_ngon(bm, shrink_boundary(boundary, PLANTER_T * 0.5), SOIL_Z)  # soil fill
-        for off in (-0.28, 0.3):
+        # dense groundcover: sparse blobs left bare soil reading as empty
+        for off in (-0.38, -0.13, 0.12, 0.36):
             k = int((len(inner) - 1) * (0.5 + off))
             mx = (inner[k][0] + outer[k][0]) / 2.0
             my = (inner[k][1] + outer[k][1]) / 2.0
