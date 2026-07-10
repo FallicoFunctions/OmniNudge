@@ -10087,6 +10087,56 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V150_CascadeCourtJet_L')).toBe('V18_CyanWaterMistGlow');
   });
 
+  it('rings the cascade court with planted beds and lantern posts', () => {
+    // Pass 3: four planter-walled garden beds hug the court's diagonal
+    // corners (arcs following the fountain's own base polygon) with layered
+    // foliage, plus four basin-vocabulary lantern posts at the approach gaps.
+    for (const family of [
+      'V150_CascadeCourtPlanter_',
+      'V150_CascadeCourtUnderstory_',
+      'V150_CascadeCourtCanopy_',
+      'V150_CascadeCourtLanternStem_',
+      'V150_CascadeCourtLanternHousing_',
+      'V150_CascadeCourtLanternCore_',
+    ]) {
+      expect(nodeNamesWithPrefix(family)).toHaveLength(2);
+    }
+
+    const planter = readMeshGeometry('V150_CascadeCourtPlanter_R');
+    expect(planter.min[0]).toBeGreaterThan(31);
+    expect(planter.max[0]).toBeLessThan(67);
+    expect(planter.max[1]).toBeLessThan(0.5); // low bed walls
+    expect(planter.min[2]).toBeGreaterThan(-41);
+    expect(planter.max[2]).toBeLessThan(-16);
+
+    const canopy = readMeshGeometry('V150_CascadeCourtCanopy_R');
+    expect(canopy.max[1]).toBeGreaterThan(1.3); // accent shrubs top the beds
+    expect(canopy.max[1]).toBeLessThan(1.75);
+
+    // four posts per side: stem, then an EXPOSED warm core (the glow must
+    // escape - a core sealed inside a housing reads as a dead post), then a
+    // wider gold cap above it
+    const geometryFloor = {
+      minVertexCount: 60,
+      minUniquePositions: 25,
+      minNonZeroAreaTriangles: 20,
+    };
+    const stem = readMeshGeometry('V150_CascadeCourtLanternStem_R', geometryFloor);
+    const core = readMeshGeometry('V150_CascadeCourtLanternCore_R', geometryFloor);
+    const cap = readMeshGeometry('V150_CascadeCourtLanternHousing_R', geometryFloor);
+    expect(stem.max[1]).toBeGreaterThan(2.0);
+    expect(core.min[1]).toBeGreaterThanOrEqual(stem.max[1] - 0.01);
+    expect(cap.min[1]).toBeGreaterThanOrEqual(core.max[1] - 0.01);
+    expect(cap.max[1]).toBeLessThan(2.8);
+
+    expect(materialNameFor('V150_CascadeCourtPlanter_R')).toBe('V15_PearlShellBeveled');
+    expect(materialNameFor('V150_CascadeCourtUnderstory_R')).toBe('V16_DeepGardenPlanting');
+    expect(materialNameFor('V150_CascadeCourtCanopy_R')).toBe('V14_LayeredGardenPlanting');
+    expect(materialNameFor('V150_CascadeCourtLanternStem_R')).toBe('V14_MatteBlackProductionRig');
+    expect(materialNameFor('V150_CascadeCourtLanternHousing_R')).toBe('V20_ChasedGoldFiligree');
+    expect(materialNameFor('V150_CascadeCourtLanternCore_R')).toBe('V14_WarmBasinPractical');
+  });
+
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
     expect(mainStageGlbJson.nodes.length).toBeLessThanOrEqual(1800);
   });
