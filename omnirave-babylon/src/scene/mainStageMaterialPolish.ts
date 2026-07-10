@@ -1192,8 +1192,10 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'cascade-court-shell',
     match: [{ prefix: 'V150_CascadeCourtShell_' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.16, 0.18, 0.22],
+      // Keep the pearl stone's real PBR maps (albedo grain, normal, AO) and
+      // tint over them - flat painted color was the strongest "3D rendering"
+      // tell on the fountain (player-flagged).
+      albedoColor: [0.34, 0.38, 0.46],
       emissiveColor: [0.004, 0.006, 0.01],
       emissiveIntensity: 0.01,
       metallic: 0.02,
@@ -1203,14 +1205,31 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     },
   },
   {
+    // Cascade court waterline: the darker wet stain ringing each tier's
+    // base where the pool laps the riser. Real fountains always carry this
+    // mark; its absence reads as CG.
+    key: 'cascade-court-waterline',
+    match: [{ prefix: 'V150_CascadeCourtWaterline_' }],
+    params: {
+      albedoColor: [0.14, 0.16, 0.19],
+      emissiveColor: [0.002, 0.004, 0.006],
+      emissiveIntensity: 0.01,
+      metallic: 0.02,
+      roughness: 0.32,
+      clearCoat: { intensity: 0.3, roughness: 0.2 },
+      environmentIntensity: 0.4,
+    },
+  },
+  {
     // Cascade court coping: raised pearl curb rimming each tier. Deliberately
     // brighter than the shell so the bands trace the mound's levels and the
     // form reads as one carved object, not stacked grey prisms.
     key: 'cascade-court-coping',
     match: [{ prefix: 'V150_CascadeCourtCoping_' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.4, 0.41, 0.44],
+      // Textured pearl (tint multiplies the stone maps), kept brighter than
+      // the shell so the curbs still trace the mound's levels.
+      albedoColor: [0.78, 0.8, 0.84],
       emissiveColor: [0.012, 0.014, 0.018],
       emissiveIntensity: 0.03,
       metallic: 0.04,
@@ -1246,8 +1265,8 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'cascade-court-planter',
     match: [{ prefix: 'V150_CascadeCourtPlanter_' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.4, 0.41, 0.44],
+      // Textured pearl matching the fountain coping treatment.
+      albedoColor: [0.78, 0.8, 0.84],
       emissiveColor: [0.012, 0.014, 0.018],
       emissiveIntensity: 0.03,
       metallic: 0.04,

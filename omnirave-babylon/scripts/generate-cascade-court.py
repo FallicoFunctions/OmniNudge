@@ -33,7 +33,12 @@ from cascade_court_params import (  # noqa: E402
 )
 
 GENERATED_PREFIX = "V150_CascadeCourt"
-STONE_SUFFIXES = ("Shell_R", "Shell_L", "Coping_R", "Coping_L")
+STONE_SUFFIXES = (
+    "Shell_R", "Shell_L", "Coping_R", "Coping_L", "Waterline_R", "Waterline_L",
+)
+
+CHAMFER = 0.035     # eased edge on every curb: sharp 90-degree rims read as CG
+WATERLINE_H = 0.13  # wet stain band height above each tier's base
 
 
 def clear_previous():
@@ -67,17 +72,20 @@ def build_tier(bm, pts, z0, z1):
 
 
 def build_curb_ring(bm, outer_pts, inner_pts, z0, z1):
-    """Raised curb: outer wall, flat cap, inner wall - a bright band that
-    traces a level and contains the water inside it."""
+    """Raised curb: outer wall, chamfered shoulder, flat cap, inner wall.
+    The eased 45-degree shoulder catches highlights the way machined stone
+    does - dead-sharp rims are one of the strongest CG tells."""
+    chamfered = offset_polygon(outer_pts, -CHAMFER)
     ob = [bm.verts.new((x, y, z0)) for (x, y) in outer_pts]
-    ot = [bm.verts.new((x, y, z1)) for (x, y) in outer_pts]
+    om = [bm.verts.new((x, y, z1 - CHAMFER)) for (x, y) in outer_pts]
+    ot = [bm.verts.new((x, y, z1)) for (x, y) in chamfered]
     it_ = [bm.verts.new((x, y, z1)) for (x, y) in inner_pts]
     ib = [bm.verts.new((x, y, z0)) for (x, y) in inner_pts]
     bm.verts.ensure_lookup_table()
     n = len(outer_pts)
     for i in range(n):
         j = (i + 1) % n
-        for a, b in ((ob, ot), (ot, it_), (it_, ib)):
+        for a, b in ((ob, om), (om, ot), (ot, it_), (it_, ib)):
             try:
                 bm.faces.new([a[i], a[j], b[j], b[i]])
             except ValueError:
@@ -144,6 +152,25 @@ def build_side(side, mat):
         BASE_CURB_H,
     )
     _finalize(bm, f"{GENERATED_PREFIX}Coping_{side}", mat, side)
+
+    # waterline stain: a darker wet band ringing each tier's base where the
+    # pool below laps the riser - real fountains carry this mark, and its
+    # absence is a strong CG tell
+    bm = bmesh.new()
+    for (pts, z0, _z1) in polys:
+        lo_pts = offset_polygon(pts, 0.02)
+        hi_pts = offset_polygon(pts, 0.02 - WATERLINE_H * 0.45)  # follow the batter
+        lo = [bm.verts.new((x, y, z0 + 0.02)) for (x, y) in lo_pts]
+        hi = [bm.verts.new((x, y, z0 + 0.02 + WATERLINE_H)) for (x, y) in hi_pts]
+        bm.verts.ensure_lookup_table()
+        n = len(pts)
+        for i in range(n):
+            j = (i + 1) % n
+            try:
+                bm.faces.new([lo[i], lo[j], hi[j], hi[i]])
+            except ValueError:
+                pass
+    _finalize(bm, f"{GENERATED_PREFIX}Waterline_{side}", mat, side)
 
 
 def main():
