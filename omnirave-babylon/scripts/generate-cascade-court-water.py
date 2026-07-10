@@ -81,19 +81,6 @@ def add_ngon(bm, pts, z):
         pass
 
 
-def add_curtain(bm, pts_top, pts_bottom, z_top, z_bottom):
-    top = [bm.verts.new((x, y, z_top)) for (x, y) in pts_top]
-    bot = [bm.verts.new((x, y, z_bottom)) for (x, y) in pts_bottom]
-    bm.verts.ensure_lookup_table()
-    n = len(pts_top)
-    for i in range(n):
-        j = (i + 1) % n
-        try:
-            bm.faces.new([top[i], top[j], bot[j], bot[i]])
-        except ValueError:
-            pass
-
-
 def _box_project_uvs(mesh, cube_size=1.5):
     uv_layer = mesh.uv_layers.new(name="CascadeWaterUV")
     for poly in mesh.polygons:
@@ -147,19 +134,41 @@ def build_water(side, mat):
         pts = tier_polygon(cx + ox, cy + oy, rx, ry, n, phase, seed)
         polys.append(pts)
         levels.append(z1 + WATER_RISE)
+    rng = random.Random(211)
     for i, pts in enumerate(polys):
         # tread pool, edge-jittered so it reads as water lapping the stone
         add_ngon(bm, jitter_polygon(offset_polygon(pts, -INSET), 300 + i), levels[i])
-        # spill sheet: top hugs the riser lip, bottom flares outward and lands
-        # on the tier below (or the catch basin) - visibly falling water
+        # discrete spill ribbons through 2-3 notches per tier. A continuous
+        # flared skirt off every edge produced stray angular wedges that read
+        # as solid slabs (player-flagged); real cascades pour at a few points.
         z_bottom = levels[i - 1] if i > 0 else CATCH_Z + 0.02
-        add_curtain(
-            bm,
-            offset_polygon(pts, OUTSET),
-            offset_polygon(pts, OUTSET + SPILL_FLARE),
-            levels[i],
-            z_bottom,
-        )
+        n = len(pts)
+        cx0 = sum(p[0] for p in pts) / n
+        cy0 = sum(p[1] for p in pts) / n
+        spills = rng.sample(range(n), 3 if i < 3 else 2)
+        for k in spills:
+            x0, y0 = pts[k]
+            x1, y1 = pts[(k + 1) % n]
+            # ribbon spans the middle 60% of the edge
+            ax, ay = x0 + (x1 - x0) * 0.2, y0 + (y1 - y0) * 0.2
+            bx, by = x0 + (x1 - x0) * 0.8, y0 + (y1 - y0) * 0.8
+            def push(px, py, dist):
+                dx, dy = px - cx0, py - cy0
+                d = math.hypot(dx, dy) or 1.0
+                return (px + dx / d * dist, py + dy / d * dist)
+            top = [push(ax, ay, OUTSET), push(bx, by, OUTSET)]
+            bot = [push(ax, ay, OUTSET + SPILL_FLARE), push(bx, by, OUTSET + SPILL_FLARE)]
+            vs = [
+                bm.verts.new((top[0][0], top[0][1], levels[i])),
+                bm.verts.new((top[1][0], top[1][1], levels[i])),
+                bm.verts.new((bot[1][0], bot[1][1], z_bottom)),
+                bm.verts.new((bot[0][0], bot[0][1], z_bottom)),
+            ]
+            bm.verts.ensure_lookup_table()
+            try:
+                bm.faces.new(vs)
+            except ValueError:
+                pass
     # irregular catch basin pooling around the whole mound base (tight jitter
     # so the pool stays inside the pocket envelope)
     catch = tier_polygon(cx, cy, CATCH_RX, CATCH_RY, 13, 0.75, 113, j_lo=0.88, j_hi=1.06)
