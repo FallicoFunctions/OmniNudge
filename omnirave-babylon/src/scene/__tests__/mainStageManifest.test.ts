@@ -10010,6 +10010,17 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(coping.max[1]).toBeGreaterThan(3.9); // curb tops the summit tier
     expect(materialNameFor('V150_CascadeCourtCoping_R')).toBe('V15_PearlShellBeveled');
     expect(materialNameFor('V150_CascadeCourtCoping_L')).toBe('V15_PearlShellBeveled');
+
+    // waterline stain bands ring each tier's base (wet-mark realism cue)
+    expect(nodeNamesWithPrefix('V150_CascadeCourtWaterline_')).toHaveLength(2);
+    const waterline = readMeshGeometry('V150_CascadeCourtWaterline_R', {
+      minVertexCount: 60,
+      minUniquePositions: 25,
+      minNonZeroAreaTriangles: 20,
+    });
+    expect(waterline.min[1]).toBeGreaterThan(-0.1);
+    expect(waterline.max[1]).toBeLessThan(3.6); // top tier base + band height
+    expect(materialNameFor('V150_CascadeCourtWaterline_R')).toBe('V15_PearlShellBeveled');
   });
 
   it('fills the cascade court with reflecting water and base mist', () => {

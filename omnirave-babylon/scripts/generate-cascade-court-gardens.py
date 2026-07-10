@@ -116,17 +116,20 @@ def shrink_boundary(pts, delta):
     return out
 
 
-def add_loop_wall(bm, outer_pts, inner_pts, z0, z1):
-    """Closed curb: outer wall, flat top, inner wall."""
+def add_loop_wall(bm, outer_pts, inner_pts, z0, z1, chamfer=0.03):
+    """Closed curb: outer wall, chamfered shoulder, flat top, inner wall -
+    matches the fountain coping's eased-edge treatment."""
+    shoulder = shrink_boundary(outer_pts, chamfer)
     ob = [bm.verts.new((x, y, z0)) for (x, y) in outer_pts]
-    ot = [bm.verts.new((x, y, z1)) for (x, y) in outer_pts]
+    om = [bm.verts.new((x, y, z1 - chamfer)) for (x, y) in outer_pts]
+    ot = [bm.verts.new((x, y, z1)) for (x, y) in shoulder]
     it_ = [bm.verts.new((x, y, z1)) for (x, y) in inner_pts]
     ib = [bm.verts.new((x, y, z0)) for (x, y) in inner_pts]
     bm.verts.ensure_lookup_table()
     n = len(outer_pts)
     for i in range(n):
         j = (i + 1) % n
-        for a, b in ((ob, ot), (ot, it_), (it_, ib)):
+        for a, b in ((ob, om), (om, ot), (ot, it_), (it_, ib)):
             try:
                 bm.faces.new([a[i], a[j], b[j], b[i]])
             except ValueError:
@@ -143,24 +146,30 @@ def add_ngon(bm, pts, z):
 
 
 def add_blob(bm, px, py, r, z0, z1, seed):
-    """Low irregular foliage mound: jittered 7-gon frustum with a cap."""
+    """Irregular foliage mound: jittered 7-gon in two stacked stages (wide
+    base, bulged middle, tight crown) so the silhouette reads rounded rather
+    than as an obvious cone."""
     rng = random.Random(seed)
     n = 7
-    lower, upper = [], []
+    zm = z0 + (z1 - z0) * 0.55
+    lower, middle, upper = [], [], []
     for k in range(n):
         a = 2.0 * math.pi * k / n + rng.random() * 0.35
         rr = r * (0.8 + 0.4 * rng.random())
         lower.append((px + rr * math.cos(a), py + rr * math.sin(a)))
-        upper.append((px + rr * 0.52 * math.cos(a), py + rr * 0.52 * math.sin(a)))
+        middle.append((px + rr * 0.92 * math.cos(a + 0.2), py + rr * 0.92 * math.sin(a + 0.2)))
+        upper.append((px + rr * 0.42 * math.cos(a + 0.4), py + rr * 0.42 * math.sin(a + 0.4)))
     lo = [bm.verts.new((x, y, z0)) for (x, y) in lower]
+    mid = [bm.verts.new((x, y, zm)) for (x, y) in middle]
     hi = [bm.verts.new((x, y, z1)) for (x, y) in upper]
     bm.verts.ensure_lookup_table()
-    for i in range(n):
-        j = (i + 1) % n
-        try:
-            bm.faces.new([lo[i], lo[j], hi[j], hi[i]])
-        except ValueError:
-            pass
+    for ring_a, ring_b in ((lo, mid), (mid, hi)):
+        for i in range(n):
+            j = (i + 1) % n
+            try:
+                bm.faces.new([ring_a[i], ring_a[j], ring_b[j], ring_b[i]])
+            except ValueError:
+                pass
     try:
         bm.faces.new(hi)
     except ValueError:
