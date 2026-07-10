@@ -5187,10 +5187,11 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(mainStageGlbBuffer.byteLength, 'embedded texture set must stay browser-conscious').toBeLessThanOrEqual(
       // Close-range material response adds UV + tangent attributes across
       // 31 architectural materials (~8MB); accepted for the fidelity goal.
-      26.0 * 1024 * 1024,
-      // (raised 2026-07-09 for the approach-light + arcade + wing-lantern
-      // content additions; this is the dev-only validation artifact, never
-      // shipped to players - the real runtime GLB stays ~6MB via Draco)
+      26.5 * 1024 * 1024,
+      // (raised 2026-07-09 for the approach-light + arcade + wing-lantern +
+      // cascade-court content additions; this is the dev-only validation
+      // artifact, never shipped to players - the real runtime GLB stays
+      // ~6MB via Draco)
     );
   });
 
@@ -10045,6 +10046,29 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V150_CascadeCourtWater_L')).toBe('V14_DeepReflectingWater');
     expect(materialNameFor('V150_CascadeCourtMist_R')).toBe('V18_CyanWaterMistGlow');
     expect(materialNameFor('V150_CascadeCourtMist_L')).toBe('V18_CyanWaterMistGlow');
+
+    // summit crown: gold nozzle collar + translucent jet rising above it -
+    // the fountain's focal point (both deliberately tiny meshes)
+    expect(nodeNamesWithPrefix('V150_CascadeCourtCrown_')).toHaveLength(2);
+    expect(nodeNamesWithPrefix('V150_CascadeCourtJet_')).toHaveLength(2);
+    const crown = readMeshGeometry('V150_CascadeCourtCrown_R', {
+      minVertexCount: 40,
+      minUniquePositions: 15,
+      minNonZeroAreaTriangles: 15,
+    });
+    expect(crown.min[1]).toBeGreaterThan(3.9); // sits on the summit pool
+    expect(crown.max[1]).toBeLessThan(4.5);
+    const jet = readMeshGeometry('V150_CascadeCourtJet_R', {
+      minVertexCount: 8,
+      minUniquePositions: 6,
+      minNonZeroAreaTriangles: 4,
+    });
+    expect(jet.max[1]).toBeGreaterThan(5.8); // rises well above the summit
+    expect(jet.max[1]).toBeLessThan(7);
+    expect(materialNameFor('V150_CascadeCourtCrown_R')).toBe('V18_BrushedGoldTrim');
+    expect(materialNameFor('V150_CascadeCourtCrown_L')).toBe('V18_BrushedGoldTrim');
+    expect(materialNameFor('V150_CascadeCourtJet_R')).toBe('V18_CyanWaterMistGlow');
+    expect(materialNameFor('V150_CascadeCourtJet_L')).toBe('V18_CyanWaterMistGlow');
   });
 
   it('keeps the visible GLB node count within the Main Stage browser budget', () => {
