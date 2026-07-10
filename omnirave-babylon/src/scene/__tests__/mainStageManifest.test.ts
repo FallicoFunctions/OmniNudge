@@ -10018,8 +10018,16 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(water.min[2]).toBeGreaterThan(-41.5);
     expect(water.max[2]).toBeLessThan(-16);
 
-    const mist = readMeshGeometry('V150_CascadeCourtMist_R');
-    expect(mist.max[1]).toBeGreaterThan(1.4); // plumes rise above the base
+    // deliberately sparse: 11 low crossed spray panels per side
+    const mist = readMeshGeometry('V150_CascadeCourtMist_R', {
+      minVertexCount: 60,
+      minUniquePositions: 25,
+      minNonZeroAreaTriangles: 15,
+    });
+    // low spray panels anchored to the base spill line (redesigned from tall
+    // plumes, which read as floating slabs)
+    expect(mist.max[1]).toBeGreaterThan(0.7);
+    expect(mist.max[1]).toBeLessThan(1.4);
     expect(mist.min[2]).toBeGreaterThan(-41);
     expect(mist.max[2]).toBeLessThan(-16);
 

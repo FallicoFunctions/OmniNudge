@@ -98,7 +98,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
       emissiveIntensity: 0.4,
       metallic: 0.02,
       roughness: 0.28,
-      alpha: 0.42,
+      alpha: 0.26,
       transparencyMode: 2,
       clearCoatEnabled: true,
       clearCoatIntensity: 0.62,

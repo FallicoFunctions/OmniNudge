@@ -169,34 +169,40 @@ def build_water(side, mat):
 
 def build_mist(side, mat):
     cx, cy = CENTER
-    rx, ry = TIERS[0][0], TIERS[0][1]
+    (rx, ry, _z0, _z1, n, phase, ox, oy, seed) = TIERS[0]
+    base = tier_polygon(cx + ox, cy + oy, rx, ry, n, phase, seed)
     rng = random.Random(97)
     bm = bmesh.new()
-    # crossed vertical planes ringing the base where water collects; each plume
-    # split into two stacked segments and height-jittered so it reads as spray
-    # rather than a picket fence.
-    plumes = 14
-    for k in range(plumes):
-        a = 0.4 + 2.0 * math.pi * k / plumes
-        px = cx + rx * 0.98 * math.cos(a)
-        py = cy + ry * 0.98 * math.sin(a)
-        h = 1.3 + 0.9 * rng.random()
-        w = 0.6
-        mid = 0.1 + h * 0.55
-        for (ux, uy) in ((math.cos(a), math.sin(a)), (-math.sin(a), math.cos(a))):
-            for (zb, zt, taper) in ((0.1, mid, 1.0), (mid, 0.1 + h, 0.55)):
-                q = [
-                    (px - ux * w, py - uy * w, zb),
-                    (px + ux * w, py + uy * w, zb),
-                    (px + ux * w * taper, py + uy * w * taper, zt),
-                    (px - ux * w * taper, py - uy * w * taper, zt),
-                ]
-                vs = [bm.verts.new(v) for v in q]
-                bm.verts.ensure_lookup_table()
-                try:
-                    bm.faces.new(vs)
-                except ValueError:
-                    pass
+    # low crossed spray panels anchored to the ACTUAL base-tier edge midpoints
+    # (exactly where the bottom spill sheets land in the catch basin), tapered
+    # hard toward the top so they read as spray kicking up, not floating slabs
+    m = len(base)
+    for k in range(m):
+        x0, y0 = base[k]
+        x1, y1 = base[(k + 1) % m]
+        px, py = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+        # nudge the panel just outside the spill line
+        dx, dy = px - cx, py - cy
+        d = math.hypot(dx, dy) or 1.0
+        px += dx / d * (OUTSET + SPILL_FLARE * 0.6)
+        py += dy / d * (OUTSET + SPILL_FLARE * 0.6)
+        h = 0.5 + 0.45 * rng.random()
+        w = 0.45 + 0.25 * rng.random()
+        el = math.hypot(x1 - x0, y1 - y0) or 1.0
+        ex, ey = (x1 - x0) / el, (y1 - y0) / el  # along-edge direction
+        for (ux, uy) in ((ex, ey), (-ey, ex)):
+            q = [
+                (px - ux * w, py - uy * w, 0.08),
+                (px + ux * w, py + uy * w, 0.08),
+                (px + ux * w * 0.3, py + uy * w * 0.3, 0.08 + h),
+                (px - ux * w * 0.3, py - uy * w * 0.3, 0.08 + h),
+            ]
+            vs = [bm.verts.new(v) for v in q]
+            bm.verts.ensure_lookup_table()
+            try:
+                bm.faces.new(vs)
+            except ValueError:
+                pass
     _finalize(bm, f"{GENERATED_PREFIX}Mist_{side}", mat, side)
 
 
