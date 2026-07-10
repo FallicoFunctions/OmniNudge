@@ -10017,17 +10017,33 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     // cyan mist plumes ringing the base. Both families align to the shell
     // footprint (glTF X 35..61, Z -40..-17); the left is the X-mirror.
     expect(nodeNamesWithPrefix('V150_CascadeCourtWater_')).toHaveLength(2);
+    expect(nodeNamesWithPrefix('V150_CascadeCourtSpill_')).toHaveLength(2);
     expect(nodeNamesWithPrefix('V150_CascadeCourtMist_')).toHaveLength(2);
 
-    const water = readMeshGeometry('V150_CascadeCourtWater_R');
+    // six flat pool n-gons (five treads + catch): deliberately lean geometry
+    const water = readMeshGeometry('V150_CascadeCourtWater_R', {
+      minVertexCount: 40,
+      minUniquePositions: 25,
+      minNonZeroAreaTriangles: 15,
+    });
     expect(water.min[0]).toBeGreaterThan(31);
     expect(water.max[0]).toBeLessThan(67);
     expect(water.max[1]).toBeGreaterThan(3.5); // pools climb to the summit
-    // spill sheets flare outward past the stone and the catch basin rings the
-    // base, so the water runs slightly proud of the shell footprint (still
-    // well clear of the spawn canopy at Z<=-42.7)
+    // the catch pool rings the base, so the water runs slightly proud of the
+    // shell footprint (still well clear of the spawn canopy at Z<=-42.7)
     expect(water.min[2]).toBeGreaterThan(-41.5);
     expect(water.max[2]).toBeLessThan(-16);
+
+    // spill ribbons pour over the curb notches from summit to catch pool
+    const spill = readMeshGeometry('V150_CascadeCourtSpill_R', {
+      minVertexCount: 30,
+      minUniquePositions: 20,
+      minNonZeroAreaTriangles: 10,
+    });
+    expect(spill.max[1]).toBeGreaterThan(4); // topmost ribbon crests the summit curb
+    expect(spill.min[1]).toBeLessThan(0.15); // lowest ribbon lands in the catch pool
+    expect(materialNameFor('V150_CascadeCourtSpill_R')).toBe('V18_CyanWaterMistGlow');
+    expect(materialNameFor('V150_CascadeCourtSpill_L')).toBe('V18_CyanWaterMistGlow');
 
     // deliberately sparse: 11 low crossed spray panels per side
     const mist = readMeshGeometry('V150_CascadeCourtMist_R', {

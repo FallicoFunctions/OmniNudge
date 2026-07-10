@@ -1240,6 +1240,25 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     },
   },
   {
+    // Cascade court spill ribbons: the water pouring over each curb notch.
+    // Translucent glowing cyan - falling water is aerated and bright; in the
+    // dark pool material these read as broken shards (player-flagged).
+    key: 'cascade-court-spill',
+    match: [{ prefix: 'V150_CascadeCourtSpill_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.06, 0.09, 0.11],
+      emissiveColor: [0.05, 0.14, 0.19],
+      emissiveIntensity: 0.45,
+      metallic: 0.02,
+      roughness: 0.28,
+      alpha: 0.34,
+      alphaBlend: true,
+      clearCoat: { intensity: 0.62, roughness: 0.16 },
+      environmentIntensity: 0.82,
+    },
+  },
+  {
     // Cascade court crown: gold nozzle collar at the summit-pool center -
     // the fountain's focal point. Matches the basin fountain nozzle gold.
     key: 'cascade-court-crown',

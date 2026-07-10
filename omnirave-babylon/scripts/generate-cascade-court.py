@@ -25,14 +25,11 @@ from cascade_court_params import (  # noqa: E402
     BASE_CURB_IN,
     BASE_CURB_OUT,
     BATTER,
-    CENTER,
     COPING_H,
     COPING_LIP,
     COPING_W,
-    TIERS,
-    base_polygon,
     offset_polygon,
-    tier_polygon,
+    tier_polygons,
 )
 
 GENERATED_PREFIX = "V150_CascadeCourt"
@@ -119,10 +116,7 @@ def _finalize(bm, name, mat, side):
 
 
 def build_side(side, mat):
-    cx, cy = CENTER
-    polys = []
-    for (rx, ry, z0, z1, n, phase, ox, oy, seed) in TIERS:
-        polys.append((tier_polygon(cx + ox, cy + oy, rx, ry, n, phase, seed), z0, z1))
+    polys = tier_polygons()
 
     bm = bmesh.new()
     for (pts, z0, z1) in polys:
@@ -141,7 +135,7 @@ def build_side(side, mat):
     # floor curb ringing the catch basin - the fountain's edge against the
     # plaza, so the base doesn't just vanish into flat paving. Offset from
     # the base tier's own polygon so it always follows the stone.
-    base = base_polygon()
+    base = polys[0][0]
     build_curb_ring(
         bm,
         offset_polygon(base, BASE_CURB_OUT),
