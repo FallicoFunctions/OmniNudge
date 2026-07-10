@@ -9,6 +9,8 @@ import '@babylonjs/core/Shaders/fxaa.vertex';
 import '@babylonjs/core/Shaders/imageProcessing.fragment';
 import '@babylonjs/core/Shaders/kernelBlur.fragment';
 import '@babylonjs/core/Shaders/kernelBlur.vertex';
+import '@babylonjs/core/Shaders/particles.fragment';
+import '@babylonjs/core/Shaders/particles.vertex';
 import '@babylonjs/core/Shaders/pbr.fragment';
 import '@babylonjs/core/Shaders/pbr.vertex';
 import '@babylonjs/core/Shaders/rgbdDecode.fragment';
