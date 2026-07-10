@@ -9999,6 +9999,16 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
 
     expect(materialNameFor('V150_CascadeCourtShell_R')).toBe('V15_PearlShellBeveled');
     expect(materialNameFor('V150_CascadeCourtShell_L')).toBe('V15_PearlShellBeveled');
+
+    // raised pearl coping curbs rim every tier (separate family so the
+    // polish table tints them brighter than the shell stone)
+    expect(nodeNamesWithPrefix('V150_CascadeCourtCoping_')).toHaveLength(2);
+    const coping = readMeshGeometry('V150_CascadeCourtCoping_R');
+    expect(coping.min[0]).toBeGreaterThan(31);
+    expect(coping.max[0]).toBeLessThan(67);
+    expect(coping.max[1]).toBeGreaterThan(3.9); // curb tops the summit tier
+    expect(materialNameFor('V150_CascadeCourtCoping_R')).toBe('V15_PearlShellBeveled');
+    expect(materialNameFor('V150_CascadeCourtCoping_L')).toBe('V15_PearlShellBeveled');
   });
 
   it('fills the cascade court with reflecting water and base mist', () => {

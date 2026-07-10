@@ -1203,6 +1203,23 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     },
   },
   {
+    // Cascade court coping: raised pearl curb rimming each tier. Deliberately
+    // brighter than the shell so the bands trace the mound's levels and the
+    // form reads as one carved object, not stacked grey prisms.
+    key: 'cascade-court-coping',
+    match: [{ prefix: 'V150_CascadeCourtCoping_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.4, 0.41, 0.44],
+      emissiveColor: [0.012, 0.014, 0.018],
+      emissiveIntensity: 0.03,
+      metallic: 0.04,
+      roughness: 0.5,
+      clearCoat: { intensity: 0.18, roughness: 0.4 },
+      environmentIntensity: 0.3,
+    },
+  },
+  {
     // Cascade court water: reflecting sheets pooling on each tier and
     // spilling down the risers. Mirrors the basin water-sheet treatment.
     key: 'cascade-court-water',

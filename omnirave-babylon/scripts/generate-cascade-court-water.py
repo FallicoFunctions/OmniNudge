@@ -30,10 +30,13 @@ TIERS = [
     (3.6, 3.0, 3.20, 4.00, 7, 0.90, -0.5, -0.4, 79),
 ]
 WATER_RISE = 0.02   # water sits a hair above the stone tread
-INSET = 0.45        # water pulls in from the stone edge
-OUTSET = 0.10       # spill curtain top sits just outside the riser lip
-SPILL_FLARE = 0.55  # spill curtain bottom flares outward - falling water is
-                    # visibly proud of the stone instead of shrink-wrapping it
+# MUST match generate-cascade-court.py: battered riser + coping curb geometry.
+BATTER = 0.35
+COPING_W = 0.5
+COPING_H = 0.09
+POOL_INSET = BATTER + COPING_W + 0.12  # pool fills the tread inside the curb
+SPILL_TOP = -(BATTER - 0.12)           # ribbon top just outside the curb face
+SPILL_FLARE = 0.45  # ribbon bottom flares outward past the tier base
 CATCH_RX = 14.2     # irregular catch basin pooling around the mound base
 CATCH_RY = 11.4
 CATCH_Z = 0.07
@@ -136,11 +139,14 @@ def build_water(side, mat):
         levels.append(z1 + WATER_RISE)
     rng = random.Random(211)
     for i, pts in enumerate(polys):
-        # tread pool, edge-jittered so it reads as water lapping the stone
-        add_ngon(bm, jitter_polygon(offset_polygon(pts, -INSET), 300 + i), levels[i])
+        # tread pool inside the coping curb, edge-jittered so it reads as
+        # water lapping the stone (pool surface sits below the curb top)
+        add_ngon(bm, jitter_polygon(offset_polygon(pts, -POOL_INSET), 300 + i, amount=0.18), levels[i])
         # discrete spill ribbons through 2-3 notches per tier. A continuous
         # flared skirt off every edge produced stray angular wedges that read
         # as solid slabs (player-flagged); real cascades pour at a few points.
+        # Each ribbon starts just over the curb and lands on the tier below.
+        z_top = TIERS[i][3] + COPING_H + 0.03
         z_bottom = levels[i - 1] if i > 0 else CATCH_Z + 0.02
         n = len(pts)
         cx0 = sum(p[0] for p in pts) / n
@@ -156,11 +162,11 @@ def build_water(side, mat):
                 dx, dy = px - cx0, py - cy0
                 d = math.hypot(dx, dy) or 1.0
                 return (px + dx / d * dist, py + dy / d * dist)
-            top = [push(ax, ay, OUTSET), push(bx, by, OUTSET)]
-            bot = [push(ax, ay, OUTSET + SPILL_FLARE), push(bx, by, OUTSET + SPILL_FLARE)]
+            top = [push(ax, ay, SPILL_TOP), push(bx, by, SPILL_TOP)]
+            bot = [push(ax, ay, SPILL_FLARE), push(bx, by, SPILL_FLARE)]
             vs = [
-                bm.verts.new((top[0][0], top[0][1], levels[i])),
-                bm.verts.new((top[1][0], top[1][1], levels[i])),
+                bm.verts.new((top[0][0], top[0][1], z_top)),
+                bm.verts.new((top[1][0], top[1][1], z_top)),
                 bm.verts.new((bot[1][0], bot[1][1], z_bottom)),
                 bm.verts.new((bot[0][0], bot[0][1], z_bottom)),
             ]
@@ -193,8 +199,8 @@ def build_mist(side, mat):
         # nudge the panel just outside the spill line
         dx, dy = px - cx, py - cy
         d = math.hypot(dx, dy) or 1.0
-        px += dx / d * (OUTSET + SPILL_FLARE * 0.6)
-        py += dy / d * (OUTSET + SPILL_FLARE * 0.6)
+        px += dx / d * (SPILL_FLARE * 0.7)
+        py += dy / d * (SPILL_FLARE * 0.7)
         h = 0.5 + 0.45 * rng.random()
         w = 0.45 + 0.25 * rng.random()
         el = math.hypot(x1 - x0, y1 - y0) or 1.0
