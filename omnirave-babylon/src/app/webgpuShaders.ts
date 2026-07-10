@@ -32,3 +32,10 @@ import '@babylonjs/core/ShadersWGSL/glowMapGeneration.vertex.js';
 import '@babylonjs/core/ShadersWGSL/glowMapGeneration.fragment.js';
 import '@babylonjs/core/ShadersWGSL/background.vertex.js';
 import '@babylonjs/core/ShadersWGSL/background.fragment.js';
+// Cascade court living water: particle sprays plus runtime-generated ripple
+// normal maps. DynamicTexture needs its engine extension registered on the
+// tree-shaken WebGPU engine (without it, construction throws
+// "engine.createDynamicTexture is not a function").
+import '@babylonjs/core/ShadersWGSL/particles.vertex.js';
+import '@babylonjs/core/ShadersWGSL/particles.fragment.js';
+import '@babylonjs/core/Engines/WebGPU/Extensions/engine.dynamicTexture.js';
