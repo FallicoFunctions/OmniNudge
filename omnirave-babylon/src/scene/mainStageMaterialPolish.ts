@@ -1227,14 +1227,50 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     params: {
       clearAlbedoTexture: true,
       albedoColor: [0.04, 0.06, 0.08],
-      emissiveColor: [0.01, 0.025, 0.035],
-      emissiveIntensity: 0.08,
+      // Stronger cyan sheen than the flat basin sheets: the cascade pools
+      // must read unmistakably as water at night, not dark glass.
+      emissiveColor: [0.02, 0.055, 0.075],
+      emissiveIntensity: 0.16,
       metallic: 0.02,
-      roughness: 0.22,
+      roughness: 0.16,
       alpha: 0.98,
       clearCoat: { intensity: 0.7, roughness: 0.08 },
       environmentIntensity: 0.86,
       zOffset: 1,
+    },
+  },
+  {
+    // Cascade court crown: gold nozzle collar at the summit-pool center -
+    // the fountain's focal point. Matches the basin fountain nozzle gold.
+    key: 'cascade-court-crown',
+    match: [{ prefix: 'V150_CascadeCourtCrown_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.16, 0.13, 0.06],
+      emissiveColor: [0.006, 0.004, 0.001],
+      emissiveIntensity: 0.012,
+      metallic: 0.16,
+      roughness: 0.88,
+      clearCoat: { intensity: 0, roughness: 0.84 },
+      environmentIntensity: 0.12,
+    },
+  },
+  {
+    // Cascade court jet: the translucent water column rising from the crown
+    // nozzle. Brighter than the base mist so the summit reads as the source.
+    key: 'cascade-court-jet',
+    match: [{ prefix: 'V150_CascadeCourtJet_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.06, 0.09, 0.11],
+      emissiveColor: [0.06, 0.16, 0.22],
+      emissiveIntensity: 0.5,
+      metallic: 0.02,
+      roughness: 0.28,
+      alpha: 0.3,
+      alphaBlend: true,
+      clearCoat: { intensity: 0.62, roughness: 0.16 },
+      environmentIntensity: 0.82,
     },
   },
   {

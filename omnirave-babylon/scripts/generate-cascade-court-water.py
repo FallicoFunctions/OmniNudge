@@ -1,78 +1,61 @@
 # Pass 2 of the cascade court: WATER for the volcano mound built by
-# generate-cascade-court.py. Reuses the identical seeded tier polygons so the
-# water aligns exactly with the stone tiers:
-#   - a reflecting water sheet pooling on each tier tread
-#   - spill curtains sheeting down every tier riser (water flows down all sides)
-#   - mist plumes around the base where the water collects
+# generate-cascade-court.py. Tier geometry comes from cascade_court_params.py
+# (shared with the stone generator) so the water registers exactly:
+#   - a reflecting pool inside the coping curb on each tier tread
+#   - discrete spill ribbons pouring over the curb at 2-3 notches per tier
+#   - a catch pool ringing the base, inside the floor curb
+#   - low spray panels where the bottom spills land
+#   - a summit crown: gold nozzle collar + rising translucent jet
 #
-# Families: V150_CascadeCourtWater_{L,R} (V14_DeepReflectingWater),
-#           V150_CascadeCourtMist_{L,R}  (V18_CyanWaterMistGlow).
+# Families: V150_CascadeCourtWater_{L,R}  (V14_DeepReflectingWater)
+#           V150_CascadeCourtMist_{L,R}   (V18_CyanWaterMistGlow)
+#           V150_CascadeCourtCrown_{L,R}  (V18_BrushedGoldTrim)
+#           V150_CascadeCourtJet_{L,R}    (V18_CyanWaterMistGlow)
 #
 # Run:  blender -b assets-src/main-stage/main-stage.blend \
 #         --python scripts/generate-cascade-court-water.py -- --write
 import math
+import os
 import random
 import sys
 
 import bpy
 import bmesh
 
-GENERATED_PREFIX = "V150_CascadeCourt"
-WATER_SUFFIXES = ("Water_R", "Water_L", "Mist_R", "Mist_L")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cascade_court_params import (  # noqa: E402
+    BASE_POOL_OFF,
+    BATTER,
+    CATCH_Z,
+    CENTER,
+    COPING_H,
+    COPING_W,
+    TIERS,
+    base_polygon,
+    jitter_polygon,
+    offset_polygon,
+    tier_polygon,
+)
 
-# MUST match generate-cascade-court.py exactly so water lands on the stone.
-CENTER = (48.5, 28.5)
-TIERS = [
-    (13.0, 10.6, 0.00, 0.80, 11, 0.15, 0.0, 0.0, 11),
-    (10.6, 8.6, 0.80, 1.60, 9, 0.55, 0.9, -0.6, 27),
-    (8.2, 6.6, 1.60, 2.40, 10, 1.10, -0.8, 0.7, 43),
-    (5.8, 4.7, 2.40, 3.20, 8, 0.30, 0.6, 0.5, 61),
-    (3.6, 3.0, 3.20, 4.00, 7, 0.90, -0.5, -0.4, 79),
-]
-WATER_RISE = 0.02   # water sits a hair above the stone tread
-# MUST match generate-cascade-court.py: battered riser + coping curb geometry.
-BATTER = 0.35
-COPING_W = 0.5
-COPING_H = 0.09
+GENERATED_PREFIX = "V150_CascadeCourt"
+WATER_SUFFIXES = ("Water_R", "Water_L", "Mist_R", "Mist_L", "Crown_R", "Crown_L", "Jet_R", "Jet_L")
+
+WATER_RISE = 0.02                      # pool sits a hair above the stone tread
 POOL_INSET = BATTER + COPING_W + 0.12  # pool fills the tread inside the curb
 SPILL_TOP = -(BATTER - 0.12)           # ribbon top just outside the curb face
-SPILL_FLARE = 0.45  # ribbon bottom flares outward past the tier base
-CATCH_RX = 14.2     # irregular catch basin pooling around the mound base
-CATCH_RY = 11.4
-CATCH_Z = 0.07
+SPILL_FLARE = 0.45                     # ribbon bottom flares past the tier base
+
+# Summit crown: nozzle collar + jet sized against the top tier (z_top 4.0).
+CROWN_R = 0.55       # nozzle collar radius
+CROWN_H = 0.28       # nozzle collar height above the summit pool
+JET_H = 2.1          # jet rises this far above the nozzle
+JET_W = 0.5          # jet half-width at the nozzle
 
 
 def clear_previous():
     for obj in list(bpy.data.objects):
         if obj.type == "MESH" and any(obj.name.startswith(GENERATED_PREFIX + s) for s in WATER_SUFFIXES):
             bpy.data.objects.remove(obj, do_unlink=True)
-
-
-def get_material(name, fallback):
-    m = bpy.data.materials.get(name)
-    return m if m else bpy.data.materials.get(fallback)
-
-
-def tier_polygon(cx, cy, rx, ry, n, phase, seed, j_lo=0.80, j_hi=1.20):
-    rng = random.Random(seed)
-    pts = []
-    for k in range(n):
-        a = phase + 2.0 * math.pi * k / n
-        r_mult = j_lo + (j_hi - j_lo) * rng.random()
-        pts.append((cx + rx * r_mult * math.cos(a), cy + ry * r_mult * math.sin(a)))
-    return pts
-
-
-def offset_polygon(pts, delta):
-    """Move each vertex toward (delta<0) or away from (delta>0) the centroid."""
-    cx = sum(p[0] for p in pts) / len(pts)
-    cy = sum(p[1] for p in pts) / len(pts)
-    out = []
-    for (x, y) in pts:
-        dx, dy = x - cx, y - cy
-        d = math.hypot(dx, dy) or 1.0
-        out.append((x + dx / d * delta, y + dy / d * delta))
-    return out
 
 
 def add_ngon(bm, pts, z):
@@ -112,20 +95,6 @@ def _finalize(bm, name, mat, side):
         obj.data.calc_tangents()
     except Exception:
         pass
-
-
-def jitter_polygon(pts, seed, amount=0.3):
-    """Radial jitter so water edges never run parallel to the stone edges."""
-    rng = random.Random(seed)
-    cx = sum(p[0] for p in pts) / len(pts)
-    cy = sum(p[1] for p in pts) / len(pts)
-    out = []
-    for (x, y) in pts:
-        dx, dy = x - cx, y - cy
-        d = math.hypot(dx, dy) or 1.0
-        delta = (rng.random() * 2.0 - 1.0) * amount
-        out.append((x + dx / d * delta, y + dy / d * delta))
-    return out
 
 
 def build_water(side, mat):
@@ -175,32 +144,30 @@ def build_water(side, mat):
                 bm.faces.new(vs)
             except ValueError:
                 pass
-    # irregular catch basin pooling around the whole mound base (tight jitter
-    # so the pool stays inside the pocket envelope)
-    catch = tier_polygon(cx, cy, CATCH_RX, CATCH_RY, 13, 0.75, 113, j_lo=0.88, j_hi=1.06)
-    add_ngon(bm, catch, CATCH_Z)
+    # catch pool ringing the base, offset from the base stone so it always
+    # follows the mound's irregular footprint (edge concealed by the floor curb)
+    add_ngon(bm, offset_polygon(polys[0], BASE_POOL_OFF), CATCH_Z)
     _finalize(bm, f"{GENERATED_PREFIX}Water_{side}", mat, side)
 
 
 def build_mist(side, mat):
+    base = base_polygon()
     cx, cy = CENTER
-    (rx, ry, _z0, _z1, n, phase, ox, oy, seed) = TIERS[0]
-    base = tier_polygon(cx + ox, cy + oy, rx, ry, n, phase, seed)
     rng = random.Random(97)
     bm = bmesh.new()
     # low crossed spray panels anchored to the ACTUAL base-tier edge midpoints
-    # (exactly where the bottom spill sheets land in the catch basin), tapered
+    # (exactly where the bottom spill sheets land in the catch pool), tapered
     # hard toward the top so they read as spray kicking up, not floating slabs
     m = len(base)
     for k in range(m):
         x0, y0 = base[k]
         x1, y1 = base[(k + 1) % m]
         px, py = (x0 + x1) / 2.0, (y0 + y1) / 2.0
-        # nudge the panel just outside the spill line
+        # nudge the panel out over the catch pool ring
         dx, dy = px - cx, py - cy
         d = math.hypot(dx, dy) or 1.0
-        px += dx / d * (SPILL_FLARE * 0.7)
-        py += dy / d * (SPILL_FLARE * 0.7)
+        px += dx / d * (BASE_POOL_OFF * 0.55)
+        py += dy / d * (BASE_POOL_OFF * 0.55)
         h = 0.5 + 0.45 * rng.random()
         w = 0.45 + 0.25 * rng.random()
         el = math.hypot(x1 - x0, y1 - y0) or 1.0
@@ -221,14 +188,70 @@ def build_mist(side, mat):
     _finalize(bm, f"{GENERATED_PREFIX}Mist_{side}", mat, side)
 
 
+def build_crown(side, gold_mat, jet_mat):
+    """Summit focal point: a low octagonal gold nozzle collar at the center of
+    the summit pool, and a tapered translucent jet rising from it."""
+    cx, cy = CENTER
+    summit_top = TIERS[-1][3]
+    ox, oy = TIERS[-1][6], TIERS[-1][7]
+    px, py = cx + ox, cy + oy
+    z0 = summit_top + WATER_RISE
+
+    bm = bmesh.new()
+    n = 8
+    outer = [(px + CROWN_R * math.cos(2 * math.pi * k / n),
+              py + CROWN_R * math.sin(2 * math.pi * k / n)) for k in range(n)]
+    inner = [(px + CROWN_R * 0.55 * math.cos(2 * math.pi * k / n),
+              py + CROWN_R * 0.55 * math.sin(2 * math.pi * k / n)) for k in range(n)]
+    ob = [bm.verts.new((x, y, z0)) for (x, y) in outer]
+    ot = [bm.verts.new((x, y, z0 + CROWN_H)) for (x, y) in outer]
+    it_ = [bm.verts.new((x, y, z0 + CROWN_H)) for (x, y) in inner]
+    bm.verts.ensure_lookup_table()
+    for i in range(n):
+        j = (i + 1) % n
+        for a, b in ((ob, ot), (ot, it_)):
+            try:
+                bm.faces.new([a[i], a[j], b[j], b[i]])
+            except ValueError:
+                pass
+    _finalize(bm, f"{GENERATED_PREFIX}Crown_{side}", gold_mat, side)
+
+    # jet: four crossed sheets rising from inside the collar, each in two
+    # stacked segments - wide at the nozzle, bulging slightly at mid-height,
+    # tapering hard at the crest like a real pressure jet
+    bm = bmesh.new()
+    jz0 = z0 + CROWN_H * 0.5
+    jz_mid = jz0 + JET_H * 0.45
+    jz_top = jz0 + JET_H
+    for k in range(4):
+        a = math.pi * k / 4.0
+        ux, uy = math.cos(a), math.sin(a)
+        for (za, zb, wa, wb) in ((jz0, jz_mid, 1.0, 1.15), (jz_mid, jz_top, 1.15, 0.15)):
+            q = [
+                (px - ux * JET_W * wa, py - uy * JET_W * wa, za),
+                (px + ux * JET_W * wa, py + uy * JET_W * wa, za),
+                (px + ux * JET_W * wb, py + uy * JET_W * wb, zb),
+                (px - ux * JET_W * wb, py - uy * JET_W * wb, zb),
+            ]
+            vs = [bm.verts.new(v) for v in q]
+            bm.verts.ensure_lookup_table()
+            try:
+                bm.faces.new(vs)
+            except ValueError:
+                pass
+    _finalize(bm, f"{GENERATED_PREFIX}Jet_{side}", jet_mat, side)
+
+
 def main():
     write = "--write" in sys.argv
     clear_previous()
-    water = get_material("V14_DeepReflectingWater", "V14_DeepReflectingWater")
-    mist = get_material("V18_CyanWaterMistGlow", "V18_CyanWaterMistGlow")
+    water = bpy.data.materials.get("V14_DeepReflectingWater")
+    mist = bpy.data.materials.get("V18_CyanWaterMistGlow")
+    gold = bpy.data.materials.get("V18_BrushedGoldTrim")
     for side in ("R", "L"):
         build_water(side, water)
         build_mist(side, mist)
+        build_crown(side, gold, mist)
     count = len([o for o in bpy.data.objects
                  if any(o.name.startswith(GENERATED_PREFIX + s) for s in WATER_SUFFIXES)])
     if write:
