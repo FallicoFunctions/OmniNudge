@@ -38,6 +38,17 @@ TIERS = [
     (3.6, 3.0, 3.20, 4.00, 7, 0.90, -0.5, -0.4, 79),
 ]
 
+# Battered (inward-leaning) riser walls: each tier's top ring pulls toward its
+# centroid so the tiers flow into one carved mound instead of reading as a
+# stack of vertical-walled prisms (player-flagged).
+BATTER = 0.35
+# Raised coping curb rimming each tread: brighter pearl band that traces every
+# level and contains the tread pool. Separate object family so the polish
+# table can tint it lighter than the shell stone.
+COPING_W = 0.5
+COPING_H = 0.09
+COPING_LIP = 0.06  # curb outer face sits slightly proud of the riser top
+
 
 def clear_previous():
     for obj in list(bpy.data.objects):
@@ -62,9 +73,24 @@ def tier_polygon(cx, cy, rx, ry, n, phase, seed):
     return pts
 
 
+def offset_polygon(pts, delta):
+    """Move each vertex toward (delta<0) or away from (delta>0) the centroid."""
+    cx = sum(p[0] for p in pts) / len(pts)
+    cy = sum(p[1] for p in pts) / len(pts)
+    out = []
+    for (x, y) in pts:
+        dx, dy = x - cx, y - cy
+        d = math.hypot(dx, dy) or 1.0
+        out.append((x + dx / d * delta, y + dy / d * delta))
+    return out
+
+
 def build_tier(bm, pts, z0, z1):
+    """Frustum tier: full-size ring at the base, battered (inset) ring at the
+    top, so the riser leans inward and the mound reads as one carved form."""
+    top_pts = offset_polygon(pts, -BATTER)
     bottom = [bm.verts.new((x, y, z0)) for (x, y) in pts]
-    top = [bm.verts.new((x, y, z1)) for (x, y) in pts]
+    top = [bm.verts.new((x, y, z1)) for (x, y) in top_pts]
     bm.verts.ensure_lookup_table()
     n = len(pts)
     try:
@@ -75,12 +101,32 @@ def build_tier(bm, pts, z0, z1):
         bm.faces.new(top)  # the step tread
     except ValueError:
         pass
-    for i in range(n):  # riser walls
+    for i in range(n):  # sloped riser walls
         j = (i + 1) % n
         try:
             bm.faces.new([bottom[i], bottom[j], top[j], top[i]])
         except ValueError:
             pass
+
+
+def build_coping_ring(bm, pts, z1):
+    """Raised curb on the tread's outer edge: outer wall, flat cap, inner
+    wall - a bright band tracing the tier and containing the tread pool."""
+    outer_pts = offset_polygon(pts, -BATTER + COPING_LIP)
+    inner_pts = offset_polygon(pts, -BATTER - COPING_W)
+    ob = [bm.verts.new((x, y, z1)) for (x, y) in outer_pts]
+    ot = [bm.verts.new((x, y, z1 + COPING_H)) for (x, y) in outer_pts]
+    it_ = [bm.verts.new((x, y, z1 + COPING_H)) for (x, y) in inner_pts]
+    ib = [bm.verts.new((x, y, z1)) for (x, y) in inner_pts]
+    bm.verts.ensure_lookup_table()
+    n = len(pts)
+    for i in range(n):
+        j = (i + 1) % n
+        for a, b in ((ob, ot), (ot, it_), (it_, ib)):
+            try:
+                bm.faces.new([a[i], a[j], b[j], b[i]])
+            except ValueError:
+                pass
 
 
 def _box_project_uvs(mesh, cube_size=1.5):
@@ -101,26 +147,38 @@ def _ensure_tangents(obj):
         pass
 
 
-def build_side(side, mat):
-    cx, cy = CENTER
-    bm = bmesh.new()
-    for (rx, ry, z0, z1, n, phase, ox, oy, seed) in TIERS:
-        pts = tier_polygon(cx + ox, cy + oy, rx, ry, n, phase, seed)
-        build_tier(bm, pts, z0, z1)
+def _finalize(bm, name, mat, side):
     if side == "L":
         for v in bm.verts:
             v.co.x = -v.co.x
     # triangulate n-gon caps for a well-defined tangent basis on export
     bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='BEAUTY', ngon_method='BEAUTY')
-    mesh = bpy.data.meshes.new(f"{GENERATED_PREFIX}Shell_{side}_Mesh")
+    mesh = bpy.data.meshes.new(name + "_Mesh")
     bm.to_mesh(mesh)
     bm.free()
     _box_project_uvs(mesh)
-    obj = bpy.data.objects.new(f"{GENERATED_PREFIX}Shell_{side}", mesh)
+    obj = bpy.data.objects.new(name, mesh)
     if mat:
         obj.data.materials.append(mat)
     bpy.context.collection.objects.link(obj)
     _ensure_tangents(obj)
+
+
+def build_side(side, mat):
+    cx, cy = CENTER
+    polys = []
+    for (rx, ry, z0, z1, n, phase, ox, oy, seed) in TIERS:
+        polys.append((tier_polygon(cx + ox, cy + oy, rx, ry, n, phase, seed), z0, z1))
+
+    bm = bmesh.new()
+    for (pts, z0, z1) in polys:
+        build_tier(bm, pts, z0, z1)
+    _finalize(bm, f"{GENERATED_PREFIX}Shell_{side}", mat, side)
+
+    bm = bmesh.new()
+    for (pts, _z0, z1) in polys:
+        build_coping_ring(bm, pts, z1)
+    _finalize(bm, f"{GENERATED_PREFIX}Coping_{side}", mat, side)
 
 
 def main():
