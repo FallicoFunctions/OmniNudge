@@ -12,6 +12,7 @@ import { createPlayerRig } from '../player/createPlayerRig';
 import { createReviewAvatar } from '../player/createReviewAvatar';
 import { resolveMoveVector, resolveVerticalDirection } from '../player/movementMath';
 import { createAtmosphereRig } from './createAtmosphereRig';
+import { createCascadeCourtWaterMotion } from './cascadeCourtWaterMotion';
 import { createLightingRig } from './createLightingRig';
 import { createMainStagePresentationRig } from './createMainStagePresentationRig';
 import { freezeStaticScene } from './freezeStaticScene';
@@ -90,6 +91,11 @@ export async function createMainStageScene(engine: AbstractEngine) {
     dynamicMeshes: reviewAvatar.meshes,
   });
 
+  // After the freeze: bring the cascade court's water to life (rippling
+  // pools, streaming spills, breathing mist, summit spray). The module
+  // unfreezes only the cascade water materials it animates.
+  const cascadeWaterMotion = createCascadeCourtWaterMotion(scene);
+
   const canvas = engine.getRenderingCanvas?.();
   if (canvas) {
     cameraRig.camera.attachControl(canvas, true);
@@ -142,6 +148,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
       input,
       playerRig,
       productionSurfaces,
+      cascadeWaterMotion,
       spawn: BACK_PLAZA_SPAWN,
     },
   };
