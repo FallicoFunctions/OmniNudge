@@ -4499,6 +4499,37 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     },
   },
   {
+    // Gothic facade colonnade behind the V28 arcade row. Previously had no
+    // polish at all, rendering near-black - the player couldn't see it
+    // ("I don't see any change"). Slightly brighter than V28 with a warm
+    // whisper so the backdrop layer reads and the two rows gain depth.
+    key: 'wing-arcade-facade-colonnade',
+    match: [{ prefix: 'V140_WingArcade_', suffix: 'Colonnade' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.2, 0.22, 0.27],
+      emissiveColor: [0.008, 0.01, 0.014],
+      emissiveIntensity: 0.03,
+      metallic: 0.02,
+      roughness: 0.9,
+      clearCoat: { intensity: 0.03, roughness: 0.7 },
+      environmentIntensity: 0.1,
+    },
+  },
+  {
+    key: 'wing-arcade-facade-arch-gold',
+    match: [{ prefix: 'V140_WingArcade_', suffix: 'Arch' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.2, 0.16, 0.07],
+      emissiveColor: [0.014, 0.01, 0.003],
+      emissiveIntensity: 0.03,
+      metallic: 0.2,
+      roughness: 0.86,
+      environmentIntensity: 0.12,
+    },
+  },
+  {
     key: 'wing-arcade-cyan-inlay',
     match: [{ exact: 'V28_WingArcadeCyanInlay_L' }, { exact: 'V28_WingArcadeCyanInlay_R' }],
     params: {
