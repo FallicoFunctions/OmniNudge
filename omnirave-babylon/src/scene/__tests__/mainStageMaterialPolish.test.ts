@@ -260,6 +260,25 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     },
   },
   {
+    key: 'cascade-court-gold-inlay',
+    meshNames: ['V150_CascadeCourtGoldInlay_R', 'V150_CascadeCourtGoldInlay_L'],
+    expected: {
+      albedoTextureCleared: true,
+      albedoColor: [0.24, 0.19, 0.09],
+      emissiveColor: [0.014, 0.01, 0.003],
+      emissiveIntensity: 0.03,
+      metallic: 0.32,
+      roughness: 0.58,
+      alpha: 1,
+      transparencyMode: null,
+      clearCoatEnabled: true,
+      clearCoatIntensity: 0.1,
+      clearCoatRoughness: 0.5,
+      environmentIntensity: 0.22,
+      metaPolish: null,
+    },
+  },
+  {
     key: 'cascade-court-crown',
     meshNames: ['V150_CascadeCourtCrown_R', 'V150_CascadeCourtCrown_L'],
     expected: {

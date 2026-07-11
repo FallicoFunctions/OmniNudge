@@ -1375,6 +1375,22 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     },
   },
   {
+    // Cascade court gold inlay: bands set into every curb cap, tracing the
+    // fountain's levels in the venue's gold-on-pearl signature.
+    key: 'cascade-court-gold-inlay',
+    match: [{ prefix: 'V150_CascadeCourtGoldInlay_' }],
+    params: {
+      clearAlbedoTexture: true,
+      albedoColor: [0.24, 0.19, 0.09],
+      emissiveColor: [0.014, 0.01, 0.003],
+      emissiveIntensity: 0.03,
+      metallic: 0.32,
+      roughness: 0.58,
+      clearCoat: { intensity: 0.1, roughness: 0.5 },
+      environmentIntensity: 0.22,
+    },
+  },
+  {
     // Cascade court crown: gold nozzle collar at the summit-pool center -
     // the fountain's focal point. Matches the basin fountain nozzle gold.
     key: 'cascade-court-crown',
