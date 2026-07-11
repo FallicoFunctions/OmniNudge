@@ -10021,6 +10021,19 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(waterline.min[1]).toBeGreaterThan(-0.1);
     expect(waterline.max[1]).toBeLessThan(3.6); // top tier base + band height
     expect(materialNameFor('V150_CascadeCourtWaterline_R')).toBe('V15_PearlShellBeveled');
+
+    // gold inlay bands trace every curb cap (tier curbs + base curb)
+    expect(nodeNamesWithPrefix('V150_CascadeCourtGoldInlay_')).toHaveLength(2);
+    const inlay = readMeshGeometry('V150_CascadeCourtGoldInlay_R', {
+      minVertexCount: 60,
+      minUniquePositions: 25,
+      minNonZeroAreaTriangles: 20,
+    });
+    expect(inlay.min[1]).toBeGreaterThan(0.1); // base curb band
+    expect(inlay.max[1]).toBeGreaterThan(4.0); // summit curb band
+    expect(inlay.max[1]).toBeLessThan(4.3);
+    expect(materialNameFor('V150_CascadeCourtGoldInlay_R')).toBe('V18_BrushedGoldTrim');
+    expect(materialNameFor('V150_CascadeCourtGoldInlay_L')).toBe('V18_BrushedGoldTrim');
   });
 
   it('fills the cascade court with reflecting water and base mist', () => {
