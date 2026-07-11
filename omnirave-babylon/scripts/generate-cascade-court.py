@@ -35,10 +35,18 @@ from cascade_court_params import (  # noqa: E402
 GENERATED_PREFIX = "V150_CascadeCourt"
 STONE_SUFFIXES = (
     "Shell_R", "Shell_L", "Coping_R", "Coping_L", "Waterline_R", "Waterline_L",
+    "GoldInlay_R", "GoldInlay_L",
 )
 
 CHAMFER = 0.035     # eased edge on every curb: sharp 90-degree rims read as CG
 WATERLINE_H = 0.13  # wet stain band height above each tier's base
+
+# Gold inlay band set into every curb cap: ties the fountain into the venue's
+# gold-and-pearl language. Sits proud of the cap by a real physical lift (the
+# venue's seal-script convention) so it can never z-fight the stone.
+INLAY_OUT = 0.12    # band outer edge, inset from the curb's outer face
+INLAY_W = 0.12      # band width
+INLAY_LIFT = 0.008
 
 
 def clear_previous():
@@ -123,7 +131,7 @@ def _finalize(bm, name, mat, side):
         pass
 
 
-def build_side(side, mat):
+def build_side(side, mat, gold_mat):
     polys = tier_polygons()
 
     bm = bmesh.new()
@@ -172,13 +180,36 @@ def build_side(side, mat):
                 pass
     _finalize(bm, f"{GENERATED_PREFIX}Waterline_{side}", mat, side)
 
+    # gold inlay bands set into every curb cap (tier curbs + base curb) -
+    # the venue's gold-on-pearl signature, tracing the fountain's levels
+    bm = bmesh.new()
+    def add_inlay(ring_pts, cap_outer_off, z_cap):
+        outer = offset_polygon(ring_pts, cap_outer_off - INLAY_OUT)
+        inner = offset_polygon(ring_pts, cap_outer_off - INLAY_OUT - INLAY_W)
+        z = z_cap + INLAY_LIFT
+        ov = [bm.verts.new((x, y, z)) for (x, y) in outer]
+        iv = [bm.verts.new((x, y, z)) for (x, y) in inner]
+        bm.verts.ensure_lookup_table()
+        n = len(ring_pts)
+        for i in range(n):
+            j = (i + 1) % n
+            try:
+                bm.faces.new([ov[i], ov[j], iv[j], iv[i]])
+            except ValueError:
+                pass
+    for (pts, _z0, z1) in polys:
+        add_inlay(pts, -BATTER + COPING_LIP, z1 + COPING_H)
+    add_inlay(base, BASE_CURB_OUT, BASE_CURB_H)
+    _finalize(bm, f"{GENERATED_PREFIX}GoldInlay_{side}", gold_mat, side)
+
 
 def main():
     write = "--write" in sys.argv
     clear_previous()
     pearl = bpy.data.materials.get("V15_PearlShellBeveled")
-    build_side("R", pearl)
-    build_side("L", pearl)
+    gold = bpy.data.materials.get("V18_BrushedGoldTrim")
+    build_side("R", pearl, gold)
+    build_side("L", pearl, gold)
     count = len([o for o in bpy.data.objects
                  if any(o.name.startswith(GENERATED_PREFIX + s) for s in STONE_SUFFIXES)])
     if write:
