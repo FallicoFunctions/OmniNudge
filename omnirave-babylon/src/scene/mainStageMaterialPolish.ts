@@ -2150,8 +2150,10 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'approach-paver-field',
     match: [{ exact: 'V34_ApproachPaverField' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.14, 0.135, 0.13],
+      // Keep V18_WetStonePaver's real texture maps and tint over them:
+      // clearing them left the whole walkup reading as blank unfinished
+      // slabs (player-flagged on the V65 approach).
+      albedoColor: [0.3, 0.29, 0.28],
       emissiveColor: [0.01, 0.012, 0.015],
       emissiveIntensity: 0.05,
       metallic: 0.06,
