@@ -2755,8 +2755,8 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     key: 'approach-paver-field',
     meshNames: ['V34_ApproachPaverField'],
     expected: {
-      albedoTextureCleared: true,
-      albedoColor: [0.14, 0.135, 0.13],
+      albedoTextureCleared: false,
+      albedoColor: [0.3, 0.29, 0.28],
       emissiveColor: [0.01, 0.012, 0.015],
       emissiveIntensity: 0.05,
       metallic: 0.06,

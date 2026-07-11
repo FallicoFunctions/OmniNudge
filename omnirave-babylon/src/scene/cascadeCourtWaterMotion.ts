@@ -10,6 +10,7 @@ export interface CascadeWaterMotionSummary {
   streams: number;
   mists: number;
   jets: number;
+  underlays: number;
 }
 
 // Static water was the cascade court's strongest fake tell (player: "they
@@ -26,9 +27,15 @@ export function createCascadeCourtWaterMotion(scene: Scene): CascadeWaterMotionS
   const poolMeshes = scene.meshes.filter((m) => /^V150_CascadeCourtWater_[LR]$/.test(m.name));
   const streamMeshes = scene.meshes.filter((m) => /^V150_CascadeCourt(Spill|Jet)_[LR]$/.test(m.name));
   const mistMeshes = scene.meshes.filter((m) => /^V150_CascadeCourtMist_[LR]$/.test(m.name));
+  // The arrival approach's reflection underlay is the same "still water"
+  // idea at venue scale - and it read as static paint (player-flagged on
+  // the V65 walkup). It drifts with its own ripple map, scaled for a
+  // ~300-unit-long strip.
+  const underlayMeshes = scene.meshes.filter((m) => m.name === 'V34_ApproachReflectionUnderlay');
 
   const poolNormals = tryCreateWaterNormalTexture(scene, 'cascade-pool-ripple');
   const streamNormals = tryCreateWaterNormalTexture(scene, 'cascade-stream-flow');
+  const underlayNormals = tryCreateWaterNormalTexture(scene, 'approach-underlay-ripple');
 
   const touched = new Set<PBRMaterial>();
   const bind = (meshes: { material: unknown }[], texture: DynamicTexture | null, uScale: number, vScale: number) => {
@@ -46,6 +53,7 @@ export function createCascadeCourtWaterMotion(scene: Scene): CascadeWaterMotionS
   };
   bind(poolMeshes, poolNormals, 5, 5);
   bind(streamMeshes, streamNormals, 1.5, 3);
+  bind(underlayMeshes, underlayNormals, 6, 64);
   for (const mesh of mistMeshes) {
     if (mesh.material instanceof PBRMaterial) touched.add(mesh.material);
   }
@@ -79,6 +87,11 @@ export function createCascadeCourtWaterMotion(scene: Scene): CascadeWaterMotionS
     if (streamNormals) {
       // fast fall-direction scroll: the spill sheets visibly stream downward
       streamNormals.vOffset = (streamNormals.vOffset - dt * 0.55 + 1) % 1;
+    }
+    if (underlayNormals) {
+      // barely-moving drift: arrival water is still, not flowing
+      underlayNormals.uOffset = (underlayNormals.uOffset + dt * 0.012) % 1;
+      underlayNormals.vOffset = (underlayNormals.vOffset + dt * 0.007) % 1;
     }
     for (let i = 0; i < mistMaterials.length; i++) {
       mistMaterials[i].alpha = mistBaseAlpha[i] * (0.78 + 0.22 * Math.sin(elapsed * 1.7 + i));
@@ -123,6 +136,7 @@ export function createCascadeCourtWaterMotion(scene: Scene): CascadeWaterMotionS
     streams: streamMeshes.length,
     mists: mistMeshes.length,
     jets,
+    underlays: underlayMeshes.length,
   };
 }
 
