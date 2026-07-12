@@ -25,6 +25,10 @@ describe('createCascadeCourtWaterMotion', () => {
       'V150_CascadeCourtMist_R',
       'V150_CascadeCourtMist_L',
       'V34_ApproachReflectionUnderlay',
+      'V63_BasinWaterParterre',
+      'V118_BasinWaterSheet_L',
+      'V67_VipGardenReflectingPool_R',
+      'V86_SpawnWetInsetPoolArray_L',
     ];
     for (const name of families) {
       const mesh = MeshBuilder.CreateBox(name, { size: 1 }, scene);
@@ -46,10 +50,11 @@ describe('createCascadeCourtWaterMotion', () => {
     expect(summary.mists).toBe(2);
     expect(summary.jets).toBe(2);
     expect(summary.underlays).toBe(1);
+    expect(summary.stillWaters).toBe(4);
     expect(scene.particleSystems.length).toBe(2);
 
     for (const mesh of scene.meshes) {
-      if (!/^V150_CascadeCourt|^V34_ApproachReflectionUnderlay$/.test(mesh.name)) continue;
+      if (!/^(V150_CascadeCourt|V34_Approach|V63_|V118_|V67_|V86_)/.test(mesh.name)) continue;
       const material = mesh.material;
       expect(material instanceof PBRMaterial).toBe(true);
       expect((material as PBRMaterial).isFrozen).toBe(false);
@@ -91,6 +96,7 @@ describe('createCascadeCourtWaterMotion', () => {
     expect(summary.mists).toBe(0);
     expect(summary.jets).toBe(0);
     expect(summary.underlays).toBe(0);
+    expect(summary.stillWaters).toBe(0);
     expect(scene.particleSystems.length).toBe(0);
     expect(() => scene.render()).not.toThrow();
   });
