@@ -9646,7 +9646,9 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V118_BasinWaterSheet_L')).toBe('V14_DeepReflectingWater');
     expect(materialNameFor('V118_BasinWaterSheet_R')).toBe('V14_DeepReflectingWater');
 
-    expect(wallLeft.vertexCount + wallRight.vertexCount + waterLeft.vertexCount + waterRight.vertexCount).toBeLessThanOrEqual(260);
+    // Raised 2026-07-11: the water sheets carry box UVs + tangents now (the
+    // venue-wide ripple motion needs them), which grows the flat-vertex count.
+    expect(wallLeft.vertexCount + wallRight.vertexCount + waterLeft.vertexCount + waterRight.vertexCount).toBeLessThanOrEqual(320);
   });
 
   it('replaces the remaining basin side deck cuboids with authored relief slabs', () => {

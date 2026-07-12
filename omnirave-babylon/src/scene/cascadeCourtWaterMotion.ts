@@ -11,6 +11,7 @@ export interface CascadeWaterMotionSummary {
   mists: number;
   jets: number;
   underlays: number;
+  stillWaters: number;
 }
 
 // Static water was the cascade court's strongest fake tell (player: "they
@@ -32,10 +33,22 @@ export function createCascadeCourtWaterMotion(scene: Scene): CascadeWaterMotionS
   // the V65 walkup). It drifts with its own ripple map, scaled for a
   // ~300-unit-long strip.
   const underlayMeshes = scene.meshes.filter((m) => m.name === 'V34_ApproachReflectionUnderlay');
+  // Every remaining water surface in the venue: basin parterre, basin
+  // sheets, VIP garden pools, spawn inset pools. Same slow drift - "none of
+  // the water looks real, looks like paint" applied venue-wide. (The older
+  // meshes carry box UVs added by scripts/add-still-water-uvs.py.)
+  // Opaque water (the VIP pools) gets static-merged, so match the merged
+  // name too - the merged mesh keeps the family's cloned material.
+  const stillWaterMeshes = scene.meshes.filter((m) =>
+    /^(merged:)?(V63_BasinWaterParterre|V118_BasinWaterSheet_[LR]|V67_VipGardenReflectingPool|V86_SpawnWetInsetPoolArray)/.test(
+      m.name,
+    ),
+  );
 
   const poolNormals = tryCreateWaterNormalTexture(scene, 'cascade-pool-ripple');
   const streamNormals = tryCreateWaterNormalTexture(scene, 'cascade-stream-flow');
   const underlayNormals = tryCreateWaterNormalTexture(scene, 'approach-underlay-ripple');
+  const stillNormals = tryCreateWaterNormalTexture(scene, 'venue-still-water-ripple');
 
   const touched = new Set<PBRMaterial>();
   const bind = (meshes: { material: unknown }[], texture: DynamicTexture | null, uScale: number, vScale: number) => {
@@ -54,6 +67,9 @@ export function createCascadeCourtWaterMotion(scene: Scene): CascadeWaterMotionS
   bind(poolMeshes, poolNormals, 5, 5);
   bind(streamMeshes, streamNormals, 1.5, 3);
   bind(underlayMeshes, underlayNormals, 6, 64);
+  // box UVs are already world-proportional, so one modest tiling works
+  // across every still-water surface regardless of mesh size
+  bind(stillWaterMeshes, stillNormals, 2, 2);
   for (const mesh of mistMeshes) {
     if (mesh.material instanceof PBRMaterial) touched.add(mesh.material);
   }
@@ -92,6 +108,10 @@ export function createCascadeCourtWaterMotion(scene: Scene): CascadeWaterMotionS
       // barely-moving drift: arrival water is still, not flowing
       underlayNormals.uOffset = (underlayNormals.uOffset + dt * 0.012) % 1;
       underlayNormals.vOffset = (underlayNormals.vOffset + dt * 0.007) % 1;
+    }
+    if (stillNormals) {
+      stillNormals.uOffset = (stillNormals.uOffset + dt * 0.014) % 1;
+      stillNormals.vOffset = (stillNormals.vOffset + dt * 0.009) % 1;
     }
     for (let i = 0; i < mistMaterials.length; i++) {
       mistMaterials[i].alpha = mistBaseAlpha[i] * (0.78 + 0.22 * Math.sin(elapsed * 1.7 + i));
@@ -137,6 +157,7 @@ export function createCascadeCourtWaterMotion(scene: Scene): CascadeWaterMotionS
     mists: mistMeshes.length,
     jets,
     underlays: underlayMeshes.length,
+    stillWaters: stillWaterMeshes.length,
   };
 }
 
