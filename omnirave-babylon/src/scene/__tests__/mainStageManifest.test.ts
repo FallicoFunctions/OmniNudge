@@ -10307,4 +10307,45 @@ describe('reviewRouteData', () => {
     expect(readableFramingDistance(promenadeCheckpoint!)).toBeLessThanOrEqual(90);
     expect(readableFramingDistance(vipCheckpoint!)).toBeLessThanOrEqual(75);
   });
+
+  it('keeps focal approval checkpoints clear of clipped or top-down review framing', () => {
+    const crowdPit = MAIN_STAGE_REVIEW_ROUTE.find((checkpoint) => checkpoint.id === 'crowd_pit');
+    const cascadeCourt = MAIN_STAGE_REVIEW_ROUTE.find((checkpoint) => checkpoint.id === 'cascade_court');
+    const vipTerrace = MAIN_STAGE_REVIEW_ROUTE.find((checkpoint) => checkpoint.id === 'vip_terrace');
+
+    expect(crowdPit).toBeDefined();
+    expect(cascadeCourt).toBeDefined();
+    expect(vipTerrace).toBeDefined();
+
+    const cameraPosition = (checkpoint: NonNullable<typeof crowdPit>) => ({
+      x: checkpoint.x + (checkpoint.camera.positionOffset?.x ?? 0),
+      y: checkpoint.y + (checkpoint.camera.positionOffset?.y ?? 0),
+      z: checkpoint.z + (checkpoint.camera.positionOffset?.z ?? 0),
+    });
+    const focusTarget = (checkpoint: NonNullable<typeof crowdPit>) => ({
+      x: checkpoint.x + checkpoint.camera.focusOffset.x,
+      y: checkpoint.y + checkpoint.camera.focusOffset.y,
+      z: checkpoint.z + checkpoint.camera.focusOffset.z,
+    });
+
+    const crowdCamera = cameraPosition(crowdPit!);
+    const crowdFocus = focusTarget(crowdPit!);
+    expect(crowdCamera.z).toBeLessThanOrEqual(-58);
+    expect(crowdCamera.y).toBeLessThanOrEqual(12);
+    expect(crowdFocus.y).toBeGreaterThanOrEqual(22);
+    expect(crowdFocus.z).toBeLessThanOrEqual(0);
+
+    const cascadeCamera = cameraPosition(cascadeCourt!);
+    const cascadeFocus = focusTarget(cascadeCourt!);
+    expect(cascadeCamera.y - cascadeFocus.y).toBeLessThanOrEqual(14);
+    expect(Math.abs(cascadeCamera.x - cascadeFocus.x)).toBeGreaterThanOrEqual(20);
+    expect(Math.abs(cascadeCamera.z - cascadeFocus.z)).toBeGreaterThanOrEqual(20);
+
+    const vipCamera = cameraPosition(vipTerrace!);
+    const vipFocus = focusTarget(vipTerrace!);
+    expect(vipCamera.y).toBeGreaterThanOrEqual(23);
+    expect(vipCamera.z).toBeLessThanOrEqual(-30);
+    expect(Math.abs(vipCamera.x - vipFocus.x)).toBeGreaterThanOrEqual(8);
+    expect(vipCamera.y - vipFocus.y).toBeGreaterThanOrEqual(8);
+  });
 });
