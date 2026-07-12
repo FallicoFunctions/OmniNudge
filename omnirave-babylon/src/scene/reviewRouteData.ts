@@ -45,8 +45,10 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
       alpha: -Math.PI / 2,
       beta: 1.06,
       radius: 52,
-      focusOffset: { x: 0, y: 10.3, z: 18 },
-      positionOffset: { x: 10, y: 20.3, z: -66 },
+      // Offsets ride the player root, which now stands 0.79 higher on the
+      // foreground deck - drop them so the absolute framing is unchanged.
+      focusOffset: { x: 0, y: 9.5, z: 18 },
+      positionOffset: { x: 10, y: 19.5, z: -66 },
     },
   },
   {
@@ -75,10 +77,12 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
       alpha: -Math.PI / 2,
       beta: 1.35,
       radius: 26,
-      focusOffset: { x: -2, y: 14, z: 26 },
+      // Offsets dropped 0.8 to compensate for the raised foreground deck
+      // under this checkpoint (player root rides the new floor).
+      focusOffset: { x: -2, y: 13.2, z: 26 },
       // Clears the route-edge tent roofline: at y 2.6 the camera grazed the
       // canopy and ground-snap variance decided whether it clipped inside.
-      positionOffset: { x: 12, y: 8.5, z: -24 },
+      positionOffset: { x: 12, y: 7.7, z: -24 },
     },
   },
   {
