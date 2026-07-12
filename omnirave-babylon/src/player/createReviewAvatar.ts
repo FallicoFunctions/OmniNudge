@@ -1,4 +1,6 @@
-import '@babylonjs/loaders/glTF';
+import '@babylonjs/loaders/glTF/2.0/glTFLoader.js';
+import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_draco_mesh_compression.js';
+import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_materials_emissive_strength.js';
 
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader.js';
 import { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
