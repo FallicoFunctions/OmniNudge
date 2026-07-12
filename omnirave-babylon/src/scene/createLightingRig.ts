@@ -7,7 +7,10 @@ import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.
 import { RenderTargetTexture } from '@babylonjs/core/Materials/Textures/renderTargetTexture.js';
 import type { Scene } from '@babylonjs/core/scene.js';
 
+import '@babylonjs/core/Materials/standardMaterial.js';
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
+import '@babylonjs/core/Shaders/shadowMap.fragment.js';
+import '@babylonjs/core/Shaders/shadowMap.vertex.js';
 
 import type { PerfFlags } from '../app/perfFlags';
 
@@ -17,7 +20,7 @@ export function createLightingRig(scene: Scene, perfFlags: PerfFlags = PERF_DEFA
   const hemi = new HemisphericLight('main-stage-hemi-light', new Vector3(0, 1, 0), scene);
   hemi.diffuse = new Color3(0.36, 0.41, 0.52);
   hemi.groundColor = new Color3(0.05, 0.06, 0.08);
-  hemi.intensity = 0.48;
+  hemi.intensity = 0.72;
 
   const key = new DirectionalLight(
     'main-stage-key-light',
@@ -46,7 +49,7 @@ export function createLightingRig(scene: Scene, perfFlags: PerfFlags = PERF_DEFA
   );
   fill.diffuse = new Color3(0.22, 0.34, 0.58);
   fill.specular = new Color3(0.1, 0.18, 0.34);
-  fill.intensity = 0.72;
+  fill.intensity = 0.82;
   fill.position = new Vector3(0, 24, -84);
 
   const isWebGPU = scene.getEngine().isWebGPU;

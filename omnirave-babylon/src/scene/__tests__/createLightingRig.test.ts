@@ -1,4 +1,4 @@
-import { MeshBuilder, NullEngine, PBRMaterial, RenderTargetTexture, Scene } from '@babylonjs/core';
+import { MeshBuilder, NullEngine, PBRMaterial, RenderTargetTexture, Scene, ShaderStore } from '@babylonjs/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createLightingRig } from '../createLightingRig';
@@ -25,7 +25,8 @@ describe('createLightingRig', () => {
     expect(rig.rim.name).toBe('main-stage-rim-light');
     expect(rig.fill.name).toBe('main-stage-front-fill-light');
     expect(rig.key.intensity).toBeGreaterThan(2);
-    expect(rig.hemi.intensity).toBeLessThanOrEqual(0.6);
+    expect(rig.hemi.intensity).toBeGreaterThanOrEqual(0.68);
+    expect(rig.hemi.intensity).toBeLessThanOrEqual(0.82);
     expect(rig.rim.intensity).toBeGreaterThanOrEqual(0.9);
     expect(rig.fill.intensity).toBeGreaterThanOrEqual(0.55);
     expect(rig.fill.intensity).toBeLessThanOrEqual(0.9);
@@ -99,5 +100,15 @@ describe('createLightingRig', () => {
     expect(included).toContain('V90_NearPaving');
     expect(included).not.toContain('V24_FarTower');
     expect(solidMaterial.maxSimultaneousLights).toBeGreaterThanOrEqual(6);
+  });
+
+  it('registers WebGL shadow shaders needed by the forced fallback runtime', () => {
+    engine = new NullEngine();
+    scene = new Scene(engine);
+
+    createLightingRig(scene);
+
+    expect(ShaderStore.ShadersStore.shadowMapVertexShader).toBeTypeOf('string');
+    expect(ShaderStore.ShadersStore.shadowMapPixelShader).toBeTypeOf('string');
   });
 });
