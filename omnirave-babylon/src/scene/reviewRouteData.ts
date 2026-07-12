@@ -64,8 +64,8 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
       alpha: 0,
       beta: 1.1,
       radius: 36,
-      focusOffset: { x: 26.5, y: 1.3, z: -8.5 },
-      positionOffset: { x: 8, y: 20, z: 20 },
+      focusOffset: { x: 12, y: 3.5, z: -7 },
+      positionOffset: { x: 44, y: 16, z: -34 },
     },
   },
   {
@@ -77,12 +77,11 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
       alpha: -Math.PI / 2,
       beta: 1.35,
       radius: 26,
-      // Offsets dropped 0.8 to compensate for the raised foreground deck
-      // under this checkpoint (player root rides the new floor).
-      focusOffset: { x: -2, y: 13.2, z: 26 },
-      // Clears the route-edge tent roofline: at y 2.6 the camera grazed the
-      // canopy and ground-snap variance decided whether it clipped inside.
-      positionOffset: { x: 12, y: 7.7, z: -24 },
+      // Pull the approval camera back off the LED panels and aim at the
+      // upper proscenium so the crowd-pit review reads as a full hero stage,
+      // not a clipped screen close-up.
+      focusOffset: { x: -6, y: 24, z: 8 },
+      positionOffset: { x: -6, y: 6, z: -74 },
     },
   },
   {
@@ -107,8 +106,8 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
       alpha: -2.8,
       beta: 1,
       radius: 38,
-      focusOffset: { x: -16, y: 3.5, z: 0 },
-      positionOffset: { x: 16, y: 13.5, z: -64 },
+      focusOffset: { x: -20, y: 5, z: -10 },
+      positionOffset: { x: -10, y: 15, z: -52 },
     },
   },
 ] as const;
