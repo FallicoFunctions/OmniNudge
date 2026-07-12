@@ -1,4 +1,13 @@
-import { FreeCamera, MeshBuilder, NullEngine, PBRMaterial, Scene, Vector3 } from '@babylonjs/core';
+import {
+  FreeCamera,
+  MeshBuilder,
+  NullEngine,
+  PBRMaterial,
+  RawTexture,
+  Scene,
+  Texture,
+  Vector3,
+} from '@babylonjs/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createCascadeCourtWaterMotion } from '../cascadeCourtWaterMotion';
@@ -83,11 +92,63 @@ describe('createCascadeCourtWaterMotion', () => {
     }
   });
 
-  it('does nothing harmful in a scene without cascade meshes', () => {
+  it('creates scene-owned raw textures and animates replacement water normals under NullEngine', () => {
+    const scene = buildCascadeScene();
+    const underlay = scene.getMeshByName('V34_ApproachReflectionUnderlay');
+    const underlayMaterial = underlay?.material as PBRMaterial;
+    const authoredNormal = RawTexture.CreateRGBATexture(
+      new Uint8Array([128, 128, 255, 255]),
+      1,
+      1,
+      scene,
+      false,
+      false,
+      Texture.NEAREST_SAMPLINGMODE,
+    );
+    authoredNormal.name = 'authored-underlay-normal';
+    underlayMaterial.bumpTexture = authoredNormal;
+
+    createCascadeCourtWaterMotion(scene);
+
+    const expectedGeneratedNames = [
+      'cascade-pool-ripple',
+      'cascade-stream-flow',
+      'approach-underlay-ripple',
+      'venue-still-water-ripple',
+      'cascade-spray-sprite',
+    ];
+    const generatedTextures = expectedGeneratedNames.map((name) => scene.getTextureByName(name));
+    expect(generatedTextures.every((texture) => texture instanceof RawTexture)).toBe(true);
+    expect(underlayMaterial.bumpTexture).toBe(scene.getTextureByName('approach-underlay-ripple'));
+    expect(underlayMaterial.bumpTexture).not.toBe(authoredNormal);
+    const animatedNormal = underlayMaterial.bumpTexture as RawTexture;
+    expect(animatedNormal.uScale).toBe(6);
+    expect(animatedNormal.vScale).toBe(64);
+    expect(scene.particleSystems[0]?.particleTexture).toBe(scene.getTextureByName('cascade-spray-sprite'));
+
+    const initialUOffset = animatedNormal.uOffset;
+    const initialVOffset = animatedNormal.vOffset;
+    scene.render();
+    expect(animatedNormal.uOffset).not.toBe(initialUOffset);
+    expect(animatedNormal.vOffset).not.toBe(initialVOffset);
+    expect(scene.textures).toContain(authoredNormal);
+
+    const disposedNames = new Set<string>();
+    for (const texture of generatedTextures) {
+      texture?.onDisposeObservable.addOnce(() => disposedNames.add(texture.name));
+    }
+    scene.dispose();
+    expect(disposedNames).toEqual(new Set(expectedGeneratedNames));
+    expect(scene.textures).toHaveLength(0);
+  });
+
+  it('allocates no textures or frame observers in a scene without target water meshes', () => {
     engine = new NullEngine();
     const scene = new Scene(engine);
     new FreeCamera('test-camera', new Vector3(0, 5, -10), scene);
     MeshBuilder.CreateBox('V30_SomethingElse', { size: 1 }, scene);
+    const initialTextureCount = scene.textures.length;
+    const initialObserverCount = scene.onBeforeRenderObservable.observers.length;
 
     const summary = createCascadeCourtWaterMotion(scene);
 
@@ -98,6 +159,8 @@ describe('createCascadeCourtWaterMotion', () => {
     expect(summary.underlays).toBe(0);
     expect(summary.stillWaters).toBe(0);
     expect(scene.particleSystems.length).toBe(0);
+    expect(scene.textures.length).toBe(initialTextureCount);
+    expect(scene.onBeforeRenderObservable.observers.length).toBe(initialObserverCount);
     expect(() => scene.render()).not.toThrow();
   });
 });

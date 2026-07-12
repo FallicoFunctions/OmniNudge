@@ -173,15 +173,16 @@ function createKeyShadowGenerator(scene: Scene, key: DirectionalLight) {
     shadowGenerator.addShadowCaster(mesh, false);
   }
 
-  // The stage set is static, so the map should bake once - but not on the
-  // first frame: material depth-effects compile asynchronously, and baking
-  // before they are ready captures an almost-empty map (the scene then
-  // renders shadowless forever). Render every frame until the scene reports
-  // ready, then bake one final time and freeze.
+  // The stage set is static. Limit the initial compile pass to one frame,
+  // then request exactly one final bake when every depth effect is ready.
+  // Leaving the default EVERY_FRAME rate active until scene readiness makes
+  // hundreds of static casters render continuously and can hold WebGL near
+  // 3 FPS during startup.
   const shadowMap = shadowGenerator.getShadowMap();
   if (shadowMap) {
+    shadowMap.refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
+    shadowMap.resetRefreshCounter();
     scene.executeWhenReady(() => {
-      shadowMap.refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
       shadowMap.resetRefreshCounter();
     });
   }

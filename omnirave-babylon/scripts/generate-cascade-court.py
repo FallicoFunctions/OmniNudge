@@ -50,9 +50,14 @@ INLAY_LIFT = 0.008
 
 
 def clear_previous():
+    owned_meshes = set()
     for obj in list(bpy.data.objects):
         if obj.type == "MESH" and any(obj.name.startswith(GENERATED_PREFIX + s) for s in STONE_SUFFIXES):
+            owned_meshes.add(obj.data)
             bpy.data.objects.remove(obj, do_unlink=True)
+    for mesh in owned_meshes:
+        if mesh.users == 0:
+            bpy.data.meshes.remove(mesh)
 
 
 def build_tier(bm, pts, z0, z1):
@@ -115,6 +120,7 @@ def _finalize(bm, name, mat, side):
     if side == "L":
         for v in bm.verts:
             v.co.x = -v.co.x
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
     # triangulate n-gon caps for a well-defined tangent basis on export
     bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='BEAUTY', ngon_method='BEAUTY')
     mesh = bpy.data.meshes.new(name + "_Mesh")

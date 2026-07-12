@@ -34,8 +34,12 @@ export interface AdaptiveResolutionState {
   aboveSinceMs: number | null;
 }
 
-export function createAdaptiveResolutionState(config: AdaptiveResolutionConfig): AdaptiveResolutionState {
-  return { level: config.sharpestLevel, belowSinceMs: null, aboveSinceMs: null };
+export function createAdaptiveResolutionState(
+  config: AdaptiveResolutionConfig,
+  initialLevel = config.sharpestLevel,
+): AdaptiveResolutionState {
+  const level = Number.isFinite(initialLevel) && initialLevel > 0 ? initialLevel : config.sharpestLevel;
+  return { level, belowSinceMs: null, aboveSinceMs: null };
 }
 
 export function stepAdaptiveResolution(

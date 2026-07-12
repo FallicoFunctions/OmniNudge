@@ -1,4 +1,9 @@
-import '@babylonjs/loaders/glTF';
+// Register only the loader and extensions used by this asset. Importing the
+// glTF barrel pulls every optional extension (FlowGraph, OpenPBR, audio, ...)
+// into the initial game chunk.
+import '@babylonjs/loaders/glTF/2.0/glTFLoader.js';
+import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_draco_mesh_compression.js';
+import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_materials_emissive_strength.js';
 
 import { DracoCompression } from '@babylonjs/core/Meshes/Compression/dracoCompression.js';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader.js';
@@ -10,7 +15,7 @@ DracoCompression.Configuration = {
   decoder: {
     wasmUrl: '/libs/draco/draco_wasm_wrapper_gltf.js',
     wasmBinaryUrl: '/libs/draco/draco_decoder_gltf.wasm',
-    fallbackUrl: '/libs/draco/draco_wasm_wrapper_gltf.js',
+    fallbackUrl: '/libs/draco/draco_decoder_gltf.js',
   },
 };
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';

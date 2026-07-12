@@ -1,4 +1,4 @@
-import { MeshBuilder, NullEngine, PBRMaterial, Scene, TransformNode } from '@babylonjs/core';
+import { Mesh, MeshBuilder, NullEngine, PBRMaterial, Scene, TransformNode } from '@babylonjs/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { freezeStaticScene } from '../freezeStaticScene';
@@ -55,5 +55,30 @@ describe('freezeStaticScene', () => {
 
     expect(shared.isFrozen).toBe(false);
     expect(venue.isWorldMatrixFrozen).toBe(true);
+  });
+
+  it('leaves billboard and infinite-distance meshes camera-dependent', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+
+    const billboard = MeshBuilder.CreatePlane('screen-haze', { size: 1 }, scene);
+    billboard.billboardMode = Mesh.BILLBOARDMODE_ALL;
+    billboard.material = new PBRMaterial('screen-haze-material', scene);
+
+    const vault = MeshBuilder.CreateSphere('celestial-vault', { diameter: 10 }, scene);
+    vault.infiniteDistance = true;
+    vault.material = new PBRMaterial('celestial-vault-material', scene);
+
+    const venue = MeshBuilder.CreateBox('venue-mass', { size: 1 }, scene);
+    venue.material = new PBRMaterial('venue-material', scene);
+
+    const summary = freezeStaticScene(scene, { dynamicNamePatterns: [] });
+
+    expect(billboard.isWorldMatrixFrozen).toBe(false);
+    expect(vault.isWorldMatrixFrozen).toBe(false);
+    expect((billboard.material as PBRMaterial).isFrozen).toBe(false);
+    expect((vault.material as PBRMaterial).isFrozen).toBe(false);
+    expect(venue.isWorldMatrixFrozen).toBe(true);
+    expect(summary.frozenMeshes).toBe(1);
   });
 });

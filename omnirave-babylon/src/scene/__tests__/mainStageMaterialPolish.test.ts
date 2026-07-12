@@ -1,7 +1,7 @@
 import { MeshBuilder, NullEngine, PBRMaterial, Scene } from '@babylonjs/core';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { polishMainStageMaterials } from '../mainStageMaterialPolish';
+import { MAIN_STAGE_MESH_OVERRIDES, polishMainStageMaterials } from '../mainStageMaterialPolish';
 
 // NOTE: never pass Babylon objects (materials, meshes, scenes) to expect() —
 // a failing object-valued assertion makes vitest diff the whole engine graph,
@@ -6491,7 +6491,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
   },
   {
     key: 'wing-canopy-lamella-gold-front',
-    meshNames: ['V117_WingCanopyLamellaGoldArray_Probe'],
+    meshNames: ['V117_WingCanopyLamellaGoldArray_Probe_Front'],
     expected: {
       albedoTextureCleared: true,
       albedoColor: [0.149, 0.111, 0.047],
@@ -6681,6 +6681,34 @@ describe('polishMainStageMaterials', () => {
       name: 'probe-albedo',
     } as unknown as PBRMaterial['albedoTexture'];
   }
+
+  it('keeps every override fixture aligned with one unambiguous production rule', () => {
+    const ruleKeys = MAIN_STAGE_MESH_OVERRIDES.map(({ key }) => key);
+    const expectationKeys = OVERRIDE_EXPECTATIONS.map(({ key }) => key);
+
+    expect(new Set(ruleKeys).size).toBe(ruleKeys.length);
+    expect(new Set(expectationKeys).size).toBe(expectationKeys.length);
+    expect([...ruleKeys].sort()).toEqual([...expectationKeys].sort());
+
+    const matcherMatches = (
+      matcher: (typeof MAIN_STAGE_MESH_OVERRIDES)[number]['match'][number],
+      meshName: string,
+    ) => {
+      if (matcher.exact !== undefined) return meshName === matcher.exact;
+      if (matcher.prefix !== undefined && !meshName.startsWith(matcher.prefix)) return false;
+      if (matcher.suffix !== undefined && !meshName.endsWith(matcher.suffix)) return false;
+      return matcher.prefix !== undefined || matcher.suffix !== undefined;
+    };
+
+    for (const expectation of OVERRIDE_EXPECTATIONS) {
+      for (const meshName of expectation.meshNames) {
+        const matchingKeys = MAIN_STAGE_MESH_OVERRIDES
+          .filter((rule) => rule.match.some((matcher) => matcherMatches(matcher, meshName)))
+          .map(({ key }) => key);
+        expect(matchingKeys).toEqual([expectation.key]);
+      }
+    }
+  });
 
   it('upgrades named Main Stage material families for richer in-engine rendering', () => {
     const screen = createMeshWithMaterial('V14_CosmicScreenEmission');

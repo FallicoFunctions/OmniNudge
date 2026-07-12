@@ -20,9 +20,14 @@ GENERATED_PREFIX = "V140_WingArcade"  # own namespace; safe to clear+regen
 
 
 def clear_previous():
+    owned_meshes = set()
     for obj in list(bpy.data.objects):
         if obj.type == "MESH" and obj.name.startswith(GENERATED_PREFIX):
+            owned_meshes.add(obj.data)
             bpy.data.objects.remove(obj, do_unlink=True)
+    for mesh in owned_meshes:
+        if mesh.users == 0:
+            bpy.data.meshes.remove(mesh)
 
 
 def get_material(name, fallback):

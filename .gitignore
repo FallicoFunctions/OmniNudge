@@ -107,3 +107,5 @@ TMP_MAIN_STAGE_TEST.glb
 docs/superpowers/plans/
 frontend/playwright-report/
 frontend/test-results/
+__pycache__/
+*.py[cod]

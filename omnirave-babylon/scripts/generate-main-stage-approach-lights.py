@@ -17,6 +17,8 @@ OBJECT_NAMES = [
     "V40_ApproachLightStem_L", "V40_ApproachLightStem_R",
 ]
 SPACING = 26.0
+SOURCE_Y = 104.0
+POSITION_TOLERANCE = 0.05
 NEW_POST_COUNT = 4  # fills Y[104,286] -> extends to Y=0, matching the
                     # walkway start (Y=-15.9) closely enough that the
                     # residual ~16m gap reads as intentional foreground.
@@ -55,14 +57,22 @@ def extend_object(name):
     bm.verts.ensure_lookup_table()
 
     islands = mesh_islands(bm)
-    # front-most island = lowest Y center = the one nearest the gap we fill
-    islands.sort(key=lambda comp: sum(v.co.y for v in comp) / len(comp))
-    template = islands[0]
+    centers = [sum(v.co.y for v in comp) / len(comp) for comp in islands]
+    template_index = min(range(len(islands)), key=lambda index: abs(centers[index] - SOURCE_Y))
+    if abs(centers[template_index] - SOURCE_Y) > POSITION_TOLERANCE:
+        bm.free()
+        raise RuntimeError(f"Missing stable Y={SOURCE_Y:g} approach-light template in {name}")
+    template = islands[template_index]
     template_verts = list(template)
-    template_faces = [f for f in bm.faces if all(v in template_verts for v in f.verts)]
+    template_vert_set = set(template_verts)
+    template_faces = [f for f in bm.faces if all(v in template_vert_set for v in f.verts)]
 
+    added = 0
     for n in range(1, NEW_POST_COUNT + 1):
-        delta_y = -SPACING * n
+        target_y = SOURCE_Y - SPACING * n
+        if any(abs(center - target_y) <= POSITION_TOLERANCE for center in centers):
+            continue
+        delta_y = target_y - SOURCE_Y
         vert_map = {}
         for v in template_verts:
             nv = bm.verts.new((v.co.x, v.co.y + delta_y, v.co.z))
@@ -72,24 +82,26 @@ def extend_object(name):
                 bm.faces.new([vert_map[v] for v in f.verts])
             except ValueError:
                 pass  # duplicate face guard
+        centers.append(target_y)
+        added += 1
 
     bm.to_mesh(obj.data)
     obj.data.update()
     bm.free()
-    return len(template_verts), len(template_faces)
+    return len(template_verts), len(template_faces), added
 
 
 def main():
     write = "--write" in sys.argv
     totals = []
     for name in OBJECT_NAMES:
-        nv, nf = extend_object(name)
-        totals.append((name, nv, nf))
+        nv, nf, added = extend_object(name)
+        totals.append((name, nv, nf, added))
     if write:
         bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
-    for name, nv, nf in totals:
-        print(f"EXTENDED {name}: template {nv}v/{nf}f x{NEW_POST_COUNT} copies")
-    print(f"APPROACH_LIGHTS_EXTENDED objects={len(totals)} written={write}")
+    for name, nv, nf, added in totals:
+        print(f"EXTENDED {name}: template {nv}v/{nf}f added={added}")
+    print(f"APPROACH_LIGHTS_EXTENDED objects={len(totals)} copiesAdded={sum(item[3] for item in totals)} written={write}")
 
 
 main()

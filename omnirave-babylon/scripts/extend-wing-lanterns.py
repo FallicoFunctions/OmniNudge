@@ -12,6 +12,7 @@ import bmesh
 
 TEMPLATE_Y_CENTER = 0.00
 TEMPLATE_X_CENTER_L = -6.20
+POSITION_TOLERANCE = 0.1
 
 # New lantern positions in the outer wing corridor, left side (X negative).
 # Right side is the mirror (X * -1). Chosen to echo the organic scatter
@@ -50,20 +51,23 @@ def find_template_island(obj, y_center_target, x_center_target, tol=0.1):
                     stack.append(other)
         islands.append(island)
 
-    for island in islands:
-        xs = [v.co.x for v in island]
-        ys = [v.co.y for v in island]
-        xc = sum(xs) / len(xs)
-        yc = sum(ys) / len(ys)
+    centers = [
+        (
+            sum(v.co.x for v in island) / len(island),
+            sum(v.co.y for v in island) / len(island),
+        )
+        for island in islands
+    ]
+    for island, (xc, yc) in zip(islands, centers):
         if abs(xc - x_center_target) < tol and abs(yc - y_center_target) < tol:
-            return bm, island
+            return bm, island, centers
     bm.free()
-    return None, None
+    return None, None, []
 
 
 def extend_lanterns(obj_name, template_x_center, positions):
     obj = bpy.data.objects[obj_name]
-    bm, island = find_template_island(obj, TEMPLATE_Y_CENTER, template_x_center)
+    bm, island, existing_centers = find_template_island(obj, TEMPLATE_Y_CENTER, template_x_center)
     if island is None:
         raise RuntimeError(f"template island not found for {obj_name}")
 
@@ -74,6 +78,11 @@ def extend_lanterns(obj_name, template_x_center, positions):
 
     added = 0
     for (new_x, new_y) in positions:
+        if any(
+            abs(cx - new_x) <= POSITION_TOLERANCE and abs(cy - new_y) <= POSITION_TOLERANCE
+            for cx, cy in existing_centers
+        ):
+            continue
         dx = new_x - template_x_center
         dy = new_y - TEMPLATE_Y_CENTER
         vert_map = {}
@@ -86,6 +95,7 @@ def extend_lanterns(obj_name, template_x_center, positions):
                 bm.faces.new([vert_map[v] for v in f.verts])
             except ValueError:
                 pass
+        existing_centers.append((new_x, new_y))
         added += 1
 
     bm.faces.ensure_lookup_table()

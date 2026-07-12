@@ -53,10 +53,16 @@ GENERATED = ("V151_ApproachDeckSlab", "V151_ApproachDeckStair", "COL_ApproachDec
 
 
 def clear_previous():
+    owned_meshes = set()
     for name in GENERATED:
         obj = bpy.data.objects.get(name)
         if obj:
+            if obj.type == "MESH":
+                owned_meshes.add(obj.data)
             bpy.data.objects.remove(obj, do_unlink=True)
+    for mesh in owned_meshes:
+        if mesh.users == 0:
+            bpy.data.meshes.remove(mesh)
 
 
 def get_material(name):
