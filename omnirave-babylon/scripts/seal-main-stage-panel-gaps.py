@@ -11,6 +11,7 @@
 # Run headless: blender -b assets-src/main-stage/main-stage.blend \
 #   --python scripts/seal-main-stage-panel-gaps.py
 import re
+import sys
 
 import bpy
 from mathutils import Vector
@@ -44,30 +45,77 @@ LIFT_PATTERN = re.compile(
     r"PlazaPaverPearlBands|BackPlazaSightlineGoldRail"
 )
 LIFT_METERS = 0.006
+SEAL_MARKER = "omnirave_panel_gap_seal_version"
+SEAL_VERSION = 1
 
-sealed = 0
-for obj in bpy.data.objects:
+
+def target_kind(obj):
     if obj.type != "MESH":
-        continue
+        return None
     if SINK_PATTERN.search(obj.name):
-        obj.location.z -= SINK_METERS
-        sealed += 1
-        continue
+        return "sink"
     if LIFT_PATTERN.search(obj.name):
-        obj.location.z += LIFT_METERS
-        sealed += 1
-        continue
-    gentle = GENTLE_PATTERN.search(obj.name)
-    if not gentle and not TARGET_PATTERN.search(obj.name):
-        continue
-    mesh = obj.data
-    amount = GENTLE_INFLATE_METERS if gentle else INFLATE_METERS
-    # displace along per-vertex normals (world-scale assumed 1.0 per source rules)
-    offsets = [Vector(v.normal) * amount for v in mesh.vertices]
-    for vertex, offset in zip(mesh.vertices, offsets):
-        vertex.co += offset
-    mesh.update()
-    sealed += 1
+        return "lift"
+    if GENTLE_PATTERN.search(obj.name):
+        return "gentle"
+    if TARGET_PATTERN.search(obj.name):
+        return "inflate"
+    return None
 
-bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
-print(f"PANEL_GAPS_SEALED objects={sealed}")
+
+def mark_current_state():
+    """Adopt the already-sealed repository baseline without moving geometry."""
+    marked = 0
+    for obj in bpy.data.objects:
+        kind = target_kind(obj)
+        if kind in {"sink", "lift"}:
+            obj[SEAL_MARKER] = SEAL_VERSION
+            marked += 1
+        elif kind in {"gentle", "inflate"} and obj.data.get(SEAL_MARKER) != SEAL_VERSION:
+            obj.data[SEAL_MARKER] = SEAL_VERSION
+            marked += 1
+    return marked
+
+
+def seal_once():
+    sealed = 0
+    for obj in bpy.data.objects:
+        kind = target_kind(obj)
+        if kind is None:
+            continue
+        if kind in {"sink", "lift"}:
+            if obj.get(SEAL_MARKER) == SEAL_VERSION:
+                continue
+            obj.location.z += -SINK_METERS if kind == "sink" else LIFT_METERS
+            obj[SEAL_MARKER] = SEAL_VERSION
+            sealed += 1
+            continue
+
+        mesh = obj.data
+        # Mirrored objects can share one mesh datablock. Marking the datablock
+        # prevents both double-application in one run and drift across reruns.
+        if mesh.get(SEAL_MARKER) == SEAL_VERSION:
+            continue
+        amount = GENTLE_INFLATE_METERS if kind == "gentle" else INFLATE_METERS
+        offsets = [Vector(vertex.normal) * amount for vertex in mesh.vertices]
+        for vertex, offset in zip(mesh.vertices, offsets):
+            vertex.co += offset
+        mesh[SEAL_MARKER] = SEAL_VERSION
+        mesh.update()
+        sealed += 1
+    return sealed
+
+
+def main():
+    if "--mark-current" in sys.argv:
+        changed = mark_current_state()
+        action = "PANEL_GAP_BASELINE_MARKED"
+    else:
+        changed = seal_once()
+        action = "PANEL_GAPS_SEALED"
+    bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
+    print(f"{action} datablocks={changed}")
+
+
+if __name__ == "__main__":
+    main()

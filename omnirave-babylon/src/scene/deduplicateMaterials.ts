@@ -2,13 +2,9 @@ import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import type { Scene } from '@babylonjs/core/scene';
 
 export interface DeduplicateMaterialsSummary {
+  materialsDisposed: number;
   materialsRemapped: number;
 }
-
-const color = (c: { r: number; g: number; b: number } | null | undefined) =>
-  c ? `${c.r},${c.g},${c.b}` : 'x';
-
-const texture = (t: { uniqueId?: number } | null | undefined) => (t ? `t${t.uniqueId}` : 'x');
 
 // The polish pass clones one material per override row; many rows carry
 // identical final values, so the scene ends up with hundreds of visually
@@ -16,35 +12,22 @@ const texture = (t: { uniqueId?: number } | null | undefined) => (t ? `t${t.uniq
 // distinct visual signature lets the static merge collapse across rows.
 export function deduplicateMaterials(scene: Scene): DeduplicateMaterialsSummary {
   const canonical = new Map<string, PBRMaterial>();
+  const signatures = new Map<PBRMaterial, string>();
+  const getSignature = (material: PBRMaterial) => {
+    let signature = signatures.get(material);
+    if (signature === undefined) {
+      signature = materialSignature(material);
+      signatures.set(material, signature);
+    }
+    return signature;
+  };
   let materialsRemapped = 0;
-
-  const signature = (m: PBRMaterial) =>
-    [
-      color(m.albedoColor),
-      color(m.emissiveColor),
-      m.emissiveIntensity,
-      m.metallic ?? 'x',
-      m.roughness ?? 'x',
-      m.alpha,
-      m.transparencyMode ?? 'x',
-      m.zOffset,
-      m.environmentIntensity,
-      m.clearCoat.isEnabled ? `${m.clearCoat.intensity},${m.clearCoat.roughness}` : 'x',
-      texture(m.albedoTexture),
-      texture(m.bumpTexture),
-      texture(m.metallicTexture),
-      texture(m.ambientTexture),
-      texture(m.emissiveTexture),
-      m.unlit ? 1 : 0,
-      m.backFaceCulling ? 1 : 0,
-      m.maxSimultaneousLights,
-    ].join('|');
 
   for (const mesh of scene.meshes) {
     const material = mesh.material;
     if (!(material instanceof PBRMaterial)) continue;
 
-    const key = signature(material);
+    const key = getSignature(material);
     const existing = canonical.get(key);
     if (!existing) {
       canonical.set(key, material);
@@ -56,5 +39,44 @@ export function deduplicateMaterials(scene: Scene): DeduplicateMaterialsSummary 
     }
   }
 
-  return { materialsRemapped };
+  let materialsDisposed = 0;
+  for (const material of [...scene.materials]) {
+    if (!(material instanceof PBRMaterial) || isMaterialReferenced(scene, material)) {
+      continue;
+    }
+
+    const key = getSignature(material);
+    const existing = canonical.get(key);
+    if (!existing) {
+      canonical.set(key, material);
+      continue;
+    }
+    if (existing !== material) {
+      // The canonical material owns the shared textures. Dispose only this
+      // orphan's material/effect resources, never the textures themselves.
+      material.dispose(false, false);
+      materialsDisposed += 1;
+    }
+  }
+
+  return { materialsDisposed, materialsRemapped };
+}
+
+function materialSignature(material: PBRMaterial) {
+  // PBRMaterial.serialize covers the complete shader-visible state,
+  // including BRDF, clearcoat, sheen, anisotropy, subsurface, stencil,
+  // texture transforms, culling, and depth settings. Remove only instance
+  // identity so visually identical clones can share one canonical material.
+  const serialized = material.serialize();
+  delete serialized.id;
+  delete serialized.name;
+  delete serialized.uniqueId;
+  return JSON.stringify(serialized);
+}
+
+function isMaterialReferenced(scene: Scene, material: PBRMaterial) {
+  return (
+    scene.meshes.some((mesh) => mesh.material === material) ||
+    scene.multiMaterials.some((multiMaterial) => multiMaterial.subMaterials.includes(material))
+  );
 }

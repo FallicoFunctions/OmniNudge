@@ -4931,7 +4931,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
   },
   {
     key: 'wing-canopy-lamella-gold-front',
-    match: [{ prefix: 'V117_WingCanopyLamellaGoldArray_' }],
+    match: [{ prefix: 'V117_WingCanopyLamellaGoldArray_', suffix: '_Front' }],
     params: {
       clearAlbedoTexture: true,
       albedoColor: [0.149, 0.111, 0.047],

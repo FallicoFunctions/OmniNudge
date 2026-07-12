@@ -7,4 +7,4 @@ PYTHON_SCRIPT="$ROOT_DIR/scripts/export-main-stage.py"
 
 node "$ROOT_DIR/scripts/optimize-main-stage.mjs"
 blender -b "$BLEND_FILE" --python "$PYTHON_SCRIPT"
-node "$ROOT_DIR/scripts/optimize-main-stage.mjs" --require-exports
+node "$ROOT_DIR/scripts/optimize-main-stage.mjs" --finalize-exports

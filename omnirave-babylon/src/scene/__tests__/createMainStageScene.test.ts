@@ -1,15 +1,35 @@
-import { ArcRotateCamera, MeshBuilder, NullEngine, TransformNode } from '@babylonjs/core';
+import {
+  ArcRotateCamera,
+  MeshBuilder,
+  NullEngine,
+  PBRMaterial,
+  Ray,
+  TransformNode,
+  Vector3,
+  type AbstractMesh,
+  type Scene,
+} from '@babylonjs/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-async function loadCreateMainStageScene() {
+interface StageAssets {
+  collisionMeshes: AbstractMesh[];
+  mainMeshes: AbstractMesh[];
+}
+
+async function loadCreateMainStageScene(
+  populateStageAssets?: (scene: Scene, stageAssets: StageAssets) => void,
+) {
   vi.resetModules();
-  const stageAssets = {
+  const stageAssets: StageAssets = {
     collisionMeshes: [],
     mainMeshes: [],
   };
 
   vi.doMock('../loadMainStageAssets', () => ({
-    loadMainStageAssets: vi.fn(async () => stageAssets),
+    loadMainStageAssets: vi.fn(async (scene: Scene) => {
+      populateStageAssets?.(scene, stageAssets);
+      return stageAssets;
+    }),
   }));
 
   vi.doMock('../../player/createReviewAvatar', async () => {
@@ -116,5 +136,77 @@ describe('createMainStageScene', () => {
     scene.render();
 
     expect(avatarBody!.visibility).toBe(0);
+  });
+
+  it('preserves side LED fields through merging and refreshes the live stage mesh list', async () => {
+    engine = new NullEngine();
+    const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(
+      (scene, assets) => {
+        const ledMaterial = new PBRMaterial('side-led-material', scene);
+        for (const [side, x] of [
+          ['L', -20],
+          ['R', 20],
+        ] as const) {
+          const field = MeshBuilder.CreateBox(
+            `V31_SideLedTileField_${side}`,
+            { width: 8, height: 1, depth: 6 },
+            scene,
+          );
+          field.position.set(x, 5, 0);
+          field.material = ledMaterial;
+          assets.mainMeshes.push(field);
+        }
+
+        const mergeMaterial = new PBRMaterial('merge-material', scene);
+        for (let i = 0; i < 2; i++) {
+          const member = MeshBuilder.CreateBox(`V200_MergeMember_${i}`, { size: 1 }, scene);
+          member.position.x = i * 3;
+          member.material = mergeMaterial;
+          assets.mainMeshes.push(member);
+        }
+      },
+    );
+
+    const scene = await createMainStageScene(engine);
+    const runtime = scene.metadata?.reviewRuntime;
+
+    expect(scene.getMeshByName('V31_SideLedTileField_L')).not.toBeNull();
+    expect(scene.getMeshByName('V31_SideLedTileField_R')).not.toBeNull();
+    expect(runtime.presentationRig.emissiveSpillLights).toHaveLength(4);
+    expect(stageAssets.mainMeshes).toEqual(
+      expect.arrayContaining([
+        scene.getMeshByName('V31_SideLedTileField_L'),
+        scene.getMeshByName('V31_SideLedTileField_R'),
+      ]),
+    );
+    expect(stageAssets.mainMeshes.some((mesh) => mesh.name.startsWith('merged:'))).toBe(true);
+    expect(stageAssets.mainMeshes.every((mesh) => scene.meshes.includes(mesh))).toBe(true);
+    expect(stageAssets.mainMeshes.every((mesh) => !mesh.isDisposed())).toBe(true);
+  });
+
+  it('reuses one ground ray across render frames', async () => {
+    engine = new NullEngine();
+    const rayInstances = new Set<Ray>();
+    const intersectsMesh = vi
+      .spyOn(Ray.prototype, 'intersectsMesh')
+      .mockImplementation(function (this: Ray) {
+        rayInstances.add(this);
+        return {
+          distance: 128,
+          hit: true,
+          pickedPoint: Vector3.Zero(),
+        } as ReturnType<Ray['intersectsMesh']>;
+      });
+    const { createMainStageScene } = await loadCreateMainStageScene((scene, assets) => {
+      const collision = MeshBuilder.CreateGround('collision-ground', { width: 500, height: 500 }, scene);
+      assets.collisionMeshes.push(collision);
+    });
+
+    const scene = await createMainStageScene(engine);
+    scene.render();
+    scene.render();
+
+    expect(intersectsMesh).toHaveBeenCalledTimes(2);
+    expect(rayInstances.size).toBe(1);
   });
 });

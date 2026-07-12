@@ -1,3 +1,5 @@
+import { createRuntimeErrorOverlay } from '../ui/createRuntimeErrorOverlay';
+
 export async function bootstrapRuntime() {
   const app = document.getElementById('app');
   if (!app) {
@@ -5,7 +7,6 @@ export async function bootstrapRuntime() {
   }
 
   let host = app.querySelector<HTMLElement>('[data-testid="babylon-runtime-host"]');
-  const hostCreated = !host;
   if (!host) {
     host = document.createElement('div');
     host.dataset.testid = 'babylon-runtime-host';
@@ -14,14 +15,17 @@ export async function bootstrapRuntime() {
   }
 
   if (!host.querySelector('canvas[data-testid="babylon-render-canvas"]')) {
+    host.replaceChildren();
     try {
       const { createRuntime } = await import('./createRuntime');
       await createRuntime(host);
     } catch (error) {
       host.replaceChildren();
-      if (hostCreated) {
-        host.remove();
-      }
+      createRuntimeErrorOverlay(host, () => {
+        void bootstrapRuntime().catch((retryError) => {
+          console.error('Main Stage retry failed', retryError);
+        });
+      });
       throw error;
     }
   }

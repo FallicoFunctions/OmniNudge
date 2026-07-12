@@ -41,8 +41,13 @@ export async function createMainStageScene(engine: AbstractEngine) {
   deduplicateMaterials(scene);
   mergeStaticMeshGroups(scene, {
     dynamicMeshes: [],
-    preserveNamePatterns: [/LanternCore|LanternWarmCore|FountainLightArray/],
+    preserveNamePatterns: [
+      /LanternCore|LanternWarmCore|FountainLightArray/,
+      /^V31_SideLedTileField_[LR]$/,
+    ],
   });
+  const collisionMeshSet = new Set(stageAssets.collisionMeshes);
+  stageAssets.mainMeshes = scene.meshes.filter((mesh) => !collisionMeshSet.has(mesh));
 
   const lightingRig = createLightingRig(scene, perfFlags);
   const atmosphereRig = createAtmosphereRig(scene);
@@ -74,18 +79,9 @@ export async function createMainStageScene(engine: AbstractEngine) {
     }
   }
 
-  // The venue geometry never moves, so freeze it: skip per-frame world-matrix
-  // recompute, bounding-info sync, and material state churn across ~700 static
-  // meshes. This is the single biggest CPU saving and lets the scene render at
-  // a crisp resolution without dropping frames. The avatar is excluded — it is
-  // parented to the moving player rig.
-  freezeStaticStage(stageAssets.mainMeshes);
-  for (const material of scene.materials) {
-    material.freeze();
-  }
-
   // Everything authored is static: stop per-frame world-matrix and material
-  // dirty work for the whole venue. Only the player rig and avatar animate.
+  // dirty work for the whole venue. Player/avatar and camera-dependent
+  // billboards/infinite-distance meshes remain dynamic.
   freezeStaticScene(scene, {
     dynamicNamePatterns: [/^player-/],
     dynamicMeshes: reviewAvatar.meshes,
@@ -104,6 +100,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
   // Review flight: E/Q raise or lower the eye above ground level; the
   // ground-follow keeps the elevation while walking over ramps and stairs.
   let reviewFlightOffset = 0;
+  const groundRay = new Ray(Vector3.Zero(), Vector3.Down(), 256);
 
   scene.onBeforeRenderObservable.add(() => {
     const zoomState = cameraRig.syncZoomState();
@@ -129,7 +126,11 @@ export async function createMainStageScene(engine: AbstractEngine) {
       playerRig.root.position.z += move.z * distance;
     }
 
-    const groundHeight = resolveGroundHeight(stageAssets.collisionMeshes, playerRig.root.position);
+    const groundHeight = resolveGroundHeight(
+      stageAssets.collisionMeshes,
+      playerRig.root.position,
+      groundRay,
+    );
     if (groundHeight !== null) {
       playerRig.root.position.y = groundHeight + playerRig.eyeHeightMeters + reviewFlightOffset;
     }
@@ -161,16 +162,14 @@ export async function createMainStageScene(engine: AbstractEngine) {
   return scene;
 }
 
-function freezeStaticStage(meshes: AbstractMesh[]) {
-  for (const mesh of meshes) {
-    mesh.freezeWorldMatrix();
-    mesh.doNotSyncBoundingInfo = true;
-  }
-}
-
-function resolveGroundHeight(collisionMeshes: AbstractMesh[], position: Vector3) {
-  const ray = new Ray(new Vector3(position.x, 128, position.z), Vector3.Down(), 256);
-  let nearestHit: { distance: number; y: number } | null = null;
+function resolveGroundHeight(
+  collisionMeshes: AbstractMesh[],
+  position: Vector3,
+  ray: Ray,
+) {
+  ray.origin.set(position.x, 128, position.z);
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  let groundHeight: number | null = null;
 
   for (const mesh of collisionMeshes) {
     const hit = ray.intersectsMesh(mesh, false);
@@ -178,13 +177,11 @@ function resolveGroundHeight(collisionMeshes: AbstractMesh[], position: Vector3)
       continue;
     }
 
-    if (!nearestHit || hit.distance < nearestHit.distance) {
-      nearestHit = {
-        distance: hit.distance,
-        y: hit.pickedPoint.y,
-      };
+    if (hit.distance < nearestDistance) {
+      nearestDistance = hit.distance;
+      groundHeight = hit.pickedPoint.y;
     }
   }
 
-  return nearestHit?.y ?? null;
+  return groundHeight;
 }

@@ -1,4 +1,12 @@
-import { ArcRotateCamera, NullEngine, PBRMaterial, Scene, ShaderStore, Vector3 } from '@babylonjs/core';
+import {
+  ArcRotateCamera,
+  MeshBuilder,
+  NullEngine,
+  PBRMaterial,
+  Scene,
+  ShaderStore,
+  Vector3,
+} from '@babylonjs/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createMainStagePresentationRig } from '../createMainStagePresentationRig';
@@ -18,6 +26,20 @@ describe('createMainStagePresentationRig', () => {
     engine = new NullEngine();
     scene = new Scene(engine);
     const camera = new ArcRotateCamera('review-camera', 0, 1, 12, Vector3.Zero(), scene);
+    const sideLedMaterial = new PBRMaterial('side-led', scene);
+    for (const [side, x] of [
+      ['L', -20],
+      ['R', 20],
+    ] as const) {
+      const field = MeshBuilder.CreateBox(
+        `V31_SideLedTileField_${side}`,
+        { width: 8, height: 1, depth: 6 },
+        scene,
+      );
+      field.position.set(x, 5, 0);
+      field.material = sideLedMaterial;
+      field.computeWorldMatrix(true);
+    }
 
     const rig = createMainStagePresentationRig(scene, camera);
 
@@ -76,7 +98,7 @@ describe('createMainStagePresentationRig', () => {
     expect(rig.pipeline.bloomKernel).toBeGreaterThanOrEqual(48);
 
     const spills = rig.emissiveSpillLights;
-    expect(spills.length).toBeGreaterThanOrEqual(2);
+    expect(spills).toHaveLength(4);
     for (const spill of spills) {
       expect(spill.intensity).toBeGreaterThanOrEqual(40);
       expect(spill.range).toBeGreaterThanOrEqual(10);

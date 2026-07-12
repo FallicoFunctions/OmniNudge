@@ -13,6 +13,9 @@ const mainStageGlbText = readFileSync(
   path.join(projectRoot, 'assets-src/main-stage/build/main-stage-validation.glb'),
 ).toString('utf8');
 const mainStageGlbBuffer = readFileSync(path.join(projectRoot, 'assets-src/main-stage/build/main-stage-validation.glb'));
+const mainStageRuntimeGlbBuffer = readFileSync(
+  path.join(projectRoot, 'public/assets/venues/main-stage/main-stage.glb'),
+);
 const mainStageCollisionGlbBuffer = readFileSync(
   path.join(projectRoot, 'public/assets/venues/main-stage/main-stage-collision.glb'),
 );
@@ -84,6 +87,7 @@ interface MainStageGlbJson {
   accessors: GlbAccessor[];
   buffers: GlbBuffer[];
   bufferViews: GlbBufferView[];
+  extensionsUsed?: string[];
   images?: Array<{
     bufferView?: number;
     mimeType?: string;
@@ -141,8 +145,10 @@ const readGlb = (buffer: Buffer): ParsedGlb => {
   return { binaryChunk, json };
 };
 const mainStageGlb = readGlb(mainStageGlbBuffer);
+const mainStageRuntimeGlb = readGlb(mainStageRuntimeGlbBuffer);
 const mainStageCollisionGlb = readGlb(mainStageCollisionGlbBuffer);
 const { binaryChunk: mainStageGlbBinary, json: mainStageGlbJson } = mainStageGlb;
+const { json: mainStageRuntimeGlbJson } = mainStageRuntimeGlb;
 const { json: mainStageCollisionGlbJson } = mainStageCollisionGlb;
 const nodesByName = new Map(mainStageGlbJson.nodes.map((node) => [node.name, node]));
 const collisionNodesByName = new Map(mainStageCollisionGlbJson.nodes.map((node) => [node.name, node]));
@@ -227,6 +233,30 @@ const readVectorLengthRangeFrom = (glb: ParsedGlb, accessorIndex: number, vector
 };
 const readVectorLengthRange = (accessorIndex: number, vectorAxes = 3) =>
   readVectorLengthRangeFrom(mainStageGlb, accessorIndex, vectorAxes);
+const readSignedMeshVolume = (nodeName: string) => {
+  const node = nodesByName.get(nodeName);
+  expect(node?.mesh, `missing mesh node for signed-volume check: ${nodeName}`).toEqual(expect.any(Number));
+  const mesh = mainStageGlbJson.meshes[node!.mesh!];
+  let volume = 0;
+
+  for (const primitive of mesh.primitives) {
+    const positions = readAccessorValues(primitive.attributes.POSITION);
+    const indices = primitive.indices === undefined
+      ? positions.map((_, index) => index)
+      : readAccessorValues(primitive.indices).map(([index]) => index);
+    for (let index = 0; index + 2 < indices.length; index += 3) {
+      const a = positions[indices[index]];
+      const b = positions[indices[index + 1]];
+      const c = positions[indices[index + 2]];
+      volume += (
+        a[0] * (b[1] * c[2] - b[2] * c[1])
+        - a[1] * (b[0] * c[2] - b[2] * c[0])
+        + a[2] * (b[0] * c[1] - b[1] * c[0])
+      ) / 6;
+    }
+  }
+  return volume;
+};
 const readMeshGeometry = (
   nodeName: string,
   optionsOrIndex?:
@@ -474,23 +504,25 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(optimizeScript).toContain('main-stage-collision.glb');
   });
 
-  it('runs lossless texture optimization before export and verifies the GLBs afterward', () => {
+  it('optimizes textures before export, then repairs and compresses the canonical GLB', () => {
     expect(exportShellScript).toMatch(/node "\$ROOT_DIR\/scripts\/optimize-main-stage\.mjs"/);
     expect(exportShellScript).toMatch(/blender -b "\$BLEND_FILE" --python "\$PYTHON_SCRIPT"/);
-    expect(exportShellScript).toMatch(/node "\$ROOT_DIR\/scripts\/optimize-main-stage\.mjs" --require-exports/);
+    expect(exportShellScript).toMatch(/node "\$ROOT_DIR\/scripts\/optimize-main-stage\.mjs" --finalize-exports/);
     expect(optimizeScript).toContain('jpegtran');
     expect(optimizeScript).toContain('-optimize');
     expect(optimizeScript).toContain('textures/subtle');
-    expect(optimizeScript).toContain('--require-exports');
+    expect(optimizeScript).toContain('--finalize-exports');
+    expect(optimizeScript).toContain("'draco'");
+    expect(optimizeScript).toMatch(/repairDegenerateTangents\(\)[\s\S]*compressRuntimeGlb\(\)/);
   });
 
   it('keeps collision-only objects out of the visible scene export', () => {
     expect(exportScript).toContain('collision_object_names');
     expect(exportScript).toContain('visible_objects');
-    // The selection flag moved into the shared option dict that both the
-    // validation and runtime exports spread.
+    // The canonical visible export uses an explicit selection that excludes
+    // every collision object.
     expect(exportScript).toMatch(/common_gltf_options = dict\([\s\S]*use_selection=True/);
-    expect(exportScript).toMatch(/filepath=str\(scene_output\)[\s\S]*\*\*common_gltf_options/);
+    expect(exportScript).toMatch(/filepath=str\(validation_output\)[\s\S]*\*\*common_gltf_options/);
   });
 
   it('temporarily unhides collision objects for the collision-only export', () => {
@@ -5198,6 +5230,18 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     );
   });
 
+  it('ships a Draco runtime GLB derived from the canonical node and material contract', () => {
+    const sortedNames = (entries: Array<{ name?: string }>) =>
+      entries.map(({ name }) => name ?? '').sort();
+
+    expect(sortedNames(mainStageRuntimeGlbJson.nodes)).toEqual(sortedNames(mainStageGlbJson.nodes));
+    expect(sortedNames(mainStageRuntimeGlbJson.materials)).toEqual(sortedNames(mainStageGlbJson.materials));
+    expect(mainStageRuntimeGlbJson.extensionsUsed).toContain('KHR_draco_mesh_compression');
+    expect(mainStageRuntimeGlbBuffer.byteLength, 'production Main Stage download exceeded 7 MiB').toBeLessThanOrEqual(
+      7 * 1024 * 1024,
+    );
+  });
+
   it('replaces the legacy crown rigging span and chords with an authored truss crown assembly', () => {
     const exportedNodeNames = mainStageGlbJson.nodes.flatMap(({ name }) => (name ? [name] : []));
     for (const nodeName of ['V16_CrownRiggingSpan', 'V16_CrownRiggingFrontChord', 'V16_CrownRiggingRearChord']) {
@@ -7785,6 +7829,14 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
         ).toBeLessThan(1.001);
       }
     }
+  });
+
+  it('keeps mirrored cascade shells on the same outward-winding convention', () => {
+    const rightVolume = readSignedMeshVolume('V150_CascadeCourtShell_R');
+    const leftVolume = readSignedMeshVolume('V150_CascadeCourtShell_L');
+
+    expect(Math.sign(leftVolume)).toBe(Math.sign(rightVolume));
+    expect(Math.abs(leftVolume)).toBeCloseTo(Math.abs(rightVolume), 3);
   });
 
   it('exports a layered Celestial Crown silhouette with structural proscenium depth', () => {

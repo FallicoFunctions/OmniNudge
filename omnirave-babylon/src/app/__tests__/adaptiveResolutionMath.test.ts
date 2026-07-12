@@ -10,6 +10,18 @@ import {
 const cfg = ADAPTIVE_RESOLUTION_DEFAULTS;
 
 describe('stepAdaptiveResolution', () => {
+  it('starts from the engine hardware scaling level', () => {
+    expect(createAdaptiveResolutionState(cfg, 1.0).level).toBe(1.0);
+  });
+
+  it('never increases render load from a coarser engine level during low FPS', () => {
+    let s = createAdaptiveResolutionState(cfg, 1.0);
+    s = stepAdaptiveResolution(s, cfg, 30, 0);
+    s = stepAdaptiveResolution(s, cfg, 30, 2000);
+
+    expect(s.level).toBe(1.0);
+  });
+
   it('starts at the sharpest level and holds it while FPS is comfortable', () => {
     let s = createAdaptiveResolutionState(cfg);
     for (let t = 0; t < 10_000; t += 500) {

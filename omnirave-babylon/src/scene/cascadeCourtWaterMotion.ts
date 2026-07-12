@@ -1,5 +1,6 @@
-import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
+import { RawTexture } from '@babylonjs/core/Materials/Textures/rawTexture.js';
+import { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import { ParticleSystem } from '@babylonjs/core/Particles/particleSystem.js';
 import { Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
@@ -44,19 +45,57 @@ export function createCascadeCourtWaterMotion(scene: Scene): CascadeWaterMotionS
       m.name,
     ),
   );
+  const jetMeshes = scene.meshes.filter((m) => /^V150_CascadeCourtJet_[LR]$/.test(m.name));
 
-  const poolNormals = tryCreateWaterNormalTexture(scene, 'cascade-pool-ripple');
-  const streamNormals = tryCreateWaterNormalTexture(scene, 'cascade-stream-flow');
-  const underlayNormals = tryCreateWaterNormalTexture(scene, 'approach-underlay-ripple');
-  const stillNormals = tryCreateWaterNormalTexture(scene, 'venue-still-water-ripple');
+  const summary: CascadeWaterMotionSummary = {
+    pools: poolMeshes.length,
+    streams: streamMeshes.length,
+    mists: mistMeshes.length,
+    jets: 0,
+    underlays: underlayMeshes.length,
+    stillWaters: stillWaterMeshes.length,
+  };
+  if (
+    summary.pools === 0 &&
+    summary.streams === 0 &&
+    summary.mists === 0 &&
+    summary.underlays === 0 &&
+    summary.stillWaters === 0
+  ) {
+    return summary;
+  }
+
+  const hasPbrMaterial = (meshes: { material: unknown }[]) =>
+    meshes.some((mesh) => mesh.material instanceof PBRMaterial);
+  const hasPoolMaterial = hasPbrMaterial(poolMeshes);
+  const hasStreamMaterial = hasPbrMaterial(streamMeshes);
+  const hasUnderlayMaterial = hasPbrMaterial(underlayMeshes);
+  const hasStillMaterial = hasPbrMaterial(stillWaterMeshes);
+  const normalData = hasPoolMaterial || hasStreamMaterial || hasUnderlayMaterial || hasStillMaterial
+    ? tryCreateWaterNormalData()
+    : null;
+  const poolNormals = hasPoolMaterial && normalData
+    ? tryCreateWaterNormalTexture(scene, 'cascade-pool-ripple', normalData)
+    : null;
+  const streamNormals = hasStreamMaterial && normalData
+    ? tryCreateWaterNormalTexture(scene, 'cascade-stream-flow', normalData)
+    : null;
+  const underlayNormals = hasUnderlayMaterial && normalData
+    ? tryCreateWaterNormalTexture(scene, 'approach-underlay-ripple', normalData)
+    : null;
+  const stillNormals = hasStillMaterial && normalData
+    ? tryCreateWaterNormalTexture(scene, 'venue-still-water-ripple', normalData)
+    : null;
 
   const touched = new Set<PBRMaterial>();
-  const bind = (meshes: { material: unknown }[], texture: DynamicTexture | null, uScale: number, vScale: number) => {
+  const bind = (meshes: { material: unknown }[], texture: RawTexture | null, uScale: number, vScale: number) => {
     for (const mesh of meshes) {
       const material = mesh.material;
       if (!(material instanceof PBRMaterial)) continue;
       touched.add(material);
-      if (texture && !material.bumpTexture) {
+      if (texture) {
+        // These are family-scoped polish clones. Always replace the authored
+        // static normal so the texture being animated below is the one bound.
         material.bumpTexture = texture;
         texture.uScale = uScale;
         texture.vScale = vScale;
@@ -90,38 +129,41 @@ export function createCascadeCourtWaterMotion(scene: Scene): CascadeWaterMotionS
   const mistBaseAlpha = mistMaterials.map((m) => m.alpha);
 
   let elapsed = 0;
-  scene.onBeforeRenderObservable.add(() => {
-    // getDeltaTime() is 0 on the very first frame (and under NullEngine);
-    // fall back to a nominal 60fps step so motion never stalls.
-    const dt = (scene.getEngine().getDeltaTime() || 16.7) / 1000;
-    elapsed += dt;
-    if (poolNormals) {
-      // two slow drift axes so the ripple field never reads as a conveyor
-      poolNormals.uOffset = (poolNormals.uOffset + dt * 0.018) % 1;
-      poolNormals.vOffset = (poolNormals.vOffset + dt * 0.011) % 1;
-    }
-    if (streamNormals) {
-      // fast fall-direction scroll: the spill sheets visibly stream downward
-      streamNormals.vOffset = (streamNormals.vOffset - dt * 0.55 + 1) % 1;
-    }
-    if (underlayNormals) {
-      // barely-moving drift: arrival water is still, not flowing
-      underlayNormals.uOffset = (underlayNormals.uOffset + dt * 0.012) % 1;
-      underlayNormals.vOffset = (underlayNormals.vOffset + dt * 0.007) % 1;
-    }
-    if (stillNormals) {
-      stillNormals.uOffset = (stillNormals.uOffset + dt * 0.014) % 1;
-      stillNormals.vOffset = (stillNormals.vOffset + dt * 0.009) % 1;
-    }
-    for (let i = 0; i < mistMaterials.length; i++) {
-      mistMaterials[i].alpha = mistBaseAlpha[i] * (0.78 + 0.22 * Math.sin(elapsed * 1.7 + i));
-    }
-  });
+  if (poolNormals || streamNormals || underlayNormals || stillNormals || mistMaterials.length > 0) {
+    // The observer and every resource it closes over belong to this scene;
+    // Scene.dispose() clears the observer and disposes all RawTextures.
+    scene.onBeforeRenderObservable.add(() => {
+      // getDeltaTime() is 0 on the very first frame (and under NullEngine);
+      // fall back to a nominal 60fps step so motion never stalls.
+      const dt = (scene.getEngine().getDeltaTime() || 16.7) / 1000;
+      elapsed += dt;
+      if (poolNormals) {
+        // two slow drift axes so the ripple field never reads as a conveyor
+        poolNormals.uOffset = (poolNormals.uOffset + dt * 0.018) % 1;
+        poolNormals.vOffset = (poolNormals.vOffset + dt * 0.011) % 1;
+      }
+      if (streamNormals) {
+        // fast fall-direction scroll: the spill sheets visibly stream downward
+        streamNormals.vOffset = (streamNormals.vOffset - dt * 0.55 + 1) % 1;
+      }
+      if (underlayNormals) {
+        // barely-moving drift: arrival water is still, not flowing
+        underlayNormals.uOffset = (underlayNormals.uOffset + dt * 0.012) % 1;
+        underlayNormals.vOffset = (underlayNormals.vOffset + dt * 0.007) % 1;
+      }
+      if (stillNormals) {
+        stillNormals.uOffset = (stillNormals.uOffset + dt * 0.014) % 1;
+        stillNormals.vOffset = (stillNormals.vOffset + dt * 0.009) % 1;
+      }
+      for (let i = 0; i < mistMaterials.length; i++) {
+        mistMaterials[i].alpha = mistBaseAlpha[i] * (0.78 + 0.22 * Math.sin(elapsed * 1.7 + i));
+      }
+    });
+  }
 
   // Summit spray: a particle fountain rising from each jet and arcing out.
-  let jets = 0;
-  const spriteTexture = tryCreateSpraySprite(scene);
-  for (const jetMesh of scene.meshes.filter((m) => /^V150_CascadeCourtJet_[LR]$/.test(m.name))) {
+  const spriteTexture = jetMeshes.length > 0 ? tryCreateSpraySprite(scene) : null;
+  for (const jetMesh of jetMeshes) {
     const bounds = jetMesh.getBoundingInfo().boundingBox;
     const emitterPosition = new Vector3(
       bounds.centerWorld.x,
@@ -148,30 +190,19 @@ export function createCascadeCourtWaterMotion(scene: Scene): CascadeWaterMotionS
     spray.color2 = new Color4(0.75, 0.95, 1.0, 0.4);
     spray.colorDead = new Color4(0.3, 0.55, 0.75, 0);
     spray.start();
-    jets += 1;
+    summary.jets += 1;
   }
 
-  return {
-    pools: poolMeshes.length,
-    streams: streamMeshes.length,
-    mists: mistMeshes.length,
-    jets,
-    underlays: underlayMeshes.length,
-    stillWaters: stillWaterMeshes.length,
-  };
+  return summary;
 }
 
 // A small tiling water-normal map, generated at load: layered integer-
 // frequency sine waves (so the texture tiles seamlessly) converted to a
-// tangent-space normal encoding. Returns null where a 2D canvas is
-// unavailable (NullEngine test runs) - motion then degrades gracefully.
-function tryCreateWaterNormalTexture(scene: Scene, name: string): DynamicTexture | null {
+// tangent-space normal encoding. Raw pixel data keeps generation identical
+// across browser, WebGPU, WebGL, and NullEngine environments.
+function tryCreateWaterNormalData(): Uint8Array | null {
   try {
     const size = 256;
-    const texture = new DynamicTexture(name, size, scene, false);
-    const ctx = texture.getContext() as CanvasRenderingContext2D | null;
-    if (!ctx || typeof ctx.createImageData !== 'function') return null;
-
     const height = new Float32Array(size * size);
     const waves: Array<[number, number, number, number]> = [
       // [freqX, freqY, amplitude, phase] - integer frequencies tile cleanly
@@ -191,7 +222,7 @@ function tryCreateWaterNormalTexture(scene: Scene, name: string): DynamicTexture
       }
     }
 
-    const image = ctx.createImageData(size, size);
+    const data = new Uint8Array(size * size * 4);
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const xp = (x + 1) % size;
@@ -200,18 +231,38 @@ function tryCreateWaterNormalTexture(scene: Scene, name: string): DynamicTexture
         const dy = height[yp * size + x] - height[y * size + x];
         const inverseLength = 1 / Math.hypot(dx * 2.2, dy * 2.2, 1);
         const idx = (y * size + x) * 4;
-        image.data[idx] = Math.round(((-dx * 2.2 * inverseLength) * 0.5 + 0.5) * 255);
-        image.data[idx + 1] = Math.round(((-dy * 2.2 * inverseLength) * 0.5 + 0.5) * 255);
-        image.data[idx + 2] = Math.round((inverseLength * 0.5 + 0.5) * 255);
-        image.data[idx + 3] = 255;
+        data[idx] = Math.round(((-dx * 2.2 * inverseLength) * 0.5 + 0.5) * 255);
+        data[idx + 1] = Math.round(((-dy * 2.2 * inverseLength) * 0.5 + 0.5) * 255);
+        data[idx + 2] = Math.round((inverseLength * 0.5 + 0.5) * 255);
+        data[idx + 3] = 255;
       }
     }
-    ctx.putImageData(image, 0, 0);
-    texture.update(false);
-    texture.wrapU = 1; // WRAP_ADDRESSMODE
-    texture.wrapV = 1;
+    return data;
+  } catch (error) {
+    console.warn('cascade water: ripple normal data unavailable', error);
+    return null;
+  }
+}
+
+function tryCreateWaterNormalTexture(scene: Scene, name: string, data: Uint8Array): RawTexture | null {
+  let texture: RawTexture | null = null;
+  try {
+    texture = RawTexture.CreateRGBATexture(
+      data,
+      256,
+      256,
+      scene,
+      true,
+      false,
+      Texture.TRILINEAR_SAMPLINGMODE,
+    );
+    texture.name = name;
+    texture.gammaSpace = false;
+    texture.wrapU = Texture.WRAP_ADDRESSMODE;
+    texture.wrapV = Texture.WRAP_ADDRESSMODE;
     return texture;
   } catch (error) {
+    texture?.dispose();
     // Water still renders (static) without the ripple map - but say why.
     console.warn('cascade water: ripple normal map unavailable', error);
     return null;
@@ -219,21 +270,45 @@ function tryCreateWaterNormalTexture(scene: Scene, name: string): DynamicTexture
 }
 
 // Soft radial droplet sprite for the spray particles.
-function tryCreateSpraySprite(scene: Scene): DynamicTexture | null {
+function tryCreateSpraySprite(scene: Scene): RawTexture | null {
+  let texture: RawTexture | null = null;
   try {
     const size = 64;
-    const texture = new DynamicTexture('cascade-spray-sprite', size, scene, false);
-    const ctx = texture.getContext() as CanvasRenderingContext2D | null;
-    if (!ctx || typeof ctx.createRadialGradient !== 'function') return null;
-    const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    gradient.addColorStop(0, 'rgba(255,255,255,1)');
-    gradient.addColorStop(0.4, 'rgba(210,240,255,0.55)');
-    gradient.addColorStop(1, 'rgba(180,220,255,0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, size, size);
-    texture.update(false);
+    const data = new Uint8Array(size * size * 4);
+    const center = (size - 1) / 2;
+    const radius = size / 2;
+    const inner = [255, 255, 255, 255] as const;
+    const middle = [210, 240, 255, 140] as const;
+    const outer = [180, 220, 255, 0] as const;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const distance = Math.min(1, Math.hypot(x - center, y - center) / radius);
+        const start = distance <= 0.4 ? inner : middle;
+        const end = distance <= 0.4 ? middle : outer;
+        const amount = distance <= 0.4 ? distance / 0.4 : (distance - 0.4) / 0.6;
+        const idx = (y * size + x) * 4;
+        for (let channel = 0; channel < 4; channel++) {
+          data[idx + channel] = Math.round(start[channel] + (end[channel] - start[channel]) * amount);
+        }
+      }
+    }
+
+    texture = RawTexture.CreateRGBATexture(
+      data,
+      size,
+      size,
+      scene,
+      true,
+      false,
+      Texture.TRILINEAR_SAMPLINGMODE,
+    );
+    texture.name = 'cascade-spray-sprite';
+    texture.hasAlpha = true;
+    texture.wrapU = Texture.CLAMP_ADDRESSMODE;
+    texture.wrapV = Texture.CLAMP_ADDRESSMODE;
     return texture;
   } catch (error) {
+    texture?.dispose();
     console.warn('cascade water: spray sprite unavailable', error);
     return null;
   }
