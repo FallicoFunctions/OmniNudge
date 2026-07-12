@@ -19,7 +19,7 @@ import {
   createAdaptiveResolutionState,
   stepAdaptiveResolution,
 } from './adaptiveResolutionMath';
-import { createMainStageScene } from '../scene/createMainStageScene';
+import type { createMainStageScene } from '../scene/createMainStageScene';
 import { createDebugPanel } from '../ui/createDebugPanel';
 import { createPerfOverlay, updatePerfOverlay } from '../ui/createPerfOverlay';
 import { createReviewHud } from '../ui/createReviewHud';
@@ -144,7 +144,10 @@ export async function createRuntime(host: HTMLElement) {
     };
     loadingOverlay = createRuntimeLoadingOverlay(host);
 
-    const scene = await createMainStageScene(activeEngine);
+    // Keep the engine/bootstrap chunk small; scene construction brings in the
+    // full Main Stage graph and can load behind the visible boot overlay.
+    const { createMainStageScene: createScene } = await import('../scene/createMainStageScene');
+    const scene = await createScene(activeEngine);
     const reviewRuntime = scene.metadata?.reviewRuntime;
     hud = createReviewHud(host, {
       checkpoints: reviewRuntime?.checkpoints,
