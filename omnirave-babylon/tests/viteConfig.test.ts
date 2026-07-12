@@ -9,10 +9,22 @@ describe('vite config', () => {
       path.join(process.cwd(), 'src/app/bootstrapRuntime.ts'),
       'utf8',
     );
+    const avatarSource = readFileSync(
+      path.join(process.cwd(), 'src/player/createReviewAvatar.ts'),
+      'utf8',
+    );
+    const runtimeSource = readFileSync(
+      path.join(process.cwd(), 'src/app/createRuntime.ts'),
+      'utf8',
+    );
 
     expect(configSource).not.toContain('manualChunks');
     expect(configSource).toContain('chunkSizeWarningLimit: 2300');
     expect(bootstrapSource).not.toContain("import { createRuntime } from './createRuntime'");
     expect(bootstrapSource).toContain("import('./createRuntime')");
+    expect(avatarSource).not.toContain("@babylonjs/loaders/glTF'");
+    expect(avatarSource).toContain("@babylonjs/loaders/glTF/2.0/glTFLoader.js");
+    expect(runtimeSource).not.toContain("import { createMainStageScene } from '../scene/createMainStageScene'");
+    expect(runtimeSource).toContain("import('../scene/createMainStageScene')");
   });
 });
