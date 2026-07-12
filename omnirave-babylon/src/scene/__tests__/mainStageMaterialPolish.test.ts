@@ -510,8 +510,8 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     key: 'wet-route-stone-band',
     meshNames: ['V97_WetRouteStoneBandArray'],
     expected: {
-      albedoTextureCleared: true,
-      albedoColor: [0.2, 0.22, 0.26],
+      albedoTextureCleared: false,
+      albedoColor: [0.4, 0.44, 0.52],
       emissiveColor: [0.005, 0.007, 0.011],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -1388,8 +1388,8 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     key: 'wet-paver-stone-band',
     meshNames: ['V85_WetPaverStoneBands'],
     expected: {
-      albedoTextureCleared: true,
-      albedoColor: [0.21, 0.23, 0.27],
+      albedoTextureCleared: false,
+      albedoColor: [0.42, 0.46, 0.54],
       emissiveColor: [0.006, 0.008, 0.012],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -2736,8 +2736,8 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     key: 'festival-field-night',
     meshNames: ['FestivalField'],
     expected: {
-      albedoTextureCleared: true,
-      albedoColor: [0.06, 0.08, 0.1],
+      albedoTextureCleared: false,
+      albedoColor: [0.13, 0.17, 0.21],
       emissiveColor: [0.003, 0.006, 0.009],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -5003,8 +5003,8 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     key: 'pyro-pod-pearl-shell',
     meshNames: ['V45_PyroPodPearlShell'],
     expected: {
-      albedoTextureCleared: true,
-      albedoColor: [0.21, 0.23, 0.27],
+      albedoTextureCleared: false,
+      albedoColor: [0.42, 0.46, 0.54],
       emissiveColor: [0.006, 0.008, 0.012],
       emissiveIntensity: 0.02,
       metallic: 0.02,

@@ -225,8 +225,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'wet-route-stone-band',
     match: [{ exact: 'V97_WetRouteStoneBandArray' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.2, 0.22, 0.26],
+      albedoColor: [0.4, 0.44, 0.52],
       emissiveColor: [0.005, 0.007, 0.011],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -875,8 +874,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'wet-paver-stone-band',
     match: [{ exact: 'V85_WetPaverStoneBands' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.21, 0.23, 0.27],
+      albedoColor: [0.42, 0.46, 0.54],
       emissiveColor: [0.006, 0.008, 0.012],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -2136,8 +2134,9 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'festival-field-night',
     match: [{ exact: 'FestivalField' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.06, 0.08, 0.1],
+      // Keep the wet plaza stone maps (the single largest surface in the
+      // venue) - tinted to night darkness instead of flat-painted.
+      albedoColor: [0.13, 0.17, 0.21],
       emissiveColor: [0.003, 0.006, 0.009],
       emissiveIntensity: 0.02,
       metallic: 0.02,
@@ -3826,8 +3825,7 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     key: 'pyro-pod-pearl-shell',
     match: [{ exact: 'V45_PyroPodPearlShell' }],
     params: {
-      clearAlbedoTexture: true,
-      albedoColor: [0.21, 0.23, 0.27],
+      albedoColor: [0.42, 0.46, 0.54],
       emissiveColor: [0.006, 0.008, 0.012],
       emissiveIntensity: 0.02,
       metallic: 0.02,
