@@ -10311,10 +10311,12 @@ describe('reviewRouteData', () => {
   it('keeps focal approval checkpoints clear of clipped or top-down review framing', () => {
     const crowdPit = MAIN_STAGE_REVIEW_ROUTE.find((checkpoint) => checkpoint.id === 'crowd_pit');
     const cascadeCourt = MAIN_STAGE_REVIEW_ROUTE.find((checkpoint) => checkpoint.id === 'cascade_court');
+    const basinEdge = MAIN_STAGE_REVIEW_ROUTE.find((checkpoint) => checkpoint.id === 'basin_edge');
     const vipTerrace = MAIN_STAGE_REVIEW_ROUTE.find((checkpoint) => checkpoint.id === 'vip_terrace');
 
     expect(crowdPit).toBeDefined();
     expect(cascadeCourt).toBeDefined();
+    expect(basinEdge).toBeDefined();
     expect(vipTerrace).toBeDefined();
 
     const cameraPosition = (checkpoint: NonNullable<typeof crowdPit>) => ({
@@ -10340,6 +10342,13 @@ describe('reviewRouteData', () => {
     expect(cascadeCamera.y - cascadeFocus.y).toBeLessThanOrEqual(14);
     expect(Math.abs(cascadeCamera.x - cascadeFocus.x)).toBeGreaterThanOrEqual(20);
     expect(Math.abs(cascadeCamera.z - cascadeFocus.z)).toBeGreaterThanOrEqual(20);
+
+    const basinCamera = cameraPosition(basinEdge!);
+    const basinFocus = focusTarget(basinEdge!);
+    expect(Math.abs(basinCamera.x)).toBeLessThanOrEqual(22);
+    expect(basinCamera.z).toBeLessThanOrEqual(-56);
+    expect(basinFocus.z).toBeGreaterThanOrEqual(16);
+    expect(basinCamera.y - basinFocus.y).toBeLessThanOrEqual(12);
 
     const vipCamera = cameraPosition(vipTerrace!);
     const vipFocus = focusTarget(vipTerrace!);
