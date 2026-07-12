@@ -4358,17 +4358,20 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(runwayCyan.min[2]).toBeLessThan(-49.4);
     expect(runwayCyan.max[2]).toBeGreaterThan(1.7);
 
+    // The three threshold bands step down with the foreground deck stair
+    // (2026-07-11): each band crowns its own step edge, so the family spans
+    // from just above the lowest tread up over the deck rim.
     expect(thresholdGold.min[0]).toBeLessThan(-13.8);
     expect(thresholdGold.max[0]).toBeGreaterThan(13.8);
-    expect(thresholdGold.min[1]).toBeGreaterThan(0.35);
-    expect(thresholdGold.max[1]).toBeGreaterThan(0.73);
+    expect(thresholdGold.min[1]).toBeGreaterThan(0.04);
+    expect(thresholdGold.max[1]).toBeGreaterThan(0.9);
     expect(thresholdGold.min[2]).toBeLessThan(-57.0);
     expect(thresholdGold.max[2]).toBeLessThan(-41.8);
 
     expect(thresholdShadow.min[0]).toBeLessThan(-12.8);
     expect(thresholdShadow.max[0]).toBeGreaterThan(12.8);
-    expect(thresholdShadow.min[1]).toBeGreaterThan(0.34);
-    expect(thresholdShadow.max[1]).toBeGreaterThan(0.53);
+    expect(thresholdShadow.min[1]).toBeGreaterThan(0.03);
+    expect(thresholdShadow.max[1]).toBeGreaterThan(0.7);
     expect(thresholdShadow.min[2]).toBeLessThan(-56.8);
     expect(thresholdShadow.max[2]).toBeLessThan(-41.5);
 
@@ -10109,6 +10112,41 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     expect(materialNameFor('V150_CascadeCourtCrown_L')).toBe('V18_BrushedGoldTrim');
     expect(materialNameFor('V150_CascadeCourtJet_R')).toBe('V18_CyanWaterMistGlow');
     expect(materialNameFor('V150_CascadeCourtJet_L')).toBe('V18_CyanWaterMistGlow');
+  });
+
+  it('builds the raised foreground deck under the barricade gold run', () => {
+    // The V108 barricade runs (Z 0.90-1.06) and V65 threshold bands were trim
+    // for a floor that was never authored - the gold rails floated at ankle
+    // height over bare pavers (player-flagged). The deck slab tops out flush
+    // under the gold run; the stair flares down to the V65 walkway width.
+    expect(nodeNamesWithPrefix('V151_ApproachDeck')).toHaveLength(2);
+
+    // deliberately minimal prisms: a box slab and two flared treads
+    const slab = readMeshGeometry('V151_ApproachDeckSlab', {
+      minVertexCount: 20,
+      minUniquePositions: 7,
+      minNonZeroAreaTriangles: 10,
+    });
+    expect(slab.min[0]).toBeGreaterThan(-9.2);
+    expect(slab.max[0]).toBeLessThan(9.2);
+    expect(slab.max[1]).toBeGreaterThan(0.89); // flush under the gold run
+    expect(slab.max[1]).toBeLessThan(0.91);
+    expect(slab.min[2]).toBeGreaterThan(-42.1);
+    expect(slab.max[2]).toBeLessThan(0);
+
+    const stair = readMeshGeometry('V151_ApproachDeckStair', {
+      minVertexCount: 40,
+      minUniquePositions: 12,
+      minNonZeroAreaTriangles: 20,
+    });
+    expect(stair.min[0]).toBeLessThan(-14.1); // flares to the V65 band width
+    expect(stair.max[0]).toBeGreaterThan(14.1);
+    expect(stair.max[1]).toBeGreaterThan(0.6); // upper terrace
+    expect(stair.max[1]).toBeLessThan(0.66);
+    expect(stair.min[2]).toBeGreaterThan(-57.1);
+
+    expect(materialNameFor('V151_ApproachDeckSlab')).toBe('V18_WetStonePaver');
+    expect(materialNameFor('V151_ApproachDeckStair')).toBe('V18_WetStonePaver');
   });
 
   it('rings the cascade court with planted beds and lantern posts', () => {

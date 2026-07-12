@@ -2772,6 +2772,25 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     },
   },
   {
+    key: 'approach-deck',
+    meshNames: ['V151_ApproachDeckSlab', 'V151_ApproachDeckStair'],
+    expected: {
+      albedoTextureCleared: false,
+      albedoColor: [0.36, 0.35, 0.34],
+      emissiveColor: [0.01, 0.012, 0.015],
+      emissiveIntensity: 0.05,
+      metallic: 0.06,
+      roughness: 0.6,
+      alpha: 1,
+      transparencyMode: null,
+      clearCoatEnabled: true,
+      clearCoatIntensity: 0.2,
+      clearCoatRoughness: 0.24,
+      environmentIntensity: 0.44,
+      metaPolish: null,
+    },
+  },
+  {
     key: 'approach-reflection-underlay',
     meshNames: ['V34_ApproachReflectionUnderlay'],
     expected: {

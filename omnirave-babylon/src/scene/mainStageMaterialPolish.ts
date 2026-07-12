@@ -2164,6 +2164,22 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     },
   },
   {
+    // The raised foreground deck + stair whose trim (V108 barricade runs,
+    // V65 threshold bands) always implied a floor that was never authored.
+    // Same textured wet-stone paver treatment as the walkway it meets.
+    key: 'approach-deck',
+    match: [{ prefix: 'V151_ApproachDeck' }],
+    params: {
+      albedoColor: [0.36, 0.35, 0.34],
+      emissiveColor: [0.01, 0.012, 0.015],
+      emissiveIntensity: 0.05,
+      metallic: 0.06,
+      roughness: 0.6,
+      clearCoat: { intensity: 0.2, roughness: 0.24 },
+      environmentIntensity: 0.44,
+    },
+  },
+  {
     key: 'approach-reflection-underlay',
     match: [{ exact: 'V34_ApproachReflectionUnderlay' }],
     params: {
