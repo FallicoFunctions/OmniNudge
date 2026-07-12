@@ -10,18 +10,14 @@
   },
   "dependencies": {
     "@babylonjs/core": "^8.1.0",
-    "@babylonjs/gui": "^8.1.0",
-    "@babylonjs/inspector": "^8.1.0",
-    "@babylonjs/loaders": "^8.1.0",
-    "@babylonjs/materials": "^8.1.0"
+    "@babylonjs/loaders": "^8.1.0"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^4.4.1",
     "@types/node": "^24.10.1",
-    "draco3d": "^1.5.7",
-    "draco3dgltf": "^1.5.7",
     "jsdom": "^27.0.1",
     "typescript": "~5.9.3",
-    "vite": "^7.2.4",
+    "vite": "^7.3.6",
     "vitest": "^3.2.4"
   }
 }

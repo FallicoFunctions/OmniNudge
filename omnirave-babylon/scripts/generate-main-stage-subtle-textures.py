@@ -82,7 +82,7 @@ def emit_family(name, height, albedo_amp, rough_amp, normal_scale, rough_base=0.
     save_jpg(
         f'subtle_{name}_nor_gl_1k.jpg',
         -gx / norm * 0.5 + 0.5,
-        gy / norm * 0.5 + 0.5,
+        -gy / norm * 0.5 + 0.5,
         nz / norm * 0.5 + 0.5,
         quality=90,
     )

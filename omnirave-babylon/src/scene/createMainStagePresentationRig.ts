@@ -15,15 +15,11 @@ import '@babylonjs/core/Shaders/kernelBlur.fragment.js';
 import '@babylonjs/core/Shaders/kernelBlur.vertex.js';
 import '@babylonjs/core/Shaders/postprocess.vertex.js';
 import '@babylonjs/core/Shaders/sharpen.fragment.js';
-import '@babylonjs/core/Shaders/volumetricLightScattering.fragment.js';
-import '@babylonjs/core/Shaders/volumetricLightScatteringPass.fragment.js';
-import '@babylonjs/core/Shaders/volumetricLightScatteringPass.vertex.js';
 
 import type { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline.js';
-import { VolumetricLightScatteringPostProcess } from '@babylonjs/core/PostProcesses/volumetricLightScatteringPostProcess.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { PointLight } from '@babylonjs/core/Lights/pointLight.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
@@ -51,7 +47,6 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera, per
   const backdropRoot = createPresentationBackdrop(scene);
   const heroScreenPanels = createHeroScreenPanels(scene);
   const emissiveSpillLights = createEmissiveSpillLights(scene, heroScreenPanels);
-  const screenScattering = createScreenLightScattering(scene, camera, heroScreenPanels);
 
   const pipeline = new DefaultRenderingPipeline(
     'main-stage-presentation-pipeline',
@@ -90,48 +85,7 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera, per
     environmentTexture,
     heroScreenPanels,
     pipeline,
-    screenScattering,
   };
-}
-
-// Festival air scatters screen light into visible haze; volumetric
-// scattering from each LED panel puts that glow in the air itself
-// instead of only on emitter surfaces.
-function createScreenLightScattering(scene: Scene, camera: Camera, panels: Mesh[]) {
-  const effects: VolumetricLightScatteringPostProcess[] = [];
-  // No WGSL variant exists for this post-process: under WebGPU the GLSL
-  // compile fails asynchronously every frame (the constructor try/catch
-  // cannot catch it) and floods the console. Skip cleanly instead.
-  if (scene.getEngine().isWebGPU) {
-    return effects;
-  }
-  // Disabled for performance: the occlusion pass re-renders scene geometry
-  // every frame, and the haze it adds is marginal against the emitter-hugging
-  // glow billboards. Kept as a code path in case a lighter budget allows it.
-  const SCATTERING_SOURCES = 0;
-  for (const panel of panels.slice(0, SCATTERING_SOURCES)) {
-    try {
-      const scattering = new VolumetricLightScatteringPostProcess(
-        `${panel.name}-scattering`,
-        { postProcessRatio: 0.5, passRatio: 0.2 },
-        camera,
-        panel,
-        32,
-        Texture.BILINEAR_SAMPLINGMODE,
-        scene.getEngine(),
-        false,
-      );
-      scattering.exposure = 0.24;
-      scattering.decay = 0.955;
-      scattering.weight = 0.5;
-      effects.push(scattering);
-    } catch (error) {
-      // Engines without the required caps skip the haze - but log it, a
-      // silent skip once hid a real construction failure for days.
-      console.warn('screen light scattering unavailable:', error);
-    }
-  }
-  return effects;
 }
 
 // Real LED surfaces wash their surroundings with colored light; the

@@ -60,6 +60,9 @@ describe('createLightingRig', () => {
     expect(casterNames).not.toContain('V02_GlassLens');
     expect(casterNames).not.toContain('CollisionProxy');
     expect(solid.receiveShadows).toBe(true);
+    expect(rig.shadowGenerator.getShadowMap()?.refreshRate).toBe(
+      RenderTargetTexture.REFRESHRATE_RENDER_ONCE,
+    );
     await scene.whenReadyAsync();
     expect(rig.shadowGenerator.getShadowMap()?.refreshRate).toBe(
       RenderTargetTexture.REFRESHRATE_RENDER_ONCE,

@@ -6,10 +6,12 @@ import { spawnSync } from 'node:child_process';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(scriptDir, '..');
-const sceneGlb = path.join(rootDir, 'assets-src/main-stage/build/main-stage-validation.glb');
+const validationGlb = path.join(rootDir, 'assets-src/main-stage/build/main-stage-validation.glb');
+const sceneGlb = path.join(rootDir, 'public/assets/venues/main-stage/main-stage.glb');
 const collisionGlb = path.join(rootDir, 'public/assets/venues/main-stage/main-stage-collision.glb');
 const textureDir = path.join(rootDir, 'assets-src/main-stage/textures/subtle');
-const requireExports = process.argv.includes('--require-exports');
+const finalizeExports = process.argv.includes('--finalize-exports');
+const gltfTransformCli = path.join(rootDir, 'node_modules/@gltf-transform/cli/bin/cli.js');
 
 const ensureJpegtran = () => {
   const probe = spawnSync('jpegtran', ['-version'], { encoding: 'utf8' });
@@ -67,10 +69,10 @@ const optimizeTextures = async () => {
   }
 };
 
-const verifyExports = async () => {
-  await access(sceneGlb);
+const verifyBlenderExports = async () => {
+  await access(validationGlb);
   await access(collisionGlb);
-  console.log('[optimize-main-stage] Found Main Stage GLB exports');
+  console.log('[optimize-main-stage] Found canonical Main Stage and collision exports');
 };
 
 
@@ -79,7 +81,7 @@ const repairDegenerateTangents = async () => {
   // are degenerate (zero area). Replace them with a unit tangent orthogonal
   // to the vertex normal so renderers and the GLB contract tests see valid
   // tangent space.
-  const buffer = await readFile(sceneGlb);
+  const buffer = await readFile(validationGlb);
   const jsonLength = buffer.readUInt32LE(12);
   const json = JSON.parse(buffer.slice(20, 20 + jsonLength).toString());
   const binStart = 20 + jsonLength + 8;
@@ -122,20 +124,62 @@ const repairDegenerateTangents = async () => {
     }
   }
   if (repaired > 0) {
-    await writeFile(sceneGlb, buffer);
+    await writeFile(validationGlb, buffer);
     console.log(`[optimize-main-stage] Repaired ${repaired} degenerate Main Stage tangents`);
   }
 };
 
-await optimizeTextures();
+const compressRuntimeGlb = async () => {
+  await access(gltfTransformCli);
+  const result = spawnSync(
+    process.execPath,
+    [
+      gltfTransformCli,
+      'draco',
+      validationGlb,
+      sceneGlb,
+      '--method',
+      'edgebreaker',
+      '--encode-speed',
+      '4',
+      '--decode-speed',
+      '6',
+    ],
+    { encoding: 'utf8' },
+  );
 
-if (requireExports) {
-  await verifyExports();
-  await repairDegenerateTangents();
-} else {
-  try {
-    await verifyExports();
-  } catch {
-    console.log('[optimize-main-stage] GLB export verification skipped until export artifacts exist');
+  if (result.error || result.status !== 0) {
+    throw new Error(
+      `Main Stage Draco compression failed: ${result.stderr || result.stdout || result.error?.message || 'unknown error'}`,
+    );
   }
+  if (result.stdout.trim()) console.log(result.stdout.trim());
+  if (result.stderr.trim()) console.error(result.stderr.trim());
+};
+
+const readGlbJson = async (glbPath) => {
+  const buffer = await readFile(glbPath);
+  const jsonLength = buffer.readUInt32LE(12);
+  return JSON.parse(buffer.subarray(20, 20 + jsonLength).toString().trim());
+};
+
+const verifyRuntimeParity = async () => {
+  const [canonical, runtime] = await Promise.all([readGlbJson(validationGlb), readGlbJson(sceneGlb)]);
+  const names = (value, key) => (value[key] ?? []).map((entry) => entry.name ?? '').sort();
+  if (JSON.stringify(names(canonical, 'nodes')) !== JSON.stringify(names(runtime, 'nodes'))) {
+    throw new Error('Runtime Main Stage node names diverged from the repaired canonical export');
+  }
+  if (JSON.stringify(names(canonical, 'materials')) !== JSON.stringify(names(runtime, 'materials'))) {
+    throw new Error('Runtime Main Stage material names diverged from the repaired canonical export');
+  }
+  console.log('[optimize-main-stage] Runtime GLB matches the repaired canonical node/material contract');
+};
+
+if (finalizeExports) {
+  await verifyBlenderExports();
+  await repairDegenerateTangents();
+  await compressRuntimeGlb();
+  await verifyRuntimeParity();
+} else {
+  await optimizeTextures();
 }

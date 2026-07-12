@@ -71,9 +71,14 @@ def clamp_pt(x, y):
 
 
 def clear_previous():
+    owned_meshes = set()
     for obj in list(bpy.data.objects):
         if obj.type == "MESH" and any(obj.name.startswith(GENERATED_PREFIX + s) for s in GARDEN_SUFFIXES):
+            owned_meshes.add(obj.data)
             bpy.data.objects.remove(obj, do_unlink=True)
+    for mesh in owned_meshes:
+        if mesh.users == 0:
+            bpy.data.meshes.remove(mesh)
 
 
 def get_material(name):
@@ -212,6 +217,7 @@ def _finalize(bm, name, mat, side, with_uv=True, smooth=False):
     if side == "L":
         for v in bm.verts:
             v.co.x = -v.co.x
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
     bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='BEAUTY', ngon_method='BEAUTY')
     mesh = bpy.data.meshes.new(name + "_Mesh")
     bm.to_mesh(mesh)

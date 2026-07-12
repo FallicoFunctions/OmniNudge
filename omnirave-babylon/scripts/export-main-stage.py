@@ -7,10 +7,9 @@ root = Path(__file__).resolve().parent.parent
 output_dir = root / "public" / "assets" / "venues" / "main-stage"
 output_dir.mkdir(parents=True, exist_ok=True)
 
-scene_output = output_dir / "main-stage.glb"
-# Uncompressed twin of the runtime GLB: the tangent-repair pass and the
-# geometry contract tests read raw accessors, which Draco compression
-# removes. Lives outside public/ so it never ships.
+# The Blender export is the uncompressed canonical artifact. The finalize
+# step repairs its tangent data, then Draco-compresses this exact file into
+# the runtime GLB so production and validation cannot diverge.
 validation_dir = root / "assets-src" / "main-stage" / "build"
 validation_dir.mkdir(parents=True, exist_ok=True)
 validation_output = validation_dir / "main-stage-validation.glb"
@@ -124,15 +123,6 @@ common_gltf_options = dict(
 # Validation artifact first: raw accessors for tangent repair and tests.
 bpy.ops.export_scene.gltf(filepath=str(validation_output), **common_gltf_options)
 strip_unused_tangents(validation_output)
-# Runtime artifact: Draco-compressed geometry (28MB -> ~6MB download); the
-# runtime decodes with the decoder vendored at public/libs/draco/.
-bpy.ops.export_scene.gltf(
-    filepath=str(scene_output),
-    export_draco_mesh_compression_enable=True,
-    export_draco_mesh_compression_level=6,
-    **common_gltf_options,
-)
-
 for obj in bpy.data.objects:
     obj.select_set(False)
 

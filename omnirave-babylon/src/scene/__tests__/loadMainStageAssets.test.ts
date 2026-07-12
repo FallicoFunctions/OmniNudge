@@ -1,4 +1,5 @@
 import { MeshBuilder, NullEngine, PBRMaterial, Scene } from '@babylonjs/core';
+import { DracoCompression } from '@babylonjs/core/Meshes/Compression/dracoCompression.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 async function loadModuleWithMockedSceneLoader() {
@@ -66,5 +67,10 @@ describe('loadMainStageAssets', () => {
     expect(collisionMaterial.metadata?.mainStageMaterialPolish).toBeUndefined();
     expect(result.collisionMeshes[0].isVisible).toBe(false);
     expect(result.collisionMeshes[0].checkCollisions).toBe(true);
+    expect(DracoCompression.Configuration.decoder).toEqual({
+      fallbackUrl: '/libs/draco/draco_decoder_gltf.js',
+      wasmBinaryUrl: '/libs/draco/draco_decoder_gltf.wasm',
+      wasmUrl: '/libs/draco/draco_wasm_wrapper_gltf.js',
+    });
   });
 });

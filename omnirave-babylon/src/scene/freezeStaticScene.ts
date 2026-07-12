@@ -23,6 +23,8 @@ export function freezeStaticScene(
   const explicitDynamic = new Set(options.dynamicMeshes ?? []);
   const isDynamic = (mesh: AbstractMesh) =>
     explicitDynamic.has(mesh) ||
+    mesh.billboardMode !== 0 ||
+    mesh.infiniteDistance ||
     options.dynamicNamePatterns.some((pattern) => pattern.test(mesh.name));
 
   const materialsOfDynamicMeshes = new Set(

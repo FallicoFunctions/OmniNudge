@@ -56,7 +56,7 @@ describe('bootstrapRuntime', () => {
     expect(createRuntimeMock).toHaveBeenCalledTimes(1);
   });
 
-  it('cleans up failed initialization so bootstrap can retry', async () => {
+  it('cleans up failed initialization, reports it visibly, and retries in place', async () => {
     let attempts = 0;
     const { bootstrapRuntime, createRuntimeMock } = await loadBootstrapRuntime(async (host) => {
       attempts += 1;
@@ -77,14 +77,20 @@ describe('bootstrapRuntime', () => {
     document.body.innerHTML = '<div id="app"></div>';
 
     await expect(bootstrapRuntime()).rejects.toThrow('scene failed');
-    expect(document.querySelector('[data-testid="babylon-runtime-host"]')).toBeNull();
+    expect(document.querySelector('[data-testid="babylon-runtime-host"]')).not.toBeNull();
     expect(document.querySelector('canvas[data-testid="babylon-render-canvas"]')).toBeNull();
     expect(document.querySelector('[data-testid="review-hud"]')).toBeNull();
+    expect(document.querySelector('[data-testid="runtime-error-overlay"]')?.getAttribute('role')).toBe('alert');
+    expect(document.body.textContent).toContain('Main Stage could not start');
 
-    await bootstrapRuntime();
+    document.querySelector<HTMLButtonElement>('[data-testid="runtime-retry"]')?.click();
+    await vi.waitFor(() => {
+      expect(document.querySelector('canvas[data-testid="babylon-render-canvas"]')).not.toBeNull();
+    });
 
     expect(document.querySelector('canvas[data-testid="babylon-render-canvas"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="review-hud"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="runtime-error-overlay"]')).toBeNull();
     expect(createRuntimeMock).toHaveBeenCalledTimes(2);
   });
 });
@@ -92,11 +98,207 @@ describe('bootstrapRuntime', () => {
 describe('createRuntime', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
+    delete window.__OMNIRAVE_RUNTIME__;
     vi.resetModules();
     vi.clearAllMocks();
     vi.doUnmock('../createRuntime');
     vi.doUnmock('../../scene/createMainStageScene');
     vi.doUnmock('@babylonjs/core/Engines/engine');
+    vi.doUnmock('@babylonjs/core/Engines/webgpuEngine');
+  });
+
+  it('disposes a failed WebGPU engine and falls back to WebGL', async () => {
+    const webgpuDispose = vi.fn();
+    const webgpuInit = vi.fn().mockRejectedValue(new Error('WebGPU adapter failed'));
+    const WebGPUEngineMock = Object.assign(
+      vi.fn(() => ({
+        dispose: webgpuDispose,
+        initAsync: webgpuInit,
+      })),
+      { IsSupportedAsync: Promise.resolve(true) },
+    );
+    const webglEngine = {
+      dispose: vi.fn(),
+      getFps: vi.fn(() => 60),
+      getHardwareScalingLevel: vi.fn(() => 1),
+      onDisposeObservable: { addOnce: vi.fn() },
+      resize: vi.fn(),
+      runRenderLoop: vi.fn(),
+      setHardwareScalingLevel: vi.fn(),
+    };
+    const EngineMock = vi.fn((_canvas: HTMLCanvasElement, _antialias: boolean, _options: Record<string, unknown>) => webglEngine);
+    const scene = {
+      metadata: {},
+      pick: vi.fn(() => null),
+      render: vi.fn(),
+    };
+
+    vi.doMock('@babylonjs/core/Engines/webgpuEngine', () => ({
+      WebGPUEngine: WebGPUEngineMock,
+    }));
+    vi.doMock('@babylonjs/core/Engines/engine', () => ({
+      Engine: EngineMock,
+    }));
+    vi.doMock('../../scene/createMainStageScene', () => ({
+      createMainStageScene: vi.fn(async () => scene),
+    }));
+
+    const { createRuntime } = await import('../createRuntime');
+    const host = document.createElement('div');
+    const runtime = await createRuntime(host);
+
+    expect(webgpuInit).toHaveBeenCalledTimes(1);
+    expect(webgpuDispose).toHaveBeenCalledTimes(1);
+    expect(EngineMock).toHaveBeenCalledTimes(1);
+    expect(EngineMock.mock.calls[0]?.[2]).not.toHaveProperty('preserveDrawingBuffer');
+    expect(runtime.engine).toBe(webglEngine);
+    expect(webglEngine.getHardwareScalingLevel).toHaveBeenCalledTimes(1);
+
+    runtime.dispose();
+  });
+
+  it('disposes a successful runtime and removes all owned resources', async () => {
+    let notifyEngineDisposed: (() => void) | undefined;
+    const engineDispose = vi.fn(() => notifyEngineDisposed?.());
+    const engineResize = vi.fn();
+    const engine = {
+      dispose: engineDispose,
+      getFps: vi.fn(() => 60),
+      getHardwareScalingLevel: vi.fn(() => 1),
+      onDisposeObservable: {
+        addOnce: vi.fn((callback: () => void) => {
+          notifyEngineDisposed = callback;
+        }),
+      },
+      resize: engineResize,
+      runRenderLoop: vi.fn(),
+      setHardwareScalingLevel: vi.fn(),
+    };
+    const scenePick = vi.fn(() => null);
+    const scene = {
+      metadata: {},
+      pick: scenePick,
+      render: vi.fn(),
+    };
+
+    vi.doMock('@babylonjs/core/Engines/engine', () => ({
+      Engine: vi.fn(() => engine),
+    }));
+    vi.doMock('../../scene/createMainStageScene', () => ({
+      createMainStageScene: vi.fn(async () => scene),
+    }));
+
+    const { createRuntime } = await import('../createRuntime');
+    const host = document.createElement('div');
+    const runtime = await createRuntime(host);
+    const canvas = runtime.canvas;
+
+    window.dispatchEvent(new Event('resize'));
+    canvas.dispatchEvent(new MouseEvent('click'));
+    expect(engineResize).toHaveBeenCalledTimes(1);
+    expect(scenePick).toHaveBeenCalledTimes(1);
+
+    runtime.dispose();
+    runtime.dispose();
+
+    expect(engineDispose).toHaveBeenCalledTimes(1);
+    expect(window.__OMNIRAVE_RUNTIME__).toBeUndefined();
+    expect(host.children).toHaveLength(0);
+
+    window.dispatchEvent(new Event('resize'));
+    canvas.dispatchEvent(new MouseEvent('click'));
+    expect(engineResize).toHaveBeenCalledTimes(1);
+    expect(scenePick).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies adaptive resolution before the next render instead of invalidating the submitted WebGPU frame', async () => {
+    const frameEvents: string[] = [];
+    let renderFrame: (() => void) | undefined;
+    const setHardwareScalingLevel = vi.fn(() => frameEvents.push('scale'));
+    const engine = {
+      dispose: vi.fn(),
+      getFps: vi.fn(() => 30),
+      getHardwareScalingLevel: vi.fn(() => 1 / 1.5),
+      onDisposeObservable: { addOnce: vi.fn() },
+      resize: vi.fn(),
+      runRenderLoop: vi.fn((callback: () => void) => {
+        renderFrame = callback;
+      }),
+      setHardwareScalingLevel,
+    };
+    const scene = {
+      activeCamera: undefined,
+      metadata: {},
+      pick: vi.fn(() => null),
+      render: vi.fn(() => frameEvents.push('render')),
+      textures: [],
+    };
+    const now = vi.spyOn(performance, 'now');
+    now.mockReturnValueOnce(0).mockReturnValue(2_000);
+
+    vi.doMock('@babylonjs/core/Engines/engine', () => ({
+      Engine: vi.fn(() => engine),
+    }));
+    vi.doMock('../../scene/createMainStageScene', () => ({
+      createMainStageScene: vi.fn(async () => scene),
+    }));
+
+    const { createRuntime } = await import('../createRuntime');
+    const runtime = await createRuntime(document.createElement('div'));
+
+    expect(renderFrame).toBeTypeOf('function');
+    for (let frame = 0; frame < 60; frame += 1) {
+      renderFrame?.();
+    }
+    expect(setHardwareScalingLevel).not.toHaveBeenCalled();
+
+    frameEvents.length = 0;
+    renderFrame?.();
+
+    expect(frameEvents.slice(0, 2)).toEqual(['scale', 'render']);
+    expect(setHardwareScalingLevel).toHaveBeenCalledTimes(1);
+    runtime.dispose();
+    now.mockRestore();
+  });
+
+  it('cleans up owned resources when the engine is disposed externally', async () => {
+    let notifyEngineDisposed: (() => void) | undefined;
+    const engineDispose = vi.fn(() => notifyEngineDisposed?.());
+    const engine = {
+      dispose: engineDispose,
+      getFps: vi.fn(() => 60),
+      getHardwareScalingLevel: vi.fn(() => 1),
+      onDisposeObservable: {
+        addOnce: vi.fn((callback: () => void) => {
+          notifyEngineDisposed = callback;
+        }),
+      },
+      resize: vi.fn(),
+      runRenderLoop: vi.fn(),
+      setHardwareScalingLevel: vi.fn(),
+    };
+
+    vi.doMock('@babylonjs/core/Engines/engine', () => ({
+      Engine: vi.fn(() => engine),
+    }));
+    vi.doMock('../../scene/createMainStageScene', () => ({
+      createMainStageScene: vi.fn(async () => ({
+        metadata: {},
+        pick: vi.fn(() => null),
+        render: vi.fn(),
+      })),
+    }));
+
+    const { createRuntime } = await import('../createRuntime');
+    const host = document.createElement('div');
+    const runtime = await createRuntime(host);
+
+    engine.dispose();
+
+    expect(window.__OMNIRAVE_RUNTIME__).toBeUndefined();
+    expect(host.children).toHaveLength(0);
+    runtime.dispose();
+    expect(engineDispose).toHaveBeenCalledTimes(1);
   });
 
   it('disposes the engine and removes DOM nodes when scene creation fails', async () => {
@@ -107,8 +309,11 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: vi.fn(() => ({
         dispose: engineDispose,
+        getHardwareScalingLevel: vi.fn(() => 1),
+        onDisposeObservable: { addOnce: vi.fn() },
         runRenderLoop: engineRunRenderLoop,
         resize: engineResize,
+        setHardwareScalingLevel: vi.fn(),
       })),
     }));
 
@@ -184,8 +389,11 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: vi.fn(() => ({
         dispose: engineDispose,
+        getHardwareScalingLevel: vi.fn(() => 1),
+        onDisposeObservable: { addOnce: vi.fn() },
         runRenderLoop: engineRunRenderLoop,
         resize: engineResize,
+        setHardwareScalingLevel: vi.fn(),
       })),
     }));
 
@@ -196,7 +404,7 @@ describe('createRuntime', () => {
     const { createRuntime } = await import('../createRuntime');
     const host = document.createElement('div');
 
-    await createRuntime(host);
+    const runtime = await createRuntime(host);
 
     expect(host.querySelector('canvas[data-testid="babylon-render-canvas"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="review-hud"]')).not.toBeNull();
@@ -233,6 +441,8 @@ describe('createRuntime', () => {
     });
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
     expect(engineDispose).not.toHaveBeenCalled();
+
+    runtime.dispose();
   });
 
   it('shows a loading overlay until the scene finishes booting', async () => {
@@ -248,8 +458,11 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: vi.fn(() => ({
         dispose: engineDispose,
+        getHardwareScalingLevel: vi.fn(() => 1),
+        onDisposeObservable: { addOnce: vi.fn() },
         runRenderLoop: engineRunRenderLoop,
         resize: engineResize,
+        setHardwareScalingLevel: vi.fn(),
       })),
     }));
 
@@ -261,9 +474,9 @@ describe('createRuntime', () => {
     const host = document.createElement('div');
 
     const runtimePromise = createRuntime(host);
-    await Promise.resolve();
-
-    expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).not.toBeNull();
+    await vi.waitFor(() => {
+      expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).not.toBeNull();
+    });
     expect(host.textContent).toContain('Loading Main Stage');
     expect(host.querySelector('[data-testid="review-hud"]')).toBeNull();
 
@@ -273,11 +486,13 @@ describe('createRuntime', () => {
       render: vi.fn(),
     });
 
-    await runtimePromise;
+    const runtime = await runtimePromise;
 
     expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).toBeNull();
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
     expect(engineDispose).not.toHaveBeenCalled();
+
+    runtime.dispose();
   });
 
   it('registers the Babylon runtime shaders required by GLB materials and presentation post-processes', async () => {

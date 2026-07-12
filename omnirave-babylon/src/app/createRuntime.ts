@@ -26,18 +26,59 @@ import { createReviewHud } from '../ui/createReviewHud';
 import { createRuntimeLoadingOverlay } from '../ui/createRuntimeLoadingOverlay';
 import { RUNTIME_CONFIG } from './runtimeConfig';
 
+type RuntimeEngine = Engine | WebGPUEngine;
+
 declare global {
   interface Window {
     __OMNIRAVE_RUNTIME__?: {
       canvas: HTMLCanvasElement;
       debugPanel?: HTMLElement;
-      engine: Engine | WebGPUEngine;
+      dispose: () => void;
+      engine: RuntimeEngine;
       host: HTMLElement;
       hud?: HTMLElement;
       perfOverlay?: HTMLElement;
       scene: Awaited<ReturnType<typeof createMainStageScene>>;
     };
   }
+}
+
+function createWebGlEngine(canvas: HTMLCanvasElement) {
+  return new Engine(canvas, true, {
+    stencil: true,
+    // Render at the display's true pixel density. Without this, Babylon
+    // defaults to CSS-pixel resolution and the browser upscales the buffer,
+    // so the whole scene renders soft/pixelated on high-DPI (retina)
+    // screens.
+    adaptToDeviceRatio: true,
+  });
+}
+
+async function createBabylonEngine(canvas: HTMLCanvasElement, forceWebGl: boolean): Promise<RuntimeEngine> {
+  if (!forceWebGl) {
+    let webgpu: WebGPUEngine | undefined;
+
+    try {
+      if (await WebGPUEngine.IsSupportedAsync) {
+        webgpu = new WebGPUEngine(canvas, {
+          adaptToDeviceRatio: true,
+          antialias: true,
+        });
+        await webgpu.initAsync();
+        return webgpu;
+      }
+    } catch {
+      // A rejected adapter/device request must not leave a partial WebGPU
+      // engine alive or prevent the supported WebGL fallback from booting.
+      try {
+        webgpu?.dispose();
+      } catch {
+        // Continue to WebGL even if the failed engine cannot finish teardown.
+      }
+    }
+  }
+
+  return createWebGlEngine(canvas);
 }
 
 export async function createRuntime(host: HTMLElement) {
@@ -53,48 +94,57 @@ export async function createRuntime(host: HTMLElement) {
   // remains the automatic fallback, and ?perf=webgl forces it for
   // debugging comparisons.
   const perfFlags = parsePerfFlags(window.location.search);
-  let engine: Engine | WebGPUEngine;
-  if (!perfFlags.webgl && (await WebGPUEngine.IsSupportedAsync)) {
-    const webgpu = new WebGPUEngine(canvas, {
-      adaptToDeviceRatio: true,
-      antialias: true,
-    });
-    await webgpu.initAsync();
-    engine = webgpu;
-  } else {
-    engine = new Engine(canvas, true, {
-      preserveDrawingBuffer: true,
-      stencil: true,
-      // Render at the display's true pixel density. Without this, Babylon
-      // defaults to CSS-pixel resolution and the browser upscales the buffer,
-      // so the whole scene renders soft/pixelated on high-DPI (retina)
-      // screens.
-      adaptToDeviceRatio: true,
-    });
-  }
-
-  // Cap the effective render density: full retina (2x) quadruples the pixel
-  // cost of this heavy scene, but 1.5x is still visibly crisp at roughly half
-  // that cost — the sweet spot between "pixelated" and "unplayable".
-  const MAX_RENDER_RATIO = 1.5;
-  const deviceRatio = window.devicePixelRatio || 1;
-  if (deviceRatio > MAX_RENDER_RATIO) {
-    // The adaptive controller's sharpest bound mirrors this same cap.
-    engine.setHardwareScalingLevel(ADAPTIVE_RESOLUTION_DEFAULTS.sharpestLevel);
-  }
-
-  const handleResize = () => {
-    engine.resize();
-  };
-
+  let engine: RuntimeEngine | undefined;
   let hud: HTMLElement | undefined;
   let perfOverlay: HTMLElement | undefined;
   let debugPanel: HTMLElement | undefined;
-  const loadingOverlay = createRuntimeLoadingOverlay(host);
+  let loadingOverlay: HTMLElement | undefined;
   let handleCanvasPick: ((event: MouseEvent) => void) | undefined;
+  let handleResize: (() => void) | undefined;
+  let disposed = false;
+
+  const cleanupOwnedResources = () => {
+    if (disposed) {
+      return;
+    }
+    disposed = true;
+
+    if (engine && window.__OMNIRAVE_RUNTIME__?.engine === engine) {
+      delete window.__OMNIRAVE_RUNTIME__;
+    }
+    if (handleCanvasPick) {
+      canvas.removeEventListener('click', handleCanvasPick);
+    }
+    if (handleResize) {
+      window.removeEventListener('resize', handleResize);
+    }
+    debugPanel?.remove();
+    perfOverlay?.remove();
+    hud?.remove();
+    loadingOverlay?.remove();
+    canvas.remove();
+  };
 
   try {
-    const scene = await createMainStageScene(engine);
+    engine = await createBabylonEngine(canvas, perfFlags.webgl);
+    const activeEngine = engine;
+
+    // Cap the effective render density: full retina (2x) quadruples the pixel
+    // cost of this heavy scene, but 1.5x is still visibly crisp at roughly half
+    // that cost — the sweet spot between "pixelated" and "unplayable".
+    const MAX_RENDER_RATIO = 1.5;
+    const deviceRatio = window.devicePixelRatio || 1;
+    if (deviceRatio > MAX_RENDER_RATIO) {
+      // The adaptive controller's sharpest bound mirrors this same cap.
+      activeEngine.setHardwareScalingLevel(ADAPTIVE_RESOLUTION_DEFAULTS.sharpestLevel);
+    }
+
+    handleResize = () => {
+      activeEngine.resize();
+    };
+    loadingOverlay = createRuntimeLoadingOverlay(host);
+
+    const scene = await createMainStageScene(activeEngine);
     const reviewRuntime = scene.metadata?.reviewRuntime;
     hud = createReviewHud(host, {
       checkpoints: reviewRuntime?.checkpoints,
@@ -125,30 +175,51 @@ export async function createRuntime(host: HTMLElement) {
     };
     canvas.addEventListener('click', handleCanvasPick);
 
-    window.__OMNIRAVE_RUNTIME__ = {
+    const dispose = () => {
+      if (disposed) {
+        return;
+      }
+      cleanupOwnedResources();
+      activeEngine.dispose();
+    };
+    const runtime = {
       canvas,
       debugPanel,
-      engine,
+      dispose,
+      engine: activeEngine,
       host,
       hud,
       perfOverlay,
       scene,
     };
+    window.__OMNIRAVE_RUNTIME__ = runtime;
     loadingOverlay.remove();
 
     let perfFrameCounter = 0;
-    let adaptiveState = createAdaptiveResolutionState(ADAPTIVE_RESOLUTION_DEFAULTS);
-    engine.runRenderLoop(() => {
+    let adaptiveState = createAdaptiveResolutionState(
+      ADAPTIVE_RESOLUTION_DEFAULTS,
+      activeEngine.getHardwareScalingLevel(),
+    );
+    let pendingHardwareScalingLevel: number | undefined;
+    activeEngine.runRenderLoop(() => {
+      // WebGPU submits the command buffers recorded by scene.render() after
+      // this callback returns. Resizing here, before recording the next frame,
+      // prevents setHardwareScalingLevel() from destroying the swapchain
+      // texture still referenced by the current submission.
+      if (pendingHardwareScalingLevel !== undefined) {
+        activeEngine.setHardwareScalingLevel(pendingHardwareScalingLevel);
+        pendingHardwareScalingLevel = undefined;
+      }
       scene.render();
       perfFrameCounter += 1;
       if (perfFrameCounter % 30 === 0) {
-        const fps = engine.getFps();
+        const fps = activeEngine.getFps();
 
         // Hold the FPS target by trading render scale, never frame pacing:
         // sharp when the GPU can afford it, gracefully coarser when not.
         const nextState = stepAdaptiveResolution(adaptiveState, ADAPTIVE_RESOLUTION_DEFAULTS, fps, performance.now());
         if (nextState.level !== adaptiveState.level) {
-          engine.setHardwareScalingLevel(nextState.level);
+          pendingHardwareScalingLevel = nextState.level;
         }
         adaptiveState = nextState;
 
@@ -163,20 +234,16 @@ export async function createRuntime(host: HTMLElement) {
     });
 
     window.addEventListener('resize', handleResize);
+    activeEngine.onDisposeObservable.addOnce(cleanupOwnedResources);
 
-    return { engine, scene, canvas, hud, perfOverlay, debugPanel, config: RUNTIME_CONFIG };
+    return { ...runtime, config: RUNTIME_CONFIG };
   } catch (error) {
-    delete window.__OMNIRAVE_RUNTIME__;
-    if (handleCanvasPick) {
-      canvas.removeEventListener('click', handleCanvasPick);
+    cleanupOwnedResources();
+    try {
+      engine?.dispose();
+    } catch {
+      // Preserve the startup error after best-effort engine teardown.
     }
-    window.removeEventListener('resize', handleResize);
-    engine.dispose();
-    debugPanel?.remove();
-    perfOverlay?.remove();
-    hud?.remove();
-    loadingOverlay.remove();
-    canvas.remove();
     throw error;
   }
 }
