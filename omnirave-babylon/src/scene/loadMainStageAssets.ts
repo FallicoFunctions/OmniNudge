@@ -48,6 +48,7 @@ function trimSubtleClearcoat(scene: Scene) {
 export interface MainStageAssetLoadResult {
   collisionMeshes: AbstractMesh[];
   mainMeshes: AbstractMesh[];
+  solidCollisionMeshes: AbstractMesh[];
 }
 
 export async function loadMainStageAssets(scene: Scene): Promise<MainStageAssetLoadResult> {
@@ -65,5 +66,6 @@ export async function loadMainStageAssets(scene: Scene): Promise<MainStageAssetL
   return {
     mainMeshes: main.meshes,
     collisionMeshes: collision.meshes,
+    solidCollisionMeshes: [],
   };
 }

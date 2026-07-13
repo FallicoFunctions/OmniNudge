@@ -24,6 +24,7 @@ describe('createPlayerRig', () => {
     expect(rig.capsule.isVisible).toBe(false);
     expect(rig.capsule.checkCollisions).toBe(true);
     expect(rig.capsule.position.y).toBeCloseTo(-0.75);
+    expect(rig.radiusMeters).toBe(0.35);
     expect(rig.speedMetersPerSecond).toBe(4.5);
   });
 });
