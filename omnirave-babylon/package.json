@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4175",
-    "build": "tsc --project tsconfig.json && vite build",
-    "test": "vitest"
+    "build": "tsc --project tsconfig.json && vite build && node scripts/write-sites-worker.mjs",
+    "test": "vitest && node --test tests/sitesWorker.node-test.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^8.1.0",

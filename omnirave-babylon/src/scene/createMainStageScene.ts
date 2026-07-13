@@ -1,16 +1,16 @@
 import { Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
-import { Ray } from '@babylonjs/core/Culling/ray.js';
-import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import type { AbstractEngine } from '@babylonjs/core/Engines/abstractEngine';
 
+import { createMainStageRouteProgress } from '../game/mainStageRouteProgress';
+import { applyAvatarColorway, USER_AVATAR_COLORWAYS } from '../player/avatarColorways';
 import { createFollowCameraRig } from '../player/createFollowCameraRig';
 import { createInputMap } from '../player/createInputMap';
+import { createPlayerController } from '../player/playerController';
 import { createPlayerRig } from '../player/createPlayerRig';
 import { createReviewAvatar } from '../player/createReviewAvatar';
-import { resolveMoveVector, resolveVerticalDirection } from '../player/movementMath';
 import { createAtmosphereRig } from './createAtmosphereRig';
 import { createCascadeCourtWaterMotion } from './cascadeCourtWaterMotion';
 import { createLightingRig } from './createLightingRig';
@@ -57,6 +57,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
     new Vector3(BACK_PLAZA_SPAWN.x, BACK_PLAZA_SPAWN.y, BACK_PLAZA_SPAWN.z),
   );
   const reviewAvatar = await createReviewAvatar(scene);
+  let selectedAvatarColorway = applyAvatarColorway(reviewAvatar, USER_AVATAR_COLORWAYS[0].id);
   reviewAvatar.root.parent = playerRig.avatarAnchor;
   const cameraRig = createFollowCameraRig(scene, playerRig.root);
   cameraRig.applyCheckpointView(MAIN_STAGE_REVIEW_ROUTE[0].camera);
@@ -97,42 +98,23 @@ export async function createMainStageScene(engine: AbstractEngine) {
     cameraRig.camera.attachControl(canvas, true);
   }
 
-  // Review flight: E/Q raise or lower the eye above ground level; the
-  // ground-follow keeps the elevation while walking over ramps and stairs.
-  let reviewFlightOffset = 0;
-  const groundRay = new Ray(Vector3.Zero(), Vector3.Down(), 256);
+  const playerController = createPlayerController({
+    avatarRoot: reviewAvatar.root,
+    camera: cameraRig.camera,
+    collisionMeshes: stageAssets.collisionMeshes,
+    input: input.state,
+    playerRig,
+  });
+  const routeProgress = createMainStageRouteProgress(MAIN_STAGE_REVIEW_ROUTE);
 
   scene.onBeforeRenderObservable.add(() => {
+    const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
+    playerController.step(deltaSeconds);
+    routeProgress.step(playerRig.root.position);
     const zoomState = cameraRig.syncZoomState();
     const avatarVisibility = zoomState.mode === 'first_person' ? 0 : zoomState.shoulderOpacity;
     for (const mesh of reviewAvatar.meshes) {
       mesh.visibility = avatarVisibility;
-    }
-
-    const move = resolveMoveVector(input.state);
-    const vertical = resolveVerticalDirection(input.state);
-    if (vertical !== 0) {
-      const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
-      reviewFlightOffset = Math.min(
-        60,
-        Math.max(0, reviewFlightOffset + vertical * playerRig.speedMetersPerSecond * deltaSeconds),
-      );
-    }
-    if (move.magnitude > 0) {
-      const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
-      const distance = playerRig.speedMetersPerSecond * deltaSeconds;
-
-      playerRig.root.position.x += move.x * distance;
-      playerRig.root.position.z += move.z * distance;
-    }
-
-    const groundHeight = resolveGroundHeight(
-      stageAssets.collisionMeshes,
-      playerRig.root.position,
-      groundRay,
-    );
-    if (groundHeight !== null) {
-      playerRig.root.position.y = groundHeight + playerRig.eyeHeightMeters + reviewFlightOffset;
     }
   });
 
@@ -148,6 +130,16 @@ export async function createMainStageScene(engine: AbstractEngine) {
       stageAssets,
       input,
       playerRig,
+      playerController,
+      routeProgress,
+      avatarColorways: USER_AVATAR_COLORWAYS,
+      get selectedAvatarColorway() {
+        return selectedAvatarColorway;
+      },
+      setAvatarColorway(colorwayId: string) {
+        selectedAvatarColorway = applyAvatarColorway(reviewAvatar, colorwayId);
+        return selectedAvatarColorway;
+      },
       productionSurfaces,
       cascadeWaterMotion,
       spawn: BACK_PLAZA_SPAWN,
@@ -160,28 +152,4 @@ export async function createMainStageScene(engine: AbstractEngine) {
   });
 
   return scene;
-}
-
-function resolveGroundHeight(
-  collisionMeshes: AbstractMesh[],
-  position: Vector3,
-  ray: Ray,
-) {
-  ray.origin.set(position.x, 128, position.z);
-  let nearestDistance = Number.POSITIVE_INFINITY;
-  let groundHeight: number | null = null;
-
-  for (const mesh of collisionMeshes) {
-    const hit = ray.intersectsMesh(mesh, false);
-    if (!hit.hit || !hit.pickedPoint) {
-      continue;
-    }
-
-    if (hit.distance < nearestDistance) {
-      nearestDistance = hit.distance;
-      groundHeight = hit.pickedPoint.y;
-    }
-  }
-
-  return groundHeight;
 }

@@ -87,12 +87,17 @@ describe('createMainStageScene', () => {
       'main-stage-presentation-pipeline',
     );
     expect(scene.metadata?.reviewRuntime?.productionSurfaces).toBeDefined();
+    expect(scene.metadata?.reviewRuntime?.playerController).toBeDefined();
+    expect(scene.metadata?.reviewRuntime?.routeProgress).toBeDefined();
+    expect(scene.metadata?.reviewRuntime?.avatarColorways.length).toBeGreaterThanOrEqual(3);
+    expect(scene.metadata?.reviewRuntime?.selectedAvatarColorway.id).toBe('aurora');
     expect(scene.getMeshByName('main-stage-center-celestial-screen')).not.toBeNull();
     expect(scene.getTransformNodeByName('main-stage-presentation-backdrop')).not.toBeNull();
     expect(scene.getMeshByName('main-stage-celestial-vault')).not.toBeNull();
     expect(scene.getMeshByName('main-stage-arrival-void-veil')).not.toBeNull();
     expect(scene.environmentTexture?.name).toBe('main-stage-night-reflection-env');
     expect(scene.metadata?.reviewRuntime?.reviewAvatar).toBeDefined();
+    expect(scene.metadata?.reviewRuntime?.reviewAvatar.root.metadata?.avatarColorway).toBe('aurora');
     expect(scene.getTransformNodeByName('review-avatar-root')?.parent?.name).toBe('player-avatar-anchor');
     expect(scene.getTransformNodeByName('review-camera-target')).not.toBeNull();
     expect(scene.lights.map((light) => light.name)).toEqual(
@@ -184,8 +189,9 @@ describe('createMainStageScene', () => {
     expect(stageAssets.mainMeshes.every((mesh) => !mesh.isDisposed())).toBe(true);
   });
 
-  it('reuses one ground ray across render frames', async () => {
+  it('moves the playable avatar through the controller and reuses one ground ray across render frames', async () => {
     engine = new NullEngine();
+    vi.spyOn(engine, 'getDeltaTime').mockReturnValue(16.667);
     const rayInstances = new Set<Ray>();
     const intersectsMesh = vi
       .spyOn(Ray.prototype, 'intersectsMesh')
@@ -203,10 +209,18 @@ describe('createMainStageScene', () => {
     });
 
     const scene = await createMainStageScene(engine);
+    const runtime = scene.metadata?.reviewRuntime;
+    expect(runtime).toBeDefined();
+    runtime!.input.state.forward = true;
     scene.render();
     scene.render();
 
-    expect(intersectsMesh).toHaveBeenCalledTimes(2);
+    expect(runtime!.playerRig.root.position.z).toBeGreaterThan(-48);
+    expect(runtime!.playerController.currentSpeedMetersPerSecond).toBeGreaterThan(0);
+    expect(runtime!.routeProgress.completedCount).toBeGreaterThanOrEqual(1);
+    expect(runtime!.routeProgress.activeCheckpoint?.id).toBe('promenade_mid');
+    expect(runtime!.reviewAvatar.root.metadata?.animationState).toBe('run');
+    expect(intersectsMesh).toHaveBeenCalledTimes(4);
     expect(rayInstances.size).toBe(1);
   });
 });
