@@ -67,6 +67,7 @@ describe('loadMainStageAssets', () => {
     expect(collisionMaterial.metadata?.mainStageMaterialPolish).toBeUndefined();
     expect(result.collisionMeshes[0].isVisible).toBe(false);
     expect(result.collisionMeshes[0].checkCollisions).toBe(true);
+    expect(result.solidCollisionMeshes).toEqual([]);
     expect(DracoCompression.Configuration.decoder).toEqual({
       fallbackUrl: '/libs/draco/draco_decoder_gltf.js',
       wasmBinaryUrl: '/libs/draco/draco_decoder_gltf.wasm',

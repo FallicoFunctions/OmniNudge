@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 interface StageAssets {
   collisionMeshes: AbstractMesh[];
   mainMeshes: AbstractMesh[];
+  solidCollisionMeshes: AbstractMesh[];
 }
 
 async function loadCreateMainStageScene(
@@ -23,6 +24,7 @@ async function loadCreateMainStageScene(
   const stageAssets: StageAssets = {
     collisionMeshes: [],
     mainMeshes: [],
+    solidCollisionMeshes: [],
   };
 
   vi.doMock('../loadMainStageAssets', () => ({
@@ -80,6 +82,16 @@ describe('createMainStageScene', () => {
     expect(scene.getTransformNodeByName('player-root')).not.toBeNull();
     expect(scene.getMeshByName('player-capsule')).not.toBeNull();
     expect(scene.metadata?.reviewRuntime?.stageAssets).toBe(stageAssets);
+    expect(stageAssets.solidCollisionMeshes.map((mesh) => mesh.name)).toEqual(
+      expect.arrayContaining([
+        'main-stage-blocker-left-envelope',
+        'main-stage-blocker-right-envelope',
+        'main-stage-blocker-back-envelope',
+        'main-stage-blocker-front-stage',
+      ]),
+    );
+    expect(stageAssets.solidCollisionMeshes.every((mesh) => !mesh.isVisible)).toBe(true);
+    expect(stageAssets.solidCollisionMeshes.every((mesh) => mesh.checkCollisions)).toBe(true);
     expect(scene.metadata?.reviewRuntime?.lightingRig).toBeDefined();
     expect(scene.metadata?.reviewRuntime?.atmosphereRig).toBeDefined();
     expect(scene.metadata?.reviewRuntime?.presentationRig).toBeDefined();

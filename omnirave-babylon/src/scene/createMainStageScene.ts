@@ -14,6 +14,7 @@ import { createReviewAvatar } from '../player/createReviewAvatar';
 import { createAtmosphereRig } from './createAtmosphereRig';
 import { createCascadeCourtWaterMotion } from './cascadeCourtWaterMotion';
 import { createLightingRig } from './createLightingRig';
+import { createMainStageCollisionBlockers } from './createMainStageCollisionBlockers';
 import { createMainStagePresentationRig } from './createMainStagePresentationRig';
 import { freezeStaticScene } from './freezeStaticScene';
 import { deduplicateMaterials } from './deduplicateMaterials';
@@ -61,6 +62,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
   });
   const collisionMeshSet = new Set(stageAssets.collisionMeshes);
   stageAssets.mainMeshes = scene.meshes.filter((mesh) => !collisionMeshSet.has(mesh));
+  stageAssets.solidCollisionMeshes = createMainStageCollisionBlockers(scene);
 
   const lightingRig = createLightingRig(scene, perfFlags);
   const atmosphereRig = createAtmosphereRig(scene);
@@ -112,6 +114,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
     collisionMeshes: stageAssets.collisionMeshes,
     input: input.state,
     playerRig,
+    solidCollisionMeshes: stageAssets.solidCollisionMeshes,
   });
   const routeProgress = createMainStageRouteProgress(MAIN_STAGE_REVIEW_ROUTE);
   const canvas = engine.getRenderingCanvas?.();
