@@ -64,8 +64,8 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
       alpha: 0,
       beta: 1.1,
       radius: 36,
-      focusOffset: { x: 12, y: 3.5, z: -7 },
-      positionOffset: { x: 44, y: 16, z: -34 },
+      focusOffset: { x: 14, y: 3.5, z: -7 },
+      positionOffset: { x: 36, y: 16, z: -34 },
     },
   },
   {
