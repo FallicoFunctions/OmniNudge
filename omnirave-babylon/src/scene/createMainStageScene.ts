@@ -125,8 +125,8 @@ export async function createMainStageScene(engine: AbstractEngine) {
 
     event.preventDefault();
     cameraRig.orbit(
-      event.deltaX * TRACKPAD_CAMERA_YAW_SENSITIVITY,
-      -event.deltaY * TRACKPAD_CAMERA_PITCH_SENSITIVITY,
+      -event.deltaX * TRACKPAD_CAMERA_YAW_SENSITIVITY,
+      event.deltaY * TRACKPAD_CAMERA_PITCH_SENSITIVITY,
     );
   };
   const handleCameraPointerDown = (event: PointerEvent) => {
