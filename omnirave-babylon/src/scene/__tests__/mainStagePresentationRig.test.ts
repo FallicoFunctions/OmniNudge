@@ -61,6 +61,9 @@ describe('createMainStagePresentationRig', () => {
     expect(scene.getMeshByName('main-stage-crown-halo')?.parent?.name).toBe(
       'main-stage-presentation-backdrop',
     );
+    expect(scene.getMeshByName('main-stage-crown-silhouette-aura')?.parent?.name).toBe(
+      'main-stage-presentation-backdrop',
+    );
     expect(scene.getMeshByName('main-stage-horizon-aura')?.parent?.name).toBe(
       'main-stage-presentation-backdrop',
     );
@@ -78,6 +81,15 @@ describe('createMainStagePresentationRig', () => {
     );
     expect(scene.getMaterialByName('main-stage-arrival-void-veil-material')).not.toBeNull();
     expect(scene.getMaterialByName('main-stage-crown-halo-material')).not.toBeNull();
+    const crownSilhouetteMaterial = scene.getMaterialByName(
+      'main-stage-crown-silhouette-aura-material',
+    ) as PBRMaterial | null;
+    expect(crownSilhouetteMaterial).not.toBeNull();
+    expect(crownSilhouetteMaterial?.unlit).toBe(true);
+    expect(crownSilhouetteMaterial?.emissiveIntensity).toBeGreaterThanOrEqual(0.72);
+    expect(crownSilhouetteMaterial?.alpha).toBeGreaterThanOrEqual(0.28);
+    expect(crownSilhouetteMaterial?.emissiveTexture).toBeNull();
+    expect(crownSilhouetteMaterial?.opacityTexture).toBeNull();
     expect(scene.getMaterialByName('main-stage-horizon-aura-material')).not.toBeNull();
     expect(scene.getMaterialByName('main-stage-side-aura-material')).not.toBeNull();
     expect(scene.getMaterialByName('main-stage-arrival-mist-band-material')).not.toBeNull();
