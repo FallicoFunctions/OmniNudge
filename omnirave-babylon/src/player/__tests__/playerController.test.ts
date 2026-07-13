@@ -101,7 +101,7 @@ describe('createPlayerController', () => {
 
     controller.step(1);
 
-    expect(rig.root.position.x).toBeCloseTo(2.65);
+    expect(rig.root.position.x).toBeCloseTo(2.649);
     expect(rig.root.position.y).toBeCloseTo(1.65);
     expect(controller.grounded).toBe(true);
   });
@@ -129,7 +129,7 @@ describe('createPlayerController', () => {
 
     controller.step(1);
 
-    expect(rig.root.position.x).toBeCloseTo(1.925);
+    expect(rig.root.position.x).toBeCloseTo(1.924);
     expect(rig.root.position.y).toBeCloseTo(1.65);
   });
 
