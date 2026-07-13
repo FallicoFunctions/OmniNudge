@@ -69,17 +69,23 @@ export function createPlayerController(options: CreatePlayerControllerOptions): 
       const speed = resolvePlayerSpeed(options.playerRig.speedMetersPerSecond, options.input.sprint);
       const horizontalSpeed = move.magnitude > 0 ? speed : 0;
 
+      const previousX = options.playerRig.root.position.x;
       options.playerRig.root.position.x += move.x * horizontalSpeed * deltaSeconds;
       resolveHorizontalCollision(
         options.solidCollisionMeshes ?? [],
         options.playerRig.root.position,
+        previousX,
+        'x',
         options.playerRig.eyeHeightMeters,
         options.playerRig.radiusMeters,
       );
+      const previousZ = options.playerRig.root.position.z;
       options.playerRig.root.position.z += move.z * horizontalSpeed * deltaSeconds;
       resolveHorizontalCollision(
         options.solidCollisionMeshes ?? [],
         options.playerRig.root.position,
+        previousZ,
+        'z',
         options.playerRig.eyeHeightMeters,
         options.playerRig.radiusMeters,
       );
@@ -156,6 +162,8 @@ function resolveGroundHeight(collisionMeshes: AbstractMesh[], position: Vector3,
 function resolveHorizontalCollision(
   solidCollisionMeshes: AbstractMesh[],
   position: Vector3,
+  previousAxisPosition: number,
+  movingAxis: 'x' | 'z',
   eyeHeightMeters: number,
   radiusMeters: number,
 ) {
@@ -173,7 +181,26 @@ function resolveHorizontalCollision(
     const maxX = maximumWorld.x + radiusMeters;
     const minZ = minimumWorld.z - radiusMeters;
     const maxZ = maximumWorld.z + radiusMeters;
-    if (position.x < minX || position.x > maxX || position.z < minZ || position.z > maxZ) {
+    const crossAxis = movingAxis === 'x' ? 'z' : 'x';
+    const crossAxisPosition = position[crossAxis];
+    const crossAxisMin = movingAxis === 'x' ? minZ : minX;
+    const crossAxisMax = movingAxis === 'x' ? maxZ : maxX;
+    if (crossAxisPosition < crossAxisMin || crossAxisPosition > crossAxisMax) {
+      continue;
+    }
+
+    const movingAxisMin = movingAxis === 'x' ? minX : minZ;
+    const movingAxisMax = movingAxis === 'x' ? maxX : maxZ;
+    const currentAxisPosition = position[movingAxis];
+    if (previousAxisPosition <= movingAxisMin && currentAxisPosition > movingAxisMin) {
+      position[movingAxis] = movingAxisMin;
+      continue;
+    }
+    if (previousAxisPosition >= movingAxisMax && currentAxisPosition < movingAxisMax) {
+      position[movingAxis] = movingAxisMax;
+      continue;
+    }
+    if (currentAxisPosition < movingAxisMin || currentAxisPosition > movingAxisMax) {
       continue;
     }
 
