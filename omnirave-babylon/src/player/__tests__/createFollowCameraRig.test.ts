@@ -94,6 +94,32 @@ describe('createFollowCameraRig', () => {
     expect(rig.camera.position.z).toBeCloseTo(-66);
   });
 
+  it('preserves authored camera position offsets while following a snapped player root', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const target = new TransformNode('player-root', scene);
+    target.position.set(32, 8.5, 4);
+    const rig = createFollowCameraRig(scene, target);
+
+    rig.applyCheckpointView({
+      alpha: -2.8,
+      beta: 1,
+      radius: 38,
+      focusOffset: { x: -26, y: 5, z: -4 },
+      positionOffset: { x: 6, y: 8, z: -30 },
+    });
+
+    target.position.y = 1.65;
+    rig.syncZoomState();
+
+    expect(rig.targetAnchor.position.x).toBeCloseTo(6);
+    expect(rig.targetAnchor.position.y).toBeCloseTo(6.65);
+    expect(rig.targetAnchor.position.z).toBeCloseTo(0);
+    expect(rig.camera.position.x).toBeCloseTo(38);
+    expect(rig.camera.position.y).toBeCloseTo(9.65);
+    expect(rig.camera.position.z).toBeCloseTo(-26);
+  });
+
   it('keeps the camera anchored to the player root as it moves after a checkpoint view, instead of staying fixed at the old position', () => {
     engine = new NullEngine();
     const scene = new Scene(engine);
