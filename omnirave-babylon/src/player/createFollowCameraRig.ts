@@ -19,7 +19,7 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
   const checkpointWorldPosition = new Vector3();
   const followWorldTarget = new Vector3();
   const followWorldPosition = new Vector3();
-  const lastPositionOffsetRoot = new Vector3();
+  const activeTargetToCameraOffset = new Vector3();
   // The offset last authored by a checkpoint view, re-applied to the player's
   // CURRENT position every frame in syncZoomState. Without this, the anchor
   // only ever moved at the instant a checkpoint button was clicked, so free
@@ -31,10 +31,13 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
   let hasActivePositionOffset = false;
 
   const applyPositionOffsetCamera = (worldPosition: Vector3, worldTarget: Vector3) => {
-    camera.position.copyFrom(worldPosition);
+    const offset = worldPosition.subtract(worldTarget);
+    const radius = offset.length();
     camera.setTarget(worldTarget);
-    camera.rebuildAnglesAndRadius();
-    camera.radius = camera.position.subtract(worldTarget).length();
+    camera.alpha = Math.atan2(offset.z, offset.x);
+    camera.beta = Math.acos(Math.min(1, Math.max(-1, offset.y / radius)));
+    camera.radius = radius;
+    camera.position.copyFrom(worldPosition);
   };
 
   const camera = new ArcRotateCamera('review-camera', Math.PI, 1.1, 6, targetAnchor.position, scene);
@@ -67,8 +70,8 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
       activePositionOffset.set(view.positionOffset.x, view.positionOffset.y, view.positionOffset.z);
       hasActivePositionOffset = true;
       checkpointWorldPosition.copyFrom(target.getAbsolutePosition());
-      lastPositionOffsetRoot.copyFrom(checkpointWorldPosition);
       checkpointWorldPosition.addInPlace(activePositionOffset);
+      activeTargetToCameraOffset.copyFrom(checkpointWorldPosition.subtract(checkpointWorldTarget));
       applyPositionOffsetCamera(checkpointWorldPosition, checkpointWorldTarget);
       return resolveZoomState(camera.radius);
     }
@@ -88,15 +91,15 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
       // keeps the camera attached instead of leaving it behind.
       target.computeWorldMatrix(true);
       followWorldTarget.copyFrom(target.getAbsolutePosition());
-      const rootMovedSincePositionOffset =
-        followWorldTarget.subtract(lastPositionOffsetRoot).lengthSquared() > 0.000001;
       followWorldTarget.addInPlace(activeFocusOffset);
       targetAnchor.position.copyFrom(followWorldTarget);
 
-      if (hasActivePositionOffset && rootMovedSincePositionOffset) {
-        followWorldPosition.copyFrom(target.getAbsolutePosition());
-        lastPositionOffsetRoot.copyFrom(followWorldPosition);
-        followWorldPosition.addInPlace(activePositionOffset);
+      if (hasActivePositionOffset) {
+        const distance = camera.radius;
+        followWorldPosition.copyFrom(activeTargetToCameraOffset);
+        followWorldPosition.normalize();
+        followWorldPosition.scaleInPlace(distance);
+        followWorldPosition.addInPlace(followWorldTarget);
         applyPositionOffsetCamera(followWorldPosition, followWorldTarget);
       }
 
