@@ -175,4 +175,33 @@ describe('createFollowCameraRig', () => {
     expect(rig.targetAnchor.position.y).toBeCloseTo(12);
     expect(rig.targetAnchor.position.z).toBeCloseTo(25);
   });
+
+  it('orbits the follow camera around the player without moving the player target', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const target = new TransformNode('player-root', scene);
+    target.position.set(0, 1.7, 0);
+    const rig = createFollowCameraRig(scene, target);
+
+    rig.applyCheckpointView({
+      alpha: -Math.PI / 2,
+      beta: 1.1,
+      radius: 8,
+      focusOffset: { x: 0, y: 1.4, z: 0 },
+      positionOffset: { x: 0, y: 4, z: -8 },
+    });
+
+    const targetBefore = rig.targetAnchor.position.clone();
+
+    rig.orbit(Math.PI / 2, 0.2);
+
+    expect(target.position.x).toBeCloseTo(0);
+    expect(target.position.z).toBeCloseTo(0);
+    expect(rig.targetAnchor.position.x).toBeCloseTo(targetBefore.x);
+    expect(rig.targetAnchor.position.y).toBeCloseTo(targetBefore.y);
+    expect(rig.targetAnchor.position.z).toBeCloseTo(targetBefore.z);
+    expect(rig.camera.position.x).toBeGreaterThan(7);
+    expect(rig.camera.position.y).toBeLessThan(5.7);
+    expect(rig.camera.position.z).toBeCloseTo(0, 1);
+  });
 });
