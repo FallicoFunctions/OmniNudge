@@ -1244,17 +1244,15 @@ export const MAIN_STAGE_MESH_OVERRIDES: readonly MainStageOverrideRule[] = [
     params: {
       clearAlbedoTexture: true,
       albedoColor: [0.04, 0.06, 0.08],
-      // Stronger cyan sheen than the flat basin sheets: the cascade pools
-      // must read unmistakably as water at night, not dark glass. Roughness
-      // kept moderate: mirror-tight speculars turned the stage lighting into
-      // hard magenta blobs on the pools (player-flagged as CG-looking).
-      emissiveColor: [0.02, 0.055, 0.075],
-      emissiveIntensity: 0.16,
+      // Keep a cyan sheen on the cascade pools without turning the upper
+      // sheets into glowing slabs in the Basin Edge approval view.
+      emissiveColor: [0.016, 0.04, 0.055],
+      emissiveIntensity: 0.08,
       metallic: 0.02,
       roughness: 0.3,
-      alpha: 0.98,
+      alpha: 0.94,
       clearCoat: { intensity: 0.5, roughness: 0.26 },
-      environmentIntensity: 0.86,
+      environmentIntensity: 0.58,
       zOffset: 1,
     },
   },
