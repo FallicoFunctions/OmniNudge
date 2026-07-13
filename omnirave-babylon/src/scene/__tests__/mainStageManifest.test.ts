@@ -10340,6 +10340,8 @@ describe('reviewRouteData', () => {
     const cascadeCamera = cameraPosition(cascadeCourt!);
     const cascadeFocus = focusTarget(cascadeCourt!);
     expect(cascadeCamera.y - cascadeFocus.y).toBeLessThanOrEqual(14);
+    expect(cascadeCamera.x).toBeLessThanOrEqual(58);
+    expect(cascadeFocus.x).toBeGreaterThanOrEqual(34);
     expect(Math.abs(cascadeCamera.x - cascadeFocus.x)).toBeGreaterThanOrEqual(20);
     expect(Math.abs(cascadeCamera.z - cascadeFocus.z)).toBeGreaterThanOrEqual(20);
 
