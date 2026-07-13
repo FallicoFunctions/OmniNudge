@@ -253,6 +253,32 @@ describe('createMainStageScene', () => {
     expect(sourceBlocker!.getBoundingInfo().boundingBox.minimumWorld.z).toBeCloseTo(0.25);
   });
 
+  it('creates solid blockers for approach light cores', async () => {
+    engine = new NullEngine();
+    const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(
+      (scene, assets) => {
+        const lightCore = MeshBuilder.CreateBox(
+          'V40_ApproachLightCore_L',
+          { width: 0.5, height: 1.8, depth: 0.5 },
+          scene,
+        );
+        lightCore.position.set(-12.2, 1.2, -26);
+        assets.mainMeshes.push(lightCore);
+      },
+    );
+
+    await createMainStageScene(engine);
+    const sourceBlocker = stageAssets.solidCollisionMeshes.find(
+      (mesh) => mesh.metadata?.sourceMeshName === 'V40_ApproachLightCore_L',
+    );
+
+    expect(sourceBlocker).toBeDefined();
+    expect(sourceBlocker!.isVisible).toBe(false);
+    expect(sourceBlocker!.checkCollisions).toBe(true);
+    expect(sourceBlocker!.position.x).toBeCloseTo(-12.2);
+    expect(sourceBlocker!.position.z).toBeCloseTo(-26);
+  });
+
   it('moves the playable avatar through the controller and reuses one ground ray across render frames', async () => {
     engine = new NullEngine();
     vi.spyOn(engine, 'getDeltaTime').mockReturnValue(16.667);
