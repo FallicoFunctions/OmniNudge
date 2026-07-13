@@ -230,6 +230,29 @@ describe('createMainStageScene', () => {
     expect(scene.getMeshByName(sourceBlocker!.name)).toBe(sourceBlocker);
   });
 
+  it('clips basin wall blockers clear of the foreground barricade walk surface', async () => {
+    engine = new NullEngine();
+    const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(
+      (scene, assets) => {
+        const basinWall = MeshBuilder.CreateBox(
+          'merged:V118_BasinWallRelief+1',
+          { width: 2, height: 6, depth: 6 },
+          scene,
+        );
+        basinWall.position.set(7, 3, 1);
+        assets.mainMeshes.push(basinWall);
+      },
+    );
+
+    await createMainStageScene(engine);
+    const sourceBlocker = stageAssets.solidCollisionMeshes.find(
+      (mesh) => mesh.metadata?.sourceMeshName === 'merged:V118_BasinWallRelief+1',
+    );
+
+    expect(sourceBlocker).toBeDefined();
+    expect(sourceBlocker!.getBoundingInfo().boundingBox.minimumWorld.z).toBeCloseTo(0.25);
+  });
+
   it('moves the playable avatar through the controller and reuses one ground ray across render frames', async () => {
     engine = new NullEngine();
     vi.spyOn(engine, 'getDeltaTime').mockReturnValue(16.667);
