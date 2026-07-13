@@ -114,11 +114,11 @@ describe('createMainStageScene', () => {
     const camera = scene.activeCamera as ArcRotateCamera | null;
 
     expect(camera).not.toBeNull();
-    expect(camera!.position.y).toBeGreaterThan(20);
-    expect(camera!.position.z).toBeLessThan(-90);
+    expect(camera!.position.y).toBeCloseTo(5.7);
+    expect(camera!.position.z).toBeCloseTo(-55);
     expect(camera!.lockedTarget?.name).toBe('review-camera-target');
-    expect((camera!.lockedTarget as TransformNode).position.y).toBeCloseTo(14);
-    expect((camera!.lockedTarget as TransformNode).position.z).toBeCloseTo(12);
+    expect((camera!.lockedTarget as TransformNode).position.y).toBeCloseTo(3.1);
+    expect((camera!.lockedTarget as TransformNode).position.z).toBeCloseTo(-46.4);
 
     camera!.radius = 20;
     scene.render();
