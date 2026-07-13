@@ -204,4 +204,25 @@ describe('createFollowCameraRig', () => {
     expect(rig.camera.position.y).toBeLessThan(5.7);
     expect(rig.camera.position.z).toBeCloseTo(0, 1);
   });
+
+  it('allows pitch orbit past horizontal so the player can look up', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const target = new TransformNode('player-root', scene);
+    target.position.set(0, 1.7, 0);
+    const rig = createFollowCameraRig(scene, target);
+
+    rig.applyCheckpointView({
+      alpha: -Math.PI / 2,
+      beta: 1.1,
+      radius: 8,
+      focusOffset: { x: 0, y: 1.4, z: 0 },
+      positionOffset: { x: 0, y: 4, z: -8 },
+    });
+
+    rig.orbit(0, 1.2);
+
+    expect(rig.camera.beta).toBeGreaterThan(Math.PI / 2);
+    expect(rig.camera.position.y).toBeLessThan(rig.targetAnchor.position.y);
+  });
 });
