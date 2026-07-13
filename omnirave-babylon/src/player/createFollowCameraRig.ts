@@ -15,6 +15,7 @@ export interface FollowCameraRig {
   orbit: (deltaYaw: number, deltaPitch: number) => ReturnType<typeof resolveZoomState>;
   syncZoomState: () => ReturnType<typeof resolveZoomState>;
   targetAnchor: TransformNode;
+  zoom: (deltaDistance: number) => ReturnType<typeof resolveZoomState>;
 }
 
 export function createFollowCameraRig(scene: Scene, target: TransformNode): FollowCameraRig {
@@ -142,5 +143,9 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
       return zoomState;
     },
     targetAnchor,
+    zoom(deltaDistance) {
+      camera.radius += deltaDistance;
+      return this.syncZoomState();
+    },
   };
 }
