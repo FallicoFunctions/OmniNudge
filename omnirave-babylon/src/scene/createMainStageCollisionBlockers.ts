@@ -32,6 +32,8 @@ const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
 
 const MIN_SOURCE_BLOCKER_THICKNESS = 1.2;
 const FOREGROUND_BARRICADE_CLEAR_Z = 0.25;
+const SOURCE_BLOCKER_CENTER_Y = 4;
+const SOURCE_BLOCKER_HEIGHT = 8;
 
 export function createMainStageCollisionBlockers(scene: Scene, sourceMeshes: readonly AbstractMesh[] = []): Mesh[] {
   const authoredBlockers = MAIN_STAGE_COLLISION_BLOCKERS.map((blocker) => createBlockerFromSpec(scene, blocker));
@@ -63,8 +65,8 @@ function createBlockerFromSourceMesh(scene: Scene, sourceMesh: AbstractMesh) {
   const { minimumWorld, maximumWorld } = sourceMesh.getBoundingInfo().boundingBox;
   const minX = minimumWorld.x;
   const maxX = maximumWorld.x;
-  const minY = minimumWorld.y;
-  const maxY = maximumWorld.y;
+  const minY = SOURCE_BLOCKER_CENTER_Y - SOURCE_BLOCKER_HEIGHT / 2;
+  const maxY = SOURCE_BLOCKER_CENTER_Y + SOURCE_BLOCKER_HEIGHT / 2;
   const minZ = /V118_BasinWallRelief/.test(sourceMesh.name)
     ? Math.max(minimumWorld.z, FOREGROUND_BARRICADE_CLEAR_Z)
     : minimumWorld.z;

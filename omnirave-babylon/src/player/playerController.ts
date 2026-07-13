@@ -31,6 +31,7 @@ const GRAVITY_METERS_PER_SECOND = 18;
 const JUMP_VELOCITY_METERS_PER_SECOND = 6.4;
 const MAX_FALL_SPEED_METERS_PER_SECOND = -32;
 const GROUND_SNAP_EPSILON = 0.06;
+const COLLISION_SURFACE_EPSILON = 0.001;
 
 export function createPlayerController(options: CreatePlayerControllerOptions): PlayerController {
   const groundRay = new Ray(Vector3.Zero(), Vector3.Down(), 256);
@@ -193,11 +194,11 @@ function resolveHorizontalCollision(
     const movingAxisMax = movingAxis === 'x' ? maxX : maxZ;
     const currentAxisPosition = position[movingAxis];
     if (previousAxisPosition <= movingAxisMin && currentAxisPosition > movingAxisMin) {
-      position[movingAxis] = movingAxisMin;
+      position[movingAxis] = movingAxisMin - COLLISION_SURFACE_EPSILON;
       continue;
     }
     if (previousAxisPosition >= movingAxisMax && currentAxisPosition < movingAxisMax) {
-      position[movingAxis] = movingAxisMax;
+      position[movingAxis] = movingAxisMax + COLLISION_SURFACE_EPSILON;
       continue;
     }
     if (currentAxisPosition < movingAxisMin || currentAxisPosition > movingAxisMax) {

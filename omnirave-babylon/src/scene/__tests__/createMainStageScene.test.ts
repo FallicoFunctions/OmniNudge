@@ -225,7 +225,9 @@ describe('createMainStageScene', () => {
     expect(sourceBlocker!.isVisible).toBe(false);
     expect(sourceBlocker!.checkCollisions).toBe(true);
     expect(sourceBlocker!.position.x).toBeCloseTo(18);
+    expect(sourceBlocker!.position.y).toBeCloseTo(4);
     expect(sourceBlocker!.position.z).toBeCloseTo(-8);
+    expect(sourceBlocker!.getBoundingInfo().boundingBox.extendSizeWorld.y).toBeCloseTo(4);
     expect(sourceBlocker!.getBoundingInfo().boundingBox.extendSizeWorld.z).toBeCloseTo(0.6);
     expect(scene.getMeshByName(sourceBlocker!.name)).toBe(sourceBlocker);
   });
@@ -276,7 +278,9 @@ describe('createMainStageScene', () => {
     expect(sourceBlocker!.isVisible).toBe(false);
     expect(sourceBlocker!.checkCollisions).toBe(true);
     expect(sourceBlocker!.position.x).toBeCloseTo(-12.2);
+    expect(sourceBlocker!.position.y).toBeCloseTo(4);
     expect(sourceBlocker!.position.z).toBeCloseTo(-26);
+    expect(sourceBlocker!.getBoundingInfo().boundingBox.extendSizeWorld.y).toBeCloseTo(4);
   });
 
   it('moves the playable avatar through the controller and reuses one ground ray across render frames', async () => {
