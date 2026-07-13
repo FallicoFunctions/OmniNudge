@@ -34,6 +34,8 @@ const PLAYABLE_START_CAMERA: ReviewCheckpointCamera = {
 };
 const TRACKPAD_CAMERA_YAW_SENSITIVITY = 0.0045;
 const TRACKPAD_CAMERA_PITCH_SENSITIVITY = 0.0032;
+const POINTER_CAMERA_YAW_SENSITIVITY = 0.006;
+const POINTER_CAMERA_PITCH_SENSITIVITY = 0.0045;
 
 export async function createMainStageScene(engine: AbstractEngine) {
   const scene = new Scene(engine);
@@ -113,6 +115,9 @@ export async function createMainStageScene(engine: AbstractEngine) {
   });
   const routeProgress = createMainStageRouteProgress(MAIN_STAGE_REVIEW_ROUTE);
   const canvas = engine.getRenderingCanvas?.();
+  let activeCameraPointerId: number | undefined;
+  let lastCameraPointerX = 0;
+  let lastCameraPointerY = 0;
   const handleCameraWheel = (event: WheelEvent) => {
     if (event.ctrlKey) {
       return;
@@ -124,8 +129,51 @@ export async function createMainStageScene(engine: AbstractEngine) {
       -event.deltaY * TRACKPAD_CAMERA_PITCH_SENSITIVITY,
     );
   };
+  const handleCameraPointerDown = (event: PointerEvent) => {
+    if (event.button !== 0) {
+      return;
+    }
 
-  canvas?.addEventListener('wheel', handleCameraWheel, { passive: false });
+    event.preventDefault();
+    activeCameraPointerId = event.pointerId;
+    lastCameraPointerX = event.clientX;
+    lastCameraPointerY = event.clientY;
+    canvas?.setPointerCapture(event.pointerId);
+  };
+  const handleCameraPointerMove = (event: PointerEvent) => {
+    if (activeCameraPointerId !== event.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    const deltaX = event.clientX - lastCameraPointerX;
+    const deltaY = event.clientY - lastCameraPointerY;
+    lastCameraPointerX = event.clientX;
+    lastCameraPointerY = event.clientY;
+    cameraRig.orbit(
+      deltaX * POINTER_CAMERA_YAW_SENSITIVITY,
+      -deltaY * POINTER_CAMERA_PITCH_SENSITIVITY,
+    );
+  };
+  const handleCameraPointerEnd = (event: PointerEvent) => {
+    if (activeCameraPointerId !== event.pointerId) {
+      return;
+    }
+
+    activeCameraPointerId = undefined;
+    if (canvas?.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  if (canvas) {
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('wheel', handleCameraWheel, { passive: false });
+    canvas.addEventListener('pointerdown', handleCameraPointerDown);
+    canvas.addEventListener('pointermove', handleCameraPointerMove);
+    canvas.addEventListener('pointerup', handleCameraPointerEnd);
+    canvas.addEventListener('pointercancel', handleCameraPointerEnd);
+  }
 
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
@@ -168,6 +216,10 @@ export async function createMainStageScene(engine: AbstractEngine) {
 
   scene.onDisposeObservable.add(() => {
     canvas?.removeEventListener('wheel', handleCameraWheel);
+    canvas?.removeEventListener('pointerdown', handleCameraPointerDown);
+    canvas?.removeEventListener('pointermove', handleCameraPointerMove);
+    canvas?.removeEventListener('pointerup', handleCameraPointerEnd);
+    canvas?.removeEventListener('pointercancel', handleCameraPointerEnd);
     input.dispose();
     cameraRig.camera.detachControl();
   });
