@@ -10334,7 +10334,8 @@ describe('reviewRouteData', () => {
     const crowdFocus = focusTarget(crowdPit!);
     expect(crowdCamera.z).toBeLessThanOrEqual(-58);
     expect(crowdCamera.y).toBeLessThanOrEqual(12);
-    expect(crowdFocus.y).toBeGreaterThanOrEqual(22);
+    expect(crowdFocus.y).toBeGreaterThanOrEqual(16);
+    expect(crowdFocus.y).toBeLessThanOrEqual(19);
     expect(crowdFocus.z).toBeLessThanOrEqual(0);
 
     const cascadeCamera = cameraPosition(cascadeCourt!);
