@@ -30,6 +30,13 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
   const activePositionOffset = new Vector3(0, 0, 0);
   let hasActivePositionOffset = false;
 
+  const applyPositionOffsetCamera = (worldPosition: Vector3, worldTarget: Vector3) => {
+    camera.position.copyFrom(worldPosition);
+    camera.setTarget(worldTarget);
+    camera.rebuildAnglesAndRadius();
+    camera.radius = camera.position.subtract(worldTarget).length();
+  };
+
   const camera = new ArcRotateCamera('review-camera', Math.PI, 1.1, 6, targetAnchor.position, scene);
   camera.lockedTarget = targetAnchor;
   camera.lowerRadiusLimit = MIN_ZOOM_DISTANCE;
@@ -62,9 +69,7 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
       checkpointWorldPosition.copyFrom(target.getAbsolutePosition());
       lastPositionOffsetRoot.copyFrom(checkpointWorldPosition);
       checkpointWorldPosition.addInPlace(activePositionOffset);
-      camera.position.copyFrom(checkpointWorldPosition);
-      camera.setTarget(checkpointWorldTarget);
-      camera.rebuildAnglesAndRadius();
+      applyPositionOffsetCamera(checkpointWorldPosition, checkpointWorldTarget);
       return resolveZoomState(camera.radius);
     }
 
@@ -92,9 +97,7 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
         followWorldPosition.copyFrom(target.getAbsolutePosition());
         lastPositionOffsetRoot.copyFrom(followWorldPosition);
         followWorldPosition.addInPlace(activePositionOffset);
-        camera.position.copyFrom(followWorldPosition);
-        camera.setTarget(followWorldTarget);
-        camera.rebuildAnglesAndRadius();
+        applyPositionOffsetCamera(followWorldPosition, followWorldTarget);
       }
 
       const zoomState = resolveZoomState(camera.radius);

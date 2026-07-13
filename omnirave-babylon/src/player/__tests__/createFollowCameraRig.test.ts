@@ -118,6 +118,7 @@ describe('createFollowCameraRig', () => {
     expect(rig.camera.position.x).toBeCloseTo(38);
     expect(rig.camera.position.y).toBeCloseTo(9.65);
     expect(rig.camera.position.z).toBeCloseTo(-26);
+    expect(rig.camera.radius).toBeCloseTo(Math.hypot(32, 3, -26));
   });
 
   it('keeps the camera anchored to the player root as it moves after a checkpoint view, instead of staying fixed at the old position', () => {
