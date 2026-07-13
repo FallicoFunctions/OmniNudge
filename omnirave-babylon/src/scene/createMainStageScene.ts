@@ -23,6 +23,15 @@ import { parsePerfFlags } from '../app/perfFlags';
 import { createMainStageProductionSurfaces } from './createMainStageProductionSurfaces';
 import { loadMainStageAssets } from './loadMainStageAssets';
 import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from './reviewRouteData';
+import type { ReviewCheckpointCamera } from './reviewRouteData';
+
+const PLAYABLE_START_CAMERA: ReviewCheckpointCamera = {
+  alpha: -Math.PI / 2,
+  beta: 1.12,
+  radius: 9,
+  focusOffset: { x: 0, y: 1.4, z: 1.6 },
+  positionOffset: { x: 0, y: 4, z: -7 },
+};
 
 export async function createMainStageScene(engine: AbstractEngine) {
   const scene = new Scene(engine);
@@ -60,7 +69,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
   let selectedAvatarColorway = applyAvatarColorway(reviewAvatar, USER_AVATAR_COLORWAYS[0].id);
   reviewAvatar.root.parent = playerRig.avatarAnchor;
   const cameraRig = createFollowCameraRig(scene, playerRig.root);
-  cameraRig.applyCheckpointView(MAIN_STAGE_REVIEW_ROUTE[0].camera);
+  cameraRig.applyCheckpointView(PLAYABLE_START_CAMERA);
 
   scene.activeCamera = cameraRig.camera;
   const presentationRig = createMainStagePresentationRig(scene, cameraRig.camera, perfFlags);
@@ -92,11 +101,6 @@ export async function createMainStageScene(engine: AbstractEngine) {
   // pools, streaming spills, breathing mist, summit spray). The module
   // unfreezes only the cascade water materials it animates.
   const cascadeWaterMotion = createCascadeCourtWaterMotion(scene);
-
-  const canvas = engine.getRenderingCanvas?.();
-  if (canvas) {
-    cameraRig.camera.attachControl(canvas, true);
-  }
 
   const playerController = createPlayerController({
     avatarRoot: reviewAvatar.root,
