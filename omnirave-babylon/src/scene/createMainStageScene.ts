@@ -32,6 +32,8 @@ const PLAYABLE_START_CAMERA: ReviewCheckpointCamera = {
   focusOffset: { x: 0, y: 1.4, z: 1.6 },
   positionOffset: { x: 0, y: 4, z: -7 },
 };
+const TRACKPAD_CAMERA_YAW_SENSITIVITY = 0.0045;
+const TRACKPAD_CAMERA_PITCH_SENSITIVITY = 0.0032;
 
 export async function createMainStageScene(engine: AbstractEngine) {
   const scene = new Scene(engine);
@@ -110,6 +112,20 @@ export async function createMainStageScene(engine: AbstractEngine) {
     playerRig,
   });
   const routeProgress = createMainStageRouteProgress(MAIN_STAGE_REVIEW_ROUTE);
+  const canvas = engine.getRenderingCanvas?.();
+  const handleCameraWheel = (event: WheelEvent) => {
+    if (event.ctrlKey) {
+      return;
+    }
+
+    event.preventDefault();
+    cameraRig.orbit(
+      -event.deltaX * TRACKPAD_CAMERA_YAW_SENSITIVITY,
+      event.deltaY * TRACKPAD_CAMERA_PITCH_SENSITIVITY,
+    );
+  };
+
+  canvas?.addEventListener('wheel', handleCameraWheel, { passive: false });
 
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
@@ -151,6 +167,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
   };
 
   scene.onDisposeObservable.add(() => {
+    canvas?.removeEventListener('wheel', handleCameraWheel);
     input.dispose();
     cameraRig.camera.detachControl();
   });

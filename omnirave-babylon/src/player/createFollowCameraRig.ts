@@ -9,6 +9,7 @@ import type { ReviewCheckpointCamera } from '../scene/reviewRouteData';
 export interface FollowCameraRig {
   applyCheckpointView: (view: ReviewCheckpointCamera) => ReturnType<typeof resolveZoomState>;
   camera: ArcRotateCamera;
+  orbit: (deltaYaw: number, deltaPitch: number) => ReturnType<typeof resolveZoomState>;
   syncZoomState: () => ReturnType<typeof resolveZoomState>;
   targetAnchor: TransformNode;
 }
@@ -29,6 +30,32 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
   const activeFocusOffset = new Vector3(0, 0, 0);
   const activePositionOffset = new Vector3(0, 0, 0);
   let hasActivePositionOffset = false;
+
+  const syncActiveOffsetFromCamera = () => {
+    targetAnchor.computeWorldMatrix(true);
+    activeTargetToCameraOffset.copyFrom(camera.position);
+    activeTargetToCameraOffset.subtractInPlace(targetAnchor.getAbsolutePosition());
+    hasActivePositionOffset = true;
+  };
+
+  const applyOrbitDelta = (deltaYaw: number, deltaPitch: number) => {
+    if (!hasActivePositionOffset || activeTargetToCameraOffset.lengthSquared() === 0) {
+      syncActiveOffsetFromCamera();
+    }
+
+    const radius = Math.max(MIN_ZOOM_DISTANCE, activeTargetToCameraOffset.length());
+    const currentAlpha = Math.atan2(activeTargetToCameraOffset.z, activeTargetToCameraOffset.x);
+    const currentBeta = Math.acos(Math.min(1, Math.max(-1, activeTargetToCameraOffset.y / radius)));
+    const nextAlpha = currentAlpha + deltaYaw;
+    const nextBeta = Math.min(1.38, Math.max(0.62, currentBeta + deltaPitch));
+    const horizontalRadius = Math.sin(nextBeta) * radius;
+
+    activeTargetToCameraOffset.set(
+      horizontalRadius * Math.cos(nextAlpha),
+      Math.cos(nextBeta) * radius,
+      horizontalRadius * Math.sin(nextAlpha),
+    );
+  };
 
   const applyPositionOffsetCamera = (worldPosition: Vector3, worldTarget: Vector3) => {
     const offset = worldPosition.subtract(worldTarget);
@@ -86,6 +113,10 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
   return {
     applyCheckpointView,
     camera,
+    orbit(deltaYaw, deltaPitch) {
+      applyOrbitDelta(deltaYaw, deltaPitch);
+      return this.syncZoomState();
+    },
     syncZoomState() {
       // Re-anchor to the player's live position every frame so WASD movement
       // keeps the camera attached instead of leaving it behind.
