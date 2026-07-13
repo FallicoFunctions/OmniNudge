@@ -338,7 +338,10 @@ describe('createRuntime', () => {
 
   it('renders review instrumentation after successful runtime creation', async () => {
     const engineDispose = vi.fn();
-    const engineRunRenderLoop = vi.fn();
+    let renderFrame: (() => void) | undefined;
+    const engineRunRenderLoop = vi.fn((callback: () => void) => {
+      renderFrame = callback;
+    });
     const engineResize = vi.fn();
     const scenePick = vi.fn(() => ({
       hit: true,
@@ -347,6 +350,8 @@ describe('createRuntime', () => {
     const sceneRender = vi.fn();
     const playerPositionSet = vi.fn();
     const applyCheckpointView = vi.fn();
+    const routeProgressReset = vi.fn();
+    const setAvatarColorway = vi.fn();
     const scene = {
       pick: scenePick,
       render: sceneRender,
@@ -372,13 +377,73 @@ describe('createRuntime', () => {
               },
             },
           ],
+          avatarColorways: [
+            {
+              id: 'aurora',
+              label: 'Aurora',
+              primaryHex: '#f4efe2',
+              accentHex: '#68d8ff',
+              emissiveHex: '#49b9ff',
+            },
+            {
+              id: 'pulse',
+              label: 'Pulse',
+              primaryHex: '#352944',
+              accentHex: '#67e2b0',
+              emissiveHex: '#51ffc4',
+            },
+          ],
           cameraRig: {
             applyCheckpointView,
           },
           playerRig: {
             root: {
               position: {
+                x: 1.25,
+                y: 1.65,
+                z: -47.5,
                 set: playerPositionSet,
+              },
+            },
+          },
+          selectedAvatarColorway: {
+            id: 'aurora',
+            label: 'Aurora',
+            primaryHex: '#f4efe2',
+            accentHex: '#68d8ff',
+            emissiveHex: '#49b9ff',
+          },
+          setAvatarColorway,
+          routeProgress: {
+            activeCheckpoint: {
+              id: 'spawn_reveal',
+              x: 0,
+              y: 1.7,
+              z: -48,
+              camera: {
+                alpha: -Math.PI / 2,
+                beta: 1.08,
+                radius: 60,
+                focusOffset: { x: 0, y: 8, z: 44 },
+                positionOffset: { x: 0, y: 26.3, z: -57 },
+              },
+            },
+            activeIndex: 0,
+            completedCount: 0,
+            complete: false,
+            currentDistanceMeters: 12,
+            reset: routeProgressReset,
+            totalCount: 1,
+          },
+          playerController: {
+            animationState: 'idle',
+            currentSpeedMetersPerSecond: 4.5,
+            grounded: true,
+          },
+          reviewAvatar: {
+            root: {
+              metadata: {
+                animationState: 'run',
               },
             },
           },
@@ -414,6 +479,9 @@ describe('createRuntime', () => {
     expect(host.querySelector('[data-debug-toggle="routes"]')).not.toBeNull();
     expect(host.querySelector('[data-debug-toggle="lighting"]')).not.toBeNull();
     expect(host.querySelector('[data-debug-readout="mesh-pick"]')).not.toBeNull();
+    expect(host.querySelector('[data-debug-readout="player-state"]')).not.toBeNull();
+    expect(host.querySelector('[data-review-objective]')).not.toBeNull();
+    expect(host.querySelector('[data-avatar-colorway="aurora"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(window.__OMNIRAVE_RUNTIME__).toMatchObject({
       canvas: expect.any(HTMLCanvasElement),
       debugPanel: expect.any(HTMLElement),
@@ -432,6 +500,7 @@ describe('createRuntime', () => {
     );
     host.querySelector<HTMLButtonElement>('[data-review-checkpoint="spawn_reveal"]')?.click();
     expect(playerPositionSet).toHaveBeenCalledWith(0, 1.7, -48);
+    expect(routeProgressReset).toHaveBeenCalledWith(0);
     expect(applyCheckpointView).toHaveBeenCalledWith({
       alpha: -Math.PI / 2,
       beta: 1.08,
@@ -440,6 +509,19 @@ describe('createRuntime', () => {
       positionOffset: { x: 0, y: 26.3, z: -57 },
     });
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
+    renderFrame?.();
+    expect(host.querySelector('[data-debug-readout="player-state"]')?.textContent).toBe(
+      'Player: run grounded 4.5m/s @ 1.3,1.6,-47.5',
+    );
+    expect(host.querySelector('[data-review-objective]')?.textContent).toBe(
+      'Objective: reach Spawn Reveal (0/1)',
+    );
+    expect(host.querySelector('[data-review-checkpoint="spawn_reveal"]')?.getAttribute('data-route-state')).toBe(
+      'active',
+    );
+    host.querySelector<HTMLButtonElement>('[data-avatar-colorway="pulse"]')?.click();
+    expect(setAvatarColorway).toHaveBeenCalledWith('pulse');
+    expect(host.querySelector('[data-avatar-colorway="pulse"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(engineDispose).not.toHaveBeenCalled();
 
     runtime.dispose();

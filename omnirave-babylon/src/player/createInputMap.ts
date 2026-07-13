@@ -10,6 +10,9 @@ const KEY_BINDINGS: Record<string, keyof MovementInput> = {
   KeyD: 'right',
   KeyS: 'backward',
   KeyW: 'forward',
+  ShiftLeft: 'sprint',
+  ShiftRight: 'sprint',
+  Space: 'jump',
   // Review flight: hold to rise/descend; ground-follow keeps the offset.
   KeyE: 'up',
   KeyQ: 'down',
@@ -21,6 +24,8 @@ export function createInputMap(target: Window): InputMap {
     backward: false,
     left: false,
     right: false,
+    jump: false,
+    sprint: false,
     up: false,
     down: false,
   };
@@ -28,6 +33,12 @@ export function createInputMap(target: Window): InputMap {
   const handleKeyDown = (event: KeyboardEvent) => {
     const binding = KEY_BINDINGS[event.code];
     if (binding) {
+      if (event.code === 'Space') {
+        event.preventDefault();
+        if (event.repeat) {
+          return;
+        }
+      }
       state[binding] = true;
     }
   };
@@ -35,6 +46,10 @@ export function createInputMap(target: Window): InputMap {
   const handleKeyUp = (event: KeyboardEvent) => {
     const binding = KEY_BINDINGS[event.code];
     if (binding) {
+      if (event.code === 'Space') {
+        event.preventDefault();
+        return;
+      }
       state[binding] = false;
     }
   };

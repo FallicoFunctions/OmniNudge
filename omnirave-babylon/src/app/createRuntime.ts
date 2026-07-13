@@ -20,9 +20,10 @@ import {
   stepAdaptiveResolution,
 } from './adaptiveResolutionMath';
 import type { createMainStageScene } from '../scene/createMainStageScene';
+import type { ReviewCheckpoint } from '../scene/reviewRouteData';
 import { createDebugPanel } from '../ui/createDebugPanel';
 import { createPerfOverlay, updatePerfOverlay } from '../ui/createPerfOverlay';
-import { createReviewHud } from '../ui/createReviewHud';
+import { createReviewHud, formatCheckpointLabel } from '../ui/createReviewHud';
 import { createRuntimeLoadingOverlay } from '../ui/createRuntimeLoadingOverlay';
 import { RUNTIME_CONFIG } from './runtimeConfig';
 
@@ -149,10 +150,23 @@ export async function createRuntime(host: HTMLElement) {
     const { createMainStageScene: createScene } = await import('../scene/createMainStageScene');
     const scene = await createScene(activeEngine);
     const reviewRuntime = scene.metadata?.reviewRuntime;
-    hud = createReviewHud(host, {
-      checkpoints: reviewRuntime?.checkpoints,
+    const reviewCheckpoints = reviewRuntime?.checkpoints as readonly ReviewCheckpoint[] | undefined;
+    const reviewHud = createReviewHud(host, {
+      avatarColorways: reviewRuntime?.avatarColorways,
+      checkpoints: reviewCheckpoints,
+      selectedAvatarColorwayId: reviewRuntime?.selectedAvatarColorway?.id,
+      onSelectAvatarColorway(colorway) {
+        reviewRuntime?.setAvatarColorway?.(colorway.id);
+        for (const button of Array.from(reviewHud.querySelectorAll<HTMLButtonElement>('[data-avatar-colorway]'))) {
+          button.ariaPressed = String(button.dataset.avatarColorway === colorway.id);
+        }
+      },
       onSelectCheckpoint(checkpoint) {
         reviewRuntime?.playerRig?.root.position.set(checkpoint.x, checkpoint.y, checkpoint.z);
+        const checkpointIndex = reviewCheckpoints?.findIndex((routeCheckpoint) => routeCheckpoint.id === checkpoint.id) ?? -1;
+        if (checkpointIndex >= 0) {
+          reviewRuntime?.routeProgress?.reset(checkpointIndex);
+        }
         if (checkpoint.camera) {
           // Defer one frame: the player's ground-height snap runs in the next
           // onBeforeRender, and applying the camera from the pre-snap player
@@ -163,9 +177,12 @@ export async function createRuntime(host: HTMLElement) {
         }
       },
     });
+    hud = reviewHud;
     perfOverlay = createPerfOverlay(host);
     debugPanel = createDebugPanel(host);
+    const objectiveReadout = reviewHud.querySelector<HTMLOutputElement>('[data-review-objective]');
     const pickReadout = debugPanel.querySelector<HTMLOutputElement>('[data-debug-readout="mesh-pick"]');
+    const playerReadout = debugPanel.querySelector<HTMLOutputElement>('[data-debug-readout="player-state"]');
 
     handleCanvasPick = (event: MouseEvent) => {
       if (!pickReadout) {
@@ -214,6 +231,40 @@ export async function createRuntime(host: HTMLElement) {
         pendingHardwareScalingLevel = undefined;
       }
       scene.render();
+      const playerRuntime = scene.metadata?.reviewRuntime;
+      const playerPosition = playerRuntime?.playerRig?.root.position;
+      const playerController = playerRuntime?.playerController;
+      if (playerReadout && playerPosition && playerController) {
+        const state = playerRuntime?.reviewAvatar?.root.metadata?.animationState ?? playerController.animationState;
+        const groundedLabel = playerController.grounded ? 'grounded' : 'airborne';
+        playerReadout.value = `${playerPosition.x.toFixed(1)},${playerPosition.y.toFixed(1)},${playerPosition.z.toFixed(1)}`;
+        playerReadout.textContent = `Player: ${state} ${groundedLabel} ${playerController.currentSpeedMetersPerSecond.toFixed(1)}m/s @ ${playerReadout.value}`;
+      }
+      const routeProgress = playerRuntime?.routeProgress;
+      if (objectiveReadout && routeProgress) {
+        const objectiveText = routeProgress.complete || !routeProgress.activeCheckpoint
+          ? `Objective: route complete (${routeProgress.completedCount}/${routeProgress.totalCount})`
+          : `Objective: reach ${formatCheckpointLabel(routeProgress.activeCheckpoint.id)} (${routeProgress.completedCount}/${routeProgress.totalCount})`;
+        objectiveReadout.value = objectiveText;
+        objectiveReadout.textContent = objectiveText;
+        for (const button of Array.from(reviewHud.querySelectorAll<HTMLButtonElement>('[data-review-checkpoint]'))) {
+          const routeIndex = reviewCheckpoints?.findIndex((checkpoint) => checkpoint.id === button.dataset.reviewCheckpoint) ?? -1;
+          if (routeIndex < 0 || routeIndex >= routeProgress.totalCount) {
+            delete button.dataset.routeState;
+          } else if (routeIndex < routeProgress.completedCount) {
+            button.dataset.routeState = 'complete';
+          } else if (routeIndex === routeProgress.activeIndex) {
+            button.dataset.routeState = 'active';
+          } else {
+            delete button.dataset.routeState;
+          }
+        }
+      }
+      if (playerRuntime?.selectedAvatarColorway) {
+        for (const button of Array.from(reviewHud.querySelectorAll<HTMLButtonElement>('[data-avatar-colorway]'))) {
+          button.ariaPressed = String(button.dataset.avatarColorway === playerRuntime.selectedAvatarColorway.id);
+        }
+      }
       perfFrameCounter += 1;
       if (perfFrameCounter % 30 === 0) {
         const fps = activeEngine.getFps();

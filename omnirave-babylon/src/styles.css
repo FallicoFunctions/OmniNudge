@@ -164,6 +164,15 @@ body,
   line-height: 1.45;
 }
 
+.review-hud__objective {
+  display: block;
+  margin-top: 12px;
+  color: #fff8df;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .review-hud__route {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -186,6 +195,42 @@ body,
 .review-hud__checkpoint:focus-visible {
   border-color: rgba(236, 193, 93, 0.9);
   background: rgba(15, 83, 106, 0.82);
+  outline: none;
+}
+
+.review-hud__checkpoint[data-route-state="active"] {
+  border-color: rgba(236, 193, 93, 0.95);
+  color: #fff8df;
+  background: rgba(94, 55, 13, 0.82);
+}
+
+.review-hud__checkpoint[data-route-state="complete"] {
+  border-color: rgba(103, 226, 176, 0.5);
+  color: rgba(232, 251, 255, 0.72);
+  background: rgba(20, 76, 62, 0.54);
+}
+
+.review-hud__avatar-picker {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.review-hud__avatar-swatch {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(244, 239, 226, 0.45);
+  border-radius: 50%;
+  background:
+    linear-gradient(135deg, var(--avatar-primary) 0 48%, var(--avatar-accent) 52% 100%);
+  cursor: pointer;
+}
+
+.review-hud__avatar-swatch:hover,
+.review-hud__avatar-swatch:focus-visible,
+.review-hud__avatar-swatch[aria-pressed="true"] {
+  border-color: #fff8df;
+  box-shadow: 0 0 0 2px rgba(104, 216, 255, 0.45);
   outline: none;
 }
 

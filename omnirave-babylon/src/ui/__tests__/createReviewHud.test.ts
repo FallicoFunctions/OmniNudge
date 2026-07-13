@@ -1,13 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { USER_AVATAR_COLORWAYS } from '../../player/avatarColorways';
 import { createReviewHud } from '../createReviewHud';
 
 describe('createReviewHud', () => {
   it('renders Main Stage route checkpoint buttons and dispatches selection', () => {
     const host = document.createElement('div');
     const onSelectCheckpoint = vi.fn();
+    const onSelectAvatarColorway = vi.fn();
 
     createReviewHud(host, {
+      avatarColorways: USER_AVATAR_COLORWAYS,
       checkpoints: [
         {
           id: 'spawn_reveal',
@@ -34,7 +37,9 @@ describe('createReviewHud', () => {
           },
         },
       ],
+      onSelectAvatarColorway,
       onSelectCheckpoint,
+      selectedAvatarColorwayId: 'aurora',
     });
 
     const spawnButton = host.querySelector<HTMLButtonElement>(
@@ -46,8 +51,16 @@ describe('createReviewHud', () => {
     expect(vipButton).not.toBeNull();
     expect(spawnButton!.textContent).toContain('Spawn Reveal');
     expect(vipButton!.textContent).toContain('VIP Terrace');
+    expect(host.querySelector('[data-review-objective]')?.textContent).toContain(
+      'Objective: reach the first checkpoint',
+    );
+    const auroraButton = host.querySelector<HTMLButtonElement>('[data-avatar-colorway="aurora"]');
+    const pulseButton = host.querySelector<HTMLButtonElement>('[data-avatar-colorway="pulse"]');
+    expect(auroraButton?.ariaPressed).toBe('true');
+    expect(pulseButton?.ariaLabel).toBe('Pulse');
 
     vipButton?.click();
+    pulseButton?.click();
 
     expect(onSelectCheckpoint).toHaveBeenCalledWith({
       id: 'vip_terrace',
@@ -61,5 +74,6 @@ describe('createReviewHud', () => {
         focusOffset: { x: -10, y: 3, z: -14 },
       },
     });
+    expect(onSelectAvatarColorway).toHaveBeenCalledWith(USER_AVATAR_COLORWAYS[2]);
   });
 });

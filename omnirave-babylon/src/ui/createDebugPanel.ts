@@ -7,6 +7,7 @@ export function createDebugPanel(host: HTMLElement) {
     <label><input type="checkbox" data-debug-toggle="routes" /> Review Route</label>
     <label><input type="checkbox" data-debug-toggle="lighting" /> Lighting</label>
     <output data-debug-readout="mesh-pick">Pick: --</output>
+    <output data-debug-readout="player-state">Player: --</output>
   `;
   host.appendChild(panel);
   return panel;
