@@ -77,10 +77,9 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
       alpha: -Math.PI / 2,
       beta: 1.35,
       radius: 26,
-      // Pull the approval camera back off the LED panels and aim at the
-      // upper proscenium so the crowd-pit review reads as a full hero stage,
-      // not a clipped screen close-up.
-      focusOffset: { x: -6, y: 24, z: 8 },
+      // Pull the approval camera back off the LED panels and aim through the
+      // mid-stage band so the crown canopy frames the view instead of filling it.
+      focusOffset: { x: -6, y: 16, z: 8 },
       positionOffset: { x: -6, y: 6, z: -74 },
     },
   },
