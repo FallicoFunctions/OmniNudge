@@ -33,7 +33,7 @@ const PLAYABLE_START_CAMERA: ReviewCheckpointCamera = {
   positionOffset: { x: 0, y: 4, z: -7 },
 };
 const TRACKPAD_CAMERA_YAW_SENSITIVITY = 0.0045;
-const TRACKPAD_CAMERA_ZOOM_SENSITIVITY = 0.018;
+const TRACKPAD_CAMERA_PITCH_SENSITIVITY = 0.0032;
 const POINTER_CAMERA_YAW_SENSITIVITY = 0.006;
 const POINTER_CAMERA_PITCH_SENSITIVITY = 0.0045;
 
@@ -124,8 +124,10 @@ export async function createMainStageScene(engine: AbstractEngine) {
     }
 
     event.preventDefault();
-    cameraRig.orbit(event.deltaX * TRACKPAD_CAMERA_YAW_SENSITIVITY, 0);
-    cameraRig.zoom(event.deltaY * TRACKPAD_CAMERA_ZOOM_SENSITIVITY);
+    cameraRig.orbit(
+      event.deltaX * TRACKPAD_CAMERA_YAW_SENSITIVITY,
+      event.deltaY * TRACKPAD_CAMERA_PITCH_SENSITIVITY,
+    );
   };
   const handleCameraPointerDown = (event: PointerEvent) => {
     if (event.button !== 0) {
