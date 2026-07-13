@@ -10355,9 +10355,10 @@ describe('reviewRouteData', () => {
 
     const vipCamera = cameraPosition(vipTerrace!);
     const vipFocus = focusTarget(vipTerrace!);
-    expect(vipCamera.y).toBeGreaterThanOrEqual(23);
-    expect(vipCamera.z).toBeLessThanOrEqual(-30);
-    expect(Math.abs(vipCamera.x - vipFocus.x)).toBeGreaterThanOrEqual(8);
-    expect(vipCamera.y - vipFocus.y).toBeGreaterThanOrEqual(8);
+    expect(vipCamera.y).toBeLessThanOrEqual(19);
+    expect(vipCamera.z).toBeLessThanOrEqual(-24);
+    expect(Math.abs(vipCamera.x - vipFocus.x)).toBeGreaterThanOrEqual(28);
+    expect(vipCamera.y - vipFocus.y).toBeLessThanOrEqual(5);
+    expect(Math.abs(vipCamera.z - vipFocus.z)).toBeGreaterThanOrEqual(22);
   });
 });

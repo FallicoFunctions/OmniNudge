@@ -58,7 +58,7 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera, per
   pipeline.fxaaEnabled = true;
   pipeline.bloomEnabled = true;
   pipeline.bloomThreshold = 0.5;
-  pipeline.bloomWeight = 0.62;
+  pipeline.bloomWeight = 0.7;
   // Bloom kernel is in pixels: normalise to render height so halos keep
   // the same angular size on any viewport instead of shrinking on large
   // windows (reviews from bigger tabs kept reporting 'no bloom').
@@ -71,7 +71,7 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera, per
   // top of it is largely redundant and expensive; FXAA handles the remainder.
   pipeline.samples = 1;
   pipeline.imageProcessing.vignetteEnabled = true;
-  pipeline.imageProcessing.vignetteWeight = 1.5;
+  pipeline.imageProcessing.vignetteWeight = 1.08;
   // A faint, static film grain breaks up flat gradients; the previous
   // intensity (9, animated) overlaid shimmering noise that read as TV static
   // across every surface once the image rendered at full crisp density.

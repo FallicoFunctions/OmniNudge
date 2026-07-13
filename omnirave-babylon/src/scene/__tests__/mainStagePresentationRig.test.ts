@@ -98,10 +98,11 @@ describe('createMainStagePresentationRig', () => {
     expect(rig.pipeline.fxaaEnabled).toBe(true);
     expect(rig.pipeline.bloomThreshold).toBeGreaterThanOrEqual(0.4);
     expect(rig.pipeline.bloomThreshold).toBeLessThanOrEqual(0.7);
-    expect(rig.pipeline.bloomWeight).toBeGreaterThanOrEqual(0.35);
-    expect(rig.pipeline.bloomWeight).toBeLessThanOrEqual(0.7);
+    expect(rig.pipeline.bloomWeight).toBeGreaterThanOrEqual(0.68);
+    expect(rig.pipeline.bloomWeight).toBeLessThanOrEqual(0.74);
     expect(rig.pipeline.imageProcessing.vignetteEnabled).toBe(true);
     expect(rig.pipeline.imageProcessing.vignetteWeight).toBeGreaterThanOrEqual(1);
+    expect(rig.pipeline.imageProcessing.vignetteWeight).toBeLessThanOrEqual(1.12);
     expect(rig.pipeline.grainEnabled).toBe(true);
     // Static (non-animated), faint grain: animated grain read as TV static
     // across every surface once the scene rendered at full crisp density.

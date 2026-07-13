@@ -98,15 +98,15 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
   },
   {
     id: 'vip_terrace',
-    x: 24,
+    x: 32,
     y: 8.5,
-    z: 18,
+    z: 4,
     camera: {
       alpha: -2.8,
       beta: 1,
       radius: 38,
-      focusOffset: { x: -20, y: 5, z: -10 },
-      positionOffset: { x: -10, y: 15, z: -52 },
+      focusOffset: { x: -26, y: 5, z: -4 },
+      positionOffset: { x: 6, y: 8, z: -30 },
     },
   },
 ] as const;
