@@ -62,7 +62,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
   });
   const collisionMeshSet = new Set(stageAssets.collisionMeshes);
   stageAssets.mainMeshes = scene.meshes.filter((mesh) => !collisionMeshSet.has(mesh));
-  stageAssets.solidCollisionMeshes = createMainStageCollisionBlockers(scene);
+  stageAssets.solidCollisionMeshes = createMainStageCollisionBlockers(scene, stageAssets.mainMeshes);
 
   const lightingRig = createLightingRig(scene, perfFlags);
   const atmosphereRig = createAtmosphereRig(scene);

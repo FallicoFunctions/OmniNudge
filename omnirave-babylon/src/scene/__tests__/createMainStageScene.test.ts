@@ -201,6 +201,35 @@ describe('createMainStageScene', () => {
     expect(stageAssets.mainMeshes.every((mesh) => !mesh.isDisposed())).toBe(true);
   });
 
+  it('creates solid blockers from merged architectural mesh bounds', async () => {
+    engine = new NullEngine();
+    const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(
+      (scene, assets) => {
+        const vipFascia = MeshBuilder.CreateBox(
+          'merged:V30_VipShellFascia+1',
+          { width: 10, height: 3, depth: 0.2 },
+          scene,
+        );
+        vipFascia.position.set(18, 3, -8);
+        assets.mainMeshes.push(vipFascia);
+      },
+    );
+
+    const scene = await createMainStageScene(engine);
+    const sourceBlocker = stageAssets.solidCollisionMeshes.find(
+      (mesh) => mesh.metadata?.sourceMeshName === 'merged:V30_VipShellFascia+1',
+    );
+
+    expect(sourceBlocker).toBeDefined();
+    expect(sourceBlocker!.name).toBe('main-stage-blocker-source-merged:V30_VipShellFascia+1');
+    expect(sourceBlocker!.isVisible).toBe(false);
+    expect(sourceBlocker!.checkCollisions).toBe(true);
+    expect(sourceBlocker!.position.x).toBeCloseTo(18);
+    expect(sourceBlocker!.position.z).toBeCloseTo(-8);
+    expect(sourceBlocker!.getBoundingInfo().boundingBox.extendSizeWorld.z).toBeCloseTo(0.6);
+    expect(scene.getMeshByName(sourceBlocker!.name)).toBe(sourceBlocker);
+  });
+
   it('moves the playable avatar through the controller and reuses one ground ray across render frames', async () => {
     engine = new NullEngine();
     vi.spyOn(engine, 'getDeltaTime').mockReturnValue(16.667);
