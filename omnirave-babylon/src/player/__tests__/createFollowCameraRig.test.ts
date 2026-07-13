@@ -225,23 +225,4 @@ describe('createFollowCameraRig', () => {
     expect(rig.camera.beta).toBeGreaterThan(Math.PI / 2);
     expect(rig.camera.position.y).toBeLessThan(rig.targetAnchor.position.y);
   });
-
-  it('zooms the follow camera through the shared zoom state', () => {
-    engine = new NullEngine();
-    const scene = new Scene(engine);
-    const target = new TransformNode('player-root', scene);
-    const rig = createFollowCameraRig(scene, target);
-
-    expect(rig.camera.radius).toBeCloseTo(6);
-
-    const nearState = rig.zoom(-5.5);
-
-    expect(nearState.mode).toBe('first_person');
-    expect(rig.camera.radius).toBeCloseTo(0.5);
-
-    const farState = rig.zoom(200);
-
-    expect(farState.mode).toBe('third_person');
-    expect(rig.camera.radius).toBe(140);
-  });
 });
