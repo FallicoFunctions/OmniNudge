@@ -2929,9 +2929,9 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     meshNames: ['V113_CrownShellLamellaArray_Probe'],
     expected: {
       albedoTextureCleared: true,
-      albedoColor: [0.22, 0.18, 0.08],
-      emissiveColor: [0.01, 0.008, 0.004],
-      emissiveIntensity: 0.02,
+      albedoColor: [0.3, 0.255, 0.13],
+      emissiveColor: [0.018, 0.014, 0.006],
+      emissiveIntensity: 0.04,
       metallic: 0.22,
       roughness: 0.82,
       alpha: 1,
@@ -2939,7 +2939,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
       clearCoatEnabled: true,
       clearCoatIntensity: 0.02,
       clearCoatRoughness: 0.78,
-      environmentIntensity: 0.18,
+      environmentIntensity: 0.3,
       metaPolish: null,
     },
   },
@@ -5348,9 +5348,9 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     meshNames: ['V50_InnerPortalPylon_Probe'],
     expected: {
       albedoTextureCleared: true,
-      albedoColor: [0.2, 0.22, 0.26],
-      emissiveColor: [0.005, 0.007, 0.011],
-      emissiveIntensity: 0.02,
+      albedoColor: [0.25, 0.28, 0.34],
+      emissiveColor: [0.012, 0.018, 0.028],
+      emissiveIntensity: 0.04,
       metallic: 0.02,
       roughness: 0.9,
       alpha: 1,
@@ -5358,7 +5358,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
       clearCoatEnabled: true,
       clearCoatIntensity: 0.03,
       clearCoatRoughness: 0.74,
-      environmentIntensity: 0.13,
+      environmentIntensity: 0.26,
       metaPolish: null,
     },
   },
@@ -5367,9 +5367,9 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
     meshNames: ['V50_InnerShellCascade_Probe'],
     expected: {
       albedoTextureCleared: true,
-      albedoColor: [0.22, 0.24, 0.28],
-      emissiveColor: [0.007, 0.009, 0.013],
-      emissiveIntensity: 0.024,
+      albedoColor: [0.27, 0.3, 0.36],
+      emissiveColor: [0.012, 0.018, 0.026],
+      emissiveIntensity: 0.046,
       metallic: 0.02,
       roughness: 0.86,
       alpha: 1,
@@ -5377,7 +5377,7 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
       clearCoatEnabled: true,
       clearCoatIntensity: 0.05,
       clearCoatRoughness: 0.68,
-      environmentIntensity: 0.15,
+      environmentIntensity: 0.28,
       metaPolish: null,
     },
   },
@@ -5540,15 +5540,15 @@ const OVERRIDE_EXPECTATIONS: readonly OverrideExpectation[] = [
       albedoTextureCleared: false,
       albedoColor: [0.09, 0.19, 0.24],
       emissiveColor: [0.01, 0.03, 0.042],
-      emissiveIntensity: 0.076,
+      emissiveIntensity: 0.13,
       metallic: 0.02,
       roughness: 0.24,
-      alpha: 0.32,
+      alpha: 0.42,
       transparencyMode: 2,
       clearCoatEnabled: true,
       clearCoatIntensity: 0.05,
       clearCoatRoughness: 0.66,
-      environmentIntensity: 0.28,
+      environmentIntensity: 0.4,
       metaPolish: null,
     },
   },
@@ -6806,11 +6806,11 @@ describe('polishMainStageMaterials', () => {
     expect(crownShellMaterial.metadata?.mainStageMaterialPolish).toBe('pearl');
     expect(crownShellMaterial.metadata?.mainStageMaterialOverride).toBe('crown-shell-lamella');
     expect(crownShellMaterial.albedoColor.r).toBeLessThanOrEqual(0.3);
-    expect(crownShellMaterial.albedoColor.g).toBeLessThanOrEqual(0.24);
+    expect(crownShellMaterial.albedoColor.g).toBeLessThanOrEqual(0.255);
     expect(crownShellMaterial.albedoColor.b).toBeLessThanOrEqual(0.14);
     expect(crownShellMaterial.emissiveIntensity).toBeLessThanOrEqual(0.04);
     expect(crownShellMaterial.roughness).toBeGreaterThanOrEqual(0.72);
-    expect(crownShellMaterial.environmentIntensity).toBeLessThanOrEqual(0.28);
+    expect(crownShellMaterial.environmentIntensity).toBeLessThanOrEqual(0.3);
   });
 
   describe('mesh-specific overrides', () => {

@@ -395,6 +395,21 @@ function createPresentationBackdrop(scene: Scene) {
   crownHalo.isPickable = false;
   crownHalo.material = createCrownHaloMaterial(scene);
 
+  const crownSilhouetteAura = MeshBuilder.CreatePlane(
+    'main-stage-crown-silhouette-aura',
+    {
+      width: 132,
+      height: 118,
+      sideOrientation: Mesh.DOUBLESIDE,
+    },
+    scene,
+  );
+  crownSilhouetteAura.parent = root;
+  crownSilhouetteAura.position.y = 44;
+  crownSilhouetteAura.position.z = 42;
+  crownSilhouetteAura.isPickable = false;
+  crownSilhouetteAura.material = createCrownSilhouetteAuraMaterial(scene);
+
   const horizonAura = MeshBuilder.CreatePlane(
     'main-stage-horizon-aura',
     {
@@ -495,6 +510,19 @@ function createCrownHaloMaterial(scene: Scene) {
   material.emissiveColor = new Color3(0.1, 0.48, 0.64);
   material.emissiveIntensity = 0.46;
   material.alpha = 0.3;
+
+  return material;
+}
+
+function createCrownSilhouetteAuraMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-crown-silhouette-aura-material', scene);
+  material.backFaceCulling = false;
+  material.unlit = true;
+  material.albedoColor = new Color3(0.018, 0.04, 0.064);
+  material.emissiveColor = new Color3(0.1, 0.34, 0.5);
+  material.emissiveIntensity = 0.78;
+  material.alpha = 0.3;
+  material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
 
   return material;
 }
