@@ -7,6 +7,7 @@ export interface PlayerRig {
   avatarAnchor: TransformNode;
   capsule: ReturnType<typeof MeshBuilder.CreateCapsule>;
   eyeHeightMeters: number;
+  radiusMeters: number;
   root: TransformNode;
   speedMetersPerSecond: number;
 }
@@ -16,6 +17,7 @@ export function createPlayerRig(scene: Scene, spawn: Vector3): PlayerRig {
   root.position.copyFrom(spawn);
 
   const eyeHeightMeters = 1.65;
+  const radiusMeters = 0.35;
   const avatarAnchor = new TransformNode('player-avatar-anchor', scene);
   avatarAnchor.parent = root;
   avatarAnchor.position.y = -eyeHeightMeters;
@@ -24,7 +26,7 @@ export function createPlayerRig(scene: Scene, spawn: Vector3): PlayerRig {
     'player-capsule',
     {
       height: 1.8,
-      radius: 0.35,
+      radius: radiusMeters,
     },
     scene,
   );
@@ -39,5 +41,6 @@ export function createPlayerRig(scene: Scene, spawn: Vector3): PlayerRig {
     capsule,
     speedMetersPerSecond: 4.5,
     eyeHeightMeters,
+    radiusMeters,
   };
 }

@@ -24,6 +24,7 @@ export interface CreatePlayerControllerOptions {
   collisionMeshes: AbstractMesh[];
   input: MovementInput;
   playerRig: PlayerRig;
+  solidCollisionMeshes?: AbstractMesh[];
 }
 
 const GRAVITY_METERS_PER_SECOND = 18;
@@ -69,7 +70,19 @@ export function createPlayerController(options: CreatePlayerControllerOptions): 
       const horizontalSpeed = move.magnitude > 0 ? speed : 0;
 
       options.playerRig.root.position.x += move.x * horizontalSpeed * deltaSeconds;
+      resolveHorizontalCollision(
+        options.solidCollisionMeshes ?? [],
+        options.playerRig.root.position,
+        options.playerRig.eyeHeightMeters,
+        options.playerRig.radiusMeters,
+      );
       options.playerRig.root.position.z += move.z * horizontalSpeed * deltaSeconds;
+      resolveHorizontalCollision(
+        options.solidCollisionMeshes ?? [],
+        options.playerRig.root.position,
+        options.playerRig.eyeHeightMeters,
+        options.playerRig.radiusMeters,
+      );
 
       if (move.magnitude > 0) {
         options.avatarRoot.rotation.y = Math.atan2(move.x, move.z);
@@ -138,4 +151,42 @@ function resolveGroundHeight(collisionMeshes: AbstractMesh[], position: Vector3,
   }
 
   return groundHeight;
+}
+
+function resolveHorizontalCollision(
+  solidCollisionMeshes: AbstractMesh[],
+  position: Vector3,
+  eyeHeightMeters: number,
+  radiusMeters: number,
+) {
+  const feetY = position.y - eyeHeightMeters;
+  const headY = position.y;
+
+  for (const mesh of solidCollisionMeshes) {
+    mesh.computeWorldMatrix(true);
+    const { minimumWorld, maximumWorld } = mesh.getBoundingInfo().boundingBox;
+    if (headY < minimumWorld.y || feetY > maximumWorld.y) {
+      continue;
+    }
+
+    const minX = minimumWorld.x - radiusMeters;
+    const maxX = maximumWorld.x + radiusMeters;
+    const minZ = minimumWorld.z - radiusMeters;
+    const maxZ = maximumWorld.z + radiusMeters;
+    if (position.x < minX || position.x > maxX || position.z < minZ || position.z > maxZ) {
+      continue;
+    }
+
+    const distances = [
+      { axis: 'x' as const, value: minX, distance: Math.abs(position.x - minX) },
+      { axis: 'x' as const, value: maxX, distance: Math.abs(maxX - position.x) },
+      { axis: 'z' as const, value: minZ, distance: Math.abs(position.z - minZ) },
+      { axis: 'z' as const, value: maxZ, distance: Math.abs(maxZ - position.z) },
+    ];
+    const nearest = distances.reduce((best, candidate) =>
+      candidate.distance < best.distance ? candidate : best,
+    );
+
+    position[nearest.axis] = nearest.value;
+  }
 }

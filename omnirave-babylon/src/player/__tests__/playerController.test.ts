@@ -78,6 +78,34 @@ describe('createPlayerController', () => {
     expect(controller.currentSpeedMetersPerSecond).toBeCloseTo(6.975, 3);
   });
 
+  it('blocks horizontal movement against solid collision meshes without using them as ground', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const ground = MeshBuilder.CreateGround('collision-ground', { width: 100, height: 100 }, scene);
+    const wall = MeshBuilder.CreateBox('collision-wall', { width: 4, height: 4, depth: 20 }, scene);
+    wall.position.set(5, 2, 5);
+    wall.computeWorldMatrix(true);
+    const rig = createPlayerRig(scene, new Vector3(0, 1.65, 5));
+    const avatarRoot = new TransformNode('avatar-root', scene);
+    const camera = new FreeCamera('camera', new Vector3(0, 2, -5), scene);
+    camera.setTarget(new Vector3(0, 2, 0));
+    const input = createInput({ right: true });
+    const controller = createPlayerController({
+      avatarRoot,
+      camera,
+      collisionMeshes: [ground],
+      input,
+      playerRig: rig,
+      solidCollisionMeshes: [wall],
+    });
+
+    controller.step(1);
+
+    expect(rig.root.position.x).toBeCloseTo(2.65);
+    expect(rig.root.position.y).toBeCloseTo(1.65);
+    expect(controller.grounded).toBe(true);
+  });
+
   it('jumps from the ground and lands back on collision geometry', () => {
     engine = new NullEngine();
     const scene = new Scene(engine);
