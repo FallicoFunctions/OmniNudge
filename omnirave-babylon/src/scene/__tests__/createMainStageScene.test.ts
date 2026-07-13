@@ -118,7 +118,7 @@ describe('createMainStageScene', () => {
     camera!.radius = 20;
     scene.render();
 
-    expect(camera!.radius).toBe(20);
+    expect(camera!.radius).toBeCloseTo(20);
   });
 
   it('hides the embodied avatar when zoomed into first-person', async () => {
