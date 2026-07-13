@@ -30,6 +30,7 @@ const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
 ];
 
 const MIN_SOURCE_BLOCKER_THICKNESS = 1.2;
+const FOREGROUND_BARRICADE_CLEAR_Z = 0.25;
 
 export function createMainStageCollisionBlockers(scene: Scene, sourceMeshes: readonly AbstractMesh[] = []): Mesh[] {
   const authoredBlockers = MAIN_STAGE_COLLISION_BLOCKERS.map((blocker) => createBlockerFromSpec(scene, blocker));
@@ -59,9 +60,17 @@ function createBlockerFromSourceMesh(scene: Scene, sourceMesh: AbstractMesh) {
   sourceMesh.computeWorldMatrix(true);
   sourceMesh.refreshBoundingInfo({ applySkeleton: false });
   const { minimumWorld, maximumWorld } = sourceMesh.getBoundingInfo().boundingBox;
-  const width = Math.max(MIN_SOURCE_BLOCKER_THICKNESS, maximumWorld.x - minimumWorld.x);
-  const height = Math.max(1, maximumWorld.y - minimumWorld.y);
-  const depth = Math.max(MIN_SOURCE_BLOCKER_THICKNESS, maximumWorld.z - minimumWorld.z);
+  const minX = minimumWorld.x;
+  const maxX = maximumWorld.x;
+  const minY = minimumWorld.y;
+  const maxY = maximumWorld.y;
+  const minZ = /V118_BasinWallRelief/.test(sourceMesh.name)
+    ? Math.max(minimumWorld.z, FOREGROUND_BARRICADE_CLEAR_Z)
+    : minimumWorld.z;
+  const maxZ = maximumWorld.z;
+  const width = Math.max(MIN_SOURCE_BLOCKER_THICKNESS, maxX - minX);
+  const height = Math.max(1, maxY - minY);
+  const depth = Math.max(MIN_SOURCE_BLOCKER_THICKNESS, maxZ - minZ);
   const mesh = MeshBuilder.CreateBox(
     `main-stage-blocker-source-${sourceMesh.name}`,
     {
@@ -72,9 +81,9 @@ function createBlockerFromSourceMesh(scene: Scene, sourceMesh: AbstractMesh) {
     scene,
   );
   mesh.position.set(
-    (minimumWorld.x + maximumWorld.x) / 2,
-    (minimumWorld.y + maximumWorld.y) / 2,
-    (minimumWorld.z + maximumWorld.z) / 2,
+    (minX + maxX) / 2,
+    (minY + maxY) / 2,
+    (minZ + maxZ) / 2,
   );
   mesh.metadata = {
     ...mesh.metadata,
