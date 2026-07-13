@@ -6,6 +6,9 @@ import type { Scene } from '@babylonjs/core/scene';
 import { MAX_ZOOM_DISTANCE, MIN_ZOOM_DISTANCE, resolveZoomState } from './cameraRigMath';
 import type { ReviewCheckpointCamera } from '../scene/reviewRouteData';
 
+const MIN_ORBIT_BETA = 0.62;
+const MAX_ORBIT_BETA = 2.2;
+
 export interface FollowCameraRig {
   applyCheckpointView: (view: ReviewCheckpointCamera) => ReturnType<typeof resolveZoomState>;
   camera: ArcRotateCamera;
@@ -47,7 +50,7 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
     const currentAlpha = Math.atan2(activeTargetToCameraOffset.z, activeTargetToCameraOffset.x);
     const currentBeta = Math.acos(Math.min(1, Math.max(-1, activeTargetToCameraOffset.y / radius)));
     const nextAlpha = currentAlpha + deltaYaw;
-    const nextBeta = Math.min(1.38, Math.max(0.62, currentBeta + deltaPitch));
+    const nextBeta = Math.min(MAX_ORBIT_BETA, Math.max(MIN_ORBIT_BETA, currentBeta + deltaPitch));
     const horizontalRadius = Math.sin(nextBeta) * radius;
 
     activeTargetToCameraOffset.set(
