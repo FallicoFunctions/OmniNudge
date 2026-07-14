@@ -327,7 +327,7 @@ describe('createMainStageScene', () => {
     expect(sourceBlocker!.getBoundingInfo().boundingBox.extendSizeWorld.y).toBeCloseTo(4);
   });
 
-  it('adds blockers for basin, stair, water, promenade, and crowd-control physical features', async () => {
+  it('adds blockers for basin, stair, and crowd-control physical features without walling low surface inlays', async () => {
     engine = new NullEngine();
     const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(
       (scene, assets) => {
@@ -357,12 +357,12 @@ describe('createMainStageScene', () => {
         'merged:V90_BasinStoneCopingArray+1',
         'V123_CentralStairGoldNosingArray',
         'merged:V121_BasinBridgeRelief_North+2',
-        'V63_BasinWaterParterre',
-        'V64_PromenadeCyanThread',
         'V124_CrowdControlRailArray_L',
         'V125_CrowdBarrierRailArray_R',
       ]),
     );
+    expect(blockerSourceNames).not.toContain('V63_BasinWaterParterre');
+    expect(blockerSourceNames).not.toContain('V64_PromenadeCyanThread');
     expect(
       stageAssets.solidCollisionMeshes.filter(
         (mesh) => mesh.metadata?.sourceMeshName === 'merged:V99_BasinParapetRelief+1',
@@ -373,6 +373,17 @@ describe('createMainStageScene', () => {
         (mesh) => mesh.metadata?.sourceMeshName === 'merged:V90_BasinStoneCopingArray+1',
       ),
     ).toHaveLength(2);
+    expect(
+      stageAssets.solidCollisionMeshes.some((mesh) => {
+        const bounds = mesh.getBoundingInfo().boundingBox;
+        return (
+          bounds.minimumWorld.x <= -0.5 &&
+          bounds.maximumWorld.x >= -0.5 &&
+          bounds.minimumWorld.z <= -38.3 &&
+          bounds.maximumWorld.z >= -38.3
+        );
+      }),
+    ).toBe(false);
   });
 
   it('moves the playable avatar through the controller and reuses one ground ray across render frames', async () => {
