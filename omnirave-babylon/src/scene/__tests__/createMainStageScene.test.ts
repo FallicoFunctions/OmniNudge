@@ -327,7 +327,7 @@ describe('createMainStageScene', () => {
     expect(sourceBlocker!.getBoundingInfo().boundingBox.extendSizeWorld.y).toBeCloseTo(4);
   });
 
-  it('adds blockers for basin, stair, and crowd-control physical features without walling low surface inlays', async () => {
+  it('adds blockers for basin and crowd-control physical features without walling low surface or trim inlays', async () => {
     engine = new NullEngine();
     const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(
       (scene, assets) => {
@@ -355,7 +355,6 @@ describe('createMainStageScene', () => {
       expect.arrayContaining([
         'merged:V99_BasinParapetRelief+1',
         'merged:V90_BasinStoneCopingArray+1',
-        'V123_CentralStairGoldNosingArray',
         'merged:V121_BasinBridgeRelief_North+2',
         'V124_CrowdControlRailArray_L',
         'V125_CrowdBarrierRailArray_R',
@@ -363,6 +362,7 @@ describe('createMainStageScene', () => {
     );
     expect(blockerSourceNames).not.toContain('V63_BasinWaterParterre');
     expect(blockerSourceNames).not.toContain('V64_PromenadeCyanThread');
+    expect(blockerSourceNames).not.toContain('V123_CentralStairGoldNosingArray');
     expect(
       stageAssets.solidCollisionMeshes.filter(
         (mesh) => mesh.metadata?.sourceMeshName === 'merged:V99_BasinParapetRelief+1',
