@@ -372,6 +372,9 @@ func TestLogin(t *testing.T) {
 func TestValidateJWTRejectsBannedOrDeletedUsers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
+	handler, _, cleanup := setupAuthHandlerTest(t)
+	defer cleanup()
+
 	testCases := []struct {
 		name       string
 		mutateUser func(t *testing.T, handler *AuthHandler, adminID int, userID int)
@@ -394,9 +397,6 @@ func TestValidateJWTRejectsBannedOrDeletedUsers(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			handler, _, cleanup := setupAuthHandlerTest(t)
-			defer cleanup()
-
 			ctx := context.Background()
 			admin := &models.User{
 				Username:     uniqueAuthUsername("validate_admin"),

@@ -1232,9 +1232,8 @@
     },
     "edit": {
       "title": "Edit profile",
-      "description": "Update your avatar URL, status text, and bio.",
-      "avatarUrlLabel": "Avatar URL",
-      "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
+      "description": "Update your avatar image, status text, and bio.",
+      "avatarUrlLabel": "Avatar Image",
       "avatarUploadButton": "Upload avatar image",
       "avatarUploading": "Uploading...",
       "avatarUploadHint": "PNG, JPG, GIF, or WebP up to 5MB. Auto-cropped to 200x200.",
@@ -1251,7 +1250,7 @@
         "bioTooLong": "Bio must be 500 characters or less.",
         "statusTooLong": "Status text must be 500 characters or less.",
         "locationTooLong": "Location must be 100 characters or less.",
-        "invalidAvatarUrl": "Avatar URL must start with http:// or https://",
+        "invalidAvatarUrl": "Avatar image must start with http:// or https://",
         "uploadFailed": "Failed to upload avatar: {{message}}",
         "saveFailed": "Failed to save profile: {{message}}"
       }
@@ -2406,6 +2405,7 @@
       "signingIn": "Signing in...",
       "creatingAccount": "Creating account...",
       "signIn": "Sign in",
+      "logout": "Log out",
       "signUp": "Sign up"
     },
     "switch": {
@@ -3728,8 +3728,7 @@
     "minParticipants": "Add at least 2 other members.",
     "nameLabel": "Group Name",
     "namePlaceholder": "Enter a group name",
-    "avatarLabel": "Avatar URL (optional)",
-    "avatarPlaceholder": "https://example.com/avatar.png",
+    "avatarLabel": "Avatar Image (optional)",
     "descriptionLabel": "Description (optional)",
     "descriptionPlaceholder": "What is this group about?",
     "selectedCount": "{{count}} selected",
@@ -3972,6 +3971,8 @@
       "settingsSave": "Save settings",
       "settingsSaved": "Settings saved",
       "settingsSaveError": "Failed to save settings",
+      "viewCharacterForm": "Open character form",
+      "viewCharacterFormDescription": "View the bot's full persona definition in a modal.",
       "newChat": "New chat",
       "newChatConfirm": "Start a new conversation?",
       "forkChat": "Fork this chat",
@@ -3993,6 +3994,7 @@
       "discover": "Discover",
       "search": "Search",
       "chat": "Chat",
+      "studio": "Studio",
       "searchPlaceholder": "Search personas...",
       "noResults": "No results found",
       "collapse": "Collapse sidebar",
@@ -4014,6 +4016,114 @@
       "empty": "No conversations yet. Start chatting with a persona!",
       "lastMessage": "Last message",
       "noMessages": "No messages yet"
+    },
+    "studio": {
+      "loadingStudio": "Loading studio...",
+      "eyebrow": "OmniChat Studio",
+      "title": "Your Characters",
+      "description": "Create native OmniChat personas or import existing character cards. Personal characters remain private until publishing ships.",
+      "creatorOnly": "Creator-only",
+      "loadingPersonas": "Loading your personas...",
+      "loadPersonasError": "Failed to load your personas.",
+      "loadingDefinition": "Loading persona definition...",
+      "import": {
+        "title": "Import Character Card",
+        "importing": "Importing...",
+        "uploadCta": "Upload .png or .json"
+      },
+      "editor": {
+        "newCharacter": "New Character",
+        "editCharacter": "Edit Character"
+      },
+      "actions": {
+        "openChat": "Open Chat",
+        "exportJson": "Export JSON",
+        "delete": "Delete",
+        "saving": "Saving...",
+        "createCharacter": "Create Character",
+        "saveChanges": "Save Changes",
+        "backToDiscover": "Back to discover"
+      },
+      "fields": {
+        "name": "Name",
+        "category": "Category",
+        "description": "Description",
+        "visibility": "Visibility",
+        "visibilityPrivate": "Private to you",
+        "personality": "Personality",
+        "scenario": "Scenario",
+        "openingMessage": "Opening Message",
+        "exampleDialogue": "Example Dialogue",
+        "systemPrompt": "System Prompt Override",
+        "systemPromptPlaceholder": "Leave empty to use OmniChat's structured character prompt.",
+        "postHistoryInstructions": "Post-History Instructions",
+        "alternateGreetings": "Alternate Greetings",
+        "alternateGreetingsPlaceholder": "One greeting per line",
+        "tags": "Tags",
+        "tagsPlaceholder": "comma, separated, tags",
+        "creatorName": "Creator Name",
+        "characterVersion": "Character Version",
+        "creatorNotes": "Creator Notes",
+        "avatarUrl": "Avatar Image",
+        "previewVideoUrl": "Preview Video",
+        "galleryUrls": "Gallery Images",
+        "galleryUrlsPlaceholder": "One uploaded image per line",
+        "characterBookJson": "Character Book JSON",
+        "extensionsJson": "Extensions JSON"
+      },
+      "uploadingField": "Uploading {{field}}...",
+      "dangerZone": {
+        "title": "Danger Zone",
+        "description": "Delete this character from your private OmniChat studio.",
+        "delete": "Delete Character"
+      },
+      "deleteModal": {
+        "title": "Delete character?",
+        "description": "This will remove the selected character from your private OmniChat studio.",
+        "descriptionNamed": "This will remove {{name}} from your private OmniChat studio.",
+        "confirm": "Delete Character"
+      },
+      "discardModal": {
+        "title": "Discard unsaved changes?",
+        "description": "You have unsaved edits in this character form. Leaving now will discard them.",
+        "confirm": "Discard Changes"
+      }
+    },
+    "personaDetails": {
+      "title": "Character Form",
+      "loading": "Loading character form...",
+      "loadError": "Unable to load the full character form.",
+      "noAvatar": "No avatar",
+      "fields": {
+        "name": "Name",
+        "category": "Category",
+        "description": "Description",
+        "visibility": "Visibility",
+        "nsfw": "NSFW",
+        "personality": "Personality",
+        "scenario": "Scenario",
+        "openingMessage": "Opening Message",
+        "exampleDialogue": "Example Dialogue",
+        "systemPrompt": "System Prompt Override",
+        "postHistoryInstructions": "Post-History Instructions",
+        "alternateGreetings": "Alternate Greetings",
+        "tags": "Tags",
+        "creatorName": "Creator Name",
+        "characterVersion": "Character Version",
+        "creatorNotes": "Creator Notes",
+        "avatarUrl": "Avatar Image",
+        "previewVideoUrl": "Preview Video",
+        "galleryUrls": "Gallery Images",
+        "characterBookJson": "Character Book JSON",
+        "extensionsJson": "Extensions JSON"
+      },
+      "dangerZone": {
+        "title": "Danger Zone",
+        "description": "Delete this character and remove it from your private persona library.",
+        "delete": "Delete Character",
+        "confirmDelete": "Confirm Delete",
+        "deleteError": "Unable to delete this character."
+      }
     }
   }
 }

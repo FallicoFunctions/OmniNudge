@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { omnichatService, omnichatQueryKeys } from '../services/omnichatService';
@@ -247,7 +247,7 @@ export default function OmniChatDiscoverPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [category, setCategory] = useState<PersonaCategory | 'all'>('all');
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('discover');
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
@@ -266,16 +266,45 @@ export default function OmniChatDiscoverPage() {
     }
   }, [searchParams, setSearchParams]);
 
+  const handleOpenStudio = useCallback(() => {
+    if (isAuthenticated) {
+      navigate('/omnichat/studio');
+      return;
+    }
+    window.dispatchEvent(
+      new CustomEvent('open-auth-modal', {
+        detail: {
+          mode: 'login',
+          redirectTo: '/omnichat/studio',
+        },
+      })
+    );
+  }, [isAuthenticated, navigate]);
+
   const handleSidebarTabChange = useCallback((tab: SidebarTab) => {
-    setSidebarTab(tab);
     if (tab === 'search') {
       setSearchOverlayOpen(true);
       // Reset to discover tab after opening overlay
       setSidebarTab('discover');
-    } else if (tab === 'chat') {
+      return;
+    }
+
+    if (tab === 'studio') {
+      if (isAuthenticated) {
+        setSidebarTab('studio');
+        navigate('/omnichat/studio');
+        return;
+      }
+      handleOpenStudio();
+      setSidebarTab('discover');
+      return;
+    }
+
+    setSidebarTab(tab);
+    if (tab === 'chat') {
       navigate('/omnichat/chat');
     }
-  }, [navigate]);
+  }, [handleOpenStudio, isAuthenticated, navigate]);
 
   const personasQuery = useQuery({
     queryKey: omnichatQueryKeys.personas(),
@@ -304,6 +333,10 @@ export default function OmniChatDiscoverPage() {
 
   const personas = personasQuery.data ?? EMPTY_PERSONAS;
   const conversations = useMemo(() => conversationsQuery.data ?? [], [conversationsQuery.data]);
+  const activePersonaById = useMemo(
+    () => new Map(personas.map((persona) => [Number(persona.id), persona])),
+    [personas]
+  );
 
   const featured = useMemo(
     () =>
@@ -326,9 +359,9 @@ export default function OmniChatDiscoverPage() {
 
     for (const conv of conversations) {
       if (!conv.last_message_preview) continue;
-      const persona =
-        conv.persona ?? personas.find((p) => Number(p.id) === Number(conv.persona_id));
-      if (!persona) continue;
+      const latestPersona = activePersonaById.get(Number(conv.persona_id));
+      if (!latestPersona) continue;
+      const persona = { ...(conv.persona ?? latestPersona), ...latestPersona };
       if (seen.has(conv.persona_id)) continue;
       seen.add(conv.persona_id);
       items.push({ ...conv, persona });
@@ -337,12 +370,19 @@ export default function OmniChatDiscoverPage() {
     return items.sort(
       (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
     );
-  }, [conversations, personas]);
+  }, [activePersonaById, conversations]);
 
   const continueChattingPersonas = useMemo(
     () => continueChatting.map((conversation) => conversation.persona),
     [continueChatting]
   );
+
+  const ownedPersonas = useMemo(() => {
+    if (!isAuthenticated || !user) {
+      return [];
+    }
+    return personas.filter((persona) => persona.owner_user_id === user.id);
+  }, [isAuthenticated, personas, user]);
 
   const featuredPreview = useMobilePreviewSequence(featured, isMobile, 'sequential');
   const continuePreview = useMobilePreviewSequence(
@@ -421,12 +461,23 @@ export default function OmniChatDiscoverPage() {
           {/* Featured section */}
           {featured.length > 0 && (
             <section className="mb-8">
-              <p className="mb-0.5 text-sm font-medium text-[var(--color-text-secondary)]">
-                {t('omnichat.discover.featuredEyebrow')}
-              </p>
-              <h1 className="mb-4 text-2xl font-bold text-[var(--color-text-primary)]">
-                {t('omnichat.discover.featuredTitle')}
-              </h1>
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="mb-0.5 text-sm font-medium text-[var(--color-text-secondary)]">
+                    {t('omnichat.discover.featuredEyebrow')}
+                  </p>
+                  <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+                    {t('omnichat.discover.featuredTitle')}
+                  </h1>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenStudio}
+                  className="rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)]"
+                >
+                  Create or Import Character
+                </button>
+              </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {featured.map((persona) => (
                   <PersonaCard
@@ -452,6 +503,30 @@ export default function OmniChatDiscoverPage() {
                       }
                     }}
                   />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {isAuthenticated && ownedPersonas.length > 0 && (
+            <section className="mb-8">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-[var(--color-text-secondary)]">
+                    Your private and imported bots
+                  </p>
+                  <h2 className="text-xl font-bold text-[var(--color-text-primary)]">My Characters</h2>
+                </div>
+                <Link
+                  to="/omnichat/studio"
+                  className="rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)]"
+                >
+                  Manage Studio
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+                {ownedPersonas.map((persona) => (
+                  <PersonaCard key={persona.id} persona={persona} onSelect={handleSelect} allowMobileAutoplay />
                 ))}
               </div>
             </section>

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useWebSocket } from '../../contexts/WebSocketContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -7,15 +8,31 @@ import { useTranslation } from 'react-i18next';
  * Only visible when disconnected or reconnecting
  */
 export function ConnectionStatusIndicator() {
-  const { isConnected } = useWebSocket();
+  const { connectionState } = useWebSocket();
   const { user } = useAuth();
   const { t } = useTranslation();
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (connectionState !== 'reconnecting') {
+      setIsVisible(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setIsVisible(true);
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [connectionState]);
 
   // Don't show indicator if not authenticated
   if (!user) return null;
 
-  // Don't show indicator when connected
-  if (isConnected) return null;
+  // Only show for sustained reconnect attempts, not initial connect or brief dev churn.
+  if (!isVisible) return null;
 
   return (
     <div

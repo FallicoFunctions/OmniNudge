@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/assert"
@@ -41,10 +42,14 @@ func setupAdminPersonaTestEnv(t *testing.T) (*gin.Engine, *models.UserRepository
 				c.Set("user_id", id)
 			}
 		}
+		if role := c.GetHeader("X-Test-Role"); role != "" {
+			c.Set("role", role)
+		}
 		c.Next()
 	})
 
 	adminRoutes := router.Group("/api/v1/admin/omnichat")
+	adminRoutes.Use(middleware.RequireRole("admin"))
 	{
 		adminRoutes.GET("/personas", handler.ListPersonas)
 		adminRoutes.PUT("/personas/:id", handler.UpdatePersonaMedia)
@@ -67,6 +72,11 @@ func createAdminPersonaTestUser(t *testing.T, repo *models.UserRepository, usern
 	err := repo.Create(ctx, user)
 	require.NoError(t, err)
 	return user
+}
+
+func setAdminPersonaTestHeaders(req *http.Request, userID int, role string) {
+	req.Header.Set("X-Test-User-ID", strconv.Itoa(userID))
+	req.Header.Set("X-Test-Role", role)
 }
 
 func seedAdminPersona(t *testing.T, pool *pgxpool.Pool, repo *models.BotPersonaRepository) *models.BotPersona {
@@ -93,11 +103,12 @@ func TestAdminPersonaHandlerListPersonas(t *testing.T) {
 	admin := createAdminPersonaTestUser(t, userRepo, "persona_admin_list", "admin")
 	persona := seedAdminPersona(t, pool, personaRepo)
 	videoURL := "/uploads/persona-preview.mp4"
-	_, err := personaRepo.UpdateMedia(context.Background(), persona.ID, persona.AvatarURL, &videoURL)
+	gallery := []string{}
+	_, err := personaRepo.UpdateMedia(context.Background(), persona.ID, persona.AvatarURL, &videoURL, &gallery)
 	require.NoError(t, err)
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/admin/omnichat/personas", nil)
-	req.Header.Set("X-Test-User-ID", strconv.Itoa(admin.ID))
+	setAdminPersonaTestHeaders(req, admin.ID, "admin")
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -129,15 +140,16 @@ func TestAdminPersonaHandlerUpdatePersonaMedia(t *testing.T) {
 	admin := createAdminPersonaTestUser(t, userRepo, "persona_admin_update", "admin")
 	persona := seedAdminPersona(t, pool, personaRepo)
 
-	payload := map[string]string{
+	payload := map[string]interface{}{
 		"avatar_url":        "/uploads/persona-avatar.png",
 		"preview_video_url": "/uploads/persona-preview.mp4",
+		"gallery_urls":      []string{"/uploads/gallery-1.png", "/uploads/gallery-2.webp"},
 	}
 	body, _ := json.Marshal(payload)
 
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/admin/omnichat/personas/"+strconv.Itoa(persona.ID), bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Test-User-ID", strconv.Itoa(admin.ID))
+	setAdminPersonaTestHeaders(req, admin.ID, "admin")
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -151,6 +163,38 @@ func TestAdminPersonaHandlerUpdatePersonaMedia(t *testing.T) {
 	require.NotNil(t, updated.PreviewVideoURL)
 	assert.Equal(t, "/uploads/persona-avatar.png", *updated.AvatarURL)
 	assert.Equal(t, "/uploads/persona-preview.mp4", *updated.PreviewVideoURL)
+	assert.Equal(t, []string{"/uploads/gallery-1.png", "/uploads/gallery-2.webp"}, updated.GalleryURLs)
+}
+
+func TestAdminPersonaHandlerUpdatePersonaMediaPreservesGalleryWhenOmitted(t *testing.T) {
+	router, userRepo, personaRepo, pool, cleanup := setupAdminPersonaTestEnv(t)
+	defer cleanup()
+
+	admin := createAdminPersonaTestUser(t, userRepo, "persona_admin_preserve_gallery", "admin")
+	persona := seedAdminPersona(t, pool, personaRepo)
+	originalGallery := []string{"/uploads/original-gallery.png"}
+	_, err := personaRepo.UpdateMedia(context.Background(), persona.ID, nil, nil, &originalGallery)
+	require.NoError(t, err)
+
+	payload := map[string]string{
+		"avatar_url":        "/uploads/new-avatar.png",
+		"preview_video_url": "/uploads/new-preview.mp4",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/admin/omnichat/personas/"+strconv.Itoa(persona.ID), bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	setAdminPersonaTestHeaders(req, admin.ID, "admin")
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	updated, err := personaRepo.GetByID(context.Background(), persona.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	assert.Equal(t, originalGallery, updated.GalleryURLs)
 }
 
 func TestAdminPersonaHandlerRejectsInvalidPreviewVideoURL(t *testing.T) {
@@ -168,11 +212,63 @@ func TestAdminPersonaHandlerRejectsInvalidPreviewVideoURL(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/admin/omnichat/personas/"+strconv.Itoa(persona.ID), bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Test-User-ID", strconv.Itoa(admin.ID))
+	setAdminPersonaTestHeaders(req, admin.ID, "admin")
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "Preview video URL must be a valid HTTP(S) or upload URL")
+	assert.Contains(t, w.Body.String(), "Preview video URL must be a valid uploaded video URL")
+}
+
+func TestAdminPersonaHandlerRejectsExternalMediaURL(t *testing.T) {
+	router, userRepo, personaRepo, pool, cleanup := setupAdminPersonaTestEnv(t)
+	defer cleanup()
+
+	admin := createAdminPersonaTestUser(t, userRepo, "persona_admin_external", "admin")
+	persona := seedAdminPersona(t, pool, personaRepo)
+
+	payload := map[string]string{
+		"avatar_url":        "https://example.com/persona-avatar.png",
+		"preview_video_url": "/uploads/persona-preview.mp4",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/admin/omnichat/personas/"+strconv.Itoa(persona.ID), bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	setAdminPersonaTestHeaders(req, admin.ID, "admin")
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Avatar URL must be a valid uploaded image URL")
+}
+
+func TestAdminPersonaHandlerRequiresAdminRole(t *testing.T) {
+	router, userRepo, personaRepo, pool, cleanup := setupAdminPersonaTestEnv(t)
+	defer cleanup()
+
+	user := createAdminPersonaTestUser(t, userRepo, "persona_admin_denied", "user")
+	persona := seedAdminPersona(t, pool, personaRepo)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/admin/omnichat/personas", nil)
+	setAdminPersonaTestHeaders(req, user.ID, "user")
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+
+	payload := map[string]string{"avatar_url": "/uploads/persona-avatar.png"}
+	body, _ := json.Marshal(payload)
+
+	req, _ = http.NewRequest(http.MethodPut, "/api/v1/admin/omnichat/personas/"+strconv.Itoa(persona.ID), bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	setAdminPersonaTestHeaders(req, user.ID, "user")
+
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
 }

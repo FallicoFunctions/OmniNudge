@@ -1232,9 +1232,8 @@
     },
     "edit": {
       "title": "Editar perfil",
-      "description": "Actualiza la URL de tu avatar, tu estado y tu biografía.",
-      "avatarUrlLabel": "URL del avatar",
-      "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
+      "description": "Actualiza la imagen de tu avatar, tu estado y tu biografía.",
+      "avatarUrlLabel": "Imagen del avatar",
       "avatarUploadButton": "Subir imagen de avatar",
       "avatarUploading": "Subiendo...",
       "avatarUploadHint": "PNG, JPG, GIF o WebP hasta 5MB. Recorte automático a 200x200.",
@@ -1251,7 +1250,7 @@
         "bioTooLong": "La biografía debe tener 500 caracteres o menos.",
         "statusTooLong": "El estado debe tener 500 caracteres o menos.",
         "locationTooLong": "La ubicación debe tener 100 caracteres o menos.",
-        "invalidAvatarUrl": "La URL del avatar debe comenzar con http:// o https://",
+        "invalidAvatarUrl": "La imagen del avatar debe comenzar con http:// o https://",
         "uploadFailed": "No se pudo subir el avatar: {{message}}",
         "saveFailed": "No se pudo guardar el perfil: {{message}}"
       }
@@ -2406,6 +2405,7 @@
       "signingIn": "Iniciando sesión...",
       "creatingAccount": "Creando cuenta...",
       "signIn": "Iniciar sesión",
+      "logout": "Cerrar sesión",
       "signUp": "Registrarse"
     },
     "switch": {
@@ -3728,8 +3728,7 @@
     "minParticipants": "Añade al menos 2 miembros más.",
     "nameLabel": "Nombre del grupo",
     "namePlaceholder": "Introduce un nombre para el grupo",
-    "avatarLabel": "URL del avatar (opcional)",
-    "avatarPlaceholder": "https://example.com/avatar.png",
+    "avatarLabel": "Imagen del avatar (opcional)",
     "descriptionLabel": "Descripción (opcional)",
     "descriptionPlaceholder": "¿De qué trata este grupo?",
     "selectedCount": "{{count}} seleccionados",
@@ -3966,6 +3965,8 @@
       "settingsSave": "Guardar ajustes",
       "settingsSaved": "Ajustes guardados",
       "settingsSaveError": "No se pudieron guardar los ajustes",
+      "viewCharacterForm": "Abrir formulario del personaje",
+      "viewCharacterFormDescription": "Ver la definición completa de la persona del bot en un modal.",
       "noPersonaSelected": "Selecciona una persona de Descubrir para empezar a chatear",
       "personaNotFound": "No se pudo encontrar esta persona.",
       "loading": "Cargando conversación...",
@@ -3993,6 +3994,7 @@
       "discover": "Descubrir",
       "search": "Buscar",
       "chat": "Chat",
+      "studio": "Studio",
       "searchPlaceholder": "Buscar personas...",
       "noResults": "No se encontraron resultados",
       "collapse": "Contraer barra lateral",
@@ -4014,6 +4016,114 @@
       "empty": "Aún no hay conversaciones. ¡Empieza a chatear con un personaje!",
       "lastMessage": "Último mensaje",
       "noMessages": "Aún no hay mensajes"
+    },
+    "studio": {
+      "loadingStudio": "Cargando studio...",
+      "eyebrow": "OmniChat Studio",
+      "title": "Tus personajes",
+      "description": "Crea personas nativas de OmniChat o importa tarjetas de personajes existentes. Los personajes personales permanecen privados hasta que se lance la publicación.",
+      "creatorOnly": "Solo creador",
+      "loadingPersonas": "Cargando tus personas...",
+      "loadPersonasError": "No se pudieron cargar tus personas.",
+      "loadingDefinition": "Cargando definición de persona...",
+      "import": {
+        "title": "Importar tarjeta de personaje",
+        "importing": "Importando...",
+        "uploadCta": "Subir .png o .json"
+      },
+      "editor": {
+        "newCharacter": "Nuevo personaje",
+        "editCharacter": "Editar personaje"
+      },
+      "actions": {
+        "openChat": "Abrir chat",
+        "exportJson": "Exportar JSON",
+        "delete": "Eliminar",
+        "saving": "Guardando...",
+        "createCharacter": "Crear personaje",
+        "saveChanges": "Guardar cambios",
+        "backToDiscover": "Volver a descubrir"
+      },
+      "fields": {
+        "name": "Nombre",
+        "category": "Categoría",
+        "description": "Descripción",
+        "visibility": "Visibilidad",
+        "visibilityPrivate": "Privado para ti",
+        "personality": "Personalidad",
+        "scenario": "Escenario",
+        "openingMessage": "Mensaje inicial",
+        "exampleDialogue": "Diálogo de ejemplo",
+        "systemPrompt": "Anulación del prompt del sistema",
+        "systemPromptPlaceholder": "Déjalo vacío para usar el prompt estructurado de personaje de OmniChat.",
+        "postHistoryInstructions": "Instrucciones posteriores al historial",
+        "alternateGreetings": "Saludos alternativos",
+        "alternateGreetingsPlaceholder": "Un saludo por línea",
+        "tags": "Etiquetas",
+        "tagsPlaceholder": "etiquetas, separadas, por comas",
+        "creatorName": "Nombre del creador",
+        "characterVersion": "Versión del personaje",
+        "creatorNotes": "Notas del creador",
+        "avatarUrl": "Imagen del avatar",
+        "previewVideoUrl": "Video de vista previa",
+        "galleryUrls": "Imágenes de galería",
+        "galleryUrlsPlaceholder": "Una imagen subida por línea",
+        "characterBookJson": "JSON del libro de personaje",
+        "extensionsJson": "JSON de extensiones"
+      },
+      "uploadingField": "Subiendo {{field}}...",
+      "dangerZone": {
+        "title": "Zona de peligro",
+        "description": "Elimina este personaje de tu studio privado de OmniChat.",
+        "delete": "Eliminar personaje"
+      },
+      "deleteModal": {
+        "title": "¿Eliminar personaje?",
+        "description": "Esto eliminará el personaje seleccionado de tu studio privado de OmniChat.",
+        "descriptionNamed": "Esto eliminará a {{name}} de tu studio privado de OmniChat.",
+        "confirm": "Eliminar personaje"
+      },
+      "discardModal": {
+        "title": "¿Descartar cambios sin guardar?",
+        "description": "Tienes cambios sin guardar en este formulario de personaje. Si sales ahora, se descartarán.",
+        "confirm": "Descartar cambios"
+      }
+    },
+    "personaDetails": {
+      "title": "Formulario del personaje",
+      "loading": "Cargando formulario del personaje...",
+      "loadError": "No se pudo cargar el formulario completo del personaje.",
+      "noAvatar": "Sin avatar",
+      "fields": {
+        "name": "Nombre",
+        "category": "Categoría",
+        "description": "Descripción",
+        "visibility": "Visibilidad",
+        "nsfw": "NSFW",
+        "personality": "Personalidad",
+        "scenario": "Escenario",
+        "openingMessage": "Mensaje inicial",
+        "exampleDialogue": "Diálogo de ejemplo",
+        "systemPrompt": "Anulación del prompt del sistema",
+        "postHistoryInstructions": "Instrucciones posteriores al historial",
+        "alternateGreetings": "Saludos alternativos",
+        "tags": "Etiquetas",
+        "creatorName": "Nombre del creador",
+        "characterVersion": "Versión del personaje",
+        "creatorNotes": "Notas del creador",
+        "avatarUrl": "Imagen del avatar",
+        "previewVideoUrl": "Video de vista previa",
+        "galleryUrls": "Imágenes de galería",
+        "characterBookJson": "JSON del libro de personaje",
+        "extensionsJson": "JSON de extensiones"
+      },
+      "dangerZone": {
+        "title": "Zona de peligro",
+        "description": "Elimina este personaje y quítalo de tu biblioteca privada de personas.",
+        "delete": "Eliminar personaje",
+        "confirmDelete": "Confirmar eliminación",
+        "deleteError": "No se pudo eliminar este personaje."
+      }
     }
   }
 }

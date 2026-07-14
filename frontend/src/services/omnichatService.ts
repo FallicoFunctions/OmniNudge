@@ -6,9 +6,12 @@ import type {
   BotConversationDetail,
   BotMessage,
   BotPersona,
+  BotPersonaDefinition,
   ConversationSettings,
+  PersonaDefinitionPayload,
   PersonaCategory,
 } from '../types/omnichat';
+import { getStoredAuthToken } from '../lib/api';
 
 export const omnichatService = {
   async listPersonas(category?: PersonaCategory): Promise<BotPersona[]> {
@@ -76,6 +79,81 @@ export const omnichatService = {
       settings,
       messages,
     });
+  },
+
+  async listMyPersonas(): Promise<BotPersona[]> {
+    const res = await api.get<{ personas: BotPersona[] }>('/omnichat/my-personas');
+    return res.personas ?? [];
+  },
+
+  async getPersonaDefinition(personaId: number): Promise<BotPersonaDefinition> {
+    const res = await api.get<{ persona: BotPersonaDefinition }>(`/omnichat/personas/${personaId}`);
+    return res.persona;
+  },
+
+  async createPersona(payload: PersonaDefinitionPayload): Promise<BotPersonaDefinition> {
+    const res = await api.post<{ persona: BotPersonaDefinition }>('/omnichat/personas', payload);
+    return res.persona;
+  },
+
+  async updatePersona(
+    personaId: number,
+    payload: PersonaDefinitionPayload
+  ): Promise<BotPersonaDefinition> {
+    const res = await api.put<{ persona: BotPersonaDefinition }>(`/omnichat/personas/${personaId}`, payload);
+    return res.persona;
+  },
+
+  async deletePersona(personaId: number): Promise<void> {
+    await api.delete(`/omnichat/personas/${personaId}`);
+  },
+
+  async importPersona(
+    file: File,
+    options?: { avatarUrl?: string; isNsfw?: boolean }
+  ): Promise<BotPersonaDefinition> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (options?.avatarUrl) {
+      formData.append('avatar_url', options.avatarUrl);
+    }
+    if (options?.isNsfw) {
+      formData.append('is_nsfw', 'true');
+    }
+
+    const token = getStoredAuthToken();
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/omnichat/personas/import`,
+      {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      }
+    );
+
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error((body && (body.message || body.error)) || 'Import failed');
+    }
+
+    return body.persona as BotPersonaDefinition;
+  },
+
+  async exportPersona(personaId: number): Promise<Blob> {
+    const token = getStoredAuthToken();
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/omnichat/personas/${personaId}/export`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }
+    );
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error((body && (body.message || body.error)) || 'Export failed');
+    }
+
+    return response.blob();
   },
 };
 

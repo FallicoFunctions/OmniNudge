@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Copy, History, Loader2, MessageSquare, Save, ArrowRight, Trash2, X } from 'lucide-react';
+import { Copy, History, Loader2, MessageSquare, Save, ArrowRight, ScrollText, Trash2, X } from 'lucide-react';
 import { Modal } from '../common/Modal';
+import PersonaDetailsModal from './PersonaDetailsModal';
 import { omnichatService, omnichatQueryKeys } from '../../services/omnichatService';
 import { saveOmniChatDefaults } from '../../utils/omnichatDefaults';
 import { getOmniChatPreviewText } from '../../utils/omnichatMessageFormatting';
@@ -34,6 +35,7 @@ export default function ChatSettingsModal({
   const [localSaveSuccess, setLocalSaveSuccess] = useState(false);
   const [flippedId, setFlippedId] = useState<number | null>(null);
   const [slidingOutId, setSlidingOutId] = useState<number | null>(null);
+  const [isPersonaDetailsOpen, setIsPersonaDetailsOpen] = useState(false);
 
   // Sync form state with currentSettings when modal opens or conversation changes
   useEffect(() => {
@@ -180,6 +182,25 @@ export default function ChatSettingsModal({
             {updateSettingsMutation.isError && (
               <p className="text-center text-xs text-red-500">{t('omnichat.chat.settingsSaveError')}</p>
             )}
+          </div>
+
+          <div className="border-t border-[var(--color-border)]" />
+
+          <div>
+            <button
+              type="button"
+              onClick={() => setIsPersonaDetailsOpen(true)}
+              className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left text-sm hover:bg-[var(--color-surface-hover)]"
+            >
+              <ScrollText size={18} className="text-[var(--color-text-secondary)]" />
+              <div className="flex-1">
+                <p className="font-medium text-[var(--color-text-primary)]">{t('omnichat.chat.viewCharacterForm')}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {t('omnichat.chat.viewCharacterFormDescription')}
+                </p>
+              </div>
+              <ArrowRight size={16} className="text-[var(--color-text-secondary)]" />
+            </button>
           </div>
 
           {conversationId !== null && (
@@ -329,6 +350,16 @@ export default function ChatSettingsModal({
           )}
         </div>
       </div>
+      <PersonaDetailsModal
+        isOpen={isPersonaDetailsOpen}
+        onClose={() => setIsPersonaDetailsOpen(false)}
+        persona={persona}
+        onDeleted={() => {
+          setIsPersonaDetailsOpen(false);
+          onClose();
+          navigate('/omnichat/studio');
+        }}
+      />
     </Modal>
   );
 }

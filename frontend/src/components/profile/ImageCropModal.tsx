@@ -165,7 +165,6 @@ export default function ImageCropModal({
     cs.y = pivotY + (cs.y - pivotY) * actualDelta;
     cs.scale = newScale;
     draw();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draw]);
 
   // ── Mouse events ──────────────────────────────────────────────────────────

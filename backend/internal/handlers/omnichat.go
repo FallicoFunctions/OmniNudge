@@ -36,7 +36,12 @@ func NewOmniChatHandler(
 
 // ListPersonas returns the active bot persona catalog, optionally filtered by ?category=.
 func (h *OmniChatHandler) ListPersonas(c *gin.Context) {
-	personas, err := h.personaRepo.ListActive(c.Request.Context(), c.Query("category"))
+	var viewerUserID *int
+	if userID, ok := middleware.GetOptionalUserID(c); ok {
+		viewerUserID = &userID
+	}
+
+	personas, err := h.personaRepo.ListCatalog(c.Request.Context(), c.Query("category"), viewerUserID)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to list personas")
 		return
@@ -50,7 +55,7 @@ type OmniChatCreateConversationRequest struct {
 	Title     *string                      `json:"title"`
 	ForceNew  bool                         `json:"force_new"`
 	Settings  *models.ConversationSettings `json:"settings,omitempty"`
-	Messages  []*models.BotMessage        `json:"messages,omitempty"`
+	Messages  []*models.BotMessage         `json:"messages,omitempty"`
 }
 
 // CreateConversation starts a new conversation between the current user and a persona.
@@ -76,7 +81,7 @@ func (h *OmniChatHandler) CreateConversation(c *gin.Context) {
 		return
 	}
 
-	persona, err := h.personaRepo.GetByID(c.Request.Context(), req.PersonaID)
+	persona, err := h.personaRepo.GetAccessibleByID(c.Request.Context(), req.PersonaID, &userID)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to look up persona")
 		return
@@ -103,6 +108,14 @@ func (h *OmniChatHandler) CreateConversation(c *gin.Context) {
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to create conversation")
 		return
+	}
+
+	if len(messages) == 0 {
+		if starter := h.chatbotService.BuildStarterMessage(persona); starter != "" {
+			if _, err := h.messageRepo.Create(c.Request.Context(), conversation.ID, models.BotMessageRoleAssistant, starter, false); err == nil {
+				_ = h.convRepo.UpdateLastMessageAt(c.Request.Context(), conversation.ID)
+			}
+		}
 	}
 
 	conversation.Persona = persona
@@ -162,8 +175,13 @@ func (h *OmniChatHandler) DeleteConversation(c *gin.Context) {
 		return
 	}
 
-	if err := h.convRepo.Archive(c.Request.Context(), conversationID, userID); err != nil {
+	archived, err := h.convRepo.Archive(c.Request.Context(), conversationID, userID)
+	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to archive conversation")
+		return
+	}
+	if !archived {
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return
 	}
 
@@ -242,9 +260,13 @@ func (h *OmniChatHandler) ForkConversation(c *gin.Context) {
 	}
 
 	// Load persona to populate on the new conversation
-	persona, err := h.personaRepo.GetByID(c.Request.Context(), original.PersonaID)
+	persona, err := h.personaRepo.GetAccessibleByID(c.Request.Context(), original.PersonaID, &userID)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to load persona")
+		return
+	}
+	if persona == nil {
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return
 	}
 	original.Persona = persona
@@ -282,9 +304,13 @@ func (h *OmniChatHandler) GetConversation(c *gin.Context) {
 		return
 	}
 
-	persona, err := h.personaRepo.GetByID(c.Request.Context(), conversation.PersonaID)
+	persona, err := h.personaRepo.GetAccessibleByID(c.Request.Context(), conversation.PersonaID, &userID)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to load persona")
+		return
+	}
+	if persona == nil {
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return
 	}
 	conversation.Persona = persona

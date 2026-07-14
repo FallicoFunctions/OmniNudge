@@ -98,6 +98,45 @@ func TestUploadsHandler_ServeUpload_AllowsCleanMedia(t *testing.T) {
 	require.Equal(t, "clean", w.Body.String())
 }
 
+func TestUploadsHandler_ServeUpload_RedirectsTrackedRemoteMediaWhenLocalFileMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	require.NoError(t, db.Migrate(context.Background()))
+	require.NoError(t, database.ResetTestData(context.Background(), db))
+
+	uploadsRoot := t.TempDir()
+
+	userRepo := models.NewUserRepository(db.Pool)
+	user := &models.User{Username: "uploads_remote_user", PasswordHash: "hash"}
+	require.NoError(t, userRepo.Create(context.Background(), user))
+
+	mediaRepo := models.NewMediaFileRepository(db.Pool)
+	media := &models.MediaFile{
+		UserID:           user.ID,
+		Filename:         "remote.png",
+		OriginalFilename: "remote.png",
+		FileType:         "image/png",
+		FileSize:         5,
+		StorageURL:       "https://cdn.omninudge.com/remote.png",
+		StoragePath:      "uploads/remote.png",
+	}
+	require.NoError(t, mediaRepo.Create(context.Background(), media))
+	require.NoError(t, mediaRepo.MarkScanClean(context.Background(), media.ID))
+
+	handler := NewUploadsHandler(mediaRepo, uploadsRoot)
+	router := gin.New()
+	router.GET("/uploads/*filepath", handler.ServeUpload)
+
+	req := httptest.NewRequest(http.MethodGet, "/uploads/remote.png", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusTemporaryRedirect, w.Code, w.Body.String())
+	require.Equal(t, "https://cdn.omninudge.com/remote.png", w.Header().Get("Location"))
+}
+
 func TestUploadsHandler_ServeUpload_AllowsNonMediaFiles(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	uploadsRoot := t.TempDir()

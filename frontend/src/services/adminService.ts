@@ -217,7 +217,7 @@ export const adminService = {
 
   async updateOmniChatPersonaMedia(
     personaId: number,
-    data: { avatar_url?: string; preview_video_url?: string }
+    data: { avatar_url?: string; preview_video_url?: string; gallery_urls?: string[] }
   ): Promise<AdminOmniChatPersona> {
     const response = await api.put<{ persona: AdminOmniChatPersona }>(
       `/admin/omnichat/personas/${personaId}`,

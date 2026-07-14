@@ -27,8 +27,8 @@ export default function PersonaAvatar({
   onPreviewEnded?: () => void;
 }) {
   const gradient = getPersonaGradient(persona);
-  const avatarSrc = resolveMediaUrl(persona.avatar_url);
-  const previewVideoSrc = resolveMediaUrl(persona.preview_video_url);
+  const avatarSrc = resolveMediaUrl(persona.avatar_url, persona.updated_at);
+  const previewVideoSrc = resolveMediaUrl(persona.preview_video_url, persona.updated_at);
   const shouldRenderPreview = previewEnabled && Boolean(previewVideoSrc);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight, Compass, Menu, MessageSquare, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Compass, Menu, MessageSquare, Search, SquarePen, X } from 'lucide-react';
 
-export type SidebarTab = 'discover' | 'search' | 'chat';
+export type SidebarTab = 'discover' | 'search' | 'chat' | 'studio';
 
 interface OmniChatSidebarProps {
   activeTab: SidebarTab;
@@ -15,10 +15,11 @@ interface OmniChatSidebarProps {
   onDesktopCollapsedChange: (collapsed: boolean) => void;
 }
 
-const TABS: { id: SidebarTab; icon: typeof Compass; labelKey: string }[] = [
-  { id: 'discover', icon: Compass, labelKey: 'omnichat.sidebar.discover' },
-  { id: 'search', icon: Search, labelKey: 'omnichat.sidebar.search' },
-  { id: 'chat', icon: MessageSquare, labelKey: 'omnichat.sidebar.chat' },
+const TABS: { id: SidebarTab; icon: typeof Compass; labelKey: string; fallbackLabel: string }[] = [
+  { id: 'discover', icon: Compass, labelKey: 'omnichat.sidebar.discover', fallbackLabel: 'Discover' },
+  { id: 'search', icon: Search, labelKey: 'omnichat.sidebar.search', fallbackLabel: 'Search' },
+  { id: 'chat', icon: MessageSquare, labelKey: 'omnichat.sidebar.chat', fallbackLabel: 'Chat' },
+  { id: 'studio', icon: SquarePen, labelKey: 'omnichat.sidebar.studio', fallbackLabel: 'Studio' },
 ];
 
 function SidebarNav({
@@ -34,14 +35,16 @@ function SidebarNav({
 
   return (
     <nav className="flex flex-1 flex-col gap-2">
-      {TABS.map(({ id, icon: Icon, labelKey }) => {
+      {TABS.map(({ id, icon: Icon, labelKey, fallbackLabel }) => {
         const active = activeTab === id;
+        const label = t(labelKey);
+        const resolvedLabel = label === labelKey ? fallbackLabel : label;
         return (
           <button
             key={id}
             type="button"
             onClick={() => onTabChange(id)}
-            title={collapsed ? t(labelKey) : undefined}
+            title={collapsed ? resolvedLabel : undefined}
             className={`flex items-center rounded-2xl border transition ${
               collapsed ? 'h-10 w-10 self-center justify-center px-0 rounded-[18px]' : 'h-14 justify-start px-4'
             } gap-3 ${
@@ -51,7 +54,7 @@ function SidebarNav({
             }`}
           >
             <Icon size={20} className="flex-shrink-0" />
-            {!collapsed && <span className="truncate text-sm font-medium">{t(labelKey)}</span>}
+            {!collapsed && <span className="truncate text-sm font-medium">{resolvedLabel}</span>}
           </button>
         );
       })}

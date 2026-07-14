@@ -32,24 +32,6 @@ export function useVoicePlayer(): UseVoicePlayerReturn {
   const lastUpdateRef = useRef(0);
   const mountedRef = useRef(true);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      // Stop and release audio on unmount
-      const audio = audioRef.current;
-      if (audio) {
-        audio.pause();
-        audio.src = '';
-        audioRef.current = null;
-      }
-      if (globalAudioRef.stopCallback === stopCurrentRef.current) {
-        globalAudioRef.stopCallback = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const stopCurrent = useCallback(() => {
     const audio = audioRef.current;
     if (audio) {
@@ -66,7 +48,27 @@ export function useVoicePlayer(): UseVoicePlayerReturn {
 
   // Keep a stable ref so the cleanup effect can compare without causing re-runs
   const stopCurrentRef = useRef(stopCurrent);
-  stopCurrentRef.current = stopCurrent;
+
+  useEffect(() => {
+    stopCurrentRef.current = stopCurrent;
+  }, [stopCurrent]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      // Stop and release audio on unmount
+      const audio = audioRef.current;
+      if (audio) {
+        audio.pause();
+        audio.src = '';
+        audioRef.current = null;
+      }
+      if (globalAudioRef.stopCallback === stopCurrentRef.current) {
+        globalAudioRef.stopCallback = null;
+      }
+    };
+  }, []);
 
   const play = useCallback(
     (url: string) => {

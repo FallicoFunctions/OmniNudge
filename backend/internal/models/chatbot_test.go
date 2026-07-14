@@ -139,7 +139,8 @@ func TestBotPersonaRepositoryUpdateMedia(t *testing.T) {
 
 	avatarURL := "/uploads/updated-avatar.png"
 	previewVideoURL := "/uploads/updated-preview.mp4"
-	updated, err := repo.UpdateMedia(ctx, personaID, &avatarURL, &previewVideoURL, []string{})
+	gallery := []string{}
+	updated, err := repo.UpdateMedia(ctx, personaID, &avatarURL, &previewVideoURL, &gallery)
 	require.NoError(t, err)
 	require.NotNil(t, updated)
 	require.NotNil(t, updated.AvatarURL)
@@ -147,7 +148,7 @@ func TestBotPersonaRepositoryUpdateMedia(t *testing.T) {
 	require.Equal(t, avatarURL, *updated.AvatarURL)
 	require.Equal(t, previewVideoURL, *updated.PreviewVideoURL)
 
-	cleared, err := repo.UpdateMedia(ctx, personaID, nil, nil, []string{})
+	cleared, err := repo.UpdateMedia(ctx, personaID, nil, nil, &gallery)
 	require.NoError(t, err)
 	require.NotNil(t, cleared)
 	require.Nil(t, cleared.AvatarURL)
@@ -174,8 +175,8 @@ func TestBotPersonaRepositoryGalleryURLs(t *testing.T) {
 		Scan(&personaID)
 	require.NoError(t, err)
 
-	gallery := []string{"/uploads/g1.png", "https://example.com/g2.jpg", "/uploads/g3.webp"}
-	updated, err := repo.UpdateMedia(ctx, personaID, nil, nil, gallery)
+	gallery := []string{"/uploads/g1.png", "/uploads/g2.jpg", "/uploads/g3.webp"}
+	updated, err := repo.UpdateMedia(ctx, personaID, nil, nil, &gallery)
 	require.NoError(t, err)
 	require.NotNil(t, updated)
 	require.Equal(t, 3, len(updated.GalleryURLs))
@@ -187,9 +188,121 @@ func TestBotPersonaRepositoryGalleryURLs(t *testing.T) {
 	require.NotNil(t, fetched)
 	require.Equal(t, gallery, fetched.GalleryURLs)
 
+	preserved, err := repo.UpdateMedia(ctx, personaID, nil, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, preserved)
+	require.Equal(t, gallery, preserved.GalleryURLs)
+
 	// Clear gallery.
-	cleared, err := repo.UpdateMedia(ctx, personaID, nil, nil, []string{})
+	emptyGallery := []string{}
+	cleared, err := repo.UpdateMedia(ctx, personaID, nil, nil, &emptyGallery)
 	require.NoError(t, err)
 	require.NotNil(t, cleared)
 	require.Equal(t, 0, len(cleared.GalleryURLs))
+}
+
+func TestBotConversationRepositoryListByUserIDWithOwnedPersona(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	userRepo := NewUserRepository(db.Pool)
+	user := &User{
+		Username:     fmt.Sprintf("omnichat_list_%d", time.Now().UnixNano()),
+		PasswordHash: "hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user))
+
+	personaRepo := NewBotPersonaRepository(db.Pool)
+	persona, err := personaRepo.CreateOwned(ctx, user.ID, &BotPersona{
+		Slug:               fmt.Sprintf("u%d-owned-%d", user.ID, time.Now().UnixNano()),
+		Name:               "Owned Persona",
+		Category:           PersonaCategoryOriginal,
+		Visibility:         "private",
+		SourceFormat:       "native",
+		SystemPrompt:       "stay in character",
+		AlternateGreetings: []string{},
+		Tags:               []string{},
+		GalleryURLs:        []string{},
+		ExtensionsJSON:     json.RawMessage(`{}`),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, persona)
+
+	convRepo := NewBotConversationRepository(db.Pool)
+	conversation, err := convRepo.CreateWithMessages(ctx, user.ID, persona.ID, nil, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, conversation)
+
+	messageRepo := NewBotMessageRepository(db.Pool)
+	_, err = messageRepo.Create(ctx, conversation.ID, BotMessageRoleAssistant, "Welcome.", false)
+	require.NoError(t, err)
+	require.NoError(t, convRepo.UpdateLastMessageAt(ctx, conversation.ID))
+
+	conversations, err := convRepo.ListByUserID(ctx, user.ID, 20, 0)
+	require.NoError(t, err)
+	require.Len(t, conversations, 1)
+	require.NotNil(t, conversations[0].Persona)
+	require.Equal(t, persona.ID, conversations[0].Persona.ID)
+	require.Equal(t, "Owned Persona", conversations[0].Persona.Name)
+	require.Equal(t, "private", conversations[0].Persona.Visibility)
+}
+
+func TestBotConversationRepositoryListByUserIDExcludesInactivePersonas(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	userRepo := NewUserRepository(db.Pool)
+	user := &User{
+		Username:     fmt.Sprintf("omnichat_deleted_persona_%d", time.Now().UnixNano()),
+		PasswordHash: "hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user))
+
+	personaRepo := NewBotPersonaRepository(db.Pool)
+	persona, err := personaRepo.CreateOwned(ctx, user.ID, &BotPersona{
+		Slug:               fmt.Sprintf("u%d-deleted-%d", user.ID, time.Now().UnixNano()),
+		Name:               "Deleted Persona",
+		Category:           PersonaCategoryOriginal,
+		Visibility:         "private",
+		SourceFormat:       "native",
+		SystemPrompt:       "stay in character",
+		AlternateGreetings: []string{},
+		Tags:               []string{},
+		GalleryURLs:        []string{},
+		ExtensionsJSON:     json.RawMessage(`{}`),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, persona)
+
+	convRepo := NewBotConversationRepository(db.Pool)
+	conversation, err := convRepo.CreateWithMessages(ctx, user.ID, persona.ID, nil, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, conversation)
+
+	messageRepo := NewBotMessageRepository(db.Pool)
+	_, err = messageRepo.Create(ctx, conversation.ID, BotMessageRoleAssistant, "Welcome.", false)
+	require.NoError(t, err)
+	require.NoError(t, convRepo.UpdateLastMessageAt(ctx, conversation.ID))
+
+	deleted, err := personaRepo.DeleteOwned(ctx, user.ID, persona.ID)
+	require.NoError(t, err)
+	require.True(t, deleted)
+
+	conversations, err := convRepo.ListByUserID(ctx, user.ID, 20, 0)
+	require.NoError(t, err)
+	require.Empty(t, conversations)
+
+	personaConversations, err := convRepo.ListByUserIDAndPersonaID(ctx, user.ID, persona.ID, 20, 0)
+	require.NoError(t, err)
+	require.Empty(t, personaConversations)
 }

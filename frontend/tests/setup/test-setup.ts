@@ -57,6 +57,14 @@ if (typeof File !== 'undefined' && !File.prototype.arrayBuffer) {
   };
 }
 
+if (!URL.createObjectURL) {
+  URL.createObjectURL = vi.fn(() => 'blob:test-object-url');
+}
+
+if (!URL.revokeObjectURL) {
+  URL.revokeObjectURL = vi.fn();
+}
+
 if (!window.matchMedia) {
   window.matchMedia = vi.fn().mockImplementation((query) => ({
     matches: false,

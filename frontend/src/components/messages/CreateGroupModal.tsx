@@ -1,8 +1,11 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { groupsService } from '../../services/groupsService';
+import { mediaService } from '../../services/mediaService';
 import type { Conversation } from '../../types/messages';
+import { normalizeUploadedMediaUrl } from '../../utils/uploadedMediaUrl';
+import MediaUploadField from '../common/MediaUploadField';
 import { GroupAvatar } from './GroupAvatar';
 
 interface User {
@@ -23,6 +26,8 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const titleId = useId();
+  const groupNameId = useId();
+  const descriptionId = useId();
   const overlayRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
@@ -38,6 +43,7 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
   const [anyoneCanPin, setAnyoneCanPin] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(true);
   const [error, setError] = useState('');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -102,6 +108,23 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
     });
     setSearchQuery('');
     setSearchResults([]);
+  };
+
+  const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingAvatar(true);
+    setError('');
+    try {
+      const uploaded = await mediaService.uploadMedia(file);
+      setAvatarUrl(normalizeUploadedMediaUrl(uploaded.storage_url || uploaded.storage_path));
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : t('common.error'));
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = '';
+    }
   };
 
   const handleNext = () => {
@@ -196,10 +219,11 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
                 <GroupAvatar name={groupName || 'G'} avatarUrl={avatarUrl || null} size={72} />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1">
+                <label htmlFor={groupNameId} className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1">
                   {t('groups.nameLabel')} <span className="text-[var(--color-error)] ml-1">*</span>
                 </label>
                 <input
+                  id={groupNameId}
                   ref={firstInputRef}
                   type="text"
                   value={groupName}
@@ -209,23 +233,25 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
                   className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 />
               </div>
+              <MediaUploadField
+                id="create-group-avatar"
+                label={t('groups.avatarLabel')}
+                value={avatarUrl}
+                accept="image/*"
+                mediaType="image"
+                uploadButtonLabel="Select group image"
+                uploadingLabel="Uploading group image..."
+                clearLabel="Remove image"
+                isUploading={isUploadingAvatar}
+                onFileChange={handleAvatarUpload}
+                onClear={() => setAvatarUrl('')}
+              />
               <div>
-                <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1">
-                  {t('groups.avatarLabel')}
-                </label>
-                <input
-                  type="url"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  placeholder={t('groups.avatarPlaceholder')}
-                  className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1">
+                <label htmlFor={descriptionId} className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1">
                   {t('groups.descriptionLabel')}
                 </label>
                 <textarea
+                  id={descriptionId}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   maxLength={500}

@@ -31,6 +31,7 @@ import { resolveMediaUrl } from '../utils/mediaUrl';
 
 type ChatFilter = 'all' | 'unread' | 'favorites';
 type ProfileTab = 'profile' | 'gallery';
+type ActiveBotConversation = BotConversation & { persona: BotPersona };
 
 const PROFILE_PANE_COLLAPSED_KEY = 'omnichat_profile_pane_collapsed';
 const PROFILE_PANE_WIDTH = 304;
@@ -157,6 +158,7 @@ export default function OmniChatChatPage() {
     if (typeof localStorage === 'undefined') return false;
     return localStorage.getItem(PROFILE_PANE_COLLAPSED_KEY) === 'true';
   });
+  const [storedGuestPersonaIds, setStoredGuestPersonaIds] = useState<number[]>(() => getGuestPersonaIds());
   const persistedGuest = useRef(false);
   const nextOptimisticId = useRef(-1);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -172,23 +174,25 @@ export default function OmniChatChatPage() {
     enabled: isAuthenticated,
   });
 
-  const selectedConversationId = useMemo(() => {
-    if (isGuest) return null;
-    if (Number.isFinite(routeConversationId)) return routeConversationId;
-    if (!isAuthenticated) return null;
-    return conversationsQuery.data?.[0]?.id ?? null;
-  }, [isGuest, routeConversationId, conversationsQuery.data, isAuthenticated]);
-
-  const conversationQuery = useQuery({
-    queryKey: omnichatQueryKeys.conversation(selectedConversationId ?? -1),
-    queryFn: () => omnichatService.getConversation(selectedConversationId as number),
-    enabled: selectedConversationId !== null && !isGuest,
-  });
+  const activePersonaById = useMemo(
+    () => new Map((personasQuery.data ?? []).map((persona) => [Number(persona.id), persona])),
+    [personasQuery.data]
+  );
 
   const filteredConversations = useMemo(() => {
     const all = conversationsQuery.data ?? [];
-    const withMessages = all.filter((c) => c.last_message_preview);
-    const newestByPersona = new Map<number, BotConversation>();
+    const withMessages = all
+      .filter((c) => c.last_message_preview)
+      .map((conversation) => {
+        const latestPersona = activePersonaById.get(Number(conversation.persona_id));
+        if (!latestPersona) return null;
+        return {
+          ...conversation,
+          persona: { ...(conversation.persona ?? latestPersona), ...latestPersona },
+        };
+      })
+      .filter((conversation): conversation is ActiveBotConversation => conversation !== null);
+    const newestByPersona = new Map<number, ActiveBotConversation>();
 
     for (const conversation of withMessages) {
       const existing = newestByPersona.get(conversation.persona_id);
@@ -215,14 +219,34 @@ export default function OmniChatChatPage() {
         preview.toLowerCase().includes(query)
       );
     });
-  }, [conversationsQuery.data, directoryQuery]);
+  }, [activePersonaById, conversationsQuery.data, directoryQuery]);
 
-  const storedGuestPersonaIds = getGuestPersonaIds();
-  const guestPersonaIds = isGuest && guestPersonaId != null
-    ? (storedGuestPersonaIds.includes(guestPersonaId)
-        ? storedGuestPersonaIds
-        : [...storedGuestPersonaIds, guestPersonaId])
-    : storedGuestPersonaIds;
+  const selectedConversationId = useMemo(() => {
+    if (isGuest || !isAuthenticated) return null;
+    if (Number.isFinite(routeConversationId)) {
+      return filteredConversations.some((conversation) => conversation.id === routeConversationId)
+        ? routeConversationId
+        : null;
+    }
+    return filteredConversations[0]?.id ?? null;
+  }, [filteredConversations, isAuthenticated, isGuest, routeConversationId]);
+
+  const conversationQuery = useQuery({
+    queryKey: omnichatQueryKeys.conversation(selectedConversationId ?? -1),
+    queryFn: () => omnichatService.getConversation(selectedConversationId as number),
+    enabled: selectedConversationId !== null && !isGuest,
+  });
+
+  useEffect(() => {
+    setStoredGuestPersonaIds(getGuestPersonaIds());
+  }, [guestMessages.length, guestPersonaId]);
+
+  const guestPersonaIds = useMemo(() => {
+    if (!isGuest || guestPersonaId == null) return storedGuestPersonaIds;
+    return storedGuestPersonaIds.includes(guestPersonaId)
+      ? storedGuestPersonaIds
+      : [...storedGuestPersonaIds, guestPersonaId];
+  }, [guestPersonaId, isGuest, storedGuestPersonaIds]);
 
   const filteredGuestPersonas = useMemo(() => {
     if (guestPersonaIds.length === 0) return [];
@@ -255,8 +279,8 @@ export default function OmniChatChatPage() {
     () =>
       selectedConversationId === null
         ? null
-        : (conversationsQuery.data ?? []).find((conversation) => conversation.id === selectedConversationId) ?? null,
-    [conversationsQuery.data, selectedConversationId]
+        : filteredConversations.find((conversation) => conversation.id === selectedConversationId) ?? null,
+    [filteredConversations, selectedConversationId]
   );
 
   const conversationPreviewQueries = useQueries({
@@ -463,7 +487,7 @@ export default function OmniChatChatPage() {
       queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
       navigate(`/omnichat/c/${conversation.id}`);
     });
-  }, [conversationQuery.data?.conversation.persona_id, guestPersona, isAuthenticated, isGuest, navigate, queryClient, selectedConversation?.persona_id]);
+  }, [conversationQuery.data?.conversation.persona_id, guestPersona, isGuest, navigate, queryClient, selectedConversation?.persona_id]);
 
   const handleForkChat = useCallback(() => {
     setNewChatMenuOpen(false);
@@ -483,6 +507,12 @@ export default function OmniChatChatPage() {
         navigate(`/omnichat/c/${conversation.id}`);
       });
   }, [isGuest, guestPersona, guestPersonaId, guestMessages, selectedConversationId, navigate, queryClient]);
+
+  const activePersona = isGuest
+    ? guestPersona
+    : activePersonaById.get(
+        Number(conversationQuery.data?.conversation.persona_id ?? selectedConversation?.persona_id)
+      ) ?? null;
 
   const handleSubmit = useCallback(
     (event: FormEvent) => {
@@ -531,7 +561,7 @@ export default function OmniChatChatPage() {
         return;
       }
 
-      if (!selectedConversationId) return;
+      if (!selectedConversationId || !activePersona) return;
 
       queryClient.setQueryData<BotConversationDetail | undefined>(
         omnichatQueryKeys.conversation(selectedConversationId),
@@ -556,10 +586,9 @@ export default function OmniChatChatPage() {
 
       sendMessageMutation.mutate(content);
     },
-    [draft, guestMessages, guestPersona, isGuest, queryClient, selectedConversationId, sendMessageMutation]
+    [activePersona, draft, guestMessages, guestPersona, isGuest, queryClient, selectedConversationId, sendMessageMutation]
   );
 
-  const activePersona = isGuest ? guestPersona : conversationQuery.data?.conversation.persona ?? selectedConversation?.persona ?? null;
   const galleryUrls = (activePersona?.gallery_urls ?? []).filter(Boolean);
   const hasGallery = galleryUrls.length > 0;
   const hasVideo = Boolean(activePersona?.preview_video_url);
@@ -576,7 +605,7 @@ export default function OmniChatChatPage() {
 
   const activeMessages = isGuest
     ? guestMessages
-    : selectedConversationId !== null
+    : selectedConversationId !== null && activePersona
       ? (conversationQuery.data?.messages ?? [])
       : [];
   const activeConversationSettings = conversationQuery.data?.conversation.settings;
@@ -590,6 +619,7 @@ export default function OmniChatChatPage() {
         if (tab === 'discover') navigate('/omnichat');
         if (tab === 'search') setSearchOverlayOpen(true);
         if (tab === 'chat') navigate('/omnichat/chat');
+        if (tab === 'studio') navigate('/omnichat/studio');
       }}
     >
       <div className="h-[calc(100dvh-72px)] overflow-hidden bg-[#111114]">
@@ -802,14 +832,14 @@ export default function OmniChatChatPage() {
                         }
                       }}
                       placeholder={t('omnichat.chat.inputPlaceholder')}
-                      disabled={isGenerating || (isGuest && !guestPersona)}
+                      disabled={isGenerating || !activePersona}
                       rows={1}
                       style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
                       className="flex-1 resize-none border-0 bg-transparent px-3 py-0 text-sm leading-9 text-white placeholder:text-white/35 outline-none"
                     />
                     <button
                       type="submit"
-                      disabled={isGenerating || !draft.trim()}
+                      disabled={isGenerating || !draft.trim() || !activePersona}
                       className="flex h-9 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] px-5 text-sm font-medium text-white transition hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
                     >
                       {isGenerating ? <Loader2 size={14} className="animate-spin" /> : 'Send'}
