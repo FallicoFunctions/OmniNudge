@@ -327,6 +327,54 @@ describe('createMainStageScene', () => {
     expect(sourceBlocker!.getBoundingInfo().boundingBox.extendSizeWorld.y).toBeCloseTo(4);
   });
 
+  it('adds blockers for basin, stair, water, promenade, and crowd-control physical features', async () => {
+    engine = new NullEngine();
+    const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(
+      (scene, assets) => {
+        for (const [name, width, height, depth, x, y, z] of [
+          ['merged:V99_BasinParapetRelief+1', 20, 0.6, 58, 0, 2, -9],
+          ['merged:V90_BasinStoneCopingArray+1', 50, 0.4, 62, 0, 0.8, -16],
+          ['V123_CentralStairGoldNosingArray', 10, 1.2, 19, 0, 1.2, -3],
+          ['merged:V121_BasinBridgeRelief_North+2', 9, 2.5, 38, 0, 1.6, -6],
+          ['V63_BasinWaterParterre', 12, 0.4, 8, 0, 0.2, -2],
+          ['V64_PromenadeCyanThread', 7, 0.2, 6, 0, 0.2, -2],
+          ['V124_CrowdControlRailArray_L', 0.2, 1.1, 40, -18, 1, 40],
+          ['V125_CrowdBarrierRailArray_R', 0.4, 1.1, 66, 13.2, 1, 4],
+        ] as const) {
+          const mesh = MeshBuilder.CreateBox(name, { width, height, depth }, scene);
+          mesh.position.set(x, y, z);
+          assets.mainMeshes.push(mesh);
+        }
+      },
+    );
+
+    await createMainStageScene(engine);
+    const blockerSourceNames = stageAssets.solidCollisionMeshes.map((mesh) => mesh.metadata?.sourceMeshName);
+
+    expect(blockerSourceNames).toEqual(
+      expect.arrayContaining([
+        'merged:V99_BasinParapetRelief+1',
+        'merged:V90_BasinStoneCopingArray+1',
+        'V123_CentralStairGoldNosingArray',
+        'merged:V121_BasinBridgeRelief_North+2',
+        'V63_BasinWaterParterre',
+        'V64_PromenadeCyanThread',
+        'V124_CrowdControlRailArray_L',
+        'V125_CrowdBarrierRailArray_R',
+      ]),
+    );
+    expect(
+      stageAssets.solidCollisionMeshes.filter(
+        (mesh) => mesh.metadata?.sourceMeshName === 'merged:V99_BasinParapetRelief+1',
+      ),
+    ).toHaveLength(2);
+    expect(
+      stageAssets.solidCollisionMeshes.filter(
+        (mesh) => mesh.metadata?.sourceMeshName === 'merged:V90_BasinStoneCopingArray+1',
+      ),
+    ).toHaveLength(2);
+  });
+
   it('moves the playable avatar through the controller and reuses one ground ray across render frames', async () => {
     engine = new NullEngine();
     vi.spyOn(engine, 'getDeltaTime').mockReturnValue(16.667);
