@@ -30,8 +30,8 @@ const PLAYABLE_START_CAMERA: ReviewCheckpointCamera = {
   alpha: -Math.PI / 2,
   beta: 1.12,
   radius: 9,
-  focusOffset: { x: 0, y: 1.4, z: 1.6 },
-  positionOffset: { x: 0, y: 4, z: -7 },
+  focusOffset: { x: 0, y: -0.35, z: 0 },
+  positionOffset: { x: 0, y: 2.25, z: -7 },
 };
 const TRACKPAD_CAMERA_YAW_SENSITIVITY = 0.0045;
 const TRACKPAD_CAMERA_PITCH_SENSITIVITY = 0.0032;
