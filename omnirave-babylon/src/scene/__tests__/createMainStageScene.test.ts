@@ -233,27 +233,70 @@ describe('createMainStageScene', () => {
     expect(scene.getMeshByName(sourceBlocker!.name)).toBe(sourceBlocker);
   });
 
-  it('clips basin wall blockers clear of the foreground barricade walk surface', async () => {
+  it('splits merged basin wall blockers so side walls stay solid without closing the center walkway', async () => {
     engine = new NullEngine();
     const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(
       (scene, assets) => {
         const basinWall = MeshBuilder.CreateBox(
           'merged:V118_BasinWallRelief+1',
-          { width: 2, height: 6, depth: 6 },
+          { width: 16, height: 6, depth: 62 },
           scene,
         );
-        basinWall.position.set(7, 3, 1);
+        basinWall.position.set(0, 3, -8);
         assets.mainMeshes.push(basinWall);
       },
     );
 
     await createMainStageScene(engine);
-    const sourceBlocker = stageAssets.solidCollisionMeshes.find(
+    const sourceBlockers = stageAssets.solidCollisionMeshes.filter(
       (mesh) => mesh.metadata?.sourceMeshName === 'merged:V118_BasinWallRelief+1',
     );
 
-    expect(sourceBlocker).toBeDefined();
-    expect(sourceBlocker!.getBoundingInfo().boundingBox.minimumWorld.z).toBeCloseTo(0.25);
+    expect(sourceBlockers).toHaveLength(2);
+    expect(sourceBlockers.map((mesh) => mesh.metadata?.blockerSide)).toEqual(
+      expect.arrayContaining(['left', 'right']),
+    );
+    expect(
+      sourceBlockers.some((mesh) => {
+        const bounds = mesh.getBoundingInfo().boundingBox;
+        return bounds.minimumWorld.x <= 0 && bounds.maximumWorld.x >= 0;
+      }),
+    ).toBe(false);
+    expect(sourceBlockers.every((mesh) => mesh.getBoundingInfo().boundingBox.minimumWorld.z < -38)).toBe(true);
+  });
+
+  it('leaves the foreground approach deck open between merged side-pair blockers', async () => {
+    engine = new NullEngine();
+    const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(
+      (scene, assets) => {
+        const vipFascia = MeshBuilder.CreateBox(
+          'merged:V30_VipShellFascia+1',
+          { width: 60, height: 4, depth: 44 },
+          scene,
+        );
+        vipFascia.position.set(0, 3, 2);
+        assets.mainMeshes.push(vipFascia);
+      },
+    );
+
+    await createMainStageScene(engine);
+    const sourceBlockers = stageAssets.solidCollisionMeshes.filter(
+      (mesh) => mesh.metadata?.sourceMeshName === 'merged:V30_VipShellFascia+1',
+    );
+    const reportedPlayerPoint = { x: -0.6, z: -20.1 };
+
+    expect(sourceBlockers).toHaveLength(2);
+    expect(
+      sourceBlockers.some((mesh) => {
+        const bounds = mesh.getBoundingInfo().boundingBox;
+        return (
+          bounds.minimumWorld.x <= reportedPlayerPoint.x &&
+          bounds.maximumWorld.x >= reportedPlayerPoint.x &&
+          bounds.minimumWorld.z <= reportedPlayerPoint.z &&
+          bounds.maximumWorld.z >= reportedPlayerPoint.z
+        );
+      }),
+    ).toBe(false);
   });
 
   it('creates solid blockers for approach light cores', async () => {
