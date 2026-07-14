@@ -118,6 +118,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
   });
   const routeProgress = createMainStageRouteProgress(MAIN_STAGE_REVIEW_ROUTE);
   const canvas = engine.getRenderingCanvas?.();
+  let avatarElapsedSeconds = 0;
   let activeCameraPointerId: number | undefined;
   let lastCameraPointerX = 0;
   let lastCameraPointerY = 0;
@@ -181,6 +182,8 @@ export async function createMainStageScene(engine: AbstractEngine) {
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
     playerController.step(deltaSeconds);
+    avatarElapsedSeconds += deltaSeconds;
+    reviewAvatar.animate(avatarElapsedSeconds, playerController.animationState);
     routeProgress.step(playerRig.root.position);
     const zoomState = cameraRig.syncZoomState();
     const avatarVisibility = zoomState.mode === 'first_person' ? 0 : zoomState.shoulderOpacity;

@@ -44,6 +44,7 @@ async function loadCreateMainStageScene(
         body.parent = root;
 
         return {
+          animate: vi.fn(),
           meshes: [body],
           root,
         };

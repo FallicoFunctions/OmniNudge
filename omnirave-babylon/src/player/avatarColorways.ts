@@ -16,6 +16,7 @@ export interface AvatarColorway {
 interface AvatarMaterialMetadata {
   avatarBaseMaterial?: Material;
   avatarColorwayMaterials?: Record<string, Material>;
+  avatarColorRole?: 'accent' | 'emissive' | 'primary';
 }
 
 export const USER_AVATAR_COLORWAYS: readonly AvatarColorway[] = [
@@ -56,7 +57,7 @@ export function applyAvatarColorway(avatar: ReviewAvatar, colorwayId: string) {
     let material = colorwayMaterials[colorway.id];
 
     if (!material) {
-      material = createColorwayMaterial(baseMaterial, colorway);
+      material = createColorwayMaterial(baseMaterial, colorway, metadata.avatarColorRole);
       colorwayMaterials[colorway.id] = material;
     }
 
@@ -81,21 +82,27 @@ export function resolveAvatarColorway(colorwayId: string) {
   return USER_AVATAR_COLORWAYS.find((colorway) => colorway.id === colorwayId) ?? USER_AVATAR_COLORWAYS[0];
 }
 
-function createColorwayMaterial(baseMaterial: Material, colorway: AvatarColorway) {
+function createColorwayMaterial(
+  baseMaterial: Material,
+  colorway: AvatarColorway,
+  role: AvatarMaterialMetadata['avatarColorRole'],
+) {
   const material = baseMaterial.clone(`${baseMaterial.name}__avatar_${colorway.id}`) ?? baseMaterial;
   const primary = Color3.FromHexString(colorway.primaryHex);
   const accent = Color3.FromHexString(colorway.accentHex);
   const emissive = Color3.FromHexString(colorway.emissiveHex);
+  const albedo = role === 'accent' ? accent : primary;
+  const glow = role === 'emissive' ? emissive : role === 'accent' ? accent : emissive.scale(0.65);
 
   if (material instanceof PBRMaterial) {
-    material.albedoColor = primary;
+    material.albedoColor = albedo;
     material.reflectivityColor = accent.scale(0.26);
-    material.emissiveColor = emissive.scale(0.18);
-    material.emissiveIntensity = Math.max(material.emissiveIntensity, 0.35);
+    material.emissiveColor = glow.scale(role === 'emissive' ? 1 : 0.18);
+    material.emissiveIntensity = Math.max(material.emissiveIntensity, role === 'emissive' ? 1.2 : 0.35);
   } else if (material instanceof StandardMaterial) {
-    material.diffuseColor = primary;
+    material.diffuseColor = albedo;
     material.specularColor = accent.scale(0.38);
-    material.emissiveColor = emissive.scale(0.16);
+    material.emissiveColor = glow.scale(role === 'emissive' ? 1 : 0.16);
   }
 
   return material;
