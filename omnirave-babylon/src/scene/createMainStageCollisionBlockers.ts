@@ -30,8 +30,18 @@ const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
   /V133_VipTerraceGoldArray/,
 ];
 
+const BILATERAL_SOURCE_BLOCKER_RULES: readonly {
+  innerClearanceX: number;
+  pattern: RegExp;
+}[] = [
+  { pattern: /V30_VipShellFascia/, innerClearanceX: 17.3 },
+  { pattern: /V40_ApproachLightCore/, innerClearanceX: 11.75 },
+  { pattern: /V68_PortalArcadeShadowCore/, innerClearanceX: 8.35 },
+  { pattern: /V118_BasinWallRelief/, innerClearanceX: 6.2 },
+  { pattern: /V133_VipTerraceGoldArray/, innerClearanceX: 18.3 },
+];
+
 const MIN_SOURCE_BLOCKER_THICKNESS = 1.2;
-const FOREGROUND_BARRICADE_CLEAR_Z = 0.25;
 const SOURCE_BLOCKER_CENTER_Y = 4;
 const SOURCE_BLOCKER_HEIGHT = 8;
 
@@ -39,7 +49,7 @@ export function createMainStageCollisionBlockers(scene: Scene, sourceMeshes: rea
   const authoredBlockers = MAIN_STAGE_COLLISION_BLOCKERS.map((blocker) => createBlockerFromSpec(scene, blocker));
   const sourceBlockers = sourceMeshes
     .filter((mesh) => SOLID_SOURCE_NAME_PATTERNS.some((pattern) => pattern.test(mesh.name)))
-    .map((mesh) => createBlockerFromSourceMesh(scene, mesh));
+    .flatMap((mesh) => createBlockersFromSourceMesh(scene, mesh));
 
   return [...authoredBlockers, ...sourceBlockers];
 }
@@ -59,23 +69,66 @@ function createBlockerFromSpec(scene: Scene, blocker: CollisionBlockerSpec) {
   return mesh;
 }
 
-function createBlockerFromSourceMesh(scene: Scene, sourceMesh: AbstractMesh) {
+function createBlockersFromSourceMesh(scene: Scene, sourceMesh: AbstractMesh) {
   sourceMesh.computeWorldMatrix(true);
   sourceMesh.refreshBoundingInfo({ applySkeleton: false });
   const { minimumWorld, maximumWorld } = sourceMesh.getBoundingInfo().boundingBox;
-  const minX = minimumWorld.x;
-  const maxX = maximumWorld.x;
+  const lateralRule = BILATERAL_SOURCE_BLOCKER_RULES.find((rule) => rule.pattern.test(sourceMesh.name));
+  if (
+    lateralRule &&
+    minimumWorld.x < -lateralRule.innerClearanceX &&
+    maximumWorld.x > lateralRule.innerClearanceX
+  ) {
+    return [
+      createBlockerFromSourceBounds(
+        scene,
+        sourceMesh,
+        minimumWorld.x,
+        -lateralRule.innerClearanceX,
+        minimumWorld.z,
+        maximumWorld.z,
+        'left',
+      ),
+      createBlockerFromSourceBounds(
+        scene,
+        sourceMesh,
+        lateralRule.innerClearanceX,
+        maximumWorld.x,
+        minimumWorld.z,
+        maximumWorld.z,
+        'right',
+      ),
+    ];
+  }
+
+  return [
+    createBlockerFromSourceBounds(
+      scene,
+      sourceMesh,
+      minimumWorld.x,
+      maximumWorld.x,
+      minimumWorld.z,
+      maximumWorld.z,
+    ),
+  ];
+}
+
+function createBlockerFromSourceBounds(
+  scene: Scene,
+  sourceMesh: AbstractMesh,
+  minX: number,
+  maxX: number,
+  minZ: number,
+  maxZ: number,
+  side?: 'left' | 'right',
+) {
   const minY = SOURCE_BLOCKER_CENTER_Y - SOURCE_BLOCKER_HEIGHT / 2;
   const maxY = SOURCE_BLOCKER_CENTER_Y + SOURCE_BLOCKER_HEIGHT / 2;
-  const minZ = /V118_BasinWallRelief/.test(sourceMesh.name)
-    ? Math.max(minimumWorld.z, FOREGROUND_BARRICADE_CLEAR_Z)
-    : minimumWorld.z;
-  const maxZ = maximumWorld.z;
   const width = Math.max(MIN_SOURCE_BLOCKER_THICKNESS, maxX - minX);
   const height = Math.max(1, maxY - minY);
   const depth = Math.max(MIN_SOURCE_BLOCKER_THICKNESS, maxZ - minZ);
   const mesh = MeshBuilder.CreateBox(
-    `main-stage-blocker-source-${sourceMesh.name}`,
+    `main-stage-blocker-source-${sourceMesh.name}${side ? `-${side}` : ''}`,
     {
       width,
       height,
@@ -90,6 +143,7 @@ function createBlockerFromSourceMesh(scene: Scene, sourceMesh: AbstractMesh) {
   );
   mesh.metadata = {
     ...mesh.metadata,
+    blockerSide: side,
     sourceMeshName: sourceMesh.name,
   };
   configureBlocker(mesh);
