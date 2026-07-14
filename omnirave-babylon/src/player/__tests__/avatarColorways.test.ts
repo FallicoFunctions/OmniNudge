@@ -19,6 +19,7 @@ describe('avatarColorways', () => {
     const baseMaterial = new StandardMaterial('avatar-base', scene);
     mesh.material = baseMaterial;
     const avatar: ReviewAvatar = {
+      animate: () => {},
       meshes: [mesh],
       root: new TransformNode('avatar-root', scene),
     };
