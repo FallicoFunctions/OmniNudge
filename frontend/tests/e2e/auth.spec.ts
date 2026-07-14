@@ -5,21 +5,45 @@ import { test, expect } from '@playwright/test';
  * Requires the dev server running at http://localhost:5173.
  */
 test.describe('Authentication', () => {
-  test('shows login form at /login or via auth modal trigger', async ({ page }) => {
-    await page.goto('/login');
-    // The app may redirect to home with a modal, or have a /login route.
-    // Either way we expect to see username + password fields.
-    const usernameField = page.locator('input[type="text"], input[placeholder*="user" i], [data-testid="username-input"]').first();
-    const passwordField = page.locator('input[type="password"]').first();
+  async function prepareLandingPage(page: import('@playwright/test').Page) {
+    await page.addInitScript(() => {
+      localStorage.setItem('omninudge_about_modal_dismissed', 'true');
+    });
+  }
+
+  async function dismissAboutModalIfPresent(page: import('@playwright/test').Page) {
+    const continueButton = page.getByRole('button', { name: 'Continue' });
+    if (await continueButton.isVisible().catch(() => false)) {
+      await continueButton.click();
+    }
+  }
+
+  async function openLoginModal(page: import('@playwright/test').Page) {
+    await prepareLandingPage(page);
+    await page.goto('/');
+    await dismissAboutModalIfPresent(page);
+    await expect(page.getByRole('link', { name: /omninudge/i }).first()).toBeVisible({
+      timeout: 10000,
+    });
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+    });
+  }
+
+  test('shows login form via the auth modal trigger', async ({ page }) => {
+    await openLoginModal(page);
+    const usernameField = page.locator('#auth-username');
+    const passwordField = page.locator('#auth-password');
     await expect(usernameField).toBeVisible({ timeout: 10000 });
     await expect(passwordField).toBeVisible({ timeout: 10000 });
   });
 
   test('shows error on wrong password', async ({ page }) => {
-    await page.goto('/login');
-    const usernameField = page.locator('input[type="text"], [data-testid="username-input"]').first();
-    const passwordField = page.locator('input[type="password"]').first();
-    const submitButton = page.locator('button[type="submit"]').first();
+    await openLoginModal(page);
+    const usernameField = page.locator('#auth-username');
+    const passwordField = page.locator('#auth-password');
+    const submitButton = page.getByRole('button', { name: /sign in/i });
 
     await usernameField.fill('nonexistent_user');
     await passwordField.fill('wrongpassword');
@@ -32,22 +56,18 @@ test.describe('Authentication', () => {
 
   test('requires authentication for protected routes — redirects to login', async ({ page }) => {
     // Clear any existing auth state
+    await prepareLandingPage(page);
     await page.goto('/');
+    await dismissAboutModalIfPresent(page);
     await page.evaluate(() => {
       localStorage.removeItem('auth_token');
       sessionStorage.removeItem('auth_token');
     });
 
     await page.goto('/messages');
-    // App should redirect to home or show a login prompt
-    await expect(page).toHaveURL(/messages|login|auth|\/$/, { timeout: 10000 });
+    await dismissAboutModalIfPresent(page);
 
-    // If it stayed on /messages without auth, a login modal or redirect should appear
-    const loginPrompt = page.locator('input[type="password"], [data-testid="login-submit"]').first();
-    const isRedirected = !page.url().includes('/messages');
-    if (!isRedirected) {
-      await expect(loginPrompt).toBeVisible({ timeout: 5000 });
-    }
+    await expect(page).toHaveURL(/\/$/, { timeout: 10000 });
   });
 
   test('successful login redirects user away from login page', async ({ page }) => {
@@ -59,12 +79,13 @@ test.describe('Authentication', () => {
       test.skip();
     }
 
-    await page.goto('/login');
-    await page.locator('input[type="text"]').first().fill(username!);
-    await page.locator('input[type="password"]').first().fill(password!);
-    await page.locator('button[type="submit"]').first().click();
+    await openLoginModal(page);
+    await page.locator('#auth-username').fill(username!);
+    await page.locator('#auth-password').fill(password!);
+    await page.getByRole('button', { name: /sign in/i }).click();
 
-    // After successful login, user should land on home / feed
-    await expect(page).not.toHaveURL(/login/, { timeout: 15000 });
+    await expect(page.locator('#auth-password')).not.toBeVisible({
+      timeout: 15000,
+    });
   });
 });

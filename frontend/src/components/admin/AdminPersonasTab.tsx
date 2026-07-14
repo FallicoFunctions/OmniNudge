@@ -3,12 +3,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../../services/adminService';
 import { mediaService } from '../../services/mediaService';
 import type { AdminOmniChatPersona } from '../../types/admin';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
+import MediaUploadField from '../common/MediaUploadField';
 import PersonaAvatar from '../omnichat/PersonaAvatar';
 import { LoadingMessage } from '../common/StatusMessage';
 
 type PersonaDraft = {
   avatar_url?: string;
   preview_video_url?: string;
+  gallery_urls: string[];
 };
 
 export default function AdminPersonasTab() {
@@ -32,6 +35,7 @@ export default function AdminPersonasTab() {
           next[persona.id] = {
             avatar_url: persona.avatar_url,
             preview_video_url: persona.preview_video_url,
+            gallery_urls: persona.gallery_urls ?? [],
           };
         }
       }
@@ -51,6 +55,7 @@ export default function AdminPersonasTab() {
         [updatedPersona.id]: {
           avatar_url: updatedPersona.avatar_url,
           preview_video_url: updatedPersona.preview_video_url,
+          gallery_urls: updatedPersona.gallery_urls ?? [],
         },
       }));
     },
@@ -74,7 +79,7 @@ export default function AdminPersonasTab() {
   const handleUpload = async (
     personaId: number,
     file: File | undefined,
-    field: keyof PersonaDraft
+    field: 'avatar_url' | 'preview_video_url'
   ) => {
     if (!file) return;
     const uploadKey = `${personaId}:${field}`;
@@ -89,6 +94,30 @@ export default function AdminPersonasTab() {
     } finally {
       setUploading((current) => ({ ...current, [uploadKey]: false }));
     }
+  };
+
+  const handleGalleryUpload = async (personaId: number, file: File | undefined) => {
+    if (!file) return;
+    const uploadKey = `${personaId}:gallery_urls`;
+    setUploading((current) => ({ ...current, [uploadKey]: true }));
+    setUploadErrors((current) => ({ ...current, [uploadKey]: '' }));
+    try {
+      const uploaded = await mediaService.uploadMedia(file);
+      const currentGallery = drafts[personaId]?.gallery_urls ?? [];
+      updateDraft(personaId, { gallery_urls: [...currentGallery, uploaded.storage_url] });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Upload failed';
+      setUploadErrors((current) => ({ ...current, [uploadKey]: message }));
+    } finally {
+      setUploading((current) => ({ ...current, [uploadKey]: false }));
+    }
+  };
+
+  const removeGalleryURL = (personaId: number, index: number) => {
+    const currentGallery = drafts[personaId]?.gallery_urls ?? [];
+    updateDraft(personaId, {
+      gallery_urls: currentGallery.filter((_, currentIndex) => currentIndex !== index),
+    });
   };
 
   if (personasQuery.isLoading) {
@@ -113,10 +142,12 @@ export default function AdminPersonasTab() {
           const draft = drafts[persona.id] ?? {
             avatar_url: persona.avatar_url,
             preview_video_url: persona.preview_video_url,
+            gallery_urls: persona.gallery_urls ?? [],
           };
           const isSaving = saveMutation.isPending && saveMutation.variables?.personaId === persona.id;
           const avatarUploading = uploading[`${persona.id}:avatar_url`] === true;
           const videoUploading = uploading[`${persona.id}:preview_video_url`] === true;
+          const galleryUploading = uploading[`${persona.id}:gallery_urls`] === true;
 
           return (
             <section
@@ -147,74 +178,129 @@ export default function AdminPersonasTab() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <label className="space-y-2">
-                    <span className="block text-sm font-medium text-[var(--color-text-primary)]">Avatar image URL</span>
-                    <input
-                      type="text"
-                      value={draft.avatar_url ?? ''}
-                      onChange={(event) => updateDraft(persona.id, { avatar_url: event.target.value })}
-                      className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
-                      placeholder="/uploads/persona-avatar.png"
-                    />
-                    <input
-                      type="file"
+                  <div className="space-y-2">
+                    <MediaUploadField
+                      id={`admin-persona-${persona.id}-avatar`}
+                      label="Avatar Image"
+                      value={draft.avatar_url}
                       accept="image/*"
-                      onChange={(event) => handleUpload(persona.id, event.target.files?.[0], 'avatar_url')}
-                      className="block w-full text-sm"
+                      mediaType="image"
+                      uploadButtonLabel="Select avatar image"
+                      uploadingLabel="Uploading avatar..."
+                      clearLabel="Clear image"
+                      isUploading={avatarUploading}
+                      showStoredPath
+                      onFileChange={(event) => handleUpload(persona.id, event.target.files?.[0], 'avatar_url')}
+                      onClear={() => updateDraft(persona.id, { avatar_url: '' })}
                     />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => updateDraft(persona.id, { avatar_url: '' })}
-                        className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm"
-                      >
-                        Clear image
-                      </button>
-                    </div>
                     {avatarUploading && (
                       <p className="text-xs text-[var(--color-text-secondary)]">Uploading avatar...</p>
                     )}
                     {uploadErrors[`${persona.id}:avatar_url`] && (
                       <p className="text-xs text-red-400">{uploadErrors[`${persona.id}:avatar_url`]}</p>
                     )}
-                  </label>
+                  </div>
 
-                  <label className="space-y-2">
-                    <span className="block text-sm font-medium text-[var(--color-text-primary)]">Preview video URL</span>
-                    <input
-                      type="text"
-                      value={draft.preview_video_url ?? ''}
-                      onChange={(event) =>
-                        updateDraft(persona.id, { preview_video_url: event.target.value })
-                      }
-                      className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
-                      placeholder="/uploads/persona-preview.mp4"
-                    />
-                    <input
-                      type="file"
+                  <div className="space-y-2">
+                    <MediaUploadField
+                      id={`admin-persona-${persona.id}-preview-video`}
+                      label="Preview Video"
+                      value={draft.preview_video_url}
                       accept="video/mp4,video/webm,video/quicktime"
-                      onChange={(event) =>
+                      mediaType="video"
+                      uploadButtonLabel="Select preview video"
+                      uploadingLabel="Uploading preview video..."
+                      clearLabel="Clear video"
+                      isUploading={videoUploading}
+                      showStoredPath
+                      onFileChange={(event) =>
                         handleUpload(persona.id, event.target.files?.[0], 'preview_video_url')
                       }
-                      className="block w-full text-sm"
+                      onClear={() => updateDraft(persona.id, { preview_video_url: '' })}
                     />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => updateDraft(persona.id, { preview_video_url: '' })}
-                        className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm"
-                      >
-                        Clear video
-                      </button>
-                    </div>
                     {videoUploading && (
                       <p className="text-xs text-[var(--color-text-secondary)]">Uploading preview video...</p>
                     )}
                     {uploadErrors[`${persona.id}:preview_video_url`] && (
                       <p className="text-xs text-red-400">{uploadErrors[`${persona.id}:preview_video_url`]}</p>
                     )}
-                  </label>
+                  </div>
                 </div>
+              </div>
+
+              <div className="mt-4 space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Gallery Images</h3>
+                    <p className="text-xs text-[var(--color-text-secondary)]">
+                      Optional images shown in the persona gallery.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateDraft(persona.id, { gallery_urls: [] })}
+                      className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm"
+                    >
+                      Clear gallery
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <label
+                    htmlFor={`admin-persona-${persona.id}-gallery-file`}
+                    className="inline-flex cursor-pointer items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                  >
+                    {galleryUploading ? 'Uploading gallery image...' : 'Add gallery image'}
+                  </label>
+                  <input
+                    id={`admin-persona-${persona.id}-gallery-file`}
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => handleGalleryUpload(persona.id, event.target.files?.[0])}
+                    className="hidden"
+                    disabled={galleryUploading}
+                  />
+                </div>
+
+                {galleryUploading && (
+                  <p className="text-xs text-[var(--color-text-secondary)]">Uploading gallery image...</p>
+                )}
+                {uploadErrors[`${persona.id}:gallery_urls`] && (
+                  <p className="text-xs text-red-400">{uploadErrors[`${persona.id}:gallery_urls`]}</p>
+                )}
+
+                {(draft.gallery_urls ?? []).length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {(draft.gallery_urls ?? []).map((url, index) => (
+                      <div
+                        key={`${persona.id}-gallery-${url}-${index}`}
+                        className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+                      >
+                        <img
+                          src={resolveMediaUrl(url)}
+                          alt={`${persona.name} gallery image ${index + 1}`}
+                          className="h-40 w-full bg-black/10 object-cover"
+                        />
+                        <div className="space-y-2 p-2">
+                          <p className="break-all rounded-lg bg-[var(--color-surface)] px-2 py-1 font-mono text-[11px] text-[var(--color-text-secondary)]">
+                            {url}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => removeGalleryURL(persona.id, index)}
+                            className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--color-text-secondary)]">No gallery images set.</p>
+                )}
               </div>
 
               <div className="mt-4 flex items-center gap-3">
@@ -226,10 +312,13 @@ export default function AdminPersonasTab() {
                       draft: {
                         avatar_url: draft.avatar_url?.trim() || undefined,
                         preview_video_url: draft.preview_video_url?.trim() || undefined,
+                        gallery_urls: (draft.gallery_urls ?? [])
+                          .map((url) => url.trim())
+                          .filter(Boolean),
                       },
                     })
                   }
-                  disabled={isSaving || avatarUploading || videoUploading}
+                  disabled={isSaving || avatarUploading || videoUploading || galleryUploading}
                   className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
                 >
                   {isSaving ? 'Saving...' : 'Save media'}

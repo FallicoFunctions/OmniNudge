@@ -12,13 +12,57 @@ export interface BotPersona {
   name: string;
   description?: string;
   category: PersonaCategory;
+  owner_user_id?: number;
+  visibility?: 'public' | 'private' | 'unlisted';
+  source_format?: string;
   avatar_url?: string;
   preview_video_url?: string;
   gallery_urls?: string[];
+  tags?: string[];
+  creator_name?: string;
+  character_version?: string;
   is_nsfw: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface BotPersonaDefinition extends BotPersona {
+  system_prompt: string;
+  personality: string;
+  scenario: string;
+  first_message: string;
+  example_dialogue: string;
+  post_history_instructions: string;
+  alternate_greetings: string[];
+  creator_notes: string;
+  character_book_json?: Record<string, unknown>;
+  extensions_json: Record<string, unknown>;
+  import_source_filename?: string;
+}
+
+export interface PersonaDefinitionPayload {
+  name: string;
+  description: string;
+  category: PersonaCategory;
+  visibility: 'public' | 'private' | 'unlisted';
+  system_prompt: string;
+  personality: string;
+  scenario: string;
+  first_message: string;
+  example_dialogue: string;
+  post_history_instructions: string;
+  alternate_greetings: string[];
+  creator_notes: string;
+  tags: string[];
+  creator_name: string;
+  character_version: string;
+  avatar_url?: string;
+  preview_video_url?: string;
+  gallery_urls: string[];
+  is_nsfw: boolean;
+  character_book_json?: Record<string, unknown>;
+  extensions_json?: Record<string, unknown>;
 }
 
 export interface ConversationSettings {

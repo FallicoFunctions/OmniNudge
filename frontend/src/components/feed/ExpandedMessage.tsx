@@ -218,6 +218,7 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
     message.sender_media_encryption_key,
     message.media_encryption_iv,
     isOwnMessage,
+    t,
   ]);
 
   return mediaSrc;

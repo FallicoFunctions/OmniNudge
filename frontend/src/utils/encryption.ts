@@ -203,7 +203,6 @@ export async function decryptMessage(
 }
 
 function stringToBase64(value: string): string {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (typeof Buffer !== 'undefined') {
     return Buffer.from(value, 'utf8').toString('base64');
   }
@@ -212,7 +211,6 @@ function stringToBase64(value: string): string {
 }
 
 function base64ToString(base64: string): string {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (typeof Buffer !== 'undefined') {
     return Buffer.from(base64, 'base64').toString('utf8');
   }
@@ -226,7 +224,6 @@ function base64ToString(base64: string): string {
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   // Node/test environments: avoid cross-realm ArrayBuffer issues by using Buffer.
   // In the browser, Buffer is typically undefined, so we fall back to btoa.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (typeof Buffer !== 'undefined') {
     return Buffer.from(buffer).toString('base64');
   }
@@ -244,7 +241,6 @@ export function arrayBufferToBase64(buffer: ArrayBuffer): string {
  */
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   // Node/test environments: avoid cross-realm ArrayBuffer issues by using Buffer.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (typeof Buffer !== 'undefined') {
     const buf = Buffer.from(base64, 'base64');
     return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);

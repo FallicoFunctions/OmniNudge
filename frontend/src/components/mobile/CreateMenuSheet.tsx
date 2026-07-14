@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { FileText, Users } from 'lucide-react';
@@ -25,11 +25,11 @@ export function CreateMenuSheet({ isOpen, onClose }: CreateMenuSheetProps) {
     }
   }, [isOpen]);
 
-  const handleNavigate = (path: string, label: string) => {
+  const handleNavigate = useCallback((path: string, label: string) => {
     trackEvent('MobileNavigation', 'CreateMenuClick', label);
     navigate(path);
     onClose();
-  };
+  }, [navigate, onClose]);
 
   const items = useMemo(
     () => [

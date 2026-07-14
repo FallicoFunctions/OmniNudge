@@ -1232,9 +1232,8 @@
     },
     "edit": {
       "title": "تعديل الملف الشخصي",
-      "description": "حدّث رابط الصورة الشخصية ونص الحالة والنبذة.",
-      "avatarUrlLabel": "رابط الصورة الشخصية",
-      "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
+      "description": "حدّث الصورة الشخصية ونص الحالة والنبذة.",
+      "avatarUrlLabel": "الصورة الشخصية",
       "avatarUploadButton": "رفع صورة الملف الشخصي",
       "avatarUploading": "جارٍ الرفع...",
       "avatarUploadHint": "PNG أو JPG أو GIF أو WebP حتى 5MB. قص تلقائي إلى 200x200.",
@@ -1251,7 +1250,7 @@
         "bioTooLong": "يجب ألا تتجاوز النبذة 500 حرف.",
         "statusTooLong": "يجب ألا يتجاوز نص الحالة 500 حرف.",
         "locationTooLong": "يجب ألا يتجاوز الموقع 100 حرف.",
-        "invalidAvatarUrl": "يجب أن يبدأ رابط الصورة بـ http:// أو https://",
+        "invalidAvatarUrl": "يجب أن تبدأ الصورة بـ http:// أو https://",
         "uploadFailed": "فشل رفع الصورة الشخصية: {{message}}",
         "saveFailed": "فشل حفظ الملف الشخصي: {{message}}"
       }
@@ -2406,6 +2405,7 @@
       "signingIn": "جاري تسجيل الدخول...",
       "creatingAccount": "جاري إنشاء الحساب...",
       "signIn": "تسجيل الدخول",
+      "logout": "تسجيل الخروج",
       "signUp": "إنشاء حساب"
     },
     "switch": {
@@ -3728,8 +3728,7 @@
     "minParticipants": "أضف عضوين على الأقل.",
     "nameLabel": "اسم المجموعة",
     "namePlaceholder": "أدخل اسم المجموعة",
-    "avatarLabel": "رابط الصورة (اختياري)",
-    "avatarPlaceholder": "https://example.com/avatar.png",
+    "avatarLabel": "الصورة (اختياري)",
     "descriptionLabel": "الوصف (اختياري)",
     "descriptionPlaceholder": "عم ماذا تدور هذه المجموعة؟",
     "selectedCount": "{{count}} محدد",
@@ -3966,6 +3965,8 @@
       "settingsSave": "حفظ الإعدادات",
       "settingsSaved": "تم حفظ الإعدادات",
       "settingsSaveError": "تعذّر حفظ الإعدادات",
+      "viewCharacterForm": "فتح نموذج الشخصية",
+      "viewCharacterFormDescription": "عرض تعريف شخصية البوت الكامل في نافذة منبثقة.",
       "noPersonaSelected": "اختر شخصية من اكتشف لبدء الدردشة",
       "personaNotFound": "تعذّر العثور على هذه الشخصية.",
       "loading": "جارٍ تحميل المحادثة...",
@@ -3993,6 +3994,7 @@
       "discover": "اكتشف",
       "search": "بحث",
       "chat": "الدردشة",
+      "studio": "الاستوديو",
       "searchPlaceholder": "البحث عن شخصيات...",
       "noResults": "لم يتم العثور على نتائج",
       "collapse": "طي الشريط الجانبي",
@@ -4014,6 +4016,114 @@
       "empty": "لا توجد محادثات بعد. ابدأ الدردشة مع شخصية!",
       "lastMessage": "آخر رسالة",
       "noMessages": "لا توجد رسائل بعد"
+    },
+    "studio": {
+      "loadingStudio": "جارٍ تحميل الاستوديو...",
+      "eyebrow": "استوديو OmniChat",
+      "title": "شخصياتك",
+      "description": "أنشئ شخصيات OmniChat أصلية أو استورد بطاقات شخصيات موجودة. تبقى الشخصيات الشخصية خاصة حتى إطلاق النشر.",
+      "creatorOnly": "للمُنشئ فقط",
+      "loadingPersonas": "جارٍ تحميل شخصياتك...",
+      "loadPersonasError": "تعذّر تحميل شخصياتك.",
+      "loadingDefinition": "جارٍ تحميل تعريف الشخصية...",
+      "import": {
+        "title": "استيراد بطاقة شخصية",
+        "importing": "جارٍ الاستيراد...",
+        "uploadCta": "رفع .png أو .json"
+      },
+      "editor": {
+        "newCharacter": "شخصية جديدة",
+        "editCharacter": "تعديل الشخصية"
+      },
+      "actions": {
+        "openChat": "فتح الدردشة",
+        "exportJson": "تصدير JSON",
+        "delete": "حذف",
+        "saving": "جارٍ الحفظ...",
+        "createCharacter": "إنشاء شخصية",
+        "saveChanges": "حفظ التغييرات",
+        "backToDiscover": "العودة إلى الاستكشاف"
+      },
+      "fields": {
+        "name": "الاسم",
+        "category": "الفئة",
+        "description": "الوصف",
+        "visibility": "الظهور",
+        "visibilityPrivate": "خاص بك",
+        "personality": "الشخصية",
+        "scenario": "السيناريو",
+        "openingMessage": "رسالة البداية",
+        "exampleDialogue": "حوار مثال",
+        "systemPrompt": "تجاوز موجه النظام",
+        "systemPromptPlaceholder": "اتركه فارغًا لاستخدام موجه الشخصية المنظم في OmniChat.",
+        "postHistoryInstructions": "تعليمات ما بعد السجل",
+        "alternateGreetings": "تحيات بديلة",
+        "alternateGreetingsPlaceholder": "تحية واحدة في كل سطر",
+        "tags": "الوسوم",
+        "tagsPlaceholder": "وسوم، مفصولة، بفواصل",
+        "creatorName": "اسم المُنشئ",
+        "characterVersion": "إصدار الشخصية",
+        "creatorNotes": "ملاحظات المُنشئ",
+        "avatarUrl": "الصورة الشخصية",
+        "previewVideoUrl": "فيديو المعاينة",
+        "galleryUrls": "صور المعرض",
+        "galleryUrlsPlaceholder": "صورة مرفوعة واحدة في كل سطر",
+        "characterBookJson": "JSON كتاب الشخصية",
+        "extensionsJson": "JSON الإضافات"
+      },
+      "uploadingField": "جارٍ رفع {{field}}...",
+      "dangerZone": {
+        "title": "منطقة الخطر",
+        "description": "احذف هذه الشخصية من استوديو OmniChat الخاص بك.",
+        "delete": "حذف الشخصية"
+      },
+      "deleteModal": {
+        "title": "حذف الشخصية؟",
+        "description": "سيؤدي هذا إلى إزالة الشخصية المحددة من استوديو OmniChat الخاص بك.",
+        "descriptionNamed": "سيؤدي هذا إلى إزالة {{name}} من استوديو OmniChat الخاص بك.",
+        "confirm": "حذف الشخصية"
+      },
+      "discardModal": {
+        "title": "تجاهل التغييرات غير المحفوظة؟",
+        "description": "لديك تعديلات غير محفوظة في نموذج الشخصية هذا. ستُفقد إذا غادرت الآن.",
+        "confirm": "تجاهل التغييرات"
+      }
+    },
+    "personaDetails": {
+      "title": "نموذج الشخصية",
+      "loading": "جارٍ تحميل نموذج الشخصية...",
+      "loadError": "تعذّر تحميل نموذج الشخصية الكامل.",
+      "noAvatar": "لا توجد صورة",
+      "fields": {
+        "name": "الاسم",
+        "category": "الفئة",
+        "description": "الوصف",
+        "visibility": "الظهور",
+        "nsfw": "NSFW",
+        "personality": "الشخصية",
+        "scenario": "السيناريو",
+        "openingMessage": "رسالة البداية",
+        "exampleDialogue": "حوار مثال",
+        "systemPrompt": "تجاوز موجه النظام",
+        "postHistoryInstructions": "تعليمات ما بعد السجل",
+        "alternateGreetings": "تحيات بديلة",
+        "tags": "الوسوم",
+        "creatorName": "اسم المُنشئ",
+        "characterVersion": "إصدار الشخصية",
+        "creatorNotes": "ملاحظات المُنشئ",
+        "avatarUrl": "الصورة الشخصية",
+        "previewVideoUrl": "فيديو المعاينة",
+        "galleryUrls": "صور المعرض",
+        "characterBookJson": "JSON كتاب الشخصية",
+        "extensionsJson": "JSON الإضافات"
+      },
+      "dangerZone": {
+        "title": "منطقة الخطر",
+        "description": "احذف هذه الشخصية وأزلها من مكتبة الشخصيات الخاصة بك.",
+        "delete": "حذف الشخصية",
+        "confirmDelete": "تأكيد الحذف",
+        "deleteError": "تعذّر حذف هذه الشخصية."
+      }
     }
   }
 }

@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { User, Settings, Grid3x3, Info, Shield, LogOut, LogIn, UserPlus } from 'lucide-react';
@@ -37,17 +37,17 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
     }
   }, [isOpen]);
 
-  const handleNavigate = (path: string, label: string) => {
+  const handleNavigate = useCallback((path: string, label: string) => {
     trackEvent('MobileNavigation', 'MoreMenuClick', label);
     navigate(path);
     onClose();
-  };
+  }, [navigate, onClose]);
 
-  const handleLogoutClick = () => {
+  const handleLogoutClick = useCallback(() => {
     trackEvent('MobileNavigation', 'MoreMenuClick', 'Logout');
     heavyHaptic(); // Stronger feedback for destructive action
     setShowLogoutConfirm(true);
-  };
+  }, []);
 
   const handleLogoutConfirm = () => {
     logout();
@@ -151,13 +151,13 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
   );
 
   // Group items by section
-  const sections = ['user', 'nav', 'settings', 'auth'];
+  const sections = useMemo(() => ['user', 'nav', 'settings', 'auth'], []);
   const groupedItems = useMemo(
     () =>
       sections
         .map((section) => items.filter((item) => item.section === section && item.show))
         .filter((group) => group.length > 0),
-    [items]
+    [items, sections]
   );
 
   return (

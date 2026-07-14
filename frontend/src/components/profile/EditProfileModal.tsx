@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import MediaUploadField from '../common/MediaUploadField';
 import ImageCropModal from './ImageCropModal';
 
 interface EditProfileModalProps {
@@ -159,7 +160,7 @@ export default function EditProfileModal({
       !trimmedBannerUrl.startsWith('https://') &&
       !trimmedBannerUrl.startsWith('/uploads/banners/')
     ) {
-      setError('Banner URL must start with http:// or https://');
+      setError('Banner image must start with http:// or https://');
       return;
     }
 
@@ -197,88 +198,40 @@ export default function EditProfileModal({
         </p>
 
         <div className="mt-4 space-y-4">
-          <div>
-            <label
-              htmlFor="edit-profile-avatar-url"
-              className="block text-sm font-medium text-[var(--color-text-primary)]"
-            >
-              {t('userProfilePage.edit.avatarUrlLabel')}
-            </label>
-            <input
-              id="edit-profile-avatar-url"
-              type="url"
-              value={avatarUrl}
-              onChange={(e) => setAvatarUrl(e.target.value)}
-              placeholder={t('userProfilePage.edit.avatarUrlPlaceholder')}
-              className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
-            />
-            {onUploadAvatar && (
-              <div className="mt-2 flex items-center gap-2">
-                <label
-                  htmlFor="edit-profile-avatar-file"
-                  className="inline-flex cursor-pointer items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                >
-                  {isUploadingAvatar
-                    ? t('userProfilePage.edit.avatarUploading')
-                    : t('userProfilePage.edit.avatarUploadButton')}
-                </label>
-                <input
-                  id="edit-profile-avatar-file"
-                  type="file"
-                  accept="image/png,image/jpeg,image/gif,image/webp"
-                  className="hidden"
-                  disabled={isUploadingAvatar}
-                  onChange={handleAvatarFileChange}
-                />
-                <span className="text-xs text-[var(--color-text-secondary)]">
-                  {t('userProfilePage.edit.avatarUploadHint')}
-                </span>
-              </div>
-            )}
-          </div>
+          <MediaUploadField
+            id="edit-profile-avatar"
+            label={t('userProfilePage.edit.avatarUrlLabel')}
+            value={avatarUrl}
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            mediaType="image"
+            uploadButtonLabel={t('userProfilePage.edit.avatarUploadButton')}
+            uploadingLabel={t('userProfilePage.edit.avatarUploading')}
+            clearLabel="Remove image"
+            hint={t('userProfilePage.edit.avatarUploadHint')}
+            disabled={!onUploadAvatar}
+            isUploading={isUploadingAvatar}
+            onFileChange={handleAvatarFileChange}
+            onClear={() => setAvatarUrl('')}
+          />
 
-          <div>
-            <label
-              htmlFor="edit-profile-banner-url"
-              className="block text-sm font-medium text-[var(--color-text-primary)]"
-            >
-              Cover / Banner Image URL
-            </label>
-            <input
-              id="edit-profile-banner-url"
-              type="url"
-              value={bannerUrl}
-              onChange={(e) => setBannerUrl(e.target.value)}
-              placeholder="https://example.com/banner.jpg"
-              className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
-            />
-            {onUploadBanner && (
-              <div className="mt-2 flex items-center gap-2">
-                <label
-                  htmlFor="edit-profile-banner-file"
-                  className="inline-flex cursor-pointer items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                >
-                  {isUploadingBanner ? 'Uploading…' : 'Upload banner image'}
-                </label>
-                <input
-                  id="edit-profile-banner-file"
-                  type="file"
-                  accept="image/png,image/jpeg,image/gif,image/webp"
-                  className="hidden"
-                  disabled={isUploadingBanner}
-                  onChange={(event) => {
-                    void handleBannerFileChange(event);
-                  }}
-                />
-                <span className="text-xs text-[var(--color-text-secondary)]">
-                  PNG, JPG, GIF, WebP · max 10MB
-                </span>
-              </div>
-            )}
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-              Shown as the full-width banner behind your profile header.
-            </p>
-          </div>
+          <MediaUploadField
+            id="edit-profile-banner"
+            label="Cover / Banner Image"
+            value={bannerUrl}
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            mediaType="image"
+            uploadButtonLabel="Upload banner image"
+            uploadingLabel="Uploading..."
+            clearLabel="Remove image"
+            hint="PNG, JPG, GIF, WebP · max 10MB"
+            description="Shown as the full-width banner behind your profile header."
+            disabled={!onUploadBanner}
+            isUploading={isUploadingBanner}
+            onFileChange={(event) => {
+              void handleBannerFileChange(event);
+            }}
+            onClear={() => setBannerUrl('')}
+          />
 
           <div>
             <label

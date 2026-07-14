@@ -24,6 +24,10 @@ export default function OmniChatHeader({
   const [defaultsOpen, setDefaultsOpen] = useState(false);
 
   const initials = user?.username ? user.username.slice(0, 2).toUpperCase() : 'OC';
+  const signInLabel = t('auth.buttons.signIn');
+  const logoutLabel = t('auth.buttons.logout');
+  const resolvedSignInLabel = signInLabel === 'auth.buttons.signIn' ? 'Sign in' : signInLabel;
+  const resolvedLogoutLabel = logoutLabel === 'auth.buttons.logout' ? 'Log out' : logoutLabel;
 
   return (
     <>
@@ -59,7 +63,7 @@ export default function OmniChatHeader({
                     <UserRound size={16} />
                   </span>
                   <span className="hidden text-sm font-medium text-white/80 sm:inline">
-                    {t('auth.buttons.signIn')}
+                    {resolvedSignInLabel}
                   </span>
                 </button>
               )}
@@ -87,7 +91,7 @@ export default function OmniChatHeader({
                     className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
                   >
                     <LogOut size={16} />
-                    {t('auth.buttons.logout')}
+                    {resolvedLogoutLabel}
                   </button>
                 </div>
               )}

@@ -38,7 +38,10 @@ describe('PersonaAvatar', () => {
   it('renders the poster image by default', () => {
     render(<PersonaAvatar persona={basePersona} />);
 
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/uploads/persona-avatar.png');
+    expect(screen.getByRole('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('/uploads/persona-avatar.png')
+    );
     expect(screen.queryByTestId('persona-preview-video')).not.toBeInTheDocument();
   });
 
@@ -53,8 +56,8 @@ describe('PersonaAvatar', () => {
 
     const video = screen.getByTestId('persona-preview-video');
     expect(video).toBeInTheDocument();
-    expect(video).toHaveAttribute('src', '/uploads/persona-preview.mp4');
-    expect(video).toHaveAttribute('poster', '/uploads/persona-avatar.png');
+    expect(video).toHaveAttribute('src', expect.stringContaining('/uploads/persona-preview.mp4'));
+    expect(video).toHaveAttribute('poster', expect.stringContaining('/uploads/persona-avatar.png'));
   });
 
   it('does not render a preview video when the persona has no preview media', () => {

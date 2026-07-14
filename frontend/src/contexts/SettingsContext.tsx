@@ -393,7 +393,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setQuietHoursEnabledState(settings.quiet_hours_enabled ?? false);
         setQuietHoursStartMinutesState(settings.quiet_hours_start_minutes ?? 1320);
         setQuietHoursEndMinutesState(settings.quiet_hours_end_minutes ?? 420);
-        setQuietHoursTimezoneState(settings.quiet_hours_timezone ?? quietHoursTimezone);
+        setQuietHoursTimezoneState((current) => settings.quiet_hours_timezone ?? current);
         setBatchNotificationsState(settings.batch_notifications ?? true);
         setReadReceiptsState(settings.show_read_receipts ?? true);
         setTypingIndicatorsState(settings.show_typing_indicators ?? true);

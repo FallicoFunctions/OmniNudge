@@ -937,6 +937,7 @@ export default function HubsPage() {
       hubname,
       hubDisplayTitle,
       isModerator,
+      t,
       useRelativeTime,
       handleSharePost,
       handleToggleSavePost,

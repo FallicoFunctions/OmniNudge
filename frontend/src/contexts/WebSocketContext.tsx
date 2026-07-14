@@ -45,6 +45,7 @@ type FeatureFlagUpdatedPayload = { key: string; enabled: boolean; percentage?: n
 interface WebSocketContextType {
   // Connection state
   isConnected: boolean;
+  connectionState: 'idle' | 'connecting' | 'connected' | 'reconnecting';
 
   // Send methods
   sendTypingIndicator: (conversationId: number, recipientId: number, isTyping: boolean) => void;
@@ -65,6 +66,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionState, setConnectionState] = useState<
+    'idle' | 'connecting' | 'connected' | 'reconnecting'
+  >('idle');
   const [onlineUsers, setOnlineUsers] = useState<Set<number>>(new Set());
   const [typingUsers, setTypingUsers] = useState<Map<number, Set<number>>>(new Map());
   const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -72,6 +76,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const reconnectAttemptsRef = useRef(0);
   const isCleanupRef = useRef(false);
   const recentMessageIdsRef = useRef<Set<number>>(new Set());
+  const activeConnectionIdRef = useRef(0);
 
   // Send WebSocket message
   const sendMessage = useCallback((type: string, payload: unknown) => {
@@ -719,13 +724,20 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   // WebSocket connection management
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setIsConnected(false);
+      setConnectionState('idle');
+      return;
+    }
 
     isCleanupRef.current = false;
     const typingTimeouts = typingTimeoutsRef.current;
 
     const connect = async () => {
       console.log('[WebSocket] Connecting...');
+      setConnectionState(reconnectAttemptsRef.current > 0 ? 'reconnecting' : 'connecting');
+      const connectionId = activeConnectionIdRef.current + 1;
+      activeConnectionIdRef.current = connectionId;
       let wsToken: string;
       try {
         const response = await api.post<{ ws_token: string }>('/auth/ws-token');
@@ -733,6 +745,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.warn('[WebSocket] Failed to fetch WebSocket token; skipping connect', error);
         setIsConnected(false);
+        setConnectionState('reconnecting');
         if (!isCleanupRef.current) {
           reconnectAttemptsRef.current += 1;
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
@@ -750,10 +763,16 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       const socket = new WebSocket(url.toString());
       wsRef.current = socket;
       let hasOpened = false;
+      const isStaleSocket = () => wsRef.current !== socket || activeConnectionIdRef.current !== connectionId;
 
       socket.onopen = () => {
+        if (isStaleSocket()) {
+          socket.close();
+          return;
+        }
         hasOpened = true;
         setIsConnected(true);
+        setConnectionState('connected');
         // Reset reconnection attempts on successful connection
         reconnectAttemptsRef.current = 0;
         console.log('[WebSocket] Connected successfully');
@@ -762,10 +781,19 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
       };
 
-      socket.onmessage = handleMessage;
+      socket.onmessage = (event) => {
+        if (isStaleSocket()) {
+          return;
+        }
+        handleMessage(event);
+      };
 
       socket.onclose = () => {
+        if (isStaleSocket()) {
+          return;
+        }
         setIsConnected(false);
+        setConnectionState('reconnecting');
         console.log('[WebSocket] Disconnected');
 
         if (isCleanupRef.current) return;
@@ -780,6 +808,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       };
 
       socket.onerror = (error) => {
+        if (isStaleSocket()) {
+          return;
+        }
         if (!isCleanupRef.current) {
           console.error('[WebSocket] Error:', error);
         }
@@ -791,11 +822,16 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     return () => {
       console.log('[WebSocket] Cleaning up...');
       isCleanupRef.current = true;
+      setIsConnected(false);
+      setConnectionState('idle');
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
       }
-      if (wsRef.current) {
-        wsRef.current.close();
+      const socket = wsRef.current;
+      wsRef.current = null;
+      activeConnectionIdRef.current += 1;
+      if (socket) {
+        socket.close();
       }
       // Clear all typing timeouts
       typingTimeouts.forEach(clearTimeout);
@@ -805,6 +841,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   const value: WebSocketContextType = {
     isConnected,
+    connectionState,
     sendTypingIndicator,
     onlineUsers,
     isUserOnline,

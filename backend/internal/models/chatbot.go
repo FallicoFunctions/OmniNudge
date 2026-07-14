@@ -2,7 +2,9 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -28,19 +30,36 @@ const (
 
 // BotPersona is a catalog entry for an OmniChat character.
 type BotPersona struct {
-	ID              int       `json:"id"`
-	Slug            string    `json:"slug"`
-	Name            string    `json:"name"`
-	Description     *string   `json:"description,omitempty"`
-	Category        string    `json:"category"` // genre/content tag: see PersonaCategory* constants
-	SystemPrompt    string    `json:"-"`
-	AvatarURL       *string   `json:"avatar_url,omitempty"`
-	PreviewVideoURL *string   `json:"preview_video_url,omitempty"`
-	GalleryURLs     []string  `json:"gallery_urls,omitempty"`
-	IsNSFW          bool      `json:"is_nsfw"`
-	IsActive        bool      `json:"is_active"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID                      int             `json:"id"`
+	Slug                    string          `json:"slug"`
+	Name                    string          `json:"name"`
+	Description             *string         `json:"description,omitempty"`
+	Category                string          `json:"category"` // genre/content tag: see PersonaCategory* constants
+	OwnerUserID             *int            `json:"owner_user_id,omitempty"`
+	Visibility              string          `json:"visibility,omitempty"`
+	SourceFormat            string          `json:"source_format,omitempty"`
+	SystemPrompt            string          `json:"-"`
+	Personality             string          `json:"-"`
+	Scenario                string          `json:"-"`
+	FirstMessage            string          `json:"-"`
+	ExampleDialogue         string          `json:"-"`
+	PostHistoryInstructions string          `json:"-"`
+	AlternateGreetings      []string        `json:"-"`
+	CreatorNotes            string          `json:"-"`
+	Tags                    []string        `json:"tags,omitempty"`
+	CreatorName             string          `json:"creator_name,omitempty"`
+	CharacterVersion        string          `json:"character_version,omitempty"`
+	ExtensionsJSON          json.RawMessage `json:"-"`
+	CharacterBookJSON       json.RawMessage `json:"-"`
+	RawCardJSON             json.RawMessage `json:"-"`
+	ImportSourceFilename    *string         `json:"import_source_filename,omitempty"`
+	AvatarURL               *string         `json:"avatar_url,omitempty"`
+	PreviewVideoURL         *string         `json:"preview_video_url,omitempty"`
+	GalleryURLs             []string        `json:"gallery_urls,omitempty"`
+	IsNSFW                  bool            `json:"is_nsfw"`
+	IsActive                bool            `json:"is_active"`
+	CreatedAt               time.Time       `json:"created_at"`
+	UpdatedAt               time.Time       `json:"updated_at"`
 }
 
 // ConversationSettings holds per-conversation user metadata that the persona
@@ -91,20 +110,81 @@ func NewBotPersonaRepository(pool *pgxpool.Pool) *BotPersonaRepository {
 // LIMIT regardless of expected size.
 const maxPersonaListSize = 500
 
-// ListActive returns all active personas, optionally filtered by category.
-func (r *BotPersonaRepository) ListActive(ctx context.Context, category string) ([]*BotPersona, error) {
+const botPersonaSelectColumns = `
+	id, slug, name, description, category, owner_user_id, visibility, source_format,
+	system_prompt, personality, scenario, first_message, example_dialogue,
+	post_history_instructions, alternate_greetings, creator_notes, tags, creator_name,
+	character_version, extensions_json, character_book_json, raw_card_json,
+	import_source_filename, avatar_url, preview_video_url, gallery_urls,
+	is_nsfw, is_active, created_at, updated_at
+`
+
+func qualifySelectColumns(alias, columns string) string {
+	parts := strings.Split(columns, ",")
+	for i, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		parts[i] = alias + "." + trimmed
+	}
+	return strings.Join(parts, ", ")
+}
+
+func scanBotPersona(scanner interface {
+	Scan(dest ...interface{}) error
+}) (*BotPersona, error) {
+	p := &BotPersona{}
+	err := scanner.Scan(
+		&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.OwnerUserID, &p.Visibility, &p.SourceFormat,
+		&p.SystemPrompt, &p.Personality, &p.Scenario, &p.FirstMessage, &p.ExampleDialogue,
+		&p.PostHistoryInstructions, &p.AlternateGreetings, &p.CreatorNotes, &p.Tags, &p.CreatorName,
+		&p.CharacterVersion, &p.ExtensionsJSON, &p.CharacterBookJSON, &p.RawCardJSON,
+		&p.ImportSourceFilename, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs,
+		&p.IsNSFW, &p.IsActive, &p.CreatedAt, &p.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if p.Visibility == "" {
+		p.Visibility = "public"
+	}
+	if p.SourceFormat == "" {
+		p.SourceFormat = "native"
+	}
+	if p.AlternateGreetings == nil {
+		p.AlternateGreetings = []string{}
+	}
+	if p.Tags == nil {
+		p.Tags = []string{}
+	}
+	if p.GalleryURLs == nil {
+		p.GalleryURLs = []string{}
+	}
+	return p, nil
+}
+
+// ListCatalog returns all active public personas plus any personas owned by the
+// requesting user. The caller can pass nil when no user is authenticated.
+func (r *BotPersonaRepository) ListCatalog(ctx context.Context, category string, viewerUserID *int) ([]*BotPersona, error) {
 	query := `
-		SELECT id, slug, name, description, category, system_prompt, avatar_url, preview_video_url, gallery_urls, is_nsfw, is_active, created_at, updated_at
+		SELECT ` + botPersonaSelectColumns + `
 		FROM bot_personas
 		WHERE is_active
 	`
 	args := []interface{}{}
+	if viewerUserID == nil {
+		query += " AND owner_user_id IS NULL AND visibility = 'public'"
+	} else {
+		args = append(args, *viewerUserID)
+		query += " AND (owner_user_id IS NULL AND visibility = 'public' OR owner_user_id = $1)"
+	}
 	if category != "" {
-		query += " AND category = $1"
 		args = append(args, category)
+		query += fmt.Sprintf(" AND category = $%d", len(args))
 	}
 	args = append(args, maxPersonaListSize)
-	query += fmt.Sprintf(" ORDER BY name LIMIT $%d", len(args))
+	query += fmt.Sprintf(" ORDER BY CASE WHEN owner_user_id IS NULL THEN 1 ELSE 0 END, updated_at DESC, name LIMIT $%d", len(args))
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
@@ -114,12 +194,33 @@ func (r *BotPersonaRepository) ListActive(ctx context.Context, category string) 
 
 	personas := []*BotPersona{}
 	for rows.Next() {
-		p := &BotPersona{}
-		if err := rows.Scan(
-			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category,
-			&p.SystemPrompt, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs, &p.IsNSFW, &p.IsActive,
-			&p.CreatedAt, &p.UpdatedAt,
-		); err != nil {
+		p, err := scanBotPersona(rows)
+		if err != nil {
+			return nil, err
+		}
+		personas = append(personas, p)
+	}
+	return personas, rows.Err()
+}
+
+// ListOwnedByUser returns the active personas created by the given user.
+func (r *BotPersonaRepository) ListOwnedByUser(ctx context.Context, userID int) ([]*BotPersona, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT `+botPersonaSelectColumns+`
+		FROM bot_personas
+		WHERE owner_user_id = $1 AND is_active
+		ORDER BY updated_at DESC, name
+		LIMIT $2
+	`, userID, maxPersonaListSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	personas := []*BotPersona{}
+	for rows.Next() {
+		p, err := scanBotPersona(rows)
+		if err != nil {
 			return nil, err
 		}
 		personas = append(personas, p)
@@ -129,17 +230,52 @@ func (r *BotPersonaRepository) ListActive(ctx context.Context, category string) 
 
 // GetByID retrieves a persona by its ID.
 func (r *BotPersonaRepository) GetByID(ctx context.Context, id int) (*BotPersona, error) {
-	p := &BotPersona{}
 	query := `
-		SELECT id, slug, name, description, category, system_prompt, avatar_url, preview_video_url, gallery_urls, is_nsfw, is_active, created_at, updated_at
+		SELECT ` + botPersonaSelectColumns + `
 		FROM bot_personas
 		WHERE id = $1
 	`
-	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category,
-		&p.SystemPrompt, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs, &p.IsNSFW, &p.IsActive,
-		&p.CreatedAt, &p.UpdatedAt,
-	)
+	p, err := scanBotPersona(r.pool.QueryRow(ctx, query, id))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return p, nil
+}
+
+// GetAccessibleByID retrieves a persona only if it is visible to the caller.
+func (r *BotPersonaRepository) GetAccessibleByID(ctx context.Context, id int, viewerUserID *int) (*BotPersona, error) {
+	query := `
+		SELECT ` + botPersonaSelectColumns + `
+		FROM bot_personas
+		WHERE id = $1 AND is_active
+	`
+	args := []interface{}{id}
+	if viewerUserID == nil {
+		query += " AND owner_user_id IS NULL AND visibility = 'public'"
+	} else {
+		args = append(args, *viewerUserID)
+		query += " AND (owner_user_id IS NULL AND visibility = 'public' OR owner_user_id = $2)"
+	}
+	p, err := scanBotPersona(r.pool.QueryRow(ctx, query, args...))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return p, nil
+}
+
+// GetOwnedByUserAndID retrieves a persona only when it is owned by the user.
+func (r *BotPersonaRepository) GetOwnedByUserAndID(ctx context.Context, userID, id int) (*BotPersona, error) {
+	p, err := scanBotPersona(r.pool.QueryRow(ctx, `
+		SELECT `+botPersonaSelectColumns+`
+		FROM bot_personas
+		WHERE id = $1 AND owner_user_id = $2 AND is_active
+	`, id, userID))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -152,7 +288,7 @@ func (r *BotPersonaRepository) GetByID(ctx context.Context, id int) (*BotPersona
 // ListAll returns all personas, active or inactive, for admin management.
 func (r *BotPersonaRepository) ListAll(ctx context.Context) ([]*BotPersona, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, slug, name, description, category, system_prompt, avatar_url, preview_video_url, gallery_urls, is_nsfw, is_active, created_at, updated_at
+		SELECT `+botPersonaSelectColumns+`
 		FROM bot_personas
 		ORDER BY name
 		LIMIT $1
@@ -164,12 +300,8 @@ func (r *BotPersonaRepository) ListAll(ctx context.Context) ([]*BotPersona, erro
 
 	personas := []*BotPersona{}
 	for rows.Next() {
-		p := &BotPersona{}
-		if err := rows.Scan(
-			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category,
-			&p.SystemPrompt, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs, &p.IsNSFW, &p.IsActive,
-			&p.CreatedAt, &p.UpdatedAt,
-		); err != nil {
+		p, err := scanBotPersona(rows)
+		if err != nil {
 			return nil, err
 		}
 		personas = append(personas, p)
@@ -177,24 +309,110 @@ func (r *BotPersonaRepository) ListAll(ctx context.Context) ([]*BotPersona, erro
 	return personas, rows.Err()
 }
 
-// UpdateMedia updates avatar, preview video, and gallery URLs for an admin-curated persona.
-func (r *BotPersonaRepository) UpdateMedia(ctx context.Context, id int, avatarURL *string, previewVideoURL *string, galleryURLs []string) (*BotPersona, error) {
+// CreateOwned creates a new persona owned by the given user.
+func (r *BotPersonaRepository) CreateOwned(ctx context.Context, userID int, persona *BotPersona) (*BotPersona, error) {
+	query := `
+		INSERT INTO bot_personas (
+			slug, name, description, category, owner_user_id, visibility, source_format,
+			system_prompt, personality, scenario, first_message, example_dialogue,
+			post_history_instructions, alternate_greetings, creator_notes, tags,
+			creator_name, character_version, extensions_json, character_book_json, raw_card_json,
+			import_source_filename, avatar_url, preview_video_url, gallery_urls, is_nsfw, is_active
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7,
+			$8, $9, $10, $11, $12,
+			$13, $14, $15, $16,
+			$17, $18, $19, $20, $21,
+			$22, $23, $24, $25, $26, TRUE
+		)
+		RETURNING ` + botPersonaSelectColumns
+	return scanBotPersona(r.pool.QueryRow(
+		ctx,
+		query,
+		persona.Slug, persona.Name, persona.Description, persona.Category, userID, persona.Visibility, persona.SourceFormat,
+		persona.SystemPrompt, persona.Personality, persona.Scenario, persona.FirstMessage, persona.ExampleDialogue,
+		persona.PostHistoryInstructions, persona.AlternateGreetings, persona.CreatorNotes, persona.Tags,
+		persona.CreatorName, persona.CharacterVersion, emptyRawJSON(persona.ExtensionsJSON), nilIfEmptyRawJSON(persona.CharacterBookJSON), nilIfEmptyRawJSON(persona.RawCardJSON),
+		persona.ImportSourceFilename, persona.AvatarURL, persona.PreviewVideoURL, persona.GalleryURLs, persona.IsNSFW,
+	))
+}
+
+// UpdateOwned updates an existing user-owned persona.
+func (r *BotPersonaRepository) UpdateOwned(ctx context.Context, userID, id int, persona *BotPersona) (*BotPersona, error) {
+	query := `
+		UPDATE bot_personas
+		SET name = $3,
+		    description = $4,
+		    category = $5,
+		    visibility = $6,
+		    source_format = $7,
+		    system_prompt = $8,
+		    personality = $9,
+		    scenario = $10,
+		    first_message = $11,
+		    example_dialogue = $12,
+		    post_history_instructions = $13,
+		    alternate_greetings = $14,
+		    creator_notes = $15,
+		    tags = $16,
+		    creator_name = $17,
+		    character_version = $18,
+		    extensions_json = $19,
+		    character_book_json = $20,
+		    raw_card_json = $21,
+		    import_source_filename = $22,
+		    avatar_url = $23,
+		    preview_video_url = $24,
+		    gallery_urls = $25,
+		    is_nsfw = $26,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND owner_user_id = $2 AND is_active
+		RETURNING ` + botPersonaSelectColumns
+	return scanBotPersona(r.pool.QueryRow(
+		ctx,
+		query,
+		id, userID,
+		persona.Name, persona.Description, persona.Category, persona.Visibility, persona.SourceFormat,
+		persona.SystemPrompt, persona.Personality, persona.Scenario, persona.FirstMessage, persona.ExampleDialogue,
+		persona.PostHistoryInstructions, persona.AlternateGreetings, persona.CreatorNotes, persona.Tags,
+		persona.CreatorName, persona.CharacterVersion, emptyRawJSON(persona.ExtensionsJSON), nilIfEmptyRawJSON(persona.CharacterBookJSON), nilIfEmptyRawJSON(persona.RawCardJSON),
+		persona.ImportSourceFilename, persona.AvatarURL, persona.PreviewVideoURL, persona.GalleryURLs, persona.IsNSFW,
+	))
+}
+
+// DeleteOwned soft-deletes a user-owned persona.
+func (r *BotPersonaRepository) DeleteOwned(ctx context.Context, userID, id int) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE bot_personas
+		SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND owner_user_id = $2 AND is_active
+	`, id, userID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// UpdateMedia updates avatar, preview video, and optionally gallery URLs for
+// an admin-curated persona. A nil galleryURLs pointer preserves the existing
+// gallery; a non-nil empty slice clears it.
+func (r *BotPersonaRepository) UpdateMedia(ctx context.Context, id int, avatarURL *string, previewVideoURL *string, galleryURLs *[]string) (*BotPersona, error) {
 	query := `
 		UPDATE bot_personas
 		SET avatar_url = $2,
 		    preview_video_url = $3,
-		    gallery_urls = $4,
+		    gallery_urls = COALESCE($4::text[], gallery_urls),
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = $1
-		RETURNING id, slug, name, description, category, system_prompt, avatar_url, preview_video_url, gallery_urls, is_nsfw, is_active, created_at, updated_at
+		RETURNING ` + botPersonaSelectColumns + `
 	`
 
-	p := &BotPersona{}
-	err := r.pool.QueryRow(ctx, query, id, avatarURL, previewVideoURL, galleryURLs).Scan(
-		&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category,
-		&p.SystemPrompt, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs, &p.IsNSFW, &p.IsActive,
-		&p.CreatedAt, &p.UpdatedAt,
-	)
+	var galleryArg interface{}
+	if galleryURLs != nil {
+		galleryArg = *galleryURLs
+	}
+
+	p, err := scanBotPersona(r.pool.QueryRow(ctx, query, id, avatarURL, previewVideoURL, galleryArg))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -202,6 +420,22 @@ func (r *BotPersonaRepository) UpdateMedia(ctx context.Context, id int, avatarUR
 		return nil, err
 	}
 	return p, nil
+}
+
+func emptyRawJSON(raw json.RawMessage) json.RawMessage {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" {
+		return json.RawMessage(`{}`)
+	}
+	return json.RawMessage(trimmed)
+}
+
+func nilIfEmptyRawJSON(raw json.RawMessage) json.RawMessage {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" {
+		return nil
+	}
+	return json.RawMessage(trimmed)
 }
 
 // BotConversationRepository handles database operations for bot conversations.
@@ -351,10 +585,9 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 			lm.content,
 			c.settings_user_name, c.settings_user_age, c.settings_user_gender,
 			c.created_at, c.last_message_at, c.archived_at,
-			p.id, p.slug, p.name, p.description, p.category, p.system_prompt, p.avatar_url, p.preview_video_url, p.gallery_urls,
-			p.is_nsfw, p.is_active, p.created_at, p.updated_at
+			` + qualifySelectColumns("p", botPersonaSelectColumns) + `
 		FROM bot_conversations c
-		INNER JOIN bot_personas p ON p.id = c.persona_id
+		INNER JOIN bot_personas p ON p.id = c.persona_id AND p.is_active
 		LEFT JOIN LATERAL (
 			SELECT content
 			FROM bot_messages
@@ -382,7 +615,11 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 			&c.LastMessagePreview,
 			&s.UserName, &s.UserAge, &s.UserGender,
 			&c.CreatedAt, &c.LastMessageAt, &c.ArchivedAt,
-			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.SystemPrompt, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs,
+			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.OwnerUserID, &p.Visibility, &p.SourceFormat,
+			&p.SystemPrompt, &p.Personality, &p.Scenario, &p.FirstMessage, &p.ExampleDialogue,
+			&p.PostHistoryInstructions, &p.AlternateGreetings, &p.CreatorNotes, &p.Tags, &p.CreatorName,
+			&p.CharacterVersion, &p.ExtensionsJSON, &p.CharacterBookJSON, &p.RawCardJSON,
+			&p.ImportSourceFilename, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs,
 			&p.IsNSFW, &p.IsActive, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -403,6 +640,7 @@ func (r *BotConversationRepository) ListByUserIDAndPersonaID(ctx context.Context
 		       c.settings_user_name, c.settings_user_age, c.settings_user_gender,
 		       c.created_at, c.last_message_at, c.archived_at
 		FROM bot_conversations c
+		INNER JOIN bot_personas p ON p.id = c.persona_id AND p.is_active
 		LEFT JOIN LATERAL (
 		    SELECT content
 		    FROM bot_messages
@@ -500,10 +738,14 @@ func (r *BotConversationRepository) ForkConversation(ctx context.Context, userID
 	return newConv, nil
 }
 
-// Archive soft-deletes a bot conversation by setting archived_at.
-func (r *BotConversationRepository) Archive(ctx context.Context, conversationID, userID int) error {
-	_, err := r.pool.Exec(ctx, `UPDATE bot_conversations SET archived_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2`, conversationID, userID)
-	return err
+// Archive soft-deletes a bot conversation by setting archived_at. It returns
+// false when no conversation matched the requested id/user ownership pair.
+func (r *BotConversationRepository) Archive(ctx context.Context, conversationID, userID int) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `UPDATE bot_conversations SET archived_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2`, conversationID, userID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 // UpdateLastMessageAt bumps the conversation's last_message_at to now.

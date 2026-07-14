@@ -45,6 +45,7 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 	}
 	publicURL := "/uploads/" + filepath.ToSlash(cleanRelPath)
 	allowUntracked := isUntrackedUploadPathAllowed(cleanRelPath)
+	storagePath := filepath.ToSlash(filepath.Join("uploads", cleanRelPath))
 
 	if h.mediaRepo != nil {
 		media, err := h.mediaRepo.GetByPublicURL(c.Request.Context(), publicURL)
@@ -60,6 +61,13 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 					RespondError(c, http.StatusInternalServerError, "Failed to validate media access")
 					return
 				}
+			}
+		}
+		if media == nil {
+			media, err = h.mediaRepo.FindByStoragePath(c.Request.Context(), storagePath)
+			if err != nil {
+				RespondError(c, http.StatusInternalServerError, "Failed to validate media access")
+				return
 			}
 		}
 		if media == nil {
@@ -103,6 +111,17 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 
 	info, err := os.Stat(absFile)
 	if err != nil || info.IsDir() {
+		if h.mediaRepo != nil {
+			media, lookupErr := h.mediaRepo.FindByStoragePath(c.Request.Context(), storagePath)
+			if lookupErr != nil {
+				RespondError(c, http.StatusInternalServerError, "Failed to validate media access")
+				return
+			}
+			if media != nil && (media.ScanStatus == models.MediaScanStatusClean) && strings.HasPrefix(media.StorageURL, "http") {
+				c.Redirect(http.StatusTemporaryRedirect, media.StorageURL)
+				return
+			}
+		}
 		c.Status(http.StatusNotFound)
 		return
 	}

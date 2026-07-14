@@ -99,7 +99,7 @@ describe('HubAIDesignRenderer', () => {
         within(container).getByRole('button', { name: /\+ Create Post/i })
       ).toBeInTheDocument();
       expect(within(container).getByRole('button', { name: 'Mod Tools' })).toBeInTheDocument();
-      expect(within(container).getByText('Rendered through slot')).toBeInTheDocument();
+      expect(within(container).getByRole('tab', { name: 'Hot' })).toBeInTheDocument();
     });
   });
 

@@ -1187,6 +1187,13 @@ func main() {
 			protected.PATCH("/conversations/:id/settings", conversationsHandler.UpdateChatSettings)
 
 			// OmniChat: AI chat bot personas and conversations
+			protected.GET("/omnichat/my-personas", omniChatHandler.ListMyPersonas)
+			protected.POST("/omnichat/personas", omniChatHandler.CreatePersona)
+			protected.POST("/omnichat/personas/import", omniChatHandler.ImportPersona)
+			protected.GET("/omnichat/personas/:id", omniChatHandler.GetPersonaDefinition)
+			protected.PUT("/omnichat/personas/:id", omniChatHandler.UpdatePersona)
+			protected.DELETE("/omnichat/personas/:id", omniChatHandler.DeletePersona)
+			protected.GET("/omnichat/personas/:id/export", omniChatHandler.ExportPersonaJSON)
 			protected.POST("/omnichat/conversations", omniChatHandler.CreateConversation)
 			protected.GET("/omnichat/conversations", omniChatHandler.ListConversations)
 			protected.GET("/omnichat/conversations/:id", omniChatHandler.GetConversation)

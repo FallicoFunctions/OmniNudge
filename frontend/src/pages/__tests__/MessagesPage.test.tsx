@@ -334,8 +334,8 @@ describe('MessagesPage swipe archive gestures', () => {
 
     fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
 
-    const menuButton = await screen.findByRole('button', { name: 'Message options' });
-    fireEvent.click(menuButton);
+    const menuButtons = await screen.findAllByRole('button', { name: 'Message options' });
+    fireEvent.click(menuButtons[menuButtons.length - 1]);
     fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
 
     const input = screen.getByPlaceholderText('Type a message...');

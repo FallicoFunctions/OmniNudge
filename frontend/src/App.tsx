@@ -39,6 +39,7 @@ const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const OmniChatDiscoverPage = lazy(() => import('./pages/OmniChatDiscoverPage'));
 const OmniChatConversationsPage = lazy(() => import('./pages/OmniChatConversationsPage'));
 const OmniChatPage = lazy(() => import('./pages/OmniChatPage'));
+const OmniChatStudioPage = lazy(() => import('./pages/OmniChatStudioPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const BlockedUsersPage = lazy(() => import('./pages/BlockedUsersPage'));
 const FriendsPage = lazy(() => import('./pages/FriendsPage'));
@@ -232,6 +233,14 @@ function App() {
                             <Route
                               path="/omnichat/c/:conversationId"
                               element={<OmniChatPage />}
+                            />
+                            <Route
+                              path="/omnichat/studio"
+                              element={
+                                <ProtectedRoute>
+                                  <OmniChatStudioPage />
+                                </ProtectedRoute>
+                              }
                             />
                             <Route
                               path="/settings"
