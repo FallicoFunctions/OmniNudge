@@ -25,8 +25,16 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
 const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
   /V30_VipShellFascia/,
   /V40_ApproachLightCore/,
+  /V63_BasinWaterParterre/,
+  /V64_Promenade(CyanThread|GoldInlay|PearlRibbon)/,
   /V68_PortalArcadeShadowCore/,
+  /V90_BasinStoneCopingArray/,
+  /V99_Basin(ParapetRelief|RetainingWall)/,
   /V118_BasinWallRelief/,
+  /V121_Basin(BridgeRelief|RetainingRelief)/,
+  /V123_(CentralStairGoldNosingArray|SpawnRouteGoldEdgeArray|SpawnRouteWetCenterInlayArray)/,
+  /V124_CrowdControl(FrameArray|RailArray)/,
+  /V125_CrowdBarrier(BaseArray|RailArray)/,
   /V133_VipTerraceGoldArray/,
 ];
 
@@ -37,7 +45,13 @@ const BILATERAL_SOURCE_BLOCKER_RULES: readonly {
   { pattern: /V30_VipShellFascia/, innerClearanceX: 17.3 },
   { pattern: /V40_ApproachLightCore/, innerClearanceX: 11.75 },
   { pattern: /V68_PortalArcadeShadowCore/, innerClearanceX: 8.35 },
+  { pattern: /V90_BasinStoneCopingArray/, innerClearanceX: 5.1 },
+  { pattern: /V99_Basin(ParapetRelief|RetainingWall)/, innerClearanceX: 8.3 },
   { pattern: /V118_BasinWallRelief/, innerClearanceX: 6.2 },
+  { pattern: /V121_BasinRetainingRelief/, innerClearanceX: 4.3 },
+  { pattern: /V123_SpawnRouteGoldEdgeArray/, innerClearanceX: 4.6 },
+  { pattern: /V124_CrowdControl(FrameArray|RailArray)/, innerClearanceX: 17.8 },
+  { pattern: /V125_CrowdBarrier(BaseArray|RailArray)/, innerClearanceX: 12.6 },
   { pattern: /V133_VipTerraceGoldArray/, innerClearanceX: 18.3 },
 ];
 
