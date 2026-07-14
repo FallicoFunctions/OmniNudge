@@ -25,8 +25,6 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
 const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
   /V30_VipShellFascia/,
   /V40_ApproachLightCore/,
-  /V63_BasinWaterParterre/,
-  /V64_Promenade(CyanThread|GoldInlay|PearlRibbon)/,
   /V68_PortalArcadeShadowCore/,
   /V90_BasinStoneCopingArray/,
   /V99_Basin(ParapetRelief|RetainingWall)/,
