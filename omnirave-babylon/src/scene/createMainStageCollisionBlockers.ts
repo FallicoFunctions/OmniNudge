@@ -29,7 +29,11 @@ const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
   /V90_BasinStoneCopingArray/,
   /V99_Basin(ParapetRelief|RetainingWall)/,
   /V118_BasinWallRelief/,
-  /V121_Basin(BridgeRelief|RetainingRelief)/,
+  // BridgeRelief deliberately absent: those are knee-high walkway trim bands
+  // ON the causeway (z 0.43-0.87 and crown inlay) - a blocker built from
+  // their merged bounds walled off the center promenade and made the first
+  // route objective unreachable.
+  /V121_BasinRetainingRelief/,
   /V124_CrowdControl(FrameArray|RailArray)/,
   /V125_CrowdBarrier(BaseArray|RailArray)/,
   /V133_VipTerraceGoldArray/,
@@ -43,7 +47,11 @@ const BILATERAL_SOURCE_BLOCKER_RULES: readonly {
   { pattern: /V40_ApproachLightCore/, innerClearanceX: 11.75 },
   { pattern: /V68_PortalArcadeShadowCore/, innerClearanceX: 8.35 },
   { pattern: /V90_BasinStoneCopingArray/, innerClearanceX: 5.1 },
-  { pattern: /V99_Basin(ParapetRelief|RetainingWall)/, innerClearanceX: 8.3 },
+  { pattern: /V99_BasinParapetRelief/, innerClearanceX: 8.3 },
+  // The retaining walls sit closer to the center (x +/-5.7..7.1) than the
+  // parapets: with the parapet clearance the split never fired and the
+  // merged-bounds blocker bridged the walkway (player froze at z -37.9).
+  { pattern: /V99_BasinRetainingWall/, innerClearanceX: 5.6 },
   { pattern: /V118_BasinWallRelief/, innerClearanceX: 6.2 },
   { pattern: /V121_BasinRetainingRelief/, innerClearanceX: 4.3 },
   { pattern: /V124_CrowdControl(FrameArray|RailArray)/, innerClearanceX: 17.8 },
