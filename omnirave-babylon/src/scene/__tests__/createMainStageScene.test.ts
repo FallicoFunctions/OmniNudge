@@ -265,6 +265,41 @@ describe('createMainStageScene', () => {
     expect(sourceBlockers.every((mesh) => mesh.getBoundingInfo().boundingBox.minimumWorld.z < -38)).toBe(true);
   });
 
+  it('splits the merged basin retaining walls so the center promenade stays open', async () => {
+    // Regression: the retaining walls hug the walkway closer (x +/-5.7..7.1)
+    // than the parapets, so the parapet clearance never split them and the
+    // merged-bounds blocker froze the avatar at z -37.9 on the way to the
+    // first route objective.
+    engine = new NullEngine();
+    const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(
+      (scene, assets) => {
+        const retainingWalls = MeshBuilder.CreateBox(
+          'merged:V99_BasinRetainingWall+1',
+          { width: 14.2, height: 2.3, depth: 57.3 },
+          scene,
+        );
+        retainingWalls.position.set(0, 1.1, -9.25);
+        assets.mainMeshes.push(retainingWalls);
+      },
+    );
+
+    await createMainStageScene(engine);
+    const sourceBlockers = stageAssets.solidCollisionMeshes.filter(
+      (mesh) => mesh.metadata?.sourceMeshName === 'merged:V99_BasinRetainingWall+1',
+    );
+
+    expect(sourceBlockers).toHaveLength(2);
+    expect(sourceBlockers.map((mesh) => mesh.metadata?.blockerSide)).toEqual(
+      expect.arrayContaining(['left', 'right']),
+    );
+    expect(
+      sourceBlockers.some((mesh) => {
+        const bounds = mesh.getBoundingInfo().boundingBox;
+        return bounds.minimumWorld.x <= 0 && bounds.maximumWorld.x >= 0;
+      }),
+    ).toBe(false);
+  });
+
   it('leaves the foreground approach deck open between merged side-pair blockers', async () => {
     engine = new NullEngine();
     const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(
@@ -355,7 +390,6 @@ describe('createMainStageScene', () => {
       expect.arrayContaining([
         'merged:V99_BasinParapetRelief+1',
         'merged:V90_BasinStoneCopingArray+1',
-        'merged:V121_BasinBridgeRelief_North+2',
         'V124_CrowdControlRailArray_L',
         'V125_CrowdBarrierRailArray_R',
       ]),
@@ -363,6 +397,9 @@ describe('createMainStageScene', () => {
     expect(blockerSourceNames).not.toContain('V63_BasinWaterParterre');
     expect(blockerSourceNames).not.toContain('V64_PromenadeCyanThread');
     expect(blockerSourceNames).not.toContain('V123_CentralStairGoldNosingArray');
+    // bridge reliefs are knee-high causeway trim the avatar steps over; a
+    // merged-bounds blocker here walled off the center promenade
+    expect(blockerSourceNames).not.toContain('merged:V121_BasinBridgeRelief_North+2');
     expect(
       stageAssets.solidCollisionMeshes.filter(
         (mesh) => mesh.metadata?.sourceMeshName === 'merged:V99_BasinParapetRelief+1',
