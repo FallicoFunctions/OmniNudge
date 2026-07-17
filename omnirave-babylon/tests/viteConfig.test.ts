@@ -22,8 +22,9 @@ describe('vite config', () => {
     expect(configSource).toContain('chunkSizeWarningLimit: 2300');
     expect(bootstrapSource).not.toContain("import { createRuntime } from './createRuntime'");
     expect(bootstrapSource).toContain("import('./createRuntime')");
-    expect(avatarSource).not.toContain("@babylonjs/loaders/glTF'");
-    expect(avatarSource).toContain("@babylonjs/loaders/glTF/2.0/glTFLoader.js");
+    // The festival avatar is fully procedural (MeshBuilder + colorways);
+    // it must not pull any glTF loader into the eager chunk at all.
+    expect(avatarSource).not.toContain('@babylonjs/loaders');
     expect(runtimeSource).not.toContain("import { createMainStageScene } from '../scene/createMainStageScene'");
     expect(runtimeSource).toContain("import('../scene/createMainStageScene')");
   });
