@@ -12,8 +12,10 @@ var (
 	ErrForbidden    = errors.New("forbidden")
 
 	// Resource
-	ErrNotFound      = errors.New("resource not found")
-	ErrAlreadyExists = errors.New("resource already exists")
+	ErrNotFound                = errors.New("resource not found")
+	ErrAlreadyExists           = errors.New("resource already exists")
+	ErrMessageNotRegeneratable = errors.New("message cannot be regenerated")
+	ErrMessageNotEditable      = errors.New("message cannot be edited")
 
 	// Validation
 	ErrInvalidInput     = errors.New("invalid input")

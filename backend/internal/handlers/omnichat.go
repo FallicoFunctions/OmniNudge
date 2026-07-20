@@ -188,6 +188,39 @@ func (h *OmniChatHandler) DeleteConversation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "conversation archived"})
 }
 
+// DeletePersonaConversations soft-deletes every active conversation the user
+// has with one OmniChat persona.
+func (h *OmniChatHandler) DeletePersonaConversations(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	personaID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid persona id")
+		return
+	}
+
+	persona, err := h.personaRepo.GetAccessibleByID(c.Request.Context(), personaID, &userID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load persona")
+		return
+	}
+	if persona == nil {
+		RespondError(c, http.StatusNotFound, "Persona not found")
+		return
+	}
+
+	archivedCount, err := h.convRepo.ArchiveByUserAndPersonaID(c.Request.Context(), userID, personaID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to archive conversations")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "conversations archived", "archived_count": archivedCount})
+}
+
 // OmniChatUpdateSettingsRequest is the request body for updating conversation settings.
 type OmniChatUpdateSettingsRequest struct {
 	Settings models.ConversationSettings `json:"settings" binding:"required"`
@@ -320,6 +353,22 @@ func (h *OmniChatHandler) GetConversation(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to load messages")
 		return
 	}
+	if repaired, err := h.messageRepo.RepairStaleDanglingUserTurn(
+		c.Request.Context(),
+		conversationID,
+		services.StaleDanglingOmniChatTurnAfter,
+		services.InterruptedOmniChatReply,
+	); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to repair interrupted message")
+		return
+	} else if repaired != nil {
+		_ = h.convRepo.UpdateLastMessageAt(c.Request.Context(), conversationID)
+		messages, err = h.messageRepo.ListByConversationID(c.Request.Context(), conversationID, 200)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to load messages")
+			return
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{"conversation": conversation, "messages": messages})
 }
@@ -372,6 +421,89 @@ func (h *OmniChatHandler) SendMessage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, assistantMsg)
+}
+
+// RegenerateMessage replaces the latest assistant reply with a newly
+// generated version. The service preserves the original reply on failure.
+func (h *OmniChatHandler) RegenerateMessage(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || conversationID <= 0 {
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
+		return
+	}
+	messageID, err := strconv.Atoi(c.Param("message_id"))
+	if err != nil || messageID <= 0 {
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
+		return
+	}
+
+	message, err := h.chatbotService.RegenerateMessage(
+		c.Request.Context(),
+		userID,
+		conversationID,
+		messageID,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrNotFound):
+			RespondError(c, http.StatusNotFound, "Conversation not found")
+		case errors.Is(err, services.ErrMessageNotRegeneratable):
+			RespondError(c, http.StatusConflict, "Only the latest assistant reply can be regenerated")
+		default:
+			RespondError(c, http.StatusBadGateway, "Failed to regenerate reply")
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, message)
+}
+
+type editAssistantMessageRequest struct {
+	Content string `json:"content" binding:"required"`
+}
+
+// EditAssistantMessage lets a user correct the latest assistant reply in an
+// owned conversation. The previous text is retained in private edit history.
+func (h *OmniChatHandler) EditAssistantMessage(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || conversationID <= 0 {
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
+		return
+	}
+	messageID, err := strconv.Atoi(c.Param("message_id"))
+	if err != nil || messageID <= 0 {
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
+		return
+	}
+	var req editAssistantMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Message content is required")
+		return
+	}
+	content, err := normalizeOmniChatContent(req.Content)
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	message, err := h.chatbotService.EditAssistantMessage(c.Request.Context(), userID, conversationID, messageID, content)
+	if err != nil {
+		if errors.Is(err, services.ErrMessageNotEditable) {
+			RespondError(c, http.StatusConflict, "Only the latest assistant reply can be edited")
+			return
+		}
+		RespondError(c, http.StatusInternalServerError, "Failed to edit reply")
+		return
+	}
+	c.JSON(http.StatusOK, message)
 }
 
 // anonymousMessage is a single turn sent by the frontend in an anonymous

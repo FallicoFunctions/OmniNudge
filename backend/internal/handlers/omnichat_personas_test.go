@@ -47,7 +47,7 @@ func setupOmniChatPersonaTestEnv(t *testing.T) (*gin.Engine, *models.UserReposit
 	omnichat := router.Group("/api/v1/omnichat")
 	{
 		omnichat.GET("/personas", handler.ListPersonas)
-	omnichat.GET("/my-personas", handler.ListMyPersonas)
+		omnichat.GET("/my-personas", handler.ListMyPersonas)
 		omnichat.POST("/personas", handler.CreatePersona)
 		omnichat.POST("/personas/import", handler.ImportPersona)
 		omnichat.GET("/personas/:id", handler.GetPersonaDefinition)
@@ -72,6 +72,19 @@ func createOmniChatPersonaTestUser(t *testing.T, repo *models.UserRepository, us
 	}
 	require.NoError(t, repo.Create(context.Background(), user))
 	return user
+}
+
+func TestNormalizeResponseStyleProfileDefaultsBySource(t *testing.T) {
+	native, err := normalizeResponseStyleProfile("", nil, "native")
+	require.NoError(t, err)
+	require.Equal(t, models.ResponseStyleProfileInherit, native)
+
+	imported, err := normalizeResponseStyleProfile("", nil, "chara_card_v2")
+	require.NoError(t, err)
+	require.Equal(t, models.ResponseStyleProfileCharacterOnly, imported)
+
+	_, err = normalizeResponseStyleProfile("performative_human", nil, "native")
+	require.EqualError(t, err, "response style profile is invalid")
 }
 
 func seedPublicOmniChatPersona(t *testing.T, pool *pgxpool.Pool, repo *models.BotPersonaRepository, slug, name string) *models.BotPersona {
@@ -133,10 +146,11 @@ func TestOmniChatPersonaHandler_CreatePersonaForcesPrivateAndListsOwned(t *testi
 
 	var createdResp struct {
 		Persona struct {
-			ID          int    `json:"id"`
-			OwnerUserID *int   `json:"owner_user_id"`
-			Visibility  string `json:"visibility"`
-			Name        string `json:"name"`
+			ID                   int    `json:"id"`
+			OwnerUserID          *int   `json:"owner_user_id"`
+			Visibility           string `json:"visibility"`
+			Name                 string `json:"name"`
+			ResponseStyleProfile string `json:"response_style_profile"`
 		} `json:"persona"`
 	}
 	require.NoError(t, json.Unmarshal(createW.Body.Bytes(), &createdResp))
@@ -144,6 +158,7 @@ func TestOmniChatPersonaHandler_CreatePersonaForcesPrivateAndListsOwned(t *testi
 	require.Equal(t, "private", createdResp.Persona.Visibility)
 	require.NotNil(t, createdResp.Persona.OwnerUserID)
 	require.Equal(t, owner.ID, *createdResp.Persona.OwnerUserID)
+	require.Equal(t, models.ResponseStyleProfileInherit, createdResp.Persona.ResponseStyleProfile)
 
 	myReq, _ := http.NewRequest(http.MethodGet, "/api/v1/omnichat/my-personas", nil)
 	setOmniChatPersonaTestUser(myReq, owner.ID)
@@ -238,10 +253,11 @@ func TestOmniChatPersonaHandler_ImportPersonaOwnerOnlyAccess(t *testing.T) {
 
 	var importResp struct {
 		Persona struct {
-			ID          int    `json:"id"`
-			Name        string `json:"name"`
-			Visibility  string `json:"visibility"`
-			OwnerUserID *int   `json:"owner_user_id"`
+			ID                   int    `json:"id"`
+			Name                 string `json:"name"`
+			Visibility           string `json:"visibility"`
+			OwnerUserID          *int   `json:"owner_user_id"`
+			ResponseStyleProfile string `json:"response_style_profile"`
 		} `json:"persona"`
 	}
 	require.NoError(t, json.Unmarshal(importW.Body.Bytes(), &importResp))
@@ -249,6 +265,7 @@ func TestOmniChatPersonaHandler_ImportPersonaOwnerOnlyAccess(t *testing.T) {
 	require.Equal(t, "private", importResp.Persona.Visibility)
 	require.NotNil(t, importResp.Persona.OwnerUserID)
 	require.Equal(t, owner.ID, *importResp.Persona.OwnerUserID)
+	require.Equal(t, models.ResponseStyleProfileCharacterOnly, importResp.Persona.ResponseStyleProfile)
 
 	ownerReq, _ := http.NewRequest(http.MethodGet, "/api/v1/omnichat/personas/"+strconv.Itoa(importResp.Persona.ID), nil)
 	setOmniChatPersonaTestUser(ownerReq, owner.ID)

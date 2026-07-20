@@ -1194,6 +1194,7 @@ func main() {
 			protected.PUT("/omnichat/personas/:id", omniChatHandler.UpdatePersona)
 			protected.DELETE("/omnichat/personas/:id", omniChatHandler.DeletePersona)
 			protected.GET("/omnichat/personas/:id/export", omniChatHandler.ExportPersonaJSON)
+			protected.DELETE("/omnichat/personas/:id/conversations", omniChatHandler.DeletePersonaConversations)
 			protected.POST("/omnichat/conversations", omniChatHandler.CreateConversation)
 			protected.GET("/omnichat/conversations", omniChatHandler.ListConversations)
 			protected.GET("/omnichat/conversations/:id", omniChatHandler.GetConversation)
@@ -1201,6 +1202,8 @@ func main() {
 			protected.POST("/omnichat/conversations/:id/fork", omniChatHandler.ForkConversation)
 			protected.DELETE("/omnichat/conversations/:id", omniChatHandler.DeleteConversation)
 			protected.POST("/omnichat/conversations/:id/messages", omniChatRateLimiter.Middleware(), omniChatHandler.SendMessage)
+			protected.POST("/omnichat/conversations/:id/messages/:message_id/regenerate", omniChatRateLimiter.Middleware(), omniChatHandler.RegenerateMessage)
+			protected.PATCH("/omnichat/conversations/:id/messages/:message_id", omniChatRateLimiter.Middleware(), omniChatHandler.EditAssistantMessage)
 
 			protected.POST("/folders", foldersHandler.CreateFolder)
 			protected.GET("/folders", foldersHandler.ListFolders)

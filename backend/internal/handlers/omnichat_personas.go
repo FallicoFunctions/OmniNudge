@@ -41,6 +41,7 @@ type personaDefinitionRequest struct {
 	Scenario                string          `json:"scenario"`
 	FirstMessage            string          `json:"first_message"`
 	ExampleDialogue         string          `json:"example_dialogue"`
+	ResponseStyleProfile    string          `json:"response_style_profile"`
 	PostHistoryInstructions string          `json:"post_history_instructions"`
 	AlternateGreetings      []string        `json:"alternate_greetings"`
 	CreatorNotes            string          `json:"creator_notes"`
@@ -69,6 +70,7 @@ type personaDefinitionResponse struct {
 	Scenario                string          `json:"scenario"`
 	FirstMessage            string          `json:"first_message"`
 	ExampleDialogue         string          `json:"example_dialogue"`
+	ResponseStyleProfile    string          `json:"response_style_profile"`
 	PostHistoryInstructions string          `json:"post_history_instructions"`
 	AlternateGreetings      []string        `json:"alternate_greetings"`
 	CreatorNotes            string          `json:"creator_notes"`
@@ -266,6 +268,7 @@ func (h *OmniChatHandler) ImportPersona(c *gin.Context) {
 		Scenario:                card.Scenario,
 		FirstMessage:            card.FirstMessage,
 		ExampleDialogue:         card.ExampleDialogue,
+		ResponseStyleProfile:    models.ResponseStyleProfileCharacterOnly,
 		PostHistoryInstructions: card.PostHistoryInstructions,
 		AlternateGreetings:      card.AlternateGreetings,
 		CreatorNotes:            card.CreatorNotes,
@@ -366,6 +369,7 @@ func buildPersonaDefinitionResponse(persona *models.BotPersona) personaDefinitio
 		Scenario:                persona.Scenario,
 		FirstMessage:            persona.FirstMessage,
 		ExampleDialogue:         persona.ExampleDialogue,
+		ResponseStyleProfile:    persona.ResponseStyleProfile,
 		PostHistoryInstructions: persona.PostHistoryInstructions,
 		AlternateGreetings:      cloneStrings(persona.AlternateGreetings),
 		CreatorNotes:            persona.CreatorNotes,
@@ -430,6 +434,10 @@ func normalizePersonaDefinitionRequest(userID int, existing *models.BotPersona, 
 	if err != nil {
 		return nil, fmt.Errorf("character version is too long")
 	}
+	responseStyleProfile, err := normalizeResponseStyleProfile(req.ResponseStyleProfile, existing, sourceFormat)
+	if err != nil {
+		return nil, err
+	}
 
 	category := strings.TrimSpace(req.Category)
 	if !isValidPersonaCategory(category) {
@@ -490,6 +498,7 @@ func normalizePersonaDefinitionRequest(userID int, existing *models.BotPersona, 
 		Scenario:                scenario,
 		FirstMessage:            firstMessage,
 		ExampleDialogue:         exampleDialogue,
+		ResponseStyleProfile:    responseStyleProfile,
 		PostHistoryInstructions: postHistoryInstructions,
 		AlternateGreetings:      alternateGreetings,
 		CreatorNotes:            creatorNotes,
@@ -508,6 +517,30 @@ func normalizePersonaDefinitionRequest(userID int, existing *models.BotPersona, 
 		persona.Description = &description
 	}
 	return persona, nil
+}
+
+func normalizeResponseStyleProfile(raw string, existing *models.BotPersona, sourceFormat string) (string, error) {
+	profile := strings.TrimSpace(raw)
+	if profile == "" {
+		if existing != nil && existing.ResponseStyleProfile != "" {
+			return existing.ResponseStyleProfile, nil
+		}
+		if sourceFormat != "" && sourceFormat != "native" {
+			return models.ResponseStyleProfileCharacterOnly, nil
+		}
+		return models.ResponseStyleProfileInherit, nil
+	}
+
+	switch profile {
+	case models.ResponseStyleProfileInherit,
+		models.ResponseStyleProfileNaturalDialogue,
+		models.ResponseStyleProfileLeanNarrative,
+		models.ResponseStyleProfileProfessional,
+		models.ResponseStyleProfileCharacterOnly:
+		return profile, nil
+	default:
+		return "", fmt.Errorf("response style profile is invalid")
+	}
 }
 
 func normalizePersonaField(value string, maxRunes int, required bool) (string, error) {
