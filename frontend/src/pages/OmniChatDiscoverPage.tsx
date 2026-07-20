@@ -516,6 +516,7 @@ export default function OmniChatDiscoverPage() {
         onClose={() => setSearchOverlayOpen(false)}
         personas={personas}
         onSelectPersona={handleSelect}
+        restoreFocusRef={searchReturnRef}
       />
       <QuickChatDialog
         isOpen={Boolean(quickChatPersona)}
@@ -531,7 +532,7 @@ export default function OmniChatDiscoverPage() {
         restoreFocusTo={quickChatFocusReturn}
       />
 
-      <div className="h-[calc(100dvh-72px)] overflow-y-auto scroll-smooth">
+      <div className="h-[calc(100dvh-var(--omnichat-header-offset))] overscroll-y-contain overflow-y-auto scroll-smooth">
         <div className="mx-auto w-full max-w-[1540px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 xl:px-10">
           {heroPersona && (
             <section
@@ -620,7 +621,7 @@ export default function OmniChatDiscoverPage() {
                 <button
                   type="button"
                   onClick={() => navigate('/omnichat/chat')}
-                  className="hidden items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/5 hover:text-white sm:flex"
+                  className="omnichat-touch-target hidden items-center gap-2 rounded-full border border-white/10 px-4 text-xs font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/5 hover:text-white sm:flex"
                 >
                   <MessageCircle size={14} />
                   {t('omnichat.discover.viewChats')}
@@ -712,7 +713,7 @@ export default function OmniChatDiscoverPage() {
                 </div>
                 <Link
                   to="/omnichat/studio"
-                  className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
+                  className="omnichat-touch-target flex items-center gap-2 rounded-full border border-white/10 px-4 text-xs font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
                 >
                   {t('omnichat.discover.manageStudio')} <ArrowRight size={14} />
                 </Link>
@@ -737,7 +738,7 @@ export default function OmniChatDiscoverPage() {
                   searchReturnRef.current = event.currentTarget;
                   setSearchOverlayOpen(true);
                 }}
-                className="flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-4 text-xs font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+                className="omnichat-touch-target flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-4 text-xs font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
               >
                 <SearchIcon size={14} />
                 {t('omnichat.discover.searchAll')}

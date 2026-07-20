@@ -31,9 +31,9 @@ export default function OmniChatHeader({
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 h-[72px] border-b border-white/[0.08] bg-[#090a0f]/80 backdrop-blur-2xl">
-        <div className="flex h-full items-center justify-between px-5 lg:px-6">
-          <Link to="/omnichat" className="group flex items-center text-white">
+      <header className="fixed inset-x-0 top-0 z-40 h-[var(--omnichat-header-offset)] border-b border-white/[0.08] bg-[#090a0f]/80 pt-[var(--omnichat-safe-top)] backdrop-blur-2xl">
+        <div className="flex h-[var(--omnichat-header-height)] items-center justify-between px-5 lg:px-6">
+          <Link to="/omnichat" className="omnichat-touch-target group flex items-center text-white">
             <span>
               <span className="block text-[1.2rem] font-bold leading-none tracking-[-0.035em] sm:text-[1.28rem]">OmniChat</span>
               <span className="mt-1 hidden text-[9px] font-semibold uppercase tracking-[0.22em] text-white/35 sm:block">Stories that answer back</span>
@@ -46,7 +46,7 @@ export default function OmniChatHeader({
                 <button
                   type="button"
                   onClick={() => setMenuOpen((open) => !open)}
-                  className="flex h-10 items-center gap-2.5 rounded-[18px] border border-white/10 bg-white/[0.055] px-3 text-white shadow-[0_8px_24px_rgba(0,0,0,0.16)] transition hover:border-white/20 hover:bg-white/10"
+                  className="omnichat-touch-target flex items-center gap-2.5 rounded-[18px] border border-white/10 bg-white/[0.055] px-3 text-white shadow-[0_8px_24px_rgba(0,0,0,0.16)] transition hover:border-white/20 hover:bg-white/10"
                 >
                   <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[var(--color-primary)]/20 text-[11px] font-semibold text-[var(--color-primary-light)]">
                     {initials}
@@ -60,7 +60,7 @@ export default function OmniChatHeader({
                 <button
                   type="button"
                   onClick={onSignIn}
-                  className="flex h-10 items-center gap-2.5 rounded-[18px] border border-white/10 bg-white/[0.055] px-3 text-white transition hover:border-white/20 hover:bg-white/10"
+                  className="omnichat-touch-target flex items-center gap-2.5 rounded-[18px] border border-white/10 bg-white/[0.055] px-3 text-white transition hover:border-white/20 hover:bg-white/10"
                 >
                   <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[var(--color-primary)]/20 text-[11px] font-semibold text-[var(--color-primary-light)]">
                     <UserRound size={16} />
@@ -102,7 +102,7 @@ export default function OmniChatHeader({
 
             <Link
               to="/"
-              className="group flex h-10 items-center gap-1.5 rounded-[18px] border border-white/10 bg-white/[0.035] px-3.5 text-sm font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+              className="omnichat-touch-target group flex items-center gap-1.5 rounded-[18px] border border-white/10 bg-white/[0.035] px-3.5 text-sm font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
             >
               <span className="hidden sm:inline">{t('omnichat.exitToSite')}</span>
               <ArrowUpRight size={15} className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />

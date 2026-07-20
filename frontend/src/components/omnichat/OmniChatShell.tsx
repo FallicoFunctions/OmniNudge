@@ -14,7 +14,6 @@ import OmniChatSidebar, { type SidebarTab } from './OmniChatSidebar';
 
 const DESKTOP_EXPANDED_WIDTH = 223;
 const DESKTOP_COLLAPSED_WIDTH = 72;
-const HEADER_HEIGHT = 72;
 const SIDEBAR_COLLAPSED_KEY = 'omnichat_sidebar_collapsed';
 const AUTO_COLLAPSE_QUERY = '(min-width: 1024px) and (max-width: 1359px)';
 
@@ -99,7 +98,7 @@ export default function OmniChatShell({
           }}
         />
 
-        <div className="fixed left-0 z-30" style={{ top: HEADER_HEIGHT, bottom: 0 }}>
+        <div className="fixed bottom-0 left-0 top-[var(--omnichat-header-offset)] z-30">
           <OmniChatSidebar
             activeTab={activeTab}
             onTabChange={onTabChange}
@@ -120,11 +119,10 @@ export default function OmniChatShell({
         </div>
 
         <main
-          id="main-content"
           className="relative z-10 px-0 transition-[padding] duration-300 lg:pl-[var(--omnichat-sidebar-width)]"
           style={
             {
-              paddingTop: HEADER_HEIGHT,
+              paddingTop: 'var(--omnichat-header-offset)',
               ['--omnichat-sidebar-width' as string]: `${sidebarWidth}px`,
             } as CSSProperties
           }
@@ -132,8 +130,11 @@ export default function OmniChatShell({
           {children}
         </main>
 
-        {!isAuthenticated && (
-          <div className="fixed bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-full border border-white/10 bg-[#16161b]/95 px-4 py-2 text-xs text-white/60 shadow-xl lg:hidden">
+        {!isAuthenticated && activeTab !== 'chat' && (
+          <div
+            data-testid="omnichat-guest-save-prompt"
+            className="fixed bottom-[max(1rem,var(--omnichat-safe-bottom))] left-1/2 z-30 -translate-x-1/2 rounded-full border border-white/10 bg-[#16161b]/95 px-4 py-2 text-xs text-white/60 shadow-xl lg:hidden"
+          >
             {t('omnichat.chat.signInPrompt')}
           </div>
         )}

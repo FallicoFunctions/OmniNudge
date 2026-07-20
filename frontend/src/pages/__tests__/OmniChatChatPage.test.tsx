@@ -191,6 +191,7 @@ describe('OmniChatChatPage', () => {
     renderPage('/omnichat/c/guest?persona=9');
 
     expect((await screen.findAllByText(/The fire gutters/)).length).toBeGreaterThan(0);
+    expect(screen.getByText('Sign in to save your chat')).toBeInTheDocument();
   });
 
   it('collapses the right profile pane fully and reopens it from the chat header', async () => {
@@ -704,8 +705,13 @@ describe('OmniChatChatPage', () => {
     renderPage();
 
     const deleteButton = await screen.findByRole('button', { name: 'Delete chat history' });
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     fireEvent.click(deleteButton);
-    fireEvent.click(await screen.findByRole('button', { name: 'This chat' }));
+    const cancelButton = await screen.findByRole('button', { name: 'Cancel' });
+    expect(cancelButton).toHaveFocus();
+    expect(cancelButton).toHaveClass('omnichat-touch-target');
+    fireEvent.click(screen.getByRole('button', { name: 'This chat' }));
+    expect(await screen.findByRole('button', { name: 'Back' })).toHaveFocus();
     fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(mockDeleteConversation).toHaveBeenCalledWith(42));

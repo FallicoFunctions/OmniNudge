@@ -4026,7 +4026,9 @@
       "historyLoadError": "Failed to load chat history",
       "emptyWorkspace": "No active chat yet",
       "profile": "Profile",
-      "gallery": "Gallery"
+      "gallery": "Gallery",
+      "showProfileImage": "Show profile image",
+      "showProfileVideo": "Show profile video"
     },
     "exitToSite": "Exit to OmniNudge",
     "header": {
@@ -4040,6 +4042,8 @@
       "chat": "Chat",
       "studio": "Studio",
       "searchPlaceholder": "Search personas...",
+      "clearSearch": "Clear search",
+      "closeSearch": "Close search",
       "noResults": "No results found",
       "collapse": "Collapse sidebar",
       "expand": "Expand sidebar",
