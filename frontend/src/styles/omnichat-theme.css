@@ -6,17 +6,19 @@
    without any component-level changes. */
 
 :root {
-  --oc-bg: #0f0f12;
-  --oc-surface: #1a1a1f;
-  --oc-surface-elevated: #232329;
-  --oc-surface-hover: #222228;
-  --oc-text-primary: #f5f5f7;
-  --oc-text-secondary: #a1a1aa;
-  --oc-text-muted: #71717a;
-  --oc-border: #2a2a30;
-  --oc-border-hover: #38383f;
-  --oc-primary: #3b82f6;
-  --oc-primary-dark: #2563eb;
+  --oc-bg: #090a0f;
+  --oc-surface: #12131a;
+  --oc-surface-elevated: #1b1c25;
+  --oc-surface-hover: #20212b;
+  --oc-text-primary: #f7f7fb;
+  --oc-text-secondary: #b1b1bd;
+  --oc-text-muted: #777785;
+  --oc-border: #292a35;
+  --oc-border-hover: #40414f;
+  --oc-primary: #8b5cf6;
+  --oc-primary-dark: #7c3aed;
+  --oc-accent: #fb7185;
+  --oc-mint: #5eead4;
 }
 
 .omnichat-theme {
@@ -33,6 +35,46 @@
   --color-text-muted: var(--oc-text-muted);
   --color-border: var(--oc-border);
   --color-border-hover: var(--oc-border-hover);
-  background-color: var(--oc-bg);
+  background:
+    radial-gradient(circle at 72% -10%, rgba(139, 92, 246, 0.16), transparent 34rem),
+    radial-gradient(circle at 22% 36%, rgba(251, 113, 133, 0.07), transparent 28rem),
+    var(--oc-bg);
   color-scheme: dark;
+  isolation: isolate;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.omnichat-theme ::selection {
+  background: rgba(139, 92, 246, 0.42);
+  color: white;
+}
+
+.omnichat-theme .omnichat-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.92' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+  opacity: 0.025;
+}
+
+@keyframes omnichat-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -8px, 0); }
+}
+
+@keyframes omnichat-pulse {
+  0%, 100% { opacity: 0.65; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+.omnichat-float {
+  animation: omnichat-float 7s ease-in-out infinite;
+}
+
+.omnichat-live-dot {
+  animation: omnichat-pulse 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .omnichat-float,
+  .omnichat-live-dot {
+    animation: none;
+  }
 }

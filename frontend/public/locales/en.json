@@ -3943,8 +3943,24 @@
       "startError": "Unable to start that chat. Try again.",
       "empty": "No personas in this category yet.",
       "startingChat": "Starting chat...",
-      "continueChatting": "Continue Chatting",
-      "conversationsLoadError": "Unable to load your conversations."
+    "continueChatting": "Continue Chatting",
+    "conversationsLoadError": "Unable to load your conversations.",
+    "heroEyebrow": "Featured world",
+    "heroTitle": "Step into a story that answers back.",
+    "heroDescription": "Meet vivid characters, shape the scene, and take every conversation somewhere unexpected.",
+    "enterPersona": "Enter {{name}}",
+    "searchCharacters": "Search characters",
+    "spotlight": "Spotlight: {{name}} · {{category}}",
+    "continueEyebrow": "Pick up where you left off",
+    "viewChats": "View chats",
+    "createOrImport": "Create or Import Character",
+    "privateCollection": "Your private collection",
+    "myCharacters": "My Characters",
+    "manageStudio": "Manage Studio",
+    "exploreEyebrow": "Every genre. Your direction.",
+    "exploreTitle": "Explore characters",
+    "searchAll": "Search all",
+    "categoryAria": "Character categories"
     },
     "chat": {
       "invalidConversation": "This conversation could not be found.",
@@ -3959,6 +3975,13 @@
       "inputPlaceholder": "Say or do something...",
       "send": "Send message",
       "rateLimited": "You're moving too fast — please wait a moment before sending another message.",
+      "regenerateResponse": "Regenerate response",
+      "regenerationFailed": "Couldn't regenerate this response. The original was kept.",
+      "editResponse": "Edit response",
+      "saveEdit": "Save",
+      "cancelEdit": "Cancel",
+      "editLearningHint": "Future replies in this chat will use your edited version.",
+      "editFailed": "Couldn't save this edit. Your draft was kept.",
       "settings": "Chat settings",
       "settingsName": "Name",
       "settingsAge": "Age",
@@ -4054,6 +4077,9 @@
         "scenario": "Scenario",
         "openingMessage": "Opening Message",
         "exampleDialogue": "Example Dialogue",
+        "exampleDialoguePlaceholder": "<START>\n{{userMarker}}: I have an idea.\n{{charMarker}}: Let's hear it.",
+        "exampleDialogueHelp": "Use {{charMarker}} for the character and {{userMarker}} for the user. Add <START> between separate example conversations.",
+        "responseStyle": "Response Style",
         "systemPrompt": "System Prompt Override",
         "systemPromptPlaceholder": "Leave empty to use OmniChat's structured character prompt.",
         "postHistoryInstructions": "Post-History Instructions",
@@ -4070,6 +4096,28 @@
         "galleryUrlsPlaceholder": "One uploaded image per line",
         "characterBookJson": "Character Book JSON",
         "extensionsJson": "Extensions JSON"
+      },
+      "responseStyles": {
+        "inherit": {
+          "label": "Use OmniChat default",
+          "description": "Follows OmniChat's current global conversation style."
+        },
+        "natural_dialogue": {
+          "label": "Natural dialogue",
+          "description": "Direct, varied conversation without automatic validation or a forced question at the end."
+        },
+        "lean_narrative": {
+          "label": "Lean narrative / game",
+          "description": "Concise narration that ends with a playable situation, decision, or useful prompt."
+        },
+        "professional": {
+          "label": "Professional",
+          "description": "Warm and precise, with a focused question only when it genuinely helps."
+        },
+        "character_only": {
+          "label": "Character instructions only",
+          "description": "Applies no OmniChat response-style layer. Useful for imported cards with their own style."
+        }
       },
       "uploadingField": "Uploading {{field}}...",
       "dangerZone": {

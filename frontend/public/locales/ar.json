@@ -3943,8 +3943,24 @@
       "startError": "تعذّر بدء هذه المحادثة. حاول مرة أخرى.",
       "empty": "لا توجد شخصيات في هذه الفئة بعد.",
       "startingChat": "جارٍ بدء المحادثة...",
-      "continueChatting": "متابعة المحادثة",
-      "conversationsLoadError": "تعذّر تحميل محادثاتك."
+    "continueChatting": "متابعة المحادثة",
+    "conversationsLoadError": "تعذّر تحميل محادثاتك.",
+    "heroEyebrow": "عالم مميز",
+    "heroTitle": "ادخل قصةً تتفاعل معك.",
+    "heroDescription": "تعرّف إلى شخصيات نابضة بالحياة، وشكّل مجرى الأحداث، وخذ كل محادثة إلى وجهة غير متوقعة.",
+    "enterPersona": "ادخل عالم {{name}}",
+    "searchCharacters": "البحث عن الشخصيات",
+    "spotlight": "تحت الأضواء: {{name}} · {{category}}",
+    "continueEyebrow": "تابع من حيث توقفت",
+    "viewChats": "عرض المحادثات",
+    "createOrImport": "إنشاء شخصية أو استيرادها",
+    "privateCollection": "مجموعتك الخاصة",
+    "myCharacters": "شخصياتي",
+    "manageStudio": "إدارة الاستوديو",
+    "exploreEyebrow": "كل الأنواع. والاتجاه بيدك.",
+    "exploreTitle": "استكشف الشخصيات",
+    "searchAll": "بحث في الكل",
+    "categoryAria": "فئات الشخصيات"
     },
     "chat": {
       "invalidConversation": "تعذّر العثور على هذه المحادثة.",
@@ -3974,6 +3990,13 @@
       "inputPlaceholder": "قل أو افعل شيئًا...",
       "send": "إرسال الرسالة",
       "rateLimited": "أنت تتحرك بسرعة كبيرة — يُرجى الانتظار لحظة قبل إرسال رسالة أخرى.",
+      "regenerateResponse": "إعادة إنشاء الرد",
+      "regenerationFailed": "تعذّرت إعادة إنشاء هذا الرد. تم الاحتفاظ بالرد الأصلي.",
+      "editResponse": "تعديل الرد",
+      "saveEdit": "حفظ",
+      "cancelEdit": "إلغاء",
+      "editLearningHint": "ستستخدم الردود اللاحقة في هذه المحادثة نسختك المعدّلة.",
+      "editFailed": "تعذّر حفظ التعديل. تم الاحتفاظ بمسودتك.",
       "newChatConfirm": "بدء محادثة جديدة؟",
       "forkChat": "تشعيب هذه المحادثة",
       "forkChatDesc": "إنشاء نسخة من هذه المحادثة بكل الرسائل",
@@ -4054,6 +4077,9 @@
         "scenario": "السيناريو",
         "openingMessage": "رسالة البداية",
         "exampleDialogue": "حوار مثال",
+        "exampleDialoguePlaceholder": "<START>\n{{userMarker}}: لدي فكرة.\n{{charMarker}}: لنسمعها.",
+        "exampleDialogueHelp": "استخدم {{charMarker}} للشخصية و{{userMarker}} للمستخدم. أضف <START> بين محادثات الأمثلة المنفصلة.",
+        "responseStyle": "أسلوب الرد",
         "systemPrompt": "تجاوز موجه النظام",
         "systemPromptPlaceholder": "اتركه فارغًا لاستخدام موجه الشخصية المنظم في OmniChat.",
         "postHistoryInstructions": "تعليمات ما بعد السجل",
@@ -4070,6 +4096,28 @@
         "galleryUrlsPlaceholder": "صورة مرفوعة واحدة في كل سطر",
         "characterBookJson": "JSON كتاب الشخصية",
         "extensionsJson": "JSON الإضافات"
+      },
+      "responseStyles": {
+        "inherit": {
+          "label": "استخدام إعداد OmniChat",
+          "description": "يتبع أسلوب المحادثة العام الحالي في OmniChat."
+        },
+        "natural_dialogue": {
+          "label": "حوار طبيعي",
+          "description": "محادثة مباشرة ومتنوعة دون تأييد تلقائي أو سؤال مفروض في النهاية."
+        },
+        "lean_narrative": {
+          "label": "سرد / لعبة موجزة",
+          "description": "سرد موجز ينتهي بموقف قابل للعب أو قرار أو سؤال مفيد."
+        },
+        "professional": {
+          "label": "مهني",
+          "description": "دافئ ودقيق، مع سؤال مركز فقط عندما يكون مفيدًا حقًا."
+        },
+        "character_only": {
+          "label": "تعليمات الشخصية فقط",
+          "description": "لا يطبق طبقة أسلوب OmniChat. مناسب للبطاقات المستوردة ذات الأسلوب الخاص."
+        }
       },
       "uploadingField": "جارٍ رفع {{field}}...",
       "dangerZone": {

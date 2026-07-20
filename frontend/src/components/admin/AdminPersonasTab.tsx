@@ -4,6 +4,7 @@ import { adminService } from '../../services/adminService';
 import { mediaService } from '../../services/mediaService';
 import type { AdminOmniChatPersona } from '../../types/admin';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { normalizeUploadedMediaUrl } from '../../utils/uploadedMediaUrl';
 import MediaUploadField from '../common/MediaUploadField';
 import PersonaAvatar from '../omnichat/PersonaAvatar';
 import { LoadingMessage } from '../common/StatusMessage';
@@ -19,6 +20,7 @@ export default function AdminPersonasTab() {
   const [drafts, setDrafts] = useState<Record<number, PersonaDraft>>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
+  const [saveSuccesses, setSaveSuccesses] = useState<Record<number, string>>({});
   const [hoveredPersonaId, setHoveredPersonaId] = useState<number | null>(null);
 
   const personasQuery = useQuery({
@@ -58,6 +60,10 @@ export default function AdminPersonasTab() {
           gallery_urls: updatedPersona.gallery_urls ?? [],
         },
       }));
+      setSaveSuccesses((current) => ({
+        ...current,
+        [updatedPersona.id]: 'Media saved.',
+      }));
     },
   });
 
@@ -67,6 +73,12 @@ export default function AdminPersonasTab() {
   );
 
   const updateDraft = (personaId: number, patch: Partial<PersonaDraft>) => {
+    setSaveSuccesses((current) => {
+      if (!current[personaId]) return current;
+      const next = { ...current };
+      delete next[personaId];
+      return next;
+    });
     setDrafts((current) => ({
       ...current,
       [personaId]: {
@@ -75,6 +87,9 @@ export default function AdminPersonasTab() {
       },
     }));
   };
+
+  const normalizeUploadDraftUrl = (storageUrl?: string, storagePath?: string) =>
+    normalizeUploadedMediaUrl(undefined, storagePath) || normalizeUploadedMediaUrl(storageUrl);
 
   const handleUpload = async (
     personaId: number,
@@ -87,7 +102,7 @@ export default function AdminPersonasTab() {
     setUploadErrors((current) => ({ ...current, [uploadKey]: '' }));
     try {
       const uploaded = await mediaService.uploadMedia(file);
-      updateDraft(personaId, { [field]: uploaded.storage_url });
+      updateDraft(personaId, { [field]: normalizeUploadDraftUrl(uploaded.storage_url, uploaded.storage_path) });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Upload failed';
       setUploadErrors((current) => ({ ...current, [uploadKey]: message }));
@@ -104,7 +119,9 @@ export default function AdminPersonasTab() {
     try {
       const uploaded = await mediaService.uploadMedia(file);
       const currentGallery = drafts[personaId]?.gallery_urls ?? [];
-      updateDraft(personaId, { gallery_urls: [...currentGallery, uploaded.storage_url] });
+      updateDraft(personaId, {
+        gallery_urls: [...currentGallery, normalizeUploadDraftUrl(uploaded.storage_url, uploaded.storage_path)],
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Upload failed';
       setUploadErrors((current) => ({ ...current, [uploadKey]: message }));
@@ -183,13 +200,15 @@ export default function AdminPersonasTab() {
                       id={`admin-persona-${persona.id}-avatar`}
                       label="Avatar Image"
                       value={draft.avatar_url}
+                      previewSrc={resolveMediaUrl(draft.avatar_url, persona.updated_at)}
                       accept="image/*"
                       mediaType="image"
                       uploadButtonLabel="Select avatar image"
                       uploadingLabel="Uploading avatar..."
                       clearLabel="Clear image"
                       isUploading={avatarUploading}
-                      showStoredPath
+                      previewFrameClassName="aspect-[3/4]"
+                      imageClassName="h-full w-full bg-black/10 object-cover"
                       onFileChange={(event) => handleUpload(persona.id, event.target.files?.[0], 'avatar_url')}
                       onClear={() => updateDraft(persona.id, { avatar_url: '' })}
                     />
@@ -206,13 +225,13 @@ export default function AdminPersonasTab() {
                       id={`admin-persona-${persona.id}-preview-video`}
                       label="Preview Video"
                       value={draft.preview_video_url}
+                      previewSrc={resolveMediaUrl(draft.preview_video_url, persona.updated_at)}
                       accept="video/mp4,video/webm,video/quicktime"
                       mediaType="video"
                       uploadButtonLabel="Select preview video"
                       uploadingLabel="Uploading preview video..."
                       clearLabel="Clear video"
                       isUploading={videoUploading}
-                      showStoredPath
                       onFileChange={(event) =>
                         handleUpload(persona.id, event.target.files?.[0], 'preview_video_url')
                       }
@@ -332,6 +351,9 @@ export default function AdminPersonasTab() {
                   <span className="text-xs text-red-400">
                     {saveMutation.error instanceof Error ? saveMutation.error.message : 'Save failed'}
                   </span>
+                )}
+                {saveSuccesses[persona.id] && !isSaving && (
+                  <span className="text-xs text-emerald-400">{saveSuccesses[persona.id]}</span>
                 )}
               </div>
             </section>

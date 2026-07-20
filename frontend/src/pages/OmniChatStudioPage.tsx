@@ -15,6 +15,7 @@ import type {
   BotPersonaDefinition,
   PersonaCategory,
   PersonaDefinitionPayload,
+  ResponseStyleProfile,
 } from '../types/omnichat';
 import { mediaService } from '../services/mediaService';
 import { resolveMediaUrl } from '../utils/mediaUrl';
@@ -29,6 +30,14 @@ const CATEGORIES: PersonaCategory[] = [
   'fiction_media',
 ];
 
+const RESPONSE_STYLE_PROFILES: ResponseStyleProfile[] = [
+  'inherit',
+  'natural_dialogue',
+  'lean_narrative',
+  'professional',
+  'character_only',
+];
+
 const BLANK_DRAFT: PersonaDefinitionPayload = {
   name: '',
   description: '',
@@ -39,6 +48,7 @@ const BLANK_DRAFT: PersonaDefinitionPayload = {
   scenario: '',
   first_message: '',
   example_dialogue: '',
+  response_style_profile: 'natural_dialogue',
   post_history_instructions: '',
   alternate_greetings: [],
   creator_notes: '',
@@ -64,6 +74,7 @@ function draftFromPersona(persona: BotPersonaDefinition): PersonaDefinitionPaylo
     scenario: persona.scenario || '',
     first_message: persona.first_message || '',
     example_dialogue: persona.example_dialogue || '',
+    response_style_profile: persona.response_style_profile || 'inherit',
     post_history_instructions: persona.post_history_instructions || '',
     alternate_greetings: persona.alternate_greetings || [],
     creator_notes: persona.creator_notes || '',
@@ -771,17 +782,57 @@ export default function OmniChatStudioPage() {
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
                 />
               </label>
-              <label className="space-y-2 md:col-span-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.exampleDialogue')}</span>
+              <div className="space-y-2 md:col-span-2">
+                <label htmlFor="omnichat-response-style" className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.responseStyle')}
+                </label>
+                <select
+                  id="omnichat-response-style"
+                  aria-describedby="omnichat-response-style-description"
+                  value={draft.response_style_profile}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      response_style_profile: event.target.value as ResponseStyleProfile,
+                    }))
+                  }
+                  className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
+                >
+                  {RESPONSE_STYLE_PROFILES.map((profile) => (
+                    <option key={profile} value={profile}>
+                      {t(`omnichat.studio.responseStyles.${profile}.label`)}
+                    </option>
+                  ))}
+                </select>
+                <span id="omnichat-response-style-description" className="block text-xs leading-5 text-[var(--color-text-secondary)]">
+                  {t(`omnichat.studio.responseStyles.${draft.response_style_profile}.description`)}
+                </span>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label htmlFor="omnichat-example-dialogue" className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.exampleDialogue')}
+                </label>
                 <textarea
+                  id="omnichat-example-dialogue"
+                  aria-describedby="omnichat-example-dialogue-help"
                   value={draft.example_dialogue}
                   onChange={(event) =>
                     setDraft((current) => ({ ...current, example_dialogue: event.target.value }))
                   }
                   rows={5}
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
+                  placeholder={t('omnichat.studio.fields.exampleDialoguePlaceholder', {
+                    userMarker: '{{User}}',
+                    charMarker: '{{Char}}',
+                  })}
                 />
-              </label>
+                <span id="omnichat-example-dialogue-help" className="block text-xs leading-5 text-[var(--color-text-secondary)]">
+                  {t('omnichat.studio.fields.exampleDialogueHelp', {
+                    userMarker: '{{User}}',
+                    charMarker: '{{Char}}',
+                  })}
+                </span>
+              </div>
               <label className="space-y-2 md:col-span-2">
                 <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.systemPrompt')}</span>
                 <textarea
@@ -869,6 +920,8 @@ export default function OmniChatStudioPage() {
                 uploadingLabel="Uploading avatar..."
                 clearLabel="Remove image"
                 isUploading={uploadingField === 'avatar_url'}
+                previewFrameClassName="aspect-[3/4]"
+                imageClassName="h-full w-full bg-black/10 object-cover"
                 onFileChange={(event) => void handleFileUpload(event, 'avatar_url')}
                 onClear={() => {
                   setLocalPreviews((current) => {

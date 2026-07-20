@@ -49,11 +49,13 @@ function SidebarNav({
               collapsed ? 'h-10 w-10 self-center justify-center px-0 rounded-[18px]' : 'h-14 justify-start px-4'
             } gap-3 ${
               active
-                ? 'border-white/15 bg-white/[0.08] text-white shadow-[0_16px_40px_rgba(0,0,0,0.18)]'
-                : 'border-transparent bg-transparent text-[rgba(255,255,255,0.68)] hover:border-white/10 hover:bg-white/[0.04] hover:text-white'
+                ? 'border-violet-300/20 bg-gradient-to-r from-violet-500/20 to-fuchsia-500/[0.07] text-white shadow-[0_16px_40px_rgba(31,20,63,0.25)]'
+                : 'border-transparent bg-transparent text-[rgba(255,255,255,0.58)] hover:border-white/10 hover:bg-white/[0.045] hover:text-white'
             }`}
           >
-            <Icon size={20} className="flex-shrink-0" />
+            <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl transition ${active ? 'bg-violet-400/15 text-violet-200' : ''}`}>
+              <Icon size={19} />
+            </span>
             {!collapsed && <span className="truncate text-sm font-medium">{resolvedLabel}</span>}
           </button>
         );
@@ -78,12 +80,12 @@ export default function OmniChatSidebar({
   return (
     <>
       <aside
-        className={`hidden h-full border-r border-white/10 bg-[#17171c]/95 py-4 backdrop-blur-xl lg:flex lg:flex-col ${
+        className={`hidden h-full border-r border-white/[0.08] bg-[#0c0d13]/80 py-4 backdrop-blur-2xl transition-[width,padding] duration-300 lg:flex lg:flex-col ${
           desktopCollapsed ? 'w-[72px] px-2' : 'w-[223px] px-3'
         }`}
       >
         <div className={`mb-4 flex items-center ${desktopCollapsed ? 'justify-center' : 'justify-between gap-3'}`}>
-          {!desktopCollapsed && <span className="px-2 text-xs font-semibold uppercase tracking-[0.24em] text-white/35">Menu</span>}
+          {!desktopCollapsed && <span className="px-2 text-[10px] font-semibold uppercase tracking-[0.28em] text-white/30">Navigate</span>}
           <button
             type="button"
             onClick={() => onDesktopCollapsedChange(!desktopCollapsed)}

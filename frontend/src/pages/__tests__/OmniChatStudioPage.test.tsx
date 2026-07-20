@@ -121,6 +121,7 @@ describe('OmniChatStudioPage', () => {
       scenario: '',
       first_message: 'Hello there.',
       example_dialogue: '',
+      response_style_profile: 'natural_dialogue',
       post_history_instructions: '',
       alternate_greetings: [],
       creator_notes: '',
@@ -167,6 +168,7 @@ describe('OmniChatStudioPage', () => {
       scenario: '',
       first_message: '',
       example_dialogue: '',
+      response_style_profile: 'character_only',
       post_history_instructions: '',
       alternate_greetings: [],
       creator_notes: '',
@@ -230,6 +232,12 @@ describe('OmniChatStudioPage', () => {
     fireEvent.change(screen.getByLabelText('Tags'), {
       target: { value: 'launch, helper, launch' },
     });
+    fireEvent.change(screen.getByLabelText('Response Style'), {
+      target: { value: 'professional' },
+    });
+    fireEvent.change(screen.getByLabelText('Example Dialogue'), {
+      target: { value: '<START>\n{{User}}: Help me launch.\n{{Char}}: Show me the checklist.' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
 
@@ -242,6 +250,8 @@ describe('OmniChatStudioPage', () => {
           creator_name: 'Owner',
           character_version: '1.0',
           tags: ['launch', 'helper', 'launch'],
+          response_style_profile: 'professional',
+          example_dialogue: '<START>\n{{User}}: Help me launch.\n{{Char}}: Show me the checklist.',
         })
       );
     });
@@ -298,6 +308,7 @@ describe('OmniChatStudioPage', () => {
       scenario: '',
       first_message: '',
       example_dialogue: '',
+      response_style_profile: 'natural_dialogue',
       post_history_instructions: '',
       alternate_greetings: [],
       creator_notes: '',

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,6 +8,7 @@ import {
   mapOmniChatDefaultsToUserSettings,
   mapUserSettingsToOmniChatDefaults,
 } from '../../utils/omnichatDefaults';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import OmniChatHeader from './OmniChatHeader';
 import OmniChatSidebar, { type SidebarTab } from './OmniChatSidebar';
 
@@ -15,6 +16,7 @@ const DESKTOP_EXPANDED_WIDTH = 223;
 const DESKTOP_COLLAPSED_WIDTH = 72;
 const HEADER_HEIGHT = 72;
 const SIDEBAR_COLLAPSED_KEY = 'omnichat_sidebar_collapsed';
+const AUTO_COLLAPSE_QUERY = '(min-width: 1024px) and (max-width: 1359px)';
 
 export default function OmniChatShell({
   activeTab,
@@ -33,6 +35,8 @@ export default function OmniChatShell({
     if (typeof localStorage === 'undefined') return false;
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
   });
+  const shouldAutoCollapseSidebar = useMediaQuery(AUTO_COLLAPSE_QUERY);
+  const wasAutoCollapseWidth = useRef<boolean | null>(null);
 
   const settingsQuery = useQuery({
     queryKey: ['user-settings', 'omnichat-defaults'],
@@ -68,8 +72,18 @@ export default function OmniChatShell({
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(desktopSidebarCollapsed));
   }, [desktopSidebarCollapsed]);
 
+  useEffect(() => {
+    const wasNarrow = wasAutoCollapseWidth.current;
+    wasAutoCollapseWidth.current = shouldAutoCollapseSidebar;
+
+    if (shouldAutoCollapseSidebar && wasNarrow !== true) {
+      setDesktopSidebarCollapsed(true);
+    }
+  }, [shouldAutoCollapseSidebar]);
+
   return (
-      <div className="omnichat-theme min-h-[100dvh] bg-[var(--color-background)]">
+      <div className="omnichat-theme relative min-h-[100dvh] overflow-hidden bg-[var(--color-background)]">
+        <div className="omnichat-noise pointer-events-none fixed inset-0 z-0" aria-hidden="true" />
         <OmniChatHeader
           defaults={defaults}
           onSaveDefaults={async (next) => {
@@ -106,7 +120,8 @@ export default function OmniChatShell({
         </div>
 
         <main
-          className="px-0 lg:pl-[var(--omnichat-sidebar-width)]"
+          id="main-content"
+          className="relative z-10 px-0 transition-[padding] duration-300 lg:pl-[var(--omnichat-sidebar-width)]"
           style={
             {
               paddingTop: HEADER_HEIGHT,

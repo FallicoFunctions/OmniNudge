@@ -99,7 +99,20 @@ describe('OmniChatConversationsPage', () => {
     expect(screen.getByRole('button', { name: 'Favorites' })).toBeInTheDocument();
   });
 
-  it('shows persona description as the row subtitle', async () => {
+  it('shows the latest message as the row subtitle', async () => {
+    const persona = {
+      id: 9,
+      slug: 'narrator',
+      name: 'Narrator',
+      description: 'A terse, old-school text-adventure narrator.',
+      category: 'roleplay',
+      avatar_url: undefined,
+      is_nsfw: false,
+      is_active: true,
+      created_at: '2026-07-01T10:00:00Z',
+      updated_at: '2026-07-01T10:00:00Z',
+    };
+    mockListPersonas.mockResolvedValueOnce([persona]);
     mockListConversations.mockResolvedValueOnce([
       {
         id: 42,
@@ -109,25 +122,14 @@ describe('OmniChatConversationsPage', () => {
         last_message_preview: 'Hello?',
         created_at: '2026-07-02T10:00:00Z',
         last_message_at: '2026-07-02T10:15:00Z',
-        persona: {
-          id: 9,
-          slug: 'narrator',
-          name: 'Narrator',
-          description: 'A terse, old-school text-adventure narrator.',
-          category: 'roleplay',
-          avatar_url: undefined,
-          is_nsfw: false,
-          is_active: true,
-          created_at: '2026-07-01T10:00:00Z',
-          updated_at: '2026-07-01T10:00:00Z',
-        },
+        persona,
       },
     ]);
 
     renderPage();
 
     expect(await screen.findByText('Campfire Thread')).toBeInTheDocument();
-    expect(screen.getAllByText('A terse, old-school text-adventure narrator.').length).toBeGreaterThan(0);
+    expect(screen.getByText('Hello?')).toBeInTheDocument();
   });
 
   it('opens the search overlay from the sidebar search action', async () => {
