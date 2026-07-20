@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import postcss from 'postcss';
 import tailwindcss from 'tailwindcss';
 import tailwindConfig from '../../../../tailwind.config.js';
@@ -104,5 +104,58 @@ describe('OmniChatSidebar color utilities', () => {
     );
 
     expect(screen.queryByText('Sign in to save your chat')).not.toBeInTheDocument();
+  });
+
+  it('locks background scrolling and closes the mobile drawer with Escape', () => {
+    const onMobileClose = vi.fn();
+    document.body.style.overflow = 'clip';
+    const { unmount } = render(
+      <OmniChatSidebar
+        activeTab="discover"
+        onTabChange={() => {}}
+        isAuthenticated
+        onSignIn={() => {}}
+        mobileOpen
+        onMobileOpen={() => {}}
+        onMobileClose={onMobileClose}
+        desktopCollapsed={false}
+        onDesktopCollapsedChange={() => {}}
+      />
+    );
+
+    expect(document.body.style.overflow).toBe('hidden');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onMobileClose).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(document.body.style.overflow).toBe('clip');
+    document.body.style.overflow = '';
+  });
+
+  it('contains keyboard focus in the mobile drawer and restores the menu trigger', () => {
+    const props = {
+      activeTab: 'discover' as const,
+      onTabChange: () => {},
+      isAuthenticated: true,
+      onSignIn: () => {},
+      onMobileOpen: () => {},
+      onMobileClose: () => {},
+      desktopCollapsed: false,
+      onDesktopCollapsedChange: () => {},
+    };
+    const { rerender } = render(<OmniChatSidebar {...props} mobileOpen={false} />);
+    const trigger = screen.getByRole('button', { name: 'Open menu' });
+    trigger.focus();
+
+    rerender(<OmniChatSidebar {...props} mobileOpen />);
+    const drawer = screen.getByRole('dialog', { name: 'Open menu' });
+    expect(drawer).toHaveFocus();
+
+    const lastDrawerButton = within(drawer).getByRole('button', { name: 'Studio' });
+    lastDrawerButton.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(within(drawer).getByRole('button', { name: 'Close menu' })).toHaveFocus();
+
+    rerender(<OmniChatSidebar {...props} mobileOpen={false} />);
+    expect(trigger).toHaveFocus();
   });
 });

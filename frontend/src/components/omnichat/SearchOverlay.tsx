@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, X, ChevronRight } from 'lucide-react';
 import PersonaAvatar from './PersonaAvatar';
 import type { BotPersona } from '../../types/omnichat';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 interface SearchOverlayProps {
   isOpen: boolean;
   onClose: () => void;
   personas: BotPersona[];
   onSelectPersona: (persona: BotPersona, trigger?: HTMLElement) => void;
+  restoreFocusRef?: RefObject<HTMLElement | null>;
 }
 
 export default function SearchOverlay({
@@ -16,34 +18,29 @@ export default function SearchOverlay({
   onClose,
   personas,
   onSelectPersona,
+  restoreFocusRef,
 }: SearchOverlayProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useDialogFocus({
+    isActive: isOpen,
+    onEscape: onClose,
+    initialFocusRef: inputRef,
+    restoreFocusRef,
+  });
 
-  // Auto-focus input and lock body scroll when overlay opens
+  // Lock body scroll while the overlay is open.
   useEffect(() => {
     if (isOpen) {
-      const timer = setTimeout(() => inputRef.current?.focus(), 100);
       const prev = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       return () => {
-        clearTimeout(timer);
         document.body.style.overflow = prev;
       };
     }
     setQuery('');
   }, [isOpen]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose]);
 
   const results = useMemo(() => {
     if (!query.trim()) return [];
@@ -71,7 +68,15 @@ export default function SearchOverlay({
   if (!isOpen) return null;
 
   return (
-    <div data-omnichat-search-overlay="true" className="fixed inset-0 z-50 flex flex-col">
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      data-omnichat-search-overlay="true"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('omnichat.sidebar.search')}
+      className="fixed inset-0 z-50 flex flex-col pb-[var(--omnichat-safe-bottom)] pt-[var(--omnichat-safe-top)]"
+    >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
@@ -89,13 +94,14 @@ export default function SearchOverlay({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('omnichat.sidebar.searchPlaceholder')}
-              className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] py-3 pl-11 pr-10 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]/30"
+              className="min-h-11 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] py-3 pl-11 pr-12 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]/30"
             />
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                aria-label={t('omnichat.sidebar.clearSearch')}
+                className="omnichat-touch-target absolute right-0 top-1/2 flex -translate-y-1/2 items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
               >
                 <X size={16} />
               </button>
@@ -104,15 +110,15 @@ export default function SearchOverlay({
           <button
             type="button"
             onClick={onClose}
-            className="flex-shrink-0 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-black hover:bg-gray-100"
+            className="omnichat-touch-target flex-shrink-0 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-black hover:bg-gray-100"
           >
-            {t('omnichat.sidebar.search')}
+            {t('omnichat.sidebar.closeSearch')}
           </button>
         </div>
       </div>
 
       {/* Results — fill the bottom 75% of viewport */}
-      <div className="relative flex-[3] overflow-y-auto px-4 pt-2 pb-4">
+      <div className="relative flex-[3] overscroll-y-contain overflow-y-auto px-4 pb-4 pt-2">
         <div className="mx-auto max-w-3xl">
           {query.trim() && results.length === 0 && (
             <p className="py-8 text-center text-sm text-[var(--color-text-muted)]">
