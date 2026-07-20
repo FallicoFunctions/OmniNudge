@@ -199,6 +199,31 @@ describe('OmniChatDiscoverPage', () => {
     expect(description).toHaveClass('max-h-0');
   });
 
+  it('does not display persona categories or category filters', async () => {
+    mockListPersonas.mockResolvedValue([
+      {
+        id: 1,
+        slug: 'guide-bot',
+        name: 'Guide Bot',
+        description: 'Public helper.',
+        category: 'helper' as const,
+        tags: ['guide'],
+        is_nsfw: false,
+        is_active: true,
+        created_at: '2026-07-11T00:00:00Z',
+        updated_at: '2026-07-11T00:00:00Z',
+      },
+    ]);
+
+    renderPage();
+
+    await screen.findAllByText('Guide Bot');
+    expect(screen.queryByText('Helper')).not.toBeInTheDocument();
+    expect(screen.queryByText('#guide')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'All' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Roleplay' })).not.toBeInTheDocument();
+  });
+
   it('uses fresh persona media for continue chatting cards instead of stale conversation media', async () => {
     mockIsAuthenticated = true;
     mockListPersonas.mockResolvedValue([
@@ -276,7 +301,7 @@ describe('OmniChatDiscoverPage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('No personas in this category yet.')).toBeInTheDocument();
+    expect(await screen.findByText('No personas yet.')).toBeInTheDocument();
     expect(screen.queryByText('Continue Chatting')).not.toBeInTheDocument();
     expect(screen.queryByTestId('persona-avatar-77')).not.toBeInTheDocument();
   });
