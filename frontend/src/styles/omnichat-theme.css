@@ -15,17 +15,18 @@
   --oc-text-muted: #777785;
   --oc-border: #292a35;
   --oc-border-hover: #40414f;
-  --oc-primary: #8b5cf6;
-  --oc-primary-dark: #7c3aed;
-  --oc-accent: #fb7185;
-  --oc-mint: #5eead4;
+  --oc-primary: #3b82f6;
+  --oc-primary-dark: #2563eb;
+  --oc-primary-light: #60a5fa;
+  --oc-accent: #60a5fa;
+  --oc-mint: #38bdf8;
 }
 
 .omnichat-theme {
   --color-primary: var(--oc-primary);
   --color-primary-dark: var(--oc-primary-dark);
   --color-primary-strong: var(--oc-primary-dark);
-  --color-primary-light: var(--oc-primary);
+  --color-primary-light: var(--oc-primary-light);
   --color-background: var(--oc-bg);
   --color-surface: var(--oc-surface);
   --color-surface-elevated: var(--oc-surface-elevated);
@@ -36,8 +37,8 @@
   --color-border: var(--oc-border);
   --color-border-hover: var(--oc-border-hover);
   background:
-    radial-gradient(circle at 72% -10%, rgba(139, 92, 246, 0.16), transparent 34rem),
-    radial-gradient(circle at 22% 36%, rgba(251, 113, 133, 0.07), transparent 28rem),
+    radial-gradient(circle at 72% -10%, rgba(59, 130, 246, 0.16), transparent 34rem),
+    radial-gradient(circle at 22% 36%, rgba(96, 165, 250, 0.07), transparent 28rem),
     var(--oc-bg);
   color-scheme: dark;
   isolation: isolate;
@@ -45,7 +46,7 @@
 }
 
 .omnichat-theme ::selection {
-  background: rgba(139, 92, 246, 0.42);
+  background: rgba(59, 130, 246, 0.42);
   color: white;
 }
 

@@ -49,11 +49,11 @@ function SidebarNav({
               collapsed ? 'h-10 w-10 self-center justify-center px-0 rounded-[18px]' : 'h-14 justify-start px-4'
             } gap-3 ${
               active
-                ? 'border-violet-300/20 bg-gradient-to-r from-violet-500/20 to-fuchsia-500/[0.07] text-white shadow-[0_16px_40px_rgba(31,20,63,0.25)]'
+                ? 'border-blue-300/20 bg-gradient-to-r from-blue-500/20 to-sky-500/[0.07] text-white shadow-[0_16px_40px_rgba(20,48,96,0.25)]'
                 : 'border-transparent bg-transparent text-[rgba(255,255,255,0.58)] hover:border-white/10 hover:bg-white/[0.045] hover:text-white'
             }`}
           >
-            <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl transition ${active ? 'bg-violet-400/15 text-violet-200' : ''}`}>
+            <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl transition ${active ? 'bg-blue-400/15 text-blue-200' : ''}`}>
               <Icon size={19} />
             </span>
             {!collapsed && <span className="truncate text-sm font-medium">{resolvedLabel}</span>}
