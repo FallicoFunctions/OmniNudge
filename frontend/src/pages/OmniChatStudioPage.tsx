@@ -352,6 +352,7 @@ export default function OmniChatStudioPage() {
   );
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
+  const isEditorLoading = selectedId !== null && selectedPersonaQuery.isLoading;
 
   useEffect(() => {
     if (!isDirty) {
@@ -495,6 +496,12 @@ export default function OmniChatStudioPage() {
 
   const handleSubmit = async () => {
     setSaveError(null);
+
+    if (!draft.first_message.trim() && parseLineList(alternateGreetingsText).length === 0) {
+      setSaveError(t('omnichat.studio.openingMessageRequired'));
+      document.getElementById('omnichat-opening-message')?.focus();
+      return;
+    }
 
     let characterBookJSON: Record<string, unknown> | undefined;
     let extensionsJSON: Record<string, unknown> | undefined;
@@ -773,15 +780,23 @@ export default function OmniChatStudioPage() {
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
                 />
               </label>
-              <label className="space-y-2 md:col-span-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.openingMessage')}</span>
+              <div className="space-y-2 md:col-span-2">
+                <label htmlFor="omnichat-opening-message" className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.openingMessage')}
+                </label>
                 <textarea
+                  id="omnichat-opening-message"
+                  aria-describedby="omnichat-opening-message-help"
+                  aria-required="true"
                   value={draft.first_message}
                   onChange={(event) => setDraft((current) => ({ ...current, first_message: event.target.value }))}
                   rows={4}
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
                 />
-              </label>
+                <span id="omnichat-opening-message-help" className="block text-xs leading-5 text-[var(--color-text-secondary)]">
+                  {t('omnichat.studio.fields.openingMessageHelp')}
+                </span>
+              </div>
               <div className="space-y-2 md:col-span-2">
                 <label htmlFor="omnichat-response-style" className="block text-sm font-medium text-[var(--color-text-primary)]">
                   {t('omnichat.studio.fields.responseStyle')}
@@ -1042,7 +1057,7 @@ export default function OmniChatStudioPage() {
               <button
                 type="button"
                 onClick={() => void handleSubmit()}
-                disabled={isSaving}
+                disabled={isSaving || isEditorLoading}
                 className="rounded-2xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
               >
                 {isSaving

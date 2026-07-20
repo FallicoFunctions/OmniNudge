@@ -1,7 +1,7 @@
 import { api } from '../lib/api';
 import type {
-  AnonymousMessageRequest,
-  AnonymousMessageResponse,
+  PreviewMessageRequest,
+  PreviewMessageResponse,
   BotConversation,
   BotConversationDetail,
   BotMessage,
@@ -79,8 +79,8 @@ export const omnichatService = {
     await api.delete(`/omnichat/personas/${personaId}/conversations`);
   },
 
-  async sendAnonymousMessage(req: AnonymousMessageRequest): Promise<AnonymousMessageResponse> {
-    return api.post<AnonymousMessageResponse>('/omnichat/anonymous/messages', req);
+  async sendPreviewMessage(req: PreviewMessageRequest): Promise<PreviewMessageResponse> {
+    return api.post<PreviewMessageResponse>('/omnichat/preview/messages', req);
   },
 
   async createConversationWithMessages(

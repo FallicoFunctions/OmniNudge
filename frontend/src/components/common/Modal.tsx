@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 type ModalProps = {
   isOpen: boolean;
@@ -7,6 +8,8 @@ type ModalProps = {
   overlayClassName?: string;
   className?: string;
   closeOnOverlayClick?: boolean;
+  ariaLabelledBy?: string;
+  ariaDescribedBy?: string;
 };
 
 export function Modal({
@@ -16,9 +19,16 @@ export function Modal({
   overlayClassName = 'bg-black/50', // Standard 50% overlay darkness (MODAL-2)
   className = '',
   closeOnOverlayClick = false,
+  ariaLabelledBy,
+  ariaDescribedBy,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   // Focus trap implementation (WCAG 2.4.3)
   useEffect(() => {
@@ -35,8 +45,8 @@ export function Modal({
     // Handle keyboard navigation
     const handleKeyDown = (event: KeyboardEvent) => {
       // ESC key closes modal
-      if (event.key === 'Escape' && onClose) {
-        onClose();
+      if (event.key === 'Escape' && onCloseRef.current) {
+        onCloseRef.current();
         return;
       }
 
@@ -83,11 +93,11 @@ export function Modal({
         previouslyFocusedElement.current.focus();
       }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center px-4 ${overlayClassName} animate-fadeIn`}
       style={{
@@ -104,7 +114,7 @@ export function Modal({
       <div
         ref={modalRef}
         tabIndex={-1}
-        className={className}
+        className={`outline-none ${className}`}
         style={{
           animation: 'scaleIn 200ms ease-out',
         }}
@@ -112,10 +122,13 @@ export function Modal({
           event.stopPropagation();
         }}
         aria-modal="true"
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
         role="dialog"
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

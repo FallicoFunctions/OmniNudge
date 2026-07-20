@@ -3962,6 +3962,24 @@
     "searchAll": "Buscar todos",
     "categoryAria": "Categorías de personajes"
     },
+    "quickChat": {
+      "eyebrow": "Chat rápido",
+      "title": "Conoce a {{name}}",
+      "close": "Cerrar el chat rápido",
+      "description": "Su mensaje inicial aparece al instante. Responde una vez para probar la conversación; nada se guarda hasta que continúes.",
+      "openingUnavailable": "Este personaje necesita un mensaje inicial preparado antes de comenzar el chat rápido.",
+      "replyLabel": "Responder a {{name}}",
+      "placeholder": "Responde a {{name}}...",
+      "send": "Enviar respuesta",
+      "generating": "{{name}} está respondiendo...",
+      "generationFailed": "La respuesta de prueba no llegó. Tu mensaje sigue aquí.",
+      "retry": "Intentar de nuevo",
+      "oneReplyHint": "Probando una respuesta antes de abrir el chat completo...",
+      "continue": "Continuar chateando",
+      "openingChat": "Abriendo chat...",
+      "continueFailed": "No se pudo abrir el chat. Inténtalo de nuevo.",
+      "resumeExisting": "Continuar tu chat existente"
+    },
     "chat": {
       "invalidConversation": "No se pudo encontrar esta conversación.",
       "back": "Volver a Descubrir",
@@ -4049,6 +4067,7 @@
       "loadingPersonas": "Cargando tus personas...",
       "loadPersonasError": "No se pudieron cargar tus personas.",
       "loadingDefinition": "Cargando definición de persona...",
+      "openingMessageRequired": "Añade un mensaje inicial o al menos un saludo alternativo.",
       "import": {
         "title": "Importar tarjeta de personaje",
         "importing": "Importando...",
@@ -4076,6 +4095,7 @@
         "personality": "Personalidad",
         "scenario": "Escenario",
         "openingMessage": "Mensaje inicial",
+        "openingMessageHelp": "Se muestra al instante al abrir el chat rápido. Si queda vacío al importar, se usa el primer saludo alternativo.",
         "exampleDialogue": "Diálogo de ejemplo",
         "exampleDialoguePlaceholder": "<START>\n{{userMarker}}: Tengo una idea.\n{{charMarker}}: Te escucho.",
         "exampleDialogueHelp": "Usa {{charMarker}} para el personaje y {{userMarker}} para el usuario. Añade <START> entre conversaciones de ejemplo.",

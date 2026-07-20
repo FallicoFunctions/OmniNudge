@@ -3962,6 +3962,24 @@
     "searchAll": "بحث في الكل",
     "categoryAria": "فئات الشخصيات"
     },
+    "quickChat": {
+      "eyebrow": "محادثة سريعة",
+      "title": "تعرّف إلى {{name}}",
+      "close": "إغلاق المحادثة السريعة",
+      "description": "تظهر الرسالة الافتتاحية المُعدّة فورًا. رد مرة واحدة لتجربة المحادثة؛ لن يُحفظ شيء حتى تتابع.",
+      "openingUnavailable": "تحتاج هذه الشخصية إلى رسالة افتتاحية مُعدّة قبل بدء المحادثة السريعة.",
+      "replyLabel": "الرد على {{name}}",
+      "placeholder": "اكتب ردًا إلى {{name}}...",
+      "send": "إرسال الرد",
+      "generating": "{{name}} يرد الآن...",
+      "generationFailed": "لم يصل رد المعاينة. ما زالت رسالتك موجودة.",
+      "retry": "المحاولة مجددًا",
+      "oneReplyHint": "تجري معاينة رد واحد قبل فتح المحادثة الكاملة...",
+      "continue": "متابعة المحادثة",
+      "openingChat": "جارٍ فتح المحادثة...",
+      "continueFailed": "تعذّر فتح المحادثة. حاول مجددًا.",
+      "resumeExisting": "متابعة محادثتك الحالية بدلًا من ذلك"
+    },
     "chat": {
       "invalidConversation": "تعذّر العثور على هذه المحادثة.",
       "back": "العودة إلى الاستكشاف",
@@ -4049,6 +4067,7 @@
       "loadingPersonas": "جارٍ تحميل شخصياتك...",
       "loadPersonasError": "تعذّر تحميل شخصياتك.",
       "loadingDefinition": "جارٍ تحميل تعريف الشخصية...",
+      "openingMessageRequired": "أضف رسالة افتتاحية أو تحية بديلة واحدة على الأقل.",
       "import": {
         "title": "استيراد بطاقة شخصية",
         "importing": "جارٍ الاستيراد...",
@@ -4076,6 +4095,7 @@
         "personality": "الشخصية",
         "scenario": "السيناريو",
         "openingMessage": "رسالة البداية",
+        "openingMessageHelp": "تظهر فور فتح المحادثة السريعة. إذا تُركت فارغة أثناء الاستيراد، فستُستخدم أول تحية بديلة.",
         "exampleDialogue": "حوار مثال",
         "exampleDialoguePlaceholder": "<START>\n{{userMarker}}: لدي فكرة.\n{{charMarker}}: لنسمعها.",
         "exampleDialogueHelp": "استخدم {{charMarker}} للشخصية و{{userMarker}} للمستخدم. أضف <START> بين محادثات الأمثلة المنفصلة.",

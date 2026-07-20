@@ -25,8 +25,10 @@ const {
   mockDeletePersonaConversations: vi.fn(),
 }));
 
+let mockIsAuthenticated = true;
+
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ isAuthenticated: true }),
+  useAuth: () => ({ isAuthenticated: mockIsAuthenticated }),
 }));
 
 vi.mock('../../components/omnichat/PersonaAvatar', () => ({
@@ -57,7 +59,7 @@ vi.mock('../../services/omnichatService', () => ({
     deletePersonaConversations: (...args: unknown[]) => mockDeletePersonaConversations(...args),
     createConversation: vi.fn(),
     createConversationWithMessages: vi.fn(),
-    sendAnonymousMessage: vi.fn(),
+    sendPreviewMessage: vi.fn(),
   },
   omnichatQueryKeys: {
     personas: () => ['omnichat', 'personas'],
@@ -111,6 +113,8 @@ describe('OmniChatChatPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
+    mockIsAuthenticated = true;
     mockMatchMedia();
 
     const persona = {
@@ -118,6 +122,7 @@ describe('OmniChatChatPage', () => {
       slug: 'narrator',
       name: 'Narrator',
       description: 'A terse, old-school text-adventure narrator.',
+      first_message: '*The fire gutters.* You made it.',
       category: 'roleplay' as const,
       avatar_url: undefined,
       preview_video_url: undefined,
@@ -178,6 +183,14 @@ describe('OmniChatChatPage', () => {
     });
     mockDeleteConversation.mockResolvedValue(undefined);
     mockDeletePersonaConversations.mockResolvedValue(undefined);
+  });
+
+  it('shows a public persona opening immediately in a direct guest chat', async () => {
+    mockIsAuthenticated = false;
+
+    renderPage('/omnichat/c/guest?persona=9');
+
+    expect((await screen.findAllByText(/The fire gutters/)).length).toBeGreaterThan(0);
   });
 
   it('collapses the right profile pane fully and reopens it from the chat header', async () => {

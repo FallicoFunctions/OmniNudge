@@ -166,7 +166,7 @@ describe('OmniChatStudioPage', () => {
       system_prompt: '',
       personality: '',
       scenario: '',
-      first_message: '',
+      first_message: 'Welcome back.',
       example_dialogue: '',
       response_style_profile: 'character_only',
       post_history_instructions: '',
@@ -223,6 +223,9 @@ describe('OmniChatStudioPage', () => {
     fireEvent.change(screen.getByLabelText('Personality'), {
       target: { value: 'Calm' },
     });
+    fireEvent.change(screen.getByLabelText('Opening Message'), {
+      target: { value: 'Hello there.' },
+    });
     fireEvent.change(screen.getByLabelText('Creator Name'), {
       target: { value: 'Owner' },
     });
@@ -255,6 +258,19 @@ describe('OmniChatStudioPage', () => {
         })
       );
     });
+  });
+
+  it('requires a prepared opening before creating a character', async () => {
+    renderPage();
+
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Silent Guide' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
+
+    expect(
+      await screen.findByText('Add an opening message or at least one alternate greeting.')
+    ).toBeInTheDocument();
+    expect(mockCreatePersona).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Opening Message')).toHaveFocus();
   });
 
   it('imports a PNG card by uploading the avatar and forwarding the uploaded media URL', async () => {
@@ -306,7 +322,7 @@ describe('OmniChatStudioPage', () => {
       system_prompt: '',
       personality: '',
       scenario: '',
-      first_message: '',
+      first_message: 'Ready when you are.',
       example_dialogue: '',
       response_style_profile: 'natural_dialogue',
       post_history_instructions: '',
@@ -364,7 +380,7 @@ describe('OmniChatStudioPage', () => {
       system_prompt: '',
       personality: '',
       scenario: '',
-      first_message: '',
+      first_message: 'Ready when you are.',
       example_dialogue: '',
       post_history_instructions: '',
       alternate_greetings: [],
@@ -385,6 +401,7 @@ describe('OmniChatStudioPage', () => {
 
     renderPage();
 
+    await screen.findByDisplayValue('Ready when you are.');
     fireEvent.change(await screen.findByLabelText('Description'), {
       target: { value: 'Updated launch helper.' },
     });
@@ -427,7 +444,7 @@ describe('OmniChatStudioPage', () => {
       system_prompt: '',
       personality: '',
       scenario: '',
-      first_message: '',
+      first_message: 'Ready when you are.',
       example_dialogue: '',
       post_history_instructions: '',
       alternate_greetings: [],
@@ -452,6 +469,7 @@ describe('OmniChatStudioPage', () => {
 
     renderPage();
 
+    await screen.findByDisplayValue('Ready when you are.');
     await screen.findByRole('button', { name: 'Save Changes' });
 
     const avatarInput = document.getElementById('omnichat-studio-avatar-file') as HTMLInputElement;
@@ -514,7 +532,7 @@ describe('OmniChatStudioPage', () => {
       system_prompt: '',
       personality: '',
       scenario: '',
-      first_message: '',
+      first_message: 'Ready when you are.',
       example_dialogue: '',
       post_history_instructions: '',
       alternate_greetings: [],
@@ -535,6 +553,7 @@ describe('OmniChatStudioPage', () => {
 
     renderPage();
 
+    await screen.findByDisplayValue('Ready when you are.');
     await screen.findByRole('button', { name: 'Save Changes' });
     await screen.findByAltText('Avatar Image');
     await screen.findByAltText('Gallery image 1');
@@ -584,7 +603,7 @@ describe('OmniChatStudioPage', () => {
       system_prompt: '',
       personality: '',
       scenario: '',
-      first_message: '',
+      first_message: 'Ready when you are.',
       example_dialogue: '',
       post_history_instructions: '',
       alternate_greetings: [],
