@@ -134,6 +134,33 @@ describe('QuickChatDialog', () => {
     expect(reply).toHaveFocus();
   });
 
+  it('grows the mobile composer with its content and scrolls new transcript content into view', async () => {
+    render(
+      <QuickChatDialog
+        isOpen
+        persona={persona}
+        onClose={vi.fn()}
+        onContinue={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    const reply = screen.getByLabelText('Reply to The Archivist') as HTMLTextAreaElement;
+    const transcript = document.querySelector<HTMLElement>('[aria-live="polite"]');
+    expect(transcript).not.toBeNull();
+    Object.defineProperty(reply, 'scrollHeight', { configurable: true, value: 96 });
+    Object.defineProperty(transcript, 'scrollHeight', { configurable: true, value: 720 });
+    const scrollTo = vi.fn();
+    Object.defineProperty(transcript, 'scrollTo', { configurable: true, value: scrollTo });
+
+    fireEvent.change(reply, { target: { value: 'A reply long enough to grow.' } });
+    expect(reply.style.height).toBe('96px');
+    fireEvent.click(screen.getByRole('button', { name: 'Send reply' }));
+
+    await waitFor(() => {
+      expect(scrollTo).toHaveBeenCalledWith({ top: 720, behavior: 'smooth' });
+    });
+  });
+
   it('disables modal animation when the user requests reduced motion', () => {
     render(
       <QuickChatDialog

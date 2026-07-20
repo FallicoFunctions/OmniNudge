@@ -50,6 +50,8 @@ export default function QuickChatDialog({
   const [generationError, setGenerationError] = useState(false);
   const [continueError, setContinueError] = useState(false);
   const requestVersionRef = useRef(0);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const openingMessage = persona?.first_message?.trim() ?? '';
 
@@ -72,6 +74,22 @@ export default function QuickChatDialog({
       document.body.style.overflow = previousOverflow;
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    const transcriptElement = transcriptRef.current;
+    if (!transcriptElement || typeof transcriptElement.scrollTo !== 'function') return;
+    transcriptElement.scrollTo({
+      top: transcriptElement.scrollHeight,
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    });
+  }, [assistantReply, generationError, isGenerating, reduceMotion, submittedContent]);
+
+  useEffect(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+    composer.style.height = '0px';
+    composer.style.height = `${Math.min(Math.max(composer.scrollHeight, 44), 128)}px`;
+  }, [draft]);
 
   const transcript = useMemo(() => {
     const messages: BotMessage[] = [];
@@ -154,7 +172,7 @@ export default function QuickChatDialog({
       animation={reduceMotion ? 'none' : 'quick-chat'}
       restoreFocusTo={restoreFocusTo}
       overlayClassName="!z-[100] !items-end !justify-end !px-0 bg-black/70 backdrop-blur-sm sm:!items-center sm:!justify-center sm:!px-4"
-      className="flex h-[min(92dvh,760px)] w-full flex-col overflow-hidden rounded-t-[30px] border border-white/10 bg-[#11131c] shadow-[0_30px_100px_rgba(0,0,0,0.65)] sm:max-w-xl sm:rounded-[30px]"
+      className="flex h-[min(calc(100dvh-env(safe-area-inset-top,0px)),760px)] w-full flex-col overflow-hidden rounded-t-[30px] border border-white/10 bg-[#11131c] shadow-[0_30px_100px_rgba(0,0,0,0.65)] sm:h-[min(92dvh,760px)] sm:max-w-xl sm:rounded-[30px]"
     >
       {persona && (
         <>
@@ -187,7 +205,7 @@ export default function QuickChatDialog({
                 onClick={handleClose}
                 disabled={isContinuing}
                 aria-label={t('omnichat.quickChat.close')}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-black/20 text-white/65 transition hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-wait disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
+                className="omnichat-touch-target grid shrink-0 place-items-center rounded-full border border-white/10 bg-black/20 text-white/65 transition hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-wait disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
               >
                 <X size={18} />
               </button>
@@ -197,7 +215,11 @@ export default function QuickChatDialog({
             </p>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6" aria-live="polite">
+          <div
+            ref={transcriptRef}
+            className="min-h-0 flex-1 overscroll-y-contain overflow-y-auto px-4 py-5 sm:px-6"
+            aria-live="polite"
+          >
             {!openingMessage ? (
               <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
                 {t('omnichat.quickChat.openingUnavailable')}
@@ -235,7 +257,7 @@ export default function QuickChatDialog({
                     <button
                       type="button"
                       onClick={() => void generateReply(submittedContent)}
-                      className="mt-3 flex items-center gap-2 rounded-full border border-red-200/20 px-3 py-1.5 text-xs font-bold transition hover:bg-red-200/10 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-300"
+                      className="omnichat-touch-target mt-3 flex items-center gap-2 rounded-full border border-red-200/20 px-3 text-xs font-bold transition hover:bg-red-200/10 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-300"
                     >
                       <RotateCcw size={13} />
                       {t('omnichat.quickChat.retry')}
@@ -255,21 +277,23 @@ export default function QuickChatDialog({
             )}
           </div>
 
-          <footer className="shrink-0 border-t border-white/[0.08] bg-black/15 p-4 sm:p-5">
+          <footer className="omnichat-safe-bottom shrink-0 border-t border-white/[0.08] bg-black/15 px-4 pt-4 sm:p-5">
             {!submittedContent ? (
               <form onSubmit={handleSubmit} className="flex items-end gap-2.5">
                 <label htmlFor="quick-chat-reply" className="sr-only">
                   {t('omnichat.quickChat.replyLabel', { name: persona.name })}
                 </label>
                 <textarea
+                  ref={composerRef}
                   id="quick-chat-reply"
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                   placeholder={t('omnichat.quickChat.placeholder', { name: persona.name })}
                   rows={1}
+                  enterKeyHint="send"
                   maxLength={4000}
                   disabled={!openingMessage}
-                  className="min-h-11 max-h-32 flex-1 resize-none rounded-[20px] border border-white/10 bg-white/[0.055] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-blue-400/60 focus:bg-white/[0.075] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-h-11 max-h-32 flex-1 resize-none overflow-y-auto rounded-[20px] border border-white/10 bg-white/[0.055] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-blue-400/60 focus:bg-white/[0.075] disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 <button
                   type="submit"
@@ -305,7 +329,7 @@ export default function QuickChatDialog({
               <button
                 type="button"
                 onClick={() => onResume(existingConversation)}
-                className="mt-3 w-full text-center text-xs font-semibold text-white/50 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
+                className="omnichat-touch-target mt-3 flex w-full items-center justify-center text-center text-xs font-semibold text-white/50 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
               >
                 {t('omnichat.quickChat.resumeExisting')}
               </button>

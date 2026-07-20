@@ -19,7 +19,7 @@ vi.mock('../../../hooks/useMediaQuery', () => ({
   useMediaQuery: () => mockIsAutoCollapseWidth,
 }));
 
-function renderShell() {
+function renderShell(activeTab: 'discover' | 'chat' = 'chat') {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -30,7 +30,7 @@ function renderShell() {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <OmniChatShell activeTab="chat" onTabChange={() => {}}>
+        <OmniChatShell activeTab={activeTab} onTabChange={() => {}}>
           <div>Chat content</div>
         </OmniChatShell>
       </MemoryRouter>
@@ -82,5 +82,25 @@ describe('OmniChatShell sidebar auto-collapse', () => {
 
     expect(localStorage.getItem('omnichat_sidebar_collapsed')).toBe('false');
     expect(getDesktopToggle('Close menu')).toBeInTheDocument();
+  });
+
+  it('keeps the floating guest prompt off the chat composer but shows it on Discover', () => {
+    mockIsAuthenticated = false;
+    const { rerender } = renderShell('chat');
+
+    expect(screen.queryByTestId('omnichat-guest-save-prompt')).not.toBeInTheDocument();
+
+    const queryClient = new QueryClient();
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <OmniChatShell activeTab="discover" onTabChange={() => {}}>
+            <div>Discover content</div>
+          </OmniChatShell>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByTestId('omnichat-guest-save-prompt')).toBeInTheDocument();
   });
 });

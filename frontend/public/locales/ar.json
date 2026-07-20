@@ -4026,7 +4026,9 @@
       "historyLoadError": "تعذّر تحميل سجل المحادثة",
       "emptyWorkspace": "لا توجد محادثة نشطة بعد",
       "profile": "الملف الشخصي",
-      "gallery": "المعرض"
+      "gallery": "المعرض",
+      "showProfileImage": "عرض صورة الملف الشخصي",
+      "showProfileVideo": "عرض فيديو الملف الشخصي"
     },
     "exitToSite": "الخروج إلى OmniNudge",
     "header": {
@@ -4040,6 +4042,8 @@
       "chat": "الدردشة",
       "studio": "الاستوديو",
       "searchPlaceholder": "البحث عن شخصيات...",
+      "clearSearch": "مسح البحث",
+      "closeSearch": "إغلاق البحث",
       "noResults": "لم يتم العثور على نتائج",
       "collapse": "طي الشريط الجانبي",
       "expand": "توسيع الشريط الجانبي",
