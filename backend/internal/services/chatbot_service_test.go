@@ -99,7 +99,7 @@ func TestResponseStyleEndingRulesDifferByPersonaRole(t *testing.T) {
 		ResponseStyleProfile: models.ResponseStyleProfileProfessional,
 	}, nil, nil)
 
-	require.Contains(t, natural, "Do not add a question")
+	require.Contains(t, natural, "Do not end the reply with a question")
 	require.Contains(t, narrative, "End each turn with a playable opening")
 	require.Contains(t, professional, "a question is not required")
 }
@@ -113,6 +113,56 @@ func TestBuildStarterMessagePrefersFirstMessage(t *testing.T) {
 
 	require.Equal(t, "The fire crackles.", service.BuildStarterMessage(persona))
 	require.True(t, strings.TrimSpace(service.BuildStarterMessage(&models.BotPersona{})) == "")
+}
+
+func TestSendPreviewMessageAllowsOnlyPublicOrOwnedPersonas(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	userRepo := models.NewUserRepository(db.Pool)
+	owner := &models.User{Username: fmt.Sprintf("preview_owner_%d", time.Now().UnixNano()), PasswordHash: "hash", Role: "user"}
+	other := &models.User{Username: fmt.Sprintf("preview_other_%d", time.Now().UnixNano()), PasswordHash: "hash", Role: "user"}
+	require.NoError(t, userRepo.Create(ctx, owner))
+	require.NoError(t, userRepo.Create(ctx, other))
+
+	personaRepo := models.NewBotPersonaRepository(db.Pool)
+	privatePersona, err := personaRepo.CreateOwned(ctx, owner.ID, &models.BotPersona{
+		Slug:               fmt.Sprintf("preview-private-%d", time.Now().UnixNano()),
+		Name:               "Private Guide",
+		Category:           models.PersonaCategoryOriginal,
+		Visibility:         "private",
+		SourceFormat:       "native",
+		SystemPrompt:       "Stay in character.",
+		FirstMessage:       "You found me.",
+		AlternateGreetings: []string{},
+		Tags:               []string{},
+		GalleryURLs:        []string{},
+		ExtensionsJSON:     json.RawMessage(`{}`),
+		IsActive:           true,
+	})
+	require.NoError(t, err)
+
+	service := NewChatbotService(db.Pool, personaRepo, nil, nil, stubChatCompletionClient{
+		generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+			require.NotEmpty(t, messages)
+			return "A private reply.", nil
+		},
+	}, nil)
+
+	reply, failed, err := service.SendPreviewMessage(ctx, privatePersona.ID, &owner.ID, "Hello", nil)
+	require.NoError(t, err)
+	require.False(t, failed)
+	require.Equal(t, "A private reply.", reply)
+
+	_, _, err = service.SendPreviewMessage(ctx, privatePersona.ID, &other.ID, "Hello", nil)
+	require.ErrorIs(t, err, ErrNotFound)
+	_, _, err = service.SendPreviewMessage(ctx, privatePersona.ID, nil, "Hello", nil)
+	require.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestNormalizeAssistantMessageContentRemovesBoundaryWhitespace(t *testing.T) {

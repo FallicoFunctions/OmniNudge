@@ -1038,7 +1038,7 @@ func main() {
 		omniChatPublic.Use(middleware.AuthOptional(authService))
 		{
 			omniChatPublic.GET("/personas", omniChatHandler.ListPersonas)
-			omniChatPublic.POST("/anonymous/messages", omniChatRateLimiter.Middleware(), omniChatHandler.AnonymousSendMessage)
+			omniChatPublic.POST("/preview/messages", omniChatRateLimiter.Middleware(), omniChatHandler.PreviewSendMessage)
 		}
 
 		// Protected routes (auth required)

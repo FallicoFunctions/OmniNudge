@@ -42,7 +42,7 @@ Keep the character's established voice, opinions, knowledge, and boundaries. Res
 Avoid canned conversational bridges, generic therapy language, repetitive physical tells, mixed-emotion formulas, and habitual rhetorical contrasts such as "not X, but Y." Use actions and sensory detail only when they add something specific. Prefer plain punctuation over frequent em dashes or semicolons, and avoid decorative metaphor unless it belongs to the character.
 Let sentence length and rhythm vary naturally. Fragments are fine. Do not use a mechanical response template.`
 
-const naturalDialogueEndingV1 = `Do not add a question, invitation, recap, or call to action merely to keep the conversation going. A statement, reaction, joke, disagreement, or moment of silence can be a complete reply.`
+const naturalDialogueEndingV1 = `Do not end the reply with a question, invitation, recap, or call to action. Normal conversation does not need a prompt for the user to continue. End with a statement, reaction, joke, disagreement, or moment of silence instead.`
 
 const leanNarrativeEndingV1 = `Keep narration concise, concrete, and committed to a clear outcome. End each turn with a playable opening: an immediate situation, meaningful decision, or direct question the user can act on. Vary how that opening is phrased.`
 
@@ -336,17 +336,17 @@ func (s *ChatbotService) persistAssistantFallback(ctx context.Context, conversat
 	return assistantMsg, nil
 }
 
-// ChatMessage is a single turn in the chat, used by the anonymous endpoint.
+// ChatMessage is a single turn in an ephemeral chat preview.
 type ChatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-// SendAnonymousMessage generates a persona reply for an unauthenticated user.
-// No messages are persisted and no WebSocket streaming is performed — the
-// frontend owns all conversation state in memory.
-func (s *ChatbotService) SendAnonymousMessage(ctx context.Context, personaID int, content string, history []ChatMessage) (string, bool, error) {
-	persona, err := s.personaRepo.GetAccessibleByID(ctx, personaID, nil)
+// SendPreviewMessage generates one ephemeral persona reply. Public personas
+// are available to everyone; authenticated users may also preview personas
+// they own. No messages are persisted and no WebSocket stream is created.
+func (s *ChatbotService) SendPreviewMessage(ctx context.Context, personaID int, viewerUserID *int, content string, history []ChatMessage) (string, bool, error) {
+	persona, err := s.personaRepo.GetAccessibleByID(ctx, personaID, viewerUserID)
 	if err != nil {
 		return "", false, fmt.Errorf("chatbot: load persona: %w", err)
 	}
@@ -364,7 +364,7 @@ func (s *ChatbotService) SendAnonymousMessage(ctx context.Context, personaID int
 	fullText, genErr := s.openrouter.Generate(ctx, messages, nil)
 	if genErr != nil {
 		zlog.Warn().Err(genErr).Int("persona_id", personaID).
-			Msg("chatbot: anonymous generation failed")
+			Msg("chatbot: preview generation failed")
 		return userFacingGenerationError(genErr), true, genErr
 	}
 	return normalizeAssistantMessageContent(fullText), false, nil

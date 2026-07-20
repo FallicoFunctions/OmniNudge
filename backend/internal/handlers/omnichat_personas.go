@@ -471,6 +471,12 @@ func normalizePersonaDefinitionRequest(userID int, existing *models.BotPersona, 
 	}
 
 	alternateGreetings := normalizeStringList(req.AlternateGreetings, maxPersonaAlternateGreetings)
+	if firstMessage == "" && len(alternateGreetings) > 0 {
+		firstMessage = alternateGreetings[0]
+	}
+	if firstMessage == "" {
+		return nil, fmt.Errorf("first message is required")
+	}
 	tags := normalizeStringList(req.Tags, maxPersonaTags)
 
 	extensionsJSON, err := normalizeJSONObject(req.ExtensionsJSON, true)

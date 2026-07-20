@@ -53,7 +53,7 @@ type BotPersona struct {
 	SystemPrompt            string          `json:"-"`
 	Personality             string          `json:"-"`
 	Scenario                string          `json:"-"`
-	FirstMessage            string          `json:"-"`
+	FirstMessage            string          `json:"first_message"`
 	ExampleDialogue         string          `json:"-"`
 	ResponseStyleProfile    string          `json:"response_style_profile,omitempty"`
 	PostHistoryInstructions string          `json:"-"`

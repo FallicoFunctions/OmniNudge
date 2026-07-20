@@ -11,13 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBotPersonaJSONOmitsSystemPrompt(t *testing.T) {
+func TestBotPersonaJSONExposesOpeningButOmitsPrivatePromptFields(t *testing.T) {
 	persona := BotPersona{
 		ID:           1,
 		Slug:         "narrator",
 		Name:         "Narrator",
 		Category:     PersonaCategoryRoleplay,
 		SystemPrompt: "top secret prompt",
+		FirstMessage: "Welcome to the archive.",
 		IsNSFW:       false,
 		IsActive:     true,
 		CreatedAt:    time.Now(),
@@ -28,6 +29,7 @@ func TestBotPersonaJSONOmitsSystemPrompt(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, string(payload), "system_prompt")
 	require.NotContains(t, string(payload), "top secret prompt")
+	require.Contains(t, string(payload), `"first_message":"Welcome to the archive."`)
 }
 
 func TestBotConversationRepositoryCreateWithMessagesRollsBackOnFailure(t *testing.T) {
