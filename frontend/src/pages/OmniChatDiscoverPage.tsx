@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +30,11 @@ import {
   type MobilePreviewState,
   type PreviewResumeMode,
 } from '../utils/omnichatMobilePreview';
+import {
+  findPersonaTransitionElement,
+  OMNICHAT_PERSONA_TRANSITION_NAME,
+  runPersonaSharedElementTransition,
+} from '../utils/omnichatViewTransitions';
 
 // Stable reference so the useMemo hooks below don't see a "new" array on
 // every render while personas are still loading.
@@ -160,7 +166,7 @@ function PersonaCard({
   cardRef,
 }: {
   persona: BotPersona;
-  onSelect: (persona: BotPersona) => void;
+  onSelect: (persona: BotPersona, trigger?: HTMLElement) => void;
   featured?: boolean;
   allowMobileAutoplay?: boolean;
   mobilePreviewActive?: boolean;
@@ -180,8 +186,9 @@ function PersonaCard({
   return (
     <button
       ref={cardRef}
+      data-persona-id={persona.id}
       type="button"
-      onClick={() => onSelect(persona)}
+      onClick={(event) => onSelect(persona, event.currentTarget)}
       onMouseEnter={(event) => {
         setIsHovered(true);
         if (!isMobile) {
@@ -199,7 +206,7 @@ function PersonaCard({
         setIsHovered(false);
         setDesktopDescriptionExpanded(false);
       }}
-      className={`group relative w-full overflow-hidden rounded-[26px] border border-white/[0.08] bg-white/[0.035] text-left shadow-[0_18px_45px_rgba(0,0,0,0.18)] transition-all duration-500 hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_24px_70px_rgba(0,0,0,0.38)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)] focus-visible:outline-offset-2 ${
+      className={`group relative w-full overflow-hidden rounded-[26px] border border-white/[0.08] bg-white/[0.035] text-left shadow-[0_18px_45px_rgba(0,0,0,0.18)] transition-all duration-500 hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_24px_70px_rgba(0,0,0,0.38)] active:translate-y-0 active:scale-[0.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)] focus-visible:outline-offset-2 ${
         featured ? 'aspect-[16/10]' : 'aspect-[4/5]'
       }`}
     >
@@ -261,6 +268,10 @@ export default function OmniChatDiscoverPage() {
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('discover');
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [quickChatPersona, setQuickChatPersona] = useState<BotPersona | null>(null);
+  const [quickChatFocusReturn, setQuickChatFocusReturn] = useState<HTMLElement | null>(null);
+  const quickChatOriginRef = useRef<HTMLElement | null>(null);
+  const heroAvatarRef = useRef<HTMLDivElement | null>(null);
+  const searchReturnRef = useRef<HTMLButtonElement | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useMediaQuery('(max-width: 767px)');
   const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
@@ -294,6 +305,7 @@ export default function OmniChatDiscoverPage() {
 
   const handleSidebarTabChange = useCallback((tab: SidebarTab) => {
     if (tab === 'search') {
+      searchReturnRef.current = null;
       setSearchOverlayOpen(true);
       // Reset to discover tab after opening overlay
       setSidebarTab('discover');
@@ -336,10 +348,6 @@ export default function OmniChatDiscoverPage() {
         undefined,
         loadOmniChatDefaults('authenticated')
       ),
-    onSuccess: (conversation) => {
-      queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
-      navigate(`/omnichat/c/${conversation.id}`);
-    },
   });
 
   const personas = personasQuery.data ?? EMPTY_PERSONAS;
@@ -406,22 +414,99 @@ export default function OmniChatDiscoverPage() {
   const findConversationForPersona = (personaId: number) =>
     conversations.find((c) => Number(c.persona_id) === Number(personaId));
 
-  const handleSelect = (persona: BotPersona) => {
-    setQuickChatPersona(persona);
+  const handleSelect = (
+    persona: BotPersona,
+    trigger?: HTMLElement,
+    returnTarget?: HTMLElement,
+    focusReturnTarget?: HTMLElement
+  ) => {
+    const source = findPersonaTransitionElement(trigger ?? null);
+    const selectedFromSearch = Boolean(
+      trigger?.closest('[data-omnichat-search-overlay="true"]')
+    );
+    quickChatOriginRef.current =
+      findPersonaTransitionElement(returnTarget ?? null) ??
+      returnTarget ??
+      (selectedFromSearch ? searchReturnRef.current : null) ??
+      source;
+    setQuickChatFocusReturn(
+      focusReturnTarget ??
+      returnTarget ??
+      (selectedFromSearch ? searchReturnRef.current : null) ??
+      trigger?.closest<HTMLElement>('button, a, [tabindex]:not([tabindex="-1"])') ??
+      null
+    );
+    runPersonaSharedElementTransition({
+      source,
+      sourceState: 'old',
+      disabled: reduceMotion,
+      counterpart: () =>
+        document.querySelector<HTMLElement>('[data-quick-chat-shared-avatar="true"]'),
+      update: () => {
+        flushSync(() => setQuickChatPersona(persona));
+      },
+    });
+  };
+
+  const handleCloseQuickChat = () => {
+    runPersonaSharedElementTransition({
+      source: quickChatOriginRef.current,
+      sourceState: 'new',
+      disabled: reduceMotion,
+      counterpart: () =>
+        document.querySelector<HTMLElement>('[data-quick-chat-shared-avatar="true"]'),
+      update: () => {
+        flushSync(() => setQuickChatPersona(null));
+      },
+    });
+  };
+
+  const navigateFromQuickChat = (
+    to: string,
+    state?: Record<string, unknown>
+  ) => {
+    const destinationState = { ...state, fromQuickChat: true };
+    const quickChatAvatar = document.querySelector<HTMLElement>(
+      '[data-quick-chat-shared-avatar="true"]'
+    );
+
+    runPersonaSharedElementTransition({
+      source: quickChatAvatar,
+      sourceState: 'old',
+      disabled: reduceMotion,
+      counterpart: () =>
+        document.querySelector<HTMLElement>(
+          `[data-persona-avatar="true"][style*="${OMNICHAT_PERSONA_TRANSITION_NAME}"]`
+        ),
+      update: () => {
+        flushSync(() => navigate(to, { state: destinationState }));
+      },
+    });
   };
 
   const handleContinueQuickChat = async (messages: BotMessage[]) => {
     if (!quickChatPersona) return;
     if (!isAuthenticated) {
-      navigate(`/omnichat/c/guest?persona=${quickChatPersona.id}`, {
-        state: { forkedMessages: messages },
+      navigateFromQuickChat(`/omnichat/c/guest?persona=${quickChatPersona.id}`, {
+        forkedMessages: messages,
       });
       return;
     }
-    await createConversationMutation.mutateAsync({
+    const conversation = await createConversationMutation.mutateAsync({
       personaId: quickChatPersona.id,
       messages,
     });
+    const conversationWithPersona = { ...conversation, persona: quickChatPersona };
+    queryClient.setQueryData<BotConversation[]>(omnichatQueryKeys.conversations, (current = []) => [
+      conversationWithPersona,
+      ...current.filter((candidate) => candidate.id !== conversation.id),
+    ]);
+    queryClient.setQueryData(omnichatQueryKeys.conversation(conversation.id), {
+      conversation: conversationWithPersona,
+      messages,
+    });
+    void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
+    navigateFromQuickChat(`/omnichat/c/${conversation.id}`);
   };
 
   return (
@@ -438,9 +523,12 @@ export default function OmniChatDiscoverPage() {
         existingConversation={
           quickChatPersona ? findConversationForPersona(quickChatPersona.id) : undefined
         }
-        onClose={() => setQuickChatPersona(null)}
+        onClose={handleCloseQuickChat}
         onContinue={handleContinueQuickChat}
-        onResume={(conversation) => navigate(`/omnichat/c/${conversation.id}`)}
+        onResume={(conversation) => navigateFromQuickChat(`/omnichat/c/${conversation.id}`)}
+        reduceMotion={reduceMotion}
+        sharedElementName={OMNICHAT_PERSONA_TRANSITION_NAME}
+        restoreFocusTo={quickChatFocusReturn}
       />
 
       <div className="h-[calc(100dvh-72px)] overflow-y-auto scroll-smooth">
@@ -453,6 +541,7 @@ export default function OmniChatDiscoverPage() {
               <div className="absolute inset-0 sm:left-[38%]">
                 <PersonaAvatar
                   persona={heroPersona}
+                  rootRef={heroAvatarRef}
                   className="h-full w-full !rounded-none"
                   previewEnabled={Boolean(heroPersona.preview_video_url) && !isMobile}
                   previewActive={!isMobile}
@@ -477,16 +566,27 @@ export default function OmniChatDiscoverPage() {
                 <div className="mt-7 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => handleSelect(heroPersona)}
-                    className="group flex h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-[#101118] shadow-[0_12px_30px_rgba(255,255,255,0.14)] transition hover:-translate-y-0.5 hover:bg-blue-50"
+                    onClick={(event) =>
+                      handleSelect(
+                        heroPersona,
+                        heroAvatarRef.current ?? undefined,
+                        undefined,
+                        event.currentTarget
+                      )
+                    }
+                    className="group flex h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-[#101118] shadow-[0_12px_30px_rgba(255,255,255,0.14)] transition hover:-translate-y-0.5 hover:bg-blue-50 active:translate-y-0 active:scale-[0.98]"
                   >
                     {t('omnichat.discover.enterPersona', { name: heroPersona.name })}
                     <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
                   </button>
                   <button
+                    ref={searchReturnRef}
                     type="button"
-                    onClick={() => setSearchOverlayOpen(true)}
-                    className="flex h-11 items-center gap-2 rounded-full border border-white/15 bg-black/20 px-5 text-sm font-semibold text-white backdrop-blur-md transition hover:border-white/30 hover:bg-white/10"
+                    onClick={(event) => {
+                      searchReturnRef.current = event.currentTarget;
+                      setSearchOverlayOpen(true);
+                    }}
+                    className="flex h-11 items-center gap-2 rounded-full border border-white/15 bg-black/20 px-5 text-sm font-semibold text-white backdrop-blur-md transition hover:border-white/30 hover:bg-white/10 active:scale-[0.98]"
                   >
                     <SearchIcon size={16} />
                     {t('omnichat.discover.searchCharacters')}
@@ -633,7 +733,10 @@ export default function OmniChatDiscoverPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setSearchOverlayOpen(true)}
+                onClick={(event) => {
+                  searchReturnRef.current = event.currentTarget;
+                  setSearchOverlayOpen(true);
+                }}
                 className="flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-4 text-xs font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
               >
                 <SearchIcon size={14} />

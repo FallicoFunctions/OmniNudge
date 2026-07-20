@@ -14,6 +14,9 @@ type QuickChatDialogProps = {
   onClose: () => void;
   onContinue: (messages: BotMessage[]) => Promise<void>;
   onResume?: (conversation: BotConversation) => void;
+  reduceMotion?: boolean;
+  sharedElementName?: string;
+  restoreFocusTo?: HTMLElement | null;
 };
 
 function createPreviewMessage(id: number, role: BotMessage['role'], content: string): BotMessage {
@@ -34,6 +37,9 @@ export default function QuickChatDialog({
   onClose,
   onContinue,
   onResume,
+  reduceMotion = false,
+  sharedElementName,
+  restoreFocusTo,
 }: QuickChatDialogProps) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState('');
@@ -145,6 +151,8 @@ export default function QuickChatDialog({
       closeOnOverlayClick={!isContinuing}
       ariaLabelledBy="quick-chat-title"
       ariaDescribedBy="quick-chat-description"
+      animation={reduceMotion ? 'none' : 'quick-chat'}
+      restoreFocusTo={restoreFocusTo}
       overlayClassName="!z-[100] !items-end !justify-end !px-0 bg-black/70 backdrop-blur-sm sm:!items-center sm:!justify-center sm:!px-4"
       className="flex h-[min(92dvh,760px)] w-full flex-col overflow-hidden rounded-t-[30px] border border-white/10 bg-[#11131c] shadow-[0_30px_100px_rgba(0,0,0,0.65)] sm:max-w-xl sm:rounded-[30px]"
     >
@@ -156,10 +164,16 @@ export default function QuickChatDialog({
             </div>
             <div className="absolute inset-0 bg-gradient-to-b from-[#11131c]/55 to-[#11131c]" />
             <div className="relative flex items-center gap-4">
-              <PersonaAvatar
-                persona={persona}
-                className="h-14 w-14 shrink-0 rounded-2xl border border-white/15 shadow-lg"
-              />
+              <div
+                data-quick-chat-shared-avatar="true"
+                className="h-14 w-14 shrink-0 rounded-2xl"
+                style={sharedElementName ? { viewTransitionName: sharedElementName } : undefined}
+              >
+                <PersonaAvatar
+                  persona={persona}
+                  className="h-full w-full rounded-2xl border border-white/15 shadow-lg"
+                />
+              </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-200/65">
                   {t('omnichat.quickChat.eyebrow')}
@@ -173,7 +187,7 @@ export default function QuickChatDialog({
                 onClick={handleClose}
                 disabled={isContinuing}
                 aria-label={t('omnichat.quickChat.close')}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-black/20 text-white/65 transition hover:border-white/20 hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-black/20 text-white/65 transition hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-wait disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
               >
                 <X size={18} />
               </button>
@@ -221,7 +235,7 @@ export default function QuickChatDialog({
                     <button
                       type="button"
                       onClick={() => void generateReply(submittedContent)}
-                      className="mt-3 flex items-center gap-2 rounded-full border border-red-200/20 px-3 py-1.5 text-xs font-bold transition hover:bg-red-200/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-300"
+                      className="mt-3 flex items-center gap-2 rounded-full border border-red-200/20 px-3 py-1.5 text-xs font-bold transition hover:bg-red-200/10 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-300"
                     >
                       <RotateCcw size={13} />
                       {t('omnichat.quickChat.retry')}
@@ -261,7 +275,7 @@ export default function QuickChatDialog({
                   type="submit"
                   disabled={!draft.trim() || !openingMessage}
                   aria-label={t('omnichat.quickChat.send')}
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-600 text-white shadow-[0_10px_28px_rgba(37,99,235,0.3)] transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-600 text-white shadow-[0_10px_28px_rgba(37,99,235,0.3)] transition hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
                 >
                   <Send size={17} />
                 </button>
@@ -272,7 +286,7 @@ export default function QuickChatDialog({
                   type="button"
                   onClick={() => void handleContinue()}
                   disabled={isContinuing}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-black text-white shadow-[0_14px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-black text-white shadow-[0_14px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-500 active:scale-[0.985] disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
                 >
                   {isContinuing ? <Loader2 size={17} className="animate-spin" /> : <ArrowRight size={17} />}
                   {isContinuing ? t('omnichat.quickChat.openingChat') : t('omnichat.quickChat.continue')}

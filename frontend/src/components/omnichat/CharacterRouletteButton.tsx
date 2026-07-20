@@ -42,13 +42,15 @@ export default function CharacterRouletteButton({
   reduceMotion = false,
 }: {
   personas: BotPersona[];
-  onSelect: (persona: BotPersona) => void;
+  onSelect: (persona: BotPersona, trigger?: HTMLElement, returnTarget?: HTMLElement) => void;
   reduceMotion?: boolean;
 }) {
   const { t } = useTranslation();
   const eligiblePersonas = useMemo(() => getRouletteEligiblePersonas(personas), [personas]);
   const [revealPersona, setRevealPersona] = useState<BotPersona | null>(null);
   const previousPersonaIdRef = useRef<number | undefined>(undefined);
+  const revealAvatarRef = useRef<HTMLDivElement | null>(null);
+  const rouletteButtonRef = useRef<HTMLButtonElement | null>(null);
   const revealTimerRef = useRef<number | null>(null);
   const isShuffling = revealPersona !== null;
 
@@ -76,27 +78,31 @@ export default function CharacterRouletteButton({
 
     setRevealPersona(selectedPersona);
     revealTimerRef.current = window.setTimeout(() => {
+      const revealAvatar = revealAvatarRef.current;
       setRevealPersona(null);
       revealTimerRef.current = null;
-      onSelect(selectedPersona);
+      onSelect(selectedPersona, revealAvatar ?? undefined, rouletteButtonRef.current ?? undefined);
     }, ROULETTE_REVEAL_MS);
   };
 
   return (
     <>
       <button
+        ref={rouletteButtonRef}
         type="button"
         onClick={handleRoulette}
         disabled={eligiblePersonas.length === 0}
         aria-disabled={isShuffling || eligiblePersonas.length === 0}
         aria-busy={isShuffling}
-        className="group flex h-11 items-center gap-2 rounded-full border border-blue-300/30 bg-blue-500/15 px-5 text-sm font-bold text-blue-50 shadow-[0_10px_28px_rgba(37,99,235,0.13)] backdrop-blur-md transition hover:-translate-y-0.5 hover:border-blue-200/55 hover:bg-blue-500/25 disabled:cursor-not-allowed aria-disabled:cursor-wait aria-disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
+        className="group flex h-11 items-center gap-2 rounded-full border border-blue-300/30 bg-blue-500/15 px-5 text-sm font-bold text-blue-50 shadow-[0_10px_28px_rgba(37,99,235,0.13)] backdrop-blur-md transition hover:-translate-y-0.5 hover:border-blue-200/55 hover:bg-blue-500/25 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed aria-disabled:cursor-wait aria-disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
       >
-        {isShuffling ? (
-          <Loader2 size={16} className="animate-spin" />
-        ) : (
-          <Dices size={16} className="transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-110" />
-        )}
+        <span className="grid h-4 w-4 place-items-center" aria-hidden="true">
+          {isShuffling ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Dices size={16} className="transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-110" />
+          )}
+        </span>
         {isShuffling
           ? t('omnichat.discover.rouletteShuffling')
           : t('omnichat.discover.roulette')}
@@ -118,6 +124,7 @@ export default function CharacterRouletteButton({
                 <div className="absolute -inset-10 rounded-[46px] border border-blue-300/10" aria-hidden="true" />
                 <PersonaAvatar
                   persona={revealPersona}
+                  rootRef={revealAvatarRef}
                   hideOverlay
                   className="h-28 w-28 rounded-[28px] border border-white/15 shadow-[0_24px_70px_rgba(37,99,235,0.35)]"
                 />

@@ -8,7 +8,7 @@ interface SearchOverlayProps {
   isOpen: boolean;
   onClose: () => void;
   personas: BotPersona[];
-  onSelectPersona: (persona: BotPersona) => void;
+  onSelectPersona: (persona: BotPersona, trigger?: HTMLElement) => void;
 }
 
 export default function SearchOverlay({
@@ -71,7 +71,7 @@ export default function SearchOverlay({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col">
+    <div data-omnichat-search-overlay="true" className="fixed inset-0 z-50 flex flex-col">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
@@ -125,11 +125,11 @@ export default function SearchOverlay({
                 <button
                   key={persona.id}
                   type="button"
-                  onClick={() => {
-                    onSelectPersona(persona);
+                  onClick={(event) => {
                     onClose();
+                    onSelectPersona(persona, event.currentTarget);
                   }}
-                  className="flex w-full items-center gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-colors hover:bg-[var(--color-surface-elevated)]"
+                  className="flex w-full items-center gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-all hover:-translate-y-0.5 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-elevated)] active:translate-y-0 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)] focus-visible:outline-offset-2"
                 >
                   <PersonaAvatar
                     persona={persona}

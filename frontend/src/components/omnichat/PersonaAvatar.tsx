@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type CSSProperties, type Ref } from 'react';
 import { getPersonaGradient } from '../../utils/personaGradients';
 import type { BotPersona } from '../../types/omnichat';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
@@ -13,6 +13,8 @@ export default function PersonaAvatar({
   loopPreview = true,
   previewVersion = 0,
   hideOverlay = false,
+  rootRef,
+  style,
   onPreviewEnded,
 }: {
   persona: BotPersona;
@@ -24,6 +26,8 @@ export default function PersonaAvatar({
   loopPreview?: boolean;
   previewVersion?: number;
   hideOverlay?: boolean;
+  rootRef?: Ref<HTMLDivElement>;
+  style?: CSSProperties;
   onPreviewEnded?: () => void;
 }) {
   const gradient = getPersonaGradient(persona);
@@ -83,7 +87,12 @@ export default function PersonaAvatar({
   }, [previewActive, previewVersion, resetOnInactive, shouldRenderPreview]);
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl ${className}`}>
+    <div
+      ref={rootRef}
+      data-persona-avatar="true"
+      className={`relative overflow-hidden rounded-2xl ${className}`}
+      style={style}
+    >
       {avatarSrc ? (
         <img
           src={avatarSrc}
