@@ -17,6 +17,7 @@ import PersonaAvatar from '../components/omnichat/PersonaAvatar';
 import SearchOverlay from '../components/omnichat/SearchOverlay';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
 import QuickChatDialog from '../components/omnichat/QuickChatDialog';
+import CharacterRouletteButton from '../components/omnichat/CharacterRouletteButton';
 import type { SidebarTab } from '../components/omnichat/OmniChatSidebar';
 import type { BotConversation, BotMessage, BotPersona } from '../types/omnichat';
 import { loadOmniChatDefaults } from '../utils/omnichatDefaults';
@@ -262,6 +263,7 @@ export default function OmniChatDiscoverPage() {
   const [quickChatPersona, setQuickChatPersona] = useState<BotPersona | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useMediaQuery('(max-width: 767px)');
+  const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
 
   // Initialize search overlay from URL (e.g. /omnichat?search=foo from chat page search tab)
   useEffect(() => {
@@ -489,6 +491,11 @@ export default function OmniChatDiscoverPage() {
                     <SearchIcon size={16} />
                     {t('omnichat.discover.searchCharacters')}
                   </button>
+                  <CharacterRouletteButton
+                    personas={personas}
+                    onSelect={handleSelect}
+                    reduceMotion={reduceMotion}
+                  />
                 </div>
                 <div className="mt-7 flex items-center gap-3 text-xs text-white/45">
                   <span className="h-px w-8 bg-gradient-to-r from-blue-400 to-transparent" />
