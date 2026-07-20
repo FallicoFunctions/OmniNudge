@@ -21,6 +21,14 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
   { name: 'main-stage-blocker-front-stage', x: 0, y: 5, z: 14, width: 78, height: 10, depth: 4 },
   { name: 'main-stage-blocker-cascade-court-left', x: -49, y: 3, z: -28.5, width: 36, height: 6, depth: 23 },
   { name: 'main-stage-blocker-cascade-court-right', x: 49, y: 3, z: -28.5, width: 36, height: 6, depth: 23 },
+  // The basin foliage hedges guarding the sunken water strip (|x| 8.3..17.3)
+  // end at z 9.2, but the water runs to z 23.2: without these caps the
+  // avatar can step off the outer coping walkway and wade through the
+  // water's unhedged north tip (verified live).
+  // The east edge tucks 0.5 under the outer walkway floor: a zero-gap seam
+  // let the capsule wedge into the box rim when stepping off the edge.
+  { name: 'main-stage-blocker-basin-water-north-left', x: -13.05, y: 1.5, z: 16.3, width: 9.5, height: 3, depth: 14.2 },
+  { name: 'main-stage-blocker-basin-water-north-right', x: 13.05, y: 1.5, z: 16.3, width: 9.5, height: 3, depth: 14.2 },
 ];
 
 const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [

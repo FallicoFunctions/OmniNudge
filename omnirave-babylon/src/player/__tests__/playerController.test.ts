@@ -106,6 +106,46 @@ describe('createPlayerController', () => {
     expect(controller.grounded).toBe(true);
   });
 
+  it('ejects out of overlapping solids instead of walking through them pinned inside', () => {
+    // Live regression: per-box nearest-face ejection churned when two solids
+    // overlapped - the wall-relief blocker's east face sat INSIDE the basin
+    // water blocker, so the last-iterated box pinned x inside the water box
+    // while z walked the avatar straight through the "solid" water zone.
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const ground = MeshBuilder.CreateGround('collision-ground', { width: 200, height: 200 }, scene);
+    // wall-relief-style: tall thin slab whose east face lands inside the water box
+    const wallRelief = MeshBuilder.CreateBox('wall-relief', { width: 2, height: 6, depth: 62 }, scene);
+    wallRelief.position.set(7.2, 1, -8);
+    wallRelief.computeWorldMatrix(true);
+    // water-north-style: wide box overlapping the wall relief's east edge
+    const waterBox = MeshBuilder.CreateBox('water-box', { width: 9.5, height: 3, depth: 14.2 }, scene);
+    waterBox.position.set(13.05, 1.5, 16.3);
+    waterBox.computeWorldMatrix(true);
+    const rig = createPlayerRig(scene, new Vector3(12, 1.65, 16)); // inside the water box
+    const avatarRoot = new TransformNode('avatar-root', scene);
+    const camera = new FreeCamera('camera', new Vector3(12, 2, 11), scene);
+    camera.setTarget(new Vector3(12, 2, 16)); // forward = +z (north)
+    const input = createInput({ forward: true });
+    const controller = createPlayerController({
+      avatarRoot,
+      camera,
+      collisionMeshes: [ground],
+      input,
+      playerRig: rig,
+      solidCollisionMeshes: [waterBox, wallRelief],
+    });
+
+    for (let i = 0; i < 120; i++) {
+      controller.step(1 / 60);
+    }
+
+    // must be ejected from the union, not pinned inside walking north
+    const p = rig.root.position;
+    const insideWater = p.x > 7.95 && p.x < 18.15 && p.z > 8.85 && p.z < 23.75;
+    expect(insideWater).toBe(false);
+  });
+
   it('blocks movement that crosses through a solid mesh between frames', () => {
     engine = new NullEngine();
     const scene = new Scene(engine);
