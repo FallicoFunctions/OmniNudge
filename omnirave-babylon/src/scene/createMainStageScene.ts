@@ -35,8 +35,12 @@ const PLAYABLE_START_CAMERA: ReviewCheckpointCamera = {
 };
 const TRACKPAD_CAMERA_YAW_SENSITIVITY = 0.0045;
 const TRACKPAD_CAMERA_PITCH_SENSITIVITY = 0.0032;
+const TRACKPAD_CAMERA_ZOOM_SENSITIVITY = 0.02;
 const POINTER_CAMERA_YAW_SENSITIVITY = 0.006;
 const POINTER_CAMERA_PITCH_SENSITIVITY = 0.0045;
+// Per movement frame: an authored checkpoint focus offset decays toward the
+// avatar, so walking recenters the camera within a few steps.
+const FOCUS_SETTLE_STRENGTH = 0.06;
 
 export async function createMainStageScene(engine: AbstractEngine) {
   const scene = new Scene(engine);
@@ -123,11 +127,15 @@ export async function createMainStageScene(engine: AbstractEngine) {
   let lastCameraPointerX = 0;
   let lastCameraPointerY = 0;
   const handleCameraWheel = (event: WheelEvent) => {
+    event.preventDefault();
     if (event.ctrlKey) {
+      // macOS synthesizes a trackpad pinch as wheel + ctrlKey. deltaY > 0 is
+      // fingers together (zoom out, larger distance); preventDefault also
+      // stops the browser's page zoom.
+      cameraRig.zoom(event.deltaY * TRACKPAD_CAMERA_ZOOM_SENSITIVITY);
       return;
     }
 
-    event.preventDefault();
     cameraRig.orbit(
       event.deltaX * TRACKPAD_CAMERA_YAW_SENSITIVITY,
       event.deltaY * TRACKPAD_CAMERA_PITCH_SENSITIVITY,
@@ -185,6 +193,9 @@ export async function createMainStageScene(engine: AbstractEngine) {
     avatarElapsedSeconds += deltaSeconds;
     reviewAvatar.animate(avatarElapsedSeconds, playerController.animationState);
     routeProgress.step(playerRig.root.position);
+    if (playerController.animationState !== 'idle') {
+      cameraRig.settleFocus(FOCUS_SETTLE_STRENGTH);
+    }
     const zoomState = cameraRig.syncZoomState();
     const avatarVisibility = zoomState.mode === 'first_person' ? 0 : zoomState.shoulderOpacity;
     for (const mesh of reviewAvatar.meshes) {
