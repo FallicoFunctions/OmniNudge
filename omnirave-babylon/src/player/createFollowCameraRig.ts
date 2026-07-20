@@ -13,8 +13,10 @@ export interface FollowCameraRig {
   applyCheckpointView: (view: ReviewCheckpointCamera) => ReturnType<typeof resolveZoomState>;
   camera: ArcRotateCamera;
   orbit: (deltaYaw: number, deltaPitch: number) => ReturnType<typeof resolveZoomState>;
+  settleFocus: (strength: number) => void;
   syncZoomState: () => ReturnType<typeof resolveZoomState>;
   targetAnchor: TransformNode;
+  zoom: (deltaDistance: number) => ReturnType<typeof resolveZoomState>;
 }
 
 export function createFollowCameraRig(scene: Scene, target: TransformNode): FollowCameraRig {
@@ -58,6 +60,23 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
       Math.cos(nextBeta) * radius,
       horizontalRadius * Math.sin(nextAlpha),
     );
+  };
+
+  const applyZoomDelta = (deltaDistance: number) => {
+    if (!hasActivePositionOffset || activeTargetToCameraOffset.lengthSquared() === 0) {
+      syncActiveOffsetFromCamera();
+    }
+
+    const currentLength = Math.max(MIN_ZOOM_DISTANCE, activeTargetToCameraOffset.length());
+    const nextLength = Math.min(
+      MAX_ZOOM_DISTANCE,
+      Math.max(MIN_ZOOM_DISTANCE, currentLength + deltaDistance),
+    );
+    activeTargetToCameraOffset.scaleInPlace(nextLength / currentLength);
+    // syncZoomState treats camera.radius as the distance source of truth
+    // (the offset only supplies direction), so the radius must move too or
+    // the zoom silently does nothing.
+    camera.radius = nextLength;
   };
 
   const applyPositionOffsetCamera = (worldPosition: Vector3, worldTarget: Vector3) => {
@@ -120,6 +139,19 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
       applyOrbitDelta(deltaYaw, deltaPitch);
       return this.syncZoomState();
     },
+    settleFocus(strength) {
+      // Checkpoint views author a focus offset so the review framing looks
+      // at scenery, not the avatar - but once the player MOVES, the camera
+      // must recenter on them (player-flagged: "the avatar is not locked in
+      // the middle like you'd expect in a video game"). Called from the
+      // movement loop, this decays the authored offset toward zero so the
+      // avatar glides back to center over a few steps instead of snapping.
+      const clamped = Math.min(1, Math.max(0, strength));
+      activeFocusOffset.scaleInPlace(1 - clamped);
+      if (activeFocusOffset.lengthSquared() < 0.0004) {
+        activeFocusOffset.set(0, 0, 0);
+      }
+    },
     syncZoomState() {
       // Re-anchor to the player's live position every frame so WASD movement
       // keeps the camera attached instead of leaving it behind.
@@ -142,5 +174,9 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
       return zoomState;
     },
     targetAnchor,
+    zoom(deltaDistance) {
+      applyZoomDelta(deltaDistance);
+      return this.syncZoomState();
+    },
   };
 }

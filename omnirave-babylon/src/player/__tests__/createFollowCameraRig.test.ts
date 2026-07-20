@@ -29,6 +29,67 @@ describe('createFollowCameraRig', () => {
     expect(rig.camera.radius).toBe(0.1);
   });
 
+  it('zooms the follow distance within the rig bounds', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const target = new TransformNode('player-root', scene);
+    const rig = createFollowCameraRig(scene, target);
+
+    expect(rig.zoom(4).distance).toBeCloseTo(10);
+    expect(rig.camera.radius).toBeCloseTo(10);
+    expect(rig.zoom(-30).distance).toBeCloseTo(0.1); // clamped to min
+    expect(rig.zoom(500).distance).toBeCloseTo(140); // clamped to max
+  });
+
+  it('zooms along the authored view direction after a checkpoint with a position offset', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const target = new TransformNode('player-root', scene);
+    const rig = createFollowCameraRig(scene, target);
+    rig.applyCheckpointView({
+      alpha: 0,
+      beta: 1.1,
+      radius: 10,
+      focusOffset: { x: 0, y: 0, z: 0 },
+      positionOffset: { x: 0, y: 3, z: -9 },
+    });
+    const before = rig.camera.radius;
+
+    const state = rig.zoom(-3);
+
+    expect(state.distance).toBeCloseTo(before - 3);
+    expect(rig.camera.radius).toBeCloseTo(before - 3);
+    // direction preserved: still behind and above the target
+    expect(rig.camera.position.y).toBeGreaterThan(0);
+    expect(rig.camera.position.z).toBeLessThan(0);
+  });
+
+  it('settles an authored focus offset back onto the moving player', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const target = new TransformNode('player-root', scene);
+    target.position.set(5, 2, -8);
+    const rig = createFollowCameraRig(scene, target);
+    rig.applyCheckpointView({
+      alpha: 0,
+      beta: 1.1,
+      radius: 10,
+      focusOffset: { x: 14, y: 3.5, z: -7 },
+      positionOffset: { x: 0, y: 2, z: -7 },
+    });
+
+    // walking: the movement loop decays the focus toward the avatar
+    for (let i = 0; i < 240; i++) {
+      rig.settleFocus(0.06);
+      rig.syncZoomState();
+    }
+
+    const anchor = rig.targetAnchor.position;
+    expect(anchor.x).toBeCloseTo(target.position.x, 1);
+    expect(anchor.y).toBeCloseTo(target.position.y, 1);
+    expect(anchor.z).toBeCloseTo(target.position.z, 1);
+  });
+
   it('applies authored checkpoint framing with a local focus offset instead of orbiting the player root directly', () => {
     engine = new NullEngine();
     const scene = new Scene(engine);
