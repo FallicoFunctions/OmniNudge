@@ -226,9 +226,10 @@ describe('createMainStageScene', () => {
     expect(sourceBlocker!.isVisible).toBe(false);
     expect(sourceBlocker!.checkCollisions).toBe(true);
     expect(sourceBlocker!.position.x).toBeCloseTo(18);
-    expect(sourceBlocker!.position.y).toBeCloseTo(4);
+    // floor (y0) through the fascia's real top (y 4.5): center 2.25
+    expect(sourceBlocker!.position.y).toBeCloseTo(2.25);
     expect(sourceBlocker!.position.z).toBeCloseTo(-8);
-    expect(sourceBlocker!.getBoundingInfo().boundingBox.extendSizeWorld.y).toBeCloseTo(4);
+    expect(sourceBlocker!.getBoundingInfo().boundingBox.extendSizeWorld.y).toBeCloseTo(2.25);
     expect(sourceBlocker!.getBoundingInfo().boundingBox.extendSizeWorld.z).toBeCloseTo(0.6);
     expect(scene.getMeshByName(sourceBlocker!.name)).toBe(sourceBlocker);
   });
@@ -357,9 +358,10 @@ describe('createMainStageScene', () => {
     expect(sourceBlocker!.isVisible).toBe(false);
     expect(sourceBlocker!.checkCollisions).toBe(true);
     expect(sourceBlocker!.position.x).toBeCloseTo(-12.2);
-    expect(sourceBlocker!.position.y).toBeCloseTo(4);
+    // floor (y0) through the core's real top (y 2.1): center 1.05
+    expect(sourceBlocker!.position.y).toBeCloseTo(1.05);
     expect(sourceBlocker!.position.z).toBeCloseTo(-26);
-    expect(sourceBlocker!.getBoundingInfo().boundingBox.extendSizeWorld.y).toBeCloseTo(4);
+    expect(sourceBlocker!.getBoundingInfo().boundingBox.extendSizeWorld.y).toBeCloseTo(1.05);
   });
 
   it('adds blockers for basin and crowd-control physical features without walling low surface or trim inlays', async () => {
@@ -371,6 +373,7 @@ describe('createMainStageScene', () => {
           ['merged:V90_BasinStoneCopingArray+1', 50, 0.4, 62, 0, 0.8, -16],
           ['V123_CentralStairGoldNosingArray', 10, 1.2, 19, 0, 1.2, -3],
           ['merged:V121_BasinBridgeRelief_North+2', 9, 2.5, 38, 0, 1.6, -6],
+          ['merged:V33_BasinFoliageUnderstory+1', 9, 0.8, 48, 13.6, 1.2, -15],
           ['V63_BasinWaterParterre', 12, 0.4, 8, 0, 0.2, -2],
           ['V64_PromenadeCyanThread', 7, 0.2, 6, 0, 0.2, -2],
           ['V124_CrowdControlRailArray_L', 0.2, 1.1, 40, -18, 1, 40],
@@ -389,7 +392,7 @@ describe('createMainStageScene', () => {
     expect(blockerSourceNames).toEqual(
       expect.arrayContaining([
         'merged:V99_BasinParapetRelief+1',
-        'merged:V90_BasinStoneCopingArray+1',
+        'merged:V33_BasinFoliageUnderstory+1',
         'V124_CrowdControlRailArray_L',
         'V125_CrowdBarrierRailArray_R',
       ]),
@@ -400,6 +403,10 @@ describe('createMainStageScene', () => {
     // bridge reliefs are knee-high causeway trim the avatar steps over; a
     // merged-bounds blocker here walled off the center promenade
     expect(blockerSourceNames).not.toContain('merged:V121_BasinBridgeRelief_North+2');
+    // the coping is a walkable floor (COL_BasinCoping* collision slabs), not
+    // a wall - its blocker sealed the flank and the cascade-court objective;
+    // the foliage banks above hedge the sunken water strip instead
+    expect(blockerSourceNames).not.toContain('merged:V90_BasinStoneCopingArray+1');
     expect(
       stageAssets.solidCollisionMeshes.filter(
         (mesh) => mesh.metadata?.sourceMeshName === 'merged:V99_BasinParapetRelief+1',
@@ -407,9 +414,9 @@ describe('createMainStageScene', () => {
     ).toHaveLength(2);
     expect(
       stageAssets.solidCollisionMeshes.filter(
-        (mesh) => mesh.metadata?.sourceMeshName === 'merged:V90_BasinStoneCopingArray+1',
+        (mesh) => mesh.metadata?.sourceMeshName === 'merged:V33_BasinFoliageUnderstory+1',
       ),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(
       stageAssets.solidCollisionMeshes.some((mesh) => {
         const bounds = mesh.getBoundingInfo().boundingBox;

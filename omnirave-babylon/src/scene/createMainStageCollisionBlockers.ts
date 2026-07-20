@@ -1,4 +1,5 @@
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
 import type { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import type { Scene } from '@babylonjs/core/scene';
@@ -24,9 +25,14 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
 
 const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
   /V30_VipShellFascia/,
+  // Basin foliage banks hedge the sunken water strip (|x| 8.3..17.3) so the
+  // avatar cannot wade in; the coping walkways around it are FLOOR (see
+  // COL_BasinCoping* in the collision GLB), which is why
+  // V90_BasinStoneCopingArray is deliberately absent here - its blocker
+  // sealed the entire flank including the cascade-court objective.
+  /V33_BasinFoliage(Understory|Midstory)/,
   /V40_ApproachLightCore/,
   /V68_PortalArcadeShadowCore/,
-  /V90_BasinStoneCopingArray/,
   /V99_Basin(ParapetRelief|RetainingWall)/,
   /V118_BasinWallRelief/,
   // BridgeRelief deliberately absent: those are knee-high walkway trim bands
@@ -39,29 +45,18 @@ const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
   /V133_VipTerraceGoldArray/,
 ];
 
-const BILATERAL_SOURCE_BLOCKER_RULES: readonly {
-  innerClearanceX: number;
-  pattern: RegExp;
-}[] = [
-  { pattern: /V30_VipShellFascia/, innerClearanceX: 17.3 },
-  { pattern: /V40_ApproachLightCore/, innerClearanceX: 11.75 },
-  { pattern: /V68_PortalArcadeShadowCore/, innerClearanceX: 8.35 },
-  { pattern: /V90_BasinStoneCopingArray/, innerClearanceX: 5.1 },
-  { pattern: /V99_BasinParapetRelief/, innerClearanceX: 8.3 },
-  // The retaining walls sit closer to the center (x +/-5.7..7.1) than the
-  // parapets: with the parapet clearance the split never fired and the
-  // merged-bounds blocker bridged the walkway (player froze at z -37.9).
-  { pattern: /V99_BasinRetainingWall/, innerClearanceX: 5.6 },
-  { pattern: /V118_BasinWallRelief/, innerClearanceX: 6.2 },
-  { pattern: /V121_BasinRetainingRelief/, innerClearanceX: 4.3 },
-  { pattern: /V124_CrowdControl(FrameArray|RailArray)/, innerClearanceX: 17.8 },
-  { pattern: /V125_CrowdBarrier(BaseArray|RailArray)/, innerClearanceX: 12.6 },
-  { pattern: /V133_VipTerraceGoldArray/, innerClearanceX: 18.3 },
-];
-
 const MIN_SOURCE_BLOCKER_THICKNESS = 1.2;
-const SOURCE_BLOCKER_CENTER_Y = 4;
-const SOURCE_BLOCKER_HEIGHT = 8;
+// Side pairs merged into one mesh must split back into per-side blockers.
+// The split is derived from the mesh's own vertices (a real central gap of
+// at least this width), and each side box hugs that side's actual bounds:
+// synthetic clearance rectangles overfilled the gap between the clearance
+// line and the merged bbox edge with phantom collision, sealing whole
+// flanks of walkable plaza (player-flagged as invisible walls).
+const MIN_CENTER_GAP_X = 2;
+// Geometry that floats entirely above the avatar capsule (elevated terrace
+// reliefs and the like) never blocks ground movement.
+const CAPSULE_TOP_Y = 2.4;
+const MIN_SOURCE_BLOCKER_HEIGHT = 1;
 
 export function createMainStageCollisionBlockers(scene: Scene, sourceMeshes: readonly AbstractMesh[] = []): Mesh[] {
   const authoredBlockers = MAIN_STAGE_COLLISION_BLOCKERS.map((blocker) => createBlockerFromSpec(scene, blocker));
@@ -87,63 +82,96 @@ function createBlockerFromSpec(scene: Scene, blocker: CollisionBlockerSpec) {
   return mesh;
 }
 
+interface SideBounds {
+  maxX: number;
+  maxY: number;
+  maxZ: number;
+  minX: number;
+  minY: number;
+  minZ: number;
+}
+
 function createBlockersFromSourceMesh(scene: Scene, sourceMesh: AbstractMesh) {
   sourceMesh.computeWorldMatrix(true);
-  sourceMesh.refreshBoundingInfo({ applySkeleton: false });
-  const { minimumWorld, maximumWorld } = sourceMesh.getBoundingInfo().boundingBox;
-  const lateralRule = BILATERAL_SOURCE_BLOCKER_RULES.find((rule) => rule.pattern.test(sourceMesh.name));
-  if (
-    lateralRule &&
-    minimumWorld.x < -lateralRule.innerClearanceX &&
-    maximumWorld.x > lateralRule.innerClearanceX
-  ) {
-    return [
-      createBlockerFromSourceBounds(
-        scene,
-        sourceMesh,
-        minimumWorld.x,
-        -lateralRule.innerClearanceX,
-        minimumWorld.z,
-        maximumWorld.z,
-        'left',
-      ),
-      createBlockerFromSourceBounds(
-        scene,
-        sourceMesh,
-        lateralRule.innerClearanceX,
-        maximumWorld.x,
-        minimumWorld.z,
-        maximumWorld.z,
-        'right',
-      ),
-    ];
+  const positions = sourceMesh.getVerticesData('position');
+  if (!positions || positions.length === 0) {
+    return [];
   }
 
-  return [
-    createBlockerFromSourceBounds(
-      scene,
-      sourceMesh,
-      minimumWorld.x,
-      maximumWorld.x,
-      minimumWorld.z,
-      maximumWorld.z,
-    ),
-  ];
+  const worldMatrix = sourceMesh.getWorldMatrix();
+  const left = emptyBounds();
+  const right = emptyBounds();
+  const vertex = new Vector3();
+  for (let index = 0; index < positions.length; index += 3) {
+    Vector3.TransformCoordinatesFromFloatsToRef(
+      positions[index],
+      positions[index + 1],
+      positions[index + 2],
+      worldMatrix,
+      vertex,
+    );
+    growBounds(vertex.x < 0 ? left : right, vertex);
+  }
+
+  const sides: Array<{ bounds: SideBounds; side?: 'left' | 'right' }> = [];
+  const hasCentralGap =
+    Number.isFinite(left.maxX) &&
+    Number.isFinite(right.minX) &&
+    right.minX - left.maxX >= MIN_CENTER_GAP_X;
+  if (hasCentralGap) {
+    sides.push({ bounds: left, side: 'left' }, { bounds: right, side: 'right' });
+  } else {
+    const merged = emptyBounds();
+    for (const bounds of [left, right]) {
+      if (!Number.isFinite(bounds.minX)) continue;
+      merged.minX = Math.min(merged.minX, bounds.minX);
+      merged.maxX = Math.max(merged.maxX, bounds.maxX);
+      merged.minY = Math.min(merged.minY, bounds.minY);
+      merged.maxY = Math.max(merged.maxY, bounds.maxY);
+      merged.minZ = Math.min(merged.minZ, bounds.minZ);
+      merged.maxZ = Math.max(merged.maxZ, bounds.maxZ);
+    }
+    sides.push({ bounds: merged });
+  }
+
+  return sides
+    .filter(({ bounds }) => bounds.minY <= CAPSULE_TOP_Y)
+    .map(({ bounds, side }) => createBlockerFromSourceBounds(scene, sourceMesh, bounds, side));
+}
+
+function emptyBounds(): SideBounds {
+  return {
+    minX: Number.POSITIVE_INFINITY,
+    maxX: Number.NEGATIVE_INFINITY,
+    minY: Number.POSITIVE_INFINITY,
+    maxY: Number.NEGATIVE_INFINITY,
+    minZ: Number.POSITIVE_INFINITY,
+    maxZ: Number.NEGATIVE_INFINITY,
+  };
+}
+
+function growBounds(bounds: SideBounds, vertex: Vector3) {
+  bounds.minX = Math.min(bounds.minX, vertex.x);
+  bounds.maxX = Math.max(bounds.maxX, vertex.x);
+  bounds.minY = Math.min(bounds.minY, vertex.y);
+  bounds.maxY = Math.max(bounds.maxY, vertex.y);
+  bounds.minZ = Math.min(bounds.minZ, vertex.z);
+  bounds.maxZ = Math.max(bounds.maxZ, vertex.z);
 }
 
 function createBlockerFromSourceBounds(
   scene: Scene,
   sourceMesh: AbstractMesh,
-  minX: number,
-  maxX: number,
-  minZ: number,
-  maxZ: number,
+  bounds: SideBounds,
   side?: 'left' | 'right',
 ) {
-  const minY = SOURCE_BLOCKER_CENTER_Y - SOURCE_BLOCKER_HEIGHT / 2;
-  const maxY = SOURCE_BLOCKER_CENTER_Y + SOURCE_BLOCKER_HEIGHT / 2;
+  const { minX, maxX, minZ, maxZ } = bounds;
+  // Block from the floor through the geometry's real top: a knee-high rail
+  // still stops the capsule, while the box never towers 8m over trim again.
+  const minY = Math.min(bounds.minY, 0);
+  const maxY = Math.max(bounds.maxY, minY + MIN_SOURCE_BLOCKER_HEIGHT);
   const width = Math.max(MIN_SOURCE_BLOCKER_THICKNESS, maxX - minX);
-  const height = Math.max(1, maxY - minY);
+  const height = Math.max(MIN_SOURCE_BLOCKER_HEIGHT, maxY - minY);
   const depth = Math.max(MIN_SOURCE_BLOCKER_THICKNESS, maxZ - minZ);
   const mesh = MeshBuilder.CreateBox(
     `main-stage-blocker-source-${sourceMesh.name}${side ? `-${side}` : ''}`,
