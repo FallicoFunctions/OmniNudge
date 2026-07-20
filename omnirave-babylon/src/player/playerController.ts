@@ -204,17 +204,93 @@ function resolveHorizontalCollision(
     if (currentAxisPosition < movingAxisMin || currentAxisPosition > movingAxisMax) {
       continue;
     }
+  }
 
-    const distances = [
-      { axis: 'x' as const, value: minX, distance: Math.abs(position.x - minX) },
-      { axis: 'x' as const, value: maxX, distance: Math.abs(maxX - position.x) },
-      { axis: 'z' as const, value: minZ, distance: Math.abs(position.z - minZ) },
-      { axis: 'z' as const, value: maxZ, distance: Math.abs(maxZ - position.z) },
-    ];
-    const nearest = distances.reduce((best, candidate) =>
-      candidate.distance < best.distance ? candidate : best,
-    );
+  // Ejection from any box the position ended up inside (diagonal corner
+  // entries, seam drops). Resolved against the UNION of containing boxes:
+  // per-box nearest-face ejection churned when solids overlap - one box's
+  // ejection face sat inside a neighbour, so whichever mesh iterated last
+  // pinned the player INSIDE the other while the free axis walked them
+  // straight through it (observed live: wall-relief blocker pinned x while
+  // z strolled through the basin water blocker).
+  resolveSolidPenetration(solidCollisionMeshes, position, eyeHeightMeters, radiusMeters);
+}
 
-    position[nearest.axis] = nearest.value;
+interface ExpandedBox {
+  maxX: number;
+  maxZ: number;
+  minX: number;
+  minZ: number;
+}
+
+function resolveSolidPenetration(
+  solidCollisionMeshes: AbstractMesh[],
+  position: Vector3,
+  eyeHeightMeters: number,
+  radiusMeters: number,
+) {
+  const feetY = position.y - eyeHeightMeters;
+  const headY = position.y;
+
+  const boxes: ExpandedBox[] = [];
+  for (const mesh of solidCollisionMeshes) {
+    const { minimumWorld, maximumWorld } = mesh.getBoundingInfo().boundingBox;
+    if (headY < minimumWorld.y || feetY > maximumWorld.y) {
+      continue;
+    }
+    boxes.push({
+      minX: minimumWorld.x - radiusMeters,
+      maxX: maximumWorld.x + radiusMeters,
+      minZ: minimumWorld.z - radiusMeters,
+      maxZ: maximumWorld.z + radiusMeters,
+    });
+  }
+
+  const contains = (box: ExpandedBox, x: number, z: number) =>
+    x > box.minX && x < box.maxX && z > box.minZ && z < box.maxZ;
+
+  for (let pass = 0; pass < 3; pass++) {
+    if (!boxes.some((box) => contains(box, position.x, position.z))) {
+      return;
+    }
+
+    // For each cardinal direction, march the exit point outward until it
+    // clears every box in the overlapping cluster, then take the cheapest.
+    let best: { axis: 'x' | 'z'; value: number; cost: number } | null = null;
+    for (const [axis, sign] of [
+      ['x', 1],
+      ['x', -1],
+      ['z', 1],
+      ['z', -1],
+    ] as const) {
+      let candidate = axis === 'x' ? position.x : position.z;
+      for (let hop = 0; hop < 4; hop++) {
+        const x = axis === 'x' ? candidate : position.x;
+        const z = axis === 'z' ? candidate : position.z;
+        const blocking = boxes.find((box) => contains(box, x, z));
+        if (!blocking) {
+          break;
+        }
+        const face =
+          axis === 'x'
+            ? sign > 0
+              ? blocking.maxX
+              : blocking.minX
+            : sign > 0
+              ? blocking.maxZ
+              : blocking.minZ;
+        candidate = face + sign * COLLISION_SURFACE_EPSILON;
+      }
+      const origin = axis === 'x' ? position.x : position.z;
+      const cost = Math.abs(candidate - origin);
+      if (!best || cost < best.cost) {
+        best = { axis, value: candidate, cost };
+      }
+    }
+
+    if (!best) {
+      return;
+    }
+    position[best.axis] = best.value;
   }
 }
