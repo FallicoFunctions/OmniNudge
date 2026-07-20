@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowUpRight, ChevronDown, LogOut, Settings2, Sparkles, UserRound } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, LogOut, Settings2, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import type { ConversationSettings } from '../../types/omnichat';
@@ -33,11 +33,7 @@ export default function OmniChatHeader({
     <>
       <header className="fixed inset-x-0 top-0 z-40 h-[72px] border-b border-white/[0.08] bg-[#090a0f]/80 backdrop-blur-2xl">
         <div className="flex h-full items-center justify-between px-5 lg:px-6">
-          <Link to="/omnichat" className="group flex items-center gap-3 text-white">
-            <span className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-[14px] border border-white/15 bg-gradient-to-br from-violet-500 via-fuchsia-500 to-rose-400 shadow-[0_8px_30px_rgba(139,92,246,0.3)] transition-transform duration-300 group-hover:rotate-3 group-hover:scale-105">
-              <Sparkles size={17} strokeWidth={2.2} />
-              <span className="absolute inset-x-1 top-0 h-px bg-white/70" />
-            </span>
+          <Link to="/omnichat" className="group flex items-center text-white">
             <span>
               <span className="block text-[1.2rem] font-bold leading-none tracking-[-0.035em] sm:text-[1.28rem]">OmniChat</span>
               <span className="mt-1 hidden text-[9px] font-semibold uppercase tracking-[0.22em] text-white/35 sm:block">Stories that answer back</span>
