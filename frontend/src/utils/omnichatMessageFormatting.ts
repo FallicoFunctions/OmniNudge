@@ -6,11 +6,16 @@ export type OmniChatMessageSegment = {
 
 const SENTENCE_PATTERN = /[^.!?]*[.!?]+(?:["')\]]+)?(?=\s|$)/g;
 
+export function normalizeOmniChatMessageContent(content: string) {
+  return content.trim();
+}
+
 function hasClosingMarker(content: string, marker: '*' | '**', fromIndex: number) {
   return content.indexOf(marker, fromIndex) !== -1;
 }
 
 export function parseOmniChatMessage(content: string): OmniChatMessageSegment[] {
+  const normalizedContent = normalizeOmniChatMessageContent(content);
   const segments: OmniChatMessageSegment[] = [];
   let buffer = '';
   let bold = false;
@@ -24,15 +29,15 @@ export function parseOmniChatMessage(content: string): OmniChatMessageSegment[] 
     buffer = '';
   };
 
-  for (let index = 0; index < content.length; ) {
-    if (content.startsWith('**', index)) {
+  for (let index = 0; index < normalizedContent.length; ) {
+    if (normalizedContent.startsWith('**', index)) {
       if (bold) {
         flush();
         bold = false;
         index += 2;
         continue;
       }
-      if (hasClosingMarker(content, '**', index + 2)) {
+      if (hasClosingMarker(normalizedContent, '**', index + 2)) {
         flush();
         bold = true;
         index += 2;
@@ -42,14 +47,14 @@ export function parseOmniChatMessage(content: string): OmniChatMessageSegment[] 
       continue;
     }
 
-    if (content[index] === '*') {
+    if (normalizedContent[index] === '*') {
       if (italic) {
         flush();
         italic = false;
         index += 1;
         continue;
       }
-      if (hasClosingMarker(content, '*', index + 1)) {
+      if (hasClosingMarker(normalizedContent, '*', index + 1)) {
         flush();
         italic = true;
         index += 1;
@@ -59,7 +64,7 @@ export function parseOmniChatMessage(content: string): OmniChatMessageSegment[] 
       continue;
     }
 
-    buffer += content[index];
+    buffer += normalizedContent[index];
     index += 1;
   }
 

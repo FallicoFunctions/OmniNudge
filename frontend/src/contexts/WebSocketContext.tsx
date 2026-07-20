@@ -695,6 +695,58 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             break;
           }
 
+          case 'omnichat_regeneration_token': {
+            window.dispatchEvent(
+              new CustomEvent('omnichat-regeneration-token', {
+                detail: data.payload as {
+                  conversation_id: number;
+                  message_id: number;
+                  token: string;
+                },
+              })
+            );
+            break;
+          }
+
+          case 'omnichat_message_regenerated': {
+            const message = data.payload as BotMessage;
+            queryClient.setQueryData<BotConversationDetail | undefined>(
+              ['omnichat', 'conversation', message.conversation_id],
+              (prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  messages: prev.messages.map((candidate) =>
+                    candidate.id === message.id ? message : candidate
+                  ),
+                };
+              }
+            );
+            queryClient.invalidateQueries({ queryKey: ['omnichat', 'conversations'] });
+            window.dispatchEvent(
+              new CustomEvent('omnichat-message-regenerated', { detail: message })
+            );
+            break;
+          }
+
+          case 'omnichat_message_edited': {
+            const message = data.payload as BotMessage;
+            queryClient.setQueryData<BotConversationDetail | undefined>(
+              ['omnichat', 'conversation', message.conversation_id],
+              (prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  messages: prev.messages.map((candidate) =>
+                    candidate.id === message.id ? message : candidate
+                  ),
+                };
+              }
+            );
+            queryClient.invalidateQueries({ queryKey: ['omnichat', 'conversations'] });
+            break;
+          }
+
           case 'friend_request': {
             // Someone sent us a friend request — invalidate so the badge and
             // incoming list update immediately without waiting for the 30s poll.

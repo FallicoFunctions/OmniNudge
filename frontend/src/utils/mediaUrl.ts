@@ -28,5 +28,7 @@ export function resolveMediaUrl(url?: string | null, version?: string | null): s
   }
   // /uploads/ paths are served same-origin in prod and via Vite proxy in dev.
   if (url.startsWith('/uploads/')) return appendVersion(url, version);
+  // Public frontend-bundled OmniChat assets are served by the frontend host.
+  if (url.startsWith('/omnichat/')) return appendVersion(url, version);
   return appendVersion(`${API_ORIGIN}${url.startsWith('/') ? '' : '/'}${url}`, version);
 }
