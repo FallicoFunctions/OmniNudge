@@ -50,6 +50,19 @@ export const omnichatService = {
     });
   },
 
+  async regenerateMessage(conversationId: number, messageId: number): Promise<BotMessage> {
+    return api.post<BotMessage>(
+      `/omnichat/conversations/${conversationId}/messages/${messageId}/regenerate`
+    );
+  },
+
+  async editMessage(conversationId: number, messageId: number, content: string): Promise<BotMessage> {
+    return api.patch<BotMessage>(
+      `/omnichat/conversations/${conversationId}/messages/${messageId}`,
+      { content }
+    );
+  },
+
   async updateSettings(conversationId: number, settings: ConversationSettings): Promise<void> {
     await api.put(`/omnichat/conversations/${conversationId}/settings`, { settings });
   },
@@ -60,6 +73,10 @@ export const omnichatService = {
 
   async deleteConversation(conversationId: number): Promise<void> {
     await api.delete(`/omnichat/conversations/${conversationId}`);
+  },
+
+  async deletePersonaConversations(personaId: number): Promise<void> {
+    await api.delete(`/omnichat/personas/${personaId}/conversations`);
   },
 
   async sendAnonymousMessage(req: AnonymousMessageRequest): Promise<AnonymousMessageResponse> {

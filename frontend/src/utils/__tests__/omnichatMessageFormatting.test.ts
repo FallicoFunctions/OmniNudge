@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { getOmniChatPreviewText, parseOmniChatMessage } from '../omnichatMessageFormatting';
+import {
+  getOmniChatPreviewText,
+  normalizeOmniChatMessageContent,
+  parseOmniChatMessage,
+} from '../omnichatMessageFormatting';
+
+describe('normalizeOmniChatMessageContent', () => {
+  it('removes leading and trailing blank space from bot messages', () => {
+    expect(normalizeOmniChatMessageContent('\n\n*Malachar watches.*\n\n')).toBe('*Malachar watches.*');
+  });
+});
 
 describe('parseOmniChatMessage', () => {
   it('renders bold and italic spans without exposing markdown markers', () => {
@@ -23,6 +33,12 @@ describe('parseOmniChatMessage', () => {
       { text: '"Begin Training. ', bold: false, italic: false },
       { text: 'Now', bold: false, italic: true },
       { text: '.', bold: false, italic: false },
+    ]);
+  });
+
+  it('does not render a leading blank segment when content starts with newlines', () => {
+    expect(parseOmniChatMessage('\n\n*Malachar watches.*')).toEqual([
+      { text: 'Malachar watches.', bold: false, italic: true },
     ]);
   });
 });

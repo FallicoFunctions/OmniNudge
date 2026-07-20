@@ -6,6 +6,13 @@ export type PersonaCategory =
   | 'anime_game'
   | 'fiction_media';
 
+export type ResponseStyleProfile =
+  | 'inherit'
+  | 'natural_dialogue'
+  | 'lean_narrative'
+  | 'professional'
+  | 'character_only';
+
 export interface BotPersona {
   id: number;
   slug: string;
@@ -15,6 +22,7 @@ export interface BotPersona {
   owner_user_id?: number;
   visibility?: 'public' | 'private' | 'unlisted';
   source_format?: string;
+  response_style_profile?: ResponseStyleProfile;
   avatar_url?: string;
   preview_video_url?: string;
   gallery_urls?: string[];
@@ -33,6 +41,7 @@ export interface BotPersonaDefinition extends BotPersona {
   scenario: string;
   first_message: string;
   example_dialogue: string;
+  response_style_profile: ResponseStyleProfile;
   post_history_instructions: string;
   alternate_greetings: string[];
   creator_notes: string;
@@ -51,6 +60,7 @@ export interface PersonaDefinitionPayload {
   scenario: string;
   first_message: string;
   example_dialogue: string;
+  response_style_profile: ResponseStyleProfile;
   post_history_instructions: string;
   alternate_greetings: string[];
   creator_notes: string;
@@ -98,6 +108,10 @@ export interface BotMessage {
 export interface OmniChatTokenPayload {
   conversation_id: number;
   token: string;
+}
+
+export interface OmniChatRegenerationTokenPayload extends OmniChatTokenPayload {
+  message_id: number;
 }
 
 export interface BotConversationDetail {
