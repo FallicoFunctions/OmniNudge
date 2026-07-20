@@ -35,7 +35,11 @@ const PLAYABLE_START_CAMERA: ReviewCheckpointCamera = {
 };
 const TRACKPAD_CAMERA_YAW_SENSITIVITY = 0.0045;
 const TRACKPAD_CAMERA_PITCH_SENSITIVITY = 0.0032;
-const TRACKPAD_CAMERA_ZOOM_SENSITIVITY = 0.02;
+// Proportional: each pinch tick scales the CURRENT follow distance, so one
+// full pinch gesture traverses the whole 0.1..140 zoom range (a fixed
+// per-tick step needed 10+ gestures, player-flagged) while staying
+// fine-grained near the avatar.
+const TRACKPAD_CAMERA_ZOOM_RATE = 0.01;
 const POINTER_CAMERA_YAW_SENSITIVITY = 0.006;
 const POINTER_CAMERA_PITCH_SENSITIVITY = 0.0045;
 // Per movement frame: an authored checkpoint focus offset decays toward the
@@ -132,7 +136,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
       // macOS synthesizes a trackpad pinch as wheel + ctrlKey. deltaY > 0 is
       // fingers together (zoom out, larger distance); preventDefault also
       // stops the browser's page zoom.
-      cameraRig.zoom(event.deltaY * TRACKPAD_CAMERA_ZOOM_SENSITIVITY);
+      cameraRig.zoom(event.deltaY * TRACKPAD_CAMERA_ZOOM_RATE * cameraRig.camera.radius);
       return;
     }
 
