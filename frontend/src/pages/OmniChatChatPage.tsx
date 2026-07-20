@@ -45,6 +45,7 @@ import {
 import { loadOmniChatDefaults } from '../utils/omnichatDefaults';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { OMNICHAT_PERSONA_TRANSITION_NAME } from '../utils/omnichatViewTransitions';
 
 type ChatFilter = 'all' | 'unread' | 'favorites';
 type ProfileTab = 'profile' | 'gallery';
@@ -257,6 +258,9 @@ export default function OmniChatChatPage() {
   const [searchParams] = useSearchParams();
   const { conversationId } = useParams<{ conversationId?: string }>();
   const { isAuthenticated } = useAuth();
+  const arrivedFromQuickChat = Boolean(
+    (location.state as Record<string, unknown> | null)?.fromQuickChat
+  );
 
   const isGuest = conversationId === 'guest';
   const routeConversationId = Number(conversationId);
@@ -267,6 +271,17 @@ export default function OmniChatChatPage() {
     const id = fromQuery ? Number(fromQuery) : Number(statePersonaId);
     return Number.isFinite(id) ? id : null;
   }, [isGuest, searchParams, location.state]);
+
+  useEffect(() => {
+    if (!arrivedFromQuickChat) return;
+    const timer = window.setTimeout(() => {
+      navigate(
+        { pathname: location.pathname, search: location.search },
+        { replace: true, state: null }
+      );
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [arrivedFromQuickChat, location.pathname, location.search, navigate]);
 
   const [directoryQuery, setDirectoryQuery] = useState('');
   const [directoryFilter, setDirectoryFilter] = useState<ChatFilter>('all');
@@ -1223,11 +1238,27 @@ export default function OmniChatChatPage() {
                       className="flex-shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)] focus-visible:outline-offset-2"
                       aria-label="Open profile pane"
                     >
-                      <PersonaAvatar persona={activePersona} className="h-14 w-14 rounded-full" />
+                      <PersonaAvatar
+                        persona={activePersona}
+                        className={`h-14 w-14 rounded-full ${arrivedFromQuickChat ? 'omnichat-chat-avatar-arrival' : ''}`}
+                        style={
+                          arrivedFromQuickChat
+                            ? { viewTransitionName: OMNICHAT_PERSONA_TRANSITION_NAME }
+                            : undefined
+                        }
+                      />
                     </button>
                   )}
                   {activePersona && !mobileChatMode && (
-                    <PersonaAvatar persona={activePersona} className="h-14 w-14 flex-shrink-0 rounded-full" />
+                    <PersonaAvatar
+                      persona={activePersona}
+                      className={`h-14 w-14 flex-shrink-0 rounded-full ${arrivedFromQuickChat ? 'omnichat-chat-avatar-arrival' : ''}`}
+                      style={
+                        arrivedFromQuickChat
+                          ? { viewTransitionName: OMNICHAT_PERSONA_TRANSITION_NAME }
+                          : undefined
+                      }
+                    />
                   )}
                   <div className="min-w-0 overflow-hidden">
                     <h2 className="truncate text-xl font-semibold tracking-tight text-white xl:text-2xl">

@@ -65,6 +65,64 @@
   50% { opacity: 1; transform: scale(1.08); }
 }
 
+@keyframes omnichat-quick-chat-overlay-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes omnichat-quick-chat-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes omnichat-quick-chat-sheet-enter {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes omnichat-chat-avatar-arrival {
+  0% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.55); }
+  55% { box-shadow: 0 0 0 8px rgba(96, 165, 250, 0.12); }
+  100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
+}
+
+.omnichat-quick-chat-overlay-enter {
+  animation: omnichat-quick-chat-overlay-enter 180ms ease-out both;
+}
+
+.omnichat-quick-chat-dialog-enter {
+  animation: omnichat-quick-chat-dialog-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.omnichat-chat-avatar-arrival {
+  animation: omnichat-chat-avatar-arrival 620ms ease-out 120ms both;
+}
+
+html.omnichat-shared-transition::view-transition-old(root),
+html.omnichat-shared-transition::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-group(omnichat-persona-shared) {
+  animation-duration: 440ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 120;
+}
+
+::view-transition-old(omnichat-persona-shared),
+::view-transition-new(omnichat-persona-shared) {
+  height: 100%;
+  object-fit: cover;
+  overflow: clip;
+  border-radius: 16px;
+}
+
 .omnichat-float {
   animation: omnichat-float 7s ease-in-out infinite;
 }
@@ -75,7 +133,23 @@
 
 @media (prefers-reduced-motion: reduce) {
   .omnichat-float,
-  .omnichat-live-dot {
+  .omnichat-live-dot,
+  .omnichat-quick-chat-overlay-enter,
+  .omnichat-quick-chat-dialog-enter,
+  .omnichat-chat-avatar-arrival {
     animation: none;
+  }
+
+  ::view-transition-group(omnichat-persona-shared),
+  ::view-transition-old(omnichat-persona-shared),
+  ::view-transition-new(omnichat-persona-shared) {
+    animation-duration: 1ms;
+  }
+}
+
+@media (max-width: 639px) and (prefers-reduced-motion: no-preference) {
+  .omnichat-quick-chat-dialog-enter {
+    animation-name: omnichat-quick-chat-sheet-enter;
+    animation-duration: 360ms;
   }
 }

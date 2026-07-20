@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Ref } from 'react';
 import type { BotPersona } from '../../../types/omnichat';
 import CharacterRouletteButton, {
   getRouletteEligiblePersonas,
@@ -8,8 +9,8 @@ import CharacterRouletteButton, {
 } from '../CharacterRouletteButton';
 
 vi.mock('../PersonaAvatar', () => ({
-  default: ({ persona }: { persona: BotPersona }) => (
-    <div data-testid={`roulette-avatar-${persona.id}`} />
+  default: ({ persona, rootRef }: { persona: BotPersona; rootRef?: Ref<HTMLDivElement> }) => (
+    <div ref={rootRef} data-testid={`roulette-avatar-${persona.id}`} />
   ),
 }));
 
@@ -86,7 +87,11 @@ describe('CharacterRouletteButton', () => {
     });
 
     expect(screen.queryByTestId('character-roulette-reveal')).not.toBeInTheDocument();
-    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+      expect.any(HTMLElement),
+      expect.any(HTMLElement)
+    );
   });
 
   it('skips the animated reveal when reduced motion is preferred', () => {

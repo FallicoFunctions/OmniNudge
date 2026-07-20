@@ -134,6 +134,23 @@ describe('QuickChatDialog', () => {
     expect(reply).toHaveFocus();
   });
 
+  it('disables modal animation when the user requests reduced motion', () => {
+    render(
+      <QuickChatDialog
+        isOpen
+        persona={persona}
+        onClose={vi.fn()}
+        onContinue={vi.fn().mockResolvedValue(undefined)}
+        reduceMotion
+      />
+    );
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).not.toHaveClass('omnichat-quick-chat-dialog-enter');
+    expect(dialog.parentElement).not.toHaveClass('omnichat-quick-chat-overlay-enter');
+    expect(dialog.style.animation).toBe('');
+  });
+
   it('cannot be dismissed while a conversation handoff is pending', async () => {
     let finishContinue: (() => void) | undefined;
     const onContinue = vi.fn(
