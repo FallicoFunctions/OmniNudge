@@ -42,6 +42,8 @@ describe('CharacterRouletteButton', () => {
       persona(3, { is_nsfw: true }),
       persona(4, { is_active: false }),
       persona(5, { first_message: '   ' }),
+      persona(6, { visibility: 'private' }),
+      persona(7, { visibility: 'unlisted' }),
     ]);
 
     expect(eligible.map((item) => item.id)).toEqual([1]);
@@ -74,7 +76,9 @@ describe('CharacterRouletteButton', () => {
       'true'
     );
     expect(screen.getByRole('button', { name: 'Shuffling...' })).toHaveFocus();
-    expect(screen.getByTestId('character-roulette-reveal')).toHaveTextContent('Persona 1');
+    const reveal = screen.getByTestId('character-roulette-reveal');
+    expect(reveal).toHaveTextContent('Persona 1');
+    expect(reveal).not.toHaveClass('pointer-events-none');
     expect(onSelect).not.toHaveBeenCalled();
 
     act(() => {

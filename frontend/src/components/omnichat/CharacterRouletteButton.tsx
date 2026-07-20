@@ -11,7 +11,8 @@ export function getRouletteEligiblePersonas(personas: BotPersona[]): BotPersona[
   return personas.filter(
     (persona) =>
       persona.is_active &&
-      !persona.owner_user_id &&
+      persona.owner_user_id == null &&
+      persona.visibility === 'public' &&
       !persona.is_nsfw &&
       Boolean(persona.first_message?.trim())
   );
@@ -104,7 +105,7 @@ export default function CharacterRouletteButton({
       {revealPersona &&
         createPortal(
           <div
-            className="pointer-events-none fixed inset-0 z-[90] flex items-center justify-center bg-[#070912]/80 px-5 backdrop-blur-xl animate-fadeIn"
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-[#070912]/80 px-5 backdrop-blur-xl animate-fadeIn"
             role="status"
             aria-live="polite"
             aria-atomic="true"
