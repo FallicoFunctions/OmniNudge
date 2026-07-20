@@ -10,6 +10,8 @@ type ModalProps = {
   closeOnOverlayClick?: boolean;
   ariaLabelledBy?: string;
   ariaDescribedBy?: string;
+  animation?: 'default' | 'quick-chat' | 'none';
+  restoreFocusTo?: HTMLElement | null;
 };
 
 export function Modal({
@@ -21,6 +23,8 @@ export function Modal({
   closeOnOverlayClick = false,
   ariaLabelledBy,
   ariaDescribedBy,
+  animation = 'default',
+  restoreFocusTo,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
@@ -35,7 +39,7 @@ export function Modal({
     if (!isOpen) return;
 
     // Store the element that was focused before modal opened
-    previouslyFocusedElement.current = document.activeElement as HTMLElement;
+    previouslyFocusedElement.current = restoreFocusTo ?? (document.activeElement as HTMLElement);
 
     // Focus the modal container
     if (modalRef.current) {
@@ -93,16 +97,23 @@ export function Modal({
         previouslyFocusedElement.current.focus();
       }
     };
-  }, [isOpen]);
+  }, [isOpen, restoreFocusTo]);
 
   if (!isOpen) return null;
 
+  const overlayAnimationClass =
+    animation === 'quick-chat'
+      ? 'omnichat-quick-chat-overlay-enter'
+      : animation === 'default'
+        ? 'animate-fadeIn'
+        : '';
+  const dialogAnimationClass =
+    animation === 'quick-chat' ? 'omnichat-quick-chat-dialog-enter' : '';
+
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center px-4 ${overlayClassName} animate-fadeIn`}
-      style={{
-        animation: 'fadeIn 150ms ease-out',
-      }}
+      className={`fixed inset-0 z-50 flex items-center justify-center px-4 ${overlayClassName} ${overlayAnimationClass}`}
+      style={animation === 'default' ? { animation: 'fadeIn 150ms ease-out' } : undefined}
       onClick={
         closeOnOverlayClick
           ? () => {
@@ -114,10 +125,8 @@ export function Modal({
       <div
         ref={modalRef}
         tabIndex={-1}
-        className={`outline-none ${className}`}
-        style={{
-          animation: 'scaleIn 200ms ease-out',
-        }}
+        className={`outline-none ${dialogAnimationClass} ${className}`}
+        style={animation === 'default' ? { animation: 'scaleIn 200ms ease-out' } : undefined}
         onClick={(event) => {
           event.stopPropagation();
         }}
