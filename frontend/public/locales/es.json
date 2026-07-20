@@ -3943,8 +3943,24 @@
       "startError": "No se pudo iniciar ese chat. Inténtalo de nuevo.",
       "empty": "Aún no hay personajes en esta categoría.",
       "startingChat": "Iniciando chat...",
-      "continueChatting": "Continuar chateando",
-      "conversationsLoadError": "No se pudieron cargar tus conversaciones."
+    "continueChatting": "Continuar chateando",
+    "conversationsLoadError": "No se pudieron cargar tus conversaciones.",
+    "heroEyebrow": "Mundo destacado",
+    "heroTitle": "Entra en una historia que te responde.",
+    "heroDescription": "Conoce personajes llenos de vida, da forma a la escena y lleva cada conversación hacia un lugar inesperado.",
+    "enterPersona": "Entrar con {{name}}",
+    "searchCharacters": "Buscar personajes",
+    "spotlight": "Destacado: {{name}} · {{category}}",
+    "continueEyebrow": "Retoma donde lo dejaste",
+    "viewChats": "Ver chats",
+    "createOrImport": "Crear o importar un personaje",
+    "privateCollection": "Tu colección privada",
+    "myCharacters": "Mis personajes",
+    "manageStudio": "Administrar Studio",
+    "exploreEyebrow": "Todos los géneros. Tú marcas el rumbo.",
+    "exploreTitle": "Explorar personajes",
+    "searchAll": "Buscar todos",
+    "categoryAria": "Categorías de personajes"
     },
     "chat": {
       "invalidConversation": "No se pudo encontrar esta conversación.",
@@ -3974,6 +3990,13 @@
       "inputPlaceholder": "Di o haz algo...",
       "send": "Enviar mensaje",
       "rateLimited": "Te estás moviendo demasiado rápido — espera un momento antes de enviar otro mensaje.",
+      "regenerateResponse": "Regenerar respuesta",
+      "regenerationFailed": "No se pudo regenerar esta respuesta. Se conservó la original.",
+      "editResponse": "Editar respuesta",
+      "saveEdit": "Guardar",
+      "cancelEdit": "Cancelar",
+      "editLearningHint": "Las respuestas futuras de este chat usarán tu versión editada.",
+      "editFailed": "No se pudo guardar la edición. Tu borrador se conservó.",
       "newChatConfirm": "¿Iniciar una conversación nueva?",
       "forkChat": "Bifurcar este chat",
       "forkChatDesc": "Crear una copia de esta conversación con todos los mensajes",
@@ -4054,6 +4077,9 @@
         "scenario": "Escenario",
         "openingMessage": "Mensaje inicial",
         "exampleDialogue": "Diálogo de ejemplo",
+        "exampleDialoguePlaceholder": "<START>\n{{userMarker}}: Tengo una idea.\n{{charMarker}}: Te escucho.",
+        "exampleDialogueHelp": "Usa {{charMarker}} para el personaje y {{userMarker}} para el usuario. Añade <START> entre conversaciones de ejemplo.",
+        "responseStyle": "Estilo de respuesta",
         "systemPrompt": "Anulación del prompt del sistema",
         "systemPromptPlaceholder": "Déjalo vacío para usar el prompt estructurado de personaje de OmniChat.",
         "postHistoryInstructions": "Instrucciones posteriores al historial",
@@ -4070,6 +4096,28 @@
         "galleryUrlsPlaceholder": "Una imagen subida por línea",
         "characterBookJson": "JSON del libro de personaje",
         "extensionsJson": "JSON de extensiones"
+      },
+      "responseStyles": {
+        "inherit": {
+          "label": "Usar el valor de OmniChat",
+          "description": "Sigue el estilo de conversación global actual de OmniChat."
+        },
+        "natural_dialogue": {
+          "label": "Diálogo natural",
+          "description": "Conversación directa y variada sin validación automática ni una pregunta forzada al final."
+        },
+        "lean_narrative": {
+          "label": "Narrativa / juego conciso",
+          "description": "Narración concisa que termina con una situación jugable, decisión o indicación útil."
+        },
+        "professional": {
+          "label": "Profesional",
+          "description": "Cálido y preciso, con una pregunta enfocada solo cuando realmente ayuda."
+        },
+        "character_only": {
+          "label": "Solo instrucciones del personaje",
+          "description": "No aplica el estilo de OmniChat. Útil para tarjetas importadas con estilo propio."
+        }
       },
       "uploadingField": "Subiendo {{field}}...",
       "dangerZone": {

@@ -16,6 +16,9 @@ type MediaUploadFieldProps = {
   disabled?: boolean;
   isUploading?: boolean;
   showStoredPath?: boolean;
+  previewFrameClassName?: string;
+  imageClassName?: string;
+  videoClassName?: string;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onClear?: () => void;
 };
@@ -35,23 +38,32 @@ export default function MediaUploadField({
   disabled = false,
   isUploading = false,
   showStoredPath = false,
+  previewFrameClassName,
+  imageClassName,
+  videoClassName,
   onFileChange,
   onClear,
 }: MediaUploadFieldProps) {
   const mediaSrc = previewSrc || resolveMediaUrl(value || undefined);
   const hasMedia = Boolean(mediaSrc);
   const inputId = `${id}-file`;
+  const frameClassName = previewFrameClassName || '';
+  const resolvedImageClassName = imageClassName || 'max-h-56 w-full bg-black/10 object-contain';
+  const resolvedVideoClassName =
+    videoClassName || 'aspect-video w-full bg-black object-contain';
 
   return (
     <div className="space-y-2">
       <span className="block text-sm font-medium text-[var(--color-text-primary)]">{label}</span>
 
-      <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div
+        className={`overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] ${frameClassName}`}
+      >
         {hasMedia ? (
           mediaType === 'video' ? (
-            <video src={mediaSrc} controls preload="metadata" className="aspect-video w-full bg-black object-contain" />
+            <video src={mediaSrc} controls preload="metadata" className={resolvedVideoClassName} />
           ) : (
-            <img src={mediaSrc} alt={label} className="max-h-56 w-full bg-black/10 object-contain" />
+            <img src={mediaSrc} alt={label} className={resolvedImageClassName} />
           )
         ) : (
           <div className="flex min-h-32 items-center justify-center px-4 py-8 text-sm text-[var(--color-text-secondary)]">

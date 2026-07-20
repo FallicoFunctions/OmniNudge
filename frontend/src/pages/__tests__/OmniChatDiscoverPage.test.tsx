@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import OmniChatDiscoverPage from '../OmniChatDiscoverPage';
@@ -153,6 +153,50 @@ describe('OmniChatDiscoverPage', () => {
     expect(authEventListener).toHaveBeenCalledTimes(1);
 
     window.removeEventListener('open-auth-modal', authEventListener);
+  });
+
+  it('reveals a tile description only while the pointer is in the lower half', async () => {
+    mockListPersonas.mockResolvedValue([
+      {
+        id: 1,
+        slug: 'guide-bot',
+        name: 'Guide Bot',
+        description: 'Public helper.',
+        category: 'helper' as const,
+        is_nsfw: false,
+        is_active: true,
+        created_at: '2026-07-11T00:00:00Z',
+        updated_at: '2026-07-11T00:00:00Z',
+      },
+    ]);
+
+    renderPage();
+
+    await screen.findAllByText('Guide Bot');
+    const card = document.querySelector<HTMLButtonElement>('button[data-persona-id="1"]');
+    expect(card).not.toBeNull();
+    if (!card) return;
+    const description = within(card).getByText('Public helper.');
+    vi.spyOn(card, 'getBoundingClientRect').mockReturnValue({
+      top: 100,
+      bottom: 300,
+      height: 200,
+      left: 0,
+      right: 200,
+      width: 200,
+      x: 0,
+      y: 100,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.mouseEnter(card, { clientY: 150 });
+    expect(description).toHaveClass('max-h-0');
+
+    fireEvent.mouseMove(card, { clientY: 250 });
+    expect(description).toHaveClass('max-h-24');
+
+    fireEvent.mouseMove(card, { clientY: 110 });
+    expect(description).toHaveClass('max-h-0');
   });
 
   it('uses fresh persona media for continue chatting cards instead of stale conversation media', async () => {

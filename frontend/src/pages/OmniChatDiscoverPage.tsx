@@ -2,6 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import {
+  ArrowRight,
+  MessageCircle,
+  Plus,
+  Search as SearchIcon,
+  Sparkles,
+  WandSparkles,
+} from 'lucide-react';
 import { omnichatService, omnichatQueryKeys } from '../services/omnichatService';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,14 +33,21 @@ import {
 const EMPTY_PERSONAS: BotPersona[] = [];
 
 // All PersonaCategory values are represented as filter pills.
+const CATEGORY_LABEL_KEYS: Record<PersonaCategory, string> = {
+  roleplay: 'omnichat.categories.roleplay',
+  helper: 'omnichat.categories.helper',
+  romance: 'omnichat.categories.romance',
+  original: 'omnichat.categories.original',
+  anime_game: 'omnichat.categories.animeGame',
+  fiction_media: 'omnichat.categories.fictionMedia',
+};
+
 const CATEGORIES: { value: PersonaCategory | 'all'; labelKey: string }[] = [
   { value: 'all', labelKey: 'omnichat.categories.all' },
-  { value: 'roleplay', labelKey: 'omnichat.categories.roleplay' },
-  { value: 'helper', labelKey: 'omnichat.categories.helper' },
-  { value: 'romance', labelKey: 'omnichat.categories.romance' },
-  { value: 'original', labelKey: 'omnichat.categories.original' },
-  { value: 'anime_game', labelKey: 'omnichat.categories.animeGame' },
-  { value: 'fiction_media', labelKey: 'omnichat.categories.fictionMedia' },
+  ...Object.entries(CATEGORY_LABEL_KEYS).map(([value, labelKey]) => ({
+    value: value as PersonaCategory,
+    labelKey,
+  })),
 ];
 
 // --- Card component ---------------------------------------------------------
@@ -170,6 +185,7 @@ function PersonaCard({
   onPreviewEnded?: () => void;
   cardRef?: (node: HTMLButtonElement | null) => void;
 }) {
+  const { t } = useTranslation();
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [isHovered, setIsHovered] = useState(false);
   const [desktopDescriptionExpanded, setDesktopDescriptionExpanded] = useState(false);
@@ -177,28 +193,31 @@ function PersonaCard({
   const previewActive = isMobile ? mobilePreviewActive : isHovered;
   const descriptionExpanded = isMobile ? mobileDescriptionExpanded : desktopDescriptionExpanded;
   const holdPreviewFrame = isMobile && mobileDescriptionExpanded;
-  const hasDescription = Boolean(persona.description);
 
   return (
     <button
       ref={cardRef}
       type="button"
       onClick={() => onSelect(persona)}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseMove={(event) => {
-        if (isMobile || !hasDescription) {
-          return;
+      onMouseEnter={(event) => {
+        setIsHovered(true);
+        if (!isMobile) {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          setDesktopDescriptionExpanded(event.clientY - bounds.top >= bounds.height / 2);
         }
-        const bounds = event.currentTarget.getBoundingClientRect();
-        const offsetY = event.clientY - bounds.top;
-        setDesktopDescriptionExpanded(offsetY >= bounds.height / 2);
+      }}
+      onMouseMove={(event) => {
+        if (!isMobile) {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          setDesktopDescriptionExpanded(event.clientY - bounds.top >= bounds.height / 2);
+        }
       }}
       onMouseLeave={() => {
         setIsHovered(false);
         setDesktopDescriptionExpanded(false);
       }}
-      className={`group relative w-full overflow-hidden text-left transition-all duration-200 hover:scale-[1.02] hover:shadow-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)] focus-visible:outline-offset-2 rounded-2xl ${
-        featured ? 'aspect-[16/10]' : 'aspect-[3/4]'
+      className={`group relative w-full overflow-hidden rounded-[26px] border border-white/[0.08] bg-white/[0.035] text-left shadow-[0_18px_45px_rgba(0,0,0,0.18)] transition-all duration-500 hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_24px_70px_rgba(0,0,0,0.38)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)] focus-visible:outline-offset-2 ${
+        featured ? 'aspect-[16/10]' : 'aspect-[4/5]'
       }`}
     >
       <PersonaAvatar
@@ -213,6 +232,14 @@ function PersonaCard({
         onPreviewEnded={onPreviewEnded}
       />
 
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.11)_50%,transparent_65%)] bg-[length:240%_100%] bg-[position:120%_0] opacity-0 transition-all duration-700 group-hover:bg-[position:-30%_0] group-hover:opacity-100" />
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-3">
+        <span className="rounded-full border border-white/15 bg-black/35 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/80 backdrop-blur-md">
+          {t(CATEGORY_LABEL_KEYS[persona.category])}
+        </span>
+      </div>
+
       {/* 18+ badge */}
       {persona.is_nsfw && (
         <span className="absolute right-2.5 top-2.5 rounded-full bg-red-600/90 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-sm">
@@ -220,17 +247,26 @@ function PersonaCard({
         </span>
       )}
 
-      {/* Card label at bottom */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0">
-        <p className="px-3 pb-1 text-sm font-semibold text-white drop-shadow-sm">
-          {persona.name}
-        </p>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3.5 sm:p-4">
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className={`${featured ? 'text-base sm:text-lg' : 'text-sm sm:text-base'} truncate font-bold tracking-[-0.02em] text-white drop-shadow-sm`}>
+              {persona.name}
+            </p>
+            {!descriptionExpanded && persona.tags?.[0] && (
+              <p className="mt-1 truncate text-[11px] font-medium text-white/60">#{persona.tags[0]}</p>
+            )}
+          </div>
+          <span className="flex h-8 w-8 flex-shrink-0 translate-y-2 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white opacity-0 backdrop-blur-md transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+            <ArrowRight size={14} />
+          </span>
+        </div>
         {persona.description && (
           <p
-            className={`overflow-hidden rounded-t-2xl border-t border-white/10 bg-black/60 px-3 text-xs text-white/85 backdrop-blur-sm transition-all duration-300 ${
+            className={`overflow-hidden text-xs leading-relaxed text-white/75 transition-all duration-300 ${
               descriptionExpanded
-                ? 'max-h-24 translate-y-0 py-2 opacity-100'
-                : 'max-h-0 translate-y-2 py-0 opacity-0'
+                ? 'mt-2 max-h-24 translate-y-0 opacity-100'
+                : 'mt-0 max-h-0 translate-y-2 opacity-0'
             }`}
           >
             {persona.description}
@@ -346,6 +382,11 @@ export default function OmniChatDiscoverPage() {
     [personas]
   );
 
+  const heroPersona = useMemo(
+    () => featured.find((persona) => Boolean(persona.avatar_url)) ?? featured[0],
+    [featured]
+  );
+
   const filtered = useMemo(
     () => (category === 'all' ? personas : personas.filter((p) => p.category === category)),
     [personas, category]
@@ -419,18 +460,90 @@ export default function OmniChatDiscoverPage() {
         onSelectPersona={handleSelect}
       />
 
-      <div className="h-[calc(100dvh-72px)] overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1600px] px-6 py-8 lg:px-10">
+      <div className="h-[calc(100dvh-72px)] overflow-y-auto scroll-smooth">
+        <div className="mx-auto w-full max-w-[1540px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 xl:px-10">
+          {heroPersona && (
+            <section
+              aria-labelledby="omnichat-hero-title"
+              className="relative mb-7 min-h-[420px] overflow-hidden rounded-[34px] border border-white/10 bg-[#151620] shadow-[0_32px_100px_rgba(0,0,0,0.38)] sm:min-h-[440px]"
+            >
+              <div className="absolute inset-0 sm:left-[38%]">
+                <PersonaAvatar
+                  persona={heroPersona}
+                  className="h-full w-full !rounded-none"
+                  previewEnabled={Boolean(heroPersona.preview_video_url) && !isMobile}
+                  previewActive={!isMobile}
+                  hideOverlay
+                />
+              </div>
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,#11121a_0%,rgba(17,18,26,0.98)_34%,rgba(17,18,26,0.58)_66%,rgba(17,18,26,0.08)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(9,10,15,0.9)_0%,transparent_48%)] sm:bg-none" />
+              <div className="omnichat-float absolute -right-14 -top-16 h-52 w-52 rounded-full border border-violet-300/10 bg-violet-500/10 blur-sm" aria-hidden="true" />
 
-          {/* Continue Chatting section */}
+              <div className="relative z-10 flex min-h-[420px] max-w-2xl flex-col justify-end p-6 sm:min-h-[440px] sm:justify-center sm:p-10 lg:p-12">
+                <div className="mb-5 flex w-fit items-center gap-2 rounded-full border border-violet-300/20 bg-violet-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-violet-100 backdrop-blur-md">
+                  <Sparkles size={13} />
+                  {t('omnichat.discover.heroEyebrow')}
+                </div>
+                <h1 id="omnichat-hero-title" className="max-w-xl text-[2.55rem] font-black leading-[0.98] tracking-[-0.055em] text-white sm:text-5xl lg:text-[3.65rem]">
+                  {t('omnichat.discover.heroTitle')}
+                </h1>
+                <p className="mt-5 max-w-lg text-sm leading-relaxed text-white/65 sm:text-base">
+                  {t('omnichat.discover.heroDescription')}
+                </p>
+                <div className="mt-7 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(heroPersona)}
+                    className="group flex h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-[#101118] shadow-[0_12px_30px_rgba(255,255,255,0.14)] transition hover:-translate-y-0.5 hover:bg-violet-50"
+                  >
+                    {t('omnichat.discover.enterPersona', { name: heroPersona.name })}
+                    <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSearchOverlayOpen(true)}
+                    className="flex h-11 items-center gap-2 rounded-full border border-white/15 bg-black/20 px-5 text-sm font-semibold text-white backdrop-blur-md transition hover:border-white/30 hover:bg-white/10"
+                  >
+                    <SearchIcon size={16} />
+                    {t('omnichat.discover.searchCharacters')}
+                  </button>
+                </div>
+                <div className="mt-7 flex items-center gap-3 text-xs text-white/45">
+                  <span className="h-px w-8 bg-gradient-to-r from-violet-400 to-transparent" />
+                  {t('omnichat.discover.spotlight', {
+                    name: heroPersona.name,
+                    category: t(CATEGORY_LABEL_KEYS[heroPersona.category]),
+                  })}
+                </div>
+              </div>
+            </section>
+          )}
+
           {isAuthenticated && !conversationsQuery.isLoading && continueChatting.length > 0 && (
-            <section className="mb-8">
-              <h2 className="mb-4 text-xl font-bold text-[var(--color-text-primary)]">
-                {t('omnichat.discover.continueChatting')}
-              </h2>
-              <div className="flex gap-3 overflow-x-auto pb-4 hide-scrollbar">
+            <section className="mb-9 rounded-[30px] border border-white/[0.08] bg-white/[0.025] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:p-6">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <div className="mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.19em] text-emerald-200/70">
+                    <span className="omnichat-live-dot h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                    {t('omnichat.discover.continueEyebrow')}
+                  </div>
+                  <h2 className="text-xl font-bold tracking-[-0.03em] text-[var(--color-text-primary)]">
+                    {t('omnichat.discover.continueChatting')}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/omnichat/chat')}
+                  className="hidden items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/5 hover:text-white sm:flex"
+                >
+                  <MessageCircle size={14} />
+                  {t('omnichat.discover.viewChats')}
+                </button>
+              </div>
+              <div className="flex gap-4 overflow-x-auto pb-1 hide-scrollbar">
                 {continueChatting.map((conv) => (
-                  <div key={conv.id} className="w-32 shrink-0 sm:w-40">
+                  <div key={conv.id} className="w-36 shrink-0 sm:w-40">
                     <PersonaCard
                       persona={conv.persona}
                       onSelect={() => navigate(`/omnichat/c/${conv.id}`)}
@@ -447,9 +560,7 @@ export default function OmniChatDiscoverPage() {
                       }
                       cardRef={(node) => {
                         continuePreview.setCardRef(conv.persona.id, node);
-                        if (node) {
-                          node.dataset.personaId = String(conv.persona.id);
-                        }
+                        if (node) node.dataset.personaId = String(conv.persona.id);
                       }}
                     />
                   </div>
@@ -458,27 +569,28 @@ export default function OmniChatDiscoverPage() {
             </section>
           )}
 
-          {/* Featured section */}
           {featured.length > 0 && (
-            <section className="mb-8">
-              <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <section className="mb-10">
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="mb-0.5 text-sm font-medium text-[var(--color-text-secondary)]">
+                  <p className="mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.19em] text-violet-200/65">
+                    <WandSparkles size={14} />
                     {t('omnichat.discover.featuredEyebrow')}
                   </p>
-                  <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+                  <h2 className="text-2xl font-black tracking-[-0.04em] text-[var(--color-text-primary)] sm:text-3xl">
                     {t('omnichat.discover.featuredTitle')}
-                  </h1>
+                  </h2>
                 </div>
                 <button
                   type="button"
                   onClick={handleOpenStudio}
-                  className="rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)]"
+                  className="group flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 text-sm font-semibold text-white/75 transition hover:border-violet-300/30 hover:bg-violet-400/10 hover:text-white"
                 >
-                  Create or Import Character
+                  <Plus size={16} className="transition-transform group-hover:rotate-90" />
+                  {t('omnichat.discover.createOrImport')}
                 </button>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {featured.map((persona) => (
                   <PersonaCard
                     key={persona.id}
@@ -498,9 +610,7 @@ export default function OmniChatDiscoverPage() {
                     }
                     cardRef={(node) => {
                       featuredPreview.setCardRef(persona.id, node);
-                      if (node) {
-                        node.dataset.personaId = String(persona.id);
-                      }
+                      if (node) node.dataset.personaId = String(persona.id);
                     }}
                   />
                 ))}
@@ -509,22 +619,20 @@ export default function OmniChatDiscoverPage() {
           )}
 
           {isAuthenticated && ownedPersonas.length > 0 && (
-            <section className="mb-8">
-              <div className="mb-4 flex items-center justify-between gap-3">
+            <section className="mb-10 rounded-[30px] border border-white/[0.08] bg-gradient-to-br from-violet-500/[0.06] to-transparent p-5 sm:p-6">
+              <div className="mb-5 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-[var(--color-text-secondary)]">
-                    Your private and imported bots
-                  </p>
-                  <h2 className="text-xl font-bold text-[var(--color-text-primary)]">My Characters</h2>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">{t('omnichat.discover.privateCollection')}</p>
+                  <h2 className="mt-1 text-xl font-bold tracking-[-0.03em] text-[var(--color-text-primary)]">{t('omnichat.discover.myCharacters')}</h2>
                 </div>
                 <Link
                   to="/omnichat/studio"
-                  className="rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)]"
+                  className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
                 >
-                  Manage Studio
+                  {t('omnichat.discover.manageStudio')} <ArrowRight size={14} />
                 </Link>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
                 {ownedPersonas.map((persona) => (
                   <PersonaCard key={persona.id} persona={persona} onSelect={handleSelect} allowMobileAutoplay />
                 ))}
@@ -532,73 +640,78 @@ export default function OmniChatDiscoverPage() {
             </section>
           )}
 
-          {/* Category filter pills */}
-          <div className="mb-5 flex flex-wrap gap-2">
-            {CATEGORIES.map((c) => {
-              const isActive = category === c.value;
-              return (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => setCategory(c.value)}
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-150 ${
-                    isActive
-                      ? 'bg-[var(--color-primary)] text-white border border-transparent'
-                      : 'bg-transparent text-[var(--color-text-primary)] border border-[var(--color-border)]'
-                  }`}
-                >
-                  {t(c.labelKey)}
-                </button>
-              );
-            })}
-          </div>
+          <section id="discover-characters" aria-labelledby="discover-characters-title" className="pb-10">
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.19em] text-rose-200/60">{t('omnichat.discover.exploreEyebrow')}</p>
+                <h2 id="discover-characters-title" className="mt-1.5 text-2xl font-black tracking-[-0.04em] text-white sm:text-3xl">{t('omnichat.discover.exploreTitle')}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSearchOverlayOpen(true)}
+                className="flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-4 text-xs font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+              >
+                <SearchIcon size={14} />
+                {t('omnichat.discover.searchAll')}
+              </button>
+            </div>
 
-          {/* Status messages */}
-          {personasQuery.isLoading && (
-            <LoadingMessage>{t('omnichat.discover.loading')}</LoadingMessage>
-          )}
-          {personasQuery.isError && (
-            <ErrorMessage>{t('omnichat.discover.loadError')}</ErrorMessage>
-          )}
-          {conversationsQuery.isError && (
-            <ErrorMessage>{t('omnichat.discover.conversationsLoadError')}</ErrorMessage>
-          )}
-          {createConversationMutation.isError && (
-            <ErrorMessage>{t('omnichat.discover.startError')}</ErrorMessage>
-          )}
-          {!personasQuery.isLoading && !personasQuery.isError && filtered.length === 0 && (
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t('omnichat.discover.empty')}
-            </p>
-          )}
+            <div className="mb-6 flex gap-2 overflow-x-auto pb-1 hide-scrollbar" aria-label={t('omnichat.discover.categoryAria')}>
+              {CATEGORIES.map((c) => {
+                const isActive = category === c.value;
+                return (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setCategory(c.value)}
+                    aria-pressed={isActive}
+                    className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition-all duration-200 ${
+                      isActive
+                        ? 'border-violet-300/30 bg-violet-500 text-white shadow-[0_10px_25px_rgba(124,58,237,0.24)]'
+                        : 'border-white/10 bg-white/[0.025] text-white/55 hover:border-white/20 hover:bg-white/[0.06] hover:text-white'
+                    }`}
+                  >
+                    {t(c.labelKey)}
+                  </button>
+                );
+              })}
+            </div>
 
-          {/* Persona grid */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {filtered.map((persona) => (
-              <PersonaCard
-                key={persona.id}
-                persona={persona}
-                onSelect={handleSelect}
-                allowMobileAutoplay
-                mobilePreviewActive={isMobile && gridPreview.activePreview?.id === persona.id}
-                mobilePreviewVersion={
-                  isMobile && gridPreview.activePreview?.id === persona.id
-                    ? gridPreview.activePreview.version
-                    : 0
-                }
-                onPreviewEnded={() => gridPreview.handlePreviewEnded(persona.id)}
-                mobileDescriptionExpanded={
-                  isMobile && gridPreview.expandedDescriptionId === persona.id
-                }
-                cardRef={(node) => {
-                  gridPreview.setCardRef(persona.id, node);
-                  if (node) {
-                    node.dataset.personaId = String(persona.id);
+            {personasQuery.isLoading && <LoadingMessage>{t('omnichat.discover.loading')}</LoadingMessage>}
+            {personasQuery.isError && <ErrorMessage>{t('omnichat.discover.loadError')}</ErrorMessage>}
+            {conversationsQuery.isError && <ErrorMessage>{t('omnichat.discover.conversationsLoadError')}</ErrorMessage>}
+            {createConversationMutation.isError && <ErrorMessage>{t('omnichat.discover.startError')}</ErrorMessage>}
+            {!personasQuery.isLoading && !personasQuery.isError && filtered.length === 0 && (
+              <div className="rounded-[26px] border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center text-sm text-[var(--color-text-secondary)]">
+                {t('omnichat.discover.empty')}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 2xl:grid-cols-5">
+              {filtered.map((persona) => (
+                <PersonaCard
+                  key={persona.id}
+                  persona={persona}
+                  onSelect={handleSelect}
+                  allowMobileAutoplay
+                  mobilePreviewActive={isMobile && gridPreview.activePreview?.id === persona.id}
+                  mobilePreviewVersion={
+                    isMobile && gridPreview.activePreview?.id === persona.id
+                      ? gridPreview.activePreview.version
+                      : 0
                   }
-                }}
-              />
-            ))}
-          </div>
+                  onPreviewEnded={() => gridPreview.handlePreviewEnded(persona.id)}
+                  mobileDescriptionExpanded={
+                    isMobile && gridPreview.expandedDescriptionId === persona.id
+                  }
+                  cardRef={(node) => {
+                    gridPreview.setCardRef(persona.id, node);
+                    if (node) node.dataset.personaId = String(persona.id);
+                  }}
+                />
+              ))}
+            </div>
+          </section>
         </div>
       </div>
 
