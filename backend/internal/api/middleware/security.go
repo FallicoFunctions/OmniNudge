@@ -33,7 +33,7 @@ func SecurityHeaders() gin.HandlerFunc {
 			"img-src 'self' data: blob: https:", // Allow images from self, data URLs, blobs, HTTPS
 			"font-src 'self' data:",             // Allow fonts from self and data URLs
 			"connect-src 'self' ws: wss:",       // Allow WebSocket connections
-			"media-src 'self' blob:",            // Allow media from self and blobs
+			"media-src 'self' blob: https:",     // Allow media from self, blobs, and HTTPS CDN redirects
 			"object-src 'none'",                 // Block plugins (Flash, etc.)
 			"frame-ancestors 'none'",            // Prevent clickjacking
 			"base-uri 'self'",                   // Restrict <base> tag

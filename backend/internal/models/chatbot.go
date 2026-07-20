@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -20,6 +21,17 @@ const (
 	PersonaCategoryOriginal     = "original"
 	PersonaCategoryAnimeGame    = "anime_game"
 	PersonaCategoryFictionMedia = "fiction_media"
+)
+
+// Response style profiles add a platform-level conversational style after the
+// character card prompt. "inherit" follows the current platform default while
+// "character_only" leaves imported/custom character instructions untouched.
+const (
+	ResponseStyleProfileInherit         = "inherit"
+	ResponseStyleProfileNaturalDialogue = "natural_dialogue"
+	ResponseStyleProfileLeanNarrative   = "lean_narrative"
+	ResponseStyleProfileProfessional    = "professional"
+	ResponseStyleProfileCharacterOnly   = "character_only"
 )
 
 // Message roles within a bot conversation.
@@ -43,6 +55,7 @@ type BotPersona struct {
 	Scenario                string          `json:"-"`
 	FirstMessage            string          `json:"-"`
 	ExampleDialogue         string          `json:"-"`
+	ResponseStyleProfile    string          `json:"response_style_profile,omitempty"`
 	PostHistoryInstructions string          `json:"-"`
 	AlternateGreetings      []string        `json:"-"`
 	CreatorNotes            string          `json:"-"`
@@ -112,7 +125,7 @@ const maxPersonaListSize = 500
 
 const botPersonaSelectColumns = `
 	id, slug, name, description, category, owner_user_id, visibility, source_format,
-	system_prompt, personality, scenario, first_message, example_dialogue,
+	system_prompt, personality, scenario, first_message, example_dialogue, response_style_profile,
 	post_history_instructions, alternate_greetings, creator_notes, tags, creator_name,
 	character_version, extensions_json, character_book_json, raw_card_json,
 	import_source_filename, avatar_url, preview_video_url, gallery_urls,
@@ -137,7 +150,7 @@ func scanBotPersona(scanner interface {
 	p := &BotPersona{}
 	err := scanner.Scan(
 		&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.OwnerUserID, &p.Visibility, &p.SourceFormat,
-		&p.SystemPrompt, &p.Personality, &p.Scenario, &p.FirstMessage, &p.ExampleDialogue,
+		&p.SystemPrompt, &p.Personality, &p.Scenario, &p.FirstMessage, &p.ExampleDialogue, &p.ResponseStyleProfile,
 		&p.PostHistoryInstructions, &p.AlternateGreetings, &p.CreatorNotes, &p.Tags, &p.CreatorName,
 		&p.CharacterVersion, &p.ExtensionsJSON, &p.CharacterBookJSON, &p.RawCardJSON,
 		&p.ImportSourceFilename, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs,
@@ -151,6 +164,9 @@ func scanBotPersona(scanner interface {
 	}
 	if p.SourceFormat == "" {
 		p.SourceFormat = "native"
+	}
+	if p.ResponseStyleProfile == "" {
+		p.ResponseStyleProfile = ResponseStyleProfileInherit
 	}
 	if p.AlternateGreetings == nil {
 		p.AlternateGreetings = []string{}
@@ -314,23 +330,23 @@ func (r *BotPersonaRepository) CreateOwned(ctx context.Context, userID int, pers
 	query := `
 		INSERT INTO bot_personas (
 			slug, name, description, category, owner_user_id, visibility, source_format,
-			system_prompt, personality, scenario, first_message, example_dialogue,
+			system_prompt, personality, scenario, first_message, example_dialogue, response_style_profile,
 			post_history_instructions, alternate_greetings, creator_notes, tags,
 			creator_name, character_version, extensions_json, character_book_json, raw_card_json,
 			import_source_filename, avatar_url, preview_video_url, gallery_urls, is_nsfw, is_active
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7,
-			$8, $9, $10, $11, $12,
-			$13, $14, $15, $16,
-			$17, $18, $19, $20, $21,
-			$22, $23, $24, $25, $26, TRUE
+			$8, $9, $10, $11, $12, $13,
+			$14, $15, $16, $17,
+			$18, $19, $20, $21, $22,
+			$23, $24, $25, $26, $27, TRUE
 		)
 		RETURNING ` + botPersonaSelectColumns
 	return scanBotPersona(r.pool.QueryRow(
 		ctx,
 		query,
 		persona.Slug, persona.Name, persona.Description, persona.Category, userID, persona.Visibility, persona.SourceFormat,
-		persona.SystemPrompt, persona.Personality, persona.Scenario, persona.FirstMessage, persona.ExampleDialogue,
+		persona.SystemPrompt, persona.Personality, persona.Scenario, persona.FirstMessage, persona.ExampleDialogue, responseStyleProfileOrDefault(persona.ResponseStyleProfile),
 		persona.PostHistoryInstructions, persona.AlternateGreetings, persona.CreatorNotes, persona.Tags,
 		persona.CreatorName, persona.CharacterVersion, emptyRawJSON(persona.ExtensionsJSON), nilIfEmptyRawJSON(persona.CharacterBookJSON), nilIfEmptyRawJSON(persona.RawCardJSON),
 		persona.ImportSourceFilename, persona.AvatarURL, persona.PreviewVideoURL, persona.GalleryURLs, persona.IsNSFW,
@@ -350,21 +366,22 @@ func (r *BotPersonaRepository) UpdateOwned(ctx context.Context, userID, id int, 
 		    personality = $9,
 		    scenario = $10,
 		    first_message = $11,
-		    example_dialogue = $12,
-		    post_history_instructions = $13,
-		    alternate_greetings = $14,
-		    creator_notes = $15,
-		    tags = $16,
-		    creator_name = $17,
-		    character_version = $18,
-		    extensions_json = $19,
-		    character_book_json = $20,
-		    raw_card_json = $21,
-		    import_source_filename = $22,
-		    avatar_url = $23,
-		    preview_video_url = $24,
-		    gallery_urls = $25,
-		    is_nsfw = $26,
+		example_dialogue = $12,
+		response_style_profile = $13,
+		post_history_instructions = $14,
+		alternate_greetings = $15,
+		creator_notes = $16,
+		tags = $17,
+		creator_name = $18,
+		character_version = $19,
+		extensions_json = $20,
+		character_book_json = $21,
+		raw_card_json = $22,
+		import_source_filename = $23,
+		avatar_url = $24,
+		preview_video_url = $25,
+		gallery_urls = $26,
+		is_nsfw = $27,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = $1 AND owner_user_id = $2 AND is_active
 		RETURNING ` + botPersonaSelectColumns
@@ -373,7 +390,7 @@ func (r *BotPersonaRepository) UpdateOwned(ctx context.Context, userID, id int, 
 		query,
 		id, userID,
 		persona.Name, persona.Description, persona.Category, persona.Visibility, persona.SourceFormat,
-		persona.SystemPrompt, persona.Personality, persona.Scenario, persona.FirstMessage, persona.ExampleDialogue,
+		persona.SystemPrompt, persona.Personality, persona.Scenario, persona.FirstMessage, persona.ExampleDialogue, responseStyleProfileOrDefault(persona.ResponseStyleProfile),
 		persona.PostHistoryInstructions, persona.AlternateGreetings, persona.CreatorNotes, persona.Tags,
 		persona.CreatorName, persona.CharacterVersion, emptyRawJSON(persona.ExtensionsJSON), nilIfEmptyRawJSON(persona.CharacterBookJSON), nilIfEmptyRawJSON(persona.RawCardJSON),
 		persona.ImportSourceFilename, persona.AvatarURL, persona.PreviewVideoURL, persona.GalleryURLs, persona.IsNSFW,
@@ -436,6 +453,13 @@ func nilIfEmptyRawJSON(raw json.RawMessage) json.RawMessage {
 		return nil
 	}
 	return json.RawMessage(trimmed)
+}
+
+func responseStyleProfileOrDefault(profile string) string {
+	if strings.TrimSpace(profile) == "" {
+		return ResponseStyleProfileInherit
+	}
+	return strings.TrimSpace(profile)
 }
 
 // BotConversationRepository handles database operations for bot conversations.
@@ -616,7 +640,7 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 			&s.UserName, &s.UserAge, &s.UserGender,
 			&c.CreatedAt, &c.LastMessageAt, &c.ArchivedAt,
 			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.OwnerUserID, &p.Visibility, &p.SourceFormat,
-			&p.SystemPrompt, &p.Personality, &p.Scenario, &p.FirstMessage, &p.ExampleDialogue,
+			&p.SystemPrompt, &p.Personality, &p.Scenario, &p.FirstMessage, &p.ExampleDialogue, &p.ResponseStyleProfile,
 			&p.PostHistoryInstructions, &p.AlternateGreetings, &p.CreatorNotes, &p.Tags, &p.CreatorName,
 			&p.CharacterVersion, &p.ExtensionsJSON, &p.CharacterBookJSON, &p.RawCardJSON,
 			&p.ImportSourceFilename, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs,
@@ -748,6 +772,22 @@ func (r *BotConversationRepository) Archive(ctx context.Context, conversationID,
 	return tag.RowsAffected() > 0, nil
 }
 
+// ArchiveByUserAndPersonaID soft-deletes every active conversation the user
+// has with a persona. It returns how many rows were archived.
+func (r *BotConversationRepository) ArchiveByUserAndPersonaID(ctx context.Context, userID, personaID int) (int64, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE bot_conversations
+		SET archived_at = CURRENT_TIMESTAMP
+		WHERE user_id = $1
+		  AND persona_id = $2
+		  AND archived_at IS NULL
+	`, userID, personaID)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 // UpdateLastMessageAt bumps the conversation's last_message_at to now.
 func (r *BotConversationRepository) UpdateLastMessageAt(ctx context.Context, conversationID int) error {
 	_, err := r.pool.Exec(ctx, `UPDATE bot_conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = $1`, conversationID)
@@ -781,6 +821,75 @@ func (r *BotMessageRepository) Create(ctx context.Context, conversationID int, r
 	`
 	err := r.pool.QueryRow(ctx, query, conversationID, role, content, failed).Scan(&m.ID, &m.CreatedAt)
 	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// RepairStaleDanglingUserTurn inserts a failed assistant fallback when the
+// latest message in a conversation is an old user turn with no assistant
+// response. It returns nil when there is nothing to repair.
+func (r *BotMessageRepository) RepairStaleDanglingUserTurn(ctx context.Context, conversationID int, staleAfter time.Duration, content string) (*BotMessage, error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Serialize repairs for a conversation before checking its latest message.
+	// Without this lock, simultaneous page loads can both observe the same stale
+	// user turn and each append an assistant fallback.
+	var lockedConversationID int
+	err = tx.QueryRow(ctx, `
+		SELECT id
+		FROM bot_conversations
+		WHERE id = $1
+		FOR UPDATE
+	`, conversationID).Scan(&lockedConversationID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	query := `
+		WITH last_message AS (
+			SELECT id, created_at
+			FROM bot_messages
+			WHERE conversation_id = $1
+			ORDER BY id DESC
+			LIMIT 1
+		), inserted AS (
+			INSERT INTO bot_messages (conversation_id, role, content, failed)
+			SELECT $1, $2, $3, TRUE
+			FROM last_message lm
+			JOIN bot_messages m ON m.id = lm.id
+			WHERE m.role = $4
+			  AND lm.created_at <= NOW() - ($5::DOUBLE PRECISION * INTERVAL '1 second')
+			RETURNING id, conversation_id, role, content, failed, created_at
+		)
+		SELECT id, conversation_id, role, content, failed, created_at
+		FROM inserted
+	`
+	m := &BotMessage{}
+	err = tx.QueryRow(ctx, query,
+		conversationID,
+		BotMessageRoleAssistant,
+		content,
+		BotMessageRoleUser,
+		staleAfter.Seconds(),
+	).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			if err := tx.Commit(ctx); err != nil {
+				return nil, err
+			}
+			return nil, nil
+		}
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -840,4 +949,168 @@ func (r *BotMessageRepository) ListByConversationID(ctx context.Context, convers
 		messages = append(messages, m)
 	}
 	return messages, rows.Err()
+}
+
+// GetLatestAssistantForRegeneration returns messageID only when it is the
+// conversation's latest message and is an assistant reply. This keeps
+// regeneration from rewriting earlier history after the user has continued.
+func (r *BotMessageRepository) GetLatestAssistantForRegeneration(ctx context.Context, conversationID, messageID int) (*BotMessage, error) {
+	query := `
+		SELECT m.id, m.conversation_id, m.role, m.content, m.failed, m.created_at
+		FROM bot_messages m
+		WHERE m.id = $1
+		  AND m.conversation_id = $2
+		  AND m.role = $3
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM bot_messages newer
+			WHERE newer.conversation_id = m.conversation_id
+			  AND newer.id > m.id
+		  )
+	`
+	m := &BotMessage{}
+	err := r.pool.QueryRow(ctx, query, messageID, conversationID, BotMessageRoleAssistant).
+		Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return m, nil
+}
+
+// ListBeforeMessageID returns the most recent messages before messageID in
+// chronological order. The target assistant reply itself is intentionally
+// excluded so a regeneration is based on the same conversation state.
+func (r *BotMessageRepository) ListBeforeMessageID(ctx context.Context, conversationID, messageID, limit int) ([]*BotMessage, error) {
+	query := `
+		SELECT id, conversation_id, role, content, failed, created_at
+		FROM (
+			SELECT id, conversation_id, role, content, failed, created_at
+			FROM bot_messages
+			WHERE conversation_id = $1 AND id < $2
+			ORDER BY id DESC
+			LIMIT $3
+		) recent
+		ORDER BY id
+	`
+	rows, err := r.pool.Query(ctx, query, conversationID, messageID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	messages := []*BotMessage{}
+	for rows.Next() {
+		m := &BotMessage{}
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
+
+// ReplaceLatestAssistantContent updates a reply only if it is still latest
+// and still contains the content the caller originally read. The content
+// check prevents two concurrent regenerations from overwriting each other.
+func (r *BotMessageRepository) ReplaceLatestAssistantContent(ctx context.Context, conversationID, messageID int, expectedContent, content string) (*BotMessage, error) {
+	query := `
+		UPDATE bot_messages AS target
+		SET content = $4, failed = FALSE
+		WHERE target.id = $1
+		  AND target.conversation_id = $2
+		  AND target.role = $3
+		  AND target.content = $5
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM bot_messages newer
+			WHERE newer.conversation_id = target.conversation_id
+			  AND newer.id > target.id
+		  )
+		RETURNING target.id, target.conversation_id, target.role, target.content, target.failed, target.created_at
+	`
+	m := &BotMessage{}
+	err := r.pool.QueryRow(ctx, query, messageID, conversationID, BotMessageRoleAssistant, content, expectedContent).
+		Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return m, nil
+}
+
+// EditLatestAssistantContent atomically records the previous text and replaces
+// the latest assistant reply. The ownership join keeps authorization at the
+// data boundary, and the row lock prevents racing edits from losing history.
+func (r *BotMessageRepository) EditLatestAssistantContent(ctx context.Context, userID, conversationID, messageID int, content string) (*BotMessage, error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	current := &BotMessage{}
+	query := `
+		SELECT m.id, m.conversation_id, m.role, m.content, m.failed, m.created_at
+		FROM bot_messages m
+		JOIN bot_conversations c ON c.id = m.conversation_id
+		WHERE c.user_id = $1
+		  AND c.id = $2
+		  AND m.id = $3
+		  AND m.role = $4
+		  AND NOT EXISTS (
+			SELECT 1 FROM bot_messages newer
+			WHERE newer.conversation_id = m.conversation_id AND newer.id > m.id
+		  )
+		FOR UPDATE OF m
+	`
+	err = tx.QueryRow(ctx, query, userID, conversationID, messageID, BotMessageRoleAssistant).
+		Scan(&current.ID, &current.ConversationID, &current.Role, &current.Content, &current.Failed, &current.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if current.Content == content {
+		return current, nil
+	}
+
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO bot_message_edit_history (message_id, previous_content, edited_by)
+		VALUES ($1, $2, $3)
+	`, messageID, current.Content, userID); err != nil {
+		return nil, err
+	}
+
+	updated := &BotMessage{}
+	err = tx.QueryRow(ctx, `
+		UPDATE bot_messages AS target
+		SET content = $2, failed = FALSE
+		WHERE target.id = $1
+		  AND target.conversation_id = $3
+		  AND target.role = $4
+		  AND NOT EXISTS (
+			SELECT 1 FROM bot_messages newer
+			WHERE newer.conversation_id = target.conversation_id AND newer.id > target.id
+		  )
+		RETURNING id, conversation_id, role, content, failed, created_at
+	`, messageID, content, conversationID, BotMessageRoleAssistant).Scan(
+		&updated.ID, &updated.ConversationID, &updated.Role,
+		&updated.Content, &updated.Failed, &updated.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return updated, nil
 }

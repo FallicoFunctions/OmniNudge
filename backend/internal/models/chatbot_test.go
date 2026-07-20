@@ -306,3 +306,197 @@ func TestBotConversationRepositoryListByUserIDExcludesInactivePersonas(t *testin
 	require.NoError(t, err)
 	require.Empty(t, personaConversations)
 }
+
+func TestBotConversationRepositoryArchiveByUserAndPersonaID(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	userRepo := NewUserRepository(db.Pool)
+	user := &User{
+		Username:     fmt.Sprintf("omnichat_archive_persona_%d", time.Now().UnixNano()),
+		PasswordHash: "hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user))
+
+	personaRepo := NewBotPersonaRepository(db.Pool)
+	firstPersona, err := personaRepo.CreateOwned(ctx, user.ID, &BotPersona{
+		Slug:               fmt.Sprintf("u%d-archive-a-%d", user.ID, time.Now().UnixNano()),
+		Name:               "Archive A",
+		Category:           PersonaCategoryOriginal,
+		Visibility:         "private",
+		SourceFormat:       "native",
+		SystemPrompt:       "stay in character",
+		AlternateGreetings: []string{},
+		Tags:               []string{},
+		GalleryURLs:        []string{},
+		ExtensionsJSON:     json.RawMessage(`{}`),
+	})
+	require.NoError(t, err)
+	secondPersona, err := personaRepo.CreateOwned(ctx, user.ID, &BotPersona{
+		Slug:               fmt.Sprintf("u%d-archive-b-%d", user.ID, time.Now().UnixNano()),
+		Name:               "Archive B",
+		Category:           PersonaCategoryOriginal,
+		Visibility:         "private",
+		SourceFormat:       "native",
+		SystemPrompt:       "stay in character",
+		AlternateGreetings: []string{},
+		Tags:               []string{},
+		GalleryURLs:        []string{},
+		ExtensionsJSON:     json.RawMessage(`{}`),
+	})
+	require.NoError(t, err)
+
+	convRepo := NewBotConversationRepository(db.Pool)
+	_, err = convRepo.CreateWithMessages(ctx, user.ID, firstPersona.ID, nil, nil, nil)
+	require.NoError(t, err)
+	_, err = convRepo.CreateWithMessages(ctx, user.ID, firstPersona.ID, nil, nil, nil)
+	require.NoError(t, err)
+	_, err = convRepo.CreateWithMessages(ctx, user.ID, secondPersona.ID, nil, nil, nil)
+	require.NoError(t, err)
+
+	archivedCount, err := convRepo.ArchiveByUserAndPersonaID(ctx, user.ID, firstPersona.ID)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, archivedCount)
+
+	firstPersonaConversations, err := convRepo.ListByUserIDAndPersonaID(ctx, user.ID, firstPersona.ID, 20, 0)
+	require.NoError(t, err)
+	require.Empty(t, firstPersonaConversations)
+
+	secondPersonaConversations, err := convRepo.ListByUserIDAndPersonaID(ctx, user.ID, secondPersona.ID, 20, 0)
+	require.NoError(t, err)
+	require.Len(t, secondPersonaConversations, 1)
+}
+
+func TestBotMessageRepositoryRepairsStaleDanglingUserTurn(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	userRepo := NewUserRepository(db.Pool)
+	user := &User{
+		Username:     fmt.Sprintf("omnichat_repair_%d", time.Now().UnixNano()),
+		PasswordHash: "hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user))
+
+	personaRepo := NewBotPersonaRepository(db.Pool)
+	persona, err := personaRepo.CreateOwned(ctx, user.ID, &BotPersona{
+		Slug:               fmt.Sprintf("u%d-repair-%d", user.ID, time.Now().UnixNano()),
+		Name:               "Repair Persona",
+		Category:           PersonaCategoryOriginal,
+		Visibility:         "private",
+		SourceFormat:       "native",
+		SystemPrompt:       "stay in character",
+		AlternateGreetings: []string{},
+		Tags:               []string{},
+		GalleryURLs:        []string{},
+		ExtensionsJSON:     json.RawMessage(`{}`),
+	})
+	require.NoError(t, err)
+
+	convRepo := NewBotConversationRepository(db.Pool)
+	conversation, err := convRepo.CreateWithMessages(ctx, user.ID, persona.ID, nil, nil, nil)
+	require.NoError(t, err)
+
+	messageRepo := NewBotMessageRepository(db.Pool)
+	userMessage, err := messageRepo.Create(ctx, conversation.ID, BotMessageRoleUser, "Are you there?", false)
+	require.NoError(t, err)
+	_, err = db.Pool.Exec(ctx, `UPDATE bot_messages SET created_at = NOW() - INTERVAL '2 minutes' WHERE id = $1`, userMessage.ID)
+	require.NoError(t, err)
+
+	type repairResult struct {
+		message *BotMessage
+		err     error
+	}
+	const repairAttempts = 8
+	start := make(chan struct{})
+	results := make(chan repairResult, repairAttempts)
+	for range repairAttempts {
+		go func() {
+			<-start
+			message, repairErr := messageRepo.RepairStaleDanglingUserTurn(
+				ctx,
+				conversation.ID,
+				75*time.Second,
+				"The bot was interrupted before it could answer. Please send your message again.",
+			)
+			results <- repairResult{message: message, err: repairErr}
+		}()
+	}
+	close(start)
+
+	repairCount := 0
+	for range repairAttempts {
+		result := <-results
+		require.NoError(t, result.err)
+		if result.message == nil {
+			continue
+		}
+		repairCount++
+		require.Equal(t, BotMessageRoleAssistant, result.message.Role)
+		require.True(t, result.message.Failed)
+		require.Equal(t, "The bot was interrupted before it could answer. Please send your message again.", result.message.Content)
+	}
+	require.Equal(t, 1, repairCount)
+
+	messages, err := messageRepo.ListByConversationID(ctx, conversation.ID, 20)
+	require.NoError(t, err)
+	require.Len(t, messages, 2)
+
+	secondRepair, err := messageRepo.RepairStaleDanglingUserTurn(ctx, conversation.ID, 75*time.Second, "duplicate")
+	require.NoError(t, err)
+	require.Nil(t, secondRepair)
+}
+
+func TestBotMessageRepositoryDoesNotRepairFreshDanglingUserTurn(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	userRepo := NewUserRepository(db.Pool)
+	user := &User{
+		Username:     fmt.Sprintf("omnichat_repair_fresh_%d", time.Now().UnixNano()),
+		PasswordHash: "hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user))
+
+	personaRepo := NewBotPersonaRepository(db.Pool)
+	persona, err := personaRepo.CreateOwned(ctx, user.ID, &BotPersona{
+		Slug:               fmt.Sprintf("u%d-repair-fresh-%d", user.ID, time.Now().UnixNano()),
+		Name:               "Fresh Repair Persona",
+		Category:           PersonaCategoryOriginal,
+		Visibility:         "private",
+		SourceFormat:       "native",
+		SystemPrompt:       "stay in character",
+		AlternateGreetings: []string{},
+		Tags:               []string{},
+		GalleryURLs:        []string{},
+		ExtensionsJSON:     json.RawMessage(`{}`),
+	})
+	require.NoError(t, err)
+
+	convRepo := NewBotConversationRepository(db.Pool)
+	conversation, err := convRepo.CreateWithMessages(ctx, user.ID, persona.ID, nil, nil, nil)
+	require.NoError(t, err)
+
+	messageRepo := NewBotMessageRepository(db.Pool)
+	_, err = messageRepo.Create(ctx, conversation.ID, BotMessageRoleUser, "Still generating?", false)
+	require.NoError(t, err)
+
+	repaired, err := messageRepo.RepairStaleDanglingUserTurn(ctx, conversation.ID, 75*time.Second, "The bot was interrupted before it could answer. Please send your message again.")
+	require.NoError(t, err)
+	require.Nil(t, repaired)
+}
