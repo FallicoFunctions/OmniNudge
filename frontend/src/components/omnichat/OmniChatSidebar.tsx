@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Compass, Menu, MessageSquare, Search, SquarePen, X } from 'lucide-react';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 export type SidebarTab = 'discover' | 'search' | 'chat' | 'studio';
 
@@ -76,6 +78,21 @@ export default function OmniChatSidebar({
   onDesktopCollapsedChange,
 }: OmniChatSidebarProps) {
   const { t } = useTranslation();
+  const mobileTriggerRef = useRef<HTMLButtonElement>(null);
+  const mobileDrawerRef = useDialogFocus({
+    isActive: mobileOpen,
+    onEscape: onMobileClose,
+    restoreFocusRef: mobileTriggerRef,
+  });
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen]);
 
   return (
     <>
@@ -115,10 +132,11 @@ export default function OmniChatSidebar({
       </aside>
 
       <button
+        ref={mobileTriggerRef}
         type="button"
         onClick={onMobileOpen}
         aria-label={t('omnichat.sidebar.openMenu')}
-        className="fixed left-4 top-[84px] z-30 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-[#191920] text-white shadow-md lg:hidden"
+        className="omnichat-touch-target fixed left-4 top-[calc(var(--omnichat-header-offset)+12px)] z-30 flex items-center justify-center rounded-2xl border border-white/10 bg-[#191920] text-white shadow-md lg:hidden"
         style={{ display: mobileOpen ? 'none' : undefined }}
       >
         <Menu size={18} />
@@ -126,15 +144,27 @@ export default function OmniChatSidebar({
 
       {mobileOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={onMobileClose} />
-          <div className="fixed inset-y-0 left-0 z-50 w-[248px] border-r border-white/10 bg-[#17171c]/95 p-4 backdrop-blur-xl lg:hidden">
+          <button
+            type="button"
+            aria-label={t('omnichat.sidebar.closeMenu')}
+            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+            onClick={onMobileClose}
+          />
+          <div
+            ref={mobileDrawerRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('omnichat.sidebar.openMenu')}
+            className="fixed inset-y-0 left-0 z-50 flex w-[248px] flex-col border-r border-white/10 bg-[#17171c]/95 px-4 pb-[max(1rem,var(--omnichat-safe-bottom))] pt-[max(1rem,var(--omnichat-safe-top))] backdrop-blur-xl lg:hidden"
+          >
             <div className="mb-5 flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/35">Menu</span>
               <button
                 type="button"
                 onClick={onMobileClose}
                 aria-label={t('omnichat.sidebar.closeMenu')}
-                className="flex h-9 w-9 items-center justify-center rounded-2xl text-white/65 hover:bg-white/5"
+                className="omnichat-touch-target flex items-center justify-center rounded-2xl text-white/65 hover:bg-white/5"
               >
                 <X size={16} />
               </button>
