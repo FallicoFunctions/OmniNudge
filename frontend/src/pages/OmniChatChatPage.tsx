@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import PersonaAvatar from '../components/omnichat/PersonaAvatar';
 import SearchOverlay from '../components/omnichat/SearchOverlay';
 import ChatSettingsModal from '../components/omnichat/ChatSettingsModal';
+import OmniChatMessageContent from '../components/omnichat/OmniChatMessageContent';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { useAuth } from '../contexts/AuthContext';
@@ -40,7 +41,6 @@ import {
 import {
   getOmniChatPreviewText,
   normalizeOmniChatMessageContent,
-  parseOmniChatMessage,
 } from '../utils/omnichatMessageFormatting';
 import { loadOmniChatDefaults } from '../utils/omnichatDefaults';
 import { resolveMediaUrl } from '../utils/mediaUrl';
@@ -59,26 +59,6 @@ const PROFILE_DRAWER_WIDTH = 360;
 const CHAT_LIST_WIDTH_WIDE = 340;
 const CHAT_LIST_WIDTH_COMPACT = 320;
 const CHAT_LIST_WIDTH_COLLAPSED = 88;
-
-function MessageContent({ content }: { content: string }) {
-  const segments = parseOmniChatMessage(content);
-  if (segments.length === 0) {
-    return null;
-  }
-
-  return (
-    <p className="whitespace-pre-wrap text-sm leading-relaxed">
-      {segments.map((segment, index) => (
-        <span
-          key={index}
-          className={`${segment.bold ? 'font-semibold' : ''} ${segment.italic ? 'italic text-white/55' : ''}`.trim()}
-        >
-          {segment.text}
-        </span>
-      ))}
-    </p>
-  );
-}
 
 function GeneratingIndicator() {
   return (
@@ -506,6 +486,23 @@ export default function OmniChatChatPage() {
   }, [guestPersonaId, isGuest]);
 
   useEffect(() => {
+    if (!isGuest || !guestPersona || guestMessages.length > 0) return;
+    const openingMessage = guestPersona.first_message?.trim();
+    if (!openingMessage) return;
+
+    setGuestMessages([
+      {
+        id: nextOptimisticId.current--,
+        conversation_id: 0,
+        role: 'assistant',
+        content: openingMessage,
+        failed: false,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+  }, [guestMessages.length, guestPersona, isGuest]);
+
+  useEffect(() => {
     if (!isGuest || !isAuthenticated || !guestPersona || guestMessages.length === 0 || persistedGuest.current) {
       return;
     }
@@ -845,7 +842,7 @@ export default function OmniChatChatPage() {
         setGuestIsGenerating(true);
 
         omnichatService
-          .sendAnonymousMessage({
+          .sendPreviewMessage({
             persona_id: guestPersona.id,
             content,
             history: guestMessages.map((message) => ({ role: message.role, content: message.content })),
@@ -942,7 +939,7 @@ export default function OmniChatChatPage() {
       setRegeneratingMessageId(messageId);
       setRegenerationText('');
       try {
-        const response = await omnichatService.sendAnonymousMessage({
+        const response = await omnichatService.sendPreviewMessage({
           persona_id: guestPersona.id,
           content: userMessage.content,
           history: guestMessages
@@ -1336,12 +1333,12 @@ export default function OmniChatChatPage() {
                             </div>
                           ) : isRegenerating ? (
                             normalizedRegenerationText ? (
-                              <MessageContent content={normalizedRegenerationText} />
+                              <OmniChatMessageContent content={normalizedRegenerationText} />
                             ) : (
                               <GeneratingIndicator />
                             )
                           ) : (
-                            <MessageContent content={message.content} />
+                            <OmniChatMessageContent content={message.content} />
                           )}
                         </div>
 
@@ -1378,7 +1375,7 @@ export default function OmniChatChatPage() {
                   <div className="flex justify-start">
                     <div className="rounded-[26px] border border-white/8 bg-white/[0.06] px-4 py-3 text-white">
                       {normalizedStreamingText ? (
-                        <MessageContent content={normalizedStreamingText} />
+                        <OmniChatMessageContent content={normalizedStreamingText} />
                       ) : (
                         <GeneratingIndicator />
                       )}

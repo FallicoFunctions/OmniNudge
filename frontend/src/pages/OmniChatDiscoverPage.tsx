@@ -16,8 +16,9 @@ import { useAuth } from '../contexts/AuthContext';
 import PersonaAvatar from '../components/omnichat/PersonaAvatar';
 import SearchOverlay from '../components/omnichat/SearchOverlay';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
+import QuickChatDialog from '../components/omnichat/QuickChatDialog';
 import type { SidebarTab } from '../components/omnichat/OmniChatSidebar';
-import type { BotConversation, BotPersona } from '../types/omnichat';
+import type { BotConversation, BotMessage, BotPersona } from '../types/omnichat';
 import { loadOmniChatDefaults } from '../utils/omnichatDefaults';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import {
@@ -258,6 +259,7 @@ export default function OmniChatDiscoverPage() {
   const { isAuthenticated, user } = useAuth();
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('discover');
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
+  const [quickChatPersona, setQuickChatPersona] = useState<BotPersona | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useMediaQuery('(max-width: 767px)');
 
@@ -325,11 +327,11 @@ export default function OmniChatDiscoverPage() {
   });
 
   const createConversationMutation = useMutation({
-    mutationFn: (personaId: number) =>
-      omnichatService.createConversation(
+    mutationFn: ({ personaId, messages }: { personaId: number; messages: BotMessage[] }) =>
+      omnichatService.createConversationWithMessages(
         personaId,
+        messages,
         undefined,
-        false,
         loadOmniChatDefaults('authenticated')
       ),
     onSuccess: (conversation) => {
@@ -403,18 +405,21 @@ export default function OmniChatDiscoverPage() {
     conversations.find((c) => Number(c.persona_id) === Number(personaId));
 
   const handleSelect = (persona: BotPersona) => {
+    setQuickChatPersona(persona);
+  };
+
+  const handleContinueQuickChat = async (messages: BotMessage[]) => {
+    if (!quickChatPersona) return;
     if (!isAuthenticated) {
-      navigate(`/omnichat/c/guest?persona=${persona.id}`, {
-        state: { personaId: persona.id },
+      navigate(`/omnichat/c/guest?persona=${quickChatPersona.id}`, {
+        state: { forkedMessages: messages },
       });
       return;
     }
-    const existing = findConversationForPersona(persona.id);
-    if (existing) {
-      navigate(`/omnichat/c/${existing.id}`);
-      return;
-    }
-    createConversationMutation.mutate(persona.id);
+    await createConversationMutation.mutateAsync({
+      personaId: quickChatPersona.id,
+      messages,
+    });
   };
 
   return (
@@ -424,6 +429,16 @@ export default function OmniChatDiscoverPage() {
         onClose={() => setSearchOverlayOpen(false)}
         personas={personas}
         onSelectPersona={handleSelect}
+      />
+      <QuickChatDialog
+        isOpen={Boolean(quickChatPersona)}
+        persona={quickChatPersona}
+        existingConversation={
+          quickChatPersona ? findConversationForPersona(quickChatPersona.id) : undefined
+        }
+        onClose={() => setQuickChatPersona(null)}
+        onContinue={handleContinueQuickChat}
+        onResume={(conversation) => navigate(`/omnichat/c/${conversation.id}`)}
       />
 
       <div className="h-[calc(100dvh-72px)] overflow-y-auto scroll-smooth">
@@ -622,7 +637,6 @@ export default function OmniChatDiscoverPage() {
             {personasQuery.isLoading && <LoadingMessage>{t('omnichat.discover.loading')}</LoadingMessage>}
             {personasQuery.isError && <ErrorMessage>{t('omnichat.discover.loadError')}</ErrorMessage>}
             {conversationsQuery.isError && <ErrorMessage>{t('omnichat.discover.conversationsLoadError')}</ErrorMessage>}
-            {createConversationMutation.isError && <ErrorMessage>{t('omnichat.discover.startError')}</ErrorMessage>}
             {!personasQuery.isLoading && !personasQuery.isError && personas.length === 0 && (
               <div className="rounded-[26px] border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center text-sm text-[var(--color-text-secondary)]">
                 {t('omnichat.discover.empty')}
@@ -657,14 +671,6 @@ export default function OmniChatDiscoverPage() {
         </div>
       </div>
 
-      {/* Starting chat overlay */}
-      {createConversationMutation.isPending && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-6 py-4 shadow-2xl">
-            <LoadingMessage>{t('omnichat.discover.startingChat')}</LoadingMessage>
-          </div>
-        </div>
-      )}
     </OmniChatShell>
   );
 }

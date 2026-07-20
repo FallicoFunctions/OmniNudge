@@ -3962,6 +3962,24 @@
     "searchAll": "Search all",
     "categoryAria": "Character categories"
     },
+    "quickChat": {
+      "eyebrow": "Quick chat",
+      "title": "Meet {{name}}",
+      "close": "Close quick chat",
+      "description": "Their prepared opening appears instantly. Reply once to preview how the conversation feels; nothing is saved until you continue.",
+      "openingUnavailable": "This character needs a prepared opening message before quick chat can begin.",
+      "replyLabel": "Reply to {{name}}",
+      "placeholder": "Reply to {{name}}...",
+      "send": "Send reply",
+      "generating": "{{name}} is replying...",
+      "generationFailed": "That preview reply did not come through. Your message is still here.",
+      "retry": "Try again",
+      "oneReplyHint": "Previewing one response before opening the full chat...",
+      "continue": "Continue chatting",
+      "openingChat": "Opening chat...",
+      "continueFailed": "The chat could not be opened. Try again.",
+      "resumeExisting": "Resume your existing chat instead"
+    },
     "chat": {
       "invalidConversation": "This conversation could not be found.",
       "back": "Back to Discover",
@@ -4049,6 +4067,7 @@
       "loadingPersonas": "Loading your personas...",
       "loadPersonasError": "Failed to load your personas.",
       "loadingDefinition": "Loading persona definition...",
+      "openingMessageRequired": "Add an opening message or at least one alternate greeting.",
       "import": {
         "title": "Import Character Card",
         "importing": "Importing...",
@@ -4076,6 +4095,7 @@
         "personality": "Personality",
         "scenario": "Scenario",
         "openingMessage": "Opening Message",
+        "openingMessageHelp": "Shown immediately when someone opens Quick Chat. If left blank during import, the first alternate greeting is used.",
         "exampleDialogue": "Example Dialogue",
         "exampleDialoguePlaceholder": "<START>\n{{userMarker}}: I have an idea.\n{{charMarker}}: Let's hear it.",
         "exampleDialogueHelp": "Use {{charMarker}} for the character and {{userMarker}} for the user. Add <START> between separate example conversations.",

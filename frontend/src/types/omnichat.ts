@@ -18,6 +18,7 @@ export interface BotPersona {
   slug: string;
   name: string;
   description?: string;
+  first_message?: string;
   category: PersonaCategory;
   owner_user_id?: number;
   visibility?: 'public' | 'private' | 'unlisted';
@@ -119,13 +120,13 @@ export interface BotConversationDetail {
   messages: BotMessage[];
 }
 
-export interface AnonymousMessageRequest {
+export interface PreviewMessageRequest {
   persona_id: number;
   content: string;
   history: Array<{ role: string; content: string }>;
 }
 
-export interface AnonymousMessageResponse {
+export interface PreviewMessageResponse {
   role: 'assistant';
   content: string;
   failed: boolean;
