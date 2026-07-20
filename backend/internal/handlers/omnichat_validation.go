@@ -68,7 +68,7 @@ func normalizeConversationSettings(settings *models.ConversationSettings) (*mode
 	}, nil
 }
 
-func normalizeAnonymousHistory(history []anonymousMessage) ([]services.ChatMessage, error) {
+func normalizePreviewHistory(history []previewMessage) ([]services.ChatMessage, error) {
 	if len(history) > maxOmniChatHistoryMessages {
 		history = history[len(history)-maxOmniChatHistoryMessages:]
 	}

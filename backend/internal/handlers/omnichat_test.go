@@ -28,8 +28,8 @@ func TestNormalizeConversationSettingsNormalizesValidValues(t *testing.T) {
 	require.Equal(t, "F", settings.UserGender)
 }
 
-func TestNormalizeAnonymousHistoryRejectsInvalidRole(t *testing.T) {
-	_, err := normalizeAnonymousHistory([]anonymousMessage{
+func TestNormalizePreviewHistoryRejectsInvalidRole(t *testing.T) {
+	_, err := normalizePreviewHistory([]previewMessage{
 		{Role: "system", Content: "bad"},
 	})
 	require.Error(t, err)

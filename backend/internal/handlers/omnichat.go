@@ -506,23 +506,22 @@ func (h *OmniChatHandler) EditAssistantMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, message)
 }
 
-// anonymousMessage is a single turn sent by the frontend in an anonymous
-// chat request. Mirrors openrouter.Message's JSON shape.
-type anonymousMessage struct {
+// previewMessage is a single ephemeral turn sent by the frontend.
+type previewMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-// OmniChatAnonymousMessageRequest is the request body for anonymous chat messages.
-type OmniChatAnonymousMessageRequest struct {
-	PersonaID int                `json:"persona_id" binding:"required"`
-	Content   string             `json:"content" binding:"required"`
-	History   []anonymousMessage `json:"history"`
+// OmniChatPreviewMessageRequest is the request body for ephemeral preview messages.
+type OmniChatPreviewMessageRequest struct {
+	PersonaID int              `json:"persona_id" binding:"required"`
+	Content   string           `json:"content" binding:"required"`
+	History   []previewMessage `json:"history"`
 }
 
-// AnonymousSendMessage handles guest chat messages without authentication or persistence.
-func (h *OmniChatHandler) AnonymousSendMessage(c *gin.Context) {
-	var req OmniChatAnonymousMessageRequest
+// PreviewSendMessage generates an ephemeral reply without persisting a conversation.
+func (h *OmniChatHandler) PreviewSendMessage(c *gin.Context) {
+	var req OmniChatPreviewMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
@@ -533,13 +532,18 @@ func (h *OmniChatHandler) AnonymousSendMessage(c *gin.Context) {
 		return
 	}
 
-	history, err := normalizeAnonymousHistory(req.History)
+	history, err := normalizePreviewHistory(req.History)
 	if err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid message history")
 		return
 	}
 
-	fullText, failed, err := h.chatbotService.SendAnonymousMessage(c.Request.Context(), req.PersonaID, content, history)
+	var viewerUserID *int
+	if userID, ok := middleware.GetOptionalUserID(c); ok {
+		viewerUserID = &userID
+	}
+
+	fullText, failed, err := h.chatbotService.SendPreviewMessage(c.Request.Context(), req.PersonaID, viewerUserID, content, history)
 	if err != nil && fullText == "" {
 		if errors.Is(err, services.ErrNotFound) {
 			RespondError(c, http.StatusNotFound, "Persona not found")

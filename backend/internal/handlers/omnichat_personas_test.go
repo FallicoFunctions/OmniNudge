@@ -87,6 +87,22 @@ func TestNormalizeResponseStyleProfileDefaultsBySource(t *testing.T) {
 	require.EqualError(t, err, "response style profile is invalid")
 }
 
+func TestNormalizePersonaDefinitionRequiresPreparedOpening(t *testing.T) {
+	base := &personaDefinitionRequest{
+		Name:       "Quiet Guide",
+		Category:   models.PersonaCategoryOriginal,
+		Visibility: "private",
+	}
+
+	_, err := normalizePersonaDefinitionRequest(7, nil, base, "native", nil)
+	require.EqualError(t, err, "first message is required")
+
+	base.AlternateGreetings = []string{"  This way.  "}
+	persona, err := normalizePersonaDefinitionRequest(7, nil, base, "chara_card_v2", nil)
+	require.NoError(t, err)
+	require.Equal(t, "This way.", persona.FirstMessage)
+}
+
 func seedPublicOmniChatPersona(t *testing.T, pool *pgxpool.Pool, repo *models.BotPersonaRepository, slug, name string) *models.BotPersona {
 	t.Helper()
 	var personaID int
