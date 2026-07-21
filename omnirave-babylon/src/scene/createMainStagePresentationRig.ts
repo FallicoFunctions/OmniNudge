@@ -475,8 +475,8 @@ function createPresentationBackdrop(scene: Scene) {
   const moon = MeshBuilder.CreateSphere(
     'main-stage-moon',
     {
-      diameter: 34,
-      segments: 20,
+      diameter: 24,
+      segments: 24,
     },
     scene,
   );
@@ -527,79 +527,139 @@ function createSeededRandom(seed: number) {
   };
 }
 
-// Equirectangular-ish night-sky map painted as raw pixel data (same
-// approach as createLedWallContentTexture/createEnvironmentTexture above):
-// pure math, no canvas 2D context involved, so it generates identically
-// under the browser, WebGL/WebGPU, and NullEngine test runs.
+// Smooth value-noise sampler over a seeded lattice, wrapping in U so it tiles
+// around the equirectangular sphere. Used for nebulosity and the Milky Way.
+function makeValueNoise(cells: number, random: () => number) {
+  const grid = new Float32Array((cells + 1) * (cells + 1));
+  for (let i = 0; i < grid.length; i++) grid[i] = random();
+  return (u: number, v: number) => {
+    const gx = ((u % 1) + 1) % 1 * cells;
+    const gy = Math.min(0.9999, Math.max(0, v)) * cells;
+    const x0 = Math.floor(gx) % cells;
+    const y0 = Math.floor(gy);
+    const x1 = (x0 + 1) % cells;
+    const y1 = Math.min(cells, y0 + 1);
+    const fx = gx - Math.floor(gx);
+    const fy = gy - Math.floor(gy);
+    const sx = fx * fx * (3 - 2 * fx);
+    const sy = fy * fy * (3 - 2 * fy);
+    const a = grid[y0 * (cells + 1) + x0];
+    const b = grid[y0 * (cells + 1) + x1];
+    const c = grid[y1 * (cells + 1) + x0];
+    const d = grid[y1 * (cells + 1) + x1];
+    return (a * (1 - sx) + b * sx) * (1 - sy) + (c * (1 - sx) + d * sx) * sy;
+  };
+}
+
+// Realistic equirectangular night-sky map painted as raw pixel data (pure
+// math, no canvas). Pinpoint stars with a power-law brightness range, star
+// colour temperature, a tilted Milky Way band that also clusters the stars,
+// and faint nebulosity - so the sky reads as photographed, not drawn.
 function createStarfieldTexture(scene: Scene) {
   try {
-    const width = 1024;
-    const height = 512;
+    const width = 2048;
+    const height = 1024;
     const data = new Uint8Array(width * height * 4);
+    const random = createSeededRandom(0x51a37);
+    const nebula = makeValueNoise(12, random);
+    const milkNoise = makeValueNoise(40, random);
 
-    // Dark night-sky base: near-black at the zenith (top), lifting to a
-    // faint deep blue toward the horizon (middle rows of the equirect map).
+    // Milky Way: a band tilted across the sky. bandAt() returns 0..1 density.
+    const bandAt = (u: number, v: number, softness: number) => {
+      const centre = 0.5 + 0.22 * Math.sin(u * Math.PI * 2 + 0.6);
+      return Math.exp(-((v - centre) * (v - centre)) / (softness * softness));
+    };
+
+    // --- background: near-black zenith, faint deep-blue lift, nebulosity,
+    //     and a milky glow along the galactic band ---
     for (let y = 0; y < height; y++) {
       const v = y / (height - 1);
-      const horizonness = Math.sin(v * Math.PI); // 0 at poles, 1 at equator/horizon
-      const r = 0.01 + 0.02 * horizonness;
-      const g = 0.015 + 0.03 * horizonness;
-      const b = 0.03 + 0.06 * horizonness;
+      const horizonness = Math.sin(v * Math.PI);
       for (let x = 0; x < width; x++) {
+        const u = x / (width - 1);
+        let r = 0.005 + 0.011 * horizonness;
+        let g = 0.008 + 0.017 * horizonness;
+        let b = 0.02 + 0.04 * horizonness;
+        // sparse faint nebulosity (thresholded so most sky stays black)
+        const neb = Math.max(0, nebula(u * 1.3, v * 1.3) - 0.62) * 1.4;
+        r += neb * 0.03;
+        g += neb * 0.022;
+        b += neb * 0.055;
+        // milky glow along the band, mottled by noise
+        const milk = bandAt(u, v, 0.11) * (0.35 + 0.65 * milkNoise(u * 3, v * 3));
+        r += milk * 0.018;
+        g += milk * 0.02;
+        b += milk * 0.028;
         const i = (y * width + x) * 4;
-        data[i] = Math.round(r * 255);
-        data[i + 1] = Math.round(g * 255);
-        data[i + 2] = Math.round(b * 255);
+        data[i] = Math.min(255, Math.round(r * 255));
+        data[i + 1] = Math.min(255, Math.round(g * 255));
+        data[i + 2] = Math.min(255, Math.round(b * 255));
         data[i + 3] = 255;
       }
     }
 
-    // Scatter stars: mostly small faint white dots, a handful brighter,
-    // a couple with a faint blue or warm tint.
-    const random = createSeededRandom(0x51a37);
-    const starCount = 620;
+    const plot = (px: number, py: number, r: number, g: number, b: number) => {
+      if (px < 0 || px >= width || py < 0 || py >= height) return;
+      const i = (py * width + px) * 4;
+      data[i] = Math.min(255, Math.max(data[i], Math.round(r * 255)));
+      data[i + 1] = Math.min(255, Math.max(data[i + 1], Math.round(g * 255)));
+      data[i + 2] = Math.min(255, Math.max(data[i + 2], Math.round(b * 255)));
+    };
+
+    // --- stars: power-law magnitude, colour temperature, band clustering ---
+    const starCount = 13000;
     for (let s = 0; s < starCount; s++) {
-      const x = Math.floor(random() * width);
-      // Bias away from the very bottom rows (below the horizon shroud
-      // covers this anyway, but keeps the map's star density looking
-      // natural rather than uniform pole-to-pole).
-      const y = Math.floor(random() * height * 0.92);
-      const brightnessRoll = random();
-      // Most stars are mid-bright; a tail is brilliant. Kept high because
-      // the map is heavily minified on the 520-unit vault - dim single
-      // pixels vanish on screen (an earlier faint version read as no sky).
-      const brightness = brightnessRoll > 0.9 ? 0.9 + random() * 0.1 : 0.55 + random() * 0.4;
-      const tintRoll = random();
-      let r = 1;
-      let g = 1;
-      let b = 1;
-      if (tintRoll > 0.9) {
-        r = 1;
-        g = 0.92;
-        b = 0.78; // faint warm tint
-      } else if (tintRoll > 0.8) {
-        r = 0.8;
-        g = 0.88;
-        b = 1; // faint blue tint
+      const u = random();
+      const v = random() * 0.95;
+      // cluster toward the Milky Way but keep the whole field populated
+      if (random() > 0.78 + 0.22 * bandAt(u, v, 0.2)) continue;
+      const x = Math.floor(u * width);
+      const y = Math.floor(v * height);
+      // magnitude skewed toward faint (square of uniform - a touch less
+      // extreme than a cube so more mid stars read against the dark sphere)
+      const t = random();
+      const mag = t * t;
+      // colour temperature
+      const ct = random();
+      let cr = 1;
+      let cg = 1;
+      let cb = 1;
+      if (ct < 0.12) {
+        cr = 0.68; cg = 0.78; cb = 1; // blue
+      } else if (ct < 0.3) {
+        cr = 0.85; cg = 0.9; cb = 1; // blue-white
+      } else if (ct > 0.92) {
+        cr = 1; cg = 0.72; cb = 0.5; // orange
+      } else if (ct > 0.76) {
+        cr = 1; cg = 0.88; cb = 0.68; // yellow
       }
 
-      // Every star is at least a 3x3 dot (brilliant ones 5x5) with radial
-      // falloff, so it survives minification on the sphere. Single-pixel
-      // stars were averaged into the background and disappeared entirely.
-      const radius = brightness > 0.9 ? 2 : 1;
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dx = -radius; dx <= radius; dx++) {
-          const px = x + dx;
-          const py = y + dy;
-          if (px < 0 || px >= width || py < 0 || py >= height) continue;
-          const dist = Math.hypot(dx, dy);
-          const falloff = dist === 0 ? 1 : Math.max(0, 1 - dist / (radius + 0.5));
-          const value = brightness * falloff;
-          const i = (py * width + px) * 4;
-          data[i] = Math.max(data[i], Math.round(r * value * 255));
-          data[i + 1] = Math.max(data[i + 1], Math.round(g * value * 255));
-          data[i + 2] = Math.max(data[i + 2], Math.round(b * value * 255));
+      if (mag > 0.9) {
+        // brilliant: sharp core, soft halo, faint diffraction glint
+        plot(x, y, cr, cg, cb);
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const d = Math.hypot(dx, dy);
+            if (d === 0 || d > 2.4) continue;
+            const f = Math.max(0, 0.55 * (1 - d / 2.6));
+            plot(x + dx, y + dy, cr * f, cg * f, cb * f);
+          }
         }
+        for (const [dx, dy] of [[3, 0], [-3, 0], [0, 3], [0, -3]]) {
+          plot(x + dx, y + dy, cr * 0.32, cg * 0.32, cb * 0.32);
+        }
+      } else if (mag > 0.62) {
+        // bright: core plus a faint single-pixel halo
+        const b0 = 0.75 + 0.25 * random();
+        plot(x, y, cr * b0, cg * b0, cb * b0);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          plot(x + dx, y + dy, cr * b0 * 0.35, cg * b0 * 0.35, cb * b0 * 0.35);
+        }
+      } else {
+        // the faint majority: crisp single pixels, floor raised so the ACES
+        // contrast curve doesn't crush them to black on the sphere.
+        const b0 = 0.42 + 0.35 * mag;
+        plot(x, y, cr * b0, cg * b0, cb * b0);
       }
     }
 
@@ -625,16 +685,87 @@ function createStarfieldTexture(scene: Scene) {
   }
 }
 
+// Procedural lunar surface: warm-white base darkened by maria (the grey
+// "seas") and a scatter of craters, with limb darkening toward the edge, so
+// the moon reads as a body with a surface rather than a flat glowing disc.
+function createMoonTexture(scene: Scene) {
+  try {
+    const size = 256;
+    const data = new Uint8Array(size * size * 4);
+    const random = createSeededRandom(0x1055aa);
+    const maria = makeValueNoise(6, random);
+    const speckle = makeValueNoise(48, random);
+
+    // a few large maria centres and small craters
+    const craters: Array<[number, number, number, number]> = [];
+    for (let c = 0; c < 26; c++) {
+      craters.push([random(), random(), 0.015 + random() * 0.05, 0.4 + random() * 0.5]);
+    }
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const u = x / (size - 1);
+        const v = y / (size - 1);
+        // limb darkening: the disc texture maps onto a sphere; darken toward
+        // the texture's edges so the rim falls off like a lit sphere.
+        const dx = u - 0.5;
+        const dy = v - 0.5;
+        const rr = Math.min(1, Math.hypot(dx, dy) / 0.5);
+        const limb = 0.55 + 0.45 * Math.cos(rr * 1.3);
+        // base tone + maria darkening + fine speckle
+        let tone = 0.82;
+        tone -= Math.max(0, maria(u, v) - 0.5) * 0.7; // maria seas
+        tone += (speckle(u, v) - 0.5) * 0.08; // regolith grain
+        for (const [cx, cy, cr, depth] of craters) {
+          const cd = Math.hypot(u - cx, v - cy);
+          if (cd < cr) tone -= depth * (1 - cd / cr) * 0.5;
+        }
+        tone = Math.max(0.15, Math.min(1, tone)) * limb;
+        const i = (y * size + x) * 4;
+        data[i] = Math.round(tone * 255);
+        data[i + 1] = Math.round(tone * 0.97 * 255);
+        data[i + 2] = Math.round(tone * 0.9 * 255);
+        data[i + 3] = 255;
+      }
+    }
+
+    const texture = RawTexture.CreateRGBATexture(
+      data,
+      size,
+      size,
+      scene,
+      true,
+      false,
+      Texture.TRILINEAR_SAMPLINGMODE,
+    );
+    texture.name = 'main-stage-moon-surface';
+    return texture;
+  } catch (error) {
+    console.warn('celestial vault: moon texture unavailable', error);
+    return null;
+  }
+}
+
 function createMoonMaterial(scene: Scene) {
   const material = new PBRMaterial('main-stage-moon-material', scene);
   material.backFaceCulling = false;
   // unlit shows albedo, so the moon's warm-white disc colour must live on
   // albedo (emissive is kept too as a bloom seed but does nothing in unlit).
   material.unlit = true;
-  material.albedoColor = new Color3(1, 0.97, 0.88);
-  material.emissiveColor = new Color3(1, 0.97, 0.88);
-  material.emissiveIntensity = 2.4;
+  // Keep it below bloom saturation so the surface reads: emissive at 2.4 +
+  // the bloom pass blew the whole disc to featureless white. unlit shows
+  // albedo, so the moon's brightness and its maria/craters both live there;
+  // a slight sub-1 albedo lets the bright highlands glow without clipping.
+  material.albedoColor = new Color3(0.86, 0.83, 0.75);
+  material.emissiveColor = new Color3(0, 0, 0);
+  material.emissiveIntensity = 0;
   material.reflectivityColor = new Color3(0, 0, 0);
+
+  const surface = createMoonTexture(scene);
+  if (surface) {
+    material.albedoTexture = surface;
+    material.albedoColor = new Color3(0.95, 0.92, 0.85);
+  }
 
   return material;
 }
