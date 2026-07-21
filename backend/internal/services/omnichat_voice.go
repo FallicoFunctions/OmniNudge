@@ -13,15 +13,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/omninudge/backend/internal/models"
-	"github.com/omninudge/backend/internal/services/elevenlabs"
+	"github.com/omninudge/backend/internal/services/speech"
 	"golang.org/x/sync/singleflight"
 )
 
 var ErrOmniChatBrowserVoice = errors.New("omnichat voice uses browser synthesis")
 
-type OmniChatSpeechSynthesizer interface {
-	Synthesize(ctx context.Context, voiceID string, request elevenlabs.SpeechRequest) ([]byte, string, error)
-}
+const (
+	maxOmniChatMP3Bytes = 10 << 20
+	maxOmniChatWAVBytes = 25 << 20
+)
 
 type OmniChatVoiceStore interface {
 	GetSpeechSourceOwned(ctx context.Context, userID, conversationID, messageID int) (*models.OmniChatSpeechSource, error)
@@ -30,15 +31,15 @@ type OmniChatVoiceStore interface {
 }
 
 type OmniChatVoiceService struct {
-	store        OmniChatVoiceStore
-	storage      StorageService
-	synthesizer  OmniChatSpeechSynthesizer
-	defaultModel string
-	speechGroup  singleflight.Group
+	store         OmniChatVoiceStore
+	storage       StorageService
+	providers     map[string]speech.Synthesizer
+	defaultModels map[string]string
+	speechGroup   singleflight.Group
 }
 
-func NewOmniChatVoiceService(store OmniChatVoiceStore, storage StorageService, synthesizer OmniChatSpeechSynthesizer, defaultModel string) *OmniChatVoiceService {
-	return &OmniChatVoiceService{store: store, storage: storage, synthesizer: synthesizer, defaultModel: defaultModel}
+func NewOmniChatVoiceService(store OmniChatVoiceStore, storage StorageService, providers map[string]speech.Synthesizer, defaultModels map[string]string) *OmniChatVoiceService {
+	return &OmniChatVoiceService{store: store, storage: storage, providers: providers, defaultModels: defaultModels}
 }
 
 func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, conversationID, messageID int) (*models.OmniChatSpeechAudio, error) {
@@ -52,7 +53,8 @@ func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, co
 	if source.Voice.Provider == "browser" {
 		return nil, ErrOmniChatBrowserVoice
 	}
-	if source.Voice.Provider != "elevenlabs" || s.synthesizer == nil || s.storage == nil {
+	synthesizer := s.providers[source.Voice.Provider]
+	if synthesizer == nil || s.storage == nil {
 		return nil, errors.New("character speech provider is unavailable")
 	}
 	textHashBytes := sha256.Sum256([]byte(source.Text))
@@ -83,7 +85,7 @@ func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, co
 		if cached != nil {
 			return cached, nil
 		}
-		return s.generateSpeech(workCtx, source, userID, messageID, textHash, voiceHash)
+		return s.generateSpeech(workCtx, synthesizer, source, userID, messageID, textHash, voiceHash)
 	})
 	select {
 	case <-ctx.Done():
@@ -100,18 +102,18 @@ func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, co
 	}
 }
 
-func (s *OmniChatVoiceService) generateSpeech(ctx context.Context, source *models.OmniChatSpeechSource, userID, messageID int, textHash, voiceHash string) (*models.OmniChatSpeechAudio, error) {
+func (s *OmniChatVoiceService) generateSpeech(ctx context.Context, synthesizer speech.Synthesizer, source *models.OmniChatSpeechSource, userID, messageID int, textHash, voiceHash string) (*models.OmniChatSpeechAudio, error) {
 	model := source.Voice.ModelID
 	if strings.TrimSpace(model) == "" {
-		model = s.defaultModel
+		model = s.defaultModels[source.Voice.Provider]
 	}
 	languageCode := ""
 	if source.Voice.LanguageCode != nil {
 		languageCode = strings.TrimSpace(*source.Voice.LanguageCode)
 	}
-	audioBytes, contentType, err := s.synthesizer.Synthesize(ctx, source.Voice.VoiceID, elevenlabs.SpeechRequest{
-		Text: source.Text, ModelID: model, LanguageCode: languageCode,
-		VoiceSettings: &elevenlabs.VoiceSettings{
+	generated, err := synthesizer.Synthesize(ctx, source.Voice.VoiceID, speech.Request{
+		Text: source.Text, VoiceName: source.Voice.VoiceName, ModelID: model, LanguageCode: languageCode,
+		VoiceSettings: &speech.VoiceSettings{
 			Stability: source.Voice.Stability, SimilarityBoost: source.Voice.SimilarityBoost,
 			Style: source.Voice.Style, Speed: source.Voice.Speed,
 		},
@@ -119,11 +121,14 @@ func (s *OmniChatVoiceService) generateSpeech(ctx context.Context, source *model
 	if err != nil {
 		return nil, err
 	}
-	path := fmt.Sprintf("omnichat/speech/%d/%d/%s-%s-%s.mp3", userID, messageID, voiceHash[:16], textHash[:16], uuid.NewString())
-	if _, err = s.storage.Upload(ctx, path, bytes.NewReader(audioBytes), contentType); err != nil {
+	if !validOmniChatSpeechAudio(generated) {
+		return nil, errors.New("speech provider returned invalid audio metadata")
+	}
+	path := fmt.Sprintf("omnichat/speech/%d/%d/%s-%s-%s%s", userID, messageID, voiceHash[:16], textHash[:16], uuid.NewString(), generated.Extension)
+	if _, err = s.storage.Upload(ctx, path, bytes.NewReader(generated.Bytes), generated.ContentType); err != nil {
 		return nil, err
 	}
-	audio := &models.OmniChatSpeechAudio{OwnerUserID: userID, PersonaID: source.PersonaID, MessageID: messageID, TextHash: textHash, VoiceConfigHash: voiceHash, StoragePath: path, FileType: contentType, FileSize: int64(len(audioBytes))}
+	audio := &models.OmniChatSpeechAudio{OwnerUserID: userID, PersonaID: source.PersonaID, MessageID: messageID, TextHash: textHash, VoiceConfigHash: voiceHash, StoragePath: path, FileType: generated.ContentType, FileSize: int64(len(generated.Bytes))}
 	if err = s.store.SaveSpeechAudio(ctx, audio); err != nil {
 		s.deleteSpeechObject(ctx, path)
 		return nil, err
@@ -134,6 +139,35 @@ func (s *OmniChatVoiceService) generateSpeech(ctx context.Context, source *model
 		s.deleteSpeechObject(ctx, path)
 	}
 	return audio, nil
+}
+
+func validOmniChatSpeechAudio(audio *speech.Audio) bool {
+	if audio == nil || len(audio.Bytes) == 0 {
+		return false
+	}
+	switch audio.ContentType {
+	case "audio/mpeg":
+		return audio.Extension == ".mp3" && len(audio.Bytes) <= maxOmniChatMP3Bytes
+	case "audio/wav":
+		return audio.Extension == ".wav" && len(audio.Bytes) <= maxOmniChatWAVBytes
+	default:
+		return false
+	}
+}
+
+func (s *OmniChatVoiceService) PreviewPresetSpeech(ctx context.Context, preset OmniChatVoicePreset) (*speech.Audio, error) {
+	synthesizer := s.providers[preset.Provider]
+	if synthesizer == nil {
+		return nil, errors.New("character speech provider is unavailable")
+	}
+	previewCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	return synthesizer.Synthesize(previewCtx, preset.VoiceID, speech.Request{
+		Text:         "Hi, this is " + preset.Name + ". Choose me as your character voice.",
+		VoiceName:    preset.Name,
+		ModelID:      preset.ModelID,
+		LanguageCode: preset.LanguageCode,
+	})
 }
 
 func (s *OmniChatVoiceService) deleteSpeechObject(ctx context.Context, path string) {

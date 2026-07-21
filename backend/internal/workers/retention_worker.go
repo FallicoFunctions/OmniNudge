@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/services/speech"
 )
 
 // RetentionWorker runs daily data cleanup jobs: message deletion, export expiry,
@@ -106,6 +107,7 @@ func (w *RetentionWorker) runAllJobs(ctx context.Context) {
 	log.Printf("[RETENTION] Starting daily cleanup jobs (DryRun=%v)", w.cfg.DryRun)
 
 	w.cleanupExpiredExports(ctx)
+	w.cleanupDeletedOmniChatSpeech(ctx)
 	w.cleanupExpiredOmniChatSpeech(ctx)
 	w.cleanupAbandonedOmniChatCalls(ctx)
 	w.cleanupExpiredMessages(ctx)
@@ -115,6 +117,88 @@ func (w *RetentionWorker) runAllJobs(ctx context.Context) {
 	w.anonymizeAnalytics(ctx)
 
 	log.Println("[RETENTION] All daily cleanup jobs finished")
+}
+
+// cleanupDeletedOmniChatSpeech drains the durable outbox populated by the
+// database DELETE trigger. It covers cascades from users, personas,
+// conversations, and messages, where the deleted speech row would otherwise
+// no longer contain the storage key needed for cleanup.
+func (w *RetentionWorker) cleanupDeletedOmniChatSpeech(ctx context.Context) {
+	if w.db == nil || w.voiceStorage == nil {
+		return
+	}
+	const batchSize = 500
+	for {
+		rows, err := w.db.Query(ctx, `
+			SELECT storage_path FROM omnichat_speech_deletion_queue
+			ORDER BY created_at, storage_path
+			LIMIT $1
+		`, batchSize)
+		if err != nil {
+			if !isUndefinedTableError(err) {
+				log.Printf("[RETENTION] Failed to query deleted OmniChat speech: %v", err)
+			}
+			return
+		}
+		paths := make([]string, 0, batchSize)
+		for rows.Next() {
+			var storagePath string
+			if err := rows.Scan(&storagePath); err != nil {
+				rows.Close()
+				log.Printf("[RETENTION] Failed to scan deleted OmniChat speech: %v", err)
+				return
+			}
+			paths = append(paths, storagePath)
+		}
+		rowsErr := rows.Err()
+		rows.Close()
+		if rowsErr != nil {
+			log.Printf("[RETENTION] Failed while reading deleted OmniChat speech: %v", rowsErr)
+			return
+		}
+		if len(paths) == 0 {
+			return
+		}
+		if w.cfg.DryRun {
+			log.Printf("[RETENTION][DRY-RUN] Would delete %d cascaded OmniChat speech files", len(paths))
+			return
+		}
+		acknowledged := 0
+		invalidPaths := 0
+		for _, storagePath := range paths {
+			if !speech.IsOmniChatStoragePath(storagePath) {
+				// Retain unsafe tombstones for manual investigation; never let a
+				// corrupted database row turn the worker into an arbitrary deleter.
+				invalidPaths++
+				continue
+			}
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			err := w.voiceStorage.Delete(cleanupCtx, storagePath)
+			if err == nil {
+				_, err = w.db.Exec(cleanupCtx, `DELETE FROM omnichat_speech_deletion_queue WHERE storage_path=$1`, storagePath)
+				if err == nil {
+					acknowledged++
+				}
+			}
+			cancel()
+			if err != nil {
+				// Leave the tombstone in place. Storage Delete is idempotent, so a
+				// partial success before a database error is safe to retry.
+				log.Printf("[RETENTION] Warning: failed to drain OmniChat speech deletion outbox: %v", err)
+			}
+		}
+		if invalidPaths > 0 {
+			log.Printf("[RETENTION] Refusing %d invalid OmniChat speech storage paths", invalidPaths)
+		}
+		if acknowledged == 0 {
+			// A full batch of invalid paths or a storage outage would otherwise
+			// be selected again immediately and spin forever.
+			return
+		}
+		if len(paths) < batchSize {
+			return
+		}
+	}
 }
 
 // cleanupAbandonedOmniChatCalls closes provider sessions that are already
@@ -268,6 +352,14 @@ func (w *RetentionWorker) cleanupExpiredOmniChatSpeech(ctx context.Context) {
 			if _, err := tx.Exec(ctx, `DELETE FROM omnichat_speech_audio WHERE id=$1`, item.id); err != nil {
 				_ = tx.Rollback(ctx)
 				log.Printf("[RETENTION] Warning: failed to delete OmniChat speech row %s: %v", item.id, err)
+				continue
+			}
+			// The row DELETE trigger writes a tombstone. The object was removed
+			// above while the row lock was held, so acknowledge it atomically to
+			// avoid a redundant retention pass tomorrow.
+			if _, err := tx.Exec(ctx, `DELETE FROM omnichat_speech_deletion_queue WHERE storage_path=$1`, lockedPath); err != nil {
+				_ = tx.Rollback(ctx)
+				log.Printf("[RETENTION] Warning: failed to acknowledge OmniChat speech cleanup %s: %v", item.id, err)
 				continue
 			}
 			if err := tx.Commit(ctx); err != nil {

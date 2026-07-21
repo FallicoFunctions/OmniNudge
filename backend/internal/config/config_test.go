@@ -27,3 +27,11 @@ func TestGetEnvAsPositiveInt64FallsBackForInvalidValues(t *testing.T) {
 	t.Setenv("TEST_POSITIVE_INT64", "2048")
 	require.EqualValues(t, 2048, getEnvAsPositiveInt64("TEST_POSITIVE_INT64", 1024))
 }
+
+func TestGetEnvAsStringListNormalizesAndDeduplicates(t *testing.T) {
+	t.Setenv("TEST_STRING_LIST", " 10.0.0.1, 192.0.2.0/24,10.0.0.1, ,")
+	require.Equal(t, []string{"10.0.0.1", "192.0.2.0/24"}, getEnvAsStringList("TEST_STRING_LIST"))
+
+	t.Setenv("TEST_STRING_LIST", "")
+	require.Nil(t, getEnvAsStringList("TEST_STRING_LIST"))
+}

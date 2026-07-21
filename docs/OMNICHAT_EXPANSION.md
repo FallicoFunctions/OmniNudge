@@ -8,7 +8,7 @@ This document is the production and maintenance guide for OmniChat's generative 
 - The Create workspace generates character-consistent images and videos outside chat. Successful results are stored privately in the user's gallery automatically.
 - A gallery owner can publish an approved creation to Explore. Conversation owners can publish an immutable, moderated snapshot. Other users can like, comment, bookmark, follow, share, report, or continue a shared chat in a private conversation of their own.
 - OmniChat groups can contain human members and AI personas. Up to three explicitly selected or mentioned personas answer a turn; model calls run concurrently and messages are persisted in deterministic order.
-- Every character receives a stable browser voice profile automatically. A character owner or moderator can configure an ElevenLabs voice profile for server-rendered speech.
+- Every character receives a stable browser voice profile automatically. A character owner can select one of 12 curated local Voicebox/Kokoro presets, while moderators can also configure supported server-rendered providers.
 - Assistant messages support read-aloud. Voice calls use the same persisted conversation, browser speech recognition where available, typed fallback input, and character speech. Video calls require Tavus CVI and open a private, short-lived WebRTC room where the character avatar can see, hear, respond, gesture, and lip-sync in real time. Call transcripts are not copied into a separate OmniChat recording.
 
 ## Runtime architecture
@@ -32,6 +32,7 @@ The API and worker must share PostgreSQL, Redis, and the same storage backend. P
 | `OPENROUTER_API_KEY` | Direct and group AI responses plus fail-closed moderation for public text and shared chats |
 | `OPENROUTER_MODEL` | Chat and moderation model |
 | `REDIS_ADDR` / `REDIS_PASSWORD` | Generation queue and distributed rate-limit/cache infrastructure |
+| `TRUSTED_PROXIES` | Comma-separated IP/CIDR allowlist for reverse proxies allowed to supply client-IP headers; empty trusts none |
 | `OMNICHAT_MEDIA_PROVIDER` | `fal` |
 | `FAL_KEY` | Server/worker-only Fal credential |
 | `FAL_IMAGE_MODEL` | Text-to-image model |
@@ -45,11 +46,15 @@ The API and worker must share PostgreSQL, Redis, and the same storage backend. P
 | `ELEVENLABS_BASE_URL` | ElevenLabs API base URL |
 | `ELEVENLABS_TTS_MODEL` | Default speech model |
 | `ELEVENLABS_ENABLE_LOGGING` | Provider request logging choice; defaults to `false` |
+| `VOICEBOX_ENABLED` | Enables free local Voicebox speech; defaults to `true` |
+| `VOICEBOX_BASE_URL` | Loopback-only Voicebox API URL; defaults to `http://127.0.0.1:17493` |
+| `VOICEBOX_TIMEOUT_SECONDS` | Local generation timeout; defaults to `120` |
+| `OMNICHAT_VOICE_CLONING_ENABLED` | Feature gate for user voice uploads; defaults to `false` until consent/retention controls are configured |
 | `TAVUS_API_KEY` | Optional server-only credential for real-time avatar video calls |
 | `TAVUS_BASE_URL` | Tavus API base URL; defaults to `https://tavusapi.com` |
 | `TAVUS_REPLICA_ID` / `TAVUS_PERSONA_ID` | Default live replica/persona pair; a character voice profile can override both IDs |
 
-If `ELEVENLABS_API_KEY` is absent, all characters still have distinct, stable on-device voice profiles. Character owners and moderators can store a Tavus `live_video_replica_id` and `live_video_persona_id` alongside the character voice profile; both values are required as a pair. If Tavus is absent, voice calls remain available but video-call creation fails explicitly. If Redis or Fal is unavailable, generation fails explicitly and does not create a partial gallery asset. If public-text moderation is unavailable, publication and comment text fail closed.
+If `ELEVENLABS_API_KEY` is absent, Voicebox provides the 12 curated server voices at no per-request cost while browser voices remain the safe fallback. Voicebox must remain on loopback because its local API is not an authenticated multi-tenant boundary. Character owners and moderators can store a Tavus `live_video_replica_id` and `live_video_persona_id` alongside the character voice profile; both values are required as a pair. If Tavus is absent, voice calls remain available but video-call creation fails explicitly. If Redis or Fal is unavailable, generation fails explicitly and does not create a partial gallery asset. If public-text moderation is unavailable, publication and comment text fail closed.
 
 ## Principal API surfaces
 
@@ -71,6 +76,7 @@ Group messages are delivered to connected members through the existing authentic
 - Generated assets are private by default. Public content is served through a separate authorization path.
 - Generated media references are owner-scoped, and downloads reject loopback/private-network URLs, DNS rebinding, unsafe redirects, invalid MIME signatures, and oversized payloads.
 - Queue payloads contain only UUIDs. Provider credentials never reach the browser.
+- Cost-bearing OmniChat rate limiters fail closed during counter-backend outages, and anonymous IP limits ignore proxy headers unless the proxy is explicitly trusted.
 - Quotas are enforced transactionally using the user's tracked storage total.
 - Virus scanning can fail closed and should remain enabled in production.
 - Public captions, comments, and complete shared-chat snapshots are normalized and moderated before publication. The snapshot digest is checked again inside the publish transaction to prevent a moderation race.
@@ -79,6 +85,7 @@ Group messages are delivered to connected members through the existing authentic
 - Group invite tokens contain 256 bits of randomness and only their SHA-256 digest is stored. Tokens expire after seven days and have bounded use counts.
 - Character prompts treat group transcripts as untrusted data and explicitly prevent transcript text from overriding the system role.
 - Speech is only created for an assistant message in a conversation owned by the requester. Cached speech expires after 30 days; the daily retention worker deletes the object before removing its database row.
+- A database deletion outbox preserves speech storage keys across user, persona, conversation, and message cascades; account erasure deletes speech synchronously and fails closed if voice storage is unavailable.
 - Only one call is active per user. Starting another call atomically ends the prior session. Sessions record mode, timestamps, and turn count, but `recording_enabled` remains false and no separate audio or transcript recording is created.
 - Live-avatar provider keys never reach the browser. Tavus rooms require a short-lived meeting token, only trusted `*.daily.co` room URLs pass validation/CSP, and the provider session ID is retained after the local call closes until provider cleanup succeeds or the retention worker retries it.
 
@@ -86,15 +93,16 @@ Group messages are delivered to connected members through the existing authentic
 
 Before enabling the feature in production:
 
-1. Apply all migrations through `144_omnichat_live_avatar_calls`.
+1. Apply all migrations through `146_omnichat_speech_deletion_outbox`.
 2. Run both the API server and background worker with the same environment and storage configuration.
 3. Verify Redis connectivity; generation is deliberately unavailable without the durable queue.
 4. Verify ClamAV and keep `VIRUS_SCAN_FAIL_CLOSED=true`.
 5. Configure `FAL_KEY`, then test image, image-edit, text-video, and image-video model IDs in staging because provider model availability and input contracts can change.
 6. Keep S3/R2/CloudFront CORS and object permissions private; generated files are streamed or signed by authorized application routes.
 7. Configure `OPENROUTER_API_KEY` before enabling public creation so moderation remains available.
-8. If using ElevenLabs, configure a voice ID on a character through the owner-authorized voice endpoint and confirm the account supports the selected logging mode.
-9. For real-time avatar video, configure `TAVUS_API_KEY` plus a default replica/persona pair or set character-specific live-video IDs through the same owner-authorized voice endpoint. Confirm camera and microphone permissions in staging and verify provider calls end when the modal closes.
+8. For free local speech, start Voicebox on the same host as the API, download/load Kokoro, confirm `GET http://127.0.0.1:17493/health`, and verify port `17493` is not reachable from another machine. Voicebox can start after the API; failed previews remain retryable.
+9. If using ElevenLabs, configure a voice ID on a character through the owner-authorized voice endpoint and confirm the account supports the selected logging mode.
+10. For real-time avatar video, configure `TAVUS_API_KEY` plus a default replica/persona pair or set character-specific live-video IDs through the same owner-authorized voice endpoint. Confirm camera and microphone permissions in staging and verify provider calls end when the modal closes.
 
 Useful verification commands:
 

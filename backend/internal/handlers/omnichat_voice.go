@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/services/speech"
 	"github.com/omninudge/backend/internal/services/tavus"
 	zlog "github.com/rs/zerolog/log"
 )
@@ -48,7 +49,7 @@ func normalizeOmniChatVoiceProfile(voice *models.OmniChatPersonaVoice) error {
 	if voice.LiveVideoPersonaID != nil && *voice.LiveVideoPersonaID == "" {
 		voice.LiveVideoPersonaID = nil
 	}
-	if (voice.Provider != "browser" && voice.Provider != "elevenlabs") ||
+	if (voice.Provider != "browser" && voice.Provider != "elevenlabs" && voice.Provider != "voicebox") ||
 		!omniChatVoiceIDPattern.MatchString(voice.VoiceID) || voice.VoiceName == "" ||
 		len([]rune(voice.VoiceName)) > 100 || (voice.ModelID != "" && !omniChatVoiceModelPattern.MatchString(voice.ModelID)) ||
 		(voice.LanguageCode != nil && !omniChatVoiceLanguagePattern.MatchString(*voice.LanguageCode)) ||
@@ -59,9 +60,17 @@ func normalizeOmniChatVoiceProfile(voice *models.OmniChatPersonaVoice) error {
 		(voice.LiveVideoReplicaID != nil && (!omniChatVoiceIDPattern.MatchString(*voice.LiveVideoReplicaID) || !omniChatVoiceIDPattern.MatchString(*voice.LiveVideoPersonaID))) {
 		return errors.New("invalid voice profile")
 	}
+	if voice.Provider == "voicebox" {
+		preset, ok := services.FindOmniChatVoicePreset(voice.VoiceID)
+		if !ok || voice.ModelID != preset.ModelID || voice.VoiceName != preset.Name || voice.LanguageCode == nil || *voice.LanguageCode != preset.LanguageCode {
+			return errors.New("invalid voice profile")
+		}
+	}
 	if voice.ModelID == "" {
 		if voice.Provider == "browser" {
 			voice.ModelID = "browser-native"
+		} else if voice.Provider == "voicebox" {
+			voice.ModelID = "kokoro"
 		} else {
 			voice.ModelID = "eleven_multilingual_v2"
 		}
@@ -94,15 +103,53 @@ type OmniChatVoiceData interface {
 }
 type OmniChatSpeechCreator interface {
 	GetOrCreateSpeech(ctx context.Context, userID, conversationID, messageID int) (*models.OmniChatSpeechAudio, error)
+	PreviewPresetSpeech(ctx context.Context, preset services.OmniChatVoicePreset) (*speech.Audio, error)
 }
 
 type OmniChatVoiceHandler struct {
-	data          OmniChatVoiceData
-	speech        OmniChatSpeechCreator
-	storage       services.StorageService
-	liveVideo     *tavus.Client
-	liveReplicaID string
-	livePersonaID string
+	data                OmniChatVoiceData
+	speech              OmniChatSpeechCreator
+	storage             services.StorageService
+	liveVideo           *tavus.Client
+	liveReplicaID       string
+	livePersonaID       string
+	voiceboxAvailable   bool
+	voiceCloningEnabled bool
+}
+
+func (h *OmniChatVoiceHandler) ConfigureVoiceCatalog(voiceboxAvailable, voiceCloningEnabled bool) *OmniChatVoiceHandler {
+	h.voiceboxAvailable = voiceboxAvailable
+	h.voiceCloningEnabled = voiceCloningEnabled
+	return h
+}
+
+func (h *OmniChatVoiceHandler) ListVoicePresets(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"presets":               services.OmniChatVoicePresets(),
+		"voicebox_available":    h.voiceboxAvailable,
+		"voice_cloning_enabled": h.voiceCloningEnabled,
+	})
+}
+
+func (h *OmniChatVoiceHandler) PreviewVoicePreset(c *gin.Context) {
+	preset, ok := services.FindOmniChatVoicePreset(strings.TrimSpace(c.Param("preset_id")))
+	if !ok {
+		RespondError(c, http.StatusNotFound, "Voice preset not found")
+		return
+	}
+	if !h.voiceboxAvailable || h.speech == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Voice previews are temporarily unavailable")
+		return
+	}
+	audio, err := h.speech.PreviewPresetSpeech(c.Request.Context(), preset)
+	if err != nil || audio == nil || audio.ContentType != "audio/wav" || len(audio.Bytes) == 0 || len(audio.Bytes) > 25<<20 {
+		RespondError(c, http.StatusServiceUnavailable, "Voice preview is temporarily unavailable")
+		return
+	}
+	c.Header("Content-Type", audio.ContentType)
+	c.Header("Cache-Control", "private, max-age=86400")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Data(http.StatusOK, audio.ContentType, audio.Bytes)
 }
 
 func NewOmniChatVoiceHandler(data OmniChatVoiceData, speech OmniChatSpeechCreator, storage services.StorageService, liveVideo *tavus.Client, liveReplicaID, livePersonaID string) *OmniChatVoiceHandler {
@@ -157,7 +204,7 @@ func (h *OmniChatVoiceHandler) UpdatePersonaVoice(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to load character voice")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"voice": saved})
+	c.JSON(http.StatusOK, gin.H{"voice": publicOmniChatVoiceProfile(saved)})
 }
 
 func (h *OmniChatVoiceHandler) GetMessageSpeech(c *gin.Context) {
@@ -184,7 +231,7 @@ func (h *OmniChatVoiceHandler) GetMessageSpeech(c *gin.Context) {
 		RespondError(c, http.StatusServiceUnavailable, "Speech storage is unavailable")
 		return
 	}
-	if audio.FileType != "audio/mpeg" {
+	if audio.FileType != "audio/mpeg" && audio.FileType != "audio/wav" {
 		RespondError(c, http.StatusConflict, "Speech audio type is invalid")
 		return
 	}
@@ -193,7 +240,11 @@ func (h *OmniChatVoiceHandler) GetMessageSpeech(c *gin.Context) {
 		RespondError(c, http.StatusNotFound, "Speech audio not found")
 		return
 	}
-	if objectSize <= 0 || objectSize > 10<<20 {
+	maxBytes := int64(10 << 20)
+	if audio.FileType == "audio/wav" {
+		maxBytes = 25 << 20
+	}
+	if objectSize <= 0 || objectSize > maxBytes {
 		RespondError(c, http.StatusConflict, "Speech audio size is invalid")
 		return
 	}

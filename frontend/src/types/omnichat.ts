@@ -327,7 +327,7 @@ export interface OmniChatGroupInvite {
 
 export interface OmniChatPersonaVoice {
   persona_id: number;
-  provider: 'browser' | 'elevenlabs';
+  provider: 'browser' | 'elevenlabs' | 'voicebox';
   voice_id: string;
   voice_name: string;
   model_id: string;
@@ -341,6 +341,22 @@ export interface OmniChatPersonaVoice {
   live_video_persona_id?: string;
   active: boolean;
   updated_at?: string;
+}
+
+export interface OmniChatVoicePreset {
+  id: string;
+  name: string;
+  gender: 'female' | 'male';
+  provider: 'voicebox';
+  voice_id: string;
+  model_id: 'kokoro';
+  language_code: string;
+}
+
+export interface OmniChatVoiceCatalog {
+  presets: OmniChatVoicePreset[];
+  voicebox_available: boolean;
+  voice_cloning_enabled: boolean;
 }
 
 export interface OmniChatCallSession {

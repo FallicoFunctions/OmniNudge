@@ -94,6 +94,10 @@ type OmniChatVoiceConfig struct {
 	ElevenLabsBaseURL       string
 	ElevenLabsEnableLogging bool
 	DefaultModel            string
+	VoiceboxEnabled         bool
+	VoiceboxBaseURL         string
+	VoiceboxTimeoutSeconds  int
+	VoiceCloningEnabled     bool
 	TavusAPIKey             string
 	TavusBaseURL            string
 	TavusReplicaID          string
@@ -149,8 +153,9 @@ type JWTConfig struct {
 
 // ServerConfig holds server-related configuration
 type ServerConfig struct {
-	Port string
-	Host string
+	Port           string
+	Host           string
+	TrustedProxies []string
 }
 
 // DatabaseConfig holds database connection configuration
@@ -237,8 +242,9 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8080"),
-			Host: getEnv("SERVER_HOST", "localhost"),
+			Port:           getEnv("SERVER_PORT", "8080"),
+			Host:           getEnv("SERVER_HOST", "localhost"),
+			TrustedProxies: getEnvAsStringList("TRUSTED_PROXIES"),
 		},
 		Database: DatabaseConfig{
 			Host:        getEnv("DB_HOST", "localhost"),
@@ -346,6 +352,10 @@ func Load() (*Config, error) {
 			ElevenLabsBaseURL:       getEnv("ELEVENLABS_BASE_URL", "https://api.elevenlabs.io"),
 			ElevenLabsEnableLogging: getEnvAsBool("ELEVENLABS_ENABLE_LOGGING", false),
 			DefaultModel:            getEnv("ELEVENLABS_TTS_MODEL", "eleven_multilingual_v2"),
+			VoiceboxEnabled:         getEnvAsBool("VOICEBOX_ENABLED", true),
+			VoiceboxBaseURL:         getEnv("VOICEBOX_BASE_URL", "http://127.0.0.1:17493"),
+			VoiceboxTimeoutSeconds:  getEnvAsPositiveInt("VOICEBOX_TIMEOUT_SECONDS", 120),
+			VoiceCloningEnabled:     getEnvAsBool("OMNICHAT_VOICE_CLONING_ENABLED", false),
 			TavusAPIKey:             getEnv("TAVUS_API_KEY", ""),
 			TavusBaseURL:            getEnv("TAVUS_BASE_URL", "https://tavusapi.com"),
 			TavusReplicaID:          getEnv("TAVUS_REPLICA_ID", ""),
@@ -451,4 +461,25 @@ func getEnvAsPositiveInt64(key string, defaultValue int64) int64 {
 		return defaultValue
 	}
 	return value
+}
+
+func getEnvAsStringList(key string) []string {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return nil
+	}
+	values := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, item := range strings.Split(raw, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, exists := seen[item]; exists {
+			continue
+		}
+		seen[item] = struct{}{}
+		values = append(values, item)
+	}
+	return values
 }

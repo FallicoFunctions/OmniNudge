@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Download, FileUp, Plus, Trash2 } from 'lucide-react';
+import { Download, FileUp, Plus, Trash2, Volume2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
 import type { SidebarTab } from '../components/omnichat/OmniChatSidebar';
@@ -9,13 +9,14 @@ import MediaUploadField from '../components/common/MediaUploadField';
 import { Modal } from '../components/common/Modal';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { useAuth } from '../contexts/AuthContext';
-import { omnichatService } from '../services/omnichatService';
+import { omnichatQueryKeys, omnichatService } from '../services/omnichatService';
 import type {
   BotPersona,
   BotPersonaDefinition,
   PersonaCategory,
   PersonaDefinitionPayload,
   ResponseStyleProfile,
+  OmniChatVoicePreset,
 } from '../types/omnichat';
 import { mediaService } from '../services/mediaService';
 import { resolveMediaUrl } from '../utils/mediaUrl';
@@ -127,6 +128,35 @@ function normalizePersonaMediaUploadUrl(storageUrl?: string, storagePath?: strin
   return normalizeUploadedMediaUrl(storageUrl);
 }
 
+function voicePayloadFromPreset(preset: OmniChatVoicePreset) {
+  return {
+    provider: preset.provider,
+    voice_id: preset.voice_id,
+    voice_name: preset.name,
+    model_id: preset.model_id,
+    stability: 0.5,
+    similarity_boost: 0.75,
+    style: 0,
+    speed: 1,
+    pitch: 1,
+    language_code: preset.language_code,
+  };
+}
+
+function browserVoicePayload(personaId: number) {
+  return {
+    provider: 'browser' as const,
+    voice_id: `browser-${personaId}`,
+    voice_name: 'Character voice',
+    model_id: 'browser-native',
+    stability: 0.5,
+    similarity_boost: 0.75,
+    style: 0,
+    speed: 1,
+    pitch: 1,
+  };
+}
+
 type PendingStudioAction =
   | { type: 'reset' }
   | { type: 'select'; personaId: number }
@@ -180,6 +210,11 @@ export default function OmniChatStudioPage() {
   );
   const [isDiscardModalOpen, setIsDiscardModalOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingStudioAction | null>(null);
+  const [selectedVoicePresetId, setSelectedVoicePresetId] = useState('');
+  const [baselineVoicePresetId, setBaselineVoicePresetId] = useState('');
+  const [voiceSelectionInitialized, setVoiceSelectionInitialized] = useState(false);
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
+  const previewAudioRef = useRef<{ audio: HTMLAudioElement; url: string } | null>(null);
 
   const clearLocalPreviews = () => {
     setLocalPreviews((current) => {
@@ -194,6 +229,16 @@ export default function OmniChatStudioPage() {
 
   useEffect(() => clearLocalPreviews, []);
 
+  useEffect(
+    () => () => {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.audio.pause();
+        URL.revokeObjectURL(previewAudioRef.current.url);
+      }
+    },
+    []
+  );
+
   const personasQuery = useQuery({
     queryKey: ['omnichat', 'my-personas'],
     queryFn: () => omnichatService.listMyPersonas(),
@@ -205,6 +250,47 @@ export default function OmniChatStudioPage() {
     queryFn: () => omnichatService.getPersonaDefinition(selectedId as number),
     enabled: selectedId !== null,
   });
+
+  const voiceCatalogQuery = useQuery({
+    queryKey: omnichatQueryKeys.voicePresets,
+    queryFn: () => omnichatService.listVoicePresets(),
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const selectedVoiceQuery = useQuery({
+    queryKey: omnichatQueryKeys.personaVoice(selectedId ?? 0),
+    queryFn: () => omnichatService.getPersonaVoice(selectedId as number),
+    enabled: selectedId !== null,
+  });
+
+  useEffect(() => {
+    if (
+      selectedId !== null ||
+      voiceSelectionInitialized ||
+      !voiceCatalogQuery.data?.voicebox_available
+    ) {
+      return;
+    }
+    const firstPresetId = voiceCatalogQuery.data.presets[0]?.id ?? '';
+    setSelectedVoicePresetId(firstPresetId);
+    setBaselineVoicePresetId(firstPresetId);
+    setVoiceSelectionInitialized(true);
+  }, [selectedId, voiceCatalogQuery.data, voiceSelectionInitialized]);
+
+  useEffect(() => {
+    if (selectedId === null || !selectedVoiceQuery.data) return;
+    const presetId =
+      selectedVoiceQuery.data.provider === 'voicebox' &&
+      voiceCatalogQuery.data?.presets.some(
+        (preset) => preset.voice_id === selectedVoiceQuery.data.voice_id
+      )
+        ? selectedVoiceQuery.data.voice_id
+        : '';
+    setSelectedVoicePresetId(presetId);
+    setBaselineVoicePresetId(presetId);
+    setVoiceSelectionInitialized(true);
+  }, [selectedId, selectedVoiceQuery.data, voiceCatalogQuery.data]);
 
   useEffect(() => {
     if (authIsLoading || isAuthenticated) {
@@ -258,18 +344,21 @@ export default function OmniChatStudioPage() {
 
   const createMutation = useMutation({
     mutationFn: (payload: PersonaDefinitionPayload) => omnichatService.createPersona(payload),
-    onSuccess: async (persona) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['omnichat', 'my-personas'] });
       await queryClient.invalidateQueries({ queryKey: ['omnichat', 'personas'] });
       await queryClient.invalidateQueries({ queryKey: ['omnichat', 'conversations'] });
-      setIsCreatingNew(false);
-      setSelectedId(persona.id);
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ personaId, payload }: { personaId: number; payload: PersonaDefinitionPayload }) =>
-      omnichatService.updatePersona(personaId, payload),
+    mutationFn: ({
+      personaId,
+      payload,
+    }: {
+      personaId: number;
+      payload: PersonaDefinitionPayload;
+    }) => omnichatService.updatePersona(personaId, payload),
     onSuccess: async (persona) => {
       await queryClient.invalidateQueries({ queryKey: ['omnichat', 'my-personas'] });
       await queryClient.invalidateQueries({ queryKey: ['omnichat', 'personas'] });
@@ -301,7 +390,8 @@ export default function OmniChatStudioPage() {
   });
 
   const startChatMutation = useMutation({
-    mutationFn: (personaId: number) => omnichatService.createConversation(personaId, undefined, true),
+    mutationFn: (personaId: number) =>
+      omnichatService.createConversation(personaId, undefined, true),
     onSuccess: (conversation) => {
       navigate(`/omnichat/c/${conversation.id}`);
     },
@@ -317,7 +407,10 @@ export default function OmniChatStudioPage() {
           avatarUrl = normalizePersonaMediaUploadUrl(uploaded.storage_url, uploaded.storage_path);
         } catch (error) {
           avatarUploadFailed = true;
-          console.warn('OmniChat PNG avatar upload failed; continuing import without avatar.', error);
+          console.warn(
+            'OmniChat PNG avatar upload failed; continuing import without avatar.',
+            error
+          );
         }
       }
       const persona = await omnichatService.importPersona(file, { avatarUrl });
@@ -330,7 +423,9 @@ export default function OmniChatStudioPage() {
       setSelectedId(persona.id);
       setImportError(null);
       setImportWarning(
-        avatarUploadFailed ? 'Character imported, but the PNG avatar could not be uploaded automatically.' : null
+        avatarUploadFailed
+          ? 'Character imported, but the PNG avatar could not be uploaded automatically.'
+          : null
       );
     },
     onError: (error) => {
@@ -346,9 +441,23 @@ export default function OmniChatStudioPage() {
 
   const isDirty = useMemo(
     () =>
-      stringifyEditorState(draft, alternateGreetingsText, tagsText, characterBookText, extensionsText) !==
+      stringifyEditorState(
+        draft,
+        alternateGreetingsText,
+        tagsText,
+        characterBookText,
+        extensionsText
+      ) !== baselineEditorState || selectedVoicePresetId !== baselineVoicePresetId,
+    [
+      alternateGreetingsText,
       baselineEditorState,
-    [alternateGreetingsText, baselineEditorState, characterBookText, draft, extensionsText, tagsText]
+      baselineVoicePresetId,
+      characterBookText,
+      draft,
+      extensionsText,
+      selectedVoicePresetId,
+      tagsText,
+    ]
   );
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -379,6 +488,12 @@ export default function OmniChatStudioPage() {
       setTagsText('');
       setCharacterBookText('{}');
       setExtensionsText('{}');
+      const defaultVoiceId = voiceCatalogQuery.data?.voicebox_available
+        ? (voiceCatalogQuery.data.presets[0]?.id ?? '')
+        : '';
+      setSelectedVoicePresetId(defaultVoiceId);
+      setBaselineVoicePresetId(defaultVoiceId);
+      setVoiceSelectionInitialized(true);
       setSaveError(null);
       setSaveSuccess(null);
       setIsDeleteModalOpen(false);
@@ -418,9 +533,12 @@ export default function OmniChatStudioPage() {
       requestAction({ type: 'navigate', path: '/omnichat?search=1', sidebarTab: 'discover' });
       return;
     }
-    if (tab === 'discover') requestAction({ type: 'navigate', path: '/omnichat', sidebarTab: 'discover' });
-    if (tab === 'chat') requestAction({ type: 'navigate', path: '/omnichat/chat', sidebarTab: 'chat' });
-    if (tab === 'groups') requestAction({ type: 'navigate', path: '/omnichat/groups', sidebarTab: 'groups' });
+    if (tab === 'discover')
+      requestAction({ type: 'navigate', path: '/omnichat', sidebarTab: 'discover' });
+    if (tab === 'chat')
+      requestAction({ type: 'navigate', path: '/omnichat/chat', sidebarTab: 'chat' });
+    if (tab === 'groups')
+      requestAction({ type: 'navigate', path: '/omnichat/groups', sidebarTab: 'groups' });
     if (tab === 'characters') setSidebarTab('characters');
     if (tab === 'create') navigate('/omnichat/create');
     if (tab === 'explore') navigate('/omnichat/explore');
@@ -443,7 +561,10 @@ export default function OmniChatStudioPage() {
         const existingPlaceholders = Array.from({
           length: Math.max(0, draft.gallery_urls.length - current.gallery_urls.length),
         }).map(() => undefined);
-        return { ...current, gallery_urls: [...current.gallery_urls, ...existingPlaceholders, localPreviewUrl] };
+        return {
+          ...current,
+          gallery_urls: [...current.gallery_urls, ...existingPlaceholders, localPreviewUrl],
+        };
       }
       const previous = current[field];
       if (previous) URL.revokeObjectURL(previous);
@@ -454,7 +575,10 @@ export default function OmniChatStudioPage() {
     try {
       const uploaded = await mediaService.uploadMedia(file);
       setDraft((current) => {
-        const normalizedUrl = normalizePersonaMediaUploadUrl(uploaded.storage_url, uploaded.storage_path);
+        const normalizedUrl = normalizePersonaMediaUploadUrl(
+          uploaded.storage_url,
+          uploaded.storage_path
+        );
         if (field === 'gallery_urls') {
           return { ...current, gallery_urls: [...current.gallery_urls, normalizedUrl] };
         }
@@ -464,7 +588,10 @@ export default function OmniChatStudioPage() {
       setLocalPreviews((current) => {
         if (field === 'gallery_urls') {
           URL.revokeObjectURL(localPreviewUrl);
-          return { ...current, gallery_urls: current.gallery_urls.filter((url) => url !== localPreviewUrl) };
+          return {
+            ...current,
+            gallery_urls: current.gallery_urls.filter((url) => url !== localPreviewUrl),
+          };
         }
         if (current[field] === localPreviewUrl) {
           URL.revokeObjectURL(localPreviewUrl);
@@ -527,21 +654,93 @@ export default function OmniChatStudioPage() {
       preview_video_url: draft.preview_video_url || undefined,
     };
 
+    let createdPersonaId: number | null = null;
     try {
+      let savedPersonaId = selectedId;
       if (selectedId === null) {
+        setIsCreatingNew(true);
         const created = await createMutation.mutateAsync(payload);
-        setIsCreatingNew(false);
-        setSelectedId(created.id);
+        savedPersonaId = created.id;
+        createdPersonaId = created.id;
       } else {
         await updateMutation.mutateAsync({ personaId: selectedId, payload });
       }
+      const selectedVoice = voiceCatalogQuery.data?.presets.find(
+        (preset) => preset.id === selectedVoicePresetId
+      );
+      if (savedPersonaId !== null) {
+        const voicePayload =
+          selectedVoice && voiceCatalogQuery.data?.voicebox_available
+            ? voicePayloadFromPreset(selectedVoice)
+            : browserVoicePayload(savedPersonaId);
+        const savedVoice = await omnichatService.updatePersonaVoice(savedPersonaId, voicePayload);
+        if (savedVoice) {
+          queryClient.setQueryData(omnichatQueryKeys.personaVoice(savedPersonaId), savedVoice);
+        }
+        queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.personaVoice(savedPersonaId) });
+      }
       setBaselineEditorState(
-        stringifyEditorState(payload, alternateGreetingsText, tagsText, characterBookText, extensionsText)
+        stringifyEditorState(
+          payload,
+          alternateGreetingsText,
+          tagsText,
+          characterBookText,
+          extensionsText
+        )
       );
       setSaveSuccess(selectedId === null ? 'Character created.' : 'Changes saved.');
+      setBaselineVoicePresetId(selectedVoicePresetId);
+      if (createdPersonaId !== null) {
+        setIsCreatingNew(false);
+        setSelectedId(createdPersonaId);
+      }
     } catch (error) {
+      if (createdPersonaId !== null) {
+        // The persona exists even when voice persistence fails. Select it so a
+        // retry updates the same record instead of creating a duplicate.
+        setIsCreatingNew(false);
+        setSelectedId(createdPersonaId);
+      }
       setSaveSuccess(null);
       setSaveError(error instanceof Error ? error.message : 'Save failed');
+    }
+  };
+
+  const handlePreviewVoice = async () => {
+    if (!selectedVoicePresetId) return;
+    setPreviewingVoiceId(selectedVoicePresetId);
+    setSaveError(null);
+    try {
+      const blob = await omnichatService.previewVoicePreset(selectedVoicePresetId);
+      if (previewAudioRef.current) {
+        previewAudioRef.current.audio.pause();
+        URL.revokeObjectURL(previewAudioRef.current.url);
+      }
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      previewAudioRef.current = { audio, url };
+      audio.addEventListener(
+        'ended',
+        () => {
+          URL.revokeObjectURL(url);
+          if (previewAudioRef.current?.url === url) previewAudioRef.current = null;
+        },
+        { once: true }
+      );
+      try {
+        await audio.play();
+      } catch (error) {
+        audio.pause();
+        URL.revokeObjectURL(url);
+        if (previewAudioRef.current?.url === url) previewAudioRef.current = null;
+        throw error;
+      }
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : t('omnichat.studio.voice.previewError')
+      );
+    } finally {
+      setPreviewingVoiceId(null);
     }
   };
 
@@ -562,14 +761,13 @@ export default function OmniChatStudioPage() {
     }
   };
 
-  return (
-    authIsLoading ? (
-      <OmniChatShell activeTab={sidebarTab} onTabChange={handleSidebarTabChange}>
-        <div className="min-h-[calc(100dvh-72px)] bg-[var(--color-background)] px-6 py-8">
-          <LoadingMessage>{t('omnichat.studio.loadingStudio')}</LoadingMessage>
-        </div>
-      </OmniChatShell>
-    ) : !isAuthenticated ? null : (
+  return authIsLoading ? (
+    <OmniChatShell activeTab={sidebarTab} onTabChange={handleSidebarTabChange}>
+      <div className="min-h-[calc(100dvh-72px)] bg-[var(--color-background)] px-6 py-8">
+        <LoadingMessage>{t('omnichat.studio.loadingStudio')}</LoadingMessage>
+      </div>
+    </OmniChatShell>
+  ) : !isAuthenticated ? null : (
     <OmniChatShell activeTab={sidebarTab} onTabChange={handleSidebarTabChange}>
       <div className="min-h-[calc(100dvh-72px)] bg-[var(--color-background)]">
         <div className="mx-auto grid max-w-[1600px] gap-6 px-6 py-8 lg:grid-cols-[320px,1fr] lg:px-10">
@@ -608,7 +806,11 @@ export default function OmniChatStudioPage() {
               </div>
               <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-6 text-sm text-[var(--color-text-secondary)]">
                 <FileUp size={18} />
-                <span>{importMutation.isPending ? t('omnichat.studio.import.importing') : t('omnichat.studio.import.uploadCta')}</span>
+                <span>
+                  {importMutation.isPending
+                    ? t('omnichat.studio.import.importing')
+                    : t('omnichat.studio.import.uploadCta')}
+                </span>
                 <input
                   type="file"
                   accept=".png,.json,application/json,image/png"
@@ -631,8 +833,12 @@ export default function OmniChatStudioPage() {
             </div>
 
             <div className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
-              {personasQuery.isLoading && <LoadingMessage>{t('omnichat.studio.loadingPersonas')}</LoadingMessage>}
-              {personasQuery.isError && <ErrorMessage>{t('omnichat.studio.loadPersonasError')}</ErrorMessage>}
+              {personasQuery.isLoading && (
+                <LoadingMessage>{t('omnichat.studio.loadingPersonas')}</LoadingMessage>
+              )}
+              {personasQuery.isError && (
+                <ErrorMessage>{t('omnichat.studio.loadPersonasError')}</ErrorMessage>
+              )}
               <div className="space-y-2">
                 {(personasQuery.data ?? []).map((persona) => (
                   <button
@@ -679,7 +885,9 @@ export default function OmniChatStudioPage() {
                   Persona Editor
                 </p>
                 <h2 className="mt-1 text-2xl font-semibold text-[var(--color-text-primary)]">
-                  {selectedId === null ? t('omnichat.studio.editor.newCharacter') : selectedPersona?.name || t('omnichat.studio.editor.editCharacter')}
+                  {selectedId === null
+                    ? t('omnichat.studio.editor.newCharacter')
+                    : selectedPersona?.name || t('omnichat.studio.editor.editCharacter')}
                 </h2>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -723,20 +931,29 @@ export default function OmniChatStudioPage() {
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <label className="space-y-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.name')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.name')}
+                </span>
                 <input
                   type="text"
                   value={draft.name}
-                  onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, name: event.target.value }))
+                  }
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
                 />
               </label>
               <label className="space-y-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.category')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.category')}
+                </span>
                 <select
                   value={draft.category}
                   onChange={(event) =>
-                    setDraft((current) => ({ ...current, category: event.target.value as PersonaCategory }))
+                    setDraft((current) => ({
+                      ...current,
+                      category: event.target.value as PersonaCategory,
+                    }))
                   }
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
                 >
@@ -748,43 +965,144 @@ export default function OmniChatStudioPage() {
                 </select>
               </label>
               <label className="space-y-2 md:col-span-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.description')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.description')}
+                </span>
                 <textarea
                   value={draft.description}
-                  onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, description: event.target.value }))
+                  }
                   rows={3}
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
                 />
               </label>
               <div className="space-y-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.visibility')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.visibility')}
+                </span>
                 <div className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-secondary)]">
                   {t('omnichat.studio.fields.visibilityPrivate')}
                 </div>
               </div>
             </div>
 
+            <div className="mt-6 rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                    {t('omnichat.studio.voice.title')}
+                  </h3>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {t('omnichat.studio.voice.description')}
+                  </p>
+                </div>
+                <span className="rounded-full border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-text-secondary)]">
+                  {t('omnichat.studio.voice.localBadge')}
+                </span>
+              </div>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label className="min-w-0 flex-1 space-y-2">
+                  <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                    {t('omnichat.studio.voice.label')}
+                  </span>
+                  <select
+                    value={selectedVoicePresetId}
+                    disabled={
+                      voiceCatalogQuery.isLoading || !voiceCatalogQuery.data?.voicebox_available
+                    }
+                    onChange={(event) => {
+                      setSelectedVoicePresetId(event.target.value);
+                      setVoiceSelectionInitialized(true);
+                    }}
+                    className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm disabled:opacity-60"
+                  >
+                    <option value="">{t('omnichat.studio.voice.browserFallback')}</option>
+                    <optgroup label={t('omnichat.studio.voice.femaleGroup')}>
+                      {(voiceCatalogQuery.data?.presets ?? [])
+                        .filter((preset) => preset.gender === 'female')
+                        .map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {preset.name}
+                          </option>
+                        ))}
+                    </optgroup>
+                    <optgroup label={t('omnichat.studio.voice.maleGroup')}>
+                      {(voiceCatalogQuery.data?.presets ?? [])
+                        .filter((preset) => preset.gender === 'male')
+                        .map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {preset.name}
+                          </option>
+                        ))}
+                    </optgroup>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void handlePreviewVoice()}
+                  disabled={
+                    !selectedVoicePresetId ||
+                    previewingVoiceId !== null ||
+                    !voiceCatalogQuery.data?.voicebox_available
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--color-border)] px-4 py-2 text-sm disabled:opacity-60"
+                >
+                  <Volume2 size={16} />
+                  {previewingVoiceId
+                    ? t('omnichat.studio.voice.previewing')
+                    : t('omnichat.studio.voice.preview')}
+                </button>
+              </div>
+              {!voiceCatalogQuery.data?.voicebox_available && !voiceCatalogQuery.isLoading && (
+                <p className="mt-3 text-sm text-amber-300">
+                  {t('omnichat.studio.voice.unavailable')}
+                </p>
+              )}
+              <div className="mt-4 rounded-2xl border border-dashed border-[var(--color-border)] px-4 py-3">
+                <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                  {voiceCatalogQuery.data?.voice_cloning_enabled
+                    ? t('omnichat.studio.voice.cloningEnabled')
+                    : t('omnichat.studio.voice.cloningDisabled')}
+                </p>
+                <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                  {t('omnichat.studio.voice.cloningSafety')}
+                </p>
+              </div>
+            </div>
+
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <label className="space-y-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.personality')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.personality')}
+                </span>
                 <textarea
                   value={draft.personality}
-                  onChange={(event) => setDraft((current) => ({ ...current, personality: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, personality: event.target.value }))
+                  }
                   rows={5}
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
                 />
               </label>
               <label className="space-y-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.scenario')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.scenario')}
+                </span>
                 <textarea
                   value={draft.scenario}
-                  onChange={(event) => setDraft((current) => ({ ...current, scenario: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, scenario: event.target.value }))
+                  }
                   rows={5}
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
                 />
               </label>
               <div className="space-y-2 md:col-span-2">
-                <label htmlFor="omnichat-opening-message" className="block text-sm font-medium text-[var(--color-text-primary)]">
+                <label
+                  htmlFor="omnichat-opening-message"
+                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                >
                   {t('omnichat.studio.fields.openingMessage')}
                 </label>
                 <textarea
@@ -792,16 +1110,24 @@ export default function OmniChatStudioPage() {
                   aria-describedby="omnichat-opening-message-help"
                   aria-required="true"
                   value={draft.first_message}
-                  onChange={(event) => setDraft((current) => ({ ...current, first_message: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, first_message: event.target.value }))
+                  }
                   rows={4}
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
                 />
-                <span id="omnichat-opening-message-help" className="block text-xs leading-5 text-[var(--color-text-secondary)]">
+                <span
+                  id="omnichat-opening-message-help"
+                  className="block text-xs leading-5 text-[var(--color-text-secondary)]"
+                >
                   {t('omnichat.studio.fields.openingMessageHelp')}
                 </span>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <label htmlFor="omnichat-response-style" className="block text-sm font-medium text-[var(--color-text-primary)]">
+                <label
+                  htmlFor="omnichat-response-style"
+                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                >
                   {t('omnichat.studio.fields.responseStyle')}
                 </label>
                 <select
@@ -822,12 +1148,18 @@ export default function OmniChatStudioPage() {
                     </option>
                   ))}
                 </select>
-                <span id="omnichat-response-style-description" className="block text-xs leading-5 text-[var(--color-text-secondary)]">
+                <span
+                  id="omnichat-response-style-description"
+                  className="block text-xs leading-5 text-[var(--color-text-secondary)]"
+                >
                   {t(`omnichat.studio.responseStyles.${draft.response_style_profile}.description`)}
                 </span>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <label htmlFor="omnichat-example-dialogue" className="block text-sm font-medium text-[var(--color-text-primary)]">
+                <label
+                  htmlFor="omnichat-example-dialogue"
+                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                >
                   {t('omnichat.studio.fields.exampleDialogue')}
                 </label>
                 <textarea
@@ -844,7 +1176,10 @@ export default function OmniChatStudioPage() {
                     charMarker: '{{Char}}',
                   })}
                 />
-                <span id="omnichat-example-dialogue-help" className="block text-xs leading-5 text-[var(--color-text-secondary)]">
+                <span
+                  id="omnichat-example-dialogue-help"
+                  className="block text-xs leading-5 text-[var(--color-text-secondary)]"
+                >
                   {t('omnichat.studio.fields.exampleDialogueHelp', {
                     userMarker: '{{User}}',
                     charMarker: '{{Char}}',
@@ -852,21 +1187,30 @@ export default function OmniChatStudioPage() {
                 </span>
               </div>
               <label className="space-y-2 md:col-span-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.systemPrompt')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.systemPrompt')}
+                </span>
                 <textarea
                   value={draft.system_prompt}
-                  onChange={(event) => setDraft((current) => ({ ...current, system_prompt: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, system_prompt: event.target.value }))
+                  }
                   rows={4}
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
                   placeholder={t('omnichat.studio.fields.systemPromptPlaceholder')}
                 />
               </label>
               <label className="space-y-2 md:col-span-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.postHistoryInstructions')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.postHistoryInstructions')}
+                </span>
                 <textarea
                   value={draft.post_history_instructions}
                   onChange={(event) =>
-                    setDraft((current) => ({ ...current, post_history_instructions: event.target.value }))
+                    setDraft((current) => ({
+                      ...current,
+                      post_history_instructions: event.target.value,
+                    }))
                   }
                   rows={4}
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
@@ -876,7 +1220,9 @@ export default function OmniChatStudioPage() {
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <label className="space-y-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.alternateGreetings')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.alternateGreetings')}
+                </span>
                 <textarea
                   value={alternateGreetingsText}
                   onChange={(event) => setAlternateGreetingsText(event.target.value)}
@@ -886,7 +1232,9 @@ export default function OmniChatStudioPage() {
                 />
               </label>
               <label className="space-y-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.tags')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.tags')}
+                </span>
                 <textarea
                   value={tagsText}
                   onChange={(event) => setTagsText(event.target.value)}
@@ -896,16 +1244,22 @@ export default function OmniChatStudioPage() {
                 />
               </label>
               <label className="space-y-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.creatorName')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.creatorName')}
+                </span>
                 <input
                   type="text"
                   value={draft.creator_name}
-                  onChange={(event) => setDraft((current) => ({ ...current, creator_name: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, creator_name: event.target.value }))
+                  }
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
                 />
               </label>
               <label className="space-y-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.characterVersion')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.characterVersion')}
+                </span>
                 <input
                   type="text"
                   value={draft.character_version}
@@ -916,10 +1270,14 @@ export default function OmniChatStudioPage() {
                 />
               </label>
               <label className="space-y-2 md:col-span-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.creatorNotes')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.creatorNotes')}
+                </span>
                 <textarea
                   value={draft.creator_notes}
-                  onChange={(event) => setDraft((current) => ({ ...current, creator_notes: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, creator_notes: event.target.value }))
+                  }
                   rows={4}
                   className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
                 />
@@ -1012,7 +1370,9 @@ export default function OmniChatStudioPage() {
                       htmlFor="omnichat-studio-gallery-file"
                       className="inline-flex cursor-pointer items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                     >
-                      {uploadingField === 'gallery_urls' ? 'Uploading gallery image...' : 'Add gallery image'}
+                      {uploadingField === 'gallery_urls'
+                        ? 'Uploading gallery image...'
+                        : 'Add gallery image'}
                     </label>
                     <input
                       id="omnichat-studio-gallery-file"
@@ -1029,7 +1389,9 @@ export default function OmniChatStudioPage() {
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <label className="space-y-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.characterBookJson')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.characterBookJson')}
+                </span>
                 <textarea
                   value={characterBookText}
                   onChange={(event) => setCharacterBookText(event.target.value)}
@@ -1038,7 +1400,9 @@ export default function OmniChatStudioPage() {
                 />
               </label>
               <label className="space-y-2">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">{t('omnichat.studio.fields.extensionsJson')}</span>
+                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.studio.fields.extensionsJson')}
+                </span>
                 <textarea
                   value={extensionsText}
                   onChange={(event) => setExtensionsText(event.target.value)}
@@ -1048,7 +1412,11 @@ export default function OmniChatStudioPage() {
               </label>
             </div>
 
-            {uploadingField && <LoadingMessage>{t('omnichat.studio.uploadingField', { field: uploadingField.replace('_', ' ') })}</LoadingMessage>}
+            {uploadingField && (
+              <LoadingMessage>
+                {t('omnichat.studio.uploadingField', { field: uploadingField.replace('_', ' ') })}
+              </LoadingMessage>
+            )}
             {saveError && <ErrorMessage>{saveError}</ErrorMessage>}
             {saveSuccess && (
               <p className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-200">
@@ -1071,7 +1439,9 @@ export default function OmniChatStudioPage() {
               </button>
               <button
                 type="button"
-                onClick={() => requestAction({ type: 'navigate', path: '/omnichat', sidebarTab: 'discover' })}
+                onClick={() =>
+                  requestAction({ type: 'navigate', path: '/omnichat', sidebarTab: 'discover' })
+                }
                 className="text-sm text-[var(--color-text-secondary)] underline-offset-2 hover:underline"
               >
                 {t('omnichat.studio.actions.backToDiscover')}
@@ -1082,7 +1452,9 @@ export default function OmniChatStudioPage() {
               <div className="mt-8 rounded-3xl border border-red-500/25 bg-red-500/10 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-red-200">{t('omnichat.studio.dangerZone.title')}</h3>
+                    <h3 className="text-sm font-semibold text-red-200">
+                      {t('omnichat.studio.dangerZone.title')}
+                    </h3>
                     <p className="mt-1 text-sm text-red-200/80">
                       {t('omnichat.studio.dangerZone.description')}
                     </p>
@@ -1110,7 +1482,9 @@ export default function OmniChatStudioPage() {
       >
         <div className="space-y-4 p-6">
           <div>
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('omnichat.studio.deleteModal.title')}</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {t('omnichat.studio.deleteModal.title')}
+            </h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
               {selectedPersona?.name
                 ? t('omnichat.studio.deleteModal.descriptionNamed', { name: selectedPersona.name })
@@ -1119,7 +1493,9 @@ export default function OmniChatStudioPage() {
           </div>
           {deleteMutation.isError && (
             <ErrorMessage>
-              {deleteMutation.error instanceof Error ? deleteMutation.error.message : 'Delete failed.'}
+              {deleteMutation.error instanceof Error
+                ? deleteMutation.error.message
+                : 'Delete failed.'}
             </ErrorMessage>
           )}
           <div className="flex flex-wrap justify-end gap-2">
@@ -1159,7 +1535,9 @@ export default function OmniChatStudioPage() {
       >
         <div className="space-y-4 p-6">
           <div>
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('omnichat.studio.discardModal.title')}</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {t('omnichat.studio.discardModal.title')}
+            </h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
               {t('omnichat.studio.discardModal.description')}
             </p>
@@ -1193,6 +1571,5 @@ export default function OmniChatStudioPage() {
         </div>
       </Modal>
     </OmniChatShell>
-    )
   );
 }

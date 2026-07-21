@@ -45,7 +45,9 @@ import (
 	"github.com/omninudge/backend/internal/services/fal"
 	linkpreviewsvc "github.com/omninudge/backend/internal/services/linkpreview"
 	"github.com/omninudge/backend/internal/services/openrouter"
+	"github.com/omninudge/backend/internal/services/speech"
 	"github.com/omninudge/backend/internal/services/tavus"
+	"github.com/omninudge/backend/internal/services/voicebox"
 	"github.com/omninudge/backend/internal/tracing"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/omninudge/backend/internal/websocket"
@@ -371,7 +373,7 @@ func main() {
 	var virusScanner services.VirusScanner
 
 	// Initialize scrubber service (P0-017)
-	scrubberService := services.NewScrubberService(db.Pool, storageService)
+	scrubberService := services.NewScrubberService(db.Pool, storageService).SetVoiceStorage(voiceStorage)
 
 	// Initialize email service (P0-036)
 	// Provider selection order: SendGrid > Mailgun > SMTP > stub (logs only).
@@ -665,17 +667,30 @@ func main() {
 	omniChatSocialHandler := handlers.NewOmniChatSocialHandler(omniChatSocialService, omniChatSocialRepo, storageService)
 	omniChatGroupService := services.NewOmniChatGroupService(omniChatGroupRepo, openrouterClient, hub)
 	omniChatGroupHandler := handlers.NewOmniChatGroupHandler(omniChatGroupService, omniChatGroupRepo)
+	voiceProviders := map[string]speech.Synthesizer{
+		"elevenlabs": elevenlabs.NewClient(cfg.OmniChatVoice.ElevenLabsAPIKey, cfg.OmniChatVoice.ElevenLabsBaseURL, cfg.OmniChatVoice.ElevenLabsEnableLogging),
+	}
+	voiceboxAvailable := false
+	if cfg.OmniChatVoice.VoiceboxEnabled {
+		voiceboxClient, voiceboxErr := voicebox.NewClient(cfg.OmniChatVoice.VoiceboxBaseURL, time.Duration(cfg.OmniChatVoice.VoiceboxTimeoutSeconds)*time.Second)
+		if voiceboxErr != nil {
+			zlog.Error().Err(voiceboxErr).Msg("Voicebox configuration rejected")
+		} else {
+			voiceProviders["voicebox"] = voiceboxClient
+			voiceboxAvailable = true
+		}
+	}
 	omniChatVoiceService := services.NewOmniChatVoiceService(
 		omniChatVoiceRepo,
 		voiceStorage,
-		elevenlabs.NewClient(cfg.OmniChatVoice.ElevenLabsAPIKey, cfg.OmniChatVoice.ElevenLabsBaseURL, cfg.OmniChatVoice.ElevenLabsEnableLogging),
-		cfg.OmniChatVoice.DefaultModel,
+		voiceProviders,
+		map[string]string{"elevenlabs": cfg.OmniChatVoice.DefaultModel, "voicebox": "kokoro"},
 	)
 	omniChatVoiceHandler := handlers.NewOmniChatVoiceHandler(
 		omniChatVoiceRepo, omniChatVoiceService, voiceStorage,
 		liveVideoClient,
 		cfg.OmniChatVoice.TavusReplicaID, cfg.OmniChatVoice.TavusPersonaID,
-	)
+	).ConfigureVoiceCatalog(voiceboxAvailable, cfg.OmniChatVoice.VoiceCloningEnabled)
 	adminPersonaHandler := handlers.NewAdminPersonaHandler(botPersonaRepo)
 	omniChatRateLimiter := middleware.OmniChatRateLimiter(cache)
 	omniChatMediaRateLimiter := middleware.OmniChatMediaGenerationRateLimiter(cache)
@@ -729,6 +744,13 @@ func main() {
 	//                   ctx.Done() will be cancelled automatically
 	// 12. Metrics     — measures handler latency last so compression is included
 	router := gin.New()
+	// Gin otherwise trusts proxy headers from every source, allowing anonymous
+	// clients to spoof ClientIP and rotate IP-keyed provider rate limits. The
+	// secure default is no trusted proxies; deployments behind a load balancer
+	// must explicitly allowlist its IP or CIDR via TRUSTED_PROXIES.
+	if err := router.SetTrustedProxies(cfg.Server.TrustedProxies); err != nil {
+		zlog.Fatal().Err(err).Msg("Invalid TRUSTED_PROXIES configuration")
+	}
 	router.Use(middleware.Recovery())
 	router.Use(observability.SentryMiddleware())
 	router.Use(middleware.RequestID())
@@ -1289,6 +1311,8 @@ func main() {
 			protected.POST("/omnichat/groups/:group_id/messages", omniChatRateLimiter.Middleware(), omniChatGroupHandler.SendMessage)
 			protected.POST("/omnichat/groups/:group_id/invites", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.CreateInvite)
 			protected.POST("/omnichat/groups/join", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.AcceptInvite)
+			protected.GET("/omnichat/voice-presets", omniChatVoiceHandler.ListVoicePresets)
+			protected.POST("/omnichat/voice-presets/:preset_id/preview", omniChatVoiceRateLimiter.Middleware(), omniChatVoiceHandler.PreviewVoicePreset)
 			protected.GET(omniChatPersonaPath+"/voice", omniChatVoiceHandler.GetPersonaVoice)
 			protected.PUT(omniChatPersonaPath+"/voice", omniChatVoiceHandler.UpdatePersonaVoice)
 			protected.GET("/omnichat/conversations/:id/messages/:message_id/speech", omniChatVoiceRateLimiter.Middleware(), omniChatVoiceHandler.GetMessageSpeech)
