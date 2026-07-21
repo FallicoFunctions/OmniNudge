@@ -923,14 +923,19 @@ func (r *BotMessageRepository) BulkCreateMessages(ctx context.Context, conversat
 	return created, nil
 }
 
-// ListByConversationID retrieves messages for a conversation in chronological order.
+// ListByConversationID retrieves the most recent messages for a conversation
+// and returns that bounded window in chronological order.
 func (r *BotMessageRepository) ListByConversationID(ctx context.Context, conversationID int, limit int) ([]*BotMessage, error) {
 	query := `
 		SELECT id, conversation_id, role, content, failed, created_at
-		FROM bot_messages
-		WHERE conversation_id = $1
+		FROM (
+			SELECT id, conversation_id, role, content, failed, created_at
+			FROM bot_messages
+			WHERE conversation_id = $1
+			ORDER BY id DESC
+			LIMIT $2
+		) recent
 		ORDER BY id
-		LIMIT $2
 	`
 	rows, err := r.pool.Query(ctx, query, conversationID, limit)
 	if err != nil {
