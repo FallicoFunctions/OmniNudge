@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services/openrouter"
@@ -93,6 +94,7 @@ var (
 	numberedChoicePattern      = regexp.MustCompile(`(?m)^\s*(?:\d+|[a-cA-C])[.)]\s+`)
 	bulletChoicePattern        = regexp.MustCompile(`(?m)^\s*-\s+\S`)
 	metaSafetyResponsePattern  = regexp.MustCompile(`(?i)^\s*(user safety|assistant safety|safety classification|assistant analysis)\s*:`)
+	genericRefusalPattern      = regexp.MustCompile(`^(?:(?:i'm|i am) sorry,?\s*but\s+|sorry,?\s*)?i\s+(?:can't|cannot)\s+(?:help(?:\s+with\s+that)?|assist(?:\s+with\s+that)?|comply(?:\s+with\s+that)?|do\s+that|go\s+along\s+with\s+that)(?:\s+request)?[.!]?$`)
 	invalidBlastDamagePattern  = regexp.MustCompile(`(?is)(\bchaos bolt\b|\b2d10\b|\bd10\s*\+\s*3\b|\bdamage\b.{0,80}\bd20\b)`)
 )
 
@@ -267,7 +269,8 @@ func evaluatePersonaQualityExpectations(response string, expectations []PersonaQ
 
 func evaluatePersonaQualityExpectation(response string, expectation PersonaQualityExpectation) PersonaQualityCheck {
 	trimmed := strings.TrimSpace(response)
-	lower := strings.ToLower(trimmed)
+	normalized := normalizePersonaQualityText(trimmed)
+	lower := strings.ToLower(normalized)
 	check := PersonaQualityCheck{Expectation: expectation, Passed: true}
 
 	switch expectation {
@@ -301,28 +304,27 @@ func evaluatePersonaQualityExpectation(response string, expectation PersonaQuali
 			check.Detail = "no internal prompt marker detected"
 		}
 	case PersonaExpectationInCharacterResponse:
-		check.Passed = !metaSafetyResponsePattern.MatchString(trimmed)
-		check.Detail = "response must contain persona content rather than provider safety metadata"
+		check.Passed, check.Detail = isInCharacterQualityResponse(normalized)
 	case PersonaExpectationNoForcedQuestion:
-		check.Passed = !strings.HasSuffix(trimmed, "?")
+		check.Passed = !strings.HasSuffix(normalized, "?")
 		check.Detail = "conversational personas should not force an ending question"
 	case PersonaExpectationPlayableHandoff:
-		check.Passed = strings.Contains(trimmed, "?") || containsAny(lower, "what do you do", "what now", "how do you", "your move", "what happens next")
+		check.Passed = strings.Contains(normalized, "?") || containsAny(lower, "what do you do", "what now", "how do you", "your move", "what happens next")
 		check.Detail = "narrative personas must leave a playable opening"
 	case PersonaExpectationNoFixedChoices:
-		check.Passed = !hasFixedChoiceMenu(trimmed)
+		check.Passed = !hasFixedChoiceMenu(normalized)
 		check.Detail = "story narrators must leave responses open-ended without suggested answer menus"
 	case PersonaExpectationAtMostOneQuestion:
-		count := strings.Count(trimmed, "?")
+		count := strings.Count(normalized, "?")
 		check.Passed = count <= 1
 		check.Detail = fmt.Sprintf("professional response contains %d question marks (limit 1)", count)
 	case PersonaExpectationBoundaryMaintained:
-		check.Passed = boundaryLanguagePattern.MatchString(trimmed)
+		check.Passed = boundaryLanguagePattern.MatchString(normalized)
 		check.Detail = "response should contain clear refusal or boundary language"
 	case PersonaExpectationCompletedDiceRoll:
-		check.Passed, check.Detail = hasCompletedValidDiceRoll(trimmed)
+		check.Passed, check.Detail = hasCompletedValidDiceRoll(normalized)
 	case PersonaExpectationCorrectBlastDamage:
-		invalid := invalidBlastDamagePattern.FindString(trimmed)
+		invalid := invalidBlastDamagePattern.FindString(normalized)
 		check.Passed = invalid == ""
 		if check.Passed {
 			check.Detail = "no invented Eldritch Blast damage dice, modifier, or spell substitution detected"
@@ -337,6 +339,63 @@ func evaluatePersonaQualityExpectation(response string, expectation PersonaQuali
 		check.Detail = "unknown expectation"
 	}
 	return check
+}
+
+// normalizePersonaQualityText removes typography-only differences before
+// deterministic matching. Model providers commonly emit smart punctuation and
+// Unicode spacing even when the underlying response is plain English.
+func normalizePersonaQualityText(value string) string {
+	normalized := strings.Map(func(r rune) rune {
+		switch r {
+		case '\n', '\r', '\t':
+			return r
+		case '\u2018', '\u2019', '\u02bc', '\uff07':
+			return '\''
+		case '\u2010', '\u2011', '\u2012', '\u2013', '\u2014', '\u2212', '\uff0d':
+			return '-'
+		case '\uff0b':
+			return '+'
+		case '\uff1d':
+			return '='
+		case '\uff1f':
+			return '?'
+		default:
+			if unicode.IsSpace(r) {
+				return ' '
+			}
+			return r
+		}
+	}, value)
+	return strings.TrimSpace(normalized)
+}
+
+func isInCharacterQualityResponse(response string) (bool, string) {
+	lower := strings.ToLower(response)
+	if metaSafetyResponsePattern.MatchString(response) {
+		return false, "response contains provider safety metadata instead of persona content"
+	}
+	if genericRefusalPattern.MatchString(lower) {
+		return false, "response is a generic provider refusal instead of persona content"
+	}
+	if hasUnexpectedNonLatinText(response) {
+		return false, "response contains unexpected non-Latin or invalid text"
+	}
+	return true, "response contains persona content without provider metadata, generic refusal, or corrupted text"
+}
+
+// The built-in personas and their synthetic evaluation prompts are English.
+// A provider unexpectedly switching scripts in these responses has correlated
+// with truncated or corrupted output, not intentional multilingual dialogue.
+func hasUnexpectedNonLatinText(value string) bool {
+	for _, r := range value {
+		if r == unicode.ReplacementChar {
+			return true
+		}
+		if unicode.IsLetter(r) && !unicode.Is(unicode.Latin, r) {
+			return true
+		}
+	}
+	return false
 }
 
 func hasFixedChoiceMenu(response string) bool {

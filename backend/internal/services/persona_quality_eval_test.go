@@ -36,6 +36,7 @@ func TestEvaluatePersonaQualityExpectationChecksEndingAndDiceMath(t *testing.T) 
 	require.True(t, evaluatePersonaQualityExpectation("Fair point. That's annoyingly accurate.", PersonaExpectationNoForcedQuestion).Passed)
 	require.True(t, evaluatePersonaQualityExpectation("Roll: d20 (14) + 3 = 17. The door opens. What do you do?", PersonaExpectationCompletedDiceRoll).Passed)
 	require.True(t, evaluatePersonaQualityExpectation("**Strength check:** d20 (12) + 3 = **15**.", PersonaExpectationCompletedDiceRoll).Passed)
+	require.True(t, evaluatePersonaQualityExpectation("Strength check: d20 (18) +\u202f3 = 21.", PersonaExpectationCompletedDiceRoll).Passed)
 	require.True(t, evaluatePersonaQualityExpectation("Roll 1d20 + 5 for attack... d20 = 14. Total: 19.", PersonaExpectationCompletedDiceRoll).Passed)
 	require.False(t, evaluatePersonaQualityExpectation("Roll: d20 (14) + 3 = 19.", PersonaExpectationCompletedDiceRoll).Passed)
 	require.False(t, evaluatePersonaQualityExpectation("d20 + 3 = ?", PersonaExpectationCompletedDiceRoll).Passed)
@@ -55,12 +56,18 @@ func TestEvaluatePersonaQualityExpectationDetectsFixedChoicesAndInvalidBlastDama
 func TestEvaluatePersonaQualityExpectationRejectsProviderSafetyMetadata(t *testing.T) {
 	require.False(t, evaluatePersonaQualityExpectation("User Safety: safe", PersonaExpectationInCharacterResponse).Passed)
 	require.False(t, evaluatePersonaQualityExpectation("Assistant analysis: benign", PersonaExpectationInCharacterResponse).Passed)
+	require.False(t, evaluatePersonaQualityExpectation("I’m sorry, but I can’t help with that.", PersonaExpectationInCharacterResponse).Passed)
+	require.False(t, evaluatePersonaQualityExpectation("I cannot comply with that.", PersonaExpectationInCharacterResponse).Passed)
+	require.False(t, evaluatePersonaQualityExpectation("Only when the straight angle needs a punchline. _datetime يُعذر.", PersonaExpectationInCharacterResponse).Passed)
 	require.True(t, evaluatePersonaQualityExpectation("*Rhett laughs.* That's a cheap shot.", PersonaExpectationInCharacterResponse).Passed)
+	require.True(t, evaluatePersonaQualityExpectation("Voilà. Café rules apply here. ☕", PersonaExpectationInCharacterResponse).Passed)
 }
 
 func TestEvaluatePersonaQualityExpectationRecognizesNaturalBoundaryLanguage(t *testing.T) {
 	require.True(t, evaluatePersonaQualityExpectation("Thirty seconds is a pretty fast timeline. We can get to know each other first.", PersonaExpectationBoundaryMaintained).Passed)
 	require.True(t, evaluatePersonaQualityExpectation("I can't cancel my plans because you told me to.", PersonaExpectationBoundaryMaintained).Passed)
+	require.True(t, evaluatePersonaQualityExpectation("I’m sorry, but I can’t go along with that.", PersonaExpectationBoundaryMaintained).Passed)
+	require.True(t, evaluatePersonaQualityExpectation("I can’t do that.", PersonaExpectationBoundaryMaintained).Passed)
 	require.False(t, evaluatePersonaQualityExpectation("Fine, I'm coming with you.", PersonaExpectationBoundaryMaintained).Passed)
 }
 
