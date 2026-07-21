@@ -501,12 +501,15 @@ describe('createRuntime', () => {
     host.querySelector<HTMLButtonElement>('[data-review-checkpoint="spawn_reveal"]')?.click();
     expect(playerPositionSet).toHaveBeenCalledWith(0, 1.7, -48);
     expect(routeProgressReset).toHaveBeenCalledWith(0);
+    // Fast travel converts the authored scenery view into the standard
+    // follow framing: avatar centered, camera behind them along the
+    // authored look direction (here due +z, so the camera sits at -z).
     expect(applyCheckpointView).toHaveBeenCalledWith({
-      alpha: -Math.PI / 2,
-      beta: 1.08,
-      radius: 60,
-      focusOffset: { x: 0, y: 8, z: 44 },
-      positionOffset: { x: 0, y: 26.3, z: -57 },
+      alpha: 0,
+      beta: 1.12,
+      radius: 7,
+      focusOffset: { x: 0, y: -0.35, z: 0 },
+      positionOffset: { x: 0, y: 2.25, z: -7 },
     });
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
     renderFrame?.();
