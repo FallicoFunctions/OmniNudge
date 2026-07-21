@@ -40,6 +40,10 @@ const OmniChatDiscoverPage = lazy(() => import('./pages/OmniChatDiscoverPage'));
 const OmniChatConversationsPage = lazy(() => import('./pages/OmniChatConversationsPage'));
 const OmniChatPage = lazy(() => import('./pages/OmniChatPage'));
 const OmniChatStudioPage = lazy(() => import('./pages/OmniChatStudioPage'));
+const OmniChatCreatePage = lazy(() => import('./pages/OmniChatCreatePage'));
+const OmniChatExplorePage = lazy(() => import('./pages/OmniChatExplorePage'));
+const OmniChatPublicationPage = lazy(() => import('./pages/OmniChatExplorePage').then((module) => ({ default: module.OmniChatPublicationPage })));
+const OmniChatGroupsPage = lazy(() => import('./pages/OmniChatGroupsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const BlockedUsersPage = lazy(() => import('./pages/BlockedUsersPage'));
 const FriendsPage = lazy(() => import('./pages/FriendsPage'));
@@ -242,6 +246,17 @@ function App() {
                                 </ProtectedRoute>
                               }
                             />
+                            <Route
+                              path="/omnichat/create"
+                              element={
+                                <ProtectedRoute>
+                                  <OmniChatCreatePage />
+                                </ProtectedRoute>
+                              }
+                            />
+                            <Route path="/omnichat/explore" element={<OmniChatExplorePage />} />
+                            <Route path="/omnichat/explore/:publicationId" element={<OmniChatPublicationPage />} />
+                            <Route path="/omnichat/groups" element={<ProtectedRoute><OmniChatGroupsPage /></ProtectedRoute>} />
                             <Route
                               path="/settings"
                               element={

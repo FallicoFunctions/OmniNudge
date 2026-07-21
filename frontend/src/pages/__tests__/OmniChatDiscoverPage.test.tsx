@@ -49,12 +49,12 @@ vi.mock('../../components/omnichat/OmniChatShell', () => ({
     children,
   }: {
     activeTab: string;
-    onTabChange: (tab: 'discover' | 'search' | 'chat' | 'studio') => void;
+    onTabChange: (tab: 'discover' | 'search' | 'chat' | 'characters') => void;
     children: React.ReactNode;
   }) => (
     <div>
       <div data-testid="active-tab">{activeTab}</div>
-      <button type="button" onClick={() => onTabChange('studio')}>
+      <button type="button" onClick={() => onTabChange('characters')}>
         Sidebar Studio
       </button>
       {children}

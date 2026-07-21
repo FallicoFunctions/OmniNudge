@@ -10,19 +10,25 @@ const {
   mockListConversations,
   mockGetConversation,
   mockSendMessage,
+  mockCreateGeneration,
+  mockGetGeneration,
   mockRegenerateMessage,
   mockEditMessage,
   mockDeleteConversation,
   mockDeletePersonaConversations,
+  mockPublishChat,
 } = vi.hoisted(() => ({
   mockListPersonas: vi.fn(),
   mockListConversations: vi.fn(),
   mockGetConversation: vi.fn(),
   mockSendMessage: vi.fn(),
+  mockCreateGeneration: vi.fn(),
+  mockGetGeneration: vi.fn(),
   mockRegenerateMessage: vi.fn(),
   mockEditMessage: vi.fn(),
   mockDeleteConversation: vi.fn(),
   mockDeletePersonaConversations: vi.fn(),
+  mockPublishChat: vi.fn(),
 }));
 
 let mockIsAuthenticated = true;
@@ -53,6 +59,9 @@ vi.mock('../../services/omnichatService', () => ({
     listConversations: (...args: unknown[]) => mockListConversations(...args),
     getConversation: (...args: unknown[]) => mockGetConversation(...args),
     sendMessage: (...args: unknown[]) => mockSendMessage(...args),
+    createGeneration: (...args: unknown[]) => mockCreateGeneration(...args),
+    getGeneration: (...args: unknown[]) => mockGetGeneration(...args),
+    publishChat: (...args: unknown[]) => mockPublishChat(...args),
     regenerateMessage: (...args: unknown[]) => mockRegenerateMessage(...args),
     editMessage: (...args: unknown[]) => mockEditMessage(...args),
     deleteConversation: (...args: unknown[]) => mockDeleteConversation(...args),
@@ -65,6 +74,9 @@ vi.mock('../../services/omnichatService', () => ({
     personas: () => ['omnichat', 'personas'],
     conversations: ['omnichat', 'conversations'],
     conversation: (id: number) => ['omnichat', 'conversation', id],
+    generation: (id: string) => ['omnichat', 'generation', id],
+    generations: ['omnichat', 'generations'],
+    gallery: () => ['omnichat', 'gallery', 'all'],
   },
 }));
 
@@ -81,6 +93,7 @@ function renderPage(initialEntry = '/omnichat/c/42') {
         <Routes>
           <Route path="/omnichat/chat" element={<OmniChatChatPage />} />
           <Route path="/omnichat/c/:conversationId" element={<OmniChatChatPage />} />
+          <Route path="/omnichat/explore/:publicationId" element={<div>Published chat</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -165,6 +178,38 @@ describe('OmniChatChatPage', () => {
       failed: false,
       created_at: '2026-07-02T10:16:00Z',
     });
+    mockCreateGeneration.mockResolvedValue({
+      id: 'generation-1',
+      owner_user_id: 1,
+      persona_id: 9,
+      conversation_id: 42,
+      source_message_id: 7,
+      kind: 'image',
+      mode: 'contextual',
+      status: 'queued',
+      prompt: 'Show me what your outfit looks like today',
+      aspect_ratio: '4:5',
+      scene: {},
+      progress: 0,
+      created_at: '2026-07-02T10:16:00Z',
+    });
+    mockGetGeneration.mockResolvedValue({
+      id: 'generation-1',
+      owner_user_id: 1,
+      persona_id: 9,
+      conversation_id: 42,
+      source_message_id: 7,
+      output_asset_id: 'asset-1',
+      kind: 'image',
+      mode: 'contextual',
+      status: 'succeeded',
+      prompt: 'Show me what your outfit looks like today',
+      aspect_ratio: '4:5',
+      scene: {},
+      progress: 100,
+      created_at: '2026-07-02T10:16:00Z',
+    });
+    mockPublishChat.mockResolvedValue({ id: 'publication-1' });
     mockRegenerateMessage.mockResolvedValue({
       id: 2,
       conversation_id: 42,
@@ -224,7 +269,9 @@ describe('OmniChatChatPage', () => {
     expect(localStorage.getItem('omnichat_profile_pane_collapsed')).toBeNull();
     expect(profilePane).toHaveClass('fixed');
     expect(profilePane).toHaveClass('right-0');
-    expect(chatGrid).toHaveStyle({ '--omnichat-chat-grid-columns': '320px minmax(520px, 1fr) 0px' });
+    expect(chatGrid).toHaveStyle({
+      '--omnichat-chat-grid-columns': '320px minmax(520px, 1fr) 0px',
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Open profile pane' }));
 
@@ -238,16 +285,22 @@ describe('OmniChatChatPage', () => {
     const chatGrid = await screen.findByTestId('omnichat-chat-grid');
     const collapseButton = screen.getByRole('button', { name: 'Collapse chat list' });
 
-    expect(chatGrid).toHaveStyle({ '--omnichat-chat-grid-columns': '340px minmax(520px, 1fr) 304px' });
+    expect(chatGrid).toHaveStyle({
+      '--omnichat-chat-grid-columns': '340px minmax(520px, 1fr) 304px',
+    });
 
     fireEvent.click(collapseButton);
 
-    expect(chatGrid).toHaveStyle({ '--omnichat-chat-grid-columns': '88px minmax(520px, 1fr) 304px' });
+    expect(chatGrid).toHaveStyle({
+      '--omnichat-chat-grid-columns': '88px minmax(520px, 1fr) 304px',
+    });
     expect(localStorage.getItem('omnichat_chat_list_collapsed')).toBe('true');
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand chat list' }));
 
-    expect(chatGrid).toHaveStyle({ '--omnichat-chat-grid-columns': '340px minmax(520px, 1fr) 304px' });
+    expect(chatGrid).toHaveStyle({
+      '--omnichat-chat-grid-columns': '340px minmax(520px, 1fr) 304px',
+    });
   });
 
   it('uses one pane at a time on mobile and can move between chat, list, and profile', async () => {
@@ -362,7 +415,9 @@ describe('OmniChatChatPage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('No conversations yet. Start chatting with a persona!')).toBeInTheDocument();
+    expect(
+      await screen.findByText('No conversations yet. Start chatting with a persona!')
+    ).toBeInTheDocument();
     expect(screen.queryByText('Deleted Persona Thread')).not.toBeInTheDocument();
     expect(screen.queryByText('Deleted Narrator')).not.toBeInTheDocument();
     expect(screen.queryByText('This stale conversation should be hidden.')).not.toBeInTheDocument();
@@ -514,7 +569,9 @@ describe('OmniChatChatPage', () => {
     renderPage();
 
     const rowButton = await screen.findByRole('button', { name: /Campfire Thread/i });
-    expect(within(rowButton).getByText('Latest fallback preview. Second sentence.')).toBeInTheDocument();
+    expect(
+      within(rowButton).getByText('Latest fallback preview. Second sentence.')
+    ).toBeInTheDocument();
     expect(screen.queryByText('No messages yet')).not.toBeInTheDocument();
   });
 
@@ -563,8 +620,12 @@ describe('OmniChatChatPage', () => {
 
     renderPage();
 
-    const botBubble = (await screen.findAllByText('Bot reply text'))[0].closest('div[class*="rounded-[26px]"]');
-    const userBubble = (screen.getAllByText('User reply text')[0]).closest('div[class*="rounded-[26px]"]');
+    const botBubble = (await screen.findAllByText('Bot reply text'))[0].closest(
+      'div[class*="rounded-[26px]"]'
+    );
+    const userBubble = screen
+      .getAllByText('User reply text')[0]
+      .closest('div[class*="rounded-[26px]"]');
 
     expect(botBubble).toHaveClass('text-white');
     expect(userBubble).toHaveClass('text-white');
@@ -581,6 +642,31 @@ describe('OmniChatChatPage', () => {
     expect(await screen.findByText('Hello from the launch test.')).toBeInTheDocument();
     expect(await screen.findByText('Reply from the bot.')).toBeInTheDocument();
     expect(mockSendMessage).toHaveBeenCalledWith(42, 'Hello from the launch test.');
+    expect(mockSendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('turns an explicit in-chat photo request into contextual scene generation', async () => {
+    renderPage();
+
+    const composer = await screen.findByPlaceholderText('Say or do something...');
+    fireEvent.change(composer, {
+      target: { value: 'Show me what your outfit looks like today' },
+    });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() =>
+      expect(mockCreateGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'image',
+          mode: 'contextual',
+          persona_id: 9,
+          conversation_id: 42,
+          source_message_id: 7,
+          prompt: 'Show me what your outfit looks like today',
+        })
+      )
+    );
+    expect(mockSendMessage).toHaveBeenCalledTimes(1);
   });
 
   it('regenerates only the latest assistant reply and replaces it in place', async () => {
@@ -618,7 +704,11 @@ describe('OmniChatChatPage', () => {
     expect(await screen.findByText('The original weak reply.')).toBeInTheDocument();
     const regenerateButton = screen.getByRole('button', { name: 'Regenerate response' });
     expect(regenerateButton.parentElement).toHaveClass(
-      'absolute', 'left-1', 'top-full', 'md:opacity-0', 'md:group-hover/message:opacity-100'
+      'absolute',
+      'left-1',
+      'top-full',
+      'md:opacity-0',
+      'md:group-hover/message:opacity-100'
     );
     fireEvent.click(regenerateButton);
 
@@ -639,8 +729,22 @@ describe('OmniChatChatPage', () => {
         last_message_at: '2026-07-02T10:15:00Z',
       },
       messages: [
-        { id: 1, conversation_id: 42, role: 'user', content: 'Say it naturally.', failed: false, created_at: '2026-07-02T10:15:00Z' },
-        { id: 2, conversation_id: 42, role: 'assistant', content: 'An awkward reply.', failed: false, created_at: '2026-07-02T10:16:00Z' },
+        {
+          id: 1,
+          conversation_id: 42,
+          role: 'user',
+          content: 'Say it naturally.',
+          failed: false,
+          created_at: '2026-07-02T10:15:00Z',
+        },
+        {
+          id: 2,
+          conversation_id: 42,
+          role: 'assistant',
+          content: 'An awkward reply.',
+          failed: false,
+          created_at: '2026-07-02T10:16:00Z',
+        },
       ],
     });
 
@@ -655,7 +759,9 @@ describe('OmniChatChatPage', () => {
     fireEvent.change(editor, { target: { value: 'A user-corrected reply.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(mockEditMessage).toHaveBeenCalledWith(42, 2, 'A user-corrected reply.'));
+    await waitFor(() =>
+      expect(mockEditMessage).toHaveBeenCalledWith(42, 2, 'A user-corrected reply.')
+    );
     expect(await screen.findByText('A user-corrected reply.')).toBeInTheDocument();
     expect(screen.queryByText('An awkward reply.')).not.toBeInTheDocument();
   });
@@ -728,5 +834,46 @@ describe('OmniChatChatPage', () => {
 
     await waitFor(() => expect(mockDeletePersonaConversations).toHaveBeenCalledWith(9));
     expect(mockDeleteConversation).not.toHaveBeenCalled();
+  });
+
+  it('requires explicit confirmation before publishing private chat messages', async () => {
+    mockGetConversation.mockResolvedValueOnce({
+      conversation: {
+        id: 42,
+        user_id: 1,
+        persona_id: 9,
+        title: 'Campfire Thread',
+        created_at: '2026-07-02T10:00:00Z',
+        last_message_at: '2026-07-02T10:15:00Z',
+      },
+      messages: [
+        {
+          id: 1,
+          conversation_id: 42,
+          role: 'user',
+          content: 'A private thought.',
+          failed: false,
+          created_at: '2026-07-02T10:15:00Z',
+        },
+        {
+          id: 2,
+          conversation_id: 42,
+          role: 'assistant',
+          content: 'A private reply.',
+          failed: false,
+          created_at: '2026-07-02T10:16:00Z',
+        },
+      ],
+    });
+
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish this chat to Explore' }));
+
+    expect(mockPublishChat).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Publish chat to Explore' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Publish 2 messages' }));
+    await waitFor(() =>
+      expect(mockPublishChat).toHaveBeenCalledWith(42, [1, 2], 'Campfire Thread')
+    );
   });
 });

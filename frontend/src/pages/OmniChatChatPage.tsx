@@ -1,18 +1,31 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+} from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   ChevronLeft,
   ChevronRight,
+  Film,
+  Image as ImageIcon,
   Loader2,
   Check,
   Pencil,
+  Phone,
   Plus,
   RotateCcw,
   Search,
   Settings,
+  Share2,
   Trash2,
+  Video as VideoIcon,
   X,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -20,8 +33,12 @@ import PersonaAvatar from '../components/omnichat/PersonaAvatar';
 import SearchOverlay from '../components/omnichat/SearchOverlay';
 import ChatSettingsModal from '../components/omnichat/ChatSettingsModal';
 import OmniChatMessageContent from '../components/omnichat/OmniChatMessageContent';
+import OmniChatMediaAssetView from '../components/omnichat/OmniChatMediaAssetView';
+import OmniChatSpeakButton from '../components/omnichat/OmniChatSpeakButton';
+import OmniChatCallModal from '../components/omnichat/OmniChatCallModal';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { Modal } from '../components/common/Modal';
 import { useAuth } from '../contexts/AuthContext';
 import { omnichatService, omnichatQueryKeys } from '../services/omnichatService';
 import type {
@@ -30,6 +47,8 @@ import type {
   BotMessage,
   BotPersona,
   OmniChatRegenerationTokenPayload,
+  OmniChatGenerationJob,
+  OmniChatMediaKind,
   OmniChatTokenPayload,
 } from '../types/omnichat';
 import {
@@ -46,6 +65,7 @@ import { loadOmniChatDefaults } from '../utils/omnichatDefaults';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { OMNICHAT_PERSONA_TRANSITION_NAME } from '../utils/omnichatViewTransitions';
+import { detectOmniChatMediaIntent } from '../utils/omnichatMediaIntent';
 
 type ChatFilter = 'all' | 'unread' | 'favorites';
 type ProfileTab = 'profile' | 'gallery';
@@ -65,8 +85,14 @@ function GeneratingIndicator() {
   return (
     <div className="flex gap-1 px-1 py-2">
       <span className="h-2 w-2 animate-bounce-dot rounded-full bg-white/45" />
-      <span className="h-2 w-2 animate-bounce-dot rounded-full bg-white/45" style={{ animationDelay: '0.15s' }} />
-      <span className="h-2 w-2 animate-bounce-dot rounded-full bg-white/45" style={{ animationDelay: '0.3s' }} />
+      <span
+        className="h-2 w-2 animate-bounce-dot rounded-full bg-white/45"
+        style={{ animationDelay: '0.15s' }}
+      />
+      <span
+        className="h-2 w-2 animate-bounce-dot rounded-full bg-white/45"
+        style={{ animationDelay: '0.3s' }}
+      />
     </div>
   );
 }
@@ -161,19 +187,24 @@ function ConversationRow({
             type="button"
             tabIndex={deleteStage ? -1 : 0}
             onClick={onClick}
-            title={compact ? conversation.title || conversation.persona?.name || 'Unknown' : undefined}
+            title={
+              compact ? conversation.title || conversation.persona?.name || 'Unknown' : undefined
+            }
             className={`flex w-full items-center rounded-[24px] border text-left transition ${
               compact ? 'justify-center px-2 py-3' : 'gap-3 px-5 py-2.5'
             } ${
               deleteZoneHovered
                 ? 'border-red-400/30 bg-red-500/10 text-white'
                 : active
-                ? 'border-white/15 bg-white/8 shadow-[0_18px_60px_rgba(0,0,0,0.22)]'
-                : 'border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.04]'
+                  ? 'border-white/15 bg-white/8 shadow-[0_18px_60px_rgba(0,0,0,0.22)]'
+                  : 'border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.04]'
             }`}
           >
             {conversation.persona && (
-              <PersonaAvatar persona={conversation.persona} className="h-10 w-10 flex-shrink-0 rounded-full" />
+              <PersonaAvatar
+                persona={conversation.persona}
+                className="h-10 w-10 flex-shrink-0 rounded-full"
+              />
             )}
             {!compact && (
               <div className="min-w-0 flex-1">
@@ -317,6 +348,15 @@ export default function OmniChatChatPage() {
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [newChatMenuOpen, setNewChatMenuOpen] = useState(false);
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
+  const [mediaGenerationError, setMediaGenerationError] = useState<string | null>(null);
+  const [shareChatError, setShareChatError] = useState('');
+  const [pendingChatShare, setPendingChatShare] = useState<{
+    conversationId: number;
+    messageIds: number[];
+    title: string;
+  } | null>(null);
+  const [callMode, setCallMode] = useState<'voice' | 'video' | null>(null);
+  const [activeMediaJob, setActiveMediaJob] = useState<OmniChatGenerationJob | null>(null);
   const [guestMessages, setGuestMessages] = useState<BotMessage[]>([]);
   const [guestPersona, setGuestPersona] = useState<BotPersona | null>(null);
   const [guestPersonaLoading, setGuestPersonaLoading] = useState(false);
@@ -336,11 +376,19 @@ export default function OmniChatChatPage() {
   const [mobilePane, setMobilePane] = useState<MobileChatPane>(() =>
     conversationId ? 'chat' : 'list'
   );
-  const [storedGuestPersonaIds, setStoredGuestPersonaIds] = useState<number[]>(() => getGuestPersonaIds());
+  const [storedGuestPersonaIds, setStoredGuestPersonaIds] = useState<number[]>(() =>
+    getGuestPersonaIds()
+  );
   const persistedGuest = useRef(false);
   const nextOptimisticId = useRef(-1);
   const scrollRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const pendingMediaIntentRef = useRef<{
+    kind: OmniChatMediaKind;
+    prompt: string;
+    conversationId: number;
+    personaId: number;
+  } | null>(null);
 
   const personasQuery = useQuery({
     queryKey: omnichatQueryKeys.personas(),
@@ -458,7 +506,9 @@ export default function OmniChatChatPage() {
     () =>
       selectedConversationId === null
         ? null
-        : filteredConversations.find((conversation) => conversation.id === selectedConversationId) ?? null,
+        : (filteredConversations.find(
+            (conversation) => conversation.id === selectedConversationId
+          ) ?? null),
     [filteredConversations, selectedConversationId]
   );
 
@@ -466,10 +516,7 @@ export default function OmniChatChatPage() {
     queries: filteredConversations.map((conversation) => ({
       queryKey: omnichatQueryKeys.conversation(conversation.id),
       queryFn: () => omnichatService.getConversation(conversation.id),
-      enabled:
-        isAuthenticated &&
-        !isGuest &&
-        !conversation.last_message_preview,
+      enabled: isAuthenticated && !isGuest && !conversation.last_message_preview,
       staleTime: 60_000,
     })),
   });
@@ -486,8 +533,7 @@ export default function OmniChatChatPage() {
         continue;
       }
 
-      const detailPreview =
-        conversationPreviewQueries[index]?.data?.messages.at(-1)?.content;
+      const detailPreview = conversationPreviewQueries[index]?.data?.messages.at(-1)?.content;
       previews.set(conversation.id, getConversationPreview(detailPreview, fallback));
     }
 
@@ -537,13 +583,24 @@ export default function OmniChatChatPage() {
   }, [guestMessages.length, guestPersona, isGuest]);
 
   useEffect(() => {
-    if (!isGuest || !isAuthenticated || !guestPersona || guestMessages.length === 0 || persistedGuest.current) {
+    if (
+      !isGuest ||
+      !isAuthenticated ||
+      !guestPersona ||
+      guestMessages.length === 0 ||
+      persistedGuest.current
+    ) {
       return;
     }
 
     persistedGuest.current = true;
     omnichatService
-      .createConversationWithMessages(guestPersona.id, guestMessages, undefined, loadOmniChatDefaults('authenticated'))
+      .createConversationWithMessages(
+        guestPersona.id,
+        guestMessages,
+        undefined,
+        loadOmniChatDefaults('authenticated')
+      )
       .then((conversation) => {
         clearGuestMessages(guestPersona.id);
         queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
@@ -653,8 +710,42 @@ export default function OmniChatChatPage() {
     return () => document.removeEventListener('click', handler);
   }, [newChatMenuOpen]);
 
+  const mediaGenerationMutation = useMutation({
+    mutationFn: (request: Parameters<typeof omnichatService.createGeneration>[0]) =>
+      omnichatService.createGeneration(request),
+    onMutate: () => setMediaGenerationError(null),
+    onSuccess: (job) => setActiveMediaJob(job),
+    onError: () =>
+      setMediaGenerationError('Scene generation could not be started. Please try again.'),
+  });
+
+  const activeMediaJobQuery = useQuery({
+    queryKey: omnichatQueryKeys.generation(activeMediaJob?.id ?? 'none'),
+    queryFn: () => omnichatService.getGeneration(activeMediaJob!.id),
+    enabled: Boolean(
+      activeMediaJob && !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status)
+    ),
+    refetchInterval: 2000,
+  });
+
+  useEffect(() => {
+    const job = activeMediaJobQuery.data;
+    if (!job) return;
+    setActiveMediaJob(job);
+    if (job.status === 'succeeded' && job.conversation_id) {
+      void queryClient.invalidateQueries({
+        queryKey: omnichatQueryKeys.conversation(job.conversation_id),
+      });
+      void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.gallery() });
+    }
+    if (job.status === 'failed') {
+      setMediaGenerationError('The scene could not be generated. Try adjusting the request.');
+    }
+  }, [activeMediaJobQuery.data, queryClient]);
+
   const sendMessageMutation = useMutation({
-    mutationFn: (content: string) => omnichatService.sendMessage(selectedConversationId as number, content),
+    mutationFn: (content: string) =>
+      omnichatService.sendMessage(selectedConversationId as number, content),
     onSuccess: (assistantMessage) => {
       queryClient.setQueryData<BotConversationDetail | undefined>(
         omnichatQueryKeys.conversation(selectedConversationId as number),
@@ -666,8 +757,27 @@ export default function OmniChatChatPage() {
       );
       queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
       setStreamingText('');
+      const pendingIntent = pendingMediaIntentRef.current;
+      pendingMediaIntentRef.current = null;
+      if (
+        pendingIntent &&
+        !assistantMessage.failed &&
+        pendingIntent.conversationId === assistantMessage.conversation_id
+      ) {
+        mediaGenerationMutation.mutate({
+          kind: pendingIntent.kind,
+          mode: 'contextual',
+          persona_id: pendingIntent.personaId,
+          conversation_id: pendingIntent.conversationId,
+          source_message_id: assistantMessage.id,
+          prompt: pendingIntent.prompt,
+          aspect_ratio: pendingIntent.kind === 'video' ? '16:9' : '4:5',
+          duration_seconds: pendingIntent.kind === 'video' ? 5 : undefined,
+        });
+      }
     },
     onError: (error) => {
+      pendingMediaIntentRef.current = null;
       setStreamingText('');
       const err = error as Error & { status?: number };
       setRateLimitError(err.status === 429 ? 'rateLimited' : null);
@@ -719,14 +829,15 @@ export default function OmniChatChatPage() {
     onSuccess: (message) => {
       queryClient.setQueryData<BotConversationDetail | undefined>(
         omnichatQueryKeys.conversation(message.conversation_id),
-        (prev) => prev
-          ? {
-              ...prev,
-              messages: prev.messages.map((candidate) =>
-                candidate.id === message.id ? message : candidate
-              ),
-            }
-          : prev
+        (prev) =>
+          prev
+            ? {
+                ...prev,
+                messages: prev.messages.map((candidate) =>
+                  candidate.id === message.id ? message : candidate
+                ),
+              }
+            : prev
       );
       queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
       setEditingMessageId(null);
@@ -737,7 +848,13 @@ export default function OmniChatChatPage() {
   });
 
   const deletePreviewMutation = useMutation({
-    mutationFn: ({ scope, conversation }: { scope: PreviewDeleteScope; conversation: ActiveBotConversation }) =>
+    mutationFn: ({
+      scope,
+      conversation,
+    }: {
+      scope: PreviewDeleteScope;
+      conversation: ActiveBotConversation;
+    }) =>
       scope === 'all'
         ? omnichatService.deletePersonaConversations(conversation.persona_id)
         : omnichatService.deleteConversation(conversation.id),
@@ -750,7 +867,9 @@ export default function OmniChatChatPage() {
           }
           return candidate.id !== conversation.id;
         })
-        .sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+        .sort(
+          (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
+        );
 
       queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
       queryClient.removeQueries({ queryKey: omnichatQueryKeys.conversation(conversation.id) });
@@ -813,19 +932,24 @@ export default function OmniChatChatPage() {
       return;
     }
 
-    const personaId = conversationQuery.data?.conversation.persona_id ?? selectedConversation?.persona_id;
+    const personaId =
+      conversationQuery.data?.conversation.persona_id ?? selectedConversation?.persona_id;
     if (!personaId) return;
 
-    omnichatService.createConversation(
-      personaId,
-      undefined,
-      true,
-      loadOmniChatDefaults('authenticated')
-    ).then((conversation) => {
-      queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
-      navigate(`/omnichat/c/${conversation.id}`);
-    });
-  }, [conversationQuery.data?.conversation.persona_id, guestPersona, isGuest, navigate, queryClient, selectedConversation?.persona_id]);
+    omnichatService
+      .createConversation(personaId, undefined, true, loadOmniChatDefaults('authenticated'))
+      .then((conversation) => {
+        queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
+        navigate(`/omnichat/c/${conversation.id}`);
+      });
+  }, [
+    conversationQuery.data?.conversation.persona_id,
+    guestPersona,
+    isGuest,
+    navigate,
+    queryClient,
+    selectedConversation?.persona_id,
+  ]);
 
   const handleForkChat = useCallback(() => {
     setNewChatMenuOpen(false);
@@ -838,19 +962,78 @@ export default function OmniChatChatPage() {
       return;
     }
     if (!selectedConversationId) return;
-    omnichatService
-      .forkConversation(selectedConversationId)
-      .then((conversation) => {
-        queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
-        navigate(`/omnichat/c/${conversation.id}`);
-      });
-  }, [isGuest, guestPersona, guestPersonaId, guestMessages, selectedConversationId, navigate, queryClient]);
+    omnichatService.forkConversation(selectedConversationId).then((conversation) => {
+      queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
+      navigate(`/omnichat/c/${conversation.id}`);
+    });
+  }, [
+    isGuest,
+    guestPersona,
+    guestPersonaId,
+    guestMessages,
+    selectedConversationId,
+    navigate,
+    queryClient,
+  ]);
 
   const activePersona = isGuest
     ? guestPersona
-    : activePersonaById.get(
+    : (activePersonaById.get(
         Number(conversationQuery.data?.conversation.persona_id ?? selectedConversation?.persona_id)
-      ) ?? null;
+      ) ?? null);
+
+  const shareChatMutation = useMutation({
+    mutationFn: ({
+      conversationId,
+      messageIds,
+      title,
+    }: {
+      conversationId: number;
+      messageIds: number[];
+      title: string;
+    }) => omnichatService.publishChat(conversationId, messageIds, title),
+    onSuccess: (publication) => {
+      setPendingChatShare(null);
+      navigate(`/omnichat/explore/${publication.id}`);
+    },
+    onError: () =>
+      setShareChatError('This chat could not be published. Please review it and try again.'),
+  });
+
+  const handleShareChat = useCallback(() => {
+    if (!selectedConversationId || !activePersona) return;
+    const messageIds = (conversationQuery.data?.messages ?? [])
+      .filter((message) => message.id > 0 && !message.failed)
+      .slice(-100)
+      .map((message) => message.id);
+    if (messageIds.length === 0) return;
+    setShareChatError('');
+    setPendingChatShare({
+      conversationId: selectedConversationId,
+      messageIds,
+      title:
+        conversationQuery.data?.conversation.title?.trim() || `A chat with ${activePersona.name}`,
+    });
+  }, [activePersona, conversationQuery.data, selectedConversationId]);
+
+  const generateCurrentScene = useCallback(
+    (kind: OmniChatMediaKind) => {
+      if (!selectedConversationId || !activePersona || isGuest) return;
+      mediaGenerationMutation.mutate({
+        kind,
+        mode: 'contextual',
+        persona_id: activePersona.id,
+        conversation_id: selectedConversationId,
+        prompt:
+          kind === 'video'
+            ? 'Show the current scene in motion, preserving the character, setting, outfit, mood, and activity.'
+            : 'Show the current scene as a candid photo, preserving the character, setting, outfit, mood, and activity.',
+        aspect_ratio: kind === 'video' ? '16:9' : '4:5',
+        duration_seconds: kind === 'video' ? 5 : undefined,
+      });
+    },
+    [activePersona, isGuest, mediaGenerationMutation, selectedConversationId]
+  );
 
   const handleSubmit = useCallback(
     (event: FormEvent) => {
@@ -879,7 +1062,10 @@ export default function OmniChatChatPage() {
           .sendPreviewMessage({
             persona_id: guestPersona.id,
             content,
-            history: guestMessages.map((message) => ({ role: message.role, content: message.content })),
+            history: guestMessages.map((message) => ({
+              role: message.role,
+              content: message.content,
+            })),
           })
           .then((response) => {
             setGuestMessages((prev) => [
@@ -901,6 +1087,16 @@ export default function OmniChatChatPage() {
       }
 
       if (!selectedConversationId || !activePersona) return;
+
+      const mediaIntent = detectOmniChatMediaIntent(content);
+      pendingMediaIntentRef.current = mediaIntent
+        ? {
+            kind: mediaIntent,
+            prompt: content,
+            conversationId: selectedConversationId,
+            personaId: activePersona.id,
+          }
+        : null;
 
       queryClient.setQueryData<BotConversationDetail | undefined>(
         omnichatQueryKeys.conversation(selectedConversationId),
@@ -925,7 +1121,16 @@ export default function OmniChatChatPage() {
 
       sendMessageMutation.mutate(content);
     },
-    [activePersona, draft, guestMessages, guestPersona, isGuest, queryClient, selectedConversationId, sendMessageMutation]
+    [
+      activePersona,
+      draft,
+      guestMessages,
+      guestPersona,
+      isGuest,
+      queryClient,
+      selectedConversationId,
+      sendMessageMutation,
+    ]
   );
 
   const galleryUrls = (activePersona?.gallery_urls ?? []).filter(Boolean);
@@ -1008,12 +1213,15 @@ export default function OmniChatChatPage() {
     ]
   );
 
-  const beginEdit = useCallback((message: BotMessage) => {
-    if (message.id !== regeneratableMessageId || regeneratingMessageId !== null) return;
-    setEditingMessageId(message.id);
-    setEditDraft(message.content);
-    setEditError(false);
-  }, [regeneratableMessageId, regeneratingMessageId]);
+  const beginEdit = useCallback(
+    (message: BotMessage) => {
+      if (message.id !== regeneratableMessageId || regeneratingMessageId !== null) return;
+      setEditingMessageId(message.id);
+      setEditDraft(message.content);
+      setEditError(false);
+    },
+    [regeneratableMessageId, regeneratingMessageId]
+  );
 
   const cancelEdit = useCallback(() => {
     if (editMessageMutation.isPending) return;
@@ -1022,21 +1230,26 @@ export default function OmniChatChatPage() {
     setEditError(false);
   }, [editMessageMutation.isPending]);
 
-  const saveEdit = useCallback((messageId: number) => {
-    const content = editDraft.trim();
-    if (!content || content.length > 4000 || editMessageMutation.isPending) return;
-    setEditError(false);
-    if (isGuest) {
-      setGuestMessages((messages) => messages.map((message) =>
-        message.id === messageId ? { ...message, content, failed: false } : message
-      ));
-      setEditingMessageId(null);
-      setEditDraft('');
-      return;
-    }
-    if (!selectedConversationId) return;
-    editMessageMutation.mutate({ messageId, content });
-  }, [editDraft, editMessageMutation, isGuest, selectedConversationId]);
+  const saveEdit = useCallback(
+    (messageId: number) => {
+      const content = editDraft.trim();
+      if (!content || content.length > 4000 || editMessageMutation.isPending) return;
+      setEditError(false);
+      if (isGuest) {
+        setGuestMessages((messages) =>
+          messages.map((message) =>
+            message.id === messageId ? { ...message, content, failed: false } : message
+          )
+        );
+        setEditingMessageId(null);
+        setEditDraft('');
+        return;
+      }
+      if (!selectedConversationId) return;
+      editMessageMutation.mutate({ messageId, content });
+    },
+    [editDraft, editMessageMutation, isGuest, selectedConversationId]
+  );
 
   const activeConversationSettings = conversationQuery.data?.conversation.settings;
   const isLoadingConversation = isGuest ? guestPersonaLoading : conversationQuery.isLoading;
@@ -1067,7 +1280,10 @@ export default function OmniChatChatPage() {
         if (tab === 'discover') navigate('/omnichat');
         if (tab === 'search') setSearchOverlayOpen(true);
         if (tab === 'chat') navigate('/omnichat/chat');
-        if (tab === 'studio') navigate('/omnichat/studio');
+        if (tab === 'groups') navigate('/omnichat/groups');
+        if (tab === 'characters') navigate('/omnichat/studio');
+        if (tab === 'create') navigate('/omnichat/create');
+        if (tab === 'explore') navigate('/omnichat/explore');
       }}
     >
       <div className="h-[calc(100dvh-var(--omnichat-header-offset))] overflow-hidden bg-[#111114]">
@@ -1086,8 +1302,12 @@ export default function OmniChatChatPage() {
               showMobileListPane ? 'flex' : 'hidden lg:flex'
             }`}
           >
-            <div className={`omnichat-safe-bottom flex h-full w-full flex-col overflow-hidden pt-4 ${effectiveChatListCollapsed ? 'px-2' : ''}`}>
-              <div className={`flex items-center justify-between gap-3 ${effectiveChatListCollapsed ? 'px-0' : 'px-4'}`}>
+            <div
+              className={`omnichat-safe-bottom flex h-full w-full flex-col overflow-hidden pt-4 ${effectiveChatListCollapsed ? 'px-2' : ''}`}
+            >
+              <div
+                className={`flex items-center justify-between gap-3 ${effectiveChatListCollapsed ? 'px-0' : 'px-4'}`}
+              >
                 {effectiveChatListCollapsed ? (
                   <button
                     type="button"
@@ -1126,7 +1346,10 @@ export default function OmniChatChatPage() {
               {!effectiveChatListCollapsed && (
                 <>
                   <div className="relative mt-5 px-4">
-                    <Search size={16} className="absolute left-8 top-1/2 -translate-y-1/2 text-white/35" />
+                    <Search
+                      size={16}
+                      className="absolute left-8 top-1/2 -translate-y-1/2 text-white/35"
+                    />
                     <input
                       type="text"
                       value={directoryQuery}
@@ -1141,60 +1364,72 @@ export default function OmniChatChatPage() {
                       const supported = filter === 'all';
                       const active = directoryFilter === filter;
                       return (
-                      <button
-                        key={filter}
-                        type="button"
-                        onClick={() => {
-                          if (supported) setDirectoryFilter(filter);
-                        }}
-                        disabled={!supported}
-                        className={`omnichat-touch-target rounded-full border px-4 text-sm font-semibold transition ${
-                          active
-                            ? 'border-rose-400 bg-transparent text-white'
-                            : supported
-                              ? 'border-transparent bg-white/[0.06] text-white/70 hover:bg-white/[0.09]'
-                              : 'border-transparent bg-white/[0.04] text-white/35'
-                        }`}
-                      >
-                        {t(`omnichat.conversationsPage.filters.${filter}`)}
-                      </button>
+                        <button
+                          key={filter}
+                          type="button"
+                          onClick={() => {
+                            if (supported) setDirectoryFilter(filter);
+                          }}
+                          disabled={!supported}
+                          className={`omnichat-touch-target rounded-full border px-4 text-sm font-semibold transition ${
+                            active
+                              ? 'border-rose-400 bg-transparent text-white'
+                              : supported
+                                ? 'border-transparent bg-white/[0.06] text-white/70 hover:bg-white/[0.09]'
+                                : 'border-transparent bg-white/[0.04] text-white/35'
+                          }`}
+                        >
+                          {t(`omnichat.conversationsPage.filters.${filter}`)}
+                        </button>
                       );
                     })}
                   </div>
                 </>
               )}
 
-              <div className={`min-h-0 flex-1 space-y-1.5 overscroll-y-contain overflow-y-auto ${effectiveChatListCollapsed ? 'mt-4' : 'mt-5'}`}>
-                {!isAuthenticated ? personasQuery.isLoading ? (
-                  <LoadingMessage>{t('common.loading')}</LoadingMessage>
-                ) : personasQuery.isError ? (
-                  <ErrorMessage>{t('omnichat.discover.loadError')}</ErrorMessage>
-                ) : filteredGuestPersonas.length === 0 ? (
-                  <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 text-sm text-white/60">
-                    {t('omnichat.conversationsPage.empty')}
-                  </div>
-                ) : (
-                  filteredGuestPersonas.map((persona) => (
-                    <button
-                      key={persona.id}
-                      type="button"
-                      onClick={() => handleSelectPersona(persona)}
-                      title={effectiveChatListCollapsed ? persona.name : undefined}
-                      className={`flex w-full items-center rounded-[24px] border border-transparent text-left transition hover:border-white/10 hover:bg-white/[0.04] ${
-                        effectiveChatListCollapsed ? 'justify-center px-2 py-3' : 'gap-3 px-3 py-3'
-                      }`}
-                    >
-                      <PersonaAvatar persona={persona} className="h-12 w-12 flex-shrink-0 rounded-full" />
-                      {!effectiveChatListCollapsed && (
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-base font-semibold text-white">{persona.name}</p>
-                          <p className="mt-0.5 truncate text-sm text-white/58">
-                            {guestMessagePreviews.get(persona.id) || t('omnichat.conversationsPage.noMessages')}
-                          </p>
-                        </div>
-                      )}
-                    </button>
-                  ))
+              <div
+                className={`min-h-0 flex-1 space-y-1.5 overscroll-y-contain overflow-y-auto ${effectiveChatListCollapsed ? 'mt-4' : 'mt-5'}`}
+              >
+                {!isAuthenticated ? (
+                  personasQuery.isLoading ? (
+                    <LoadingMessage>{t('common.loading')}</LoadingMessage>
+                  ) : personasQuery.isError ? (
+                    <ErrorMessage>{t('omnichat.discover.loadError')}</ErrorMessage>
+                  ) : filteredGuestPersonas.length === 0 ? (
+                    <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 text-sm text-white/60">
+                      {t('omnichat.conversationsPage.empty')}
+                    </div>
+                  ) : (
+                    filteredGuestPersonas.map((persona) => (
+                      <button
+                        key={persona.id}
+                        type="button"
+                        onClick={() => handleSelectPersona(persona)}
+                        title={effectiveChatListCollapsed ? persona.name : undefined}
+                        className={`flex w-full items-center rounded-[24px] border border-transparent text-left transition hover:border-white/10 hover:bg-white/[0.04] ${
+                          effectiveChatListCollapsed
+                            ? 'justify-center px-2 py-3'
+                            : 'gap-3 px-3 py-3'
+                        }`}
+                      >
+                        <PersonaAvatar
+                          persona={persona}
+                          className="h-12 w-12 flex-shrink-0 rounded-full"
+                        />
+                        {!effectiveChatListCollapsed && (
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-base font-semibold text-white">
+                              {persona.name}
+                            </p>
+                            <p className="mt-0.5 truncate text-sm text-white/58">
+                              {guestMessagePreviews.get(persona.id) ||
+                                t('omnichat.conversationsPage.noMessages')}
+                            </p>
+                          </div>
+                        )}
+                      </button>
+                    ))
+                  )
                 ) : conversationsQuery.isLoading ? (
                   <LoadingMessage>{t('common.loading')}</LoadingMessage>
                 ) : conversationsQuery.isError ? (
@@ -1222,8 +1457,12 @@ export default function OmniChatChatPage() {
                         navigate(`/omnichat/c/${conversation.id}`);
                         if (mobileChatMode) setMobilePane('chat');
                       }}
-                      onDeleteOne={() => deletePreviewMutation.mutate({ scope: 'one', conversation })}
-                      onDeleteAll={() => deletePreviewMutation.mutate({ scope: 'all', conversation })}
+                      onDeleteOne={() =>
+                        deletePreviewMutation.mutate({ scope: 'one', conversation })
+                      }
+                      onDeleteAll={() =>
+                        deletePreviewMutation.mutate({ scope: 'all', conversation })
+                      }
                     />
                   ))
                 )}
@@ -1286,8 +1525,78 @@ export default function OmniChatChatPage() {
                   </div>
                 </div>
 
+                {mobileChatMode && isAuthenticated && activePersona && selectedConversationId && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setCallMode('voice')}
+                      aria-label={`Voice call ${activePersona.name}`}
+                      className="rounded-full p-2 text-white/70"
+                    >
+                      <Phone size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCallMode('video')}
+                      aria-label={`Video call ${activePersona.name}`}
+                      className="rounded-full p-2 text-white/70"
+                    >
+                      <VideoIcon size={19} />
+                    </button>
+                    {(conversationQuery.data?.messages.length ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleShareChat}
+                        disabled={shareChatMutation.isPending}
+                        aria-label="Publish this chat to Explore"
+                        className="rounded-full p-2 text-white/70 disabled:opacity-40"
+                      >
+                        <Share2 size={18} />
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {!mobileChatMode && (
                   <div className="hidden items-center gap-3 lg:flex">
+                    {isAuthenticated && activePersona && selectedConversationId && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setCallMode('voice')}
+                          title={`Call ${activePersona.name}`}
+                          aria-label={`Voice call ${activePersona.name}`}
+                          className="rounded-full p-2.5 text-white/75 hover:bg-white/5 hover:text-white"
+                        >
+                          <Phone size={19} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCallMode('video')}
+                          title={`Video call ${activePersona.name}`}
+                          aria-label={`Video call ${activePersona.name}`}
+                          className="rounded-full p-2.5 text-white/75 hover:bg-white/5 hover:text-white"
+                        >
+                          <VideoIcon size={20} />
+                        </button>
+                      </>
+                    )}
+                    {isAuthenticated && (conversationQuery.data?.messages.length ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleShareChat}
+                        disabled={shareChatMutation.isPending}
+                        title="Publish this chat to Explore"
+                        aria-label="Publish this chat to Explore"
+                        className="rounded-full p-2.5 text-white/75 hover:bg-white/5 hover:text-white disabled:opacity-40"
+                      >
+                        {shareChatMutation.isPending ? (
+                          <Loader2 size={19} className="animate-spin" />
+                        ) : (
+                          <Share2 size={20} />
+                        )}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setShowSettings(true)}
@@ -1311,8 +1620,13 @@ export default function OmniChatChatPage() {
               </div>
             </div>
 
-            <div ref={scrollRef} className="min-h-0 flex-1 overscroll-y-contain overflow-y-auto px-5 py-5">
-              {isLoadingConversation && <LoadingMessage>{t('omnichat.chat.loading')}</LoadingMessage>}
+            <div
+              ref={scrollRef}
+              className="min-h-0 flex-1 overscroll-y-contain overflow-y-auto px-5 py-5"
+            >
+              {isLoadingConversation && (
+                <LoadingMessage>{t('omnichat.chat.loading')}</LoadingMessage>
+              )}
               {!isLoadingConversation && activeMessages.length === 0 && (
                 <div className="flex h-full items-center justify-center text-white/35">
                   {t('omnichat.chat.emptyWorkspace')}
@@ -1359,8 +1673,14 @@ export default function OmniChatChatPage() {
                                 }}
                                 className="min-h-28 w-full resize-y rounded-2xl border border-white/15 bg-black/20 px-3 py-2 text-sm leading-relaxed text-white outline-none focus:border-blue-400/70 focus:ring-2 focus:ring-blue-400/20"
                               />
-                              <p className="text-[11px] text-white/45">{t('omnichat.chat.editLearningHint')}</p>
-                              {editError && <p className="text-xs text-rose-400">{t('omnichat.chat.editFailed')}</p>}
+                              <p className="text-[11px] text-white/45">
+                                {t('omnichat.chat.editLearningHint')}
+                              </p>
+                              {editError && (
+                                <p className="text-xs text-rose-400">
+                                  {t('omnichat.chat.editFailed')}
+                                </p>
+                              )}
                               <div className="flex justify-end gap-2">
                                 <button
                                   type="button"
@@ -1376,7 +1696,11 @@ export default function OmniChatChatPage() {
                                   disabled={!editDraft.trim() || editMessageMutation.isPending}
                                   className="omnichat-touch-target flex items-center gap-1 rounded-full bg-blue-500 px-3 text-xs font-semibold text-white hover:bg-blue-400 disabled:opacity-40"
                                 >
-                                  {editMessageMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                                  {editMessageMutation.isPending ? (
+                                    <Loader2 size={13} className="animate-spin" />
+                                  ) : (
+                                    <Check size={13} />
+                                  )}
                                   {t('omnichat.chat.saveEdit')}
                                 </button>
                               </div>
@@ -1388,34 +1712,64 @@ export default function OmniChatChatPage() {
                               <GeneratingIndicator />
                             )
                           ) : (
-                            <OmniChatMessageContent content={message.content} />
+                            <>
+                              <OmniChatMessageContent content={message.content} />
+                              {message.attachments?.map((asset) => (
+                                <OmniChatMediaAssetView
+                                  key={asset.id}
+                                  asset={asset}
+                                  className="mt-3 max-h-[32rem] min-h-52 w-full min-w-[min(70vw,18rem)] sm:min-w-80"
+                                />
+                              ))}
+                            </>
                           )}
                         </div>
 
-                        {canRegenerate && !isEditingMessage && (
-                          <div className="absolute left-1 top-full mt-1 flex gap-1 opacity-60 transition md:opacity-0 md:group-hover/message:opacity-100">
-                            <button
-                              type="button"
-                              onClick={() => void handleRegenerate(message.id)}
-                              disabled={isGenerating || isEditing}
-                              aria-label={t('omnichat.chat.regenerateResponse')}
-                              title={t('omnichat.chat.regenerateResponse')}
-                              className="omnichat-touch-target flex items-center justify-center rounded-full border border-white/10 bg-[#24242a] text-white/60 shadow-lg shadow-black/25 transition hover:border-white/20 hover:bg-[#2d2d34] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 disabled:cursor-not-allowed disabled:opacity-40 md:h-7 md:min-h-0 md:w-7 md:min-w-0"
-                            >
-                              <RotateCcw size={14} className={isRegenerating ? 'animate-spin' : ''} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => beginEdit(message)}
-                              disabled={isGenerating || isEditing}
-                              aria-label={t('omnichat.chat.editResponse')}
-                              title={t('omnichat.chat.editResponse')}
-                              className="omnichat-touch-target flex items-center justify-center rounded-full border border-white/10 bg-[#24242a] text-white/60 shadow-lg shadow-black/25 transition hover:border-white/20 hover:bg-[#2d2d34] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 disabled:cursor-not-allowed disabled:opacity-40 md:h-7 md:min-h-0 md:w-7 md:min-w-0"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                          </div>
-                        )}
+                        {(canRegenerate ||
+                          (message.role === 'assistant' && !message.failed && message.id > 0)) &&
+                          !isEditingMessage && (
+                            <div className="absolute left-1 top-full mt-1 flex gap-1 opacity-60 transition md:opacity-0 md:group-hover/message:opacity-100">
+                              {canRegenerate && (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleRegenerate(message.id)}
+                                  disabled={isGenerating || isEditing}
+                                  aria-label={t('omnichat.chat.regenerateResponse')}
+                                  title={t('omnichat.chat.regenerateResponse')}
+                                  className="omnichat-touch-target flex items-center justify-center rounded-full border border-white/10 bg-[#24242a] text-white/60 shadow-lg shadow-black/25 transition hover:border-white/20 hover:bg-[#2d2d34] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 disabled:cursor-not-allowed disabled:opacity-40 md:h-7 md:min-h-0 md:w-7 md:min-w-0"
+                                >
+                                  <RotateCcw
+                                    size={14}
+                                    className={isRegenerating ? 'animate-spin' : ''}
+                                  />
+                                </button>
+                              )}
+                              {canRegenerate && (
+                                <button
+                                  type="button"
+                                  onClick={() => beginEdit(message)}
+                                  disabled={isGenerating || isEditing}
+                                  aria-label={t('omnichat.chat.editResponse')}
+                                  title={t('omnichat.chat.editResponse')}
+                                  className="omnichat-touch-target flex items-center justify-center rounded-full border border-white/10 bg-[#24242a] text-white/60 shadow-lg shadow-black/25 transition hover:border-white/20 hover:bg-[#2d2d34] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 disabled:cursor-not-allowed disabled:opacity-40 md:h-7 md:min-h-0 md:w-7 md:min-w-0"
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                              )}
+                              {message.role === 'assistant' &&
+                                !message.failed &&
+                                message.id > 0 &&
+                                activePersona &&
+                                selectedConversationId && (
+                                  <OmniChatSpeakButton
+                                    personaId={activePersona.id}
+                                    conversationId={selectedConversationId}
+                                    messageId={message.id}
+                                    text={message.content}
+                                  />
+                                )}
+                            </div>
+                          )}
                       </div>
                     </div>
                   );
@@ -1441,13 +1795,65 @@ export default function OmniChatChatPage() {
                   {t('omnichat.chat.signInPrompt')}
                 </p>
               )}
+              {shareChatError && (
+                <p className="mb-2 px-1 text-xs text-rose-300">{shareChatError}</p>
+              )}
+              {isAuthenticated && activePersona && selectedConversationId && (
+                <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+                  <button
+                    type="button"
+                    onClick={() => generateCurrentScene('image')}
+                    disabled={
+                      mediaGenerationMutation.isPending ||
+                      Boolean(
+                        activeMediaJob &&
+                        !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status)
+                      )
+                    }
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+                  >
+                    <ImageIcon size={14} /> Scene photo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => generateCurrentScene('video')}
+                    disabled={
+                      mediaGenerationMutation.isPending ||
+                      Boolean(
+                        activeMediaJob &&
+                        !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status)
+                      )
+                    }
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+                  >
+                    <Film size={14} /> Scene video
+                  </button>
+                  {activeMediaJob &&
+                    !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status) && (
+                      <span className="flex items-center gap-1.5 text-xs text-blue-300/75">
+                        <Loader2 size={13} className="animate-spin" /> Creating{' '}
+                        {activeMediaJob.kind} · {activeMediaJob.progress}%
+                      </span>
+                    )}
+                  {activeMediaJob?.status === 'succeeded' && (
+                    <span className="text-xs text-emerald-300/75">
+                      Scene added to the chat and gallery
+                    </span>
+                  )}
+                  {mediaGenerationError && (
+                    <span className="text-xs text-rose-300">{mediaGenerationError}</span>
+                  )}
+                </div>
+              )}
               <form
                 onSubmit={handleSubmit}
                 className="rounded-[28px] border border-white/10 bg-white/[0.06] p-2 shadow-[0_20px_60px_rgba(0,0,0,0.22)]"
               >
                 <div className="relative">
                   {rateLimitError && (
-                    <p className="mb-3 text-xs text-rose-400">{t(`omnichat.chat.${rateLimitError}`)}</p>
+                    <p className="mb-3 text-xs text-rose-400">
+                      {t(`omnichat.chat.${rateLimitError}`)}
+                    </p>
                   )}
                   {regenerationError && (
                     <p className="mb-3 text-xs text-rose-400">
@@ -1482,7 +1888,11 @@ export default function OmniChatChatPage() {
                       disabled={isGenerating || !draft.trim() || !activePersona}
                       className="omnichat-touch-target flex flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--color-primary-dark)] disabled:opacity-50 sm:px-5"
                     >
-                      {isGenerating ? <Loader2 size={14} className="animate-spin" /> : t('omnichat.chat.send')}
+                      {isGenerating ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        t('omnichat.chat.send')
+                      )}
                     </button>
                     <div className="relative">
                       <button
@@ -1623,10 +2033,7 @@ export default function OmniChatChatPage() {
                         </div>
                       </div>
                     ) : (
-                      <PersonaAvatar
-                        persona={activePersona}
-                        className="aspect-[4/5] w-full"
-                      />
+                      <PersonaAvatar persona={activePersona} className="aspect-[4/5] w-full" />
                     )}
                     <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                     {hasVideo && (isAvatarHovered || mobileChatMode) && (
@@ -1657,7 +2064,9 @@ export default function OmniChatChatPage() {
                         {activePersona.name}
                       </h3>
                       {activePersona.description && (
-                        <p className="mt-3 text-base leading-7 text-white/62">{activePersona.description}</p>
+                        <p className="mt-3 text-base leading-7 text-white/62">
+                          {activePersona.description}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -1665,7 +2074,10 @@ export default function OmniChatChatPage() {
                   {galleryTab === 'gallery' && (
                     <div className="mt-6 grid grid-cols-2 gap-3">
                       {galleryUrls.map((url, index) => (
-                        <div key={index} className="overflow-hidden rounded-[20px] border border-white/10">
+                        <div
+                          key={index}
+                          className="overflow-hidden rounded-[20px] border border-white/10"
+                        >
                           <img
                             src={resolveMediaUrl(url)}
                             alt={`${activePersona.name} gallery ${index + 1}`}
@@ -1682,7 +2094,6 @@ export default function OmniChatChatPage() {
                 </div>
               )}
             </div>
-
           </aside>
         </div>
       </div>
@@ -1694,6 +2105,66 @@ export default function OmniChatChatPage() {
           conversationId={selectedConversationId}
           persona={activePersona}
           currentSettings={isGuest ? loadOmniChatDefaults('guest') : activeConversationSettings}
+        />
+      )}
+
+      {pendingChatShare && (
+        <Modal
+          isOpen
+          onClose={() => setPendingChatShare(null)}
+          closeOnOverlayClick
+          ariaLabelledBy="omnichat-publish-chat-title"
+          overlayClassName="z-[90] bg-black/75"
+          className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#1a1b22] p-6 shadow-2xl"
+        >
+          <h2 id="omnichat-publish-chat-title" className="text-xl font-semibold text-white">
+            Publish chat to Explore
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-white/60">
+            This makes the latest {pendingChatShare.messageIds.length} messages and their generated
+            attachments visible to everyone. Review the conversation for private information before
+            publishing.
+          </p>
+          <div className="mt-6 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setPendingChatShare(null)}
+              className="rounded-xl px-4 py-2 text-sm text-white/60 hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => shareChatMutation.mutate(pendingChatShare)}
+              disabled={shareChatMutation.isPending}
+              className="rounded-xl bg-indigo-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              {shareChatMutation.isPending
+                ? 'Publishing…'
+                : `Publish ${pendingChatShare.messageIds.length} messages`}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {callMode && activePersona && selectedConversationId && (
+        <OmniChatCallModal
+          persona={activePersona}
+          conversationId={selectedConversationId}
+          mode={callMode}
+          onClose={() => setCallMode(null)}
+          onAssistant={(message) => {
+            queryClient.setQueryData<BotConversationDetail | undefined>(
+              omnichatQueryKeys.conversation(selectedConversationId),
+              (previous) =>
+                previous && !previous.messages.some((candidate) => candidate.id === message.id)
+                  ? { ...previous, messages: [...previous.messages, message] }
+                  : previous
+            );
+            void queryClient.invalidateQueries({
+              queryKey: omnichatQueryKeys.conversation(selectedConversationId),
+            });
+          }}
         />
       )}
 

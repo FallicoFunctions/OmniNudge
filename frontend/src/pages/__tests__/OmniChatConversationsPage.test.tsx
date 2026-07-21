@@ -54,6 +54,9 @@ vi.mock('../../services/omnichatService', () => ({
     personas: () => ['omnichat', 'personas'],
     conversations: ['omnichat', 'conversations'],
     conversation: (id: number) => ['omnichat', 'conversation', id],
+    generation: (id: string) => ['omnichat', 'generation', id],
+    generations: ['omnichat', 'generations'],
+    gallery: () => ['omnichat', 'gallery', 'all'],
   },
 }));
 

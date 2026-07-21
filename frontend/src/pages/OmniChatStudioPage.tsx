@@ -160,7 +160,7 @@ export default function OmniChatStudioPage() {
   const { isAuthenticated, isLoading: authIsLoading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('studio');
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('characters');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [draft, setDraft] = useState<PersonaDefinitionPayload>(BLANK_DRAFT);
@@ -420,7 +420,10 @@ export default function OmniChatStudioPage() {
     }
     if (tab === 'discover') requestAction({ type: 'navigate', path: '/omnichat', sidebarTab: 'discover' });
     if (tab === 'chat') requestAction({ type: 'navigate', path: '/omnichat/chat', sidebarTab: 'chat' });
-    if (tab === 'studio') setSidebarTab('studio');
+    if (tab === 'groups') requestAction({ type: 'navigate', path: '/omnichat/groups', sidebarTab: 'groups' });
+    if (tab === 'characters') setSidebarTab('characters');
+    if (tab === 'create') navigate('/omnichat/create');
+    if (tab === 'explore') navigate('/omnichat/explore');
   };
 
   const resetToBlank = () => {
