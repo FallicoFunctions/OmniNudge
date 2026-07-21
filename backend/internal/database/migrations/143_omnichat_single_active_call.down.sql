@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_omnichat_call_sessions_one_active_user;

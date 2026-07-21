@@ -2,11 +2,13 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/config"
@@ -20,10 +22,31 @@ import (
 // The advisory lock (shared with AccountCleanupWorker) ensures only one job
 // runs at a time across all server instances.
 type RetentionWorker struct {
-	db       *pgxpool.Pool
-	scrubber *services.ScrubberService
-	storage  services.StorageService
-	cfg      config.RetentionConfig
+	db            *pgxpool.Pool
+	scrubber      *services.ScrubberService
+	storage       services.StorageService
+	voiceStorage  services.StorageService
+	liveCallEnder interface {
+		EndConversation(context.Context, string) error
+	}
+	cfg config.RetentionConfig
+}
+
+// SetVoiceStorage supplies the storage backend used for synthesized OmniChat
+// speech. Local deployments keep it in a dedicated directory; S3 deployments
+// can pass the same backend used for other media.
+func (w *RetentionWorker) SetVoiceStorage(storage services.StorageService) *RetentionWorker {
+	w.voiceStorage = storage
+	return w
+}
+
+// SetLiveCallEnder supplies the provider client used to reclaim Tavus rooms
+// after a client disconnect or a transient endpoint cleanup failure.
+func (w *RetentionWorker) SetLiveCallEnder(ender interface {
+	EndConversation(context.Context, string) error
+}) *RetentionWorker {
+	w.liveCallEnder = ender
+	return w
 }
 
 // NewRetentionWorker creates a new RetentionWorker.
@@ -83,6 +106,8 @@ func (w *RetentionWorker) runAllJobs(ctx context.Context) {
 	log.Printf("[RETENTION] Starting daily cleanup jobs (DryRun=%v)", w.cfg.DryRun)
 
 	w.cleanupExpiredExports(ctx)
+	w.cleanupExpiredOmniChatSpeech(ctx)
+	w.cleanupAbandonedOmniChatCalls(ctx)
 	w.cleanupExpiredMessages(ctx)
 	w.cleanupCallLogs(ctx)
 	w.cleanupExpiredNotifications(ctx)
@@ -90,6 +115,169 @@ func (w *RetentionWorker) runAllJobs(ctx context.Context) {
 	w.anonymizeAnalytics(ctx)
 
 	log.Println("[RETENTION] All daily cleanup jobs finished")
+}
+
+// cleanupAbandonedOmniChatCalls closes provider sessions that are already
+// locally ended or have been active without a heartbeat for two hours. The
+// provider id remains in the row after failures so the next retention pass can
+// retry; successful cleanup clears it atomically.
+func (w *RetentionWorker) cleanupAbandonedOmniChatCalls(ctx context.Context) {
+	if w.db == nil || w.liveCallEnder == nil {
+		return
+	}
+	rows, err := w.db.Query(ctx, `
+		SELECT id FROM omnichat_call_sessions
+		WHERE provider='tavus' AND provider_session_id IS NOT NULL
+		  AND (status <> 'active' OR last_activity_at < NOW()-INTERVAL '2 hours')
+		ORDER BY last_activity_at
+		LIMIT 500
+	`)
+	if err != nil {
+		if !isUndefinedTableError(err) {
+			log.Printf("[RETENTION] Failed to query abandoned OmniChat calls: %v", err)
+		}
+		return
+	}
+	callIDs := make([]string, 0, 500)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			log.Printf("[RETENTION] Failed to scan abandoned OmniChat call: %v", err)
+			return
+		}
+		callIDs = append(callIDs, id)
+	}
+	rowsErr := rows.Err()
+	rows.Close()
+	if rowsErr != nil {
+		log.Printf("[RETENTION] Failed while reading abandoned OmniChat calls: %v", rowsErr)
+		return
+	}
+	if len(callIDs) == 0 {
+		return
+	}
+	if w.cfg.DryRun {
+		log.Printf("[RETENTION][DRY-RUN] Would end %d abandoned OmniChat provider calls", len(callIDs))
+		return
+	}
+	for _, callID := range callIDs {
+		var providerSessionID string
+		err := w.db.QueryRow(ctx, `
+			UPDATE omnichat_call_sessions
+			SET status='ended',ended_at=COALESCE(ended_at,NOW()),
+			    last_activity_at=CASE WHEN status='active' THEN NOW() ELSE last_activity_at END
+			WHERE id=$1 AND provider='tavus' AND provider_session_id IS NOT NULL
+			  AND (status <> 'active' OR last_activity_at < NOW()-INTERVAL '2 hours')
+			RETURNING provider_session_id
+		`, callID).Scan(&providerSessionID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			log.Printf("[RETENTION] Warning: failed to claim abandoned OmniChat call %s: %v", callID, err)
+			continue
+		}
+		providerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		err = w.liveCallEnder.EndConversation(providerCtx, providerSessionID)
+		cancel()
+		if err != nil {
+			log.Printf("[RETENTION] Warning: failed to end OmniChat provider call %s: %v", callID, err)
+			continue
+		}
+		if _, err = w.db.Exec(ctx, `UPDATE omnichat_call_sessions SET provider_session_id=NULL WHERE id=$1 AND provider_session_id=$2`, callID, providerSessionID); err != nil {
+			log.Printf("[RETENTION] Warning: failed to record OmniChat provider cleanup %s: %v", callID, err)
+		}
+	}
+}
+
+// cleanupExpiredOmniChatSpeech removes short-lived synthesized speech caches.
+// The object is deleted first; the database row remains retryable if storage is
+// temporarily unavailable.
+func (w *RetentionWorker) cleanupExpiredOmniChatSpeech(ctx context.Context) {
+	if w.db == nil || w.voiceStorage == nil {
+		return
+	}
+	log.Println("[RETENTION] Starting expired OmniChat speech cleanup")
+	const batchSize = 500
+	for {
+		rows, err := w.db.Query(ctx, `
+			SELECT id, storage_path FROM omnichat_speech_audio
+			WHERE expires_at < NOW()
+			ORDER BY expires_at
+			LIMIT $1
+		`, batchSize)
+		if err != nil {
+			if !isUndefinedTableError(err) {
+				log.Printf("[RETENTION] Failed to query expired OmniChat speech: %v", err)
+			}
+			return
+		}
+		type expiredSpeech struct {
+			id   string
+			path string
+		}
+		items := make([]expiredSpeech, 0, batchSize)
+		for rows.Next() {
+			var item expiredSpeech
+			if err := rows.Scan(&item.id, &item.path); err != nil {
+				rows.Close()
+				log.Printf("[RETENTION] Failed to scan expired OmniChat speech: %v", err)
+				return
+			}
+			items = append(items, item)
+		}
+		rowsErr := rows.Err()
+		rows.Close()
+		if rowsErr != nil {
+			log.Printf("[RETENTION] Failed while reading expired OmniChat speech: %v", rowsErr)
+			return
+		}
+		if len(items) == 0 {
+			return
+		}
+		if w.cfg.DryRun {
+			log.Printf("[RETENTION][DRY-RUN] Would delete %d expired OmniChat speech files", len(items))
+			return
+		}
+		for _, item := range items {
+			tx, err := w.db.Begin(ctx)
+			if err != nil {
+				log.Printf("[RETENTION] Warning: failed to begin OmniChat speech cleanup for %s: %v", item.id, err)
+				continue
+			}
+			var lockedPath string
+			err = tx.QueryRow(ctx, `SELECT storage_path FROM omnichat_speech_audio WHERE id=$1 AND expires_at<NOW() FOR UPDATE`, item.id).Scan(&lockedPath)
+			if errors.Is(err, pgx.ErrNoRows) {
+				_ = tx.Rollback(ctx)
+				continue
+			}
+			if err != nil {
+				_ = tx.Rollback(ctx)
+				log.Printf("[RETENTION] Warning: failed to lock OmniChat speech row %s: %v", item.id, err)
+				continue
+			}
+			// Keep the row locked across deletion. A concurrent cache refresh
+			// either updates expiry first (so this recheck skips it) or waits
+			// until the old object and row are both gone, then inserts fresh.
+			if err := w.voiceStorage.Delete(ctx, lockedPath); err != nil {
+				_ = tx.Rollback(ctx)
+				log.Printf("[RETENTION] Warning: failed to delete OmniChat speech %s: %v", lockedPath, err)
+				continue
+			}
+			if _, err := tx.Exec(ctx, `DELETE FROM omnichat_speech_audio WHERE id=$1`, item.id); err != nil {
+				_ = tx.Rollback(ctx)
+				log.Printf("[RETENTION] Warning: failed to delete OmniChat speech row %s: %v", item.id, err)
+				continue
+			}
+			if err := tx.Commit(ctx); err != nil {
+				log.Printf("[RETENTION] Warning: failed to commit OmniChat speech cleanup %s: %v", item.id, err)
+			}
+		}
+		if len(items) < batchSize {
+			return
+		}
+	}
 }
 
 // ─── Export cleanup ──────────────────────────────────────────────────────────

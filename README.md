@@ -12,6 +12,9 @@ The repository includes a Go backend, a React frontend, background jobs, media p
 - Image, video, audio, and file uploads
 - Voice messages, WebRTC calls, and screen sharing
 - Shared slideshow sessions and conversation media galleries
+- OmniChat contextual image/video generation, private creator galleries, and an Explore feed
+- Shareable AI conversations with continuation/remix, engagement, follows, and mixed human/AI groups
+- Character read-aloud voices plus live voice and video conversation modes
 - Custom themes with installable themes, user overrides, and a visual editor
 - Moderation, feature flags, analytics, retention, data export, and account deletion flows
 
@@ -66,6 +69,9 @@ The repository includes a Go backend, a React frontend, background jobs, media p
 - ClamAV for upload scanning
 - FFmpeg for audio processing
 - Firebase Cloud Messaging for push notifications
+- Fal queue-backed image and video generation
+- Optional ElevenLabs speech synthesis with per-character browser voice fallback
+- Optional Tavus CVI private WebRTC rooms for real-time, lip-synced character video calls
 - Prometheus, OpenTelemetry, Sentry, and Pyroscope integration points
 - Gemini-backed hub AI designer endpoint
 
@@ -94,3 +100,4 @@ The repository includes a Go backend, a React frontend, background jobs, media p
 - [Database Schema](docs/technical/database-schema.md)
 - [Docs Index](docs/README.md)
 - [Runbook](RUNBOOK.md)
+- [OmniChat Media, Social, Groups, and Calls](docs/OMNICHAT_EXPANSION.md)

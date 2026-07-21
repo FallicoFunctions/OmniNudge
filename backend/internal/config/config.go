@@ -32,6 +32,8 @@ type Config struct {
 	TURN          TURNConfig
 	Gemini        GeminiConfig
 	OpenRouter    OpenRouterConfig
+	OmniChatMedia OmniChatMediaConfig
+	OmniChatVoice OmniChatVoiceConfig
 	Crypto        CryptoConfig
 	OAuth         OAuthConfig
 }
@@ -69,6 +71,33 @@ type GeminiConfig struct {
 type OpenRouterConfig struct {
 	APIKey string // OPENROUTER_API_KEY
 	Model  string // OPENROUTER_MODEL — defaults to openrouter/free
+}
+
+// OmniChatMediaConfig keeps generative-media credentials server-side and
+// makes individual model choices deploy-time configuration rather than UI
+// concerns. Fal's queue API is the initial implementation behind the provider
+// interface.
+type OmniChatMediaConfig struct {
+	Provider            string
+	FalAPIKey           string
+	FalImageModel       string
+	FalImageEditModel   string
+	FalTextVideoModel   string
+	FalImageVideoModel  string
+	MaxImageBytes       int64
+	MaxVideoBytes       int64
+	PollIntervalSeconds int
+}
+
+type OmniChatVoiceConfig struct {
+	ElevenLabsAPIKey        string
+	ElevenLabsBaseURL       string
+	ElevenLabsEnableLogging bool
+	DefaultModel            string
+	TavusAPIKey             string
+	TavusBaseURL            string
+	TavusReplicaID          string
+	TavusPersonaID          string
 }
 
 // TURNConfig holds coturn TURN server configuration for WebRTC relay
@@ -301,6 +330,27 @@ func Load() (*Config, error) {
 			APIKey: getEnv("OPENROUTER_API_KEY", ""),
 			Model:  getEnv("OPENROUTER_MODEL", "openrouter/free"),
 		},
+		OmniChatMedia: OmniChatMediaConfig{
+			Provider:            getEnv("OMNICHAT_MEDIA_PROVIDER", "fal"),
+			FalAPIKey:           getEnv("FAL_KEY", ""),
+			FalImageModel:       getEnv("FAL_IMAGE_MODEL", "fal-ai/nano-banana-2"),
+			FalImageEditModel:   getEnv("FAL_IMAGE_EDIT_MODEL", "fal-ai/nano-banana-2/edit"),
+			FalTextVideoModel:   getEnv("FAL_TEXT_VIDEO_MODEL", "fal-ai/wan/v2.7/text-to-video"),
+			FalImageVideoModel:  getEnv("FAL_IMAGE_VIDEO_MODEL", "fal-ai/wan/v2.7/image-to-video"),
+			MaxImageBytes:       getEnvAsPositiveInt64("OMNICHAT_MAX_IMAGE_BYTES", 25*1024*1024),
+			MaxVideoBytes:       getEnvAsPositiveInt64("OMNICHAT_MAX_VIDEO_BYTES", 200*1024*1024),
+			PollIntervalSeconds: getEnvAsPositiveInt("OMNICHAT_MEDIA_POLL_SECONDS", 2),
+		},
+		OmniChatVoice: OmniChatVoiceConfig{
+			ElevenLabsAPIKey:        getEnv("ELEVENLABS_API_KEY", ""),
+			ElevenLabsBaseURL:       getEnv("ELEVENLABS_BASE_URL", "https://api.elevenlabs.io"),
+			ElevenLabsEnableLogging: getEnvAsBool("ELEVENLABS_ENABLE_LOGGING", false),
+			DefaultModel:            getEnv("ELEVENLABS_TTS_MODEL", "eleven_multilingual_v2"),
+			TavusAPIKey:             getEnv("TAVUS_API_KEY", ""),
+			TavusBaseURL:            getEnv("TAVUS_BASE_URL", "https://tavusapi.com"),
+			TavusReplicaID:          getEnv("TAVUS_REPLICA_ID", ""),
+			TavusPersonaID:          getEnv("TAVUS_PERSONA_ID", ""),
+		},
 		OAuth: OAuthConfig{
 			GoogleClientID:      getEnv("GOOGLE_CLIENT_ID", ""),
 			GoogleClientSecret:  getEnv("GOOGLE_CLIENT_SECRET", ""),
@@ -382,6 +432,22 @@ func getEnvAsInt64(key string, defaultValue int64) int64 {
 	}
 	value, err := strconv.ParseInt(valueStr, 10, 64)
 	if err != nil {
+		return defaultValue
+	}
+	return value
+}
+
+func getEnvAsPositiveInt(key string, defaultValue int) int {
+	value := getEnvAsInt(key, defaultValue)
+	if value <= 0 {
+		return defaultValue
+	}
+	return value
+}
+
+func getEnvAsPositiveInt64(key string, defaultValue int64) int64 {
+	value := getEnvAsInt64(key, defaultValue)
+	if value <= 0 {
 		return defaultValue
 	}
 	return value

@@ -27,18 +27,19 @@ func SecurityHeaders() gin.HandlerFunc {
 		// Content Security Policy (CSP)
 		// Prevents XSS attacks by controlling resource loading
 		csp := []string{
-			"default-src 'self'",                // Only load from same origin by default
-			"script-src " + scriptSrc,           // Allow eval only outside production for development tooling
-			"style-src 'self' 'unsafe-inline'",  // Allow styles (unsafe-inline needed for styled-components)
-			"img-src 'self' data: blob: https:", // Allow images from self, data URLs, blobs, HTTPS
-			"font-src 'self' data:",             // Allow fonts from self and data URLs
-			"connect-src 'self' ws: wss:",       // Allow WebSocket connections
-			"media-src 'self' blob: https:",     // Allow media from self, blobs, and HTTPS CDN redirects
-			"object-src 'none'",                 // Block plugins (Flash, etc.)
-			"frame-ancestors 'none'",            // Prevent clickjacking
-			"base-uri 'self'",                   // Restrict <base> tag
-			"form-action 'self'",                // Only submit forms to same origin
-			"upgrade-insecure-requests",         // Upgrade HTTP to HTTPS
+			"default-src 'self'",                                   // Only load from same origin by default
+			"script-src " + scriptSrc,                              // Allow eval only outside production for development tooling
+			"style-src 'self' 'unsafe-inline'",                     // Allow styles (unsafe-inline needed for styled-components)
+			"img-src 'self' data: blob: https:",                    // Allow images from self, data URLs, blobs, HTTPS
+			"font-src 'self' data:",                                // Allow fonts from self and data URLs
+			"connect-src 'self' ws: wss:",                          // Allow WebSocket connections
+			"media-src 'self' blob: https:",                        // Allow media from self, blobs, and HTTPS CDN redirects
+			"frame-src 'self' https://daily.co https://*.daily.co", // Private Tavus/Daily live-avatar rooms
+			"object-src 'none'",                                    // Block plugins (Flash, etc.)
+			"frame-ancestors 'none'",                               // Prevent clickjacking
+			"base-uri 'self'",                                      // Restrict <base> tag
+			"form-action 'self'",                                   // Only submit forms to same origin
+			"upgrade-insecure-requests",                            // Upgrade HTTP to HTTPS
 		}
 		c.Header("Content-Security-Policy", strings.Join(csp, "; "))
 
@@ -67,14 +68,14 @@ func SecurityHeaders() gin.HandlerFunc {
 		// Permissions-Policy: Control browser features
 		// Disable unnecessary features to reduce attack surface
 		permissions := []string{
-			"camera=(self)",     // Camera only for same origin
-			"microphone=(self)", // Microphone only for same origin (voice messages)
-			"geolocation=()",    // Disable geolocation
-			"payment=()",        // Disable payment API
-			"usb=()",            // Disable USB access
-			"magnetometer=()",   // Disable magnetometer
-			"gyroscope=()",      // Disable gyroscope
-			"accelerometer=()",  // Disable accelerometer
+			`camera=(self "https://daily.co" "https://*.daily.co")`,     // Same-origin calls and trusted Tavus/Daily rooms
+			`microphone=(self "https://daily.co" "https://*.daily.co")`, // Same-origin voice and trusted Tavus/Daily rooms
+			"geolocation=()",   // Disable geolocation
+			"payment=()",       // Disable payment API
+			"usb=()",           // Disable USB access
+			"magnetometer=()",  // Disable magnetometer
+			"gyroscope=()",     // Disable gyroscope
+			"accelerometer=()", // Disable accelerometer
 		}
 		c.Header("Permissions-Policy", strings.Join(permissions, ", "))
 

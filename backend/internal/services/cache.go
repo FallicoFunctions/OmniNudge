@@ -3,6 +3,7 @@ package services
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -20,12 +21,21 @@ type Cache interface {
 	Set(ctx context.Context, key string, value string, ttl time.Duration) error
 }
 
+// AtomicCounter increments a fixed-window counter without a read/modify/write
+// race. Distributed rate limiting relies on this optional cache capability.
+type AtomicCounter interface {
+	IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error)
+}
+
 // NoopCache is a no-op cache implementation
 type NoopCache struct{}
 
 func (NoopCache) Get(ctx context.Context, key string) (string, bool, error) { return "", false, nil }
 func (NoopCache) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
 	return nil
+}
+func (NoopCache) IncrementWithTTL(context.Context, string, time.Duration) (int64, error) {
+	return 1, nil
 }
 
 // defaultMemoryCacheMaxSize is the default maximum number of entries in a
@@ -126,6 +136,29 @@ func (m *MemoryCache) Set(ctx context.Context, key string, value string, ttl tim
 	}
 
 	return nil
+}
+
+func (m *MemoryCache) IncrementWithTTL(_ context.Context, key string, ttl time.Duration) (int64, error) {
+	if ttl <= 0 {
+		return 0, fmt.Errorf("MemoryCache.IncrementWithTTL: ttl must be positive, got %v", ttl)
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	now := time.Now()
+	if entry, exists := m.data[key]; exists && now.Before(entry.expiration) {
+		count, err := strconv.ParseInt(entry.value, 10, 64)
+		if err != nil || count < 0 {
+			return 0, errors.New("memory cache counter contains an invalid value")
+		}
+		count++
+		m.data[key] = &cacheEntry{value: strconv.FormatInt(count, 10), expiration: entry.expiration}
+		return count, nil
+	}
+	if _, exists := m.data[key]; !exists && len(m.data) >= m.maxSize {
+		return 0, errors.New("memory cache is at capacity")
+	}
+	m.data[key] = &cacheEntry{value: "1", expiration: now.Add(ttl)}
+	return 1, nil
 }
 
 // cleanup removes expired entries every minute until Stop() is called.
@@ -339,4 +372,16 @@ func (ic *InstrumentedCache) Set(ctx context.Context, key string, value string, 
 		return err
 	}
 	return nil
+}
+
+func (ic *InstrumentedCache) IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error) {
+	counter, ok := ic.inner.(AtomicCounter)
+	if !ok {
+		return 0, errors.New("cache does not support atomic counters")
+	}
+	count, err := counter.IncrementWithTTL(ctx, key, ttl)
+	if err != nil {
+		metrics.CacheErrors.WithLabelValues(ic.cacheType, "increment").Inc()
+	}
+	return count, err
 }

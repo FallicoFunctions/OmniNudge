@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -686,23 +685,4 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
-}
-
-func nonEmptyString(value, fallback string) string {
-	if strings.TrimSpace(value) == "" {
-		return fallback
-	}
-	return strings.TrimSpace(value)
-}
-
-func detectImportFormat(filename string) string {
-	ext := strings.ToLower(filepath.Ext(filename))
-	switch ext {
-	case ".png":
-		return "chara_card_v2"
-	case ".json":
-		return "native"
-	default:
-		return "native"
-	}
 }

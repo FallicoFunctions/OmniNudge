@@ -194,7 +194,22 @@ func TestSpellResolutionGuardrailMigrationRollsBackCleanly(t *testing.T) {
 	}
 	require.Equal(t, 2, countGuardrails())
 
-	require.NoError(t, db.MigrateDown(ctx))
+	// Roll back through any migrations added after the guardrail so this
+	// regression test remains valid as the schema grows.
+	for {
+		var latest string
+		require.NoError(t, db.Pool.QueryRow(ctx, `
+			SELECT version
+			FROM schema_migrations
+			ORDER BY applied_at DESC, version DESC
+			LIMIT 1
+		`).Scan(&latest))
+		require.NoError(t, db.MigrateDown(ctx))
+		if latest == "136_omnichat_spell_resolution_guardrail" {
+			break
+		}
+		require.Greater(t, latest, "136_omnichat_spell_resolution_guardrail")
+	}
 	require.Equal(t, 0, countGuardrails())
 	var combatAccountingCount int
 	require.NoError(t, db.Pool.QueryRow(ctx, `

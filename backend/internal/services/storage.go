@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,33 +40,140 @@ func NewLocalStorageService(baseDir string, baseURL string) (*LocalStorageServic
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return nil, fmt.Errorf("local storage: create base directory: %w", err)
 	}
+	canonicalBase, err := filepath.EvalSymlinks(baseDir)
+	if err != nil {
+		return nil, fmt.Errorf("local storage: resolve base directory: %w", err)
+	}
+	canonicalBase, err = filepath.Abs(canonicalBase)
+	if err != nil {
+		return nil, fmt.Errorf("local storage: canonicalize base directory: %w", err)
+	}
 	return &LocalStorageService{
-		baseDir: baseDir,
+		baseDir: canonicalBase,
 		baseURL: baseURL,
 	}, nil
 }
 
+func (s *LocalStorageService) resolveKey(key string) (string, error) {
+	if key == "" || strings.ContainsRune(key, '\x00') {
+		return "", fmt.Errorf("local storage: invalid key")
+	}
+	nativeKey := filepath.FromSlash(key)
+	if filepath.IsAbs(nativeKey) {
+		return "", fmt.Errorf("local storage: absolute key is not allowed")
+	}
+	for _, part := range strings.FieldsFunc(nativeKey, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if part == ".." {
+			return "", fmt.Errorf("local storage: parent traversal is not allowed")
+		}
+	}
+	cleanKey := filepath.Clean(nativeKey)
+	if cleanKey == "." || cleanKey == ".." || strings.HasPrefix(cleanKey, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("local storage: invalid key")
+	}
+	path := filepath.Join(s.baseDir, cleanKey)
+	relative, err := filepath.Rel(s.baseDir, path)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("local storage: key escapes configured root")
+	}
+	return path, nil
+}
+
+func (s *LocalStorageService) rejectSymlinkPath(path string, includeLeaf bool) error {
+	relative, err := filepath.Rel(s.baseDir, path)
+	if err != nil {
+		return fmt.Errorf("local storage: resolve relative path: %w", err)
+	}
+	parts := strings.Split(relative, string(filepath.Separator))
+	if !includeLeaf && len(parts) > 0 {
+		parts = parts[:len(parts)-1]
+	}
+	current := s.baseDir
+	for _, part := range parts {
+		if part == "" || part == "." {
+			continue
+		}
+		current = filepath.Join(current, part)
+		info, statErr := os.Lstat(current)
+		if os.IsNotExist(statErr) {
+			return nil
+		}
+		if statErr != nil {
+			return fmt.Errorf("local storage: inspect path: %w", statErr)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("local storage: symbolic links are not allowed")
+		}
+	}
+	return nil
+}
+
+func (s *LocalStorageService) escapedKey(key string) (string, error) {
+	path, err := s.resolveKey(key)
+	if err != nil {
+		return "", err
+	}
+	relative, err := filepath.Rel(s.baseDir, path)
+	if err != nil {
+		return "", fmt.Errorf("local storage: resolve URL key: %w", err)
+	}
+	parts := strings.Split(filepath.ToSlash(relative), "/")
+	for index, part := range parts {
+		parts[index] = url.PathEscape(part)
+	}
+	return strings.Join(parts, "/"), nil
+}
+
 func (s *LocalStorageService) Upload(ctx context.Context, key string, body io.Reader, contentType string) (string, error) {
-	path := filepath.Join(s.baseDir, key)
+	path, err := s.resolveKey(key)
+	if err != nil {
+		return "", err
+	}
+	if err := s.rejectSymlinkPath(path, true); err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return "", fmt.Errorf("local storage: mkdir for %q: %w", key, err)
 	}
-
-	f, err := os.Create(path)
-	if err != nil {
-		return "", fmt.Errorf("local storage: create %q: %w", key, err)
+	if err := s.rejectSymlinkPath(path, true); err != nil {
+		return "", err
 	}
-	defer f.Close()
 
-	if _, err := io.Copy(f, body); err != nil {
+	tempFile, err := os.CreateTemp(filepath.Dir(path), ".omnichat-upload-*")
+	if err != nil {
+		return "", fmt.Errorf("local storage: create temporary object for %q: %w", key, err)
+	}
+	tempPath := tempFile.Name()
+	defer func() {
+		_ = tempFile.Close()
+		_ = os.Remove(tempPath)
+	}()
+
+	if _, err := io.Copy(tempFile, body); err != nil {
 		return "", fmt.Errorf("local storage: write %q: %w", key, err)
 	}
+	if err := tempFile.Sync(); err != nil {
+		return "", fmt.Errorf("local storage: sync %q: %w", key, err)
+	}
+	if err := tempFile.Close(); err != nil {
+		return "", fmt.Errorf("local storage: close %q: %w", key, err)
+	}
+	if err := os.Rename(tempPath, path); err != nil {
+		return "", fmt.Errorf("local storage: publish %q: %w", key, err)
+	}
 
-	return fmt.Sprintf("%s/%s", s.baseURL, key), nil
+	return s.PublicURL(key), nil
 }
 
 func (s *LocalStorageService) Download(ctx context.Context, key string) (io.ReadCloser, error) {
-	f, err := os.Open(filepath.Join(s.baseDir, key))
+	path, err := s.resolveKey(key)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.rejectSymlinkPath(path, true); err != nil {
+		return nil, err
+	}
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("local storage: open %q: %w", key, err)
 	}
@@ -73,7 +181,17 @@ func (s *LocalStorageService) Download(ctx context.Context, key string) (io.Read
 }
 
 func (s *LocalStorageService) Delete(ctx context.Context, key string) error {
-	if err := os.Remove(filepath.Join(s.baseDir, key)); err != nil {
+	path, err := s.resolveKey(key)
+	if err != nil {
+		return err
+	}
+	if err := s.rejectSymlinkPath(path, true); err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return fmt.Errorf("local storage: delete %q: %w", key, err)
 	}
 	return nil
@@ -85,14 +203,28 @@ func (s *LocalStorageService) Delete(ctx context.Context, key string) error {
 // it must never be relied upon for access control in any environment.
 // Use S3StorageService for real pre-signed URL enforcement.
 func (s *LocalStorageService) GetSignedURL(ctx context.Context, key string, expires time.Duration) (string, error) {
-	return fmt.Sprintf("%s/%s?expires=%d", s.baseURL, key, time.Now().Add(expires).Unix()), nil
+	escapedKey, err := s.escapedKey(key)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s/%s?expires=%d", strings.TrimRight(s.baseURL, "/"), escapedKey, time.Now().Add(expires).Unix()), nil
 }
 
 func (s *LocalStorageService) List(ctx context.Context, prefix string) ([]string, error) {
 	var keys []string
-	searchDir := filepath.Join(s.baseDir, prefix)
+	searchDir := s.baseDir
+	var err error
+	if prefix != "" {
+		searchDir, err = s.resolveKey(prefix)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := s.rejectSymlinkPath(searchDir, true); err != nil {
+		return nil, err
+	}
 
-	err := filepath.Walk(searchDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(searchDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -113,12 +245,23 @@ func (s *LocalStorageService) GeneratePresignedPutURL(ctx context.Context, key, 
 }
 
 func (s *LocalStorageService) PublicURL(key string) string {
-	return fmt.Sprintf("%s/%s", s.baseURL, key)
+	escapedKey, err := s.escapedKey(key)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s", strings.TrimRight(s.baseURL, "/"), escapedKey)
 }
 
 // GetObjectSize returns the size of the file at key on the local filesystem.
 func (s *LocalStorageService) GetObjectSize(ctx context.Context, key string) (int64, error) {
-	info, err := os.Stat(filepath.Join(s.baseDir, key))
+	path, err := s.resolveKey(key)
+	if err != nil {
+		return 0, err
+	}
+	if err := s.rejectSymlinkPath(path, true); err != nil {
+		return 0, err
+	}
+	info, err := os.Stat(path)
 	if err != nil {
 		return 0, fmt.Errorf("local storage: stat %q: %w", key, err)
 	}

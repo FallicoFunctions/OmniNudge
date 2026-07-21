@@ -369,8 +369,26 @@ func (h *OmniChatHandler) GetConversation(c *gin.Context) {
 			return
 		}
 	}
+	decorateOmniChatMessageAttachments(messages, userID)
 
 	c.JSON(http.StatusOK, gin.H{"conversation": conversation, "messages": messages})
+}
+
+func decorateOmniChatMessageAttachments(messages []*models.BotMessage, viewerUserID int) {
+	for _, message := range messages {
+		for _, asset := range message.Attachments {
+			if asset.OwnerUserID == viewerUserID {
+				asset.ContentURL = "/api/v1/omnichat/media/" + asset.ID.String() + "/content"
+				asset.ThumbnailURL = nil
+				continue
+			}
+			// Continued public chat snapshots may reference an attachment owned
+			// by the original author. Keep access behind the publication-aware
+			// endpoint so removal, blocks, NSFW settings, and bans still apply.
+			asset.ContentURL = "/api/v1/omnichat/explore/media/" + asset.ID.String() + "/content"
+			asset.ThumbnailURL = nil
+		}
+	}
 }
 
 // OmniChatSendMessageRequest is the request body for sending a message in an OmniChat conversation.
