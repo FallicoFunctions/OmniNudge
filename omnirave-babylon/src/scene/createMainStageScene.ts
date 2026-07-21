@@ -13,6 +13,7 @@ import { createPlayerRig } from '../player/createPlayerRig';
 import { createReviewAvatar } from '../player/createReviewAvatar';
 import { createAtmosphereRig } from './createAtmosphereRig';
 import { createCascadeCourtWaterMotion } from './cascadeCourtWaterMotion';
+import { createFestivalField } from './createFestivalField';
 import { createLightingRig } from './createLightingRig';
 import { createMainStageCollisionBlockers } from './createMainStageCollisionBlockers';
 import { createMainStagePresentationRig } from './createMainStagePresentationRig';
@@ -115,6 +116,12 @@ export async function createMainStageScene(engine: AbstractEngine) {
   // pools, streaming spills, breathing mist, summit spray). The module
   // unfreezes only the cascade water materials it animates.
   const cascadeWaterMotion = createCascadeCourtWaterMotion(scene);
+
+  // Grass albedo + perimeter tuft scatter on the surrounding field, so the
+  // venue's surround reads as a festival field instead of the wet-stone
+  // plaza material it inherits by default. Runs after the freeze, same as
+  // the water motion module - it unfreezes only the field's own material.
+  const festivalField = createFestivalField(scene);
 
   const playerController = createPlayerController({
     avatarRoot: reviewAvatar.root,
@@ -231,6 +238,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
       },
       productionSurfaces,
       cascadeWaterMotion,
+      festivalField,
       spawn: BACK_PLAZA_SPAWN,
     },
   };
