@@ -502,3 +502,57 @@ func TestBotMessageRepositoryDoesNotRepairFreshDanglingUserTurn(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, repaired)
 }
+
+func TestBotMessageRepositoryListsMostRecentWindowChronologically(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	userRepo := NewUserRepository(db.Pool)
+	user := &User{
+		Username:     fmt.Sprintf("omnichat_recent_window_%d", time.Now().UnixNano()),
+		PasswordHash: "hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user))
+
+	personaRepo := NewBotPersonaRepository(db.Pool)
+	persona, err := personaRepo.CreateOwned(ctx, user.ID, &BotPersona{
+		Slug:               fmt.Sprintf("u%d-recent-window-%d", user.ID, time.Now().UnixNano()),
+		Name:               "Recent Window Persona",
+		Category:           PersonaCategoryOriginal,
+		Visibility:         "private",
+		SourceFormat:       "native",
+		SystemPrompt:       "Remember the latest turn.",
+		AlternateGreetings: []string{},
+		Tags:               []string{},
+		GalleryURLs:        []string{},
+		ExtensionsJSON:     json.RawMessage(`{}`),
+	})
+	require.NoError(t, err)
+
+	conversation, err := NewBotConversationRepository(db.Pool).CreateWithMessages(ctx, user.ID, persona.ID, nil, nil, nil)
+	require.NoError(t, err)
+	messageRepo := NewBotMessageRepository(db.Pool)
+	for i := 1; i <= 6; i++ {
+		role := BotMessageRoleUser
+		if i%2 == 0 {
+			role = BotMessageRoleAssistant
+		}
+		_, err = messageRepo.Create(ctx, conversation.ID, role, fmt.Sprintf("turn-%d", i), false)
+		require.NoError(t, err)
+	}
+
+	messages, err := messageRepo.ListByConversationID(ctx, conversation.ID, 4)
+	require.NoError(t, err)
+	require.Len(t, messages, 4)
+	require.Equal(t, []string{"turn-3", "turn-4", "turn-5", "turn-6"}, []string{
+		messages[0].Content,
+		messages[1].Content,
+		messages[2].Content,
+		messages[3].Content,
+	})
+}
