@@ -22,7 +22,7 @@ import type {
   WsReactionAddedPayload,
   WsReactionRemovedPayload,
 } from '../types/reactions';
-import type { BotConversationDetail, BotMessage } from '../types/omnichat';
+import type { BotConversationDetail, BotMessage, OmniChatGroupMessage } from '../types/omnichat';
 import { friendsQueryKeys } from '../services/friendsService';
 
 interface WebSocketMessage {
@@ -689,9 +689,30 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               }
             );
             queryClient.invalidateQueries({ queryKey: ['omnichat', 'conversations'] });
-            window.dispatchEvent(
-              new CustomEvent('omnichat-message-complete', { detail: message })
+            window.dispatchEvent(new CustomEvent('omnichat-message-complete', { detail: message }));
+            break;
+          }
+
+          case 'omnichat_group_message': {
+            const message = data.payload as OmniChatGroupMessage;
+            queryClient.setQueryData<InfiniteData<OmniChatGroupMessage[]> | undefined>(
+              ['omnichat', 'group-messages', message.group_id],
+              (previous) => {
+                if (!previous) return previous;
+                if (
+                  previous.pages.some((page) =>
+                    page.some((candidate) => candidate.id === message.id)
+                  )
+                ) {
+                  return previous;
+                }
+                const pages = [...previous.pages];
+                pages[0] = [...pages[0], message];
+                return { ...previous, pages };
+              }
             );
+            queryClient.invalidateQueries({ queryKey: ['omnichat', 'groups'] });
+            window.dispatchEvent(new CustomEvent('omnichat-group-message', { detail: message }));
             break;
           }
 
@@ -815,7 +836,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       const socket = new WebSocket(url.toString());
       wsRef.current = socket;
       let hasOpened = false;
-      const isStaleSocket = () => wsRef.current !== socket || activeConnectionIdRef.current !== connectionId;
+      const isStaleSocket = () =>
+        wsRef.current !== socket || activeConnectionIdRef.current !== connectionId;
 
       socket.onopen = () => {
         if (isStaleSocket()) {

@@ -47,8 +47,8 @@ describe('OmniChatSidebar color utilities', () => {
       />
     );
 
-    const searchButton = screen.getByRole('button', { name: 'Search' });
-    expect(await hasGeneratedBaseTextColor(searchButton.className)).toBe(true);
+    const chatButton = screen.getByRole('button', { name: 'Chat' });
+    expect(await hasGeneratedBaseTextColor(chatButton.className)).toBe(true);
   });
 
   it('renders the guest sign-in button with a generated base text color utility', async () => {
@@ -150,7 +150,7 @@ describe('OmniChatSidebar color utilities', () => {
     const drawer = screen.getByRole('dialog', { name: 'Open menu' });
     expect(drawer).toHaveFocus();
 
-    const lastDrawerButton = within(drawer).getByRole('button', { name: 'Studio' });
+    const lastDrawerButton = within(drawer).getByRole('button', { name: 'Characters' });
     lastDrawerButton.focus();
     fireEvent.keyDown(document, { key: 'Tab' });
     expect(within(drawer).getByRole('button', { name: 'Close menu' })).toHaveFocus();

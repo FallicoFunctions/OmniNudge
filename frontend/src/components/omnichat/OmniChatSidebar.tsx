@@ -1,9 +1,19 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight, Compass, Menu, MessageSquare, Search, SquarePen, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Compass,
+  ImagePlus,
+  Menu,
+  MessageSquare,
+  PanelsTopLeft,
+  UsersRound,
+  X,
+} from 'lucide-react';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 
-export type SidebarTab = 'discover' | 'search' | 'chat' | 'studio';
+export type SidebarTab = 'discover' | 'search' | 'chat' | 'groups' | 'create' | 'explore' | 'characters';
 
 interface OmniChatSidebarProps {
   activeTab: SidebarTab;
@@ -19,9 +29,11 @@ interface OmniChatSidebarProps {
 
 const TABS: { id: SidebarTab; icon: typeof Compass; labelKey: string; fallbackLabel: string }[] = [
   { id: 'discover', icon: Compass, labelKey: 'omnichat.sidebar.discover', fallbackLabel: 'Discover' },
-  { id: 'search', icon: Search, labelKey: 'omnichat.sidebar.search', fallbackLabel: 'Search' },
   { id: 'chat', icon: MessageSquare, labelKey: 'omnichat.sidebar.chat', fallbackLabel: 'Chat' },
-  { id: 'studio', icon: SquarePen, labelKey: 'omnichat.sidebar.studio', fallbackLabel: 'Studio' },
+  { id: 'groups', icon: UsersRound, labelKey: 'omnichat.sidebar.groups', fallbackLabel: 'Groups' },
+  { id: 'create', icon: ImagePlus, labelKey: 'omnichat.sidebar.create', fallbackLabel: 'Create' },
+  { id: 'explore', icon: PanelsTopLeft, labelKey: 'omnichat.sidebar.explore', fallbackLabel: 'Explore' },
+  { id: 'characters', icon: UsersRound, labelKey: 'omnichat.sidebar.characters', fallbackLabel: 'Characters' },
 ];
 
 function SidebarNav({

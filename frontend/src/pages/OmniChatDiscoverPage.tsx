@@ -8,8 +8,6 @@ import {
   MessageCircle,
   Plus,
   Search as SearchIcon,
-  Sparkles,
-  WandSparkles,
 } from 'lucide-react';
 import { omnichatService, omnichatQueryKeys } from '../services/omnichatService';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
@@ -312,9 +310,9 @@ export default function OmniChatDiscoverPage() {
       return;
     }
 
-    if (tab === 'studio') {
+    if (tab === 'characters') {
       if (isAuthenticated) {
-        setSidebarTab('studio');
+        setSidebarTab('characters');
         navigate('/omnichat/studio');
         return;
       }
@@ -326,7 +324,11 @@ export default function OmniChatDiscoverPage() {
     setSidebarTab(tab);
     if (tab === 'chat') {
       navigate('/omnichat/chat');
+    } else if (tab === 'groups') {
+      navigate('/omnichat/groups');
     }
+    if (tab === 'create') navigate('/omnichat/create');
+    if (tab === 'explore') navigate('/omnichat/explore');
   }, [handleOpenStudio, isAuthenticated, navigate]);
 
   const personasQuery = useQuery({
@@ -555,7 +557,6 @@ export default function OmniChatDiscoverPage() {
 
               <div className="relative z-10 flex min-h-[420px] max-w-2xl flex-col justify-end p-6 sm:min-h-[440px] sm:justify-center sm:p-10 lg:p-12">
                 <div className="mb-5 flex w-fit items-center gap-2 rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-blue-100 backdrop-blur-md">
-                  <Sparkles size={13} />
                   {t('omnichat.discover.heroEyebrow')}
                 </div>
                 <h1 id="omnichat-hero-title" className="max-w-xl text-[2.55rem] font-black leading-[0.98] tracking-[-0.055em] text-white sm:text-5xl lg:text-[3.65rem]">
@@ -660,7 +661,6 @@ export default function OmniChatDiscoverPage() {
               <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <p className="mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.19em] text-blue-200/65">
-                    <WandSparkles size={14} />
                     {t('omnichat.discover.featuredEyebrow')}
                   </p>
                   <h2 className="text-2xl font-black tracking-[-0.04em] text-[var(--color-text-primary)] sm:text-3xl">
