@@ -76,9 +76,20 @@ describe('createMainStagePresentationRig', () => {
     expect(scene.getMeshByName('main-stage-arrival-mist-band')?.parent?.name).toBe(
       'main-stage-presentation-backdrop',
     );
-    expect(scene.getMaterialByName('main-stage-celestial-vault-material')?.getClassName()).toBe(
-      'PBRMaterial',
-    );
+    const celestialVaultMaterial = scene.getMaterialByName(
+      'main-stage-celestial-vault-material',
+    ) as PBRMaterial | null;
+    expect(celestialVaultMaterial?.getClassName()).toBe('PBRMaterial');
+    // NullEngine has no 2D canvas context, so the starfield texture build
+    // is expected to fail gracefully; the material must still exist with
+    // a safe fallback emissive colour rather than throwing.
+    expect(celestialVaultMaterial?.unlit).toBe(true);
+    expect(celestialVaultMaterial?.emissiveColor).toBeTruthy();
+
+    const moon = scene.getMeshByName('main-stage-moon');
+    expect(moon).not.toBeNull();
+    expect(moon?.parent?.name).toBe('main-stage-presentation-backdrop');
+    expect(moon?.isPickable).toBe(false);
     expect(scene.getMaterialByName('main-stage-arrival-void-veil-material')).not.toBeNull();
     expect(scene.getMaterialByName('main-stage-crown-halo-material')).not.toBeNull();
     const crownSilhouetteMaterial = scene.getMaterialByName(
