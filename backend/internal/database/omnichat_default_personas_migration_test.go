@@ -157,6 +157,56 @@ func TestMigrateSeedsDefaultOmniChatPersonas(t *testing.T) {
 		  AND post_history_instructions LIKE '%Never say an enemy is defeated unless the new HP is 0 or lower%'
 	`).Scan(&dmCombatLedgerCount))
 	require.Equal(t, 2, dmCombatLedgerCount)
+
+	var dmSpellGuardrailCount int
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM bot_personas
+		WHERE slug IN ('ruleskeeper-dm', 'malachar-warlock-dm')
+		  AND owner_user_id IS NULL
+		  AND character_version = '2026-07-defaults-v1'
+		  AND system_prompt LIKE '%[Spell Resolution Guardrail]%'
+		  AND system_prompt LIKE '%At character level 3, Eldritch Blast makes one spell attack%'
+		  AND system_prompt LIKE '%never use a d20 as its damage die%'
+		  AND system_prompt LIKE '%Do not rename Eldritch Blast as Chaos Bolt%'
+	`).Scan(&dmSpellGuardrailCount))
+	require.Equal(t, 2, dmSpellGuardrailCount)
+}
+
+func TestSpellResolutionGuardrailMigrationRollsBackCleanly(t *testing.T) {
+	db, err := NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, DropSchema(ctx, db))
+	require.NoError(t, db.Migrate(ctx))
+
+	countGuardrails := func() int {
+		var count int
+		require.NoError(t, db.Pool.QueryRow(ctx, `
+			SELECT COUNT(*)
+			FROM bot_personas
+			WHERE slug IN ('ruleskeeper-dm', 'malachar-warlock-dm')
+			  AND system_prompt LIKE '%[Spell Resolution Guardrail]%'
+		`).Scan(&count))
+		return count
+	}
+	require.Equal(t, 2, countGuardrails())
+
+	require.NoError(t, db.MigrateDown(ctx))
+	require.Equal(t, 0, countGuardrails())
+	var combatAccountingCount int
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM bot_personas
+		WHERE slug IN ('ruleskeeper-dm', 'malachar-warlock-dm')
+		  AND system_prompt LIKE '%[Combat Accounting]%'
+	`).Scan(&combatAccountingCount))
+	require.Equal(t, 2, combatAccountingCount)
+
+	require.NoError(t, db.Migrate(ctx))
+	require.Equal(t, 2, countGuardrails())
 }
 
 func TestStarterMessageOutputFormatMigrationRepairsLegacyStarterRows(t *testing.T) {
