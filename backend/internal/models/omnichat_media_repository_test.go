@@ -91,6 +91,55 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 	require.Len(t, messages[1].Attachments, 1)
 	require.Equal(t, asset.ID, messages[1].Attachments[0].ID)
 
+	original, err := conversationRepo.GetByID(ctx, conversation.ID, owner.ID)
+	require.NoError(t, err)
+	original.Persona, err = models.NewBotPersonaRepository(db.Pool).GetByID(ctx, personaID)
+	require.NoError(t, err)
+	fork, err := conversationRepo.ForkConversation(ctx, owner.ID, original)
+	require.NoError(t, err)
+	require.NotNil(t, fork)
+	forkedMessages, err := messageRepo.ListByConversationID(ctx, fork.ID, 20)
+	require.NoError(t, err)
+	require.Len(t, forkedMessages, 2)
+	require.Len(t, forkedMessages[1].Attachments, 1)
+	require.Equal(t, asset.ID, forkedMessages[1].Attachments[0].ID)
+
+	deleted, err := models.NewBotPersonaRepository(db.Pool).DeleteOwned(ctx, owner.ID, personaID)
+	require.NoError(t, err)
+	require.False(t, deleted, "catalog personas are not user-owned")
+
+	ownedPersona, err := models.NewBotPersonaRepository(db.Pool).CreateOwned(ctx, owner.ID, &models.BotPersona{
+		Slug:               "media-deletable-persona",
+		Name:               "Deletable Persona",
+		Category:           models.PersonaCategoryOriginal,
+		Visibility:         "private",
+		SourceFormat:       "native",
+		SystemPrompt:       "Stay in character.",
+		FirstMessage:       "Hello.",
+		AlternateGreetings: []string{},
+		Tags:               []string{},
+		GalleryURLs:        []string{},
+		ExtensionsJSON:     []byte(`{}`),
+	})
+	require.NoError(t, err)
+	deletionJob, err := repo.CreateGenerationJob(ctx, owner.ID, models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeCreate,
+		PersonaID: ownedPersona.ID, Prompt: "A quiet room", EffectivePrompt: "A quiet room", AspectRatio: "1:1",
+	}, "test")
+	require.NoError(t, err)
+	deleted, err = models.NewBotPersonaRepository(db.Pool).DeleteOwned(ctx, owner.ID, ownedPersona.ID)
+	require.NoError(t, err)
+	require.True(t, deleted)
+	deletedPersona, err := models.NewBotPersonaRepository(db.Pool).GetAccessibleByID(ctx, ownedPersona.ID, &owner.ID)
+	require.NoError(t, err)
+	require.Nil(t, deletedPersona)
+	cancelledJob, err := repo.GetGenerationJobOwned(ctx, deletionJob.ID, owner.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.OmniChatGenerationStatusCancelled, cancelledJob.Status)
+	preservedAsset, err := repo.GetMediaAssetOwned(ctx, asset.ID, owner.ID)
+	require.NoError(t, err)
+	require.NotNil(t, preservedAsset, "deleting a persona must not orphan or erase its existing gallery media")
+
 	var trackedBytes int64
 	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT storage_used_bytes FROM users WHERE id = $1`, owner.ID).Scan(&trackedBytes))
 	require.Equal(t, int64(1024), trackedBytes)

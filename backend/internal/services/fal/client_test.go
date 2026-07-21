@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -88,4 +89,25 @@ func TestClientRejectsOversizedSuccessfulResponse(t *testing.T) {
 		context.Background(), "fal-ai/nano-banana-2", map[string]any{"prompt": "x"},
 	)
 	require.EqualError(t, err, "fal response exceeds size limit")
+}
+
+func TestClientDoesNotFollowCrossHostRedirectWithCredential(t *testing.T) {
+	var targetRequests atomic.Int32
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		targetRequests.Add(1)
+		require.Empty(t, r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer target.Close()
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
+	}))
+	defer origin.Close()
+
+	_, err := newClient("secret-key", origin.URL, origin.Client()).Submit(
+		context.Background(), "fal-ai/nano-banana-2", map[string]any{"prompt": "portrait"},
+	)
+
+	require.Error(t, err)
+	require.Zero(t, targetRequests.Load())
 }

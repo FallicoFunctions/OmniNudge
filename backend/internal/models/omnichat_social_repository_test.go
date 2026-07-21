@@ -104,6 +104,18 @@ func TestOmniChatSocialRepositoryPublishEngageAndContinueLifecycle(t *testing.T)
 	bannedAuthorComments, err := social.ListPublicationComments(ctx, publication.ID, &owner.ID, nil, 50)
 	require.NoError(t, err)
 	require.Empty(t, bannedAuthorComments, "comments from a banned account must disappear from public threads")
+	require.NoError(t, social.SetPublicationLiked(ctx, publication.ID, reader.ID, false))
+	require.NoError(t, social.SetPublicationLiked(ctx, publication.ID, reader.ID, true))
+	bannedComment, err := social.AddPublicationComment(ctx, publication.ID, reader.ID, nil, "A banned account cannot post.")
+	require.NoError(t, err)
+	require.Nil(t, bannedComment)
+	require.NoError(t, social.SetPublicationBookmarked(ctx, publication.ID, reader.ID, true))
+	var bannedEngagements int
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT (SELECT COUNT(*) FROM omnichat_publication_reactions WHERE publication_id=$1 AND user_id=$2)
+		     + (SELECT COUNT(*) FROM omnichat_publication_bookmarks WHERE publication_id=$1 AND user_id=$2)
+	`, publication.ID, reader.ID).Scan(&bannedEngagements))
+	require.Zero(t, bannedEngagements, "a banned account must not mutate public engagement directly through the repository")
 	_, err = db.Pool.Exec(ctx, `UPDATE users SET banned=FALSE WHERE id=$1`, reader.ID)
 	require.NoError(t, err)
 

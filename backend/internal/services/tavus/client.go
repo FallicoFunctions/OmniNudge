@@ -46,7 +46,9 @@ func NewClient(apiKey, baseURL string) *Client {
 	}
 	return &Client{
 		apiKey: strings.TrimSpace(apiKey), baseURL: strings.TrimRight(baseURL, "/"),
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		httpClient: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		}},
 	}
 }
 
@@ -65,11 +67,20 @@ func (c *Client) CreateConversation(ctx context.Context, request CreateConversat
 	if len([]rune(request.ConversationName)) > 200 || len([]rune(request.ConversationalContext)) > 20_000 || len(request.MemoryStores) > 1 {
 		return nil, errors.New("invalid live avatar conversation context")
 	}
+	for _, memoryStore := range request.MemoryStores {
+		if !providerIDPattern.MatchString(memoryStore) {
+			return nil, errors.New("invalid live avatar memory store")
+		}
+	}
 	body, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
 	}
-	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/v2/conversations", bytes.NewReader(body))
+	endpoint, err := c.endpoint("/v2/conversations")
+	if err != nil {
+		return nil, err
+	}
+	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +126,11 @@ func (c *Client) EndConversation(ctx context.Context, conversationID string) err
 	if !c.Configured() || !providerIDPattern.MatchString(conversationID) {
 		return errors.New("invalid live avatar conversation")
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/v2/conversations/"+url.PathEscape(conversationID)+"/end", nil)
+	endpoint, err := c.endpoint("/v2/conversations/" + url.PathEscape(conversationID) + "/end")
+	if err != nil {
+		return err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, nil)
 	if err != nil {
 		return err
 	}
@@ -133,6 +148,20 @@ func (c *Client) EndConversation(ctx context.Context, conversationID string) err
 		return fmt.Errorf("live avatar provider returned status %d", response.StatusCode)
 	}
 	return nil
+}
+
+func (c *Client) endpoint(path string) (string, error) {
+	if c == nil {
+		return "", errors.New("live avatar video is not configured")
+	}
+	base, err := url.Parse(c.baseURL)
+	if err != nil || (base.Scheme != "https" && base.Scheme != "http") || base.Hostname() == "" ||
+		base.User != nil || base.RawQuery != "" || base.Fragment != "" {
+		return "", errors.New("invalid live avatar provider URL")
+	}
+	base.Path = strings.TrimRight(base.Path, "/") + path
+	base.RawPath = ""
+	return base.String(), nil
 }
 
 func validatedJoinURL(rawURL, token string) (string, error) {

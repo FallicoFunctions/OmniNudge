@@ -26,6 +26,26 @@ import { useAuth } from '../contexts/AuthContext';
 
 type ExploreFilter = 'all' | OmniChatPublicationKind;
 
+function getSafePublicationShareUrl(path: string, publicationId: string): string {
+  const fallback = new URL(
+    `/omnichat/explore/${encodeURIComponent(publicationId)}`,
+    window.location.origin
+  );
+  let url: URL;
+  try {
+    url = new URL(path, window.location.origin);
+  } catch {
+    return fallback.toString();
+  }
+
+  // Share paths are an API convenience, not a redirect authority.  Keep the
+  // user on this origin and within the public OmniChat route namespace.
+  if (url.origin !== window.location.origin || !url.pathname.startsWith('/omnichat/explore/')) {
+    return fallback.toString();
+  }
+  return url.toString();
+}
+
 function useOmniChatNavigation() {
   const navigate = useNavigate();
   return (tab: SidebarTab) => {
@@ -202,7 +222,7 @@ function OmniChatPublicationCard({
     const path = isAuthenticated
       ? await omnichatService.recordPublicationShare(publication.id)
       : `/omnichat/explore/${publication.id}`;
-    const url = new URL(path, window.location.origin).toString();
+    const url = getSafePublicationShareUrl(path, publication.id);
     if (navigator.share)
       await navigator.share({
         title: publication.snapshot?.title || `${publication.persona_name} on OmniChat`,

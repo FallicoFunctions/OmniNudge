@@ -19,6 +19,18 @@ type BrowserRecognition = {
 };
 type RecognitionConstructor = new () => BrowserRecognition;
 
+export function isTrustedOmniChatCallUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      (url.hostname === 'daily.co' || url.hostname.endsWith('.daily.co'))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default function OmniChatCallModal({
   persona,
   conversationId,
@@ -65,6 +77,15 @@ export default function OmniChatCallModal({
       .startCall(conversationId, mode)
       .then((created) => {
         if (active && !closedRef.current && callEpochRef.current === callEpoch) {
+          if (
+            mode === 'video' &&
+            created.live_video_url &&
+            !isTrustedOmniChatCallUrl(created.live_video_url)
+          ) {
+            void omnichatService.endCall(created.id).catch(() => undefined);
+            setStatus('error');
+            return;
+          }
           sessionRef.current = created;
           setLiveVideoURL(created.live_video_url ?? '');
           setStatus('ready');

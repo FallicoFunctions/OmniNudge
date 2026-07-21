@@ -27,6 +27,8 @@ type generatedMediaDownload struct {
 	Extension   string
 }
 
+const maxGeneratedMediaBoxes = 100_000
+
 type generatedMediaResolver interface {
 	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
 }
@@ -79,6 +81,9 @@ func validateGeneratedMediaURL(rawURL string) error {
 	}
 	if parsed.User != nil || parsed.Fragment != "" {
 		return errors.New("generated media URL contains forbidden components")
+	}
+	if port := parsed.Port(); port != "" && port != "443" {
+		return errors.New("generated media URL uses an untrusted port")
 	}
 	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
 	trusted := host == "fal.media" || strings.HasSuffix(host, ".fal.media") || host == "storage.googleapis.com"
@@ -202,8 +207,13 @@ func validateGeneratedMediaContents(file *os.File, expectedKind, contentType str
 	}
 
 	var offset int64
+	boxCount := 0
 	var sawFTYP, sawMovieMetadata, sawMediaData bool
 	for offset < size {
+		boxCount++
+		if boxCount > maxGeneratedMediaBoxes {
+			return errors.New("generated video container has too many boxes")
+		}
 		if size-offset < 8 {
 			return errors.New("generated video container is truncated")
 		}

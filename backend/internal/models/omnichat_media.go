@@ -641,7 +641,19 @@ func (r *OmniChatMediaRepository) MessageBelongsToConversation(ctx context.Conte
 }
 
 func (r *OmniChatMediaRepository) AttachAssetToMessageOwned(ctx context.Context, messageID int, assetID uuid.UUID, ownerUserID int) error {
-	tag, err := r.pool.Exec(ctx, `
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// The next attachment position is derived from existing rows. Serialize
+	// writers for this message so concurrent attaches cannot collide on the
+	// (message_id, position) uniqueness constraint.
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(68422, $1)`, messageID); err != nil {
+		return err
+	}
+	tag, err := tx.Exec(ctx, `
 		INSERT INTO bot_message_attachments (message_id, asset_id, position)
 		SELECT m.id, a.id,
 		       COALESCE((SELECT MAX(position) + 1 FROM bot_message_attachments WHERE message_id = m.id), 0)
@@ -658,5 +670,5 @@ func (r *OmniChatMediaRepository) AttachAssetToMessageOwned(ctx context.Context,
 	if tag.RowsAffected() == 0 {
 		return pgx.ErrNoRows
 	}
-	return nil
+	return tx.Commit(ctx)
 }

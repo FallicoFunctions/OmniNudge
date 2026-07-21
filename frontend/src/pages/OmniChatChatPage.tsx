@@ -81,6 +81,27 @@ const CHAT_LIST_WIDTH_WIDE = 340;
 const CHAT_LIST_WIDTH_COMPACT = 320;
 const CHAT_LIST_WIDTH_COLLAPSED = 88;
 
+function isOmniChatTokenPayload(value: unknown): value is OmniChatTokenPayload {
+  if (!value || typeof value !== 'object') return false;
+  const payload = value as Partial<OmniChatTokenPayload>;
+  return Number.isFinite(payload.conversation_id) && typeof payload.token === 'string';
+}
+
+function isOmniChatRegenerationTokenPayload(
+  value: unknown
+): value is OmniChatRegenerationTokenPayload {
+  return (
+    isOmniChatTokenPayload(value) &&
+    Number.isFinite((value as Partial<OmniChatRegenerationTokenPayload>).message_id)
+  );
+}
+
+function isConversationMessage(value: unknown): value is BotMessage {
+  if (!value || typeof value !== 'object') return false;
+  const message = value as Partial<BotMessage>;
+  return Number.isFinite(message.id) && Number.isFinite(message.conversation_id);
+}
+
 function GeneratingIndicator() {
   return (
     <div className="flex gap-1 px-1 py-2">
@@ -365,11 +386,19 @@ export default function OmniChatChatPage() {
   const [isAvatarHovered, setIsAvatarHovered] = useState(false);
   const [profilePaneCollapsed, setProfilePaneCollapsed] = useState(() => {
     if (typeof localStorage === 'undefined') return false;
-    return localStorage.getItem(PROFILE_PANE_COLLAPSED_KEY) === 'true';
+    try {
+      return localStorage.getItem(PROFILE_PANE_COLLAPSED_KEY) === 'true';
+    } catch {
+      return false;
+    }
   });
   const [chatListCollapsed, setChatListCollapsed] = useState(() => {
     if (typeof localStorage === 'undefined') return false;
-    return localStorage.getItem(CHAT_LIST_COLLAPSED_KEY) === 'true';
+    try {
+      return localStorage.getItem(CHAT_LIST_COLLAPSED_KEY) === 'true';
+    } catch {
+      return false;
+    }
   });
   const profileDrawerMode = useMediaQuery('(min-width: 1024px) and (max-width: 1499px)');
   const mobileChatMode = useMediaQuery('(max-width: 1023px)');
@@ -555,14 +584,22 @@ export default function OmniChatChatPage() {
   useEffect(() => {
     if (!isGuest || !guestPersonaId) return;
     setGuestPersonaLoading(true);
+    let active = true;
     omnichatService
       .listPersonas()
       .then((personas) => {
-        setGuestPersona(personas.find((persona) => persona.id === guestPersonaId) ?? null);
+        if (active)
+          setGuestPersona(personas.find((persona) => persona.id === guestPersonaId) ?? null);
+      })
+      .catch(() => {
+        if (active) setGuestPersona(null);
       })
       .finally(() => {
-        setGuestPersonaLoading(false);
+        if (active) setGuestPersonaLoading(false);
       });
+    return () => {
+      active = false;
+    };
   }, [guestPersonaId, isGuest]);
 
   useEffect(() => {
@@ -615,22 +652,26 @@ export default function OmniChatChatPage() {
     if (isGuest) return;
     const onToken = (event: Event) => {
       const detail = (event as CustomEvent<OmniChatTokenPayload>).detail;
+      if (!isOmniChatTokenPayload(detail)) return;
       if (detail.conversation_id !== selectedConversationId) return;
       setStreamingText((prev) => prev + detail.token);
     };
     const onComplete = (event: Event) => {
       const detail = (event as CustomEvent<BotMessage>).detail;
+      if (!isConversationMessage(detail)) return;
       if (detail.conversation_id !== selectedConversationId) return;
       setStreamingText('');
     };
     const onRegenerationToken = (event: Event) => {
       const detail = (event as CustomEvent<OmniChatRegenerationTokenPayload>).detail;
+      if (!isOmniChatRegenerationTokenPayload(detail)) return;
       if (detail.conversation_id !== selectedConversationId) return;
       setRegeneratingMessageId(detail.message_id);
       setRegenerationText((prev) => prev + detail.token);
     };
     const onRegenerated = (event: Event) => {
       const detail = (event as CustomEvent<BotMessage>).detail;
+      if (!isConversationMessage(detail)) return;
       if (detail.conversation_id !== selectedConversationId) return;
       setRegeneratingMessageId((current) => (current === detail.id ? null : current));
       setRegenerationText('');
@@ -674,12 +715,20 @@ export default function OmniChatChatPage() {
   useEffect(() => {
     if (typeof localStorage === 'undefined') return;
     if (profileDrawerMode || mobileChatMode) return;
-    localStorage.setItem(PROFILE_PANE_COLLAPSED_KEY, String(profilePaneCollapsed));
+    try {
+      localStorage.setItem(PROFILE_PANE_COLLAPSED_KEY, String(profilePaneCollapsed));
+    } catch {
+      // Storage can be disabled in privacy-restricted browser contexts.
+    }
   }, [mobileChatMode, profileDrawerMode, profilePaneCollapsed]);
 
   useEffect(() => {
     if (typeof localStorage === 'undefined' || mobileChatMode) return;
-    localStorage.setItem(CHAT_LIST_COLLAPSED_KEY, String(chatListCollapsed));
+    try {
+      localStorage.setItem(CHAT_LIST_COLLAPSED_KEY, String(chatListCollapsed));
+    } catch {
+      // Storage can be disabled in privacy-restricted browser contexts.
+    }
   }, [chatListCollapsed, mobileChatMode]);
 
   useEffect(() => {
@@ -691,7 +740,11 @@ export default function OmniChatChatPage() {
       setProfilePaneCollapsed(false);
       return;
     }
-    setProfilePaneCollapsed(localStorage.getItem(PROFILE_PANE_COLLAPSED_KEY) === 'true');
+    try {
+      setProfilePaneCollapsed(localStorage.getItem(PROFILE_PANE_COLLAPSED_KEY) === 'true');
+    } catch {
+      setProfilePaneCollapsed(false);
+    }
   }, [profileDrawerMode]);
 
   useEffect(() => {
@@ -706,8 +759,11 @@ export default function OmniChatChatPage() {
       if (!target || !document.contains(target)) return;
       setNewChatMenuOpen(false);
     };
-    setTimeout(() => document.addEventListener('click', handler), 0);
-    return () => document.removeEventListener('click', handler);
+    const timer = window.setTimeout(() => document.addEventListener('click', handler), 0);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('click', handler);
+    };
   }, [newChatMenuOpen]);
 
   const mediaGenerationMutation = useMutation({

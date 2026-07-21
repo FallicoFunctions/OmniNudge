@@ -374,6 +374,61 @@ func TestBotConversationRepositoryArchiveByUserAndPersonaID(t *testing.T) {
 	require.Len(t, secondPersonaConversations, 1)
 }
 
+func TestBotConversationRepositoryGetOrCreateActiveIsConcurrentSafe(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	user := &User{Username: fmt.Sprintf("omnichat_resume_%d", time.Now().UnixNano()), PasswordHash: "hash"}
+	require.NoError(t, NewUserRepository(db.Pool).Create(ctx, user))
+	var personaID int
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug,name,category,system_prompt,visibility,source_format,is_active)
+		VALUES ($1,'Resume Guide','original','Stay in character.','public','native',TRUE) RETURNING id
+	`, fmt.Sprintf("omnichat-resume-%d", time.Now().UnixNano())).Scan(&personaID))
+
+	repo := NewBotConversationRepository(db.Pool)
+	const callers = 8
+	start := make(chan struct{})
+	type result struct {
+		conversation *BotConversation
+		reused       bool
+		err          error
+	}
+	results := make(chan result, callers)
+	for range callers {
+		go func() {
+			<-start
+			conversation, reused, callErr := repo.GetOrCreateActiveWithMessages(ctx, user.ID, personaID, nil, nil, nil)
+			results <- result{conversation: conversation, reused: reused, err: callErr}
+		}()
+	}
+	close(start)
+	created := 0
+	var expectedID int
+	for range callers {
+		result := <-results
+		require.NoError(t, result.err)
+		require.NotNil(t, result.conversation)
+		if !result.reused {
+			created++
+		}
+		if expectedID == 0 {
+			expectedID = result.conversation.ID
+		}
+		require.Equal(t, expectedID, result.conversation.ID)
+	}
+	require.Equal(t, 1, created)
+	var activeCount int
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM bot_conversations WHERE user_id=$1 AND persona_id=$2 AND archived_at IS NULL
+	`, user.ID, personaID).Scan(&activeCount))
+	require.Equal(t, 1, activeCount)
+}
+
 func TestBotMessageRepositoryRepairsStaleDanglingUserTurn(t *testing.T) {
 	db, err := database.NewTest()
 	require.NoError(t, err)

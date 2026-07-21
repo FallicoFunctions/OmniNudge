@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +36,17 @@ export default function ChatSettingsModal({
   const [flippedId, setFlippedId] = useState<number | null>(null);
   const [slidingOutId, setSlidingOutId] = useState<number | null>(null);
   const [isPersonaDetailsOpen, setIsPersonaDetailsOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
+  const deletionTimerRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (deletionTimerRef.current !== null) {
+        window.clearTimeout(deletionTimerRef.current);
+      }
+    },
+    []
+  );
 
   // Sync form state with currentSettings when modal opens or conversation changes
   useEffect(() => {
@@ -71,18 +82,21 @@ export default function ChatSettingsModal({
 
   const deleteMutation = useMutation({
     mutationFn: (convId: number) => omnichatService.deleteConversation(convId),
+    onMutate: () => setDeleteError(false),
     onSuccess: (_data, convId) => {
       setFlippedId(null);
       setSlidingOutId(convId);
-      setTimeout(() => {
+      if (deletionTimerRef.current !== null) {
+        window.clearTimeout(deletionTimerRef.current);
+      }
+      deletionTimerRef.current = window.setTimeout(() => {
         setSlidingOutId(null);
-        queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
-        queryClient.invalidateQueries({ queryKey: [...omnichatQueryKeys.conversations, 'persona', persona.id] });
+        void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
+        void queryClient.invalidateQueries({ queryKey: [...omnichatQueryKeys.conversations, 'persona', persona.id] });
+        deletionTimerRef.current = null;
       }, 300);
     },
-    onError: (err) => {
-      console.error('Delete failed:', err);
-    },
+    onError: () => setDeleteError(true),
   });
 
   const handleSave = () => {
@@ -247,6 +261,11 @@ export default function ChatSettingsModal({
 
                 {historyQuery.isError && (
                   <p className="text-xs text-red-500">{t('omnichat.chat.historyLoadError')}</p>
+                )}
+                {deleteError && (
+                  <p role="alert" className="mt-2 text-xs text-red-500">
+                    {t('omnichat.chat.historyDeleteError')}
+                  </p>
                 )}
 
                 {historyQuery.isSuccess && otherConversations.length === 0 && (

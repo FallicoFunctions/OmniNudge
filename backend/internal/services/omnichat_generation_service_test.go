@@ -27,12 +27,14 @@ func (f *generationConversationReaderFake) GetByID(_ context.Context, _, _ int) 
 }
 
 type generationStoreFake struct {
-	scene        *models.OmniChatSceneState
-	recentEvents []string
-	asset        *models.OmniChatMediaAsset
-	created      *models.OmniChatGenerationJob
-	failedCode   string
-	failedError  string
+	scene          *models.OmniChatSceneState
+	recentEvents   []string
+	asset          *models.OmniChatMediaAsset
+	created        *models.OmniChatGenerationJob
+	failedCode     string
+	failedError    string
+	markErr        error
+	markContextErr error
 }
 
 func (f *generationStoreFake) GetRecentConversationEventsOwned(_ context.Context, _, _, _ int) ([]string, error) {
@@ -69,10 +71,11 @@ func (f *generationStoreFake) CreateGenerationJob(_ context.Context, ownerUserID
 	return f.created, nil
 }
 
-func (f *generationStoreFake) MarkGenerationJobFailed(_ context.Context, _ uuid.UUID, safeCode, providerError string) error {
+func (f *generationStoreFake) MarkGenerationJobFailed(ctx context.Context, _ uuid.UUID, safeCode, providerError string) error {
 	f.failedCode = safeCode
 	f.failedError = providerError
-	return nil
+	f.markContextErr = ctx.Err()
+	return f.markErr
 }
 
 type generationEnqueuerFake struct {
@@ -184,7 +187,28 @@ func TestOmniChatGenerationServiceCreateMarksJobFailedWhenQueueUnavailable(t *te
 
 	require.ErrorIs(t, err, ErrOmniChatGenerationUnavailable)
 	require.Equal(t, "queue_unavailable", store.failedCode)
-	require.Contains(t, store.failedError, "redis unavailable")
+	require.Equal(t, "generation could not be queued", store.failedError)
+	require.NoError(t, store.markContextErr)
+}
+
+func TestOmniChatGenerationServiceUsesIndependentContextToRecordQueueFailure(t *testing.T) {
+	store := &generationStoreFake{}
+	service := NewOmniChatGenerationService(
+		&generationPersonaReaderFake{persona: &models.BotPersona{ID: 42}},
+		&generationConversationReaderFake{}, store, nil, "fal",
+	)
+	requestCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := service.CreateGeneration(requestCtx, 9, models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeCreate,
+		PersonaID: 42, Prompt: "Portrait at sunset",
+	})
+
+	require.ErrorIs(t, err, ErrOmniChatGenerationUnavailable)
+	require.Equal(t, "queue_unavailable", store.failedCode)
+	require.Equal(t, "generation could not be queued", store.failedError)
+	require.NoError(t, store.markContextErr)
 }
 
 func TestOmniChatGenerationServiceRejectsUnsupportedProviderBeforeCreatingJob(t *testing.T) {

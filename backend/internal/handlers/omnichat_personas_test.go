@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -101,6 +102,17 @@ func TestNormalizePersonaDefinitionRequiresPreparedOpening(t *testing.T) {
 	persona, err := normalizePersonaDefinitionRequest(7, nil, base, "chara_card_v2", nil)
 	require.NoError(t, err)
 	require.Equal(t, "This way.", persona.FirstMessage)
+}
+
+func TestNormalizePersonaDefinitionRejectsOversizedListItems(t *testing.T) {
+	base := &personaDefinitionRequest{
+		Name:         "Bounded Guide",
+		Category:     models.PersonaCategoryOriginal,
+		FirstMessage: "Hello.",
+		Tags:         []string{strings.Repeat("x", maxPersonaTagRunes+1)},
+	}
+	_, err := normalizePersonaDefinitionRequest(7, nil, base, "native", nil)
+	require.EqualError(t, err, "tags contain an invalid value")
 }
 
 func seedPublicOmniChatPersona(t *testing.T, pool *pgxpool.Pool, repo *models.BotPersonaRepository, slug, name string) *models.BotPersona {
@@ -226,6 +238,42 @@ func TestOmniChatPersonaHandler_CreatePersonaForcesPrivateAndListsOwned(t *testi
 	require.NoError(t, json.Unmarshal(otherCatalogW.Body.Bytes(), &otherCatalogResp))
 	require.Len(t, otherCatalogResp.Personas, 1)
 	require.Equal(t, "Public Guide", otherCatalogResp.Personas[0].Name)
+}
+
+func TestOmniChatPersonaHandlerRejectsForeignUploadURLs(t *testing.T) {
+	router, userRepo, _, pool, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	owner := createOmniChatPersonaTestUser(t, userRepo, "persona_media_owner")
+	other := createOmniChatPersonaTestUser(t, userRepo, "persona_media_other")
+
+	insertMedia := func(userID int, name, scanStatus string) string {
+		t.Helper()
+		url := "/uploads/" + name
+		_, err := pool.Exec(context.Background(), `
+			INSERT INTO media_files (user_id,filename,original_filename,file_type,file_size,storage_url,storage_path,scan_status)
+			VALUES ($1,$2,$2,'image/png',1,$3,$4,$5)
+		`, userID, name, "https://cdn.example.test/"+name, "uploads/"+name, scanStatus)
+		require.NoError(t, err)
+		return url
+	}
+	foreignURL := insertMedia(other.ID, "foreign-persona.png", models.MediaScanStatusClean)
+	ownedURL := insertMedia(owner.ID, "owned-persona.png", models.MediaScanStatusPending)
+	requestBody := func(avatarURL string) []byte {
+		return []byte(`{"name":"Media Guide","category":"original","first_message":"Hello.","avatar_url":"` + avatarURL + `","gallery_urls":[],"extensions_json":{}}`)
+	}
+	foreignRequest := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(requestBody(foreignURL)))
+	foreignRequest.Header.Set("Content-Type", "application/json")
+	setOmniChatPersonaTestUser(foreignRequest, owner.ID)
+	foreignResponse := httptest.NewRecorder()
+	router.ServeHTTP(foreignResponse, foreignRequest)
+	require.Equal(t, http.StatusBadRequest, foreignResponse.Code)
+
+	ownedRequest := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(requestBody(ownedURL)))
+	ownedRequest.Header.Set("Content-Type", "application/json")
+	setOmniChatPersonaTestUser(ownedRequest, owner.ID)
+	ownedResponse := httptest.NewRecorder()
+	router.ServeHTTP(ownedResponse, ownedRequest)
+	require.Equal(t, http.StatusCreated, ownedResponse.Code, "a just-uploaded pending file must be attachable while serving remains scan-gated")
 }
 
 func TestOmniChatPersonaHandler_ImportPersonaOwnerOnlyAccess(t *testing.T) {

@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,12 +21,14 @@ import (
 )
 
 const (
-	maxPersonaNameRunes                = 100
-	maxPersonaDescriptionRunes         = 4000
-	maxPersonaPromptFieldRunes         = 12000
-	maxPersonaAlternateGreetings       = 12
-	maxPersonaTags                     = 32
-	maxPersonaImportBytes        int64 = 16 << 20
+	maxPersonaNameRunes                    = 100
+	maxPersonaDescriptionRunes             = 4000
+	maxPersonaPromptFieldRunes             = 12000
+	maxPersonaAlternateGreetings           = 12
+	maxPersonaTags                         = 32
+	maxPersonaAlternateGreetingRunes       = 4000
+	maxPersonaTagRunes                     = 100
+	maxPersonaImportBytes            int64 = 16 << 20
 )
 
 var personaSlugUnsafePattern = regexp.MustCompile(`[^a-z0-9]+`)
@@ -148,6 +151,10 @@ func (h *OmniChatHandler) CreatePersona(c *gin.Context) {
 
 	created, err := h.personaRepo.CreateOwned(c.Request.Context(), userID, persona)
 	if err != nil {
+		if errors.Is(err, models.ErrPersonaMediaNotOwnedOrAllowed) {
+			RespondError(c, http.StatusBadRequest, "Persona media must be your own pending or verified upload")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to create persona")
 		return
 	}
@@ -191,6 +198,10 @@ func (h *OmniChatHandler) UpdatePersona(c *gin.Context) {
 
 	updated, err := h.personaRepo.UpdateOwned(c.Request.Context(), userID, personaID, persona)
 	if err != nil {
+		if errors.Is(err, models.ErrPersonaMediaNotOwnedOrAllowed) {
+			RespondError(c, http.StatusBadRequest, "Persona media must be your own pending or verified upload")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to update persona")
 		return
 	}
@@ -245,9 +256,13 @@ func (h *OmniChatHandler) ImportPersona(c *gin.Context) {
 	}
 	defer file.Close()
 
-	raw, err := io.ReadAll(io.LimitReader(file, maxPersonaImportBytes))
+	raw, err := io.ReadAll(io.LimitReader(file, maxPersonaImportBytes+1))
 	if err != nil {
 		RespondError(c, http.StatusBadRequest, "Failed to read upload")
+		return
+	}
+	if int64(len(raw)) > maxPersonaImportBytes {
+		RespondError(c, http.StatusRequestEntityTooLarge, "Character card file is too large")
 		return
 	}
 
@@ -291,6 +306,10 @@ func (h *OmniChatHandler) ImportPersona(c *gin.Context) {
 
 	created, err := h.personaRepo.CreateOwned(c.Request.Context(), userID, persona)
 	if err != nil {
+		if errors.Is(err, models.ErrPersonaMediaNotOwnedOrAllowed) {
+			RespondError(c, http.StatusBadRequest, "Persona media must be your own pending or verified upload")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to import persona")
 		return
 	}
@@ -469,14 +488,20 @@ func normalizePersonaDefinitionRequest(userID int, existing *models.BotPersona, 
 		}
 	}
 
-	alternateGreetings := normalizeStringList(req.AlternateGreetings, maxPersonaAlternateGreetings)
+	alternateGreetings, err := normalizeStringList(req.AlternateGreetings, maxPersonaAlternateGreetings, maxPersonaAlternateGreetingRunes)
+	if err != nil {
+		return nil, fmt.Errorf("alternate greetings contain an invalid value")
+	}
 	if firstMessage == "" && len(alternateGreetings) > 0 {
 		firstMessage = alternateGreetings[0]
 	}
 	if firstMessage == "" {
 		return nil, fmt.Errorf("first message is required")
 	}
-	tags := normalizeStringList(req.Tags, maxPersonaTags)
+	tags, err := normalizeStringList(req.Tags, maxPersonaTags, maxPersonaTagRunes)
+	if err != nil {
+		return nil, fmt.Errorf("tags contain an invalid value")
+	}
 
 	extensionsJSON, err := normalizeJSONObject(req.ExtensionsJSON, true)
 	if err != nil {
@@ -562,9 +587,9 @@ func normalizePersonaField(value string, maxRunes int, required bool) (string, e
 	return trimmed, nil
 }
 
-func normalizeStringList(values []string, maxItems int) []string {
+func normalizeStringList(values []string, maxItems, maxItemRunes int) ([]string, error) {
 	if len(values) == 0 {
-		return []string{}
+		return []string{}, nil
 	}
 	normalized := make([]string, 0, minInt(len(values), maxItems))
 	seen := make(map[string]struct{}, len(values))
@@ -572,6 +597,9 @@ func normalizeStringList(values []string, maxItems int) []string {
 		trimmed := strings.TrimSpace(value)
 		if trimmed == "" {
 			continue
+		}
+		if utf8.RuneCountInString(trimmed) > maxItemRunes {
+			return nil, fmt.Errorf("value too long")
 		}
 		key := strings.ToLower(trimmed)
 		if _, exists := seen[key]; exists {
@@ -583,7 +611,7 @@ func normalizeStringList(values []string, maxItems int) []string {
 			break
 		}
 	}
-	return normalized
+	return normalized, nil
 }
 
 func normalizeJSONObject(raw json.RawMessage, requiredObject bool) (json.RawMessage, error) {

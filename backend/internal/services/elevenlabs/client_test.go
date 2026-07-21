@@ -5,8 +5,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
+	"github.com/omninudge/backend/internal/services/speech"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,10 +27,10 @@ func TestClientSynthesizeUsesServerCredentialAndBoundedAudioResponse(t *testing.
 	defer server.Close()
 
 	client := NewClient("secret-key", server.URL, false)
-	audio, contentType, err := client.Synthesize(context.Background(), "voice-123", SpeechRequest{Text: "Hello Sadie", ModelID: "eleven_multilingual_v2"})
+	audio, err := client.Synthesize(context.Background(), "voice-123", speech.Request{Text: "Hello Sadie", ModelID: "eleven_multilingual_v2"})
 	require.NoError(t, err)
-	require.Equal(t, "audio/mpeg", contentType)
-	require.Equal(t, []byte{'I', 'D', '3'}, audio[:3])
+	require.Equal(t, "audio/mpeg", audio.ContentType)
+	require.Equal(t, []byte{'I', 'D', '3'}, audio.Bytes[:3])
 }
 
 func TestClientSynthesizeRejectsNonAudioProviderResponses(t *testing.T) {
@@ -39,7 +41,31 @@ func TestClientSynthesizeRejectsNonAudioProviderResponses(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, _, err := NewClient("key", server.URL, false).Synthesize(context.Background(), "voice", SpeechRequest{Text: "Hello"})
+	_, err := NewClient("key", server.URL, false).Synthesize(context.Background(), "voice", speech.Request{Text: "Hello"})
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), "secret provider detail")
+}
+
+func TestClientDoesNotFollowCrossHostRedirectWithCredential(t *testing.T) {
+	var targetRequests atomic.Int32
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		targetRequests.Add(1)
+		require.Empty(t, r.Header.Get("xi-api-key"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer target.Close()
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
+	}))
+	defer origin.Close()
+
+	_, err := NewClient("secret-key", origin.URL, false).Synthesize(context.Background(), "voice", speech.Request{Text: "Hello"})
+
+	require.Error(t, err)
+	require.Zero(t, targetRequests.Load())
+}
+
+func TestClientRejectsCredentialBearingBaseURL(t *testing.T) {
+	_, err := NewClient("secret-key", "https://attacker@api.elevenlabs.io", false).Synthesize(context.Background(), "voice", speech.Request{Text: "Hello"})
+	require.EqualError(t, err, "invalid elevenlabs base URL")
 }
