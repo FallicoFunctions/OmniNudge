@@ -14,6 +14,10 @@ const {
   mockCreateConversation,
   mockImportPersona,
   mockUploadMedia,
+  mockListVoicePresets,
+  mockGetPersonaVoice,
+  mockUpdatePersonaVoice,
+  mockPreviewVoicePreset,
 } = vi.hoisted(() => ({
   mockListMyPersonas: vi.fn(),
   mockGetPersonaDefinition: vi.fn(),
@@ -23,6 +27,10 @@ const {
   mockCreateConversation: vi.fn(),
   mockImportPersona: vi.fn(),
   mockUploadMedia: vi.fn(),
+  mockListVoicePresets: vi.fn(),
+  mockGetPersonaVoice: vi.fn(),
+  mockUpdatePersonaVoice: vi.fn(),
+  mockPreviewVoicePreset: vi.fn(),
 }));
 
 let mockIsAuthenticated = true;
@@ -53,6 +61,10 @@ vi.mock('../../components/omnichat/OmniChatShell', () => ({
 }));
 
 vi.mock('../../services/omnichatService', () => ({
+  omnichatQueryKeys: {
+    voicePresets: ['omnichat', 'voice-presets'],
+    personaVoice: (id: number) => ['omnichat', 'persona-voice', id],
+  },
   omnichatService: {
     listMyPersonas: (...args: unknown[]) => mockListMyPersonas(...args),
     getPersonaDefinition: (...args: unknown[]) => mockGetPersonaDefinition(...args),
@@ -62,6 +74,10 @@ vi.mock('../../services/omnichatService', () => ({
     createConversation: (...args: unknown[]) => mockCreateConversation(...args),
     importPersona: (...args: unknown[]) => mockImportPersona(...args),
     exportPersona: vi.fn(),
+    listVoicePresets: (...args: unknown[]) => mockListVoicePresets(...args),
+    getPersonaVoice: (...args: unknown[]) => mockGetPersonaVoice(...args),
+    updatePersonaVoice: (...args: unknown[]) => mockUpdatePersonaVoice(...args),
+    previewVoicePreset: (...args: unknown[]) => mockPreviewVoicePreset(...args),
   },
 }));
 
@@ -190,6 +206,46 @@ describe('OmniChatStudioPage', () => {
       storage_url: '/uploads/imported-avatar.png',
       storage_path: 'uploads/imported-avatar.png',
     });
+    mockListVoicePresets.mockResolvedValue({
+      voicebox_available: true,
+      voice_cloning_enabled: false,
+      presets: [
+        ...['Heart', 'Bella', 'Nova', 'Sarah', 'Sky', 'Emma'].map((name, index) => ({
+          id: ['af_heart', 'af_bella', 'af_nova', 'af_sarah', 'af_sky', 'bf_emma'][index],
+          name,
+          gender: 'female' as const,
+          provider: 'voicebox' as const,
+          voice_id: ['af_heart', 'af_bella', 'af_nova', 'af_sarah', 'af_sky', 'bf_emma'][index],
+          model_id: 'kokoro',
+          language_code: 'en',
+        })),
+        ...['Adam', 'Echo', 'Eric', 'Liam', 'Onyx', 'George'].map((name, index) => ({
+          id: ['am_adam', 'am_echo', 'am_eric', 'am_liam', 'am_onyx', 'bm_george'][index],
+          name,
+          gender: 'male' as const,
+          provider: 'voicebox' as const,
+          voice_id: ['am_adam', 'am_echo', 'am_eric', 'am_liam', 'am_onyx', 'bm_george'][index],
+          model_id: 'kokoro',
+          language_code: 'en',
+        })),
+      ],
+    });
+    mockGetPersonaVoice.mockResolvedValue({
+      persona_id: 77,
+      provider: 'voicebox',
+      voice_id: 'af_heart',
+      voice_name: 'Heart',
+      model_id: 'kokoro',
+      stability: 0.5,
+      similarity_boost: 0.75,
+      style: 0,
+      speed: 1,
+      pitch: 1,
+      language_code: 'en',
+      active: true,
+    });
+    mockUpdatePersonaVoice.mockResolvedValue(undefined);
+    mockPreviewVoicePreset.mockResolvedValue(new Blob(['wav'], { type: 'audio/wav' }));
   });
 
   it('routes sidebar search to discover with the search overlay query flag', async () => {
@@ -258,6 +314,94 @@ describe('OmniChatStudioPage', () => {
         })
       );
     });
+    expect(mockUpdatePersonaVoice).toHaveBeenCalledWith(
+      77,
+      expect.objectContaining({ provider: 'voicebox', voice_id: 'af_heart', voice_name: 'Heart' })
+    );
+  });
+
+  it('offers six female and six male server voices while keeping cloning gated', async () => {
+    renderPage();
+
+    const voiceSelect = await screen.findByLabelText('Character voice');
+    await waitFor(() => expect(voiceSelect).toHaveValue('af_heart'));
+    expect(
+      screen.getByRole('group', { name: 'Female voices' }).querySelectorAll('option')
+    ).toHaveLength(6);
+    expect(
+      screen.getByRole('group', { name: 'Male voices' }).querySelectorAll('option')
+    ).toHaveLength(6);
+    expect(screen.getByText('Custom voice cloning is coming later.')).toBeInTheDocument();
+  });
+
+  it('persists the browser fallback when no local preset is selected', async () => {
+    renderPage();
+
+    fireEvent.change(await screen.findByLabelText('Character voice'), {
+      target: { value: '' },
+    });
+    fireEvent.change(screen.getByLabelText('Opening Message'), {
+      target: { value: 'Hello from the browser voice.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
+
+    await waitFor(() => {
+      expect(mockUpdatePersonaVoice).toHaveBeenCalledWith(
+        77,
+        expect.objectContaining({
+          provider: 'browser',
+          voice_id: 'browser-77',
+          voice_name: 'Character voice',
+          model_id: 'browser-native',
+        })
+      );
+    });
+  });
+
+  it('releases preview audio when browser playback fails', async () => {
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:voice-preview');
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL');
+    const pause = vi.fn();
+    class RejectedAudio {
+      pause = pause;
+      addEventListener = vi.fn();
+      play = vi.fn().mockRejectedValue(new Error('Playback blocked'));
+    }
+    vi.stubGlobal('Audio', RejectedAudio);
+
+    try {
+      renderPage();
+      await waitFor(() => expect(screen.getByLabelText('Character voice')).toHaveValue('af_heart'));
+      fireEvent.click(await screen.findByRole('button', { name: 'Preview voice' }));
+
+      expect(await screen.findByText('Playback blocked')).toBeInTheDocument();
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      expect(pause).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:voice-preview');
+    } finally {
+      vi.unstubAllGlobals();
+      createObjectURL.mockRestore();
+      revokeObjectURL.mockRestore();
+    }
+  });
+
+  it('retries a failed voice assignment without creating a duplicate persona', async () => {
+    mockUpdatePersonaVoice
+      .mockRejectedValueOnce(new Error('Voice service unavailable'))
+      .mockResolvedValueOnce(undefined);
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('Opening Message'), {
+      target: { value: 'Retry this character.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
+
+    expect(await screen.findByText('Voice service unavailable')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => expect(mockUpdatePersonaVoice).toHaveBeenCalledTimes(2));
+    expect(mockCreatePersona).toHaveBeenCalledTimes(1);
+    expect(mockUpdatePersona).toHaveBeenCalledTimes(1);
   });
 
   it('requires a prepared opening before creating a character', async () => {
@@ -463,9 +607,18 @@ describe('OmniChatStudioPage', () => {
       updated_at: '2026-07-11T00:00:00Z',
     });
     mockUploadMedia
-      .mockResolvedValueOnce({ storage_url: '/uploads/avatar.png', storage_path: 'uploads/avatar.png' })
-      .mockResolvedValueOnce({ storage_url: '/uploads/preview.mp4', storage_path: 'uploads/preview.mp4' })
-      .mockResolvedValueOnce({ storage_url: '/uploads/gallery.png', storage_path: 'uploads/gallery.png' });
+      .mockResolvedValueOnce({
+        storage_url: '/uploads/avatar.png',
+        storage_path: 'uploads/avatar.png',
+      })
+      .mockResolvedValueOnce({
+        storage_url: '/uploads/preview.mp4',
+        storage_path: 'uploads/preview.mp4',
+      })
+      .mockResolvedValueOnce({
+        storage_url: '/uploads/gallery.png',
+        storage_path: 'uploads/gallery.png',
+      });
 
     renderPage();
 
@@ -473,8 +626,12 @@ describe('OmniChatStudioPage', () => {
     await screen.findByRole('button', { name: 'Save Changes' });
 
     const avatarInput = document.getElementById('omnichat-studio-avatar-file') as HTMLInputElement;
-    const videoInput = document.getElementById('omnichat-studio-preview-video-file') as HTMLInputElement;
-    const galleryInput = document.getElementById('omnichat-studio-gallery-file') as HTMLInputElement;
+    const videoInput = document.getElementById(
+      'omnichat-studio-preview-video-file'
+    ) as HTMLInputElement;
+    const galleryInput = document.getElementById(
+      'omnichat-studio-gallery-file'
+    ) as HTMLInputElement;
 
     fireEvent.change(avatarInput, {
       target: { files: [new File(['avatar'], 'avatar.png', { type: 'image/png' })] },

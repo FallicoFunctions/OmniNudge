@@ -20,10 +20,38 @@ import type {
   OmniChatGroupInvite,
   OmniChatGroupMessage,
   OmniChatPersonaVoice,
+  OmniChatVoiceCatalog,
   OmniChatCallSession,
   OmniChatSceneState,
 } from '../types/omnichat';
 import { API_BASE_URL, getStoredAuthToken } from '../lib/api';
+
+function getApiUrl(path: string): URL {
+  return new URL(`${API_BASE_URL.replace(/\/$/, '')}${path}`);
+}
+
+/**
+ * Media URLs are returned by an API response, but must never be allowed to
+ * redirect an authenticated browser request to a third party.  In particular,
+ * a compromised publication record must not receive the user's bearer token.
+ */
+function resolveApiMediaContentUrl(assetId: string, publicContentUrl?: string): string {
+  const fallback = getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/content`);
+  if (!publicContentUrl) return fallback.toString();
+
+  let candidate: URL;
+  try {
+    candidate = new URL(publicContentUrl, fallback);
+  } catch {
+    throw new Error('Generated media URL is invalid');
+  }
+
+  if (candidate.protocol !== fallback.protocol || candidate.origin !== fallback.origin) {
+    throw new Error('Generated media is hosted by an untrusted origin');
+  }
+
+  return candidate.toString();
+}
 
 export const omnichatService = {
   async listPersonas(category?: PersonaCategory): Promise<BotPersona[]> {
@@ -245,11 +273,7 @@ export const omnichatService = {
 
   async getMediaAssetContent(assetId: string, publicContentUrl?: string): Promise<Blob> {
     const token = getStoredAuthToken();
-    let contentUrl = `${API_BASE_URL}/omnichat/media/${encodeURIComponent(assetId)}/content`;
-    if (publicContentUrl) {
-      const base = /^https?:\/\//i.test(API_BASE_URL) ? API_BASE_URL : window.location.origin;
-      contentUrl = new URL(publicContentUrl, base).toString();
-    }
+    const contentUrl = resolveApiMediaContentUrl(assetId, publicContentUrl);
     const response = await fetch(contentUrl, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       cache: 'no-store',
@@ -405,11 +429,7 @@ export const omnichatService = {
     return response.group;
   },
 
-  async listGroups(
-    before?: string,
-    beforeId?: string,
-    limit = 50
-  ): Promise<OmniChatGroup[]> {
+  async listGroups(before?: string, beforeId?: string, limit = 50): Promise<OmniChatGroup[]> {
     const params = new URLSearchParams({ limit: String(limit) });
     if (before) params.set('before', before);
     if (beforeId) params.set('before_id', beforeId);
@@ -475,6 +495,27 @@ export const omnichatService = {
     return response.voice;
   },
 
+  async listVoicePresets(): Promise<OmniChatVoiceCatalog> {
+    return api.get<OmniChatVoiceCatalog>('/omnichat/voice-presets');
+  },
+
+  async previewVoicePreset(presetId: string): Promise<Blob> {
+    const token = getStoredAuthToken();
+    const response = await fetch(
+      `${API_BASE_URL}/omnichat/voice-presets/${encodeURIComponent(presetId)}/preview`,
+      {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }
+    );
+    if (!response.ok) throw new Error('Voice preview is unavailable');
+    const blob = await response.blob();
+    if (blob.type !== 'audio/wav' || blob.size === 0 || blob.size > 25 * 1024 * 1024) {
+      throw new Error('Voice preview is invalid');
+    }
+    return blob;
+  },
+
   async updatePersonaVoice(
     personaId: number,
     voice: Omit<OmniChatPersonaVoice, 'persona_id' | 'active' | 'updated_at'>
@@ -530,4 +571,5 @@ export const omnichatQueryKeys = {
   group: (id: string) => ['omnichat', 'group', id] as const,
   groupMessages: (id: string) => ['omnichat', 'group-messages', id] as const,
   personaVoice: (id: number) => ['omnichat', 'persona-voice', id] as const,
+  voicePresets: ['omnichat', 'voice-presets'] as const,
 };

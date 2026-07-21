@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/omninudge/backend/internal/models"
-	"github.com/omninudge/backend/internal/services/elevenlabs"
+	"github.com/omninudge/backend/internal/services/speech"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,19 +32,25 @@ func (f *omniChatVoiceStoreFake) SaveSpeechAudio(_ context.Context, audio *model
 	return f.saveErr
 }
 
-type omniChatSpeechSynthesizerFake struct{ request elevenlabs.SpeechRequest }
+type omniChatSpeechSynthesizerFake struct {
+	request speech.Request
+	audio   *speech.Audio
+}
 
-func (f *omniChatSpeechSynthesizerFake) Synthesize(_ context.Context, _ string, request elevenlabs.SpeechRequest) ([]byte, string, error) {
+func (f *omniChatSpeechSynthesizerFake) Synthesize(_ context.Context, _ string, request speech.Request) (*speech.Audio, error) {
 	f.request = request
-	return []byte("mp3"), "audio/mpeg", nil
+	if f.audio != nil {
+		return f.audio, nil
+	}
+	return &speech.Audio{Bytes: []byte("wav"), ContentType: "audio/wav", Extension: ".wav"}, nil
 }
 
 type concurrentSpeechSynthesizerFake struct{ calls atomic.Int32 }
 
-func (f *concurrentSpeechSynthesizerFake) Synthesize(_ context.Context, _ string, _ elevenlabs.SpeechRequest) ([]byte, string, error) {
+func (f *concurrentSpeechSynthesizerFake) Synthesize(_ context.Context, _ string, _ speech.Request) (*speech.Audio, error) {
 	f.calls.Add(1)
 	time.Sleep(100 * time.Millisecond)
-	return []byte("mp3"), "audio/mpeg", nil
+	return &speech.Audio{Bytes: []byte("wav"), ContentType: "audio/wav", Extension: ".wav"}, nil
 }
 
 type omniChatVoiceStorageFake struct {
@@ -93,7 +99,7 @@ func TestOmniChatVoiceServicePassesCharacterLanguageToProvider(t *testing.T) {
 		},
 	}}
 	synthesizer := &omniChatSpeechSynthesizerFake{}
-	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, synthesizer, "default-model")
+	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, map[string]speech.Synthesizer{"elevenlabs": synthesizer}, map[string]string{"elevenlabs": "default-model"})
 
 	_, err := service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
 	require.NoError(t, err)
@@ -109,7 +115,7 @@ func TestOmniChatVoiceServiceDeletesUploadedAudioWhenCachePersistenceFails(t *te
 		saveErr: errors.New("database unavailable"),
 	}
 	storage := &omniChatVoiceStorageFake{}
-	service := NewOmniChatVoiceService(store, storage, &omniChatSpeechSynthesizerFake{}, "default-model")
+	service := NewOmniChatVoiceService(store, storage, map[string]speech.Synthesizer{"elevenlabs": &omniChatSpeechSynthesizerFake{}}, map[string]string{"elevenlabs": "default-model"})
 
 	_, err := service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
 	require.Error(t, err)
@@ -125,7 +131,7 @@ func TestOmniChatVoiceServiceCleanupSurvivesCancelledRequestContext(t *testing.T
 		saveErr: errors.New("database unavailable"),
 	}
 	storage := &omniChatVoiceStorageFake{}
-	service := NewOmniChatVoiceService(store, storage, &omniChatSpeechSynthesizerFake{}, "default-model")
+	service := NewOmniChatVoiceService(store, storage, map[string]speech.Synthesizer{"elevenlabs": &omniChatSpeechSynthesizerFake{}}, map[string]string{"elevenlabs": "default-model"})
 	requestContext, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -147,7 +153,7 @@ func TestOmniChatVoiceServiceCoalescesConcurrentSpeechGeneration(t *testing.T) {
 		},
 	}}
 	synthesizer := &concurrentSpeechSynthesizerFake{}
-	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, synthesizer, "default-model")
+	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, map[string]speech.Synthesizer{"elevenlabs": synthesizer}, map[string]string{"elevenlabs": "default-model"})
 	start := make(chan struct{})
 	errorsByRequest := make(chan error, 2)
 	var requests sync.WaitGroup
@@ -167,4 +173,61 @@ func TestOmniChatVoiceServiceCoalescesConcurrentSpeechGeneration(t *testing.T) {
 		require.NoError(t, err)
 	}
 	require.Equal(t, int32(1), synthesizer.calls.Load(), "the same message and voice must generate only one provider request")
+}
+
+func TestOmniChatVoiceServiceRoutesVoiceboxAndStoresWAV(t *testing.T) {
+	store := &omniChatVoiceStoreFake{source: &models.OmniChatSpeechSource{
+		OwnerUserID: 7, PersonaID: 22, MessageID: 33, Text: "Welcome back",
+		Voice: &models.OmniChatPersonaVoice{
+			PersonaID: 22, Provider: "voicebox", VoiceID: "af_heart", VoiceName: "Heart",
+			ModelID: "kokoro", Speed: 1,
+		},
+	}}
+	voicebox := &omniChatSpeechSynthesizerFake{}
+	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, map[string]speech.Synthesizer{"voicebox": voicebox}, map[string]string{"voicebox": "kokoro"})
+
+	audio, err := service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
+
+	require.NoError(t, err)
+	require.Equal(t, "kokoro", voicebox.request.ModelID)
+	require.Equal(t, "audio/wav", audio.FileType)
+	require.Contains(t, audio.StoragePath, ".wav")
+}
+
+func TestOmniChatVoiceServiceRejectsMismatchedAudioMetadata(t *testing.T) {
+	store := &omniChatVoiceStoreFake{source: &models.OmniChatSpeechSource{
+		OwnerUserID: 7, PersonaID: 22, MessageID: 33, Text: "Welcome back",
+		Voice: &models.OmniChatPersonaVoice{
+			PersonaID: 22, Provider: "voicebox", VoiceID: "af_heart", VoiceName: "Heart",
+			ModelID: "kokoro", Speed: 1,
+		},
+	}}
+	voicebox := &omniChatSpeechSynthesizerFake{audio: &speech.Audio{
+		Bytes: []byte("not-an-mp3"), ContentType: "audio/wav", Extension: ".mp3",
+	}}
+	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, map[string]speech.Synthesizer{"voicebox": voicebox}, map[string]string{"voicebox": "kokoro"})
+
+	_, err := service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
+
+	require.ErrorContains(t, err, "invalid audio metadata")
+	require.Nil(t, store.saved)
+}
+
+func TestValidOmniChatSpeechAudioRequiresMatchingBoundedFormats(t *testing.T) {
+	tests := []struct {
+		name  string
+		audio *speech.Audio
+		valid bool
+	}{
+		{name: "mp3", audio: &speech.Audio{Bytes: []byte("mp3"), ContentType: "audio/mpeg", Extension: ".mp3"}, valid: true},
+		{name: "wav", audio: &speech.Audio{Bytes: []byte("wav"), ContentType: "audio/wav", Extension: ".wav"}, valid: true},
+		{name: "mismatched extension", audio: &speech.Audio{Bytes: []byte("wav"), ContentType: "audio/wav", Extension: ".mp3"}},
+		{name: "oversized mp3", audio: &speech.Audio{Bytes: make([]byte, maxOmniChatMP3Bytes+1), ContentType: "audio/mpeg", Extension: ".mp3"}},
+		{name: "oversized wav", audio: &speech.Audio{Bytes: make([]byte, maxOmniChatWAVBytes+1), ContentType: "audio/wav", Extension: ".wav"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.valid, validOmniChatSpeechAudio(test.audio))
+		})
+	}
 }
