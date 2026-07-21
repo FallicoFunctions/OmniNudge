@@ -51,9 +51,12 @@ func (f *cancellableFalFake) Cancel(context.Context, string, string) error {
 }
 
 type generationClaimStoreFake struct {
-	job        *models.OmniChatGenerationJob
-	markResult bool
-	markErr    error
+	job           *models.OmniChatGenerationJob
+	markResult    bool
+	markErr       error
+	failureCode   string
+	failureText   string
+	failureCtxErr error
 }
 
 func (f *generationClaimStoreFake) GetGenerationJobForProcessing(context.Context, uuid.UUID) (*models.OmniChatGenerationJob, error) {
@@ -68,8 +71,11 @@ func (f *generationClaimStoreFake) MarkGenerationJobRunning(context.Context, uui
 func (*generationClaimStoreFake) UpdateGenerationProgress(context.Context, uuid.UUID, int) error {
 	return nil
 }
-func (*generationClaimStoreFake) MarkGenerationJobFailed(context.Context, uuid.UUID, string, string) error {
-	return nil
+func (f *generationClaimStoreFake) MarkGenerationJobFailed(ctx context.Context, _ uuid.UUID, code, detail string) error {
+	f.failureCode = code
+	f.failureText = detail
+	f.failureCtxErr = ctx.Err()
+	return f.markErr
 }
 func (*generationClaimStoreFake) CompleteGenerationJob(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, int64, int64) error {
 	return nil
@@ -290,6 +296,30 @@ func TestOmniChatGenerationHandlerCleansUpUploadAfterRequestCancellation(t *test
 	handler.deleteGenerationObject(requestContext, "omnichat/generated/orphan.png")
 
 	require.NoError(t, storage.deleteContextErr)
+}
+
+func TestOmniChatGenerationHandlerRecordsFailureWithIndependentContextAndSafeDetail(t *testing.T) {
+	store := &generationClaimStoreFake{}
+	handler := &OmniChatGenerationHandler{jobs: store}
+	requestContext, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := handler.recordGenerationFailure(requestContext, uuid.New(), "provider_result_invalid")
+
+	require.NoError(t, err)
+	require.Equal(t, "provider_result_invalid", store.failureCode)
+	require.Equal(t, "generation failed", store.failureText)
+	require.NoError(t, store.failureCtxErr)
+}
+
+func TestOmniChatGenerationHandlerReturnsPersistenceErrorWhenTerminalFailureCannotBeRecorded(t *testing.T) {
+	persistenceErr := errors.New("database unavailable")
+	store := &generationClaimStoreFake{markErr: persistenceErr}
+	handler := &OmniChatGenerationHandler{jobs: store}
+
+	err := handler.recordGenerationFailure(context.Background(), uuid.New(), "generation_failed")
+
+	require.ErrorIs(t, err, persistenceErr)
 }
 
 var _ services.StorageService = (*unusedGenerationStorageFake)(nil)

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -82,4 +83,32 @@ func TestClientRejectsOversizedSuccessfulResponse(t *testing.T) {
 		ReplicaID: "replica-1", PersonaID: "persona-1",
 	})
 	require.EqualError(t, err, "live avatar provider response exceeds size limit")
+}
+
+func TestClientDoesNotFollowCrossHostRedirectWithCredential(t *testing.T) {
+	var targetRequests atomic.Int32
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		targetRequests.Add(1)
+		require.Empty(t, r.Header.Get("x-api-key"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer target.Close()
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
+	}))
+	defer origin.Close()
+
+	_, err := NewClient("server-secret", origin.URL).CreateConversation(context.Background(), CreateConversationRequest{
+		ReplicaID: "replica-1", PersonaID: "persona-1",
+	})
+
+	require.Error(t, err)
+	require.Zero(t, targetRequests.Load())
+}
+
+func TestClientRejectsCredentialBearingBaseURL(t *testing.T) {
+	_, err := NewClient("server-secret", "https://attacker@tavusapi.com").CreateConversation(context.Background(), CreateConversationRequest{
+		ReplicaID: "replica-1", PersonaID: "persona-1",
+	})
+	require.EqualError(t, err, "invalid live avatar provider URL")
 }

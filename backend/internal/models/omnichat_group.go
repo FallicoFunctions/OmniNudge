@@ -395,8 +395,12 @@ func (r *OmniChatGroupRepository) ListMessagesForMember(ctx context.Context, gro
 		COALESCE(u.username,p.name,'System'),COALESCE(u.avatar_url,p.avatar_url),gm.reply_to_id,gm.content,gm.failed,gm.created_at
 		FROM omnichat_group_messages gm
 		JOIN omnichat_group_members viewer ON viewer.group_id=gm.group_id AND viewer.user_id=$2
+		JOIN omnichat_groups g ON g.id=gm.group_id AND g.archived_at IS NULL
 		LEFT JOIN users u ON u.id=gm.sender_user_id LEFT JOIN bot_personas p ON p.id=gm.sender_persona_id
 		WHERE gm.group_id=$1 AND gm.deleted_at IS NULL
+		  AND NOT EXISTS (SELECT 1 FROM blocked_users owner_block WHERE
+			(owner_block.blocker_id=$2 AND owner_block.blocked_id=g.owner_user_id) OR
+			(owner_block.blocker_id=g.owner_user_id AND owner_block.blocked_id=$2))
 		  AND ($3::timestamptz IS NULL OR (gm.created_at,gm.id)<($3,$4))
 		  AND (gm.sender_user_id IS NULL OR gm.sender_user_id=$2 OR NOT EXISTS (
 			SELECT 1 FROM blocked_users bu WHERE

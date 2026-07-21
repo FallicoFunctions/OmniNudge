@@ -11,11 +11,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
-const apiURL = "https://openrouter.ai/api/v1/chat/completions"
+const (
+	apiURL                    = "https://openrouter.ai/api/v1/chat/completions"
+	maxMessages               = 128
+	maxMessageRunes           = 64_000
+	maxRequestRunes           = 256_000
+	maxStreamLineBytes        = 1 << 20
+	maxGeneratedResponseRunes = 128_000
+)
+
+var modelPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$`)
 
 // ErrNotConfigured is returned when the client has no API key set.
 var ErrNotConfigured = errors.New("openrouter: API key not configured")
@@ -43,16 +54,36 @@ type StreamCallback func(token string)
 type Client struct {
 	apiKey     string
 	model      string
+	endpoint   string
 	httpClient *http.Client
 }
 
 // NewClient creates an OpenRouter client. apiKey may be empty; in that case
 // Generate returns ErrNotConfigured.
 func NewClient(apiKey, model string) *Client {
+	return newClient(apiKey, model, apiURL, nil)
+}
+
+// newClient permits an isolated test endpoint while applying the same redirect
+// policy as production. Completion requests contain both the API credential and
+// private persona context, so redirects must never forward either to another
+// origin.
+func newClient(apiKey, model, endpoint string, httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 60 * time.Second}
+	} else {
+		clientCopy := *httpClient
+		httpClient = &clientCopy
+		if httpClient.Timeout <= 0 {
+			httpClient.Timeout = 60 * time.Second
+		}
+	}
+	httpClient.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
 	return &Client{
-		apiKey:     apiKey,
-		model:      model,
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		apiKey: strings.TrimSpace(apiKey), model: strings.TrimSpace(model),
+		endpoint: strings.TrimSpace(endpoint), httpClient: httpClient,
 	}
 }
 
@@ -86,8 +117,14 @@ type rateLimitError struct {
 // Generate runs a chat completion, streaming token chunks to onChunk as they
 // arrive, and returns the full concatenated text once generation completes.
 func (c *Client) Generate(ctx context.Context, messages []Message, onChunk StreamCallback) (string, error) {
-	if c.apiKey == "" {
+	if c == nil || c.apiKey == "" {
 		return "", ErrNotConfigured
+	}
+	if err := validateRequest(c.model, messages); err != nil {
+		return "", err
+	}
+	if c.httpClient == nil || c.endpoint == "" {
+		return "", errors.New("openrouter: client is not configured")
 	}
 
 	payload, err := json.Marshal(chatRequest{
@@ -103,7 +140,7 @@ func (c *Client) Generate(ctx context.Context, messages []Message, onChunk Strea
 	backoff := 1 * time.Second
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(payload))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(payload))
 		if err != nil {
 			return "", fmt.Errorf("openrouter: build request: %w", err)
 		}
@@ -125,7 +162,7 @@ func (c *Client) Generate(ctx context.Context, messages []Message, onChunk Strea
 
 			if resp.StatusCode == http.StatusTooManyRequests {
 				if attempt == maxRetries {
-					return "", fmt.Errorf("%w: %s", ErrRateLimited, string(body))
+					return "", ErrRateLimited
 				}
 
 				// Calculate delay, respecting Retry-After if provided
@@ -134,7 +171,7 @@ func (c *Client) Generate(ctx context.Context, messages []Message, onChunk Strea
 				if err := json.Unmarshal(body, &rl); err == nil && rl.Error.Metadata.RetryAfterSeconds > 0 {
 					delay = time.Duration(rl.Error.Metadata.RetryAfterSeconds * float64(time.Second))
 				}
-				
+
 				// Cap max delay to prevent long stalls
 				if delay > 10*time.Second {
 					delay = 10 * time.Second
@@ -148,7 +185,7 @@ func (c *Client) Generate(ctx context.Context, messages []Message, onChunk Strea
 					return "", ctx.Err()
 				}
 			}
-			return "", fmt.Errorf("openrouter: returned status %d: %s", resp.StatusCode, string(body))
+			return "", fmt.Errorf("openrouter: returned status %d", resp.StatusCode)
 		}
 
 		full, err := processStream(resp.Body, onChunk)
@@ -161,9 +198,10 @@ func (c *Client) Generate(ctx context.Context, messages []Message, onChunk Strea
 
 func processStream(body io.ReadCloser, onChunk StreamCallback) (string, error) {
 	var full strings.Builder
+	generatedRunes := 0
 	scanner := bufio.NewScanner(body)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	
+	scanner.Buffer(make([]byte, 0, 64*1024), maxStreamLineBytes)
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		// Skip SSE comment/keep-alive lines (e.g. ": OPENROUTER PROCESSING").
@@ -183,13 +221,18 @@ func processStream(body io.ReadCloser, onChunk StreamCallback) (string, error) {
 			continue
 		}
 		if chunk.Error != nil {
-			return full.String(), fmt.Errorf("openrouter: %s", chunk.Error.Message)
+			return full.String(), errors.New("openrouter: provider returned a streaming error")
 		}
 		for _, choice := range chunk.Choices {
 			if choice.Delta.Content == "" {
 				continue
 			}
+			chunkRunes := utf8RuneCount(choice.Delta.Content)
+			if generatedRunes+chunkRunes > maxGeneratedResponseRunes {
+				return full.String(), errors.New("openrouter: generated response exceeds size limit")
+			}
 			full.WriteString(choice.Delta.Content)
+			generatedRunes += chunkRunes
 			if onChunk != nil {
 				onChunk(choice.Delta.Content)
 			}
@@ -200,4 +243,32 @@ func processStream(body io.ReadCloser, onChunk StreamCallback) (string, error) {
 	}
 
 	return full.String(), nil
+}
+
+func validateRequest(model string, messages []Message) error {
+	if !modelPattern.MatchString(model) {
+		return errors.New("openrouter: model is invalid")
+	}
+	if len(messages) == 0 || len(messages) > maxMessages {
+		return errors.New("openrouter: message count is invalid")
+	}
+	totalRunes := 0
+	for _, message := range messages {
+		if message.Role != RoleSystem && message.Role != RoleUser && message.Role != RoleAssistant {
+			return errors.New("openrouter: message role is invalid")
+		}
+		messageRunes := utf8RuneCount(message.Content)
+		if messageRunes == 0 || messageRunes > maxMessageRunes {
+			return errors.New("openrouter: message content is invalid")
+		}
+		totalRunes += messageRunes
+		if totalRunes > maxRequestRunes {
+			return errors.New("openrouter: request exceeds size limit")
+		}
+	}
+	return nil
+}
+
+func utf8RuneCount(value string) int {
+	return utf8.RuneCountInString(value)
 }

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import OmniChatCallModal from '../OmniChatCallModal';
+import OmniChatCallModal, { isTrustedOmniChatCallUrl } from '../OmniChatCallModal';
 import { omnichatService } from '../../../services/omnichatService';
 import { speakOmniChatMessage } from '../OmniChatSpeakButton';
 import type { BotPersona, OmniChatCallSession } from '../../../types/omnichat';
@@ -128,6 +128,35 @@ describe('OmniChatCallModal', () => {
     expect(frame).toHaveAttribute('src', 'https://room.daily.co/call-1?t=short-lived-token');
     expect(frame).toHaveAttribute('allow', expect.stringContaining('camera'));
     expect(screen.queryByLabelText('Type during call')).not.toBeInTheDocument();
+  });
+
+  it('rejects a non-Daily call URL before it can receive camera or microphone permission', async () => {
+    vi.mocked(omnichatService.startCall).mockResolvedValue({
+      ...call,
+      mode: 'video',
+      live_video_url: 'https://attacker.example/call',
+    });
+    vi.mocked(omnichatService.endCall).mockResolvedValue(undefined);
+    render(
+      <OmniChatCallModal
+        persona={persona}
+        conversationId={12}
+        mode="video"
+        onClose={vi.fn()}
+        onAssistant={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText('Connection needs attention')).toBeInTheDocument();
+    expect(screen.queryByTitle('Live avatar video call with Sadie')).not.toBeInTheDocument();
+    expect(omnichatService.endCall).toHaveBeenCalledWith('call-1');
+  });
+
+  it('accepts only HTTPS Daily room origins', () => {
+    expect(isTrustedOmniChatCallUrl('https://room.daily.co/call-1')).toBe(true);
+    expect(isTrustedOmniChatCallUrl('https://daily.co.evil.example/call-1')).toBe(false);
+    expect(isTrustedOmniChatCallUrl('http://room.daily.co/call-1')).toBe(false);
+    expect(isTrustedOmniChatCallUrl('javascript:alert(1)')).toBe(false);
   });
 
   it('does not start late speech after the user ends a thinking call', async () => {

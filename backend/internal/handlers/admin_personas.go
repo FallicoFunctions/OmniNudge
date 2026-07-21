@@ -54,7 +54,7 @@ func (h *AdminPersonaHandler) UpdatePersonaMedia(c *gin.Context) {
 	}
 
 	var req updateAdminPersonaMediaRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := decodeStrictJSON(c, &req); err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}

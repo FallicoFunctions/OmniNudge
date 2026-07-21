@@ -80,6 +80,11 @@ func (h *OmniChatHandler) CreateConversation(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Invalid imported messages")
 		return
 	}
+	title, err := normalizeConversationTitle(req.Title)
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid conversation title")
+		return
+	}
 
 	persona, err := h.personaRepo.GetAccessibleByID(c.Request.Context(), req.PersonaID, &userID)
 	if err != nil {
@@ -91,34 +96,35 @@ func (h *OmniChatHandler) CreateConversation(c *gin.Context) {
 		return
 	}
 
-	// Reuse an existing active conversation for this persona unless force_new
-	// is set (e.g. user clicked "New Chat").
-	if !req.ForceNew {
-		if existing, err := h.convRepo.GetActiveByUserAndPersonaID(c.Request.Context(), userID, req.PersonaID); err != nil {
-			RespondError(c, http.StatusInternalServerError, "Failed to look up conversation")
-			return
-		} else if existing != nil {
-			existing.Persona = persona
-			c.JSON(http.StatusOK, existing)
-			return
+	// Persist the starter turn in the same transaction as the conversation.
+	// Previously a failed follow-up insert still returned 201 with a partially
+	// initialized conversation.
+	initialMessages := messages
+	if len(initialMessages) == 0 {
+		if starter := h.chatbotService.BuildStarterMessage(persona); starter != "" {
+			initialMessages = []*models.BotMessage{{
+				Role:    models.BotMessageRoleAssistant,
+				Content: starter,
+			}}
 		}
 	}
-
-	conversation, err := h.convRepo.CreateWithMessages(c.Request.Context(), userID, req.PersonaID, req.Title, settings, messages)
+	var conversation *models.BotConversation
+	var reused bool
+	if req.ForceNew {
+		conversation, err = h.convRepo.CreateWithMessages(c.Request.Context(), userID, req.PersonaID, title, settings, initialMessages)
+	} else {
+		conversation, reused, err = h.convRepo.GetOrCreateActiveWithMessages(c.Request.Context(), userID, req.PersonaID, title, settings, initialMessages)
+	}
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to create conversation")
 		return
 	}
 
-	if len(messages) == 0 {
-		if starter := h.chatbotService.BuildStarterMessage(persona); starter != "" {
-			if _, err := h.messageRepo.Create(c.Request.Context(), conversation.ID, models.BotMessageRoleAssistant, starter, false); err == nil {
-				_ = h.convRepo.UpdateLastMessageAt(c.Request.Context(), conversation.ID)
-			}
-		}
-	}
-
 	conversation.Persona = persona
+	if reused {
+		c.JSON(http.StatusOK, conversation)
+		return
+	}
 	c.JSON(http.StatusCreated, conversation)
 }
 
@@ -141,7 +147,7 @@ func (h *OmniChatHandler) ListConversations(c *gin.Context) {
 
 	if personaIDStr := c.Query("persona_id"); personaIDStr != "" {
 		personaID, err := strconv.Atoi(personaIDStr)
-		if err != nil {
+		if err != nil || personaID <= 0 {
 			RespondError(c, http.StatusBadRequest, "Invalid persona_id")
 			return
 		}
@@ -261,8 +267,13 @@ func (h *OmniChatHandler) UpdateConversationSettings(c *gin.Context) {
 		return
 	}
 
-	if err := h.convRepo.UpdateSettings(c.Request.Context(), conversationID, settings); err != nil {
+	updated, err := h.convRepo.UpdateSettings(c.Request.Context(), conversationID, userID, settings)
+	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update settings")
+		return
+	}
+	if !updated {
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return
 	}
 
@@ -362,7 +373,10 @@ func (h *OmniChatHandler) GetConversation(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to repair interrupted message")
 		return
 	} else if repaired != nil {
-		_ = h.convRepo.UpdateLastMessageAt(c.Request.Context(), conversationID)
+		if err := h.convRepo.UpdateLastMessageAt(c.Request.Context(), conversationID); err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to update conversation activity")
+			return
+		}
 		messages, err = h.messageRepo.ListByConversationID(c.Request.Context(), conversationID, 200)
 		if err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to load messages")

@@ -114,6 +114,8 @@ type BotPersonaRepository struct {
 	pool *pgxpool.Pool
 }
 
+var ErrPersonaMediaNotOwnedOrAllowed = errors.New("persona media is not an accessible pending or clean upload")
+
 // NewBotPersonaRepository creates a new bot persona repository.
 func NewBotPersonaRepository(pool *pgxpool.Pool) *BotPersonaRepository {
 	return &BotPersonaRepository{pool: pool}
@@ -328,6 +330,9 @@ func (r *BotPersonaRepository) ListAll(ctx context.Context) ([]*BotPersona, erro
 
 // CreateOwned creates a new persona owned by the given user.
 func (r *BotPersonaRepository) CreateOwned(ctx context.Context, userID int, persona *BotPersona) (*BotPersona, error) {
+	if err := r.validatePersonaMediaURLs(ctx, userID, persona.AvatarURL, persona.PreviewVideoURL, persona.GalleryURLs); err != nil {
+		return nil, err
+	}
 	query := `
 		INSERT INTO bot_personas (
 			slug, name, description, category, owner_user_id, visibility, source_format,
@@ -356,6 +361,9 @@ func (r *BotPersonaRepository) CreateOwned(ctx context.Context, userID int, pers
 
 // UpdateOwned updates an existing user-owned persona.
 func (r *BotPersonaRepository) UpdateOwned(ctx context.Context, userID, id int, persona *BotPersona) (*BotPersona, error) {
+	if err := r.validatePersonaMediaURLs(ctx, userID, persona.AvatarURL, persona.PreviewVideoURL, persona.GalleryURLs); err != nil {
+		return nil, err
+	}
 	query := `
 		UPDATE bot_personas
 		SET name = $3,
@@ -398,17 +406,39 @@ func (r *BotPersonaRepository) UpdateOwned(ctx context.Context, userID, id int, 
 	))
 }
 
-// DeleteOwned soft-deletes a user-owned persona.
+// DeleteOwned soft-deletes a user-owned persona. Existing generated media is
+// retained for its owner, while unfinished jobs are cancelled so a deleted
+// character cannot produce new output after access has been revoked.
 func (r *BotPersonaRepository) DeleteOwned(ctx context.Context, userID, id int) (bool, error) {
-	tag, err := r.pool.Exec(ctx, `
-		UPDATE bot_personas
-		SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1 AND owner_user_id = $2 AND is_active
-	`, id, userID)
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	defer func() { _ = tx.Rollback(ctx) }()
+	var personaID int
+	err = tx.QueryRow(ctx, `
+		UPDATE bot_personas
+		SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND owner_user_id = $2 AND is_active
+		RETURNING id
+	`, id, userID).Scan(&personaID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if _, err = tx.Exec(ctx, `
+		UPDATE omnichat_generation_jobs
+		SET status = 'cancelled', cancelled_at = NOW(), completed_at = NOW(), error_code = 'persona_deleted'
+		WHERE owner_user_id = $1 AND persona_id = $2 AND status IN ('queued', 'running')
+	`, userID, personaID); err != nil {
+		return false, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // UpdateMedia updates avatar, preview video, and optionally gallery URLs for
@@ -438,6 +468,46 @@ func (r *BotPersonaRepository) UpdateMedia(ctx context.Context, id int, avatarUR
 		return nil, err
 	}
 	return p, nil
+}
+
+// validatePersonaMediaURLs makes /uploads references capability-like: a
+// regular creator can only attach their own pending-or-clean uploads. Pending
+// references are safe because UploadsHandler fail-closes byte access until the
+// scanner marks the file clean; allowing them lets the Studio save immediately
+// after its normal asynchronous upload. URL shape validation belongs to the
+// handler; this verifies ownership and scan state at the data boundary. Admin
+// media assignment is separately privileged.
+func (r *BotPersonaRepository) validatePersonaMediaURLs(ctx context.Context, ownerUserID int, avatarURL, previewVideoURL *string, galleryURLs []string) error {
+	urls := make([]string, 0, len(galleryURLs)+2)
+	if avatarURL != nil {
+		urls = append(urls, *avatarURL)
+	}
+	if previewVideoURL != nil {
+		urls = append(urls, *previewVideoURL)
+	}
+	urls = append(urls, galleryURLs...)
+	seen := make(map[string]struct{}, len(urls))
+	for _, url := range urls {
+		if _, exists := seen[url]; exists {
+			continue
+		}
+		seen[url] = struct{}{}
+		var exists bool
+		err := r.pool.QueryRow(ctx, `
+			SELECT EXISTS(
+				SELECT 1 FROM media_files
+				WHERE (storage_url = $1 OR storage_path = LTRIM($1, '/'))
+				  AND user_id = $2 AND scan_status IN ('pending', 'clean')
+			)
+		`, url, ownerUserID).Scan(&exists)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return ErrPersonaMediaNotOwnedOrAllowed
+		}
+	}
+	return nil
 }
 
 func emptyRawJSON(raw json.RawMessage) json.RawMessage {
@@ -503,7 +573,55 @@ func (r *BotConversationRepository) CreateWithMessages(ctx context.Context, user
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
+	c, err := createConversationWithMessagesTx(ctx, tx, userID, personaID, title, settings, messages)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
 
+// GetOrCreateActiveWithMessages serializes the normal "resume this persona"
+// path across requests and application nodes. force_new callers intentionally
+// use CreateWithMessages instead.
+func (r *BotConversationRepository) GetOrCreateActiveWithMessages(ctx context.Context, userID, personaID int, title *string, settings *ConversationSettings, messages []*BotMessage) (*BotConversation, bool, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(68423, $1)`, userID); err != nil {
+		return nil, false, err
+	}
+	existing, err := scanConversation(tx.QueryRow(ctx, `
+		SELECT id, user_id, persona_id, title, settings_user_name, settings_user_age, settings_user_gender, created_at, last_message_at, archived_at
+		FROM bot_conversations
+		WHERE user_id = $1 AND persona_id = $2 AND archived_at IS NULL
+		ORDER BY last_message_at DESC, id DESC
+		LIMIT 1
+	`, userID, personaID))
+	if err == nil {
+		if err = tx.Commit(ctx); err != nil {
+			return nil, false, err
+		}
+		return existing, true, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, err
+	}
+	c, err := createConversationWithMessagesTx(ctx, tx, userID, personaID, title, settings, messages)
+	if err != nil {
+		return nil, false, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return nil, false, err
+	}
+	return c, false, nil
+}
+
+func createConversationWithMessagesTx(ctx context.Context, tx pgx.Tx, userID, personaID int, title *string, settings *ConversationSettings, messages []*BotMessage) (*BotConversation, error) {
 	c := &BotConversation{UserID: userID, PersonaID: personaID, Title: title}
 	if settings == nil {
 		settings = &ConversationSettings{}
@@ -515,7 +633,7 @@ func (r *BotConversationRepository) CreateWithMessages(ctx context.Context, user
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, last_message_at
 	`
-	err = tx.QueryRow(ctx, query, userID, personaID, title,
+	err := tx.QueryRow(ctx, query, userID, personaID, title,
 		settings.UserName, settings.UserAge, settings.UserGender,
 	).Scan(&c.ID, &c.CreatedAt, &c.LastMessageAt)
 	if err != nil {
@@ -537,9 +655,6 @@ func (r *BotConversationRepository) CreateWithMessages(ctx context.Context, user
 		}
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return nil, err
-	}
 	return c, nil
 }
 
@@ -588,7 +703,7 @@ func (r *BotConversationRepository) GetByID(ctx context.Context, id, userID int)
 	query := `
 		SELECT id, user_id, persona_id, title, settings_user_name, settings_user_age, settings_user_gender, created_at, last_message_at, archived_at
 		FROM bot_conversations
-		WHERE id = $1 AND user_id = $2
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
 	`
 	c, err := scanConversation(r.pool.QueryRow(ctx, query, id, userID))
 	if err != nil {
@@ -613,6 +728,7 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 			` + qualifySelectColumns("p", botPersonaSelectColumns) + `
 		FROM bot_conversations c
 		INNER JOIN bot_personas p ON p.id = c.persona_id AND p.is_active
+			AND ((p.owner_user_id IS NULL AND p.visibility = 'public') OR p.owner_user_id = c.user_id)
 		LEFT JOIN LATERAL (
 			SELECT content
 			FROM bot_messages
@@ -666,6 +782,7 @@ func (r *BotConversationRepository) ListByUserIDAndPersonaID(ctx context.Context
 		       c.created_at, c.last_message_at, c.archived_at
 		FROM bot_conversations c
 		INNER JOIN bot_personas p ON p.id = c.persona_id AND p.is_active
+			AND ((p.owner_user_id IS NULL AND p.visibility = 'public') OR p.owner_user_id = c.user_id)
 		LEFT JOIN LATERAL (
 		    SELECT content
 		    FROM bot_messages
@@ -703,13 +820,16 @@ func (r *BotConversationRepository) ListByUserIDAndPersonaID(ctx context.Context
 }
 
 // UpdateSettings updates the per-conversation user settings.
-func (r *BotConversationRepository) UpdateSettings(ctx context.Context, conversationID int, settings *ConversationSettings) error {
-	_, err := r.pool.Exec(ctx, `
+func (r *BotConversationRepository) UpdateSettings(ctx context.Context, conversationID, userID int, settings *ConversationSettings) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
 		UPDATE bot_conversations
 		SET settings_user_name = $1, settings_user_age = $2, settings_user_gender = $3
-		WHERE id = $4
-	`, settings.UserName, settings.UserAge, settings.UserGender, conversationID)
-	return err
+		WHERE id = $4 AND user_id = $5 AND archived_at IS NULL
+	`, settings.UserName, settings.UserAge, settings.UserGender, conversationID, userID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
 }
 
 // ForkConversation creates a new conversation for the same persona, copying
@@ -721,8 +841,25 @@ func (r *BotConversationRepository) ForkConversation(ctx context.Context, userID
 	}
 	defer tx.Rollback(ctx)
 
+	// Keep ownership enforcement at the data boundary. The handler has already
+	// loaded the conversation, but it can be archived between those operations.
+	var originalID int
+	if err = tx.QueryRow(ctx, `
+		SELECT id FROM bot_conversations
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+		FOR SHARE
+	`, original.ID, userID).Scan(&originalID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
 	// Create new conversation with same persona, title, and settings
 	title := "Copy of " + coalesceString(original.Title, original.Persona.Name)
+	if len([]rune(title)) > 200 {
+		title = string([]rune(title)[:200])
+	}
 	settings := original.Settings
 	if settings == nil {
 		settings = &ConversationSettings{}
@@ -742,16 +879,49 @@ func (r *BotConversationRepository) ForkConversation(ctx context.Context, userID
 	}
 	newConv.Settings = settings
 
-	// Copy all messages from the original conversation
-	_, err = tx.Exec(ctx, `
-		INSERT INTO bot_messages (conversation_id, role, content, failed, created_at)
-		SELECT $1, role, content, failed, created_at
-		FROM bot_messages
-		WHERE conversation_id = $2
-		ORDER BY id
-	`, newConv.ID, original.ID)
+	// Copy messages and their attachments together. A bulk INSERT of just the
+	// turns used to silently drop generated media from forked conversations.
+	type sourceMessage struct {
+		id      int
+		role    string
+		content string
+		failed  bool
+		created time.Time
+	}
+	rows, err := tx.Query(ctx, `
+		SELECT id, role, content, failed, created_at
+		FROM bot_messages WHERE conversation_id = $1 ORDER BY id
+	`, originalID)
 	if err != nil {
 		return nil, err
+	}
+	sourceMessages := make([]sourceMessage, 0)
+	for rows.Next() {
+		var message sourceMessage
+		if err = rows.Scan(&message.id, &message.role, &message.content, &message.failed, &message.created); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		sourceMessages = append(sourceMessages, message)
+	}
+	rows.Close()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, message := range sourceMessages {
+		var copiedMessageID int
+		if err = tx.QueryRow(ctx, `
+			INSERT INTO bot_messages (conversation_id, role, content, failed, created_at)
+			VALUES ($1, $2, $3, $4, $5) RETURNING id
+		`, newConv.ID, message.role, message.content, message.failed, message.created).Scan(&copiedMessageID); err != nil {
+			return nil, err
+		}
+		if _, err = tx.Exec(ctx, `
+			INSERT INTO bot_message_attachments (message_id, asset_id, position)
+			SELECT $1, asset_id, position FROM bot_message_attachments WHERE message_id = $2
+		`, copiedMessageID, message.id); err != nil {
+			return nil, err
+		}
 	}
 
 	if _, err := tx.Exec(ctx, `UPDATE bot_conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = $1`, newConv.ID); err != nil {

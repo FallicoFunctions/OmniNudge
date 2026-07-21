@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/omninudge/backend/internal/models"
@@ -13,6 +14,18 @@ func TestNormalizeConversationSettingsRejectsPromptInjectionLikeName(t *testing.
 		UserAge:    "27",
 		UserGender: "F",
 	})
+	require.Error(t, err)
+}
+
+func TestNormalizeConversationTitleTrimsAndBoundsInput(t *testing.T) {
+	title := "  Weekend plan  "
+	normalized, err := normalizeConversationTitle(&title)
+	require.NoError(t, err)
+	require.NotNil(t, normalized)
+	require.Equal(t, "Weekend plan", *normalized)
+
+	tooLong := strings.Repeat("x", maxConversationTitleRunes+1)
+	_, err = normalizeConversationTitle(&tooLong)
 	require.Error(t, err)
 }
 

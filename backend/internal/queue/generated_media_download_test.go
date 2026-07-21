@@ -88,12 +88,31 @@ func TestValidateGeneratedMediaURLRejectsSSRFAndUntrustedHosts(t *testing.T) {
 		"https://169.254.169.254/latest/meta-data",
 		"https://fal.media.evil.example/output.png",
 		"https://user:pass@fal.media/output.png",
+		"https://fal.media:8443/output.png",
 		"data:text/html,<script>alert(1)</script>",
 	} {
 		t.Run(rawURL, func(t *testing.T) {
 			require.Error(t, validateGeneratedMediaURL(rawURL))
 		})
 	}
+}
+
+func TestValidateGeneratedMediaContentsRejectsExcessiveMP4BoxCount(t *testing.T) {
+	// A syntactically plausible stream of tiny boxes can otherwise turn a
+	// bounded but attacker-controlled download into millions of filesystem
+	// reads during validation.
+	content := make([]byte, 0, (maxGeneratedMediaBoxes+1)*8+16)
+	content = append(content, 0, 0, 0, 16, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm', 0, 0, 0, 0)
+	for i := 0; i < maxGeneratedMediaBoxes; i++ {
+		content = append(content, 0, 0, 0, 8, 'f', 'r', 'e', 'e')
+	}
+	file, err := os.CreateTemp("", "omnichat-many-video-boxes-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(file.Name()) })
+	_, err = file.Write(content)
+	require.NoError(t, err)
+
+	require.EqualError(t, validateGeneratedMediaContents(file, "video", "video/mp4", int64(len(content))), "generated video container has too many boxes")
 }
 
 func TestGeneratedMediaDialRejectsPrivateDNSAnswersBeforeConnecting(t *testing.T) {

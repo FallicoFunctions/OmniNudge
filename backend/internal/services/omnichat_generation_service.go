@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/omninudge/backend/internal/models"
@@ -137,14 +138,32 @@ func (s *OmniChatGenerationService) CreateGeneration(ctx context.Context, ownerU
 		return nil, fmt.Errorf("create generation job: %w", err)
 	}
 	if s.enqueuer == nil {
-		_ = s.store.MarkGenerationJobFailed(ctx, job.ID, "queue_unavailable", "generation enqueuer is not configured")
+		if err := s.markQueueFailure(ctx, job.ID); err != nil {
+			return nil, ErrOmniChatGenerationUnavailable
+		}
 		return nil, ErrOmniChatGenerationUnavailable
 	}
 	if err := s.enqueuer.EnqueueOmniChatGeneration(ctx, job.ID); err != nil {
-		_ = s.store.MarkGenerationJobFailed(ctx, job.ID, "queue_unavailable", err.Error())
+		if markErr := s.markQueueFailure(ctx, job.ID); markErr != nil {
+			return nil, ErrOmniChatGenerationUnavailable
+		}
 		return nil, fmt.Errorf("%w: enqueue generation", ErrOmniChatGenerationUnavailable)
 	}
 	return job, nil
+}
+
+// markQueueFailure uses a short independent context so a client disconnect
+// cannot leave a just-created job queued after enqueueing has already failed.
+// The detail is intentionally static: provider and infrastructure errors may
+// include credentials, signed URLs, or topology and must not be persisted with
+// a user-visible job.
+func (s *OmniChatGenerationService) markQueueFailure(ctx context.Context, jobID uuid.UUID) error {
+	if s == nil || s.store == nil {
+		return ErrOmniChatGenerationUnavailable
+	}
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+	return s.store.MarkGenerationJobFailed(cleanupCtx, jobID, "queue_unavailable", "generation could not be queued")
 }
 
 func omniChatSceneIsEmpty(scene models.OmniChatSceneState) bool {

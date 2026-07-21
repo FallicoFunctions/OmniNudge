@@ -109,16 +109,36 @@ func (h *OmniChatGenerationHandler) Handle(ctx context.Context, task *asynq.Task
 	}
 	var permanent *permanentGenerationError
 	if errors.As(err, &permanent) {
-		_ = h.jobs.MarkGenerationJobFailed(ctx, jobID, permanent.code, permanent.Error())
+		if markErr := h.recordGenerationFailure(ctx, jobID, permanent.code); markErr != nil {
+			// Returning the persistence error (without SkipRetry) keeps Asynq
+			// retrying until the durable job is terminal instead of silently
+			// leaving a queued/running job behind.
+			return fmt.Errorf("record terminal generation failure: %w", markErr)
+		}
 		return fmt.Errorf("%w: %v", asynq.SkipRetry, err)
 	}
 	retryCount, _ := asynq.GetRetryCount(ctx)
 	maxRetry, _ := asynq.GetMaxRetry(ctx)
 	if maxRetry > 0 && retryCount >= maxRetry {
-		_ = h.jobs.MarkGenerationJobFailed(ctx, jobID, "generation_failed", err.Error())
+		if markErr := h.recordGenerationFailure(ctx, jobID, "generation_failed"); markErr != nil {
+			return fmt.Errorf("record exhausted generation failure: %w", markErr)
+		}
 		return fmt.Errorf("%w: generation retries exhausted", asynq.SkipRetry)
 	}
 	return err
+}
+
+// recordGenerationFailure makes terminal state durable even when the worker
+// task context has already been cancelled. It deliberately stores a generic
+// detail: provider errors can contain signed URLs or service internals, while
+// ErrorCode is the only client-facing failure signal.
+func (h *OmniChatGenerationHandler) recordGenerationFailure(ctx context.Context, jobID uuid.UUID, code string) error {
+	if h == nil || h.jobs == nil {
+		return errors.New("generation job store is not configured")
+	}
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+	return h.jobs.MarkGenerationJobFailed(cleanupCtx, jobID, code, "generation failed")
 }
 
 func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID) error {
@@ -340,7 +360,10 @@ func (h *OmniChatGenerationHandler) stopIfGenerationCancelled(ctx context.Contex
 		return false, nil
 	}
 	if providerJobID != "" {
-		if err := h.provider.Cancel(ctx, modelID, providerJobID); err != nil {
+		cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		err := h.provider.Cancel(cancelCtx, modelID, providerJobID)
+		cancel()
+		if err != nil {
 			// The local cancellation is authoritative. Fal may already have
 			// completed, so a provider-side cancellation failure must not revive
 			// or retry the local job.

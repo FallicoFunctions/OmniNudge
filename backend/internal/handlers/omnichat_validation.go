@@ -15,6 +15,7 @@ const (
 	maxImportedMessages        = 200
 	maxOmniChatMessageRunes    = 4000
 	maxConversationNameRunes   = 80
+	maxConversationTitleRunes  = 200
 )
 
 var (
@@ -66,6 +67,20 @@ func normalizeConversationSettings(settings *models.ConversationSettings) (*mode
 		UserAge:    age,
 		UserGender: gender,
 	}, nil
+}
+
+func normalizeConversationTitle(title *string) (*string, error) {
+	if title == nil {
+		return nil, nil
+	}
+	normalized := strings.TrimSpace(*title)
+	if normalized == "" {
+		return nil, nil
+	}
+	if utf8.RuneCountInString(normalized) > maxConversationTitleRunes {
+		return nil, fmt.Errorf("title too long")
+	}
+	return &normalized, nil
 }
 
 func normalizePreviewHistory(history []previewMessage) ([]services.ChatMessage, error) {

@@ -68,6 +68,15 @@ func NewClient(apiKey string) *Client {
 }
 
 func newClient(apiKey, queueURL string, httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 30 * time.Second}
+	} else {
+		clientCopy := *httpClient
+		httpClient = &clientCopy
+	}
+	httpClient.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
 	return &Client{
 		apiKey: strings.TrimSpace(apiKey), queueURL: strings.TrimRight(queueURL, "/"), httpClient: httpClient,
 	}

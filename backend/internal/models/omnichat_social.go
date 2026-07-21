@@ -478,7 +478,11 @@ func (r *OmniChatSocialRepository) SetPublicationLiked(ctx context.Context, publ
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO omnichat_publication_reactions (publication_id, user_id)
 		SELECT p.id, $2 FROM omnichat_publications p
-		WHERE p.id = $1 AND p.status = 'published' AND NOT EXISTS (
+		JOIN users actor ON actor.id = $2 AND actor.deleted = FALSE AND actor.banned = FALSE
+		JOIN users author ON author.id = p.author_user_id AND author.deleted = FALSE AND author.banned = FALSE
+		WHERE p.id = $1 AND p.status = 'published'
+		  AND (p.is_nsfw = FALSE OR actor.nsfw = TRUE)
+		  AND NOT EXISTS (
 			SELECT 1 FROM blocked_users bu WHERE
 			(bu.blocker_id = $2 AND bu.blocked_id = p.author_user_id) OR
 			(bu.blocker_id = p.author_user_id AND bu.blocked_id = $2)
@@ -492,7 +496,11 @@ func (r *OmniChatSocialRepository) AddPublicationComment(ctx context.Context, pu
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO omnichat_publication_comments (id, publication_id, author_user_id, parent_id, body)
 		SELECT $1, p.id, $3, $4, $5 FROM omnichat_publications p
-		WHERE p.id = $2 AND p.status = 'published' AND NOT EXISTS (
+		JOIN users actor ON actor.id = $3 AND actor.deleted = FALSE AND actor.banned = FALSE
+		JOIN users author ON author.id = p.author_user_id AND author.deleted = FALSE AND author.banned = FALSE
+		WHERE p.id = $2 AND p.status = 'published'
+		  AND (p.is_nsfw = FALSE OR actor.nsfw = TRUE)
+		  AND NOT EXISTS (
 			SELECT 1 FROM blocked_users bu WHERE
 			(bu.blocker_id = $3 AND bu.blocked_id = p.author_user_id) OR
 			(bu.blocker_id = p.author_user_id AND bu.blocked_id = $3)
@@ -527,6 +535,13 @@ func (r *OmniChatSocialRepository) ListPublicationComments(ctx context.Context, 
 		SELECT c.id, c.publication_id, c.author_user_id, u.username, u.avatar_url, c.parent_id, c.body, c.created_at, c.updated_at
 		FROM omnichat_publication_comments c JOIN users u ON u.id = c.author_user_id
 		WHERE c.publication_id = $1 AND c.status = 'active' AND u.deleted = FALSE AND u.banned = FALSE
+		  AND EXISTS (
+			SELECT 1 FROM omnichat_publications p JOIN users author ON author.id = p.author_user_id
+			WHERE p.id = c.publication_id AND p.status = 'published' AND author.deleted = FALSE AND author.banned = FALSE
+			  AND (p.is_nsfw = FALSE OR ($2::INTEGER IS NOT NULL AND EXISTS (
+				SELECT 1 FROM users viewer WHERE viewer.id = $2 AND viewer.nsfw = TRUE AND viewer.deleted = FALSE AND viewer.banned = FALSE
+			  )))
+		  )
 		  AND ($2::INTEGER IS NULL OR NOT EXISTS (
 			SELECT 1 FROM blocked_users bu WHERE
 			(bu.blocker_id=$2 AND bu.blocked_id=c.author_user_id) OR
@@ -555,7 +570,11 @@ func (r *OmniChatSocialRepository) RecordPublicationShare(ctx context.Context, p
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO omnichat_publication_shares (publication_id, user_id)
 		SELECT p.id, $2 FROM omnichat_publications p
-		WHERE p.id = $1 AND p.status = 'published' AND NOT EXISTS (
+		JOIN users actor ON actor.id = $2 AND actor.deleted = FALSE AND actor.banned = FALSE
+		JOIN users author ON author.id = p.author_user_id AND author.deleted = FALSE AND author.banned = FALSE
+		WHERE p.id = $1 AND p.status = 'published'
+		  AND (p.is_nsfw = FALSE OR actor.nsfw = TRUE)
+		  AND NOT EXISTS (
 			SELECT 1 FROM blocked_users bu WHERE
 			(bu.blocker_id=$2 AND bu.blocked_id=p.author_user_id) OR
 			(bu.blocker_id=p.author_user_id AND bu.blocked_id=$2)
@@ -573,7 +592,11 @@ func (r *OmniChatSocialRepository) SetPublicationBookmarked(ctx context.Context,
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO omnichat_publication_bookmarks (publication_id, user_id)
 		SELECT p.id, $2 FROM omnichat_publications p
-		WHERE p.id=$1 AND p.status='published' AND NOT EXISTS (
+		JOIN users actor ON actor.id = $2 AND actor.deleted = FALSE AND actor.banned = FALSE
+		JOIN users author ON author.id = p.author_user_id AND author.deleted = FALSE AND author.banned = FALSE
+		WHERE p.id=$1 AND p.status='published'
+		  AND (p.is_nsfw = FALSE OR actor.nsfw = TRUE)
+		  AND NOT EXISTS (
 			SELECT 1 FROM blocked_users bu WHERE
 			(bu.blocker_id=$2 AND bu.blocked_id=p.author_user_id) OR
 			(bu.blocker_id=p.author_user_id AND bu.blocked_id=$2)
@@ -590,8 +613,9 @@ func (r *OmniChatSocialRepository) CanFollow(ctx context.Context, followerUserID
 	var allowed bool
 	err := r.pool.QueryRow(ctx, `
 		SELECT EXISTS (
-			SELECT 1 FROM users followed
-			WHERE followed.id=$2 AND followed.deleted=FALSE AND followed.banned=FALSE
+			SELECT 1 FROM users follower JOIN users followed ON followed.id=$2
+			WHERE follower.id=$1 AND follower.deleted=FALSE AND follower.banned=FALSE
+			  AND followed.deleted=FALSE AND followed.banned=FALSE
 			  AND NOT EXISTS (
 				SELECT 1 FROM blocked_users
 				WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)
@@ -611,8 +635,9 @@ func (r *OmniChatSocialRepository) SetFollowing(ctx context.Context, followerUse
 	}
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO omnichat_follows (follower_user_id, followed_user_id)
-		SELECT $1, followed.id FROM users followed
-		WHERE followed.id=$2 AND followed.deleted=FALSE AND followed.banned=FALSE
+		SELECT $1, followed.id FROM users follower JOIN users followed ON followed.id=$2
+		WHERE follower.id=$1 AND follower.deleted=FALSE AND follower.banned=FALSE
+		  AND followed.deleted=FALSE AND followed.banned=FALSE
 		  AND NOT EXISTS (SELECT 1 FROM blocked_users WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1))
 		ON CONFLICT DO NOTHING
 	`, followerUserID, followedUserID)
@@ -634,9 +659,10 @@ func (r *OmniChatSocialRepository) ContinueChatSnapshot(ctx context.Context, pub
 		JOIN omnichat_chat_snapshots s ON s.id = p.snapshot_id
 		JOIN bot_personas bp ON bp.id = p.persona_id
 		JOIN users author ON author.id = p.author_user_id
+		JOIN users viewer ON viewer.id = $2 AND viewer.deleted = FALSE AND viewer.banned = FALSE
 		WHERE p.id = $1 AND p.content_kind = 'chat' AND p.status = 'published'
 		  AND author.deleted = FALSE AND author.banned = FALSE
-		  AND (p.is_nsfw = FALSE OR EXISTS (SELECT 1 FROM users viewer WHERE viewer.id=$2 AND viewer.nsfw=TRUE))
+		  AND (p.is_nsfw = FALSE OR viewer.nsfw = TRUE)
 		  AND bp.is_active = TRUE
 		  AND ((bp.owner_user_id IS NULL AND bp.visibility = 'public') OR bp.owner_user_id = $2)
 		  AND NOT EXISTS (SELECT 1 FROM blocked_users bu WHERE

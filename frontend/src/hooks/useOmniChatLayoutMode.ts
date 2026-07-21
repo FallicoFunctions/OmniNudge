@@ -7,8 +7,12 @@ const DEFAULT_MODE: OmniChatLayoutMode = 'immersive';
 
 function readStoredMode(): OmniChatLayoutMode {
   if (typeof window === 'undefined') return DEFAULT_MODE;
-  const stored = localStorage.getItem(STORAGE_KEY);
-  return stored === 'shared-nav' ? 'shared-nav' : DEFAULT_MODE;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored === 'shared-nav' ? 'shared-nav' : DEFAULT_MODE;
+  } catch {
+    return DEFAULT_MODE;
+  }
 }
 
 // OmniChat's dark, image-forward look is a deliberate departure from the rest
@@ -20,7 +24,11 @@ export function useOmniChatLayoutMode() {
   const [mode, setModeState] = useState<OmniChatLayoutMode>(readStoredMode);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, mode);
+    try {
+      localStorage.setItem(STORAGE_KEY, mode);
+    } catch {
+      // Storage can be disabled in privacy-restricted browser contexts.
+    }
   }, [mode]);
 
   const setMode = useCallback((next: OmniChatLayoutMode) => {

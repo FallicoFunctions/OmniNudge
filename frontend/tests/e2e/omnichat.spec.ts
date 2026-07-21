@@ -464,7 +464,7 @@ test.describe('OmniChat launch smoke', () => {
     ).toBeVisible();
 
     await page.getByPlaceholder(/say or do something/i).fill('Hello there');
-    await page.getByRole('button', { name: /^send$/i }).click();
+    await page.getByRole('button', { name: /^send(?: message)?$/i }).click();
     await expect(page.getByText('Hello there', { exact: true }).last()).toBeVisible();
     await expect(page.getByText('Replying to: Hello there', { exact: true }).last()).toBeVisible();
 
@@ -486,7 +486,10 @@ test.describe('OmniChat launch smoke', () => {
       });
 
     await expect(page.getByRole('heading', { name: 'Hogwarts Simulator' })).toBeVisible();
-    await expect(page.getByLabel('Avatar URL')).toHaveValue('/uploads/imported-avatar.png');
+    await expect(page.getByRole('img', { name: 'Avatar Image' })).toHaveAttribute(
+      'src',
+      /\/uploads\/imported-avatar\.png$/
+    );
 
     await page.getByRole('button', { name: /^delete$/i }).click();
     await page.getByRole('dialog').getByRole('button', { name: /delete character/i }).click();

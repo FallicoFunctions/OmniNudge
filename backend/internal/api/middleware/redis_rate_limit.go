@@ -14,11 +14,21 @@ import (
 
 // RedisRateLimiter implements distributed rate limiting using Redis
 type RedisRateLimiter struct {
-	cache  services.Cache
-	limit  int           // Max requests per window
-	window time.Duration // Time window
-	prefix string        // Redis key prefix
-	mu     sync.Mutex    // compatibility lock for caches without atomic counters
+	cache      services.Cache
+	limit      int           // Max requests per window
+	window     time.Duration // Time window
+	prefix     string        // Redis key prefix
+	failClosed bool          // reject requests when the counter backend is unavailable
+	mu         sync.Mutex    // compatibility lock for caches without atomic counters
+}
+
+// FailClosed makes a limiter reject requests when its shared counter backend
+// is unavailable. Use this for endpoints that incur provider cost or create
+// scarce resources; silently disabling their limit during a cache outage would
+// turn an infrastructure incident into unbounded spend or abuse.
+func (rl *RedisRateLimiter) FailClosed() *RedisRateLimiter {
+	rl.failClosed = true
+	return rl
 }
 
 // NewRedisRateLimiter creates a Redis-backed rate limiter
@@ -42,9 +52,7 @@ func (rl *RedisRateLimiter) checkLimit(ctx context.Context, key string) (bool, i
 	if counter, ok := rl.cache.(services.AtomicCounter); ok {
 		count, err := counter.IncrementWithTTL(ctx, key, rl.window)
 		if err != nil {
-			// Preserve the application's availability policy: cache outages do
-			// not take unrelated API routes down.
-			return true, rl.limit, resetTime, nil
+			return !rl.failClosed, rl.limit, resetTime, err
 		}
 		remaining := rl.limit - int(count)
 		if remaining < 0 {
@@ -61,8 +69,7 @@ func (rl *RedisRateLimiter) checkLimit(ctx context.Context, key string) (bool, i
 	// Get current count
 	value, hit, err := rl.cache.Get(ctx, key)
 	if err != nil {
-		// On Redis error, allow request (fail open)
-		return true, rl.limit, resetTime, nil
+		return !rl.failClosed, rl.limit, resetTime, err
 	}
 
 	var count int
@@ -79,8 +86,7 @@ func (rl *RedisRateLimiter) checkLimit(ctx context.Context, key string) (bool, i
 	// Increment counter
 	count++
 	if err := rl.cache.Set(ctx, key, strconv.Itoa(count), rl.window); err != nil {
-		// On Redis error, allow request (fail open)
-		return true, rl.limit - count, resetTime, nil
+		return !rl.failClosed, rl.limit - count, resetTime, err
 	}
 
 	remaining := rl.limit - count
@@ -95,12 +101,22 @@ func (rl *RedisRateLimiter) Middleware() gin.HandlerFunc {
 		if !exists {
 			// If no user ID, rate limit by IP for anonymous requests
 			key := fmt.Sprintf("%s:ip:%s", rl.prefix, c.ClientIP())
-			allowed, remaining, resetTime, _ := rl.checkLimit(c.Request.Context(), key)
+			allowed, remaining, resetTime, err := rl.checkLimit(c.Request.Context(), key)
 
 			// Add rate limit headers
 			c.Header("X-RateLimit-Limit", strconv.Itoa(rl.limit))
 			c.Header("X-RateLimit-Remaining", strconv.Itoa(remaining))
 			c.Header("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
+
+			if err != nil && rl.failClosed {
+				c.Header("Retry-After", "5")
+				c.JSON(http.StatusServiceUnavailable, gin.H{
+					"error": "Rate limiting is temporarily unavailable. Please try again later.",
+					"code":  "RATE_LIMIT_UNAVAILABLE",
+				})
+				c.Abort()
+				return
+			}
 
 			if !allowed {
 				c.Header("Retry-After", strconv.Itoa(int(rl.window.Seconds())))
@@ -122,12 +138,22 @@ func (rl *RedisRateLimiter) Middleware() gin.HandlerFunc {
 		// Rate limit by user ID
 		uid := userID.(int)
 		key := fmt.Sprintf("%s:user:%d", rl.prefix, uid)
-		allowed, remaining, resetTime, _ := rl.checkLimit(c.Request.Context(), key)
+		allowed, remaining, resetTime, err := rl.checkLimit(c.Request.Context(), key)
 
 		// Add rate limit headers (P0-007)
 		c.Header("X-RateLimit-Limit", strconv.Itoa(rl.limit))
 		c.Header("X-RateLimit-Remaining", strconv.Itoa(remaining))
 		c.Header("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
+
+		if err != nil && rl.failClosed {
+			c.Header("Retry-After", "5")
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error": "Rate limiting is temporarily unavailable. Please try again later.",
+				"code":  "RATE_LIMIT_UNAVAILABLE",
+			})
+			c.Abort()
+			return
+		}
 
 		if !allowed {
 			c.Header("Retry-After", strconv.Itoa(int(rl.window.Seconds())))
@@ -228,24 +254,24 @@ func ChatDesignRateLimiter(cache services.Cache) *RedisRateLimiter {
 // across the whole app, so this is deliberately tight per user.
 // 20 messages per hour per user.
 func OmniChatRateLimiter(cache services.Cache) *RedisRateLimiter {
-	return NewRedisRateLimiter(cache, 20, time.Hour, "rate:omnichat")
+	return NewRedisRateLimiter(cache, 20, time.Hour, "rate:omnichat").FailClosed()
 }
 
 // OmniChatMediaGenerationRateLimiter isolates costly image/video jobs from
 // ordinary character messages so one activity cannot unexpectedly lock out the
 // other while still enforcing a distributed provider-cost boundary.
 func OmniChatMediaGenerationRateLimiter(cache services.Cache) *RedisRateLimiter {
-	return NewRedisRateLimiter(cache, 10, time.Hour, "rate:omnichat_media")
+	return NewRedisRateLimiter(cache, 10, time.Hour, "rate:omnichat_media").FailClosed()
 }
 
 func OmniChatSocialRateLimiter(cache services.Cache) *RedisRateLimiter {
-	return NewRedisRateLimiter(cache, 60, time.Hour, "rate:omnichat_social")
+	return NewRedisRateLimiter(cache, 60, time.Hour, "rate:omnichat_social").FailClosed()
 }
 
 func OmniChatVoiceRateLimiter(cache services.Cache) *RedisRateLimiter {
-	return NewRedisRateLimiter(cache, 60, time.Hour, "rate:omnichat_voice")
+	return NewRedisRateLimiter(cache, 60, time.Hour, "rate:omnichat_voice").FailClosed()
 }
 
 func OmniChatCallRateLimiter(cache services.Cache) *RedisRateLimiter {
-	return NewRedisRateLimiter(cache, 10, time.Hour, "rate:omnichat_call")
+	return NewRedisRateLimiter(cache, 10, time.Hour, "rate:omnichat_call").FailClosed()
 }

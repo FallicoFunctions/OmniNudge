@@ -133,6 +133,30 @@ describe('OmniChatExploreWorkspace', () => {
     );
   });
 
+  it('does not share an external URL returned by the API', async () => {
+    vi.mocked(omnichatService.recordPublicationShare).mockResolvedValue(
+      'https://attacker.example/'
+    );
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <OmniChatExploreWorkspace />
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /Share 1/ }));
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        expect.stringContaining('/omnichat/explore/pub-chat')
+      )
+    );
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalledWith('https://attacker.example/');
+  });
+
   it('lets an authenticated viewer report a publication', async () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
