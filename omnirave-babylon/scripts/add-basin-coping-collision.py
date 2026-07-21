@@ -18,6 +18,11 @@ import bpy
 
 COPING_TOP = 1.0
 COPING_BOTTOM = 0.0
+# Coordinates are BLENDER-side; the runtime is a 180-degree rotation about
+# the vertical axis (runtime x = -blenderX, runtime z = -blenderY), so an
+# _L slab authored at blender -x lands at runtime +x. This matches every
+# venue mesh family (e.g. V150_CascadeCourtWater_L, verified live) - the
+# L/R suffix always names the AUTHORED stage side, not the runtime sign.
 # (name, x_lo, x_hi, y_lo, y_hi) in blender coordinates
 SLABS = [
     ("COL_BasinCopingInner_R", 5.1, 8.3, -14.7, 47.9),

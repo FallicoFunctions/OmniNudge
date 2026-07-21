@@ -46,8 +46,9 @@ const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
   // BridgeRelief deliberately absent: those are knee-high walkway trim bands
   // ON the causeway (z 0.43-0.87 and crown inlay) - a blocker built from
   // their merged bounds walled off the center promenade and made the first
-  // route objective unreachable.
-  /V121_BasinRetainingRelief/,
+  // route objective unreachable. RetainingRelief is also absent: its
+  // geometry floats at y 4.25+ on the terrace, above the capsule, so the
+  // overhead skip made its pattern a permanent no-op.
   /V124_CrowdControl(FrameArray|RailArray)/,
   /V125_CrowdBarrier(BaseArray|RailArray)/,
   /V133_VipTerraceGoldArray/,
