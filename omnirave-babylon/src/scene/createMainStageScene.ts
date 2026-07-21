@@ -14,6 +14,7 @@ import { createReviewAvatar } from '../player/createReviewAvatar';
 import { createAtmosphereRig } from './createAtmosphereRig';
 import { createCascadeCourtWaterMotion } from './cascadeCourtWaterMotion';
 import { createFestivalField } from './createFestivalField';
+import { createWayfindingSigns } from './createWayfindingSigns';
 import { createLightingRig } from './createLightingRig';
 import { createMainStageCollisionBlockers } from './createMainStageCollisionBlockers';
 import { createMainStagePresentationRig } from './createMainStagePresentationRig';
@@ -122,6 +123,11 @@ export async function createMainStageScene(engine: AbstractEngine) {
   // plaza material it inherits by default. Runs after the freeze, same as
   // the water motion module - it unfreezes only the field's own material.
   const festivalField = createFestivalField(scene);
+
+  // Wayfinding signs flanking the promenade: name/point to the VIP terrace,
+  // cascade courts and stage so players can find them (the authored pylons
+  // only mark the far arrival point).
+  const wayfindingSigns = createWayfindingSigns(scene);
 
   const playerController = createPlayerController({
     avatarRoot: reviewAvatar.root,
@@ -239,6 +245,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
       productionSurfaces,
       cascadeWaterMotion,
       festivalField,
+      wayfindingSigns,
       spawn: BACK_PLAZA_SPAWN,
     },
   };
