@@ -346,6 +346,10 @@ function createPresentationBackdrop(scene: Scene) {
   celestialVault.parent = root;
   celestialVault.isPickable = false;
   celestialVault.infiniteDistance = true;
+  // Critical: EXP2 fog fully saturates infinite-distance geometry, painting
+  // the whole dome flat fog-colour and erasing every star. The sky must be
+  // fog-exempt.
+  celestialVault.applyFog = false;
   celestialVault.material = createCelestialVaultMaterial(scene);
 
   const horizonShroud = MeshBuilder.CreateCylinder(
@@ -461,16 +465,175 @@ function createPresentationBackdrop(scene: Scene) {
   arrivalMistBand.isPickable = false;
   arrivalMistBand.material = createArrivalMistBandMaterial(scene);
 
+  // Moon: high, off to one side, out toward +z where the stage faces and
+  // where players are mostly looking from the review checkpoints. A SPHERE,
+  // not a billboarded disc: freezeStaticScene (which runs after this rig)
+  // freezes world matrices, so a billboard's per-frame facing update never
+  // runs and the disc sits edge-on and invisible. A sphere reads identically
+  // from every angle with no per-frame work. Placed at a large finite
+  // distance so it renders in front of the infinite-distance vault.
+  const moon = MeshBuilder.CreateSphere(
+    'main-stage-moon',
+    {
+      diameter: 34,
+      segments: 20,
+    },
+    scene,
+  );
+  moon.parent = root;
+  moon.position.set(210, 340, 620);
+  moon.isPickable = false;
+  moon.applyFog = false;
+  moon.material = createMoonMaterial(scene);
+
   return root;
 }
 
 function createCelestialVaultMaterial(scene: Scene) {
   const material = new PBRMaterial('main-stage-celestial-vault-material', scene);
   material.backFaceCulling = false;
+  // unlit shows the ALBEDO channel and ignores emissive entirely (verified
+  // live: forcing emissive did nothing, forcing albedo flooded the sky). The
+  // starfield therefore goes on albedoTexture, not emissiveTexture. The map
+  // already carries the dark sky + bright stars, so albedoColor is white to
+  // pass it through untinted.
   material.unlit = true;
-  material.albedoColor = new Color3(0.022, 0.038, 0.072);
-  material.emissiveColor = new Color3(0.024, 0.042, 0.075);
-  material.emissiveIntensity = 0.6;
+  material.albedoColor = new Color3(1, 1, 1);
+  material.reflectivityColor = new Color3(0, 0, 0);
+
+  const starfield = createStarfieldTexture(scene);
+  if (starfield) {
+    material.albedoTexture = starfield;
+  } else {
+    // No texture (eg. NullEngine test runs): fall back to a flat night-sky
+    // colour rather than a white dome.
+    material.albedoColor = new Color3(0.024, 0.042, 0.075);
+  }
+
+  return material;
+}
+
+// Small deterministic PRNG (mulberry32) so the starfield renders identically
+// on every load - a re-randomised sky each session read as a bug during
+// review ("why did the stars move").
+function createSeededRandom(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Equirectangular-ish night-sky map painted as raw pixel data (same
+// approach as createLedWallContentTexture/createEnvironmentTexture above):
+// pure math, no canvas 2D context involved, so it generates identically
+// under the browser, WebGL/WebGPU, and NullEngine test runs.
+function createStarfieldTexture(scene: Scene) {
+  try {
+    const width = 1024;
+    const height = 512;
+    const data = new Uint8Array(width * height * 4);
+
+    // Dark night-sky base: near-black at the zenith (top), lifting to a
+    // faint deep blue toward the horizon (middle rows of the equirect map).
+    for (let y = 0; y < height; y++) {
+      const v = y / (height - 1);
+      const horizonness = Math.sin(v * Math.PI); // 0 at poles, 1 at equator/horizon
+      const r = 0.01 + 0.02 * horizonness;
+      const g = 0.015 + 0.03 * horizonness;
+      const b = 0.03 + 0.06 * horizonness;
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        data[i] = Math.round(r * 255);
+        data[i + 1] = Math.round(g * 255);
+        data[i + 2] = Math.round(b * 255);
+        data[i + 3] = 255;
+      }
+    }
+
+    // Scatter stars: mostly small faint white dots, a handful brighter,
+    // a couple with a faint blue or warm tint.
+    const random = createSeededRandom(0x51a37);
+    const starCount = 620;
+    for (let s = 0; s < starCount; s++) {
+      const x = Math.floor(random() * width);
+      // Bias away from the very bottom rows (below the horizon shroud
+      // covers this anyway, but keeps the map's star density looking
+      // natural rather than uniform pole-to-pole).
+      const y = Math.floor(random() * height * 0.92);
+      const brightnessRoll = random();
+      // Most stars are mid-bright; a tail is brilliant. Kept high because
+      // the map is heavily minified on the 520-unit vault - dim single
+      // pixels vanish on screen (an earlier faint version read as no sky).
+      const brightness = brightnessRoll > 0.9 ? 0.9 + random() * 0.1 : 0.55 + random() * 0.4;
+      const tintRoll = random();
+      let r = 1;
+      let g = 1;
+      let b = 1;
+      if (tintRoll > 0.9) {
+        r = 1;
+        g = 0.92;
+        b = 0.78; // faint warm tint
+      } else if (tintRoll > 0.8) {
+        r = 0.8;
+        g = 0.88;
+        b = 1; // faint blue tint
+      }
+
+      // Every star is at least a 3x3 dot (brilliant ones 5x5) with radial
+      // falloff, so it survives minification on the sphere. Single-pixel
+      // stars were averaged into the background and disappeared entirely.
+      const radius = brightness > 0.9 ? 2 : 1;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const px = x + dx;
+          const py = y + dy;
+          if (px < 0 || px >= width || py < 0 || py >= height) continue;
+          const dist = Math.hypot(dx, dy);
+          const falloff = dist === 0 ? 1 : Math.max(0, 1 - dist / (radius + 0.5));
+          const value = brightness * falloff;
+          const i = (py * width + px) * 4;
+          data[i] = Math.max(data[i], Math.round(r * value * 255));
+          data[i + 1] = Math.max(data[i + 1], Math.round(g * value * 255));
+          data[i + 2] = Math.max(data[i + 2], Math.round(b * value * 255));
+        }
+      }
+    }
+
+    // generateMipMaps MUST be false: mip minification averages the sparse
+    // stars into the dark background and the sky renders empty. Bilinear
+    // (no-mip) sampling keeps them crisp at every viewing distance.
+    const texture = RawTexture.CreateRGBATexture(
+      data,
+      width,
+      height,
+      scene,
+      false,
+      false,
+      Texture.BILINEAR_SAMPLINGMODE,
+    );
+    texture.name = 'main-stage-celestial-vault-starfield';
+    texture.wrapU = Texture.WRAP_ADDRESSMODE;
+    texture.wrapV = Texture.CLAMP_ADDRESSMODE;
+    return texture;
+  } catch (error) {
+    console.warn('celestial vault: starfield texture unavailable', error);
+    return null;
+  }
+}
+
+function createMoonMaterial(scene: Scene) {
+  const material = new PBRMaterial('main-stage-moon-material', scene);
+  material.backFaceCulling = false;
+  // unlit shows albedo, so the moon's warm-white disc colour must live on
+  // albedo (emissive is kept too as a bloom seed but does nothing in unlit).
+  material.unlit = true;
+  material.albedoColor = new Color3(1, 0.97, 0.88);
+  material.emissiveColor = new Color3(1, 0.97, 0.88);
+  material.emissiveIntensity = 2.4;
   material.reflectivityColor = new Color3(0, 0, 0);
 
   return material;
