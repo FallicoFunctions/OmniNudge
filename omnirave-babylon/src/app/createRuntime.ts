@@ -20,6 +20,7 @@ import {
   stepAdaptiveResolution,
 } from './adaptiveResolutionMath';
 import type { createMainStageScene } from '../scene/createMainStageScene';
+import { resolveTravelCameraOffsets, TRAVEL_CAMERA_DISTANCE } from '../player/cameraRigMath';
 import type { ReviewCheckpoint } from '../scene/reviewRouteData';
 import { createDebugPanel } from '../ui/createDebugPanel';
 import { createPerfOverlay, updatePerfOverlay } from '../ui/createPerfOverlay';
@@ -167,14 +168,23 @@ export async function createRuntime(host: HTMLElement) {
         if (checkpointIndex >= 0) {
           reviewRuntime?.routeProgress?.reset(checkpointIndex);
         }
-        if (checkpoint.camera) {
-          // Defer one frame: the player's ground-height snap runs in the next
-          // onBeforeRender, and applying the camera from the pre-snap player
-          // position intermittently lands it inside nearby geometry.
-          scene.onAfterRenderObservable.addOnce(() => {
-            reviewRuntime?.cameraRig?.applyCheckpointView(checkpoint.camera);
+        // Fast travel lands in the standard follow framing - avatar
+        // centered, facing the checkpoint's authored look direction. The
+        // raw authored views are scenery shots whose look target can sit
+        // tens of meters from the avatar; teleporting into one left the
+        // player unable to find themselves (flagged on the VIP terrace).
+        const travelView = resolveTravelCameraOffsets(checkpoint.camera);
+        // Defer one frame: the player's ground-height snap runs in the next
+        // onBeforeRender, and applying the camera from the pre-snap player
+        // position intermittently lands it inside nearby geometry.
+        scene.onAfterRenderObservable.addOnce(() => {
+          reviewRuntime?.cameraRig?.applyCheckpointView({
+            alpha: 0,
+            beta: 1.12,
+            radius: TRAVEL_CAMERA_DISTANCE,
+            ...travelView,
           });
-        }
+        });
       },
     });
     hud = reviewHud;
