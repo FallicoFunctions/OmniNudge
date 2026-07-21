@@ -46,8 +46,9 @@ func NewResilientRedisCacheWithClient(client *redis.Client) *ResilientRedisCache
 // Pool size note: go-redis defaults to PoolSize = 10 * runtime.GOMAXPROCS(0).
 // On an 8-core machine that is 80 Redis connections. If you run multiple server
 // replicas, size the pool explicitly to avoid exhausting Redis maxclients:
-//   client := redis.NewClient(&redis.Options{..., PoolSize: 20})
-//   cache := NewResilientRedisCacheWithClient(client)
+//
+//	client := redis.NewClient(&redis.Options{..., PoolSize: 20})
+//	cache := NewResilientRedisCacheWithClient(client)
 func NewResilientRedisCache(addr, password string) *ResilientRedisCache {
 	client := redis.NewClient(&redis.Options{
 		Addr:         addr,
@@ -192,4 +193,37 @@ func (r *ResilientRedisCache) Set(ctx context.Context, key string, value string,
 		return nil
 	}
 	return cbErr
+}
+
+func (r *ResilientRedisCache) IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error) {
+	if ttl <= 0 {
+		return 0, errors.New("redis counter ttl must be positive")
+	}
+	detached := context.WithoutCancel(ctx)
+	ttlMilliseconds := ttl.Milliseconds()
+	if ttlMilliseconds < 1 {
+		ttlMilliseconds = 1
+	}
+	const incrementScript = `
+		local count = redis.call('INCR', KEYS[1])
+		if count == 1 then
+			redis.call('PEXPIRE', KEYS[1], ARGV[1])
+		end
+		return count
+	`
+	value, cbErr := r.breaker.Execute(func() (any, error) {
+		count, err := r.client.Eval(detached, incrementScript, []string{key}, ttlMilliseconds).Int64()
+		if err != nil {
+			return nil, fmt.Errorf("redis atomic increment: %w", err)
+		}
+		return count, nil
+	})
+	if cbErr != nil {
+		return 0, cbErr
+	}
+	count, ok := value.(int64)
+	if !ok || count < 1 {
+		return 0, errors.New("redis counter returned an invalid value")
+	}
+	return count, nil
 }

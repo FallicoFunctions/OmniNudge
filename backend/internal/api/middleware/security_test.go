@@ -51,6 +51,27 @@ func TestSecurityHeaders_DevelopmentCSPAllowsUnsafeEvalForTooling(t *testing.T) 
 	}
 }
 
+func TestSecurityHeaders_AllowsOnlyTrustedLiveAvatarFrames(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(SecurityHeaders())
+	router.GET("/", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	csp := w.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "frame-src 'self' https://daily.co https://*.daily.co") {
+		t.Fatalf("CSP must allow private Daily live-avatar rooms, got %q", csp)
+	}
+	permissions := w.Header().Get("Permissions-Policy")
+	if !strings.Contains(permissions, `camera=(self "https://daily.co" "https://*.daily.co")`) {
+		t.Fatalf("Permissions-Policy must allow Daily rooms to use the camera, got %q", permissions)
+	}
+	if !strings.Contains(permissions, `microphone=(self "https://daily.co" "https://*.daily.co")`) {
+		t.Fatalf("Permissions-Policy must allow Daily rooms to use the microphone, got %q", permissions)
+	}
+}
+
 func TestFileValidation_AllowsNewDocumentAndArchiveTypes(t *testing.T) {
 	t.Parallel()
 

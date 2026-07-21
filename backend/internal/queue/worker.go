@@ -135,6 +135,9 @@ func (w *Worker) RegisterAllHandlers(handlers JobHandlers) {
 	if handlers.VideoTranscode != nil {
 		w.RegisterHandler(JobTypeVideoTranscode, handlers.VideoTranscode)
 	}
+	if handlers.OmniChatGeneration != nil {
+		w.RegisterHandler(JobTypeOmniChatGeneration, handlers.OmniChatGeneration)
+	}
 }
 
 // JobHandlers groups all job handler functions
@@ -149,6 +152,7 @@ type JobHandlers struct {
 	MessageReencrypt    JobHandler
 	WaveformGeneration  JobHandler
 	VideoTranscode      JobHandler
+	OmniChatGeneration  JobHandler
 }
 
 // Start starts the worker server

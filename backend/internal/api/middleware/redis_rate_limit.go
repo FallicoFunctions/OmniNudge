@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +18,7 @@ type RedisRateLimiter struct {
 	limit  int           // Max requests per window
 	window time.Duration // Time window
 	prefix string        // Redis key prefix
+	mu     sync.Mutex    // compatibility lock for caches without atomic counters
 }
 
 // NewRedisRateLimiter creates a Redis-backed rate limiter
@@ -37,6 +39,24 @@ func NewRedisRateLimiter(cache services.Cache, limit int, window time.Duration, 
 func (rl *RedisRateLimiter) checkLimit(ctx context.Context, key string) (bool, int, time.Time, error) {
 	now := time.Now()
 	resetTime := now.Add(rl.window)
+	if counter, ok := rl.cache.(services.AtomicCounter); ok {
+		count, err := counter.IncrementWithTTL(ctx, key, rl.window)
+		if err != nil {
+			// Preserve the application's availability policy: cache outages do
+			// not take unrelated API routes down.
+			return true, rl.limit, resetTime, nil
+		}
+		remaining := rl.limit - int(count)
+		if remaining < 0 {
+			remaining = 0
+		}
+		return count <= int64(rl.limit), remaining, resetTime, nil
+	}
+
+	// Custom caches may only implement the legacy interface. Serialize that
+	// fallback locally; production Redis and memory caches are atomic above.
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
 
 	// Get current count
 	value, hit, err := rl.cache.Get(ctx, key)
@@ -209,4 +229,23 @@ func ChatDesignRateLimiter(cache services.Cache) *RedisRateLimiter {
 // 20 messages per hour per user.
 func OmniChatRateLimiter(cache services.Cache) *RedisRateLimiter {
 	return NewRedisRateLimiter(cache, 20, time.Hour, "rate:omnichat")
+}
+
+// OmniChatMediaGenerationRateLimiter isolates costly image/video jobs from
+// ordinary character messages so one activity cannot unexpectedly lock out the
+// other while still enforcing a distributed provider-cost boundary.
+func OmniChatMediaGenerationRateLimiter(cache services.Cache) *RedisRateLimiter {
+	return NewRedisRateLimiter(cache, 10, time.Hour, "rate:omnichat_media")
+}
+
+func OmniChatSocialRateLimiter(cache services.Cache) *RedisRateLimiter {
+	return NewRedisRateLimiter(cache, 60, time.Hour, "rate:omnichat_social")
+}
+
+func OmniChatVoiceRateLimiter(cache services.Cache) *RedisRateLimiter {
+	return NewRedisRateLimiter(cache, 60, time.Hour, "rate:omnichat_voice")
+}
+
+func OmniChatCallRateLimiter(cache services.Cache) *RedisRateLimiter {
+	return NewRedisRateLimiter(cache, 10, time.Hour, "rate:omnichat_call")
 }

@@ -100,12 +100,13 @@ type BotConversation struct {
 
 // BotMessage is a single turn (user or assistant) within a BotConversation.
 type BotMessage struct {
-	ID             int       `json:"id"`
-	ConversationID int       `json:"conversation_id"`
-	Role           string    `json:"role"` // 'user' or 'assistant'
-	Content        string    `json:"content"`
-	Failed         bool      `json:"failed"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             int                          `json:"id"`
+	ConversationID int                          `json:"conversation_id"`
+	Role           string                       `json:"role"` // 'user' or 'assistant'
+	Content        string                       `json:"content"`
+	Failed         bool                         `json:"failed"`
+	Attachments    []*OmniChatMessageMediaAsset `json:"attachments,omitempty"`
+	CreatedAt      time.Time                    `json:"created_at"`
 }
 
 // BotPersonaRepository handles database operations for bot personas.
@@ -953,7 +954,52 @@ func (r *BotMessageRepository) ListByConversationID(ctx context.Context, convers
 		}
 		messages = append(messages, m)
 	}
-	return messages, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := r.hydrateAttachments(ctx, conversationID, messages); err != nil {
+		return nil, err
+	}
+	return messages, nil
+}
+
+func (r *BotMessageRepository) hydrateAttachments(ctx context.Context, conversationID int, messages []*BotMessage) error {
+	if len(messages) == 0 {
+		return nil
+	}
+	byID := make(map[int]*BotMessage, len(messages))
+	for _, message := range messages {
+		byID[message.ID] = message
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT bma.message_id,
+		       a.id, a.owner_user_id, a.kind, a.visibility, a.width, a.height,
+		       a.duration_seconds, mf.thumbnail_url, mf.file_type, a.created_at
+		FROM bot_message_attachments bma
+		JOIN bot_messages m ON m.id = bma.message_id AND m.conversation_id = $1
+		JOIN omnichat_media_assets a ON a.id = bma.asset_id AND a.deleted_at IS NULL
+		JOIN media_files mf ON mf.id = a.media_file_id
+		ORDER BY bma.message_id, bma.position
+	`, conversationID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var messageID int
+		asset := &OmniChatMessageMediaAsset{}
+		if err := rows.Scan(
+			&messageID, &asset.ID, &asset.OwnerUserID, &asset.Kind,
+			&asset.Visibility, &asset.Width, &asset.Height, &asset.DurationSeconds,
+			&asset.ThumbnailURL, &asset.FileType, &asset.CreatedAt,
+		); err != nil {
+			return err
+		}
+		if message := byID[messageID]; message != nil {
+			message.Attachments = append(message.Attachments, asset)
+		}
+	}
+	return rows.Err()
 }
 
 // GetLatestAssistantForRegeneration returns messageID only when it is the

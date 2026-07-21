@@ -120,7 +120,7 @@ func (db *DB) MigrateDown(ctx context.Context) error {
 	var version string
 	err := db.Pool.QueryRow(ctx, `
 		SELECT version FROM public.schema_migrations
-		ORDER BY applied_at DESC
+		ORDER BY applied_at DESC, version DESC
 		LIMIT 1
 	`).Scan(&version)
 	if err != nil {

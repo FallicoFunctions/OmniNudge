@@ -211,7 +211,7 @@ func (e *MixpanelExporter) Export(ctx context.Context, event *EnrichedEvent) err
 
 	if resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("Mixpanel export failed: %d - %s", resp.StatusCode, string(body))
+		return fmt.Errorf("mixpanel export failed: %d - %s", resp.StatusCode, string(body))
 	}
 
 	return nil
@@ -262,7 +262,7 @@ func (e *MixpanelExporter) BatchExport(ctx context.Context, events []*EnrichedEv
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("Mixpanel batch export failed: %d", resp.StatusCode)
+		return fmt.Errorf("mixpanel batch export failed: %d", resp.StatusCode)
 	}
 
 	return nil
@@ -391,12 +391,12 @@ func (e *PostHogExporter) BatchExport(ctx context.Context, events []*EnrichedEve
 func mapEventNameForGA(eventName string) string {
 	// GA4 has reserved event names
 	gaMapping := map[string]string{
-		EventSignup:         "sign_up",
-		EventLogin:          "login",
-		EventPostCreated:    "post_created",
-		EventPostViewed:     "view_item",
+		EventSignup:          "sign_up",
+		EventLogin:           "login",
+		EventPostCreated:     "post_created",
+		EventPostViewed:      "view_item",
 		EventSearchPerformed: "search",
-		EventHubJoined:      "join_group",
+		EventHubJoined:       "join_group",
 	}
 
 	if gaName, ok := gaMapping[eventName]; ok {

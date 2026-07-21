@@ -14,6 +14,7 @@ import (
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/services/fal"
 	zlog "github.com/rs/zerolog/log"
 )
 
@@ -130,6 +131,15 @@ func main() {
 	queueClient := queue.NewQueueClient(cfg.Redis.Addr, cfg.Redis.Password)
 
 	// Register all job handlers
+	omniChatGenerationWorker := queue.NewOmniChatGenerationHandler(
+		models.NewOmniChatMediaRepository(db.Pool),
+		models.NewBotPersonaRepository(db.Pool),
+		storageService,
+		virusScanner,
+		fal.NewClient(cfg.OmniChatMedia.FalAPIKey),
+		cfg.OmniChatMedia,
+		cfg.VirusScan.FailClosed,
+	).SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes)
 	handlers := queue.JobHandlers{
 		VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed, storageService, queueClient),
 		Transcription:       queue.NewUnsupportedHandler(queue.JobTypeTranscription, "transcription backend pipeline is not yet implemented"),
@@ -141,12 +151,13 @@ func main() {
 		MessageReencrypt:    queue.NewUnsupportedHandler(queue.JobTypeMessageReencrypt, "message re-encryption backend pipeline is not yet implemented"),
 		WaveformGeneration:  queue.NewWaveformJobHandler(db.Pool, voiceStorage).Handle,
 		VideoTranscode:      queue.NewVideoTranscodeHandler(db.Pool, "./uploads/hls", storageService).Handle,
+		OmniChatGeneration:  omniChatGenerationWorker.Handle,
 	}
 
 	worker.RegisterAllHandlers(handlers)
 
 	zlog.Info().Int("concurrency", concurrency).Msg("Worker configured")
-	zlog.Info().Strs("handlers", []string{"virus_scan", "transcription", "notification", "thumbnail_generation", "email_send", "data_export", "content_moderation", "message_reencrypt", "waveform_generation", "video_transcode"}).Msg("Registered job handlers")
+	zlog.Info().Strs("handlers", []string{"virus_scan", "transcription", "notification", "thumbnail_generation", "email_send", "data_export", "content_moderation", "message_reencrypt", "waveform_generation", "video_transcode", "omnichat_generation"}).Msg("Registered job handlers")
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)

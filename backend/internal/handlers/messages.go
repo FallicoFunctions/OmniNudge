@@ -1064,7 +1064,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			}
 		}
 
-		targetRecipientID := original.RecipientID //nolint:ineffassign,staticcheck // always overwritten in dm and else branches below
+		var targetRecipientID int
 		if targetConversationType == "dm" {
 			targetConversation, err := h.conversationRepo.GetByID(ctx, targetConversationID)
 			if err != nil {

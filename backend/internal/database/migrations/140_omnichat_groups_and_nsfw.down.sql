@@ -1,0 +1,11 @@
+DROP TRIGGER IF EXISTS trg_omnichat_group_persona_limit ON omnichat_group_personas;
+DROP TRIGGER IF EXISTS trg_omnichat_group_member_limit ON omnichat_group_members;
+DROP FUNCTION IF EXISTS enforce_omnichat_group_persona_limit();
+DROP FUNCTION IF EXISTS enforce_omnichat_group_member_limit();
+DROP TABLE IF EXISTS omnichat_group_invites;
+DROP TABLE IF EXISTS omnichat_group_message_attachments;
+DROP TABLE IF EXISTS omnichat_group_messages;
+DROP TABLE IF EXISTS omnichat_group_personas;
+DROP TABLE IF EXISTS omnichat_group_members;
+DROP TABLE IF EXISTS omnichat_groups;
+ALTER TABLE omnichat_publications DROP COLUMN IF EXISTS is_nsfw;

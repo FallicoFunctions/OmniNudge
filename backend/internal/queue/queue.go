@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	zlog "github.com/rs/zerolog/log"
 )
@@ -24,6 +25,7 @@ const (
 	JobTypeContentModeration   JobType = "content_moderation" // P0-043
 	JobTypeMessageReencrypt    JobType = "message_reencrypt"
 	JobTypeVideoTranscode      JobType = "video_transcode"
+	JobTypeOmniChatGeneration  JobType = "omnichat_generation"
 )
 
 // QueueClient wraps the Asynq client for enqueuing jobs
@@ -47,6 +49,21 @@ type ThumbnailGenerationEnqueuer interface {
 type MediaJobEnqueuer interface {
 	VirusScanEnqueuer
 	ThumbnailGenerationEnqueuer
+}
+
+type OmniChatGenerationPayload struct {
+	JobID string `json:"job_id"`
+}
+
+func (q *QueueClient) EnqueueOmniChatGeneration(ctx context.Context, jobID uuid.UUID) error {
+	_, err := q.EnqueueJob(ctx, JobTypeOmniChatGeneration, OmniChatGenerationPayload{JobID: jobID.String()},
+		asynq.Queue("default"),
+		asynq.MaxRetry(3),
+		asynq.Timeout(20*time.Minute),
+		asynq.Retention(24*time.Hour),
+		asynq.Unique(30*time.Minute),
+	)
+	return err
 }
 
 // NewQueueClient creates a new queue client for enqueuing jobs
