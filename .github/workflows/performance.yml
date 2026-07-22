@@ -6,19 +6,27 @@ on:
   push:
     branches: [main, master]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lighthouse:
     name: Lighthouse CI
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -30,20 +38,40 @@ jobs:
         working-directory: ./frontend
         run: npm run build
 
-      - name: Install Lighthouse CI
-        run: npm install -g @lhci/cli@0.14.x
-
-      - name: Run Lighthouse CI
+      - name: Run Lighthouse budgets
         working-directory: ./frontend
         run: |
-          lhci autorun || echo "LHCI_BUILD_CONTEXT__CURRENT_HASH=$(git rev-parse HEAD)" >> $GITHUB_ENV
-        env:
-          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/omninudge-vite-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill "$PREVIEW_PID"' EXIT
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              cat /tmp/omninudge-vite-preview.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          mkdir -p .lighthouseci
+          for run_number in 1 2 3; do
+            npx --no-install lighthouse http://127.0.0.1:4173/ \
+              --chrome-flags="--headless --no-sandbox" \
+              --only-categories=performance,accessibility,best-practices,seo \
+              --output=json \
+              --output-path=".lighthouseci/report-${run_number}.json" \
+              --quiet
+          done
+          node ./scripts/assert-lighthouse-budget.mjs .lighthouseci/report-*.json
 
       - name: Upload Lighthouse results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: lighthouse-results
-          path: .lighthouseci/
+          path: frontend/.lighthouseci/
           retention-days: 30
+          if-no-files-found: error

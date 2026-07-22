@@ -15,6 +15,13 @@ on:
       - 'backend/cmd/migrate/**'
   workflow_dispatch: # Allow manual trigger
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   rollback-tests:
     name: Test Migration Rollbacks
@@ -23,7 +30,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -38,12 +45,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.23'
+          go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
       - name: Install PostgreSQL client
@@ -69,7 +76,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: migration-rollback-test-results
           path: |
@@ -84,7 +91,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check for .down.sql files
         run: |
@@ -127,7 +134,7 @@ jobs:
           DANGEROUS_FOUND=0
 
           for pattern in "${DANGEROUS_PATTERNS[@]}"; do
-            if grep -rP "$pattern" backend/internal/database/migrations/*.sql 2>/dev/null; then
+            if grep -P "$pattern" backend/internal/database/migrations/*.up.sql 2>/dev/null; then
               echo "⚠️  Found potentially dangerous operation: $pattern"
               DANGEROUS_FOUND=$((DANGEROUS_FOUND + 1))
             fi
@@ -135,9 +142,9 @@ jobs:
 
           if [ $DANGEROUS_FOUND -gt 0 ]; then
             echo ""
-            echo "WARNING: Found $DANGEROUS_FOUND potentially dangerous operation(s)"
-            echo "Consider using 'IF EXISTS' clauses to make operations idempotent"
-            echo "This is a warning, not a failure - review manually"
+            echo "ERROR: Found $DANGEROUS_FOUND unsafe operation(s) in forward migrations"
+            echo "Use an idempotent/online migration strategy and document any required exception"
+            exit 1
           else
             echo ""
             echo "✓ No obviously dangerous operations found"
