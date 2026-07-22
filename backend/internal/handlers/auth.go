@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -34,6 +35,8 @@ type AuthHandler struct {
 	frontendURL           string
 	auditLogger           *audit.AuditLogger
 	lockoutService        *services.AccountLockoutService
+	sessions              *services.AuthSessionService
+	secureCookie          bool
 }
 
 // logAudit writes a structured audit event. It is a nil-safe wrapper around
@@ -63,7 +66,8 @@ func NewAuthHandler(
 	frontendURL string,
 	auditLogger *audit.AuditLogger,
 	lockoutService *services.AccountLockoutService,
-	_ string,
+	sessions *services.AuthSessionService,
+	appEnv string,
 ) *AuthHandler {
 	return &AuthHandler{
 		authService:           authService,
@@ -74,6 +78,8 @@ func NewAuthHandler(
 		frontendURL:           frontendURL,
 		auditLogger:           auditLogger,
 		lockoutService:        lockoutService,
+		sessions:              sessions,
+		secureCookie:          appEnv != "" && appEnv != "development" && appEnv != "test",
 	}
 }
 
@@ -104,7 +110,8 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-// Logout handles user logout (client-side token removal).
+// Logout revokes only the current browser/device session. Legacy bearer tokens
+// do not carry a session ID, so their fallback remains account-wide revocation.
 // @Summary      Logout
 // @Tags         Auth
 // @Security     BearerAuth
@@ -119,11 +126,21 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	h.logAudit(c.Request.Context(), &userID, "logout", "user", &userID,
 		c.ClientIP(), c.Request.UserAgent(), nil)
-	if err := h.userRepo.IncrementTokenVersion(c.Request.Context(), userID); err != nil {
-		slog.Error("failed to invalidate sessions on logout", "error", err, "user_id", userID)
-		RespondError(c, http.StatusInternalServerError, "Failed to log out")
-		return
+	sessionID := c.GetString("session_id")
+	if sessionID != "" && h.sessions != nil {
+		if err := h.sessions.Revoke(c.Request.Context(), sessionID, userID); err != nil {
+			slog.Error("failed to revoke browser session on logout", "error", err, "user_id", userID)
+			RespondError(c, http.StatusInternalServerError, "Failed to log out")
+			return
+		}
+	} else {
+		if err := h.userRepo.IncrementTokenVersion(c.Request.Context(), userID); err != nil {
+			slog.Error("failed to invalidate sessions on logout", "error", err, "user_id", userID)
+			RespondError(c, http.StatusInternalServerError, "Failed to log out")
+			return
+		}
 	}
+	clearBrowserSessionCookies(c, h.secureCookie)
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
@@ -145,7 +162,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user, token, err := h.authService.Register(c.Request.Context(), h.userRepo, &req)
+	user, _, err := h.authService.Register(c.Request.Context(), h.userRepo, &req)
 	if err != nil {
 		zlog.Warn().Err(err).Msg("registration validation failed")
 		RespondError(c, http.StatusBadRequest, "Registration failed. Please check your input and try again.")
@@ -201,8 +218,14 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		}()
 	}
 
+	credentials, err := h.sessions.Create(c.Request.Context(), user, false, c.Request.UserAgent(), c.ClientIP())
+	if err != nil {
+		slog.Error("failed to create browser session after registration", "error", err, "user_id", user.ID)
+		RespondError(c, http.StatusServiceUnavailable, "Account created, but sign-in is temporarily unavailable")
+		return
+	}
+	writeBrowserSessionCookies(c, credentials, h.secureCookie)
 	c.JSON(http.StatusCreated, gin.H{
-		"token":                   token,
 		"user":                    user,
 		"email_verification_sent": emailVerificationSent,
 	})
@@ -252,7 +275,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		}
 	}
 
-	user, token, err := h.authService.Login(ctx, h.userRepo, &req)
+	user, _, err := h.authService.Login(ctx, h.userRepo, &req)
 	if err != nil {
 		// Record the failure for lockout tracking.
 		// Fix 9: RecordFailure failure means this attempt is not counted toward
@@ -283,10 +306,71 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		ipAddress, c.Request.UserAgent(),
 		map[string]any{"username": user.Username})
 
-	c.JSON(http.StatusOK, gin.H{
-		"token": token,
-		"user":  user,
-	})
+	credentials, err := h.sessions.Create(ctx, user, req.KeepLoggedIn, c.Request.UserAgent(), c.ClientIP())
+	if err != nil {
+		slog.Error("failed to create browser session after login", "error", err, "user_id", user.ID)
+		RespondError(c, http.StatusServiceUnavailable, "Sign-in is temporarily unavailable")
+		return
+	}
+	writeBrowserSessionCookies(c, credentials, h.secureCookie)
+	c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
+// Refresh rotates both the opaque refresh secret and CSRF token and issues a
+// new fifteen-minute access cookie. Reuse of an old refresh secret revokes the
+// device session.
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	refreshToken, err := c.Cookie(services.RefreshTokenCookieName)
+	if err != nil || refreshToken == "" {
+		clearBrowserSessionCookies(c, h.secureCookie)
+		RespondError(c, http.StatusUnauthorized, "Authentication session expired")
+		return
+	}
+	csrfCookie, cookieErr := c.Cookie(services.CSRFTokenCookieName)
+	csrfHeader := c.GetHeader("X-CSRF-Token")
+	if cookieErr != nil || csrfCookie == "" || csrfHeader == "" ||
+		subtle.ConstantTimeCompare([]byte(csrfCookie), []byte(csrfHeader)) != 1 {
+		RespondError(c, http.StatusForbidden, "CSRF validation failed")
+		return
+	}
+	user, credentials, err := h.sessions.Refresh(c.Request.Context(), refreshToken, csrfHeader)
+	if err != nil {
+		clearBrowserSessionCookies(c, h.secureCookie)
+		RespondError(c, http.StatusUnauthorized, "Authentication session expired")
+		return
+	}
+	writeBrowserSessionCookies(c, credentials, h.secureCookie)
+	c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
+func (h *AuthHandler) ListSessions(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	items, err := h.sessions.List(c.Request.Context(), userID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to list sessions")
+		return
+	}
+	currentID := c.GetString("session_id")
+	c.JSON(http.StatusOK, gin.H{"sessions": items, "current_session_id": currentID})
+}
+
+func (h *AuthHandler) RevokeSession(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	targetID := c.Param("session_id")
+	if err := h.sessions.Revoke(c.Request.Context(), targetID, userID); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid session")
+		return
+	}
+	if targetID == c.GetString("session_id") {
+		clearBrowserSessionCookies(c, h.secureCookie)
+	}
+	c.Status(http.StatusNoContent)
 }
 
 // UpdatePublicKey handles updating user's public encryption key.
@@ -799,7 +883,13 @@ func (h *AuthHandler) GenerateWSToken(c *gin.Context) {
 		return
 	}
 
-	token, err := h.authService.GenerateWebSocketJWT(user.ID, user.Username, user.Role, user.TokenVersion)
+	sessionID := c.GetString("session_id")
+	var token string
+	if sessionID != "" {
+		token, err = h.authService.GenerateWebSocketJWTForSession(user.ID, user.Username, user.Role, user.TokenVersion, sessionID)
+	} else {
+		token, err = h.authService.GenerateWebSocketJWT(user.ID, user.Username, user.Role, user.TokenVersion)
+	}
 	if err != nil {
 		zlog.Error().Err(err).Int("user_id", userID).Msg("Failed to generate websocket token")
 		RespondError(c, http.StatusInternalServerError, "Failed to generate WebSocket token")

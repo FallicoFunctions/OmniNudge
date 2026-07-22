@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -36,7 +38,7 @@ type oauthUserInfo struct {
 // Steam uses OpenID 2.0, not OAuth2, so it's handled separately from the
 // oauth2.Config-based providers throughout this file.
 type OAuthHandler struct {
-	authService  *services.AuthService
+	sessions     *services.AuthSessionService
 	userRepo     ports.UserRepository
 	db           *pgxpool.Pool
 	frontendURL  string
@@ -51,7 +53,7 @@ type OAuthHandler struct {
 // NewOAuthHandler creates the handler. Pass empty client IDs (or an empty Steam API
 // key) to disable a provider.
 func NewOAuthHandler(
-	authService *services.AuthService,
+	sessions *services.AuthSessionService,
 	userRepo ports.UserRepository,
 	db *pgxpool.Pool,
 	frontendURL, backendURL string,
@@ -62,12 +64,12 @@ func NewOAuthHandler(
 	appEnv string,
 ) *OAuthHandler {
 	h := &OAuthHandler{
-		authService:  authService,
+		sessions:     sessions,
 		userRepo:     userRepo,
 		db:           db,
 		frontendURL:  frontendURL,
 		backendURL:   backendURL,
-		secureCookie: appEnv == "production",
+		secureCookie: appEnv != "" && appEnv != "development" && appEnv != "test",
 		steamAPIKey:  steamAPIKey,
 	}
 
@@ -116,6 +118,22 @@ func (h *OAuthHandler) oauthErrorURL(reason string) string {
 	return h.frontendURL + "/auth/callback?auth_error=" + reason
 }
 
+func (h *OAuthHandler) writeOAuthStateCookie(c *gin.Context, value string, maxAge int) {
+	cookie := &http.Cookie{
+		Name: "oauth_state", Value: value, Path: "/api/v1/auth/oauth/",
+		MaxAge: maxAge, HttpOnly: true, Secure: h.secureCookie, SameSite: http.SameSiteLaxMode,
+	}
+	if maxAge < 0 {
+		cookie.Expires = time.Unix(1, 0)
+	}
+	http.SetCookie(c.Writer, cookie)
+}
+
+func validOAuthState(cookieState, queryState string) bool {
+	return cookieState != "" && queryState != "" &&
+		subtle.ConstantTimeCompare([]byte(cookieState), []byte(queryState)) == 1
+}
+
 // Initiate handles GET /auth/oauth/:provider — sets state cookie and redirects to provider.
 func (h *OAuthHandler) Initiate(c *gin.Context) {
 	provider := c.Param("provider")
@@ -137,7 +155,7 @@ func (h *OAuthHandler) Initiate(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("oauth_state", state, 600, "/", "", h.secureCookie, true)
+	h.writeOAuthStateCookie(c, state, 600)
 	c.Redirect(http.StatusFound, cfg.AuthCodeURL(state, oauth2.AccessTypeOnline))
 }
 
@@ -150,10 +168,17 @@ func (h *OAuthHandler) initiateSteam(c *gin.Context) {
 		return
 	}
 
+	state, err := randomHex(16)
+	if err != nil {
+		c.Redirect(http.StatusFound, h.oauthErrorURL("server_error"))
+		return
+	}
+	h.writeOAuthStateCookie(c, state, 600)
+	returnTo := h.backendURL + "/api/v1/auth/oauth/steam/callback?state=" + url.QueryEscape(state)
 	params := url.Values{
 		"openid.ns":         {"http://specs.openid.net/auth/2.0"},
 		"openid.mode":       {"checkid_setup"},
-		"openid.return_to":  {h.backendURL + "/api/v1/auth/oauth/steam/callback"},
+		"openid.return_to":  {returnTo},
 		"openid.realm":      {h.backendURL},
 		"openid.identity":   {"http://specs.openid.net/auth/2.0/identifier_select"},
 		"openid.claimed_id": {"http://specs.openid.net/auth/2.0/identifier_select"},
@@ -161,7 +186,7 @@ func (h *OAuthHandler) initiateSteam(c *gin.Context) {
 	c.Redirect(http.StatusFound, "https://steamcommunity.com/openid/login?"+params.Encode())
 }
 
-// Callback handles GET /auth/oauth/:provider/callback — exchanges code, finds/creates user, issues JWT.
+// Callback handles GET /auth/oauth/:provider/callback and establishes a browser session.
 func (h *OAuthHandler) Callback(c *gin.Context) {
 	provider := c.Param("provider")
 
@@ -178,11 +203,11 @@ func (h *OAuthHandler) Callback(c *gin.Context) {
 
 	// CSRF state check
 	cookieState, _ := c.Cookie("oauth_state")
-	if cookieState == "" || cookieState != c.Query("state") {
+	if !validOAuthState(cookieState, c.Query("state")) {
 		c.Redirect(http.StatusFound, h.oauthErrorURL("invalid_state"))
 		return
 	}
-	c.SetCookie("oauth_state", "", -1, "/", "", h.secureCookie, true)
+	h.writeOAuthStateCookie(c, "", -1)
 
 	// Exchange authorisation code for token
 	code := c.Query("code")
@@ -217,6 +242,12 @@ func (h *OAuthHandler) callbackSteam(c *gin.Context) {
 		c.Redirect(http.StatusFound, h.oauthErrorURL("unknown_provider"))
 		return
 	}
+	cookieState, _ := c.Cookie("oauth_state")
+	if !validOAuthState(cookieState, c.Query("state")) {
+		c.Redirect(http.StatusFound, h.oauthErrorURL("invalid_state"))
+		return
+	}
+	h.writeOAuthStateCookie(c, "", -1)
 
 	steamID, err := h.verifySteamCallback(c.Request)
 	if err != nil {
@@ -236,7 +267,7 @@ func (h *OAuthHandler) callbackSteam(c *gin.Context) {
 }
 
 // finishOAuthLogin finds/creates the local account for a verified provider identity
-// and either redirects to the choose-username flow (new identity) or issues a JWT.
+// and either redirects to the choose-username flow or establishes a browser session.
 func (h *OAuthHandler) finishOAuthLogin(c *gin.Context, provider string, info *oauthUserInfo) {
 	user, pending, err := h.findOrPrepareUser(c.Request.Context(), provider, info)
 	if err != nil {
@@ -246,8 +277,13 @@ func (h *OAuthHandler) finishOAuthLogin(c *gin.Context, provider string, info *o
 	}
 
 	if pending != nil {
-		redirectURL := h.frontendURL + "/auth/choose-username?pending_token=" + pending.Token +
-			"&suggested=" + url.QueryEscape(pending.SuggestedUsername) + "&provider=" + provider
+		http.SetCookie(c.Writer, &http.Cookie{
+			Name: "omni_oauth_pending", Value: pending.Token,
+			Path: "/api/v1/auth/oauth/complete", MaxAge: 600,
+			HttpOnly: true, Secure: h.secureCookie, SameSite: http.SameSiteStrictMode,
+		})
+		redirectURL := h.frontendURL + "/auth/choose-username?suggested=" +
+			url.QueryEscape(pending.SuggestedUsername) + "&provider=" + provider
 		if pending.Email == "" {
 			redirectURL += "&no_email=1"
 		}
@@ -255,15 +291,14 @@ func (h *OAuthHandler) finishOAuthLogin(c *gin.Context, provider string, info *o
 		return
 	}
 
-	// Issue JWT (7-day, same as regular login)
-	jwtToken, err := h.authService.GenerateJWTWithVersion(user.ID, user.Username, user.Role, user.TokenVersion)
+	credentials, err := h.sessions.Create(c.Request.Context(), user, true, c.Request.UserAgent(), c.ClientIP())
 	if err != nil {
-		log.Printf("[oauth] GenerateJWT failed: %v", err)
+		log.Printf("[oauth] browser session creation failed: %v", err)
 		c.Redirect(http.StatusFound, h.oauthErrorURL("server_error"))
 		return
 	}
-
-	c.Redirect(http.StatusFound, h.frontendURL+"/auth/callback?token="+jwtToken+"&provider="+provider)
+	writeBrowserSessionCookies(c, credentials, h.secureCookie)
+	c.Redirect(http.StatusFound, h.frontendURL+"/auth/callback?provider="+provider)
 }
 
 // verifySteamCallback validates a Steam OpenID 2.0 callback by POSTing the
@@ -286,13 +321,18 @@ func (h *OAuthHandler) verifySteamCallback(r *http.Request) (string, error) {
 	}
 	verifyParams.Set("openid.mode", "check_authentication")
 
-	resp, err := http.PostForm("https://steamcommunity.com/openid/login", verifyParams)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, "https://steamcommunity.com/openid/login", strings.NewReader(verifyParams.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("create check_authentication request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	if err != nil {
 		return "", fmt.Errorf("check_authentication request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return "", fmt.Errorf("read check_authentication response: %w", err)
 	}
@@ -324,7 +364,7 @@ func (h *OAuthHandler) fetchSteamUserInfo(ctx context.Context, steamID string) (
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("GetPlayerSummaries: %w", err)
 	}
@@ -356,13 +396,12 @@ func (h *OAuthHandler) fetchSteamUserInfo(ctx context.Context, steamID string) (
 
 // completeSignupRequest is the body for POST /auth/oauth/complete.
 type completeSignupRequest struct {
-	PendingToken string `json:"pending_token"`
-	Username     string `json:"username"`
-	Email        string `json:"email"` // optional; only sent when the provider didn't supply one
+	Username string `json:"username"`
+	Email    string `json:"email"` // optional; only sent when the provider didn't supply one
 }
 
 // CompleteSignup handles POST /auth/oauth/complete — finalises a pending OAuth
-// signup with the user's chosen username, creates the account, and issues a JWT.
+// signup with the user's chosen username and creates a browser session.
 func (h *OAuthHandler) CompleteSignup(c *gin.Context) {
 	var req completeSignupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -376,7 +415,12 @@ func (h *OAuthHandler) CompleteSignup(c *gin.Context) {
 		return
 	}
 
-	pending, err := h.getPendingSignup(c.Request.Context(), req.PendingToken)
+	pendingToken, cookieErr := c.Cookie("omni_oauth_pending")
+	if cookieErr != nil || pendingToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "this sign-up link has expired, please sign in again"})
+		return
+	}
+	pending, err := h.getPendingSignup(c.Request.Context(), pendingToken)
 	if err != nil || pending == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "this sign-up link has expired, please sign in again"})
 		return
@@ -428,15 +472,20 @@ func (h *OAuthHandler) CompleteSignup(c *gin.Context) {
 		log.Printf("[oauth] insert oauth_account for new user_id=%d: %v", newUser.ID, err)
 	}
 
-	h.deletePendingSignup(c.Request.Context(), req.PendingToken)
+	h.deletePendingSignup(c.Request.Context(), pendingToken)
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name: "omni_oauth_pending", Value: "", Path: "/api/v1/auth/oauth/complete",
+		MaxAge: -1, Expires: time.Unix(1, 0), HttpOnly: true,
+		Secure: h.secureCookie, SameSite: http.SameSiteStrictMode,
+	})
 
-	jwtToken, err := h.authService.GenerateJWTWithVersion(newUser.ID, newUser.Username, newUser.Role, newUser.TokenVersion)
+	credentials, err := h.sessions.Create(c.Request.Context(), newUser, true, c.Request.UserAgent(), c.ClientIP())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "failed to create authentication session"})
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"token": jwtToken})
+	writeBrowserSessionCookies(c, credentials, h.secureCookie)
+	c.JSON(http.StatusOK, gin.H{"user": newUser})
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -641,7 +690,7 @@ func (h *OAuthHandler) findOrPrepareUser(ctx context.Context, provider string, i
 	_, err = h.db.Exec(ctx,
 		`INSERT INTO oauth_pending_signups (token, provider, provider_user_id, email, name, avatar_url, suggested_username, expires_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		token, provider, info.ProviderUserID, info.Email, info.Name, info.AvatarURL, suggested, time.Now().UTC().Add(15*time.Minute),
+		hashPendingSignupToken(token), provider, info.ProviderUserID, info.Email, info.Name, info.AvatarURL, suggested, time.Now().UTC().Add(10*time.Minute),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("insert pending signup: %w", err)
@@ -668,7 +717,7 @@ func (h *OAuthHandler) getPendingSignup(ctx context.Context, token string) (*pen
 	err := h.db.QueryRow(ctx,
 		`SELECT provider, provider_user_id, COALESCE(email, ''), COALESCE(name, ''), COALESCE(avatar_url, ''), suggested_username, expires_at
 		 FROM oauth_pending_signups WHERE token = $1`,
-		token,
+		hashPendingSignupToken(token),
 	).Scan(&p.Provider, &p.ProviderUserID, &p.Email, &p.Name, &p.AvatarURL, &p.SuggestedUsername, &expiresAt)
 	if err != nil {
 		return nil, err
@@ -681,9 +730,14 @@ func (h *OAuthHandler) getPendingSignup(ctx context.Context, token string) (*pen
 }
 
 func (h *OAuthHandler) deletePendingSignup(ctx context.Context, token string) {
-	if _, err := h.db.Exec(ctx, `DELETE FROM oauth_pending_signups WHERE token = $1`, token); err != nil {
+	if _, err := h.db.Exec(ctx, `DELETE FROM oauth_pending_signups WHERE token = $1`, hashPendingSignupToken(token)); err != nil {
 		log.Printf("[oauth] delete pending signup failed: %v", err)
 	}
+}
+
+func hashPendingSignupToken(token string) string {
+	digest := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(digest[:])
 }
 
 func (h *OAuthHandler) insertOAuthAccount(ctx context.Context, userID int, provider string, info *oauthUserInfo) error {

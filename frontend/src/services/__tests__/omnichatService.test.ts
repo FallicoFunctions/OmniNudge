@@ -21,7 +21,6 @@ describe('omnichatService media content loading', () => {
   });
 
   it('continues to fetch same-origin media with authentication', async () => {
-    localStorage.setItem('auth_token', 'session-token');
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       blob: () => Promise.resolve(new Blob(['image'])),
@@ -32,7 +31,9 @@ describe('omnichatService media content loading', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:8080/api/v1/omnichat/media/asset-1/content',
-      expect.objectContaining({ headers: { Authorization: 'Bearer session-token' } })
+      expect.objectContaining({ credentials: 'include' })
     );
+    const requestInit = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(new Headers(requestInit.headers).has('Authorization')).toBe(false);
   });
 });

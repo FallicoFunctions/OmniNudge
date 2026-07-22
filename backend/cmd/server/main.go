@@ -208,6 +208,8 @@ func main() {
 		cfg.Turnstile.Secret,
 	)
 	authService.SetUserRepository(userRepo)
+	authSessionService := services.NewAuthSessionService(db.Pool, authService)
+	authService.SetSessionService(authSessionService)
 
 	// Redis is optional in dev. If it's configured but unreachable, fall back to in-memory cache and disable the job queue
 	// (otherwise Asynq will spam errors and unrelated endpoints can fail).
@@ -546,8 +548,8 @@ func main() {
 	} else {
 		devLockoutService = lockoutService
 	}
-	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, devLockoutService, cfg.AppEnv)
-	oauthHandler := handlers.NewOAuthHandler(authService, userRepo, db.Pool, cfg.FrontendURL, cfg.OAuth.BackendURL, cfg.OAuth.GoogleClientID, cfg.OAuth.GoogleClientSecret, cfg.OAuth.DiscordClientID, cfg.OAuth.DiscordClientSecret, cfg.OAuth.GitHubClientID, cfg.OAuth.GitHubClientSecret, cfg.OAuth.SteamAPIKey, cfg.AppEnv)
+	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, devLockoutService, authSessionService, cfg.AppEnv)
+	oauthHandler := handlers.NewOAuthHandler(authSessionService, userRepo, db.Pool, cfg.FrontendURL, cfg.OAuth.BackendURL, cfg.OAuth.GoogleClientID, cfg.OAuth.GoogleClientSecret, cfg.OAuth.DiscordClientID, cfg.OAuth.DiscordClientSecret, cfg.OAuth.GitHubClientID, cfg.OAuth.GitHubClientSecret, cfg.OAuth.SteamAPIKey, cfg.AppEnv)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo, autoDeleteSvc)
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo, hubSettingsRepo)
 	postsHandler.SetLinkPreviewService(linkpreviewsvc.NewService(nil, storageService, virusScanner))
@@ -940,7 +942,8 @@ func main() {
 			// Social / OAuth login
 			auth.GET("/oauth/:provider", oauthHandler.Initiate)
 			auth.GET("/oauth/:provider/callback", oauthHandler.Callback)
-			auth.POST("/oauth/complete", oauthHandler.CompleteSignup)
+			auth.POST("/oauth/complete", authRateLimiter.Middleware(), oauthHandler.CompleteSignup)
+			auth.POST("/refresh", authRateLimiter.Middleware(), authHandler.Refresh)
 		}
 
 		// Combined feed routes (optional auth)
@@ -1129,6 +1132,8 @@ func main() {
 			protected.GET("/auth/me", authHandler.GetMe)
 			protected.POST("/auth/logout", authHandler.Logout)
 			protected.POST("/auth/ws-token", authHandler.GenerateWSToken)
+			protected.GET("/auth/sessions", authHandler.ListSessions)
+			protected.DELETE("/auth/sessions/:session_id", authHandler.RevokeSession)
 			protected.PUT("/auth/public-key", authHandler.UpdatePublicKey)
 			protected.GET("/auth/public-keys", authHandler.GetPublicKeys)
 			protected.PUT("/auth/encrypted-private-key", authHandler.UpdateEncryptedPrivateKey)

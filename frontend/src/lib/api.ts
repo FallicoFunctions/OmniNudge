@@ -1,8 +1,7 @@
+import { authenticatedFetch } from '../services/authSession';
+
 // API client configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
-
-export const getStoredAuthToken = () =>
-  localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
 
 interface ApiError {
   code?: string;
@@ -18,21 +17,14 @@ class ApiClient {
     this.baseUrl = baseUrl;
   }
 
-  private getAuthHeader(): HeadersInit {
-    const token = getStoredAuthToken();
-    if (!token) return {};
-    return { Authorization: `Bearer ${token}` };
-  }
-
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const headers = {
       'Content-Type': 'application/json',
-      ...this.getAuthHeader(),
       ...options.headers,
     };
 
-    const response = await fetch(url, {
+    const response = await authenticatedFetch(url, {
       ...options,
       headers,
       // Bypass browser HTTP cache on every API call. React Query manages its own
@@ -58,11 +50,9 @@ class ApiClient {
         message: 'Unknown error',
       };
 
-      // If banned/deleted, clear auth and surface reason
+      // If banned/deleted, clear non-secret cached user metadata.
       const errorText = `${error.message || ''} ${error.error || ''}`.toLowerCase();
       if (response.status === 401 && errorText.includes('ban')) {
-        localStorage.removeItem('auth_token');
-        sessionStorage.removeItem('auth_token');
         localStorage.removeItem('user');
       }
 
@@ -125,9 +115,8 @@ class ApiClient {
     }
 
     const url = `${this.baseUrl}${endpoint}`;
-    const response = await fetch(url, {
+    const response = await authenticatedFetch(url, {
       method: 'POST',
-      headers: this.getAuthHeader(),
       body: formData,
     });
 

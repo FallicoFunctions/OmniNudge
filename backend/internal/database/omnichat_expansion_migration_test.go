@@ -20,6 +20,16 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 		require.NoError(t, db.Migrate(ctx))
 	})
 	require.NoError(t, db.Migrate(ctx))
+	// New non-OmniChat migrations sort after the expansion. Roll them back
+	// before exercising the speech-outbox rollback guardrail.
+	for _, expected := range []string{
+		"147_auth_sessions",
+	} {
+		var latest string
+		require.NoError(t, db.Pool.QueryRow(ctx, `SELECT version FROM schema_migrations ORDER BY applied_at DESC, version DESC LIMIT 1`).Scan(&latest))
+		require.Equal(t, expected, latest)
+		require.NoError(t, db.MigrateDown(ctx))
+	}
 	_, err = db.Pool.Exec(ctx, `INSERT INTO omnichat_speech_deletion_queue(storage_path) VALUES('omnichat/speech/pending.mp3')`)
 	require.NoError(t, err)
 	err = db.MigrateDown(ctx)
@@ -46,6 +56,7 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 	}
 
 	for _, table := range []string{
+		"auth_sessions",
 		"omnichat_generation_jobs",
 		"omnichat_media_assets",
 		"omnichat_publications",
@@ -61,6 +72,7 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 
 	require.NoError(t, db.Migrate(ctx))
 	for _, table := range []string{
+		"auth_sessions",
 		"omnichat_generation_jobs",
 		"omnichat_media_assets",
 		"omnichat_publications",

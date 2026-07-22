@@ -24,7 +24,8 @@ import type {
   OmniChatCallSession,
   OmniChatSceneState,
 } from '../types/omnichat';
-import { API_BASE_URL, getStoredAuthToken } from '../lib/api';
+import { API_BASE_URL } from '../lib/api';
+import { authenticatedFetch } from './authSession';
 
 function getApiUrl(path: string): URL {
   return new URL(`${API_BASE_URL.replace(/\/$/, '')}${path}`);
@@ -187,12 +188,10 @@ export const omnichatService = {
       formData.append('is_nsfw', 'true');
     }
 
-    const token = getStoredAuthToken();
-    const response = await fetch(
+    const response = await authenticatedFetch(
       `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/omnichat/personas/import`,
       {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       }
     );
@@ -206,12 +205,8 @@ export const omnichatService = {
   },
 
   async exportPersona(personaId: number): Promise<Blob> {
-    const token = getStoredAuthToken();
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/omnichat/personas/${personaId}/export`,
-      {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }
+    const response = await authenticatedFetch(
+      `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/omnichat/personas/${personaId}/export`
     );
 
     if (!response.ok) {
@@ -272,10 +267,8 @@ export const omnichatService = {
   },
 
   async getMediaAssetContent(assetId: string, publicContentUrl?: string): Promise<Blob> {
-    const token = getStoredAuthToken();
     const contentUrl = resolveApiMediaContentUrl(assetId, publicContentUrl);
-    const response = await fetch(contentUrl, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    const response = await authenticatedFetch(contentUrl, {
       cache: 'no-store',
     });
     if (!response.ok) {
@@ -500,12 +493,10 @@ export const omnichatService = {
   },
 
   async previewVoicePreset(presetId: string): Promise<Blob> {
-    const token = getStoredAuthToken();
-    const response = await fetch(
+    const response = await authenticatedFetch(
       `${API_BASE_URL}/omnichat/voice-presets/${encodeURIComponent(presetId)}/preview`,
       {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
       }
     );
     if (!response.ok) throw new Error('Voice preview is unavailable');
@@ -528,11 +519,9 @@ export const omnichatService = {
   },
 
   async getMessageSpeech(conversationId: number, messageId: number): Promise<Blob> {
-    const token = getStoredAuthToken();
-    const response = await fetch(
+    const response = await authenticatedFetch(
       `${API_BASE_URL}/omnichat/conversations/${conversationId}/messages/${messageId}/speech`,
       {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
         cache: 'force-cache',
       }
     );

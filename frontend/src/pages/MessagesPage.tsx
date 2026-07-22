@@ -56,7 +56,8 @@ import type {
   SendMessageRequest,
 } from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
-import { API_BASE_URL, getStoredAuthToken } from '../lib/api';
+import { API_BASE_URL } from '../lib/api';
+import { authenticatedFetch } from '../services/authSession';
 import {
   decryptMessage,
   encryptFile,
@@ -496,10 +497,7 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
         console.log('[Media Decryption] Starting decryption for:', originalUrl);
         console.log('[Media Decryption] Attempting fetch...');
 
-        const token = getStoredAuthToken();
-        const response = await fetch(originalUrl, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const response = await authenticatedFetch(originalUrl);
         console.log(
           '[Media Decryption] Fetch response status:',
           response.status,
@@ -1204,12 +1202,9 @@ export default function MessagesPage() {
   const { data: modMailConversation } = useQuery<ModMailConversation>({
     queryKey: ['modMailConversation', selectedConversationId],
     queryFn: async () => {
-      const token = getStoredAuthToken();
-      const response = await fetch(`${API_BASE_URL}/mod-mail/${selectedConversationId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await authenticatedFetch(
+        `${API_BASE_URL}/mod-mail/${selectedConversationId}`
+      );
       if (!response.ok) {
         throw new Error(t('messages.errors.loadModMailFailed'));
       }
@@ -1391,12 +1386,7 @@ export default function MessagesPage() {
       };
 
       const fetchModMailParticipantIDs = async (conversationId: number): Promise<number[]> => {
-        const token = getStoredAuthToken();
-        const response = await fetch(`${API_BASE_URL}/mod-mail/${conversationId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await authenticatedFetch(`${API_BASE_URL}/mod-mail/${conversationId}`);
         if (!response.ok) {
           throw new Error(
             t(
@@ -1839,11 +1829,7 @@ export default function MessagesPage() {
           console.log('[Media Encryption] New chat mode, fetching user:', recipient);
           if (recipient) {
             try {
-              const res = await fetch(`${API_BASE_URL}/users/${recipient}`, {
-                headers: {
-                  Authorization: `Bearer ${getStoredAuthToken()}`,
-                },
-              });
+              const res = await authenticatedFetch(`${API_BASE_URL}/users/${recipient}`);
               if (!res.ok) {
                 // 404 means user not found or has blocked the sender — abort the
                 // entire send so no file is uploaded and the user gets feedback.
@@ -4760,9 +4746,8 @@ export default function MessagesPage() {
             setSelectedConversationId(conversation.id);
           }}
           searchUsers={async (query) => {
-            const res = await fetch(
-              `${API_BASE_URL}/search/users?q=${encodeURIComponent(query)}&limit=10`,
-              { headers: { Authorization: `Bearer ${getStoredAuthToken()}` } }
+            const res = await authenticatedFetch(
+              `${API_BASE_URL}/search/users?q=${encodeURIComponent(query)}&limit=10`
             );
             if (!res.ok) return [];
             const data = (await res.json()) as {

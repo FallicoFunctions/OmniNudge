@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -49,6 +50,8 @@ func setupAuthHandlerTest(t *testing.T) (*AuthHandler, *database.Database, func(
 
 	userRepo := models.NewUserRepository(db.Pool)
 	authSvc.SetUserRepository(userRepo)
+	sessionService := services.NewAuthSessionService(db.Pool, authSvc)
+	authSvc.SetSessionService(sessionService)
 	handler := NewAuthHandler(
 		authSvc,
 		userRepo,
@@ -58,7 +61,8 @@ func setupAuthHandlerTest(t *testing.T) (*AuthHandler, *database.Database, func(
 		"http://localhost:3000",
 		nil, // auditLogger
 		nil, // lockoutService
-		"",  // appEnv — non-production
+		sessionService,
+		"", // appEnv — non-production
 	)
 
 	cleanup := func() {
@@ -74,7 +78,7 @@ func TestRegister(t *testing.T) {
 		name           string
 		body           map[string]interface{}
 		expectedStatus int
-		expectToken    bool
+		expectSession  bool
 	}{
 		{
 			name: "success",
@@ -85,7 +89,7 @@ func TestRegister(t *testing.T) {
 				"accept_terms":          true,
 			},
 			expectedStatus: http.StatusCreated,
-			expectToken:    true,
+			expectSession:  true,
 		},
 		{
 			name: "password too short",
@@ -96,7 +100,7 @@ func TestRegister(t *testing.T) {
 				"accept_terms":          true,
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectToken:    false,
+			expectSession:  false,
 		},
 		{
 			name: "username too short",
@@ -107,7 +111,7 @@ func TestRegister(t *testing.T) {
 				"accept_terms":          true,
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectToken:    false,
+			expectSession:  false,
 		},
 		{
 			name: "missing privacy policy acceptance",
@@ -118,7 +122,7 @@ func TestRegister(t *testing.T) {
 				"accept_terms":          true,
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectToken:    false,
+			expectSession:  false,
 		},
 		{
 			name: "missing terms acceptance",
@@ -129,13 +133,13 @@ func TestRegister(t *testing.T) {
 				"accept_terms":          false,
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectToken:    false,
+			expectSession:  false,
 		},
 		{
 			name:           "empty body returns bad request",
 			body:           map[string]interface{}{},
 			expectedStatus: http.StatusBadRequest,
-			expectToken:    false,
+			expectSession:  false,
 		},
 	}
 
@@ -157,14 +161,16 @@ func TestRegister(t *testing.T) {
 
 			assert.Equal(t, tc.expectedStatus, w.Code)
 
-			if tc.expectToken {
+			if tc.expectSession {
 				var resp map[string]interface{}
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
-				assert.Contains(t, resp, "token")
-				// Token must be a non-empty string
-				token, _ := resp["token"].(string)
-				assert.NotEmpty(t, token, "token must be a non-empty string")
+				assert.NotContains(t, resp, "token")
+				assert.Contains(t, resp, "user")
+				setCookies := w.Header().Values("Set-Cookie")
+				assert.Contains(t, strings.Join(setCookies, "\n"), services.AccessTokenCookieName+"=")
+				assert.Contains(t, strings.Join(setCookies, "\n"), services.RefreshTokenCookieName+"=")
+				assert.Contains(t, strings.Join(setCookies, "\n"), services.CSRFTokenCookieName+"=")
 			}
 		})
 	}
@@ -218,7 +224,7 @@ func TestLogin(t *testing.T) {
 		setup          func(t *testing.T, handler *AuthHandler) string // returns username
 		password       string
 		expectedStatus int
-		expectToken    bool
+		expectSession  bool
 	}{
 		{
 			name: "success",
@@ -228,7 +234,7 @@ func TestLogin(t *testing.T) {
 			},
 			password:       "ValidPass123!",
 			expectedStatus: http.StatusOK,
-			expectToken:    true,
+			expectSession:  true,
 		},
 		{
 			name: "wrong password",
@@ -238,7 +244,7 @@ func TestLogin(t *testing.T) {
 			},
 			password:       "WrongPassword!",
 			expectedStatus: http.StatusUnauthorized,
-			expectToken:    false,
+			expectSession:  false,
 		},
 		{
 			name: "user not found",
@@ -248,7 +254,7 @@ func TestLogin(t *testing.T) {
 			},
 			password:       "SomePassword123!",
 			expectedStatus: http.StatusUnauthorized,
-			expectToken:    false,
+			expectSession:  false,
 		},
 		{
 			name: "banned user",
@@ -275,7 +281,7 @@ func TestLogin(t *testing.T) {
 			},
 			password:       "ValidPass123!",
 			expectedStatus: http.StatusUnauthorized,
-			expectToken:    false,
+			expectSession:  false,
 		},
 		{
 			name: "deleted user",
@@ -302,7 +308,7 @@ func TestLogin(t *testing.T) {
 			},
 			password:       "ValidPass123!",
 			expectedStatus: http.StatusUnauthorized,
-			expectToken:    false,
+			expectSession:  false,
 		},
 	}
 
@@ -349,15 +355,13 @@ func TestLogin(t *testing.T) {
 
 			assert.Equal(t, tc.expectedStatus, w.Code)
 
-			if tc.expectToken {
+			if tc.expectSession {
 				var resp map[string]interface{}
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
-				assert.Contains(t, resp, "token")
+				assert.NotContains(t, resp, "token")
 				assert.Contains(t, resp, "user")
-				// Token must not be empty
-				token, _ := resp["token"].(string)
-				assert.NotEmpty(t, token)
+				assert.Contains(t, strings.Join(w.Header().Values("Set-Cookie"), "\n"), services.AccessTokenCookieName+"=")
 			} else {
 				// Unauthorized responses must NOT expose a token
 				var resp map[string]interface{}
