@@ -1,13 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Inbox,
-  Search,
-  AlertCircle,
-  Lock,
-  MessageSquare,
-  type LucideIcon,
-} from 'lucide-react';
+import { Inbox, Search, AlertCircle, Lock, MessageSquare, type LucideIcon } from 'lucide-react';
 
 type EmptyStateIllustrationVariant =
   | 'noData'

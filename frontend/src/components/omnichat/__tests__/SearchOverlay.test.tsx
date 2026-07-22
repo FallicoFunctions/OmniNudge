@@ -27,7 +27,9 @@ function SearchHarness() {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setIsOpen(true)}>Open character search</button>
+      <button type="button" onClick={() => setIsOpen(true)}>
+        Open character search
+      </button>
       <SearchOverlay
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}

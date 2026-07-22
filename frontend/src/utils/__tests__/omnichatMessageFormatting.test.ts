@@ -7,7 +7,9 @@ import {
 
 describe('normalizeOmniChatMessageContent', () => {
   it('removes leading and trailing blank space from bot messages', () => {
-    expect(normalizeOmniChatMessageContent('\n\n*Malachar watches.*\n\n')).toBe('*Malachar watches.*');
+    expect(normalizeOmniChatMessageContent('\n\n*Malachar watches.*\n\n')).toBe(
+      '*Malachar watches.*'
+    );
   });
 });
 

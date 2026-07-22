@@ -98,34 +98,37 @@ function PhotosWidget({
 
   const avatarItems = useMemo<WallPostMedia[]>(
     () => (avatarUrl ? [{ url: avatarUrl, media_type: 'image' }] : []),
-    [avatarUrl],
+    [avatarUrl]
   );
   const bannerItems = useMemo<WallPostMedia[]>(
     () => (bannerUrl ? [{ url: bannerUrl, media_type: 'image' }] : []),
-    [bannerUrl],
+    [bannerUrl]
   );
 
   const allItems = useMemo<WallPostMedia[]>(
     () => [...avatarItems, ...bannerItems, ...media],
-    [avatarItems, bannerItems, media],
+    [avatarItems, bannerItems, media]
   );
 
   const albumItems = useMemo<WallPostMedia[]>(() => {
     const source =
-      album === 'wall' ? media :
-      album === 'avatar' ? avatarItems :
-      album === 'cover' ? bannerItems :
-      allItems;
+      album === 'wall'
+        ? media
+        : album === 'avatar'
+          ? avatarItems
+          : album === 'cover'
+            ? bannerItems
+            : allItems;
     return source.slice(0, 9);
   }, [album, media, avatarItems, bannerItems, allItems]);
 
   if (allItems.length === 0) return null;
 
   const allTabs: { key: PhotoAlbum; label: string; count: number }[] = [
-    { key: 'all',    label: 'All',    count: allItems.length },
-    { key: 'wall',   label: 'Wall',   count: media.length },
+    { key: 'all', label: 'All', count: allItems.length },
+    { key: 'wall', label: 'Wall', count: media.length },
     { key: 'avatar', label: 'Avatar', count: avatarItems.length },
-    { key: 'cover',  label: 'Cover',  count: bannerItems.length },
+    { key: 'cover', label: 'Cover', count: bannerItems.length },
   ];
   const tabs = allTabs.filter((tab) => tab.key === 'all' || tab.count > 0);
 

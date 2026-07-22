@@ -60,9 +60,7 @@ export default function SearchOverlay({
       })
       .filter(Boolean) as Array<{ persona: BotPersona; score: number; nameMatch: boolean }>;
 
-    return scored
-      .sort((a, b) => a.score - b.score)
-      .map((s) => s.persona);
+    return scored.sort((a, b) => a.score - b.score).map((s) => s.persona);
   }, [personas, query]);
 
   if (!isOpen) return null;

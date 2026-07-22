@@ -1,14 +1,10 @@
 import type { BotPersona } from '../types/omnichat';
 
 const SLUG_GRADIENTS: Record<string, string> = {
-  'chat-buddy':
-    'radial-gradient(ellipse at 40% 25%, #c0256e 0%, #7a1050 55%, #3a0830 100%)',
-  'dungeon-master':
-    'radial-gradient(ellipse at 35% 30%, #0f7a5a 0%, #074d3a 55%, #022820 100%)',
-  narrator:
-    'radial-gradient(ellipse at 40% 25%, #8a1a30 0%, #5a0f20 55%, #2e0510 100%)',
-  companion:
-    'radial-gradient(ellipse at 35% 30%, #3b2a7a 0%, #21184a 55%, #100c28 100%)',
+  'chat-buddy': 'radial-gradient(ellipse at 40% 25%, #c0256e 0%, #7a1050 55%, #3a0830 100%)',
+  'dungeon-master': 'radial-gradient(ellipse at 35% 30%, #0f7a5a 0%, #074d3a 55%, #022820 100%)',
+  narrator: 'radial-gradient(ellipse at 40% 25%, #8a1a30 0%, #5a0f20 55%, #2e0510 100%)',
+  companion: 'radial-gradient(ellipse at 35% 30%, #3b2a7a 0%, #21184a 55%, #100c28 100%)',
 };
 
 const CATEGORY_GRADIENTS: Record<string, string[]> = {

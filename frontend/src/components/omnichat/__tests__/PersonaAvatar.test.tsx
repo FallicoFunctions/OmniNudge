@@ -46,13 +46,7 @@ describe('PersonaAvatar', () => {
   });
 
   it('renders the preview video when preview mode is active', () => {
-    render(
-      <PersonaAvatar
-        persona={basePersona}
-        previewEnabled
-        previewActive
-      />
-    );
+    render(<PersonaAvatar persona={basePersona} previewEnabled previewActive />);
 
     const video = screen.getByTestId('persona-preview-video');
     expect(video).toBeInTheDocument();
@@ -74,23 +68,13 @@ describe('PersonaAvatar', () => {
 
   it('rewinds and hides the preview when it becomes inactive without a hold state', () => {
     const { rerender } = render(
-      <PersonaAvatar
-        persona={basePersona}
-        previewEnabled
-        previewActive
-      />
+      <PersonaAvatar persona={basePersona} previewEnabled previewActive />
     );
 
     const video = screen.getByTestId('persona-preview-video') as HTMLVideoElement;
     video.currentTime = 2.4;
 
-    rerender(
-      <PersonaAvatar
-        persona={basePersona}
-        previewEnabled
-        previewActive={false}
-      />
-    );
+    rerender(<PersonaAvatar persona={basePersona} previewEnabled previewActive={false} />);
 
     expect(video.currentTime).toBe(0);
     expect(video).toHaveClass('opacity-0');
@@ -98,11 +82,7 @@ describe('PersonaAvatar', () => {
 
   it('holds the last frame visible while mobile description overlay is expanded', () => {
     const { rerender } = render(
-      <PersonaAvatar
-        persona={basePersona}
-        previewEnabled
-        previewActive
-      />
+      <PersonaAvatar persona={basePersona} previewEnabled previewActive />
     );
 
     const video = screen.getByTestId('persona-preview-video') as HTMLVideoElement;
@@ -124,11 +104,7 @@ describe('PersonaAvatar', () => {
 
   it('still attempts playback when rewinding to the first frame is not yet allowed', () => {
     const { rerender } = render(
-      <PersonaAvatar
-        persona={basePersona}
-        previewEnabled
-        previewActive={false}
-      />
+      <PersonaAvatar persona={basePersona} previewEnabled previewActive={false} />
     );
 
     const video = screen.getByTestId('persona-preview-video') as HTMLVideoElement;
@@ -145,24 +121,14 @@ describe('PersonaAvatar', () => {
       get: () => HTMLMediaElement.HAVE_CURRENT_DATA,
     });
 
-    rerender(
-      <PersonaAvatar
-        persona={basePersona}
-        previewEnabled
-        previewActive
-      />
-    );
+    rerender(<PersonaAvatar persona={basePersona} previewEnabled previewActive />);
 
     expect(playSpy).toHaveBeenCalledTimes(1);
   });
 
   it('requests video data before playing when the preview is not ready yet', () => {
     const { rerender } = render(
-      <PersonaAvatar
-        persona={basePersona}
-        previewEnabled
-        previewActive={false}
-      />
+      <PersonaAvatar persona={basePersona} previewEnabled previewActive={false} />
     );
 
     const video = screen.getByTestId('persona-preview-video') as HTMLVideoElement;
@@ -172,13 +138,7 @@ describe('PersonaAvatar', () => {
       get: () => HTMLMediaElement.HAVE_METADATA,
     });
 
-    rerender(
-      <PersonaAvatar
-        persona={basePersona}
-        previewEnabled
-        previewActive
-      />
-    );
+    rerender(<PersonaAvatar persona={basePersona} previewEnabled previewActive />);
 
     expect(loadSpy).toHaveBeenCalledTimes(1);
   });

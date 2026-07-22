@@ -148,24 +148,34 @@ export default function ImageCropModal({
       setLoaded(true);
     };
     img.src = src;
-    return () => { img.onload = null; };
+    return () => {
+      img.onload = null;
+    };
   }, [src, fw, fh, frameCX, frameCY]);
 
-  useEffect(() => { draw(); }, [draw, loaded]);
+  useEffect(() => {
+    draw();
+  }, [draw, loaded]);
 
   // ── Constraint helpers ────────────────────────────────────────────────────
   const clampScale = (s: number) =>
-    Math.min(MAX_ZOOM * cropState.current.minScale / MIN_ZOOM, Math.max(cropState.current.minScale, s));
+    Math.min(
+      (MAX_ZOOM * cropState.current.minScale) / MIN_ZOOM,
+      Math.max(cropState.current.minScale, s)
+    );
 
-  const applyZoom = useCallback((delta: number, pivotX: number, pivotY: number) => {
-    const cs = cropState.current;
-    const newScale = clampScale(cs.scale * delta);
-    const actualDelta = newScale / cs.scale;
-    cs.x = pivotX + (cs.x - pivotX) * actualDelta;
-    cs.y = pivotY + (cs.y - pivotY) * actualDelta;
-    cs.scale = newScale;
-    draw();
-  }, [draw]);
+  const applyZoom = useCallback(
+    (delta: number, pivotX: number, pivotY: number) => {
+      const cs = cropState.current;
+      const newScale = clampScale(cs.scale * delta);
+      const actualDelta = newScale / cs.scale;
+      cs.x = pivotX + (cs.x - pivotX) * actualDelta;
+      cs.y = pivotY + (cs.y - pivotY) * actualDelta;
+      cs.scale = newScale;
+      draw();
+    },
+    [draw]
+  );
 
   // ── Mouse events ──────────────────────────────────────────────────────────
   const getCanvasPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -192,7 +202,9 @@ export default function ImageCropModal({
     draw();
   };
 
-  const onMouseUp = () => { drag.current = null; };
+  const onMouseUp = () => {
+    drag.current = null;
+  };
 
   const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
@@ -223,7 +235,7 @@ export default function ImageCropModal({
       drag.current = null;
       lastPinchDist.current = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY,
+        e.touches[0].clientY - e.touches[1].clientY
       );
     }
   };
@@ -231,13 +243,15 @@ export default function ImageCropModal({
   const onTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     if (e.touches.length === 1 && drag.current) {
-      cropState.current.x = drag.current.startImgX + e.touches[0].clientX - drag.current.startClientX;
-      cropState.current.y = drag.current.startImgY + e.touches[0].clientY - drag.current.startClientY;
+      cropState.current.x =
+        drag.current.startImgX + e.touches[0].clientX - drag.current.startClientX;
+      cropState.current.y =
+        drag.current.startImgY + e.touches[0].clientY - drag.current.startClientY;
       draw();
     } else if (e.touches.length === 2 && lastPinchDist.current !== null) {
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY,
+        e.touches[0].clientY - e.touches[1].clientY
       );
       const pivotX = (getCanvasTouchPos(e.touches[0]).x + getCanvasTouchPos(e.touches[1]).x) / 2;
       const pivotY = (getCanvasTouchPos(e.touches[0]).y + getCanvasTouchPos(e.touches[1]).y) / 2;
@@ -281,7 +295,7 @@ export default function ImageCropModal({
         onConfirm(new File([blob], 'crop.jpg', { type: 'image/jpeg' }));
       },
       'image/jpeg',
-      0.92,
+      0.92
     );
   };
 

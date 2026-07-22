@@ -178,7 +178,10 @@ export default function QuickChatDialog({
         <>
           <header className="relative shrink-0 overflow-hidden border-b border-white/[0.08] px-5 pb-5 pt-5 sm:px-6">
             <div className="absolute inset-0 opacity-20">
-              <PersonaAvatar persona={persona} className="h-full w-full !rounded-none blur-2xl scale-110" />
+              <PersonaAvatar
+                persona={persona}
+                className="h-full w-full !rounded-none blur-2xl scale-110"
+              />
             </div>
             <div className="absolute inset-0 bg-gradient-to-b from-[#11131c]/55 to-[#11131c]" />
             <div className="relative flex items-center gap-4">
@@ -196,7 +199,10 @@ export default function QuickChatDialog({
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-200/65">
                   {t('omnichat.quickChat.eyebrow')}
                 </p>
-                <h2 id="quick-chat-title" className="truncate text-xl font-black tracking-[-0.03em] text-white">
+                <h2
+                  id="quick-chat-title"
+                  className="truncate text-xl font-black tracking-[-0.03em] text-white"
+                >
                   {t('omnichat.quickChat.title', { name: persona.name })}
                 </h2>
               </div>
@@ -210,7 +216,10 @@ export default function QuickChatDialog({
                 <X size={18} />
               </button>
             </div>
-            <p id="quick-chat-description" className="relative mt-3 text-xs leading-relaxed text-white/45">
+            <p
+              id="quick-chat-description"
+              className="relative mt-3 text-xs leading-relaxed text-white/45"
+            >
               {t('omnichat.quickChat.description')}
             </p>
           </header>
@@ -312,8 +321,14 @@ export default function QuickChatDialog({
                   disabled={isContinuing}
                   className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-black text-white shadow-[0_14px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-500 active:scale-[0.985] disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
                 >
-                  {isContinuing ? <Loader2 size={17} className="animate-spin" /> : <ArrowRight size={17} />}
-                  {isContinuing ? t('omnichat.quickChat.openingChat') : t('omnichat.quickChat.continue')}
+                  {isContinuing ? (
+                    <Loader2 size={17} className="animate-spin" />
+                  ) : (
+                    <ArrowRight size={17} />
+                  )}
+                  {isContinuing
+                    ? t('omnichat.quickChat.openingChat')
+                    : t('omnichat.quickChat.continue')}
                 </button>
                 {continueError && (
                   <p className="mt-2 text-center text-xs text-red-200" role="alert">
@@ -322,7 +337,9 @@ export default function QuickChatDialog({
                 )}
               </div>
             ) : (
-              <p className="py-2 text-center text-xs text-white/40">{t('omnichat.quickChat.oneReplyHint')}</p>
+              <p className="py-2 text-center text-xs text-white/40">
+                {t('omnichat.quickChat.oneReplyHint')}
+              </p>
             )}
 
             {existingConversation && onResume && !isGenerating && !isContinuing && (

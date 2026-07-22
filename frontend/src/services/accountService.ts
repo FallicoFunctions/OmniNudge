@@ -70,7 +70,6 @@ class AccountService {
     });
     return response.data;
   }
-
 }
 
 export const accountService = new AccountService();

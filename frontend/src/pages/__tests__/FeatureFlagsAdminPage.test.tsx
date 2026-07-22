@@ -5,15 +5,21 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
 // --- Service mock ---
-const { mockGetFlags, mockUpdateFlag, mockCreateFlag, mockDeleteFlag, mockGetAuditLog, mockUseAuth } =
-  vi.hoisted(() => ({
-    mockGetFlags: vi.fn(),
-    mockUpdateFlag: vi.fn(),
-    mockCreateFlag: vi.fn(),
-    mockDeleteFlag: vi.fn(),
-    mockGetAuditLog: vi.fn(),
-    mockUseAuth: vi.fn(),
-  }));
+const {
+  mockGetFlags,
+  mockUpdateFlag,
+  mockCreateFlag,
+  mockDeleteFlag,
+  mockGetAuditLog,
+  mockUseAuth,
+} = vi.hoisted(() => ({
+  mockGetFlags: vi.fn(),
+  mockUpdateFlag: vi.fn(),
+  mockCreateFlag: vi.fn(),
+  mockDeleteFlag: vi.fn(),
+  mockGetAuditLog: vi.fn(),
+  mockUseAuth: vi.fn(),
+}));
 
 vi.mock('../../services/featureFlagService', () => ({
   default: {

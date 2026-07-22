@@ -97,8 +97,7 @@ function runFallbackTransition(
     newElement.style.opacity = '0';
 
     requestAnimationFrame(() => {
-      clone.style.transform =
-        `translate3d(${translateX}px, ${translateY}px, 0) scale(${scaleX}, ${scaleY})`;
+      clone.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scaleX}, ${scaleY})`;
       clone.style.borderRadius = newRadius;
     });
     window.setTimeout(() => {
@@ -136,11 +135,9 @@ export function runPersonaSharedElementTransition({
   }
 
   if (!transitionDocument.startViewTransition) {
-    const oldElement = sourceState === 'old' ? source : counterpart?.() ?? null;
-    runFallbackTransition(
-      oldElement,
-      update,
-      () => (sourceState === 'new' ? source : counterpart?.() ?? null)
+    const oldElement = sourceState === 'old' ? source : (counterpart?.() ?? null);
+    runFallbackTransition(oldElement, update, () =>
+      sourceState === 'new' ? source : (counterpart?.() ?? null)
     );
     return null;
   }
@@ -152,10 +149,7 @@ export function runPersonaSharedElementTransition({
 
   try {
     const transition = transitionDocument.startViewTransition(() => {
-      setTransitionName(
-        source,
-        sourceState === 'new' ? OMNICHAT_PERSONA_TRANSITION_NAME : ''
-      );
+      setTransitionName(source, sourceState === 'new' ? OMNICHAT_PERSONA_TRANSITION_NAME : '');
       update();
     });
 

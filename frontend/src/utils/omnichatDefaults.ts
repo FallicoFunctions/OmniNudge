@@ -51,15 +51,19 @@ export function mapUserSettingsToOmniChatDefaults(
   settings?: Partial<
     Pick<
       UserSettings,
-      | 'omnichat_default_user_name'
-      | 'omnichat_default_user_age'
-      | 'omnichat_default_user_gender'
+      'omnichat_default_user_name' | 'omnichat_default_user_age' | 'omnichat_default_user_gender'
     >
   > | null
 ): ConversationSettings {
   return {
-    user_name: typeof settings?.omnichat_default_user_name === 'string' ? settings.omnichat_default_user_name : '',
-    user_age: typeof settings?.omnichat_default_user_age === 'string' ? settings.omnichat_default_user_age : '',
+    user_name:
+      typeof settings?.omnichat_default_user_name === 'string'
+        ? settings.omnichat_default_user_name
+        : '',
+    user_age:
+      typeof settings?.omnichat_default_user_age === 'string'
+        ? settings.omnichat_default_user_age
+        : '',
     user_gender:
       typeof settings?.omnichat_default_user_gender === 'string'
         ? settings.omnichat_default_user_gender

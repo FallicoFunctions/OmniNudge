@@ -68,7 +68,7 @@ export default function EditProfileModal({
     file: File,
     type: 'avatar' | 'banner',
     uploadFn: (f: File) => Promise<string>,
-    inputEl: HTMLInputElement,
+    inputEl: HTMLInputElement
   ) => {
     if (cropObjectUrl.current) URL.revokeObjectURL(cropObjectUrl.current);
     const url = URL.createObjectURL(file);
@@ -96,7 +96,7 @@ export default function EditProfileModal({
       setError(
         t('userProfilePage.edit.errors.uploadFailed', {
           message: err instanceof Error ? err.message : t('common.error'),
-        }),
+        })
       );
     } finally {
       if (type === 'avatar') setIsUploadingAvatar(false);
@@ -176,157 +176,159 @@ export default function EditProfileModal({
 
   return (
     <>
-    {cropSrc && cropType && (
-      <ImageCropModal
-        src={cropSrc}
-        aspect={cropType === 'avatar' ? 1 : 3}
-        shape={cropType === 'avatar' ? 'circle' : 'rect'}
-        outputWidth={cropType === 'avatar' ? 800 : 1500}
-        outputHeight={cropType === 'avatar' ? 800 : 500}
-        title={cropType === 'avatar' ? 'Crop profile photo' : 'Crop cover photo'}
-        onConfirm={(file) => { void handleCropConfirm(file); }}
-        onCancel={closeCropModal}
-      />
-    )}
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl">
-        <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          {t('userProfilePage.edit.title')}
-        </h2>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          {t('userProfilePage.edit.description')}
-        </p>
-
-        <div className="mt-4 space-y-4">
-          <MediaUploadField
-            id="edit-profile-avatar"
-            label={t('userProfilePage.edit.avatarUrlLabel')}
-            value={avatarUrl}
-            accept="image/png,image/jpeg,image/gif,image/webp"
-            mediaType="image"
-            uploadButtonLabel={t('userProfilePage.edit.avatarUploadButton')}
-            uploadingLabel={t('userProfilePage.edit.avatarUploading')}
-            clearLabel="Remove image"
-            hint={t('userProfilePage.edit.avatarUploadHint')}
-            disabled={!onUploadAvatar}
-            isUploading={isUploadingAvatar}
-            onFileChange={handleAvatarFileChange}
-            onClear={() => setAvatarUrl('')}
-          />
-
-          <MediaUploadField
-            id="edit-profile-banner"
-            label="Cover / Banner Image"
-            value={bannerUrl}
-            accept="image/png,image/jpeg,image/gif,image/webp"
-            mediaType="image"
-            uploadButtonLabel="Upload banner image"
-            uploadingLabel="Uploading..."
-            clearLabel="Remove image"
-            hint="PNG, JPG, GIF, WebP · max 10MB"
-            description="Shown as the full-width banner behind your profile header."
-            disabled={!onUploadBanner}
-            isUploading={isUploadingBanner}
-            onFileChange={(event) => {
-              void handleBannerFileChange(event);
-            }}
-            onClear={() => setBannerUrl('')}
-          />
-
-          <div>
-            <label
-              htmlFor="edit-profile-status-text"
-              className="block text-sm font-medium text-[var(--color-text-primary)]"
-            >
-              {t('userProfilePage.edit.statusLabel')}
-            </label>
-            <input
-              id="edit-profile-status-text"
-              type="text"
-              value={statusText}
-              onChange={(e) => setStatusText(e.target.value)}
-              maxLength={500}
-              placeholder={t('userProfilePage.edit.statusPlaceholder')}
-              className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
-            />
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-              {t('userProfilePage.edit.statusCount', { count: statusText.length })}
-            </p>
-          </div>
-
-          <div>
-            <label
-              htmlFor="edit-profile-location"
-              className="block text-sm font-medium text-[var(--color-text-primary)]"
-            >
-              {t('userProfilePage.edit.locationLabel')}
-            </label>
-            <input
-              id="edit-profile-location"
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              maxLength={100}
-              placeholder={t('userProfilePage.edit.locationPlaceholder')}
-              className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
-            />
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-              {t('userProfilePage.edit.locationCount', { count: location.length })}
-            </p>
-          </div>
-
-          <div>
-            <label
-              htmlFor="edit-profile-bio"
-              className="block text-sm font-medium text-[var(--color-text-primary)]"
-            >
-              {t('userProfilePage.edit.bioLabel')}
-            </label>
-            <textarea
-              id="edit-profile-bio"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              rows={5}
-              maxLength={500}
-              placeholder={t('userProfilePage.edit.bioPlaceholder')}
-              className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
-            />
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-              {t('userProfilePage.edit.bioCount', { count: bio.length })}
-            </p>
-          </div>
-        </div>
-
-        {error && (
-          <p className="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
+      {cropSrc && cropType && (
+        <ImageCropModal
+          src={cropSrc}
+          aspect={cropType === 'avatar' ? 1 : 3}
+          shape={cropType === 'avatar' ? 'circle' : 'rect'}
+          outputWidth={cropType === 'avatar' ? 800 : 1500}
+          outputHeight={cropType === 'avatar' ? 800 : 500}
+          title={cropType === 'avatar' ? 'Crop profile photo' : 'Crop cover photo'}
+          onConfirm={(file) => {
+            void handleCropConfirm(file);
+          }}
+          onCancel={closeCropModal}
+        />
+      )}
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="w-full max-w-xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl">
+          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+            {t('userProfilePage.edit.title')}
+          </h2>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            {t('userProfilePage.edit.description')}
           </p>
-        )}
 
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSaving || isUploadingAvatar || isUploadingBanner}
-            className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
-          >
-            {t('common.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={isSaving || isUploadingAvatar || isUploadingBanner}
-            className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-          >
-            {isSaving
-              ? t('common.loading')
-              : isUploadingAvatar || isUploadingBanner
-                ? t('userProfilePage.edit.avatarUploading')
-                : t('common.save')}
-          </button>
+          <div className="mt-4 space-y-4">
+            <MediaUploadField
+              id="edit-profile-avatar"
+              label={t('userProfilePage.edit.avatarUrlLabel')}
+              value={avatarUrl}
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              mediaType="image"
+              uploadButtonLabel={t('userProfilePage.edit.avatarUploadButton')}
+              uploadingLabel={t('userProfilePage.edit.avatarUploading')}
+              clearLabel="Remove image"
+              hint={t('userProfilePage.edit.avatarUploadHint')}
+              disabled={!onUploadAvatar}
+              isUploading={isUploadingAvatar}
+              onFileChange={handleAvatarFileChange}
+              onClear={() => setAvatarUrl('')}
+            />
+
+            <MediaUploadField
+              id="edit-profile-banner"
+              label="Cover / Banner Image"
+              value={bannerUrl}
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              mediaType="image"
+              uploadButtonLabel="Upload banner image"
+              uploadingLabel="Uploading..."
+              clearLabel="Remove image"
+              hint="PNG, JPG, GIF, WebP · max 10MB"
+              description="Shown as the full-width banner behind your profile header."
+              disabled={!onUploadBanner}
+              isUploading={isUploadingBanner}
+              onFileChange={(event) => {
+                void handleBannerFileChange(event);
+              }}
+              onClear={() => setBannerUrl('')}
+            />
+
+            <div>
+              <label
+                htmlFor="edit-profile-status-text"
+                className="block text-sm font-medium text-[var(--color-text-primary)]"
+              >
+                {t('userProfilePage.edit.statusLabel')}
+              </label>
+              <input
+                id="edit-profile-status-text"
+                type="text"
+                value={statusText}
+                onChange={(e) => setStatusText(e.target.value)}
+                maxLength={500}
+                placeholder={t('userProfilePage.edit.statusPlaceholder')}
+                className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+              />
+              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                {t('userProfilePage.edit.statusCount', { count: statusText.length })}
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="edit-profile-location"
+                className="block text-sm font-medium text-[var(--color-text-primary)]"
+              >
+                {t('userProfilePage.edit.locationLabel')}
+              </label>
+              <input
+                id="edit-profile-location"
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                maxLength={100}
+                placeholder={t('userProfilePage.edit.locationPlaceholder')}
+                className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+              />
+              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                {t('userProfilePage.edit.locationCount', { count: location.length })}
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="edit-profile-bio"
+                className="block text-sm font-medium text-[var(--color-text-primary)]"
+              >
+                {t('userProfilePage.edit.bioLabel')}
+              </label>
+              <textarea
+                id="edit-profile-bio"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                rows={5}
+                maxLength={500}
+                placeholder={t('userProfilePage.edit.bioPlaceholder')}
+                className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+              />
+              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                {t('userProfilePage.edit.bioCount', { count: bio.length })}
+              </p>
+            </div>
+          </div>
+
+          {error && (
+            <p className="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </p>
+          )}
+
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSaving || isUploadingAvatar || isUploadingBanner}
+              className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={isSaving || isUploadingAvatar || isUploadingBanner}
+              className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {isSaving
+                ? t('common.loading')
+                : isUploadingAvatar || isUploadingBanner
+                  ? t('userProfilePage.edit.avatarUploading')
+                  : t('common.save')}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
     </>
   );
 }

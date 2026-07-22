@@ -475,7 +475,6 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
             onCommentPosted={handleCommentPosted}
           />
         )}
-
       </div>
     </div>
   );
