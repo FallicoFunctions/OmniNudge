@@ -1,1 +1,15 @@
+# Reviewed historical false positives. Keep entries fingerprint-specific so
+# future findings in the same files and rules remain blocking.
+16bc1189266ae33db94b0a761dc0341f37e67c86:omnirave-babylon/src/scene/mainStageMaterialPolish.ts:generic-api-key:570
+16bc1189266ae33db94b0a761dc0341f37e67c86:omnirave-babylon/src/scene/__tests__/mainStageMaterialPolish.test.ts:generic-api-key:698
+2090b2e47de9ffada17bfdad64d348de493feb1a:frontend/src/utils/__tests__/platformExternalProviders.test.ts:generic-api-key:27
 80a12c68fc440e45dd4dc9cb65cf601779064f55:frontend/src/utils/__tests__/platformExternalProviders.test.ts:generic-api-key:30
+480890fce0204f77df63b9bce0109bab3e45a10d:docs/technical/api-design.md:generic-api-key:63
+afca663ba38bc4853c022388b7eb0f7f3c4755ce:frontend/public/firebase-messaging-sw.js:gcp-api-key:9
+afca663ba38bc4853c022388b7eb0f7f3c4755ce:frontend/src/lib/firebase.ts:gcp-api-key:6
+a789322b3b57e03b5973e3401c0df3c56831cc08:ENCRYPTION_QUICKSTART.md:generic-api-key:47
+a789322b3b57e03b5973e3401c0df3c56831cc08:ENCRYPTION_QUICKSTART.md:generic-api-key:52
+b55a9f53ab54e4ec4f7ae287aaee8a89b0a8e417:docs/FRONTEND_SETUP_COMPLETE.md:curl-auth-header:255
+b4891595babad5c3788f9b8f457d8c6a60515d8b:docs/FRONTEND_SETUP_GUIDE.md:curl-auth-header:770
+11a3d8497ac4e31715c452c3d0204bb80f7ba688:docs/roadmap/03-implementation-guide.md:curl-auth-header:842
+11a3d8497ac4e31715c452c3d0204bb80f7ba688:docs/technical/api-design.md:generic-api-key:65
