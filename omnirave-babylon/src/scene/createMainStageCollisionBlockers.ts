@@ -25,19 +25,13 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
   { name: 'main-stage-blocker-right-envelope', x: 64, y: 3, z: -34.5, width: 4, height: 6, depth: 111 },
   { name: 'main-stage-blocker-back-envelope', x: 0, y: 3, z: -90, width: 132, height: 6, depth: 4 },
   { name: 'main-stage-blocker-front-stage', x: 0, y: 5, z: 14, width: 78, height: 10, depth: 4 },
-  // Hug the built cascade-court water feature (V150 planter/coping footprint:
-  // |x| 34.3..63.8, z -41.4..-16.2), not the whole flank pocket. The old
-  // pocket-wide boxes (x 31..67) predated the feature and, together with the
-  // wing shell blockers, sealed the entire east/west flanks - the cascade
-  // plaza, the flank fields, and the VIP forecourts were unreachable on foot
-  // (verified by collision flood-fill; both side objectives only completed
-  // via checkpoint teleports). Hugged to the feature, the walking route
-  // opens: south field -> strip between the crowd-pit fence and the cascade
-  // court -> corridor at |x| 29.8..34.3 past the wing shell -> flank field ->
-  // VIP forecourt. The tiers and water stay guarded: the box still covers
-  // the full planted footprint out to the coping rim.
-  { name: 'main-stage-blocker-cascade-court-left', x: -49.05, y: 3, z: -28.8, width: 29.5, height: 6, depth: 25.2 },
-  { name: 'main-stage-blocker-cascade-court-right', x: 49.05, y: 3, z: -28.8, width: 29.5, height: 6, depth: 25.2 },
+  // The cascade-court water features have no authored rows here: their
+  // collision comes from the clustered V150_CascadeCourtCoping footprint
+  // (see CLUSTERED_SOURCE_NAME_PATTERNS), which hugs the stone rim's real
+  // outline. The earlier pocket-wide boxes (x 31..67 per side) sealed the
+  // entire east/west flanks - cascade plazas, flank fields, and the VIP
+  // forecourts were unreachable on foot - and even a hand-hugged rectangle
+  // left phantom walls at the feature's tapered corners (player-flagged).
   // The basin foliage hedges guarding the sunken water strip (|x| 8.3..17.3)
   // end at z 9.2, but the water runs to z 23.2: without these caps the
   // avatar can step off the outer coping walkway and wade through the
@@ -49,7 +43,6 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
 ];
 
 const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
-  /V30_VipShellFascia/,
   // Basin foliage banks hedge the sunken water strip (|x| 8.3..17.3) so the
   // avatar cannot wade in; the coping walkways around it are FLOOR (see
   // COL_BasinCoping* in the collision GLB), which is why
@@ -71,6 +64,43 @@ const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
   /V133_VipTerraceGoldArray/,
 ];
 
+// Families of DISCRETE objects (pylon rows, sentinels, plinth daises,
+// lantern stems, pyro pods, the VIP wing shell segments): one bbox per side
+// would wall off every visible gap between the objects - the repeated
+// "invisible walls" / "walk-through objects" complaint class. These are
+// decomposed into per-object boxes by recursive axis-gap clustering of the
+// mesh's own vertices, so each pylon/stem/shell blocks exactly where it
+// stands and the gaps between them stay walkable.
+// One representative mesh per physical family: sentinel/pylon co-located
+// dressing meshes (crowns, spines, shadow cores) share the pearl shell's
+// footprint and would only duplicate boxes.
+const CLUSTERED_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
+  // The wing shell's own base only meets the ground at two strips - opening
+  // just the fascia would let players walk under the elevated terrace,
+  // whose sweep/soffit hang below capsule height (1.9m). Clustering those
+  // undercroft meshes too seals the sub-capsule space with real footprints
+  // while the genuinely open ground around the wings stays walkable.
+  /V26_VipTerraceOuterSweep/,
+  /V30_VipShellFascia/,
+  /V30_VipSoffitShadow/,
+  /V33_BasinLanternStem/,
+  // The stone rim of the tiered cascade water features: its refined
+  // footprint replaces the hand-authored pocket rectangles (see the note in
+  // MAIN_STAGE_COLLISION_BLOCKERS) and keeps the tiers and water unwadeable.
+  /V150_CascadeCourtCoping/,
+  /V44_PlazaLanternStemCluster/,
+  /V45_PyroPodPearlShell/,
+  /V55_SpawnPylonPearlShell/,
+  /V57_BackPlazaSentinelPearl\+/,
+  /V58_ArrivalPlinthPearlDais/,
+  /V59_BackPlazaLanternStemCluster/,
+  /V60_SpawnGateSentinelPearl\+/,
+];
+
+// Objects closer than this along an axis merge into one blocker box; the
+// capsule (diameter 0.8) cannot pass a narrower gap anyway.
+const CLUSTER_GAP = 1.5;
+
 const MIN_SOURCE_BLOCKER_THICKNESS = 1.2;
 // Side pairs merged into one mesh must split back into per-side blockers.
 // The split is derived from the mesh's own vertices (a real central gap of
@@ -89,8 +119,11 @@ export function createMainStageCollisionBlockers(scene: Scene, sourceMeshes: rea
   const sourceBlockers = sourceMeshes
     .filter((mesh) => SOLID_SOURCE_NAME_PATTERNS.some((pattern) => pattern.test(mesh.name)))
     .flatMap((mesh) => createBlockersFromSourceMesh(scene, mesh));
+  const clusteredBlockers = sourceMeshes
+    .filter((mesh) => CLUSTERED_SOURCE_NAME_PATTERNS.some((pattern) => pattern.test(mesh.name)))
+    .flatMap((mesh) => createClusteredBlockersFromSourceMesh(scene, mesh));
 
-  return [...authoredBlockers, ...sourceBlockers];
+  return [...authoredBlockers, ...sourceBlockers, ...clusteredBlockers];
 }
 
 function createBlockerFromSpec(scene: Scene, blocker: CollisionBlockerSpec) {
@@ -165,6 +198,235 @@ function createBlockersFromSourceMesh(scene: Scene, sourceMesh: AbstractMesh) {
     .map(({ bounds, side }) => createBlockerFromSourceBounds(scene, sourceMesh, bounds, side));
 }
 
+// Decompose a family mesh into per-object blocker boxes. Merged family
+// meshes concatenate their source objects' vertex buffers, so each physical
+// pylon/stem/shell survives as a disconnected component of the index
+// buffer: union-find over the triangles recovers them exactly (a vertex-gap
+// scan cannot - wide hollow objects have no interior vertices and split at
+// their own faces). Components whose xz bounds sit closer than CLUSTER_GAP
+// merge back together, since the capsule cannot pass between them anyway;
+// groups floating entirely above the capsule are skipped.
+function createClusteredBlockersFromSourceMesh(scene: Scene, sourceMesh: AbstractMesh) {
+  sourceMesh.computeWorldMatrix(true);
+  const positions = sourceMesh.getVerticesData('position');
+  if (!positions || positions.length === 0) {
+    return [];
+  }
+  const vertexCount = positions.length / 3;
+  const rawIndices = sourceMesh.getIndices();
+  const indices = rawIndices && rawIndices.length > 0 ? rawIndices : null;
+
+  // Union-find over triangle connectivity; without indices every vertex is
+  // its own component and the spatial merge below groups them.
+  const parent = new Int32Array(vertexCount);
+  for (let i = 0; i < vertexCount; i++) parent[i] = i;
+  const find = (a: number): number => {
+    let root = a;
+    while (parent[root] !== root) root = parent[root];
+    while (parent[a] !== root) {
+      const next = parent[a];
+      parent[a] = root;
+      a = next;
+    }
+    return root;
+  };
+  if (indices) {
+    for (let i = 0; i + 2 < indices.length; i += 3) {
+      const a = find(indices[i]);
+      const b = find(indices[i + 1]);
+      const c = find(indices[i + 2]);
+      parent[b] = a;
+      parent[c] = a;
+    }
+  }
+
+  // World-space vertex positions, transformed once.
+  const world = new Float32Array(positions.length);
+  const vertex = new Vector3();
+  for (let i = 0; i < vertexCount; i++) {
+    Vector3.TransformCoordinatesFromFloatsToRef(
+      positions[i * 3],
+      positions[i * 3 + 1],
+      positions[i * 3 + 2],
+      worldMatrixOf(sourceMesh),
+      vertex,
+    );
+    world[i * 3] = vertex.x;
+    world[i * 3 + 1] = vertex.y;
+    world[i * 3 + 2] = vertex.z;
+  }
+
+  // The blocker footprint is built from TRIANGLES that reach down into the
+  // capsule band (any vertex at or below CAPSULE_TOP_Y): a wide solid wall
+  // has no interior vertices, but its faces span it, while lintels and
+  // canopies above the band contribute nothing. Each qualifying triangle is
+  // recorded as its bbox. Without indices, each vertex stands alone.
+  const lowBoxes: SideBounds[] = [];
+  const lowBoxComponent: number[] = [];
+  if (indices) {
+    for (let i = 0; i + 2 < indices.length; i += 3) {
+      const a = indices[i], b = indices[i + 1], c = indices[i + 2];
+      const minY = Math.min(world[a * 3 + 1], world[b * 3 + 1], world[c * 3 + 1]);
+      if (minY > CAPSULE_TOP_Y) continue;
+      const box = emptyBounds();
+      for (const v of [a, b, c]) {
+        box.minX = Math.min(box.minX, world[v * 3]);
+        box.maxX = Math.max(box.maxX, world[v * 3]);
+        box.minY = Math.min(box.minY, world[v * 3 + 1]);
+        box.maxY = Math.max(box.maxY, world[v * 3 + 1]);
+        box.minZ = Math.min(box.minZ, world[v * 3 + 2]);
+        box.maxZ = Math.max(box.maxZ, world[v * 3 + 2]);
+      }
+      lowBoxes.push(box);
+      lowBoxComponent.push(find(a));
+    }
+  } else {
+    for (let i = 0; i < vertexCount; i++) {
+      if (world[i * 3 + 1] > CAPSULE_TOP_Y) continue;
+      const box = emptyBounds();
+      box.minX = box.maxX = world[i * 3];
+      box.minY = box.maxY = world[i * 3 + 1];
+      box.minZ = box.maxZ = world[i * 3 + 2];
+      lowBoxes.push(box);
+      lowBoxComponent.push(find(i));
+    }
+  }
+  if (lowBoxes.length === 0) {
+    return [];
+  }
+
+  // Group the triangle boxes by connected component, then merge groups
+  // whose xz footprints are within CLUSTER_GAP of each other until stable.
+  const groupsByRoot = new Map<number, ClusterGroup>();
+  lowBoxes.forEach((box, index) => {
+    const root = lowBoxComponent[index];
+    let group = groupsByRoot.get(root);
+    if (!group) {
+      group = { bounds: emptyBounds(), boxes: [] };
+      groupsByRoot.set(root, group);
+    }
+    group.boxes.push(box);
+    mergeBounds(group.bounds, box);
+  });
+  // Sweep-until-stable (never restart the scan per merge: families like the
+  // cascade coping arrive as thousands of per-stone components, and a
+  // restart-per-merge scan goes cubic and hangs the suite).
+  const groups = [...groupsByRoot.values()];
+  let merged = true;
+  while (merged) {
+    merged = false;
+    for (let i = 0; i < groups.length; i++) {
+      for (let j = groups.length - 1; j > i; j--) {
+        const a = groups[i].bounds;
+        const b = groups[j].bounds;
+        const gapX = Math.max(a.minX, b.minX) - Math.min(a.maxX, b.maxX);
+        const gapZ = Math.max(a.minZ, b.minZ) - Math.min(a.maxZ, b.maxZ);
+        if (gapX < CLUSTER_GAP && gapZ < CLUSTER_GAP) {
+          mergeBounds(a, b);
+          for (const box of groups[j].boxes) groups[i].boxes.push(box);
+          groups.splice(j, 1);
+          merged = true;
+        }
+      }
+    }
+  }
+
+  const blockers: Mesh[] = [];
+  for (const group of groups) {
+    for (const bounds of refineGroupFootprint(group)) {
+      blockers.push(
+        createBlockerFromSourceBounds(scene, sourceMesh, bounds, undefined, `-cluster-${blockers.length}`),
+      );
+    }
+  }
+  return blockers;
+}
+
+function worldMatrixOf(mesh: AbstractMesh) {
+  return mesh.getWorldMatrix();
+}
+
+interface ClusterGroup {
+  bounds: SideBounds;
+  // Bboxes of the group's triangles that reach into the capsule band.
+  boxes: SideBounds[];
+}
+
+// A wide CONNECTED structure (the VIP wing shell, the cascade-court stone
+// ring) is one component, so a single bbox would wall its archways and
+// taper its corners into phantom collision. Refine: bin the group's
+// low-reaching triangle boxes along the longer axis; bins no triangle spans
+// are real openings (no blocker), and runs of occupied bins with a similar
+// cross-axis profile collapse into one snug box each. Compact groups
+// (single pylons, stems) stay one box.
+const REFINE_MIN_SPAN = 8;
+const REFINE_BIN_SIZE = 1;
+const REFINE_PROFILE_TOLERANCE = 0.75;
+
+function refineGroupFootprint(group: ClusterGroup): SideBounds[] {
+  const total = group.bounds;
+  const spanX = total.maxX - total.minX;
+  const spanZ = total.maxZ - total.minZ;
+  const span = Math.max(spanX, spanZ);
+  if (span <= REFINE_MIN_SPAN) {
+    return [total];
+  }
+
+  const alongX = spanX >= spanZ;
+  const start = alongX ? total.minX : total.minZ;
+  const binCount = Math.ceil(span / REFINE_BIN_SIZE);
+  const bins: Array<SideBounds | undefined> = new Array(binCount);
+  for (const box of group.boxes) {
+    const alongMin = (alongX ? box.minX : box.minZ) - start;
+    const alongMax = (alongX ? box.maxX : box.maxZ) - start;
+    const first = Math.min(binCount - 1, Math.max(0, Math.floor(alongMin / REFINE_BIN_SIZE)));
+    const last = Math.min(binCount - 1, Math.max(0, Math.floor(alongMax / REFINE_BIN_SIZE)));
+    for (let index = first; index <= last; index++) {
+      let bin = bins[index];
+      if (!bin) {
+        bin = emptyBounds();
+        bins[index] = bin;
+      }
+      mergeBounds(bin, box);
+    }
+  }
+
+  const results: SideBounds[] = [];
+  let run: SideBounds | undefined;
+  for (const bin of bins) {
+    if (!bin) {
+      if (run) results.push(run);
+      run = undefined;
+      continue;
+    }
+    const crossMinRun = run ? (alongX ? run.minZ : run.minX) : 0;
+    const crossMaxRun = run ? (alongX ? run.maxZ : run.maxX) : 0;
+    const crossMinBin = alongX ? bin.minZ : bin.minX;
+    const crossMaxBin = alongX ? bin.maxZ : bin.maxX;
+    const similar =
+      run &&
+      Math.abs(crossMinBin - crossMinRun) <= REFINE_PROFILE_TOLERANCE &&
+      Math.abs(crossMaxBin - crossMaxRun) <= REFINE_PROFILE_TOLERANCE;
+    if (run && similar) {
+      mergeBounds(run, bin);
+    } else {
+      if (run) results.push(run);
+      run = bin;
+    }
+  }
+  if (run) results.push(run);
+  return results;
+}
+
+function mergeBounds(target: SideBounds, source: SideBounds) {
+  target.minX = Math.min(target.minX, source.minX);
+  target.maxX = Math.max(target.maxX, source.maxX);
+  target.minY = Math.min(target.minY, source.minY);
+  target.maxY = Math.max(target.maxY, source.maxY);
+  target.minZ = Math.min(target.minZ, source.minZ);
+  target.maxZ = Math.max(target.maxZ, source.maxZ);
+}
+
 function emptyBounds(): SideBounds {
   return {
     minX: Number.POSITIVE_INFINITY,
@@ -190,6 +452,7 @@ function createBlockerFromSourceBounds(
   sourceMesh: AbstractMesh,
   bounds: SideBounds,
   side?: 'left' | 'right',
+  nameSuffix?: string,
 ) {
   const { minX, maxX, minZ, maxZ } = bounds;
   // Block from the floor through the geometry's real top: a knee-high rail
@@ -200,7 +463,7 @@ function createBlockerFromSourceBounds(
   const height = Math.max(MIN_SOURCE_BLOCKER_HEIGHT, maxY - minY);
   const depth = Math.max(MIN_SOURCE_BLOCKER_THICKNESS, maxZ - minZ);
   const mesh = MeshBuilder.CreateBox(
-    `main-stage-blocker-source-${sourceMesh.name}${side ? `-${side}` : ''}`,
+    `main-stage-blocker-source-${sourceMesh.name}${side ? `-${side}` : ''}${nameSuffix ?? ''}`,
     {
       width,
       height,

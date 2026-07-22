@@ -1,5 +1,6 @@
 import {
   ArcRotateCamera,
+  Mesh,
   MeshBuilder,
   NullEngine,
   PBRMaterial,
@@ -222,7 +223,9 @@ describe('createMainStageScene', () => {
     );
 
     expect(sourceBlocker).toBeDefined();
-    expect(sourceBlocker!.name).toBe('main-stage-blocker-source-merged:V30_VipShellFascia+1');
+    // Fascia is a clustered family (discrete shell segments get one box
+    // each); a single continuous test box yields exactly one cluster.
+    expect(sourceBlocker!.name).toBe('main-stage-blocker-source-merged:V30_VipShellFascia+1-cluster-0');
     expect(sourceBlocker!.isVisible).toBe(false);
     expect(sourceBlocker!.checkCollisions).toBe(true);
     expect(sourceBlocker!.position.x).toBeCloseTo(18);
@@ -305,12 +308,17 @@ describe('createMainStageScene', () => {
     engine = new NullEngine();
     const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(
       (scene, assets) => {
-        const vipFascia = MeshBuilder.CreateBox(
-          'merged:V30_VipShellFascia+1',
-          { width: 60, height: 4, depth: 44 },
-          scene,
-        );
-        vipFascia.position.set(0, 3, 2);
+        // True to the real merged family mesh: the two wing shells survive
+        // merging as DISJOINT index-buffer components (MergeMeshes
+        // concatenates buffers without stitching), one per side. The
+        // clustered decomposition must give each its own box and leave the
+        // center approach open - a single merged bbox here once sealed it.
+        const left = MeshBuilder.CreateBox('fascia-left', { width: 12, height: 4, depth: 44 }, scene);
+        left.position.set(-24, 3, 2);
+        const right = MeshBuilder.CreateBox('fascia-right', { width: 12, height: 4, depth: 44 }, scene);
+        right.position.set(24, 3, 2);
+        const vipFascia = Mesh.MergeMeshes([left, right], true, true)!;
+        vipFascia.name = 'merged:V30_VipShellFascia+1';
         assets.mainMeshes.push(vipFascia);
       },
     );

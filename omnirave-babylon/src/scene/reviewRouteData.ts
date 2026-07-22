@@ -57,15 +57,20 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
     // runtime x31..67 z-17..-40; stand inboard of it and look outward. Placed
     // here to keep the route's z values ascending (between promenade and pit).
     id: 'cascade_court',
-    x: 22,
+    // 24,-22 is verified clear of the basin lantern stems, which now carry
+    // real collision (a stem stands at ~21.5,-21 - the old 22,-20 teleport
+    // wedged the player against it).
+    x: 24,
     y: 1.7,
-    z: -20,
+    z: -22,
     camera: {
       alpha: 0,
       beta: 1.1,
       radius: 36,
-      focusOffset: { x: 14, y: 3.5, z: -7 },
-      positionOffset: { x: 36, y: 16, z: -34 },
+      // Offsets compensate the player nudge (+2x, -2z) so the absolute
+      // camera framing of the cascade is unchanged.
+      focusOffset: { x: 12, y: 3.5, z: -5 },
+      positionOffset: { x: 34, y: 16, z: -32 },
     },
   },
   {
