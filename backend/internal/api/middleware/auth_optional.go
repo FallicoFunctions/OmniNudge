@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"crypto/subtle"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +38,22 @@ func AuthOptional(authService *services.AuthService) gin.HandlerFunc {
 			// Ignore invalid tokens in optional mode
 			c.Next()
 			return
+		}
+		// Optional-auth routes include a few public write endpoints (for example,
+		// anonymous analytics and bug reports). A browser access-token cookie must
+		// not silently associate a cross-site write with the signed-in user. Keep
+		// such requests usable anonymously, but attach the cookie identity only
+		// after the session-bound CSRF check succeeds.
+		if cookieAuth && isStateChangingMethod(c.Request.Method) {
+			csrfCookie, cookieErr := c.Cookie(services.CSRFTokenCookieName)
+			csrfHeader := c.GetHeader("X-CSRF-Token")
+			if cookieErr != nil || csrfCookie == "" || csrfHeader == "" ||
+				subtle.ConstantTimeCompare([]byte(csrfCookie), []byte(csrfHeader)) != 1 ||
+				claims.SessionID == "" ||
+				authService.ValidateCSRF(c.Request.Context(), claims.SessionID, csrfHeader) != nil {
+				c.Next()
+				return
+			}
 		}
 
 		c.Set("user_id", claims.UserID)

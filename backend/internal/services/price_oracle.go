@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -78,7 +79,7 @@ func (s *PriceOracleService) GetUSDPrice(ctx context.Context, coin string) (floa
 
 	// Response shape: {"bitcoin":{"usd":65000.5}}
 	var data map[string]map[string]float64
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&data); err != nil {
 		return 0, fmt.Errorf("decode price response: %w", err)
 	}
 

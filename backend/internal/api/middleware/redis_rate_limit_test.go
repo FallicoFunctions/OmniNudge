@@ -81,6 +81,40 @@ func TestOmniChatRateLimiterFailsClosedWhenCounterUnavailable(t *testing.T) {
 	require.Equal(t, "5", response.Header().Get("Retry-After"))
 }
 
+func TestFriendRequestRateLimiterFailsClosedWhenCounterUnavailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", 42)
+		c.Next()
+	})
+	router.POST("/friend-requests", FriendRequestRateLimiterRedis(failingRateLimitCache{}).Middleware(), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/friend-requests", nil))
+
+	require.Equal(t, http.StatusServiceUnavailable, response.Code)
+}
+
+func TestSecuritySensitiveRateLimitersFailClosed(t *testing.T) {
+	tests := map[string]*RedisRateLimiter{
+		"authentication": AuthRateLimiter(failingRateLimitCache{}),
+		"password reset": PasswordResetRateLimiter(failingRateLimitCache{}),
+		"AI generation":  AIDesignRateLimiter(failingRateLimitCache{}),
+		"AI refinement":  ChatDesignRateLimiter(failingRateLimitCache{}),
+	}
+
+	for name, limiter := range tests {
+		t.Run(name, func(t *testing.T) {
+			allowed, _, _, err := limiter.checkLimit(context.Background(), "rate:test:ip:192.0.2.1")
+			require.Error(t, err)
+			require.False(t, allowed)
+		})
+	}
+}
+
 func TestIPRateLimitIgnoresSpoofedForwardedForWithoutTrustedProxy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cache := services.NewMemoryCache()
@@ -104,4 +138,21 @@ func TestIPRateLimitIgnoresSpoofedForwardedForWithoutTrustedProxy(t *testing.T) 
 			require.Equal(t, http.StatusTooManyRequests, response.Code)
 		}
 	}
+}
+
+func TestRedisRateLimiterMalformedUserContextFallsBackToIP(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cache := services.NewMemoryCache()
+	t.Cleanup(cache.Stop)
+	limiter := NewRedisRateLimiter(cache, 1, time.Minute, "rate:test")
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", "not-an-int")
+		c.Next()
+	})
+	router.POST("/", limiter.Middleware(), func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/", nil))
+	require.Equal(t, http.StatusNoContent, response.Code)
 }

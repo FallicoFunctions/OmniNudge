@@ -309,11 +309,13 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		return
 	}
 
-	var usedInMessageID *int
-	if val := c.PostForm("used_in_message_id"); val != "" {
-		if id, err := strconv.Atoi(val); err == nil {
-			usedInMessageID = &id
-		}
+	// Message associations are established by SendMessage after it verifies
+	// that the uploaded media belongs to the sender. Accepting a raw message ID
+	// here would let a client attach its upload to another user's message.
+	if c.PostForm("used_in_message_id") != "" {
+		_ = os.Remove(storagePath)
+		RespondError(c, http.StatusBadRequest, "used_in_message_id is server-managed")
+		return
 	}
 
 	storageURL := "/uploads/" + newName
@@ -346,7 +348,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		FileSize:         total,
 		StorageURL:       storageURL,
 		StoragePath:      storagePath,
-		UsedInMessageID:  usedInMessageID,
+		UsedInMessageID:  nil,
 	}
 
 	// Extract dimensions for images (thumbnail generation is async when queue is available)

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 )
@@ -75,7 +76,10 @@ type submitRequest struct {
 // @Failure  409 {object} map[string]any "TXID already submitted"
 // @Router   /payments/crypto/submit [post]
 func (h *PaymentsHandler) SubmitCryptoPayment(c *gin.Context) {
-	userID := c.GetInt("userID")
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	var req submitRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -201,6 +205,10 @@ func (h *PaymentsHandler) SubmitCryptoPayment(c *gin.Context) {
 // @Failure  404   {object} map[string]any
 // @Router   /payments/crypto/{txid}/status [get]
 func (h *PaymentsHandler) GetPaymentStatus(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 	txid := c.Param("txid")
 	coin := strings.ToUpper(c.Query("coin"))
 	if coin == "" {
@@ -215,6 +223,12 @@ func (h *PaymentsHandler) GetPaymentStatus(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch payment"})
+		return
+	}
+	if payment.UserID != userID {
+		// TXIDs are not a capability.  Hide the record so callers cannot use
+		// the endpoint to enumerate another account's payment history.
+		c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
 		return
 	}
 

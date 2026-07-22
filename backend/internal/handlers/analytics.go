@@ -1,13 +1,19 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/omninudge/backend/internal/services"
 )
+
+var analyticsEventNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+
+const maxAnalyticsPropertiesBytes = 32 * 1024
 
 type AnalyticsHandler struct {
 	svc *services.AnalyticsService
@@ -40,6 +46,18 @@ func (h *AnalyticsHandler) TrackEvent(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
+	if !analyticsEventNamePattern.MatchString(req.Event) {
+		RespondError(c, http.StatusBadRequest, "Invalid event name")
+		return
+	}
+	if len(req.Properties) > 50 {
+		RespondError(c, http.StatusBadRequest, "Too many event properties")
+		return
+	}
+	if encoded, err := json.Marshal(req.Properties); err != nil || len(encoded) > maxAnalyticsPropertiesBytes {
+		RespondError(c, http.StatusBadRequest, "Event properties are too large")
+		return
+	}
 
 	event := services.Event{
 		Name:       req.Event,
@@ -49,15 +67,21 @@ func (h *AnalyticsHandler) TrackEvent(c *gin.Context) {
 	}
 
 	if req.AnonymousID != "" {
-		if uid, err := uuid.Parse(req.AnonymousID); err == nil {
-			event.AnonymousID = &uid
+		uid, err := uuid.Parse(req.AnonymousID)
+		if err != nil {
+			RespondError(c, http.StatusBadRequest, "Invalid anonymous ID")
+			return
 		}
+		event.AnonymousID = &uid
 	}
 
 	if req.SessionID != "" {
-		if sid, err := uuid.Parse(req.SessionID); err == nil {
-			event.SessionID = &sid
+		sid, err := uuid.Parse(req.SessionID)
+		if err != nil {
+			RespondError(c, http.StatusBadRequest, "Invalid session ID")
+			return
 		}
+		event.SessionID = &sid
 	}
 
 	if userID > 0 {
@@ -90,7 +114,7 @@ func (h *AnalyticsHandler) StartSession(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		RespondError(c, http.StatusBadRequest, err.Error())
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -134,7 +158,7 @@ func (h *AnalyticsHandler) EndSession(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		RespondError(c, http.StatusBadRequest, err.Error())
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -174,7 +198,7 @@ func (h *AnalyticsHandler) Identify(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		RespondError(c, http.StatusBadRequest, err.Error())
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 

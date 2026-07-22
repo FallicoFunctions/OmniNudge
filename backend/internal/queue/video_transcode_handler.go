@@ -17,6 +17,7 @@ import (
 	zlog "github.com/rs/zerolog/log"
 
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/utils"
 )
 
 // hlsSegmentDuration is the target HLS segment length in seconds.
@@ -124,23 +125,23 @@ func (h *VideoTranscodeHandler) Handle(ctx context.Context, task *asynq.Task) er
 	// -c:v libx264 -preset fast -crf 23 — reasonable quality/speed trade-off
 	// -c:a aac -b:a 128k
 	args := []string{
-		"-y",                     // overwrite output without prompting
-		"-i", inputPath,          // input file
-		"-c:v", "libx264",        // video codec
-		"-preset", "fast",        // encoding speed preset
-		"-crf", "23",             // constant rate factor (quality)
-		"-c:a", "aac",            // audio codec
-		"-b:a", "128k",           // audio bitrate
+		"-y",            // overwrite output without prompting
+		"-i", inputPath, // input file
+		"-c:v", "libx264", // video codec
+		"-preset", "fast", // encoding speed preset
+		"-crf", "23", // constant rate factor (quality)
+		"-c:a", "aac", // audio codec
+		"-b:a", "128k", // audio bitrate
 		"-hls_time", hlsSegmentDuration, // segment duration in seconds
-		"-hls_list_size", "0",    // keep all segments
+		"-hls_list_size", "0", // keep all segments
 		"-hls_segment_filename", filepath.Join(tmpDir, "seg_%03d.ts"),
-		"-f", "hls",              // output format
+		"-f", "hls", // output format
 		outputPlaylist,
 	}
 
 	//nolint:gosec // inputPath comes from internal job payload, validated above.
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
-	output, err := cmd.CombinedOutput()
+	output, err := utils.RunCommandWithOutputLimit(cmd, 64*1024)
 	if err != nil {
 		var execErr *exec.Error
 		if errors.As(err, &execErr) && errors.Is(execErr.Err, exec.ErrNotFound) {

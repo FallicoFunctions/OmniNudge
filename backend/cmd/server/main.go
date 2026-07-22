@@ -31,8 +31,6 @@ import (
 	"github.com/omninudge/backend/internal/audit"
 	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/database"
-	"github.com/omninudge/backend/internal/domain/events"
-	"github.com/omninudge/backend/internal/eventhandlers"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/jobs"
 	"github.com/omninudge/backend/internal/models"
@@ -135,6 +133,15 @@ func main() {
 
 	// Initialize repositories
 	userRepo := repository.NewPostgresUserRepository(db.Pool)
+	backfillCtx, backfillCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	backfilledEmails, err := userRepo.BackfillEmailLookupHashes(backfillCtx)
+	backfillCancel()
+	if err != nil {
+		zlog.Fatal().Err(err).Msg("Failed to backfill email lookup hashes")
+	}
+	if backfilledEmails > 0 {
+		zlog.Info().Int("users", backfilledEmails).Msg("Backfilled email lookup hashes")
+	}
 	userSettingsRepo := repository.NewPostgresUserSettingsRepository(db.Pool)
 	postRepo := repository.NewPostgresPlatformPostRepository(db.Pool)
 	commentRepo := repository.NewPostgresPostCommentRepository(db.Pool)
@@ -184,19 +191,6 @@ func main() {
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
 	go hub.Run()
-
-	// Initialize domain event bus and register event handlers.
-	// Log events in non-production environments so they can be inspected via
-	// GetEventLog in tests and staging. In production the log is disabled to
-	// prevent the slice growing without bound.
-	eventBus := events.NewEventBus(cfg.AppEnv != "production")
-	userEventHandlers := eventhandlers.NewUserEventHandlers()
-	eventBus.Subscribe("UserRegistered", userEventHandlers.OnUserRegistered)
-	eventBus.Subscribe("UserBanned", userEventHandlers.OnUserBanned)
-	eventBus.Subscribe("UserUnbanned", userEventHandlers.OnUserUnbanned)
-	eventBus.Subscribe("UserDeleted", userEventHandlers.OnUserDeleted)
-	eventBus.Subscribe("PasswordChanged", userEventHandlers.OnPasswordChanged)
-	zlog.Info().Msg("Domain event bus initialized")
 
 	// Initialize services
 	if cfg.Turnstile.Secret == "" {
@@ -623,7 +617,6 @@ func main() {
 	hubSettingsHandler := handlers.NewHubSettingsHandler(hubRepo, hubSettingsRepo, userRepo)
 	hubWikiHandler := handlers.NewHubWikiHandler(hubRepo, hubSettingsRepo, hubWikiRepo)
 	accessRequestHandler := handlers.NewAccessRequestHandler(hubAccessRequestRepo, hubRepo, hubSettingsRepo, userRepo)
-	jobsHandler := handlers.NewJobsHandler(queueClient)
 	audioEncoderHandler := handlers.NewAudioEncoderHandler(mediaRepo, userSettingsRepo, queueClient)
 	voiceHandler := handlers.NewVoiceMessagesHandler(db.Pool, voiceStorage, virusScanner, hub, queueClient, cfg.VirusScan.FailClosed)
 	featureFlagsHandler := handlers.NewFeatureFlagHandler(featureFlagService)
@@ -704,7 +697,7 @@ func main() {
 	// Feature 1: Message Reactions handler + rate limiter
 	reactionsHandler := handlers.NewReactionsHandler(reactionService)
 	reactionRateLimiter := middleware.ReactionRateLimiter()
-	friendRequestRateLimiter := middleware.FriendRequestRateLimiter()
+	friendRequestRateLimiter := middleware.FriendRequestRateLimiterRedis(cache)
 
 	// Rate limiters hoisted so they are accessible at graceful shutdown.
 	themeCreationLimiter := middleware.ThemeCreationRateLimiter()
@@ -717,6 +710,9 @@ func main() {
 	// (no user_id exists at login/register time, so the Redis limiter falls back to ClientIP).
 	authRateLimiter := middleware.AuthRateLimiter(cache)
 	passwordResetRateLimiter := middleware.PasswordResetRateLimiter(cache)
+	analyticsRateLimiter := middleware.NewRedisRateLimiter(cache, 120, time.Minute, "rate:analytics").FailClosed()
+	bugReportRateLimiter := middleware.NewRedisRateLimiter(cache, 5, time.Hour, "rate:bug_reports").FailClosed()
+	presenceRateLimiter := middleware.NewRedisRateLimiter(cache, 120, time.Minute, "rate:presence").FailClosed()
 
 	// Check ffmpeg availability for iOS audio encoding (P0-003)
 	if err := handlers.CheckFFmpegAvailability(); err != nil {
@@ -1030,7 +1026,7 @@ func main() {
 			hubs.GET("/:name/wiki", hubWikiHandler.GetHubWikiPage)
 			hubs.GET("/:name/wiki/:pagePath", hubWikiHandler.GetHubWikiPage)
 			hubs.GET("/:name/active-users", hubPresenceHandler.GetHubActiveUsers)
-			hubs.POST("/:name/active-users/ping", hubPresenceHandler.PingHubPresence)
+			hubs.POST("/:name/active-users/ping", presenceRateLimiter.Middleware(), hubPresenceHandler.PingHubPresence)
 
 			// Hub settings (public can view some, moderators see all)
 			hubs.GET("/:name/settings", hubSettingsHandler.GetHubSettings)
@@ -1056,7 +1052,7 @@ func main() {
 			subreddits.GET("/:name/posts", postsHandler.GetSubredditPosts)
 			subreddits.GET("/:name/subscription", subscriptionsHandler.CheckSubredditSubscription)
 			subreddits.GET("/:name/active-users", subredditPresenceHandler.GetSubredditActiveUsers)
-			subreddits.POST("/:name/active-users/ping", subredditPresenceHandler.PingSubredditPresence)
+			subreddits.POST("/:name/active-users/ping", presenceRateLimiter.Middleware(), subredditPresenceHandler.PingSubredditPresence)
 		}
 
 		// Public user profile routes
@@ -1093,24 +1089,19 @@ func main() {
 		bugReports := api.Group("/bug-reports")
 		bugReports.Use(middleware.AuthOptional(authService))
 		{
-			bugReports.POST("", bugReportsHandler.CreateBugReport)   // Anyone can report bugs
-			bugReports.GET("/known", bugReportsHandler.GetKnownBugs) // Public list of known bugs
+			bugReports.POST("", bugReportRateLimiter.Middleware(), bugReportsHandler.CreateBugReport) // Anyone can report bugs
+			bugReports.GET("/known", bugReportsHandler.GetKnownBugs)                                  // Public list of known bugs
 		}
 
 		// Analytics routes (P0-027: track events, optional auth for user context)
 		analytics := api.Group("/analytics")
 		analytics.Use(middleware.AuthOptional(authService))
+		analytics.Use(analyticsRateLimiter.Middleware())
 		{
 			analytics.POST("/track", analyticsHandler.TrackEvent)
 			analytics.POST("/session/start", analyticsHandler.StartSession)
 			analytics.POST("/session/end", analyticsHandler.EndSession)
 			analytics.POST("/identify", analyticsHandler.Identify)
-		}
-
-		// Job status routes (P0-002: job status queryable via API)
-		jobs := api.Group("/jobs")
-		{
-			jobs.GET("/:queue/:id", jobsHandler.GetJobStatus)
 		}
 
 		// OmniChat public routes (no auth required)
@@ -1151,8 +1142,6 @@ func main() {
 
 			// Account deletion (P0-017: GDPR right to erasure)
 			protected.POST("/account/delete", accountDeletionHandler.RequestAccountDeletion)
-			protected.POST("/account/cancel-deletion", accountDeletionHandler.CancelAccountDeletion)
-			protected.GET("/account/deletion-status", accountDeletionHandler.GetAccountDeletionStatus)
 
 			// GDPR Data Export (P0-016: GDPR right to data portability)
 			protected.POST("/account/export", dataExportHandler.RequestDataExport)
@@ -1723,7 +1712,6 @@ func main() {
 	// workerCancel() are deferred and fire on return from main() — after this
 	// block. Do not move these Stop() calls into defers without careful ordering.
 	reactionRateLimiter.Stop()
-	friendRequestRateLimiter.Stop()
 	themeCreationLimiter.Stop()
 	themePreviewLimiter.Stop()
 	generalLimiter.Stop()
@@ -1739,21 +1727,3 @@ func main() {
 
 	zlog.Info().Msg("Server exited")
 }
-
-// asynqmonDashboard is a swaggo documentation stub for the Asynqmon queue
-// monitoring dashboard. The actual handler is wired inline in main() because
-// asynqmon provides a net/http handler that cannot be expressed as a named
-// gin HandlerFunc. This stub exists solely so swag init can generate the
-// OpenAPI entry for the route.
-//
-// @Summary      Queue monitoring dashboard
-// @Description  Asynqmon web UI — view and manage background job queues (active, pending, scheduled, retry, dead). Requires Redis to be available.
-// @Tags         Admin
-// @Security     BearerAuth
-// @Produce      html
-// @Success      200  "HTML dashboard"
-// @Failure      401  {object}  response.ErrorResponse  "Unauthorized — ASYNQMON_TOKEN required in production"
-// @Router       /admin/queues [get]
-//
-//lint:ignore U1000 Swagger documentation stub consumed by swag rather than Go callers.
-func asynqmonDashboard() {} //nolint:unused

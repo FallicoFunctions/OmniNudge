@@ -698,8 +698,11 @@ func (s *NotificationService) deliverNotification(ctx context.Context, notificat
 		} else if settings.ShowPushNotifications {
 			// Decide if we should send push (e.g. if user is offline)
 			if !online {
-				// Use background context for detachment (survives request completion)
-				go s.sendPushToUser(context.Background(), notification)
+				go func() {
+					pushCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+					s.sendPushToUser(pushCtx, notification)
+				}()
 			}
 		}
 	}
@@ -870,8 +873,8 @@ func nextDailyDigestRunAt(now time.Time, tz string) time.Time {
 func (s *NotificationService) SendMessagePush(ctx context.Context, senderID int, recipientID int, message *models.Message) {
 	// Entire process is async to avoid blocking the chat request (P0-042-FLAW: Latency)
 	go func() {
-		// Use background context for detachment
-		bgCtx := context.Background()
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 
 		// 1. Check user settings for push
 		settings, err := s.getOrCreateSettings(bgCtx, recipientID)
@@ -1169,7 +1172,7 @@ func (s *NotificationService) performPush(ctx context.Context, n *models.Notific
 				targetToken := tokens[i].Token
 				if s.isTokenInvalid(resp.Error) {
 					log.Printf("[Push] Removing invalid device token for user %d: %s", n.UserID, targetToken)
-					_ = s.tokenRepo.DeleteByUserAndToken(context.Background(), n.UserID, targetToken)
+					_ = s.tokenRepo.DeleteByUserAndToken(ctx, n.UserID, targetToken)
 				} else {
 					log.Printf("[Push] Token failed with non-fatal error: %v", resp.Error)
 				}

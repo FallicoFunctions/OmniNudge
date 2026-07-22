@@ -24,25 +24,25 @@ func NewGroupEncryptionService(db *sql.DB) *GroupEncryptionService {
 
 // GroupEncryptionKey represents a group encryption key
 type GroupEncryptionKey struct {
-	ID                 int       `json:"id"`
-	ConversationID     int       `json:"conversation_id"`
-	KeyVersion         int       `json:"key_version"`
-	EncryptedGroupKey  string    `json:"encrypted_group_key"`
-	CreatedBy          int       `json:"created_by"`
-	CreatedAt          time.Time `json:"created_at"`
-	ExpiresAt          *time.Time `json:"expires_at,omitempty"`
-	IsActive           bool      `json:"is_active"`
-	MemberCount        int       `json:"member_count"`
+	ID                int        `json:"id"`
+	ConversationID    int        `json:"conversation_id"`
+	KeyVersion        int        `json:"key_version"`
+	EncryptedGroupKey string     `json:"encrypted_group_key"`
+	CreatedBy         int        `json:"created_by"`
+	CreatedAt         time.Time  `json:"created_at"`
+	ExpiresAt         *time.Time `json:"expires_at,omitempty"`
+	IsActive          bool       `json:"is_active"`
+	MemberCount       int        `json:"member_count"`
 }
 
 // GroupKeyMember represents a member's copy of a group encryption key
 type GroupKeyMember struct {
-	ID                   int       `json:"id"`
-	GroupKeyID           int       `json:"group_key_id"`
-	UserID               int       `json:"user_id"`
-	EncryptedKeyForUser  string    `json:"encrypted_key_for_user"`
-	DeliveredAt          *time.Time `json:"delivered_at,omitempty"`
-	CreatedAt            time.Time `json:"created_at"`
+	ID                  int        `json:"id"`
+	GroupKeyID          int        `json:"group_key_id"`
+	UserID              int        `json:"user_id"`
+	EncryptedKeyForUser string     `json:"encrypted_key_for_user"`
+	DeliveredAt         *time.Time `json:"delivered_at,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
 }
 
 // GenerateAESKey generates a new AES-256 key for group encryption
@@ -190,23 +190,6 @@ func (s *GroupEncryptionService) GetActiveGroupKey(conversationID int) (*GroupEn
 	return &key, nil
 }
 
-// GetMemberKey retrieves a user's encrypted copy of a group key
-func (s *GroupEncryptionService) GetMemberKey(groupKeyID int, userID int) (string, error) {
-	var encryptedKey string
-	err := s.db.QueryRow(`
-		SELECT encrypted_key_for_user
-		FROM group_key_members
-		WHERE group_key_id = $1 AND user_id = $2
-	`, groupKeyID, userID).Scan(&encryptedKey)
-	if err == sql.ErrNoRows {
-		return "", errors.New("member key not found")
-	}
-	if err != nil {
-		return "", fmt.Errorf("failed to get member key: %w", err)
-	}
-	return encryptedKey, nil
-}
-
 // RotateGroupKey rotates the group encryption key (called on member add/remove)
 // memberKeys maps userID to the new group key encrypted with that user's public key
 func (s *GroupEncryptionService) RotateGroupKey(
@@ -308,34 +291,4 @@ func DecryptGroupMessage(ciphertext string, iv string, aesKey []byte) (string, e
 	}
 
 	return string(plaintextBytes), nil
-}
-
-// ListGroupKeys lists all encryption keys for a conversation (for debugging/auditing)
-func (s *GroupEncryptionService) ListGroupKeys(conversationID int) ([]GroupEncryptionKey, error) {
-	rows, err := s.db.Query(`
-		SELECT id, conversation_id, key_version, encrypted_group_key,
-			created_by, created_at, expires_at, is_active, member_count
-		FROM group_encryption_keys
-		WHERE conversation_id = $1
-		ORDER BY key_version DESC
-	`, conversationID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list group keys: %w", err)
-	}
-	defer rows.Close()
-
-	var keys []GroupEncryptionKey
-	for rows.Next() {
-		var key GroupEncryptionKey
-		err := rows.Scan(
-			&key.ID, &key.ConversationID, &key.KeyVersion, &key.EncryptedGroupKey,
-			&key.CreatedBy, &key.CreatedAt, &key.ExpiresAt, &key.IsActive, &key.MemberCount,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
-		}
-		keys = append(keys, key)
-	}
-
-	return keys, rows.Err()
 }

@@ -62,7 +62,42 @@ func TestAuthRequired_CookieSessionRequiresCSRFForMutations(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, request(http.MethodPost, true))
 }
 
+func TestAuthOptional_CookieSessionDoesNotAssociateMutationWithoutCSRF(t *testing.T) {
+	db := testutil.NewTestDatabase(t)
+	user := testutil.NewFixtures(t, db).CreateUniqueUser("optional_cookie_auth")
+	auth := services.NewAuthService("cookie-test-secret", "test", "")
+	sessions := services.NewAuthSessionService(db.Pool, auth)
+	auth.SetSessionService(sessions)
+	credentials, err := sessions.Create(t.Context(), user, false, "test browser", "")
+	require.NoError(t, err)
+
+	request := func(includeCSRF bool) int {
+		router := gin.New()
+		router.Use(AuthOptional(auth))
+		router.POST("/", func(c *gin.Context) {
+			if _, authenticated := c.Get("user_id"); authenticated {
+				c.Status(http.StatusNoContent)
+				return
+			}
+			c.Status(http.StatusAccepted)
+		})
+		req := httptest.NewRequest(http.MethodPost, "/", nil)
+		req.AddCookie(&http.Cookie{Name: services.AccessTokenCookieName, Value: credentials.AccessToken})
+		if includeCSRF {
+			req.AddCookie(&http.Cookie{Name: services.CSRFTokenCookieName, Value: credentials.CSRFToken})
+			req.Header.Set("X-CSRF-Token", credentials.CSRFToken)
+		}
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	require.Equal(t, http.StatusAccepted, request(false))
+	require.Equal(t, http.StatusNoContent, request(true))
+}
+
 func TestCORS_AllowsLocalhostAndLoopbackDevOrigins(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	gin.SetMode(gin.TestMode)
 
 	for _, origin := range []string{
@@ -84,8 +119,26 @@ func TestCORS_AllowsLocalhostAndLoopbackDevOrigins(t *testing.T) {
 			require.Equal(t, http.StatusNoContent, w.Code)
 			require.Equal(t, origin, w.Header().Get("Access-Control-Allow-Origin"))
 			require.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
+			require.Contains(t, w.Header().Values("Vary"), "Origin")
 		})
 	}
+}
+
+func TestCORS_ProductionRejectsDevelopmentOrigins(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(CORS())
+	router.OPTIONS("/", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodOptions, "/", nil)
+	req.Header.Set("Origin", "http://localhost:5176")
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusNoContent, w.Code)
+	require.Empty(t, w.Header().Get("Access-Control-Allow-Origin"))
+	require.Empty(t, w.Header().Get("Access-Control-Allow-Credentials"))
 }
 
 func TestRequireRole_BlocksWhenRoleMissing(t *testing.T) {

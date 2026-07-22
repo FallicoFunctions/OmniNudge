@@ -11,6 +11,7 @@ import (
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/utils"
 	zlog "github.com/rs/zerolog/log"
 )
 
@@ -360,7 +361,7 @@ func (h *AdminHandler) GetAllBanHistory(c *gin.Context) {
 // @Produce      json
 // @Param        limit   query  int     false  "Page size (default 20)"
 // @Param        offset  query  int     false  "Offset"
-// @Param        search  query  string  false  "Search by username or email"
+// @Param        search  query  string  false  "Search by username"
 // @Success      200  {object}  gin.H
 // @Failure      401  {object}  gin.H
 // @Failure      403  {object}  gin.H
@@ -397,7 +398,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	// Build query dynamically with proper parameterization
 	baseQuery := `
-		SELECT id, username, email, role, created_at, last_seen, bio, avatar_url,
+		SELECT id, username, email, email_encrypted, role, created_at, last_seen, bio, avatar_url,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by
 		FROM users
 		WHERE 1=1
@@ -408,7 +409,11 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	paramCount := 1
 
 	if search != "" {
-		conditions = append(conditions, "(username ILIKE $"+strconv.Itoa(paramCount)+" OR email ILIKE $"+strconv.Itoa(paramCount)+")")
+		// Email is encrypted with randomized encryption, so SQL cannot search it
+		// safely.  Searching ciphertext is both incorrect and can leak its
+		// structure through matching behavior; use username search until a
+		// dedicated keyed email-search index is introduced.
+		conditions = append(conditions, "username ILIKE $"+strconv.Itoa(paramCount))
 		args = append(args, "%"+search+"%")
 		paramCount++
 	}
@@ -466,21 +471,22 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	defer rows.Close()
 
 	type userRow struct {
-		ID            int
-		Username      string
-		Email         *string
-		Role          string
-		CreatedAt     time.Time
-		LastSeen      *time.Time
-		Bio           *string
-		AvatarURL     *string
-		ShadowBanned  bool
-		Banned        bool
-		Deleted       bool
-		BanReason     *string
-		ShowBanReason bool
-		BannedAt      *time.Time
-		BannedBy      *int
+		ID             int
+		Username       string
+		EncryptedEmail *string
+		EmailEncrypted bool
+		Role           string
+		CreatedAt      time.Time
+		LastSeen       *time.Time
+		Bio            *string
+		AvatarURL      *string
+		ShadowBanned   bool
+		Banned         bool
+		Deleted        bool
+		BanReason      *string
+		ShowBanReason  bool
+		BannedAt       *time.Time
+		BannedBy       *int
 	}
 	type UserResponse struct {
 		ID            int     `json:"id"`
@@ -503,7 +509,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	users := []UserResponse{}
 	for rows.Next() {
 		var row userRow
-		if err := rows.Scan(&row.ID, &row.Username, &row.Email, &row.Role, &row.CreatedAt, &row.LastSeen, &row.Bio, &row.AvatarURL,
+		if err := rows.Scan(&row.ID, &row.Username, &row.EncryptedEmail, &row.EmailEncrypted, &row.Role, &row.CreatedAt, &row.LastSeen, &row.Bio, &row.AvatarURL,
 			&row.ShadowBanned, &row.Banned, &row.Deleted, &row.BanReason, &row.ShowBanReason, &row.BannedAt, &row.BannedBy); err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to scan user")
 			return
@@ -518,10 +524,24 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 			formatted := row.BannedAt.Format(time.RFC3339)
 			bannedAtStr = &formatted
 		}
+		var email *string
+		if row.EncryptedEmail != nil {
+			if row.EmailEncrypted {
+				decrypted, decryptErr := utils.DecryptEmail(*row.EncryptedEmail)
+				if decryptErr != nil {
+					zlog.Warn().Err(decryptErr).Int("user_id", row.ID).Msg("Admin user listing could not decrypt email")
+				} else {
+					email = &decrypted
+				}
+			} else {
+				// Preserve support for legacy rows created before email encryption.
+				email = row.EncryptedEmail
+			}
+		}
 		users = append(users, UserResponse{
 			ID:            row.ID,
 			Username:      row.Username,
-			Email:         row.Email,
+			Email:         email,
 			Role:          row.Role,
 			CreatedAt:     row.CreatedAt.Format(time.RFC3339),
 			LastSeenAt:    lastSeenStr,
@@ -570,14 +590,14 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 // @Router       /admin/stats [get]
 func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 	type Stats struct {
-		TotalUsers               int     `json:"total_users"`
-		TotalPosts               int     `json:"total_posts"`
-		TotalComments            int     `json:"total_comments"`
-		TotalHubs                int     `json:"total_hubs"`
-		TotalConversations       int     `json:"total_conversations"`
-		TotalMessages            int     `json:"total_messages"`
-		AdminCount               int     `json:"admin_count"`
-		ModeratorCount           int     `json:"moderator_count"`
+		TotalUsers         int `json:"total_users"`
+		TotalPosts         int `json:"total_posts"`
+		TotalComments      int `json:"total_comments"`
+		TotalHubs          int `json:"total_hubs"`
+		TotalConversations int `json:"total_conversations"`
+		TotalMessages      int `json:"total_messages"`
+		AdminCount         int `json:"admin_count"`
+		ModeratorCount     int `json:"moderator_count"`
 	}
 
 	stats := Stats{}

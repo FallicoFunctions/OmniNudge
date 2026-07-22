@@ -60,6 +60,7 @@ func setupAdminBanTestEnv(t *testing.T) (*gin.Engine, *models.UserRepository, *p
 		adminRoutes.POST("/users/:id/unban", handler.UnbanUser)
 		adminRoutes.POST("/users/:id/delete", handler.SoftDeleteUser)
 		adminRoutes.GET("/users/:id/ban-history", handler.GetBanHistory)
+		adminRoutes.GET("/users", handler.ListUsers)
 		adminRoutes.GET("/ban-history", handler.GetAllBanHistory)
 	}
 
@@ -68,6 +69,32 @@ func setupAdminBanTestEnv(t *testing.T) (*gin.Engine, *models.UserRepository, *p
 	}
 
 	return router, userRepo, pool, cleanup
+}
+
+func TestAdminListUsersDecryptsEmailAndSearchesUsernameOnly(t *testing.T) {
+	router, userRepo, pool, cleanup := setupAdminBanTestEnv(t)
+	defer cleanup()
+
+	email := "admin-listing@example.com"
+	user := &models.User{Username: "adminlist_searchable", PasswordHash: "test-hash", Email: &email}
+	require.NoError(t, userRepo.Create(context.Background(), user))
+	var storedEmail string
+	require.NoError(t, pool.QueryRow(context.Background(), `SELECT email FROM users WHERE id = $1`, user.ID).Scan(&storedEmail))
+	assert.NotEqual(t, email, storedEmail, "the database must store encrypted email ciphertext")
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users?search=adminlist_searchable", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	assert.Contains(t, response.Body.String(), email)
+	assert.NotContains(t, response.Body.String(), storedEmail)
+
+	emailSearchRequest := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users?search=admin-listing@example.com", nil)
+	emailSearchResponse := httptest.NewRecorder()
+	router.ServeHTTP(emailSearchResponse, emailSearchRequest)
+	require.Equal(t, http.StatusOK, emailSearchResponse.Code, emailSearchResponse.Body.String())
+	assert.NotContains(t, emailSearchResponse.Body.String(), "adminlist_searchable")
 }
 
 func createAdminBanTestUser(t *testing.T, repo *models.UserRepository, username string) *models.User {

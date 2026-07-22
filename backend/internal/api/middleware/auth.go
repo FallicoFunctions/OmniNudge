@@ -3,6 +3,8 @@ package middleware
 import (
 	"crypto/subtle"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -131,40 +133,19 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 
 // CORS middleware for handling cross-origin requests
 func CORS() gin.HandlerFunc {
+	allowedOrigins := corsAllowedOrigins(os.Getenv("APP_ENV"), os.Getenv("FRONTEND_URL"))
+	allowedOriginSet := make(map[string]struct{}, len(allowedOrigins))
+	for _, origin := range allowedOrigins {
+		allowedOriginSet[origin] = struct{}{}
+	}
+
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
+		// The allow-origin value is request-specific. Make shared caches keep
+		// responses for different browser origins separate.
+		c.Writer.Header().Add("Vary", "Origin")
 
-		// In production, restrict this to your frontend domain
-		allowedOrigins := []string{
-			"https://omninudge.com",
-			"https://www.omninudge.com",
-			"http://localhost:3000",
-			"http://localhost:5173",
-			"http://localhost:5174",
-			"http://localhost:5175",
-			"http://localhost:5176",
-			"http://localhost:5177",
-			"http://localhost:5178",
-			"http://localhost:5179",
-			"http://127.0.0.1:3000",
-			"http://127.0.0.1:5173",
-			"http://127.0.0.1:5174",
-			"http://127.0.0.1:5175",
-			"http://127.0.0.1:5176",
-			"http://127.0.0.1:5177",
-			"http://127.0.0.1:5178",
-			"http://127.0.0.1:5179",
-		}
-
-		allowed := false
-		for _, o := range allowedOrigins {
-			if origin == o {
-				allowed = true
-				break
-			}
-		}
-
-		if allowed {
+		if _, allowed := allowedOriginSet[origin]; allowed {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
@@ -178,4 +159,47 @@ func CORS() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func corsAllowedOrigins(appEnv string, configuredOrigins ...string) []string {
+	production := []string{
+		"https://omninudge.com",
+		"https://www.omninudge.com",
+	}
+	isProduction := strings.EqualFold(strings.TrimSpace(appEnv), "production")
+	for _, configuredList := range configuredOrigins {
+		for _, rawOrigin := range strings.Split(configuredList, ",") {
+			parsed, err := url.Parse(strings.TrimSpace(rawOrigin))
+			if err != nil || parsed.Host == "" || parsed.User != nil ||
+				(parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
+				continue
+			}
+			if parsed.Scheme != "https" && !(parsed.Scheme == "http" && !isProduction) {
+				continue
+			}
+			production = append(production, parsed.Scheme+"://"+parsed.Host)
+		}
+	}
+	if isProduction {
+		return production
+	}
+
+	return append(production,
+		"http://localhost:3000",
+		"http://localhost:5173",
+		"http://localhost:5174",
+		"http://localhost:5175",
+		"http://localhost:5176",
+		"http://localhost:5177",
+		"http://localhost:5178",
+		"http://localhost:5179",
+		"http://127.0.0.1:3000",
+		"http://127.0.0.1:5173",
+		"http://127.0.0.1:5174",
+		"http://127.0.0.1:5175",
+		"http://127.0.0.1:5176",
+		"http://127.0.0.1:5177",
+		"http://127.0.0.1:5178",
+		"http://127.0.0.1:5179",
+	)
 }

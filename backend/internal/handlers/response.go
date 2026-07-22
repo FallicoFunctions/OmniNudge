@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
@@ -10,7 +9,6 @@ import (
 	"github.com/omninudge/backend/internal/helpers"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/repository"
-	"github.com/omninudge/backend/internal/services"
 )
 
 func requestIDFromContext(c *gin.Context) string {
@@ -48,17 +46,6 @@ func errorCodeFromStatus(status int) string {
 	}
 }
 
-// RespondWithError maps a service error (or any error) to the correct HTTP
-// status code and writes a JSON error body.
-func RespondWithError(c *gin.Context, err error) {
-	var svcErr *services.ServiceError
-	if errors.As(err, &svcErr) {
-		RespondError(c, svcErr.Code, svcErr.Message)
-		return
-	}
-	RespondError(c, http.StatusInternalServerError, "Internal server error")
-}
-
 // RespondError writes a JSON error response with the given status code and message.
 // This is the direct replacement for c.JSON(code, gin.H{"error": msg}).
 func RespondError(c *gin.Context, code int, msg string) {
@@ -69,21 +56,6 @@ func RespondError(c *gin.Context, code int, msg string) {
 		RequestID: requestIDFromContext(c),
 	}
 	c.JSON(code, resp)
-}
-
-// RespondOK writes a 200 JSON response.
-func RespondOK(c *gin.Context, data any) {
-	c.JSON(http.StatusOK, data)
-}
-
-// RespondCreated writes a 201 JSON response.
-func RespondCreated(c *gin.Context, data any) {
-	c.JSON(http.StatusCreated, data)
-}
-
-// RespondNoContent writes a 204 response with no body.
-func RespondNoContent(c *gin.Context) {
-	c.Status(http.StatusNoContent)
 }
 
 // hubModeratorRole returns the caller's moderator role for the given hub.

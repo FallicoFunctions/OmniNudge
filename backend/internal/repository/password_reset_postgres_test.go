@@ -32,14 +32,14 @@ func TestPostgresPasswordResetRepository_GetByToken(t *testing.T) {
 	ctx := context.Background()
 
 	user := fx.CreateUniqueUser("pwgettoken_u")
-	pr, _ := repo.GenerateToken(ctx, user.ID)
+	pr, err := repo.GenerateToken(ctx, user.ID)
+	require.NoError(t, err)
 
 	// Valid token — should return the record.
 	got, err := repo.GetByToken(ctx, pr.Token)
 	require.NoError(t, err)
 	require.NotNil(t, got)
-	assert.NotEqual(t, pr.Token, got.Token, "stored password reset tokens should remain hashed")
-	assert.Len(t, got.Token, 64)
+	assert.Empty(t, got.Token, "stored token digests must not leave the repository boundary")
 
 	// Non-existent token — repo returns (nil, nil).
 	got2, err2 := repo.GetByToken(ctx, "no-such-token-xyz")
@@ -74,9 +74,10 @@ func TestPostgresPasswordResetRepository_MarkAsUsed(t *testing.T) {
 	ctx := context.Background()
 
 	user := fx.CreateUniqueUser("pwused_u")
-	pr, _ := repo.GenerateToken(ctx, user.ID)
+	pr, err := repo.GenerateToken(ctx, user.ID)
+	require.NoError(t, err)
 
-	err := repo.MarkAsUsed(ctx, pr.Token)
+	err = repo.MarkAsUsed(ctx, pr.Token)
 	require.NoError(t, err)
 
 	// After marking as used, IsValid returns error "token already used".
@@ -91,10 +92,12 @@ func TestPostgresPasswordResetRepository_InvalidateUserTokens(t *testing.T) {
 	ctx := context.Background()
 
 	user := fx.CreateUniqueUser("pwinvalidate_u")
-	_, _ = repo.GenerateToken(ctx, user.ID)
-	_, _ = repo.GenerateToken(ctx, user.ID)
+	_, err := repo.GenerateToken(ctx, user.ID)
+	require.NoError(t, err)
+	_, err = repo.GenerateToken(ctx, user.ID)
+	require.NoError(t, err)
 
-	err := repo.InvalidateUserTokens(ctx, user.ID)
+	err = repo.InvalidateUserTokens(ctx, user.ID)
 	require.NoError(t, err)
 }
 

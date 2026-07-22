@@ -737,6 +737,54 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		c.Writer.Header().Add("X-Warning", "Message sent without encryption. Ensure users have encryption keys set up.")
 	}
 
+	// Media references are identifiers, not capabilities. Resolve them through
+	// an owner-scoped query and derive all storage metadata server-side so a
+	// sender cannot attach another user's upload or spoof its URL/type/size.
+	if hasMedia {
+		var (
+			mediaID    int
+			storageURL string
+			fileType   string
+			fileSize   int64
+			scanStatus string
+		)
+		if req.MediaFileID != nil {
+			if *req.MediaFileID <= 0 {
+				RespondError(c, http.StatusBadRequest, "Invalid media file ID")
+				return
+			}
+			err = h.pool.QueryRow(c.Request.Context(), `
+				SELECT id, storage_url, file_type, file_size, scan_status
+				FROM media_files
+				WHERE id = $1 AND user_id = $2
+			`, *req.MediaFileID, userID).Scan(&mediaID, &storageURL, &fileType, &fileSize, &scanStatus)
+		} else {
+			mediaURL := strings.TrimSpace(*req.MediaURL)
+			err = h.pool.QueryRow(c.Request.Context(), `
+				SELECT id, storage_url, file_type, file_size, scan_status
+				FROM media_files
+				WHERE storage_url = $1 AND user_id = $2
+			`, mediaURL, userID).Scan(&mediaID, &storageURL, &fileType, &fileSize, &scanStatus)
+		}
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				RespondError(c, http.StatusNotFound, "Media file not found")
+			} else {
+				RespondError(c, http.StatusInternalServerError, "Failed to validate media file")
+			}
+			return
+		}
+		if scanStatus != models.MediaScanStatusClean {
+			RespondError(c, http.StatusLocked, "Media file is not available until security scanning completes")
+			return
+		}
+		mediaSize := int(fileSize)
+		req.MediaFileID = &mediaID
+		req.MediaURL = &storageURL
+		req.MediaType = &fileType
+		req.MediaSize = &mediaSize
+	}
+
 	// Create message
 	message := &models.Message{
 		ConversationID:           req.ConversationID,
@@ -824,13 +872,17 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	if effectiveReplyTo != nil && message.ThreadRoot != nil && *message.ThreadRoot > 0 && h.notifService != nil {
-		go h.notifService.NotifyThreadReply(
-			context.Background(),
-			req.ConversationID,
-			*message.ThreadRoot,
-			message.ID,
-			message.SenderID,
-		)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			h.notifService.NotifyThreadReply(
+				ctx,
+				req.ConversationID,
+				*message.ThreadRoot,
+				message.ID,
+				message.SenderID,
+			)
+		}()
 	}
 
 	// Update conversation's last_message_at timestamp and re-add users if deleted
@@ -1673,7 +1725,11 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 				}
 			}
 			if h.notifService != nil {
-				go h.notifService.NotifyMessageEdited(context.Background(), messageID, conversationID, userID, participantIDs)
+				go func() {
+					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+					h.notifService.NotifyMessageEdited(ctx, messageID, conversationID, userID, participantIDs)
+				}()
 			}
 		}
 	}

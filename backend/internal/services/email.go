@@ -60,21 +60,6 @@ type EmailServiceConfig struct {
 	FrontendURL    string
 }
 
-// NewEmailService creates a new email service with the given configuration.
-// For backward compatibility with existing call sites the original 6-parameter
-// signature is preserved via NewEmailServiceLegacy.
-func NewEmailService(host, port, user, password, fromAddress, fromName string) *EmailService {
-	return &EmailService{
-		smtpHost:     host,
-		smtpPort:     port,
-		smtpUser:     user,
-		smtpPassword: password,
-		fromAddress:  fromAddress,
-		fromName:     fromName,
-		cb:           NewCircuitBreaker("email", 5, 60*time.Second),
-	}
-}
-
 // NewEmailServiceFull creates an EmailService with full provider configuration.
 func NewEmailServiceFull(cfg EmailServiceConfig) *EmailService {
 	return &EmailService{
@@ -182,7 +167,7 @@ func (s *EmailService) sendViaSendGrid(to []string, subject, body, htmlBody stri
 
 	// SendGrid returns 202 Accepted on success.
 	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 		return fmt.Errorf("email: sendgrid error (status %d): %s", resp.StatusCode, string(respBody))
 	}
 
@@ -227,7 +212,7 @@ func (s *EmailService) sendViaMailgunAPI(to []string, subject, body, htmlBody st
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 		return fmt.Errorf("email: mailgun error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 

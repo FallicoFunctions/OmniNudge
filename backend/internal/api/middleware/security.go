@@ -83,31 +83,6 @@ func SecurityHeaders() gin.HandlerFunc {
 	}
 }
 
-// SanitizeInput sanitizes user input to prevent XSS attacks
-// This is a basic implementation - for production, use a library like bluemonday
-func SanitizeInput(input string) string {
-	// Remove common XSS patterns
-	replacements := map[string]string{
-		"<script":     "&lt;script",
-		"</script>":   "&lt;/script&gt;",
-		"javascript:": "",
-		"onerror=":    "",
-		"onload=":     "",
-		"onclick=":    "",
-		"<iframe":     "&lt;iframe",
-		"</iframe>":   "&lt;/iframe&gt;",
-	}
-
-	sanitized := input
-	for pattern, replacement := range replacements {
-		sanitized = strings.ReplaceAll(sanitized, pattern, replacement)
-		// Also check uppercase variants
-		sanitized = strings.ReplaceAll(sanitized, strings.ToUpper(pattern), replacement)
-	}
-
-	return sanitized
-}
-
 // ValidateMIMEType checks if a file's MIME type is allowed
 func ValidateMIMEType(mimeType string, allowedTypes []string) bool {
 	mimeType = normalizeMIMEType(mimeType)

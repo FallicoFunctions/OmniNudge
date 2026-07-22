@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -21,10 +22,8 @@ type FrontendLogEntry struct {
 	Level     string                 `json:"level"`
 	Message   string                 `json:"message"`
 	Context   map[string]interface{} `json:"context"`
-	UserID    string                 `json:"user_id"`
 	SessionID string                 `json:"session_id"`
 	PageURL   string                 `json:"page_url"`
-	UserAgent string                 `json:"user_agent"`
 }
 
 // ipLogLimiterEntry pairs a per-IP rate limiter with the last access time.
@@ -143,13 +142,32 @@ func (h *LogHandler) HandleFrontendLogs(c *gin.Context) {
 		entry.Message = entry.Message[:2048]
 	}
 
-	// BUG-5: Sanitize PageURL — strip newlines and control characters to prevent log injection.
+	// Strip query parameters and fragments because authentication/reset tokens and
+	// other sensitive values can appear there. Logs only need the route path.
 	pageURL := strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f {
 			return -1
 		}
 		return r
 	}, entry.PageURL)
+	if parsed, err := url.Parse(pageURL); err == nil {
+		parsed.RawQuery = ""
+		parsed.Fragment = ""
+		parsed.RawFragment = ""
+		pageURL = parsed.String()
+	} else {
+		pageURL = ""
+	}
+	if len(pageURL) > 2048 {
+		pageURL = pageURL[:2048]
+	}
+
+	var authenticatedUserID interface{}
+	if userID, exists := c.Get("user_id"); exists {
+		if uid, ok := userID.(int); ok && uid > 0 {
+			authenticatedUserID = uid
+		}
+	}
 
 	// Create structured log entry (JSON format for ELK stack)
 	logData := map[string]interface{}{
@@ -157,10 +175,10 @@ func (h *LogHandler) HandleFrontendLogs(c *gin.Context) {
 		"level":      entry.Level,
 		"message":    entry.Message,
 		"source":     "frontend",
-		"user_id":    entry.UserID,
+		"user_id":    authenticatedUserID,
 		"session_id": entry.SessionID,
 		"page_url":   pageURL,
-		"user_agent": entry.UserAgent,
+		"user_agent": c.Request.UserAgent(),
 	}
 
 	// BUG-2: Namespace client context under "context" key with size cap.
@@ -199,7 +217,7 @@ func (h *LogHandler) HandleFrontendLogs(c *gin.Context) {
 			Name:       services.EventErrorOccurred,
 			UserID:     nil, // We could parse entry.UserID if it's an int
 			Properties: logData,
-			UserAgent:  entry.UserAgent,
+			UserAgent:  c.Request.UserAgent(),
 		}
 		// Try to parse SessionID
 		if sid, err := uuid.Parse(entry.SessionID); err == nil {

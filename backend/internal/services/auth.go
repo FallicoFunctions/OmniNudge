@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -50,19 +52,22 @@ func (s *AuthService) SetSessionService(sessions *AuthSessionService) {
 }
 
 // VerifyTurnstileToken verifies a Cloudflare Turnstile token
-func (s *AuthService) VerifyTurnstileToken(token, remoteIP string) error {
+func (s *AuthService) VerifyTurnstileToken(ctx context.Context, token, remoteIP string) error {
 	if s.turnstileSecret == "" {
 		// Skip verification if no secret is configured (for development)
 		return nil
 	}
 
 	// Prepare request to Cloudflare API
-	data := fmt.Sprintf("secret=%s&response=%s", s.turnstileSecret, token)
+	data := url.Values{
+		"secret":   {s.turnstileSecret},
+		"response": {token},
+	}
 	if remoteIP != "" {
-		data += fmt.Sprintf("&remoteip=%s", remoteIP)
+		data.Set("remoteip", remoteIP)
 	}
 
-	req, err := http.NewRequest("POST", "https://challenges.cloudflare.com/turnstile/v0/siteverify", strings.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://challenges.cloudflare.com/turnstile/v0/siteverify", strings.NewReader(data.Encode()))
 	if err != nil {
 		return fmt.Errorf("failed to create turnstile verification request: %w", err)
 	}
@@ -75,10 +80,13 @@ func (s *AuthService) VerifyTurnstileToken(token, remoteIP string) error {
 		return fmt.Errorf("failed to verify turnstile token: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("turnstile verification returned status %d", resp.StatusCode)
+	}
 
 	// Parse response
 	var turnstileResp TurnstileResponse
-	if err := json.NewDecoder(resp.Body).Decode(&turnstileResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&turnstileResp); err != nil {
 		return fmt.Errorf("failed to decode turnstile response: %w", err)
 	}
 
@@ -227,6 +235,36 @@ type LoginRequest struct {
 	KeepLoggedIn bool   `json:"keep_logged_in"`
 }
 
+// RestorePendingDeletionAfterAuthentication restores an account that is still
+// inside its deletion grace period after the user has proven ownership. It is
+// shared by password and OAuth authentication so OAuth-only accounts cannot be
+// stranded in an unrecoverable state.
+func RestorePendingDeletionAfterAuthentication(ctx context.Context, userRepo ports.UserRepository, user *models.User) error {
+	if user == nil || user.Banned || user.Deleted {
+		return errors.New("account unavailable")
+	}
+	if user.DeletedAt == nil {
+		return nil
+	}
+	if user.PermanentDeletionAt != nil && !time.Now().Before(*user.PermanentDeletionAt) {
+		return errors.New("account unavailable")
+	}
+	restorer, ok := userRepo.(interface {
+		CancelPendingDeletion(context.Context, int) (int, error)
+	})
+	if !ok {
+		return errors.New("account recovery unavailable")
+	}
+	newVersion, err := restorer.CancelPendingDeletion(ctx, user.ID)
+	if err != nil {
+		return fmt.Errorf("restore pending deletion: %w", err)
+	}
+	user.DeletedAt = nil
+	user.PermanentDeletionAt = nil
+	user.TokenVersion = newVersion
+	return nil
+}
+
 // Register creates a new user with username/password
 func (s *AuthService) Register(ctx context.Context, userRepo ports.UserRepository, req *RegisterRequest) (*models.User, string, error) {
 	username := strings.TrimSpace(req.Username)
@@ -257,7 +295,7 @@ func (s *AuthService) Register(ctx context.Context, userRepo ports.UserRepositor
 	}
 
 	// Verify Turnstile captcha token
-	if err := s.VerifyTurnstileToken(req.TurnstileToken, ""); err != nil {
+	if err := s.VerifyTurnstileToken(ctx, req.TurnstileToken, ""); err != nil {
 		return nil, "", fmt.Errorf("captcha verification failed: %w", err)
 	}
 
@@ -323,6 +361,15 @@ func (s *AuthService) Login(ctx context.Context, userRepo ports.UserRepository, 
 	// Check password
 	if err := utils.CheckPassword(user.PasswordHash, req.Password); err != nil {
 		log.Printf("Login failed: password mismatch for user_id=%d username=%q", user.ID, user.Username)
+		return nil, "", errors.New("invalid username or password")
+	}
+
+	// A pending-deletion account cannot use ordinary authenticated routes, so a
+	// successful password login is the recovery action promised to the user.
+	// Restore it atomically before creating any session. Expired grace periods
+	// remain inaccessible and are handled by retention.
+	if restoreErr := RestorePendingDeletionAfterAuthentication(ctx, userRepo, user); restoreErr != nil {
+		log.Printf("Login recovery failed for user_id=%d: %v", user.ID, restoreErr)
 		return nil, "", errors.New("invalid username or password")
 	}
 

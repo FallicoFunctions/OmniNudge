@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/omninudge/backend/internal/ports"
 	"html"
 	"io"
 	"log"
@@ -38,6 +38,12 @@ var proxyHTTPClient = &http.Client{
 		ResponseHeaderTimeout: 30 * time.Second,
 		MaxIdleConns:          10,
 		IdleConnTimeout:       90 * time.Second,
+	},
+	// The host is allowlisted below, but redirects are a separate request and
+	// could otherwise turn this endpoint into an SSRF primitive. Return the
+	// redirect response to the handler so it can reject it without following.
+	CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
 	},
 }
 
@@ -110,6 +116,10 @@ func (h *RedditHandler) ProxyRedditMedia(c *gin.Context) {
 		return
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= http.StatusMultipleChoices && resp.StatusCode < http.StatusBadRequest {
+		RespondError(c, http.StatusBadGateway, "upstream redirects are not allowed")
+		return
+	}
 
 	for _, header := range []string{
 		"Content-Type",
@@ -831,7 +841,7 @@ func (h *RedditHandler) GetSubredditMedia(c *gin.Context) {
 				"permalink":   "https://reddit.com" + post.Permalink,
 				"score":       post.Score,
 				"created_utc": post.CreatedUTC,
-				"over18":     post.Over18,
+				"over18":      post.Over18,
 			})
 
 			// Stop when we have enough media posts
@@ -1053,7 +1063,7 @@ func (h *RedditHandler) GetSubredditWikiPage(c *gin.Context) {
 		pagePath = "index"
 	}
 
-	ctx := context.Background()
+	ctx := c.Request.Context()
 	wikiPage, err := h.redditClient.GetSubredditWikiPage(ctx, subreddit, pagePath, revision)
 	if err != nil {
 		if errors.Is(err, services.ErrRedditNotFound) {
@@ -1105,7 +1115,7 @@ func (h *RedditHandler) CompareSubredditWikiRevisions(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx := c.Request.Context()
 	fromData, err := h.redditClient.GetSubredditWikiPage(ctx, subreddit, pagePath, fromRevision)
 	if err != nil {
 		if errors.Is(err, services.ErrRedditNotFound) {
@@ -1153,7 +1163,7 @@ func (h *RedditHandler) GetWikiPage(c *gin.Context) {
 		pagePath = "index"
 	}
 
-	ctx := context.Background()
+	ctx := c.Request.Context()
 	wikiPage, err := h.redditClient.GetWikiPage(ctx, pagePath)
 	if err != nil {
 		if errors.Is(err, services.ErrRedditNotFound) {

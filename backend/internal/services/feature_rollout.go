@@ -1,67 +1,9 @@
 package services
 
 import (
-	"context"
 	"crypto/md5"
 	"encoding/binary"
 )
-
-// RolloutService handles gradual feature rollout logic
-type RolloutService struct {
-	featureFlags *FeatureFlagService
-}
-
-func NewRolloutService(featureFlags *FeatureFlagService) *RolloutService {
-	return &RolloutService{
-		featureFlags: featureFlags,
-	}
-}
-
-// IsFeatureEnabledForUser determines if a feature is enabled for a specific user
-// Uses consistent hashing to ensure same user always gets same result
-func (s *RolloutService) IsFeatureEnabledForUser(ctx context.Context, featureKey string, userID int) (bool, error) {
-	// Check if user has an override first
-	uid := int64(userID)
-	enabled, err := s.featureFlags.IsEnabled(ctx, featureKey, &uid)
-	if err != nil {
-		return false, err
-	}
-
-	// If feature is globally disabled, respect that
-	flag, err := s.featureFlags.GetFeatureFlag(ctx, featureKey)
-	if err != nil {
-		return false, nil // Default to disabled if flag doesn't exist
-	}
-
-	if !flag.Enabled {
-		return false, nil
-	}
-
-	// Prefer first-class percentage rollout field.
-	if flag.Percentage != nil {
-		// Use consistent hashing to determine if user is in rollout group
-		userHash := hashUserID(userID, featureKey)
-		userPercentile := userHash % 100
-
-		if userPercentile < uint32(*flag.Percentage) {
-			return true, nil
-		}
-		return false, nil
-	}
-
-	// Backward compatibility for legacy metadata-based rollout.
-	if rolloutPct, ok := flag.Metadata["rollout_percentage"].(float64); ok {
-		userHash := hashUserID(userID, featureKey)
-		userPercentile := userHash % 100
-		if float64(userPercentile) < rolloutPct {
-			return true, nil
-		}
-		return false, nil
-	}
-
-	// No rollout percentage set, return global flag state
-	return enabled, nil
-}
 
 // hashUserID creates a consistent hash for a user+feature combination
 // Same user will always get same hash for same feature

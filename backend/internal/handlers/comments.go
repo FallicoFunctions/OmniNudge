@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -145,9 +146,11 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 	// Trigger notification for comment reply if parent exists and service is available
 	if h.notifService != nil && req.ParentCommentID != nil {
 		go func() {
-			parentComment, err := h.commentRepo.GetByID(c.Request.Context(), *req.ParentCommentID)
+			notifyCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			parentComment, err := h.commentRepo.GetByID(notifyCtx, *req.ParentCommentID)
 			if err == nil && parentComment != nil {
-				_ = h.notifService.NotifyCommentReply(c.Request.Context(), comment.ID, parentComment.UserID, userID)
+				_ = h.notifService.NotifyCommentReply(notifyCtx, comment.ID, parentComment.UserID, userID)
 			}
 		}()
 	}
@@ -494,8 +497,8 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 }
 
 func (h *CommentsHandler) sendCommentDeletionModMail(comment *models.PostComment, post *models.PlatformPost, moderatorID int, reason string, moderatorRole string) {
-	// This runs in a goroutine, so we need a background context
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	// Get the hub
 	if post.HubID == nil {
@@ -723,7 +726,9 @@ func (h *CommentsHandler) VoteComment(c *gin.Context) {
 	// Trigger notification check if this was an upvote and service is available
 	if h.notifService != nil && req.IsUpvote != nil && *req.IsUpvote {
 		go func() {
-			_ = h.notifService.CheckAndNotifyVote(c.Request.Context(), "comment", commentID, comment.UserID, comment.Upvotes)
+			notifyCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_ = h.notifService.CheckAndNotifyVote(notifyCtx, "comment", commentID, comment.UserID, comment.Upvotes)
 		}()
 	}
 

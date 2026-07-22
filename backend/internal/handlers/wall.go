@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -139,11 +140,11 @@ func resolveWallPostPermission(profileUserID, viewerID int, isFriend bool, wallP
 // WallPostsResponse is returned by GetWallPosts.
 type WallPostsResponse struct {
 	Posts        []*models.WallPost `json:"posts"`
-	CanPost      bool                `json:"can_post"`
-	FriendCount  int                 `json:"friend_count"`
-	OwnPostCount int                 `json:"own_post_count"`
-	ReplyCount   int                 `json:"reply_count"`
-	PhotoCount   int                 `json:"photo_count"`
+	CanPost      bool               `json:"can_post"`
+	FriendCount  int                `json:"friend_count"`
+	OwnPostCount int                `json:"own_post_count"`
+	ReplyCount   int                `json:"reply_count"`
+	PhotoCount   int                `json:"photo_count"`
 }
 
 // GetWallPosts returns recent posts on a user's profile wall.
@@ -328,11 +329,15 @@ func (h *WallHandler) CreateWallPost(c *gin.Context) {
 	}
 
 	if h.notifService != nil {
-		if post.Status == "pending" {
-			go h.notifService.NotifyWallPostPending(context.Background(), user.ID, authorID, post.ID, post.AuthorUsername)
-		} else {
-			go h.notifService.NotifyWallPost(context.Background(), user.ID, authorID, post.ID, post.AuthorUsername)
-		}
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if post.Status == "pending" {
+				h.notifService.NotifyWallPostPending(ctx, user.ID, authorID, post.ID, post.AuthorUsername)
+			} else {
+				h.notifService.NotifyWallPost(ctx, user.ID, authorID, post.ID, post.AuthorUsername)
+			}
+		}()
 	}
 
 	c.JSON(http.StatusCreated, post)
@@ -459,7 +464,11 @@ func (h *WallHandler) SetWallPostReaction(c *gin.Context) {
 		if err == nil && actor != nil {
 			username = actor.Username
 		}
-		go h.notifService.NotifyWallLike(context.Background(), post.AuthorID, userID, post.ID, username)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			h.notifService.NotifyWallLike(ctx, post.AuthorID, userID, post.ID, username)
+		}()
 	}
 
 	c.JSON(http.StatusOK, WallPostReactionResponse{Liked: liked, Disliked: disliked, LikeCount: likeCount, DislikeCount: dislikeCount})
@@ -597,7 +606,11 @@ func (h *WallHandler) CreateWallPostComment(c *gin.Context) {
 	}
 
 	if h.notifService != nil {
-		go h.notifService.NotifyWallComment(context.Background(), post.AuthorID, userID, post.ID, comment.AuthorUsername)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			h.notifService.NotifyWallComment(ctx, post.AuthorID, userID, post.ID, comment.AuthorUsername)
+		}()
 	}
 
 	c.JSON(http.StatusCreated, comment)
@@ -830,7 +843,11 @@ func (h *WallHandler) ApproveWallPost(c *gin.Context) {
 	}
 
 	if h.notifService != nil {
-		go h.notifService.NotifyWallPostApproved(context.Background(), post.AuthorID, post.ProfileUserID, post.ID, post.AuthorUsername)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			h.notifService.NotifyWallPostApproved(ctx, post.AuthorID, post.ProfileUserID, post.ID, post.AuthorUsername)
+		}()
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Wall post approved"})

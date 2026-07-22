@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/api/middleware"
 	"fmt"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strconv"
 	"time"
@@ -757,7 +757,7 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 // @Failure      401  {object}  gin.H
 // @Failure      403  {object}  gin.H
 // @Failure      500  {object}  gin.H
-// @Router       /conversations/{id}/settings [get]
+// @Router       /groups/{id}/settings [get]
 func (h *GroupHandler) GetGroupSettings(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -803,7 +803,7 @@ func (h *GroupHandler) GetGroupSettings(c *gin.Context) {
 // @Failure      401  {object}  gin.H
 // @Failure      403  {object}  gin.H
 // @Failure      500  {object}  gin.H
-// @Router       /conversations/{id}/settings [patch]
+// @Router       /groups/{id}/settings [put]
 func (h *GroupHandler) UpdateGroupSettings(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {

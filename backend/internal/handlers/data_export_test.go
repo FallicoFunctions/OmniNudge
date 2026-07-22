@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,12 +22,22 @@ import (
 
 var dataExportTestCounter int64
 
+type stubDataExportQueue struct {
+	payloads []queue.DataExportPayload
+	err      error
+}
+
+func (s *stubDataExportQueue) EnqueueDataExport(_ context.Context, payload queue.DataExportPayload) error {
+	s.payloads = append(s.payloads, payload)
+	return s.err
+}
+
 func uniqueDataExportUsername(base string) string {
 	id := atomic.AddInt64(&dataExportTestCounter, 1)
 	return fmt.Sprintf("%s_dexport_%d_%d", base, time.Now().UnixNano(), id)
 }
 
-func setupDataExportHandlerTest(t *testing.T) (*DataExportHandler, *database.Database, int, func()) {
+func setupDataExportHandlerTest(t *testing.T) (*DataExportHandler, *database.Database, int, *stubDataExportQueue) {
 	t.Helper()
 	db, err := database.NewTest()
 	require.NoError(t, err)
@@ -47,10 +58,10 @@ func setupDataExportHandlerTest(t *testing.T) (*DataExportHandler, *database.Dat
 	}
 	require.NoError(t, userRepo.Create(ctx, user))
 
-	// nil queue — skips enqueue step; export is still inserted as pending.
-	handler := NewDataExportHandler(db.Pool, nil, nil, "test-master-key-32-chars-padded!!")
+	queueStub := &stubDataExportQueue{}
+	handler := NewDataExportHandler(db.Pool, queueStub, nil, "test-master-key-32-chars-padded!!")
 
-	return handler, db, user.ID, func() {}
+	return handler, db, user.ID, queueStub
 }
 
 func TestRequestDataExport_Success(t *testing.T) {
@@ -70,11 +81,61 @@ func TestRequestDataExport_Success(t *testing.T) {
 
 	handler.RequestDataExport(c)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusAccepted, w.Code)
 	var resp map[string]interface{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.NotEmpty(t, resp["export_id"])
 	assert.Equal(t, "pending", resp["status"])
+}
+
+func TestRequestDataExport_RejectsUnsupportedDataType(t *testing.T) {
+	handler, _, userID, _ := setupDataExportHandlerTest(t)
+	body, _ := json.Marshal(map[string]interface{}{
+		"password":   "TestPassword123!",
+		"data_types": []string{"profile", "../../secrets"},
+	})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/account/export", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user_id", userID)
+
+	handler.RequestDataExport(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestRequestDataExport_RejectsConcurrentRequest(t *testing.T) {
+	handler, _, userID, _ := setupDataExportHandlerTest(t)
+	body, _ := json.Marshal(map[string]interface{}{
+		"password":   "TestPassword123!",
+		"data_types": []string{"profile"},
+	})
+
+	for attempt, expected := range []int{http.StatusAccepted, http.StatusTooManyRequests} {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPost, "/account/export", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set("user_id", userID)
+		handler.RequestDataExport(c)
+		assert.Equal(t, expected, w.Code, "attempt %d", attempt+1)
+	}
+}
+
+func TestRequestDataExport_FailsClosedWithoutQueue(t *testing.T) {
+	handler, _, userID, _ := setupDataExportHandlerTest(t)
+	handler.queue = nil
+	body, _ := json.Marshal(map[string]interface{}{"password": "TestPassword123!"})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/account/export", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user_id", userID)
+
+	handler.RequestDataExport(c)
+
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 }
 
 func TestRequestDataExport_WrongPassword(t *testing.T) {
