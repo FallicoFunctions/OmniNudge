@@ -6,7 +6,10 @@ reference with a matched runtime capture and a short delta note, per
 `docs/guides/omnirave-venue-playtest-checklist.md`.
 
 Runtime captures were taken from the live scene (WebGL path — WebGPU canvases
-return blank `toDataURL`; the venue is visually identical on both). Shots
+return blank `toDataURL`). Note: the WebGL path renders slightly richer than
+WebGPU — it keeps the rim/fill shaping lights and the key-light shadow map
+that the WebGPU path drops for its light-buffer budget — so in-engine WebGPU
+will look a touch flatter than these captures. Shots
 01–06 use the exact authored HUD checkpoint framings — the same views a player
 gets from the playtest HUD — so every capture is reproducible in-engine.
 07–08 are custom wide framings matched to the concept angles.
@@ -25,7 +28,7 @@ byte-identical to `vip-view`. The pack carries the three unique references.
 | Side routes / Cascade Court | `approved-concept-vip-view.png` (flank context) | `runtime-03-cascade-court.png` | Tiered cascade with moving water sheets, planting, lanterns in both flank pockets. Concept's flame towers do not exist; the cascades are the built replacement for the flank interest. |
 | Crowd pit / stage face | `approved-concept-primary.png` | `runtime-04-crowd-pit.png`, `runtime-07-stage-front-wide.png` | Hero LED panels beat-pulse with uv drift, spill lights crossfade magenta↔cyan, side LED tile fields alternate on half-beats. Concept shows a dense crowd and mid-air fireworks: **crowd NPCs are post-approval scope** (avatars/multiplayer milestone) and fireworks fire at route completion, not ambiently. |
 | Basin edge | *(checklist area)* | `runtime-05-basin-edge.png` | Reflecting water with motion; coping collision keeps players out of the wade-in seam. |
-| VIP read | `approved-concept-vip-view.png` | `runtime-06-vip-terrace.png`, `runtime-08-elevated-vip-wide.png` | **FLAGGED:** the VIP Terrace checkpoint view reads nearly unlit — the player lands under the terrace overhang in deep shadow with no gold/practical warmth in frame. Concept sells the VIP area as the warmest, most gilded read in the venue. Needs a lighting/framing pass before approval sign-off. |
+| VIP read | `approved-concept-vip-view.png` | `runtime-06-vip-terrace.png`, `runtime-08-elevated-vip-wide.png` | **Fixed after the first pass flagged it dark.** Root cause: the authored VIP deck/ramp collision had unapplied transforms (collapsed to origin), so the checkpoint spawned the player mid-air and dropped them onto unlit ground. Now: the checkpoint lands on the ground forecourt, three warm gold lanterns per flank light it (via the practical-pool system), and the wing's gold sail canopy catches the lantern light overhead. The elevated terrace itself is view-only this milestone (its authored access ramp predates the basin layout and dead-ends inside a water blocker). |
 
 ## Known deltas held over (not blockers unless the user says so)
 
