@@ -15,9 +15,15 @@ interface CollisionBlockerSpec {
 }
 
 const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
-  { name: 'main-stage-blocker-left-envelope', x: -64, y: 3, z: -20, width: 4, height: 6, depth: 82 },
-  { name: 'main-stage-blocker-right-envelope', x: 64, y: 3, z: -20, width: 4, height: 6, depth: 82 },
-  { name: 'main-stage-blocker-back-envelope', x: 0, y: 3, z: -60, width: 124, height: 6, depth: 4 },
+  // Envelope fence. The back edge sits at z -90, past the spawn gate
+  // sentinels (z -82), so the player can leave the approach deck and walk
+  // the promenade over the paver field (deck's back edge is z -57; the old
+  // fence at z -60 walled it off, player-flagged). Ground collision
+  // (COL_Ground) ends at z -95, so the fence stays just inside it, and the
+  // sides extend to meet the back fence corner-to-corner.
+  { name: 'main-stage-blocker-left-envelope', x: -64, y: 3, z: -34.5, width: 4, height: 6, depth: 111 },
+  { name: 'main-stage-blocker-right-envelope', x: 64, y: 3, z: -34.5, width: 4, height: 6, depth: 111 },
+  { name: 'main-stage-blocker-back-envelope', x: 0, y: 3, z: -90, width: 132, height: 6, depth: 4 },
   { name: 'main-stage-blocker-front-stage', x: 0, y: 5, z: 14, width: 78, height: 10, depth: 4 },
   { name: 'main-stage-blocker-cascade-court-left', x: -49, y: 3, z: -28.5, width: 36, height: 6, depth: 23 },
   { name: 'main-stage-blocker-cascade-court-right', x: 49, y: 3, z: -28.5, width: 36, height: 6, depth: 23 },
