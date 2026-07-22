@@ -14,7 +14,7 @@ import '@babylonjs/core/Shaders/shadowMap.vertex.js';
 
 import type { PerfFlags } from '../app/perfFlags';
 
-const PERF_DEFAULTS: PerfFlags = { noShadows: false, noPost: false, minimalLights: false, webgpu: false, webgl: false, debug: false };
+const PERF_DEFAULTS: PerfFlags = { noShadows: false, noPost: false, minimalLights: false, webgpu: false, webgl: false, debug: false, worldUrl: null, worldToken: null };
 
 export function createLightingRig(scene: Scene, perfFlags: PerfFlags = PERF_DEFAULTS) {
   const hemi = new HemisphericLight('main-stage-hemi-light', new Vector3(0, 1, 0), scene);

@@ -40,12 +40,12 @@ func TestWSHandler_JoinAndMoveUpdatesActiveZone(t *testing.T) {
 		"moveTo": map[string]float64{
 			"x": 42,
 			"y": 0,
-			"z": 9,
+			"z": 40,
 		},
 	}))
 
 	var second map[string]any
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 60; i++ {
 		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 		require.NoError(t, conn.ReadJSON(&second))
 		require.Equal(t, "world_snapshot", second["type"])
@@ -57,7 +57,7 @@ func TestWSHandler_JoinAndMoveUpdatesActiveZone(t *testing.T) {
 			"moveTo": map[string]float64{
 				"x": 42,
 				"y": 0,
-				"z": 9,
+				"z": 40,
 			},
 		}))
 	}
@@ -94,12 +94,12 @@ func TestWSHandler_BroadcastsPlayerMovementToOtherConnections(t *testing.T) {
 		"moveTo": map[string]float64{
 			"x": 42,
 			"y": 0,
-			"z": 9,
+			"z": 40,
 		},
 	}))
 
 	var secondSnapshot map[string]any
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 60; i++ {
 		_ = secondConn.SetReadDeadline(time.Now().Add(750 * time.Millisecond))
 		require.NoError(t, secondConn.ReadJSON(&secondSnapshot))
 		require.Equal(t, "world_snapshot", secondSnapshot["type"])
@@ -111,7 +111,7 @@ func TestWSHandler_BroadcastsPlayerMovementToOtherConnections(t *testing.T) {
 			"moveTo": map[string]float64{
 				"x": 42,
 				"y": 0,
-				"z": 9,
+				"z": 40,
 			},
 		}))
 	}
@@ -182,12 +182,12 @@ func TestWSHandler_RespawnEventRebroadcastsSnapshot(t *testing.T) {
 		"moveTo": map[string]float64{
 			"x": 44,
 			"y": 0,
-			"z": 9,
+			"z": 40,
 		},
 	}))
 
 	var moved map[string]any
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 60; i++ {
 		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 		require.NoError(t, conn.ReadJSON(&moved))
 		require.Equal(t, "world_snapshot", moved["type"])
@@ -199,7 +199,7 @@ func TestWSHandler_RespawnEventRebroadcastsSnapshot(t *testing.T) {
 			"moveTo": map[string]float64{
 				"x": 44,
 				"y": 0,
-				"z": 9,
+				"z": 40,
 			},
 		}))
 	}
@@ -225,7 +225,7 @@ func TestWSHandler_RespawnEventRebroadcastsSnapshot(t *testing.T) {
 	position, ok := player["position"].(map[string]any)
 	require.True(t, ok)
 	require.Equal(t, 42.0, position["x"])
-	require.Equal(t, 9.0, position["z"])
+	require.Equal(t, 36.0, position["z"])
 }
 
 func TestWSHandler_BroadcastsDisconnectToOtherConnections(t *testing.T) {
@@ -346,7 +346,7 @@ func TestWSHandler_IgnoresForgedQueryIdentityAndRestoresOnlyServerApprovedState(
 	testServer := httptest.NewServer(New(worldState, mediaState, authService, []string{"https://play.omninudge.com"}))
 	defer testServer.Close()
 
-	returnPoint := &omnigamemodel.SavedPoint{X: 42, Y: 0, Z: 9}
+	returnPoint := &omnigamemodel.SavedPoint{X: 42, Y: 0, Z: 40}
 	token := newGuestWorldSessionToken(t, authService, "guest-authoritative", "Guest-Authoritative", returnPoint)
 	forged := "&player_id=forged-player&player_name=ForgedName&mode=account&return_x=-40&return_y=0&return_z=10"
 	conn, _, err := websocket.DefaultDialer.Dial(buildWorldWSURL(testServer.URL, token, forged), worldDialHeader("https://play.omninudge.com"))
@@ -367,7 +367,7 @@ func TestWSHandler_IgnoresForgedQueryIdentityAndRestoresOnlyServerApprovedState(
 	require.Equal(t, "guest-authoritative", player["id"])
 	position := player["position"].(map[string]any)
 	require.Equal(t, 42.0, position["x"])
-	require.Equal(t, 9.0, position["z"])
+	require.Equal(t, 40.0, position["z"])
 
 	require.NoError(t, conn.WriteJSON(map[string]any{
 		"type": "chat",
