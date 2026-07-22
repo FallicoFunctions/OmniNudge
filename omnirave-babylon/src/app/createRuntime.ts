@@ -21,6 +21,7 @@ import {
 } from './adaptiveResolutionMath';
 import type { createMainStageScene } from '../scene/createMainStageScene';
 import { resolveTravelCameraOffsets, TRAVEL_CAMERA_DISTANCE } from '../player/cameraRigMath';
+import { BACK_PLAZA_SPAWN } from '../scene/reviewRouteData';
 import type { ReviewCheckpoint } from '../scene/reviewRouteData';
 import { createDebugPanel } from '../ui/createDebugPanel';
 import { createPerfOverlay, updatePerfOverlay } from '../ui/createPerfOverlay';
@@ -186,11 +187,32 @@ export async function createRuntime(host: HTMLElement) {
           });
         });
       },
+      onRestartRoute() {
+        reviewRuntime?.completionCelebration?.stop();
+        reviewRuntime?.routeProgress?.reset(0);
+        reviewRuntime?.playerRig?.root.position.set(
+          BACK_PLAZA_SPAWN.x,
+          BACK_PLAZA_SPAWN.y,
+          BACK_PLAZA_SPAWN.z,
+        );
+        // Same standard follow framing as a checkpoint fast-travel, facing
+        // the default north-facing direction (no authored view to derive from).
+        const travelView = resolveTravelCameraOffsets(undefined);
+        scene.onAfterRenderObservable.addOnce(() => {
+          reviewRuntime?.cameraRig?.applyCheckpointView({
+            alpha: 0,
+            beta: 1.12,
+            radius: TRAVEL_CAMERA_DISTANCE,
+            ...travelView,
+          });
+        });
+      },
     });
     hud = reviewHud;
     perfOverlay = createPerfOverlay(host);
     debugPanel = createDebugPanel(host);
     const objectiveReadout = reviewHud.querySelector<HTMLOutputElement>('[data-review-objective]');
+    const completeBanner = reviewHud.querySelector<HTMLElement>('[data-review-complete]');
     const pickReadout = debugPanel.querySelector<HTMLOutputElement>('[data-debug-readout="mesh-pick"]');
     const playerReadout = debugPanel.querySelector<HTMLOutputElement>('[data-debug-readout="player-state"]');
 
@@ -257,6 +279,9 @@ export async function createRuntime(host: HTMLElement) {
           : `Objective: reach ${formatCheckpointLabel(routeProgress.activeCheckpoint.id)} (${routeProgress.completedCount}/${routeProgress.totalCount})`;
         objectiveReadout.value = objectiveText;
         objectiveReadout.textContent = objectiveText;
+        if (completeBanner) {
+          completeBanner.hidden = !routeProgress.complete;
+        }
         for (const button of Array.from(reviewHud.querySelectorAll<HTMLButtonElement>('[data-review-checkpoint]'))) {
           const routeIndex = reviewCheckpoints?.findIndex((checkpoint) => checkpoint.id === button.dataset.reviewCheckpoint) ?? -1;
           if (routeIndex < 0 || routeIndex >= routeProgress.totalCount) {

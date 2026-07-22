@@ -464,4 +464,33 @@ describe('createMainStageScene', () => {
     expect(intersectsMesh).toHaveBeenCalledTimes(4);
     expect(rayInstances.size).toBe(1);
   });
+
+  it('starts the completion celebration when the route finishes, and stops it on reset', async () => {
+    engine = new NullEngine();
+    const { createMainStageScene } = await loadCreateMainStageScene();
+
+    const scene = await createMainStageScene(engine);
+    const runtime = scene.metadata?.reviewRuntime;
+    expect(runtime).toBeDefined();
+    expect(runtime!.completionCelebration).toBeDefined();
+    expect(runtime!.completionCelebration.active).toBe(false);
+
+    // Drive the route straight to completion without walking it: reset()
+    // marks every checkpoint captured, so the next step()'s false->true
+    // transition fires the celebration exactly as reaching the final
+    // checkpoint would.
+    runtime!.routeProgress.reset(runtime!.routeProgress.totalCount);
+    scene.render();
+
+    expect(runtime!.routeProgress.complete).toBe(true);
+    expect(runtime!.completionCelebration.active).toBe(true);
+
+    // Resetting back into the route (fast travel / Play Again) is the
+    // true->false transition: the finale must stop and re-arm.
+    runtime!.routeProgress.reset(0);
+    scene.render();
+
+    expect(runtime!.routeProgress.complete).toBe(false);
+    expect(runtime!.completionCelebration.active).toBe(false);
+  });
 });

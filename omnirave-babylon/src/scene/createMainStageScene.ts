@@ -4,6 +4,7 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import type { AbstractEngine } from '@babylonjs/core/Engines/abstractEngine';
 
+import { createCompletionCelebration } from '../game/createCompletionCelebration';
 import { createMainStageRouteProgress } from '../game/mainStageRouteProgress';
 import { applyAvatarColorway, USER_AVATAR_COLORWAYS } from '../player/avatarColorways';
 import { createFollowCameraRig } from '../player/createFollowCameraRig';
@@ -14,6 +15,7 @@ import { createReviewAvatar } from '../player/createReviewAvatar';
 import { createAtmosphereRig } from './createAtmosphereRig';
 import { createCascadeCourtWaterMotion } from './cascadeCourtWaterMotion';
 import { createFestivalField } from './createFestivalField';
+import { createStageShow } from './createStageShow';
 import { createWayfindingSigns } from './createWayfindingSigns';
 import { createLightingRig } from './createLightingRig';
 import { createMainStageCollisionBlockers } from './createMainStageCollisionBlockers';
@@ -129,6 +131,12 @@ export async function createMainStageScene(engine: AbstractEngine) {
   // only mark the far arrival point).
   const wayfindingSigns = createWayfindingSigns(scene);
 
+  // The general lighting show runs continuously (per the venue docs: an
+  // ambient show is always on; the completion celebration layers the special
+  // finale on top): beat-driven screen pulses, spill-light color sweeps, and
+  // the side LED decks answering each other. Unfreezes only what it animates.
+  const stageShow = createStageShow(scene);
+
   const playerController = createPlayerController({
     avatarRoot: reviewAvatar.root,
     camera: cameraRig.camera,
@@ -138,6 +146,8 @@ export async function createMainStageScene(engine: AbstractEngine) {
     solidCollisionMeshes: stageAssets.solidCollisionMeshes,
   });
   const routeProgress = createMainStageRouteProgress(MAIN_STAGE_REVIEW_ROUTE);
+  const completionCelebration = createCompletionCelebration(scene);
+  let wasRouteComplete = routeProgress.complete;
   const canvas = engine.getRenderingCanvas?.();
   let avatarElapsedSeconds = 0;
   let activeCameraPointerId: number | undefined;
@@ -210,6 +220,15 @@ export async function createMainStageScene(engine: AbstractEngine) {
     avatarElapsedSeconds += deltaSeconds;
     reviewAvatar.animate(avatarElapsedSeconds, playerController.animationState);
     routeProgress.step(playerRig.root.position);
+    if (routeProgress.complete && !wasRouteComplete) {
+      // false -> true: the player just reached the final checkpoint.
+      completionCelebration.start();
+    } else if (!routeProgress.complete && wasRouteComplete) {
+      // true -> false: a checkpoint jump or restart reset progress mid-route
+      // (or past it). Stop the finale and re-arm for the next completion.
+      completionCelebration.stop();
+    }
+    wasRouteComplete = routeProgress.complete;
     if (playerController.animationState !== 'idle') {
       cameraRig.settleFocus(FOCUS_SETTLE_STRENGTH);
     }
@@ -234,6 +253,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
       playerRig,
       playerController,
       routeProgress,
+      completionCelebration,
       avatarColorways: USER_AVATAR_COLORWAYS,
       get selectedAvatarColorway() {
         return selectedAvatarColorway;
@@ -245,12 +265,14 @@ export async function createMainStageScene(engine: AbstractEngine) {
       productionSurfaces,
       cascadeWaterMotion,
       festivalField,
+      stageShow,
       wayfindingSigns,
       spawn: BACK_PLAZA_SPAWN,
     },
   };
 
   scene.onDisposeObservable.add(() => {
+    completionCelebration.dispose();
     canvas?.removeEventListener('wheel', handleCameraWheel);
     canvas?.removeEventListener('pointerdown', handleCameraPointerDown);
     canvas?.removeEventListener('pointermove', handleCameraPointerMove);
