@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -649,19 +650,6 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 	})
 }
 
-// GetUserPosts returns posts by a specific user (internal helper).
-// @Summary      Get user posts (internal)
-// @Tags         Posts
-// @Produce      json
-// @Success      200  {object}  gin.H
-// @Failure      500  {object}  gin.H
-// @Router       /posts/user/:username [get]
-func (h *PostsHandler) GetUserPosts(c *gin.Context) {
-	// This would require looking up the user by username first
-	// For now, we'll skip this and implement it later when needed
-	RespondError(c, http.StatusNotImplemented, "Not implemented yet")
-}
-
 // UpdatePost updates an existing post.
 // @Summary      Update post
 // @Tags         Posts
@@ -839,8 +827,8 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 }
 
 func (h *PostsHandler) sendPostDeletionModMail(post *models.PlatformPost, moderatorID int, reason string, moderatorRole string) {
-	// This runs in a goroutine, so we need a background context
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	// Get the hub
 	if post.HubID == nil {
@@ -997,7 +985,9 @@ func (h *PostsHandler) VotePost(c *gin.Context) {
 	if h.notifService != nil && req.IsUpvote != nil && *req.IsUpvote {
 		// Run in background to not block response
 		go func() {
-			_ = h.notifService.CheckAndNotifyVote(c.Request.Context(), "post", postID, post.AuthorID, post.Upvotes)
+			notifyCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_ = h.notifService.CheckAndNotifyVote(notifyCtx, "post", postID, post.AuthorID, post.Upvotes)
 		}()
 	}
 

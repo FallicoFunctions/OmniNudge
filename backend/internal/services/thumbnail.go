@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/disintegration/imaging"
+	"github.com/omninudge/backend/internal/utils"
 	_ "golang.org/x/image/webp"
 )
 
@@ -367,7 +368,7 @@ func optimizeJPEGFile(path string, maxBytes int64) error {
 
 func defaultCommandRunner(ctx context.Context, name string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
-	return cmd.CombinedOutput()
+	return utils.RunCommandWithOutputLimit(cmd, 64*1024)
 }
 
 // calculateThumbnailDimensions calculates thumbnail dimensions while maintaining aspect ratio

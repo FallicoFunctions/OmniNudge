@@ -1,12 +1,9 @@
 package services
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -180,150 +177,6 @@ func (m *MemoryCache) cleanup() {
 			}
 			m.mutex.Unlock()
 		}
-	}
-}
-
-// RedisCache is a lightweight Redis client using raw RESP for simple GET/SETEX.
-//
-// Deprecated: RedisCache opens a new TCP connection on every Get and Set call,
-// making it unsuitable for any non-trivial production load (connection setup
-// overhead + ephemeral port exhaustion). Use ResilientRedisCache instead,
-// which wraps go-redis with a connection pool, circuit breaker, and singleflight.
-// RedisCache is retained only for environments where go-redis cannot be imported.
-type RedisCache struct {
-	addr     string
-	password string
-	timeout  time.Duration
-}
-
-// NewRedisCache creates a Redis-backed cache.
-//
-// Deprecated: see RedisCache type comment. Use NewResilientRedisCache instead.
-func NewRedisCache(addr, password string, timeout time.Duration) *RedisCache {
-	return &RedisCache{
-		addr:     addr,
-		password: password,
-		timeout:  timeout,
-	}
-}
-
-func (r *RedisCache) dial(ctx context.Context) (net.Conn, error) {
-	// r.timeout serves as BOTH the dial deadline AND the per-operation deadline
-	// set on the connection after it is established. This means the total budget
-	// for a Get/Set call is up to 2×r.timeout (dial + op). Pass a timeout that
-	// is at most half of your desired end-to-end deadline.
-	dialer := &net.Dialer{Timeout: r.timeout}
-	conn, err := dialer.DialContext(ctx, "tcp", r.addr)
-	if err != nil {
-		return nil, err
-	}
-	_ = conn.SetDeadline(time.Now().Add(r.timeout))
-
-	if r.password != "" {
-		if err := writeCommand(conn, "AUTH", r.password); err != nil {
-			conn.Close()
-			return nil, err
-		}
-		if _, _, err := readReply(conn); err != nil {
-			conn.Close()
-			return nil, err
-		}
-	}
-
-	return conn, nil
-}
-
-// Get returns value and hit bool
-func (r *RedisCache) Get(ctx context.Context, key string) (string, bool, error) {
-	conn, err := r.dial(ctx)
-	if err != nil {
-		return "", false, err
-	}
-	defer conn.Close()
-
-	if err := writeCommand(conn, "GET", key); err != nil {
-		return "", false, err
-	}
-
-	resp, ok, err := readReply(conn)
-	if err != nil {
-		return "", false, err
-	}
-	return resp, ok, nil
-}
-
-// Set sets value with TTL using SETEX.
-// Returns an error if ttl is zero or negative — Redis SETEX requires a positive
-// integer TTL and would return an error anyway; failing early gives a clearer message.
-// Note: sub-second TTLs (e.g. 500ms) are truncated to whole seconds by SETEX.
-// If you need sub-second expiry, use the PSETEX command instead (not supported here).
-func (r *RedisCache) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
-	if ttl <= 0 {
-		return fmt.Errorf("RedisCache.Set: ttl must be positive, got %v", ttl)
-	}
-	seconds := int64(ttl.Seconds())
-	if seconds == 0 {
-		// ttl was positive but less than 1 second — truncation would produce 0,
-		// which Redis SETEX rejects. Round up to 1 second.
-		seconds = 1
-	}
-	conn, err := r.dial(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	if err := writeCommand(conn, "SETEX", key, strconv.FormatInt(seconds, 10), value); err != nil {
-		return err
-	}
-	_, _, err = readReply(conn)
-	return err
-}
-
-func writeCommand(conn net.Conn, args ...string) error {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("*%d\r\n", len(args)))
-	for _, arg := range args {
-		b.WriteString(fmt.Sprintf("$%d\r\n%s\r\n", len(arg), arg))
-	}
-	_, err := conn.Write([]byte(b.String()))
-	return err
-}
-
-// readReply handles simple string and bulk string
-func readReply(conn net.Conn) (string, bool, error) {
-	reader := bufio.NewReader(conn)
-	line, err := reader.ReadString('\n')
-	if err != nil {
-		return "", false, err
-	}
-	if len(line) == 0 {
-		return "", false, fmt.Errorf("empty redis reply")
-	}
-	switch line[0] {
-	case '+': // simple string
-		return strings.TrimSuffix(line[1:], "\r\n"), true, nil
-	case '$': // bulk string
-		sizeStr := strings.TrimSpace(line[1:])
-		size, err := strconv.Atoi(sizeStr)
-		if err != nil {
-			return "", false, err
-		}
-		if size < -1 {
-			return "", false, fmt.Errorf("invalid redis bulk string size: %d", size)
-		}
-		if size == -1 {
-			return "", false, nil // nil bulk — key does not exist
-		}
-		buf := make([]byte, size+2) // include CRLF
-		if _, err := io.ReadFull(reader, buf); err != nil {
-			return "", false, err
-		}
-		return string(buf[:size]), true, nil
-	case '-':
-		return "", false, fmt.Errorf("redis error: %s", strings.TrimSpace(line[1:]))
-	default:
-		return "", false, fmt.Errorf("unexpected redis reply: %s", line)
 	}
 }
 

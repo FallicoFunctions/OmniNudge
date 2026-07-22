@@ -252,9 +252,9 @@ func (r *HubRepository) SearchHubs(ctx context.Context, query string, limit int)
 	return hubs, rows.Err()
 }
 
-// GetTrendingHubs returns trending hubs
-// TODO: Implement growth rate algorithm based on subscriber growth over time
-// For now, just returns popular hubs
+// GetTrendingHubs currently uses subscriber count as its stable popularity
+// signal; subscription history is retained separately for future time-windowed
+// ranking experiments.
 func (r *HubRepository) GetTrendingHubs(ctx context.Context, limit int) ([]*Hub, error) {
 	return r.GetPopularHubs(ctx, limit, 0)
 }

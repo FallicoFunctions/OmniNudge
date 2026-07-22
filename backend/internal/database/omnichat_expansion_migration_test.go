@@ -23,6 +23,10 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 	// New non-OmniChat migrations sort after the expansion. Roll them back
 	// before exercising the speech-outbox rollback guardrail.
 	for _, expected := range []string{
+		"152_user_email_lookup_hash",
+		"151_encrypt_pending_verification_email",
+		"150_invalidate_plaintext_auth_tokens",
+		"149_data_export_integrity",
 		"148_tracked_presigned_uploads",
 		"147_auth_sessions",
 	} {
@@ -104,4 +108,31 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 	var speechDeletionTrigger bool
 	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='trg_enqueue_omnichat_speech_object_deletion' AND NOT tgisinternal)`).Scan(&speechDeletionTrigger))
 	require.True(t, speechDeletionTrigger)
+	var verificationEmailEncrypted bool
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_schema='public' AND table_name='email_verifications'
+			  AND column_name='email_encrypted'
+		)
+	`).Scan(&verificationEmailEncrypted))
+	require.True(t, verificationEmailEncrypted)
+	var exportKeyEncrypted bool
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_schema='public' AND table_name='export_session_keys'
+			  AND column_name='encrypted_key'
+		)
+	`).Scan(&exportKeyEncrypted))
+	require.True(t, exportKeyEncrypted)
+	var emailLookupHashExists bool
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_schema='public' AND table_name='users'
+			  AND column_name='email_lookup_hash'
+		)
+	`).Scan(&emailLookupHashExists))
+	require.True(t, emailLookupHashExists)
 }

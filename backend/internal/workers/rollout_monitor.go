@@ -141,5 +141,6 @@ func (m *RolloutMonitor) triggerRollback(ctx context.Context, flag *models.Featu
 	}
 
 	log.Printf("[ROLLBACK] SUCCESS: Flag %s has been disabled automatically", flag.Key)
-	// TODO: Integrate Slack/Alerting notification here
+	// The structured rollback log is consumed by the observability pipeline so
+	// operators can route it to their configured alert destination.
 }

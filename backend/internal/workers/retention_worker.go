@@ -109,6 +109,7 @@ func (w *RetentionWorker) runAllJobs(ctx context.Context) {
 
 	w.cleanupExpiredExports(ctx)
 	w.cleanupExpiredAuthSessions(ctx)
+	w.cleanupExpiredAuthTokens(ctx)
 	w.cleanupExpiredDirectUploads(ctx)
 	w.cleanupDeletedOmniChatSpeech(ctx)
 	w.cleanupExpiredOmniChatSpeech(ctx)
@@ -120,6 +121,24 @@ func (w *RetentionWorker) runAllJobs(ctx context.Context) {
 	w.anonymizeAnalytics(ctx)
 
 	log.Println("[RETENTION] All daily cleanup jobs finished")
+}
+
+func (w *RetentionWorker) cleanupExpiredAuthTokens(ctx context.Context) {
+	if w.db == nil || w.cfg.DryRun {
+		return
+	}
+	if _, err := w.db.Exec(ctx, `
+		DELETE FROM email_verifications
+		WHERE expires_at < NOW() - INTERVAL '7 days'
+	`); err != nil && !isUndefinedTableError(err) {
+		log.Printf("[RETENTION] Failed to clean expired email verification tokens: %v", err)
+	}
+	if _, err := w.db.Exec(ctx, `
+		DELETE FROM password_resets
+		WHERE expires_at < NOW() - INTERVAL '7 days'
+	`); err != nil && !isUndefinedTableError(err) {
+		log.Printf("[RETENTION] Failed to clean expired password reset tokens: %v", err)
+	}
 }
 
 func (w *RetentionWorker) cleanupExpiredAuthSessions(ctx context.Context) {

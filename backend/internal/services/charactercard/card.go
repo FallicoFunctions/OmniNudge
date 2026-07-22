@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 )
 
@@ -362,10 +361,6 @@ func nonEmpty(value, fallback string) string {
 		return fallback
 	}
 	return strings.TrimSpace(value)
-}
-
-func DetectFilenameExtension(filename string) string {
-	return strings.ToLower(filepath.Ext(strings.TrimSpace(filename)))
 }
 
 func BuildV2Export(card *Card) ([]byte, error) {

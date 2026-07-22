@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"net/http"
 	"strings"
@@ -134,7 +135,7 @@ type blockscoutTx struct {
 		To                 struct {
 			Hash string `json:"hash"`
 		} `json:"to"`
-		Value string `json:"value"` // wei as decimal string
+		Value          string `json:"value"` // wei as decimal string
 		TokenTransfers []struct {
 			Token struct {
 				Address string `json:"address"`
@@ -245,5 +246,5 @@ func (s *CryptoVerificationService) get(ctx context.Context, url string, dest in
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
-	return json.NewDecoder(resp.Body).Decode(dest)
+	return json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(dest)
 }

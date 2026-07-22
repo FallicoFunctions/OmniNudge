@@ -88,7 +88,7 @@ func NewAuthHandler(
 // @Tags         Auth
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200  {object}  models.User
+// @Success      200  {object}  map[string]interface{}
 // @Failure      401  {object}  gin.H
 // @Failure      404  {object}  gin.H
 // @Router       /auth/me [get]

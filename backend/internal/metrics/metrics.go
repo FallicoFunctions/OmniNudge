@@ -3,9 +3,7 @@ package metrics
 import (
 	"os"
 	"strings"
-	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -339,77 +337,3 @@ var (
 		},
 	)
 )
-
-// PrometheusMiddleware records HTTP request metrics
-func PrometheusMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		start := time.Now()
-
-		// Record request size
-		if c.Request.ContentLength > 0 {
-			HTTPRequestSize.WithLabelValues(c.Request.Method, c.FullPath()).Observe(float64(c.Request.ContentLength))
-		}
-
-		// Process request
-		c.Next()
-
-		// Record metrics after request completes
-		duration := time.Since(start).Seconds()
-		status := c.Writer.Status()
-
-		HTTPRequestsTotal.WithLabelValues(c.Request.Method, c.FullPath(), statusCategory(status)).Inc()
-		HTTPRequestDuration.WithLabelValues(c.Request.Method, c.FullPath()).Observe(duration)
-
-		// Record response size
-		HTTPResponseSize.WithLabelValues(c.Request.Method, c.FullPath()).Observe(float64(c.Writer.Size()))
-	}
-}
-
-// statusCategory converts HTTP status code to category (2xx, 3xx, 4xx, 5xx)
-func statusCategory(status int) string {
-	switch {
-	case status >= 200 && status < 300:
-		return "2xx"
-	case status >= 300 && status < 400:
-		return "3xx"
-	case status >= 400 && status < 500:
-		return "4xx"
-	case status >= 500:
-		return "5xx"
-	default:
-		return "unknown"
-	}
-}
-
-// RecordDatabaseQuery records a database query
-func RecordDatabaseQuery(operation, table string, duration time.Duration) {
-	DatabaseQueriesTotal.WithLabelValues(operation, table).Inc()
-	DatabaseQueryDuration.WithLabelValues(operation, table).Observe(duration.Seconds())
-}
-
-// RecordEncryption records an encryption operation
-func RecordEncryption(operation, algorithm string, duration time.Duration) {
-	EncryptionOperationsTotal.WithLabelValues(operation, algorithm).Inc()
-	EncryptionDuration.WithLabelValues(operation, algorithm).Observe(duration.Seconds())
-}
-
-// RecordFileUpload records a file upload
-func RecordFileUpload(fileType string, size int64, duration time.Duration) {
-	FileUploadsTotal.WithLabelValues(fileType).Inc()
-	FileUploadSize.WithLabelValues(fileType).Observe(float64(size))
-	FileUploadDuration.WithLabelValues(fileType).Observe(duration.Seconds())
-}
-
-// RecordJob records job queue metrics
-func RecordJobEnqueued(queue, jobType string) {
-	JobsEnqueuedTotal.WithLabelValues(queue, jobType).Inc()
-}
-
-func RecordJobCompleted(queue, jobType string, duration time.Duration) {
-	JobsCompletedTotal.WithLabelValues(queue, jobType).Inc()
-	JobDuration.WithLabelValues(queue, jobType).Observe(duration.Seconds())
-}
-
-func RecordJobFailed(queue, jobType string) {
-	JobsFailedTotal.WithLabelValues(queue, jobType).Inc()
-}

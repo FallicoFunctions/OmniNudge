@@ -53,6 +53,11 @@ type CreateBugReportRequest struct {
 	Context          map[string]interface{} `json:"context"`
 }
 
+const (
+	maxBugReportPageURLLength     = 2048
+	maxBugReportDescriptionLength = 10000
+)
+
 // CreateBugReport submits a new bug report or feedback.
 // @Summary      Submit bug report
 // @Tags         BugReports
@@ -68,6 +73,24 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+	pageURL := strings.TrimSpace(req.PageURL)
+	description := strings.TrimSpace(req.Description)
+	if pageURL == "" || len(pageURL) > maxBugReportPageURLLength {
+		RespondError(c, http.StatusBadRequest, "Page URL must be between 1 and 2048 characters")
+		return
+	}
+	if description == "" || len(description) > maxBugReportDescriptionLength {
+		RespondError(c, http.StatusBadRequest, "Description must be between 1 and 10000 characters")
+		return
+	}
+
+	// A screenshot URL is a reference to a private uploaded media object.  Do
+	// not permit anonymous reports, or one user, to attach another user's file.
+	var userID *int
+	if uid, _ := middleware.GetOptionalUserID(c); uid != 0 {
+		uidInt := uid
+		userID = &uidInt
 	}
 	feedbackType := strings.TrimSpace(req.FeedbackType)
 	if feedbackType == "" {
@@ -92,6 +115,10 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 
 	var normalizedScreenshotURL *string
 	if req.ScreenshotURL != nil && strings.TrimSpace(*req.ScreenshotURL) != "" {
+		if userID == nil {
+			RespondError(c, http.StatusUnauthorized, "Authentication is required to attach a screenshot")
+			return
+		}
 		normalizedURL := strings.TrimSpace(*req.ScreenshotURL)
 		if strings.HasPrefix(normalizedURL, "http://") || strings.HasPrefix(normalizedURL, "https://") {
 			parsedURL, err := url.Parse(normalizedURL)
@@ -116,20 +143,19 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 			RespondError(c, http.StatusBadRequest, "Screenshot must be an image file")
 			return
 		}
+		if media.UserID != *userID {
+			// Return the same error as a missing file to avoid turning this route
+			// into an attachment ownership oracle.
+			RespondError(c, http.StatusBadRequest, "Screenshot file not found")
+			return
+		}
 		normalizedScreenshotURL = &normalizedURL
-	}
-
-	// Get user ID (optional - users can report bugs while logged out)
-	var userID *int
-	if uid, _ := middleware.GetOptionalUserID(c); uid != 0 {
-		uidInt := uid
-		userID = &uidInt
 	}
 
 	report := &models.BugReport{
 		UserID:        userID,
-		PageURL:       req.PageURL,
-		Description:   req.Description,
+		PageURL:       pageURL,
+		Description:   description,
 		ScreenshotURL: normalizedScreenshotURL,
 		FeedbackType:  feedbackType,
 		Category:      category,

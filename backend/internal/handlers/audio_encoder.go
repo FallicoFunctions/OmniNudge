@@ -18,6 +18,7 @@ import (
 
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/queue"
+	"github.com/omninudge/backend/internal/utils"
 )
 
 // AudioEncoderHandler handles server-side audio encoding for iOS devices
@@ -72,9 +73,10 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 		return
 	}
 
-	// Create temp directory for processing
-	tempDir := filepath.Join(os.TempDir(), fmt.Sprintf("audio-encode-%d-%d", userID, time.Now().Unix()))
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
+	// Use an unpredictable, owner-only workspace. Predictable names in the
+	// shared system temp directory permit pre-creation and symlink attacks.
+	tempDir, err := os.MkdirTemp("", "audio-encode-*")
+	if err != nil {
 		log.Printf("Failed to create temp directory: %v", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to process audio")
 		return
@@ -85,16 +87,20 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 	inputPath := filepath.Join(tempDir, "input.wav")
 	outputPath := filepath.Join(tempDir, "output.webm")
 
-	inputFile, err := os.Create(inputPath)
+	inputFile, err := os.OpenFile(inputPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		log.Printf("Failed to create input file: %v", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to process audio")
 		return
 	}
 
-	_, err = io.Copy(inputFile, file)
-	inputFile.Close()
-	if err != nil {
+	written, copyErr := io.Copy(inputFile, io.LimitReader(file, 50*1024*1024+1))
+	closeErr := inputFile.Close()
+	if written > 50*1024*1024 {
+		RespondError(c, http.StatusBadRequest, "Audio file too large (max 50MB)")
+		return
+	}
+	if copyErr != nil || closeErr != nil {
 		log.Printf("Failed to save input file: %v", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to process audio")
 		return
@@ -119,7 +125,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 		outputPath,
 	)
 
-	output, err := cmd.CombinedOutput()
+	output, err := utils.RunCommandWithOutputLimit(cmd, 64*1024)
 	if err != nil {
 		log.Printf("FFmpeg encoding failed: %v\nOutput: %s", err, string(output))
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -153,14 +159,33 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 		return
 	}
 
-	filename := fmt.Sprintf("voice_%d_%d.webm", userID, time.Now().Unix())
-	finalPath := filepath.Join(uploadsDir, filename)
-
-	if err := os.WriteFile(finalPath, encodedData, 0644); err != nil { // #nosec G703 -- path built from hardcoded dir + integer IDs, not user-controlled
+	finalFile, err := os.CreateTemp(uploadsDir, fmt.Sprintf("voice_%d_*.webm", userID))
+	if err != nil {
+		log.Printf("Failed to create encoded audio file: %v", err)
+		RespondError(c, http.StatusInternalServerError, "Failed to save audio")
+		return
+	}
+	finalPath := finalFile.Name()
+	filename := filepath.Base(finalPath)
+	if _, err := finalFile.Write(encodedData); err != nil {
+		_ = finalFile.Close()
+		_ = os.Remove(finalPath)
 		log.Printf("Failed to write encoded file: %v", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to save audio")
 		return
 	}
+	if err := finalFile.Close(); err != nil {
+		_ = os.Remove(finalPath)
+		log.Printf("Failed to close encoded audio file: %v", err)
+		RespondError(c, http.StatusInternalServerError, "Failed to save audio")
+		return
+	}
+	persisted := false
+	defer func() {
+		if !persisted {
+			_ = os.Remove(finalPath)
+		}
+	}()
 
 	// Create media file record
 	mediaFile := &models.MediaFile{
@@ -180,6 +205,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to save audio metadata")
 		return
 	}
+	persisted = true
 
 	// Enqueue transcription job only when explicitly enabled and user opted in.
 	// This avoids creating dead-letter jobs until the transcription backend is implemented.

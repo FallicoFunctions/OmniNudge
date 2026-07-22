@@ -20,7 +20,7 @@ type PostgresUserRepository struct {
 var _ ports.UserRepository = (*PostgresUserRepository)(nil)
 
 // NewPostgresUserRepository creates a PostgresUserRepository satisfying ports.UserRepository.
-func NewPostgresUserRepository(pool *pgxpool.Pool) ports.UserRepository {
+func NewPostgresUserRepository(pool *pgxpool.Pool) *PostgresUserRepository {
 	return &PostgresUserRepository{inner: models.NewUserRepository(pool)}
 }
 
@@ -38,6 +38,10 @@ func (r *PostgresUserRepository) GetByUsername(ctx context.Context, username str
 
 func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	return r.inner.GetByEmail(ctx, email)
+}
+
+func (r *PostgresUserRepository) BackfillEmailLookupHashes(ctx context.Context) (int, error) {
+	return r.inner.BackfillEmailLookupHashes(ctx)
 }
 
 func (r *PostgresUserRepository) GetPublicKeysByIDs(ctx context.Context, userIDs []int) (map[int]string, error) {

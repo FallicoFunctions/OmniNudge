@@ -308,6 +308,10 @@ func (h *HubSettingsHandler) UpdateModeratorRole(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Cannot change owner role")
 		return
 	}
+	if req.Role != models.ModeratorRoleFullModerator && req.Role != models.ModeratorRoleModerator {
+		RespondError(c, http.StatusBadRequest, "Invalid role. Must be full_moderator or moderator")
+		return
+	}
 
 	if err := h.settingsRepo.UpdateModeratorRole(c.Request.Context(), hubID, targetUserID, req.Role); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update moderator role")

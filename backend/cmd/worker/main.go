@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -16,6 +17,11 @@ import (
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/services/fal"
 	zlog "github.com/rs/zerolog/log"
+)
+
+const (
+	defaultWorkerConcurrency = 10
+	maxWorkerConcurrency     = 64
 )
 
 func main() {
@@ -117,15 +123,10 @@ func main() {
 		zlog.Warn().Msg("Virus scan disabled via VIRUS_SCAN_ENABLED=false")
 	}
 
-	// Create worker with concurrency
-	// Default: 10 concurrent workers, can be configured via WORKER_CONCURRENCY env var
-	concurrency := 10
-	if envConcurrency := os.Getenv("WORKER_CONCURRENCY"); envConcurrency != "" {
-		var parsed int
-		if _, err := fmt.Sscanf(envConcurrency, "%d", &parsed); err == nil && parsed > 0 {
-			concurrency = parsed
-		}
-	}
+	// Bound concurrency even when configured through the environment. A typo or
+	// hostile deployment setting must not start an unbounded number of workers
+	// and exhaust CPU, memory, database connections, or provider quotas.
+	concurrency := workerConcurrencyFromEnv(os.Getenv("WORKER_CONCURRENCY"))
 
 	worker := queue.NewWorker(cfg.Redis.Addr, cfg.Redis.Password, concurrency)
 	queueClient := queue.NewQueueClient(cfg.Redis.Addr, cfg.Redis.Password)
@@ -178,4 +179,20 @@ func main() {
 			zlog.Fatal().Err(err).Msg("Worker failed")
 		}
 	}
+}
+
+func workerConcurrencyFromEnv(raw string) int {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return defaultWorkerConcurrency
+	}
+
+	concurrency, err := strconv.Atoi(raw)
+	if err != nil || concurrency < 1 {
+		return defaultWorkerConcurrency
+	}
+	if concurrency > maxWorkerConcurrency {
+		return maxWorkerConcurrency
+	}
+	return concurrency
 }

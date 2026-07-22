@@ -244,10 +244,13 @@ type EmailAttachment struct {
 
 // DataExportPayload for GDPR data export jobs
 type DataExportPayload struct {
-	UserID         int      `json:"user_id"`
+	// ExportID is an opaque server-generated reference. The worker loads the
+	// owner and requested fields from the database instead of trusting Redis
+	// task payload data for an authorization-sensitive export.
 	ExportID       string   `json:"export_id"`
-	DataTypes      []string `json:"data_types"` // e.g., ["messages", "files", "calls"]
-	IncludeDeleted bool     `json:"include_deleted"`
+	UserID         int      `json:"-"`
+	DataTypes      []string `json:"-"`
+	IncludeDeleted bool     `json:"-"`
 }
 
 // ContentModerationPayload for content moderation jobs
@@ -351,8 +354,15 @@ func (q *QueueClient) EnqueueEmail(ctx context.Context, to []string, subject, bo
 
 // EnqueueDataExport enqueues a GDPR data export job
 func (q *QueueClient) EnqueueDataExport(ctx context.Context, payload DataExportPayload) error {
-	// Low priority, can be slow
-	_, err := q.EnqueueJobWithPriority(ctx, JobTypeDataExport, payload, 0)
+	// Low priority and a deterministic task ID prevent duplicate export workers
+	// from running concurrently for the same request.
+	_, err := q.EnqueueJob(ctx, JobTypeDataExport, payload,
+		asynq.Queue("low"),
+		asynq.TaskID("data-export:"+payload.ExportID),
+		asynq.MaxRetry(3),
+		asynq.Timeout(30*time.Minute),
+		asynq.Retention(24*time.Hour),
+	)
 	return err
 }
 

@@ -60,7 +60,7 @@ func setupPaymentsTest(t *testing.T) (*PaymentsHandler, *models.UserRepository, 
 func makePaymentsRouter(h *PaymentsHandler, userID int) *gin.Engine {
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		c.Set("userID", userID)
+		c.Set("user_id", userID)
 		c.Next()
 	})
 	r.POST("/api/v1/payments/crypto/submit", h.SubmitCryptoPayment)
@@ -199,6 +199,24 @@ func TestPaymentsHandler_GetPaymentStatus(t *testing.T) {
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "pending", resp["status"])
+}
+
+func TestPaymentsHandler_GetPaymentStatusRequiresPaymentOwner(t *testing.T) {
+	handler, userRepo, payRepo, ownerID := setupPaymentsTest(t)
+	ctx := context.Background()
+	otherUser := &models.User{Username: "payments_status_other_user", PasswordHash: "hash"}
+	require.NoError(t, userRepo.Create(ctx, otherUser))
+	_, err := payRepo.Create(ctx, &models.CryptoPayment{
+		UserID: ownerID, TXID: "private-status-check", Coin: models.CoinBTC,
+		USDPriceAtSubmit: 45000, AmountReceived: 0.000067, USDValue: 3.015, PlanMonths: 1,
+	})
+	require.NoError(t, err)
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/payments/crypto/private-status-check/status?coin=BTC", nil)
+	response := httptest.NewRecorder()
+	makePaymentsRouter(handler, otherUser.ID).ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusNotFound, response.Code, response.Body.String())
 }
 
 func TestPaymentsHandler_InvalidInput(t *testing.T) {

@@ -1,13 +1,9 @@
 package middleware
 
 import (
-	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-
-	apiresponse "github.com/omninudge/backend/internal/api/response"
 )
 
 // APIVersion middleware adds API version information to responses
@@ -33,54 +29,4 @@ func APIVersion() gin.HandlerFunc {
 
 		c.Next()
 	}
-}
-
-// DeprecationWarning middleware adds deprecation headers to responses
-// Use this to warn clients that a version will be sunset
-func DeprecationWarning(sunsetDate string, successorURL string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Add deprecation headers
-		c.Header("X-API-Deprecated", "true")
-		c.Header("X-API-Sunset-Date", sunsetDate) // Format: 2026-08-06
-		c.Header("Deprecation", "true")           // Standard deprecation header
-		if sunset := formatSunsetHeader(sunsetDate); sunset != "" {
-			c.Header("Sunset", sunset)
-		}
-
-		// Add Link header pointing to new version
-		if successorURL != "" {
-			c.Header("Link", "<"+successorURL+">; rel=\"successor-version\"")
-		}
-
-		c.Next()
-
-	}
-}
-
-// SunsetVersion middleware returns 410 Gone for versions that have been sunset
-// Use this after deprecation period ends
-func SunsetVersion() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		msg := "This API version is no longer supported. Please upgrade to the latest version."
-		resp := gin.H{
-			"error":           msg,
-			"code":            "version_sunset",
-			"message":         msg,
-			"latest_version":  "v2",
-			"migration_guide": "https://docs.omninudge.com/api/v1-to-v2-migration",
-		}
-		if requestID := apiresponse.RequestIDFromContext(c); requestID != "" {
-			resp["request_id"] = requestID
-		}
-		c.JSON(http.StatusGone, resp)
-		c.Abort()
-	}
-}
-
-func formatSunsetHeader(sunsetDate string) string {
-	// Prefer strict YYYY-MM-DD input; otherwise pass through non-empty values.
-	if t, err := time.Parse("2006-01-02", sunsetDate); err == nil {
-		return t.UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT")
-	}
-	return strings.TrimSpace(sunsetDate)
 }

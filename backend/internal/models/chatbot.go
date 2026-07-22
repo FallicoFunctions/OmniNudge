@@ -1066,34 +1066,6 @@ func (r *BotMessageRepository) RepairStaleDanglingUserTurn(ctx context.Context, 
 	return m, nil
 }
 
-// BulkCreateMessages inserts multiple messages in a single batch for a conversation.
-func (r *BotMessageRepository) BulkCreateMessages(ctx context.Context, conversationID int, messages []*BotMessage) ([]*BotMessage, error) {
-	if len(messages) == 0 {
-		return messages, nil
-	}
-	query := `
-		INSERT INTO bot_messages (conversation_id, role, content, failed)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, created_at
-	`
-	created := make([]*BotMessage, len(messages))
-	for i, m := range messages {
-		m.ConversationID = conversationID
-		created[i] = &BotMessage{
-			ConversationID: conversationID,
-			Role:           m.Role,
-			Content:        m.Content,
-			Failed:         false,
-		}
-		err := r.pool.QueryRow(ctx, query, conversationID, m.Role, m.Content, false).
-			Scan(&created[i].ID, &created[i].CreatedAt)
-		if err != nil {
-			return nil, fmt.Errorf("bulk insert message %d: %w", i, err)
-		}
-	}
-	return created, nil
-}
-
 // ListByConversationID retrieves the most recent messages for a conversation
 // and returns that bounded window in chronological order.
 func (r *BotMessageRepository) ListByConversationID(ctx context.Context, conversationID int, limit int) ([]*BotMessage, error) {

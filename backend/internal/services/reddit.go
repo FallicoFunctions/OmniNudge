@@ -53,8 +53,13 @@ func RedditStatusCode(err error) (int, bool) {
 }
 
 func redditHTTPErrorFromResponse(resp *http.Response) error {
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 	return &redditHTTPError{statusCode: resp.StatusCode, body: string(body)}
+}
+
+type limitedResponseBody struct {
+	io.Reader
+	io.Closer
 }
 
 // NewRedditClient creates a new Reddit client
@@ -112,6 +117,12 @@ func (r *RedditClient) doAPIRequest(req *http.Request, endpoint string) (*http.R
 		if val, err := strconv.ParseFloat(remaining, 64); err == nil {
 			metrics.RedditAPIRateLimitRemaining.Set(val)
 		}
+	}
+	// Bound every upstream Reddit/proxy response before individual decoders see
+	// it. A trusted hostname can still malfunction or be compromised.
+	resp.Body = limitedResponseBody{
+		Reader: io.LimitReader(resp.Body, 10<<20),
+		Closer: resp.Body,
 	}
 	return resp, nil
 }

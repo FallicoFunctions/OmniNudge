@@ -22,12 +22,16 @@ import (
 // DataExportHandler handles GDPR data export requests
 type DataExportHandler struct {
 	db        *pgxpool.Pool
-	queue     *queue.QueueClient
+	queue     dataExportEnqueuer
 	storage   services.StorageService
 	masterKey []byte
 }
 
-func NewDataExportHandler(db *pgxpool.Pool, queueClient *queue.QueueClient, storage services.StorageService, masterKey string) *DataExportHandler {
+type dataExportEnqueuer interface {
+	EnqueueDataExport(context.Context, queue.DataExportPayload) error
+}
+
+func NewDataExportHandler(db *pgxpool.Pool, queueClient dataExportEnqueuer, storage services.StorageService, masterKey string) *DataExportHandler {
 	return &DataExportHandler{
 		db:        db,
 		queue:     queueClient,
@@ -77,7 +81,9 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 		return
 	}
 
-	// Default to all data types if none specified
+	// Default to all data types if none specified, otherwise strictly allowlist
+	// and deduplicate the requested export sections. Besides avoiding wasted work,
+	// this keeps user-controlled values out of temporary filenames in the worker.
 	if len(req.DataTypes) == 0 {
 		req.DataTypes = []string{
 			"profile",
@@ -89,6 +95,25 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 			"hubs",
 			"settings",
 		}
+	} else {
+		allowed := map[string]struct{}{
+			"profile": {}, "messages": {}, "posts": {}, "comments": {},
+			"votes": {}, "saved": {}, "hubs": {}, "settings": {},
+		}
+		seen := make(map[string]struct{}, len(req.DataTypes))
+		validated := make([]string, 0, len(req.DataTypes))
+		for _, dataType := range req.DataTypes {
+			if _, ok := allowed[dataType]; !ok {
+				RespondError(c, http.StatusBadRequest, "Unsupported data type")
+				return
+			}
+			if _, duplicate := seen[dataType]; duplicate {
+				continue
+			}
+			seen[dataType] = struct{}{}
+			validated = append(validated, dataType)
+		}
+		req.DataTypes = validated
 	}
 
 	// 2. Prepare E2E session keys if messages are being exported
@@ -106,6 +131,50 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to generate export ID")
 		return
 	}
+	if h.queue == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Data export is temporarily unavailable")
+		return
+	}
+
+	// Serialize requests per user so concurrent submissions cannot bypass the
+	// active-export and daily limits.
+	tx, err := h.db.Begin(c.Request.Context())
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to create export request")
+		return
+	}
+	defer tx.Rollback(c.Request.Context()) //nolint:errcheck
+	if _, err = tx.Exec(c.Request.Context(), `SELECT pg_advisory_xact_lock($1)`, int64(userID)); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to create export request")
+		return
+	}
+	var activeCount, recentCount int
+	if err = tx.QueryRow(c.Request.Context(), `
+		SELECT
+			COUNT(*) FILTER (WHERE status IN ('pending', 'processing')),
+			COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours')
+		FROM data_export_requests
+		WHERE user_id = $1
+	`, userID).Scan(&activeCount, &recentCount); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to create export request")
+		return
+	}
+	if activeCount > 0 || recentCount >= 3 {
+		RespondError(c, http.StatusTooManyRequests, "Data export limit reached; try again later")
+		return
+	}
+
+	// The parent row must exist before export_session_keys because the latter has
+	// a foreign key to data_export_requests(export_id).
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+	if _, err = tx.Exec(c.Request.Context(), `
+		INSERT INTO data_export_requests (
+			user_id, export_id, data_types, include_deleted, status, expires_at
+		) VALUES ($1, $2, $3, $4, 'pending', $5)
+	`, userID, exportID, req.DataTypes, req.IncludeDeleted, expiresAt); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to create export request")
+		return
+	}
 
 	if usesE2E && encryptedPrivateKey != nil {
 		// Decrypt private key using password (using username as salt as per schema)
@@ -118,7 +187,7 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 		}
 
 		// Fetch group keys for the user
-		rows, err := h.db.Query(c.Request.Context(), `
+		rows, err := tx.Query(c.Request.Context(), `
 			SELECT gk.id, gkm.encrypted_key_for_user
 			FROM group_encryption_keys gk
 			JOIN group_key_members gkm ON gk.id = gkm.group_key_id
@@ -126,73 +195,87 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 		`, userID)
 		if err != nil {
 			zlog.Warn().Err(err).Msg("failed to fetch group keys during data export")
+			RespondError(c, http.StatusInternalServerError, "Failed to prepare encrypted export")
+			return
 		} else {
-			defer rows.Close()
+			type preparedKey struct {
+				id        int
+				encrypted string
+			}
+			prepared := make([]preparedKey, 0)
 			for rows.Next() {
 				var keyID int
 				var encryptedKey string
 				if err := rows.Scan(&keyID, &encryptedKey); err != nil {
-					continue
+					rows.Close()
+					RespondError(c, http.StatusInternalServerError, "Failed to prepare encrypted export")
+					return
 				}
 
 				// Decrypt group key with user's RSA private key
 				rawKey, err := utils.DecryptRSA(encryptedKey, privKeyPEM)
 				if err != nil {
-					continue
+					rows.Close()
+					RespondError(c, http.StatusInternalServerError, "Failed to prepare encrypted export")
+					return
 				}
 
 				// Re-encrypt with system master key for temporary storage
 				encryptedWithSystem, err := utils.EncryptWithSystemKey(rawKey, h.masterKey)
 				if err != nil {
-					continue
+					rows.Close()
+					RespondError(c, http.StatusInternalServerError, "Failed to prepare encrypted export")
+					return
 				}
 
-				// Store in export_session_keys
-				_, _ = h.db.Exec(c.Request.Context(), `
+				prepared = append(prepared, preparedKey{id: keyID, encrypted: encryptedWithSystem})
+			}
+			rowsErr := rows.Err()
+			rows.Close()
+			if rowsErr != nil {
+				RespondError(c, http.StatusInternalServerError, "Failed to prepare encrypted export")
+				return
+			}
+			for _, key := range prepared {
+				if _, err := tx.Exec(c.Request.Context(), `
 					INSERT INTO export_session_keys (export_id, user_id, group_key_id, encrypted_key)
 					VALUES ($1, $2, $3, $4)
 					ON CONFLICT (export_id, group_key_id) DO UPDATE SET encrypted_key = EXCLUDED.encrypted_key
-				`, exportID, userID, keyID, encryptedWithSystem)
+				`, exportID, userID, key.id, key.encrypted); err != nil {
+					RespondError(c, http.StatusInternalServerError, "Failed to prepare encrypted export")
+					return
+				}
 			}
 		}
 	}
 
-	// Create export request record
-	expiresAt := time.Now().Add(7 * 24 * time.Hour) // Export available for 7 days
-	_, err = h.db.Exec(c.Request.Context(), `
-		INSERT INTO data_export_requests (
-			user_id, export_id, data_types, include_deleted, status, expires_at
-		) VALUES ($1, $2, $3, $4, 'pending', $5)
-	`, userID, exportID, req.DataTypes, req.IncludeDeleted, expiresAt)
-
-	if err != nil {
+	if err := tx.Commit(c.Request.Context()); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to create export request")
 		return
 	}
 
 	// Enqueue export job
-	if h.queue != nil {
-		payload := queue.DataExportPayload{
-			UserID:         userID,
-			ExportID:       exportID,
-			DataTypes:      req.DataTypes,
-			IncludeDeleted: req.IncludeDeleted,
-		}
-
-		if err := h.queue.EnqueueDataExport(c.Request.Context(), payload); err != nil {
-			// Update status to failed
-			_, _ = h.db.Exec(c.Request.Context(), `
-				UPDATE data_export_requests
-				SET status = 'failed', completed_at = NOW()
-				WHERE export_id = $1
-			`, exportID)
-
-			RespondError(c, http.StatusInternalServerError, "Failed to queue export job")
-			return
-		}
+	payload := queue.DataExportPayload{
+		ExportID: exportID,
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	if err := h.queue.EnqueueDataExport(c.Request.Context(), payload); err != nil {
+		// Mark failed and purge short-lived decrypted session material when the
+		// export cannot be queued. A later request can then retry safely.
+		_, _ = h.db.Exec(c.Request.Context(), `
+			WITH deleted_keys AS (
+				DELETE FROM export_session_keys WHERE export_id = $1
+			)
+			UPDATE data_export_requests
+			SET status = 'failed', completed_at = NOW()
+			WHERE export_id = $1
+		`, exportID)
+
+		RespondError(c, http.StatusServiceUnavailable, "Failed to queue export job")
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{
 		"message":    "Data export request created",
 		"export_id":  exportID,
 		"status":     "pending",
@@ -218,7 +301,7 @@ func (h *DataExportHandler) GetExportStatus(c *gin.Context) {
 
 	var status string
 	var createdAt, completedAt, expiresAt *time.Time
-	err := h.db.QueryRow(context.Background(), `
+	err := h.db.QueryRow(c.Request.Context(), `
 		SELECT status, created_at, completed_at, expires_at
 		FROM data_export_requests
 		WHERE export_id = $1 AND user_id = $2
@@ -270,7 +353,7 @@ func (h *DataExportHandler) GetExportStatus(c *gin.Context) {
 func (h *DataExportHandler) ListExportRequests(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
-	rows, err := h.db.Query(context.Background(), `
+	rows, err := h.db.Query(c.Request.Context(), `
 		SELECT export_id, status, created_at, completed_at, expires_at
 		FROM data_export_requests
 		WHERE user_id = $1

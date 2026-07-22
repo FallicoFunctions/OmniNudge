@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/ports"
-	zlog "github.com/rs/zerolog/log"
 )
 
 // redactBlockedComments replaces the body and author of comments whose
@@ -156,12 +155,7 @@ func (h *BlockingHandler) BlockUser(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to block user")
 		return
 	}
-	defer func() {
-		// Rollback is a no-op after Commit; safe to call unconditionally.
-		if rbErr := tx.Rollback(ctx); rbErr != nil {
-			zlog.Error().Err(rbErr).Msg("blocking: rollback after block error")
-		}
-	}()
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Insert block row (idempotent).
 	if _, err = tx.Exec(ctx, `

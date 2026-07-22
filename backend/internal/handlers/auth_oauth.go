@@ -290,6 +290,11 @@ func (h *OAuthHandler) finishOAuthLogin(c *gin.Context, provider string, info *o
 		c.Redirect(http.StatusFound, redirectURL)
 		return
 	}
+	if err := services.RestorePendingDeletionAfterAuthentication(c.Request.Context(), h.userRepo, user); err != nil {
+		log.Printf("[oauth] account unavailable (provider=%s): %v", provider, err)
+		c.Redirect(http.StatusFound, h.oauthErrorURL("account_error"))
+		return
+	}
 
 	credentials, err := h.sessions.Create(c.Request.Context(), user, true, c.Request.UserAgent(), c.ClientIP())
 	if err != nil {
@@ -379,7 +384,10 @@ func (h *OAuthHandler) fetchSteamUserInfo(ctx context.Context, steamID string) (
 			} `json:"players"`
 		} `json:"response"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("GetPlayerSummaries returned status %d", resp.StatusCode)
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&parsed); err != nil {
 		return nil, fmt.Errorf("decode GetPlayerSummaries response: %w", err)
 	}
 	if len(parsed.Response.Players) == 0 {
@@ -524,10 +532,9 @@ func (h *OAuthHandler) fetchUserInfo(ctx context.Context, provider string, token
 		return nil, fmt.Errorf("GET %s: %w", url, err)
 	}
 	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
+	body, err := readOAuthResponse(resp, url)
 	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
+		return nil, err
 	}
 
 	var raw map[string]interface{}
@@ -569,10 +576,9 @@ func (h *OAuthHandler) fetchGitHubUserInfo(ctx context.Context, token *oauth2.To
 		return nil, fmt.Errorf("GET /user: %w", err)
 	}
 	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
+	body, err := readOAuthResponse(resp, "GitHub /user")
 	if err != nil {
-		return nil, fmt.Errorf("read /user body: %w", err)
+		return nil, err
 	}
 
 	var raw map[string]interface{}
@@ -609,10 +615,9 @@ func (h *OAuthHandler) fetchGitHubPrimaryEmail(client *http.Client) (string, err
 		return "", fmt.Errorf("GET /user/emails: %w", err)
 	}
 	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
+	body, err := readOAuthResponse(resp, "GitHub /user/emails")
 	if err != nil {
-		return "", fmt.Errorf("read /user/emails body: %w", err)
+		return "", err
 	}
 
 	var emails []struct {
@@ -635,6 +640,21 @@ func (h *OAuthHandler) fetchGitHubPrimaryEmail(client *http.Client) (string, err
 		}
 	}
 	return "", fmt.Errorf("no verified email found")
+}
+
+func readOAuthResponse(resp *http.Response, label string) ([]byte, error) {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("%s returned status %d", label, resp.StatusCode)
+	}
+	const maxOAuthResponseBytes = 1 << 20
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxOAuthResponseBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("read %s response: %w", label, err)
+	}
+	if len(body) > maxOAuthResponseBytes {
+		return nil, fmt.Errorf("%s response exceeded size limit", label)
+	}
+	return body, nil
 }
 
 // pendingSignup holds a staged OAuth profile awaiting username selection.
@@ -668,6 +688,9 @@ func (h *OAuthHandler) findOrPrepareUser(ctx context.Context, provider string, i
 	if info.Email != "" {
 		existing, lookupErr := h.userRepo.GetByEmail(ctx, info.Email)
 		if lookupErr == nil && existing != nil {
+			if restoreErr := services.RestorePendingDeletionAfterAuthentication(ctx, h.userRepo, existing); restoreErr != nil {
+				return nil, nil, restoreErr
+			}
 			// Link this OAuth identity to the existing account
 			if linkErr := h.insertOAuthAccount(ctx, existing.ID, provider, info); linkErr != nil {
 				log.Printf("[oauth] link existing account (user_id=%d): %v", existing.ID, linkErr)

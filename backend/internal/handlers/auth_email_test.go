@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -54,6 +56,23 @@ func (m *mockEmailService) SendTemplatedEmail(to []string, template services.Ema
 		body = replaceAll(body, placeholder, v)
 	}
 	return m.SendEmail(to, subject, body, "")
+}
+
+func latestPasswordResetToken(t *testing.T, email *mockEmailService) string {
+	t.Helper()
+	email.mu.Lock()
+	defer email.mu.Unlock()
+	require.NotEmpty(t, email.calls, "expected a password reset email")
+	for _, field := range strings.Fields(email.calls[len(email.calls)-1].Body) {
+		parsed, err := url.Parse(field)
+		if err == nil && parsed.Path == "/reset-password" {
+			if token := parsed.Query().Get("token"); token != "" {
+				return token
+			}
+		}
+	}
+	t.Fatal("password reset email did not contain a reset token")
+	return ""
 }
 
 // replaceAll is a local helper used by mockEmailService to avoid importing strings.
@@ -244,7 +263,7 @@ func TestForgotPassword_UserNoEmail(t *testing.T) {
 // TestResetPassword_ValidToken verifies that a valid reset token causes the
 // password to be updated and returns 200.
 func TestResetPassword_ValidToken(t *testing.T) {
-	handler, _, db, cleanup := setupAuthHandlerForEmailTest(t)
+	handler, mockEmail, db, cleanup := setupAuthHandlerForEmailTest(t)
 	defer cleanup()
 
 	username := uniqueAuthEmailUsername("rp_valid")
@@ -260,13 +279,9 @@ func TestResetPassword_ValidToken(t *testing.T) {
 	fpReq.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(httptest.NewRecorder(), fpReq)
 
-	// Read the token directly from the database.
-	ctx := context.Background()
-	var token string
-	err := db.Pool.QueryRow(ctx,
-		`SELECT token FROM password_resets WHERE used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
-	).Scan(&token)
-	require.NoError(t, err, "expected a password reset token in the database")
+	// Only a digest is stored in the database; the one-time raw token exists in
+	// the email delivery boundary.
+	token := latestPasswordResetToken(t, mockEmail)
 
 	// Now reset the password with the real token.
 	rpBody, _ := json.Marshal(map[string]interface{}{
@@ -308,7 +323,7 @@ func TestResetPassword_InvalidToken(t *testing.T) {
 // TestResetPassword_AlreadyUsedToken verifies that a token that has already
 // been consumed returns 400 rather than allowing a second password reset.
 func TestResetPassword_AlreadyUsedToken(t *testing.T) {
-	handler, _, db, cleanup := setupAuthHandlerForEmailTest(t)
+	handler, mockEmail, db, cleanup := setupAuthHandlerForEmailTest(t)
 	defer cleanup()
 
 	username := uniqueAuthEmailUsername("rp_used")
@@ -324,11 +339,7 @@ func TestResetPassword_AlreadyUsedToken(t *testing.T) {
 	fpReq.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(httptest.NewRecorder(), fpReq)
 
-	ctx := context.Background()
-	var token string
-	require.NoError(t, db.Pool.QueryRow(ctx,
-		`SELECT token FROM password_resets WHERE used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
-	).Scan(&token))
+	token := latestPasswordResetToken(t, mockEmail)
 
 	// Use the token once — should succeed.
 	firstBody, _ := json.Marshal(map[string]interface{}{

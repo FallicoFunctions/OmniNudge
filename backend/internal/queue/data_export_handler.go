@@ -25,6 +25,21 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 			return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 		}
+		if payload.ExportID == "" {
+			return fmt.Errorf("data export payload is missing export_id: %w", asynq.SkipRetry)
+		}
+
+		// Redis is a delivery mechanism, not an authorization source. Resolve all
+		// sensitive fields from the server-created request row.
+		if err := db.QueryRow(ctx, `
+			SELECT user_id, data_types, include_deleted
+			FROM data_export_requests
+			WHERE export_id = $1
+			  AND status IN ('pending', 'processing')
+			  AND expires_at > NOW()
+		`, payload.ExportID).Scan(&payload.UserID, &payload.DataTypes, &payload.IncludeDeleted); err != nil {
+			return fmt.Errorf("data export request is unavailable: %v: %w", err, asynq.SkipRetry)
+		}
 
 		zlog.Info().Int("user_id", payload.UserID).Str("export_id", payload.ExportID).Strs("types", payload.DataTypes).Msg("data_export: starting")
 
@@ -32,15 +47,15 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		_, err := db.Exec(ctx, `
 			UPDATE data_export_requests
 			SET status = 'processing'
-			WHERE export_id = $1
-		`, payload.ExportID)
+			WHERE export_id = $1 AND user_id = $2
+		`, payload.ExportID, payload.UserID)
 		if err != nil {
 			return fmt.Errorf("failed to update status: %w", err)
 		}
 
 		// Create temporary directory for export
-		tempDir := filepath.Join(os.TempDir(), "omninudge_export_"+payload.ExportID)
-		if err := os.MkdirAll(tempDir, 0755); err != nil {
+		tempDir, err := os.MkdirTemp("", "omninudge-export-*")
+		if err != nil {
 			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to create temp dir: %v", err))
 		}
 		defer os.RemoveAll(tempDir)
@@ -54,25 +69,30 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 			JOIN group_encryption_keys gek ON esk.group_key_id = gek.id
 			WHERE esk.export_id = $1 AND esk.user_id = $2
 		`, payload.ExportID, payload.UserID)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var convID int
-				var encryptedKey string
-				if err := rows.Scan(&convID, &encryptedKey); err == nil {
-					// Decrypt session key using system master key
-					rawKey, err := utils.DecryptWithSystemKey(encryptedKey, []byte(masterKey))
-					if err == nil {
-						sessionKeys[convID] = append(sessionKeys[convID], []byte(rawKey))
-					}
-				}
-			}
-			// Check for mid-iteration network or server errors. A partial read
-			// would silently truncate the session key list without this check.
-			if rowsErr := rows.Err(); rowsErr != nil {
-				zlog.Warn().Err(rowsErr).Str("export_id", payload.ExportID).Msg("data_export: partial read of session keys — some messages may be unreadable")
-			}
+		if err != nil {
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to load export keys: %v", err))
 		}
+		for rows.Next() {
+			var convID int
+			var encryptedKey string
+			if err := rows.Scan(&convID, &encryptedKey); err != nil {
+				rows.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to read export key: %v", err))
+			}
+			// Decrypt session key using the system master key. A partial key set
+			// would produce an apparently successful but unreadable user export.
+			rawKey, err := utils.DecryptWithSystemKey(encryptedKey, []byte(masterKey))
+			if err != nil {
+				rows.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to decrypt export key: %v", err))
+			}
+			sessionKeys[convID] = append(sessionKeys[convID], []byte(rawKey))
+		}
+		if rowsErr := rows.Err(); rowsErr != nil {
+			rows.Close()
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to read export keys: %v", rowsErr))
+		}
+		rows.Close()
 
 		// 2. Export each data type to its own JSON file
 		for _, dataType := range payload.DataTypes {
@@ -99,8 +119,7 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 			case "encryption_keys":
 				data, err = exportEncryptionKeysData(ctx, db, payload.UserID)
 			default:
-				zlog.Warn().Str("data_type", dataType).Str("export_id", payload.ExportID).Msg("data_export: unknown data type, skipping")
-				continue
+				return updateExportFailed(ctx, db, payload.ExportID, "Export request contains an unsupported data type")
 			}
 
 			if err != nil {
@@ -110,48 +129,73 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 
 			// Save to JSON file
 			filePath := filepath.Join(tempDir, dataType+".json")
-			file, err := os.Create(filePath)
+			file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 			if err != nil {
-				zlog.Warn().Err(err).Str("file_path", filePath).Str("export_id", payload.ExportID).Msg("data_export: failed to create temp file")
-				continue
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to create export file: %v", err))
 			}
 
 			encoder := json.NewEncoder(file)
 			encoder.SetIndent("", "  ")
 			if err := encoder.Encode(data); err != nil {
-				zlog.Warn().Err(err).Str("data_type", dataType).Str("export_id", payload.ExportID).Msg("data_export: failed to encode data type")
+				_ = file.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to encode export data: %v", err))
 			}
-			file.Close()
+			if err := file.Close(); err != nil {
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to close export file: %v", err))
+			}
 		}
 
 		// 3. Create ZIP archive
-		zipPath := filepath.Join(os.TempDir(), "export_"+payload.ExportID+".zip")
-		zipFile, err := os.Create(zipPath)
+		zipFile, err := os.CreateTemp("", "omninudge-export-*.zip")
 		if err != nil {
 			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to create ZIP: %v", err))
 		}
+		zipPath := zipFile.Name()
 		defer os.Remove(zipPath)
 
 		zipWriter := zip.NewWriter(zipFile)
-		files, _ := os.ReadDir(tempDir)
+		files, err := os.ReadDir(tempDir)
+		if err != nil {
+			_ = zipWriter.Close()
+			_ = zipFile.Close()
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to read export files: %v", err))
+		}
 		for _, f := range files {
 			fPath := filepath.Join(tempDir, f.Name())
 			fileToZip, err := os.Open(fPath)
 			if err != nil {
-				continue
+				_ = zipWriter.Close()
+				_ = zipFile.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to read export file: %v", err))
 			}
 
 			w, err := zipWriter.Create(f.Name())
 			if err != nil {
-				fileToZip.Close()
-				continue
+				_ = fileToZip.Close()
+				_ = zipWriter.Close()
+				_ = zipFile.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to add ZIP entry: %v", err))
 			}
 
-			_, _ = io.Copy(w, fileToZip)
-			fileToZip.Close()
+			if _, err := io.Copy(w, fileToZip); err != nil {
+				_ = fileToZip.Close()
+				_ = zipWriter.Close()
+				_ = zipFile.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to write ZIP entry: %v", err))
+			}
+			if err := fileToZip.Close(); err != nil {
+				_ = zipWriter.Close()
+				_ = zipFile.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to close export source: %v", err))
+			}
 		}
-		zipWriter.Close()
-		zipFile.Close()
+		if err := zipWriter.Close(); err != nil {
+			_ = zipFile.Close()
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to finalize ZIP: %v", err))
+		}
+		if err := zipFile.Close(); err != nil {
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to close ZIP: %v", err))
+		}
 
 		// 4. Upload to storage
 		finalZip, err := os.Open(zipPath)
@@ -160,7 +204,10 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		}
 		defer finalZip.Close()
 
-		fileInfo, _ := os.Stat(zipPath)
+		fileInfo, err := os.Stat(zipPath)
+		if err != nil {
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to stat ZIP: %v", err))
+		}
 		fileSize := fileInfo.Size()
 
 		storageKey := fmt.Sprintf("exports/%d/%s.zip", payload.UserID, payload.ExportID)
@@ -194,8 +241,18 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		}
 
 		// 7. Send email notification
+		var storedEmail *string
+		var emailEncrypted bool
 		var userEmail string
-		_ = db.QueryRow(ctx, "SELECT email FROM users WHERE id = $1", payload.UserID).Scan(&userEmail)
+		if err := db.QueryRow(ctx, "SELECT email, email_encrypted FROM users WHERE id = $1", payload.UserID).Scan(&storedEmail, &emailEncrypted); err == nil && storedEmail != nil {
+			if emailEncrypted {
+				if decrypted, decryptErr := utils.DecryptEmail(*storedEmail); decryptErr == nil {
+					userEmail = decrypted
+				}
+			} else {
+				userEmail = *storedEmail
+			}
+		}
 
 		if userEmail != "" && email != nil {
 			subject := "Your OmniNudge Data Export is Ready"
@@ -234,17 +291,33 @@ func exportProfileData(ctx context.Context, db *pgxpool.Pool, userID int) (inter
 		CreatedAt time.Time `json:"created_at"`
 		LastSeen  time.Time `json:"last_seen"`
 	}
+	var storedEmail *string
+	var emailEncrypted bool
 
 	err := db.QueryRow(ctx, `
-		SELECT id, username, email, bio, avatar_url, role, created_at, last_seen
+		SELECT id, username, email, email_encrypted, bio, avatar_url, role, created_at, last_seen
 		FROM users
 		WHERE id = $1
 	`, userID).Scan(
-		&profile.ID, &profile.Username, &profile.Email,
+		&profile.ID, &profile.Username, &storedEmail, &emailEncrypted,
 		&profile.Bio, &profile.AvatarURL, &profile.Role, &profile.CreatedAt, &profile.LastSeen,
 	)
+	if err != nil {
+		return profile, err
+	}
+	if storedEmail != nil {
+		if emailEncrypted {
+			decrypted, decryptErr := utils.DecryptEmail(*storedEmail)
+			if decryptErr != nil {
+				return profile, decryptErr
+			}
+			profile.Email = &decrypted
+		} else {
+			profile.Email = storedEmail
+		}
+	}
 
-	return profile, err
+	return profile, nil
 }
 
 func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool, conversationKeys map[int][][]byte) (interface{}, error) {

@@ -1171,51 +1171,6 @@ func (h *UsersHandler) ChangePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
 }
 
-type updateEmailRequest struct {
-	Email        string `json:"email" binding:"required,email"`
-	EmailConfirm string `json:"email_confirm" binding:"required"`
-}
-
-// UpdateEmail updates the authenticated user's email address.
-// NOTE: this legacy path is not registered in main router; the active
-// /users/email endpoint is served by AuthHandler.UpdateEmail.
-func (h *UsersHandler) UpdateEmail(c *gin.Context) {
-	userID, ok := middleware.GetAuthenticatedUserID(c)
-	if !ok {
-		return
-	}
-
-	var req updateEmailRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		RespondError(c, http.StatusBadRequest, "Invalid request. Please provide a valid email address")
-		return
-	}
-
-	if req.Email != req.EmailConfirm {
-		RespondError(c, http.StatusBadRequest, "Email addresses do not match")
-		return
-	}
-
-	normalizedEmail := strings.ToLower(strings.TrimSpace(req.Email))
-	if normalizedEmail == "" {
-		RespondError(c, http.StatusBadRequest, "Email cannot be empty")
-		return
-	}
-
-	atIndex := strings.Index(normalizedEmail, "@")
-	if atIndex < 1 || atIndex >= len(normalizedEmail)-1 {
-		RespondError(c, http.StatusBadRequest, "Invalid email format")
-		return
-	}
-
-	if err := h.userRepo.UpdateEmail(c.Request.Context(), userID, &normalizedEmail); err != nil {
-		RespondError(c, http.StatusInternalServerError, "Failed to update email")
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Email updated successfully"})
-}
-
 // Ping updates the user's last_seen timestamp without fetching the profile.
 // @Summary      Ping (update last seen)
 // @Tags         Users
@@ -1255,6 +1210,8 @@ func profileResponseCacheKey(profileUserID, viewerID int, exposeLastSeen bool) s
 	return fmt.Sprintf("profile:response:%d:%s:%t", profileUserID, profileResponseCacheScope(profileUserID, viewerID), exposeLastSeen)
 }
 
+const profileResponseCacheTTL = 5 * time.Minute
+
 func (h *UsersHandler) getCachedProfileResponse(ctx context.Context, profileUserID, viewerID int, exposeLastSeen bool) (UserProfileResponse, bool) {
 	cacheKey := profileResponseCacheKey(profileUserID, viewerID, exposeLastSeen)
 	raw, hit, err := h.cache.Get(ctx, cacheKey)
@@ -1275,7 +1232,7 @@ func (h *UsersHandler) setCachedProfileResponse(ctx context.Context, profileUser
 		return
 	}
 	cacheKey := profileResponseCacheKey(profileUserID, viewerID, exposeLastSeen)
-	_ = h.cache.Set(ctx, cacheKey, string(data), services.TTLUserProfile)
+	_ = h.cache.Set(ctx, cacheKey, string(data), profileResponseCacheTTL)
 }
 
 func (h *UsersHandler) invalidateProfileResponseCache(ctx context.Context, profileUserID int) {

@@ -114,6 +114,40 @@ func TestTrackEvent_MissingEvent(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+func TestTrackEvent_RejectsInvalidIdentifiersAndEventNames(t *testing.T) {
+	tests := []map[string]interface{}{
+		{"event": "Invalid Event"},
+		{"event": "page_view", "anonymous_id": "not-a-uuid"},
+		{"event": "page_view", "session_id": "not-a-uuid"},
+	}
+	for _, payload := range tests {
+		t.Run(fmt.Sprint(payload), func(t *testing.T) {
+			handler, _, _ := setupAnalyticsHandlerTest(t)
+			body, _ := json.Marshal(payload)
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, "/analytics/track", bytes.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			handler.TrackEvent(c)
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+		})
+	}
+}
+
+func TestTrackEvent_RejectsOversizedProperties(t *testing.T) {
+	handler, _, _ := setupAnalyticsHandlerTest(t)
+	body, _ := json.Marshal(map[string]interface{}{
+		"event":      "page_view",
+		"properties": map[string]interface{}{"payload": string(make([]byte, maxAnalyticsPropertiesBytes+1))},
+	})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/analytics/track", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	handler.TrackEvent(c)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 // TestGetDashboard_TopEventsPresent verifies the endpoint responds without
 // panicking. On a fresh test DB the DAU materialized view may not be populated
 // (CONCURRENTLY requires at least one prior refresh), so the handler may return

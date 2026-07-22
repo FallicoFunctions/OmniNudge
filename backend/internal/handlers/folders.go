@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
-	"github.com/omninudge/backend/internal/api/middleware"
 	"errors"
+	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
 	"net/http"
 	"strconv"
 	"strings"
@@ -497,8 +497,28 @@ func (h *FoldersHandler) GetFolderConversations(c *gin.Context) {
 		FROM conversation_folder_members m
 		JOIN conversations c ON c.id = m.conversation_id
 		WHERE m.folder_id = $1
+		  AND (
+			-- DMs remain visible only while the folder owner is a participant and
+			-- has not deleted the conversation from their own inbox.
+			(
+				COALESCE(c.conversation_type, 'dm') = 'dm'
+				AND (
+					(c.user1_id = $2 AND COALESCE(c.deleted_for_user1, FALSE) = FALSE)
+					OR (c.user2_id = $2 AND COALESCE(c.deleted_for_user2, FALSE) = FALSE)
+				)
+			)
+			-- Group and mod-mail membership is stored in the participants table;
+			-- stale folder entries must never resurrect access after removal.
+			OR (
+				COALESCE(c.conversation_type, 'dm') IN ('group', 'mod_mail')
+				AND EXISTS (
+					SELECT 1 FROM conversation_participants cp
+					WHERE cp.conversation_id = c.id AND cp.user_id = $2
+				)
+			)
+		  )
 		ORDER BY c.last_message_at DESC
-	`, folderID)
+	`, folderID, userID)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to load folder conversations")
 		return

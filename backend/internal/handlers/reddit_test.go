@@ -3,8 +3,10 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -39,6 +41,32 @@ func (m *mockRedditCache) Set(ctx context.Context, key string, value string, ttl
 // hostRewriteTransport rewrites outgoing requests to a test server
 type hostRewriteTransport struct {
 	target *httptest.Server
+}
+
+func TestProxyRedditMediaRejectsUpstreamRedirects(t *testing.T) {
+	previousClient := proxyHTTPClient
+	t.Cleanup(func() { proxyHTTPClient = previousClient })
+	var calls atomic.Int32
+	proxyHTTPClient = &http.Client{
+		Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+			calls.Add(1)
+			return &http.Response{
+				StatusCode: http.StatusFound,
+				Header:     http.Header{"Location": []string{"http://169.254.169.254/latest/meta-data/"}},
+				Body:       io.NopCloser(strings.NewReader("")),
+				Request:    request,
+			}, nil
+		}),
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
+	}
+
+	router := gin.New()
+	router.GET("/proxy", (&RedditHandler{}).ProxyRedditMedia)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/proxy?url=https%3A%2F%2Fv.redd.it%2Fmedia", nil))
+
+	require.Equal(t, http.StatusBadGateway, response.Code)
+	require.Equal(t, int32(1), calls.Load(), "the redirect target must not be requested")
 }
 
 func (t *hostRewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
