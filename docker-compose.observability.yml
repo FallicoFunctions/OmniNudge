@@ -1,9 +1,7 @@
 # Observability stack: Grafana + Loki + Promtail
 # Usage: docker compose -f docker-compose.observability.yml up -d
-# Grafana UI: http://localhost:3000 (admin/admin)
+# Grafana UI: http://localhost:3000 (credentials must be supplied via env)
 # Loki API:   http://localhost:3100
-
-version: "3.8"
 
 volumes:
   grafana-data:
@@ -22,7 +20,7 @@ services:
     container_name: omninudge-loki
     restart: unless-stopped
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - loki-data:/loki
@@ -54,9 +52,9 @@ services:
     container_name: omninudge-grafana
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:?set a non-default Grafana admin password}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
     volumes:

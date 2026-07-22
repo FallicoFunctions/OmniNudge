@@ -88,3 +88,10 @@ backend/*.txt
 .claude/
 backend/dump.rdb
 frontend/storybook-static/
+
+# Local environment files can contain deployment credentials. Keep templates
+# such as .env.example and monitoring/.env.example tracked instead.
+.env
+.env.*
+!.env.example
+!monitoring/.env.example
