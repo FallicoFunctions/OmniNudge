@@ -16,6 +16,7 @@ import { createAtmosphereRig } from './createAtmosphereRig';
 import { createCascadeCourtWaterMotion } from './cascadeCourtWaterMotion';
 import { createFestivalField } from './createFestivalField';
 import { createStageShow } from './createStageShow';
+import { createVipForecourtDressing } from './createVipForecourtDressing';
 import { createWayfindingSigns } from './createWayfindingSigns';
 import { createLightingRig } from './createLightingRig';
 import { createMainStageCollisionBlockers } from './createMainStageCollisionBlockers';
@@ -75,6 +76,10 @@ export async function createMainStageScene(engine: AbstractEngine) {
   const collisionMeshSet = new Set(stageAssets.collisionMeshes);
   stageAssets.mainMeshes = scene.meshes.filter((mesh) => !collisionMeshSet.has(mesh));
   stageAssets.solidCollisionMeshes = createMainStageCollisionBlockers(scene, stageAssets.mainMeshes);
+
+  // Warm lantern dressing for the VIP forecourts. Before the lighting rig:
+  // the rig scans for LanternWarmCore meshes to attach practical pool lights.
+  const vipForecourtDressing = createVipForecourtDressing(scene);
 
   const lightingRig = createLightingRig(scene, perfFlags);
   const atmosphereRig = createAtmosphereRig(scene);
@@ -266,6 +271,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
       cascadeWaterMotion,
       festivalField,
       stageShow,
+      vipForecourtDressing,
       wayfindingSigns,
       spawn: BACK_PLAZA_SPAWN,
     },
