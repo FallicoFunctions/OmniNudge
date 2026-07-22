@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 .test-dist
+.lighthouseci
+coverage
 
 # Environment variables
 .env
