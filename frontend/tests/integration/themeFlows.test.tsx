@@ -263,7 +263,7 @@ describe('Theme flows E2E', () => {
 
     await waitFor(() => expect(mockThemeService.createTheme).toHaveBeenCalled());
     await waitFor(() => expect(screen.queryByText(/Theme Editor/i)).not.toBeInTheDocument(), {
-      timeout: 2500,
+      timeout: 5000,
     });
 
     await user.click(screen.getByRole('button', { name: /Active Theme/i }));

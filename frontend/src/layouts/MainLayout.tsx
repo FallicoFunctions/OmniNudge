@@ -48,6 +48,7 @@ const prefetchRoutes = {
 
 // Captured at module load so components don't call Date.now() during render
 const MODULE_LOAD_TIME = Date.now();
+const ABOUT_MODAL_STORAGE_KEY = 'omninudge_about_modal_dismissed';
 
 export default function MainLayout() {
   const { t } = useTranslation();
@@ -66,9 +67,13 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      !location.pathname.startsWith('/omnichat') &&
+      localStorage.getItem(ABOUT_MODAL_STORAGE_KEY) !== 'true'
+  );
   const [dontShowAgain, setDontShowAgain] = useState(false);
-  const aboutModalStorageKey = 'omninudge_about_modal_dismissed';
   const [showBugReportModal, setShowBugReportModal] = useState(false);
   const [bugReportUrl, setBugReportUrl] = useState('');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -205,11 +210,11 @@ export default function MainLayout() {
       setShowAboutModal(false);
       return;
     }
-    const dismissed = localStorage.getItem(aboutModalStorageKey) === 'true';
+    const dismissed = localStorage.getItem(ABOUT_MODAL_STORAGE_KEY) === 'true';
     if (!dismissed) {
       setShowAboutModal(true);
     }
-  }, [aboutModalStorageKey, isOmniChatRoute]);
+  }, [isOmniChatRoute]);
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
@@ -537,7 +542,7 @@ export default function MainLayout() {
       {showAboutModal && !isOmniChatRoute && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 py-6">
           <div className="w-full max-w-4xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl">
-            <div className="max-h-[70vh] overflow-y-auto pr-2">
+            <div className="h-[70vh] overflow-y-auto pr-2">
               <Suspense
                 fallback={
                   <div className="py-6">
@@ -562,7 +567,7 @@ export default function MainLayout() {
                 type="button"
                 onClick={() => {
                   if (dontShowAgain) {
-                    localStorage.setItem(aboutModalStorageKey, 'true');
+                    localStorage.setItem(ABOUT_MODAL_STORAGE_KEY, 'true');
                   }
                   setShowAboutModal(false);
                 }}

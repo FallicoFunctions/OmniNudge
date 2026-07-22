@@ -784,16 +784,10 @@ export function RedditPostCard({
           instance.attachMedia(videoEl);
           if (mounted) {
             hlsInstance = instance;
-            if (instance.on) {
-              // Access Events from the real Hls.js library
-              const HlsEvents = (Hls as unknown as { Events?: { MANIFEST_PARSED: string } }).Events;
-              if (HlsEvents) {
-                instance.on(HlsEvents.MANIFEST_PARSED, () => {
-                  debugLog('[HLS Effect] MANIFEST_PARSED - calling attemptAutoplay');
-                  attemptAutoplay();
-                });
-              }
-            }
+            instance.on(Hls.Events.MANIFEST_PARSED, () => {
+              debugLog('[HLS Effect] MANIFEST_PARSED - calling attemptAutoplay');
+              attemptAutoplay();
+            });
           } else {
             instance.destroy();
           }
