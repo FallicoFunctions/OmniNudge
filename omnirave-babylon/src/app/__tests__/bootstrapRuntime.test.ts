@@ -352,6 +352,7 @@ describe('createRuntime', () => {
     const applyCheckpointView = vi.fn();
     const routeProgressReset = vi.fn();
     const setAvatarColorway = vi.fn();
+    const completionCelebrationStop = vi.fn();
     const scene = {
       pick: scenePick,
       render: sceneRender,
@@ -414,6 +415,9 @@ describe('createRuntime', () => {
             emissiveHex: '#49b9ff',
           },
           setAvatarColorway,
+          completionCelebration: {
+            stop: completionCelebrationStop,
+          },
           routeProgress: {
             activeCheckpoint: {
               id: 'spawn_reveal',
@@ -526,6 +530,22 @@ describe('createRuntime', () => {
     expect(setAvatarColorway).toHaveBeenCalledWith('pulse');
     expect(host.querySelector('[data-avatar-colorway="pulse"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(engineDispose).not.toHaveBeenCalled();
+
+    // Play Again: stops any in-flight finale, resets route progress to the
+    // start, teleports to the back-plaza spawn, and applies the same
+    // standard follow framing fast-travel uses (default north-facing since
+    // there's no authored checkpoint view to derive a look direction from).
+    host.querySelector<HTMLButtonElement>('[data-review-restart]')?.click();
+    expect(completionCelebrationStop).toHaveBeenCalledTimes(1);
+    expect(routeProgressReset).toHaveBeenCalledWith(0);
+    expect(playerPositionSet).toHaveBeenCalledWith(0, 1.7, -48);
+    expect(applyCheckpointView).toHaveBeenCalledWith({
+      alpha: 0,
+      beta: 1.12,
+      radius: 7,
+      focusOffset: { x: 0, y: -0.35, z: 0 },
+      positionOffset: { x: 0, y: 2.25, z: -7 },
+    });
 
     runtime.dispose();
   });
