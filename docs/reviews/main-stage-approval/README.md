@@ -42,6 +42,13 @@ byte-identical to `vip-view`. The pack carries the three unique references.
 
 - Route: all 6 objectives walkable, completion fireworks + Play Again verified.
 - Collision: envelope fence, basin caps, promenade opened past the approach deck.
+- Flank access: the cascade-court blockers now hug the built water feature
+  instead of sealing the whole pocket, so the cascade plazas, flank fields,
+  and both VIP forecourts are reachable on foot (verified by collision
+  flood-fill from spawn; water and backstage volumes stay sealed). Walking
+  route to VIP: south field → strip between the crowd-pit fence and the
+  cascade court → corridor past the wing shell (|x| 30..34) → flank field →
+  forecourt.
 - Signs: all four wayfinding labels verified upright/left-to-right in-engine.
 - Dev chrome: hidden by default; captures here used `?debug=1` for the HUD
   travel buttons only (DOM overlay — never in canvas captures).
