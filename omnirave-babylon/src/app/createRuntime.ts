@@ -153,79 +153,92 @@ export async function createRuntime(host: HTMLElement) {
     const scene = await createScene(activeEngine);
     const reviewRuntime = scene.metadata?.reviewRuntime;
     const reviewCheckpoints = reviewRuntime?.checkpoints as readonly ReviewCheckpoint[] | undefined;
-    const reviewHud = createReviewHud(host, {
-      avatarColorways: reviewRuntime?.avatarColorways,
-      checkpoints: reviewCheckpoints,
-      selectedAvatarColorwayId: reviewRuntime?.selectedAvatarColorway?.id,
-      onSelectAvatarColorway(colorway) {
-        reviewRuntime?.setAvatarColorway?.(colorway.id);
-        for (const button of Array.from(reviewHud.querySelectorAll<HTMLButtonElement>('[data-avatar-colorway]'))) {
-          button.ariaPressed = String(button.dataset.avatarColorway === colorway.id);
-        }
-      },
-      onSelectCheckpoint(checkpoint) {
-        reviewRuntime?.playerRig?.root.position.set(checkpoint.x, checkpoint.y, checkpoint.z);
-        const checkpointIndex = reviewCheckpoints?.findIndex((routeCheckpoint) => routeCheckpoint.id === checkpoint.id) ?? -1;
-        if (checkpointIndex >= 0) {
-          reviewRuntime?.routeProgress?.reset(checkpointIndex);
-        }
-        // Fast travel lands in the standard follow framing - avatar
-        // centered, facing the checkpoint's authored look direction. The
-        // raw authored views are scenery shots whose look target can sit
-        // tens of meters from the avatar; teleporting into one left the
-        // player unable to find themselves (flagged on the VIP terrace).
-        const travelView = resolveTravelCameraOffsets(checkpoint.camera);
-        // Defer one frame: the player's ground-height snap runs in the next
-        // onBeforeRender, and applying the camera from the pre-snap player
-        // position intermittently lands it inside nearby geometry.
-        scene.onAfterRenderObservable.addOnce(() => {
-          reviewRuntime?.cameraRig?.applyCheckpointView({
-            alpha: 0,
-            beta: 1.12,
-            radius: TRAVEL_CAMERA_DISTANCE,
-            ...travelView,
-          });
-        });
-      },
-      onRestartRoute() {
-        reviewRuntime?.completionCelebration?.stop();
-        reviewRuntime?.routeProgress?.reset(0);
-        reviewRuntime?.playerRig?.root.position.set(
-          BACK_PLAZA_SPAWN.x,
-          BACK_PLAZA_SPAWN.y,
-          BACK_PLAZA_SPAWN.z,
-        );
-        // Same standard follow framing as a checkpoint fast-travel, facing
-        // the default north-facing direction (no authored view to derive from).
-        const travelView = resolveTravelCameraOffsets(undefined);
-        scene.onAfterRenderObservable.addOnce(() => {
-          reviewRuntime?.cameraRig?.applyCheckpointView({
-            alpha: 0,
-            beta: 1.12,
-            radius: TRAVEL_CAMERA_DISTANCE,
-            ...travelView,
-          });
-        });
-      },
-    });
-    hud = reviewHud;
-    perfOverlay = createPerfOverlay(host);
-    debugPanel = createDebugPanel(host);
-    const objectiveReadout = reviewHud.querySelector<HTMLOutputElement>('[data-review-objective]');
-    const completeBanner = reviewHud.querySelector<HTMLElement>('[data-review-complete]');
-    const pickReadout = debugPanel.querySelector<HTMLOutputElement>('[data-debug-readout="mesh-pick"]');
-    const playerReadout = debugPanel.querySelector<HTMLOutputElement>('[data-debug-readout="player-state"]');
 
-    handleCanvasPick = (event: MouseEvent) => {
-      if (!pickReadout) {
-        return;
-      }
+    // The review HUD, perf overlay, debug panel, and canvas pick handler are
+    // dev-only chrome: the shipped player experience is just the render
+    // canvas (plus the always-on loading/error overlays). They only exist
+    // when explicitly requested via ?debug=1 / ?perf=debug.
+    let reviewHud: HTMLElement | undefined;
+    let objectiveReadout: HTMLOutputElement | null = null;
+    let completeBanner: HTMLElement | null = null;
+    let pickReadout: HTMLOutputElement | null = null;
+    let playerReadout: HTMLOutputElement | null = null;
 
-      const pick = scene.pick(event.offsetX ?? 0, event.offsetY ?? 0);
-      pickReadout.value = pick?.pickedMesh?.name ?? 'none';
-      pickReadout.textContent = `Pick: ${pick?.pickedMesh?.name ?? 'none'}`;
-    };
-    canvas.addEventListener('click', handleCanvasPick);
+    if (perfFlags.debug) {
+      reviewHud = createReviewHud(host, {
+        avatarColorways: reviewRuntime?.avatarColorways,
+        checkpoints: reviewCheckpoints,
+        selectedAvatarColorwayId: reviewRuntime?.selectedAvatarColorway?.id,
+        onSelectAvatarColorway(colorway) {
+          reviewRuntime?.setAvatarColorway?.(colorway.id);
+          for (const button of Array.from(reviewHud?.querySelectorAll<HTMLButtonElement>('[data-avatar-colorway]') ?? [])) {
+            button.ariaPressed = String(button.dataset.avatarColorway === colorway.id);
+          }
+        },
+        onSelectCheckpoint(checkpoint) {
+          reviewRuntime?.playerRig?.root.position.set(checkpoint.x, checkpoint.y, checkpoint.z);
+          const checkpointIndex = reviewCheckpoints?.findIndex((routeCheckpoint) => routeCheckpoint.id === checkpoint.id) ?? -1;
+          if (checkpointIndex >= 0) {
+            reviewRuntime?.routeProgress?.reset(checkpointIndex);
+          }
+          // Fast travel lands in the standard follow framing - avatar
+          // centered, facing the checkpoint's authored look direction. The
+          // raw authored views are scenery shots whose look target can sit
+          // tens of meters from the avatar; teleporting into one left the
+          // player unable to find themselves (flagged on the VIP terrace).
+          const travelView = resolveTravelCameraOffsets(checkpoint.camera);
+          // Defer one frame: the player's ground-height snap runs in the next
+          // onBeforeRender, and applying the camera from the pre-snap player
+          // position intermittently lands it inside nearby geometry.
+          scene.onAfterRenderObservable.addOnce(() => {
+            reviewRuntime?.cameraRig?.applyCheckpointView({
+              alpha: 0,
+              beta: 1.12,
+              radius: TRAVEL_CAMERA_DISTANCE,
+              ...travelView,
+            });
+          });
+        },
+        onRestartRoute() {
+          reviewRuntime?.completionCelebration?.stop();
+          reviewRuntime?.routeProgress?.reset(0);
+          reviewRuntime?.playerRig?.root.position.set(
+            BACK_PLAZA_SPAWN.x,
+            BACK_PLAZA_SPAWN.y,
+            BACK_PLAZA_SPAWN.z,
+          );
+          // Same standard follow framing as a checkpoint fast-travel, facing
+          // the default north-facing direction (no authored view to derive from).
+          const travelView = resolveTravelCameraOffsets(undefined);
+          scene.onAfterRenderObservable.addOnce(() => {
+            reviewRuntime?.cameraRig?.applyCheckpointView({
+              alpha: 0,
+              beta: 1.12,
+              radius: TRAVEL_CAMERA_DISTANCE,
+              ...travelView,
+            });
+          });
+        },
+      });
+      hud = reviewHud;
+      perfOverlay = createPerfOverlay(host);
+      debugPanel = createDebugPanel(host);
+      objectiveReadout = reviewHud.querySelector<HTMLOutputElement>('[data-review-objective]');
+      completeBanner = reviewHud.querySelector<HTMLElement>('[data-review-complete]');
+      pickReadout = debugPanel.querySelector<HTMLOutputElement>('[data-debug-readout="mesh-pick"]');
+      playerReadout = debugPanel.querySelector<HTMLOutputElement>('[data-debug-readout="player-state"]');
+
+      handleCanvasPick = (event: MouseEvent) => {
+        if (!pickReadout) {
+          return;
+        }
+
+        const pick = scene.pick(event.offsetX ?? 0, event.offsetY ?? 0);
+        pickReadout.value = pick?.pickedMesh?.name ?? 'none';
+        pickReadout.textContent = `Pick: ${pick?.pickedMesh?.name ?? 'none'}`;
+      };
+      canvas.addEventListener('click', handleCanvasPick);
+    }
 
     const dispose = () => {
       if (disposed) {
@@ -282,7 +295,7 @@ export async function createRuntime(host: HTMLElement) {
         if (completeBanner) {
           completeBanner.hidden = !routeProgress.complete;
         }
-        for (const button of Array.from(reviewHud.querySelectorAll<HTMLButtonElement>('[data-review-checkpoint]'))) {
+        for (const button of Array.from(reviewHud?.querySelectorAll<HTMLButtonElement>('[data-review-checkpoint]') ?? [])) {
           const routeIndex = reviewCheckpoints?.findIndex((checkpoint) => checkpoint.id === button.dataset.reviewCheckpoint) ?? -1;
           if (routeIndex < 0 || routeIndex >= routeProgress.totalCount) {
             delete button.dataset.routeState;
@@ -296,7 +309,7 @@ export async function createRuntime(host: HTMLElement) {
         }
       }
       if (playerRuntime?.selectedAvatarColorway) {
-        for (const button of Array.from(reviewHud.querySelectorAll<HTMLButtonElement>('[data-avatar-colorway]'))) {
+        for (const button of Array.from(reviewHud?.querySelectorAll<HTMLButtonElement>('[data-avatar-colorway]') ?? [])) {
           button.ariaPressed = String(button.dataset.avatarColorway === playerRuntime.selectedAvatarColorway.id);
         }
       }
