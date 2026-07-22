@@ -64,10 +64,7 @@ export default function CharacterRouletteButton({
 
   const handleRoulette = () => {
     if (isShuffling) return;
-    const selectedPersona = pickRoulettePersona(
-      eligiblePersonas,
-      previousPersonaIdRef.current
-    );
+    const selectedPersona = pickRoulettePersona(eligiblePersonas, previousPersonaIdRef.current);
     if (!selectedPersona) return;
 
     previousPersonaIdRef.current = selectedPersona.id;
@@ -100,12 +97,13 @@ export default function CharacterRouletteButton({
           {isShuffling ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (
-            <Dices size={16} className="transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-110" />
+            <Dices
+              size={16}
+              className="transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-110"
+            />
           )}
         </span>
-        {isShuffling
-          ? t('omnichat.discover.rouletteShuffling')
-          : t('omnichat.discover.roulette')}
+        {isShuffling ? t('omnichat.discover.rouletteShuffling') : t('omnichat.discover.roulette')}
       </button>
 
       {revealPersona &&
@@ -118,10 +116,19 @@ export default function CharacterRouletteButton({
             data-testid="character-roulette-reveal"
           >
             <div className="relative flex max-w-sm flex-col items-center text-center">
-              <div className="absolute top-10 h-40 w-40 rounded-full bg-blue-500/25 blur-3xl" aria-hidden="true" />
+              <div
+                className="absolute top-10 h-40 w-40 rounded-full bg-blue-500/25 blur-3xl"
+                aria-hidden="true"
+              />
               <div className="relative mb-6">
-                <div className="absolute -inset-5 animate-pulse rounded-[34px] border border-blue-300/20" aria-hidden="true" />
-                <div className="absolute -inset-10 rounded-[46px] border border-blue-300/10" aria-hidden="true" />
+                <div
+                  className="absolute -inset-5 animate-pulse rounded-[34px] border border-blue-300/20"
+                  aria-hidden="true"
+                />
+                <div
+                  className="absolute -inset-10 rounded-[46px] border border-blue-300/10"
+                  aria-hidden="true"
+                />
                 <PersonaAvatar
                   persona={revealPersona}
                   rootRef={revealAvatarRef}

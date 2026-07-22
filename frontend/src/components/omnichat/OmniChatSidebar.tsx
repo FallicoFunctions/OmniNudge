@@ -13,7 +13,14 @@ import {
 } from 'lucide-react';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 
-export type SidebarTab = 'discover' | 'search' | 'chat' | 'groups' | 'create' | 'explore' | 'characters';
+export type SidebarTab =
+  | 'discover'
+  | 'search'
+  | 'chat'
+  | 'groups'
+  | 'create'
+  | 'explore'
+  | 'characters';
 
 interface OmniChatSidebarProps {
   activeTab: SidebarTab;
@@ -28,12 +35,27 @@ interface OmniChatSidebarProps {
 }
 
 const TABS: { id: SidebarTab; icon: typeof Compass; labelKey: string; fallbackLabel: string }[] = [
-  { id: 'discover', icon: Compass, labelKey: 'omnichat.sidebar.discover', fallbackLabel: 'Discover' },
+  {
+    id: 'discover',
+    icon: Compass,
+    labelKey: 'omnichat.sidebar.discover',
+    fallbackLabel: 'Discover',
+  },
   { id: 'chat', icon: MessageSquare, labelKey: 'omnichat.sidebar.chat', fallbackLabel: 'Chat' },
   { id: 'groups', icon: UsersRound, labelKey: 'omnichat.sidebar.groups', fallbackLabel: 'Groups' },
   { id: 'create', icon: ImagePlus, labelKey: 'omnichat.sidebar.create', fallbackLabel: 'Create' },
-  { id: 'explore', icon: PanelsTopLeft, labelKey: 'omnichat.sidebar.explore', fallbackLabel: 'Explore' },
-  { id: 'characters', icon: UsersRound, labelKey: 'omnichat.sidebar.characters', fallbackLabel: 'Characters' },
+  {
+    id: 'explore',
+    icon: PanelsTopLeft,
+    labelKey: 'omnichat.sidebar.explore',
+    fallbackLabel: 'Explore',
+  },
+  {
+    id: 'characters',
+    icon: UsersRound,
+    labelKey: 'omnichat.sidebar.characters',
+    fallbackLabel: 'Characters',
+  },
 ];
 
 function SidebarNav({
@@ -60,14 +82,18 @@ function SidebarNav({
             onClick={() => onTabChange(id)}
             title={collapsed ? resolvedLabel : undefined}
             className={`flex items-center rounded-2xl border transition ${
-              collapsed ? 'h-10 w-10 self-center justify-center px-0 rounded-[18px]' : 'h-14 justify-start px-4'
+              collapsed
+                ? 'h-10 w-10 self-center justify-center px-0 rounded-[18px]'
+                : 'h-14 justify-start px-4'
             } gap-3 ${
               active
                 ? 'border-blue-300/20 bg-gradient-to-r from-blue-500/20 to-sky-500/[0.07] text-white shadow-[0_16px_40px_rgba(20,48,96,0.25)]'
                 : 'border-transparent bg-transparent text-[rgba(255,255,255,0.58)] hover:border-white/10 hover:bg-white/[0.045] hover:text-white'
             }`}
           >
-            <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl transition ${active ? 'bg-blue-400/15 text-blue-200' : ''}`}>
+            <span
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl transition ${active ? 'bg-blue-400/15 text-blue-200' : ''}`}
+            >
               <Icon size={19} />
             </span>
             {!collapsed && <span className="truncate text-sm font-medium">{resolvedLabel}</span>}
@@ -113,12 +139,20 @@ export default function OmniChatSidebar({
           desktopCollapsed ? 'w-[72px] px-2' : 'w-[223px] px-3'
         }`}
       >
-        <div className={`mb-4 flex items-center ${desktopCollapsed ? 'justify-center' : 'justify-between gap-3'}`}>
-          {!desktopCollapsed && <span className="px-2 text-[10px] font-semibold uppercase tracking-[0.28em] text-white/30">Navigate</span>}
+        <div
+          className={`mb-4 flex items-center ${desktopCollapsed ? 'justify-center' : 'justify-between gap-3'}`}
+        >
+          {!desktopCollapsed && (
+            <span className="px-2 text-[10px] font-semibold uppercase tracking-[0.28em] text-white/30">
+              Navigate
+            </span>
+          )}
           <button
             type="button"
             onClick={() => onDesktopCollapsedChange(!desktopCollapsed)}
-            aria-label={desktopCollapsed ? t('omnichat.sidebar.openMenu') : t('omnichat.sidebar.closeMenu')}
+            aria-label={
+              desktopCollapsed ? t('omnichat.sidebar.openMenu') : t('omnichat.sidebar.closeMenu')
+            }
             className={`flex items-center justify-center border border-white/10 bg-white/[0.04] text-white/65 transition hover:bg-white/[0.08] hover:text-white ${
               desktopCollapsed ? 'h-10 w-10 rounded-[18px]' : 'h-10 w-10 rounded-2xl'
             }`}
@@ -171,7 +205,9 @@ export default function OmniChatSidebar({
             className="fixed inset-y-0 left-0 z-50 flex w-[248px] flex-col border-r border-white/10 bg-[#17171c]/95 px-4 pb-[max(1rem,var(--omnichat-safe-bottom))] pt-[max(1rem,var(--omnichat-safe-top))] backdrop-blur-xl lg:hidden"
           >
             <div className="mb-5 flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/35">Menu</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/35">
+                Menu
+              </span>
               <button
                 type="button"
                 onClick={onMobileClose}

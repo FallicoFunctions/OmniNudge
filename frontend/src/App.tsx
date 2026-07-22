@@ -42,7 +42,11 @@ const OmniChatPage = lazy(() => import('./pages/OmniChatPage'));
 const OmniChatStudioPage = lazy(() => import('./pages/OmniChatStudioPage'));
 const OmniChatCreatePage = lazy(() => import('./pages/OmniChatCreatePage'));
 const OmniChatExplorePage = lazy(() => import('./pages/OmniChatExplorePage'));
-const OmniChatPublicationPage = lazy(() => import('./pages/OmniChatExplorePage').then((module) => ({ default: module.OmniChatPublicationPage })));
+const OmniChatPublicationPage = lazy(() =>
+  import('./pages/OmniChatExplorePage').then((module) => ({
+    default: module.OmniChatPublicationPage,
+  }))
+);
 const OmniChatGroupsPage = lazy(() => import('./pages/OmniChatGroupsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const BlockedUsersPage = lazy(() => import('./pages/BlockedUsersPage'));
@@ -172,7 +176,10 @@ function App() {
                             <Route path="/reset-password" element={<ResetPasswordPage />} />
                             <Route path="/verify-email" element={<VerifyEmailPage />} />
                             <Route path="/auth/callback" element={<OAuthCallbackPage />} />
-                            <Route path="/auth/choose-username" element={<OAuthChooseUsernamePage />} />
+                            <Route
+                              path="/auth/choose-username"
+                              element={<OAuthChooseUsernamePage />}
+                            />
                             {import.meta.env.DEV && (
                               <Route
                                 path="/dev/loading-states"
@@ -229,15 +236,9 @@ function App() {
                                 </ProtectedRoute>
                               }
                             />
-                            <Route
-                              path="/omnichat"
-                              element={<OmniChatDiscoverPage />}
-                            />
+                            <Route path="/omnichat" element={<OmniChatDiscoverPage />} />
                             <Route path="/omnichat/chat" element={<OmniChatConversationsPage />} />
-                            <Route
-                              path="/omnichat/c/:conversationId"
-                              element={<OmniChatPage />}
-                            />
+                            <Route path="/omnichat/c/:conversationId" element={<OmniChatPage />} />
                             <Route
                               path="/omnichat/studio"
                               element={
@@ -255,8 +256,18 @@ function App() {
                               }
                             />
                             <Route path="/omnichat/explore" element={<OmniChatExplorePage />} />
-                            <Route path="/omnichat/explore/:publicationId" element={<OmniChatPublicationPage />} />
-                            <Route path="/omnichat/groups" element={<ProtectedRoute><OmniChatGroupsPage /></ProtectedRoute>} />
+                            <Route
+                              path="/omnichat/explore/:publicationId"
+                              element={<OmniChatPublicationPage />}
+                            />
+                            <Route
+                              path="/omnichat/groups"
+                              element={
+                                <ProtectedRoute>
+                                  <OmniChatGroupsPage />
+                                </ProtectedRoute>
+                              }
+                            />
                             <Route
                               path="/settings"
                               element={

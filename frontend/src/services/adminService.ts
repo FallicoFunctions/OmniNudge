@@ -211,7 +211,9 @@ export const adminService = {
   // ===== OMNICHAT PERSONAS =====
 
   async listOmniChatPersonas(): Promise<AdminOmniChatPersona[]> {
-    const response = await api.get<{ personas: AdminOmniChatPersona[] }>('/admin/omnichat/personas');
+    const response = await api.get<{ personas: AdminOmniChatPersona[] }>(
+      '/admin/omnichat/personas'
+    );
     return response.personas;
   },
 

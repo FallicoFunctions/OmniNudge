@@ -49,7 +49,7 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
         return existing.focus();
       }
       return self.clients.openWindow(targetURL);
-    }),
+    })
   );
 });
 

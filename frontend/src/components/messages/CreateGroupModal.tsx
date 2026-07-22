@@ -219,7 +219,10 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
                 <GroupAvatar name={groupName || 'G'} avatarUrl={avatarUrl || null} size={72} />
               </div>
               <div>
-                <label htmlFor={groupNameId} className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1">
+                <label
+                  htmlFor={groupNameId}
+                  className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1"
+                >
                   {t('groups.nameLabel')} <span className="text-[var(--color-error)] ml-1">*</span>
                 </label>
                 <input
@@ -247,7 +250,10 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
                 onClear={() => setAvatarUrl('')}
               />
               <div>
-                <label htmlFor={descriptionId} className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1">
+                <label
+                  htmlFor={descriptionId}
+                  className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1"
+                >
                   {t('groups.descriptionLabel')}
                 </label>
                 <textarea

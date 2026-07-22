@@ -22,11 +22,14 @@ describe('omnichatDefaults', () => {
   });
 
   it('loads saved defaults', () => {
-    saveOmniChatDefaults({
-      user_name: 'Riley',
-      user_age: '28',
-      user_gender: 'F',
-    }, 'guest');
+    saveOmniChatDefaults(
+      {
+        user_name: 'Riley',
+        user_age: '28',
+        user_gender: 'F',
+      },
+      'guest'
+    );
 
     expect(loadOmniChatDefaults('guest')).toEqual({
       user_name: 'Riley',
@@ -36,11 +39,14 @@ describe('omnichatDefaults', () => {
   });
 
   it('clears defaults', () => {
-    saveOmniChatDefaults({
-      user_name: 'Riley',
-      user_age: '28',
-      user_gender: 'F',
-    }, 'guest');
+    saveOmniChatDefaults(
+      {
+        user_name: 'Riley',
+        user_age: '28',
+        user_gender: 'F',
+      },
+      'guest'
+    );
     clearOmniChatDefaults('guest');
 
     expect(loadOmniChatDefaults('guest')).toEqual({

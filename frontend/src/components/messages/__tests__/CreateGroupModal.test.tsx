@@ -4,10 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CreateGroupModal } from '../CreateGroupModal';
 
-const {
-  mockCreateGroup,
-  mockUploadMedia,
-} = vi.hoisted(() => ({
+const { mockCreateGroup, mockUploadMedia } = vi.hoisted(() => ({
   mockCreateGroup: vi.fn(),
   mockUploadMedia: vi.fn(),
 }));

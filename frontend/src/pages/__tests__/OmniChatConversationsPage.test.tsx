@@ -97,7 +97,9 @@ describe('OmniChatConversationsPage', () => {
     renderPage();
 
     expect(await screen.findByText('Chat')).toBeInTheDocument();
-    expect(await screen.findByText('No conversations yet. Start chatting with a persona!')).toBeInTheDocument();
+    expect(
+      await screen.findByText('No conversations yet. Start chatting with a persona!')
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Unread' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Favorites' })).toBeInTheDocument();
   });

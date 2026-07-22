@@ -5,7 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OmniChatGroupsWorkspace } from '../OmniChatGroupsPage';
 import { omnichatService } from '../../services/omnichatService';
 
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ isAuthenticated: true, user: { id: 9 } }) }));
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ isAuthenticated: true, user: { id: 9 } }),
+}));
 vi.mock('../../services/omnichatService', () => ({
   omnichatQueryKeys: {
     groups: ['omnichat', 'groups'],

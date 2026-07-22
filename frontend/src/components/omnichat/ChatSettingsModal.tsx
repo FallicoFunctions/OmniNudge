@@ -2,7 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Copy, History, Loader2, MessageSquare, Save, ArrowRight, ScrollText, Trash2, X } from 'lucide-react';
+import {
+  Copy,
+  History,
+  Loader2,
+  MessageSquare,
+  Save,
+  ArrowRight,
+  ScrollText,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { Modal } from '../common/Modal';
 import PersonaDetailsModal from './PersonaDetailsModal';
 import { omnichatService, omnichatQueryKeys } from '../../services/omnichatService';
@@ -67,7 +77,9 @@ export default function ChatSettingsModal({
     mutationFn: (settings: ConversationSettings) =>
       omnichatService.updateSettings(conversationId as number, settings),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversation(conversationId as number) });
+      queryClient.invalidateQueries({
+        queryKey: omnichatQueryKeys.conversation(conversationId as number),
+      });
     },
   });
 
@@ -92,7 +104,9 @@ export default function ChatSettingsModal({
       deletionTimerRef.current = window.setTimeout(() => {
         setSlidingOutId(null);
         void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
-        void queryClient.invalidateQueries({ queryKey: [...omnichatQueryKeys.conversations, 'persona', persona.id] });
+        void queryClient.invalidateQueries({
+          queryKey: [...omnichatQueryKeys.conversations, 'persona', persona.id],
+        });
         deletionTimerRef.current = null;
       }, 300);
     },
@@ -191,10 +205,14 @@ export default function ChatSettingsModal({
             </button>
 
             {(updateSettingsMutation.isSuccess || localSaveSuccess) && (
-              <p className="text-center text-xs text-green-500">{t('omnichat.chat.settingsSaved')}</p>
+              <p className="text-center text-xs text-green-500">
+                {t('omnichat.chat.settingsSaved')}
+              </p>
             )}
             {updateSettingsMutation.isError && (
-              <p className="text-center text-xs text-red-500">{t('omnichat.chat.settingsSaveError')}</p>
+              <p className="text-center text-xs text-red-500">
+                {t('omnichat.chat.settingsSaveError')}
+              </p>
             )}
           </div>
 
@@ -208,7 +226,9 @@ export default function ChatSettingsModal({
             >
               <ScrollText size={18} className="text-[var(--color-text-secondary)]" />
               <div className="flex-1">
-                <p className="font-medium text-[var(--color-text-primary)]">{t('omnichat.chat.viewCharacterForm')}</p>
+                <p className="font-medium text-[var(--color-text-primary)]">
+                  {t('omnichat.chat.viewCharacterForm')}
+                </p>
                 <p className="text-xs text-[var(--color-text-muted)]">
                   {t('omnichat.chat.viewCharacterFormDescription')}
                 </p>
@@ -238,7 +258,10 @@ export default function ChatSettingsModal({
                     </p>
                   </div>
                   {forkMutation.isPending ? (
-                    <Loader2 size={16} className="animate-spin text-[var(--color-text-secondary)]" />
+                    <Loader2
+                      size={16}
+                      className="animate-spin text-[var(--color-text-secondary)]"
+                    />
                   ) : (
                     <ArrowRight size={16} className="text-[var(--color-text-secondary)]" />
                   )}
@@ -277,13 +300,21 @@ export default function ChatSettingsModal({
                 {otherConversations.length > 0 && (
                   <ul className="space-y-2 overflow-hidden">
                     {otherConversations.map((conv) => (
-                      <li key={conv.id} className={slidingOutId === conv.id ? 'transition-all duration-300 -translate-x-full opacity-0' : ''}>
+                      <li
+                        key={conv.id}
+                        className={
+                          slidingOutId === conv.id
+                            ? 'transition-all duration-300 -translate-x-full opacity-0'
+                            : ''
+                        }
+                      >
                         <div style={{ perspective: '1000px' }}>
                           <div
                             className="relative w-full transition-transform duration-500 ease-in-out"
                             style={{
                               transformStyle: 'preserve-3d',
-                              transform: flippedId === conv.id ? 'rotateX(-180deg)' : 'rotateX(0deg)',
+                              transform:
+                                flippedId === conv.id ? 'rotateX(-180deg)' : 'rotateX(0deg)',
                             }}
                           >
                             {/* Front face */}
@@ -299,7 +330,10 @@ export default function ChatSettingsModal({
                                 }}
                                 className="group/left flex min-w-0 flex-1 items-center gap-3 rounded-l-md px-3 py-2 hover:bg-[var(--color-surface-hover)]"
                               >
-                                <MessageSquare size={16} className="flex-shrink-0 text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]" />
+                                <MessageSquare
+                                  size={16}
+                                  className="flex-shrink-0 text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]"
+                                />
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate font-medium text-[var(--color-text-primary)] group-hover/left:text-[var(--color-primary)]">
                                     {conv.last_message_preview
@@ -309,10 +343,13 @@ export default function ChatSettingsModal({
                                   <p className="truncate text-xs text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]">
                                     {conv.last_message_preview
                                       ? formatRelativeTime(conv.last_message_at)
-                                      : conv.title ?? persona.name}
+                                      : (conv.title ?? persona.name)}
                                   </p>
                                 </div>
-                                <ArrowRight size={14} className="flex-shrink-0 text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]" />
+                                <ArrowRight
+                                  size={14}
+                                  className="flex-shrink-0 text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]"
+                                />
                               </button>
                               <div className="h-4 w-px self-center bg-[var(--color-border)]" />
                               <button
@@ -320,8 +357,12 @@ export default function ChatSettingsModal({
                                 onClick={() => setFlippedId(conv.id)}
                                 className="group flex items-center rounded-r-md px-3 py-2"
                               >
-                                {deleteMutation.isPending && deleteMutation.variables === conv.id ? (
-                                  <Loader2 size={14} className="animate-spin text-[var(--color-text-muted)]" />
+                                {deleteMutation.isPending &&
+                                deleteMutation.variables === conv.id ? (
+                                  <Loader2
+                                    size={14}
+                                    className="animate-spin text-[var(--color-text-muted)]"
+                                  />
                                 ) : (
                                   <Trash2
                                     size={14}
@@ -334,7 +375,11 @@ export default function ChatSettingsModal({
                             {/* Back face */}
                             <div
                               className="absolute inset-0 flex items-center justify-center gap-3 rounded-md border border-[var(--color-border)] px-3 py-2"
-                              style={{ backfaceVisibility: 'hidden', transform: 'rotateX(180deg)', backgroundColor: 'var(--color-surface)' }}
+                              style={{
+                                backfaceVisibility: 'hidden',
+                                transform: 'rotateX(180deg)',
+                                backgroundColor: 'var(--color-surface)',
+                              }}
                             >
                               <button
                                 type="button"
@@ -351,7 +396,8 @@ export default function ChatSettingsModal({
                                 }}
                                 className="rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700"
                               >
-                                {deleteMutation.isPending && deleteMutation.variables === conv.id ? (
+                                {deleteMutation.isPending &&
+                                deleteMutation.variables === conv.id ? (
                                   <Loader2 size={14} className="animate-spin" />
                                 ) : (
                                   'Delete'

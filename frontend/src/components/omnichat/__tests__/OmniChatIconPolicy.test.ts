@@ -19,7 +19,9 @@ describe('OmniChat icon policy', () => {
       .filter((path) => path.includes('/omnichat/') || path.includes('/OmniChat'))
       .flatMap((path) => {
         const source = readFileSync(path, 'utf8');
-        return forbiddenNames.filter((name) => source.includes(name)).map((name) => ({ path, name }));
+        return forbiddenNames
+          .filter((name) => source.includes(name))
+          .map((name) => ({ path, name }));
       });
 
     expect(offenders).toEqual([]);

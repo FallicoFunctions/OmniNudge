@@ -45,14 +45,7 @@ describe('QuickChatDialog', () => {
   it('shows the prepared opening without calling the model, then hands off the complete preview', async () => {
     const onContinue = vi.fn().mockResolvedValue(undefined);
 
-    render(
-      <QuickChatDialog
-        isOpen
-        persona={persona}
-        onClose={vi.fn()}
-        onContinue={onContinue}
-      />
-    );
+    render(<QuickChatDialog isOpen persona={persona} onClose={vi.fn()} onContinue={onContinue} />);
 
     expect(screen.getByText(/You are late/)).toBeInTheDocument();
     expect(mockSendPreviewMessage).not.toHaveBeenCalled();
@@ -74,7 +67,10 @@ describe('QuickChatDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue chatting' }));
     await waitFor(() => expect(onContinue).toHaveBeenCalledTimes(1));
     expect(onContinue.mock.calls[0][0]).toEqual([
-      expect.objectContaining({ role: 'assistant', content: '*Closes a heavy book.* You are late.' }),
+      expect.objectContaining({
+        role: 'assistant',
+        content: '*Closes a heavy book.* You are late.',
+      }),
       expect.objectContaining({ role: 'user', content: 'Traffic in the mortal realm.' }),
       expect.objectContaining({ role: 'assistant', content: 'Late is still better than absent.' }),
     ]);
@@ -88,14 +84,7 @@ describe('QuickChatDialog', () => {
     });
     const onContinue = vi.fn().mockResolvedValue(undefined);
 
-    render(
-      <QuickChatDialog
-        isOpen
-        persona={persona}
-        onClose={vi.fn()}
-        onContinue={onContinue}
-      />
-    );
+    render(<QuickChatDialog isOpen persona={persona} onClose={vi.fn()} onContinue={onContinue} />);
 
     fireEvent.change(screen.getByLabelText('Reply to The Archivist'), {
       target: { value: 'Hello?' },
@@ -181,20 +170,14 @@ describe('QuickChatDialog', () => {
   it('cannot be dismissed while a conversation handoff is pending', async () => {
     let finishContinue: (() => void) | undefined;
     const onContinue = vi.fn(
-      () => new Promise<void>((resolve) => {
-        finishContinue = resolve;
-      })
+      () =>
+        new Promise<void>((resolve) => {
+          finishContinue = resolve;
+        })
     );
     const onClose = vi.fn();
 
-    render(
-      <QuickChatDialog
-        isOpen
-        persona={persona}
-        onClose={onClose}
-        onContinue={onContinue}
-      />
-    );
+    render(<QuickChatDialog isOpen persona={persona} onClose={onClose} onContinue={onContinue} />);
 
     fireEvent.change(screen.getByLabelText('Reply to The Archivist'), {
       target: { value: 'Open the door.' },

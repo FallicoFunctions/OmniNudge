@@ -49,8 +49,7 @@ export default function MediaUploadField({
   const inputId = `${id}-file`;
   const frameClassName = previewFrameClassName || '';
   const resolvedImageClassName = imageClassName || 'max-h-56 w-full bg-black/10 object-contain';
-  const resolvedVideoClassName =
-    videoClassName || 'aspect-video w-full bg-black object-contain';
+  const resolvedVideoClassName = videoClassName || 'aspect-video w-full bg-black object-contain';
 
   return (
     <div className="space-y-2">

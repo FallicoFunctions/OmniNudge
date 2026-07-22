@@ -11,9 +11,7 @@ export type MobilePreviewState = {
 export type PreviewResumeMode = 'loop' | 'sequential';
 
 export function getPreviewEligibleIds(items: PreviewableEntity[]): number[] {
-  return items
-    .filter((item) => Boolean(item.preview_video_url))
-    .map((item) => item.id);
+  return items.filter((item) => Boolean(item.preview_video_url)).map((item) => item.id);
 }
 
 export function getNextPreviewState(

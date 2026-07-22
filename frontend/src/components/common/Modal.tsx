@@ -37,8 +37,7 @@ export function Modal({
       : animation === 'default'
         ? 'animate-fadeIn'
         : '';
-  const dialogAnimationClass =
-    animation === 'quick-chat' ? 'omnichat-quick-chat-dialog-enter' : '';
+  const dialogAnimationClass = animation === 'quick-chat' ? 'omnichat-quick-chat-dialog-enter' : '';
 
   return createPortal(
     <div

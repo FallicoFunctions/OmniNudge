@@ -1,14 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import {
-  Film,
-  Image as ImageIcon,
-  ImagePlus,
-  Images,
-  Loader2,
-  Send,
-} from 'lucide-react';
+import { Film, Image as ImageIcon, ImagePlus, Images, Loader2, Send } from 'lucide-react';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
 import OmniChatMediaAssetView from '../components/omnichat/OmniChatMediaAssetView';
 import PersonaAvatar from '../components/omnichat/PersonaAvatar';

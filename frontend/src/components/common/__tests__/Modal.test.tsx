@@ -19,11 +19,7 @@ describe('Modal', () => {
     expect(screen.getByRole('dialog')).toHaveFocus();
 
     rerender(
-      <Modal
-        isOpen={false}
-        restoreFocusTo={returnTarget}
-        ariaLabelledBy="modal-title"
-      >
+      <Modal isOpen={false} restoreFocusTo={returnTarget} ariaLabelledBy="modal-title">
         <h2 id="modal-title">Test dialog</h2>
       </Modal>
     );

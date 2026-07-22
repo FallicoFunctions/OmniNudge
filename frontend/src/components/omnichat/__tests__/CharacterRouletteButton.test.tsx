@@ -61,12 +61,7 @@ describe('CharacterRouletteButton', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const onSelect = vi.fn();
 
-    render(
-      <CharacterRouletteButton
-        personas={[persona(1), persona(2)]}
-        onSelect={onSelect}
-      />
-    );
+    render(<CharacterRouletteButton personas={[persona(1), persona(2)]} onSelect={onSelect} />);
 
     const rouletteButton = screen.getByRole('button', { name: 'Surprise me' });
     rouletteButton.focus();
@@ -97,13 +92,7 @@ describe('CharacterRouletteButton', () => {
   it('skips the animated reveal when reduced motion is preferred', () => {
     const onSelect = vi.fn();
 
-    render(
-      <CharacterRouletteButton
-        personas={[persona(1)]}
-        onSelect={onSelect}
-        reduceMotion
-      />
-    );
+    render(<CharacterRouletteButton personas={[persona(1)]} onSelect={onSelect} reduceMotion />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Surprise me' }));
 

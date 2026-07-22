@@ -5,11 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import OmniChatDiscoverPage from '../OmniChatDiscoverPage';
 
-const {
-  mockListPersonas,
-  mockListConversations,
-  mockPersonaAvatar,
-} = vi.hoisted(() => ({
+const { mockListPersonas, mockListConversations, mockPersonaAvatar } = vi.hoisted(() => ({
   mockListPersonas: vi.fn(),
   mockListConversations: vi.fn(),
   mockPersonaAvatar: vi.fn(),
@@ -26,7 +22,9 @@ vi.mock('../../hooks/useMediaQuery', () => ({
 }));
 
 vi.mock('../../components/omnichat/PersonaAvatar', () => ({
-  default: (props: { persona: { id: number; avatar_url?: string; preview_video_url?: string } }) => {
+  default: (props: {
+    persona: { id: number; avatar_url?: string; preview_video_url?: string };
+  }) => {
     mockPersonaAvatar(props);
     return (
       <div

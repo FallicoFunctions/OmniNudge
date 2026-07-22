@@ -35,8 +35,12 @@ export default function OmniChatHeader({
         <div className="flex h-[var(--omnichat-header-height)] items-center justify-between px-5 lg:px-6">
           <Link to="/omnichat" className="omnichat-touch-target group flex items-center text-white">
             <span>
-              <span className="block text-[1.2rem] font-bold leading-none tracking-[-0.035em] sm:text-[1.28rem]">OmniChat</span>
-              <span className="mt-1 hidden text-[9px] font-semibold uppercase tracking-[0.22em] text-white/35 sm:block">Stories that answer back</span>
+              <span className="block text-[1.2rem] font-bold leading-none tracking-[-0.035em] sm:text-[1.28rem]">
+                OmniChat
+              </span>
+              <span className="mt-1 hidden text-[9px] font-semibold uppercase tracking-[0.22em] text-white/35 sm:block">
+                Stories that answer back
+              </span>
             </span>
           </Link>
 
@@ -105,7 +109,10 @@ export default function OmniChatHeader({
               className="omnichat-touch-target group flex items-center gap-1.5 rounded-[18px] border border-white/10 bg-white/[0.035] px-3.5 text-sm font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
             >
               <span className="hidden sm:inline">{t('omnichat.exitToSite')}</span>
-              <ArrowUpRight size={15} className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              <ArrowUpRight
+                size={15}
+                className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+              />
             </Link>
           </div>
         </div>

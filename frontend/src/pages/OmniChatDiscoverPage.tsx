@@ -3,12 +3,7 @@ import { flushSync } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import {
-  ArrowRight,
-  MessageCircle,
-  Plus,
-  Search as SearchIcon,
-} from 'lucide-react';
+import { ArrowRight, MessageCircle, Plus, Search as SearchIcon } from 'lucide-react';
 import { omnichatService, omnichatQueryKeys } from '../services/omnichatService';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { useAuth } from '../contexts/AuthContext';
@@ -127,9 +122,7 @@ function useMobilePreviewSequence(
 
       collapseTimerRef.current = window.setTimeout(() => {
         setExpandedDescriptionId((current) => (current === personaId ? null : current));
-        setActivePreview(
-          getResumePreviewState(visibleIds, personaId, currentPreview, resumeMode)
-        );
+        setActivePreview(getResumePreviewState(visibleIds, personaId, currentPreview, resumeMode));
         collapseTimerRef.current = null;
       }, 3000);
     },
@@ -232,7 +225,9 @@ function PersonaCard({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3.5 sm:p-4">
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className={`${featured ? 'text-base sm:text-lg' : 'text-sm sm:text-base'} truncate font-bold tracking-[-0.02em] text-white drop-shadow-sm`}>
+            <p
+              className={`${featured ? 'text-base sm:text-lg' : 'text-sm sm:text-base'} truncate font-bold tracking-[-0.02em] text-white drop-shadow-sm`}
+            >
               {persona.name}
             </p>
           </div>
@@ -301,35 +296,38 @@ export default function OmniChatDiscoverPage() {
     );
   }, [isAuthenticated, navigate]);
 
-  const handleSidebarTabChange = useCallback((tab: SidebarTab) => {
-    if (tab === 'search') {
-      searchReturnRef.current = null;
-      setSearchOverlayOpen(true);
-      // Reset to discover tab after opening overlay
-      setSidebarTab('discover');
-      return;
-    }
-
-    if (tab === 'characters') {
-      if (isAuthenticated) {
-        setSidebarTab('characters');
-        navigate('/omnichat/studio');
+  const handleSidebarTabChange = useCallback(
+    (tab: SidebarTab) => {
+      if (tab === 'search') {
+        searchReturnRef.current = null;
+        setSearchOverlayOpen(true);
+        // Reset to discover tab after opening overlay
+        setSidebarTab('discover');
         return;
       }
-      handleOpenStudio();
-      setSidebarTab('discover');
-      return;
-    }
 
-    setSidebarTab(tab);
-    if (tab === 'chat') {
-      navigate('/omnichat/chat');
-    } else if (tab === 'groups') {
-      navigate('/omnichat/groups');
-    }
-    if (tab === 'create') navigate('/omnichat/create');
-    if (tab === 'explore') navigate('/omnichat/explore');
-  }, [handleOpenStudio, isAuthenticated, navigate]);
+      if (tab === 'characters') {
+        if (isAuthenticated) {
+          setSidebarTab('characters');
+          navigate('/omnichat/studio');
+          return;
+        }
+        handleOpenStudio();
+        setSidebarTab('discover');
+        return;
+      }
+
+      setSidebarTab(tab);
+      if (tab === 'chat') {
+        navigate('/omnichat/chat');
+      } else if (tab === 'groups') {
+        navigate('/omnichat/groups');
+      }
+      if (tab === 'create') navigate('/omnichat/create');
+      if (tab === 'explore') navigate('/omnichat/explore');
+    },
+    [handleOpenStudio, isAuthenticated, navigate]
+  );
 
   const personasQuery = useQuery({
     queryKey: omnichatQueryKeys.personas(),
@@ -423,9 +421,7 @@ export default function OmniChatDiscoverPage() {
     focusReturnTarget?: HTMLElement
   ) => {
     const source = findPersonaTransitionElement(trigger ?? null);
-    const selectedFromSearch = Boolean(
-      trigger?.closest('[data-omnichat-search-overlay="true"]')
-    );
+    const selectedFromSearch = Boolean(trigger?.closest('[data-omnichat-search-overlay="true"]'));
     quickChatOriginRef.current =
       findPersonaTransitionElement(returnTarget ?? null) ??
       returnTarget ??
@@ -433,10 +429,10 @@ export default function OmniChatDiscoverPage() {
       source;
     setQuickChatFocusReturn(
       focusReturnTarget ??
-      returnTarget ??
-      (selectedFromSearch ? searchReturnRef.current : null) ??
-      trigger?.closest<HTMLElement>('button, a, [tabindex]:not([tabindex="-1"])') ??
-      null
+        returnTarget ??
+        (selectedFromSearch ? searchReturnRef.current : null) ??
+        trigger?.closest<HTMLElement>('button, a, [tabindex]:not([tabindex="-1"])') ??
+        null
     );
     runPersonaSharedElementTransition({
       source,
@@ -463,10 +459,7 @@ export default function OmniChatDiscoverPage() {
     });
   };
 
-  const navigateFromQuickChat = (
-    to: string,
-    state?: Record<string, unknown>
-  ) => {
+  const navigateFromQuickChat = (to: string, state?: Record<string, unknown>) => {
     const destinationState = { ...state, fromQuickChat: true };
     const quickChatAvatar = document.querySelector<HTMLElement>(
       '[data-quick-chat-shared-avatar="true"]'
@@ -553,13 +546,19 @@ export default function OmniChatDiscoverPage() {
               </div>
               <div className="absolute inset-0 bg-[linear-gradient(90deg,#11121a_0%,rgba(17,18,26,0.98)_34%,rgba(17,18,26,0.58)_66%,rgba(17,18,26,0.08)_100%)]" />
               <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(9,10,15,0.9)_0%,transparent_48%)] sm:bg-none" />
-              <div className="omnichat-float absolute -right-14 -top-16 h-52 w-52 rounded-full border border-blue-300/10 bg-blue-500/10 blur-sm" aria-hidden="true" />
+              <div
+                className="omnichat-float absolute -right-14 -top-16 h-52 w-52 rounded-full border border-blue-300/10 bg-blue-500/10 blur-sm"
+                aria-hidden="true"
+              />
 
               <div className="relative z-10 flex min-h-[420px] max-w-2xl flex-col justify-end p-6 sm:min-h-[440px] sm:justify-center sm:p-10 lg:p-12">
                 <div className="mb-5 flex w-fit items-center gap-2 rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-blue-100 backdrop-blur-md">
                   {t('omnichat.discover.heroEyebrow')}
                 </div>
-                <h1 id="omnichat-hero-title" className="max-w-xl text-[2.55rem] font-black leading-[0.98] tracking-[-0.055em] text-white sm:text-5xl lg:text-[3.65rem]">
+                <h1
+                  id="omnichat-hero-title"
+                  className="max-w-xl text-[2.55rem] font-black leading-[0.98] tracking-[-0.055em] text-white sm:text-5xl lg:text-[3.65rem]"
+                >
                   {t('omnichat.discover.heroTitle')}
                 </h1>
                 <p className="mt-5 max-w-lg text-sm leading-relaxed text-white/65 sm:text-base">
@@ -579,7 +578,10 @@ export default function OmniChatDiscoverPage() {
                     className="group flex h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-[#101118] shadow-[0_12px_30px_rgba(255,255,255,0.14)] transition hover:-translate-y-0.5 hover:bg-blue-50 active:translate-y-0 active:scale-[0.98]"
                   >
                     {t('omnichat.discover.enterPersona', { name: heroPersona.name })}
-                    <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                    <ArrowRight
+                      size={16}
+                      className="transition-transform group-hover:translate-x-1"
+                    />
                   </button>
                   <button
                     ref={searchReturnRef}
@@ -635,7 +637,9 @@ export default function OmniChatDiscoverPage() {
                       persona={conv.persona}
                       onSelect={() => navigate(`/omnichat/c/${conv.id}`)}
                       allowMobileAutoplay
-                      mobilePreviewActive={isMobile && continuePreview.activePreview?.id === conv.persona.id}
+                      mobilePreviewActive={
+                        isMobile && continuePreview.activePreview?.id === conv.persona.id
+                      }
                       mobilePreviewVersion={
                         isMobile && continuePreview.activePreview?.id === conv.persona.id
                           ? continuePreview.activePreview.version
@@ -684,7 +688,9 @@ export default function OmniChatDiscoverPage() {
                     onSelect={handleSelect}
                     featured
                     allowMobileAutoplay
-                    mobilePreviewActive={isMobile && featuredPreview.activePreview?.id === persona.id}
+                    mobilePreviewActive={
+                      isMobile && featuredPreview.activePreview?.id === persona.id
+                    }
                     mobilePreviewVersion={
                       isMobile && featuredPreview.activePreview?.id === persona.id
                         ? featuredPreview.activePreview.version
@@ -708,8 +714,12 @@ export default function OmniChatDiscoverPage() {
             <section className="mb-10 rounded-[30px] border border-white/[0.08] bg-gradient-to-br from-blue-500/[0.06] to-transparent p-5 sm:p-6">
               <div className="mb-5 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">{t('omnichat.discover.privateCollection')}</p>
-                  <h2 className="mt-1 text-xl font-bold tracking-[-0.03em] text-[var(--color-text-primary)]">{t('omnichat.discover.myCharacters')}</h2>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+                    {t('omnichat.discover.privateCollection')}
+                  </p>
+                  <h2 className="mt-1 text-xl font-bold tracking-[-0.03em] text-[var(--color-text-primary)]">
+                    {t('omnichat.discover.myCharacters')}
+                  </h2>
                 </div>
                 <Link
                   to="/omnichat/studio"
@@ -720,17 +730,33 @@ export default function OmniChatDiscoverPage() {
               </div>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
                 {ownedPersonas.map((persona) => (
-                  <PersonaCard key={persona.id} persona={persona} onSelect={handleSelect} allowMobileAutoplay />
+                  <PersonaCard
+                    key={persona.id}
+                    persona={persona}
+                    onSelect={handleSelect}
+                    allowMobileAutoplay
+                  />
                 ))}
               </div>
             </section>
           )}
 
-          <section id="discover-characters" aria-labelledby="discover-characters-title" className="pb-10">
+          <section
+            id="discover-characters"
+            aria-labelledby="discover-characters-title"
+            className="pb-10"
+          >
             <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.19em] text-blue-200/60">{t('omnichat.discover.exploreEyebrow')}</p>
-                <h2 id="discover-characters-title" className="mt-1.5 text-2xl font-black tracking-[-0.04em] text-white sm:text-3xl">{t('omnichat.discover.exploreTitle')}</h2>
+                <p className="text-[10px] font-bold uppercase tracking-[0.19em] text-blue-200/60">
+                  {t('omnichat.discover.exploreEyebrow')}
+                </p>
+                <h2
+                  id="discover-characters-title"
+                  className="mt-1.5 text-2xl font-black tracking-[-0.04em] text-white sm:text-3xl"
+                >
+                  {t('omnichat.discover.exploreTitle')}
+                </h2>
               </div>
               <button
                 type="button"
@@ -745,9 +771,15 @@ export default function OmniChatDiscoverPage() {
               </button>
             </div>
 
-            {personasQuery.isLoading && <LoadingMessage>{t('omnichat.discover.loading')}</LoadingMessage>}
-            {personasQuery.isError && <ErrorMessage>{t('omnichat.discover.loadError')}</ErrorMessage>}
-            {conversationsQuery.isError && <ErrorMessage>{t('omnichat.discover.conversationsLoadError')}</ErrorMessage>}
+            {personasQuery.isLoading && (
+              <LoadingMessage>{t('omnichat.discover.loading')}</LoadingMessage>
+            )}
+            {personasQuery.isError && (
+              <ErrorMessage>{t('omnichat.discover.loadError')}</ErrorMessage>
+            )}
+            {conversationsQuery.isError && (
+              <ErrorMessage>{t('omnichat.discover.conversationsLoadError')}</ErrorMessage>
+            )}
             {!personasQuery.isLoading && !personasQuery.isError && personas.length === 0 && (
               <div className="rounded-[26px] border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center text-sm text-[var(--color-text-secondary)]">
                 {t('omnichat.discover.empty')}
@@ -781,7 +813,6 @@ export default function OmniChatDiscoverPage() {
           </section>
         </div>
       </div>
-
     </OmniChatShell>
   );
 }

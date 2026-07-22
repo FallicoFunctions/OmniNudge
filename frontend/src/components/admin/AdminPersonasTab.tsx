@@ -102,7 +102,9 @@ export default function AdminPersonasTab() {
     setUploadErrors((current) => ({ ...current, [uploadKey]: '' }));
     try {
       const uploaded = await mediaService.uploadMedia(file);
-      updateDraft(personaId, { [field]: normalizeUploadDraftUrl(uploaded.storage_url, uploaded.storage_path) });
+      updateDraft(personaId, {
+        [field]: normalizeUploadDraftUrl(uploaded.storage_url, uploaded.storage_path),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Upload failed';
       setUploadErrors((current) => ({ ...current, [uploadKey]: message }));
@@ -120,7 +122,10 @@ export default function AdminPersonasTab() {
       const uploaded = await mediaService.uploadMedia(file);
       const currentGallery = drafts[personaId]?.gallery_urls ?? [];
       updateDraft(personaId, {
-        gallery_urls: [...currentGallery, normalizeUploadDraftUrl(uploaded.storage_url, uploaded.storage_path)],
+        gallery_urls: [
+          ...currentGallery,
+          normalizeUploadDraftUrl(uploaded.storage_url, uploaded.storage_path),
+        ],
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Upload failed';
@@ -148,9 +153,12 @@ export default function AdminPersonasTab() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">OmniChat personas</h2>
+        <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
+          OmniChat personas
+        </h2>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          Upload avatar stills and short preview videos. Featured tiles autoplay on mobile; all tiles preview on desktop hover.
+          Upload avatar stills and short preview videos. Featured tiles autoplay on mobile; all
+          tiles preview on desktop hover.
         </p>
       </div>
 
@@ -161,7 +169,8 @@ export default function AdminPersonasTab() {
             preview_video_url: persona.preview_video_url,
             gallery_urls: persona.gallery_urls ?? [],
           };
-          const isSaving = saveMutation.isPending && saveMutation.variables?.personaId === persona.id;
+          const isSaving =
+            saveMutation.isPending && saveMutation.variables?.personaId === persona.id;
           const avatarUploading = uploading[`${persona.id}:avatar_url`] === true;
           const videoUploading = uploading[`${persona.id}:preview_video_url`] === true;
           const galleryUploading = uploading[`${persona.id}:gallery_urls`] === true;
@@ -176,7 +185,9 @@ export default function AdminPersonasTab() {
                   <div
                     className="w-40 max-w-full"
                     onMouseEnter={() => setHoveredPersonaId(persona.id)}
-                    onMouseLeave={() => setHoveredPersonaId((current) => (current === persona.id ? null : current))}
+                    onMouseLeave={() =>
+                      setHoveredPersonaId((current) => (current === persona.id ? null : current))
+                    }
                   >
                     <PersonaAvatar
                       persona={{ ...persona, ...draft }}
@@ -187,7 +198,9 @@ export default function AdminPersonasTab() {
                     />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-[var(--color-text-primary)]">{persona.name}</div>
+                    <div className="text-sm font-semibold text-[var(--color-text-primary)]">
+                      {persona.name}
+                    </div>
                     <div className="text-xs uppercase tracking-[0.18em] text-[var(--color-text-secondary)]">
                       {persona.category.replace('_', ' ')}
                     </div>
@@ -209,14 +222,20 @@ export default function AdminPersonasTab() {
                       isUploading={avatarUploading}
                       previewFrameClassName="aspect-[3/4]"
                       imageClassName="h-full w-full bg-black/10 object-cover"
-                      onFileChange={(event) => handleUpload(persona.id, event.target.files?.[0], 'avatar_url')}
+                      onFileChange={(event) =>
+                        handleUpload(persona.id, event.target.files?.[0], 'avatar_url')
+                      }
                       onClear={() => updateDraft(persona.id, { avatar_url: '' })}
                     />
                     {avatarUploading && (
-                      <p className="text-xs text-[var(--color-text-secondary)]">Uploading avatar...</p>
+                      <p className="text-xs text-[var(--color-text-secondary)]">
+                        Uploading avatar...
+                      </p>
                     )}
                     {uploadErrors[`${persona.id}:avatar_url`] && (
-                      <p className="text-xs text-red-400">{uploadErrors[`${persona.id}:avatar_url`]}</p>
+                      <p className="text-xs text-red-400">
+                        {uploadErrors[`${persona.id}:avatar_url`]}
+                      </p>
                     )}
                   </div>
 
@@ -238,10 +257,14 @@ export default function AdminPersonasTab() {
                       onClear={() => updateDraft(persona.id, { preview_video_url: '' })}
                     />
                     {videoUploading && (
-                      <p className="text-xs text-[var(--color-text-secondary)]">Uploading preview video...</p>
+                      <p className="text-xs text-[var(--color-text-secondary)]">
+                        Uploading preview video...
+                      </p>
                     )}
                     {uploadErrors[`${persona.id}:preview_video_url`] && (
-                      <p className="text-xs text-red-400">{uploadErrors[`${persona.id}:preview_video_url`]}</p>
+                      <p className="text-xs text-red-400">
+                        {uploadErrors[`${persona.id}:preview_video_url`]}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -250,7 +273,9 @@ export default function AdminPersonasTab() {
               <div className="mt-4 space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Gallery Images</h3>
+                    <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                      Gallery Images
+                    </h3>
                     <p className="text-xs text-[var(--color-text-secondary)]">
                       Optional images shown in the persona gallery.
                     </p>
@@ -284,10 +309,14 @@ export default function AdminPersonasTab() {
                 </div>
 
                 {galleryUploading && (
-                  <p className="text-xs text-[var(--color-text-secondary)]">Uploading gallery image...</p>
+                  <p className="text-xs text-[var(--color-text-secondary)]">
+                    Uploading gallery image...
+                  </p>
                 )}
                 {uploadErrors[`${persona.id}:gallery_urls`] && (
-                  <p className="text-xs text-red-400">{uploadErrors[`${persona.id}:gallery_urls`]}</p>
+                  <p className="text-xs text-red-400">
+                    {uploadErrors[`${persona.id}:gallery_urls`]}
+                  </p>
                 )}
 
                 {(draft.gallery_urls ?? []).length > 0 ? (
@@ -318,7 +347,9 @@ export default function AdminPersonasTab() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-[var(--color-text-secondary)]">No gallery images set.</p>
+                  <p className="text-xs text-[var(--color-text-secondary)]">
+                    No gallery images set.
+                  </p>
                 )}
               </div>
 
@@ -349,7 +380,9 @@ export default function AdminPersonasTab() {
                 )}
                 {saveMutation.isError && saveMutation.variables?.personaId === persona.id && (
                   <span className="text-xs text-red-400">
-                    {saveMutation.error instanceof Error ? saveMutation.error.message : 'Save failed'}
+                    {saveMutation.error instanceof Error
+                      ? saveMutation.error.message
+                      : 'Save failed'}
                   </span>
                 )}
                 {saveSuccesses[persona.id] && !isSaving && (

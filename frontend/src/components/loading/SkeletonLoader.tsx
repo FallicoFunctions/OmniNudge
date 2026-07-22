@@ -10,13 +10,7 @@ function Skeleton({ className = '' }: SkeletonProps) {
 }
 
 // Text line skeleton
-function SkeletonText({
-  lines = 1,
-  className = '',
-}: {
-  lines?: number;
-  className?: string;
-}) {
+function SkeletonText({ lines = 1, className = '' }: { lines?: number; className?: string }) {
   return (
     <div className={`space-y-2 ${className}`}>
       {Array.from({ length: lines }).map((_, i) => (

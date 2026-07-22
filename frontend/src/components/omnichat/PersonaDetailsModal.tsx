@@ -103,7 +103,9 @@ export default function PersonaDetailsModal({
             <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-text-secondary)]">
               {t('omnichat.personaDetails.title')}
             </p>
-            <h2 className="mt-1 text-2xl font-semibold text-[var(--color-text-primary)]">{persona.name}</h2>
+            <h2 className="mt-1 text-2xl font-semibold text-[var(--color-text-primary)]">
+              {persona.name}
+            </h2>
           </div>
           <button
             type="button"
@@ -146,21 +148,53 @@ export default function PersonaDetailsModal({
                   )}
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <ReadOnlyInput label={t('omnichat.personaDetails.fields.name')} value={definition.name} />
-                  <ReadOnlyInput label={t('omnichat.personaDetails.fields.category')} value={definition.category.replace('_', ' ')} />
-                  <ReadOnlyField label={t('omnichat.personaDetails.fields.description')} value={definition.description} rows={3} />
+                  <ReadOnlyInput
+                    label={t('omnichat.personaDetails.fields.name')}
+                    value={definition.name}
+                  />
+                  <ReadOnlyInput
+                    label={t('omnichat.personaDetails.fields.category')}
+                    value={definition.category.replace('_', ' ')}
+                  />
+                  <ReadOnlyField
+                    label={t('omnichat.personaDetails.fields.description')}
+                    value={definition.description}
+                    rows={3}
+                  />
                   <div className="grid gap-4">
-                    <ReadOnlyInput label={t('omnichat.personaDetails.fields.visibility')} value={definition.visibility || 'private'} />
-                    <ReadOnlyInput label={t('omnichat.personaDetails.fields.nsfw')} value={definition.is_nsfw ? t('common.yes') : t('common.no')} />
+                    <ReadOnlyInput
+                      label={t('omnichat.personaDetails.fields.visibility')}
+                      value={definition.visibility || 'private'}
+                    />
+                    <ReadOnlyInput
+                      label={t('omnichat.personaDetails.fields.nsfw')}
+                      value={definition.is_nsfw ? t('common.yes') : t('common.no')}
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <ReadOnlyField label={t('omnichat.personaDetails.fields.personality')} value={definition.personality} rows={5} />
-                <ReadOnlyField label={t('omnichat.personaDetails.fields.scenario')} value={definition.scenario} rows={5} />
-                <ReadOnlyField label={t('omnichat.personaDetails.fields.openingMessage')} value={definition.first_message} rows={4} />
-                <ReadOnlyField label={t('omnichat.personaDetails.fields.exampleDialogue')} value={definition.example_dialogue} rows={5} />
+                <ReadOnlyField
+                  label={t('omnichat.personaDetails.fields.personality')}
+                  value={definition.personality}
+                  rows={5}
+                />
+                <ReadOnlyField
+                  label={t('omnichat.personaDetails.fields.scenario')}
+                  value={definition.scenario}
+                  rows={5}
+                />
+                <ReadOnlyField
+                  label={t('omnichat.personaDetails.fields.openingMessage')}
+                  value={definition.first_message}
+                  rows={4}
+                />
+                <ReadOnlyField
+                  label={t('omnichat.personaDetails.fields.exampleDialogue')}
+                  value={definition.example_dialogue}
+                  rows={5}
+                />
                 <div className="md:col-span-2">
                   <ReadOnlyField
                     label={t('omnichat.personaDetails.fields.systemPrompt')}
@@ -183,17 +217,37 @@ export default function PersonaDetailsModal({
                   value={(definition.alternate_greetings || []).join('\n')}
                   rows={4}
                 />
-                <ReadOnlyField label={t('omnichat.personaDetails.fields.tags')} value={(definition.tags || []).join(', ')} rows={4} />
-                <ReadOnlyInput label={t('omnichat.personaDetails.fields.creatorName')} value={definition.creator_name} />
-                <ReadOnlyInput label={t('omnichat.personaDetails.fields.characterVersion')} value={definition.character_version} />
+                <ReadOnlyField
+                  label={t('omnichat.personaDetails.fields.tags')}
+                  value={(definition.tags || []).join(', ')}
+                  rows={4}
+                />
+                <ReadOnlyInput
+                  label={t('omnichat.personaDetails.fields.creatorName')}
+                  value={definition.creator_name}
+                />
+                <ReadOnlyInput
+                  label={t('omnichat.personaDetails.fields.characterVersion')}
+                  value={definition.character_version}
+                />
                 <div className="md:col-span-2">
-                  <ReadOnlyField label={t('omnichat.personaDetails.fields.creatorNotes')} value={definition.creator_notes} rows={4} />
+                  <ReadOnlyField
+                    label={t('omnichat.personaDetails.fields.creatorNotes')}
+                    value={definition.creator_notes}
+                    rows={4}
+                  />
                 </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <ReadOnlyInput label={t('omnichat.personaDetails.fields.avatarUrl')} value={definition.avatar_url} />
-                <ReadOnlyInput label={t('omnichat.personaDetails.fields.previewVideoUrl')} value={definition.preview_video_url} />
+                <ReadOnlyInput
+                  label={t('omnichat.personaDetails.fields.avatarUrl')}
+                  value={definition.avatar_url}
+                />
+                <ReadOnlyInput
+                  label={t('omnichat.personaDetails.fields.previewVideoUrl')}
+                  value={definition.preview_video_url}
+                />
                 <div className="md:col-span-2">
                   <ReadOnlyField
                     label={t('omnichat.personaDetails.fields.galleryUrls')}
@@ -219,53 +273,59 @@ export default function PersonaDetailsModal({
               </div>
 
               {isOwner && (
-              <div className="rounded-3xl border border-red-500/25 bg-red-500/10 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-red-200">{t('omnichat.personaDetails.dangerZone.title')}</h3>
-                    <p className="mt-1 text-sm text-red-200/80">
-                      {t('omnichat.personaDetails.dangerZone.description')}
-                    </p>
-                  </div>
-                  {!isConfirmingDelete ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsConfirmingDelete(true)}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-400/40 px-4 py-2 text-sm font-medium text-red-200 hover:bg-red-500/10"
-                    >
-                      <Trash2 size={16} />
-                      {t('omnichat.personaDetails.dangerZone.delete')}
-                    </button>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsConfirmingDelete(false)}
-                        disabled={deleteMutation.isPending}
-                        className="rounded-2xl border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-primary)] disabled:opacity-60"
-                      >
-                        {t('common.cancel')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteMutation.mutate(persona.id)}
-                        disabled={deleteMutation.isPending}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
-                      >
-                        {deleteMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                        {t('omnichat.personaDetails.dangerZone.confirmDelete')}
-                      </button>
+                <div className="rounded-3xl border border-red-500/25 bg-red-500/10 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-red-200">
+                        {t('omnichat.personaDetails.dangerZone.title')}
+                      </h3>
+                      <p className="mt-1 text-sm text-red-200/80">
+                        {t('omnichat.personaDetails.dangerZone.description')}
+                      </p>
                     </div>
+                    {!isConfirmingDelete ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsConfirmingDelete(true)}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-400/40 px-4 py-2 text-sm font-medium text-red-200 hover:bg-red-500/10"
+                      >
+                        <Trash2 size={16} />
+                        {t('omnichat.personaDetails.dangerZone.delete')}
+                      </button>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsConfirmingDelete(false)}
+                          disabled={deleteMutation.isPending}
+                          className="rounded-2xl border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-primary)] disabled:opacity-60"
+                        >
+                          {t('common.cancel')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteMutation.mutate(persona.id)}
+                          disabled={deleteMutation.isPending}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                        >
+                          {deleteMutation.isPending ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
+                          {t('omnichat.personaDetails.dangerZone.confirmDelete')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {deleteMutation.isError && (
+                    <p className="mt-3 text-sm text-red-200">
+                      {deleteMutation.error instanceof Error
+                        ? deleteMutation.error.message
+                        : t('omnichat.personaDetails.dangerZone.deleteError')}
+                    </p>
                   )}
                 </div>
-                {deleteMutation.isError && (
-                  <p className="mt-3 text-sm text-red-200">
-                    {deleteMutation.error instanceof Error
-                      ? deleteMutation.error.message
-                      : t('omnichat.personaDetails.dangerZone.deleteError')}
-                  </p>
-                )}
-              </div>
               )}
             </>
           )}

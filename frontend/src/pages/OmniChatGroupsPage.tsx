@@ -42,11 +42,7 @@ export function OmniChatGroupsWorkspace() {
     queryKey: omnichatQueryKeys.groups,
     initialPageParam: undefined as { before: string; beforeId: string } | undefined,
     queryFn: ({ pageParam }) =>
-      omnichatService.listGroups(
-        pageParam?.before,
-        pageParam?.beforeId,
-        GROUP_LIST_PAGE_SIZE
-      ),
+      omnichatService.listGroups(pageParam?.before, pageParam?.beforeId, GROUP_LIST_PAGE_SIZE),
     getNextPageParam: (lastPage) => {
       if (lastPage.length < GROUP_LIST_PAGE_SIZE) return undefined;
       const oldest = lastPage[lastPage.length - 1];
