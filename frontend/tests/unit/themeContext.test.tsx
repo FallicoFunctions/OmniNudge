@@ -71,7 +71,7 @@ const createWrapper = () => {
 describe('ThemeProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.setItem('auth_token', 'test-token');
+    document.cookie = 'omni_csrf=test-csrf; path=/';
     mockThemeService.getPredefinedThemes.mockResolvedValue([createTheme({ id: 1 })]);
     mockThemeService.getMyThemes.mockResolvedValue({
       themes: [createTheme({ id: 2, theme_type: 'variable_customization' })],

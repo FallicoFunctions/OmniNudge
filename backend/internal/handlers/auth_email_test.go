@@ -110,6 +110,9 @@ func setupAuthHandlerForEmailTest(t *testing.T) (
 	emailVerificationRepo := repository.NewPostgresEmailVerificationRepository(db.Pool)
 
 	authService := services.NewAuthService("test-jwt-secret", "ua", "")
+	authService.SetUserRepository(userRepo)
+	sessionService := services.NewAuthSessionService(db.Pool, authService)
+	authService.SetSessionService(sessionService)
 	mockEmail := &mockEmailService{}
 
 	handler := NewAuthHandler(
@@ -122,7 +125,8 @@ func setupAuthHandlerForEmailTest(t *testing.T) (
 		"http://localhost:5176",
 		nil, // auditLogger — nil safe
 		nil, // lockoutService — nil safe
-		"",  // appEnv — non-production
+		sessionService,
+		"", // appEnv — non-production
 	)
 
 	cleanup := func() { db.Close() }

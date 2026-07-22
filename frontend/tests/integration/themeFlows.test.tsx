@@ -218,7 +218,7 @@ const ThemeTestHarness = () => {
 describe('Theme flows E2E', () => {
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem('auth_token', 'test-token');
+    document.cookie = 'omni_csrf=test-csrf; path=/';
     localStorage.setItem(
       SETTINGS_STORAGE_KEY,
       JSON.stringify({ autoCloseThemeSelector: true, settingsVersion: 6 })
@@ -262,10 +262,9 @@ describe('Theme flows E2E', () => {
     await user.click(screen.getByRole('button', { name: /Create Theme/i }));
 
     await waitFor(() => expect(mockThemeService.createTheme).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(screen.queryByText(/Theme Editor/i)).not.toBeInTheDocument(),
-      { timeout: 2500 }
-    );
+    await waitFor(() => expect(screen.queryByText(/Theme Editor/i)).not.toBeInTheDocument(), {
+      timeout: 2500,
+    });
 
     await user.click(screen.getByRole('button', { name: /Active Theme/i }));
     await waitFor(() => {
@@ -295,10 +294,9 @@ describe('Theme flows E2E', () => {
     await user.click(screen.getByRole('button', { name: /Update Theme/i }));
 
     await waitFor(() => expect(mockThemeService.updateTheme).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(screen.queryByText(/Theme Editor/i)).not.toBeInTheDocument(),
-      { timeout: 2500 }
-    );
+    await waitFor(() => expect(screen.queryByText(/Theme Editor/i)).not.toBeInTheDocument(), {
+      timeout: 2500,
+    });
 
     await user.click(screen.getByRole('button', { name: /Active Theme/i }));
     await waitFor(() =>

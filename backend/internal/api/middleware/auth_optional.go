@@ -12,20 +12,28 @@ import (
 func AuthOptional(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		var tokenString string
+		cookieAuth := false
+		if authHeader != "" {
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+				c.Next()
+				return
+			}
+			tokenString = parts[1]
+		}
+		if tokenString == "" {
+			if cookieToken, err := c.Cookie(services.AccessTokenCookieName); err == nil && cookieToken != "" {
+				tokenString = cookieToken
+				cookieAuth = true
+			}
+		}
+		if tokenString == "" {
 			c.Next()
 			return
 		}
-
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			c.Next()
-			return
-		}
-
-		tokenString := parts[1]
 		claims, err := authService.ValidateJWTContext(c.Request.Context(), tokenString)
-		if err != nil {
+		if err != nil || claims.Use == "ws" {
 			// Ignore invalid tokens in optional mode
 			c.Next()
 			return
@@ -34,6 +42,8 @@ func AuthOptional(authService *services.AuthService) gin.HandlerFunc {
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
+		c.Set("session_id", claims.SessionID)
+		c.Set("auth_via_cookie", cookieAuth)
 		c.Next()
 	}
 }

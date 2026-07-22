@@ -4,9 +4,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,6 +31,35 @@ func TestRequireRole_AllowsMatchingRole(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.True(t, allowed, "handler should run for allowed role")
+}
+
+func TestAuthRequired_CookieSessionRequiresCSRFForMutations(t *testing.T) {
+	db := testutil.NewTestDatabase(t)
+	user := testutil.NewFixtures(t, db).CreateUniqueUser("cookie_auth")
+	auth := services.NewAuthService("cookie-test-secret", "test", "")
+	sessions := services.NewAuthSessionService(db.Pool, auth)
+	auth.SetSessionService(sessions)
+	credentials, err := sessions.Create(t.Context(), user, false, "test browser", "")
+	require.NoError(t, err)
+
+	request := func(method string, includeCSRF bool) int {
+		router := gin.New()
+		router.Use(AuthRequired(auth))
+		router.Handle(method, "/", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+		req := httptest.NewRequest(method, "/", nil)
+		req.AddCookie(&http.Cookie{Name: services.AccessTokenCookieName, Value: credentials.AccessToken})
+		if includeCSRF {
+			req.AddCookie(&http.Cookie{Name: services.CSRFTokenCookieName, Value: credentials.CSRFToken})
+			req.Header.Set("X-CSRF-Token", credentials.CSRFToken)
+		}
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	require.Equal(t, http.StatusNoContent, request(http.MethodGet, false))
+	require.Equal(t, http.StatusForbidden, request(http.MethodPost, false))
+	require.Equal(t, http.StatusNoContent, request(http.MethodPost, true))
 }
 
 func TestCORS_AllowsLocalhostAndLoopbackDevOrigins(t *testing.T) {
@@ -138,6 +170,60 @@ func TestAuthRequired_RejectsInvalidToken(t *testing.T) {
 	handler(c)
 
 	require.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestAuthRequired_RejectsWebSocketTokenOnHTTP(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	authService := services.NewAuthService("test-secret", "ua", "")
+	token, err := authService.GenerateWebSocketJWT(42, "alice", "user", 0)
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	c.Request = req
+	AuthRequired(authService)(c)
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestAuthRequired_RejectsLegacyBrowserJWTWithoutSessionOrUse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const secret = "test-secret"
+	legacy := jwt.NewWithClaims(jwt.SigningMethodHS256, services.JWTClaims{
+		UserID: 42, Username: "alice", Role: "user",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer: "OmniNudge", IssuedAt: jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+	})
+	token, err := legacy.SignedString([]byte(secret))
+	require.NoError(t, err)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	c.Request = req
+	AuthRequired(services.NewAuthService(secret, "ua", ""))(c)
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestAuthRequired_WebSocketQueryTokenTakesPrecedenceOverAccessCookie(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	authService := services.NewAuthService("test-secret", "ua", "")
+	accessToken, err := authService.GenerateJWT(42, "alice", "user")
+	require.NoError(t, err)
+	wsToken, err := authService.GenerateWebSocketJWT(42, "alice", "user", 0)
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodGet, "/?token="+wsToken, nil)
+	req.Header.Set("Upgrade", "websocket")
+	req.AddCookie(&http.Cookie{Name: services.AccessTokenCookieName, Value: accessToken})
+	c.Request = req
+	AuthRequired(authService)(c)
+	require.Equal(t, http.StatusOK, w.Code)
 }
 
 func TestAuthRequired_RejectsExpiredToken(t *testing.T) {

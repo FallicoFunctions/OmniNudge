@@ -8,7 +8,8 @@ import { messagesService } from '../services/messagesService';
 import { modMailService } from '../services/modMailService';
 import { hubsService } from '../services/hubsService';
 import { encryptionService } from '../services/encryptionService';
-import { API_BASE_URL, getStoredAuthToken } from '../lib/api';
+import { API_BASE_URL } from '../lib/api';
+import { authenticatedFetch } from '../services/authSession';
 import type { Message } from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
 import {
@@ -138,12 +139,7 @@ export default function ModMailConversationPage() {
   const { data: conversation } = useQuery<ModMailConversation>({
     queryKey: ['modMailConversation', convId],
     queryFn: async () => {
-      const token = getStoredAuthToken();
-      const response = await fetch(`${API_BASE_URL}/mod-mail/${convId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await authenticatedFetch(`${API_BASE_URL}/mod-mail/${convId}`);
 
       if (!response.ok) {
         throw new Error(t('modMailConversationPage.errors.fetchConversationFailed'));

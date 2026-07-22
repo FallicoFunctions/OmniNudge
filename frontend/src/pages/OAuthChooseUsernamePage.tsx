@@ -5,10 +5,9 @@ import { api } from '../lib/api';
 
 export default function OAuthChooseUsernamePage() {
   const [searchParams] = useSearchParams();
-  const { loginWithToken } = useAuth();
+  const { completeOAuthLogin } = useAuth();
   const navigate = useNavigate();
 
-  const pendingToken = searchParams.get('pending_token') ?? '';
   const noEmail = searchParams.get('no_email') === '1';
   const [username, setUsername] = useState(searchParams.get('suggested') ?? '');
   const [email, setEmail] = useState('');
@@ -28,34 +27,20 @@ export default function OAuthChooseUsernamePage() {
     setSubmitting(true);
     setError(null);
     try {
-      const { token } = await api.post<{ token: string }>('/auth/oauth/complete', {
-        pending_token: pendingToken,
+      await api.post('/auth/oauth/complete', {
         username: trimmed,
         email: email.trim() || undefined,
       });
-      await loginWithToken(token);
+      await completeOAuthLogin();
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create your account. Please try again.');
+      setError(
+        err instanceof Error ? err.message : 'Could not create your account. Please try again.'
+      );
     } finally {
       setSubmitting(false);
     }
   };
-
-  if (!pendingToken) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6">
-        <p className="text-sm font-medium text-red-600">This sign-up link is invalid. Please try signing in again.</p>
-        <button
-          type="button"
-          onClick={() => navigate('/', { replace: true })}
-          className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-        >
-          Back to home
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="flex min-h-screen items-center justify-center p-6">
@@ -63,7 +48,9 @@ export default function OAuthChooseUsernamePage() {
         onSubmit={handleSubmit}
         className="w-full max-w-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6"
       >
-        <h1 className="mb-1 text-lg font-semibold text-[var(--color-text-primary)]">Choose your username</h1>
+        <h1 className="mb-1 text-lg font-semibold text-[var(--color-text-primary)]">
+          Choose your username
+        </h1>
         <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
           This is how other people will see you on OmniNudge. You can't change it later.
         </p>
@@ -96,8 +83,7 @@ export default function OAuthChooseUsernamePage() {
                 htmlFor="oauth-email"
                 className="block text-sm font-semibold text-[var(--color-text-primary)]"
               >
-                Email{' '}
-                <span className="text-xs text-[var(--color-text-secondary)]">(optional)</span>
+                Email <span className="text-xs text-[var(--color-text-secondary)]">(optional)</span>
               </label>
               <input
                 id="oauth-email"

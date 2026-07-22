@@ -11,12 +11,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   account_error: 'Could not create or find your account. Please try again.',
   server_error: 'An unexpected error occurred. Please try again.',
   login_failed: 'Sign-in failed. Please try again.',
-  missing_token: 'No sign-in token received. Please try again.',
 };
 
 export default function OAuthCallbackPage() {
   const [searchParams] = useSearchParams();
-  const { loginWithToken } = useAuth();
+  const { completeOAuthLogin } = useAuth();
   const navigate = useNavigate();
   const handled = useRef(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -25,19 +24,18 @@ export default function OAuthCallbackPage() {
     if (handled.current) return;
     handled.current = true;
 
-    const token = searchParams.get('token');
     const errorCode = searchParams.get('auth_error');
 
-    if (errorCode || !token) {
-      const msg = ERROR_MESSAGES[errorCode ?? 'missing_token'] ?? 'Sign-in failed. Please try again.';
+    if (errorCode) {
+      const msg = ERROR_MESSAGES[errorCode] ?? 'Sign-in failed. Please try again.';
       setErrorMsg(msg);
       return;
     }
 
-    loginWithToken(token)
+    completeOAuthLogin()
       .then(() => navigate('/', { replace: true }))
       .catch(() => setErrorMsg(ERROR_MESSAGES['login_failed']));
-  }, [loginWithToken, navigate, searchParams]);
+  }, [completeOAuthLogin, navigate, searchParams]);
 
   if (errorMsg) {
     return (

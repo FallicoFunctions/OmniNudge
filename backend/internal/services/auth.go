@@ -29,6 +29,7 @@ type AuthService struct {
 	userAgent       string
 	turnstileSecret string
 	userRepo        ports.UserRepository
+	sessions        *AuthSessionService
 }
 
 // NewAuthService creates a new auth service
@@ -42,6 +43,10 @@ func NewAuthService(jwtSecret, userAgent, turnstileSecret string) *AuthService {
 
 func (s *AuthService) SetUserRepository(userRepo ports.UserRepository) {
 	s.userRepo = userRepo
+}
+
+func (s *AuthService) SetSessionService(sessions *AuthSessionService) {
+	s.sessions = sessions
 }
 
 // VerifyTurnstileToken verifies a Cloudflare Turnstile token
@@ -94,6 +99,7 @@ type JWTClaims struct {
 	Role         string `json:"role"`
 	TokenVersion int    `json:"token_version"`
 	Use          string `json:"use,omitempty"`
+	SessionID    string `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -112,7 +118,7 @@ func (s *AuthService) GenerateJWTWithVersion(userID int, username, role string, 
 }
 
 func (s *AuthService) GenerateJWTWithExpiryAndVersion(userID int, username, role string, tokenVersion int, expiry time.Duration) (string, error) {
-	return s.generateJWT(userID, username, role, tokenVersion, expiry, "")
+	return s.generateJWT(userID, username, role, tokenVersion, expiry, "api")
 }
 
 // GenerateWebSocketJWT creates a short-lived token intended only for WebSocket upgrades.
@@ -120,13 +126,26 @@ func (s *AuthService) GenerateWebSocketJWT(userID int, username, role string, to
 	return s.generateJWT(userID, username, role, tokenVersion, 5*time.Minute, "ws")
 }
 
+func (s *AuthService) GenerateWebSocketJWTForSession(userID int, username, role string, tokenVersion int, sessionID string) (string, error) {
+	return s.generateJWTForSession(userID, username, role, tokenVersion, 5*time.Minute, "ws", sessionID)
+}
+
+func (s *AuthService) GenerateJWTForSession(userID int, username, role string, tokenVersion int, sessionID string, expiry time.Duration) (string, error) {
+	return s.generateJWTForSession(userID, username, role, tokenVersion, expiry, "", sessionID)
+}
+
 func (s *AuthService) generateJWT(userID int, username, role string, tokenVersion int, expiry time.Duration, use string) (string, error) {
+	return s.generateJWTForSession(userID, username, role, tokenVersion, expiry, use, "")
+}
+
+func (s *AuthService) generateJWTForSession(userID int, username, role string, tokenVersion int, expiry time.Duration, use, sessionID string) (string, error) {
 	claims := JWTClaims{
 		UserID:       userID,
 		Username:     username,
 		Role:         role,
 		TokenVersion: tokenVersion,
 		Use:          use,
+		SessionID:    sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -145,23 +164,36 @@ func (s *AuthService) ValidateJWT(tokenString string) (*JWTClaims, error) {
 
 func (s *AuthService) ValidateJWTContext(ctx context.Context, tokenString string) (*JWTClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return s.jwtSecret, nil
-	})
+	}, jwt.WithIssuer("OmniNudge"), jwt.WithExpirationRequired(), jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 
 	if err != nil {
 		return nil, err
 	}
 
 	if claims, ok := token.Claims.(*JWTClaims); ok && token.Valid {
-		if s.userRepo != nil {
+		// Browser access tokens are session-bound. Non-session tokens must be
+		// explicitly minted for an API or WebSocket use; this invalidates legacy
+		// browser JWTs that had neither a session identifier nor a use claim.
+		if claims.SessionID == "" && claims.Use != "api" && claims.Use != "ws" {
+			return nil, fmt.Errorf("token use is not permitted")
+		}
+		if claims.SessionID != "" {
+			if s.sessions == nil {
+				return nil, fmt.Errorf("session validation unavailable")
+			}
+			if err := s.sessions.Validate(ctx, claims.SessionID, claims.UserID, claims.TokenVersion, claims.Role); err != nil {
+				return nil, err
+			}
+		} else if s.userRepo != nil {
 			user, userErr := s.userRepo.GetByID(ctx, claims.UserID)
 			if userErr != nil {
 				return nil, userErr
 			}
-			if user == nil || user.TokenVersion != claims.TokenVersion || user.Banned || user.Deleted {
+			if user == nil || user.TokenVersion != claims.TokenVersion || user.Role != claims.Role || user.Banned || user.Deleted {
 				return nil, fmt.Errorf("invalid token")
 			}
 		}
@@ -169,6 +201,13 @@ func (s *AuthService) ValidateJWTContext(ctx context.Context, tokenString string
 	}
 
 	return nil, fmt.Errorf("invalid token")
+}
+
+func (s *AuthService) ValidateCSRF(ctx context.Context, sessionID, csrfToken string) error {
+	if s.sessions == nil {
+		return ErrInvalidAuthSession
+	}
+	return s.sessions.ValidateCSRF(ctx, sessionID, csrfToken)
 }
 
 // RegisterRequest represents the registration request payload

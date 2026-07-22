@@ -6,7 +6,8 @@ import { mediaService } from '../../services/mediaService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFormat } from '../../hooks/useFormat';
 import type { Conversation, Message, SendMessageRequest } from '../../types/messages';
-import { API_BASE_URL, getStoredAuthToken } from '../../lib/api';
+import { API_BASE_URL } from '../../lib/api';
+import { authenticatedFetch } from '../../services/authSession';
 import {
   decryptMessage,
   encryptFile,
@@ -153,10 +154,7 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
           return;
         }
 
-        const token = getStoredAuthToken();
-        const response = await fetch(originalUrl, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const response = await authenticatedFetch(originalUrl);
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);

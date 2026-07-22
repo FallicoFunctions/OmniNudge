@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"strings"
 	"time"
@@ -14,8 +15,10 @@ import (
 func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var tokenString string
+		cookieAuth := false
 
 		authHeader := c.GetHeader("Authorization")
+		isWebSocketUpgrade := strings.EqualFold(c.GetHeader("Upgrade"), "websocket")
 		if authHeader != "" {
 			parts := strings.Split(authHeader, " ")
 			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
@@ -25,12 +28,16 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 			}
 			tokenString = parts[1]
 		}
-
-		isWebSocketUpgrade := strings.EqualFold(c.GetHeader("Upgrade"), "websocket")
-		// WebSocket upgrade requests cannot send custom headers from the browser.
-		// Allow the token via query param exclusively for WS upgrades.
+		// Browser WebSocket requests carry a dedicated five-minute token in the
+		// query because the API access cookie would otherwise mask it.
 		if tokenString == "" && isWebSocketUpgrade {
 			tokenString = c.Query("token")
+		}
+		if tokenString == "" {
+			if cookieToken, err := c.Cookie(services.AccessTokenCookieName); err == nil && cookieToken != "" {
+				tokenString = cookieToken
+				cookieAuth = true
+			}
 		}
 
 		if tokenString == "" {
@@ -50,13 +57,41 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		if !isWebSocketUpgrade && claims.Use == "ws" {
+			apiresponse.WriteError(c, http.StatusUnauthorized, "WebSocket token cannot be used for HTTP requests")
+			c.Abort()
+			return
+		}
+		if cookieAuth && isStateChangingMethod(c.Request.Method) {
+			csrfCookie, cookieErr := c.Cookie(services.CSRFTokenCookieName)
+			csrfHeader := c.GetHeader("X-CSRF-Token")
+			if cookieErr != nil || csrfCookie == "" || csrfHeader == "" ||
+				subtle.ConstantTimeCompare([]byte(csrfCookie), []byte(csrfHeader)) != 1 ||
+				claims.SessionID == "" ||
+				authService.ValidateCSRF(c.Request.Context(), claims.SessionID, csrfHeader) != nil {
+				apiresponse.WriteError(c, http.StatusForbidden, "CSRF validation failed")
+				c.Abort()
+				return
+			}
+		}
 
 		// Set user info in context for handlers to use
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
+		c.Set("session_id", claims.SessionID)
+		c.Set("auth_via_cookie", cookieAuth)
 
 		c.Next()
+	}
+}
+
+func isStateChangingMethod(method string) bool {
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	default:
+		return false
 	}
 }
 

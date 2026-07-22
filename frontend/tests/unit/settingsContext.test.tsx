@@ -60,7 +60,7 @@ describe('SettingsContext showPushNotifications', () => {
     vi.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
-    localStorage.setItem('auth_token', 'test-token');
+    document.cookie = 'omni_csrf=test-csrf; path=/';
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
