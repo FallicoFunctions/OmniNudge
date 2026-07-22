@@ -25,6 +25,7 @@ import { PointLight } from '@babylonjs/core/Lights/pointLight.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
+import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import { BaseTexture } from '@babylonjs/core/Materials/Textures/baseTexture.js';
 import { RawCubeTexture } from '@babylonjs/core/Materials/Textures/rawCubeTexture.js';
 import { RawTexture } from '@babylonjs/core/Materials/Textures/rawTexture.js';
@@ -481,7 +482,10 @@ function createPresentationBackdrop(scene: Scene) {
     scene,
   );
   moon.parent = root;
-  moon.position.set(210, 340, 620);
+  // High over the stage, slightly right of the main sightline and well above
+  // the crown silhouette (y~44) so it is plainly visible when looking toward
+  // the stage and tilting up. Within the camera far plane.
+  moon.position.set(95, 360, 330);
   moon.isPickable = false;
   moon.applyFog = false;
   moon.material = createMoonMaterial(scene);
@@ -599,73 +603,66 @@ function createStarfieldTexture(scene: Scene) {
     }
 
     const plot = (px: number, py: number, r: number, g: number, b: number) => {
-      if (px < 0 || px >= width || py < 0 || py >= height) return;
-      const i = (py * width + px) * 4;
+      const wx = ((px % width) + width) % width; // wrap in U
+      if (py < 0 || py >= height) return;
+      const i = (py * width + wx) * 4;
       data[i] = Math.min(255, Math.max(data[i], Math.round(r * 255)));
       data[i + 1] = Math.min(255, Math.max(data[i + 1], Math.round(g * 255)));
       data[i + 2] = Math.min(255, Math.max(data[i + 2], Math.round(b * 255)));
     };
 
-    // --- stars: power-law magnitude, colour temperature, band clustering ---
-    const starCount = 13000;
+    // Stars baked as sharp small cores (a bright centre with a tight 1px
+    // falloff, brilliant ones a hair larger) - crisp rather than the soft
+    // blobs that read as "drawn". Power-law magnitude, colour temperature,
+    // and Milky Way clustering.
+    const starCount = 9000;
     for (let s = 0; s < starCount; s++) {
       const u = random();
       const v = random() * 0.95;
-      // cluster toward the Milky Way but keep the whole field populated
-      if (random() > 0.78 + 0.22 * bandAt(u, v, 0.2)) continue;
+      if (random() > 0.7 + 0.3 * bandAt(u, v, 0.2)) continue;
       const x = Math.floor(u * width);
       const y = Math.floor(v * height);
-      // magnitude skewed toward faint (square of uniform - a touch less
-      // extreme than a cube so more mid stars read against the dark sphere)
       const t = random();
       const mag = t * t;
-      // colour temperature
       const ct = random();
       let cr = 1;
       let cg = 1;
       let cb = 1;
       if (ct < 0.12) {
-        cr = 0.68; cg = 0.78; cb = 1; // blue
+        cr = 0.72; cg = 0.82; cb = 1;
       } else if (ct < 0.3) {
-        cr = 0.85; cg = 0.9; cb = 1; // blue-white
+        cr = 0.88; cg = 0.92; cb = 1;
       } else if (ct > 0.92) {
-        cr = 1; cg = 0.72; cb = 0.5; // orange
+        cr = 1; cg = 0.74; cb = 0.52;
       } else if (ct > 0.76) {
-        cr = 1; cg = 0.88; cb = 0.68; // yellow
+        cr = 1; cg = 0.9; cb = 0.7;
       }
 
       if (mag > 0.9) {
-        // brilliant: sharp core, soft halo, faint diffraction glint
+        // brilliant: bright core + tight halo + faint glint
         plot(x, y, cr, cg, cb);
-        for (let dy = -2; dy <= 2; dy++) {
-          for (let dx = -2; dx <= 2; dx++) {
-            const d = Math.hypot(dx, dy);
-            if (d === 0 || d > 2.4) continue;
-            const f = Math.max(0, 0.55 * (1 - d / 2.6));
-            plot(x + dx, y + dy, cr * f, cg * f, cb * f);
-          }
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          plot(x + dx, y + dy, cr * 0.5, cg * 0.5, cb * 0.5);
         }
-        for (const [dx, dy] of [[3, 0], [-3, 0], [0, 3], [0, -3]]) {
-          plot(x + dx, y + dy, cr * 0.32, cg * 0.32, cb * 0.32);
+        for (const [dx, dy] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) {
+          plot(x + dx, y + dy, cr * 0.22, cg * 0.22, cb * 0.22);
         }
-      } else if (mag > 0.62) {
-        // bright: core plus a faint single-pixel halo
-        const b0 = 0.75 + 0.25 * random();
+      } else if (mag > 0.6) {
+        const b0 = 0.85 + 0.15 * random();
         plot(x, y, cr * b0, cg * b0, cb * b0);
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          plot(x + dx, y + dy, cr * b0 * 0.35, cg * b0 * 0.35, cb * b0 * 0.35);
+          plot(x + dx, y + dy, cr * b0 * 0.28, cg * b0 * 0.28, cb * b0 * 0.28);
         }
       } else {
-        // the faint majority: crisp single pixels, floor raised so the ACES
-        // contrast curve doesn't crush them to black on the sphere.
-        const b0 = 0.42 + 0.35 * mag;
+        // faint majority: a single crisp pixel, floor raised so the ACES
+        // contrast curve doesn't crush them on the sphere.
+        const b0 = 0.5 + 0.4 * mag;
         plot(x, y, cr * b0, cg * b0, cb * b0);
       }
     }
 
-    // generateMipMaps MUST be false: mip minification averages the sparse
-    // stars into the dark background and the sky renders empty. Bilinear
-    // (no-mip) sampling keeps them crisp at every viewing distance.
+    // No mipmaps (they average the sharp stars away); bilinear keeps the tiny
+    // cores crisp at every viewing distance.
     const texture = RawTexture.CreateRGBATexture(
       data,
       width,
