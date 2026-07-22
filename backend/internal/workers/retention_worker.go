@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -107,6 +108,8 @@ func (w *RetentionWorker) runAllJobs(ctx context.Context) {
 	log.Printf("[RETENTION] Starting daily cleanup jobs (DryRun=%v)", w.cfg.DryRun)
 
 	w.cleanupExpiredExports(ctx)
+	w.cleanupExpiredAuthSessions(ctx)
+	w.cleanupExpiredDirectUploads(ctx)
 	w.cleanupDeletedOmniChatSpeech(ctx)
 	w.cleanupExpiredOmniChatSpeech(ctx)
 	w.cleanupAbandonedOmniChatCalls(ctx)
@@ -117,6 +120,95 @@ func (w *RetentionWorker) runAllJobs(ctx context.Context) {
 	w.anonymizeAnalytics(ctx)
 
 	log.Println("[RETENTION] All daily cleanup jobs finished")
+}
+
+func (w *RetentionWorker) cleanupExpiredAuthSessions(ctx context.Context) {
+	if w.db == nil {
+		return
+	}
+	if w.cfg.DryRun {
+		return
+	}
+	if _, err := w.db.Exec(ctx, `
+		DELETE FROM auth_sessions
+		WHERE expires_at < NOW() - INTERVAL '7 days'
+		   OR (revoked_at IS NOT NULL AND revoked_at < NOW() - INTERVAL '7 days')
+	`); err != nil && !isUndefinedTableError(err) {
+		log.Printf("[RETENTION] Failed to clean expired authentication sessions: %v", err)
+	}
+}
+
+// cleanupExpiredDirectUploads removes objects that were uploaded but never
+// confirmed. Database paths are constrained to the dedicated pending prefix so
+// a corrupted row cannot turn retention into an arbitrary object deleter.
+func (w *RetentionWorker) cleanupExpiredDirectUploads(ctx context.Context) {
+	if w.db == nil || w.storage == nil {
+		return
+	}
+	rows, err := w.db.Query(ctx, `
+		SELECT i.id, i.user_id, i.storage_path, i.status
+		FROM media_upload_intents i
+		LEFT JOIN media_files mf ON mf.id=i.confirmed_media_id
+		WHERE i.expires_at < NOW()
+		  AND (i.status IN ('pending','failed')
+		       OR (i.status='confirmed' AND mf.scan_status IN ('clean','infected')))
+		ORDER BY i.expires_at
+		LIMIT 500
+	`)
+	if err != nil {
+		if !isUndefinedTableError(err) {
+			log.Printf("[RETENTION] Failed to query expired direct uploads: %v", err)
+		}
+		return
+	}
+	type expiredUpload struct {
+		id, path, status string
+		userID           int
+	}
+	var uploads []expiredUpload
+	for rows.Next() {
+		var upload expiredUpload
+		if err := rows.Scan(&upload.id, &upload.userID, &upload.path, &upload.status); err != nil {
+			rows.Close()
+			log.Printf("[RETENTION] Failed to scan expired direct upload: %v", err)
+			return
+		}
+		uploads = append(uploads, upload)
+	}
+	rows.Close()
+	if w.cfg.DryRun {
+		if len(uploads) > 0 {
+			log.Printf("[RETENTION][DRY-RUN] Would delete %d expired direct uploads", len(uploads))
+		}
+		return
+	}
+	for _, upload := range uploads {
+		expectedPrefix := fmt.Sprintf("pending-uploads/%d/", upload.userID)
+		if !strings.HasPrefix(upload.path, expectedPrefix) {
+			log.Printf("[RETENTION] Refusing invalid direct-upload storage path %q", upload.path)
+			continue
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		err := w.storage.Delete(cleanupCtx, upload.path)
+		if err == nil && upload.status == "pending" {
+			_, err = w.db.Exec(cleanupCtx, `
+				UPDATE media_upload_intents
+				SET status='failed', failure_reason='upload expired before confirmation'
+				WHERE id=$1 AND status='pending'
+			`, upload.id)
+		}
+		cancel()
+		if err != nil {
+			log.Printf("[RETENTION] Failed to clean expired direct upload %s: %v", upload.id, err)
+		}
+	}
+	if _, err := w.db.Exec(ctx, `
+		DELETE FROM media_upload_intents
+		WHERE (status='failed' AND created_at < NOW()-INTERVAL '30 days')
+		   OR (status='confirmed' AND confirmed_at < NOW()-INTERVAL '90 days')
+	`); err != nil && !isUndefinedTableError(err) {
+		log.Printf("[RETENTION] Failed to prune direct-upload intents: %v", err)
+	}
 }
 
 // cleanupDeletedOmniChatSpeech drains the durable outbox populated by the

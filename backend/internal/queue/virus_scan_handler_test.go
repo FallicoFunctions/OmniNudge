@@ -1,9 +1,14 @@
 package queue
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,6 +42,25 @@ func (m *mockThumbnailEnqueuer) EnqueueThumbnailGeneration(ctx context.Context, 
 type mockVirusScanner struct {
 	result services.VirusScanResult
 	err    error
+}
+
+type promotableTestStorage struct {
+	*services.LocalStorageService
+	copies [][2]string
+}
+
+func (s *promotableTestStorage) CopyObject(ctx context.Context, sourceKey, destinationKey string) (string, error) {
+	body, err := s.Download(ctx, sourceKey)
+	if err != nil {
+		return "", err
+	}
+	defer body.Close()
+	payload, err := io.ReadAll(body)
+	if err != nil {
+		return "", err
+	}
+	s.copies = append(s.copies, [2]string{sourceKey, destinationKey})
+	return s.Upload(ctx, destinationKey, bytes.NewReader(payload), "application/octet-stream")
 }
 
 func (m *mockVirusScanner) Ping(ctx context.Context) error {
@@ -190,6 +214,52 @@ func TestVirusScanHandler_EnqueuesThumbnailAfterCleanScanForImage(t *testing.T) 
 	require.Equal(t, media.StorageURL, enqueuer.calls[0].SourceURL)
 	require.Equal(t, media.Filename, enqueuer.calls[0].SourceS3Key)
 	require.Equal(t, "image", enqueuer.calls[0].FileType)
+}
+
+func TestVirusScanHandler_PromotesCleanDirectUploadBeforePublishing(t *testing.T) {
+	_, mediaRepo, userID := setupVirusScanDB(t)
+	local, err := services.NewLocalStorageService(t.TempDir(), "https://cdn.example")
+	require.NoError(t, err)
+	storage := &promotableTestStorage{LocalStorageService: local}
+	stagingKey := fmt.Sprintf("pending-uploads/%d/upload-id/clean.png", userID)
+	var pngBuffer bytes.Buffer
+	pixel := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	pixel.Set(0, 0, color.RGBA{R: 1, A: 255})
+	require.NoError(t, png.Encode(&pngBuffer, pixel))
+	pngPayload := pngBuffer.Bytes()
+	_, err = storage.Upload(context.Background(), stagingKey, bytes.NewReader(pngPayload), "image/png")
+	require.NoError(t, err)
+
+	media := &models.MediaFile{
+		UserID: userID, Filename: "clean.png", OriginalFilename: "clean.png",
+		FileType: "image/png", FileSize: int64(len(pngPayload)), StorageURL: "", StoragePath: stagingKey,
+	}
+	require.NoError(t, mediaRepo.Create(context.Background(), media))
+	handler := NewVirusScanHandler(mediaRepo, &mockVirusScanner{}, true, storage, nil)
+	task := asynq.NewTask(string(JobTypeVirusScan), []byte(fmt.Sprintf(
+		`{"file_id":%d,"file_path":%q,"s3_key":%q,"uploaded_by":%d}`,
+		media.ID, stagingKey, stagingKey, userID,
+	)))
+	require.NoError(t, handler(context.Background(), task))
+
+	updated, err := mediaRepo.GetByID(context.Background(), media.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.MediaScanStatusClean, updated.ScanStatus)
+	require.Equal(t, fmt.Sprintf("uploads/%d/upload-id/clean.png", userID), updated.StoragePath)
+	require.Equal(t, "https://cdn.example/"+updated.StoragePath, updated.StorageURL)
+	require.Equal(t, [][2]string{{stagingKey, updated.StoragePath}}, storage.copies)
+	_, err = storage.GetObjectSize(context.Background(), stagingKey)
+	require.Error(t, err)
+}
+
+func TestValidateStagedUploadRejectsDeclaredImageWithExecutableBytes(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "payload.png")
+	require.NoError(t, os.WriteFile(path, []byte("MZ executable payload"), 0o600))
+	err := validateStagedUpload(path, &models.MediaFile{
+		OriginalFilename: "payload.png",
+		FileType:         "image/png",
+	})
+	require.Error(t, err)
 }
 
 func itoa(v int) string {

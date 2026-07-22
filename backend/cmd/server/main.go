@@ -572,6 +572,7 @@ func main() {
 		ProTierBytes:  cfg.Media.ProTierQuotaBytes,
 	}
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient, mediaQuota, cfg.VirusScan.FailClosed)
+	mediaHandler.SetPresignedUploadRepository(mediaRepo)
 	// Inject storage service so all uploads go through the configured backend.
 	mediaHandler.SetStorageService(storageService)
 	// Also inject S3 service when S3 storage backend is active so presigned URL

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/domain"
 	"github.com/omninudge/backend/internal/models"
@@ -17,8 +18,28 @@ type PostgresMediaFileRepository struct {
 var _ ports.MediaFileRepository = (*PostgresMediaFileRepository)(nil)
 
 // NewPostgresMediaFileRepository constructs a PostgresMediaFileRepository.
-func NewPostgresMediaFileRepository(pool *pgxpool.Pool) ports.MediaFileRepository {
+func NewPostgresMediaFileRepository(pool *pgxpool.Pool) *PostgresMediaFileRepository {
 	return &PostgresMediaFileRepository{inner: models.NewMediaFileRepository(pool)}
+}
+
+func (r *PostgresMediaFileRepository) ReserveUploadIntent(ctx context.Context, intent *models.MediaUploadIntent, storageCap int64) error {
+	return r.inner.ReserveUploadIntent(ctx, intent, storageCap)
+}
+
+func (r *PostgresMediaFileRepository) GetUploadIntentOwned(ctx context.Context, id uuid.UUID, userID int) (*models.MediaUploadIntent, error) {
+	return r.inner.GetUploadIntentOwned(ctx, id, userID)
+}
+
+func (r *PostgresMediaFileRepository) FinalizeUploadIntent(ctx context.Context, id uuid.UUID, userID int, actualSize, storageCap int64, storageURL string) (int, bool, error) {
+	return r.inner.FinalizeUploadIntent(ctx, id, userID, actualSize, storageCap, storageURL)
+}
+
+func (r *PostgresMediaFileRepository) RollbackConfirmedUpload(ctx context.Context, id uuid.UUID, userID int, reason string) error {
+	return r.inner.RollbackConfirmedUpload(ctx, id, userID, reason)
+}
+
+func (r *PostgresMediaFileRepository) MarkUploadIntentFailed(ctx context.Context, id uuid.UUID, userID int, reason string) error {
+	return r.inner.MarkUploadIntentFailed(ctx, id, userID, reason)
 }
 
 func (r *PostgresMediaFileRepository) Create(ctx context.Context, media *domain.MediaFile) error {
@@ -41,12 +62,12 @@ func (r *PostgresMediaFileRepository) GetTrackedStorageByUserID(ctx context.Cont
 	return r.inner.GetTrackedStorageByUserID(ctx, userID)
 }
 
-func (r *PostgresMediaFileRepository) IncrementTrackedStorageByUserID(ctx context.Context, userID int, delta int64) error {
-	return r.inner.IncrementTrackedStorageByUserID(ctx, userID, delta)
-}
-
 func (r *PostgresMediaFileRepository) UpdateThumbnailURL(ctx context.Context, mediaID int, thumbnailURL string) error {
 	return r.inner.UpdateThumbnailURL(ctx, mediaID, thumbnailURL)
+}
+
+func (r *PostgresMediaFileRepository) UpdateStorageLocation(ctx context.Context, mediaID int, storagePath, storageURL string) error {
+	return r.inner.UpdateStorageLocation(ctx, mediaID, storagePath, storageURL)
 }
 
 func (r *PostgresMediaFileRepository) DeleteByID(ctx context.Context, mediaID int) error {

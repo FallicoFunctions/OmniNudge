@@ -75,3 +75,26 @@ func TestLocalStorageUploadFailureDoesNotCorruptExistingObject(t *testing.T) {
 	require.NoError(t, reader.Close())
 	require.Equal(t, "original", string(contents))
 }
+
+func TestS3StorageRoutesPendingUploadsOnlyToPrivateStagingBucket(t *testing.T) {
+	storage := &S3StorageService{bucket: "public-assets", stagingBucket: "private-staging", region: "us-east-1"}
+	bucket, err := storage.bucketForKey("pending-uploads/1/id/file.png")
+	require.NoError(t, err)
+	require.Equal(t, "private-staging", bucket)
+	require.Empty(t, storage.PublicURL("pending-uploads/1/id/file.png"))
+
+	bucket, err = storage.bucketForKey("uploads/1/id/file.png")
+	require.NoError(t, err)
+	require.Equal(t, "public-assets", bucket)
+	require.NotEmpty(t, storage.PublicURL("uploads/1/id/file.png"))
+}
+
+func TestS3StorageDisablesPendingUploadsWithoutStagingBucket(t *testing.T) {
+	storage := &S3StorageService{bucket: "public-assets"}
+	_, err := storage.bucketForKey("pending-uploads/1/id/file.png")
+	require.ErrorContains(t, err, "S3_STAGING_BUCKET")
+	require.False(t, storage.SupportsQuarantinedDirectUploads())
+	storage.stagingBucket = storage.bucket
+	_, err = storage.bucketForKey("pending-uploads/1/id/file.png")
+	require.Error(t, err)
+}
