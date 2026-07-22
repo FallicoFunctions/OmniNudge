@@ -11,10 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CSRF is mitigated by the JWT Authorization header pattern — cross-origin
-// requests cannot set custom Authorization headers without CORS permission. If
-// cookie-based auth is ever introduced, implement double-submit cookie CSRF
-// protection at that time.
+// Browser sessions use a session-bound double-submit CSRF token. Legacy bearer
+// requests remain protected by the browser's cross-origin header restrictions
+// and the production CORS allowlist.
 
 // SecurityHeaders adds security headers to all responses
 // Implements OWASP security best practices
@@ -22,7 +21,7 @@ func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		scriptSrc := "'self' 'unsafe-inline' 'unsafe-eval'"
 		if os.Getenv("APP_ENV") == "production" {
-			scriptSrc = "'self' 'unsafe-inline'"
+			scriptSrc = "'self'"
 		}
 		// Content Security Policy (CSP)
 		// Prevents XSS attacks by controlling resource loading
@@ -51,9 +50,8 @@ func SecurityHeaders() gin.HandlerFunc {
 		// nosniff = browsers must respect Content-Type header
 		c.Header("X-Content-Type-Options", "nosniff")
 
-		// X-XSS-Protection: Enable browser XSS filter
-		// 1; mode=block = enable XSS filter and block page if attack detected
-		c.Header("X-XSS-Protection", "1; mode=block")
+		// Disable deprecated browser XSS auditors; CSP is the primary defense.
+		c.Header("X-XSS-Protection", "0")
 
 		// Strict-Transport-Security (HSTS): Force HTTPS
 		// max-age=31536000 = 1 year

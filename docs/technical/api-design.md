@@ -2,14 +2,17 @@
 
 **Base URL:** `https://yoursite.com/api/v1`
 **Development:** `http://localhost:8080/api/v1`
-**Authentication:** JWT Bearer Token
+**Authentication:** HTTP-only cookie session with double-submit CSRF protection
 **Content-Type:** `application/json` (except file uploads)
 
 ---
 
 ## Authentication
 
-Authentication uses username/password plus JWT bearer tokens.
+Authentication uses username/password credentials and server-tracked browser sessions. Login and
+registration set an HTTP-only access cookie plus a readable CSRF cookie. State-changing browser
+requests must echo the CSRF cookie in the `X-CSRF-Token` header. API clients may still use an
+explicit bearer access token when one is issued for that client; bearer requests do not use cookies.
 There is no Reddit sign-in redirect flow.
 Reddit browsing is fetched server-side from Reddit's public JSON API.
 
@@ -21,22 +24,9 @@ Public endpoints include:
 - `GET /auth/verify-email`
 - Reddit browsing endpoints under `/reddit/*` (best effort, anonymous upstream access)
 
-All other user-specific endpoints require authentication.
-
-**Header:**
-```
-Authorization: Bearer <JWT_TOKEN>
-```
-
-**JWT Token Structure:**
-```json
-{
-  "user_id": 123,
-  "username": "yorkielover42",
-  "exp": 1234567890,
-  "iat": 1234560000
-}
-```
+All other user-specific endpoints require authentication. Browser clients send credentials with
+`credentials: include`; mutation requests also send `X-CSRF-Token`. Never persist access tokens in
+browser storage.
 
 ---
 
@@ -60,7 +50,6 @@ Create a platform account with username/password authentication.
 **Response:**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIs...",
   "user": {
     "id": 1,
     "username": "yorkielover42",
@@ -79,7 +68,7 @@ Create a platform account with username/password authentication.
 
 #### `POST /auth/login`
 
-Authenticate with platform credentials and receive a JWT.
+Authenticate with platform credentials and establish a cookie-backed session.
 
 **Request Body:**
 ```json
@@ -92,7 +81,6 @@ Authenticate with platform credentials and receive a JWT.
 **Response:**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIs...",
   "user": {
     "id": 1,
     "username": "yorkielover42",
@@ -111,12 +99,9 @@ Authenticate with platform credentials and receive a JWT.
 
 #### `POST /auth/logout`
 
-Logs out current user (invalidates token).
+Logs out the current user, revokes the server-side session, and clears authentication cookies.
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
+**Headers:** `X-CSRF-Token` must match the CSRF cookie.
 
 **Response:**
 ```json
@@ -131,10 +116,7 @@ Authorization: Bearer <token>
 
 Get current authenticated user info.
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
+The browser session cookie is sent automatically.
 
 **Response:**
 ```json
@@ -687,14 +669,17 @@ Health check endpoint.
 **Connection URL:** `wss://yoursite.com/api/v1/ws`  
 **Development:** `ws://localhost:8080/api/v1/ws`
 
-**Authentication:** send your JWT as an `Authorization: Bearer <token>` header when opening the socket. (The endpoint is behind the same auth middleware as other protected routes.)
+**Authentication:** while authenticated, call `POST /auth/ws-token` with a valid CSRF header, then
+pass the returned single-purpose, five-minute token as the WebSocket `token` query parameter. Do not
+put the normal session credential in the WebSocket URL.
 
 ### Connection Flow
 
 ```
-1. Client opens ws://localhost:8080/api/v1/ws with Authorization header.
-2. Server validates JWT and registers the user in the hub.
-3. From here, the socket is used for:
+1. Client obtains a short-lived WebSocket token from `POST /auth/ws-token`.
+2. Client opens `ws://localhost:8080/api/v1/ws?token=<short-lived-token>`.
+3. Server validates the token purpose and lifetime, then registers the user in the hub.
+4. From here, the socket is used for:
    - Receiving events: new_message, message_delivered, conversation_read, typing
    - Sending events: typing (to show indicators to the other participant)
 ```
@@ -977,7 +962,7 @@ All error responses follow this format:
 
 ### Error Codes
 
-- `INVALID_TOKEN`: JWT token invalid or expired
+- `SESSION_EXPIRED`: Session is invalid, revoked, or expired
 - `USER_NOT_FOUND`: User doesn't exist
 - `CONVERSATION_NOT_FOUND`: Conversation doesn't exist
 - `MESSAGE_NOT_FOUND`: Message doesn't exist
@@ -1040,7 +1025,8 @@ Access-Control-Allow-Origin: https://yoursite.com
 
 ```
 1. Client: POST /api/v1/messages
-   Headers: Authorization: Bearer xyz123
+   Credentials: browser session cookie
+   Headers: X-CSRF-Token: <matching CSRF cookie value>
    Body: {
      "conversation_id": 1,
      "recipient_id": 2,
@@ -1048,7 +1034,7 @@ Access-Control-Allow-Origin: https://yoursite.com
      "message_type": "text"
    }
 
-2. Server: Validates token, checks not blocked
+2. Server: Validates the session and CSRF token, then checks not blocked
 3. Server: Stores message in PostgreSQL
 4. Server: Checks if recipient online (Redis)
 5. Server: If online, sends via WebSocket:
@@ -1087,22 +1073,24 @@ Access-Control-Allow-Origin: https://yoursite.com
 ### Using cURL
 
 ```bash
-# Log in with platform credentials and capture the returned JWT
-
-# Set token
-TOKEN="your_jwt_token_here"
+# Log in and keep both authentication cookies
+curl -c cookies.txt -H "Content-Type: application/json" \
+  -d '{"identifier":"yorkielover42","password":"correct horse battery staple"}' \
+  http://localhost:8080/api/v1/auth/login
 
 # Get user info
-curl -H "Authorization: Bearer $TOKEN" \
+curl -b cookies.txt \
   http://localhost:8080/api/v1/auth/me
 
 # Get conversations
-curl -H "Authorization: Bearer $TOKEN" \
+curl -b cookies.txt \
   http://localhost:8080/api/v1/conversations
 
-# Send message
+# Send a message. Read the csrf_token value from cookies.txt first.
+CSRF_TOKEN="replace-with-csrf-cookie-value"
 curl -X POST \
-  -H "Authorization: Bearer $TOKEN" \
+  -b cookies.txt \
+  -H "X-CSRF-Token: $CSRF_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"conversation_id":1,"recipient_id":2,"encrypted_content":"test","message_type":"text"}' \
   http://localhost:8080/api/v1/messages
@@ -1114,9 +1102,9 @@ curl -X POST \
 2. Create collection "OmniNudge API"
 3. Add environment variables:
    - `base_url`: http://localhost:8080/api/v1
-   - `token`: your_jwt_token
+   - `csrf_token`: the current CSRF cookie value
 4. Create requests with `{{base_url}}/endpoint`
-5. Add header: `Authorization: Bearer {{token}}`
+5. Enable the client cookie jar and add `X-CSRF-Token: {{csrf_token}}` to mutation requests
 
 ---
 
@@ -1174,7 +1162,9 @@ When making breaking changes:
 - **Voting:** `is_upvote` accepts `true` (upvote), `false` (downvote), or `null` (remove vote) on posts and comments.
 - **Media upload:** `POST /api/v1/media/upload` accepts images, video, audio, and document/text attachments up to 25MB; unsupported types or oversized files return 400.
 - **Moderation:** Role/admin actions via `/api/v1/admin/users/:id/role`, `/api/v1/admin/hubs/:name/moderators`.
-- **WebSocket:** Connect with `Authorization: Bearer <token>` header; supports real-time notification delivery.
+- **WebSocket:** Exchange the browser session for a single-purpose five-minute token at
+  `/auth/ws-token`, then connect with that token in the WebSocket query; supports real-time
+  notification delivery.
 
 ### Recently Added Features
 - **Notifications System:** Real-time notifications for post/comment milestones, velocity-based viral detection, and comment replies. See [API.md](../../backend/docs/API.md) for full notification endpoints and [NOTIFICATIONS.md](../../backend/docs/NOTIFICATIONS.md) for architecture details.
@@ -1184,4 +1174,6 @@ When making breaking changes:
 - **Rate Limiting:** Token bucket algorithm enforcing 100 req/min for authenticated users and 20 req/min for anonymous users.
 
 ### Authentication Note
-Current implementation uses username/password authentication with JWT tokens. Reddit browsing is fetched anonymously by the backend from public `.json` endpoints.
+Current browser authentication uses username/password credentials, HTTP-only cookies, server-side
+session revocation, and double-submit CSRF tokens. Reddit browsing is fetched anonymously by the
+backend from public `.json` endpoints.

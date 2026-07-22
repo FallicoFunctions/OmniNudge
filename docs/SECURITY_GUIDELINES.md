@@ -264,9 +264,11 @@ Content-Security-Policy:
   script-src 'self';
   style-src 'self' 'unsafe-inline';
   img-src 'self' https: data:;
-  font-src 'self';
-  connect-src 'self' wss://omninudge.com;
-  frame-src 'none';
+  font-src 'self' data:;
+  connect-src 'self' wss: https://*.googleapis.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com;
+  media-src 'self' blob: https:;
+  worker-src 'self' blob:;
+  frame-src 'self' https://daily.co https://*.daily.co;
   object-src 'none';
   base-uri 'self';
   form-action 'self';
@@ -275,7 +277,7 @@ Content-Security-Policy:
 **What this prevents:**
 - `script-src 'self'` - Only scripts from our domain
 - `style-src 'unsafe-inline'` - Inline styles allowed (for user CSS) but no external stylesheets
-- `frame-src 'none'` - No iframes (prevents clickjacking)
+- `frame-src` - Frames are limited to same-origin and trusted Daily live-avatar rooms
 - `object-src 'none'` - No Flash, plugins
 - `form-action 'self'` - Forms only submit to our domain
 
