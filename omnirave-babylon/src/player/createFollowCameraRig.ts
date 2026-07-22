@@ -7,7 +7,10 @@ import { MAX_ZOOM_DISTANCE, MIN_ZOOM_DISTANCE, resolveZoomState } from './camera
 import type { ReviewCheckpointCamera } from '../scene/reviewRouteData';
 
 const MIN_ORBIT_BETA = 0.62;
-const MAX_ORBIT_BETA = 2.2;
+// Raised from the old 2.2 so the view pitches substantially further up toward
+// the sky. The camera arcs a little below the target at the extreme, but the
+// sky is what the player is after there.
+const MAX_ORBIT_BETA = 2.62;
 
 export interface FollowCameraRig {
   applyCheckpointView: (view: ReviewCheckpointCamera) => ReturnType<typeof resolveZoomState>;
@@ -158,6 +161,7 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
       target.computeWorldMatrix(true);
       followWorldTarget.copyFrom(target.getAbsolutePosition());
       followWorldTarget.addInPlace(activeFocusOffset);
+
       targetAnchor.position.copyFrom(followWorldTarget);
 
       if (hasActivePositionOffset) {
