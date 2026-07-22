@@ -167,5 +167,3 @@ export function useGroupAdmin({
     handleWebSocketEvent,
   } as const;
 }
-
-export type UseGroupAdminReturn = ReturnType<typeof useGroupAdmin>;

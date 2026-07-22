@@ -6,6 +6,7 @@ import './i18n/config'; // Initialize i18n
 import App from './App.tsx';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ErrorBoundary from './ErrorBoundary';
+import { getFirebaseMessagingWorkerRegistration } from './lib/firebaseMessagingWorker';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,29 +33,7 @@ createRoot(document.getElementById('root')!).render(
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // EMERGENCY FIX: Unregister all service workers and clear caches
-    // This fixes module import errors caused by stale service worker caches
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      registrations.forEach((registration) => {
-        registration.unregister();
-      });
-    });
-
-    if ('caches' in window) {
-      caches.keys().then((names) => {
-        names.forEach((name) => caches.delete(name));
-      });
-    }
-
-    // Service worker registration temporarily disabled
-    // Will re-enable after fixing cache invalidation strategy
-
-    // Register Firebase Cloud Messaging service worker (still needed for notifications)
-    setTimeout(() => {
-      navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(() => {
-        // Ignore registration errors to avoid blocking app load.
-      });
-    }, 2000); // Delay to ensure unregistration completes
+    void getFirebaseMessagingWorkerRegistration();
   });
 }
 

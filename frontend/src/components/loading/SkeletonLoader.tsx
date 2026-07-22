@@ -10,7 +10,7 @@ function Skeleton({ className = '' }: SkeletonProps) {
 }
 
 // Text line skeleton
-export function SkeletonText({
+function SkeletonText({
   lines = 1,
   className = '',
 }: {
@@ -27,7 +27,7 @@ export function SkeletonText({
 }
 
 // Image skeleton
-export function SkeletonImage({
+function SkeletonImage({
   aspectRatio = 'square',
   className = '',
 }: {
@@ -125,34 +125,3 @@ export function SkeletonList({
     </div>
   );
 }
-
-// Message bubble skeleton
-export function SkeletonMessage({
-  isOwn = false,
-  className = '',
-}: {
-  isOwn?: boolean;
-  className?: string;
-}) {
-  return (
-    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${className}`}>
-      <div className={`max-w-[70%] ${isOwn ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
-        <Skeleton className="h-4 w-20 mb-1" />
-        <Skeleton className={`h-12 ${isOwn ? 'w-48' : 'w-56'} rounded-2xl`} />
-      </div>
-    </div>
-  );
-}
-
-// Add shimmer animation to global styles
-// This would go in index.css or a global stylesheet
-export const shimmerStyles = `
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-`;

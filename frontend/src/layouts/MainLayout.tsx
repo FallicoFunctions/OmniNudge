@@ -25,6 +25,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastContainer } from '../components/error';
 import { dismissToast, useToasts } from '../hooks/useToast';
 import { UpgradeModal } from '../components/payments/UpgradeModal';
+import { getSafeInternalPath } from '../utils/navigation';
 
 const AboutContent = lazy(() =>
   import('../components/about/AboutContent').then((module) => ({
@@ -182,7 +183,8 @@ export default function MainLayout() {
       ) {
         setAuthModal(detail.mode);
         if (detail.redirectTo) {
-          setPendingRedirect({ to: detail.redirectTo, state: detail.redirectState });
+          const redirectTo = getSafeInternalPath(detail.redirectTo, '');
+          setPendingRedirect(redirectTo ? { to: redirectTo, state: detail.redirectState } : null);
         } else {
           setPendingRedirect(null);
         }

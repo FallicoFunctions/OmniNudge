@@ -34,13 +34,3 @@ export function heavyHaptic(): void {
     navigator.vibrate(MOBILE_HAPTICS.HEAVY);
   }
 }
-
-/**
- * Trigger a success haptic feedback (pattern)
- * Used for: Successful form submission, completed actions
- */
-export function successHaptic(): void {
-  if (navigator.vibrate) {
-    navigator.vibrate([...MOBILE_HAPTICS.SUCCESS]);
-  }
-}

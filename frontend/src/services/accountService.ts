@@ -71,21 +71,6 @@ class AccountService {
     return response.data;
   }
 
-  /**
-   * Cancel pending account deletion
-   */
-  async cancelAccountDeletion() {
-    const response = await api.post('/account/cancel-deletion');
-    return response.data;
-  }
-
-  /**
-   * Get account deletion status
-   */
-  async getAccountDeletionStatus() {
-    const response = await api.get('/account/deletion-status');
-    return response.data;
-  }
 }
 
 export const accountService = new AccountService();

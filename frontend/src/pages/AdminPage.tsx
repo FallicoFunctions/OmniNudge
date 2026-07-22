@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { adminService } from '../services/adminService';
+import { api } from '../lib/api';
 import { bugReportService } from '../services/bugReportService';
 import type { Hub } from '../services/hubsService';
 import type { AdminUser, BanHistoryItem } from '../types/admin';
@@ -27,13 +28,11 @@ type TabType =
 export default function AdminPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('stats');
 
   // Check if user is admin
   if (!user || user.role !== 'admin') {
-    navigate('/');
-    return null;
+    return <Navigate to="/" replace />;
   }
 
   return (
@@ -1520,7 +1519,7 @@ function BugReportsTab() {
                                 <a
                                   href={resolveMediaUrl(report.screenshot_url)}
                                   target="_blank"
-                                  rel="noreferrer"
+                                  rel="noopener noreferrer"
                                   className="block"
                                 >
                                   <img
@@ -1579,8 +1578,7 @@ function ModeratorsTab() {
   const { data: hubsData } = useQuery({
     queryKey: ['allHubs'],
     queryFn: async () => {
-      const response = await fetch('/api/v1/hubs?limit=1000&offset=0');
-      const data = await response.json();
+      const data = await api.get<{ hubs?: Hub[] }>('/hubs?limit=1000&offset=0');
       return data.hubs || [];
     },
   });

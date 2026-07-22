@@ -117,16 +117,6 @@ export function isDurationNever(d: AutoDeleteDuration): boolean {
   return d.days === 0 && d.hours === 0 && d.minutes === 0;
 }
 
-export interface ChatSettings {
-  /** Total seconds of the per-chat override, or null if no override is set. */
-  auto_delete_after_seconds: number | null;
-}
-
-export interface WsAutoDeleteEvent {
-  message_id: number;
-  conversation_id: number;
-}
-
 export interface Message {
   id: number;
   conversation_id: number;
@@ -302,28 +292,4 @@ export interface TransferOwnershipRequest {
 
 export interface CreateGroupInviteRequest {
   user_id: number;
-}
-
-// WebSocket group events
-export interface WsGroupEvent {
-  type:
-    | 'group_created'
-    | 'member_added'
-    | 'member_removed'
-    | 'role_changed'
-    | 'group_updated'
-    | 'user_left'
-    | 'ownership_transferred'
-    | 'group_settings_updated';
-  conversation_id: number;
-  actor_id?: number;
-  user_id?: number;
-  data?: Record<string, unknown>;
-}
-
-export interface WsSystemMessageEvent {
-  type: 'system_message';
-  conversation_id: number;
-  text: string;
-  created_at: string;
 }

@@ -58,6 +58,7 @@ import HubAIDesignLayout from '../components/hubDesign/HubAIDesignLayout';
 import { useActiveHubAIDesign } from '../hooks/useActiveHubAIDesign';
 import { splitAIDesignHTML } from '../utils/splitAIDesignHTML';
 import { sanitizeHttpUrl } from '../utils/crosspostHelpers';
+import { getSafeInternalPath } from '../utils/navigation';
 
 export default function PostDetailPage() {
   const { postId, commentId, hubname, subreddit } = useParams<{
@@ -571,7 +572,10 @@ export default function PostDetailPage() {
     }
   };
 
-  const originPathFromState = (location.state as { originPath?: string } | undefined)?.originPath;
+  const originPathFromState = getSafeInternalPath(
+    (location.state as { originPath?: string } | undefined)?.originPath,
+    ''
+  );
 
   const deletePostMutation = useMutation<void, Error, { postId: number; reason?: string }>({
     mutationFn: async ({ postId, reason }) => postsService.deletePost(postId, reason),
@@ -646,11 +650,6 @@ export default function PostDetailPage() {
       const err = error as Error;
       alert(t('alerts.hideFailed', { message: err.message }));
     }
-  };
-
-  const handleCrosspost = async () => {
-    // TODO: Implement crosspost functionality
-    alert(t('posts.actions.crosspostSoon'));
   };
 
   if (!postId || Number.isNaN(parsedPostId)) {
@@ -806,10 +805,6 @@ export default function PostDetailPage() {
                 <span>•</span>
                 <button onClick={handleHidePost} className="hover:underline">
                   {t('posts.actions.hide')}
-                </button>
-                <span>•</span>
-                <button onClick={handleCrosspost} className="hover:underline">
-                  {t('posts.actions.crosspost')}
                 </button>
                 {canPinPost && postData && (
                   <>
@@ -1645,10 +1640,6 @@ export default function PostDetailPage() {
                   <span>•</span>
                   <button onClick={handleHidePost} className="hover:underline">
                     {t('posts.actions.hide')}
-                  </button>
-                  <span>•</span>
-                  <button onClick={handleCrosspost} className="hover:underline">
-                    {t('posts.actions.crosspost')}
                   </button>
                   {canPinPost && postData && (
                     <>

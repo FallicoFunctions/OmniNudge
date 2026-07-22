@@ -24,12 +24,3 @@ export function LoadingSpinner({ size = 'medium', className = '' }: LoadingSpinn
     </div>
   );
 }
-
-// Centered spinner for full page/container loading
-export function LoadingSpinnerCentered({ size = 'large' }: LoadingSpinnerProps) {
-  return (
-    <div className="flex items-center justify-center min-h-[200px] w-full">
-      <LoadingSpinner size={size} />
-    </div>
-  );
-}

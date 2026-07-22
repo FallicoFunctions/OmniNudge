@@ -79,7 +79,6 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
   const [comments, setComments] = useState<ThreadComment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(true);
   const [commentError, setCommentError] = useState<string | null>(null);
-  const [hasMoreComments, setHasMoreComments] = useState(false);
 
   const postData = post as ExpandedPostData;
   const isRedditPost = Boolean(postData.subreddit);
@@ -201,7 +200,6 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
 
           const normalizedComments = flattenComments(redditComments);
           setComments(normalizedComments);
-          setHasMoreComments(false);
         } else {
           const data = await postsService.getComments(postData.id as number);
 
@@ -212,7 +210,6 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
           }));
 
           setComments(normalizedComments);
-          setHasMoreComments(false);
         }
       } catch (err) {
         console.error('Error fetching comments:', err);
@@ -362,10 +359,6 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
     });
   };
 
-  const loadMoreComments = () => {
-    // TODO: Implement pagination
-  };
-
   return (
     <div className="expanded-post bg-[var(--color-surface)]">
       {/* Sticky back button */}
@@ -483,14 +476,6 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
           />
         )}
 
-        {hasMoreComments && (
-          <button
-            onClick={loadMoreComments}
-            className="w-full p-2 text-xs text-cyan-500 hover:text-cyan-400 border-t border-[var(--color-border)] transition-colors"
-          >
-            {t('comments.loadMore', { count: 25 })}
-          </button>
-        )}
       </div>
     </div>
   );

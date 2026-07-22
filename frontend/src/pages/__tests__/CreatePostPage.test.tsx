@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, type InitialEntry } from 'react-router-dom';
@@ -180,7 +180,11 @@ describe('CreatePostPage', () => {
   });
 
   afterEach(async () => {
-    await i18n.changeLanguage('en');
+    if (i18n.language !== 'en') {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
     Object.defineProperty(URL, 'createObjectURL', {
       configurable: true,
       writable: true,
@@ -303,6 +307,7 @@ describe('CreatePostPage', () => {
 
   it('shows translated upload failure message when media upload fails', async () => {
     vi.mocked(mediaService.batchUploadMedia).mockRejectedValue(new Error('boom'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const Wrapper = createWrapper([
       { pathname: '/posts/create', state: { defaultHub: 'testHub' } },
@@ -324,6 +329,11 @@ describe('CreatePostPage', () => {
     expect(
       await screen.findByText('Failed to upload media. Please try again.')
     ).toBeInTheDocument();
+    expect(consoleError).toHaveBeenCalledWith(
+      '[CreatePostPage] Failed to upload media:',
+      expect.objectContaining({ message: 'boom' })
+    );
+    consoleError.mockRestore();
   });
 
   it('preserves translated allowed-file label casing in Spanish', async () => {

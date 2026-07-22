@@ -44,17 +44,3 @@ export const friendsQueryKeys = {
   requests: ['friends', 'requests'] as const,
   status: (username: string) => ['friends', 'status', username] as const,
 };
-
-/** Helper: resolves the action label for a given friendship status */
-export function friendActionLabel(status: FriendshipStatus, t: (key: string) => string): string {
-  switch (status) {
-    case 'accepted':
-      return t('friends.actions.unfriend');
-    case 'pending_outgoing':
-      return t('friends.actions.cancelRequest');
-    case 'pending_incoming':
-      return t('friends.actions.accept');
-    default:
-      return t('friends.actions.addFriend');
-  }
-}

@@ -262,7 +262,7 @@ function MessageBubble({ message, isOwnMessage, currentUserId }: MessageBubblePr
                 alt={t('messages.media.fallbackText')}
                 className="max-w-full rounded cursor-pointer"
                 style={{ maxHeight: '300px' }}
-                onClick={() => window.open(mediaSrc, '_blank')}
+                onClick={() => window.open(mediaSrc, '_blank', 'noopener,noreferrer')}
               />
             )}
             {messageType === 'video' && (

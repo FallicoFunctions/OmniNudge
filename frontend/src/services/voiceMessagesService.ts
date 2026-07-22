@@ -1,6 +1,6 @@
 import type { VoiceMessage } from '../types/messages';
-
-const API_BASE = '/api/v1';
+import { API_BASE_URL } from '../lib/api';
+import { authenticatedFetch } from './authSession';
 
 export type VoiceMessageResponse = VoiceMessage;
 
@@ -26,19 +26,21 @@ export const voiceMessagesService = {
     const formData = new FormData();
     formData.append('audio', audioBlob, getFilename(audioBlob.type));
     formData.append('duration_seconds', String(durationSeconds));
-    const resp = await fetch(`${API_BASE}/messages/${messageId}/voice`, {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-    });
+    const resp = await authenticatedFetch(
+      `${API_BASE_URL}/messages/${encodeURIComponent(messageId)}/voice`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
     if (!resp.ok) throw new Error(await resp.text());
     return resp.json();
   },
 
   async getVoiceMessage(messageId: number): Promise<VoiceMessageResponse> {
-    const resp = await fetch(`${API_BASE}/messages/${messageId}/voice`, {
-      credentials: 'include',
-    });
+    const resp = await authenticatedFetch(
+      `${API_BASE_URL}/messages/${encodeURIComponent(messageId)}/voice`
+    );
     if (!resp.ok) throw new Error(await resp.text());
     return resp.json();
   },

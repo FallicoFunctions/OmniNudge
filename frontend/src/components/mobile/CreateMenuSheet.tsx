@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { FileText, Users } from 'lucide-react';
 import { BottomSheet } from './BottomSheet';
-import { trackEvent } from '../../utils/analytics';
+import { analyticsService } from '../../services/analyticsService';
 
 interface CreateMenuSheetProps {
   isOpen: boolean;
@@ -21,15 +21,18 @@ export function CreateMenuSheet({ isOpen, onClose }: CreateMenuSheetProps) {
   // Track sheet opens
   useEffect(() => {
     if (isOpen) {
-      trackEvent('MobileNavigation', 'OpenCreateMenu');
+      analyticsService.track('mobile_navigation', { action: 'OpenCreateMenu' });
     }
   }, [isOpen]);
 
-  const handleNavigate = useCallback((path: string, label: string) => {
-    trackEvent('MobileNavigation', 'CreateMenuClick', label);
-    navigate(path);
-    onClose();
-  }, [navigate, onClose]);
+  const handleNavigate = useCallback(
+    (path: string, label: string) => {
+      analyticsService.track('mobile_navigation', { action: 'CreateMenuClick', label });
+      navigate(path);
+      onClose();
+    },
+    [navigate, onClose]
+  );
 
   const items = useMemo(
     () => [

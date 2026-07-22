@@ -3,7 +3,6 @@ import {
   applyCSSVariables,
   persistThemeSelection,
   hydrateThemeFromStorage,
-  clearStoredTheme,
   getThemeVariable,
 } from '../../src/utils/theme';
 import type { UserTheme } from '../../src/types/theme';
@@ -80,8 +79,6 @@ describe('theme storage helpers', () => {
     const snapshot = hydrateThemeFromStorage();
     expect(snapshot?.id).toBe(theme.id);
     expect(snapshot?.variables?.['--color-primary']).toBe('#ff0000');
-    clearStoredTheme();
-    expect(window.localStorage.removeItem).toHaveBeenCalled();
   });
 });
 

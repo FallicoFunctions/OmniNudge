@@ -32,39 +32,41 @@ function logMissingTranslation(
   console.warn(`[i18n] Missing translation key "${key}" for language "${languageLabel}"`);
 }
 
-i18n
-  .use(HttpBackend) // Load translations from /locales
-  .use(LanguageDetector) // Detect user language
-  .use(initReactI18next) // Pass i18n instance to react-i18next
-  .init({
-    fallbackLng: 'en',
-    supportedLngs: [...SUPPORTED_LANGUAGES],
-    nonExplicitSupportedLngs: true,
-    load: 'languageOnly',
-    debug: isDev, // Enable debug in development
-    missingKeyHandler: (lng, _ns, key) => {
-      logMissingTranslation(key, lng);
-    },
-    parseMissingKeyHandler: (key) => {
-      logMissingTranslation(key, i18n.resolvedLanguage || i18n.language);
-      return key;
-    },
-    interpolation: {
-      escapeValue: false, // React already escapes by default
-    },
-    backend: {
-      loadPath: (languages: string | readonly string[]) => {
-        const language = Array.isArray(languages) ? languages[0] : languages;
-        return buildLocaleLoadPath(language || 'en');
+if (!i18n.isInitialized) {
+  i18n
+    .use(HttpBackend) // Load translations from /locales
+    .use(LanguageDetector) // Detect user language
+    .use(initReactI18next) // Pass i18n instance to react-i18next
+    .init({
+      fallbackLng: 'en',
+      supportedLngs: [...SUPPORTED_LANGUAGES],
+      nonExplicitSupportedLngs: true,
+      load: 'languageOnly',
+      debug: isDev, // Enable debug in development
+      missingKeyHandler: (lng, _ns, key) => {
+        logMissingTranslation(key, lng);
       },
-    },
-    detection: {
-      // Detection order
-      order: ['localStorage', 'navigator'],
-      caches: ['localStorage'],
-      lookupLocalStorage: 'i18nextLng',
-    },
-  });
+      parseMissingKeyHandler: (key) => {
+        logMissingTranslation(key, i18n.resolvedLanguage || i18n.language);
+        return key;
+      },
+      interpolation: {
+        escapeValue: false, // React already escapes by default
+      },
+      backend: {
+        loadPath: (languages: string | readonly string[]) => {
+          const language = Array.isArray(languages) ? languages[0] : languages;
+          return buildLocaleLoadPath(language || 'en');
+        },
+      },
+      detection: {
+        // Detection order
+        order: ['localStorage', 'navigator'],
+        caches: ['localStorage'],
+        lookupLocalStorage: 'i18nextLng',
+      },
+    });
+}
 
 function applyLanguageToDocument(language: string | null | undefined): void {
   syncDocumentLanguageAttributes(language);

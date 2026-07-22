@@ -12,4 +12,9 @@ describe('resolveMediaUrl', () => {
   it('keeps uploaded media same-origin', () => {
     expect(resolveMediaUrl('/uploads/avatar.png', 'v2')).toBe('/uploads/avatar.png?v=v2');
   });
+
+  it('does not render active or protocol-relative media metadata', () => {
+    expect(resolveMediaUrl('data:image/svg+xml,<svg onload=alert(1)>')).toBeUndefined();
+    expect(resolveMediaUrl('//attacker.example/pixel.png')).toBeUndefined();
+  });
 });

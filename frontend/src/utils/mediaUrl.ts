@@ -3,7 +3,7 @@ import { API_BASE_URL } from '../lib/api';
 const API_ORIGIN = new URL(API_BASE_URL).origin;
 
 function appendVersion(url: string, version?: string | null): string {
-  if (!version || url.startsWith('data:')) {
+  if (!version) {
     return url;
   }
 
@@ -23,8 +23,13 @@ function appendVersion(url: string, version?: string | null): string {
 
 export function resolveMediaUrl(url?: string | null, version?: string | null): string | undefined {
   if (!url) return undefined;
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+  if (url.startsWith('http://') || url.startsWith('https://')) {
     return appendVersion(url, version);
+  }
+  // Media metadata is server-controlled, but never render active data URLs
+  // from it. Local previews use blob URLs directly and do not need this helper.
+  if (url.trim().toLowerCase().startsWith('data:') || url.startsWith('//') || url.includes('\\')) {
+    return undefined;
   }
   // /uploads/ paths are served same-origin in prod and via Vite proxy in dev.
   if (url.startsWith('/uploads/')) return appendVersion(url, version);
