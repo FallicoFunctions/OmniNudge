@@ -119,10 +119,13 @@ type StorageConfig struct {
 	StorageBackend string
 
 	// S3 credentials and bucket settings
-	S3Bucket    string
-	S3Region    string
-	S3AccessKey string
-	S3SecretKey string
+	S3Bucket string
+	// S3StagingBucket is a separate private bucket for unscanned browser uploads.
+	// Direct presigned uploads remain disabled when it is not configured.
+	S3StagingBucket string
+	S3Region        string
+	S3AccessKey     string
+	S3SecretKey     string
 	// S3Endpoint is optional; set for S3-compatible providers (e.g. MinIO)
 	S3Endpoint string
 	// S3PathStyle enables path-style S3 addressing (required for MinIO/Ceph; set false for Cloudflare R2)
@@ -304,14 +307,15 @@ func Load() (*Config, error) {
 			DryRun:                getEnvAsBool("RETENTION_DRY_RUN", false),
 		},
 		Storage: StorageConfig{
-			StorageBackend: getEnv("STORAGE_BACKEND", "local"),
-			S3Bucket:       getEnv("S3_BUCKET", ""),
-			S3Region:       getEnv("S3_REGION", "us-east-1"),
-			S3AccessKey:    getEnv("S3_ACCESS_KEY", ""),
-			S3SecretKey:    getEnv("S3_SECRET_KEY", ""),
-			S3Endpoint:     getEnv("S3_ENDPOINT", ""),
-			S3PathStyle:    getEnvAsBool("S3_PATH_STYLE", true), // true for MinIO/Ceph, false for R2
-			CloudFrontURL:  getEnv("CLOUDFRONT_URL", ""),
+			StorageBackend:  getEnv("STORAGE_BACKEND", "local"),
+			S3Bucket:        getEnv("S3_BUCKET", ""),
+			S3StagingBucket: getEnv("S3_STAGING_BUCKET", ""),
+			S3Region:        getEnv("S3_REGION", "us-east-1"),
+			S3AccessKey:     getEnv("S3_ACCESS_KEY", ""),
+			S3SecretKey:     getEnv("S3_SECRET_KEY", ""),
+			S3Endpoint:      getEnv("S3_ENDPOINT", ""),
+			S3PathStyle:     getEnvAsBool("S3_PATH_STYLE", true), // true for MinIO/Ceph, false for R2
+			CloudFrontURL:   getEnv("CLOUDFRONT_URL", ""),
 		},
 		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:5176"),
 		AppEnv:      getEnv("APP_ENV", "development"),
