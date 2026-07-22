@@ -244,9 +244,37 @@ export async function createRuntime(host: HTMLElement) {
       if (disposed) {
         return;
       }
+      worldSocket?.dispose();
+      remotePlayerRigs?.dispose();
       cleanupOwnedResources();
       activeEngine.dispose();
     };
+    // Multiplayer presence (opt-in via ?world=&wtoken=): stream the local
+    // player's position to the Go world server and render every other
+    // connected player as an embodied ghost. The socket module throttles
+    // outbound moves internally; the render loop just offers the freshest
+    // position each frame.
+    let worldSocket: import('../network/worldSocket').WorldSocket | undefined;
+    let remotePlayerRigs: import('../player/createRemotePlayerRigs').RemotePlayerRigs | undefined;
+    if (perfFlags.worldUrl && perfFlags.worldToken) {
+      const [{ createWorldSocket }, { createRemotePlayerRigs }] = await Promise.all([
+        import('../network/worldSocket'),
+        import('../player/createRemotePlayerRigs'),
+      ]);
+      remotePlayerRigs = createRemotePlayerRigs(scene);
+      worldSocket = createWorldSocket({
+        url: perfFlags.worldUrl,
+        token: perfFlags.worldToken,
+      });
+      worldSocket.onSnapshot((snapshot) => {
+        remotePlayerRigs?.applySnapshot(snapshot);
+      });
+      worldSocket.onStatusChange((status) => {
+        console.info(`[world] socket ${status}`);
+      });
+      worldSocket.connect();
+    }
+
     const runtime = {
       canvas,
       debugPanel,
@@ -255,7 +283,9 @@ export async function createRuntime(host: HTMLElement) {
       host,
       hud,
       perfOverlay,
+      remotePlayerRigs,
       scene,
+      worldSocket,
     };
     window.__OMNIRAVE_RUNTIME__ = runtime;
     loadingOverlay.remove();
@@ -278,6 +308,10 @@ export async function createRuntime(host: HTMLElement) {
       scene.render();
       const playerRuntime = scene.metadata?.reviewRuntime;
       const playerPosition = playerRuntime?.playerRig?.root.position;
+      if (worldSocket && playerPosition) {
+        worldSocket.sendMove({ x: playerPosition.x, y: playerPosition.y, z: playerPosition.z });
+      }
+      remotePlayerRigs?.update(activeEngine.getDeltaTime() / 1000);
       const playerController = playerRuntime?.playerController;
       if (playerReadout && playerPosition && playerController) {
         const state = playerRuntime?.reviewAvatar?.root.metadata?.animationState ?? playerController.animationState;

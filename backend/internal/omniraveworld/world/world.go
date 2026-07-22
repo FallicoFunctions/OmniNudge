@@ -5,6 +5,15 @@ import (
 	"sync"
 )
 
+// maxMoveStep bounds how far a single ApplyInput call may relocate a player
+// in one movement tick. The Babylon client sends move frames at 10Hz with a
+// sprint top speed of ~6 m/s, i.e. ~0.6m of legitimate travel per tick - the
+// 2.25 budget is ~3.75x that, comfortable headroom for network jitter/burst
+// catch-up without materially loosening anti-teleport protection. It is not
+// meant to accommodate legitimate long jumps: those (initial spawn via
+// AddPlayer, and checkpoint/play-again resets via RespawnPlayer) bypass this
+// clamp entirely by writing player.Position directly instead of going
+// through ApplyInput/clampMoveTarget.
 const maxMoveStep = 2.25
 
 type World struct {
