@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function createDeferredPromise<T>() {
   let resolve!: (value: T) => void;
@@ -105,6 +105,15 @@ describe('createRuntime', () => {
     vi.doUnmock('../../scene/createMainStageScene');
     vi.doUnmock('@babylonjs/core/Engines/engine');
     vi.doUnmock('@babylonjs/core/Engines/webgpuEngine');
+    // Dev chrome (review HUD / perf overlay / debug panel) only appears when
+    // explicitly requested. Most tests in this describe assert that chrome
+    // exists, so opt in by default; the dedicated "no debug flag" test below
+    // resets the URL before creating its runtime.
+    window.history.replaceState(null, '', '/?debug=1');
+  });
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
   });
 
   it('disposes a failed WebGPU engine and falls back to WebGL', async () => {
@@ -596,6 +605,63 @@ describe('createRuntime', () => {
     expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).toBeNull();
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
     expect(engineDispose).not.toHaveBeenCalled();
+
+    runtime.dispose();
+  });
+
+  it('creates only the render canvas when the debug flag is absent', async () => {
+    window.history.replaceState(null, '', '/');
+
+    const engineDispose = vi.fn();
+    const engineRunRenderLoop = vi.fn();
+    const engineResize = vi.fn();
+    const scenePick = vi.fn(() => null);
+    const scene = {
+      metadata: {},
+      pick: scenePick,
+      render: vi.fn(),
+    };
+
+    vi.doMock('@babylonjs/core/Engines/engine', () => ({
+      Engine: vi.fn(() => ({
+        dispose: engineDispose,
+        getHardwareScalingLevel: vi.fn(() => 1),
+        onDisposeObservable: { addOnce: vi.fn() },
+        runRenderLoop: engineRunRenderLoop,
+        resize: engineResize,
+        setHardwareScalingLevel: vi.fn(),
+      })),
+    }));
+    vi.doMock('../../scene/createMainStageScene', () => ({
+      createMainStageScene: vi.fn(async () => scene),
+    }));
+
+    const { createRuntime } = await import('../createRuntime');
+    const host = document.createElement('div');
+
+    const runtime = await createRuntime(host);
+
+    expect(host.querySelector('canvas[data-testid="babylon-render-canvas"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="review-hud"]')).toBeNull();
+    expect(host.querySelector('[data-testid="perf-overlay"]')).toBeNull();
+    expect(host.querySelector('[data-testid="debug-panel"]')).toBeNull();
+    expect(runtime.hud).toBeUndefined();
+    expect(runtime.perfOverlay).toBeUndefined();
+    expect(runtime.debugPanel).toBeUndefined();
+    expect(window.__OMNIRAVE_RUNTIME__?.hud).toBeUndefined();
+    expect(window.__OMNIRAVE_RUNTIME__?.perfOverlay).toBeUndefined();
+    expect(window.__OMNIRAVE_RUNTIME__?.debugPanel).toBeUndefined();
+
+    // No canvas pick handler is wired up without debug chrome.
+    host
+      .querySelector<HTMLCanvasElement>('canvas[data-testid="babylon-render-canvas"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(scenePick).not.toHaveBeenCalled();
+
+    // Render loop still runs and does not throw despite no HUD/overlay/panel.
+    expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
+    const renderFrame = engineRunRenderLoop.mock.calls[0]?.[0] as (() => void) | undefined;
+    expect(() => renderFrame?.()).not.toThrow();
 
     runtime.dispose();
   });
