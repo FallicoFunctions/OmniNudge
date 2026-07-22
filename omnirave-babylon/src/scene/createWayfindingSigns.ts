@@ -131,12 +131,14 @@ function tryCreateLabelTexture(scene: Scene, label: string, accent: 'cyan' | 'go
     const accentCss = accent === 'cyan' ? '#5ad8ff' : '#ffd066';
 
     // Draw the plate + label on an OFFSCREEN canvas normally, then blit it
-    // horizontally flipped onto the texture with drawImage. The plane
-    // presents this texture reversed on the face players read, so the flip
-    // makes the label read correctly. drawImage honours the context flip
-    // reliably; drawing text directly under a flipped transform (or flipping
-    // baked pixels afterward) did not survive this DynamicTexture's paint
-    // timing in-engine.
+    // VERTICALLY flipped onto the texture with drawImage. Verified dead-on
+    // in-engine: the player-facing side presents this texture rotated 180
+    // degrees (both axes reversed), so with the earlier horizontal-only flip
+    // the label read upside-down and right-to-left. A vertical flip is the
+    // complement that lands the label upright and left-to-right. drawImage
+    // honours the context flip reliably; drawing text directly under a
+    // flipped transform (or flipping baked pixels afterward) did not survive
+    // this DynamicTexture's paint timing in-engine.
     const off = document.createElement('canvas');
     off.width = width;
     off.height = height;
@@ -161,8 +163,8 @@ function tryCreateLabelTexture(scene: Scene, label: string, accent: 'cyan' | 'go
 
     ctx.clearRect(0, 0, width, height);
     ctx.save();
-    ctx.translate(width, 0);
-    ctx.scale(-1, 1);
+    ctx.translate(0, height);
+    ctx.scale(1, -1);
     ctx.drawImage(off, 0, 0);
     ctx.restore();
     texture.update(false);
