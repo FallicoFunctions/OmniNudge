@@ -25,8 +25,19 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
   { name: 'main-stage-blocker-right-envelope', x: 64, y: 3, z: -34.5, width: 4, height: 6, depth: 111 },
   { name: 'main-stage-blocker-back-envelope', x: 0, y: 3, z: -90, width: 132, height: 6, depth: 4 },
   { name: 'main-stage-blocker-front-stage', x: 0, y: 5, z: 14, width: 78, height: 10, depth: 4 },
-  { name: 'main-stage-blocker-cascade-court-left', x: -49, y: 3, z: -28.5, width: 36, height: 6, depth: 23 },
-  { name: 'main-stage-blocker-cascade-court-right', x: 49, y: 3, z: -28.5, width: 36, height: 6, depth: 23 },
+  // Hug the built cascade-court water feature (V150 planter/coping footprint:
+  // |x| 34.3..63.8, z -41.4..-16.2), not the whole flank pocket. The old
+  // pocket-wide boxes (x 31..67) predated the feature and, together with the
+  // wing shell blockers, sealed the entire east/west flanks - the cascade
+  // plaza, the flank fields, and the VIP forecourts were unreachable on foot
+  // (verified by collision flood-fill; both side objectives only completed
+  // via checkpoint teleports). Hugged to the feature, the walking route
+  // opens: south field -> strip between the crowd-pit fence and the cascade
+  // court -> corridor at |x| 29.8..34.3 past the wing shell -> flank field ->
+  // VIP forecourt. The tiers and water stay guarded: the box still covers
+  // the full planted footprint out to the coping rim.
+  { name: 'main-stage-blocker-cascade-court-left', x: -49.05, y: 3, z: -28.8, width: 29.5, height: 6, depth: 25.2 },
+  { name: 'main-stage-blocker-cascade-court-right', x: 49.05, y: 3, z: -28.8, width: 29.5, height: 6, depth: 25.2 },
   // The basin foliage hedges guarding the sunken water strip (|x| 8.3..17.3)
   // end at z 9.2, but the water runs to z 23.2: without these caps the
   // avatar can step off the outer coping walkway and wade through the
