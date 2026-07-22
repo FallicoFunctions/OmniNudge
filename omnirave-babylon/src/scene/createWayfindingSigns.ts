@@ -37,12 +37,24 @@ export interface WayfindingSignSpec {
 // also reverse an arrow glyph. The sign's POSITION conveys the direction.
 export const WAYFINDING_SIGNS: readonly WayfindingSignSpec[] = [
   { label: 'WELCOME', x: 11, z: -45, faceYaw: 0.3, accent: 'gold' },
-  { label: 'VIP TERRACE', x: 11, z: -6, faceYaw: 0.3, accent: 'gold' },
+  // VIP TERRACE is a breadcrumb trail along the actual walking route (the
+  // forecourt sits behind the wing shell; the walk loops around the cascade
+  // court). A single sign at (11, -6) pointed straight at the wing shell
+  // wall - unreachable - and its panel hid behind the promenade parapet
+  // from the lower flank ground (player-flagged twice). Three signs walk
+  // the player in: field edge where the route leaves the promenade ->
+  // mid-strip beside the cascade court -> the corridor entrance past the
+  // wing shell.
+  { label: 'VIP TERRACE', x: 14, z: -40, faceYaw: 0.45, accent: 'gold' },
+  { label: 'VIP TERRACE', x: 31, z: -37, faceYaw: -0.9, accent: 'gold' },
+  { label: 'VIP TERRACE', x: 28.9, z: -22, faceYaw: 0.15, accent: 'gold' },
   { label: 'CASCADE COURT', x: -11, z: -22, faceYaw: -0.3, accent: 'cyan' },
   { label: 'MAIN STAGE', x: -11, z: -38, faceYaw: -0.3, accent: 'cyan' },
 ];
 
-const POST_HEIGHT = 2.5;
+// 3.5 clears the promenade parapet walls: at 2.5 the panels sat at wall-top
+// height and were half-hidden from the lower flank ground (player-flagged).
+const POST_HEIGHT = 3.5;
 const PANEL_WIDTH = 3.4;
 const PANEL_HEIGHT = 0.85;
 
