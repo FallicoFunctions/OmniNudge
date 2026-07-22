@@ -1,63 +1,8 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
 
 /**
  * Reusable loading state components for consistent UX across the app
  * Includes: Skeleton screens, spinners, and progress bars
  */
-
-// Spinner - For inline loading (buttons, small actions)
-interface SpinnerProps {
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
-}
-
-export function Spinner({ size = 'md', className = '' }: SpinnerProps) {
-  const { t } = useTranslation();
-
-  const sizeClasses = {
-    sm: 'w-4 h-4 border-2',
-    md: 'w-6 h-6 border-2',
-    lg: 'w-8 h-8 border-3',
-  };
-
-  return (
-    <div
-      className={`animate-spin rounded-full border-[var(--color-border)] border-t-[var(--color-primary)] ${sizeClasses[size]} ${className}`}
-      role="status"
-      aria-label={t('common.accessibility.loading')}
-    >
-      <span className="sr-only">{t('common.loading')}</span>
-    </div>
-  );
-}
-
-// Loading Button - Button with inline spinner
-interface LoadingButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  isLoading: boolean;
-  children: ReactNode;
-  loadingText?: string;
-}
-
-export function LoadingButton({
-  isLoading,
-  children,
-  loadingText,
-  disabled,
-  className = '',
-  ...props
-}: LoadingButtonProps) {
-  return (
-    <button
-      disabled={disabled || isLoading}
-      className={`flex items-center justify-center gap-2 ${className}`}
-      {...props}
-    >
-      {isLoading && <Spinner size="sm" />}
-      {isLoading && loadingText ? loadingText : children}
-    </button>
-  );
-}
 
 // Skeleton - For content placeholders
 interface SkeletonProps {
@@ -193,95 +138,6 @@ export function CommentSkeleton({ depth = 0, showReplies = false }: CommentSkele
           <CommentSkeleton depth={depth + 1} showReplies={false} />
         </div>
       )}
-    </div>
-  );
-}
-
-// ProgressBar - For upload/processing operations
-interface ProgressBarProps {
-  progress: number; // 0-100
-  label?: string;
-  showPercentage?: boolean;
-  className?: string;
-}
-
-export function ProgressBar({
-  progress,
-  label,
-  showPercentage = true,
-  className = '',
-}: ProgressBarProps) {
-  const { t } = useTranslation();
-  const clampedProgress = Math.min(Math.max(progress, 0), 100);
-
-  return (
-    <div className={`w-full ${className}`}>
-      {(label || showPercentage) && (
-        <div className="flex justify-between items-center mb-2">
-          {label && (
-            <span className="text-sm font-medium text-[var(--color-text-primary)]">{label}</span>
-          )}
-          {showPercentage && (
-            <span className="text-sm text-[var(--color-text-secondary)]">{clampedProgress}%</span>
-          )}
-        </div>
-      )}
-      <div className="w-full bg-[var(--color-surface)] rounded-full h-2 overflow-hidden">
-        <div
-          className="bg-[var(--color-primary)] h-full rounded-full transition-all duration-300 ease-out"
-          style={{ width: `${clampedProgress}%` }}
-          role="progressbar"
-          aria-valuenow={clampedProgress}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={label || t('common.progress')}
-        />
-      </div>
-    </div>
-  );
-}
-
-// LoadingOverlay - Full-screen or container loading overlay
-interface LoadingOverlayProps {
-  isLoading: boolean;
-  message?: string;
-  fullScreen?: boolean;
-}
-
-export function LoadingOverlay({ isLoading, message, fullScreen = false }: LoadingOverlayProps) {
-  const { t } = useTranslation();
-  if (!isLoading) return null;
-
-  const resolvedMessage = message ?? t('common.loading');
-  const containerClasses = fullScreen ? 'fixed inset-0 z-50' : 'absolute inset-0 z-10';
-
-  return (
-    <div
-      className={`${containerClasses} bg-[var(--color-background)]/80 backdrop-blur-sm flex flex-col items-center justify-center`}
-    >
-      <Spinner size="lg" />
-      {resolvedMessage && (
-        <p className="mt-4 text-sm font-medium text-[var(--color-text-primary)]">
-          {resolvedMessage}
-        </p>
-      )}
-    </div>
-  );
-}
-
-// LoadingPage - Full page loading state
-interface LoadingPageProps {
-  message?: string;
-}
-
-export function LoadingPage({ message }: LoadingPageProps) {
-  const { t } = useTranslation();
-  const resolvedMessage = message ?? t('common.loading');
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6">
-      <Spinner size="lg" />
-      <p className="mt-4 text-lg font-medium text-[var(--color-text-primary)]">{resolvedMessage}</p>
     </div>
   );
 }

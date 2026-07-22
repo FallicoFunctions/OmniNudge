@@ -63,18 +63,23 @@ vi.mock('../../components/common/StatusMessage', () => ({
 
 import ThemesPage from '../ThemesPage';
 
+async function renderThemesPage() {
+  render(
+    <MemoryRouter>
+      <ThemesPage />
+    </MemoryRouter>
+  );
+  await screen.findByTestId('theme-gallery');
+}
+
 describe('ThemesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockActiveTheme = null;
   });
 
-  it('renders the themes page heading (no-theme-selected state)', () => {
-    render(
-      <MemoryRouter>
-        <ThemesPage />
-      </MemoryRouter>
-    );
+  it('renders the themes page heading (no-theme-selected state)', async () => {
+    await renderThemesPage();
     // When no active theme, the h1 renders the i18n key 'themesPage.hero.noThemeSelected'
     expect(
       screen.getByRole('heading', { name: 'themesPage.hero.noThemeSelected' })
@@ -82,22 +87,14 @@ describe('ThemesPage', () => {
   });
 
   it('shows no-theme-selected heading when no active theme', async () => {
-    render(
-      <MemoryRouter>
-        <ThemesPage />
-      </MemoryRouter>
-    );
+    await renderThemesPage();
     await waitFor(() => {
       expect(screen.getByText('themesPage.hero.noThemeSelected')).toBeInTheDocument();
     });
   });
 
   it('renders the create theme button', async () => {
-    render(
-      <MemoryRouter>
-        <ThemesPage />
-      </MemoryRouter>
-    );
+    await renderThemesPage();
     await waitFor(() => {
       expect(screen.getByText('themesPage.selector.create')).toBeInTheDocument();
     });
@@ -106,11 +103,7 @@ describe('ThemesPage', () => {
   it('shows active theme name when a theme is active', async () => {
     mockActiveTheme = { theme_name: 'Ocean Blue', theme_description: 'A blue theme' };
 
-    render(
-      <MemoryRouter>
-        <ThemesPage />
-      </MemoryRouter>
-    );
+    await renderThemesPage();
 
     await waitFor(() => {
       expect(screen.getByText('Ocean Blue')).toBeInTheDocument();

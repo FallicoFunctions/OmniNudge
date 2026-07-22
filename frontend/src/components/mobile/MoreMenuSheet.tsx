@@ -6,7 +6,7 @@ import { BottomSheet } from './BottomSheet';
 import { ConfirmModal } from './ConfirmModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { heavyHaptic } from '../../utils/haptics';
-import { trackEvent } from '../../utils/analytics';
+import { analyticsService } from '../../services/analyticsService';
 
 interface MoreMenuSheetProps {
   isOpen: boolean;
@@ -33,18 +33,21 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
   // Track sheet opens
   useEffect(() => {
     if (isOpen) {
-      trackEvent('MobileNavigation', 'OpenMoreMenu');
+      analyticsService.track('mobile_navigation', { action: 'OpenMoreMenu' });
     }
   }, [isOpen]);
 
-  const handleNavigate = useCallback((path: string, label: string) => {
-    trackEvent('MobileNavigation', 'MoreMenuClick', label);
-    navigate(path);
-    onClose();
-  }, [navigate, onClose]);
+  const handleNavigate = useCallback(
+    (path: string, label: string) => {
+      analyticsService.track('mobile_navigation', { action: 'MoreMenuClick', label });
+      navigate(path);
+      onClose();
+    },
+    [navigate, onClose]
+  );
 
   const handleLogoutClick = useCallback(() => {
-    trackEvent('MobileNavigation', 'MoreMenuClick', 'Logout');
+    analyticsService.track('mobile_navigation', { action: 'MoreMenuClick', label: 'Logout' });
     heavyHaptic(); // Stronger feedback for destructive action
     setShowLogoutConfirm(true);
   }, []);
@@ -91,7 +94,10 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
           if (isAuthenticated) {
             handleNavigate('/settings', 'Settings');
           } else {
-            trackEvent('MobileNavigation', 'MoreMenuClick', 'Settings');
+            analyticsService.track('mobile_navigation', {
+              action: 'MoreMenuClick',
+              label: 'Settings',
+            });
             onClose();
             window.dispatchEvent(
               new CustomEvent('open-auth-modal', {
@@ -117,7 +123,7 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
         icon: LogIn,
         label: t('common.login'),
         onClick: () => {
-          trackEvent('MobileNavigation', 'MoreMenuClick', 'Login');
+          analyticsService.track('mobile_navigation', { action: 'MoreMenuClick', label: 'Login' });
           onClose();
           window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
         },
@@ -129,7 +135,10 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
         icon: UserPlus,
         label: t('common.register'),
         onClick: () => {
-          trackEvent('MobileNavigation', 'MoreMenuClick', 'Register');
+          analyticsService.track('mobile_navigation', {
+            action: 'MoreMenuClick',
+            label: 'Register',
+          });
           onClose();
           window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'signup' }));
         },

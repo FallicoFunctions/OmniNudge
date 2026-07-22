@@ -5,13 +5,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
 // --- Service mock ---
-const { mockGetFlags, mockUpdateFlag, mockCreateFlag, mockDeleteFlag, mockGetAuditLog } =
+const { mockGetFlags, mockUpdateFlag, mockCreateFlag, mockDeleteFlag, mockGetAuditLog, mockUseAuth } =
   vi.hoisted(() => ({
     mockGetFlags: vi.fn(),
     mockUpdateFlag: vi.fn(),
     mockCreateFlag: vi.fn(),
     mockDeleteFlag: vi.fn(),
     mockGetAuditLog: vi.fn(),
+    mockUseAuth: vi.fn(),
   }));
 
 vi.mock('../../services/featureFlagService', () => ({
@@ -30,6 +31,10 @@ vi.mock('../../hooks/useFormat', () => ({
     formatDate: (d: unknown) => String(d),
     formatNumber: (n: unknown) => String(n),
   }),
+}));
+
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: mockUseAuth,
 }));
 
 import AdminFeatureFlags from '../FeatureFlagsAdminPage';
@@ -58,6 +63,7 @@ const createWrapper = () => {
 describe('FeatureFlagsAdminPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({ user: { id: 1, username: 'admin', role: 'admin' } });
     mockGetAuditLog.mockResolvedValue([]);
   });
 

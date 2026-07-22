@@ -6,6 +6,7 @@ import {
   type MessagePayload,
   type Messaging,
 } from 'firebase/messaging';
+import { getFirebaseMessagingWorkerRegistration } from './firebaseMessagingWorker';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -49,7 +50,12 @@ export async function requestNotificationPermission(): Promise<string | null> {
 
     // Get FCM token
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
-    const token = await getToken(messaging, { vapidKey });
+    const serviceWorkerRegistration = await getFirebaseMessagingWorkerRegistration();
+    if (!serviceWorkerRegistration) {
+      console.error('Firebase messaging service worker is not configured');
+      return null;
+    }
+    const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration });
 
     return token;
   } catch (error) {

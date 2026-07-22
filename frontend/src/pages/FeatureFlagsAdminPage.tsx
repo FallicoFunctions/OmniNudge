@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Navigate } from 'react-router-dom';
 import featureFlagService, { type CreateFeatureFlagRequest } from '../services/featureFlagService';
 import { useFormat } from '../hooks/useFormat';
 import type { FeatureFlagAudit, FeatureFlag } from '../types/featureFlags';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function AdminFeatureFlags() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const { formatDate, formatNumber } = useFormat();
   const queryClient = useQueryClient();
   const [selectedFlag, setSelectedFlag] = useState<string | null>(null);
@@ -16,13 +19,14 @@ export default function AdminFeatureFlags() {
   const { data: flags, isLoading } = useQuery({
     queryKey: ['admin-feature-flags'],
     queryFn: featureFlagService.getFlags,
+    enabled: user?.role === 'admin',
   });
 
   const { data: auditLog } = useQuery({
     queryKey: ['feature-flag-audit', selectedFlag],
     queryFn: () =>
       selectedFlag ? featureFlagService.getAuditLog(selectedFlag) : Promise.resolve([]),
-    enabled: !!selectedFlag,
+    enabled: user?.role === 'admin' && !!selectedFlag,
   });
 
   // Mutations
@@ -52,13 +56,19 @@ export default function AdminFeatureFlags() {
 
   // Listen for real-time updates
   useEffect(() => {
+    if (user?.role !== 'admin') return;
     const handleUpdate = () => {
       // Validation: just invalidate query to refresh list
       queryClient.invalidateQueries({ queryKey: ['admin-feature-flags'] });
     };
     window.addEventListener('feature-flag-updated', handleUpdate);
     return () => window.removeEventListener('feature-flag-updated', handleUpdate);
-  }, [queryClient]);
+  }, [queryClient, user?.role]);
+
+  // This only gates the UI; every admin API must continue to enforce this role server-side.
+  if (!user || user.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
 
   if (isLoading) return <div>{t('featureFlagsAdmin.loading')}</div>;
 

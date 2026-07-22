@@ -17,6 +17,7 @@ import { MarkdownInput } from '../components/common/MarkdownInput';
 import { useTranslation } from 'react-i18next';
 import { useFormat } from '../hooks/useFormat';
 import type { UserPostsResponse } from '../types/users';
+import { getSafeInternalPath } from '../utils/navigation';
 
 const HUB_AUTOCOMPLETE_MIN_LENGTH = 2;
 const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
@@ -28,9 +29,6 @@ export default function CreatePostPage() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-
-  console.log('[CreatePostPage] Component rendering, location:', location);
-  console.log('[CreatePostPage] location.state:', location.state);
 
   const [activeTab, setActiveTab] = useState<'link' | 'text'>('link');
   const [title, setTitle] = useState('');
@@ -60,8 +58,6 @@ export default function CreatePostPage() {
     const searchParams = new URLSearchParams(location.search);
     const defaultHubFromQuery = searchParams.get('hub')?.trim();
     const defaultSubredditFromQuery = searchParams.get('subreddit')?.trim();
-
-    console.log('[useEffect] Running with location.state:', state);
 
     if (state?.defaultHub || defaultHubFromQuery) {
       const hubName = state?.defaultHub ?? defaultHubFromQuery ?? '';
@@ -930,8 +926,9 @@ export default function CreatePostPage() {
             type="button"
             onClick={() => {
               const state = location.state as { returnTo?: string } | null;
-              if (state?.returnTo) {
-                navigate(state.returnTo);
+              const returnTo = getSafeInternalPath(state?.returnTo, '');
+              if (returnTo) {
+                navigate(returnTo);
               } else {
                 navigate(-1);
               }

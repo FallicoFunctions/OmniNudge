@@ -7,7 +7,7 @@ import { CreateMenuSheet } from './CreateMenuSheet';
 import { MoreMenuSheet } from './MoreMenuSheet';
 import { useAuth } from '../../contexts/AuthContext';
 import { lightHaptic, mediumHaptic } from '../../utils/haptics';
-import { trackEvent } from '../../utils/analytics';
+import { analyticsService } from '../../services/analyticsService';
 import { MOBILE_Z_INDEX, MOBILE_TIMING, MOBILE_SIZES } from '../../constants/mobileDesignTokens';
 
 interface MobileTabBarProps {
@@ -81,7 +81,7 @@ export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
       lightHaptic();
 
       // Track analytics
-      trackEvent('MobileNavigation', 'TabClick', tabId);
+      analyticsService.track('mobile_navigation', { action: 'TabClick', label: tabId });
 
       // Show loading indicator for navigation
       if (path && !(isAlreadyActive && location.pathname === path)) {
@@ -172,11 +172,6 @@ export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
             translationKey="nav.messages"
             active={activeTab === 'messages'}
             onClick={() => handleTabClick('messages', '/messages', true)}
-            onLongPress={() => {
-              mediumHaptic();
-              // TODO: Quick action - Open new conversation modal
-              console.log('Long press: Messages - could open new conversation');
-            }}
             badge={unreadCount}
             testId="tab-messages"
           />

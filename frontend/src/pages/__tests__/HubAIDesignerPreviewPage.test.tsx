@@ -76,6 +76,7 @@ function renderPreviewPage() {
             path="/h/:hubName/ai-design/preview/:designId"
             element={<HubAIDesignerPreviewPage />}
           />
+          <Route path="/h/:hubName/settings" element={<div>Hub settings</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>

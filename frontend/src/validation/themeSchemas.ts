@@ -19,6 +19,3 @@ export const cssVariablesSchema = z
   .refine((variables) => Object.keys(variables).length <= 200, {
     message: 'You can only define up to 200 CSS variables.',
   });
-
-export type ThemeInfoInput = z.infer<typeof themeInfoSchema>;
-export type CSSVariablesInput = z.infer<typeof cssVariablesSchema>;
