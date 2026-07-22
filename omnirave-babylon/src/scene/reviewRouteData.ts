@@ -97,16 +97,23 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
     },
   },
   {
+    // The VIP forecourt: the walkable apron behind the right wing shell,
+    // under its gold sail canopies, beside the garden planters. The old spot
+    // (32, 8.5, 4) hung in mid-air - the elevated terrace has no walkable
+    // floor this milestone - so the player fell to unlit ground and the
+    // approval capture read pitch black. Ground-level spawn plus a close,
+    // low framing keeps the avatar, the lantern warmth, and the planters in
+    // frame (verified in-engine).
     id: 'vip_terrace',
     x: 32,
-    y: 8.5,
-    z: 4,
+    y: 1.7,
+    z: 2,
     camera: {
       alpha: -2.8,
-      beta: 1,
-      radius: 38,
-      focusOffset: { x: -26, y: 5, z: -4 },
-      positionOffset: { x: 6, y: 8, z: -30 },
+      beta: 1.2,
+      radius: 8,
+      focusOffset: { x: 0, y: 0.8, z: 3 },
+      positionOffset: { x: 1.5, y: 0.9, z: -5.5 },
     },
   },
 ] as const;

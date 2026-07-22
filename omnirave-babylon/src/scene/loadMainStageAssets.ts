@@ -60,7 +60,14 @@ export async function loadMainStageAssets(scene: Scene): Promise<MainStageAssetL
 
   collision.meshes.forEach((mesh) => {
     mesh.isVisible = false;
-    mesh.checkCollisions = true;
+    // COL_VIP* (deck + access ramps for the elevated wing terrace) predates
+    // the basin water layout: its ramp corridor now runs through the basin
+    // water-north blockers (an invisible mid-ramp dead end) and the deck
+    // tops out over the wing's sail roofscape, not a guest floor. The VIP
+    // terrace is view-only this milestone; the VIP read happens at the
+    // ground forecourt (see createVipForecourtDressing + the vip_terrace
+    // checkpoint).
+    mesh.checkCollisions = !mesh.name.startsWith('COL_VIP');
   });
 
   return {

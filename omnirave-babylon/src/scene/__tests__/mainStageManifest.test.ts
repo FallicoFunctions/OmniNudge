@@ -10354,12 +10354,20 @@ describe('reviewRouteData', () => {
     expect(basinFocus.z).toBeGreaterThanOrEqual(16);
     expect(basinCamera.y - basinFocus.y).toBeLessThanOrEqual(12);
 
+    // VIP read is the intimate ground forecourt under the wing's sail
+    // canopies (the elevated terrace is view-only this milestone): the
+    // camera stays low - under the canopy line - and close to the player so
+    // the lantern warmth and planters fill the frame instead of a distant
+    // silhouette (the old 38-radius long shot read pitch black).
     const vipCamera = cameraPosition(vipTerrace!);
     const vipFocus = focusTarget(vipTerrace!);
-    expect(vipCamera.y).toBeLessThanOrEqual(19);
-    expect(vipCamera.z).toBeLessThanOrEqual(-24);
-    expect(Math.abs(vipCamera.x - vipFocus.x)).toBeGreaterThanOrEqual(28);
-    expect(vipCamera.y - vipFocus.y).toBeLessThanOrEqual(5);
-    expect(Math.abs(vipCamera.z - vipFocus.z)).toBeGreaterThanOrEqual(22);
+    expect(vipTerrace!.y).toBeLessThanOrEqual(2);
+    expect(vipCamera.y).toBeLessThanOrEqual(4);
+    const vipFramingDistance = Math.hypot(
+      vipCamera.x - vipFocus.x,
+      vipCamera.y - vipFocus.y,
+      vipCamera.z - vipFocus.z,
+    );
+    expect(vipFramingDistance).toBeLessThanOrEqual(12);
   });
 });
