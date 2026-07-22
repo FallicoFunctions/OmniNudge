@@ -11,6 +11,8 @@ describe('parsePerfFlags', () => {
       webgpu: false,
       webgl: false,
       debug: false,
+      worldUrl: null,
+      worldToken: null,
     });
   });
 
@@ -22,7 +24,15 @@ describe('parsePerfFlags', () => {
       webgpu: false,
       webgl: false,
       debug: false,
+      worldUrl: null,
+      worldToken: null,
     });
+  });
+
+  it('parses world socket opt-in params', () => {
+    const flags = parsePerfFlags('?world=ws%3A%2F%2Flocalhost%3A8090%2Fws&wtoken=abc.def.ghi');
+    expect(flags.worldUrl).toBe('ws://localhost:8090/ws');
+    expect(flags.worldToken).toBe('abc.def.ghi');
   });
 
   it('enables debug via debug=1', () => {

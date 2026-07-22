@@ -12,6 +12,11 @@ export interface PerfFlags {
   webgpu: boolean;
   webgl: boolean;
   debug: boolean;
+  // Multiplayer presence opt-in: ?world=<ws url>&wtoken=<world session JWT>.
+  // Both must be present for the runtime to open a world socket; the
+  // default session stays fully single-player and offline.
+  worldUrl: string | null;
+  worldToken: string | null;
 }
 
 export function parsePerfFlags(search: string): PerfFlags {
@@ -38,5 +43,7 @@ export function parsePerfFlags(search: string): PerfFlags {
     webgpu: tokens.has('webgpu'),
     webgl: tokens.has('webgl'),
     debug: tokens.has('debug') || debugParam === '1' || debugParam === '',
+    worldUrl: params.get('world'),
+    worldToken: params.get('wtoken'),
   };
 }
