@@ -76,4 +76,23 @@ describe('createReviewHud', () => {
     });
     expect(onSelectAvatarColorway).toHaveBeenCalledWith(USER_AVATAR_COLORWAYS[2]);
   });
+
+  it('renders a hidden completion banner and dispatches restart on click', () => {
+    const host = document.createElement('div');
+    const onRestartRoute = vi.fn();
+
+    createReviewHud(host, { onRestartRoute });
+
+    const banner = host.querySelector<HTMLElement>('[data-review-complete]');
+    const restartButton = host.querySelector<HTMLButtonElement>('[data-review-restart]');
+
+    expect(banner).not.toBeNull();
+    expect(banner!.hidden).toBe(true);
+    expect(restartButton).not.toBeNull();
+    expect(restartButton!.textContent).toContain('Play Again');
+
+    restartButton?.click();
+
+    expect(onRestartRoute).toHaveBeenCalledTimes(1);
+  });
 });

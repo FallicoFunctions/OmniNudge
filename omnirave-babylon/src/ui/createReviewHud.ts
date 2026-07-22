@@ -6,6 +6,7 @@ export interface CreateReviewHudOptions {
   checkpoints?: readonly ReviewCheckpoint[];
   onSelectAvatarColorway?: (colorway: AvatarColorway) => void;
   onSelectCheckpoint?: (checkpoint: ReviewCheckpoint) => void;
+  onRestartRoute?: () => void;
   selectedAvatarColorwayId?: string;
 }
 
@@ -18,7 +19,15 @@ export function createReviewHud(host: HTMLElement, options: CreateReviewHudOptio
     <h1 class="review-hud__title">OmniRave Babylon</h1>
     <p class="review-hud__copy">Avatar movement, venue collision, lighting, and performance instrumentation active.</p>
     <output class="review-hud__objective" data-review-objective>Objective: reach the first checkpoint</output>
+    <div class="review-hud__complete" data-review-complete hidden>
+      <p class="review-hud__complete-headline">ROUTE COMPLETE</p>
+      <button type="button" class="review-hud__restart" data-review-restart>Play Again</button>
+    </div>
   `;
+
+  hud
+    .querySelector<HTMLButtonElement>('[data-review-restart]')
+    ?.addEventListener('click', () => options.onRestartRoute?.());
 
   if (options.checkpoints?.length) {
     const route = document.createElement('nav');
