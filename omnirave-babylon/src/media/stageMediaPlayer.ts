@@ -36,6 +36,10 @@ export interface StagePlayerBackend {
   seek(seconds: number): void;
   getCurrentTime(): number;
   setMuted(muted: boolean): void;
+  // Fills `target` with the current byte frequency spectrum (0..255 per bin,
+  // low frequencies first). No-op / leaves the caller's zeros in place when no
+  // AnalyserNode exists yet (before unlock, or where Web Audio is unavailable).
+  getFrequencyData(target: Uint8Array): void;
   dispose(): void;
 }
 
@@ -46,6 +50,12 @@ export interface StageMediaPlayerOptions {
 export interface StageMediaPlayer {
   unlock: () => void;
   applyMedia: (media: ZoneMediaState | null) => void;
+  // Fills `target` with the live byte frequency spectrum of the synced track.
+  // Fills zeros before unlock, when no track is playing, or where Web Audio is
+  // unavailable — always safe, never throws. Because every client plays the
+  // same server-synced track, each client's spectrum is ~identical, so the
+  // visualizer can be driven purely from this local analysis (no server push).
+  getFrequencyData: (target: Uint8Array) => void;
   dispose: () => void;
 }
 
@@ -63,6 +73,9 @@ function createNoopBackend(): StagePlayerBackend {
       return 0;
     },
     setMuted() {},
+    getFrequencyData(target) {
+      target.fill(0);
+    },
     dispose() {},
   };
 }
@@ -84,6 +97,52 @@ function createAudioBackend(): StagePlayerBackend {
   // Pending seek target held until metadata loads: HTMLAudioElement ignores
   // currentTime writes before it knows the track's duration.
   let pendingSeekHandler: (() => void) | null = null;
+
+  // Web Audio analysis tap. The AudioContext is created lazily on the FIRST
+  // playback (which only ever happens after the unlock gesture — the player
+  // stashes media until unlock), satisfying the autoplay policy that forbids
+  // creating an AudioContext before a user gesture. Graph shape:
+  //   AudioContext -> MediaElementAudioSourceNode(element) -> Analyser -> destination
+  // The analyser sits INLINE (source -> analyser -> destination) so the track
+  // still reaches the speakers. We only ever attempt the build once: a
+  // MediaElementSource can be created for a given element exactly once, and if
+  // Web Audio is unavailable we degrade to silence (zeros) rather than throw.
+  let audioContext: AudioContext | null = null;
+  let analyser: AnalyserNode | null = null;
+  let audioGraphAttempted = false;
+
+  function ensureAudioGraph(): void {
+    if (audioGraphAttempted) {
+      return;
+    }
+    audioGraphAttempted = true;
+    try {
+      const AudioContextCtor =
+        typeof window !== 'undefined'
+          ? window.AudioContext ??
+            (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+          : undefined;
+      if (!AudioContextCtor) {
+        return;
+      }
+      const context = new AudioContextCtor();
+      const source = context.createMediaElementSource(element);
+      const node = context.createAnalyser();
+      // 256-point FFT -> 128 frequency bins: enough spectral detail for a
+      // reactive visualizer without wasting work no one can see.
+      node.fftSize = 256;
+      node.smoothingTimeConstant = 0.8;
+      source.connect(node);
+      node.connect(context.destination);
+      audioContext = context;
+      analyser = node;
+    } catch {
+      // No Web Audio (or the element was already tapped): the visualizer just
+      // reads zeros. Background music is never worth taking down the runtime.
+      audioContext = null;
+      analyser = null;
+    }
+  }
 
   function clearPendingSeek(): void {
     if (pendingSeekHandler) {
@@ -110,6 +169,16 @@ function createAudioBackend(): StagePlayerBackend {
 
   function startPlayback(): void {
     playing = true;
+    // First playback runs inside the unlock gesture: safe to build the
+    // AudioContext + analyser tap now. A suspended context (some browsers
+    // start suspended) is resumed here too; the returned promise is ignored.
+    ensureAudioGraph();
+    if (audioContext && audioContext.state === 'suspended') {
+      const resumeResult = audioContext.resume();
+      if (resumeResult && typeof resumeResult.catch === 'function') {
+        void resumeResult.catch(() => {});
+      }
+    }
     // play() may reject under the browser autoplay policy; the Enter-OmniRave
     // gesture unlocks it. Swallow the rejection — do NOT retry-loop. (Some
     // environments return undefined rather than a promise; guard for that.)
@@ -143,10 +212,25 @@ function createAudioBackend(): StagePlayerBackend {
     setMuted(muted) {
       element.muted = muted;
     },
+    getFrequencyData(target) {
+      if (analyser) {
+        analyser.getByteFrequencyData(target as Uint8Array<ArrayBuffer>);
+      } else {
+        target.fill(0);
+      }
+    },
     dispose() {
       clearPendingSeek();
       element.pause();
       element.removeAttribute('src');
+      analyser = null;
+      if (audioContext) {
+        const closeResult = audioContext.close();
+        if (closeResult && typeof closeResult.catch === 'function') {
+          void closeResult.catch(() => {});
+        }
+        audioContext = null;
+      }
     },
   };
 }
@@ -222,6 +306,15 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     }
   }
 
+  function getFrequencyData(target: Uint8Array): void {
+    if (backend) {
+      backend.getFrequencyData(target);
+    } else {
+      // No backend yet (before unlock): report a silent spectrum.
+      target.fill(0);
+    }
+  }
+
   function dispose(): void {
     if (disposed) return;
     disposed = true;
@@ -232,6 +325,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   return {
     unlock,
     applyMedia,
+    getFrequencyData,
     dispose,
   };
 }

@@ -129,6 +129,7 @@ describe('createRuntime', () => {
     const webglEngine = {
       dispose: vi.fn(),
       getFps: vi.fn(() => 60),
+      getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
       onDisposeObservable: { addOnce: vi.fn() },
       resize: vi.fn(),
@@ -138,6 +139,7 @@ describe('createRuntime', () => {
     const EngineMock = vi.fn((_canvas: HTMLCanvasElement, _antialias: boolean, _options: Record<string, unknown>) => webglEngine);
     const scene = {
       metadata: {},
+      getMeshByName: () => null,
       pick: vi.fn(() => null),
       render: vi.fn(),
     };
@@ -173,6 +175,7 @@ describe('createRuntime', () => {
     const engine = {
       dispose: engineDispose,
       getFps: vi.fn(() => 60),
+      getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
       onDisposeObservable: {
         addOnce: vi.fn((callback: () => void) => {
@@ -186,6 +189,7 @@ describe('createRuntime', () => {
     const scenePick = vi.fn(() => null);
     const scene = {
       metadata: {},
+      getMeshByName: () => null,
       pick: scenePick,
       render: vi.fn(),
     };
@@ -227,6 +231,7 @@ describe('createRuntime', () => {
     const engine = {
       dispose: vi.fn(),
       getFps: vi.fn(() => 30),
+      getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1 / 1.5),
       onDisposeObservable: { addOnce: vi.fn() },
       resize: vi.fn(),
@@ -238,6 +243,7 @@ describe('createRuntime', () => {
     const scene = {
       activeCamera: undefined,
       metadata: {},
+      getMeshByName: () => null,
       pick: vi.fn(() => null),
       render: vi.fn(() => frameEvents.push('render')),
       textures: [],
@@ -276,6 +282,7 @@ describe('createRuntime', () => {
     const engine = {
       dispose: engineDispose,
       getFps: vi.fn(() => 60),
+      getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
       onDisposeObservable: {
         addOnce: vi.fn((callback: () => void) => {
@@ -293,6 +300,7 @@ describe('createRuntime', () => {
     vi.doMock('../../scene/createMainStageScene', () => ({
       createMainStageScene: vi.fn(async () => ({
         metadata: {},
+        getMeshByName: () => null,
         pick: vi.fn(() => null),
         render: vi.fn(),
       })),
@@ -318,7 +326,8 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: vi.fn(() => ({
         dispose: engineDispose,
-        getHardwareScalingLevel: vi.fn(() => 1),
+        getDeltaTime: vi.fn(() => 16),
+      getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },
         runRenderLoop: engineRunRenderLoop,
         resize: engineResize,
@@ -363,6 +372,7 @@ describe('createRuntime', () => {
     const setAvatarColorway = vi.fn();
     const completionCelebrationStop = vi.fn();
     const scene = {
+      getMeshByName: () => null,
       pick: scenePick,
       render: sceneRender,
       onAfterRenderObservable: {
@@ -467,7 +477,8 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: vi.fn(() => ({
         dispose: engineDispose,
-        getHardwareScalingLevel: vi.fn(() => 1),
+        getDeltaTime: vi.fn(() => 16),
+      getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },
         runRenderLoop: engineRunRenderLoop,
         resize: engineResize,
@@ -562,6 +573,7 @@ describe('createRuntime', () => {
     const engineResize = vi.fn();
     const deferredScene = createDeferredPromise<{
       metadata: { reviewRuntime: Record<string, never> };
+      getMeshByName: () => null;
       pick: ReturnType<typeof vi.fn>;
       render: ReturnType<typeof vi.fn>;
     }>();
@@ -569,7 +581,8 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: vi.fn(() => ({
         dispose: engineDispose,
-        getHardwareScalingLevel: vi.fn(() => 1),
+        getDeltaTime: vi.fn(() => 16),
+      getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },
         runRenderLoop: engineRunRenderLoop,
         resize: engineResize,
@@ -593,6 +606,7 @@ describe('createRuntime', () => {
 
     deferredScene.resolve({
       metadata: { reviewRuntime: {} },
+      getMeshByName: () => null,
       pick: vi.fn(() => null),
       render: vi.fn(),
     });
@@ -615,6 +629,7 @@ describe('createRuntime', () => {
     const scenePick = vi.fn(() => null);
     const scene = {
       metadata: {},
+      getMeshByName: () => null,
       pick: scenePick,
       render: vi.fn(),
     };
@@ -622,7 +637,8 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: vi.fn(() => ({
         dispose: engineDispose,
-        getHardwareScalingLevel: vi.fn(() => 1),
+        getDeltaTime: vi.fn(() => 16),
+      getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },
         runRenderLoop: engineRunRenderLoop,
         resize: engineResize,
@@ -675,7 +691,7 @@ describe('createRuntime', () => {
     }));
 
     vi.doMock('../../scene/createMainStageScene', () => ({
-      createMainStageScene: vi.fn(async () => ({ render: vi.fn() })),
+      createMainStageScene: vi.fn(async () => ({ getMeshByName: () => null, render: vi.fn() })),
     }));
 
     await import('../createRuntime');
