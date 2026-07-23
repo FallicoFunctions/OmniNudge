@@ -249,6 +249,7 @@ export async function createRuntime(host: HTMLElement) {
       }
       worldSocket?.dispose();
       remotePlayerRigs?.dispose();
+      stageAudioDevControls?.dispose();
       stageMediaPlayer?.dispose();
       stageVisualizer?.dispose();
       immersiveAudioShow?.dispose();
@@ -265,6 +266,7 @@ export async function createRuntime(host: HTMLElement) {
     let worldSocket: import('../network/worldSocket').WorldSocket | undefined;
     let remotePlayerRigs: import('../player/createRemotePlayerRigs').RemotePlayerRigs | undefined;
     let stageMediaPlayer: import('../media/stageMediaPlayer').StageMediaPlayer | undefined;
+    let stageAudioDevControls: import('../ui/createStageAudioDevControls').StageAudioDevControls | undefined;
     let stageVisualizer: import('../scene/createStageVisualizer').StageVisualizer | undefined;
     let immersiveAudioShow: import('../scene/createImmersiveAudioShow').ImmersiveAudioShow | undefined;
     let crownEffects: import('../scene/createCrownEffects').CrownEffects | undefined;
@@ -309,6 +311,13 @@ export async function createRuntime(host: HTMLElement) {
         enterOverlay?.dispose();
         enterOverlay = undefined;
       });
+
+      // DEV-ONLY audio scrubber + play/pause. Only in the world/music path and
+      // only under ?debug=1 (same gate as the rest of the dev chrome).
+      if (perfFlags.debug) {
+        const { createStageAudioDevControls } = await import('../ui/createStageAudioDevControls');
+        stageAudioDevControls = createStageAudioDevControls(host, activeStageMediaPlayer);
+      }
     }
 
     // The Main Stage screen visualizer. It runs in BOTH paths: with the stage
@@ -404,6 +413,7 @@ export async function createRuntime(host: HTMLElement) {
       }
       const deltaSeconds = activeEngine.getDeltaTime() / 1000;
       remotePlayerRigs?.update(deltaSeconds);
+      stageAudioDevControls?.update();
       activeStageVisualizer.update(deltaSeconds);
       activeImmersiveAudioShow.update(deltaSeconds);
       activeCrownEffects.update(deltaSeconds);
