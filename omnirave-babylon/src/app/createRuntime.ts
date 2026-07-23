@@ -252,6 +252,7 @@ export async function createRuntime(host: HTMLElement) {
       stageMediaPlayer?.dispose();
       stageVisualizer?.dispose();
       immersiveAudioShow?.dispose();
+      crownEffects?.dispose();
       cleanupOwnedResources();
       activeEngine.dispose();
     };
@@ -265,6 +266,7 @@ export async function createRuntime(host: HTMLElement) {
     let stageMediaPlayer: import('../media/stageMediaPlayer').StageMediaPlayer | undefined;
     let stageVisualizer: import('../scene/createStageVisualizer').StageVisualizer | undefined;
     let immersiveAudioShow: import('../scene/createImmersiveAudioShow').ImmersiveAudioShow | undefined;
+    let crownEffects: import('../scene/createCrownEffects').CrownEffects | undefined;
     if (perfFlags.worldUrl && perfFlags.worldToken) {
       const [{ createWorldSocket }, { createRemotePlayerRigs }, { createStageMediaPlayer }] = await Promise.all([
         import('../network/worldSocket'),
@@ -289,6 +291,7 @@ export async function createRuntime(host: HTMLElement) {
           : null;
         stageVisualizer?.setEventState(eventState);
         immersiveAudioShow?.setEventState(eventState);
+        crownEffects?.setEventState(eventState);
       });
       worldSocket.onStatusChange((status) => {
         console.info(`[world] socket ${status}`);
@@ -334,6 +337,16 @@ export async function createRuntime(host: HTMLElement) {
       getFrequencyData: getStageFrequencyData,
     });
     const activeImmersiveAudioShow = immersiveAudioShow;
+
+    // The crown figurehead effects (reactive LED tracery climbing the spire,
+    // the apex energy crystal, the sky beacon). Shares the exact same spectrum
+    // closure so it stays audio- and color-coherent with the venue; idle in the
+    // single-player path.
+    const { createCrownEffects } = await import('../scene/createCrownEffects');
+    crownEffects = createCrownEffects(scene, {
+      getFrequencyData: getStageFrequencyData,
+    });
+    const activeCrownEffects = crownEffects;
 
     const runtime = {
       canvas,
@@ -381,6 +394,7 @@ export async function createRuntime(host: HTMLElement) {
       remotePlayerRigs?.update(deltaSeconds);
       activeStageVisualizer.update(deltaSeconds);
       activeImmersiveAudioShow.update(deltaSeconds);
+      activeCrownEffects.update(deltaSeconds);
       // Feed the stage show's spill-light pulse real bass energy when audio is
       // live; null keeps it on its estimated 126BPM beat clock.
       playerRuntime?.stageShow?.setAudioEnergy?.(activeImmersiveAudioShow.bassLevel);
