@@ -373,15 +373,23 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
   // canvas of createCrownEffects, so this show leaves it clear.)
   // (a) Side wings: 6 emitters per side across x 16..58 at z~7, stepping up in
   // y, firing across / over the crowd.
+  // Beam reach in meters. Real festival lasers read as "going forever"
+  // because they fade into the haze, not because they're literally endless -
+  // so these run long (out toward the ~215m sky horizon) and the beam mesh
+  // fades to nothing at its far end (see the vertex-colour ramp below).
+  // Single tunable per group; the camera far clip is 10000 so length is
+  // bounded by fill-rate/framerate, not geometry.
+  const WING_BEAM_LENGTH = 180;
+  const TRUSS_BEAM_LENGTH = 150;
   const wingXs = [16, 24.4, 32.8, 41.2, 49.6, 58];
   for (let k = 0; k < wingXs.length; k++) {
     const wy = 8 + (k / (wingXs.length - 1)) * 8; // 8..16
-    pushEmitter(wingXs[k], wy, 7, 0, 9, -26, 55);
-    pushEmitter(-wingXs[k], wy, 7, 0, 9, -26, 55);
+    pushEmitter(wingXs[k], wy, 7, 0, 9, -26, WING_BEAM_LENGTH);
+    pushEmitter(-wingXs[k], wy, 7, 0, 9, -26, WING_BEAM_LENGTH);
   }
   // (b) Over-crowd truss: 8 emitters firing down over the crowd volume.
   for (let i = 0; i < 8; i++) {
-    pushEmitter((i / 7) * 28 - 14, 24, 8, 0, 4, -26, 34);
+    pushEmitter((i / 7) * 28 - 14, 24, 8, 0, 4, -26, TRUSS_BEAM_LENGTH);
   }
 
   const EMITTER_COUNT = emitters.length;
@@ -407,13 +415,29 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
   beamMaterial.alphaMode = Constants.ALPHA_ADD;
   beamMaterial.backFaceCulling = false;
   beamMesh.material = beamMaterial;
-  // White COLOR vertex buffer so the vertex-color shader define compiles and
-  // the thin-instance color attribute actually reaches the shader.
+  // COLOR vertex buffer: (1) the vertex-color shader define must compile for
+  // the thin-instance color attribute to reach the shader; (2) it ramps
+  // brightness along the beam's length - white at the emitter end (local
+  // x=0) fading to BLACK at the far tip (local x=1). Under additive blend,
+  // black adds nothing, so the beam dissolves into the night at its far end
+  // (the "goes forever" read) instead of stopping in a hard line. The
+  // per-instance colour multiplies this, so the hue is preserved near the
+  // emitter and fades out with distance.
   {
     const positions = beamMesh.getVerticesData(VertexBuffer.PositionKind);
     if (positions) {
-      const whiteColors = new Float32Array((positions.length / 3) * 4).fill(1);
-      beamMesh.setVerticesData(VertexBuffer.ColorKind, whiteColors, false, 4);
+      const vertexCount = positions.length / 3;
+      const rampColors = new Float32Array(vertexCount * 4);
+      for (let v = 0; v < vertexCount; v++) {
+        // Local x runs 0 (emitter) -> 1 (far tip) after the translation bake.
+        const x = positions[v * 3];
+        const brightness = Math.max(0, 1 - x); // 1 near, 0 far
+        rampColors[v * 4] = brightness;
+        rampColors[v * 4 + 1] = brightness;
+        rampColors[v * 4 + 2] = brightness;
+        rampColors[v * 4 + 3] = 1;
+      }
+      beamMesh.setVerticesData(VertexBuffer.ColorKind, rampColors, false, 4);
     }
   }
 
