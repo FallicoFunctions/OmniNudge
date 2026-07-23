@@ -24,10 +24,71 @@ body,
 .debug-panel,
 .perf-overlay,
 .runtime-loading-overlay,
-.runtime-error-overlay {
+.runtime-error-overlay,
+.enter-omnirave-overlay {
   position: absolute;
   color: #f4efe2;
   z-index: 4;
+}
+
+.enter-omnirave-overlay {
+  left: 50%;
+  top: 50%;
+  width: min(420px, calc(100% - 48px));
+  padding: 26px;
+  text-align: center;
+  border: 1px solid rgba(104, 216, 255, 0.35);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(104, 216, 255, 0.18), transparent 44%),
+    linear-gradient(145deg, rgba(4, 12, 23, 0.94), rgba(5, 24, 37, 0.86));
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+  z-index: 5;
+}
+
+.enter-omnirave-overlay__eyebrow,
+.enter-omnirave-overlay__title,
+.enter-omnirave-overlay__copy {
+  margin: 0;
+}
+
+.enter-omnirave-overlay__eyebrow {
+  color: #68d8ff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.enter-omnirave-overlay__title {
+  margin-top: 10px;
+  color: #fff8df;
+  font-size: 1.45rem;
+}
+
+.enter-omnirave-overlay__copy {
+  margin-top: 12px;
+  color: rgba(244, 239, 226, 0.76);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.enter-omnirave-overlay__enter {
+  margin-top: 20px;
+  padding: 10px 20px;
+  border: 1px solid rgba(104, 216, 255, 0.5);
+  border-radius: 999px;
+  color: #effbff;
+  background: rgba(8, 46, 61, 0.78);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.enter-omnirave-overlay__enter:focus-visible {
+  outline: 2px solid #68d8ff;
+  outline-offset: 3px;
 }
 
 .runtime-loading-overlay {
