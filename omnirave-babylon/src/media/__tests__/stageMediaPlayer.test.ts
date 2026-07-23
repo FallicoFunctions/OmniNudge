@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStageMediaPlayer, type StagePlayerBackend } from '../stageMediaPlayer';
 import type { ZoneMediaState } from '../../network/worldSocket';
 
@@ -18,7 +18,7 @@ function createFakeBackend(overrides: Partial<StagePlayerBackend> = {}): StagePl
 function media(overrides: Partial<ZoneMediaState> = {}): ZoneMediaState {
   return {
     zoneId: 'main-stage',
-    videoId: 'main-stage-youtube',
+    trackId: 'main-stage-set-01',
     playlistIndex: 0,
     playheadSeconds: 10,
     ...overrides,
@@ -35,20 +35,20 @@ describe('createStageMediaPlayer', () => {
     expect(backend.play).not.toHaveBeenCalled();
 
     player.unlock();
-    expect(backend.load).toHaveBeenCalledWith('main-stage-youtube', 10);
+    expect(backend.load).toHaveBeenCalledWith('main-stage-set-01', 10);
     expect(backend.setMuted).toHaveBeenCalledWith(false);
     expect(backend.play).toHaveBeenCalledTimes(1);
   });
 
-  it('loads and seeks to the playhead when the videoId changes', () => {
+  it('loads and seeks to the playhead when the trackId changes', () => {
     const backend = createFakeBackend();
     const player = createStageMediaPlayer({ backendFactory: () => backend });
     player.unlock();
 
-    player.applyMedia(media({ videoId: 'track-a', playheadSeconds: 5 }));
+    player.applyMedia(media({ trackId: 'track-a', playheadSeconds: 5 }));
     expect(backend.load).toHaveBeenCalledWith('track-a', 5);
 
-    player.applyMedia(media({ videoId: 'track-b', playheadSeconds: 20 }));
+    player.applyMedia(media({ trackId: 'track-b', playheadSeconds: 20 }));
     expect(backend.load).toHaveBeenCalledWith('track-b', 20);
     expect(backend.load).toHaveBeenCalledTimes(2);
   });
@@ -58,8 +58,8 @@ describe('createStageMediaPlayer', () => {
     const player = createStageMediaPlayer({ backendFactory: () => backend });
     player.unlock();
 
-    player.applyMedia(media({ videoId: 'track-a', playlistIndex: 0, playheadSeconds: 5 }));
-    player.applyMedia(media({ videoId: 'track-a', playlistIndex: 1, playheadSeconds: 40 }));
+    player.applyMedia(media({ trackId: 'track-a', playlistIndex: 0, playheadSeconds: 5 }));
+    player.applyMedia(media({ trackId: 'track-a', playlistIndex: 1, playheadSeconds: 40 }));
 
     expect(backend.load).toHaveBeenNthCalledWith(2, 'track-a', 40);
   });
@@ -115,7 +115,7 @@ describe('createStageMediaPlayer', () => {
     (backend.load as ReturnType<typeof vi.fn>).mockClear();
     player.applyMedia(media());
 
-    expect(backend.load).toHaveBeenCalledWith('main-stage-youtube', 10);
+    expect(backend.load).toHaveBeenCalledWith('main-stage-set-01', 10);
   });
 
   it('disposes the backend cleanly and is a no-op afterwards', () => {
@@ -128,7 +128,7 @@ describe('createStageMediaPlayer', () => {
     expect(backend.dispose).toHaveBeenCalledTimes(1);
 
     (backend.load as ReturnType<typeof vi.fn>).mockClear();
-    player.applyMedia(media({ videoId: 'ignored-after-dispose' }));
+    player.applyMedia(media({ trackId: 'ignored-after-dispose' }));
     player.unlock();
     expect(backend.load).not.toHaveBeenCalled();
   });
@@ -143,18 +143,71 @@ describe('createStageMediaPlayer', () => {
     player.dispose();
   });
 
-  it('degrades without throwing when the default backend cannot reach the YouTube API', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    document.body.innerHTML = '';
-    // No window.YT global present, and no script tag will ever call
-    // onYouTubeIframeAPIReady in this test environment - the default backend
-    // must degrade to a no-op instead of throwing.
-    const player = createStageMediaPlayer();
+  describe('default audio backend', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
 
-    expect(() => player.unlock()).not.toThrow();
-    expect(() => player.applyMedia(media())).not.toThrow();
-    expect(() => player.dispose()).not.toThrow();
+    it('degrades to a silent no-op with one warning when the audio element cannot be constructed', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      // Simulate a browser where constructing an HTMLAudioElement throws
+      // (missing/broken audio): the backend must degrade to a no-op rather
+      // than take down the runtime.
+      vi.stubGlobal(
+        'Audio',
+        vi.fn(() => {
+          throw new Error('audio unavailable');
+        }),
+      );
 
-    warnSpy.mockRestore();
+      const player = createStageMediaPlayer();
+
+      expect(() => player.unlock()).not.toThrow();
+      expect(() => player.applyMedia(media())).not.toThrow();
+      expect(() => player.dispose()).not.toThrow();
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+
+      warnSpy.mockRestore();
+    });
+
+    it('resolves trackId to a served /audio/<id>.mp3 URL and seeks after metadata loads', () => {
+      // Fake HTMLAudioElement: metadata is NOT yet loaded (readyState 0), so a
+      // currentTime write must be deferred to the 'loadedmetadata' event.
+      const listeners: Record<string, Array<() => void>> = {};
+      const fakeAudio = {
+        src: '',
+        muted: false,
+        preload: '',
+        readyState: 0,
+        currentTime: 0,
+        play: vi.fn(() => Promise.resolve()),
+        pause: vi.fn(),
+        addEventListener: vi.fn((type: string, cb: () => void) => {
+          (listeners[type] ??= []).push(cb);
+        }),
+        removeEventListener: vi.fn((type: string, cb: () => void) => {
+          listeners[type] = (listeners[type] ?? []).filter((fn) => fn !== cb);
+        }),
+        removeAttribute: vi.fn(),
+      };
+      vi.stubGlobal('Audio', vi.fn(() => fakeAudio));
+
+      const player = createStageMediaPlayer();
+      player.unlock();
+      player.applyMedia(media({ trackId: 'main-stage-set-02', playheadSeconds: 42 }));
+
+      // URL resolution + deferred seek (metadata not yet loaded).
+      expect(fakeAudio.src).toBe('/audio/main-stage-set-02.mp3');
+      expect(fakeAudio.currentTime).toBe(0);
+      expect(fakeAudio.play).toHaveBeenCalled();
+
+      // Metadata arrives -> the stashed seek is applied.
+      for (const cb of listeners.loadedmetadata ?? []) cb();
+      expect(fakeAudio.currentTime).toBe(42);
+
+      player.dispose();
+      expect(fakeAudio.pause).toHaveBeenCalled();
+      expect(fakeAudio.removeAttribute).toHaveBeenCalledWith('src');
+    });
   });
 });

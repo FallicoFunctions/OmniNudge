@@ -41,9 +41,9 @@ func (r *PostgresStagePlaylistRepository) LoadActiveStagePlaylists(ctx context.C
 		var zoneID string
 		var activatedAt time.Time
 		var position int
-		var videoID string
+		var trackID string
 		var durationSeconds int
-		if err := rows.Scan(&zoneID, &activatedAt, &position, &videoID, &durationSeconds); err != nil {
+		if err := rows.Scan(&zoneID, &activatedAt, &position, &trackID, &durationSeconds); err != nil {
 			return nil, err
 		}
 
@@ -54,7 +54,7 @@ func (r *PostgresStagePlaylistRepository) LoadActiveStagePlaylists(ctx context.C
 		}
 
 		playlist.Entries = append(playlist.Entries, world.PlaylistEntry{
-			VideoID:  videoID,
+			TrackID:  trackID,
 			Duration: time.Duration(durationSeconds) * time.Second,
 		})
 	}

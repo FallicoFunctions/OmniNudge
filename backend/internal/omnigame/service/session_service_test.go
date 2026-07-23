@@ -272,19 +272,19 @@ func TestSessionService_ExchangeLaunchSessionReturnsInjectedZoneMedia(t *testing
 		{
 			ZoneID: omniraveworld.ZoneMainStage,
 			Entries: []omniraveworld.PlaylistEntry{
-				{VideoID: "custom-main-stage", Duration: 30 * time.Minute},
+				{TrackID: "custom-main-stage", Duration: 30 * time.Minute},
 			},
 		},
 		{
 			ZoneID: omniraveworld.ZoneUnderground,
 			Entries: []omniraveworld.PlaylistEntry{
-				{VideoID: "custom-techno-room", Duration: 30 * time.Minute},
+				{TrackID: "custom-techno-room", Duration: 30 * time.Minute},
 			},
 		},
 		{
 			ZoneID: omniraveworld.ZonePlurrPartay,
 			Entries: []omniraveworld.PlaylistEntry{
-				{VideoID: "custom-neon-room", Duration: 30 * time.Minute},
+				{TrackID: "custom-neon-room", Duration: 30 * time.Minute},
 			},
 		},
 	}, time.Unix(1000, 0))
@@ -337,22 +337,22 @@ func TestSessionService_BuildRuntimeGuestLogoutUsesSingleAuthoritativeInstant(t 
 		{
 			ZoneID: omniraveworld.ZoneMainStage,
 			Entries: []omniraveworld.PlaylistEntry{
-				{VideoID: "boundary-before", Duration: time.Second},
-				{VideoID: "boundary-after", Duration: 30 * time.Minute},
+				{TrackID: "boundary-before", Duration: time.Second},
+				{TrackID: "boundary-after", Duration: 30 * time.Minute},
 			},
 			StartedAt: boundary,
 		},
 		{
 			ZoneID: omniraveworld.ZoneUnderground,
 			Entries: []omniraveworld.PlaylistEntry{
-				{VideoID: "techno-room", Duration: 30 * time.Minute},
+				{TrackID: "techno-room", Duration: 30 * time.Minute},
 			},
 			StartedAt: boundary,
 		},
 		{
 			ZoneID: omniraveworld.ZonePlurrPartay,
 			Entries: []omniraveworld.PlaylistEntry{
-				{VideoID: "neon-room", Duration: 30 * time.Minute},
+				{TrackID: "neon-room", Duration: 30 * time.Minute},
 			},
 			StartedAt: boundary,
 		},
@@ -669,21 +669,21 @@ func TestSessionService_ExchangeLaunchSessionMatchesWorldMediaAcrossSeparateServ
 			ZoneID:    omniraveworld.ZoneMainStage,
 			StartedAt: fixedAnchor,
 			Entries: []omniraveworld.PlaylistEntry{
-				{VideoID: "shared-main-stage", Duration: 30 * time.Minute},
+				{TrackID: "shared-main-stage", Duration: 30 * time.Minute},
 			},
 		},
 		{
 			ZoneID:    omniraveworld.ZoneUnderground,
 			StartedAt: fixedAnchor,
 			Entries: []omniraveworld.PlaylistEntry{
-				{VideoID: "shared-techno-room", Duration: 30 * time.Minute},
+				{TrackID: "shared-techno-room", Duration: 30 * time.Minute},
 			},
 		},
 		{
 			ZoneID:    omniraveworld.ZonePlurrPartay,
 			StartedAt: fixedAnchor,
 			Entries: []omniraveworld.PlaylistEntry{
-				{VideoID: "shared-neon-room", Duration: 30 * time.Minute},
+				{TrackID: "shared-neon-room", Duration: 30 * time.Minute},
 			},
 		},
 	}
@@ -715,7 +715,7 @@ func TestSessionService_ExchangeLaunchSessionMatchesWorldMediaAcrossSeparateServ
 	require.Len(t, bootstrap.ZoneMedia, len(worldSnapshots))
 	for index, snapshot := range worldSnapshots {
 		require.Equal(t, string(snapshot.ZoneID), bootstrap.ZoneMedia[index].ZoneID)
-		require.Equal(t, snapshot.VideoID, bootstrap.ZoneMedia[index].VideoID)
+		require.Equal(t, snapshot.TrackID, bootstrap.ZoneMedia[index].VideoID)
 		require.Equal(t, snapshot.Index, bootstrap.ZoneMedia[index].PlaylistIndex)
 		require.Equal(t, int64(snapshot.Playhead/time.Second), bootstrap.ZoneMedia[index].PlayheadSeconds)
 	}

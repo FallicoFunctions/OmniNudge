@@ -218,7 +218,7 @@ func (s *SessionService) currentZoneMedia(now time.Time) []model.ZoneMediaState 
 	for _, snapshot := range snapshots {
 		zoneMedia = append(zoneMedia, model.ZoneMediaState{
 			ZoneID:          string(snapshot.ZoneID),
-			VideoID:         snapshot.VideoID,
+			VideoID:         snapshot.TrackID,
 			PlaylistIndex:   snapshot.Index,
 			PlayheadSeconds: int64(snapshot.Playhead / time.Second),
 		})

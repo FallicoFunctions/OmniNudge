@@ -43,7 +43,7 @@ type ClientEvent struct {
 
 type ZoneMediaState struct {
 	ZoneID          ZoneID `json:"zoneId"`
-	VideoID         string `json:"videoId"`
+	TrackID         string `json:"trackId"`
 	PlaylistIndex   int    `json:"playlistIndex"`
 	PlayheadSeconds int64  `json:"playheadSeconds"`
 }
