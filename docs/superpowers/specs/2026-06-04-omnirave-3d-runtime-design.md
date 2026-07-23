@@ -1288,6 +1288,33 @@ Text display:
 - stage title card at track start shows `Artist Name - Track Title`
 - all players in a venue see the same screen state at the same time
 
+#### 13.3.1 Visualizer
+
+The screen's normal-playback content is an audio-reactive visualizer.
+
+Reaction:
+- the visualizer reacts to the ACTUAL music, not a random/decorative loop
+- it is driven by live audio analysis (frequency/amplitude of the currently
+  playing track), so motion tracks the real sound
+- because every client plays the same self-hosted track synchronized to the
+  server-owned playhead, each client's analysis yields effectively the same
+  visual — satisfying "all players see the same screen state" without a
+  server-pushed per-frame visual stream
+
+OmniRave identity:
+- the OmniRave logo appears on the screen at timed intervals (a periodic
+  identity beat, not constant), between/over the reactive visuals
+
+Fireworks event (Main Stage `:00`–`:03` headline window):
+- during the lead-in, the screen shows an on-screen COUNTDOWN to the show
+- during the event, the screen switches to a special pre-authored visualizer
+  VIDEO for the fireworks (distinct from the normal reactive visualizer)
+
+Notes captured 2026-07-22 from the product owner's earlier planning Q&A with
+the Codex agent (no image mockups were produced; these are the confirmed
+constraints). Exact visual style/motion language is open for implementation
+within these rules and the venue's motion language above.
+
 ---
 
 ## 14. Scheduled Event Model
