@@ -353,9 +353,9 @@ body,
 
 .stage-audio-dev-controls {
   position: absolute;
-  left: 50%;
+  /* Bottom-left: keeps clear of the bottom-right perf/FPS readout. */
+  left: 16px;
   bottom: 24px;
-  transform: translateX(-50%);
   z-index: 4;
   display: flex;
   align-items: center;
