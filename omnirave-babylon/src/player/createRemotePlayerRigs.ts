@@ -1,3 +1,5 @@
+import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
+import type { Material } from '@babylonjs/core/Materials/material.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import type { Scene } from '@babylonjs/core/scene';
@@ -38,6 +40,37 @@ export interface RemotePlayerRigs {
   update: (deltaSeconds: number) => void;
 }
 
+// applyAvatarColorway (avatarColorways.ts) clones a colorway material the
+// first time it's applied and caches it in mesh.metadata so re-selecting a
+// colorway is free; the original base material is swapped off the mesh and
+// cached too. mesh.dispose(false, true) only reaches whichever material is
+// CURRENTLY assigned, so every other cached clone would otherwise leak for
+// the life of the process - fatal in a 24/7 churning presence system.
+const disposeCachedAvatarMaterials = (mesh: AbstractMesh) => {
+  const metadata = mesh.metadata as
+    | { avatarBaseMaterial?: Material; avatarColorwayMaterials?: Record<string, Material> }
+    | undefined;
+  if (!metadata) return;
+  const current = mesh.material;
+  const cached = new Set<Material>();
+  if (metadata.avatarBaseMaterial) cached.add(metadata.avatarBaseMaterial);
+  if (metadata.avatarColorwayMaterials) {
+    for (const material of Object.values(metadata.avatarColorwayMaterials)) cached.add(material);
+  }
+  for (const material of cached) {
+    // The currently-assigned material is disposed by the mesh.dispose(false,
+    // true) call that follows; disposing it here too would double-free.
+    if (material !== current) material.dispose(false, true);
+  }
+};
+
+const disposeAvatarMeshes = (meshes: readonly AbstractMesh[]) => {
+  for (const mesh of meshes) {
+    disposeCachedAvatarMaterials(mesh);
+    mesh.dispose(false, true);
+  }
+};
+
 export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
   const entries = new Map<string, RemoteEntry>();
   const parent = new TransformNode('remote-player-rigs', scene);
@@ -63,7 +96,7 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
       // The player may have left (or the rig been disposed) while the
       // avatar was building.
       if (entry.gone || disposed) {
-        for (const mesh of avatar.meshes) mesh.dispose();
+        disposeAvatarMeshes(avatar.meshes);
         avatar.root.dispose();
         return;
       }
@@ -79,7 +112,7 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
   const removeEntry = (id: string, entry: RemoteEntry) => {
     entry.gone = true;
     if (entry.avatar) {
-      for (const mesh of entry.avatar.meshes) mesh.dispose();
+      disposeAvatarMeshes(entry.avatar.meshes);
       entry.avatar.root.dispose();
     }
     entry.root.dispose();

@@ -55,6 +55,26 @@ func TestWorld_RespawnPlayer_ReturnsToCurrentVenueSpawn(t *testing.T) {
 	require.Equal(t, ZoneUnderground, world.Player(player.ID).Zone)
 }
 
+func TestWorld_RemovePlayer_OnlyDeletesMatchingSession(t *testing.T) {
+	world := NewWorld(DefaultConfig())
+
+	staleSession := world.AddPlayer(PlayerSession{PlayerID: "guest-1"})
+
+	// Simulate a reconnect: the same player ID joins again before the stale
+	// connection's deferred cleanup has a chance to run.
+	freshSession := world.AddPlayer(PlayerSession{PlayerID: "guest-1"})
+	require.NotSame(t, staleSession, freshSession)
+
+	// The stale connection's cleanup fires late; it must not evict the
+	// reconnected player's entry.
+	world.RemovePlayer("guest-1", staleSession)
+	require.Same(t, freshSession, world.Player("guest-1"))
+
+	// The fresh connection's own cleanup still works.
+	world.RemovePlayer("guest-1", freshSession)
+	require.Nil(t, world.Player("guest-1"))
+}
+
 func TestSnapshotIncludesPlayerIdentityMetadata(t *testing.T) {
 	world := NewWorld(DefaultConfig())
 	world.AddPlayer(PlayerSession{

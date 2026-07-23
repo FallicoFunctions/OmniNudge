@@ -27,10 +27,6 @@ type WalkableMap struct {
 	layout Layout
 }
 
-func (w WalkableMap) ResolveMove(_ Vec3, frame InputFrame) Vec3 {
-	return frame.MoveTo
-}
-
 func (w WalkableMap) IsValid(position Vec3) bool {
 	return w.layout.IsWalkable(position)
 }

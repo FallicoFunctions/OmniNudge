@@ -19,7 +19,7 @@ import (
 func main() {
 	port := envOrDefault("OMNIRAVE_WORLD_PORT", "8092")
 	runtimeURL := envOrDefault("OMNIRAVE_RUNTIME_URL", "http://localhost:4173/omnirave")
-	jwtSecret := envOrDefault("JWT_SECRET", "dev-secret")
+	jwtSecret := requireEnv("JWT_SECRET")
 	authService := services.NewAuthService(jwtSecret, "OmniRaveWorld/1.0", "")
 	mediaState, cleanup, userRepo, err := buildMediaState(context.Background())
 	if err != nil {
@@ -35,8 +35,20 @@ func main() {
 	handler := server.New(world.NewWorld(world.DefaultConfig()), mediaState, authService, allowedRuntimeOrigins(runtimeURL))
 	addr := ":" + port
 
+	// This server holds long-lived WebSocket connections, so ReadTimeout/WriteTimeout
+	// are left at zero (no deadline) to avoid killing idle WS clients; the ws layer is
+	// responsible for its own read/write deadlines. ReadHeaderTimeout and IdleTimeout
+	// still bound the plain-HTTP surface (handshake, REST-ish endpoints) against
+	// Slowloris-style slow-header and connection-hoarding attacks.
+	httpServer := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
 	log.Printf("omnirave-world listening on %s", addr)
-	if err := http.ListenAndServe(addr, handler); err != nil {
+	if err := httpServer.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -46,6 +58,14 @@ func envOrDefault(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func requireEnv(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("required environment variable %s is not set", key)
+	}
+	return value
 }
 
 func buildMediaState(ctx context.Context) (*world.MediaState, func(), *models.UserRepository, error) {

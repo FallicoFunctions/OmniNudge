@@ -1,3 +1,5 @@
+import { MAIN_STAGE_SPAWN_X, MAIN_STAGE_SPAWN_Y, MAIN_STAGE_SPAWN_Z } from './mainStageVenueBounds';
+
 export interface ReviewCameraFocusOffset {
   x: number;
   y: number;
@@ -20,7 +22,11 @@ export interface ReviewCheckpoint {
   camera: ReviewCheckpointCamera;
 }
 
-export const BACK_PLAZA_SPAWN = { x: 0, y: 1.7, z: -48 } as const;
+export const BACK_PLAZA_SPAWN = {
+  x: MAIN_STAGE_SPAWN_X,
+  y: MAIN_STAGE_SPAWN_Y,
+  z: MAIN_STAGE_SPAWN_Z,
+} as const;
 
 export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
   {

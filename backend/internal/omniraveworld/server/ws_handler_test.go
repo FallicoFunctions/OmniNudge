@@ -1,8 +1,11 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -52,6 +55,7 @@ func TestWSHandler_JoinAndMoveUpdatesActiveZone(t *testing.T) {
 		if second["activeZone"] == "underground" {
 			break
 		}
+		time.Sleep(60 * time.Millisecond) // stay under the server's inbound move rate limit
 		require.NoError(t, conn.WriteJSON(map[string]any{
 			"type": "move",
 			"moveTo": map[string]float64{
@@ -106,6 +110,7 @@ func TestWSHandler_BroadcastsPlayerMovementToOtherConnections(t *testing.T) {
 		if playerZoneForID(t, secondSnapshot, "guest-1") == "underground" {
 			break
 		}
+		time.Sleep(60 * time.Millisecond) // stay under the server's inbound move rate limit
 		require.NoError(t, firstConn.WriteJSON(map[string]any{
 			"type": "move",
 			"moveTo": map[string]float64{
@@ -137,14 +142,13 @@ func TestWSHandler_BroadcastSnapshotsUseSingleAuthoritativeEventInstant(t *testi
 	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
 
 	boundary := time.Date(2026, 6, 4, 14, 59, 59, 0, time.UTC)
-	nowCalls := 0
-	handler.now = func() time.Time {
-		nowCalls++
-		if nowCalls == 1 {
+	var nowCalls atomic.Int32
+	handler.setNow(func() time.Time {
+		if nowCalls.Add(1) == 1 {
 			return boundary
 		}
 		return boundary.Add(time.Second)
-	}
+	})
 
 	secondConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-2", "Guest-2", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
@@ -156,7 +160,7 @@ func TestWSHandler_BroadcastSnapshotsUseSingleAuthoritativeEventInstant(t *testi
 
 	var firstJoinBroadcast map[string]any
 	require.NoError(t, firstConn.ReadJSON(&firstJoinBroadcast))
-	require.Equal(t, 1, nowCalls)
+	require.Equal(t, int32(1), nowCalls.Load())
 	require.Equal(t, eventPhaseForZone(t, secondJoinSnapshot, "main_stage"), eventPhaseForZone(t, firstJoinBroadcast, "main_stage"))
 }
 
@@ -194,6 +198,7 @@ func TestWSHandler_RespawnEventRebroadcastsSnapshot(t *testing.T) {
 		if moved["activeZone"] == "underground" {
 			break
 		}
+		time.Sleep(60 * time.Millisecond) // stay under the server's inbound move rate limit
 		require.NoError(t, conn.WriteJSON(map[string]any{
 			"type": "move",
 			"moveTo": map[string]float64{
@@ -305,6 +310,85 @@ func TestWSHandler_BroadcastsChatMessagesToAllConnections(t *testing.T) {
 	require.Equal(t, "guest-1", secondMessage["playerId"])
 	require.Equal(t, "Guest-1", secondMessage["playerName"])
 	require.Equal(t, "See you in the neon room", secondMessage["body"])
+}
+
+// TestWSHandler_ConcurrentBroadcastsDoNotPanic exercises the scenario the
+// concurrent-WriteJSON bug fix targets: several players' read loops trigger
+// broadcasts (via move events) to every connection at roughly the same time.
+// Before the per-connection write mutex, gorilla/websocket panics if two
+// goroutines call WriteJSON on the same *websocket.Conn concurrently. Run
+// with -race to also confirm there is no data race on the connection map or
+// the shared clock.
+func TestWSHandler_ConcurrentBroadcastsDoNotPanic(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	testServer := httptest.NewServer(New(worldState, mediaState, authService, []string{"https://play.omninudge.com"}))
+	defer testServer.Close()
+
+	const playerCount = 4
+	const movesPerPlayer = 10
+
+	baseURL := "ws" + testServer.URL[len("http"):] + "/ws"
+	conns := make([]*websocket.Conn, playerCount)
+	for i := 0; i < playerCount; i++ {
+		playerID := fmt.Sprintf("guest-%d", i)
+		conn, _, err := websocket.DefaultDialer.Dial(
+			baseURL+"?token="+newGuestWorldSessionToken(t, authService, playerID, playerID, nil),
+			worldDialHeader("https://play.omninudge.com"),
+		)
+		require.NoError(t, err)
+		defer conn.Close()
+		conns[i] = conn
+	}
+
+	var readers sync.WaitGroup
+	stop := make(chan struct{})
+	for _, conn := range conns {
+		readers.Add(1)
+		go func(conn *websocket.Conn) {
+			defer readers.Done()
+			for {
+				var msg map[string]any
+				_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+				if err := conn.ReadJSON(&msg); err != nil {
+					return
+				}
+				select {
+				case <-stop:
+					return
+				default:
+				}
+			}
+		}(conn)
+	}
+
+	var writers sync.WaitGroup
+	for i, conn := range conns {
+		writers.Add(1)
+		go func(conn *websocket.Conn, offset int) {
+			defer writers.Done()
+			for m := 0; m < movesPerPlayer; m++ {
+				_ = conn.WriteJSON(map[string]any{
+					"type": "move",
+					"moveTo": map[string]float64{
+						"x": float64(offset % 3),
+						"y": 0,
+						"z": -48 + float64(m%3),
+					},
+				})
+				time.Sleep(15 * time.Millisecond) // stay under the inbound rate limit
+			}
+		}(conn, i)
+	}
+
+	writers.Wait()
+	time.Sleep(200 * time.Millisecond) // let any in-flight broadcasts settle
+	close(stop)
+	for _, conn := range conns {
+		_ = conn.Close()
+	}
+	readers.Wait()
 }
 
 func TestWSHandler_RejectsMissingOrInvalidWorldCredential(t *testing.T) {

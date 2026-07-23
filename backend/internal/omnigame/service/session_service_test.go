@@ -28,6 +28,16 @@ func (s stubSessionTokenIssuer) GenerateOmniRaveWorldJWT(_ services.OmniRaveWorl
 	return s.worldToken, s.err
 }
 
+type capturingTokenIssuer struct {
+	stubSessionTokenIssuer
+	captured *services.OmniRaveWorldTokenInput
+}
+
+func (c *capturingTokenIssuer) GenerateOmniRaveWorldJWT(input services.OmniRaveWorldTokenInput) (string, error) {
+	*c.captured = input
+	return c.stubSessionTokenIssuer.GenerateOmniRaveWorldJWT(input)
+}
+
 func TestSessionService_CreateSignedInLaunchSession(t *testing.T) {
 	userID := 42
 	svc := NewSessionService("http://localhost:4173/omnirave", "ws://localhost:8092/ws")
@@ -224,6 +234,37 @@ func TestSessionService_ExchangeGuestSessionDoesNotReturnPersistedData(t *testin
 	require.NoError(t, err)
 	require.Empty(t, bootstrap.Loadout)
 	require.Nil(t, bootstrap.ReturnPoint)
+}
+
+func TestSessionService_ExchangeGuestSessionReturnsWorldSessionToken(t *testing.T) {
+	var capturedInput services.OmniRaveWorldTokenInput
+	issuer := &capturingTokenIssuer{
+		stubSessionTokenIssuer: stubSessionTokenIssuer{worldToken: "guest-world-token-1"},
+		captured:               &capturedInput,
+	}
+	svc := NewSessionServiceWithDependencies(
+		"http://localhost:4173/omnirave",
+		"ws://localhost:8092/ws",
+		repository.NewInMemoryProfileRepository(),
+		repository.NewInMemorySanctionRepository(),
+		issuer,
+	)
+
+	session, err := svc.CreateLaunchSession(context.Background(), model.LaunchRequest{
+		Mode: model.LaunchModeGuest,
+	}, model.PlayerIdentity{})
+	require.NoError(t, err)
+
+	bootstrap, err := svc.ExchangeLaunchSession(context.Background(), model.SessionExchangeRequest{
+		Handoff: session.LaunchToken,
+		Mode:    model.LaunchModeGuest,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "guest-world-token-1", bootstrap.WorldSessionToken)
+	require.Equal(t, "guest", capturedInput.Mode)
+	require.Equal(t, bootstrap.PlayerID, capturedInput.PlayerID)
+	require.Equal(t, bootstrap.PlayerName, capturedInput.PlayerName)
+	require.Nil(t, capturedInput.UserID)
 }
 
 func TestSessionService_ExchangeLaunchSessionReturnsInjectedZoneMedia(t *testing.T) {

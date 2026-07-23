@@ -10,6 +10,8 @@ import { RawTexture } from '@babylonjs/core/Materials/Textures/rawTexture.js';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import type { Scene } from '@babylonjs/core/scene';
 
+import { VENUE_WALKABLE_X_MAX, VENUE_WALKABLE_X_MIN } from './mainStageVenueBounds';
+
 export interface FestivalFieldSummary {
   fieldMesh: Mesh | null;
   scatterCount: number;
@@ -25,8 +27,12 @@ const TUFT_SOURCE_NAME = 'festival-field-tuft-source';
 // Z +-90, so anything outside this box but inside the field bounds is the
 // "outer ring" the field's grass is actually visible as, once fog eats the
 // far distance).
-const VENUE_X_MIN = -64;
-const VENUE_X_MAX = 64;
+// X extent matches the venue's shared walkable/envelope bounds (see
+// mainStageVenueBounds.ts). The Z extent below is a narrower, distinct
+// concept - the visible plaza footprint the grass ring must clear, not the
+// full walkable rectangle - so it stays local to this module.
+const VENUE_X_MIN = VENUE_WALKABLE_X_MIN;
+const VENUE_X_MAX = VENUE_WALKABLE_X_MAX;
 const VENUE_Z_MIN = -60;
 const VENUE_Z_MAX = 16;
 const FIELD_X_EXTENT = 118;
