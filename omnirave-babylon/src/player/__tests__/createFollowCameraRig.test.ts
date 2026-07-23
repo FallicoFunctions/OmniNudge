@@ -266,6 +266,35 @@ describe('createFollowCameraRig', () => {
     expect(rig.camera.position.z).toBeCloseTo(0, 1);
   });
 
+  it('does not produce NaN camera state when a checkpoint positionOffset equals its focusOffset', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const target = new TransformNode('player-root', scene);
+    target.position.set(3, 1.7, -5);
+    const rig = createFollowCameraRig(scene, target);
+
+    const zoomState = rig.applyCheckpointView({
+      alpha: 0,
+      beta: 1.1,
+      radius: 10,
+      focusOffset: { x: 2, y: 1, z: 4 },
+      positionOffset: { x: 2, y: 1, z: 4 },
+    });
+
+    expect(Number.isNaN(rig.camera.alpha)).toBe(false);
+    expect(Number.isNaN(rig.camera.beta)).toBe(false);
+    expect(Number.isNaN(rig.camera.radius)).toBe(false);
+    expect(rig.camera.radius).toBeCloseTo(0.1);
+    expect(zoomState.distance).toBeCloseTo(0.1);
+
+    // Recovery is real: syncZoomState (the per-frame path) also stays sane.
+    const state = rig.syncZoomState();
+    expect(Number.isNaN(rig.camera.alpha)).toBe(false);
+    expect(Number.isNaN(rig.camera.beta)).toBe(false);
+    expect(Number.isNaN(rig.camera.radius)).toBe(false);
+    expect(state.distance).toBeCloseTo(0.1);
+  });
+
   it('allows pitch orbit past horizontal so the player can look up', () => {
     engine = new NullEngine();
     const scene = new Scene(engine);

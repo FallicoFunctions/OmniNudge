@@ -18,7 +18,7 @@ import { createFestivalField } from './createFestivalField';
 import { createStageShow } from './createStageShow';
 import { createVipForecourtDressing } from './createVipForecourtDressing';
 import { createWayfindingSigns } from './createWayfindingSigns';
-import { createLightingRig } from './createLightingRig';
+import { applyPracticalPoolLightBudget, createLightingRig } from './createLightingRig';
 import { createMainStageCollisionBlockers } from './createMainStageCollisionBlockers';
 import { createMainStagePresentationRig } from './createMainStagePresentationRig';
 import { freezeStaticScene } from './freezeStaticScene';
@@ -97,6 +97,15 @@ export async function createMainStageScene(engine: AbstractEngine) {
   scene.activeCamera = cameraRig.camera;
   const presentationRig = createMainStagePresentationRig(scene, cameraRig.camera, perfFlags);
   const productionSurfaces = createMainStageProductionSurfaces(scene);
+
+  // The production surfaces just created 9 lit PBR materials AFTER the
+  // lighting rig's own budget bump ran, so they still hold Babylon's default
+  // of 4 - below the WebGL budget of 6, which silently caps every practical
+  // pool/spill light off of them. Re-run the same bump now that every
+  // lit-material-creating rig has run.
+  if (lightingRig.practicalPools.length > 0) {
+    applyPracticalPoolLightBudget(scene);
+  }
 
   // After every scoped light exists (pools + screen spills): bound each mesh
   // to its nearest point lights. WebGPU's 12-buffer vertex-stage limit

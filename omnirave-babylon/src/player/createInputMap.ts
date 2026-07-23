@@ -54,14 +54,26 @@ export function createInputMap(target: Window): InputMap {
     }
   };
 
+  // Alt-tabbing (or any other focus loss) while a key is held never
+  // delivers the matching keyup, so the flag would otherwise stay stuck
+  // true forever - the player keeps walking/sprinting/jumping after
+  // switching away and back. Reset everything on blur.
+  const handleBlur = () => {
+    for (const key of Object.keys(state) as Array<keyof MovementInput>) {
+      state[key] = false;
+    }
+  };
+
   target.addEventListener('keydown', handleKeyDown);
   target.addEventListener('keyup', handleKeyUp);
+  target.addEventListener('blur', handleBlur);
 
   return {
     state,
     dispose() {
       target.removeEventListener('keydown', handleKeyDown);
       target.removeEventListener('keyup', handleKeyUp);
+      target.removeEventListener('blur', handleBlur);
     },
   };
 }

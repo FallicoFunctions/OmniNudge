@@ -46,6 +46,11 @@ func (h *ProfileHandler) SaveLoadout(c *gin.Context) {
 		return
 	}
 
+	if err := validateLoadoutPayload(payload); err != nil {
+		utils.RespondBadRequest(c, "Invalid request body", err)
+		return
+	}
+
 	if err := h.profiles.SaveLoadout(c.Request.Context(), userID.(int), payload); err != nil {
 		utils.RespondInternalError(c, "Internal Server Error", err)
 		return
@@ -147,6 +152,27 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
 	}
 
 	utils.RespondSuccess(c, profile)
+}
+
+const (
+	maxLoadoutKeys      = 32
+	maxLoadoutKeyLength = 128
+	maxLoadoutValueLen  = 128
+)
+
+func validateLoadoutPayload(payload map[string]string) error {
+	if len(payload) > maxLoadoutKeys {
+		return fmt.Errorf("loadout has too many entries: %d (max %d)", len(payload), maxLoadoutKeys)
+	}
+	for key, value := range payload {
+		if len(key) > maxLoadoutKeyLength {
+			return fmt.Errorf("loadout key %q exceeds max length %d", key, maxLoadoutKeyLength)
+		}
+		if len(value) > maxLoadoutValueLen {
+			return fmt.Errorf("loadout value for key %q exceeds max length %d", key, maxLoadoutValueLen)
+		}
+	}
+	return nil
 }
 
 func isAuthoritativeVenueID(venue string) bool {

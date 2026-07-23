@@ -84,7 +84,11 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
 
   const applyPositionOffsetCamera = (worldPosition: Vector3, worldTarget: Vector3) => {
     const offset = worldPosition.subtract(worldTarget);
-    const radius = offset.length();
+    // A checkpoint whose positionOffset equals its focusOffset collapses
+    // this to the zero vector - offset.y / radius would then be 0/0 (NaN),
+    // permanently breaking alpha/beta and every frame downstream. Clamp to
+    // the same floor applyOrbitDelta/applyZoomDelta already use.
+    const radius = Math.max(MIN_ZOOM_DISTANCE, offset.length());
     camera.setTarget(worldTarget);
     camera.alpha = Math.atan2(offset.z, offset.x);
     camera.beta = Math.acos(Math.min(1, Math.max(-1, offset.y / radius)));
@@ -125,14 +129,22 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
       checkpointWorldPosition.addInPlace(activePositionOffset);
       activeTargetToCameraOffset.copyFrom(checkpointWorldPosition.subtract(checkpointWorldTarget));
       applyPositionOffsetCamera(checkpointWorldPosition, checkpointWorldTarget);
-      return resolveZoomState(camera.radius);
+      // Write the resolved (clamped) distance back to camera.radius, same
+      // as syncZoomState - otherwise a degenerate offset silently leaves
+      // camera.radius at whatever pre-clamp value applyPositionOffsetCamera
+      // computed, and recovery from the NaN case above isn't real.
+      const zoomState = resolveZoomState(camera.radius);
+      camera.radius = zoomState.distance;
+      return zoomState;
     }
 
     hasActivePositionOffset = false;
     camera.alpha = view.alpha;
     camera.beta = view.beta;
     camera.radius = view.radius;
-    return resolveZoomState(camera.radius);
+    const zoomState = resolveZoomState(camera.radius);
+    camera.radius = zoomState.distance;
+    return zoomState;
   };
 
   return {

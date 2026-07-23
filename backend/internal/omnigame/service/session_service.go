@@ -147,7 +147,7 @@ func (s *SessionService) ExchangeLaunchSession(ctx context.Context, req model.Se
 		if err != nil {
 			return nil, err
 		}
-		return s.hydrateGuestRuntimeResponse(session, bootstrap, "main_stage"), nil
+		return s.hydrateGuestRuntimeResponse(session, bootstrap, "main_stage")
 	}
 
 	if session.Mode == model.LaunchModeAccount && session.UserID != nil {
@@ -315,10 +315,10 @@ func (s *SessionService) buildGuestRuntimeResponse(ctx context.Context, activeZo
 		return nil, err
 	}
 
-	return s.hydrateGuestRuntimeResponse(guest, bootstrap, activeZone), nil
+	return s.hydrateGuestRuntimeResponse(guest, bootstrap, activeZone)
 }
 
-func (s *SessionService) hydrateGuestRuntimeResponse(session *model.LaunchSession, bootstrap *model.SessionExchangeResponse, activeZone string) *model.SessionExchangeResponse {
+func (s *SessionService) hydrateGuestRuntimeResponse(session *model.LaunchSession, bootstrap *model.SessionExchangeResponse, activeZone string) (*model.SessionExchangeResponse, error) {
 	nextActiveZone := activeZone
 	if strings.TrimSpace(nextActiveZone) == "" {
 		nextActiveZone = "main_stage"
@@ -338,5 +338,18 @@ func (s *SessionService) hydrateGuestRuntimeResponse(session *model.LaunchSessio
 		bootstrap.Loadout = map[string]string{}
 	}
 
-	return bootstrap
+	if s.tokenIssuer != nil {
+		worldToken, err := s.tokenIssuer.GenerateOmniRaveWorldJWT(services.OmniRaveWorldTokenInput{
+			PlayerID:   bootstrap.PlayerID,
+			PlayerName: bootstrap.PlayerName,
+			Mode:       string(bootstrap.Mode),
+			Loadout:    bootstrap.Loadout,
+		})
+		if err != nil {
+			return nil, err
+		}
+		bootstrap.WorldSessionToken = worldToken
+	}
+
+	return bootstrap, nil
 }

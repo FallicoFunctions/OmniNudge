@@ -473,6 +473,26 @@ describe('createMainStageScene', () => {
     expect(rayInstances.size).toBe(1);
   });
 
+  it('bumps production-surface materials to the venue light budget, not just the rig ran before them', async () => {
+    // Regression: createMainStageProductionSurfaces creates its own lit PBR
+    // materials AFTER the lighting rig's material-bump loop already ran, so
+    // without a second pass they were stuck on Babylon's default of 4 and
+    // trimMeshLightBudget's per-material ceiling made practical pool/spill
+    // lights invisible on every screen housing.
+    engine = new NullEngine();
+    const { createMainStageScene } = await loadCreateMainStageScene((scene, assets) => {
+      const lantern = MeshBuilder.CreateBox('LanternWarmCore_test', { size: 0.4 }, scene);
+      lantern.position.set(0, 1, 10);
+      assets.mainMeshes.push(lantern);
+    });
+
+    const scene = await createMainStageScene(engine);
+    const screen = scene.getMeshByName('main-stage-center-celestial-screen');
+
+    expect(screen).not.toBeNull();
+    expect((screen!.material as PBRMaterial).maxSimultaneousLights).toBe(6);
+  });
+
   it('starts the completion celebration when the route finishes, and stops it on reset', async () => {
     engine = new NullEngine();
     const { createMainStageScene } = await loadCreateMainStageScene();

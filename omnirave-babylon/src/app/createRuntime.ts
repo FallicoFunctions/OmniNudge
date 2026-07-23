@@ -287,7 +287,13 @@ export async function createRuntime(host: HTMLElement) {
       scene,
       worldSocket,
     };
-    window.__OMNIRAVE_RUNTIME__ = runtime;
+    // Only expose the global to dev tooling when the debug flag is on
+    // (?debug=1) - otherwise it hands any page script a live handle to the
+    // engine/scene/worldSocket, which is a needless attack surface in
+    // production.
+    if (perfFlags.debug) {
+      window.__OMNIRAVE_RUNTIME__ = runtime;
+    }
     loadingOverlay.remove();
 
     let perfFrameCounter = 0;

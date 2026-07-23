@@ -79,28 +79,28 @@ func (w *World) RespawnPlayer(playerID string) {
 		return
 	}
 
-	player.Position = DefaultLayout().SpawnFor(player.Zone)
+	player.Position = w.cfg.ZoneMap.layout.SpawnFor(player.Zone)
 	player.Zone = w.cfg.ZoneMap.ZoneFor(player.Position)
 }
 
-func (w *World) RemovePlayer(playerID string) {
+// RemovePlayer deletes playerID's entry only if it still belongs to session
+// (the same *Player returned by the AddPlayer call the caller is cleaning up
+// after). This guards against a reconnect race: if the same playerID
+// reconnects and a new session is stored before the old connection's
+// deferred cleanup runs, the stale cleanup must not delete the new session.
+func (w *World) RemovePlayer(playerID string, session *Player) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	delete(w.players, playerID)
+	if current, ok := w.players[playerID]; ok && current == session {
+		delete(w.players, playerID)
+	}
 }
 
 func (w *World) Player(playerID string) *Player {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	return w.players[playerID]
-}
-
-func (w *World) Snapshot() Snapshot {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
-
-	return Snapshot{Players: copyPlayers(w.players)}
 }
 
 func (w *World) SnapshotForPlayer(playerID string, zoneMedia []ZoneMediaState, zoneEvents []ZoneEventState) Snapshot {

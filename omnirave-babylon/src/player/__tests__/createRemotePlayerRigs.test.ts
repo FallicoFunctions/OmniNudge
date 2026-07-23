@@ -22,6 +22,24 @@ const snapshot = (currentPlayerId: string, players: Array<{ id: string; x: numbe
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+const snapshotWithColorway = (
+  currentPlayerId: string,
+  players: Array<{ id: string; x: number; z: number; colorway?: string }>,
+): WorldSnapshot => ({
+  players: players.map(({ id, x, z, colorway }) => ({
+    id,
+    playerName: `name-${id}`,
+    mode: 'guest' as const,
+    position: { x, y: 0, z },
+    zone: 'main_stage',
+    loadout: (colorway ? { colorway } : {}) as Record<string, string>,
+  })),
+  zoneMedia: [],
+  zoneEvents: [],
+  currentPlayerId,
+  activeZone: 'main_stage',
+});
+
 describe('createRemotePlayerRigs', () => {
   let engine: NullEngine;
   let scene: Scene;
@@ -93,5 +111,26 @@ describe('createRemotePlayerRigs', () => {
     // No stray avatar meshes left behind.
     const stray = scene.meshes.filter((m) => m.name.startsWith('review-avatar')).length;
     expect(stray).toBe(0);
+  });
+
+  it('disposes materials and textures - including cached colorway clones - on despawn, leaving no leak', async () => {
+    const rigs = createRemotePlayerRigs(scene);
+    const baselineMaterialCount = scene.materials.length;
+
+    // Spawn, then switch colorways twice: applyAvatarColorway clones+caches
+    // a material per colorway on mesh.metadata.avatarColorwayMaterials, so
+    // this leaves behind the original base material plus two cached clones
+    // per mesh, only one of which is ever the mesh's live material.
+    rigs.applySnapshot(snapshotWithColorway('me', [{ id: 'p', x: 0, z: 0, colorway: 'aurora' }]));
+    await settle();
+    rigs.applySnapshot(snapshotWithColorway('me', [{ id: 'p', x: 0, z: 0, colorway: 'signal' }]));
+    rigs.applySnapshot(snapshotWithColorway('me', [{ id: 'p', x: 0, z: 0, colorway: 'pulse' }]));
+
+    expect(scene.materials.length).toBeGreaterThan(baselineMaterialCount);
+
+    // Despawn (player leaves the world).
+    rigs.applySnapshot(snapshotWithColorway('me', []));
+
+    expect(scene.materials.length).toBe(baselineMaterialCount);
   });
 });

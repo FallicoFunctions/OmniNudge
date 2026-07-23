@@ -22,7 +22,7 @@ func main() {
 	port := envOrDefault("OMNIGAME_API_PORT", "8091")
 	runtimeURL := envOrDefault("OMNIRAVE_RUNTIME_URL", "http://localhost:4173/omnirave")
 	worldSocketURL := envOrDefault("OMNIRAVE_WORLD_SOCKET_URL", "ws://localhost:8092/ws")
-	jwtSecret := envOrDefault("JWT_SECRET", "dev-secret")
+	jwtSecret := requireEnv("JWT_SECRET")
 	authService := services.NewAuthService(jwtSecret, "OmniGame/1.0", "")
 
 	var profiles repository.ProfileRepository = repository.NewInMemoryProfileRepository()
@@ -66,8 +66,21 @@ func main() {
 	)
 	addr := ":" + port
 
+	// Plain REST API (no long-lived connections), so timeouts can be tight:
+	// ReadHeaderTimeout/ReadTimeout guard against Slowloris-style slow requests,
+	// WriteTimeout bounds handler execution, and IdleTimeout reclaims idle
+	// keep-alive connections.
+	httpServer := &http.Server{
+		Addr:              addr,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
 	log.Printf("omnigame-api listening on %s", addr)
-	if err := http.ListenAndServe(addr, router); err != nil {
+	if err := httpServer.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -77,6 +90,14 @@ func envOrDefault(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func requireEnv(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("required environment variable %s is not set", key)
+	}
+	return value
 }
 
 func trustedProxiesFromEnv() []string {

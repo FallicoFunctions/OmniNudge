@@ -14,7 +14,7 @@ import '@babylonjs/core/Shaders/shadowMap.vertex.js';
 
 import type { PerfFlags } from '../app/perfFlags';
 
-const PERF_DEFAULTS: PerfFlags = { noShadows: false, noPost: false, minimalLights: false, webgpu: false, webgl: false, debug: false, worldUrl: null, worldToken: null };
+const PERF_DEFAULTS: PerfFlags = { noShadows: false, noPost: false, minimalLights: false, webgl: false, debug: false, worldUrl: null, worldToken: null };
 
 export function createLightingRig(scene: Scene, perfFlags: PerfFlags = PERF_DEFAULTS) {
   const hemi = new HemisphericLight('main-stage-hemi-light', new Vector3(0, 1, 0), scene);
@@ -115,22 +115,32 @@ function createPracticalPoolLights(scene: Scene, perfFlags: PerfFlags) {
   }
 
   if (pools.length > 0) {
-    for (const material of scene.materials) {
-      if ('maxSimultaneousLights' in material) {
-        // Every material evaluates this many lights per fragment. 12 was the
-        // top of the budget; 6 (four rig lights + the two nearest scoped
-        // pools/spills) roughly halves the lighting shader cost with little
-        // visible loss, since distant pools contribute almost nothing.
-        // WebGPU: each effect light costs a vertex-stage uniform buffer and
-        // the device limit is 12 total (3 base + 5 fixed + N lights), so the
-        // budget there is 4 - which still covers hemi + key + the two
-        // nearest pools since rim/fill are disabled under WebGPU.
-        material.maxSimultaneousLights = scene.getEngine().isWebGPU ? 4 : 6;
-      }
-    }
+    applyPracticalPoolLightBudget(scene);
   }
 
   return pools;
+}
+
+// Every material evaluates this many lights per fragment. 12 was the top of
+// the budget; 6 (four rig lights + the two nearest scoped pools/spills)
+// roughly halves the lighting shader cost with little visible loss, since
+// distant pools contribute almost nothing. WebGPU: each effect light costs a
+// vertex-stage uniform buffer and the device limit is 12 total (3 base + 5
+// fixed + N lights), so the budget there is 4 - which still covers hemi +
+// key + the two nearest pools since rim/fill are disabled under WebGPU.
+//
+// Exported so callers can re-run it after any rig that creates lit materials
+// AFTER this rig ran (e.g. the production-surface screens) - those materials
+// are created holding Babylon's default of 4, which is below the WebGL
+// budget of 6 and would otherwise starve the practical pools that
+// trimMeshLightBudget scopes to them.
+export function applyPracticalPoolLightBudget(scene: Scene) {
+  const budget = scene.getEngine().isWebGPU ? 4 : 6;
+  for (const material of scene.materials) {
+    if ('maxSimultaneousLights' in material) {
+      material.maxSimultaneousLights = budget;
+    }
+  }
 }
 
 function createKeyShadowGenerator(scene: Scene, key: DirectionalLight) {
