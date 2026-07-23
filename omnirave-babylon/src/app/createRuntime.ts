@@ -250,6 +250,7 @@ export async function createRuntime(host: HTMLElement) {
       worldSocket?.dispose();
       remotePlayerRigs?.dispose();
       stageMediaPlayer?.dispose();
+      stageVisualizer?.dispose();
       cleanupOwnedResources();
       activeEngine.dispose();
     };
@@ -261,6 +262,7 @@ export async function createRuntime(host: HTMLElement) {
     let worldSocket: import('../network/worldSocket').WorldSocket | undefined;
     let remotePlayerRigs: import('../player/createRemotePlayerRigs').RemotePlayerRigs | undefined;
     let stageMediaPlayer: import('../media/stageMediaPlayer').StageMediaPlayer | undefined;
+    let stageVisualizer: import('../scene/createStageVisualizer').StageVisualizer | undefined;
     if (perfFlags.worldUrl && perfFlags.worldToken) {
       const [{ createWorldSocket }, { createRemotePlayerRigs }, { createStageMediaPlayer }] = await Promise.all([
         import('../network/worldSocket'),
@@ -277,6 +279,12 @@ export async function createRuntime(host: HTMLElement) {
         remotePlayerRigs?.applySnapshot(snapshot);
         const activeMedia = snapshot.zoneMedia.find((zone) => zone.zoneId === snapshot.activeZone) ?? null;
         stageMediaPlayer?.applyMedia(activeMedia);
+        // Drive the stage screen's event mode (countdown / fireworks video)
+        // from the active zone's scheduled event, if any.
+        const activeEvent = snapshot.zoneEvents.find((zone) => zone.zoneId === snapshot.activeZone) ?? null;
+        stageVisualizer?.setEventState(
+          activeEvent ? { phase: activeEvent.phase, countdownSeconds: activeEvent.countdownSeconds } : null,
+        );
       });
       worldSocket.onStatusChange((status) => {
         console.info(`[world] socket ${status}`);
@@ -292,6 +300,24 @@ export async function createRuntime(host: HTMLElement) {
         enterOverlay = undefined;
       });
     }
+
+    // The Main Stage screen visualizer. It runs in BOTH paths: with the stage
+    // media player (world/music path) it reacts to the live synced audio; in
+    // the single-player review path there is no player, so it reads a zero
+    // spectrum and shows an idle shimmer instead of crashing. Frequency data
+    // is pulled lazily each frame, so it picks up the media player as soon as
+    // that path has constructed one.
+    const { createStageVisualizer } = await import('../scene/createStageVisualizer');
+    stageVisualizer = createStageVisualizer(scene, {
+      getFrequencyData: (target) => {
+        if (stageMediaPlayer) {
+          stageMediaPlayer.getFrequencyData(target);
+        } else {
+          target.fill(0);
+        }
+      },
+    });
+    const activeStageVisualizer = stageVisualizer;
 
     const runtime = {
       canvas,
@@ -335,7 +361,9 @@ export async function createRuntime(host: HTMLElement) {
       if (worldSocket && playerPosition) {
         worldSocket.sendMove({ x: playerPosition.x, y: playerPosition.y, z: playerPosition.z });
       }
-      remotePlayerRigs?.update(activeEngine.getDeltaTime() / 1000);
+      const deltaSeconds = activeEngine.getDeltaTime() / 1000;
+      remotePlayerRigs?.update(deltaSeconds);
+      activeStageVisualizer.update(deltaSeconds);
       const playerController = playerRuntime?.playerController;
       if (playerReadout && playerPosition && playerController) {
         const state = playerRuntime?.reviewAvatar?.root.metadata?.animationState ?? playerController.animationState;

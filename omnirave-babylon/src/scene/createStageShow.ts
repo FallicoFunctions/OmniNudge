@@ -1,7 +1,6 @@
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { PointLight } from '@babylonjs/core/Lights/pointLight.js';
-import { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import type { Scene } from '@babylonjs/core/scene.js';
 
 export interface StageShowSummary {
@@ -30,11 +29,17 @@ function beatCurve(phase: number) {
   return Math.pow(Math.max(0, Math.sin(phase * Math.PI)), 3);
 }
 
-// Static LED screens and stage lighting was the venue's next "dead" tell:
-// the hero panels and spill lights never changed frame to frame. This module
-// drives a continuous, deterministic beat-synced show at 126 BPM across the
-// hero screens, their spill lights, and the side LED decks - all found by
-// name so it stays fully decoupled from whatever builds the stage meshes.
+// Static stage lighting was the venue's "dead" tell: the spill lights and LED
+// decks never changed frame to frame. This module drives a continuous,
+// deterministic beat-synced show at 126 BPM across the hero-screen spill
+// lights and the side LED decks - all found by name so it stays fully
+// decoupled from whatever builds the stage meshes.
+//
+// The hero SCREEN CONTENT itself is NOT driven here: createStageVisualizer
+// owns the hero panels' material (an audio-reactive visualizer). This module
+// still counts the panels for its summary and drives their spill lights, but
+// deliberately never touches the panel materials, so the two systems never
+// fight over the same surface.
 export function createStageShow(scene: Scene): StageShowSummary {
   const heroScreens = [
     scene.getMeshByName('main-stage-hero-screen-panel-l'),
@@ -63,13 +68,9 @@ export function createStageShow(scene: Scene): StageShowSummary {
     return summary;
   }
 
-  // --- hero screens: unfreeze + capture base state -------------------------
-  const screenMaterials = heroScreens
-    .map((mesh) => mesh.material)
-    .filter((material): material is PBRMaterial => material instanceof PBRMaterial);
-  for (const material of screenMaterials) {
-    material.unfreeze?.();
-  }
+  // Hero-panel materials are intentionally left untouched: createStageVisualizer
+  // owns their content (the audio-reactive screen). We keep the `heroScreens`
+  // lookup only to report the panel count in the summary.
 
   // --- spill lights: unfreeze (lights have no frozen state, but their
   // materials/scene may) + capture base intensity and colours ---------------
@@ -97,17 +98,7 @@ export function createStageShow(scene: Scene): StageShowSummary {
     const beatPhase = beatPosition % 1;
     const curve = beatCurve(beatPhase);
 
-    // 1. hero screens: intensity pulse + slow texture drift
-    for (const material of screenMaterials) {
-      material.emissiveIntensity = 7.5 + 2 * curve;
-      const texture = material.emissiveTexture;
-      if (texture instanceof Texture) {
-        texture.uOffset = (texture.uOffset + dt * 0.02) % 1;
-        texture.vOffset = (texture.vOffset + dt * 0.008) % 1;
-      }
-    }
-
-    // 2. spill lights: pulse intensity in sync with the beat
+    // 1. spill lights: pulse intensity in sync with the beat
     for (let i = 0; i < spillLights.length; i++) {
       spillLights[i].intensity = spillBaseIntensity[i] * (0.7 + 0.5 * curve);
     }
@@ -130,7 +121,7 @@ export function createStageShow(scene: Scene): StageShowSummary {
       }
     }
 
-    // 3. side LED decks: subtle half-beat pulse, phase-offset per side so
+    // 2. side LED decks: subtle half-beat pulse, phase-offset per side so
     // the decks answer each other (L on the beat, R on the off-beat)
     const halfBeatPhase = (beatPosition * 2) % 1;
     const rOffsetPhase = (halfBeatPhase + 0.5) % 1;

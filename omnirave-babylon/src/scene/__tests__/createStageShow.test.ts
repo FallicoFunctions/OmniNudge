@@ -77,31 +77,25 @@ describe('createStageShow', () => {
     expect(summary.spillLights).toBe(2);
     expect(summary.ledDecks).toBe(1);
 
-    const heroMaterialL = scene.getMeshByName('main-stage-hero-screen-panel-l')?.material as PBRMaterial;
-    const heroMaterialR = scene.getMeshByName('main-stage-hero-screen-panel-r')?.material as PBRMaterial;
     const deckMaterial = scene.getMeshByName('V31_SideLedTileField_L')?.material as PBRMaterial;
-    expect(heroMaterialL.isFrozen).toBe(false);
-    expect(heroMaterialR.isFrozen).toBe(false);
     expect(deckMaterial.isFrozen).toBe(false);
   });
 
-  it('pulses hero screen emissiveIntensity across rendered frames', () => {
+  it('leaves the hero-screen panel materials untouched (createStageVisualizer owns them)', () => {
     const scene = buildStageScene();
     createStageShow(scene);
 
+    // The hero panel content is now driven by createStageVisualizer. This
+    // module must NOT animate or even unfreeze the panel materials, so the two
+    // systems never fight over the same surface. The setup froze them; they
+    // must stay frozen and steady across rendered frames.
     const material = scene.getMeshByName('main-stage-hero-screen-panel-l')?.material as PBRMaterial;
-    const values = new Set<string>();
+    expect(material.isFrozen).toBe(true);
+    const before = material.emissiveIntensity;
     for (let i = 0; i < 20; i++) {
       scene.render();
-      values.add(material.emissiveIntensity.toFixed(6));
     }
-
-    expect(values.size).toBeGreaterThan(1);
-    for (const value of values) {
-      const intensity = Number(value);
-      expect(intensity).toBeGreaterThanOrEqual(5.4);
-      expect(intensity).toBeLessThanOrEqual(9.6);
-    }
+    expect(material.emissiveIntensity).toBe(before);
   });
 
   it('pulses spill light intensity across rendered frames', () => {
