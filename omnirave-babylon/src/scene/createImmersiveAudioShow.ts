@@ -1,5 +1,12 @@
+// Side-effect import: augments Mesh.prototype with thinInstance* methods. MUST
+// live in this module - the app bundle tree-shakes per-module, so a missing
+// import here means no thinInstanceSetBuffer and a silent in-browser failure
+// while vitest (which imports the whole tree) still passes.
+import '@babylonjs/core/Meshes/thinInstanceMesh.js';
+
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Color4 } from '@babylonjs/core/Maths/math.color.js';
+import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture.js';
 import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
@@ -9,62 +16,75 @@ import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { RawTexture } from '@babylonjs/core/Materials/Textures/rawTexture.js';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
+import { VertexBuffer } from '@babylonjs/core/Buffers/buffer.js';
 import type { Scene } from '@babylonjs/core/scene';
 
 import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
+import {
+  LASER_PATTERNS,
+  advancePhase,
+  nextPhraseIndex,
+  organicDrift,
+  selectPattern,
+} from './laserPatterns';
+import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor } from './ravePalettes';
+import type { RaveColor } from './ravePalettes';
 
 // The venue-wide IMMERSIVE audio show: where createStageVisualizer is a
 // surface you look AT, this module fills the space the player stands INSIDE.
-// Four layers, all driven by the same live frequency spectrum as the screen:
-//   1. Ten moving-head beam cones on the truss line, sweeping over the crowd.
-//   2. Four laser fans (7 blades each) slicing across the venue overhead.
-//   3. A reactive dust/air particle field spanning the whole crowd volume.
-//   4. A bass-thump floor glow hugging the promenade/pit ground.
-// Everything follows the venue material law: PBRMaterial only (StandardMaterial
-// renders flat white in this pipeline), emissive + albedo-black +
-// disableLighting for self-lit surfaces, low alpha for glow volumes.
+// Layers, all driven by the same live frequency spectrum as the screen and all
+// pulling color from one crossfaded rave palette so the venue stays color
+// coherent while varying over the track:
+//   1. Volumetric moving-head cone beams on truss / wings / crown.
+//   2. A DENSE thin-instanced laser field (~700 beams) mounted at the crown
+//      spire, both side wings and the truss, firing beat/phrase-synced fan,
+//      sky-shaft, cross-hatch, mandala and converging patterns with organic
+//      drift on top.
+//   3. A reactive dust/air particle field over the crowd.
+//   4. A bass-thump floor glow on the pit ground.
+// Venue material law: PBRMaterial only (StandardMaterial renders flat white in
+// this pipeline); self-lit = emissive + albedo-black + disableLighting; unlit
+// colored (per-instance) = unlit + white albedo + a white COLOR vertex buffer;
+// additive glow = low alpha + ALPHA_ADD blend.
 
-// Spectrum shape: the stage media player's analyser is a 256-point FFT ->
-// 128 byte bins.
+// Spectrum shape: the stage media player's analyser is a 256-point FFT -> 128
+// byte bins. Band split (inclusive starts, exclusive ends): bass 0-10, mids
+// 11-60, highs 61-127.
 const FREQ_BIN_COUNT = 128;
-// Band split (inclusive starts, exclusive ends): bass 0-10, mids 11-60,
-// highs 61-127.
 const BASS_END = 11;
 const MIDS_END = 61;
 
 // Bass punch detector: a raw reading this far above the smoothed level is a
-// hit; the impulse decays back to zero over ~0.2s.
+// hit; the impulse decays back to zero over PUNCH_DECAY_SECONDS. A STRONG hit
+// (raw over STRONG_PUNCH) additionally fires the venue-wide beat flash and can
+// advance the phrase / jump the palette.
 const PUNCH_RATIO = 1.25;
 const PUNCH_FLOOR = 0.12;
-const PUNCH_DECAY_SECONDS = 0.2;
+const PUNCH_DECAY_SECONDS = 0.25;
+const STRONG_PUNCH = 0.35;
+// Fast attack (~40ms) so a kick reads instantly; decay handled by the impulse.
+const PUNCH_ATTACK_SECONDS = 0.04;
+// Venue-wide beat flash: a strong kick briefly boosts ALL emitters together.
+const BEAT_FLASH_DECAY_SECONDS = 0.12;
+const BEAT_FLASH_BOOST = 0.85;
 
-// --- Layer 1: moving-head beams -------------------------------------------
-const BEAM_COUNT = 10;
-const BEAM_MOUNT_Y = 24;
-const BEAM_MOUNT_Z = 8;
-const BEAM_SPREAD_X = 14; // mounts run x -14..14 along the truss line
-const BEAM_LENGTH = 30;
-const BEAM_BASE_INTENSITY = 2;
-const BEAM_PUNCH_INTENSITY = 8;
+// --- Layer 1: cone beams (moving heads) -----------------------------------
+// Reactivity amplification: idle ~0.6, music-base ~2, bass-punch peak ~10.
+const CONE_IDLE_INTENSITY = 0.6;
+const CONE_BASE_INTENSITY = 2;
+const CONE_PEAK_INTENSITY = 10;
+const CONE_LENGTH = 30;
 
-// --- Layer 2: laser fans ---------------------------------------------------
-const LASER_BLADES_PER_FAN = 7;
-const LASER_BLADE_LENGTH = 45;
-const LASER_BLADE_THICKNESS = 0.06;
-// Two emitters per side wall; each aims into the venue at its own base yaw so
-// the four fans cross over the crowd rather than stacking.
-const LASER_EMITTERS = [
-  { x: -14, y: 12, z: 12, targetX: 6, targetZ: -20 },
-  { x: -14, y: 12, z: 12, targetX: 10, targetZ: -40 },
-  { x: 14, y: 12, z: 12, targetX: -6, targetZ: -20 },
-  { x: 14, y: 12, z: 12, targetX: -10, targetZ: -40 },
-] as const;
-// Far-end sweep heights ~4..14m at 45m throw: tilt (parent rotation.z, which
-// pitches the +x blade axis before the yaw applies) stays inside this window
-// so blades pass dramatically overhead but never park at eye level.
-const LASER_TILT_CENTER = -0.067;
-const LASER_TILT_AMPLITUDE = 0.11;
+// --- Layer 2: thin-instanced laser field ----------------------------------
+// One base thin box beam, hundreds of thin instances. BEAMS_PER_EMITTER gates
+// the total for easy perf tuning: 25 emitters x 28 = 700 beams in one draw.
+const BEAMS_PER_EMITTER = 28;
+const BEAM_THICKNESS = 0.05;
+const LASER_IDLE_INTENSITY = 0.28;
+const LASER_DRIFT_AMPLITUDE = 0.09; // low-amplitude organic wander (radians)
+// Palette color lookup resolution for the beam field (per-frame refilled).
+const PALETTE_LUT_SIZE = 24;
 
 // --- Layer 3: reactive air -------------------------------------------------
 const AIR_CAPACITY = 400;
@@ -79,9 +99,13 @@ const FLOOR_DEPTH = 36; // z -8..-44
 const FLOOR_CENTER_Z = -26;
 const FLOOR_Y = 0.08; // above the ground plane so it never z-fights
 
-// Venue identity neon, matching createStageVisualizer / createStageShow.
-const MAGENTA = new Color3(233 / 255, 42 / 255, 214 / 255);
-const CYAN = new Color3(34 / 255, 205 / 255, 240 / 255);
+// --- Palette cycling -------------------------------------------------------
+const PALETTE_CYCLE_SECONDS = 22;
+const PALETTE_FADE_SECONDS = 2;
+// Slow rotation of the palette sampling window so a single palette still drifts.
+const PALETTE_PHASE_SPEED = 0.03;
+// Debounce palette jumps triggered by strong bass hits.
+const PALETTE_JUMP_COOLDOWN = 3;
 
 export interface ImmersiveAudioShowOptions {
   // Fills the passed array with the current byte frequency spectrum (same
@@ -101,8 +125,19 @@ export interface ImmersiveAudioShow {
   // Smoothed bass energy 0..1 (punch-boosted), or null when no audio is
   // present (idle/single-player) - feeds createStageShow.setAudioEnergy.
   readonly bassLevel: number | null;
+  // Cone moving-head count.
   readonly beams: number;
+  // Total thin-instanced laser beams (the dense field).
   readonly laserBlades: number;
+  // Current venue-wide beat-flash envelope (0..1), for diagnostics/tests.
+  readonly beatFlash: number;
+  // Current global laser brightness scalar, for diagnostics/tests.
+  readonly laserIntensity: number;
+  // A primitive sampled from the current crossfaded palette (0..1); shifts as
+  // the palette cycles/crossfades over time.
+  readonly currentColorR: number;
+  readonly currentColorG: number;
+  readonly currentColorB: number;
 }
 
 // Guarded DynamicTexture factory: NullEngine / jsdom-without-canvas has no 2D
@@ -140,9 +175,8 @@ function tryCreateGradientTexture(
   }
 }
 
-// Soft radial dot sprite for the air particles - same null-safe RawTexture
-// recipe as createCompletionCelebration's firework sprite, in neutral white so
-// the per-particle color carries the venue identity.
+// Soft radial dot sprite for the air particles - null-safe RawTexture in
+// neutral white so the per-particle color carries the venue identity.
 function tryCreateAirSprite(scene: Scene): RawTexture | null {
   let texture: RawTexture | null = null;
   try {
@@ -178,7 +212,7 @@ function tryCreateAirSprite(scene: Scene): RawTexture | null {
 function createGlowMaterial(scene: Scene, name: string, color: Color3, alpha: number): PBRMaterial {
   const material = new PBRMaterial(name, scene);
   material.emissiveColor = color;
-  material.emissiveIntensity = BEAM_BASE_INTENSITY;
+  material.emissiveIntensity = CONE_BASE_INTENSITY;
   material.albedoColor = new Color3(0, 0, 0);
   material.metallic = 0;
   material.roughness = 1;
@@ -195,7 +229,25 @@ const NOOP_SHOW: ImmersiveAudioShow = {
   bassLevel: null,
   beams: 0,
   laserBlades: 0,
+  beatFlash: 0,
+  laserIntensity: 0,
+  currentColorR: 0,
+  currentColorG: 0,
+  currentColorB: 0,
 };
+
+// A laser emitter: a physical mount point with a base aim (yaw/pitch) into the
+// crowd or sky, plus a per-beam length and a noise seed. Patterns add angular
+// offsets on top of this base aim.
+interface LaserEmitter {
+  x: number;
+  y: number;
+  z: number;
+  baseYaw: number;
+  basePitch: number;
+  length: number;
+  seed: number;
+}
 
 export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioShowOptions): ImmersiveAudioShow {
   if (scene.getMeshByName(VENUE_SENTINEL_MESH) == null) {
@@ -203,93 +255,190 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     return NOOP_SHOW;
   }
 
-  // --- Layer 1: beam cones -------------------------------------------------
-  const beamMagentaMaterial = createGlowMaterial(scene, 'immersive-beam-magenta', MAGENTA, 0.22);
-  const beamCyanMaterial = createGlowMaterial(scene, 'immersive-beam-cyan', CYAN, 0.22);
+  // --- Palette state: two shared cone materials recolored per frame --------
+  const paletteScratchFrom: RaveColor = { r: 0, g: 0, b: 0 };
+  const paletteScratchTo: RaveColor = { r: 0, g: 0, b: 0 };
+  // Per-frame color lookup across t01 for the blended (crossfaded) palette.
+  const paletteLut = new Float32Array(PALETTE_LUT_SIZE * 3);
+  let paletteClock = 0; // advances with dt; kicked forward on palette jumps
+  let paletteJumpCooldown = 0;
+
+  // Sample the CURRENT crossfaded palette at t01/phase into `out` (0..1).
+  function sampleCurrentPalette(t01: number, phase: number, out: RaveColor): void {
+    const fade = paletteCrossfade(paletteClock, PALETTE_CYCLE_SECONDS, PALETTE_FADE_SECONDS, RAVE_PALETTES.length);
+    resolvePaletteColor(RAVE_PALETTES[fade.fromIndex], t01, phase, paletteScratchFrom);
+    resolvePaletteColor(RAVE_PALETTES[fade.toIndex], t01, phase, paletteScratchTo);
+    const m = fade.mix;
+    out.r = paletteScratchFrom.r + (paletteScratchTo.r - paletteScratchFrom.r) * m;
+    out.g = paletteScratchFrom.g + (paletteScratchTo.g - paletteScratchFrom.g) * m;
+    out.b = paletteScratchFrom.b + (paletteScratchTo.b - paletteScratchFrom.b) * m;
+  }
+
+  // Jump straight into the next crossfade (big-bass event / active mode).
+  function jumpPalette(): void {
+    const cycleIndex = Math.floor(paletteClock / PALETTE_CYCLE_SECONDS);
+    paletteClock = (cycleIndex + 1) * PALETTE_CYCLE_SECONDS - PALETTE_FADE_SECONDS + 0.01;
+    paletteJumpCooldown = PALETTE_JUMP_COOLDOWN;
+  }
+
+  // --- Layer 1: cone beams -------------------------------------------------
+  const coneMaterialA = createGlowMaterial(scene, 'immersive-beam-mat-a', new Color3(1, 0.4, 0.1), 0.22);
+  const coneMaterialB = createGlowMaterial(scene, 'immersive-beam-mat-b', new Color3(0.2, 0.6, 1), 0.22);
 
   // Vertical falloff so each cone reads as a light beam (bright at the head,
   // fading toward the floor) rather than a solid tent. Shared by both colors.
   const beamGradient = tryCreateGradientTexture(scene, 'immersive-beam-gradient', 8, 128, (ctx, w, h) => {
     const gradient = ctx.createLinearGradient(0, 0, 0, h);
-    // v=1 is the cylinder top (the fixture head) - keep it brightest.
     gradient.addColorStop(0, 'rgba(255,255,255,0.05)');
     gradient.addColorStop(1, 'rgba(255,255,255,0.9)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, w, h);
   });
   if (beamGradient) {
-    beamMagentaMaterial.opacityTexture = beamGradient;
-    beamCyanMaterial.opacityTexture = beamGradient;
+    coneMaterialA.opacityTexture = beamGradient;
+    coneMaterialB.opacityTexture = beamGradient;
   }
 
-  const beamMounts: TransformNode[] = [];
-  const beamCones: Mesh[] = [];
-  const beamPhase = new Float32Array(BEAM_COUNT);
-  const beamXNorm = new Float32Array(BEAM_COUNT);
-  const beamRotX = new Float32Array(BEAM_COUNT);
-  const beamRotZ = new Float32Array(BEAM_COUNT);
-  for (let i = 0; i < BEAM_COUNT; i++) {
-    const xNorm = (i / (BEAM_COUNT - 1)) * 2 - 1; // -1..1
+  // Cone mount points spread far beyond the truss: 8 over-crowd truss heads,
+  // 6 on the side wings (3 per side), 4 low on the crown figurehead.
+  interface ConeMount {
+    x: number;
+    y: number;
+    z: number;
+  }
+  const coneMountPoints: ConeMount[] = [];
+  for (let i = 0; i < 8; i++) {
+    coneMountPoints.push({ x: (i / 7) * 28 - 14, y: 24, z: 8 }); // truss x -14..14
+  }
+  for (const sx of [20, 35, 50]) {
+    coneMountPoints.push({ x: sx, y: 12, z: 7 });
+    coneMountPoints.push({ x: -sx, y: 12, z: 7 });
+  }
+  coneMountPoints.push({ x: 6, y: 34, z: 44 });
+  coneMountPoints.push({ x: -6, y: 34, z: 44 });
+  coneMountPoints.push({ x: 6, y: 52, z: 44 });
+  coneMountPoints.push({ x: -6, y: 52, z: 44 });
+
+  const CONE_COUNT = coneMountPoints.length;
+  const coneMounts: TransformNode[] = [];
+  const coneMeshes: Mesh[] = [];
+  const conePhase = new Float32Array(CONE_COUNT);
+  const coneXNorm = new Float32Array(CONE_COUNT);
+  const coneRotX = new Float32Array(CONE_COUNT);
+  const coneRotZ = new Float32Array(CONE_COUNT);
+  for (let i = 0; i < CONE_COUNT; i++) {
+    const p = coneMountPoints[i];
+    const xNorm = p.x / 14; // roughly -1..1 across the truss span
     const mount = new TransformNode(`immersive-beam-mount-${i}`, scene);
-    mount.position.set(xNorm * BEAM_SPREAD_X, BEAM_MOUNT_Y, BEAM_MOUNT_Z);
+    mount.position.set(p.x, p.y, p.z);
     const cone = MeshBuilder.CreateCylinder(
       `immersive-beam-${i}`,
-      {
-        diameterTop: 0.35,
-        diameterBottom: 4.5,
-        height: BEAM_LENGTH,
-        tessellation: 16,
-        cap: Mesh.NO_CAP,
-      },
+      { diameterTop: 0.35, diameterBottom: 4.5, height: CONE_LENGTH, tessellation: 16, cap: Mesh.NO_CAP },
       scene,
     );
     cone.parent = mount;
-    cone.position.y = -BEAM_LENGTH / 2; // hang below the mount pivot
-    cone.material = i % 2 === 0 ? beamMagentaMaterial : beamCyanMaterial;
+    cone.position.y = -CONE_LENGTH / 2; // hang below the mount pivot
+    cone.material = i % 2 === 0 ? coneMaterialA : coneMaterialB;
     cone.isPickable = false;
-    beamMounts.push(mount);
-    beamCones.push(cone);
-    beamPhase[i] = i * 0.7;
-    beamXNorm[i] = xNorm;
-    // Start aimed at the crowd (matches the normal-mode rest pose).
-    beamRotX[i] = 0.55;
-    beamRotZ[i] = 0;
+    coneMounts.push(mount);
+    coneMeshes.push(cone);
+    conePhase[i] = i * 0.7;
+    coneXNorm[i] = xNorm;
+    coneRotX[i] = 0.55; // aimed at the crowd (normal rest pose)
+    coneRotZ[i] = 0;
   }
 
-  // --- Layer 2: laser fans -------------------------------------------------
-  const laserCyanMaterial = createGlowMaterial(scene, 'immersive-laser-cyan', CYAN, 0.55);
-  const laserMagentaMaterial = createGlowMaterial(scene, 'immersive-laser-magenta', MAGENTA, 0.55);
-  laserCyanMaterial.emissiveIntensity = 3;
-  laserMagentaMaterial.emissiveIntensity = 3;
+  // --- Layer 2: thin-instanced laser field ---------------------------------
+  // Build the emitter set. Aim each emitter with atan2 so the pattern offsets
+  // ride on a sensible base direction (into the crowd / up into the sky).
+  const emitters: LaserEmitter[] = [];
+  function pushEmitter(x: number, y: number, z: number, tx: number, ty: number, tz: number, length: number): void {
+    const dx = tx - x;
+    const dy = ty - y;
+    const dz = tz - z;
+    const horiz = Math.hypot(dx, dz) || 1e-4;
+    emitters.push({
+      x,
+      y,
+      z,
+      // Beam local +x maps to (cos yaw, 0, -sin yaw) horizontally, so this yaw
+      // aims at the target; pitch lifts via sin.
+      baseYaw: Math.atan2(-dz, dx),
+      basePitch: Math.atan2(dy, horiz),
+      length,
+      seed: emitters.length * 1.7 + 0.3,
+    });
+  }
+  // (a) Crown figurehead column: 5 emitters climbing the spire, firing sky
+  // shafts up + curtains down over the crowd.
+  for (const cy of [30, 42, 54, 66, 78]) {
+    pushEmitter(0, cy, 45, 0, 6, -26, 72);
+  }
+  // (b) Side wings: 6 emitters per side across x 16..58 at z~7, stepping up in
+  // y, firing across / over the crowd.
+  const wingXs = [16, 24.4, 32.8, 41.2, 49.6, 58];
+  for (let k = 0; k < wingXs.length; k++) {
+    const wy = 8 + (k / (wingXs.length - 1)) * 8; // 8..16
+    pushEmitter(wingXs[k], wy, 7, 0, 9, -26, 55);
+    pushEmitter(-wingXs[k], wy, 7, 0, 9, -26, 55);
+  }
+  // (c) Over-crowd truss: 8 emitters firing down over the crowd volume.
+  for (let i = 0; i < 8; i++) {
+    pushEmitter((i / 7) * 28 - 14, 24, 8, 0, 4, -26, 34);
+  }
 
-  const laserFans: TransformNode[] = [];
-  const laserBlades: Mesh[] = [];
-  const laserBaseYaw = new Float32Array(LASER_EMITTERS.length);
-  const laserEmitterPhase = new Float32Array(LASER_EMITTERS.length);
-  // Blade offset baked into the vertices so each blade's local origin IS the
-  // emitter: child rotation.y then fans the blades around the emitter point.
-  const bladeOffset = Matrix.Translation(LASER_BLADE_LENGTH / 2, 0, 0);
-  for (let e = 0; e < LASER_EMITTERS.length; e++) {
-    const emitter = LASER_EMITTERS[e];
-    const fan = new TransformNode(`immersive-laser-fan-${e}`, scene);
-    fan.position.set(emitter.x, emitter.y, emitter.z);
-    // .rotation.y maps local +x to (cos yaw, 0, -sin yaw): aim at the target.
-    laserBaseYaw[e] = Math.atan2(-(emitter.targetZ - emitter.z), emitter.targetX - emitter.x);
-    laserEmitterPhase[e] = e * 1.4;
-    laserFans.push(fan);
-    for (let b = 0; b < LASER_BLADES_PER_FAN; b++) {
-      const blade = MeshBuilder.CreateBox(
-        `immersive-laser-blade-${e}-${b}`,
-        { width: LASER_BLADE_LENGTH, height: LASER_BLADE_THICKNESS, depth: LASER_BLADE_THICKNESS },
-        scene,
-      );
-      blade.bakeTransformIntoVertices(bladeOffset);
-      blade.parent = fan;
-      blade.material = emitter.x < 0 ? laserCyanMaterial : laserMagentaMaterial;
-      blade.isPickable = false;
-      laserBlades.push(blade);
+  const EMITTER_COUNT = emitters.length;
+  const BEAM_TOTAL = EMITTER_COUNT * BEAMS_PER_EMITTER;
+
+  // One base thin box: width 1 (scaled per-instance to the emitter's length),
+  // thin in y/z. Baked so the near end sits at local x=0 (the emitter pivot).
+  const beamMesh = MeshBuilder.CreateBox(
+    'immersive-laser-beam',
+    { width: 1, height: BEAM_THICKNESS, depth: BEAM_THICKNESS },
+    scene,
+  );
+  beamMesh.bakeTransformIntoVertices(Matrix.Translation(0.5, 0, 0));
+  beamMesh.isPickable = false;
+  beamMesh.alwaysSelectAsActiveMesh = true;
+  // PBR unlit + additive: per-instance color IS the beam color; low-alpha
+  // additive blend gives the volumetric laser glow.
+  const beamMaterial = new PBRMaterial('immersive-laser-beam-material', scene);
+  beamMaterial.unlit = true;
+  beamMaterial.albedoColor = new Color3(1, 1, 1);
+  beamMaterial.alpha = 0.6;
+  beamMaterial.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+  beamMaterial.alphaMode = Constants.ALPHA_ADD;
+  beamMaterial.backFaceCulling = false;
+  beamMesh.material = beamMaterial;
+  // White COLOR vertex buffer so the vertex-color shader define compiles and
+  // the thin-instance color attribute actually reaches the shader.
+  {
+    const positions = beamMesh.getVerticesData(VertexBuffer.PositionKind);
+    if (positions) {
+      const whiteColors = new Float32Array((positions.length / 3) * 4).fill(1);
+      beamMesh.setVerticesData(VertexBuffer.ColorKind, whiteColors, false, 4);
     }
   }
+
+  // Preallocated per-instance buffers, mutated in place every frame.
+  const beamMatrices = new Float32Array(BEAM_TOTAL * 16);
+  const beamColors = new Float32Array(BEAM_TOTAL * 4);
+  // Precompute the static parts of every matrix (translation to the emitter,
+  // alpha=1) so the per-frame loop only writes the 3x3 rotation basis.
+  for (let e = 0; e < EMITTER_COUNT; e++) {
+    const em = emitters[e];
+    for (let b = 0; b < BEAMS_PER_EMITTER; b++) {
+      const g = e * BEAMS_PER_EMITTER + b;
+      const o = g * 16;
+      beamMatrices[o + 12] = em.x;
+      beamMatrices[o + 13] = em.y;
+      beamMatrices[o + 14] = em.z;
+      beamMatrices[o + 15] = 1;
+      beamColors[g * 4 + 3] = 1;
+    }
+  }
+  beamMesh.thinInstanceSetBuffer('matrix', beamMatrices, 16, false);
+  beamMesh.thinInstanceSetBuffer('color', beamColors, 4, false);
 
   // --- Layer 3: reactive air ----------------------------------------------
   const airSprite = tryCreateAirSprite(scene);
@@ -308,15 +457,15 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
   airParticles.maxSize = 0.18;
   airParticles.emitRate = AIR_BASE_RATE;
   airParticles.blendMode = ParticleSystem.BLENDMODE_ADD;
-  // Magenta and cyan motes with a whitish blend between them.
-  airParticles.color1 = new Color4(MAGENTA.r, MAGENTA.g, MAGENTA.b, 0.85);
-  airParticles.color2 = new Color4(CYAN.r, CYAN.g, CYAN.b, 0.85);
+  // Colors are (re)assigned every frame from the current palette.
+  airParticles.color1 = new Color4(1, 0.4, 0.1, 0.85);
+  airParticles.color2 = new Color4(0.2, 0.6, 1, 0.85);
   airParticles.colorDead = new Color4(1, 1, 1, 0);
   airParticles.isLocal = false;
   airParticles.start();
 
   // --- Layer 4: bass floor pulse ------------------------------------------
-  const floorMaterial = createGlowMaterial(scene, 'immersive-floor-pulse-material', MAGENTA, 0.3);
+  const floorMaterial = createGlowMaterial(scene, 'immersive-floor-pulse-material', new Color3(1, 0.4, 0.1), 0.3);
   floorMaterial.emissiveIntensity = 0.7;
   const floorGradient = tryCreateGradientTexture(scene, 'immersive-floor-gradient', 128, 128, (ctx, w, h) => {
     const gradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
@@ -328,31 +477,46 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
   if (floorGradient) {
     floorMaterial.opacityTexture = floorGradient;
   }
-  const floorPulse = MeshBuilder.CreateGround(
-    'immersive-floor-pulse',
-    { width: FLOOR_WIDTH, height: FLOOR_DEPTH },
-    scene,
-  );
+  const floorPulse = MeshBuilder.CreateGround('immersive-floor-pulse', { width: FLOOR_WIDTH, height: FLOOR_DEPTH }, scene);
   floorPulse.position.set(0, FLOOR_Y, FLOOR_CENTER_Z);
   floorPulse.material = floorMaterial;
   floorPulse.isPickable = false;
 
-  // --- Band analysis state (all preallocated - zero per-frame allocation) --
+  // --- Band analysis + animation state (all preallocated) -----------------
   const freqData = new Uint8Array(FREQ_BIN_COUNT);
+  const coneColorScratch: RaveColor = { r: 0, g: 0, b: 0 };
   let bass = 0;
   let mids = 0;
   let highs = 0;
-  let punch = 0;
+  let punch = 0; // raw impulse, decays over PUNCH_DECAY_SECONDS
+  let punchEnv = 0; // attack-smoothed impulse used for intensity
+  let beatFlash = 0; // venue-wide flash envelope
   let audioPresent = false;
   let elapsed = 0;
-  let sweepPhase = 0;
+  let coneSweepPhase = 0;
   let laserPhase = 0;
   let mode: StageVisualizerMode = 'normal';
+
+  // Phrase switching for the laser patterns.
+  let phraseIndex = 0;
+  let phraseTimer = 0;
+  let bassEventAccum = 0;
+
+  // Exposed diagnostics (updated each frame).
+  let laserIntensityValue = LASER_IDLE_INTENSITY;
+  let currentColorR = 0;
+  let currentColorG = 0;
+  let currentColorB = 0;
 
   function update(dtSeconds: number): void {
     const dt = dtSeconds > 0 ? dtSeconds : 0;
     elapsed += dt;
+    paletteClock += dt;
+    if (paletteJumpCooldown > 0) {
+      paletteJumpCooldown = Math.max(0, paletteJumpCooldown - dt);
+    }
 
+    // --- spectrum + band split ---
     options.getFrequencyData(freqData);
     let bassSum = 0;
     let midSum = 0;
@@ -374,11 +538,26 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
 
     // Punch detection BEFORE smoothing absorbs this frame's hit.
     let punchBurst = false;
+    let strongBurst = false;
     if (audioPresent && bassRaw > PUNCH_FLOOR && bassRaw > bass * PUNCH_RATIO && punch <= 0.2) {
       punch = 1;
       punchBurst = true;
+      strongBurst = bassRaw > STRONG_PUNCH;
     } else {
       punch = Math.max(0, punch - dt / PUNCH_DECAY_SECONDS);
+    }
+    // Attack-smoothed envelope: chase punch up quickly (~40ms), follow it down.
+    if (punch > punchEnv) {
+      const attack = 1 - Math.exp(-dt / PUNCH_ATTACK_SECONDS);
+      punchEnv += (punch - punchEnv) * attack;
+    } else {
+      punchEnv = punch;
+    }
+    // Venue-wide beat flash on a strong kick.
+    if (strongBurst) {
+      beatFlash = 1;
+    } else {
+      beatFlash = Math.max(0, beatFlash - dt / BEAT_FLASH_DECAY_SECONDS);
     }
 
     const blendBass = Math.min(1, dt * 12);
@@ -389,55 +568,144 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
 
     const idle = !audioPresent && mode === 'normal';
     const active = mode === 'active';
+    const energyOverall = (bass + mids + highs) / 3;
+    const flashMul = 1 + beatFlash * BEAT_FLASH_BOOST;
 
-    // --- beams ---
+    // --- palette timeline ---
+    if ((strongBurst && paletteJumpCooldown <= 0) || (active && paletteJumpCooldown <= 0 && bassEventAccum === 0)) {
+      // Big bass event (or entering active) jumps to the next palette.
+      if (strongBurst) {
+        jumpPalette();
+      }
+    }
+    const colorPhase = elapsed * PALETTE_PHASE_SPEED;
+    // Refill the beam palette LUT for this frame's crossfaded palette.
+    for (let k = 0; k < PALETTE_LUT_SIZE; k++) {
+      const t = k / (PALETTE_LUT_SIZE - 1);
+      sampleCurrentPalette(t, colorPhase, coneColorScratch);
+      paletteLut[k * 3 + 0] = coneColorScratch.r;
+      paletteLut[k * 3 + 1] = coneColorScratch.g;
+      paletteLut[k * 3 + 2] = coneColorScratch.b;
+    }
+    // Representative current color (exposed primitive) from the LUT midpoint.
+    currentColorR = paletteLut[6 * 3 + 0];
+    currentColorG = paletteLut[6 * 3 + 1];
+    currentColorB = paletteLut[6 * 3 + 2];
+
+    // --- cone beams ---
     const sweepSpeed = mode === 'lead_in' ? 0.15 : active ? 2.2 : idle ? 0.3 : 0.7 + mids * 1.8;
-    sweepPhase += dt * sweepSpeed;
+    coneSweepPhase += dt * sweepSpeed;
     const rotBlend = Math.min(1, dt * (mode === 'lead_in' ? 2 : 7));
-    for (let i = 0; i < BEAM_COUNT; i++) {
+    for (let i = 0; i < CONE_COUNT; i++) {
       let targetX: number;
       let targetZ: number;
       if (mode === 'lead_in') {
-        // Converge upward toward the sky countdown: all cones flip to point
-        // up, leaning slightly toward the venue centerline, drifting slowly.
-        targetX = Math.PI;
-        targetZ = beamXNorm[i] * 0.15 + 0.06 * Math.sin(elapsed * 0.4 + beamPhase[i]);
+        targetX = Math.PI; // converge straight up toward the sky countdown
+        targetZ = coneXNorm[i] * 0.15 + 0.06 * Math.sin(elapsed * 0.4 + conePhase[i]);
       } else {
-        targetX = 0.55 + 0.3 * Math.sin(sweepPhase * 0.9 + beamPhase[i] * 1.7);
-        targetZ = 0.5 * Math.sin(sweepPhase + beamPhase[i]);
+        targetX = 0.55 + 0.3 * Math.sin(coneSweepPhase * 0.9 + conePhase[i] * 1.7);
+        targetZ = 0.5 * Math.sin(coneSweepPhase + conePhase[i]);
       }
-      beamRotX[i] += (targetX - beamRotX[i]) * rotBlend;
-      beamRotZ[i] += (targetZ - beamRotZ[i]) * rotBlend;
-      const mount = beamMounts[i];
-      mount.rotation.x = beamRotX[i];
-      mount.rotation.z = beamRotZ[i];
+      coneRotX[i] += (targetX - coneRotX[i]) * rotBlend;
+      coneRotZ[i] += (targetZ - coneRotZ[i]) * rotBlend;
+      const mount = coneMounts[i];
+      mount.rotation.x = coneRotX[i];
+      mount.rotation.z = coneRotZ[i];
     }
-    let beamIntensity: number;
+    let coneIntensity: number;
     if (mode === 'lead_in') {
-      beamIntensity = 2.5;
+      coneIntensity = 2.5;
     } else if (idle) {
-      beamIntensity = 1.3;
+      coneIntensity = CONE_IDLE_INTENSITY + 0.15 * (0.5 + 0.5 * Math.sin(elapsed * 0.8));
     } else {
-      const base = active ? 3.2 : BEAM_BASE_INTENSITY;
-      beamIntensity = base + (BEAM_PUNCH_INTENSITY - BEAM_BASE_INTENSITY) * punch;
+      const base = active ? 3.2 : CONE_BASE_INTENSITY;
+      coneIntensity = (base + (CONE_PEAK_INTENSITY - base) * punchEnv) * flashMul;
     }
-    beamMagentaMaterial.emissiveIntensity = beamIntensity;
-    beamCyanMaterial.emissiveIntensity = beamIntensity;
+    coneMaterialA.emissiveIntensity = coneIntensity;
+    coneMaterialB.emissiveIntensity = coneIntensity;
+    // Recolor the two cone materials from distinct palette positions.
+    coneMaterialA.emissiveColor.set(paletteLut[4 * 3 + 0], paletteLut[4 * 3 + 1], paletteLut[4 * 3 + 2]);
+    coneMaterialB.emissiveColor.set(paletteLut[18 * 3 + 0], paletteLut[18 * 3 + 1], paletteLut[18 * 3 + 2]);
 
-    // --- lasers ---
-    laserPhase += dt * (active ? 1.6 : idle || mode === 'lead_in' ? 0.25 : 0.45 + mids * 1.5);
-    const spreadStep = 0.025 + 0.055 * (idle ? 0.3 : mids) + (active ? 0.015 : 0);
-    for (let e = 0; e < laserFans.length; e++) {
-      const fan = laserFans[e];
-      fan.rotation.y = laserBaseYaw[e] + 0.3 * Math.sin(laserPhase + laserEmitterPhase[e]);
-      fan.rotation.z = LASER_TILT_CENTER + LASER_TILT_AMPLITUDE * Math.sin(laserPhase * 0.8 + laserEmitterPhase[e] * 1.3);
-      for (let b = 0; b < LASER_BLADES_PER_FAN; b++) {
-        laserBlades[e * LASER_BLADES_PER_FAN + b].rotation.y = (b - (LASER_BLADES_PER_FAN - 1) / 2) * spreadStep;
+    // --- laser field: phrase + pattern ---
+    // Advance the phrase on accumulated strong-bass events, or every ~8s.
+    phraseTimer += dt;
+    if (strongBurst) {
+      bassEventAccum += 1;
+    }
+    if (bassEventAccum >= 4 || phraseTimer >= 8) {
+      phraseIndex = nextPhraseIndex(phraseIndex);
+      phraseTimer = 0;
+      bassEventAccum = 0;
+    }
+    const patternFn = selectPattern(phraseIndex).fn;
+
+    // Phase advance: mids drive the sweep speed; idle/lead_in crawl.
+    const laserSpeed = mode === 'lead_in' ? 0.12 : active ? 1.5 : idle ? 0.15 : 0.4 + mids * 1.6;
+    laserPhase = advancePhase(laserPhase, dt, laserSpeed);
+    const driftPhase = elapsed * (0.3 + mids * 0.6);
+    const patternEnergy = idle ? 0.2 : Math.min(1, energyOverall + 0.2);
+
+    // Global laser brightness (reactivity amplified, beat-flashed).
+    if (idle) {
+      laserIntensityValue = LASER_IDLE_INTENSITY;
+    } else {
+      const base = active ? 1.2 : 0.8;
+      laserIntensityValue = (base + 1.4 * energyOverall + 1.5 * punchEnv) * flashMul;
+    }
+
+    for (let e = 0; e < EMITTER_COUNT; e++) {
+      const em = emitters[e];
+      const sx = em.length;
+      for (let b = 0; b < BEAMS_PER_EMITTER; b++) {
+        const g = e * BEAMS_PER_EMITTER + b;
+        const off = patternFn(e, b, BEAMS_PER_EMITTER, laserPhase, patternEnergy);
+        // Base aim + pattern offset + low-amplitude organic drift + beat accent.
+        const yaw =
+          em.baseYaw +
+          off.yaw +
+          LASER_DRIFT_AMPLITUDE * organicDrift(em.seed + b * 0.21, driftPhase) +
+          0.04 * punchEnv * Math.sin(g);
+        const pitch =
+          em.basePitch +
+          off.pitch +
+          LASER_DRIFT_AMPLITUDE * organicDrift(em.seed * 1.3 + b * 0.17, driftPhase * 1.1) +
+          0.03 * punchEnv * Math.cos(g);
+
+        const cosy = Math.cos(yaw);
+        const siny = Math.sin(yaw);
+        const cosp = Math.cos(pitch);
+        const sinp = Math.sin(pitch);
+        const o = g * 16;
+        // R = RotY(yaw) * RotZ(pitch); local +x (length axis) scaled by sx.
+        beamMatrices[o + 0] = cosy * cosp * sx;
+        beamMatrices[o + 1] = sinp * sx;
+        beamMatrices[o + 2] = -siny * cosp * sx;
+        beamMatrices[o + 4] = -cosy * sinp;
+        beamMatrices[o + 5] = cosp;
+        beamMatrices[o + 6] = siny * sinp;
+        beamMatrices[o + 8] = siny;
+        beamMatrices[o + 9] = 0;
+        beamMatrices[o + 10] = cosy;
+        // translation (o+12..14) and o+15 are static (set at build time).
+
+        // Per-beam palette color from the LUT, varied across the fan.
+        const t01 = em.seed * 0.05 + (b / BEAMS_PER_EMITTER) * 0.6 + colorPhase;
+        const frac = t01 - Math.floor(t01);
+        let lutIdx = (frac * (PALETTE_LUT_SIZE - 1)) | 0;
+        if (lutIdx < 0) lutIdx = 0;
+        else if (lutIdx > PALETTE_LUT_SIZE - 1) lutIdx = PALETTE_LUT_SIZE - 1;
+        // Idle keeps only ~1/3 of the beams meaningfully lit (calm but alive).
+        const gate = idle ? (g % 3 === 0 ? 1 : 0.05) : 1;
+        const factor = laserIntensityValue * gate;
+        const co = g * 4;
+        beamColors[co + 0] = paletteLut[lutIdx * 3 + 0] * factor;
+        beamColors[co + 1] = paletteLut[lutIdx * 3 + 1] * factor;
+        beamColors[co + 2] = paletteLut[lutIdx * 3 + 2] * factor;
       }
     }
-    const laserBase = idle ? 1.1 : mode === 'lead_in' ? 0.8 : 3;
-    laserCyanMaterial.emissiveIntensity = laserBase * (0.9 + 0.25 * highs * Math.sin(elapsed * 29));
-    laserMagentaMaterial.emissiveIntensity = laserBase * (0.9 + 0.25 * highs * Math.sin(elapsed * 29 + 1.7));
+    beamMesh.thinInstanceBufferUpdated('matrix');
+    beamMesh.thinInstanceBufferUpdated('color');
 
     // --- air particles ---
     if (idle) {
@@ -448,12 +716,13 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
       const rate = (AIR_BASE_RATE + highs * (AIR_MAX_RATE - AIR_BASE_RATE)) * (active ? 1.15 : 1);
       airParticles.emitRate = Math.min(AIR_MAX_RATE, rate);
     }
-    airParticles.maxSize = 0.18 + 0.25 * highs; // high-end sparkle
+    airParticles.maxSize = 0.18 + 0.25 * highs;
+    // Recolor motes from the palette (mutate the Color4s in place).
+    airParticles.color1.set(paletteLut[8 * 3 + 0], paletteLut[8 * 3 + 1], paletteLut[8 * 3 + 2], 0.85);
+    airParticles.color2.set(paletteLut[20 * 3 + 0], paletteLut[20 * 3 + 1], paletteLut[20 * 3 + 2], 0.85);
     if (punchBurst && !idle) {
       airParticles.manualEmitCount = AIR_PUNCH_BURST;
     } else if (airParticles.manualEmitCount === 0) {
-      // The system consumed a burst (it zeroes the counter); -1 re-enables
-      // the continuous emitRate stream.
       airParticles.manualEmitCount = -1;
     }
 
@@ -464,10 +733,11 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     } else if (mode === 'lead_in') {
       floorIntensity = 0.6;
     } else {
-      floorIntensity = (0.7 + 2.4 * bass + 2 * punch) * (active ? 1.3 : 1);
+      floorIntensity = (0.7 + 2.4 * bass + 2 * punchEnv) * flashMul * (active ? 1.3 : 1);
     }
     floorMaterial.emissiveIntensity = floorIntensity;
-    const breathe = 1 + 0.04 * bass + 0.05 * punch;
+    floorMaterial.emissiveColor.set(paletteLut[2 * 3 + 0], paletteLut[2 * 3 + 1], paletteLut[2 * 3 + 2]);
+    const breathe = 1 + 0.04 * bass + 0.05 * punchEnv;
     floorPulse.scaling.set(breathe, 1, breathe);
   }
 
@@ -475,35 +745,52 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     get bassLevel() {
       return audioPresent ? Math.min(1, bass + punch * 0.6) : null;
     },
-    beams: BEAM_COUNT,
-    laserBlades: laserBlades.length,
+    get beatFlash() {
+      return beatFlash;
+    },
+    get laserIntensity() {
+      return laserIntensityValue;
+    },
+    get currentColorR() {
+      return currentColorR;
+    },
+    get currentColorG() {
+      return currentColorG;
+    },
+    get currentColorB() {
+      return currentColorB;
+    },
+    beams: CONE_COUNT,
+    laserBlades: BEAM_TOTAL,
     update,
     setEventState(state) {
-      mode = resolveVisualizerMode(state);
+      const next = resolveVisualizerMode(state);
+      if (next === 'active' && mode !== 'active') {
+        // Entering the active zone jumps the palette for a visible shift.
+        jumpPalette();
+      }
+      mode = next;
     },
     dispose() {
       airParticles.dispose();
       airSprite?.dispose();
-      for (const cone of beamCones) {
+      for (const cone of coneMeshes) {
         cone.dispose();
       }
-      for (const mount of beamMounts) {
+      for (const mount of coneMounts) {
         mount.dispose();
       }
-      for (const blade of laserBlades) {
-        blade.dispose();
-      }
-      for (const fan of laserFans) {
-        fan.dispose();
-      }
+      beamMesh.dispose();
       floorPulse.dispose();
-      beamMagentaMaterial.dispose();
-      beamCyanMaterial.dispose();
-      laserCyanMaterial.dispose();
-      laserMagentaMaterial.dispose();
+      coneMaterialA.dispose();
+      coneMaterialB.dispose();
+      beamMaterial.dispose();
       floorMaterial.dispose();
       beamGradient?.dispose();
       floorGradient?.dispose();
     },
   };
 }
+
+// Re-exported for tuning/inspection: the number of laser patterns in rotation.
+export const LASER_PATTERN_COUNT = LASER_PATTERNS.length;

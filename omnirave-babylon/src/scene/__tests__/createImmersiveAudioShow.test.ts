@@ -1,4 +1,4 @@
-import { MeshBuilder, NullEngine, PBRMaterial, Scene } from '@babylonjs/core';
+import { Mesh, MeshBuilder, NullEngine, PBRMaterial, Scene } from '@babylonjs/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createImmersiveAudioShow } from '../createImmersiveAudioShow';
@@ -21,72 +21,104 @@ describe('createImmersiveAudioShow', () => {
     engine.dispose();
   });
 
-  function beamMaterialIntensity(): number {
-    const material = scene.getMaterialByName('immersive-beam-magenta');
+  function coneMaterialIntensity(): number {
+    const material = scene.getMaterialByName('immersive-beam-mat-a');
     expect(material instanceof PBRMaterial).toBe(true);
     return (material as PBRMaterial).emissiveIntensity;
   }
 
-  it('creates all four layers without throwing under NullEngine', () => {
+  it('creates the layers without throwing under NullEngine', () => {
     const show = createImmersiveAudioShow(scene, { getFrequencyData: zeroSource });
 
-    expect(show.beams).toBe(10);
-    expect(show.laserBlades).toBe(28);
+    expect(show.beams).toBe(18);
+    // Dense thin-instanced laser field: hundreds of beams in one mesh.
+    expect(show.laserBlades).toBeGreaterThanOrEqual(600);
+    expect(show.laserBlades).toBeLessThanOrEqual(800);
     expect(scene.getMeshByName('immersive-beam-0') != null).toBe(true);
-    expect(scene.getMeshByName('immersive-beam-9') != null).toBe(true);
-    expect(scene.getMeshByName('immersive-laser-blade-3-6') != null).toBe(true);
+    expect(scene.getMeshByName('immersive-laser-beam') != null).toBe(true);
     expect(scene.getMeshByName('immersive-floor-pulse') != null).toBe(true);
     expect(scene.particleSystems.some((system) => system.name === 'immersive-air')).toBe(true);
 
     show.dispose();
   });
 
-  it('update tolerates zero and loud spectra, and loud bass spikes beam emissiveIntensity', () => {
+  it('the laser field is one thin-instanced mesh carrying every beam', () => {
+    const show = createImmersiveAudioShow(scene, { getFrequencyData: zeroSource });
+    show.update(0.016);
+    const beam = scene.getMeshByName('immersive-laser-beam');
+    expect(beam instanceof Mesh).toBe(true);
+    expect((beam as Mesh).thinInstanceCount).toBe(show.laserBlades);
+    show.dispose();
+  });
+
+  it('loud bass spikes cone intensity, raises laser brightness and fires the beat flash', () => {
     let loud = false;
     const show = createImmersiveAudioShow(scene, {
       getFrequencyData: (target) => (loud ? loudSource(target) : zeroSource(target)),
     });
 
-    // Idle (silence): must not throw, and beams sit at the dim idle level.
+    // Idle (silence): dim, calm, no audio energy.
     expect(() => show.update(0.016)).not.toThrow();
-    const idleIntensity = beamMaterialIntensity();
+    const idleConeIntensity = coneMaterialIntensity();
+    const idleLaserIntensity = show.laserIntensity;
     expect(show.bassLevel).toBeNull();
+    expect(show.beatFlash).toBe(0);
 
-    // Loud audio: first loud frame is a bass punch (raw >> smoothed), which
-    // must spike the beam intensity well above idle.
+    // First loud frame is a strong bass punch (raw >> smoothed).
     loud = true;
     expect(() => show.update(0.016)).not.toThrow();
-    const punchIntensity = beamMaterialIntensity();
-    expect(punchIntensity).toBeGreaterThan(idleIntensity + 1);
+    const punchConeIntensity = coneMaterialIntensity();
+    expect(punchConeIntensity).toBeGreaterThan(idleConeIntensity + 1);
+    expect(show.laserIntensity).toBeGreaterThan(idleLaserIntensity);
+    // Venue-wide beat flash lit up.
+    expect(show.beatFlash).toBeGreaterThan(0);
     expect(show.bassLevel).not.toBeNull();
     expect(show.bassLevel!).toBeGreaterThan(0);
     expect(show.bassLevel!).toBeLessThanOrEqual(1);
 
-    // Sustained loud audio settles back toward the audio-driven base level.
+    // Sustained loud audio settles back below the punch peak.
     for (let i = 0; i < 60; i++) {
       show.update(0.016);
     }
-    expect(beamMaterialIntensity()).toBeLessThan(punchIntensity);
+    expect(coneMaterialIntensity()).toBeLessThan(punchConeIntensity);
 
     show.dispose();
   });
 
-  it('setEventState transitions: lead_in points beams skyward, active and null recover', () => {
+  it('cycles the palette over time, shifting the exposed current color', () => {
+    const show = createImmersiveAudioShow(scene, { getFrequencyData: zeroSource });
+
+    show.update(0.05);
+    const early = { r: show.currentColorR, g: show.currentColorG, b: show.currentColorB };
+    expect(Number.isFinite(early.r)).toBe(true);
+    expect(early.r).toBeGreaterThanOrEqual(0);
+    expect(early.r).toBeLessThanOrEqual(1);
+
+    // Advance several seconds of palette drift.
+    for (let i = 0; i < 120; i++) {
+      show.update(0.05);
+    }
+    const later = { r: show.currentColorR, g: show.currentColorG, b: show.currentColorB };
+    const delta = Math.abs(early.r - later.r) + Math.abs(early.g - later.g) + Math.abs(early.b - later.b);
+    expect(delta).toBeGreaterThan(0.02);
+
+    show.dispose();
+  });
+
+  it('setEventState transitions: lead_in points cones skyward, active and null recover', () => {
     const show = createImmersiveAudioShow(scene, { getFrequencyData: zeroSource });
 
     show.update(0.05);
     const mount = scene.getTransformNodeByName('immersive-beam-mount-0');
     expect(mount != null).toBe(true);
-    const normalRotX = mount!.rotation.x;
-    expect(normalRotX).toBeLessThan(1.2);
+    expect(mount!.rotation.x).toBeLessThan(1.2);
 
     show.setEventState({ phase: 'lead_in', countdownSeconds: 10 });
     for (let i = 0; i < 120; i++) {
       show.update(0.05);
     }
-    // Converged toward pointing straight up (rotation.x -> PI).
     expect(mount!.rotation.x).toBeGreaterThan(2.5);
-    expect(beamMaterialIntensity()).toBe(2.5);
+    expect(coneMaterialIntensity()).toBe(2.5);
 
     show.setEventState({ phase: 'active' });
     for (let i = 0; i < 120; i++) {
@@ -106,6 +138,7 @@ describe('createImmersiveAudioShow', () => {
     expect(show.beams).toBe(0);
     expect(show.laserBlades).toBe(0);
     expect(show.bassLevel).toBeNull();
+    expect(show.beatFlash).toBe(0);
     expect(bare.getMeshByName('immersive-beam-0')).toBeNull();
     expect(() => show.update(0.016)).not.toThrow();
     expect(() => show.setEventState({ phase: 'lead_in' })).not.toThrow();
@@ -114,9 +147,6 @@ describe('createImmersiveAudioShow', () => {
   });
 
   it('dispose removes every owned resource, returning the scene to baseline', () => {
-    // Count only OWN-named resources: the first PBRMaterial lazily creates a
-    // shared EnvironmentBRDFTexture as a scene-level side effect that is not
-    // ours to dispose, so raw scene counts would be fooled by that noise.
     const ownResources = () =>
       [...scene.meshes, ...scene.transformNodes, ...scene.materials, ...scene.textures].filter((resource) =>
         resource.name.startsWith('immersive-'),
@@ -125,8 +155,8 @@ describe('createImmersiveAudioShow', () => {
 
     expect(ownResources()).toBe(0);
     const show = createImmersiveAudioShow(scene, { getFrequencyData: zeroSource });
-    // 10 cones + 10 mounts + 28 blades + 4 fans + floor + 5 materials + sprite.
-    expect(ownResources()).toBeGreaterThanOrEqual(59);
+    // 18 cones + 18 mounts + 1 beam mesh + floor + 4 materials (>= 42 owned).
+    expect(ownResources()).toBeGreaterThanOrEqual(42);
     expect(scene.particleSystems.length).toBe(baselineParticles + 1);
     show.update(0.016);
     show.dispose();
