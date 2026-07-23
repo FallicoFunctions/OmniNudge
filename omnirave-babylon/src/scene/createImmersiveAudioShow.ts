@@ -37,8 +37,8 @@ import type { RaveColor } from './ravePalettes';
 // pulling color from one crossfaded rave palette so the venue stays color
 // coherent while varying over the track:
 //   1. Volumetric moving-head cone beams on truss / wings / crown.
-//   2. A DENSE thin-instanced laser field (~700 beams) mounted at the crown
-//      spire, both side wings and the truss, firing beat/phrase-synced fan,
+//   2. A DENSE thin-instanced laser field (~560 beams) mounted on both side
+//      wings and the truss, firing beat/phrase-synced fan,
 //      sky-shaft, cross-hatch, mandala and converging patterns with organic
 //      drift on top.
 //   3. A reactive dust/air particle field over the crowd.
@@ -78,7 +78,7 @@ const CONE_LENGTH = 30;
 
 // --- Layer 2: thin-instanced laser field ----------------------------------
 // One base thin box beam, hundreds of thin instances. BEAMS_PER_EMITTER gates
-// the total for easy perf tuning: 25 emitters x 28 = 700 beams in one draw.
+// the total for easy perf tuning: 20 emitters x 28 = 560 beams in one draw.
 const BEAMS_PER_EMITTER = 28;
 const BEAM_THICKNESS = 0.05;
 const LASER_IDLE_INTENSITY = 0.28;
@@ -369,12 +369,9 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
       seed: emitters.length * 1.7 + 0.3,
     });
   }
-  // (a) Crown figurehead column: 5 emitters climbing the spire, firing sky
-  // shafts up + curtains down over the crowd.
-  for (const cy of [30, 42, 54, 66, 78]) {
-    pushEmitter(0, cy, 45, 0, 6, -26, 72);
-  }
-  // (b) Side wings: 6 emitters per side across x 16..58 at z~7, stepping up in
+  // (Crown figurehead: no laser emitters here — the crown spire is now the
+  // canvas of createCrownEffects, so this show leaves it clear.)
+  // (a) Side wings: 6 emitters per side across x 16..58 at z~7, stepping up in
   // y, firing across / over the crowd.
   const wingXs = [16, 24.4, 32.8, 41.2, 49.6, 58];
   for (let k = 0; k < wingXs.length; k++) {
@@ -382,7 +379,7 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     pushEmitter(wingXs[k], wy, 7, 0, 9, -26, 55);
     pushEmitter(-wingXs[k], wy, 7, 0, 9, -26, 55);
   }
-  // (c) Over-crowd truss: 8 emitters firing down over the crowd volume.
+  // (b) Over-crowd truss: 8 emitters firing down over the crowd volume.
   for (let i = 0; i < 8; i++) {
     pushEmitter((i / 7) * 28 - 14, 24, 8, 0, 4, -26, 34);
   }
