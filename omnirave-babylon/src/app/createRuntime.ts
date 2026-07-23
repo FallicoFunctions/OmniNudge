@@ -253,6 +253,7 @@ export async function createRuntime(host: HTMLElement) {
       stageVisualizer?.dispose();
       immersiveAudioShow?.dispose();
       crownEffects?.dispose();
+      stageAtmospherics?.dispose();
       cleanupOwnedResources();
       activeEngine.dispose();
     };
@@ -267,6 +268,7 @@ export async function createRuntime(host: HTMLElement) {
     let stageVisualizer: import('../scene/createStageVisualizer').StageVisualizer | undefined;
     let immersiveAudioShow: import('../scene/createImmersiveAudioShow').ImmersiveAudioShow | undefined;
     let crownEffects: import('../scene/createCrownEffects').CrownEffects | undefined;
+    let stageAtmospherics: import('../scene/createStageAtmospherics').StageAtmospherics | undefined;
     if (perfFlags.worldUrl && perfFlags.worldToken) {
       const [{ createWorldSocket }, { createRemotePlayerRigs }, { createStageMediaPlayer }] = await Promise.all([
         import('../network/worldSocket'),
@@ -292,6 +294,7 @@ export async function createRuntime(host: HTMLElement) {
         stageVisualizer?.setEventState(eventState);
         immersiveAudioShow?.setEventState(eventState);
         crownEffects?.setEventState(eventState);
+        stageAtmospherics?.setEventState(eventState);
       });
       worldSocket.onStatusChange((status) => {
         console.info(`[world] socket ${status}`);
@@ -348,6 +351,15 @@ export async function createRuntime(host: HTMLElement) {
     });
     const activeCrownEffects = crownEffects;
 
+    // The stage atmospherics (haze air body, CO2/cryo jets, flame jets,
+    // cold-spark fountains, strobe pods): the PHYSICAL effects show. Shares the
+    // same spectrum closure; haze-only idle in the single-player path.
+    const { createStageAtmospherics } = await import('../scene/createStageAtmospherics');
+    stageAtmospherics = createStageAtmospherics(scene, {
+      getFrequencyData: getStageFrequencyData,
+    });
+    const activeStageAtmospherics = stageAtmospherics;
+
     const runtime = {
       canvas,
       debugPanel,
@@ -395,6 +407,7 @@ export async function createRuntime(host: HTMLElement) {
       activeStageVisualizer.update(deltaSeconds);
       activeImmersiveAudioShow.update(deltaSeconds);
       activeCrownEffects.update(deltaSeconds);
+      activeStageAtmospherics.update(deltaSeconds);
       // Feed the stage show's spill-light pulse real bass energy when audio is
       // live; null keeps it on its estimated 126BPM beat clock.
       playerRuntime?.stageShow?.setAudioEnergy?.(activeImmersiveAudioShow.bassLevel);
