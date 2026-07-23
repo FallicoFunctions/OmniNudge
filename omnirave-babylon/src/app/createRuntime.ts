@@ -251,6 +251,7 @@ export async function createRuntime(host: HTMLElement) {
       remotePlayerRigs?.dispose();
       stageMediaPlayer?.dispose();
       stageVisualizer?.dispose();
+      immersiveAudioShow?.dispose();
       cleanupOwnedResources();
       activeEngine.dispose();
     };
@@ -263,6 +264,7 @@ export async function createRuntime(host: HTMLElement) {
     let remotePlayerRigs: import('../player/createRemotePlayerRigs').RemotePlayerRigs | undefined;
     let stageMediaPlayer: import('../media/stageMediaPlayer').StageMediaPlayer | undefined;
     let stageVisualizer: import('../scene/createStageVisualizer').StageVisualizer | undefined;
+    let immersiveAudioShow: import('../scene/createImmersiveAudioShow').ImmersiveAudioShow | undefined;
     if (perfFlags.worldUrl && perfFlags.worldToken) {
       const [{ createWorldSocket }, { createRemotePlayerRigs }, { createStageMediaPlayer }] = await Promise.all([
         import('../network/worldSocket'),
@@ -282,9 +284,11 @@ export async function createRuntime(host: HTMLElement) {
         // Drive the stage screen's event mode (countdown / fireworks video)
         // from the active zone's scheduled event, if any.
         const activeEvent = snapshot.zoneEvents.find((zone) => zone.zoneId === snapshot.activeZone) ?? null;
-        stageVisualizer?.setEventState(
-          activeEvent ? { phase: activeEvent.phase, countdownSeconds: activeEvent.countdownSeconds } : null,
-        );
+        const eventState = activeEvent
+          ? { phase: activeEvent.phase, countdownSeconds: activeEvent.countdownSeconds }
+          : null;
+        stageVisualizer?.setEventState(eventState);
+        immersiveAudioShow?.setEventState(eventState);
       });
       worldSocket.onStatusChange((status) => {
         console.info(`[world] socket ${status}`);
@@ -307,17 +311,29 @@ export async function createRuntime(host: HTMLElement) {
     // spectrum and shows an idle shimmer instead of crashing. Frequency data
     // is pulled lazily each frame, so it picks up the media player as soon as
     // that path has constructed one.
+    // ONE shared spectrum source for the screen visualizer and the immersive
+    // venue show, so both react to the exact same audio (or the same silence).
+    const getStageFrequencyData = (target: Uint8Array) => {
+      if (stageMediaPlayer) {
+        stageMediaPlayer.getFrequencyData(target);
+      } else {
+        target.fill(0);
+      }
+    };
     const { createStageVisualizer } = await import('../scene/createStageVisualizer');
     stageVisualizer = createStageVisualizer(scene, {
-      getFrequencyData: (target) => {
-        if (stageMediaPlayer) {
-          stageMediaPlayer.getFrequencyData(target);
-        } else {
-          target.fill(0);
-        }
-      },
+      getFrequencyData: getStageFrequencyData,
     });
     const activeStageVisualizer = stageVisualizer;
+
+    // The venue-wide immersive show (beams, laser fans, air particles, floor
+    // pulse). Like the visualizer it runs in BOTH paths: audio-reactive with
+    // the world/music path, gentle idle sweeps in the single-player path.
+    const { createImmersiveAudioShow } = await import('../scene/createImmersiveAudioShow');
+    immersiveAudioShow = createImmersiveAudioShow(scene, {
+      getFrequencyData: getStageFrequencyData,
+    });
+    const activeImmersiveAudioShow = immersiveAudioShow;
 
     const runtime = {
       canvas,
@@ -364,6 +380,10 @@ export async function createRuntime(host: HTMLElement) {
       const deltaSeconds = activeEngine.getDeltaTime() / 1000;
       remotePlayerRigs?.update(deltaSeconds);
       activeStageVisualizer.update(deltaSeconds);
+      activeImmersiveAudioShow.update(deltaSeconds);
+      // Feed the stage show's spill-light pulse real bass energy when audio is
+      // live; null keeps it on its estimated 126BPM beat clock.
+      playerRuntime?.stageShow?.setAudioEnergy?.(activeImmersiveAudioShow.bassLevel);
       const playerController = playerRuntime?.playerController;
       if (playerReadout && playerPosition && playerController) {
         const state = playerRuntime?.reviewAvatar?.root.metadata?.animationState ?? playerController.animationState;
