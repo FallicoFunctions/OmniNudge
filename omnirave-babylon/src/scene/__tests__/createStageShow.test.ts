@@ -131,6 +131,30 @@ describe('createStageShow', () => {
     expect(values.size).toBeGreaterThan(1);
   });
 
+  it('setAudioEnergy overrides the spill beat clock; null restores it', () => {
+    const scene = buildStageScene();
+    const show = createStageShow(scene);
+
+    const light = scene.getLightByName('main-stage-hero-screen-panel-l-spill') as PointLight;
+
+    // Real audio energy pins the pulse to the supplied level exactly.
+    show.setAudioEnergy(1);
+    scene.render();
+    expect(light.intensity).toBeCloseTo(560 * 1.2, 5);
+    show.setAudioEnergy(0);
+    scene.render();
+    expect(light.intensity).toBeCloseTo(560 * 0.7, 5);
+
+    // Null falls back to the 126BPM estimated beat clock (values move again).
+    show.setAudioEnergy(null);
+    const values = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      scene.render();
+      values.add(light.intensity.toFixed(6));
+    }
+    expect(values.size).toBeGreaterThan(1);
+  });
+
   it('returns an all-zero summary and renders harmlessly for a scene with none of the targets', () => {
     engine = new NullEngine();
     const scene = new Scene(engine);

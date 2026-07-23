@@ -9,6 +9,13 @@ export interface StageShowSummary {
   ledDecks: number;
 }
 
+export interface StageShow extends StageShowSummary {
+  // Feed real audio energy (0..1 bass level) into the spill-light pulse, or
+  // null to fall back to the estimated 126BPM beat clock. Called per-frame by
+  // the runtime when the immersive audio show has live spectrum data.
+  setAudioEnergy: (bass: number | null) => void;
+}
+
 const BPM = 126;
 const BEAT_SECONDS = 60 / BPM;
 
@@ -40,7 +47,7 @@ function beatCurve(phase: number) {
 // still counts the panels for its summary and drives their spill lights, but
 // deliberately never touches the panel materials, so the two systems never
 // fight over the same surface.
-export function createStageShow(scene: Scene): StageShowSummary {
+export function createStageShow(scene: Scene): StageShow {
   const heroScreens = [
     scene.getMeshByName('main-stage-hero-screen-panel-l'),
     scene.getMeshByName('main-stage-hero-screen-panel-r'),
@@ -58,10 +65,17 @@ export function createStageShow(scene: Scene): StageShowSummary {
     scene.getMeshByName('V31_SideLedTileField_R'),
   ].filter((mesh): mesh is NonNullable<typeof mesh> => mesh != null);
 
-  const summary: StageShowSummary = {
+  // Live audio bass level (0..1) or null; when set, it replaces the estimated
+  // beat clock for the spill-light pulse only.
+  let audioEnergy: number | null = null;
+
+  const summary: StageShow = {
     screens: heroScreens.length,
     spillLights: spillLights.length,
     ledDecks: ledDeckMeshes.length,
+    setAudioEnergy(bass) {
+      audioEnergy = bass;
+    },
   };
 
   if (summary.screens === 0 && summary.spillLights === 0 && summary.ledDecks === 0) {
@@ -98,9 +112,11 @@ export function createStageShow(scene: Scene): StageShowSummary {
     const beatPhase = beatPosition % 1;
     const curve = beatCurve(beatPhase);
 
-    // 1. spill lights: pulse intensity in sync with the beat
+    // 1. spill lights: pulse intensity with real audio energy when the
+    // runtime provides it, otherwise in sync with the estimated beat clock
+    const spillCurve = audioEnergy ?? curve;
     for (let i = 0; i < spillLights.length; i++) {
-      spillLights[i].intensity = spillBaseIntensity[i] * (0.7 + 0.5 * curve);
+      spillLights[i].intensity = spillBaseIntensity[i] * (0.7 + 0.5 * spillCurve);
     }
 
     // every 8 beats, crossfade the hero-panel spill lights between magenta
