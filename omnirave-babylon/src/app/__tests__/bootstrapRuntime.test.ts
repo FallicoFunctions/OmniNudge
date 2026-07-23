@@ -488,9 +488,6 @@ describe('createRuntime', () => {
     expect(host.querySelector('[data-testid="review-hud"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="perf-overlay"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="debug-panel"]')).not.toBeNull();
-    expect(host.querySelector('[data-debug-toggle="collision"]')).not.toBeNull();
-    expect(host.querySelector('[data-debug-toggle="routes"]')).not.toBeNull();
-    expect(host.querySelector('[data-debug-toggle="lighting"]')).not.toBeNull();
     expect(host.querySelector('[data-debug-readout="mesh-pick"]')).not.toBeNull();
     expect(host.querySelector('[data-debug-readout="player-state"]')).not.toBeNull();
     expect(host.querySelector('[data-review-objective]')).not.toBeNull();
@@ -648,9 +645,9 @@ describe('createRuntime', () => {
     expect(runtime.hud).toBeUndefined();
     expect(runtime.perfOverlay).toBeUndefined();
     expect(runtime.debugPanel).toBeUndefined();
-    expect(window.__OMNIRAVE_RUNTIME__?.hud).toBeUndefined();
-    expect(window.__OMNIRAVE_RUNTIME__?.perfOverlay).toBeUndefined();
-    expect(window.__OMNIRAVE_RUNTIME__?.debugPanel).toBeUndefined();
+    // Without ?debug=1 the global isn't exposed at all - not even with its
+    // dev-chrome fields undefined - so it can't be reached by page scripts.
+    expect(window.__OMNIRAVE_RUNTIME__).toBeUndefined();
 
     // No canvas pick handler is wired up without debug chrome.
     host

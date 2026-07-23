@@ -4,6 +4,12 @@ import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
 import type { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import type { Scene } from '@babylonjs/core/scene';
 
+import {
+  VENUE_ENVELOPE_BACK_Z,
+  VENUE_WALKABLE_X_MAX,
+  VENUE_WALKABLE_X_MIN,
+} from './mainStageVenueBounds';
+
 interface CollisionBlockerSpec {
   depth: number;
   height: number;
@@ -15,15 +21,16 @@ interface CollisionBlockerSpec {
 }
 
 const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
-  // Envelope fence. The back edge sits at z -90, past the spawn gate
-  // sentinels (z -82), so the player can leave the approach deck and walk
-  // the promenade over the paver field (deck's back edge is z -57; the old
-  // fence at z -60 walled it off, player-flagged). Ground collision
-  // (COL_Ground) ends at z -95, so the fence stays just inside it, and the
-  // sides extend to meet the back fence corner-to-corner.
-  { name: 'main-stage-blocker-left-envelope', x: -64, y: 3, z: -34.5, width: 4, height: 6, depth: 111 },
-  { name: 'main-stage-blocker-right-envelope', x: 64, y: 3, z: -34.5, width: 4, height: 6, depth: 111 },
-  { name: 'main-stage-blocker-back-envelope', x: 0, y: 3, z: -90, width: 132, height: 6, depth: 4 },
+  // Envelope fence. The back edge sits at z VENUE_ENVELOPE_BACK_Z, past the
+  // spawn gate sentinels (z -82), so the player can leave the approach deck
+  // and walk the promenade over the paver field (deck's back edge is z -57;
+  // the old fence at z -60 walled it off, player-flagged). Ground collision
+  // (COL_Ground) ends at VENUE_GROUND_EDGE_Z (see mainStageVenueBounds.ts),
+  // so the fence stays just inside it, and the sides extend to meet the back
+  // fence corner-to-corner.
+  { name: 'main-stage-blocker-left-envelope', x: VENUE_WALKABLE_X_MIN, y: 3, z: -34.5, width: 4, height: 6, depth: 111 },
+  { name: 'main-stage-blocker-right-envelope', x: VENUE_WALKABLE_X_MAX, y: 3, z: -34.5, width: 4, height: 6, depth: 111 },
+  { name: 'main-stage-blocker-back-envelope', x: 0, y: 3, z: VENUE_ENVELOPE_BACK_Z, width: 132, height: 6, depth: 4 },
   { name: 'main-stage-blocker-front-stage', x: 0, y: 5, z: 14, width: 78, height: 10, depth: 4 },
   // The cascade-court water features have no authored rows here: their
   // collision comes from the clustered V150_CascadeCourtCoping footprint

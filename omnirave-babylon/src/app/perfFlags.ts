@@ -9,7 +9,6 @@ export interface PerfFlags {
   noShadows: boolean;
   noPost: boolean;
   minimalLights: boolean;
-  webgpu: boolean;
   webgl: boolean;
   debug: boolean;
   // Multiplayer presence opt-in: ?world=<ws url>&wtoken=<world session JWT>.
@@ -40,7 +39,6 @@ export function parsePerfFlags(search: string): PerfFlags {
     noShadows: tokens.has('noshadows'),
     noPost: tokens.has('nopost'),
     minimalLights: tokens.has('minimallights'),
-    webgpu: tokens.has('webgpu'),
     webgl: tokens.has('webgl'),
     debug: tokens.has('debug') || debugParam === '1' || debugParam === '',
     worldUrl: params.get('world'),

@@ -17,6 +17,11 @@ const BEAT_SECONDS = 60 / BPM;
 // by createMainStagePresentationRig's hero-panel and LED-deck spill lights.
 const MAGENTA = new Color3(0.72, 0.3, 0.85);
 const CYAN = new Color3(0.16, 0.6, 0.95);
+// Reused scratch target for the crossfade lerp below - LerpToRef writes into
+// it every frame instead of Color3.Lerp allocating a fresh Color3, and each
+// light gets its OWN copy via copyFrom so they don't alias the same mutable
+// instance (or each other).
+const crossfadeScratch = new Color3();
 
 // A hard-edged beat pulse: near-zero most of the beat, spiking to 1 right on
 // the downbeat and decaying fast. Cubed sine so the hit reads punchy rather
@@ -118,10 +123,10 @@ export function createStageShow(scene: Scene): StageShowSummary {
       const forward = cycleIndex % 2 === 0;
       const from = forward ? MAGENTA : CYAN;
       const to = forward ? CYAN : MAGENTA;
-      const mixed = Color3.Lerp(from, to, mixT);
+      Color3.LerpToRef(from, to, mixT, crossfadeScratch);
       for (const light of heroSpillLights) {
-        light.diffuse = mixed;
-        light.specular = mixed;
+        light.diffuse.copyFrom(crossfadeScratch);
+        light.specular.copyFrom(crossfadeScratch);
       }
     }
 
