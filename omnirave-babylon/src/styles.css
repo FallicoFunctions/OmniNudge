@@ -350,3 +350,54 @@ body,
   border-radius: 999px;
   background: rgba(5, 7, 17, 0.72);
 }
+
+.stage-audio-dev-controls {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 320px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: #f4efe2;
+  background: rgba(5, 7, 17, 0.72);
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.72rem;
+}
+
+.stage-audio-dev-controls__toggle {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(104, 216, 255, 0.4);
+  border-radius: 999px;
+  color: #effbff;
+  background: rgba(8, 46, 61, 0.7);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+}
+
+.stage-audio-dev-controls__scrubber {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: #68d8ff;
+  cursor: pointer;
+}
+
+.stage-audio-dev-controls__scrubber:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.stage-audio-dev-controls__time {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: rgba(244, 239, 226, 0.82);
+  white-space: nowrap;
+}
