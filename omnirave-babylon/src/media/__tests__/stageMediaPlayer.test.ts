@@ -9,6 +9,8 @@ function createFakeBackend(overrides: Partial<StagePlayerBackend> = {}): StagePl
     pause: vi.fn(),
     seek: vi.fn(),
     getCurrentTime: vi.fn(() => 0),
+    getDuration: vi.fn(() => 0),
+    isPaused: vi.fn(() => true),
     setMuted: vi.fn(),
     getFrequencyData: vi.fn(),
     dispose: vi.fn(),
@@ -166,6 +168,67 @@ describe('createStageMediaPlayer', () => {
     expect(backendFactory).not.toHaveBeenCalled();
 
     player.dispose();
+  });
+
+  describe('dev control surface', () => {
+    it('delegates getDuration and isPaused to the backend after unlock', () => {
+      const backend = createFakeBackend({
+        getDuration: vi.fn(() => 180),
+        isPaused: vi.fn(() => false),
+      });
+      const player = createStageMediaPlayer({ backendFactory: () => backend });
+      player.unlock();
+
+      expect(player.getDuration()).toBe(180);
+      expect(player.isPaused()).toBe(false);
+    });
+
+    it('reports safe defaults and does not create a backend before unlock', () => {
+      const backendFactory = vi.fn(() => createFakeBackend());
+      const player = createStageMediaPlayer({ backendFactory });
+
+      expect(player.getDuration()).toBe(0);
+      expect(player.getCurrentTime()).toBe(0);
+      expect(player.isPaused()).toBe(true);
+      // seekTo before unlock is a safe no-op (no backend to seek).
+      expect(() => player.seekTo(30)).not.toThrow();
+      expect(backendFactory).not.toHaveBeenCalled();
+    });
+
+    it('setManualOverride(true) suppresses drift-correction on a drifted snapshot', () => {
+      const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 5) });
+      const player = createStageMediaPlayer({ backendFactory: () => backend });
+      player.unlock();
+
+      player.applyMedia(media({ playheadSeconds: 10 }));
+      (backend.seek as ReturnType<typeof vi.fn>).mockClear();
+
+      player.setManualOverride(true);
+      expect(player.isManualOverride()).toBe(true);
+
+      // Local time (5s) is far from the reported playhead (40s), but override
+      // is active so applyMedia must NOT re-seek.
+      player.applyMedia(media({ playheadSeconds: 40 }));
+      expect(backend.seek).not.toHaveBeenCalled();
+    });
+
+    it('setManualOverride(false) resumes drift-correction on the next snapshot', () => {
+      const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 5) });
+      const player = createStageMediaPlayer({ backendFactory: () => backend });
+      player.unlock();
+
+      player.applyMedia(media({ playheadSeconds: 10 }));
+      player.setManualOverride(true);
+      player.applyMedia(media({ playheadSeconds: 40 }));
+      (backend.seek as ReturnType<typeof vi.fn>).mockClear();
+
+      player.setManualOverride(false);
+      expect(player.isManualOverride()).toBe(false);
+
+      // Drift exceeds threshold and override is off -> drift-correct.
+      player.applyMedia(media({ playheadSeconds: 40 }));
+      expect(backend.seek).toHaveBeenCalledWith(40);
+    });
   });
 
   describe('default audio backend', () => {

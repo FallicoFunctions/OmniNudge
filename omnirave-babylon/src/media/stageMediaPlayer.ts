@@ -35,6 +35,10 @@ export interface StagePlayerBackend {
   pause(): void;
   seek(seconds: number): void;
   getCurrentTime(): number;
+  // Track length in seconds (0 when unknown, e.g. before metadata loads).
+  getDuration(): number;
+  // Whether playback is currently paused.
+  isPaused(): boolean;
   setMuted(muted: boolean): void;
   // Fills `target` with the current byte frequency spectrum (0..255 per bin,
   // low frequencies first). No-op / leaves the caller's zeros in place when no
@@ -56,6 +60,19 @@ export interface StageMediaPlayer {
   // same server-synced track, each client's spectrum is ~identical, so the
   // visualizer can be driven purely from this local analysis (no server push).
   getFrequencyData: (target: Uint8Array) => void;
+  // Dev control surface (used by the debug-only audio scrubber). All safe
+  // no-ops before unlock, when there is no backend yet.
+  getCurrentTime: () => number;
+  getDuration: () => number;
+  isPaused: () => boolean;
+  play: () => void;
+  pause: () => void;
+  seekTo: (seconds: number) => void;
+  // While manual override is active, applyMedia() is a full no-op (it only
+  // stashes desiredMedia): no auto-switch, no drift-correction. This lets a dev
+  // scrub/pause stick instead of being yanked back by the server playhead.
+  setManualOverride: (active: boolean) => void;
+  isManualOverride: () => boolean;
   dispose: () => void;
 }
 
@@ -71,6 +88,12 @@ function createNoopBackend(): StagePlayerBackend {
     seek() {},
     getCurrentTime() {
       return 0;
+    },
+    getDuration() {
+      return 0;
+    },
+    isPaused() {
+      return true;
     },
     setMuted() {},
     getFrequencyData(target) {
@@ -209,6 +232,13 @@ function createAudioBackend(): StagePlayerBackend {
     getCurrentTime() {
       return element.currentTime;
     },
+    getDuration() {
+      // HTMLAudioElement.duration is NaN until metadata loads.
+      return Number.isNaN(element.duration) ? 0 : element.duration;
+    },
+    isPaused() {
+      return element.paused;
+    },
     setMuted(muted) {
       element.muted = muted;
     },
@@ -241,6 +271,9 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   let backend: StagePlayerBackend | undefined;
   let unlocked = false;
   let disposed = false;
+  // Dev-only: while true, applyMedia() ignores server snapshots entirely so a
+  // manual scrub/pause is not overridden by the synced playhead.
+  let manualOverride = false;
 
   // The desired media, tracked independently of the backend so applyMedia()
   // calls before unlock() are stashed and applied once unlocked instead of
@@ -287,6 +320,13 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
       return;
     }
 
+    if (manualOverride) {
+      // A dev is in manual control: stash the latest desired media (so normal
+      // sync can resume when override is turned off) but do not touch the
+      // backend — no auto-switch, no drift-correction.
+      return;
+    }
+
     if (!media) {
       currentTrackId = undefined;
       currentPlaylistIndex = undefined;
@@ -315,6 +355,38 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     }
   }
 
+  function getCurrentTime(): number {
+    return backend ? backend.getCurrentTime() : 0;
+  }
+
+  function getDuration(): number {
+    return backend ? backend.getDuration() : 0;
+  }
+
+  function isPaused(): boolean {
+    return backend ? backend.isPaused() : true;
+  }
+
+  function play(): void {
+    backend?.play();
+  }
+
+  function pause(): void {
+    backend?.pause();
+  }
+
+  function seekTo(seconds: number): void {
+    backend?.seek(seconds);
+  }
+
+  function setManualOverride(active: boolean): void {
+    manualOverride = active;
+  }
+
+  function isManualOverride(): boolean {
+    return manualOverride;
+  }
+
   function dispose(): void {
     if (disposed) return;
     disposed = true;
@@ -326,6 +398,14 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     unlock,
     applyMedia,
     getFrequencyData,
+    getCurrentTime,
+    getDuration,
+    isPaused,
+    play,
+    pause,
+    seekTo,
+    setManualOverride,
+    isManualOverride,
     dispose,
   };
 }
