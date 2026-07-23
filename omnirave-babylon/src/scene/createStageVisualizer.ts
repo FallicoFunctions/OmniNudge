@@ -1,39 +1,65 @@
+// Side-effect import: augments Mesh.prototype with thinInstance* methods.
+// MUST live in this module (not only in other scene modules): the app bundle
+// tree-shakes per-module, and a missing import here means no
+// thinInstanceSetBuffer and a silent in-browser failure while vitest passes.
+import '@babylonjs/core/Meshes/thinInstanceMesh.js';
+
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture.js';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
+import { VertexBuffer } from '@babylonjs/core/Buffers/buffer.js';
+import type { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import type { Scene } from '@babylonjs/core/scene';
 
-// The Main Stage's huge hero screen. Its normal-playback content is an
-// audio-reactive visualizer driven by LIVE frequency analysis of the actual
-// synced track (see docs/superpowers/specs/2026-06-04-omnirave-3d-runtime-design.md
-// §13.3 / §13.3.1) - not a decorative loop. Because every client plays the
-// same server-synced audio, each client's local analysis yields ~the same
-// picture, so this is driven purely from local audio (no server-pushed visual
-// state). The OmniRave wordmark pulses in at timed intervals (a periodic
-// identity beat). During a Main Stage fireworks event the screen switches
-// modes: an on-screen COUNTDOWN in the lead-in, then a special pre-authored
-// visualizer VIDEO while active (the real video is a future asset - this
-// builds the mode with a clearly-labeled placeholder).
+// The Main Stage's hero visualizer, rebuilt as ONE large TRUE-3D unit
+// (player-flagged: the previous two 8x7 flat panels read as small 2D screens).
+// It now fills the purple glow region - a single 31x12 face centered at
+// (0, 18) with its backing at z=-3, facing the crowd (-z) - and the spectrum
+// itself is a field of ~384 thin-instanced boxes that physically EXTRUDE
+// toward the crowd with the music, up to ~2.5 deep. The old hero panel meshes
+// are hidden (not disposed - dispose() re-enables them); their haze meshes
+// stay on as the glow atmosphere behind the new unit.
 //
-// This REPLACES createStageShow's placeholder hero-screen beat-pulse: that
-// module now leaves the hero panels alone (keeping only the spill lights + LED
-// decks), and this visualizer owns the panels' material/content outright, so
-// the two never fight over the same surface.
+// Audio-reactive content is driven by LIVE frequency analysis of the synced
+// track (docs/superpowers/specs/2026-06-04-omnirave-3d-runtime-design.md
+// §13.3 / §13.3.1): every client plays the same server-synced audio, so local
+// analysis yields ~the same picture on every client. The backing plane's
+// DynamicTexture carries only the text/mode layers (OMNIRAVE wordmark beat,
+// fireworks countdown, active-mode video placeholder); the bars are geometry.
 
-// Default hero-screen panel mesh names (the two halves of the stage screen).
+// Old flat hero-screen panels, hidden while this unit is alive.
 const DEFAULT_HERO_SCREEN_MESH_NAMES = [
   'main-stage-hero-screen-panel-l',
   'main-stage-hero-screen-panel-r',
 ] as const;
 
-// Canvas resolution for the screen texture. 512x256 is crisp on the big panel
-// without the per-frame fill cost of a full 1024-wide surface.
-const TEXTURE_WIDTH = 512;
-const TEXTURE_HEIGHT = 256;
+// Unit geometry (measured from the live scene: the haze glow spans
+// x -15.5..15.5, y 12..24, z -7.5..-2.5).
+const UNIT_WIDTH = 31;
+const UNIT_HEIGHT = 12;
+const UNIT_CENTER_Y = 18;
+const BACKING_Z = -3;
+// Bar cells rest just in front of the backing and extrude toward the crowd.
+const BAR_REST_DEPTH = 0.15;
+const BAR_MAX_DEPTH = 2.5;
 
-// Number of spectrum bins drawn. We only draw the low/mid bands (the analyser
-// reports 128 bins; getByteFrequencyData copies the lowest `BIN_COUNT` of
-// them), which carry the most visible musical motion.
+// Bar field layout: 48 columns x 8 rows of one thin-instanced base box.
+const COLUMN_COUNT = 48;
+const ROW_COUNT = 8;
+const CELL_COUNT = COLUMN_COUNT * ROW_COUNT;
+const CELL_WIDTH = UNIT_WIDTH / COLUMN_COUNT;
+const CELL_HEIGHT = UNIT_HEIGHT / ROW_COUNT;
+// Gap between cells so the field reads as a grid of blocks, not a slab.
+const CELL_FILL = 0.8;
+
+// Backing texture resolution (31:12 face; 1024x396 keeps text crisp without a
+// heavy per-frame fill).
+const TEXTURE_WIDTH = 1024;
+const TEXTURE_HEIGHT = 396;
+
+// Number of spectrum bins read. The analyser reports 128; the lowest 64 carry
+// the most visible musical motion (same policy as the old flat screen).
 const BIN_COUNT = 64;
 
 // OmniRave identity beat: the wordmark fades in for LOGO_VISIBLE seconds every
@@ -43,8 +69,11 @@ const LOGO_VISIBLE_SECONDS = 5;
 const LOGO_FADE_SECONDS = 1.2;
 
 // Venue identity neon, matched to createStageShow's magenta<->cyan spill hues.
-const MAGENTA_RGB = { r: 233, g: 42, b: 214 };
-const CYAN_RGB = { r: 34, g: 205, b: 240 };
+const MAGENTA = { r: 233 / 255, g: 42 / 255, b: 214 / 255 };
+const CYAN = { r: 34 / 255, g: 205 / 255, b: 240 / 255 };
+
+// Unlit floor color for unlit cells: faint grid presence, below bloom.
+const DIM_LEVEL = 0.045;
 
 export type StageVisualizerMode = 'normal' | 'lead_in' | 'active';
 
@@ -56,18 +85,18 @@ export interface StageEventStateInput {
 export interface StageVisualizerOptions {
   // Fills the passed array with the current byte frequency spectrum. Wired to
   // the stage media player's getFrequencyData in the world/music path, or a
-  // zero-fill in the single-player review path (idle shimmer, no audio).
+  // zero-fill in the single-player review path (idle breathing, no audio).
   getFrequencyData: (target: Uint8Array) => void;
   heroScreenMeshNames?: readonly string[];
 }
 
 export interface StageVisualizer {
-  // Advance + repaint the screen for this frame. dtSeconds is engine delta / 1000.
+  // Advance + repaint the unit for this frame. dtSeconds is engine delta / 1000.
   update: (dtSeconds: number) => void;
   // Switch modes from the active zone's fireworks event (or null for none).
   setEventState: (state: StageEventStateInput | null) => void;
   dispose: () => void;
-  // Number of hero panels the visualizer is driving (0 = inert no-op).
+  // Number of old hero panels this unit replaced (0 = inert no-op).
   readonly panels: number;
 }
 
@@ -96,16 +125,54 @@ const NOOP_VISUALIZER: StageVisualizer = {
 
 export function createStageVisualizer(scene: Scene, options: StageVisualizerOptions): StageVisualizer {
   const meshNames = options.heroScreenMeshNames ?? DEFAULT_HERO_SCREEN_MESH_NAMES;
-  const panels = meshNames
+  const oldPanels = meshNames
     .map((name) => scene.getMeshByName(name))
     .filter((mesh): mesh is NonNullable<typeof mesh> => mesh != null);
 
-  if (panels.length === 0) {
+  if (oldPanels.length === 0) {
     // No hero screen in this scene (e.g. a stripped test scene): inert.
     return NOOP_VISUALIZER;
   }
 
-  let texture: DynamicTexture;
+  // The flat panels are superseded by this unit; hidden, not disposed, so
+  // dispose() can hand the stage back exactly as it found it.
+  for (const panel of oldPanels) {
+    panel.setEnabled(false);
+  }
+
+  // --- Backing plane: text/mode layers only -------------------------------
+  // CreatePlane's front face normal is -z, which is exactly the crowd side
+  // (players stand at z<0), so no rotation is needed.
+  const backing = MeshBuilder.CreatePlane(
+    'main-stage-visualizer-backing',
+    { width: UNIT_WIDTH, height: UNIT_HEIGHT },
+    scene,
+  );
+  backing.position.set(0, UNIT_CENTER_Y, BACKING_Z);
+  backing.isPickable = false;
+
+  // PBR, not StandardMaterial: verified in-engine that this venue's pipeline
+  // renders StandardMaterial surfaces flat white (both its emissive-texture
+  // and vertex-color paths), while the PBR recipe below - identical to the
+  // previous committed visualizer's - shows the canvas correctly. The whole
+  // venue (polish table, signs) is PBR; stay on the proven material family.
+  const backingMaterial = new PBRMaterial('main-stage-visualizer-material', scene);
+  backingMaterial.emissiveColor = new Color3(1, 1, 1);
+  backingMaterial.emissiveIntensity = 3.2;
+  backingMaterial.albedoColor = new Color3(0, 0, 0);
+  backingMaterial.metallic = 0;
+  backingMaterial.roughness = 1;
+  backingMaterial.disableLighting = true;
+  backingMaterial.backFaceCulling = true;
+  backing.material = backingMaterial;
+
+  // NullEngine / jsdom-without-canvas has no usable 2D context: the texture
+  // text layers are skipped there, but the 3D bar field still builds and
+  // updates (thin instances work under NullEngine).
+  let texture: DynamicTexture | null = null;
+  let ctx: CanvasRenderingContext2D | null = null;
+  let offscreen: HTMLCanvasElement | null = null;
+  let offCtx: CanvasRenderingContext2D | null = null;
   try {
     texture = new DynamicTexture(
       'main-stage-visualizer',
@@ -113,71 +180,181 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
       scene,
       false,
     );
+    const rawContext = texture.getContext() as CanvasRenderingContext2D | null;
+    if (rawContext && typeof rawContext.fillRect === 'function' && typeof rawContext.fillText === 'function') {
+      const off = document.createElement('canvas');
+      off.width = TEXTURE_WIDTH;
+      off.height = TEXTURE_HEIGHT;
+      const offContext = off.getContext('2d');
+      if (offContext && typeof offContext.fillText === 'function') {
+        ctx = rawContext;
+        offscreen = off;
+        offCtx = offContext;
+        backingMaterial.emissiveTexture = texture;
+      }
+    }
   } catch (error) {
-    console.warn('[stageVisualizer] DynamicTexture unavailable; screen visualizer disabled.', error);
-    return NOOP_VISUALIZER;
+    console.warn('[stageVisualizer] DynamicTexture unavailable; backing text layers disabled.', error);
   }
 
-  // The hero panel's front face samples the texture reversed in U, so anything
-  // with handedness (the OMNIRAVE wordmark, the countdown digits) renders
-  // mirrored left-to-right (verified in-engine on the real panel). Flip the
-  // texture horizontally on the GPU - free, and it corrects the whole surface
-  // without a per-frame canvas flip.
-  texture.uScale = -1;
-  texture.uOffset = 1;
+  // --- 3D bar field: one base box, ~384 thin instances --------------------
+  const barMesh = MeshBuilder.CreateBox('main-stage-visualizer-bars', { size: 1 }, scene);
+  barMesh.isPickable = false;
+  // Thin instances vanish when the source mesh's own bounds leave the frustum;
+  // the field spans the whole unit, so skip per-instance culling surprises.
+  barMesh.alwaysSelectAsActiveMesh = true;
 
-  const rawContext = texture.getContext() as CanvasRenderingContext2D | null;
-  // NullEngine / jsdom-without-canvas has no usable 2D context. We still own
-  // the panel material (production always has a context), but skip all drawing
-  // so update() is a safe no-op there instead of throwing.
-  const ctx =
-    rawContext && typeof rawContext.fillRect === 'function' && typeof rawContext.fillText === 'function'
-      ? rawContext
-      : null;
-
-  // A self-lit screen: emissive-only so it glows into the venue (and feeds
-  // bloom) regardless of scene lighting, exactly like the hero panels read.
-  const material = new PBRMaterial('main-stage-visualizer-material', scene);
-  material.emissiveTexture = texture;
-  material.emissiveColor = new Color3(1, 1, 1);
-  material.emissiveIntensity = 3.2;
-  material.albedoColor = new Color3(0, 0, 0);
-  material.metallic = 0;
-  material.roughness = 1;
-  material.disableLighting = true;
-  for (const panel of panels) {
-    panel.material = material;
+  // PBR unlit so the per-instance color buffer IS the final color (white
+  // albedo x instance color). Verified in-engine: StandardMaterial ignored
+  // the instance colors entirely in this venue (rendered flat white); the
+  // PBR unlit path multiplies them correctly. Bright cells exceed the venue
+  // bloom threshold (0.5) and glow like the old screens.
+  const barMaterial = new PBRMaterial('main-stage-visualizer-bar-material', scene);
+  barMaterial.unlit = true;
+  barMaterial.albedoColor = new Color3(1, 1, 1);
+  barMesh.material = barMaterial;
+  // A plain white COLOR vertex buffer on the base box guarantees the
+  // vertex-color shader define compiles, so the thin-instance color
+  // attribute actually reaches the shader (in-engine verified requirement).
+  {
+    const positions = barMesh.getVerticesData(VertexBuffer.PositionKind);
+    if (positions) {
+      const whiteColors = new Float32Array((positions.length / 3) * 4).fill(1);
+      barMesh.setVerticesData(VertexBuffer.ColorKind, whiteColors, false, 4);
+    }
   }
 
-  // Precomputed per-bin colour strings (magenta -> cyan across the spectrum):
-  // building these once keeps the hot path free of per-frame string/gradient
-  // allocation.
-  const binColors: string[] = [];
-  for (let i = 0; i < BIN_COUNT; i++) {
-    const t = i / (BIN_COUNT - 1);
-    const r = Math.round(MAGENTA_RGB.r + (CYAN_RGB.r - MAGENTA_RGB.r) * t);
-    const g = Math.round(MAGENTA_RGB.g + (CYAN_RGB.g - MAGENTA_RGB.g) * t);
-    const b = Math.round(MAGENTA_RGB.b + (CYAN_RGB.b - MAGENTA_RGB.b) * t);
-    binColors.push(`rgb(${r},${g},${b})`);
+  // Preallocated per-instance buffers, mutated in place every frame - zero
+  // per-frame allocation. Matrices are plain scale+translate (no rotation):
+  // only the depth scale (offset+10) and z translation (offset+14) change.
+  const matrices = new Float32Array(CELL_COUNT * 16);
+  const colors = new Float32Array(CELL_COUNT * 4);
+  for (let c = 0; c < COLUMN_COUNT; c++) {
+    const x = -UNIT_WIDTH / 2 + (c + 0.5) * CELL_WIDTH;
+    for (let r = 0; r < ROW_COUNT; r++) {
+      const i = c * ROW_COUNT + r;
+      const o = i * 16;
+      matrices[o + 0] = CELL_WIDTH * CELL_FILL;
+      matrices[o + 5] = CELL_HEIGHT * CELL_FILL;
+      matrices[o + 10] = BAR_REST_DEPTH;
+      matrices[o + 12] = x;
+      matrices[o + 13] = UNIT_CENTER_Y - UNIT_HEIGHT / 2 + (r + 0.5) * CELL_HEIGHT;
+      matrices[o + 14] = BACKING_Z - 0.05 - BAR_REST_DEPTH / 2;
+      matrices[o + 15] = 1;
+      colors[i * 4 + 3] = 1;
+    }
   }
+  // staticBuffer=false: we mutate the arrays and flag thinInstanceBufferUpdated
+  // each frame instead of re-uploading fresh buffers.
+  barMesh.thinInstanceSetBuffer('matrix', matrices, 16, false);
+  barMesh.thinInstanceSetBuffer('color', colors, 4, false);
 
-  // Reused scratch buffer - filled every frame, never reallocated.
+  // Per-column identity gradient (magenta at center-lows -> cyan at edge-highs)
+  // and smoothed energies, both precomputed/preallocated.
+  const columnR = new Float32Array(COLUMN_COUNT);
+  const columnG = new Float32Array(COLUMN_COUNT);
+  const columnB = new Float32Array(COLUMN_COUNT);
+  for (let c = 0; c < COLUMN_COUNT; c++) {
+    // 0 at the center columns, 1 at the outer edges (mirrored spectrum).
+    const t = Math.abs(c - (COLUMN_COUNT - 1) / 2) / ((COLUMN_COUNT - 1) / 2);
+    columnR[c] = MAGENTA.r + (CYAN.r - MAGENTA.r) * t;
+    columnG[c] = MAGENTA.g + (CYAN.g - MAGENTA.g) * t;
+    columnB[c] = MAGENTA.b + (CYAN.b - MAGENTA.b) * t;
+  }
+  const columnEnergy = new Float32Array(COLUMN_COUNT);
   const freqData = new Uint8Array(BIN_COUNT);
 
   let elapsed = 0;
   let mode: StageVisualizerMode = 'normal';
   let countdownSeconds = 0;
 
+  // Average the bins covered by a column's mirrored position (low frequencies
+  // at the CENTER, highs at the edges - mirroring the old flat screen's look).
+  function readColumnTarget(c: number): number {
+    const half = COLUMN_COUNT / 2;
+    const m = c < half ? half - 1 - c : c - half; // 0 (center) .. half-1 (edge)
+    const start = Math.floor((m * BIN_COUNT) / half);
+    const end = Math.max(start + 1, Math.floor(((m + 1) * BIN_COUNT) / half));
+    let sum = 0;
+    for (let i = start; i < end; i++) {
+      sum += freqData[i];
+    }
+    return sum / ((end - start) * 255);
+  }
+
+  function updateBars(dtSeconds: number): void {
+    options.getFrequencyData(freqData);
+    let total = 0;
+    for (let i = 0; i < BIN_COUNT; i++) {
+      total += freqData[i];
+    }
+
+    // Smoothing toward this frame's target keeps the field fluid instead of
+    // strobing; a faster fall than rise would over-engineer this - one rate
+    // reads fine in-engine.
+    const blend = Math.min(1, dtSeconds * 12);
+
+    for (let c = 0; c < COLUMN_COUNT; c++) {
+      let target: number;
+      if (mode === 'lead_in') {
+        // Bars suppressed low so the countdown owns the moment.
+        target = 0.06 + 0.04 * Math.sin(elapsed * 1.5 + c * 0.4);
+      } else if (mode === 'active') {
+        // Slow celebratory wave rolling out from the center.
+        const m = Math.abs(c - (COLUMN_COUNT - 1) / 2);
+        target = 0.45 + 0.35 * Math.sin(elapsed * 2.2 - m * 0.45);
+      } else if (total === 0) {
+        // Idle (single-player path, no audio): gentle breathing sweep so the
+        // unit never looks dead - clearly cheaper than the audio path.
+        target = 0.1 + 0.08 * Math.sin(elapsed * 0.9 + c * 0.35) + 0.05 * Math.sin(elapsed * 0.4);
+      } else {
+        target = readColumnTarget(c);
+      }
+      columnEnergy[c] += (target - columnEnergy[c]) * blend;
+
+      const energy = columnEnergy[c] < 0 ? 0 : columnEnergy[c] > 1 ? 1 : columnEnergy[c];
+      // Eased depth response: quiet passages stay shallow, peaks punch out.
+      const eased = energy * energy * (3 - 2 * energy); // smoothstep
+      const lit = energy * ROW_COUNT;
+
+      for (let r = 0; r < ROW_COUNT; r++) {
+        const i = c * ROW_COUNT + r;
+        const o = i * 16;
+        // How lit this cell is: full below the energy line, fractional at the
+        // line, zero above it.
+        let cell = lit - r;
+        cell = cell < 0 ? 0 : cell > 1 ? 1 : cell;
+
+        const depth = BAR_REST_DEPTH + (BAR_MAX_DEPTH - BAR_REST_DEPTH) * eased * cell;
+        matrices[o + 10] = depth;
+        matrices[o + 14] = BACKING_Z - 0.05 - depth / 2;
+
+        // Dim floor for unlit cells, identity gradient scaled by lit-ness for
+        // the rest; peaks push toward white-hot for the bloom to grab.
+        const brightness = DIM_LEVEL + (0.55 + 0.45 * eased) * cell;
+        const hot = 0.35 * eased * cell;
+        colors[i * 4 + 0] = columnR[c] * brightness + hot;
+        colors[i * 4 + 1] = columnG[c] * brightness + hot;
+        colors[i * 4 + 2] = columnB[c] * brightness + hot;
+      }
+    }
+
+    barMesh.thinInstanceBufferUpdated('matrix');
+    barMesh.thinInstanceBufferUpdated('color');
+  }
+
+  // --- Backing text layers ------------------------------------------------
+
   function drawWordmark(context: CanvasRenderingContext2D, alpha: number): void {
     context.save();
     context.globalAlpha = alpha;
     context.fillStyle = '#eafcff';
-    context.font = 'bold 64px sans-serif';
+    context.font = 'bold 120px sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     if ('shadowColor' in context) {
       context.shadowColor = '#29d3f0';
-      context.shadowBlur = 26;
+      context.shadowBlur = 40;
     }
     context.fillText('OMNIRAVE', TEXTURE_WIDTH / 2, TEXTURE_HEIGHT / 2);
     context.restore();
@@ -187,26 +364,7 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     context.fillStyle = '#04060c';
     context.fillRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
-    const mid = TEXTURE_HEIGHT / 2;
-    const barWidth = TEXTURE_WIDTH / BIN_COUNT;
-    // Mirrored spectrum about the vertical centre: bar height tracks that bin's
-    // live energy, so the whole field breathes with the music.
-    for (let i = 0; i < BIN_COUNT; i++) {
-      const energy = freqData[i] / 255;
-      const barHeight = energy * (TEXTURE_HEIGHT * 0.46);
-      context.fillStyle = binColors[i];
-      const x = i * barWidth;
-      context.fillRect(x, mid - barHeight, barWidth * 0.82, barHeight);
-      context.fillRect(x, mid, barWidth * 0.82, barHeight);
-    }
-
-    // A soft sweep drifting across the screen adds venue motion even in quiet
-    // passages, so the panel never reads as a frozen bar chart.
-    const sweepX = ((elapsed * 0.12) % 1) * TEXTURE_WIDTH;
-    context.fillStyle = 'rgba(255,255,255,0.05)';
-    context.fillRect(sweepX, 0, 3, TEXTURE_HEIGHT);
-
-    // Timed OmniRave identity beat.
+    // Timed OmniRave identity beat; the spectrum itself lives in the 3D bars.
     const cycle = elapsed % LOGO_PERIOD_SECONDS;
     if (cycle < LOGO_VISIBLE_SECONDS) {
       let alpha = 1;
@@ -224,7 +382,7 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     context.fillRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
     context.fillStyle = '#29d3f0';
-    context.font = 'bold 34px sans-serif';
+    context.font = 'bold 60px sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     context.fillText('FIREWORKS IN', TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.24);
@@ -236,10 +394,10 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     context.translate(TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.6);
     context.scale(pulse, pulse);
     context.fillStyle = '#eafcff';
-    context.font = 'bold 130px sans-serif';
+    context.font = 'bold 220px sans-serif';
     if ('shadowColor' in context) {
       context.shadowColor = '#e92ad6';
-      context.shadowBlur = 30;
+      context.shadowBlur = 46;
     }
     context.fillText(String(seconds), 0, 0);
     context.restore();
@@ -256,13 +414,13 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     context.fillStyle = '#eafcff';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.font = 'bold 60px sans-serif';
+    context.font = 'bold 110px sans-serif';
     if ('shadowColor' in context) {
       context.shadowColor = `hsl(${hue}, 90%, 60%)`;
-      context.shadowBlur = 28;
+      context.shadowBlur = 40;
     }
     context.fillText('FIREWORKS', TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.42);
-    context.font = 'bold 22px sans-serif';
+    context.font = 'bold 40px sans-serif';
     if ('shadowColor' in context) {
       context.shadowBlur = 0;
     }
@@ -270,9 +428,39 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     context.fillText('[ VISUALIZER VIDEO — PLACEHOLDER ]', TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.7);
   }
 
+  function paintBacking(): void {
+    if (!ctx || !offCtx || !offscreen || !texture) {
+      return;
+    }
+    // Text with handedness (wordmark, countdown digits) is the known
+    // DynamicTexture-on-a-plane mirroring gotcha. Pattern per
+    // createWayfindingSigns: draw normally on an OFFSCREEN canvas, then blit
+    // onto the texture via drawImage (drawing text directly under a flipped
+    // transform did not survive DynamicTexture paint timing in-engine).
+    // Flip choice: wayfinding's CreatePlane front face needed a VERTICAL flip
+    // under texture.update(false); this module needs the default
+    // texture.update() (invertY=true - update(false) does not push live
+    // per-frame edits), whose upload flip is that vertical flip's exact
+    // equivalent - so the blit here is an identity pass and the readable
+    // orientation comes from the invertY upload. In-engine verification
+    // decides; if text reads reversed, add scale(-1,1)/scale(1,-1) here.
+    if (mode === 'lead_in') {
+      drawCountdown(offCtx);
+    } else if (mode === 'active') {
+      drawFireworksPlaceholder(offCtx);
+    } else {
+      drawNormal(offCtx);
+    }
+    ctx.clearRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+    ctx.drawImage(offscreen, 0, 0);
+    // Default update() (invertY) is the call that actually uploads live
+    // per-frame edits to the GPU.
+    texture.update();
+  }
+
   return {
     get panels() {
-      return panels.length;
+      return oldPanels.length;
     },
     setEventState(state) {
       mode = resolveVisualizerMode(state);
@@ -280,25 +468,21 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     },
     update(dtSeconds) {
       // Guard against NaN/negative deltas from a stalled first frame.
-      elapsed += dtSeconds > 0 ? dtSeconds : 0;
-      if (!ctx) {
-        return;
-      }
-      options.getFrequencyData(freqData);
-      if (mode === 'lead_in') {
-        drawCountdown(ctx);
-      } else if (mode === 'active') {
-        drawFireworksPlaceholder(ctx);
-      } else {
-        drawNormal(ctx);
-      }
-      // Push the freshly painted canvas to the GPU. update() (default invertY)
-      // is the call that actually uploads live per-frame edits.
-      texture.update();
+      const dt = dtSeconds > 0 ? dtSeconds : 0;
+      elapsed += dt;
+      updateBars(dt);
+      paintBacking();
     },
     dispose() {
-      material.dispose();
-      texture.dispose();
+      barMesh.dispose();
+      barMaterial.dispose();
+      backing.dispose();
+      backingMaterial.dispose();
+      texture?.dispose();
+      // Hand the stage back exactly as found: the flat panels return.
+      for (const panel of oldPanels) {
+        panel.setEnabled(true);
+      }
     },
   };
 }
