@@ -31,9 +31,9 @@ describe('createImmersiveAudioShow', () => {
     const show = createImmersiveAudioShow(scene, { getFrequencyData: zeroSource });
 
     expect(show.beams).toBe(18);
-    // Dense thin-instanced laser field: hundreds of beams in one mesh.
-    expect(show.laserBlades).toBeGreaterThanOrEqual(600);
-    expect(show.laserBlades).toBeLessThanOrEqual(800);
+    // Dense thin-instanced laser field: 20 emitters (wings + truss; the crown
+    // column moved to createCrownEffects) x 28 beams = 560 beams in one mesh.
+    expect(show.laserBlades).toBe(560);
     expect(scene.getMeshByName('immersive-beam-0') != null).toBe(true);
     expect(scene.getMeshByName('immersive-laser-beam') != null).toBe(true);
     expect(scene.getMeshByName('immersive-floor-pulse') != null).toBe(true);
