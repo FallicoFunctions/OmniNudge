@@ -6,6 +6,7 @@ import type { Scene } from '@babylonjs/core/scene';
 
 import { applyAvatarColorway } from './avatarColorways';
 import { createReviewAvatar, type ReviewAvatar } from './createReviewAvatar';
+import { createNameplate, type Nameplate } from './createNameplate';
 import { resolveAvatarAnimationState } from './avatarAnimationState';
 import type { WorldSnapshot } from '../network/worldSocket';
 
@@ -27,6 +28,7 @@ interface RemoteEntry {
   colorwayId: string | null;
   elapsedSeconds: number;
   gone: boolean;
+  nameplate: Nameplate;
   playerName: string;
   root: TransformNode;
   speedMetersPerSecond: number;
@@ -81,11 +83,17 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
     const root = new TransformNode(`remote-player-${id}`, scene);
     root.parent = parent;
     root.position.copyFrom(position);
+    // The nameplate attaches immediately - it doesn't depend on the (async,
+    // possibly slow or never-arriving) avatar build, so a player is always
+    // identifiable even before their body loads.
+    const nameplate = createNameplate(scene, id, playerName);
+    nameplate.mesh.parent = root;
     const entry: RemoteEntry = {
       avatar: null,
       colorwayId: null,
       elapsedSeconds: 0,
       gone: false,
+      nameplate,
       playerName,
       root,
       speedMetersPerSecond: 0,
@@ -115,6 +123,7 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
       disposeAvatarMeshes(entry.avatar.meshes);
       entry.avatar.root.dispose();
     }
+    entry.nameplate.dispose();
     entry.root.dispose();
     entries.delete(id);
   };
@@ -140,6 +149,7 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
           }
           entry.target.copyFrom(target);
           entry.playerName = player.playerName;
+          entry.nameplate.setName(player.playerName);
         }
         const colorwayId = player.loadout?.[COLORWAY_LOADOUT_KEY] ?? null;
         if (colorwayId && colorwayId !== entry.colorwayId) {
