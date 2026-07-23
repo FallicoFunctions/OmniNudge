@@ -27,6 +27,7 @@ import { createDebugPanel } from '../ui/createDebugPanel';
 import { createPerfOverlay, updatePerfOverlay } from '../ui/createPerfOverlay';
 import { createReviewHud, formatCheckpointLabel } from '../ui/createReviewHud';
 import { createRuntimeLoadingOverlay } from '../ui/createRuntimeLoadingOverlay';
+import { createEnterOmniRaveOverlay } from '../ui/createEnterOmniRaveOverlay';
 import { RUNTIME_CONFIG } from './runtimeConfig';
 
 type RuntimeEngine = Engine | WebGPUEngine;
@@ -102,6 +103,7 @@ export async function createRuntime(host: HTMLElement) {
   let perfOverlay: HTMLElement | undefined;
   let debugPanel: HTMLElement | undefined;
   let loadingOverlay: HTMLElement | undefined;
+  let enterOverlay: import('../ui/createEnterOmniRaveOverlay').EnterOmniRaveOverlay | undefined;
   let handleCanvasPick: ((event: MouseEvent) => void) | undefined;
   let handleResize: (() => void) | undefined;
   let disposed = false;
@@ -125,6 +127,7 @@ export async function createRuntime(host: HTMLElement) {
     perfOverlay?.remove();
     hud?.remove();
     loadingOverlay?.remove();
+    enterOverlay?.dispose();
     canvas.remove();
   };
 
@@ -246,6 +249,7 @@ export async function createRuntime(host: HTMLElement) {
       }
       worldSocket?.dispose();
       remotePlayerRigs?.dispose();
+      stageMediaPlayer?.dispose();
       cleanupOwnedResources();
       activeEngine.dispose();
     };
@@ -256,23 +260,37 @@ export async function createRuntime(host: HTMLElement) {
     // position each frame.
     let worldSocket: import('../network/worldSocket').WorldSocket | undefined;
     let remotePlayerRigs: import('../player/createRemotePlayerRigs').RemotePlayerRigs | undefined;
+    let stageMediaPlayer: import('../media/stageMediaPlayer').StageMediaPlayer | undefined;
     if (perfFlags.worldUrl && perfFlags.worldToken) {
-      const [{ createWorldSocket }, { createRemotePlayerRigs }] = await Promise.all([
+      const [{ createWorldSocket }, { createRemotePlayerRigs }, { createStageMediaPlayer }] = await Promise.all([
         import('../network/worldSocket'),
         import('../player/createRemotePlayerRigs'),
+        import('../media/stageMediaPlayer'),
       ]);
       remotePlayerRigs = createRemotePlayerRigs(scene);
+      stageMediaPlayer = createStageMediaPlayer();
       worldSocket = createWorldSocket({
         url: perfFlags.worldUrl,
         token: perfFlags.worldToken,
       });
       worldSocket.onSnapshot((snapshot) => {
         remotePlayerRigs?.applySnapshot(snapshot);
+        const activeMedia = snapshot.zoneMedia.find((zone) => zone.zoneId === snapshot.activeZone) ?? null;
+        stageMediaPlayer?.applyMedia(activeMedia);
       });
       worldSocket.onStatusChange((status) => {
         console.info(`[world] socket ${status}`);
       });
       worldSocket.connect();
+
+      // Mobile (and most desktop) autoplay policy blocks audio until an
+      // explicit user gesture. This overlay's tap IS that gesture.
+      const activeStageMediaPlayer = stageMediaPlayer;
+      enterOverlay = createEnterOmniRaveOverlay(host, () => {
+        activeStageMediaPlayer.unlock();
+        enterOverlay?.dispose();
+        enterOverlay = undefined;
+      });
     }
 
     const runtime = {
