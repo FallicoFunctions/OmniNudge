@@ -1,61 +1,36 @@
 // Synchronized stage-music player: the SERVER owns the playhead (see
 // docs/superpowers/specs/2026-06-01-omnirave-design.md §7), this module just
-// keeps the local YouTube IFrame player following it.
+// keeps the local audio player following it.
 //
-// Framework-free, no Babylon imports. AUDIO-FIRST: this only manages an
-// (effectively hidden) YouTube IFrame player. The on-stage video SCREEN
-// rendering is a separate future slice.
+// Framework-free, no Babylon imports. The audio is SELF-HOSTED: the game
+// serves its own audio files (Vite serves public/ at the web root, so a file
+// at public/audio/<trackId>.mp3 is reachable at /audio/<trackId>.mp3). There
+// is no YouTube / third-party embed.
 //
-// Like worldSocket.ts injects `webSocketFactory`, the real YouTube player is
-// hidden behind an injected `backendFactory` so this module is testable
-// under Vitest with a hand-rolled FakeBackend and never touches real
-// YouTube / the browser network.
+// Like worldSocket.ts injects `webSocketFactory`, the real HTMLAudioElement is
+// hidden behind an injected `backendFactory` so this module is testable under
+// Vitest with a hand-rolled FakeBackend and never touches the DOM / network.
 
 import type { ZoneMediaState } from '../network/worldSocket';
 
-// Minimal ambient shape of the real YouTube IFrame API — just enough of the
-// surface this module uses. There's no official @types package; this is
-// intentionally narrow rather than pulling in a full third-party typing.
-declare global {
-  namespace YT {
-    interface Player {
-      destroy(): void;
-      getCurrentTime(): number;
-      loadVideoById(videoId: string, startSeconds?: number): void;
-      mute(): void;
-      pauseVideo(): void;
-      playVideo(): void;
-      seekTo(seconds: number, allowSeekAhead: boolean): void;
-      unMute(): void;
-    }
+// The served audio file extension. A single named constant so switching the
+// whole setlist to a different container (e.g. .m4a) is a one-line change.
+const AUDIO_FILE_EXTENSION = '.mp3';
 
-    const Player: {
-      new (
-        element: HTMLElement,
-        options: {
-          height: string;
-          width: string;
-          events?: { onReady?: () => void };
-        },
-      ): Player;
-    };
-  }
-
-  interface Window {
-    YT?: typeof YT;
-    onYouTubeIframeAPIReady?: () => void;
-  }
+// Resolves a server-reported trackId to the URL of its self-hosted audio file.
+function resolveTrackUrl(trackId: string): string {
+  return `/audio/${trackId}${AUDIO_FILE_EXTENSION}`;
 }
 
 // If the server-reported playhead and our local playback position drift by
 // more than this, snap to the server position. Below this we just let
-// playback run: YouTube's own clock is close enough moment-to-moment that
-// reseeking on every ~1s snapshot would audibly stutter the track for no
+// playback run: the browser's own audio clock is close enough moment-to-moment
+// that reseeking on every ~1s snapshot would audibly stutter the track for no
 // audible sync benefit.
 const DRIFT_THRESHOLD_SECONDS = 2.5;
 
 export interface StagePlayerBackend {
-  load(videoId: string, startSeconds: number): void;
+  load(trackId: string, startSeconds: number): void;
   play(): void;
   pause(): void;
   seek(seconds: number): void;
@@ -74,10 +49,10 @@ export interface StageMediaPlayer {
   dispose: () => void;
 }
 
-// A backend that does nothing, used when the real YouTube API can't be
-// reached (blocked script, missing global, etc). Degrading to this instead
-// of throwing keeps a blocked video player from taking down the whole
-// runtime over background music.
+// A backend that does nothing, used when a real HTMLAudioElement can't be
+// constructed (non-browser env, blocked audio, etc). Degrading to this instead
+// of throwing keeps a broken audio element from taking down the whole runtime
+// over background music.
 function createNoopBackend(): StagePlayerBackend {
   return {
     load() {},
@@ -92,132 +67,92 @@ function createNoopBackend(): StagePlayerBackend {
   };
 }
 
-type YoutubeApi = typeof YT | undefined;
-
-let youtubeApiPromise: Promise<YoutubeApi> | null = null;
-
-// Loads the YouTube IFrame API script exactly once per page, however many
-// stage players get created/disposed across it. Never rejects: a blocked or
-// failed script load resolves to `undefined` so callers can fall back to the
-// no-op backend instead of throwing.
-function loadYoutubeApi(): Promise<YoutubeApi> {
-  if (youtubeApiPromise) {
-    return youtubeApiPromise;
+// The real backend: wraps an HTMLAudioElement pointed at the self-hosted file.
+function createAudioBackend(): StagePlayerBackend {
+  let audio: HTMLAudioElement;
+  try {
+    audio = new Audio();
+    // Not a UI element; keep it out of layout. It is never appended to the DOM.
+    audio.preload = 'auto';
+  } catch {
+    console.warn('[stageMediaPlayer] HTMLAudioElement unavailable; stage audio disabled.');
+    return createNoopBackend();
   }
 
-  youtubeApiPromise = new Promise((resolve) => {
-    if (typeof window === 'undefined') {
-      resolve(undefined);
-      return;
-    }
-    if (window.YT?.Player) {
-      resolve(window.YT);
-      return;
-    }
+  const element = audio;
+  let playing = false;
+  // Pending seek target held until metadata loads: HTMLAudioElement ignores
+  // currentTime writes before it knows the track's duration.
+  let pendingSeekHandler: (() => void) | null = null;
 
-    const previousReady = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      previousReady?.();
-      resolve(window.YT);
+  function clearPendingSeek(): void {
+    if (pendingSeekHandler) {
+      element.removeEventListener('loadedmetadata', pendingSeekHandler);
+      pendingSeekHandler = null;
+    }
+  }
+
+  function applySeek(seconds: number): void {
+    clearPendingSeek();
+    // HAVE_METADATA (1) or better means duration is known and currentTime sticks.
+    if (element.readyState >= 1) {
+      element.currentTime = seconds;
+      return;
+    }
+    const handler = () => {
+      element.removeEventListener('loadedmetadata', handler);
+      pendingSeekHandler = null;
+      element.currentTime = seconds;
     };
+    pendingSeekHandler = handler;
+    element.addEventListener('loadedmetadata', handler);
+  }
 
-    const existing = document.querySelector<HTMLScriptElement>('script[data-omnirave-youtube-api]');
-    if (existing) {
-      return;
+  function startPlayback(): void {
+    playing = true;
+    // play() may reject under the browser autoplay policy; the Enter-OmniRave
+    // gesture unlocks it. Swallow the rejection — do NOT retry-loop. (Some
+    // environments return undefined rather than a promise; guard for that.)
+    const result = element.play();
+    if (result && typeof result.catch === 'function') {
+      void result.catch(() => {});
     }
-
-    const script = document.createElement('script');
-    script.dataset.omniraveYoutubeApi = 'true';
-    script.src = 'https://www.youtube.com/iframe_api';
-    script.onerror = () => resolve(undefined);
-    document.head.appendChild(script);
-  });
-
-  return youtubeApiPromise;
-}
-
-function createYoutubeBackend(): StagePlayerBackend {
-  const container = document.createElement('div');
-  container.dataset.testid = 'stage-media-player';
-  // Audio-first: the iframe is present (YouTube requires a rendered target)
-  // but visually collapsed. The on-stage video screen is a future slice.
-  container.style.position = 'fixed';
-  container.style.width = '1px';
-  container.style.height = '1px';
-  container.style.overflow = 'hidden';
-  container.style.opacity = '0';
-  container.style.pointerEvents = 'none';
-  document.body.appendChild(container);
-
-  let player: YT.Player | undefined;
-  let disposed = false;
-  let pendingVideoId: string | undefined;
-  let pendingStartSeconds = 0;
-
-  void loadYoutubeApi().then((youtubeApi) => {
-    if (disposed) return;
-    if (!youtubeApi?.Player) {
-      console.warn('[stageMediaPlayer] YouTube IFrame API unavailable; stage audio disabled.');
-      container.remove();
-      return;
-    }
-
-    player = new youtubeApi.Player(container, {
-      height: '1',
-      width: '1',
-      events: {
-        onReady: () => {
-          if (disposed) return;
-          if (pendingVideoId) {
-            player?.loadVideoById(pendingVideoId, pendingStartSeconds);
-          }
-        },
-      },
-    });
-  });
+  }
 
   return {
-    load(videoId, startSeconds) {
-      pendingVideoId = videoId;
-      pendingStartSeconds = startSeconds;
-      if (player) {
-        player.loadVideoById(videoId, startSeconds);
+    load(trackId, startSeconds) {
+      element.src = resolveTrackUrl(trackId);
+      applySeek(startSeconds);
+      if (playing) {
+        startPlayback();
       }
     },
     play() {
-      player?.playVideo();
+      startPlayback();
     },
     pause() {
-      player?.pauseVideo();
+      playing = false;
+      element.pause();
     },
     seek(seconds) {
-      player?.seekTo(seconds, true);
+      applySeek(seconds);
     },
     getCurrentTime() {
-      return player?.getCurrentTime?.() ?? 0;
+      return element.currentTime;
     },
     setMuted(muted) {
-      if (!player) return;
-      if (muted) {
-        player.mute();
-      } else {
-        player.unMute();
-      }
+      element.muted = muted;
     },
     dispose() {
-      disposed = true;
-      try {
-        player?.destroy();
-      } catch {
-        // Best-effort teardown; the container removal below is what matters.
-      }
-      container.remove();
+      clearPendingSeek();
+      element.pause();
+      element.removeAttribute('src');
     },
   };
 }
 
 export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): StageMediaPlayer {
-  const createBackend = options.backendFactory ?? createYoutubeBackend;
+  const createBackend = options.backendFactory ?? createAudioBackend;
 
   let backend: StagePlayerBackend | undefined;
   let unlocked = false;
@@ -227,7 +162,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   // calls before unlock() are stashed and applied once unlocked instead of
   // being dropped.
   let desiredMedia: ZoneMediaState | null = null;
-  let currentVideoId: string | undefined;
+  let currentTrackId: string | undefined;
   let currentPlaylistIndex: number | undefined;
 
   function ensureBackend(): StagePlayerBackend {
@@ -240,12 +175,12 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   function playMedia(media: ZoneMediaState): void {
     const activeBackend = ensureBackend();
     const isNewTrack =
-      media.videoId !== currentVideoId || media.playlistIndex !== currentPlaylistIndex;
+      media.trackId !== currentTrackId || media.playlistIndex !== currentPlaylistIndex;
 
     if (isNewTrack) {
-      currentVideoId = media.videoId;
+      currentTrackId = media.trackId;
       currentPlaylistIndex = media.playlistIndex;
-      activeBackend.load(media.videoId, media.playheadSeconds);
+      activeBackend.load(media.trackId, media.playheadSeconds);
       activeBackend.setMuted(false);
       activeBackend.play();
       return;
@@ -269,7 +204,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     }
 
     if (!media) {
-      currentVideoId = undefined;
+      currentTrackId = undefined;
       currentPlaylistIndex = undefined;
       backend?.pause();
       return;

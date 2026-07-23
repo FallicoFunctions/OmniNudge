@@ -34,27 +34,27 @@ WITH inserted_setlists AS (
 INSERT INTO omnirave_stage_setlist_entries (setlist_id, position, video_id, duration_seconds)
 SELECT id, position, video_id, duration_seconds
 FROM (
-  SELECT id, zone_id, 0 AS position, 'main-stage-youtube' AS video_id, 1800 AS duration_seconds
+  SELECT id, zone_id, 0 AS position, 'main-stage-set-01' AS video_id, 1800 AS duration_seconds
   FROM inserted_setlists
   WHERE zone_id = 'main_stage'
   UNION ALL
-  SELECT id, zone_id, 1 AS position, 'main-stage-youtube-2' AS video_id, 1680 AS duration_seconds
+  SELECT id, zone_id, 1 AS position, 'main-stage-set-02' AS video_id, 1680 AS duration_seconds
   FROM inserted_setlists
   WHERE zone_id = 'main_stage'
   UNION ALL
-  SELECT id, zone_id, 0 AS position, 'techno-room-youtube' AS video_id, 1440 AS duration_seconds
+  SELECT id, zone_id, 0 AS position, 'techno-room-set-01' AS video_id, 1440 AS duration_seconds
   FROM inserted_setlists
   WHERE zone_id = 'techno_room'
   UNION ALL
-  SELECT id, zone_id, 1 AS position, 'techno-room-youtube-2' AS video_id, 1560 AS duration_seconds
+  SELECT id, zone_id, 1 AS position, 'techno-room-set-02' AS video_id, 1560 AS duration_seconds
   FROM inserted_setlists
   WHERE zone_id = 'techno_room'
   UNION ALL
-  SELECT id, zone_id, 0 AS position, 'neon-room-youtube' AS video_id, 1320 AS duration_seconds
+  SELECT id, zone_id, 0 AS position, 'neon-room-set-01' AS video_id, 1320 AS duration_seconds
   FROM inserted_setlists
   WHERE zone_id = 'neon_room'
   UNION ALL
-  SELECT id, zone_id, 1 AS position, 'neon-room-youtube-2' AS video_id, 1500 AS duration_seconds
+  SELECT id, zone_id, 1 AS position, 'neon-room-set-02' AS video_id, 1500 AS duration_seconds
   FROM inserted_setlists
   WHERE zone_id = 'neon_room'
 ) seeded_entries;

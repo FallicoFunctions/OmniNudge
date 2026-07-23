@@ -28,7 +28,7 @@ export interface WorldPlayer {
 
 export interface ZoneMediaState {
   zoneId: string;
-  videoId: string;
+  trackId: string;
   playlistIndex: number;
   playheadSeconds: number;
 }

@@ -26,14 +26,14 @@ func TestPostgresStagePlaylistRepository_LoadActiveStagePlaylists(t *testing.T) 
 
 	require.Equal(t, world.ZoneMainStage, playlists[0].ZoneID)
 	require.Len(t, playlists[0].Entries, 2)
-	require.Equal(t, "main-stage-youtube", playlists[0].Entries[0].VideoID)
-	require.Equal(t, "main-stage-youtube-2", playlists[0].Entries[1].VideoID)
+	require.Equal(t, "main-stage-set-01", playlists[0].Entries[0].TrackID)
+	require.Equal(t, "main-stage-set-02", playlists[0].Entries[1].TrackID)
 
 	require.Equal(t, world.ZoneUnderground, playlists[1].ZoneID)
-	require.Equal(t, "techno-room-youtube", playlists[1].Entries[0].VideoID)
+	require.Equal(t, "techno-room-set-01", playlists[1].Entries[0].TrackID)
 
 	require.Equal(t, world.ZonePlurrPartay, playlists[2].ZoneID)
-	require.Equal(t, "neon-room-youtube", playlists[2].Entries[0].VideoID)
+	require.Equal(t, "neon-room-set-01", playlists[2].Entries[0].TrackID)
 }
 
 func TestPostgresStagePlaylistRepository_IgnoresInactiveSetlists(t *testing.T) {
@@ -56,7 +56,7 @@ func TestPostgresStagePlaylistRepository_IgnoresInactiveSetlists(t *testing.T) {
 	playlists, err := repo.LoadActiveStagePlaylists(ctx)
 	require.NoError(t, err)
 	require.Len(t, playlists, 3)
-	require.Equal(t, "main-stage-youtube", playlists[0].Entries[0].VideoID)
+	require.Equal(t, "main-stage-set-01", playlists[0].Entries[0].TrackID)
 }
 
 func TestPostgresStagePlaylistRepository_UpgradeRenamesLegacyZoneIDs(t *testing.T) {

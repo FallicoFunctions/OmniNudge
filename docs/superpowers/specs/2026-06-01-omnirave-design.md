@@ -116,17 +116,17 @@ The world contains three persistent media zones:
 - outdoor
 - primary arrival/social anchor
 - largest congregation area
-- synchronized curated DJ concert video playlist
+- synchronized curated DJ audio setlist
 
 2. `techno_room`
 - indoor warehouse / dark room
 - darker lighting and industrial mood
-- synchronized curated techno-focused DJ concert video playlist
+- synchronized curated techno-focused DJ audio setlist
 
 3. `neon_room`
 - indoor classic rave room
 - brighter neon lighting and classic rave feel
-- synchronized curated DJ concert video playlist
+- synchronized curated DJ audio setlist
 
 Players can move freely between these spaces in the same world session.
 
@@ -299,21 +299,21 @@ That zone-change event is the trigger for stage media switching.
 
 ## 7. Stage Media Model
 
-### 7.1 Video-First Stage Design
+### 7.1 Audio-First Stage Design
 
-Stages are not audio-only zones.
+Stage music is the core of each zone, and the game serves the audio itself.
 
 Each stage has:
-- a visible video screen / concert display
-- a curated playlist of YouTube concert videos
-- a synchronized playback timeline
+- a curated setlist of self-hosted audio files served by the game
+- a server-owned synchronized playback timeline
+- a stage presentation (lighting/visuals) driven by that timeline
 
 ### 7.2 Global Sync Per Zone
 
 Each stage has one authoritative playback state shared by all players currently in that zone.
 
 Per-zone state includes:
-- active YouTube video id
+- active audio track id
 - playlist index
 - server-owned playhead reference
 - started-at timestamp or equivalent timing anchor
@@ -331,7 +331,7 @@ Rules:
 - a player hears only the stage for their current server-confirmed zone
 - there is no blended crossfade between zones
 - leaving one zone immediately cuts that zone’s media
-- entering another zone immediately switches to that zone’s current synchronized video/audio
+- entering another zone immediately switches to that zone’s current synchronized audio
 
 To avoid flicker at exact border edges, the server may use a small internal hysteresis buffer, but the user-facing behavior must still feel like a hard zone boundary.
 
@@ -346,12 +346,12 @@ Players cannot:
 
 The owner/admin control surface is responsible for:
 - setting playlist order
-- choosing which YouTube videos are in each stage setlist
+- choosing which audio tracks are in each stage setlist
 - optionally skipping/forcing tracks later through an admin tool
 
 ### 7.5 Mobile Media Unlock
 
-Because OmniRave v1 supports mobile and uses synchronized YouTube-backed stage playback, the runtime must include an explicit media unlock step before world entry.
+Because OmniRave v1 supports mobile and uses synchronized self-hosted stage audio playback, the runtime must include an explicit media unlock step before world entry.
 
 Required behavior:
 - the player must perform an interaction such as tapping `Enter OmniRave` before stage audio is expected to work
