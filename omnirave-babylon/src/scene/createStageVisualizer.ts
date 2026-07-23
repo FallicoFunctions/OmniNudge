@@ -118,6 +118,14 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     return NOOP_VISUALIZER;
   }
 
+  // The hero panel's front face samples the texture reversed in U, so anything
+  // with handedness (the OMNIRAVE wordmark, the countdown digits) renders
+  // mirrored left-to-right (verified in-engine on the real panel). Flip the
+  // texture horizontally on the GPU - free, and it corrects the whole surface
+  // without a per-frame canvas flip.
+  texture.uScale = -1;
+  texture.uOffset = 1;
+
   const rawContext = texture.getContext() as CanvasRenderingContext2D | null;
   // NullEngine / jsdom-without-canvas has no usable 2D context. We still own
   // the panel material (production always has a context), but skip all drawing
