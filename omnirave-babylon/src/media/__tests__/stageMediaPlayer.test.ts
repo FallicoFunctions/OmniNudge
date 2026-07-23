@@ -10,6 +10,7 @@ function createFakeBackend(overrides: Partial<StagePlayerBackend> = {}): StagePl
     seek: vi.fn(),
     getCurrentTime: vi.fn(() => 0),
     setMuted: vi.fn(),
+    getFrequencyData: vi.fn(),
     dispose: vi.fn(),
     ...overrides,
   };
@@ -131,6 +132,30 @@ describe('createStageMediaPlayer', () => {
     player.applyMedia(media({ trackId: 'ignored-after-dispose' }));
     player.unlock();
     expect(backend.load).not.toHaveBeenCalled();
+  });
+
+  it('reports a zero spectrum before unlock and delegates to the backend after unlock', () => {
+    const injected = [11, 22, 33, 44];
+    const backend = createFakeBackend({
+      getFrequencyData: vi.fn((target: Uint8Array) => {
+        for (let i = 0; i < target.length; i++) {
+          target[i] = injected[i] ?? 0;
+        }
+      }),
+    });
+    const player = createStageMediaPlayer({ backendFactory: () => backend });
+
+    // Before unlock there is no backend at all: the player fills zeros and does
+    // not construct one just to read the spectrum.
+    const buffer = new Uint8Array(4).fill(99);
+    player.getFrequencyData(buffer);
+    expect(Array.from(buffer)).toEqual([0, 0, 0, 0]);
+    expect(backend.getFrequencyData).not.toHaveBeenCalled();
+
+    // After unlock the backend exists and its (injected) spectrum flows through.
+    player.unlock();
+    player.getFrequencyData(buffer);
+    expect(Array.from(buffer)).toEqual([11, 22, 33, 44]);
   });
 
   it('does not create a backend or throw before unlock even if applyMedia is called', () => {
