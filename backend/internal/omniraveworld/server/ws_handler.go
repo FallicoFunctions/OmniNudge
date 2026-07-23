@@ -274,7 +274,7 @@ func currentZoneMedia(mediaState *world.MediaState, now time.Time) []world.ZoneM
 	for _, snapshot := range snapshots {
 		zoneMedia = append(zoneMedia, world.ZoneMediaState{
 			ZoneID:          snapshot.ZoneID,
-			VideoID:         snapshot.VideoID,
+			TrackID:         snapshot.TrackID,
 			PlaylistIndex:   snapshot.Index,
 			PlayheadSeconds: int64(snapshot.Playhead / time.Second),
 		})

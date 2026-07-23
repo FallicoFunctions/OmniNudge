@@ -15,21 +15,21 @@ func TestLoadStagePlaylists_UsesRepositoryPlaylistsWhenPresent(t *testing.T) {
 			{
 				ZoneID: world.ZoneMainStage,
 				Entries: []world.PlaylistEntry{
-					{VideoID: "custom-main-stage", Duration: 60},
+					{TrackID: "custom-main-stage", Duration: 60},
 				},
 			},
 		},
 	})
 	require.NoError(t, err)
 	require.Len(t, playlists, 1)
-	require.Equal(t, "custom-main-stage", playlists[0].Entries[0].VideoID)
+	require.Equal(t, "custom-main-stage", playlists[0].Entries[0].TrackID)
 }
 
 func TestLoadStagePlaylists_FallsBackToDefaultsWhenRepositoryIsEmpty(t *testing.T) {
 	playlists, err := loadStagePlaylists(context.Background(), fakeStagePlaylistRepository{})
 	require.NoError(t, err)
 	require.Len(t, playlists, 3)
-	require.Equal(t, "main-stage-youtube", playlists[0].Entries[0].VideoID)
+	require.Equal(t, "main-stage-set-01", playlists[0].Entries[0].TrackID)
 }
 
 func TestLoadStagePlaylists_ReturnsRepositoryErrors(t *testing.T) {

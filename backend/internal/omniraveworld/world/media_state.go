@@ -6,7 +6,7 @@ import (
 )
 
 type PlaylistEntry struct {
-	VideoID  string
+	TrackID  string
 	Duration time.Duration
 }
 
@@ -18,7 +18,7 @@ type StagePlaylist struct {
 
 type ZoneMediaSnapshot struct {
 	ZoneID    ZoneID
-	VideoID   string
+	TrackID   string
 	Index     int
 	StartedAt time.Time
 	Playhead  time.Duration
@@ -26,7 +26,7 @@ type ZoneMediaSnapshot struct {
 
 type zoneMediaState struct {
 	ZoneID    ZoneID
-	VideoID   string
+	TrackID   string
 	Index     int
 	StartedAt time.Time
 }
@@ -60,7 +60,7 @@ func NewMediaStateWithPlaylists(playlists []StagePlaylist, startedAt time.Time) 
 		state.playlists[playlist.ZoneID] = playlist
 		state.zones[playlist.ZoneID] = zoneMediaState{
 			ZoneID:    playlist.ZoneID,
-			VideoID:   entry.VideoID,
+			TrackID:   entry.TrackID,
 			Index:     0,
 			StartedAt: zoneStartedAt,
 		}
@@ -69,13 +69,13 @@ func NewMediaStateWithPlaylists(playlists []StagePlaylist, startedAt time.Time) 
 	return state
 }
 
-func (m *MediaState) AdvanceTo(zone ZoneID, videoID string, index int, startedAt time.Time) {
+func (m *MediaState) AdvanceTo(zone ZoneID, trackID string, index int, startedAt time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.zones[zone] = zoneMediaState{
 		ZoneID:    zone,
-		VideoID:   videoID,
+		TrackID:   trackID,
 		Index:     index,
 		StartedAt: startedAt,
 	}
@@ -91,7 +91,7 @@ func (m *MediaState) SnapshotForZone(zone ZoneID, now time.Time) ZoneMediaSnapsh
 	}
 	return ZoneMediaSnapshot{
 		ZoneID:    zone,
-		VideoID:   current.VideoID,
+		TrackID:   current.TrackID,
 		Index:     current.Index,
 		StartedAt: current.StartedAt,
 		Playhead:  now.Sub(current.StartedAt),
@@ -112,7 +112,7 @@ func (m *MediaState) Snapshots(now time.Time) []ZoneMediaSnapshot {
 
 		snapshots = append(snapshots, ZoneMediaSnapshot{
 			ZoneID:    zone,
-			VideoID:   current.VideoID,
+			TrackID:   current.TrackID,
 			Index:     current.Index,
 			StartedAt: current.StartedAt,
 			Playhead:  now.Sub(current.StartedAt),
@@ -137,7 +137,7 @@ func resolvePlaylistState(current zoneMediaState, playlist StagePlaylist, now ti
 		if entry.Duration <= 0 || elapsed < entry.Duration {
 			return ZoneMediaSnapshot{
 				ZoneID:    current.ZoneID,
-				VideoID:   entry.VideoID,
+				TrackID:   entry.TrackID,
 				Index:     index,
 				StartedAt: current.StartedAt,
 				Playhead:  elapsed,
@@ -154,22 +154,22 @@ func DefaultStagePlaylists() []StagePlaylist {
 		{
 			ZoneID: ZoneMainStage,
 			Entries: []PlaylistEntry{
-				{VideoID: "main-stage-youtube", Duration: 30 * time.Minute},
-				{VideoID: "main-stage-youtube-2", Duration: 28 * time.Minute},
+				{TrackID: "main-stage-set-01", Duration: 30 * time.Minute},
+				{TrackID: "main-stage-set-02", Duration: 28 * time.Minute},
 			},
 		},
 		{
 			ZoneID: ZoneUnderground,
 			Entries: []PlaylistEntry{
-				{VideoID: "techno-room-youtube", Duration: 24 * time.Minute},
-				{VideoID: "techno-room-youtube-2", Duration: 26 * time.Minute},
+				{TrackID: "techno-room-set-01", Duration: 24 * time.Minute},
+				{TrackID: "techno-room-set-02", Duration: 26 * time.Minute},
 			},
 		},
 		{
 			ZoneID: ZonePlurrPartay,
 			Entries: []PlaylistEntry{
-				{VideoID: "neon-room-youtube", Duration: 22 * time.Minute},
-				{VideoID: "neon-room-youtube-2", Duration: 25 * time.Minute},
+				{TrackID: "neon-room-set-01", Duration: 22 * time.Minute},
+				{TrackID: "neon-room-set-02", Duration: 25 * time.Minute},
 			},
 		},
 	}
