@@ -13,10 +13,14 @@ import {
   PERIMETER_FRONT_Z,
   PERIMETER_LEFT_X,
   PERIMETER_RIGHT_X,
+  SKYDECK_GATE_Z_MAX,
+  SKYDECK_GATE_Z_MIN,
   createVenuePerimeter,
   planVenuePerimeter,
 } from '../createVenuePerimeter';
 import {
+  SKYDECK_RAMP_Z_MAX,
+  SKYDECK_RAMP_Z_MIN,
   VENUE_ENVELOPE_BACK_Z,
   VENUE_ENVELOPE_BLOCKER_THICKNESS,
   VENUE_WALKABLE_X_MAX,
@@ -117,6 +121,61 @@ describe('createVenuePerimeter', () => {
       .toBeGreaterThan(3);
     expect(plan.posts.filter((post) => post.x === PERIMETER_RIGHT_X && post.z >= CASCADE_GAP_Z_MAX).length)
       .toBeGreaterThan(3);
+  });
+
+  it('derives the skydeck ramp gate span from the ramp constants', () => {
+    // The opening must fully clear the ramp mouth plus a margin each side, and
+    // must be anchored to the ramp so it can never drift.
+    expect(SKYDECK_GATE_Z_MIN).toBe(SKYDECK_RAMP_Z_MIN - 1.5);
+    expect(SKYDECK_GATE_Z_MAX).toBe(SKYDECK_RAMP_Z_MAX + 1.5);
+    expect(SKYDECK_GATE_Z_MIN).toBeLessThan(SKYDECK_RAMP_Z_MIN);
+    expect(SKYDECK_GATE_Z_MAX).toBeGreaterThan(SKYDECK_RAMP_Z_MAX);
+  });
+
+  it('breaks the side fence for a ramp gate on BOTH flanks, mirrored', () => {
+    const plan = planVenuePerimeter();
+    for (const flankX of [PERIMETER_LEFT_X, PERIMETER_RIGHT_X]) {
+      // No post, panel or rail stands inside the gate mouth: the ramp is clear.
+      const postsInGate = plan.posts.filter(
+        (post) =>
+          Math.abs(post.x - flankX) < 1e-6 &&
+          post.z > SKYDECK_GATE_Z_MIN &&
+          post.z < SKYDECK_GATE_Z_MAX,
+      );
+      expect(postsInGate.length).toBe(0);
+      const spansInGate = plan.spans.filter(
+        (span) =>
+          Math.abs(span.x - flankX) < 1e-6 &&
+          span.z > SKYDECK_GATE_Z_MIN &&
+          span.z < SKYDECK_GATE_Z_MAX,
+      );
+      expect(spansInGate.length).toBe(0);
+      // The run resumes at the gate's far jamb (a post sits on the north edge)
+      // and continues to the front.
+      const jamb = plan.posts.filter(
+        (post) => Math.abs(post.x - flankX) < 1e-6 && Math.abs(post.z - SKYDECK_GATE_Z_MAX) < 1e-6,
+      );
+      expect(jamb.length).toBe(1);
+      const beyondGate = plan.posts.filter(
+        (post) => Math.abs(post.x - flankX) < 1e-6 && post.z > SKYDECK_GATE_Z_MAX,
+      );
+      expect(beyondGate.length).toBeGreaterThan(3);
+    }
+  });
+
+  it('opens ONLY the ramp gate: cascade break and unit counts otherwise hold', () => {
+    const plan = planVenuePerimeter();
+    // The gate removes exactly two posts, two panels and two rails per flank
+    // (four each across both mirrored flanks) versus the ungated side runs.
+    // Post total: back 21 + per flank (8 back-run + 5 front-run) x 2 = 47.
+    expect(plan.posts.length).toBe(47);
+    // Panels/rails share one count: back 20 + per flank (8 + 4) x 2 = 44.
+    expect(plan.spans.length).toBe(44);
+    // The cascade water break is untouched: still no unit in that band.
+    const inCascadeBand = plan.posts.filter(
+      (post) => Math.abs(post.x) > 50 && post.z > CASCADE_GAP_Z_MIN && post.z < CASCADE_GAP_Z_MAX,
+    );
+    expect(inCascadeBand.length).toBe(0);
   });
 
   it('covers each edge with posts about every 6m', () => {

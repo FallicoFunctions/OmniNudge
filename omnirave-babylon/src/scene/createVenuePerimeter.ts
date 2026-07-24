@@ -10,6 +10,8 @@ import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { Scene } from '@babylonjs/core/scene';
 
 import {
+  SKYDECK_RAMP_Z_MAX,
+  SKYDECK_RAMP_Z_MIN,
   VENUE_ENVELOPE_BACK_Z,
   VENUE_ENVELOPE_BLOCKER_THICKNESS,
   VENUE_ENVELOPE_FRONT_Z,
@@ -53,6 +55,20 @@ export const PERIMETER_FRONT_Z = VENUE_ENVELOPE_FRONT_Z - BLOCKER_HALF - FENCE_I
 // around this z band.
 export const CASCADE_GAP_Z_MIN = -42;
 export const CASCADE_GAP_Z_MAX = -15;
+
+// Each VIP skydeck access ramp (createVipSkydeck.ts) lands its FOOT on this
+// side fence line: the ramp mouth occupies z SKYDECK_RAMP_Z_MIN..
+// SKYDECK_RAMP_Z_MAX at |x| ~= 61, precisely where the front side run stands.
+// Running panels straight across it dead-ends the ramp at a solid fence -
+// the owner walking the venue: "the ramp is walkable but the entrance ends at
+// a fence". So each side run BREAKS here for a gate, exactly the way it breaks
+// around the cascade water, and the ramp reads as an intentional gateway.
+//
+// The opening is the ramp's own z-extent plus GATE_CLEARANCE each side,
+// DERIVED from the ramp constants so it can never drift from the ramp.
+const GATE_CLEARANCE = 1.5;
+export const SKYDECK_GATE_Z_MIN = SKYDECK_RAMP_Z_MIN - GATE_CLEARANCE;
+export const SKYDECK_GATE_Z_MAX = SKYDECK_RAMP_Z_MAX + GATE_CLEARANCE;
 
 const NOMINAL_SPACING = 6;
 const POST_SIZE = 0.35;
@@ -102,7 +118,12 @@ function fenceRuns(): FenceRun[] {
   for (const x of [PERIMETER_LEFT_X, PERIMETER_RIGHT_X]) {
     runs.push(
       { axis: 'z', fixed: x, from: PERIMETER_BACK_Z, to: CASCADE_GAP_Z_MIN, skipFirstPost: true },
-      { axis: 'z', fixed: x, from: CASCADE_GAP_Z_MAX, to: PERIMETER_FRONT_Z, skipFirstPost: false },
+      // Front side run, split by the skydeck ramp gate. The short south stub
+      // (cascade gap end -> gate) is under one span and is dropped by the
+      // length guard below, leaving the gate mouth clear; the north segment
+      // resumes at the gate's far jamb and carries the run to the front.
+      { axis: 'z', fixed: x, from: CASCADE_GAP_Z_MAX, to: SKYDECK_GATE_Z_MIN, skipFirstPost: false },
+      { axis: 'z', fixed: x, from: SKYDECK_GATE_Z_MAX, to: PERIMETER_FRONT_Z, skipFirstPost: false },
     );
   }
   return runs;
