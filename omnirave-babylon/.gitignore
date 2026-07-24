@@ -2,3 +2,6 @@
 # Self-hosted stage audio (large binaries, not committed)
 public/audio/*
 !public/audio/.gitkeep
+
+# Timestamped .blend safety backups (local only)
+assets-src/main-stage/backups/
