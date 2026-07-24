@@ -34,6 +34,23 @@ export const VENUE_ENVELOPE_FRONT_Z = 21;
 // perimeter fence (createVenuePerimeter.ts) has to stand on.
 export const VENUE_ENVELOPE_BLOCKER_THICKNESS = 4;
 
+// --- Cascade fountain footprint -----------------------------------------
+// Each flank carries a tiered cascade FOUNTAIN. Its base stone is an
+// OCTAGON, not a rectangle. Measured live from the shipped venue (right
+// flank base-stone footprint x 54.3..82, z -41.3..-16.5), the octagon's
+// convex fit is the ellipse below: centre (68.15, -28.9), semi-axes
+// sx 13.85, sz 12.4. The left flank is the exact X-mirror (centre -68.15,
+// same axes).
+//
+// This is the SINGLE SOURCE OF TRUTH shared by BOTH the paving keep-out
+// (createCascadeCourtPaving.ts) and the collision blockers
+// (createMainStageCollisionBlockers.ts). Treating the octagon as a rectangle
+// left the octagon's corners (a) walled by invisible collision where no
+// stone is visible and (b) missing floor tiles. Both modules import this
+// ellipse so the walkable floor and the invisible walls can never disagree
+// about the fountain's real outline: corner cells are paved AND walk-through.
+export const FOUNTAIN_ELLIPSE = { cx: 68.15, cz: -28.9, sx: 13.85, sz: 12.4 } as const;
+
 // Front-of-house sound booth, placed by ACOUSTICS rather than eyeballing.
 // Measured from the venue's own PA: the main line arrays hang at x +/-16,
 // z -18.6, spanning y 7.7..17.2 (array length L = 9.5m, acoustic centre

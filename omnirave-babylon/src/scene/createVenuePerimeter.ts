@@ -49,9 +49,10 @@ export const PERIMETER_FRONT_Z = VENUE_ENVELOPE_FRONT_Z - BLOCKER_HALF - FENCE_I
 
 // The cascade-court water features occupy |x| ~34..64, z -41..-16 - i.e. they
 // straddle the side fence line. Running posts through the tiered water would
-// look broken, and no boundary read is lost there: the cascade coping has its
-// own collision (V150_CascadeCourtCoping, see the clustered blockers) and the
-// water feature is itself an obvious, readable edge. So each side run breaks
+// look broken, and no boundary read is lost there: the cascade fountain has
+// its own collision (the ellipse-hugging fountain columns in
+// createMainStageCollisionBlockers.ts) and the water feature is itself an
+// obvious, readable edge. So each side run breaks
 // around this z band.
 export const CASCADE_GAP_Z_MIN = -42;
 export const CASCADE_GAP_Z_MAX = -15;

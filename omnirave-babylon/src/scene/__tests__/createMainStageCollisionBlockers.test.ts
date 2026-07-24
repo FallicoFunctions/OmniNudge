@@ -89,9 +89,9 @@ describe('createMainStageCollisionBlockers clustered families', () => {
   it('refines a single WIDE CONNECTED mesh with a real archway gap into separate boxes, leaving the gap open', () => {
     // One continuous strip mesh (every column shares vertices with its
     // neighbour, so union-find sees exactly one component) mimicking the
-    // VIP wing shell / cascade-coping case the refinement exists for: solid
-    // piers at both ends, reaching the ground, joined across the middle by
-    // an arch that never dips below capsule height.
+    // VIP wing shell case the refinement exists for: solid piers at both
+    // ends, reaching the ground, joined across the middle by an arch that
+    // never dips below capsule height.
     const columnXs = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
     const positions: number[] = [];
     for (const x of columnXs) {
@@ -107,7 +107,7 @@ describe('createMainStageCollisionBlockers clustered families', () => {
       const t1 = c * 2 + 3;
       indices.push(b0, t0, b1, t0, t1, b1);
     }
-    const archway = new Mesh('merged:V150_CascadeCourtCoping+1', scene);
+    const archway = new Mesh('merged:V30_VipShellFascia+1', scene);
     archway.setVerticesData('position', positions);
     archway.setIndices(indices);
     archway.computeWorldMatrix(true);
@@ -176,5 +176,73 @@ describe('createMainStageCollisionBlockers clustered families', () => {
     const blockers = clusterBlockers([merged]);
 
     expect(blockers.length).toBe(pylonCount);
+  });
+});
+
+describe('createMainStageCollisionBlockers cascade fountain (octagon ellipse)', () => {
+  let engine: NullEngine;
+  let scene: Scene;
+
+  beforeEach(() => {
+    engine = new NullEngine();
+    scene = new Scene(engine);
+  });
+
+  afterEach(() => {
+    scene.dispose();
+    engine.dispose();
+  });
+
+  // True when (x, z) lies inside any authored cascade-fountain column box, at
+  // capsule height. Primitives only - the boxes' world bounds are read out and
+  // compared as numbers, never handed to expect().
+  const blockedAtFountain = (x: number, z: number): boolean => {
+    const blockers = createMainStageCollisionBlockers(scene, []).filter((mesh) =>
+      mesh.name.includes('cascade-fountain'),
+    );
+    return blockers.some((mesh) => {
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+      return (
+        x >= bb.minimumWorld.x &&
+        x <= bb.maximumWorld.x &&
+        z >= bb.minimumWorld.z &&
+        z <= bb.maximumWorld.z
+      );
+    });
+  };
+
+  it('emits an ellipse-hugging column row on each flank', () => {
+    const columns = createMainStageCollisionBlockers(scene, []).filter((mesh) =>
+      mesh.name.includes('cascade-fountain'),
+    );
+    // 14 per flank, both flanks.
+    expect(columns.length).toBe(28);
+    expect(columns.filter((mesh) => mesh.name.includes('-r-')).length).toBe(14);
+    expect(columns.filter((mesh) => mesh.name.includes('-l-')).length).toBe(14);
+  });
+
+  it('leaves the octagon corners (no stone) walk-through, both flanks', () => {
+    // Corners the old rectangle walled off - nothing stands here.
+    for (const [x, z] of [
+      [54, -39],
+      [54, -18],
+      [56, -40],
+    ] as const) {
+      expect(blockedAtFountain(x, z)).toBe(false);
+      // Left flank mirror.
+      expect(blockedAtFountain(-x, z)).toBe(false);
+    }
+  });
+
+  it('blocks the fountain stone itself, both flanks', () => {
+    // Centre and a mid-edge, both under real stone.
+    for (const [x, z] of [
+      [68, -28],
+      [60, -28],
+    ] as const) {
+      expect(blockedAtFountain(x, z)).toBe(true);
+      expect(blockedAtFountain(-x, z)).toBe(true);
+    }
   });
 });
