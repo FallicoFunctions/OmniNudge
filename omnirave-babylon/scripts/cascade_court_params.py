@@ -8,7 +8,11 @@ import math
 import random
 
 # Mound center in RIGHT-pocket coordinates (left pocket mirrors X).
-CENTER = (48.5, 28.5)
+# Moved outward from X=48.5 to X=68.5 (+20m) to reclaim inner plaza space
+# (owner request): the fountain now sits mostly past the fence through the
+# existing gap, with only ~4 tile-widths overlapping the walkable plaza.
+# Z/28.5 is unchanged so it stays aligned with the fence gap at z -42..-15.
+CENTER = (68.5, 28.5)
 
 # Stacked tiers, base (widest, lowest) -> summit (smallest, highest). Each:
 # (radius_x, radius_y, z_bottom, z_top, n_sides, phase_rad, off_x, off_y, seed)
