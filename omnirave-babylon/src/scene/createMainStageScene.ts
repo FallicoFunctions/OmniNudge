@@ -13,9 +13,12 @@ import { createPlayerController } from '../player/playerController';
 import { createPlayerRig } from '../player/createPlayerRig';
 import { createReviewAvatar } from '../player/createReviewAvatar';
 import { createAtmosphereRig } from './createAtmosphereRig';
+import { createCascadeCourtPaving } from './createCascadeCourtPaving';
 import { createCascadeCourtWaterMotion } from './cascadeCourtWaterMotion';
+import { createVenuePerimeter } from './createVenuePerimeter';
 import { createFestivalField } from './createFestivalField';
 import { createStageShow } from './createStageShow';
+import { createSoundBooth } from './createSoundBooth';
 import { createVipForecourtDressing } from './createVipForecourtDressing';
 import { createWayfindingSigns } from './createWayfindingSigns';
 import { applyPracticalPoolLightBudget, createLightingRig } from './createLightingRig';
@@ -144,6 +147,23 @@ export async function createMainStageScene(engine: AbstractEngine) {
   // cascade courts and stage so players can find them (the authored pylons
   // only mark the far arrival point).
   const wayfindingSigns = createWayfindingSigns(scene);
+
+  // Front-of-house sound booth on the promenade spine facing the stage -
+  // the mix position every real festival stage has, placed at the venue's
+  // acoustic FOH spot (see FOH_BOOTH_* in mainStageVenueBounds). Empty (the
+  // game has no NPCs): it is authentic infrastructure, not a character set.
+  // Its solid body is the authored FOH row in createMainStageCollisionBlockers.
+  const soundBooth = createSoundBooth(scene);
+
+  // The visible venue boundary. The envelope blockers that close the walkable
+  // field are invisible boxes, so players walk into nothing and stop; this
+  // stands a pearl-and-gold fence exactly on that line (no collision of its
+  // own - it is the picture of the blockers, not a second wall).
+  const venuePerimeter = createVenuePerimeter(scene);
+
+  // Pearl paving with gold seam bands on the two Cascade Court flank plazas,
+  // which otherwise read as bare ground around the water features.
+  const cascadeCourtPaving = createCascadeCourtPaving(scene);
 
   // The general lighting show runs continuously (per the venue docs: an
   // ambient show is always on; the completion celebration layers the special
@@ -282,12 +302,18 @@ export async function createMainStageScene(engine: AbstractEngine) {
       stageShow,
       vipForecourtDressing,
       wayfindingSigns,
+      soundBooth,
+      venuePerimeter,
+      cascadeCourtPaving,
       spawn: BACK_PLAZA_SPAWN,
     },
   };
 
   scene.onDisposeObservable.add(() => {
     completionCelebration.dispose();
+    soundBooth.dispose();
+    venuePerimeter.dispose();
+    cascadeCourtPaving.dispose();
     canvas?.removeEventListener('wheel', handleCameraWheel);
     canvas?.removeEventListener('pointerdown', handleCameraPointerDown);
     canvas?.removeEventListener('pointermove', handleCameraPointerMove);
