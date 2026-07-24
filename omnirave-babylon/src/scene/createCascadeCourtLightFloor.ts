@@ -78,9 +78,15 @@ const COLOR_RADIUS_SCALE = 0.02;
 // bass drives the ripple contrast; a strong kick flashes all tiles.
 const IDLE_BASE = 0.03;
 const IDLE_AMP = 0.05; // idle peak ~0.08: alive but clearly calm
-const MUSIC_BASE = 0.07;
-const BASS_RIPPLE_GAIN = 1.0;
-const BEAT_FLASH_GAIN = 0.8;
+// Music-mode gains are pushed HARD so the floor reads at the same
+// intensity as the beams/lasers/crown (which run emissive ~8-10 and feed
+// bloom) - owner: "barely reactive, crank them up to match the lights".
+// Peak now lands ~7 (base + bass ripple + kick flash), well over 1 so the
+// bright rings bloom. Idle (IDLE_BASE/IDLE_AMP above) is untouched, so a
+// quiet floor still reads as plain pearl.
+const MUSIC_BASE = 0.14;
+const BASS_RIPPLE_GAIN = 3.5;
+const BEAT_FLASH_GAIN = 3.0;
 
 export interface CascadeCourtLightFloorOptions {
   // Fills the passed array with the current byte frequency spectrum (the SAME
@@ -151,7 +157,7 @@ export function createCascadeCourtLightFloor(
   const material = new PBRMaterial('cascade-court-light-floor-material', scene);
   material.unlit = true;
   material.albedoColor = new Color3(1, 1, 1);
-  material.alpha = 0.6;
+  material.alpha = 0.9;
   material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
   material.alphaMode = Constants.ALPHA_ADD;
   material.backFaceCulling = false;
@@ -301,7 +307,7 @@ export function createCascadeCourtLightFloor(
     // contrast; a strong kick flashes all tiles via beatFlash.
     const rippleSpeed = idle ? 0.25 : (active ? 2.4 : 1.2) + mids * 3.5;
     ripplePhase += dt * rippleSpeed;
-    const bassRippleAmp = idle ? 0 : (active ? 0.35 : 0.2) + bass * BASS_RIPPLE_GAIN;
+    const bassRippleAmp = idle ? 0 : (active ? 0.6 : 0.4) + bass * BASS_RIPPLE_GAIN;
     const flash = beatFlash * BEAT_FLASH_GAIN;
 
     let peak = 0;
