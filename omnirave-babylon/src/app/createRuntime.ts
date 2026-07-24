@@ -254,6 +254,7 @@ export async function createRuntime(host: HTMLElement) {
       stageVisualizer?.dispose();
       immersiveAudioShow?.dispose();
       crownEffects?.dispose();
+      cascadeCourtLightFloor?.dispose();
       stageAtmospherics?.dispose();
       cleanupOwnedResources();
       activeEngine.dispose();
@@ -270,6 +271,7 @@ export async function createRuntime(host: HTMLElement) {
     let stageVisualizer: import('../scene/createStageVisualizer').StageVisualizer | undefined;
     let immersiveAudioShow: import('../scene/createImmersiveAudioShow').ImmersiveAudioShow | undefined;
     let crownEffects: import('../scene/createCrownEffects').CrownEffects | undefined;
+    let cascadeCourtLightFloor: import('../scene/createCascadeCourtLightFloor').CascadeCourtLightFloor | undefined;
     let stageAtmospherics: import('../scene/createStageAtmospherics').StageAtmospherics | undefined;
     if (perfFlags.worldUrl && perfFlags.worldToken) {
       const [{ createWorldSocket }, { createRemotePlayerRigs }, { createStageMediaPlayer }] = await Promise.all([
@@ -296,6 +298,7 @@ export async function createRuntime(host: HTMLElement) {
         stageVisualizer?.setEventState(eventState);
         immersiveAudioShow?.setEventState(eventState);
         crownEffects?.setEventState(eventState);
+        cascadeCourtLightFloor?.setEventState(eventState);
         stageAtmospherics?.setEventState(eventState);
       });
       worldSocket.onStatusChange((status) => {
@@ -360,6 +363,17 @@ export async function createRuntime(host: HTMLElement) {
     });
     const activeCrownEffects = crownEffects;
 
+    // The Cascade Court flank light floor: a music-reactive additive glow laid
+    // just above the pearl paving tiles (the tiles themselves - the physical,
+    // walkable floor - are untouched). Shares the exact same spectrum closure
+    // so it stays audio- and colour-coherent with the venue; a slow calm
+    // shimmer in the single-player path so the floor still reads as pearl.
+    const { createCascadeCourtLightFloor } = await import('../scene/createCascadeCourtLightFloor');
+    cascadeCourtLightFloor = createCascadeCourtLightFloor(scene, {
+      getFrequencyData: getStageFrequencyData,
+    });
+    const activeCascadeCourtLightFloor = cascadeCourtLightFloor;
+
     // The stage atmospherics (haze air body, CO2/cryo jets, flame jets,
     // cold-spark fountains, strobe pods): the PHYSICAL effects show. Shares the
     // same spectrum closure; haze-only idle in the single-player path.
@@ -417,6 +431,7 @@ export async function createRuntime(host: HTMLElement) {
       activeStageVisualizer.update(deltaSeconds);
       activeImmersiveAudioShow.update(deltaSeconds);
       activeCrownEffects.update(deltaSeconds);
+      activeCascadeCourtLightFloor.update(deltaSeconds);
       activeStageAtmospherics.update(deltaSeconds);
       // Feed the stage show's spill-light pulse real bass energy when audio is
       // live; null keeps it on its estimated 126BPM beat clock.
