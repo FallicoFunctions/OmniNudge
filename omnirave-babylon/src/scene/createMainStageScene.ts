@@ -20,6 +20,8 @@ import { createFestivalField } from './createFestivalField';
 import { createStageShow } from './createStageShow';
 import { createSoundBooth } from './createSoundBooth';
 import { createVipForecourtDressing } from './createVipForecourtDressing';
+import { createVipSkydeck } from './createVipSkydeck';
+import { createWingBridge } from './createWingBridge';
 import { createWayfindingSigns } from './createWayfindingSigns';
 import { applyPracticalPoolLightBudget, createLightingRig } from './createLightingRig';
 import { createMainStageCollisionBlockers } from './createMainStageCollisionBlockers';
@@ -165,6 +167,20 @@ export async function createMainStageScene(engine: AbstractEngine) {
   // which otherwise read as bare ground around the water features.
   const cascadeCourtPaving = createCascadeCourtPaving(scene);
 
+  // Elevated, WALKABLE player space. The skydecks lay a real floor on the
+  // venue's own wing-terrace roofscape over each VIP forecourt (which was a
+  // signposted destination with nothing to stand on), and the wing bridge
+  // flies between them so the two flanks connect straight across instead of
+  // forcing the walk around the back of the basin.
+  //
+  // Their decks/landings/ramps are FLOOR, so they join the controller's
+  // ground-ray list; only their railings are blockers (authored rows in
+  // createMainStageCollisionBlockers, whose y bands start at the deck
+  // surface and so cannot touch anyone on the ground below).
+  const vipSkydeck = createVipSkydeck(scene);
+  const wingBridge = createWingBridge(scene);
+  stageAssets.collisionMeshes.push(...vipSkydeck.walkableMeshes, ...wingBridge.walkableMeshes);
+
   // The general lighting show runs continuously (per the venue docs: an
   // ambient show is always on; the completion celebration layers the special
   // finale on top): beat-driven screen pulses, spill-light color sweeps, and
@@ -305,6 +321,8 @@ export async function createMainStageScene(engine: AbstractEngine) {
       soundBooth,
       venuePerimeter,
       cascadeCourtPaving,
+      vipSkydeck,
+      wingBridge,
       spawn: BACK_PLAZA_SPAWN,
     },
   };
@@ -314,6 +332,8 @@ export async function createMainStageScene(engine: AbstractEngine) {
     soundBooth.dispose();
     venuePerimeter.dispose();
     cascadeCourtPaving.dispose();
+    vipSkydeck.dispose();
+    wingBridge.dispose();
     canvas?.removeEventListener('wheel', handleCameraWheel);
     canvas?.removeEventListener('pointerdown', handleCameraPointerDown);
     canvas?.removeEventListener('pointermove', handleCameraPointerMove);
