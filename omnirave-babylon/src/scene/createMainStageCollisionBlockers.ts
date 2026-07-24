@@ -3,12 +3,22 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
 import type { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import type { Scene } from '@babylonjs/core/scene';
+import type { SkydeckRailRun } from './mainStageVenueBounds';
 
 import {
   FOH_BOOTH_BLOCKER_WIDTH,
   FOH_BOOTH_DECK_DEPTH,
   FOH_BOOTH_X,
   FOH_BOOTH_Z,
+  SKYDECK_DECK_Y,
+  SKYDECK_PIERS,
+  SKYDECK_PIER_SIZE,
+  SKYDECK_RAIL_HEIGHT,
+  SKYDECK_RAIL_RUNS,
+  WING_BRIDGE_DECK_Y,
+  WING_BRIDGE_HALF_SPAN,
+  WING_BRIDGE_HALF_WIDTH,
+  WING_BRIDGE_Z,
   VENUE_ENVELOPE_BACK_Z,
   VENUE_ENVELOPE_BLOCKER_THICKNESS,
   VENUE_ENVELOPE_FRONT_Z,
@@ -31,6 +41,85 @@ interface CollisionBlockerSpec {
   x: number;
   y: number;
   z: number;
+}
+
+// Elevated architecture (createVipSkydeck.ts + createWingBridge.ts). Two
+// different jobs, and the split matters:
+//   - The DECKS, LANDINGS and RAMPS are not blockers at all. They are FLOOR:
+//     they carry checkCollisions = true and are handed to the player
+//     controller's ground-ray list, which is what makes them standable.
+//   - The RAILINGS are blockers, so nobody walks off a deck 8.6m up. Every
+//     one of these rows starts its y band AT the deck surface, so a player on
+//     the ground below (head ~1.65m) never intersects them - no phantom walls
+//     under the new structures, which is the failure mode the pocket-wide
+//     boxes caused on the flanks.
+// Authored here rather than pattern-matched for the same reason the FOH booth
+// is: the source-name patterns run over the loaded GLB at scene build time,
+// and both modules are authored later, after the static freeze.
+//
+// The ramp RUN deliberately has no rows: an axis-aligned box hugging a 28
+// degree slope would either wall the flank ground beside the ramp's low end
+// or need segmenting into a stack of boxes whose seams are exactly where
+// phantom walls come from. It is 4m wide with a visible balustrade, and
+// stepping off it drops you onto the flank ground the ramp starts from.
+const RAIL_BLOCKER_THICKNESS = 0.3;
+// Piers stand on the flank ground, so their rows only need to cover the
+// capsule band; a full-height row would add nothing and reach into the deck.
+const PIER_BLOCKER_HEIGHT = 3;
+
+function railBlocker(
+  name: string,
+  line: SkydeckRailRun,
+  deckY: number,
+  sideSign: number,
+): CollisionBlockerSpec {
+  const length = line.to - line.from;
+  const along = (line.from + line.to) / 2;
+  const alongX = line.axis === 'x';
+  return {
+    name,
+    x: sideSign * (alongX ? along : line.fixed),
+    y: deckY + SKYDECK_RAIL_HEIGHT / 2,
+    z: alongX ? line.fixed : along,
+    width: alongX ? length : RAIL_BLOCKER_THICKNESS,
+    height: SKYDECK_RAIL_HEIGHT,
+    depth: alongX ? RAIL_BLOCKER_THICKNESS : length,
+  };
+}
+
+function elevatedStructureBlockers(): CollisionBlockerSpec[] {
+  const specs: CollisionBlockerSpec[] = [];
+  for (const side of [1, -1] as const) {
+    const tag = side > 0 ? 'r' : 'l';
+    for (const line of SKYDECK_RAIL_RUNS) {
+      specs.push(railBlocker(`main-stage-blocker-skydeck-${tag}-${line.name}`, line, SKYDECK_DECK_Y, side));
+    }
+    SKYDECK_PIERS.forEach((pier, index) => {
+      specs.push({
+        name: `main-stage-blocker-skydeck-pier-${tag}-${index}`,
+        x: side * pier.x,
+        y: PIER_BLOCKER_HEIGHT / 2,
+        z: pier.z,
+        width: SKYDECK_PIER_SIZE,
+        height: PIER_BLOCKER_HEIGHT,
+        depth: SKYDECK_PIER_SIZE,
+      });
+    });
+  }
+  // The bridge's two rails run the whole span; the piers under it stand on
+  // ground that is already solid (see WING_BRIDGE_PIER_XS), so they add none.
+  for (const side of [1, -1] as const) {
+    specs.push({
+      name: `main-stage-blocker-wing-bridge-rail-${side > 0 ? 'north' : 'south'}`,
+      x: 0,
+      y: WING_BRIDGE_DECK_Y + SKYDECK_RAIL_HEIGHT / 2,
+      z: WING_BRIDGE_Z + side * WING_BRIDGE_HALF_WIDTH,
+      width: WING_BRIDGE_HALF_SPAN * 2,
+      height: SKYDECK_RAIL_HEIGHT,
+      depth: RAIL_BLOCKER_THICKNESS,
+    });
+  }
+  return specs;
 }
 
 const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
@@ -79,6 +168,7 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
     height: 3,
     depth: FOH_BOOTH_DECK_DEPTH,
   },
+  ...elevatedStructureBlockers(),
 ];
 
 const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
