@@ -7,10 +7,6 @@ import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
-  CASCADE_FOOTPRINT_X_MAX,
-  CASCADE_FOOTPRINT_X_MIN,
-  CASCADE_FOOTPRINT_Z_MAX,
-  CASCADE_FOOTPRINT_Z_MIN,
   PLAZA_X_MAX,
   PLAZA_X_MIN,
   PLAZA_Z_MAX,
@@ -18,9 +14,23 @@ import {
   createCascadeCourtPaving,
   planCascadeCourtPaving,
 } from '../createCascadeCourtPaving';
-import { VENUE_ENVELOPE_BLOCKER_THICKNESS, VENUE_WALKABLE_X_MAX } from '../mainStageVenueBounds';
+import {
+  FOUNTAIN_ELLIPSE,
+  VENUE_ENVELOPE_BLOCKER_THICKNESS,
+  VENUE_WALKABLE_X_MAX,
+} from '../mainStageVenueBounds';
 
 const TILE_HALF = 0.9;
+
+// The fountain's octagon convex fit. A tile centre inside this ellipse is the
+// only thing the keep-out removes; everything outside (including the octagon's
+// corners) must stay paved.
+function insideFountainEllipse(x: number, z: number, margin = 0): boolean {
+  const { cx, cz, sx, sz } = FOUNTAIN_ELLIPSE;
+  const dx = (x - cx) / (sx + margin);
+  const dz = (z - cz) / (sz + margin);
+  return dx * dx + dz * dz <= 1;
+}
 
 // Primitives only - never hand a Babylon object to expect().
 function thinInstanceCountOf(scene: Scene, name: string): number {
@@ -75,7 +85,7 @@ describe('createCascadeCourtPaving', () => {
     expect(pieces.filter((mesh) => mesh.checkCollisions).length).toBe(0);
   });
 
-  it('stays inside the flank plaza ring and never onto the cascade water', () => {
+  it('stays inside the flank plaza ring and never onto the cascade fountain', () => {
     // The plaza's outer edge stops at the envelope blocker's walkable face.
     expect(PLAZA_X_MAX).toBe(VENUE_WALKABLE_X_MAX - VENUE_ENVELOPE_BLOCKER_THICKNESS / 2);
 
@@ -88,24 +98,36 @@ describe('createCascadeCourtPaving', () => {
       expect(tile.z - TILE_HALF).toBeGreaterThanOrEqual(PLAZA_Z_MIN);
       expect(tile.z + TILE_HALF).toBeLessThanOrEqual(PLAZA_Z_MAX);
 
-      // No overlap with the cascade water/tier footprint.
-      const overlaps =
-        tile.x + TILE_HALF > CASCADE_FOOTPRINT_X_MIN &&
-        tile.x - TILE_HALF < CASCADE_FOOTPRINT_X_MAX &&
-        tile.z + TILE_HALF > CASCADE_FOOTPRINT_Z_MIN &&
-        tile.z - TILE_HALF < CASCADE_FOOTPRINT_Z_MAX;
-      expect(overlaps).toBe(false);
+      // No tile centre falls inside the fountain ellipse keep-out.
+      expect(insideFountainEllipse(tile.x, tile.z)).toBe(false);
     }
   });
 
-  it('paves the whole ring: an inner strip plus both end bands', () => {
+  it('fills the octagon corners the old rectangle walled off', () => {
     const plan = planCascadeCourtPaving();
-    // Strip between the promenade edge and the cascade footprint.
-    expect(plan.tiles.filter((tile) => tile.x < CASCADE_FOOTPRINT_X_MIN).length).toBeGreaterThan(10);
-    // South band, behind the water.
-    expect(plan.tiles.filter((tile) => tile.z < CASCADE_FOOTPRINT_Z_MIN).length).toBeGreaterThan(10);
-    // North band, in front of the water.
-    expect(plan.tiles.filter((tile) => tile.z > CASCADE_FOOTPRINT_Z_MAX).length).toBeGreaterThan(10);
+    // A corner cell the old axis-aligned rectangle (x 52..66, z -42..-15)
+    // excluded is now paved: a tile centre near (54, -40) - outside the
+    // ellipse - is present.
+    const corner = plan.tiles.filter(
+      (tile) => tile.x > 53 && tile.x < 56 && tile.z > -42 && tile.z < -39,
+    );
+    expect(corner.length).toBeGreaterThan(0);
+    // But a tile centre inside the ellipse (e.g. near (60, -28)) is still absent.
+    const underFountain = plan.tiles.filter(
+      (tile) => tile.x > 58 && tile.x < 62 && tile.z > -30 && tile.z < -26,
+    );
+    expect(underFountain.length).toBe(0);
+  });
+
+  it('paves the whole ring: an inner strip plus both end bands', () => {
+    const { cx, cz, sx, sz } = FOUNTAIN_ELLIPSE;
+    const plan = planCascadeCourtPaving();
+    // Strip between the promenade edge and the fountain's inner tip.
+    expect(plan.tiles.filter((tile) => tile.x < cx - sx).length).toBeGreaterThan(10);
+    // South band, behind the fountain.
+    expect(plan.tiles.filter((tile) => tile.z < cz - sz).length).toBeGreaterThan(10);
+    // North band, in front of the fountain.
+    expect(plan.tiles.filter((tile) => tile.z > cz + sz).length).toBeGreaterThan(10);
   });
 
   it('lays the paving flat just above the ground', () => {
