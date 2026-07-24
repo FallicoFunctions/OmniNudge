@@ -173,6 +173,64 @@ describe('createPlayerController', () => {
     expect(rig.root.position.y).toBeCloseTo(1.65);
   });
 
+  it('keeps the ground under an elevated deck instead of teleporting onto it', () => {
+    // The VIP skydecks and the wing bridge are walkable floor 8.6m up, over
+    // walkable ground. Picking the topmost ray hit lifted anyone underneath
+    // straight onto the deck; ground must stay the surface at the feet.
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const ground = MeshBuilder.CreateGround('collision-ground', { width: 200, height: 200 }, scene);
+    const deck = MeshBuilder.CreateBox('skydeck', { width: 16, height: 0.4, depth: 8.8 }, scene);
+    deck.position.set(0, 8.4, 0);
+    deck.computeWorldMatrix(true);
+    const rig = createPlayerRig(scene, new Vector3(0, 1.65, 0));
+    const avatarRoot = new TransformNode('avatar-root', scene);
+    const camera = new FreeCamera('camera', new Vector3(0, 2, -5), scene);
+    camera.setTarget(new Vector3(0, 2, 0));
+    const controller = createPlayerController({
+      avatarRoot,
+      camera,
+      collisionMeshes: [ground, deck],
+      input: createInput(),
+      playerRig: rig,
+    });
+
+    for (let i = 0; i < 30; i += 1) {
+      controller.step(1 / 60);
+    }
+
+    expect(rig.root.position.y).toBeCloseTo(1.65);
+    expect(controller.grounded).toBe(true);
+  });
+
+  it('stands on an elevated deck once the player is on it', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const ground = MeshBuilder.CreateGround('collision-ground', { width: 200, height: 200 }, scene);
+    const deck = MeshBuilder.CreateBox('skydeck', { width: 16, height: 0.4, depth: 8.8 }, scene);
+    deck.position.set(0, 8.4, 0);
+    deck.computeWorldMatrix(true);
+    // Feet start on the deck surface (y 8.6 + eye height).
+    const rig = createPlayerRig(scene, new Vector3(0, 8.6 + 1.65, 0));
+    const avatarRoot = new TransformNode('avatar-root', scene);
+    const camera = new FreeCamera('camera', new Vector3(0, 10, -5), scene);
+    camera.setTarget(new Vector3(0, 10, 0));
+    const controller = createPlayerController({
+      avatarRoot,
+      camera,
+      collisionMeshes: [ground, deck],
+      input: createInput(),
+      playerRig: rig,
+    });
+
+    for (let i = 0; i < 30; i += 1) {
+      controller.step(1 / 60);
+    }
+
+    expect(rig.root.position.y).toBeCloseTo(10.25);
+    expect(controller.grounded).toBe(true);
+  });
+
   it('jumps from the ground and lands back on collision geometry', () => {
     engine = new NullEngine();
     const scene = new Scene(engine);

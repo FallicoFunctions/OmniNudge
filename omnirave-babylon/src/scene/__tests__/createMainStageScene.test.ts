@@ -469,7 +469,12 @@ describe('createMainStageScene', () => {
     expect(runtime!.routeProgress.completedCount).toBeGreaterThanOrEqual(1);
     expect(runtime!.routeProgress.activeCheckpoint?.id).toBe('promenade_mid');
     expect(runtime!.reviewAvatar.root.metadata?.animationState).toBe('run');
-    expect(intersectsMesh).toHaveBeenCalledTimes(4);
+    // Two ground resolves per controller step, two steps, over the ground
+    // mesh plus the seven authored walkable surfaces the skydecks and the
+    // wing bridge add to collisionMeshes (6 skydeck decks/landings/ramps +
+    // 1 bridge deck): 8 x 2 x 2.
+    expect(intersectsMesh).toHaveBeenCalledTimes(32);
+    // Still ONE ray instance reused across every frame - no per-frame alloc.
     expect(rayInstances.size).toBe(1);
   });
 

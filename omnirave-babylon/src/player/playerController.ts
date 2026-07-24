@@ -32,6 +32,20 @@ const JUMP_VELOCITY_METERS_PER_SECOND = 6.4;
 const MAX_FALL_SPEED_METERS_PER_SECOND = -32;
 const GROUND_SNAP_EPSILON = 0.06;
 const COLLISION_SURFACE_EPSILON = 0.001;
+// The venue now has WALKABLE architecture above walkable ground (the VIP
+// skydecks and the wing bridge at y 8.6, plus the GLB's own COL_VIPDeck at
+// y 6.5-7.1). Ground used to be "the highest surface the down-ray hits",
+// which teleported anyone standing UNDER a deck straight up onto it.
+// Ground is now the highest surface within one step of the player's feet:
+// the deck when you are on it, the ground when you are beneath it.
+//
+// 1.2m clears every ledge the venue already expects the player to walk up
+// (the basin coping walkways top out at y 1.0, the approach deck at 0.9,
+// the promenade at 0.36) while being far below any elevated deck. If no
+// surface qualifies - the player is under everything, which only happens
+// falling out of the world - the old highest-hit behaviour stands in as the
+// safety net.
+const GROUND_MAX_RISE = 1.2;
 
 export function createPlayerController(options: CreatePlayerControllerOptions): PlayerController {
   const groundRay = new Ray(Vector3.Zero(), Vector3.Down(), 256);
@@ -47,7 +61,12 @@ export function createPlayerController(options: CreatePlayerControllerOptions): 
       jumpQueued = true;
     },
     step(deltaSeconds: number) {
-      const groundHeight = resolveGroundHeight(options.collisionMeshes, options.playerRig.root.position, groundRay);
+      const groundHeight = resolveGroundHeight(
+        options.collisionMeshes,
+        options.playerRig.root.position,
+        groundRay,
+        options.playerRig.root.position.y - options.playerRig.eyeHeightMeters,
+      );
       const groundedEyeHeight = groundHeight === null ? null : groundHeight + options.playerRig.eyeHeightMeters;
       const distanceToGround = groundedEyeHeight === null
         ? Number.POSITIVE_INFINITY
@@ -105,6 +124,7 @@ export function createPlayerController(options: CreatePlayerControllerOptions): 
         options.collisionMeshes,
         options.playerRig.root.position,
         groundRay,
+        options.playerRig.root.position.y - options.playerRig.eyeHeightMeters,
       );
       if (updatedGroundHeight !== null) {
         const updatedGroundedEyeHeight = updatedGroundHeight + options.playerRig.eyeHeightMeters;
@@ -140,10 +160,16 @@ function resolveCameraForward(camera: Camera, target: Vector3) {
   return target;
 }
 
-function resolveGroundHeight(collisionMeshes: AbstractMesh[], position: Vector3, ray: Ray) {
+function resolveGroundHeight(
+  collisionMeshes: AbstractMesh[],
+  position: Vector3,
+  ray: Ray,
+  feetY: number,
+) {
   ray.origin.set(position.x, 128, position.z);
-  let nearestDistance = Number.POSITIVE_INFINITY;
+  const ceiling = feetY + GROUND_MAX_RISE;
   let groundHeight: number | null = null;
+  let highestHeight: number | null = null;
 
   for (const mesh of collisionMeshes) {
     const hit = ray.intersectsMesh(mesh, false);
@@ -151,13 +177,16 @@ function resolveGroundHeight(collisionMeshes: AbstractMesh[], position: Vector3,
       continue;
     }
 
-    if (hit.distance < nearestDistance) {
-      nearestDistance = hit.distance;
-      groundHeight = hit.pickedPoint.y;
+    const surfaceY = hit.pickedPoint.y;
+    if (highestHeight === null || surfaceY > highestHeight) {
+      highestHeight = surfaceY;
+    }
+    if (surfaceY <= ceiling && (groundHeight === null || surfaceY > groundHeight)) {
+      groundHeight = surfaceY;
     }
   }
 
-  return groundHeight;
+  return groundHeight ?? highestHeight;
 }
 
 function resolveHorizontalCollision(
