@@ -29,7 +29,7 @@
     "cryptocurrency-icons": "^0.18.1",
     "date-fns": "^4.1.0",
     "diff": "^8.0.2",
-    "dompurify": "^3.4.11",
+    "dompurify": "^3.4.12",
     "firebase": "^12.15.0",
     "hls.js": "^1.6.15",
     "i18next": "^25.8.4",
