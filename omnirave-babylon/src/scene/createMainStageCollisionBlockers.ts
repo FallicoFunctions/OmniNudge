@@ -5,10 +5,23 @@ import type { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import type { Scene } from '@babylonjs/core/scene';
 
 import {
+  FOH_BOOTH_BLOCKER_WIDTH,
+  FOH_BOOTH_DECK_DEPTH,
+  FOH_BOOTH_X,
+  FOH_BOOTH_Z,
   VENUE_ENVELOPE_BACK_Z,
+  VENUE_ENVELOPE_BLOCKER_THICKNESS,
+  VENUE_ENVELOPE_FRONT_Z,
   VENUE_WALKABLE_X_MAX,
   VENUE_WALKABLE_X_MIN,
 } from './mainStageVenueBounds';
+
+// Side runs span the back fence up to the envelope's front edge; the back run
+// spans the two side runs corner to corner (their outer faces).
+const ENVELOPE_SIDE_DEPTH = VENUE_ENVELOPE_FRONT_Z - VENUE_ENVELOPE_BACK_Z;
+const ENVELOPE_SIDE_Z = (VENUE_ENVELOPE_FRONT_Z + VENUE_ENVELOPE_BACK_Z) / 2;
+const ENVELOPE_BACK_WIDTH =
+  VENUE_WALKABLE_X_MAX - VENUE_WALKABLE_X_MIN + VENUE_ENVELOPE_BLOCKER_THICKNESS;
 
 interface CollisionBlockerSpec {
   depth: number;
@@ -28,9 +41,9 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
   // (COL_Ground) ends at VENUE_GROUND_EDGE_Z (see mainStageVenueBounds.ts),
   // so the fence stays just inside it, and the sides extend to meet the back
   // fence corner-to-corner.
-  { name: 'main-stage-blocker-left-envelope', x: VENUE_WALKABLE_X_MIN, y: 3, z: -34.5, width: 4, height: 6, depth: 111 },
-  { name: 'main-stage-blocker-right-envelope', x: VENUE_WALKABLE_X_MAX, y: 3, z: -34.5, width: 4, height: 6, depth: 111 },
-  { name: 'main-stage-blocker-back-envelope', x: 0, y: 3, z: VENUE_ENVELOPE_BACK_Z, width: 132, height: 6, depth: 4 },
+  { name: 'main-stage-blocker-left-envelope', x: VENUE_WALKABLE_X_MIN, y: 3, z: ENVELOPE_SIDE_Z, width: VENUE_ENVELOPE_BLOCKER_THICKNESS, height: 6, depth: ENVELOPE_SIDE_DEPTH },
+  { name: 'main-stage-blocker-right-envelope', x: VENUE_WALKABLE_X_MAX, y: 3, z: ENVELOPE_SIDE_Z, width: VENUE_ENVELOPE_BLOCKER_THICKNESS, height: 6, depth: ENVELOPE_SIDE_DEPTH },
+  { name: 'main-stage-blocker-back-envelope', x: 0, y: 3, z: VENUE_ENVELOPE_BACK_Z, width: ENVELOPE_BACK_WIDTH, height: 6, depth: VENUE_ENVELOPE_BLOCKER_THICKNESS },
   { name: 'main-stage-blocker-front-stage', x: 0, y: 5, z: 14, width: 78, height: 10, depth: 4 },
   // The cascade-court water features have no authored rows here: their
   // collision comes from the clustered V150_CascadeCourtCoping footprint
@@ -47,6 +60,25 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
   // let the capsule wedge into the box rim when stepping off the edge.
   { name: 'main-stage-blocker-basin-water-north-left', x: -13.05, y: 1.5, z: 16.3, width: 9.5, height: 3, depth: 14.2 },
   { name: 'main-stage-blocker-basin-water-north-right', x: 13.05, y: 1.5, z: 16.3, width: 9.5, height: 3, depth: 14.2 },
+  // Front-of-house sound booth (createSoundBooth.ts) - restricted crew
+  // infrastructure, so players walk around it. Authored here rather than
+  // pattern-matched: the source-mesh patterns above run over the loaded GLB
+  // meshes at scene build time, and the booth is authored later, after the
+  // static freeze. Dimensions come from the shared FOH_BOOTH_* constants so
+  // the body can never drift from the deck. Width covers the deck plus the
+  // two flight cases beside it; DEPTH is the DECK depth only, so neither the
+  // canopy overhang nor the ground cable looms leaving the front become
+  // phantom walls. It leaves ~9.4m of clear promenade on each side (crowd
+  // runs to |x| 14).
+  {
+    name: 'main-stage-blocker-foh-sound-booth',
+    x: FOH_BOOTH_X,
+    y: 1.5,
+    z: FOH_BOOTH_Z,
+    width: FOH_BOOTH_BLOCKER_WIDTH,
+    height: 3,
+    depth: FOH_BOOTH_DECK_DEPTH,
+  },
 ];
 
 const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
