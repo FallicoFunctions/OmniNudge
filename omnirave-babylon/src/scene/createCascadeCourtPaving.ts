@@ -32,13 +32,15 @@ export const PLAZA_X_MAX = VENUE_WALKABLE_X_MAX - VENUE_ENVELOPE_BLOCKER_THICKNE
 export const PLAZA_Z_MIN = -50;
 export const PLAZA_Z_MAX = -10;
 
-// The cascade water features and their tiers occupy |x| 34..64, z -41..-16
-// (their coping drives the clustered collision in
-// createMainStageCollisionBlockers.ts). The paving must not creep onto the
-// water or the tiers, so it clears that footprint with a 1m margin and stays
-// on the walkable ring around it.
-export const CASCADE_FOOTPRINT_X_MIN = 33;
-export const CASCADE_FOOTPRINT_X_MAX = 65;
+// The cascade fountain was slid outward (+20m, owner request), so it now
+// occupies |x| ~54..82, z -41..-16 - only x ~54..62 overlaps the walkable
+// plaza; the rest sits past the fence through the gap. The keep-out is pulled
+// in to X_MIN=52 (a ~2m margin inside the new fountain inner edge) so the
+// reclaimed plaza from x 30..~52 is now paved, while the tiles still clear the
+// fountain coping that drives the clustered collision in
+// createMainStageCollisionBlockers.ts.
+export const CASCADE_FOOTPRINT_X_MIN = 52;
+export const CASCADE_FOOTPRINT_X_MAX = 66;
 export const CASCADE_FOOTPRINT_Z_MIN = -42;
 export const CASCADE_FOOTPRINT_Z_MAX = -15;
 

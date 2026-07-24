@@ -10044,16 +10044,17 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     const left = readMeshGeometry('V150_CascadeCourtShell_L');
 
     // right pocket footprint and floor-to-head height range
-    expect(right.min[0]).toBeGreaterThan(31);
-    expect(right.max[0]).toBeLessThan(67);
+    // Fountain slid outward +20m (owner request): glTF X ~55..81 now.
+    expect(right.min[0]).toBeGreaterThan(53);
+    expect(right.max[0]).toBeLessThan(83);
     expect(right.min[1]).toBeLessThan(0.1);
     expect(right.max[1]).toBeGreaterThan(3.5);
     expect(right.min[2]).toBeGreaterThan(-41);
     expect(right.max[2]).toBeLessThan(-16);
 
     // left pocket is the X-mirror
-    expect(left.min[0]).toBeGreaterThan(-67);
-    expect(left.max[0]).toBeLessThan(-31);
+    expect(left.min[0]).toBeGreaterThan(-83);
+    expect(left.max[0]).toBeLessThan(-53);
 
     expect(materialNameFor('V150_CascadeCourtShell_R')).toBe('V15_PearlShellBeveled');
     expect(materialNameFor('V150_CascadeCourtShell_L')).toBe('V15_PearlShellBeveled');
@@ -10062,8 +10063,8 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
     // polish table tints them brighter than the shell stone)
     expect(nodeNamesWithPrefix('V150_CascadeCourtCoping_')).toHaveLength(2);
     const coping = readMeshGeometry('V150_CascadeCourtCoping_R');
-    expect(coping.min[0]).toBeGreaterThan(31);
-    expect(coping.max[0]).toBeLessThan(67);
+    expect(coping.min[0]).toBeGreaterThan(53);
+    expect(coping.max[0]).toBeLessThan(83);
     expect(coping.max[1]).toBeGreaterThan(3.9); // curb tops the summit tier
     expect(materialNameFor('V150_CascadeCourtCoping_R')).toBe('V15_PearlShellBeveled');
     expect(materialNameFor('V150_CascadeCourtCoping_L')).toBe('V15_PearlShellBeveled');
@@ -10096,7 +10097,8 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   it('fills the cascade court with reflecting water and base mist', () => {
     // Pass 2: water sheets pool on each tier and spill down the risers, with
     // cyan mist plumes ringing the base. Both families align to the shell
-    // footprint (glTF X 35..61, Z -40..-17); the left is the X-mirror.
+    // footprint (glTF X ~54..82 after the +20m outward slide, Z -41..-17);
+    // the left is the X-mirror.
     expect(nodeNamesWithPrefix('V150_CascadeCourtWater_')).toHaveLength(2);
     expect(nodeNamesWithPrefix('V150_CascadeCourtSpill_')).toHaveLength(2);
     expect(nodeNamesWithPrefix('V150_CascadeCourtMist_')).toHaveLength(2);
@@ -10107,8 +10109,8 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
       minUniquePositions: 25,
       minNonZeroAreaTriangles: 15,
     });
-    expect(water.min[0]).toBeGreaterThan(31);
-    expect(water.max[0]).toBeLessThan(67);
+    expect(water.min[0]).toBeGreaterThan(53);
+    expect(water.max[0]).toBeLessThan(83);
     expect(water.max[1]).toBeGreaterThan(3.5); // pools climb to the summit
     // the catch pool rings the base, so the water runs slightly proud of the
     // shell footprint (still well clear of the spawn canopy at Z<=-42.7)
