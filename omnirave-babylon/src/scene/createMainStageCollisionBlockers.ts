@@ -10,6 +10,7 @@ import {
   FOH_BOOTH_DECK_DEPTH,
   FOH_BOOTH_X,
   FOH_BOOTH_Z,
+  FOUNTAIN_ELLIPSE,
   SKYDECK_DECK_Y,
   SKYDECK_PIERS,
   SKYDECK_PIER_SIZE,
@@ -66,6 +67,49 @@ const RAIL_BLOCKER_THICKNESS = 0.3;
 // Piers stand on the flank ground, so their rows only need to cover the
 // capsule band; a full-height row would add nothing and reach into the deck.
 const PIER_BLOCKER_HEIGHT = 3;
+
+// --- Cascade fountain collision (octagon, not rectangle) ----------------
+// The cascade fountain's base is an OCTAGON; treating it as an axis-aligned
+// rectangle (the old clustered V150_CascadeCourtCoping boxes, measured
+// x[54.3,65.1] z[-39.4,-18.8]) walled the octagon's corners with invisible
+// collision where no stone stands - "stopped when walking in front of the
+// fountain even though there is nothing there". Instead we hug the shared
+// FOUNTAIN_ELLIPSE convex fit with a row of thin COLUMN boxes stepping across
+// x: each column's z-half-extent tapers as sz*sqrt(1 - ((xc-cx)/sx)^2), so the
+// boxes are short in z at the inner/outer tips and span the full height at the
+// middle - following the ellipse instead of boxing its corners. 14 columns per
+// flank keep the x step ~1.98m (edge error well under 0.6m).
+const FOUNTAIN_COLUMN_COUNT = 14;
+// Inflate each column's z-extent so no real stone edge pokes through
+// unblocked, while staying tight enough that the corner cells (x 52..62,
+// z near -42/-15) that carry no stone are NOT blocked.
+const FOUNTAIN_COLUMN_Z_MARGIN = 0.4;
+// Same y band as the other cascade collision: floor through capsule.
+const FOUNTAIN_COLLISION_HEIGHT = 3;
+
+function fountainCollisionColumns(): CollisionBlockerSpec[] {
+  const specs: CollisionBlockerSpec[] = [];
+  const { cx, cz, sx, sz } = FOUNTAIN_ELLIPSE;
+  const sliceWidth = (2 * sx) / FOUNTAIN_COLUMN_COUNT;
+  for (const side of [1, -1] as const) {
+    const tag = side > 0 ? 'r' : 'l';
+    for (let i = 0; i < FOUNTAIN_COLUMN_COUNT; i++) {
+      const xCenter = cx - sx + (i + 0.5) * sliceWidth;
+      const t = (xCenter - cx) / sx;
+      const zHalf = sz * Math.sqrt(Math.max(0, 1 - t * t)) + FOUNTAIN_COLUMN_Z_MARGIN;
+      specs.push({
+        name: `main-stage-blocker-cascade-fountain-${tag}-${i}`,
+        x: side * xCenter,
+        y: FOUNTAIN_COLLISION_HEIGHT / 2,
+        z: cz,
+        width: sliceWidth,
+        height: FOUNTAIN_COLLISION_HEIGHT,
+        depth: zHalf * 2,
+      });
+    }
+  }
+  return specs;
+}
 
 function railBlocker(
   name: string,
@@ -134,13 +178,13 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
   { name: 'main-stage-blocker-right-envelope', x: VENUE_WALKABLE_X_MAX, y: 3, z: ENVELOPE_SIDE_Z, width: VENUE_ENVELOPE_BLOCKER_THICKNESS, height: 6, depth: ENVELOPE_SIDE_DEPTH },
   { name: 'main-stage-blocker-back-envelope', x: 0, y: 3, z: VENUE_ENVELOPE_BACK_Z, width: ENVELOPE_BACK_WIDTH, height: 6, depth: VENUE_ENVELOPE_BLOCKER_THICKNESS },
   { name: 'main-stage-blocker-front-stage', x: 0, y: 5, z: 14, width: 78, height: 10, depth: 4 },
-  // The cascade-court water features have no authored rows here: their
-  // collision comes from the clustered V150_CascadeCourtCoping footprint
-  // (see CLUSTERED_SOURCE_NAME_PATTERNS), which hugs the stone rim's real
-  // outline. The earlier pocket-wide boxes (x 31..67 per side) sealed the
-  // entire east/west flanks - cascade plazas, flank fields, and the VIP
-  // forecourts were unreachable on foot - and even a hand-hugged rectangle
-  // left phantom walls at the feature's tapered corners (player-flagged).
+  // The cascade fountain's collision is authored by fountainCollisionColumns()
+  // (spread in below) as an ellipse-hugging row of tapering columns. The old
+  // clustered V150_CascadeCourtCoping footprint boxed the octagon into a
+  // rectangle and walled its empty corners (player-flagged: "stopped in front
+  // of the fountain even though there is nothing there"); an even earlier set
+  // of pocket-wide boxes (x 31..67 per side) sealed the entire east/west flanks
+  // - cascade plazas, flank fields, and the VIP forecourts were unreachable.
   // The basin foliage hedges guarding the sunken water strip (|x| 8.3..17.3)
   // end at z 9.2, but the water runs to z 23.2: without these caps the
   // avatar can step off the outer coping walkway and wade through the
@@ -168,6 +212,7 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
     height: 3,
     depth: FOH_BOOTH_DECK_DEPTH,
   },
+  ...fountainCollisionColumns(),
   ...elevatedStructureBlockers(),
 ];
 
@@ -213,10 +258,10 @@ const CLUSTERED_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
   /V30_VipShellFascia/,
   /V30_VipSoffitShadow/,
   /V33_BasinLanternStem/,
-  // The stone rim of the tiered cascade water features: its refined
-  // footprint replaces the hand-authored pocket rectangles (see the note in
-  // MAIN_STAGE_COLLISION_BLOCKERS) and keeps the tiers and water unwadeable.
-  /V150_CascadeCourtCoping/,
+  // V150_CascadeCourtCoping is deliberately ABSENT: clustering the octagonal
+  // fountain's coping produced a coarse rectangle (measured x[54.3,65.1]
+  // z[-39.4,-18.8]) that walled the octagon's empty corners. Its collision is
+  // now the ellipse-hugging fountainCollisionColumns() authored above.
   /V44_PlazaLanternStemCluster/,
   /V45_PyroPodPearlShell/,
   /V55_SpawnPylonPearlShell/,
