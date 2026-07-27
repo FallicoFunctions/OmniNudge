@@ -255,6 +255,7 @@ export async function createRuntime(host: HTMLElement) {
       immersiveAudioShow?.dispose();
       crownEffects?.dispose();
       cascadeCourtLightFloor?.dispose();
+      hologramGrid?.dispose();
       stageAtmospherics?.dispose();
       cleanupOwnedResources();
       activeEngine.dispose();
@@ -272,6 +273,7 @@ export async function createRuntime(host: HTMLElement) {
     let immersiveAudioShow: import('../scene/createImmersiveAudioShow').ImmersiveAudioShow | undefined;
     let crownEffects: import('../scene/createCrownEffects').CrownEffects | undefined;
     let cascadeCourtLightFloor: import('../scene/createCascadeCourtLightFloor').CascadeCourtLightFloor | undefined;
+    let hologramGrid: import('../scene/createHologramGrid').HologramGrid | undefined;
     let stageAtmospherics: import('../scene/createStageAtmospherics').StageAtmospherics | undefined;
     if (perfFlags.worldUrl && perfFlags.worldToken) {
       const [{ createWorldSocket }, { createRemotePlayerRigs }, { createStageMediaPlayer }] = await Promise.all([
@@ -299,6 +301,7 @@ export async function createRuntime(host: HTMLElement) {
         immersiveAudioShow?.setEventState(eventState);
         crownEffects?.setEventState(eventState);
         cascadeCourtLightFloor?.setEventState(eventState);
+        hologramGrid?.setEventState(eventState);
         stageAtmospherics?.setEventState(eventState);
       });
       worldSocket.onStatusChange((status) => {
@@ -374,6 +377,19 @@ export async function createRuntime(host: HTMLElement) {
     });
     const activeCascadeCourtLightFloor = cascadeCourtLightFloor;
 
+    // The floating 3D hologram light grid: a drone-show swarm of ~2,700
+    // individually-coloured points hanging above the crowd, in the airspace the
+    // V113 crown-shell canopy plates used to fill (this module HIDES those
+    // plates on create and restores them on dispose - the owner asked for the
+    // space back, not for the plates to be deleted). Shares the exact same
+    // spectrum closure so its formations and colours stay coherent with the
+    // venue; slow drifting formations in the single-player path.
+    const { createHologramGrid } = await import('../scene/createHologramGrid');
+    hologramGrid = createHologramGrid(scene, {
+      getFrequencyData: getStageFrequencyData,
+    });
+    const activeHologramGrid = hologramGrid;
+
     // The stage atmospherics (haze air body, CO2/cryo jets, flame jets,
     // cold-spark fountains, strobe pods): the PHYSICAL effects show. Shares the
     // same spectrum closure; haze-only idle in the single-player path.
@@ -432,6 +448,7 @@ export async function createRuntime(host: HTMLElement) {
       activeImmersiveAudioShow.update(deltaSeconds);
       activeCrownEffects.update(deltaSeconds);
       activeCascadeCourtLightFloor.update(deltaSeconds);
+      activeHologramGrid.update(deltaSeconds);
       activeStageAtmospherics.update(deltaSeconds);
       // Feed the stage show's spill-light pulse real bass energy when audio is
       // live; null keeps it on its estimated 126BPM beat clock.
