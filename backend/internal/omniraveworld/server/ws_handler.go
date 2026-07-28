@@ -275,8 +275,11 @@ func currentZoneMedia(mediaState *world.MediaState, now time.Time) []world.ZoneM
 		zoneMedia = append(zoneMedia, world.ZoneMediaState{
 			ZoneID:          snapshot.ZoneID,
 			TrackID:         snapshot.TrackID,
+			Artist:          snapshot.Artist,
+			Title:           snapshot.Title,
 			PlaylistIndex:   snapshot.Index,
 			PlayheadSeconds: int64(snapshot.Playhead / time.Second),
+			DurationSeconds: int64(snapshot.Duration / time.Second),
 		})
 	}
 	return zoneMedia

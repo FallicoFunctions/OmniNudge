@@ -351,6 +351,61 @@ body,
   background: rgba(5, 7, 17, 0.72);
 }
 
+/* Player-facing venue block (design sec 9.4): bottom-right, above the dev
+   perf pill when the debug chrome is on screen. */
+.player-hud {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 4;
+  min-width: 190px;
+  max-width: 320px;
+  padding: 10px 14px;
+  border: 1px solid rgba(104, 216, 255, 0.28);
+  border-radius: 14px;
+  color: #f4efe2;
+  background: linear-gradient(145deg, rgba(4, 12, 23, 0.78), rgba(5, 24, 37, 0.7));
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.42);
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  text-align: right;
+  pointer-events: none;
+}
+
+/* Clears the .perf-overlay pill (bottom: 24px, ~38px tall) under ?debug=1. */
+.player-hud--debug-offset {
+  bottom: 78px;
+}
+
+.player-hud__venue {
+  margin: 0;
+  color: #68d8ff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.player-hud__eyebrow {
+  margin: 6px 0 0;
+  color: rgba(244, 239, 226, 0.55);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.player-hud__track {
+  margin: 2px 0 0;
+  font-size: 0.86rem;
+  line-height: 1.3;
+}
+
+.player-hud__time {
+  margin: 2px 0 0;
+  color: rgba(244, 239, 226, 0.72);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .stage-audio-dev-controls {
   position: absolute;
   /* Bottom-left: keeps clear of the bottom-right perf/FPS readout. */

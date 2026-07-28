@@ -104,6 +104,10 @@ export async function createRuntime(host: HTMLElement) {
   let debugPanel: HTMLElement | undefined;
   let loadingOverlay: HTMLElement | undefined;
   let enterOverlay: import('../ui/createEnterOmniRaveOverlay').EnterOmniRaveOverlay | undefined;
+  // Player-facing "Now Playing" / venue block. Never gated behind ?debug=1, and
+  // owned DOM like the overlays above, so it is torn down in cleanup too.
+  let playerHud: import('../ui/createPlayerHud').PlayerHud | undefined;
+  let playerHudTimer: number | undefined;
   let handleCanvasPick: ((event: MouseEvent) => void) | undefined;
   let handleResize: (() => void) | undefined;
   let disposed = false;
@@ -128,6 +132,11 @@ export async function createRuntime(host: HTMLElement) {
     hud?.remove();
     loadingOverlay?.remove();
     enterOverlay?.dispose();
+    if (playerHudTimer !== undefined) {
+      window.clearInterval(playerHudTimer);
+      playerHudTimer = undefined;
+    }
+    playerHud?.dispose();
     canvas.remove();
   };
 
@@ -275,6 +284,10 @@ export async function createRuntime(host: HTMLElement) {
     let cascadeCourtLightFloor: import('../scene/createCascadeCourtLightFloor').CascadeCourtLightFloor | undefined;
     let hologramGrid: import('../scene/createHologramGrid').HologramGrid | undefined;
     let stageAtmospherics: import('../scene/createStageAtmospherics').StageAtmospherics | undefined;
+    // Latest active-zone media from the world snapshot; the HUD reads it on a
+    // 1s tick instead of re-rendering on every snapshot.
+    let activeZoneId = 'main_stage';
+    let activeZoneMedia: import('../network/worldSocket').ZoneMediaState | null = null;
     if (perfFlags.worldUrl && perfFlags.worldToken) {
       const [{ createWorldSocket }, { createRemotePlayerRigs }, { createStageMediaPlayer }] = await Promise.all([
         import('../network/worldSocket'),
@@ -291,6 +304,8 @@ export async function createRuntime(host: HTMLElement) {
         remotePlayerRigs?.applySnapshot(snapshot);
         const activeMedia = snapshot.zoneMedia.find((zone) => zone.zoneId === snapshot.activeZone) ?? null;
         stageMediaPlayer?.applyMedia(activeMedia);
+        activeZoneId = snapshot.activeZone;
+        activeZoneMedia = activeMedia;
         // Drive the stage screen's event mode (countdown / fireworks video)
         // from the active zone's scheduled event, if any.
         const activeEvent = snapshot.zoneEvents.find((zone) => zone.zoneId === snapshot.activeZone) ?? null;
@@ -324,6 +339,28 @@ export async function createRuntime(host: HTMLElement) {
         const { createStageAudioDevControls } = await import('../ui/createStageAudioDevControls');
         stageAudioDevControls = createStageAudioDevControls(host, activeStageMediaPlayer);
       }
+    }
+
+    // The player HUD ships in BOTH paths: with a world socket it shows the
+    // active venue and its synced track; in the single-player review path
+    // there is no media, so it shows the venue name and "No track playing".
+    // The elapsed time comes from the LOCAL playhead (the media player), so it
+    // keeps counting between snapshots; duration comes from the server entry.
+    {
+      const { createPlayerHud, formatVenueName } = await import('../ui/createPlayerHud');
+      const hudMediaPlayer = stageMediaPlayer;
+      playerHud = createPlayerHud(host, { debugChromePresent: perfFlags.debug });
+      const refreshPlayerHud = () => {
+        playerHud?.update({
+          venueName: formatVenueName(activeZoneId),
+          artist: activeZoneMedia?.artist ?? '',
+          title: activeZoneMedia?.title ?? '',
+          elapsedSeconds: hudMediaPlayer?.getCurrentTime() ?? 0,
+          durationSeconds: activeZoneMedia?.durationSeconds ?? hudMediaPlayer?.getDuration() ?? 0,
+        });
+      };
+      refreshPlayerHud();
+      playerHudTimer = window.setInterval(refreshPlayerHud, 1000);
     }
 
     // The Main Stage screen visualizer. It runs in BOTH paths: with the stage

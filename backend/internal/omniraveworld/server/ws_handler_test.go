@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -531,4 +532,52 @@ func eventPhaseForZone(t *testing.T, snapshot map[string]any, zoneID string) str
 
 	t.Fatalf("zone event %s not found in snapshot", zoneID)
 	return ""
+}
+
+func TestCurrentZoneMedia_CarriesArtistTitleAndDuration(t *testing.T) {
+	mediaState := world.NewMediaStateWithPlaylists(
+		[]world.StagePlaylist{
+			{
+				ZoneID: world.ZoneMainStage,
+				Entries: []world.PlaylistEntry{
+					{TrackID: "main-stage-set-01", Artist: "Fallico", Title: "Nick's Mix Vol. 13", Duration: 7827 * time.Second},
+				},
+			},
+		},
+		time.Unix(1000, 0),
+	)
+
+	zoneMedia := currentZoneMedia(mediaState, time.Unix(1060, 0))
+	require.NotEmpty(t, zoneMedia)
+
+	mainStage := zoneMedia[0]
+	require.Equal(t, world.ZoneMainStage, mainStage.ZoneID)
+	require.Equal(t, "main-stage-set-01", mainStage.TrackID)
+	require.Equal(t, "Fallico", mainStage.Artist)
+	require.Equal(t, "Nick's Mix Vol. 13", mainStage.Title)
+	require.Equal(t, int64(60), mainStage.PlayheadSeconds)
+	require.Equal(t, int64(7827), mainStage.DurationSeconds)
+}
+
+// TestZoneMediaState_WireFieldNames pins the JSON contract the Babylon runtime
+// HUD reads (artist/title/durationSeconds).
+func TestZoneMediaState_WireFieldNames(t *testing.T) {
+	encoded, err := json.Marshal(world.ZoneMediaState{
+		ZoneID:          world.ZoneMainStage,
+		TrackID:         "main-stage-set-01",
+		Artist:          "Fallico",
+		Title:           "Nick's Mix Vol. 13",
+		PlaylistIndex:   0,
+		PlayheadSeconds: 60,
+		DurationSeconds: 7827,
+	})
+	require.NoError(t, err)
+
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &decoded))
+	require.Equal(t, "Fallico", decoded["artist"])
+	require.Equal(t, "Nick's Mix Vol. 13", decoded["title"])
+	require.Equal(t, float64(7827), decoded["durationSeconds"])
+	require.Equal(t, float64(60), decoded["playheadSeconds"])
+	require.Equal(t, "main-stage-set-01", decoded["trackId"])
 }
