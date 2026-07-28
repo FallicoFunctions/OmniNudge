@@ -25,6 +25,13 @@ export interface PlayerSettings {
   graphicsLevel: number;
   displayNames: boolean;
   crouchMode: CrouchMode;
+  /**
+   * Chat panel open/collapsed preference (sec 9.8). Default true: "default open
+   * on session start when no saved user preference exists". This is NOT a
+   * settings-popup row - the chat panel's own collapse button writes it - but
+   * it belongs in the same guest-scoped blob rather than a second store.
+   */
+  chatOpen: boolean;
 }
 
 export const GRAPHICS_LEVEL_MIN = 1;
@@ -37,6 +44,7 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   graphicsLevel: 5,
   displayNames: true,
   crouchMode: 'hold',
+  chatOpen: true,
 };
 
 export const PLAYER_SETTINGS_STORAGE_KEY = 'omnirave.guestSettings.v1';
@@ -60,6 +68,7 @@ export function normalizePlayerSettings(raw: unknown): PlayerSettings {
     graphicsLevel: clampGraphicsLevel(source.graphicsLevel),
     displayNames: source.displayNames === undefined ? true : source.displayNames !== false,
     crouchMode: source.crouchMode === 'toggle' ? 'toggle' : 'hold',
+    chatOpen: source.chatOpen === undefined ? true : source.chatOpen !== false,
   };
 }
 

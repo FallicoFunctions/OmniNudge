@@ -115,6 +115,11 @@ export async function createRuntime(host: HTMLElement) {
   // owned DOM like the overlays above, so it is torn down in cleanup too.
   let playerHud: import('../ui/createPlayerHud').PlayerHud | undefined;
   let playerHudTimer: number | undefined;
+  // Player-facing chat panel (design sec 9.8 / 10.2 / 10.3 / 10.4). Only in the
+  // world path - chat is venue-local and server-broadcast, so with no socket
+  // there is nothing to send to and no one to hear it. Rendering it there would
+  // be a dead control, so the single-player review path omits it entirely.
+  let chatPanel: import('../ui/createChatPanel').ChatPanel | undefined;
   // Player-facing HUD shell (design sec 9.2 / 9.3 / 9.6). Also never gated
   // behind ?debug=1, also owned DOM torn down in cleanup.
   let topLeftControls: import('../ui/createTopLeftControls').TopLeftControls | undefined;
@@ -150,6 +155,7 @@ export async function createRuntime(host: HTMLElement) {
       playerHudTimer = undefined;
     }
     playerHud?.dispose();
+    chatPanel?.dispose();
     // Settings popup first: it lives inside the top-left block's slot and owns
     // a document keydown listener.
     settingsPopup?.dispose();
@@ -324,6 +330,57 @@ export async function createRuntime(host: HTMLElement) {
         url: perfFlags.worldUrl,
         token: perfFlags.worldToken,
       });
+      const activeWorldSocket = worldSocket;
+
+      // ---- Chat panel (sec 9.8 / 10.2 / 10.3 / 10.4). Player-facing, so NOT
+      // gated behind perfFlags.debug - only its bottom-left anchor lifts when
+      // the dev stage-audio scrubber occupies that corner under ?debug=1.
+      {
+        const [{ createChatPanel }, { formatVenueName: formatChatVenueName }] = await Promise.all([
+          import('../ui/createChatPanel'),
+          import('../ui/createPlayerHud'),
+        ]);
+        chatPanel = createChatPanel(host, {
+          // Sec 9.8: default open when no saved preference exists; the stored
+          // guest-scoped blob supplies it otherwise.
+          open: loadPlayerSettings().chatOpen,
+          onOpenChange(open) {
+            // Re-read before writing so this never clobbers a settings-popup
+            // change made since boot.
+            savePlayerSettings({ ...loadPlayerSettings(), chatOpen: open });
+          },
+          onSend(bodyText) {
+            activeWorldSocket.sendChat(bodyText);
+          },
+          // Sec 10.3: typing suppresses movement keys (right-click camera look
+          // is a pointer gesture and is untouched).
+          onTextEntryActiveChange(active) {
+            reviewRuntime?.input?.setTextEntryActive?.(active);
+          },
+          // Sec 10.2: guests cannot mute others, and every player is a guest
+          // until the auth block. That block flips this to true (or calls
+          // chatPanel.setCanMute(true) on upgrade) - the mute mechanism, the
+          // `Muted Users` view, and message filtering are already complete.
+          canMute: false,
+          debugChromePresent: perfFlags.debug,
+        });
+        const activeChatPanel = chatPanel;
+        worldSocket.onChat((message) => {
+          activeChatPanel.appendMessage(message);
+        });
+        // Sec 10.4: the log is per venue session. The first snapshot counts as
+        // the venue entry, so the fresh log opens with `Entered [Venue]`.
+        let chatZoneId: string | null = null;
+        worldSocket.onSnapshot((snapshot) => {
+          activeChatPanel.setCurrentPlayerId(snapshot.currentPlayerId);
+          if (snapshot.activeZone && snapshot.activeZone !== chatZoneId) {
+            chatZoneId = snapshot.activeZone;
+            activeChatPanel.clearHistory();
+            activeChatPanel.appendSystemMessage(`Entered ${formatChatVenueName(snapshot.activeZone)}`);
+          }
+        });
+      }
+
       worldSocket.onSnapshot((snapshot) => {
         remotePlayerRigs?.applySnapshot(snapshot);
         const activeMedia = snapshot.zoneMedia.find((zone) => zone.zoneId === snapshot.activeZone) ?? null;
