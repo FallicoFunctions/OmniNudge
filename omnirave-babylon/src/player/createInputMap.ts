@@ -9,6 +9,15 @@ export interface InputMap {
   /** `hold`: crouched only while Ctrl is down. `toggle`: each press flips it. */
   setCrouchMode: (mode: CrouchInputMode) => void;
   crouchMode: () => CrouchInputMode;
+  /**
+   * Design doc sec 10.3: chat typing focus suppresses movement keys (right-click
+   * camera look is a pointer gesture and is unaffected - nothing here touches
+   * it). While active the key handlers ignore every binding, and entering the
+   * state zeroes any currently-held input using the same discipline as the blur
+   * reset, so releasing focus can never leave a key stuck down.
+   */
+  setTextEntryActive: (active: boolean) => void;
+  textEntryActive: () => boolean;
 }
 
 const KEY_BINDINGS: Record<string, keyof MovementInput> = {
@@ -39,8 +48,20 @@ export function createInputMap(target: Window): InputMap {
     crouch: false,
   };
   let crouchMode: CrouchInputMode = 'hold';
+  let textEntryActive = false;
+
+  const resetState = () => {
+    for (const key of Object.keys(state) as Array<keyof MovementInput>) {
+      state[key] = false;
+    }
+  };
 
   const handleKeyDown = (event: KeyboardEvent) => {
+    // Chat typing owns the keyboard (sec 10.3). Bail before any binding lookup
+    // or preventDefault so Space/WASD reach the text field untouched.
+    if (textEntryActive) {
+      return;
+    }
     const binding = KEY_BINDINGS[event.code];
     if (binding) {
       if (event.code === 'Space') {
@@ -63,6 +84,9 @@ export function createInputMap(target: Window): InputMap {
   };
 
   const handleKeyUp = (event: KeyboardEvent) => {
+    if (textEntryActive) {
+      return;
+    }
     const binding = KEY_BINDINGS[event.code];
     if (binding) {
       if (event.code === 'Space') {
@@ -85,9 +109,7 @@ export function createInputMap(target: Window): InputMap {
   // true forever - the player keeps walking/sprinting/jumping after
   // switching away and back. Reset everything on blur.
   const handleBlur = () => {
-    for (const key of Object.keys(state) as Array<keyof MovementInput>) {
-      state[key] = false;
-    }
+    resetState();
   };
 
   target.addEventListener('keydown', handleKeyDown);
@@ -106,6 +128,16 @@ export function createInputMap(target: Window): InputMap {
       state.crouch = false;
     },
     crouchMode: () => crouchMode,
+    setTextEntryActive(active) {
+      if (textEntryActive === active) {
+        return;
+      }
+      textEntryActive = active;
+      // Whichever way the state flips, nothing may stay held: the keyup for a
+      // key pressed before focus moved into the field never reaches us.
+      resetState();
+    },
+    textEntryActive: () => textEntryActive,
     dispose() {
       target.removeEventListener('keydown', handleKeyDown);
       target.removeEventListener('keyup', handleKeyUp);
