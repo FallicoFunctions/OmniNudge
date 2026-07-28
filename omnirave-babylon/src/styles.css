@@ -771,3 +771,238 @@ body,
   color: rgba(244, 239, 226, 0.82);
   white-space: nowrap;
 }
+
+/* Chat panel (design sec 9.8 / 10.4): minimal bottom-left rectangle. The
+   header and input row never disappear; only .chat-panel__body collapses.
+   Under ?debug=1 the dev stage-audio scrubber owns bottom-left, so the panel
+   lifts above it exactly like the venue block clears the perf pill. */
+.chat-panel {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 340px;
+  max-width: 38vw;
+  padding: 8px 10px;
+  border: 1px solid var(--hud-panel-border);
+  border-radius: var(--hud-radius);
+  color: var(--hud-text);
+  background: var(--hud-panel-bg);
+  box-shadow: var(--hud-shadow);
+  backdrop-filter: var(--hud-blur);
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.76rem;
+}
+
+.chat-panel--debug-offset {
+  bottom: 78px;
+}
+
+.chat-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-panel__icon-button {
+  padding: 2px 8px;
+  border: 1px solid var(--hud-panel-border);
+  border-radius: 999px;
+  color: var(--hud-text-muted);
+  background: var(--hud-accent-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chat-panel__icon-button:hover,
+.chat-panel__icon-button:focus-visible,
+.chat-panel__icon-button[aria-pressed="true"] {
+  border-color: var(--hud-accent);
+  color: var(--hud-accent);
+  outline: none;
+}
+
+.chat-panel__body {
+  /* Fades back in on open; collapsing removes it immediately via [hidden]. */
+  animation: chat-panel-fade-in 140ms ease-out;
+}
+
+.chat-panel__body[hidden] {
+  display: none;
+}
+
+@keyframes chat-panel-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.chat-panel__history {
+  max-height: 190px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Sec 10.4: text selection/copy must keep working. */
+  user-select: text;
+}
+
+.chat-panel__history[hidden] {
+  display: none;
+}
+
+.chat-panel__line {
+  position: relative;
+  margin: 0 0 3px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.chat-panel__name {
+  color: var(--hud-accent);
+  font-weight: 600;
+}
+
+.chat-panel__time {
+  color: var(--hud-text-muted);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-panel__message {
+  color: var(--hud-text);
+}
+
+.chat-panel__line--system .chat-panel__name,
+.chat-panel__line--system .chat-panel__message {
+  color: var(--hud-text-muted);
+  font-style: italic;
+}
+
+/* Sec 10.2: mute action revealed by hovering the line's username. */
+.chat-panel__mute {
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--hud-panel-border);
+  border-radius: 999px;
+  color: var(--hud-text-muted);
+  background: transparent;
+  opacity: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.chat-panel__line:hover .chat-panel__mute,
+.chat-panel__mute:focus-visible {
+  opacity: 1;
+  outline: none;
+}
+
+.chat-panel__muted[hidden] {
+  display: none;
+}
+
+.chat-panel__muted-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.chat-panel__muted-title {
+  margin: 0;
+  color: var(--hud-text-muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.chat-panel__muted-list {
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.chat-panel__muted-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.chat-panel__muted-name {
+  overflow-wrap: anywhere;
+}
+
+.chat-panel__muted-empty {
+  margin: 0;
+  color: var(--hud-text-muted);
+}
+
+.chat-panel__text-button {
+  padding: 1px 8px;
+  border: 1px solid var(--hud-panel-border);
+  border-radius: 999px;
+  color: var(--hud-text);
+  background: var(--hud-accent-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.66rem;
+}
+
+.chat-panel__text-button:hover,
+.chat-panel__text-button:focus-visible {
+  border-color: var(--hud-accent);
+  color: var(--hud-accent);
+  outline: none;
+}
+
+/* Sec 10.3: the rate-limit hint lives INSIDE the panel, above the input line,
+   so it is readable whether or not the history is collapsed. */
+.chat-panel__hint {
+  margin: 0;
+  color: var(--hud-accent);
+  font-size: 0.68rem;
+}
+
+.chat-panel__hint[hidden] {
+  display: none;
+}
+
+.chat-panel__input-row {
+  display: flex;
+}
+
+.chat-panel__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 72px;
+  padding: 5px 8px;
+  border: 1px solid var(--hud-panel-border);
+  border-radius: 10px;
+  color: var(--hud-text);
+  background: var(--hud-accent-soft);
+  resize: none;
+  font: inherit;
+  line-height: 1.35;
+}
+
+.chat-panel__input::placeholder {
+  color: var(--hud-text-muted);
+}
+
+.chat-panel__input:focus-visible {
+  border-color: var(--hud-accent);
+  outline: none;
+}

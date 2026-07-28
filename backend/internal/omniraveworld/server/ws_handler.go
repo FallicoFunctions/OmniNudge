@@ -22,6 +22,11 @@ const (
 	maxMessageBytes = 4096
 	// maxChatBodyLength caps a chat message body after trimming whitespace.
 	maxChatBodyLength = 500
+	// maxChatBodyNewlines caps how many line breaks survive sanitising. The
+	// client supports Shift+Enter for a new line, so newlines must not be
+	// stripped outright, but an unbounded count would let one message stretch
+	// a chat bubble down the screen or push the log around.
+	maxChatBodyNewlines = 4
 	// inboundEventsPerSecond/inboundEventBurst bound how many move/chat/respawn
 	// events a single connection may push per second. Events over budget are
 	// dropped (ignored), not disconnected.
@@ -169,9 +174,25 @@ func sanitizeChatBody(raw string) string {
 		return ""
 	}
 
+	// Newlines survive: the client's chat input supports Shift+Enter for a new
+	// line (runtime design 10.3) and bubbles/log wrap multi-line messages, so
+	// stripping every control rune silently flattened legitimate messages.
+	// Every other control rune still goes (terminal escapes, bidi overrides,
+	// NULs), and the length cap below still bounds the whole body.
 	var builder strings.Builder
 	builder.Grow(len(body))
+	newlines := 0
 	for _, r := range body {
+		if r == '\n' {
+			// Bound the newline count so a wall of blank lines can't be used to
+			// spam the log or stretch a bubble across the screen.
+			if newlines >= maxChatBodyNewlines {
+				continue
+			}
+			newlines++
+			builder.WriteRune(r)
+			continue
+		}
 		if unicode.IsControl(r) {
 			continue
 		}

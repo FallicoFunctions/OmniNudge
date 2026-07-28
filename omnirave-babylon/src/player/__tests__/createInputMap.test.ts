@@ -135,6 +135,83 @@ describe('createInputMap', () => {
     input.dispose();
   });
 
+  it('suppresses movement keys while chat text entry is active (sec 10.3)', () => {
+    const input = createInputMap(window);
+
+    expect(input.textEntryActive()).toBe(false);
+
+    // A key held when focus moves into the chat field must not stay stuck.
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+    expect(input.state.forward).toBe(true);
+
+    input.setTextEntryActive(true);
+    expect(input.textEntryActive()).toBe(true);
+    expect(input.state.forward).toBe(false);
+
+    // Typing WASD/Space/Shift/Ctrl now moves nothing.
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ShiftLeft' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ControlLeft' }));
+
+    expect(input.state).toEqual({
+      forward: false,
+      backward: false,
+      left: false,
+      right: false,
+      jump: false,
+      sprint: false,
+      up: false,
+      down: false,
+      crouch: false,
+    });
+
+    input.dispose();
+  });
+
+  it('does not preventDefault while text entry is active, so the field keeps the key', () => {
+    const input = createInputMap(window);
+    input.setTextEntryActive(true);
+
+    const space = new KeyboardEvent('keydown', { code: 'Space', cancelable: true });
+    window.dispatchEvent(space);
+
+    expect(space.defaultPrevented).toBe(false);
+    input.dispose();
+  });
+
+  it('restores movement cleanly when text entry ends, with no key left stuck', () => {
+    const input = createInputMap(window);
+
+    input.setTextEntryActive(true);
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+    // The keyup for a key typed into the field never reaches the map.
+    input.setTextEntryActive(false);
+
+    expect(input.textEntryActive()).toBe(false);
+    expect(input.state.forward).toBe(false);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+    expect(input.state.forward).toBe(true);
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }));
+    expect(input.state.forward).toBe(false);
+
+    input.dispose();
+  });
+
+  it('ignores a redundant setTextEntryActive call', () => {
+    const input = createInputMap(window);
+
+    input.setTextEntryActive(false);
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+    // Same value again must not wipe live movement state.
+    input.setTextEntryActive(false);
+
+    expect(input.state.forward).toBe(true);
+    input.dispose();
+  });
+
   it('clears a latched crouch when the mode changes', () => {
     const input = createInputMap(window);
     input.setCrouchMode('toggle');
