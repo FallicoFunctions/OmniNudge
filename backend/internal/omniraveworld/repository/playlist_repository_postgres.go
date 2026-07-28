@@ -18,7 +18,7 @@ func NewPostgresStagePlaylistRepository(pool *pgxpool.Pool) *PostgresStagePlayli
 
 func (r *PostgresStagePlaylistRepository) LoadActiveStagePlaylists(ctx context.Context) ([]world.StagePlaylist, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT s.zone_id, s.activated_at, e.position, e.video_id, e.duration_seconds
+		SELECT s.zone_id, s.activated_at, e.position, e.video_id, e.artist, e.title, e.duration_seconds
 		FROM omnirave_stage_setlists s
 		JOIN omnirave_stage_setlist_entries e ON e.setlist_id = s.id
 		WHERE s.is_active = true
@@ -41,9 +41,13 @@ func (r *PostgresStagePlaylistRepository) LoadActiveStagePlaylists(ctx context.C
 		var zoneID string
 		var activatedAt time.Time
 		var position int
+		// The DB column is still named video_id from the YouTube-backed era;
+		// the domain field is TrackID.
 		var trackID string
+		var artist string
+		var title string
 		var durationSeconds int
-		if err := rows.Scan(&zoneID, &activatedAt, &position, &trackID, &durationSeconds); err != nil {
+		if err := rows.Scan(&zoneID, &activatedAt, &position, &trackID, &artist, &title, &durationSeconds); err != nil {
 			return nil, err
 		}
 
@@ -55,6 +59,8 @@ func (r *PostgresStagePlaylistRepository) LoadActiveStagePlaylists(ctx context.C
 
 		playlist.Entries = append(playlist.Entries, world.PlaylistEntry{
 			TrackID:  trackID,
+			Artist:   artist,
+			Title:    title,
 			Duration: time.Duration(durationSeconds) * time.Second,
 		})
 	}
