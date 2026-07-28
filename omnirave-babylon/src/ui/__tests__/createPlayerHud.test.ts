@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   createPlayerHud,
+  formatCommunityLabel,
+  formatGlobalPlayerCount,
   formatNowPlaying,
   formatPlayerHudElapsedRemaining,
   formatPlayerHudTime,
   formatVenueName,
+  formatVenuePlayerCount,
+  resolvePlayerCounts,
   type PlayerHudState,
 } from '../createPlayerHud';
 
@@ -168,5 +172,96 @@ describe('createPlayerHud', () => {
     hud.dispose();
 
     expect(host.querySelector('[data-testid="player-hud"]')).toBe(null);
+  });
+
+  it('renders the venue block in the spec order: venue, now playing, global, venue count', () => {
+    const host = document.createElement('div');
+    const hud = createPlayerHud(host);
+
+    hud.update(state({ zoneId: 'main_stage', globalPlayerCount: 12, venuePlayerCount: 5 }));
+
+    const order = Array.from(host.querySelectorAll<HTMLElement>('[data-testid^="player-hud-"]'))
+      .map((node) => node.dataset.testid)
+      .filter((id) => id !== 'player-hud');
+
+    expect(order.join(',')).toBe(
+      'player-hud-venue,player-hud-track,player-hud-time,player-hud-global-count,player-hud-venue-count',
+    );
+  });
+
+  it('renders both counts with the venue community label', () => {
+    const host = document.createElement('div');
+    const hud = createPlayerHud(host);
+
+    hud.update(state({ zoneId: 'underground', globalPlayerCount: 1204, venuePlayerCount: 48 }));
+
+    expect(host.querySelector('[data-testid="player-hud-global-count"]')?.textContent).toBe(
+      '1,204 ravers online',
+    );
+    expect(host.querySelector('[data-testid="player-hud-venue-count"]')?.textContent).toBe(
+      '48 Undergrounders',
+    );
+    expect(
+      host.querySelector<HTMLElement>('[data-testid="player-hud-venue-count"]')?.hidden,
+    ).toBe(false);
+  });
+
+  it('hides both counts in the single-player / no-socket path', () => {
+    const host = document.createElement('div');
+    const hud = createPlayerHud(host);
+
+    hud.update(state());
+
+    expect(
+      host.querySelector<HTMLElement>('[data-testid="player-hud-global-count"]')?.hidden,
+    ).toBe(true);
+    expect(
+      host.querySelector<HTMLElement>('[data-testid="player-hud-venue-count"]')?.hidden,
+    ).toBe(true);
+  });
+});
+
+describe('venue player counts', () => {
+  it('uses the spec community labels', () => {
+    expect(formatCommunityLabel('main_stage')).toBe('Main Stagers');
+    expect(formatCommunityLabel('underground')).toBe('Undergrounders');
+    expect(formatCommunityLabel('plurr_partay')).toBe('P.L.U.R.R. Partiers');
+    expect(formatCommunityLabel('unknown_zone')).toBe('Ravers');
+  });
+
+  it('singularizes a count of one', () => {
+    expect(formatVenuePlayerCount('main_stage', 1)).toBe('1 Main Stager');
+    expect(formatVenuePlayerCount('main_stage', 2)).toBe('2 Main Stagers');
+    expect(formatVenuePlayerCount('plurr_partay', 1)).toBe('1 P.L.U.R.R. Partier');
+    expect(formatVenuePlayerCount('underground', 0)).toBe('0 Undergrounders');
+    expect(formatVenuePlayerCount('main_stage', 2048)).toBe('2,048 Main Stagers');
+  });
+
+  it('singularizes the global count too', () => {
+    expect(formatGlobalPlayerCount(1)).toBe('1 raver online');
+    expect(formatGlobalPlayerCount(0)).toBe('0 ravers online');
+    expect(formatGlobalPlayerCount(1204)).toBe('1,204 ravers online');
+    expect(formatGlobalPlayerCount(Number.NaN)).toBe('0 ravers online');
+  });
+
+  it('counts the whole snapshot globally and the active zone locally (local player included)', () => {
+    const players = [
+      { zone: 'main_stage' },
+      { zone: 'main_stage' },
+      { zone: 'underground' },
+      { zone: 'plurr_partay' },
+    ];
+
+    const mainStage = resolvePlayerCounts(players, 'main_stage');
+    expect(mainStage.globalPlayerCount).toBe(4);
+    expect(mainStage.venuePlayerCount).toBe(2);
+
+    const underground = resolvePlayerCounts(players, 'underground');
+    expect(underground.globalPlayerCount).toBe(4);
+    expect(underground.venuePlayerCount).toBe(1);
+
+    const empty = resolvePlayerCounts([], 'main_stage');
+    expect(empty.globalPlayerCount).toBe(0);
+    expect(empty.venuePlayerCount).toBe(0);
   });
 });

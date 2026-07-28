@@ -315,4 +315,29 @@ describe('createFollowCameraRig', () => {
     expect(rig.camera.beta).toBeGreaterThan(Math.PI / 2);
     expect(rig.camera.position.y).toBeLessThan(rig.targetAnchor.position.y);
   });
+
+  it('stops tracking the player in Free Camera mode and resumes on Auto-Follow', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const target = new TransformNode('player-root', scene);
+    target.position.set(0, 1.7, 0);
+    const rig = createFollowCameraRig(scene, target);
+
+    expect(rig.followMode()).toBe('follow');
+    target.position.set(10, 1.7, 4);
+    rig.syncZoomState();
+    expect(rig.targetAnchor.position.x).toBeCloseTo(10);
+
+    rig.setFollowMode('free');
+    expect(rig.followMode()).toBe('free');
+    target.position.set(40, 1.7, 4);
+    const freeState = rig.syncZoomState();
+    // The anchor stayed where Free Camera was engaged - the player walked away.
+    expect(rig.targetAnchor.position.x).toBeCloseTo(10);
+    expect(Number.isNaN(freeState.distance)).toBe(false);
+
+    rig.setFollowMode('follow');
+    rig.syncZoomState();
+    expect(rig.targetAnchor.position.x).toBeCloseTo(40);
+  });
 });

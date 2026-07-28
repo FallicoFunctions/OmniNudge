@@ -15,6 +15,7 @@ describe('createInputMap', () => {
       sprint: false,
       up: false,
       down: false,
+      crouch: false,
     });
 
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
@@ -34,6 +35,7 @@ describe('createInputMap', () => {
       sprint: true,
       up: false,
       down: true,
+      crouch: false,
     });
 
     window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }));
@@ -51,6 +53,7 @@ describe('createInputMap', () => {
       sprint: false,
       up: false,
       down: false,
+      crouch: false,
     });
 
     input.dispose();
@@ -81,6 +84,7 @@ describe('createInputMap', () => {
       sprint: false,
       up: false,
       down: false,
+      crouch: false,
     });
 
     input.dispose();
@@ -97,5 +101,49 @@ describe('createInputMap', () => {
     // whatever it was at dispose time - this just proves the blur listener
     // itself was removed and no longer throws/interferes after teardown.
     expect(input.state.left).toBe(false);
+  });
+
+  it('crouches only while Ctrl is held in the default hold mode', () => {
+    const input = createInputMap(window);
+
+    expect(input.crouchMode()).toBe('hold');
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ControlLeft' }));
+    expect(input.state.crouch).toBe(true);
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ControlLeft' }));
+    expect(input.state.crouch).toBe(false);
+
+    input.dispose();
+  });
+
+  it('latches crouch per press in toggle mode and ignores key auto-repeat', () => {
+    const input = createInputMap(window);
+    input.setCrouchMode('toggle');
+
+    expect(input.crouchMode()).toBe('toggle');
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ControlLeft' }));
+    expect(input.state.crouch).toBe(true);
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ControlLeft', repeat: true }));
+    expect(input.state.crouch).toBe(true);
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ControlLeft' }));
+    expect(input.state.crouch).toBe(true);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ControlRight' }));
+    expect(input.state.crouch).toBe(false);
+
+    input.dispose();
+  });
+
+  it('clears a latched crouch when the mode changes', () => {
+    const input = createInputMap(window);
+    input.setCrouchMode('toggle');
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ControlLeft' }));
+    expect(input.state.crouch).toBe(true);
+
+    input.setCrouchMode('hold');
+
+    expect(input.state.crouch).toBe(false);
+    input.dispose();
   });
 });
