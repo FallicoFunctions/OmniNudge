@@ -28,6 +28,27 @@ export const ADAPTIVE_RESOLUTION_DEFAULTS: AdaptiveResolutionConfig = {
   raiseAfterMs: 4000,
 };
 
+// Manual graphics slider (design doc sec 9.6 `Graphics`: `Auto` plus a manual
+// 1-10 slider on the row below).
+//
+// MAPPING: the slider spans the SAME bounds the adaptive controller trades
+// between, linearly and inclusively -
+//   1  -> config.sharpestLevel  (sharpest / most expensive)
+//   10 -> config.coarsestLevel  (softest / cheapest)
+// so step n = sharpest + (n - 1) / 9 * (coarsest - sharpest). Out-of-range and
+// non-finite input clamps into 1..10. While the player is on a manual step the
+// runtime stops calling stepAdaptiveResolution, so the controller cannot fight
+// the choice; re-selecting `Auto` reseeds the controller from the pinned level.
+export function resolveManualHardwareScalingLevel(
+  sliderValue: number,
+  config: AdaptiveResolutionConfig = ADAPTIVE_RESOLUTION_DEFAULTS,
+): number {
+  const numeric = Number.isFinite(sliderValue) ? sliderValue : 1;
+  const clamped = Math.min(10, Math.max(1, Math.round(numeric)));
+  const t = (clamped - 1) / 9;
+  return config.sharpestLevel + t * (config.coarsestLevel - config.sharpestLevel);
+}
+
 export interface AdaptiveResolutionState {
   level: number;
   belowSinceMs: number | null;

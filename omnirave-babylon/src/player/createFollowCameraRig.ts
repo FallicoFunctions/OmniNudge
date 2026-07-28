@@ -12,9 +12,20 @@ const MIN_ORBIT_BETA = 0.62;
 // sky is what the player is after there.
 const MAX_ORBIT_BETA = 2.62;
 
+/**
+ * Settings-popup `Camera Follow` mode (design doc sec 9.6).
+ * `follow` - Auto-Follow: the anchor tracks the player every frame.
+ * `free`   - Free Camera: the anchor stops tracking, so orbit/zoom keep
+ *            working around the spot the player left it, and walking away
+ *            walks away from the camera.
+ */
+export type CameraFollowMode = 'follow' | 'free';
+
 export interface FollowCameraRig {
   applyCheckpointView: (view: ReviewCheckpointCamera) => ReturnType<typeof resolveZoomState>;
   camera: ArcRotateCamera;
+  followMode: () => CameraFollowMode;
+  setFollowMode: (mode: CameraFollowMode) => void;
   orbit: (deltaYaw: number, deltaPitch: number) => ReturnType<typeof resolveZoomState>;
   settleFocus: (strength: number) => void;
   syncZoomState: () => ReturnType<typeof resolveZoomState>;
@@ -147,9 +158,15 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
     return zoomState;
   };
 
+  let followMode: CameraFollowMode = 'follow';
+
   return {
     applyCheckpointView,
     camera,
+    followMode: () => followMode,
+    setFollowMode(mode) {
+      followMode = mode;
+    },
     orbit(deltaYaw, deltaPitch) {
       applyOrbitDelta(deltaYaw, deltaPitch);
       return this.syncZoomState();
@@ -168,6 +185,13 @@ export function createFollowCameraRig(scene: Scene, target: TransformNode): Foll
       }
     },
     syncZoomState() {
+      if (followMode === 'free') {
+        // Free Camera: the anchor stays where it is, so the player can walk
+        // out of frame. Zoom state still resolves so orbit/zoom keep working.
+        const freeZoomState = resolveZoomState(camera.radius);
+        camera.radius = freeZoomState.distance;
+        return freeZoomState;
+      }
       // Re-anchor to the player's live position every frame so WASD movement
       // keeps the camera attached instead of leaving it behind.
       target.computeWorldMatrix(true);

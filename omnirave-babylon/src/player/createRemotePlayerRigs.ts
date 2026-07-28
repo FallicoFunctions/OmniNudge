@@ -39,6 +39,9 @@ export interface RemotePlayerRigs {
   applySnapshot: (snapshot: WorldSnapshot) => void;
   count: () => number;
   dispose: () => void;
+  /** Settings-popup `Display Names` (design doc sec 9.6 / 10.1). */
+  setNameplatesVisible: (visible: boolean) => void;
+  nameplatesVisible: () => boolean;
   update: (deltaSeconds: number) => void;
 }
 
@@ -78,6 +81,7 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
   const parent = new TransformNode('remote-player-rigs', scene);
   let disposed = false;
   let lastSnapshotAt: number | null = null;
+  let nameplatesVisible = true;
 
   const spawnEntry = (id: string, playerName: string, position: Vector3) => {
     const root = new TransformNode(`remote-player-${id}`, scene);
@@ -88,6 +92,8 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
     // identifiable even before their body loads.
     const nameplate = createNameplate(scene, id, playerName);
     nameplate.mesh.parent = root;
+    // A player who joins while Display Names is off must not pop a plate.
+    nameplate.mesh.setEnabled(nameplatesVisible);
     const entry: RemoteEntry = {
       avatar: null,
       colorwayId: null,
@@ -166,6 +172,18 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
     count() {
       return entries.size;
     },
+
+    setNameplatesVisible(visible) {
+      if (disposed || visible === nameplatesVisible) {
+        return;
+      }
+      nameplatesVisible = visible;
+      for (const entry of entries.values()) {
+        entry.nameplate.mesh.setEnabled(visible);
+      }
+    },
+
+    nameplatesVisible: () => nameplatesVisible,
 
     update(deltaSeconds) {
       if (disposed || deltaSeconds <= 0) return;

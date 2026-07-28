@@ -1,8 +1,14 @@
 import type { MovementInput } from './movementMath';
 
+/** Settings-popup crouch behaviour (design doc sec 9.6 `Controls`). */
+export type CrouchInputMode = 'hold' | 'toggle';
+
 export interface InputMap {
   dispose: () => void;
   state: MovementInput;
+  /** `hold`: crouched only while Ctrl is down. `toggle`: each press flips it. */
+  setCrouchMode: (mode: CrouchInputMode) => void;
+  crouchMode: () => CrouchInputMode;
 }
 
 const KEY_BINDINGS: Record<string, keyof MovementInput> = {
@@ -13,6 +19,8 @@ const KEY_BINDINGS: Record<string, keyof MovementInput> = {
   ShiftLeft: 'sprint',
   ShiftRight: 'sprint',
   Space: 'jump',
+  ControlLeft: 'crouch',
+  ControlRight: 'crouch',
   // Review flight: hold to rise/descend; ground-follow keeps the offset.
   KeyE: 'up',
   KeyQ: 'down',
@@ -28,7 +36,9 @@ export function createInputMap(target: Window): InputMap {
     sprint: false,
     up: false,
     down: false,
+    crouch: false,
   };
+  let crouchMode: CrouchInputMode = 'hold';
 
   const handleKeyDown = (event: KeyboardEvent) => {
     const binding = KEY_BINDINGS[event.code];
@@ -39,6 +49,15 @@ export function createInputMap(target: Window): InputMap {
           return;
         }
       }
+      if (binding === 'crouch') {
+        // Key auto-repeat must not flip a toggle-mode crouch every few
+        // milliseconds while the key is merely held down.
+        if (event.repeat) {
+          return;
+        }
+        state.crouch = crouchMode === 'toggle' ? !state.crouch : true;
+        return;
+      }
       state[binding] = true;
     }
   };
@@ -48,6 +67,13 @@ export function createInputMap(target: Window): InputMap {
     if (binding) {
       if (event.code === 'Space') {
         event.preventDefault();
+        return;
+      }
+      if (binding === 'crouch') {
+        // Toggle mode latches: only a fresh press changes it.
+        if (crouchMode === 'hold') {
+          state.crouch = false;
+        }
         return;
       }
       state[binding] = false;
@@ -70,6 +96,16 @@ export function createInputMap(target: Window): InputMap {
 
   return {
     state,
+    setCrouchMode(mode) {
+      if (mode === crouchMode) {
+        return;
+      }
+      crouchMode = mode;
+      // Switching modes must not leave the player stuck crouched from the
+      // previous mode's latch.
+      state.crouch = false;
+    },
+    crouchMode: () => crouchMode,
     dispose() {
       target.removeEventListener('keydown', handleKeyDown);
       target.removeEventListener('keyup', handleKeyUp);

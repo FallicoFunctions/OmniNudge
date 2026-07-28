@@ -4,8 +4,9 @@
 //
 // Bottom-right venue block, in the spec's order:
 //   venue name
-//   Now Playing -> `Artist Name - Track Title`
-//   elapsed + remaining time
+//   Now Playing -> `Artist Name - Track Title` (+ elapsed / remaining time)
+//   global player count
+//   current venue player count (sec 9.4 community labels)
 //
 // The dev perf pill (createPerfOverlay) also anchors bottom-right, so when the
 // debug chrome is present the caller passes `debugChromePresent: true` and the
@@ -21,6 +22,13 @@ export interface PlayerHudState {
   title: string;
   elapsedSeconds: number;
   durationSeconds: number;
+  // Zone id (not the display name) for the community label. Defaults to
+  // main_stage when the caller has no zone yet.
+  zoneId?: string;
+  // Counts from the latest world snapshot. Undefined in the single-player /
+  // no-socket path, where both count lines are hidden instead of lying.
+  globalPlayerCount?: number;
+  venuePlayerCount?: number;
 }
 
 export interface PlayerHud {
@@ -85,6 +93,59 @@ export function formatPlayerHudElapsedRemaining(
   return `${formatPlayerHudTime(elapsed)} / -${formatPlayerHudTime(duration - elapsed)}`;
 }
 
+// Community labels, verbatim from sec 9.4. Unknown zones fall back to a
+// neutral "Ravers" so a new venue still renders a count.
+const COMMUNITY_LABELS: Record<string, string> = {
+  main_stage: 'Main Stagers',
+  underground: 'Undergrounders',
+  plurr_partay: 'P.L.U.R.R. Partiers',
+};
+
+const DEFAULT_COMMUNITY_LABEL = 'Ravers';
+
+export function formatCommunityLabel(zoneId: string): string {
+  return COMMUNITY_LABELS[zoneId] ?? DEFAULT_COMMUNITY_LABEL;
+}
+
+// All the labels are regular plurals ("Main Stagers" -> "Main Stager"), so a
+// single count of 1 just drops the trailing "s".
+function singularize(label: string): string {
+  return label.endsWith('s') ? label.slice(0, -1) : label;
+}
+
+function formatCount(count: number): string {
+  const safe = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  return safe.toLocaleString('en-US');
+}
+
+/** e.g. "1 raver online" / "1,204 ravers online". */
+export function formatGlobalPlayerCount(count: number): string {
+  const safe = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  return `${formatCount(safe)} ${safe === 1 ? 'raver' : 'ravers'} online`;
+}
+
+/** e.g. "1 Main Stager" / "48 Main Stagers". */
+export function formatVenuePlayerCount(zoneId: string, count: number): string {
+  const safe = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  const label = formatCommunityLabel(zoneId);
+  return `${formatCount(safe)} ${safe === 1 ? singularize(label) : label}`;
+}
+
+// Global = every player in the snapshot (the local player included); venue =
+// those whose zone matches the active zone.
+export function resolvePlayerCounts(
+  players: readonly { zone: string }[],
+  activeZone: string,
+): { globalPlayerCount: number; venuePlayerCount: number } {
+  let venuePlayerCount = 0;
+  for (const player of players) {
+    if (player.zone === activeZone) {
+      venuePlayerCount += 1;
+    }
+  }
+  return { globalPlayerCount: players.length, venuePlayerCount };
+}
+
 export function createPlayerHud(
   host: HTMLElement,
   options: CreatePlayerHudOptions = {},
@@ -115,7 +176,17 @@ export function createPlayerHud(
   time.className = 'player-hud__time';
   time.textContent = '0:00';
 
-  panel.append(venue, eyebrow, track, time);
+  const globalCount = document.createElement('p');
+  globalCount.dataset.testid = 'player-hud-global-count';
+  globalCount.className = 'player-hud__count';
+  globalCount.hidden = true;
+
+  const venueCount = document.createElement('p');
+  venueCount.dataset.testid = 'player-hud-venue-count';
+  venueCount.className = 'player-hud__count';
+  venueCount.hidden = true;
+
+  panel.append(venue, eyebrow, track, time, globalCount, venueCount);
   host.appendChild(panel);
 
   function update(state: PlayerHudState): void {
@@ -134,6 +205,29 @@ export function createPlayerHud(
     const timeText = formatPlayerHudElapsedRemaining(state.elapsedSeconds, state.durationSeconds);
     if (time.textContent !== timeText) {
       time.textContent = timeText;
+    }
+
+    // No snapshot (single-player / no socket) -> no counts to show. Hiding
+    // beats inventing a number.
+    const zoneId = state.zoneId ?? 'main_stage';
+    if (state.globalPlayerCount === undefined) {
+      globalCount.hidden = true;
+    } else {
+      const globalText = formatGlobalPlayerCount(state.globalPlayerCount);
+      if (globalCount.textContent !== globalText) {
+        globalCount.textContent = globalText;
+      }
+      globalCount.hidden = false;
+    }
+
+    if (state.venuePlayerCount === undefined) {
+      venueCount.hidden = true;
+    } else {
+      const venueCountText = formatVenuePlayerCount(zoneId, state.venuePlayerCount);
+      if (venueCount.textContent !== venueCountText) {
+        venueCount.textContent = venueCountText;
+      }
+      venueCount.hidden = false;
     }
   }
 
