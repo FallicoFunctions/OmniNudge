@@ -17,6 +17,7 @@ import '@babylonjs/core/Shaders/rgbdDecode.fragment';
 import {
   ADAPTIVE_RESOLUTION_DEFAULTS,
   createAdaptiveResolutionState,
+  resolveManualHardwareScalingLevel,
   stepAdaptiveResolution,
 } from './adaptiveResolutionMath';
 import type { createMainStageScene } from '../scene/createMainStageScene';
@@ -28,6 +29,12 @@ import { createPerfOverlay, updatePerfOverlay } from '../ui/createPerfOverlay';
 import { createReviewHud, formatCheckpointLabel } from '../ui/createReviewHud';
 import { createRuntimeLoadingOverlay } from '../ui/createRuntimeLoadingOverlay';
 import { createEnterOmniRaveOverlay } from '../ui/createEnterOmniRaveOverlay';
+import { createHudNotice } from '../ui/createHudNotice';
+import { createSettingsPopup } from '../ui/createSettingsPopup';
+import { createTopLeftControls } from '../ui/createTopLeftControls';
+import { createTopRightControls } from '../ui/createTopRightControls';
+import { loadPlayerSettings, savePlayerSettings } from '../ui/playerSettings';
+import { applyUiTheme } from '../ui/uiTheme';
 import { RUNTIME_CONFIG } from './runtimeConfig';
 
 type RuntimeEngine = Engine | WebGPUEngine;
@@ -108,6 +115,12 @@ export async function createRuntime(host: HTMLElement) {
   // owned DOM like the overlays above, so it is torn down in cleanup too.
   let playerHud: import('../ui/createPlayerHud').PlayerHud | undefined;
   let playerHudTimer: number | undefined;
+  // Player-facing HUD shell (design sec 9.2 / 9.3 / 9.6). Also never gated
+  // behind ?debug=1, also owned DOM torn down in cleanup.
+  let topLeftControls: import('../ui/createTopLeftControls').TopLeftControls | undefined;
+  let topRightControls: import('../ui/createTopRightControls').TopRightControls | undefined;
+  let settingsPopup: import('../ui/createSettingsPopup').SettingsPopup | undefined;
+  let hudNotice: import('../ui/createHudNotice').HudNotice | undefined;
   let handleCanvasPick: ((event: MouseEvent) => void) | undefined;
   let handleResize: (() => void) | undefined;
   let disposed = false;
@@ -137,6 +150,12 @@ export async function createRuntime(host: HTMLElement) {
       playerHudTimer = undefined;
     }
     playerHud?.dispose();
+    // Settings popup first: it lives inside the top-left block's slot and owns
+    // a document keydown listener.
+    settingsPopup?.dispose();
+    topLeftControls?.dispose();
+    topRightControls?.dispose();
+    hudNotice?.dispose();
     canvas.remove();
   };
 
@@ -288,6 +307,11 @@ export async function createRuntime(host: HTMLElement) {
     // 1s tick instead of re-rendering on every snapshot.
     let activeZoneId = 'main_stage';
     let activeZoneMedia: import('../network/worldSocket').ZoneMediaState | null = null;
+    // Latest snapshot roster, for the venue block's global / venue player
+    // counts (sec 9.4). Held by reference - the HUD tick counts it, so there is
+    // no per-snapshot allocation here. Null in the single-player path, where
+    // the HUD hides both count lines instead of inventing numbers.
+    let activePlayers: readonly import('../network/worldSocket').WorldPlayer[] | null = null;
     if (perfFlags.worldUrl && perfFlags.worldToken) {
       const [{ createWorldSocket }, { createRemotePlayerRigs }, { createStageMediaPlayer }] = await Promise.all([
         import('../network/worldSocket'),
@@ -306,6 +330,7 @@ export async function createRuntime(host: HTMLElement) {
         stageMediaPlayer?.applyMedia(activeMedia);
         activeZoneId = snapshot.activeZone;
         activeZoneMedia = activeMedia;
+        activePlayers = snapshot.players;
         // Drive the stage screen's event mode (countdown / fireworks video)
         // from the active zone's scheduled event, if any.
         const activeEvent = snapshot.zoneEvents.find((zone) => zone.zoneId === snapshot.activeZone) ?? null;
@@ -347,20 +372,150 @@ export async function createRuntime(host: HTMLElement) {
     // The elapsed time comes from the LOCAL playhead (the media player), so it
     // keeps counting between snapshots; duration comes from the server entry.
     {
-      const { createPlayerHud, formatVenueName } = await import('../ui/createPlayerHud');
+      const { createPlayerHud, formatVenueName, resolvePlayerCounts } = await import('../ui/createPlayerHud');
       const hudMediaPlayer = stageMediaPlayer;
       playerHud = createPlayerHud(host, { debugChromePresent: perfFlags.debug });
       const refreshPlayerHud = () => {
+        const counts = activePlayers ? resolvePlayerCounts(activePlayers, activeZoneId) : null;
         playerHud?.update({
           venueName: formatVenueName(activeZoneId),
+          zoneId: activeZoneId,
           artist: activeZoneMedia?.artist ?? '',
           title: activeZoneMedia?.title ?? '',
           elapsedSeconds: hudMediaPlayer?.getCurrentTime() ?? 0,
           durationSeconds: activeZoneMedia?.durationSeconds ?? hudMediaPlayer?.getDuration() ?? 0,
+          globalPlayerCount: counts?.globalPlayerCount,
+          venuePlayerCount: counts?.venuePlayerCount,
         });
       };
       refreshPlayerHud();
       playerHudTimer = window.setInterval(refreshPlayerHud, 1000);
+    }
+
+    // Render-scale state. Declared here (ahead of the render loop) because the
+    // settings popup's Graphics controls write to it from click handlers.
+    let perfFrameCounter = 0;
+    let adaptiveState = createAdaptiveResolutionState(
+      ADAPTIVE_RESOLUTION_DEFAULTS,
+      activeEngine.getHardwareScalingLevel(),
+    );
+    let pendingHardwareScalingLevel: number | undefined;
+    // While false the adaptive controller is not stepped at all, so it cannot
+    // fight the level the player pinned with the manual 1-10 slider.
+    let graphicsAutoEnabled = true;
+
+    // ---- Player HUD shell: top-left controls + settings popup + avatar
+    // colorway popup + top-right session controls (design sec 9.2, 9.3, 9.5,
+    // 9.6). Player-facing, so NOT gated behind perfFlags.debug - only their
+    // anchors shift when the dev chrome is present (the review HUD is top-left
+    // and the debug panel top-right, the same collision the player HUD already
+    // resolves for the perf pill).
+    {
+      const settings = loadPlayerSettings();
+      // Theme first: every surface created below reads the tokens it sets.
+      applyUiTheme(host, settings.uiTheme);
+
+      const applyCameraFollow = (mode: 'follow' | 'free') => {
+        reviewRuntime?.cameraRig?.setFollowMode?.(mode);
+      };
+      const applyCrouchMode = (mode: 'hold' | 'toggle') => {
+        reviewRuntime?.input?.setCrouchMode?.(mode);
+      };
+      const applyDisplayNames = (visible: boolean) => {
+        remotePlayerRigs?.setNameplatesVisible(visible);
+      };
+      const applyGraphicsLevel = (level: number) => {
+        pendingHardwareScalingLevel = resolveManualHardwareScalingLevel(
+          level,
+          ADAPTIVE_RESOLUTION_DEFAULTS,
+        );
+      };
+
+      // Apply the stored settings before anything renders with them.
+      applyCameraFollow(settings.cameraFollow);
+      applyCrouchMode(settings.crouchMode);
+      applyDisplayNames(settings.displayNames);
+      graphicsAutoEnabled = settings.graphicsAuto;
+      if (!settings.graphicsAuto) {
+        applyGraphicsLevel(settings.graphicsLevel);
+      }
+
+      // Manual respawn (sec 8.3): back to the current venue's spawn, no
+      // confirmation, sprint/crouch cleared, popups closed. The dev-only route
+      // reset the review HUD's "Play Again" does is deliberately NOT part of it.
+      const respawnPlayer = () => {
+        const spawn = reviewRuntime?.spawn ?? BACK_PLAZA_SPAWN;
+        reviewRuntime?.playerRig?.root.position.set(spawn.x, spawn.y, spawn.z);
+        const input = reviewRuntime?.input?.state;
+        if (input) {
+          input.sprint = false;
+          input.crouch = false;
+        }
+        const travelView = resolveTravelCameraOffsets(undefined);
+        scene.onAfterRenderObservable.addOnce(() => {
+          reviewRuntime?.cameraRig?.applyCheckpointView({
+            alpha: 0,
+            beta: 1.12,
+            radius: TRAVEL_CAMERA_DISTANCE,
+            ...travelView,
+          });
+        });
+        topLeftControls?.openPanel(null);
+      };
+
+      settingsPopup = createSettingsPopup({
+        settings,
+        onRequestClose() {
+          topLeftControls?.openPanel(null);
+        },
+        onCameraFollowChange: applyCameraFollow,
+        onCrouchModeChange: applyCrouchMode,
+        onDisplayNamesChange: applyDisplayNames,
+        onGraphicsAutoChange(auto) {
+          graphicsAutoEnabled = auto;
+          if (auto) {
+            // Resume adaptive control from wherever the manual pin left the
+            // render scale, so Auto does not jump the image on re-enable.
+            adaptiveState = createAdaptiveResolutionState(
+              ADAPTIVE_RESOLUTION_DEFAULTS,
+              activeEngine.getHardwareScalingLevel(),
+            );
+          }
+        },
+        onGraphicsLevelChange: applyGraphicsLevel,
+        onUiThemeChange(theme) {
+          applyUiTheme(host, theme);
+        },
+        onRespawn: respawnPlayer,
+        onChange(next) {
+          savePlayerSettings(next);
+        },
+      });
+
+      topLeftControls = createTopLeftControls(host, {
+        settingsPanel: settingsPopup.element,
+        avatarColorways: reviewRuntime?.avatarColorways,
+        selectedAvatarColorwayId: reviewRuntime?.selectedAvatarColorway?.id,
+        onSelectAvatarColorway(colorway) {
+          reviewRuntime?.setAvatarColorway?.(colorway.id);
+        },
+        debugChromePresent: perfFlags.debug,
+      });
+
+      hudNotice = createHudNotice(host, { debugChromePresent: perfFlags.debug });
+      // AUTH IS A LATER BLOCK. Nothing here calls an auth endpoint or fakes a
+      // session; the buttons answer honestly instead of doing nothing, and
+      // swap to the real handlers when that block lands.
+      const accountsLaterNotice = () => {
+        hudNotice?.show('Accounts arrive in a later update - you are raving as a guest.');
+      };
+      topRightControls = createTopRightControls(host, {
+        mode: 'guest',
+        onLogIn: accountsLaterNotice,
+        onSignUp: accountsLaterNotice,
+        onLogout: accountsLaterNotice,
+        debugChromePresent: perfFlags.debug,
+      });
     }
 
     // The Main Stage screen visualizer. It runs in BOTH paths: with the stage
@@ -457,12 +612,6 @@ export async function createRuntime(host: HTMLElement) {
     }
     loadingOverlay.remove();
 
-    let perfFrameCounter = 0;
-    let adaptiveState = createAdaptiveResolutionState(
-      ADAPTIVE_RESOLUTION_DEFAULTS,
-      activeEngine.getHardwareScalingLevel(),
-    );
-    let pendingHardwareScalingLevel: number | undefined;
     activeEngine.runRenderLoop(() => {
       // WebGPU submits the command buffers recorded by scene.render() after
       // this callback returns. Resizing here, before recording the next frame,
@@ -530,19 +679,24 @@ export async function createRuntime(host: HTMLElement) {
         const fps = activeEngine.getFps();
 
         // Hold the FPS target by trading render scale, never frame pacing:
-        // sharp when the GPU can afford it, gracefully coarser when not.
-        const nextState = stepAdaptiveResolution(adaptiveState, ADAPTIVE_RESOLUTION_DEFAULTS, fps, performance.now());
-        if (nextState.level !== adaptiveState.level) {
-          pendingHardwareScalingLevel = nextState.level;
+        // sharp when the GPU can afford it, gracefully coarser when not. Skipped
+        // entirely while the player pinned a manual Graphics level (sec 9.6).
+        if (graphicsAutoEnabled) {
+          const nextState = stepAdaptiveResolution(adaptiveState, ADAPTIVE_RESOLUTION_DEFAULTS, fps, performance.now());
+          if (nextState.level !== adaptiveState.level) {
+            pendingHardwareScalingLevel = nextState.level;
+          }
+          adaptiveState = nextState;
         }
-        adaptiveState = nextState;
 
         if (perfOverlay) {
           const activeFx = scene.activeCamera?._postProcesses?.filter(Boolean).length ?? 0;
           const shadowCasters =
             scene.metadata?.reviewRuntime?.lightingRig?.shadowGenerator?.getShadowMap()?.renderList?.length ?? 0;
           const readyTextures = scene.textures.filter((texture) => texture.isReady()).length;
-          updatePerfOverlay(perfOverlay, fps, fps > 0 ? 1000 / fps : 0, activeFx, shadowCasters, readyTextures, adaptiveState.level);
+          // Report the level actually in force - under a manual Graphics pin
+          // the adaptive controller's own level is not the truth.
+          updatePerfOverlay(perfOverlay, fps, fps > 0 ? 1000 / fps : 0, activeFx, shadowCasters, readyTextures, activeEngine.getHardwareScalingLevel());
         }
       }
     });
