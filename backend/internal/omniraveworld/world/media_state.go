@@ -7,6 +7,8 @@ import (
 
 type PlaylistEntry struct {
 	TrackID  string
+	Artist   string
+	Title    string
 	Duration time.Duration
 }
 
@@ -16,12 +18,18 @@ type StagePlaylist struct {
 	StartedAt time.Time
 }
 
+// ZoneMediaSnapshot carries the display metadata (artist/title/duration) the
+// runtime needs for the "Now Playing" HUD. Artist, Title and Duration are only
+// populated when the zone is playing a known playlist entry.
 type ZoneMediaSnapshot struct {
 	ZoneID    ZoneID
 	TrackID   string
+	Artist    string
+	Title     string
 	Index     int
 	StartedAt time.Time
 	Playhead  time.Duration
+	Duration  time.Duration
 }
 
 type zoneMediaState struct {
@@ -138,9 +146,12 @@ func resolvePlaylistState(current zoneMediaState, playlist StagePlaylist, now ti
 			return ZoneMediaSnapshot{
 				ZoneID:    current.ZoneID,
 				TrackID:   entry.TrackID,
+				Artist:    entry.Artist,
+				Title:     entry.Title,
 				Index:     index,
 				StartedAt: current.StartedAt,
 				Playhead:  elapsed,
+				Duration:  entry.Duration,
 			}, true
 		}
 
@@ -154,22 +165,22 @@ func DefaultStagePlaylists() []StagePlaylist {
 		{
 			ZoneID: ZoneMainStage,
 			Entries: []PlaylistEntry{
-				{TrackID: "main-stage-set-01", Duration: 30 * time.Minute},
-				{TrackID: "main-stage-set-02", Duration: 28 * time.Minute},
+				{TrackID: "main-stage-set-01", Artist: "Fallico", Title: "Nick's Mix Vol. 13", Duration: 7827 * time.Second},
+				{TrackID: "main-stage-set-02", Artist: "OmniRave", Title: "Main Stage Set 02", Duration: 28 * time.Minute},
 			},
 		},
 		{
 			ZoneID: ZoneUnderground,
 			Entries: []PlaylistEntry{
-				{TrackID: "techno-room-set-01", Duration: 24 * time.Minute},
-				{TrackID: "techno-room-set-02", Duration: 26 * time.Minute},
+				{TrackID: "techno-room-set-01", Artist: "OmniRave", Title: "Techno Room Set 01", Duration: 24 * time.Minute},
+				{TrackID: "techno-room-set-02", Artist: "OmniRave", Title: "Techno Room Set 02", Duration: 26 * time.Minute},
 			},
 		},
 		{
 			ZoneID: ZonePlurrPartay,
 			Entries: []PlaylistEntry{
-				{TrackID: "neon-room-set-01", Duration: 22 * time.Minute},
-				{TrackID: "neon-room-set-02", Duration: 25 * time.Minute},
+				{TrackID: "neon-room-set-01", Artist: "OmniRave", Title: "Neon Room Set 01", Duration: 22 * time.Minute},
+				{TrackID: "neon-room-set-02", Artist: "OmniRave", Title: "Neon Room Set 02", Duration: 25 * time.Minute},
 			},
 		},
 	}

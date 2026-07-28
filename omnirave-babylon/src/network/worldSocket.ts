@@ -29,8 +29,14 @@ export interface WorldPlayer {
 export interface ZoneMediaState {
   zoneId: string;
   trackId: string;
+  // Display metadata for the "Now Playing" HUD; empty when the zone is not on
+  // a known playlist entry.
+  artist: string;
+  title: string;
   playlistIndex: number;
   playheadSeconds: number;
+  // 0 when the server has no duration for the current entry.
+  durationSeconds: number;
 }
 
 export interface ZoneEventState {

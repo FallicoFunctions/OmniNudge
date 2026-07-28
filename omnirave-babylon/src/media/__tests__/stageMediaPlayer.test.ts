@@ -22,8 +22,11 @@ function media(overrides: Partial<ZoneMediaState> = {}): ZoneMediaState {
   return {
     zoneId: 'main-stage',
     trackId: 'main-stage-set-01',
+    artist: 'Fallico',
+    title: "Nick's Mix Vol. 13",
     playlistIndex: 0,
     playheadSeconds: 10,
+    durationSeconds: 7827,
     ...overrides,
   };
 }
