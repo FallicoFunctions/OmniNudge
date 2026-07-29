@@ -85,7 +85,8 @@ export interface StageEventStateInput {
 export interface StageVisualizerOptions {
   // Fills the passed array with the current byte frequency spectrum. Wired to
   // the stage media player's getFrequencyData in the world/music path, or a
-  // zero-fill in the single-player review path (idle breathing, no audio).
+  // zero-fill on the dev/review path (no world connection: idle breathing, no
+  // audio).
   getFrequencyData: (target: Uint8Array) => void;
   heroScreenMeshNames?: readonly string[];
 }
@@ -304,8 +305,9 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
         const m = Math.abs(c - (COLUMN_COUNT - 1) / 2);
         target = 0.45 + 0.35 * Math.sin(elapsed * 2.2 - m * 0.45);
       } else if (total === 0) {
-        // Idle (single-player path, no audio): gentle breathing sweep so the
-        // unit never looks dead - clearly cheaper than the audio path.
+        // Idle (no audio present, e.g. no world connection): gentle breathing
+        // sweep so the unit never looks dead - clearly cheaper than the audio
+        // path.
         target = 0.1 + 0.08 * Math.sin(elapsed * 0.9 + c * 0.35) + 0.05 * Math.sin(elapsed * 0.4);
       } else {
         target = readColumnTarget(c);

@@ -20,6 +20,7 @@ import {
   resolveManualHardwareScalingLevel,
   stepAdaptiveResolution,
 } from './adaptiveResolutionMath';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import type { createMainStageScene } from '../scene/createMainStageScene';
 import { resolveTravelCameraOffsets, TRAVEL_CAMERA_DISTANCE } from '../player/cameraRigMath';
 import { BACK_PLAZA_SPAWN } from '../scene/reviewRouteData';
@@ -37,6 +38,15 @@ import { loadPlayerSettings, savePlayerSettings } from '../ui/playerSettings';
 import { applyUiTheme } from '../ui/uiTheme';
 import { RUNTIME_CONFIG } from './runtimeConfig';
 
+// OmniRave is MULTIPLAYER-ONLY. There is no single-player mode and no offline
+// product mode. The shipped game always boots with a world connection
+// (?world=<ws url>&wtoken=<world session JWT>).
+//
+// This runtime can also boot with those params absent, and several comments
+// below distinguish "the world path" from "no world connection". That
+// no-socket boot is dev/review scaffolding: it exists so the local preview
+// server can drive the scene without a world backend. It is not a mode players
+// can be in, and nothing about it should be described as a product feature.
 type RuntimeEngine = Engine | WebGPUEngine;
 
 declare global {
@@ -115,10 +125,11 @@ export async function createRuntime(host: HTMLElement) {
   // owned DOM like the overlays above, so it is torn down in cleanup too.
   let playerHud: import('../ui/createPlayerHud').PlayerHud | undefined;
   let playerHudTimer: number | undefined;
-  // Player-facing chat panel (design sec 9.8 / 10.2 / 10.3 / 10.4). Only in the
-  // world path - chat is venue-local and server-broadcast, so with no socket
-  // there is nothing to send to and no one to hear it. Rendering it there would
-  // be a dead control, so the single-player review path omits it entirely.
+  // Player-facing chat panel (design sec 9.8 / 10.2 / 10.3 / 10.4). Chat is
+  // venue-local and server-broadcast, so it REQUIRES the world connection:
+  // without a socket there is nothing to send to and no one to hear it, and
+  // the panel would be a dead control. It is therefore constructed only when
+  // the world connection is present.
   let chatPanel: import('../ui/createChatPanel').ChatPanel | undefined;
   // Player-facing HUD shell (design sec 9.2 / 9.3 / 9.6). Also never gated
   // behind ?debug=1, also owned DOM torn down in cleanup.
@@ -283,6 +294,7 @@ export async function createRuntime(host: HTMLElement) {
       }
       worldSocket?.dispose();
       remotePlayerRigs?.dispose();
+      localChatBubbles?.dispose();
       stageAudioDevControls?.dispose();
       stageMediaPlayer?.dispose();
       stageVisualizer?.dispose();
@@ -301,6 +313,10 @@ export async function createRuntime(host: HTMLElement) {
     // position each frame.
     let worldSocket: import('../network/worldSocket').WorldSocket | undefined;
     let remotePlayerRigs: import('../player/createRemotePlayerRigs').RemotePlayerRigs | undefined;
+    // Sec 10.5: the local player gets above-head bubbles too - the doc's
+    // "at respawn: player's own bubbles clear" only makes sense if they exist,
+    // and the third-person camera keeps your own avatar on screen.
+    let localChatBubbles: import('../player/createChatBubbleStack').ChatBubbleStack | undefined;
     let stageMediaPlayer: import('../media/stageMediaPlayer').StageMediaPlayer | undefined;
     let stageAudioDevControls: import('../ui/createStageAudioDevControls').StageAudioDevControls | undefined;
     let stageVisualizer: import('../scene/createStageVisualizer').StageVisualizer | undefined;
@@ -315,8 +331,9 @@ export async function createRuntime(host: HTMLElement) {
     let activeZoneMedia: import('../network/worldSocket').ZoneMediaState | null = null;
     // Latest snapshot roster, for the venue block's global / venue player
     // counts (sec 9.4). Held by reference - the HUD tick counts it, so there is
-    // no per-snapshot allocation here. Null in the single-player path, where
-    // the HUD hides both count lines instead of inventing numbers.
+    // no per-snapshot allocation here. Null when there is no world connection
+    // (dev/review path), where the HUD hides both count lines instead of
+    // inventing numbers.
     let activePlayers: readonly import('../network/worldSocket').WorldPlayer[] | null = null;
     if (perfFlags.worldUrl && perfFlags.worldToken) {
       const [{ createWorldSocket }, { createRemotePlayerRigs }, { createStageMediaPlayer }] = await Promise.all([
@@ -365,16 +382,35 @@ export async function createRuntime(host: HTMLElement) {
           debugChromePresent: perfFlags.debug,
         });
         const activeChatPanel = chatPanel;
+        // Sec 10.5: the same message stream that fills the log drives the
+        // above-head bubbles.
+        const localPlayerRoot = reviewRuntime?.playerRig?.root;
+        if (localPlayerRoot) {
+          const { createChatBubbleStack } = await import('../player/createChatBubbleStack');
+          localChatBubbles = createChatBubbleStack(scene, 'local', localPlayerRoot);
+        }
+        let localPlayerId = '';
         worldSocket.onChat((message) => {
-          activeChatPanel.appendMessage(message);
+          // appendMessage returns false for a muted sender (sec 10.2) - a
+          // muted player must not get a bubble either, or muting would only
+          // half-work.
+          if (!activeChatPanel.appendMessage(message)) return;
+          if (message.playerId && message.playerId === localPlayerId) {
+            localChatBubbles?.showMessage(message.body);
+          } else {
+            remotePlayerRigs?.showChatBubble(message.playerId, message.body);
+          }
         });
         // Sec 10.4: the log is per venue session. The first snapshot counts as
         // the venue entry, so the fresh log opens with `Entered [Venue]`.
         let chatZoneId: string | null = null;
         worldSocket.onSnapshot((snapshot) => {
+          localPlayerId = snapshot.currentPlayerId;
           activeChatPanel.setCurrentPlayerId(snapshot.currentPlayerId);
           if (snapshot.activeZone && snapshot.activeZone !== chatZoneId) {
             chatZoneId = snapshot.activeZone;
+            // Sec 10.5: old-venue bubbles do not survive a venue crossing.
+            localChatBubbles?.clear();
             activeChatPanel.clearHistory();
             activeChatPanel.appendSystemMessage(`Entered ${formatChatVenueName(snapshot.activeZone)}`);
           }
@@ -424,8 +460,9 @@ export async function createRuntime(host: HTMLElement) {
     }
 
     // The player HUD ships in BOTH paths: with a world socket it shows the
-    // active venue and its synced track; in the single-player review path
-    // there is no media, so it shows the venue name and "No track playing".
+    // active venue and its synced track; on the dev/review path (no world
+    // connection) there is no media, so it shows the venue name and "No track
+    // playing".
     // The elapsed time comes from the LOCAL playhead (the media player), so it
     // keeps counting between snapshots; duration comes from the server entry.
     {
@@ -501,6 +538,8 @@ export async function createRuntime(host: HTMLElement) {
       // confirmation, sprint/crouch cleared, popups closed. The dev-only route
       // reset the review HUD's "Play Again" does is deliberately NOT part of it.
       const respawnPlayer = () => {
+        // Sec 10.5: "at respawn: player's own bubbles clear".
+        localChatBubbles?.clear();
         const spawn = reviewRuntime?.spawn ?? BACK_PLAZA_SPAWN;
         reviewRuntime?.playerRig?.root.position.set(spawn.x, spawn.y, spawn.z);
         const input = reviewRuntime?.input?.state;
@@ -576,9 +615,9 @@ export async function createRuntime(host: HTMLElement) {
     }
 
     // The Main Stage screen visualizer. It runs in BOTH paths: with the stage
-    // media player (world/music path) it reacts to the live synced audio; in
-    // the single-player review path there is no player, so it reads a zero
-    // spectrum and shows an idle shimmer instead of crashing. Frequency data
+    // media player (world/music path) it reacts to the live synced audio; on
+    // the dev/review path (no world connection) there is no player, so it
+    // reads a zero spectrum and shows an idle shimmer instead of crashing. Frequency data
     // is pulled lazily each frame, so it picks up the media player as soon as
     // that path has constructed one.
     // ONE shared spectrum source for the screen visualizer and the immersive
@@ -598,7 +637,8 @@ export async function createRuntime(host: HTMLElement) {
 
     // The venue-wide immersive show (beams, laser fans, air particles, floor
     // pulse). Like the visualizer it runs in BOTH paths: audio-reactive with
-    // the world/music path, gentle idle sweeps in the single-player path.
+    // the world/music path, gentle idle sweeps when no audio is present (no
+    // world connection).
     const { createImmersiveAudioShow } = await import('../scene/createImmersiveAudioShow');
     immersiveAudioShow = createImmersiveAudioShow(scene, {
       getFrequencyData: getStageFrequencyData,
@@ -607,8 +647,8 @@ export async function createRuntime(host: HTMLElement) {
 
     // The crown figurehead effects (reactive LED tracery climbing the spire,
     // the apex energy crystal, the sky beacon). Shares the exact same spectrum
-    // closure so it stays audio- and color-coherent with the venue; idle in the
-    // single-player path.
+    // closure so it stays audio- and color-coherent with the venue; idle when
+    // no audio is present (no world connection).
     const { createCrownEffects } = await import('../scene/createCrownEffects');
     crownEffects = createCrownEffects(scene, {
       getFrequencyData: getStageFrequencyData,
@@ -619,7 +659,8 @@ export async function createRuntime(host: HTMLElement) {
     // just above the pearl paving tiles (the tiles themselves - the physical,
     // walkable floor - are untouched). Shares the exact same spectrum closure
     // so it stays audio- and colour-coherent with the venue; a slow calm
-    // shimmer in the single-player path so the floor still reads as pearl.
+    // shimmer when no audio is present (no world connection) so the floor
+    // still reads as pearl.
     const { createCascadeCourtLightFloor } = await import('../scene/createCascadeCourtLightFloor');
     cascadeCourtLightFloor = createCascadeCourtLightFloor(scene, {
       getFrequencyData: getStageFrequencyData,
@@ -632,7 +673,8 @@ export async function createRuntime(host: HTMLElement) {
     // plates on create and restores them on dispose - the owner asked for the
     // space back, not for the plates to be deleted). Shares the exact same
     // spectrum closure so its formations and colours stay coherent with the
-    // venue; slow drifting formations in the single-player path.
+    // venue; slow drifting formations when no audio is present (no world
+    // connection).
     const { createHologramGrid } = await import('../scene/createHologramGrid');
     hologramGrid = createHologramGrid(scene, {
       getFrequencyData: getStageFrequencyData,
@@ -641,7 +683,8 @@ export async function createRuntime(host: HTMLElement) {
 
     // The stage atmospherics (haze air body, CO2/cryo jets, flame jets,
     // cold-spark fountains, strobe pods): the PHYSICAL effects show. Shares the
-    // same spectrum closure; haze-only idle in the single-player path.
+    // same spectrum closure; haze-only idle when no audio is present (no world
+    // connection).
     const { createStageAtmospherics } = await import('../scene/createStageAtmospherics');
     stageAtmospherics = createStageAtmospherics(scene, {
       getFrequencyData: getStageFrequencyData,
@@ -686,6 +729,15 @@ export async function createRuntime(host: HTMLElement) {
       }
       const deltaSeconds = activeEngine.getDeltaTime() / 1000;
       remotePlayerRigs?.update(deltaSeconds);
+      if (localChatBubbles && playerPosition) {
+        // Same sec 10.1/10.5 distance rules the remote rigs apply, measured
+        // from the camera to the local avatar.
+        const cameraPosition = scene.activeCamera?.globalPosition;
+        localChatBubbles.update(
+          deltaSeconds,
+          cameraPosition ? Vector3.Distance(cameraPosition, playerPosition) : Number.NaN,
+        );
+      }
       stageAudioDevControls?.update();
       activeStageVisualizer.update(deltaSeconds);
       activeImmersiveAudioShow.update(deltaSeconds);
