@@ -25,8 +25,8 @@ export interface PlayerHudState {
   // Zone id (not the display name) for the community label. Defaults to
   // main_stage when the caller has no zone yet.
   zoneId?: string;
-  // Counts from the latest world snapshot. Undefined in the single-player /
-  // no-socket path, where both count lines are hidden instead of lying.
+  // Counts from the latest world snapshot. Undefined on the dev/review path
+  // (no world connection), where both count lines are hidden instead of lying.
   globalPlayerCount?: number;
   venuePlayerCount?: number;
 }
@@ -207,7 +207,7 @@ export function createPlayerHud(
       time.textContent = timeText;
     }
 
-    // No snapshot (single-player / no socket) -> no counts to show. Hiding
+    // No snapshot (no world connection) -> no counts to show. Hiding
     // beats inventing a number.
     const zoneId = state.zoneId ?? 'main_stage';
     if (state.globalPlayerCount === undefined) {

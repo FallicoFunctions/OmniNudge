@@ -191,7 +191,7 @@ const PALETTE_SAT_MAX = 0.66;
 const DESATURATE_TRIM = 0.75;
 
 // --- Brightness ------------------------------------------------------------
-// IDLE (single-player / silence): dim but alive.
+// IDLE (silence, e.g. no world connection): dim but alive.
 const IDLE_BASE = 0.16;
 const IDLE_AMP = 0.1;
 // MUSIC: a floor plus energy plus a whole-formation flash on the kick. The
@@ -230,7 +230,8 @@ const WORDMARK_CANVAS_H = 22;
 export interface HologramGridOptions {
   // Fills the passed array with the current byte frequency spectrum (the SAME
   // closure as the stage visualizer / immersive show / crown / light floor;
-  // zero-filled in the single-player path, which yields the idle drift).
+  // zero-filled when there is no world connection, which yields the idle
+  // drift).
   getFrequencyData: (target: Uint8Array) => void;
 }
 

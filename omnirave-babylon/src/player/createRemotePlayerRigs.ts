@@ -6,7 +6,9 @@ import type { Scene } from '@babylonjs/core/scene';
 
 import { applyAvatarColorway } from './avatarColorways';
 import { createReviewAvatar, type ReviewAvatar } from './createReviewAvatar';
+import { createChatBubbleStack, type ChatBubbleStack } from './createChatBubbleStack';
 import { createNameplate, type Nameplate } from './createNameplate';
+import { isLabelVisibleAtDistance, resolveLabelDistanceScale } from './labelDistanceMath';
 import { resolveAvatarAnimationState } from './avatarAnimationState';
 import type { WorldSnapshot } from '../network/worldSocket';
 
@@ -25,10 +27,15 @@ const COLORWAY_LOADOUT_KEY = 'colorway';
 
 interface RemoteEntry {
   avatar: ReviewAvatar | null;
+  bubbles: ChatBubbleStack;
   colorwayId: string | null;
   elapsedSeconds: number;
   gone: boolean;
   nameplate: Nameplate;
+  /** Last applied name-plate scale, so the common case writes nothing. */
+  nameplateScale: number;
+  /** Last applied name-plate enabled state (distance + Display Names). */
+  nameplateShown: boolean;
   playerName: string;
   root: TransformNode;
   speedMetersPerSecond: number;
@@ -42,6 +49,12 @@ export interface RemotePlayerRigs {
   /** Settings-popup `Display Names` (design doc sec 9.6 / 10.1). */
   setNameplatesVisible: (visible: boolean) => void;
   nameplatesVisible: () => boolean;
+  /**
+   * Route a venue chat message to the sender's above-head bubble stack
+   * (design doc sec 10.5). Unknown ids (the local player, or someone who has
+   * already left) are ignored.
+   */
+  showChatBubble: (playerId: string, body: string) => void;
   update: (deltaSeconds: number) => void;
 }
 
@@ -96,10 +109,15 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
     nameplate.mesh.setEnabled(nameplatesVisible);
     const entry: RemoteEntry = {
       avatar: null,
+      // Bubbles attach immediately too - a message can land before the
+      // avatar body finishes building.
+      bubbles: createChatBubbleStack(scene, id, root),
       colorwayId: null,
       elapsedSeconds: 0,
       gone: false,
       nameplate,
+      nameplateScale: -1,
+      nameplateShown: nameplatesVisible,
       playerName,
       root,
       speedMetersPerSecond: 0,
@@ -129,6 +147,7 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
       disposeAvatarMeshes(entry.avatar.meshes);
       entry.avatar.root.dispose();
     }
+    entry.bubbles.dispose();
     entry.nameplate.dispose();
     entry.root.dispose();
     entries.delete(id);
@@ -180,14 +199,26 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
       nameplatesVisible = visible;
       for (const entry of entries.values()) {
         entry.nameplate.mesh.setEnabled(visible);
+        entry.nameplateShown = visible;
       }
     },
 
     nameplatesVisible: () => nameplatesVisible,
 
+    showChatBubble(playerId, body) {
+      if (disposed) return;
+      // Sec 10.1's `Display Names` setting is deliberately NOT consulted: it
+      // governs name plates, and sec 10.5's bubbles carry no username - they
+      // are the message itself, so hiding them would silence world chat.
+      entries.get(playerId)?.bubbles.showMessage(body);
+    },
+
     update(deltaSeconds) {
       if (disposed || deltaSeconds <= 0) return;
       const blend = 1 - Math.exp(-LERP_RATE * deltaSeconds);
+      // Sec 10.1/10.5 distance rules need the camera. With no active camera
+      // (headless tests) NaN keeps both labels at full size and visible.
+      const cameraPosition = scene.activeCamera?.globalPosition ?? null;
       for (const entry of entries.values()) {
         const distance = Vector3.Distance(entry.root.position, entry.target);
         if (distance > SNAP_DISTANCE) {
@@ -208,6 +239,27 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
           entry.elapsedSeconds,
           resolveAvatarAnimationState(entry.speedMetersPerSecond),
         );
+
+        // Sec 10.1: name plates hold a readable on-screen size out to 15ft,
+        // shrink naturally past it, and hard-vanish at 40ft. World occlusion
+        // is free - the plate is an ordinary depth-tested mesh.
+        const cameraDistance = cameraPosition
+          ? Vector3.Distance(cameraPosition, entry.root.position)
+          : Number.NaN;
+        const withinRange = isLabelVisibleAtDistance(cameraDistance);
+        const shown = withinRange && nameplatesVisible;
+        if (shown !== entry.nameplateShown) {
+          entry.nameplateShown = shown;
+          entry.nameplate.mesh.setEnabled(shown);
+        }
+        if (shown) {
+          const scale = resolveLabelDistanceScale(cameraDistance);
+          if (scale !== entry.nameplateScale) {
+            entry.nameplateScale = scale;
+            entry.nameplate.mesh.scaling.setAll(scale);
+          }
+        }
+        entry.bubbles.update(deltaSeconds, cameraDistance);
       }
     },
 

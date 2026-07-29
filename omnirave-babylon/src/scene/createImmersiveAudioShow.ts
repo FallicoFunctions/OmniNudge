@@ -109,7 +109,8 @@ const PALETTE_JUMP_COOLDOWN = 3;
 
 export interface ImmersiveAudioShowOptions {
   // Fills the passed array with the current byte frequency spectrum (same
-  // closure as the stage visualizer; zero-filled in the single-player path).
+  // closure as the stage visualizer; zero-filled when there is no world
+  // connection, i.e. no audio).
   getFrequencyData: (target: Uint8Array) => void;
 }
 
@@ -123,7 +124,8 @@ export interface ImmersiveAudioShow {
   setEventState: (state: StageEventStateInput | null) => void;
   dispose: () => void;
   // Smoothed bass energy 0..1 (punch-boosted), or null when no audio is
-  // present (idle/single-player) - feeds createStageShow.setAudioEnergy.
+  // present (idle, e.g. no world connection) - feeds
+  // createStageShow.setAudioEnergy.
   readonly bassLevel: number | null;
   // Cone moving-head count.
   readonly beams: number;

@@ -150,8 +150,8 @@ const CHANNEL_CAP = 1.8;
 
 export interface CascadeCourtLightFloorOptions {
   // Fills the passed array with the current byte frequency spectrum (the SAME
-  // closure as the stage visualizer / immersive show / crown; zero-filled in
-  // the single-player path, which yields the idle shimmer).
+  // closure as the stage visualizer / immersive show / crown; zero-filled when
+  // there is no world connection, which yields the idle shimmer).
   getFrequencyData: (target: Uint8Array) => void;
 }
 
