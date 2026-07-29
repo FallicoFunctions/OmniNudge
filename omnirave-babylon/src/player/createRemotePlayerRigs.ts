@@ -4,7 +4,16 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import type { Scene } from '@babylonjs/core/scene';
 
-import { applyAvatarColorway } from './avatarColorways';
+import { applyAvatarDefinition } from './applyAvatarDefinition';
+import {
+  avatarLoadoutDiffers,
+  copyAvatarLoadoutInto,
+  createSeededAvatarRng,
+  generateAvatarDefinition,
+  hasAvatarLoadout,
+  parseAvatarLoadout,
+  type AvatarDefinition,
+} from './avatarDefinition';
 import { createReviewAvatar, type ReviewAvatar } from './createReviewAvatar';
 import { createChatBubbleStack, type ChatBubbleStack } from './createChatBubbleStack';
 import { createNameplate, type Nameplate } from './createNameplate';
@@ -22,13 +31,28 @@ import type { WorldSnapshot } from '../network/worldSocket';
 const SNAP_DISTANCE = 8;
 // Exponential smoothing rate for position (higher = tighter tracking).
 const LERP_RATE = 10;
-// Loadout key the runtime uses for avatar colorways.
-const COLORWAY_LOADOUT_KEY = 'colorway';
+// Sec 6.2/6.4: a remote player's whole look arrives in their world loadout as
+// an AvatarDefinition (see avatarDefinition.ts). A loadout with no avatar keys
+// - an older client, or garbage - still has to render SOMEBODY, so it falls
+// back to a generated definition seeded off the player id: stable per player,
+// and not the same body for every legacy client.
+const resolveRemoteDefinition = (
+  id: string,
+  loadout: Record<string, string> | undefined,
+): AvatarDefinition =>
+  hasAvatarLoadout(loadout)
+    ? parseAvatarLoadout(loadout)
+    : generateAvatarDefinition(createSeededAvatarRng(id));
 
 interface RemoteEntry {
   avatar: ReviewAvatar | null;
   bubbles: ChatBubbleStack;
-  colorwayId: string | null;
+  definition: AvatarDefinition;
+  /**
+   * Last-seen avatar loadout keys, so the 10Hz snapshot path can detect a
+   * wardrobe change without allocating (no parse, no string join).
+   */
+  loadoutFingerprint: Record<string, string>;
   elapsedSeconds: number;
   gone: boolean;
   nameplate: Nameplate;
@@ -44,6 +68,8 @@ interface RemoteEntry {
 
 export interface RemotePlayerRigs {
   applySnapshot: (snapshot: WorldSnapshot) => void;
+  /** The definition a ghost is currently dressed from (sec 6.2 sync). */
+  avatarDefinitionOf: (playerId: string) => AvatarDefinition | null;
   count: () => number;
   dispose: () => void;
   /** Settings-popup `Display Names` (design doc sec 9.6 / 10.1). */
@@ -58,12 +84,12 @@ export interface RemotePlayerRigs {
   update: (deltaSeconds: number) => void;
 }
 
-// applyAvatarColorway (avatarColorways.ts) clones a colorway material the
-// first time it's applied and caches it in mesh.metadata so re-selecting a
-// colorway is free; the original base material is swapped off the mesh and
-// cached too. mesh.dispose(false, true) only reaches whichever material is
-// CURRENTLY assigned, so every other cached clone would otherwise leak for
-// the life of the process - fatal in a 24/7 churning presence system.
+// applyAvatarDefinition / applyAvatarColorway clone a material the first time
+// a look is applied and cache it in mesh.metadata so re-selecting is free; the
+// original base material is swapped off the mesh and cached too.
+// mesh.dispose(..., true) only reaches whichever material is CURRENTLY
+// assigned, so every other cached clone would otherwise leak for the life of
+// the process - fatal in a 24/7 churning presence system.
 const disposeCachedAvatarMaterials = (mesh: AbstractMesh) => {
   const metadata = mesh.metadata as
     | { avatarBaseMaterial?: Material; avatarColorwayMaterials?: Record<string, Material> }
@@ -85,7 +111,9 @@ const disposeCachedAvatarMaterials = (mesh: AbstractMesh) => {
 const disposeAvatarMeshes = (meshes: readonly AbstractMesh[]) => {
   for (const mesh of meshes) {
     disposeCachedAvatarMaterials(mesh);
-    mesh.dispose(false, true);
+    // doNotRecurse: shoes hang off the leg meshes, and every mesh in the list
+    // is disposed by this loop anyway. Recursing would double-dispose them.
+    mesh.dispose(true, true);
   }
 };
 
@@ -96,7 +124,12 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
   let lastSnapshotAt: number | null = null;
   let nameplatesVisible = true;
 
-  const spawnEntry = (id: string, playerName: string, position: Vector3) => {
+  const spawnEntry = (
+    id: string,
+    playerName: string,
+    position: Vector3,
+    loadout: Record<string, string> | undefined,
+  ) => {
     const root = new TransformNode(`remote-player-${id}`, scene);
     root.parent = parent;
     root.position.copyFrom(position);
@@ -107,12 +140,15 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
     nameplate.mesh.parent = root;
     // A player who joins while Display Names is off must not pop a plate.
     nameplate.mesh.setEnabled(nameplatesVisible);
+    const loadoutFingerprint: Record<string, string> = {};
+    copyAvatarLoadoutInto(loadout, loadoutFingerprint);
     const entry: RemoteEntry = {
       avatar: null,
       // Bubbles attach immediately too - a message can land before the
       // avatar body finishes building.
       bubbles: createChatBubbleStack(scene, id, root),
-      colorwayId: null,
+      definition: resolveRemoteDefinition(id, loadout),
+      loadoutFingerprint,
       elapsedSeconds: 0,
       gone: false,
       nameplate,
@@ -134,9 +170,7 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
       }
       avatar.root.parent = entry.root;
       entry.avatar = avatar;
-      if (entry.colorwayId) {
-        applyAvatarColorway(avatar, entry.colorwayId);
-      }
+      applyAvatarDefinition(avatar, entry.definition);
     });
     return entry;
   };
@@ -167,7 +201,7 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
         const target = new Vector3(player.position.x, player.position.y, player.position.z);
         let entry = entries.get(player.id);
         if (!entry) {
-          entry = spawnEntry(player.id, player.playerName, target);
+          entry = spawnEntry(player.id, player.playerName, target, player.loadout);
         } else {
           if (snapshotDt !== null) {
             entry.speedMetersPerSecond = Vector3.Distance(entry.target, target) / snapshotDt;
@@ -175,17 +209,23 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
           entry.target.copyFrom(target);
           entry.playerName = player.playerName;
           entry.nameplate.setName(player.playerName);
-        }
-        const colorwayId = player.loadout?.[COLORWAY_LOADOUT_KEY] ?? null;
-        if (colorwayId && colorwayId !== entry.colorwayId) {
-          entry.colorwayId = colorwayId;
-          if (entry.avatar) applyAvatarColorway(entry.avatar, colorwayId);
+          // Sec 6.6 saved-avatar sync: a player who saves a new look ships it
+          // in the next snapshot's loadout, and their ghost re-dresses.
+          if (avatarLoadoutDiffers(player.loadout, entry.loadoutFingerprint)) {
+            copyAvatarLoadoutInto(player.loadout, entry.loadoutFingerprint);
+            entry.definition = resolveRemoteDefinition(player.id, player.loadout);
+            if (entry.avatar) applyAvatarDefinition(entry.avatar, entry.definition);
+          }
         }
       }
 
       for (const [id, entry] of entries) {
         if (!seen.has(id)) removeEntry(id, entry);
       }
+    },
+
+    avatarDefinitionOf(playerId) {
+      return entries.get(playerId)?.definition ?? null;
     },
 
     count() {
