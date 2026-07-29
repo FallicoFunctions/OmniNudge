@@ -1,9 +1,12 @@
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
+import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRemotePlayerRigs } from '../createRemotePlayerRigs';
 import { sanitizePlayerName } from '../createNameplate';
+import { LABEL_MAX_DISTANCE_METERS } from '../labelDistanceMath';
 import type { WorldSnapshot } from '../../network/worldSocket';
 
 const snapshot = (currentPlayerId: string, players: Array<{ id: string; x: number; z: number }>): WorldSnapshot => ({
@@ -210,6 +213,192 @@ describe('createRemotePlayerRigs', () => {
     expect(scene.getMeshByName('nameplate-b')?.isEnabled()).toBe(true);
 
     rigs.dispose();
+  });
+
+  // ---- Sec 10.1 name-plate distance rules -------------------------------
+
+  // Places an active camera at the origin so update() has a real distance to
+  // work with (without one it treats distance as unknown and skips the rules).
+  const placeCamera = () => {
+    const camera = new FreeCamera('test-camera', new Vector3(0, 0, 0), scene);
+    scene.activeCamera = camera;
+    camera.getViewMatrix();
+    return camera;
+  };
+
+  it('hard-vanishes name plates past the 40ft bound and restores them inside it', () => {
+    placeCamera();
+    const rigs = createRemotePlayerRigs(scene);
+    const far = Math.ceil(LABEL_MAX_DISTANCE_METERS) + 10;
+
+    rigs.applySnapshot(snapshot('me', [{ id: 'p', x: far, z: 0 }]));
+    // Snap the ghost onto its far target, then evaluate the distance rules.
+    rigs.update(0.016);
+    rigs.update(0.016);
+    expect(scene.getMeshByName('nameplate-p')?.isEnabled()).toBe(false);
+
+    rigs.applySnapshot(snapshot('me', [{ id: 'p', x: 3, z: 0 }]));
+    rigs.update(0.016);
+    rigs.update(0.016);
+    expect(scene.getMeshByName('nameplate-p')?.isEnabled()).toBe(true);
+
+    rigs.dispose();
+  });
+
+  it('holds a readable plate size close up and stops compensating past 15ft', () => {
+    placeCamera();
+    const rigs = createRemotePlayerRigs(scene);
+
+    // Two ghosts spawned at their exact positions, so no lerp is in flight.
+    rigs.applySnapshot(snapshot('me', [
+      { id: 'far', x: 10, z: 0 },
+      { id: 'near', x: 2.5, z: 0 },
+    ]));
+    rigs.update(0.016);
+    const farScale = scene.getMeshByName('nameplate-far')!.scaling.x;
+    const nearScale = scene.getMeshByName('nameplate-near')!.scaling.x;
+
+    expect(farScale).toBeCloseTo(1, 6);
+    expect(nearScale).toBeLessThan(farScale);
+
+    rigs.dispose();
+  });
+
+  it('keeps distance culling from overriding a Display Names opt-out', () => {
+    placeCamera();
+    const rigs = createRemotePlayerRigs(scene);
+    rigs.applySnapshot(snapshot('me', [{ id: 'p', x: 1, z: 0 }]));
+    rigs.setNameplatesVisible(false);
+
+    rigs.update(0.016);
+    rigs.update(0.016);
+    expect(scene.getMeshByName('nameplate-p')?.isEnabled()).toBe(false);
+
+    rigs.dispose();
+  });
+
+  // ---- Sec 10.5 above-head chat bubbles ---------------------------------
+
+  const bubbleMeshCount = (id: string) =>
+    scene.meshes.filter((mesh) => mesh.name.startsWith(`chat-bubble-${id}-`)).length;
+
+  it('raises a bubble above the sender, and only the sender', () => {
+    const rigs = createRemotePlayerRigs(scene);
+    rigs.applySnapshot(snapshot('me', [
+      { id: 'a', x: 1, z: 1 },
+      { id: 'b', x: 2, z: 2 },
+    ]));
+
+    rigs.showChatBubble('a', 'hello venue');
+
+    expect(bubbleMeshCount('a')).toBe(1);
+    expect(bubbleMeshCount('b')).toBe(0);
+    // Bubbles hang off the sender's root, so they follow the ghost.
+    expect(scene.getTransformNodeByName('chat-bubbles-a')?.parent?.name).toBe('remote-player-a');
+
+    rigs.dispose();
+  });
+
+  it('ignores a bubble for an unknown player (the local player, or one who left)', () => {
+    const rigs = createRemotePlayerRigs(scene);
+    rigs.applySnapshot(snapshot('me', [{ id: 'a', x: 1, z: 1 }]));
+
+    expect(() => rigs.showChatBubble('me', 'my own message')).not.toThrow();
+    expect(() => rigs.showChatBubble('ghost-who-left', 'hi')).not.toThrow();
+    expect(scene.meshes.filter((mesh) => mesh.name.startsWith('chat-bubble-')).length).toBe(0);
+
+    rigs.dispose();
+  });
+
+  it('shows bubbles even when Display Names is off - a bubble carries no username', () => {
+    const rigs = createRemotePlayerRigs(scene);
+    rigs.applySnapshot(snapshot('me', [{ id: 'a', x: 1, z: 1 }]));
+    rigs.setNameplatesVisible(false);
+
+    rigs.showChatBubble('a', 'still audible');
+    rigs.update(0.016);
+
+    expect(bubbleMeshCount('a')).toBe(1);
+    expect(scene.getTransformNodeByName('chat-bubbles-a')?.isEnabled()).toBe(true);
+    expect(scene.getMeshByName('nameplate-a')?.isEnabled()).toBe(false);
+
+    rigs.dispose();
+  });
+
+  it('expires a bubble through the render-loop update after the spec 5 seconds', () => {
+    const rigs = createRemotePlayerRigs(scene);
+    const baselineMaterialCount = scene.materials.length;
+    rigs.applySnapshot(snapshot('me', [{ id: 'a', x: 1, z: 1 }]));
+
+    rigs.showChatBubble('a', 'fleeting');
+    expect(bubbleMeshCount('a')).toBe(1);
+    const withBubbleMaterialCount = scene.materials.length;
+    expect(withBubbleMaterialCount).toBeGreaterThan(baselineMaterialCount);
+
+    // Simulated time via the same update(dt) the render loop calls.
+    for (let step = 0; step < 60; step += 1) {
+      rigs.update(0.1);
+    }
+
+    expect(bubbleMeshCount('a')).toBe(0);
+    expect(scene.materials.length).toBe(withBubbleMaterialCount - 1);
+
+    rigs.dispose();
+  });
+
+  it('caps a rapid burst at 3 bubbles per player', () => {
+    const rigs = createRemotePlayerRigs(scene);
+    rigs.applySnapshot(snapshot('me', [{ id: 'a', x: 1, z: 1 }]));
+
+    for (const body of ['one', 'two', 'three', 'four', 'five']) {
+      rigs.showChatBubble('a', body);
+    }
+
+    expect(bubbleMeshCount('a')).toBe(3);
+
+    rigs.dispose();
+  });
+
+  it('leaves no bubble meshes or materials behind on despawn or dispose', async () => {
+    const rigs = createRemotePlayerRigs(scene);
+    const baselineMeshCount = scene.meshes.length;
+    const baselineMaterialCount = scene.materials.length;
+    const baselineNodeCount = scene.transformNodes.length;
+
+    rigs.applySnapshot(snapshot('me', [{ id: 'a', x: 1, z: 1 }]));
+    await settle();
+    rigs.showChatBubble('a', 'one');
+    rigs.showChatBubble('a', 'two');
+    expect(scene.materials.length).toBeGreaterThan(baselineMaterialCount);
+
+    // Player leaves mid-bubble.
+    rigs.applySnapshot(snapshot('me', []));
+
+    expect(scene.materials.length).toBe(baselineMaterialCount);
+    expect(scene.meshes.length).toBe(baselineMeshCount);
+    expect(scene.transformNodes.length).toBe(baselineNodeCount);
+    expect(scene.getTransformNodeByName('chat-bubbles-a') === null).toBe(true);
+
+    // And again through dispose rather than despawn.
+    rigs.applySnapshot(snapshot('me', [{ id: 'b', x: 1, z: 1 }]));
+    await settle();
+    rigs.showChatBubble('b', 'three');
+    rigs.dispose();
+
+    expect(scene.materials.length).toBe(baselineMaterialCount);
+    expect(scene.meshes.length).toBe(baselineMeshCount);
+    // dispose() also tears down the rigs' own shared parent node.
+    expect(scene.transformNodes.length).toBe(baselineNodeCount - 1);
+  });
+
+  it('bubble texture creation degrades gracefully with no 2D context (NullEngine)', () => {
+    const rigs = createRemotePlayerRigs(scene);
+    rigs.applySnapshot(snapshot('me', [{ id: 'a', x: 1, z: 1 }]));
+
+    expect(() => rigs.showChatBubble('a', 'no canvas here')).not.toThrow();
+    const bubble = scene.meshes.find((mesh) => mesh.name.startsWith('chat-bubble-a-'))!;
+    expect(bubble.material?.getActiveTextures().length ?? 0).toBe(0);
+    expect(() => rigs.dispose()).not.toThrow();
   });
 });
 

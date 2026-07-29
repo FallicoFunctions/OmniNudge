@@ -11,9 +11,11 @@ export interface PerfFlags {
   minimalLights: boolean;
   webgl: boolean;
   debug: boolean;
-  // Multiplayer presence opt-in: ?world=<ws url>&wtoken=<world session JWT>.
-  // Both must be present for the runtime to open a world socket; the
-  // default session stays fully single-player and offline.
+  // World connection: ?world=<ws url>&wtoken=<world session JWT>. Both must be
+  // present for the runtime to open a world socket. OmniRave is
+  // multiplayer-only and the shipped game always supplies them; leaving them
+  // off is a local dev/review convenience so the preview server can boot the
+  // scene without a world backend, not a supported way to play.
   worldUrl: string | null;
   worldToken: string | null;
 }

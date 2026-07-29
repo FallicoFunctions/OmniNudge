@@ -152,7 +152,7 @@ describe('createPlayerHud', () => {
     );
   });
 
-  it('shows the venue with no track in the single-player path', () => {
+  it('shows the venue with no track when there is no world connection', () => {
     const host = document.createElement('div');
     const hud = createPlayerHud(host);
 
@@ -206,7 +206,7 @@ describe('createPlayerHud', () => {
     ).toBe(false);
   });
 
-  it('hides both counts in the single-player / no-socket path', () => {
+  it('hides both counts when there is no world connection', () => {
     const host = document.createElement('div');
     const hud = createPlayerHud(host);
 
