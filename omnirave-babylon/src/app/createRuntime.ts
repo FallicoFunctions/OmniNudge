@@ -23,6 +23,7 @@ import {
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import type { createMainStageScene } from '../scene/createMainStageScene';
 import { resolveTravelCameraOffsets, TRAVEL_CAMERA_DISTANCE } from '../player/cameraRigMath';
+import { generateAvatarDefinition, serializeAvatarLoadout } from '../player/avatarDefinition';
 import { BACK_PLAZA_SPAWN } from '../scene/reviewRouteData';
 import type { ReviewCheckpoint } from '../scene/reviewRouteData';
 import { createDebugPanel } from '../ui/createDebugPanel';
@@ -200,6 +201,22 @@ export async function createRuntime(host: HTMLElement) {
     const { createMainStageScene: createScene } = await import('../scene/createMainStageScene');
     const scene = await createScene(activeEngine);
     const reviewRuntime = scene.metadata?.reviewRuntime;
+
+    // Sec 6.2: guests get a RANDOM GENERATED avatar, cannot edit it, and it is
+    // not persisted - so it is generated fresh here at boot and applied to the
+    // local body (which also applies sec 6.5's height effects to the rig).
+    // The serialized form is the loadout other players would dress this ghost
+    // from. NOTE: the world socket has no outbound loadout message today - the
+    // server takes the loadout from the world-session JWT (see
+    // backend/internal/omniraveworld/server/ws_handler.go parsePlayerSession),
+    // so a guest's generated look is local-only until either the token carries
+    // it or the protocol gains a loadout event.
+    const localAvatarDefinition = generateAvatarDefinition();
+    reviewRuntime?.setAvatarDefinition?.(localAvatarDefinition);
+    scene.metadata = {
+      ...scene.metadata,
+      localAvatarLoadout: serializeAvatarLoadout(localAvatarDefinition),
+    };
     const reviewCheckpoints = reviewRuntime?.checkpoints as readonly ReviewCheckpoint[] | undefined;
 
     // The review HUD, perf overlay, debug panel, and canvas pick handler are

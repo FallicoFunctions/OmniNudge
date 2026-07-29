@@ -25,7 +25,11 @@ describe('createReviewAvatar', () => {
     expect(scene.getMeshByName('review-avatar-torso')).not.toBeNull();
     expect(scene.getMeshByName('review-avatar-left-leg')).not.toBeNull();
     expect(scene.getMeshByName('review-avatar-right-arm')).not.toBeNull();
-    expect(avatar.meshes.every((mesh) => mesh.parent === avatar.root)).toBe(true);
+    // Every part hangs under the avatar root. Shoes are one level deeper -
+    // they parent to their leg so they swing with the walk cycle.
+    expect(
+      avatar.meshes.every((mesh) => mesh.parent === avatar.root || mesh.parent?.parent === avatar.root),
+    ).toBe(true);
     expect(avatar.meshes.every((mesh) => mesh.isPickable === false)).toBe(true);
     expect(avatar.meshes.every((mesh) => mesh.checkCollisions === false)).toBe(true);
 

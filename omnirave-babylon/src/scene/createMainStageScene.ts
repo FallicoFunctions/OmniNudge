@@ -7,6 +7,12 @@ import type { AbstractEngine } from '@babylonjs/core/Engines/abstractEngine';
 import { createCompletionCelebration } from '../game/createCompletionCelebration';
 import { createMainStageRouteProgress } from '../game/mainStageRouteProgress';
 import { applyAvatarColorway, USER_AVATAR_COLORWAYS } from '../player/avatarColorways';
+import { applyAvatarDefinition } from '../player/applyAvatarDefinition';
+import {
+  DEFAULT_AVATAR_DEFINITION,
+  serializeAvatarLoadout,
+  type AvatarDefinition,
+} from '../player/avatarDefinition';
 import { createFollowCameraRig } from '../player/createFollowCameraRig';
 import { createInputMap } from '../player/createInputMap';
 import { createPlayerController } from '../player/playerController';
@@ -96,6 +102,19 @@ export async function createMainStageScene(engine: AbstractEngine) {
   const reviewAvatar = await createReviewAvatar(scene);
   let selectedAvatarColorway = applyAvatarColorway(reviewAvatar, USER_AVATAR_COLORWAYS[0].id);
   reviewAvatar.root.parent = playerRig.avatarAnchor;
+
+  // Sec 6.2: every player is dressed from an AvatarDefinition. The scene boots
+  // on the default one; createRuntime replaces it with the guest's generated
+  // look as soon as the runtime is up. Applying a definition drives sec 6.5's
+  // height effects on BOTH halves: body scale (the avatar root) and standing
+  // presence (the rig capsule + eye level).
+  let localAvatarDefinition = applyAvatarDefinition(reviewAvatar, DEFAULT_AVATAR_DEFINITION);
+  playerRig.setHeightInches(localAvatarDefinition.heightInches);
+  const setAvatarDefinition = (definition: AvatarDefinition) => {
+    localAvatarDefinition = applyAvatarDefinition(reviewAvatar, definition);
+    playerRig.setHeightInches(localAvatarDefinition.heightInches);
+    return localAvatarDefinition;
+  };
   const cameraRig = createFollowCameraRig(scene, playerRig.root);
   cameraRig.applyCheckpointView(PLAYABLE_START_CAMERA);
 
@@ -312,6 +331,14 @@ export async function createMainStageScene(engine: AbstractEngine) {
         selectedAvatarColorway = applyAvatarColorway(reviewAvatar, colorwayId);
         return selectedAvatarColorway;
       },
+      get avatarDefinition() {
+        return localAvatarDefinition;
+      },
+      /** The outgoing world loadout for this player (sec 6.2 sync). */
+      get avatarLoadout() {
+        return serializeAvatarLoadout(localAvatarDefinition);
+      },
+      setAvatarDefinition,
       productionSurfaces,
       cascadeWaterMotion,
       festivalField,

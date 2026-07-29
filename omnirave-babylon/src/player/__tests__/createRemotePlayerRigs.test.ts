@@ -4,6 +4,15 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  AVATAR_LOADOUT_KEYS,
+  AVATAR_REFERENCE_HEIGHT_INCHES,
+  DEFAULT_AVATAR_DEFINITION,
+  EDITOR_MAX_HEIGHT_INCHES,
+  EDITOR_MIN_HEIGHT_INCHES,
+  serializeAvatarLoadout,
+  type AvatarDefinition,
+} from '../avatarDefinition';
 import { createRemotePlayerRigs } from '../createRemotePlayerRigs';
 import { sanitizePlayerName } from '../createNameplate';
 import { LABEL_MAX_DISTANCE_METERS } from '../labelDistanceMath';
@@ -26,23 +35,26 @@ const snapshot = (currentPlayerId: string, players: Array<{ id: string; x: numbe
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-const snapshotWithColorway = (
+const snapshotWithLoadout = (
   currentPlayerId: string,
-  players: Array<{ id: string; x: number; z: number; colorway?: string }>,
+  players: Array<{ id: string; x: number; z: number; loadout?: Record<string, string> }>,
 ): WorldSnapshot => ({
-  players: players.map(({ id, x, z, colorway }) => ({
+  players: players.map(({ id, x, z, loadout }) => ({
     id,
     playerName: `name-${id}`,
     mode: 'guest' as const,
     position: { x, y: 0, z },
     zone: 'main_stage',
-    loadout: (colorway ? { colorway } : {}) as Record<string, string>,
+    loadout: loadout ?? {},
   })),
   zoneMedia: [],
   zoneEvents: [],
   currentPlayerId,
   activeZone: 'main_stage',
 });
+
+const definitionLoadout = (overrides: Partial<AvatarDefinition>) =>
+  serializeAvatarLoadout({ ...DEFAULT_AVATAR_DEFINITION, ...overrides });
 
 describe('createRemotePlayerRigs', () => {
   let engine: NullEngine;
@@ -117,25 +129,141 @@ describe('createRemotePlayerRigs', () => {
     expect(stray).toBe(0);
   });
 
-  it('disposes materials and textures - including cached colorway clones - on despawn, leaving no leak', async () => {
+  it('disposes materials and textures - including cached definition clones - on despawn, leaving no leak', async () => {
     const rigs = createRemotePlayerRigs(scene);
     const baselineMaterialCount = scene.materials.length;
+    const baselineMeshCount = scene.meshes.length;
 
-    // Spawn, then switch colorways twice: applyAvatarColorway clones+caches
-    // a material per colorway on mesh.metadata.avatarColorwayMaterials, so
-    // this leaves behind the original base material plus two cached clones
-    // per mesh, only one of which is ever the mesh's live material.
-    rigs.applySnapshot(snapshotWithColorway('me', [{ id: 'p', x: 0, z: 0, colorway: 'aurora' }]));
+    // Spawn, then re-dress twice: applyAvatarDefinition clones+caches a
+    // material per (part role, colour) on mesh.metadata.avatarColorwayMaterials,
+    // so this leaves the original base material plus several cached clones per
+    // mesh, only one of which is ever the mesh's live material.
+    rigs.applySnapshot(snapshotWithLoadout('me', [
+      { id: 'p', x: 0, z: 0, loadout: definitionLoadout({ top: 'graphic-tee', shoes: 'work-boots' }) },
+    ]));
     await settle();
-    rigs.applySnapshot(snapshotWithColorway('me', [{ id: 'p', x: 0, z: 0, colorway: 'signal' }]));
-    rigs.applySnapshot(snapshotWithColorway('me', [{ id: 'p', x: 0, z: 0, colorway: 'pulse' }]));
+    rigs.applySnapshot(snapshotWithLoadout('me', [
+      { id: 'p', x: 0, z: 0, loadout: definitionLoadout({ top: 'henley', shoes: 'flip-flops' }) },
+    ]));
+    rigs.applySnapshot(snapshotWithLoadout('me', [
+      { id: 'p', x: 0, z: 0, loadout: definitionLoadout({ top: 'satin-cami', shoes: 'ballet-flats' }) },
+    ]));
 
     expect(scene.materials.length).toBeGreaterThan(baselineMaterialCount);
 
     // Despawn (player leaves the world).
-    rigs.applySnapshot(snapshotWithColorway('me', []));
+    rigs.applySnapshot(snapshotWithLoadout('me', []));
 
     expect(scene.materials.length).toBe(baselineMaterialCount);
+    expect(scene.meshes.length).toBe(baselineMeshCount);
+
+    // And again through dispose rather than despawn.
+    rigs.applySnapshot(snapshotWithLoadout('me', [
+      { id: 'q', x: 0, z: 0, loadout: definitionLoadout({ jacket: 'longline-coat' }) },
+    ]));
+    await settle();
+    rigs.dispose();
+
+    expect(scene.materials.length).toBe(baselineMaterialCount);
+    expect(scene.meshes.length).toBe(baselineMeshCount);
+  });
+
+  // ---- Sec 6.2 avatar definition sync ------------------------------------
+
+  const remoteAvatarRoot = (id: string) =>
+    scene.transformNodes.find(
+      (node) => node.name === 'review-avatar-root' && node.parent?.name === `remote-player-${id}`,
+    ) ?? null;
+
+  it('dresses a ghost from the avatar definition in its loadout', async () => {
+    const rigs = createRemotePlayerRigs(scene);
+    rigs.applySnapshot(snapshotWithLoadout('me', [
+      {
+        id: 'p',
+        x: 0,
+        z: 0,
+        loadout: definitionLoadout({
+          bodyBase: 'male',
+          heightInches: 64,
+          top: 'festival-jersey',
+          shoes: 'work-boots',
+        }),
+      },
+    ]));
+    await settle();
+
+    expect(rigs.avatarDefinitionOf('p')?.heightInches).toBe(64);
+    expect(rigs.avatarDefinitionOf('p')?.top).toBe('festival-jersey');
+    expect(rigs.avatarDefinitionOf('p')?.bodyBase).toBe('male');
+    // Sec 6.5 body scale reaches the ghost too.
+    expect(remoteAvatarRoot('p')?.scaling.y).toBeCloseTo(64 / AVATAR_REFERENCE_HEIGHT_INCHES, 6);
+
+    rigs.dispose();
+  });
+
+  it('re-dresses a ghost when its loadout changes, and only then', async () => {
+    const rigs = createRemotePlayerRigs(scene);
+    const first = definitionLoadout({ top: 'graphic-tee' });
+    rigs.applySnapshot(snapshotWithLoadout('me', [{ id: 'p', x: 0, z: 0, loadout: first }]));
+    await settle();
+    const afterSpawnMaterials = scene.materials.length;
+
+    // Same loadout again: no new clones.
+    rigs.applySnapshot(snapshotWithLoadout('me', [{ id: 'p', x: 0, z: 0, loadout: { ...first } }]));
+    expect(scene.materials.length).toBe(afterSpawnMaterials);
+    expect(rigs.avatarDefinitionOf('p')?.top).toBe('graphic-tee');
+
+    rigs.applySnapshot(snapshotWithLoadout('me', [
+      { id: 'p', x: 0, z: 0, loadout: definitionLoadout({ top: 'henley', heightInches: 78 }) },
+    ]));
+    expect(rigs.avatarDefinitionOf('p')?.top).toBe('henley');
+    expect(remoteAvatarRoot('p')?.scaling.y).toBeCloseTo(78 / AVATAR_REFERENCE_HEIGHT_INCHES, 6);
+
+    rigs.dispose();
+  });
+
+  it('gives a loadout with no avatar keys a stable generated look, not one shared default', async () => {
+    const rigs = createRemotePlayerRigs(scene);
+    const ids = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot'];
+    rigs.applySnapshot(snapshotWithLoadout('me', ids.map((id, index) => ({ id, x: index, z: 0 }))));
+    await settle();
+
+    const signatures = ids.map((id) => JSON.stringify(rigs.avatarDefinitionOf(id)));
+    expect(signatures.every((signature) => signature !== 'null')).toBe(true);
+    expect(new Set(signatures).size).toBeGreaterThan(1);
+
+    // Stable: the same id re-parsed on a later snapshot does not re-roll.
+    rigs.applySnapshot(snapshotWithLoadout('me', ids.map((id, index) => ({ id, x: index + 1, z: 0 }))));
+    expect(JSON.stringify(rigs.avatarDefinitionOf('alpha'))).toBe(signatures[0]);
+
+    rigs.dispose();
+  });
+
+  it('renders a valid avatar from a garbage loadout instead of throwing', async () => {
+    const rigs = createRemotePlayerRigs(scene);
+    expect(() => rigs.applySnapshot(snapshotWithLoadout('me', [
+      {
+        id: 'p',
+        x: 0,
+        z: 0,
+        loadout: {
+          [AVATAR_LOADOUT_KEYS.version]: '1',
+          [AVATAR_LOADOUT_KEYS.bodyBase]: 'wyvern',
+          [AVATAR_LOADOUT_KEYS.heightInches]: '99999',
+          [AVATAR_LOADOUT_KEYS.top]: 'x'.repeat(500),
+          [AVATAR_LOADOUT_KEYS.shoes]: '',
+        },
+      },
+    ]))).not.toThrow();
+    await settle();
+
+    const height = rigs.avatarDefinitionOf('p')!.heightInches;
+    expect(height).toBeGreaterThanOrEqual(EDITOR_MIN_HEIGHT_INCHES);
+    expect(height).toBeLessThanOrEqual(EDITOR_MAX_HEIGHT_INCHES);
+    expect(rigs.avatarDefinitionOf('p')?.top).toBe(DEFAULT_AVATAR_DEFINITION.top);
+    expect(rigs.count()).toBe(1);
+
+    rigs.dispose();
   });
 
   it('gives every ghost a nameplate mesh, parented to the ghost root', async () => {
