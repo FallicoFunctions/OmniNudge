@@ -36,9 +36,15 @@ type Snapshot struct {
 }
 
 type ClientEvent struct {
-	Type   string `json:"type"`
-	MoveTo *Vec3  `json:"moveTo,omitempty"`
-	Body   string `json:"body,omitempty"`
+	Type string `json:"type"`
+	// MoveTo carries a "move" event's target position.
+	MoveTo *Vec3 `json:"moveTo,omitempty"`
+	// Body carries a "chat" event's message body.
+	Body string `json:"body,omitempty"`
+	// Loadout carries a "loadout" event's avatar description. It is UNTRUSTED
+	// client input: the handler validates it with ValidateLoadout and strips
+	// control characters before it is applied and broadcast.
+	Loadout Loadout `json:"loadout,omitempty"`
 }
 
 type ZoneMediaState struct {

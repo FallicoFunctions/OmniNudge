@@ -97,6 +97,25 @@ func (w *World) RemovePlayer(playerID string, session *Player) {
 	}
 }
 
+// SetPlayerLoadout replaces playerID's avatar loadout, but only if the stored
+// entry is still session (the same *Player the caller's AddPlayer returned).
+// This is the identity discipline RemovePlayer uses, for the same reconnect
+// race: a stale connection's late "loadout" event must not repaint the avatar
+// of the reconnected player now holding that ID.
+//
+// The loadout is cloned so the caller cannot mutate live world state through
+// the map it passed in.
+func (w *World) SetPlayerLoadout(playerID string, session *Player, loadout Loadout) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	current, ok := w.players[playerID]
+	if !ok || current != session {
+		return
+	}
+	current.Loadout = loadout.Clone()
+}
+
 func (w *World) Player(playerID string) *Player {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
