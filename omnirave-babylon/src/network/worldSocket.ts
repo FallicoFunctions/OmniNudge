@@ -95,6 +95,7 @@ export interface WorldSocket {
   sendMove: (position: Vec3) => void;
   sendRespawn: () => void;
   sendChat: (body: string) => void;
+  sendLoadout: (loadout: Record<string, string>) => void;
   onSnapshot: (callback: (snapshot: WorldSnapshot) => void) => () => void;
   onChat: (callback: (message: WorldChatMessage) => void) => () => void;
   onStatusChange: (callback: (status: WorldSocketStatus) => void) => () => void;
@@ -306,6 +307,10 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     send({ type: 'chat', body });
   }
 
+  function sendLoadout(loadout: Record<string, string>): void {
+    send({ type: 'loadout', loadout });
+  }
+
   function onSnapshot(callback: (snapshot: WorldSnapshot) => void): () => void {
     snapshotCallbacks.push(callback);
     return () => {
@@ -342,6 +347,7 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     sendMove,
     sendRespawn,
     sendChat,
+    sendLoadout,
     onSnapshot,
     onChat,
     onStatusChange,

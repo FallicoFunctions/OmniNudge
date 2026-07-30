@@ -206,11 +206,10 @@ export async function createRuntime(host: HTMLElement) {
     // not persisted - so it is generated fresh here at boot and applied to the
     // local body (which also applies sec 6.5's height effects to the rig).
     // The serialized form is the loadout other players would dress this ghost
-    // from. NOTE: the world socket has no outbound loadout message today - the
-    // server takes the loadout from the world-session JWT (see
-    // backend/internal/omniraveworld/server/ws_handler.go parsePlayerSession),
-    // so a guest's generated look is local-only until either the token carries
-    // it or the protocol gains a loadout event.
+    // from, and is published below (once the world socket connects) via a
+    // "loadout" event so other players actually see it - the world-session
+    // JWT alone only carries an account player's persisted loadout, not a
+    // guest's freshly generated one.
     const localAvatarDefinition = generateAvatarDefinition();
     reviewRuntime?.setAvatarDefinition?.(localAvatarDefinition);
     scene.metadata = {
@@ -454,8 +453,19 @@ export async function createRuntime(host: HTMLElement) {
         hologramGrid?.setEventState(eventState);
         stageAtmospherics?.setEventState(eventState);
       });
+      // Sec 6.2/6.5: publish the SAME loadout that was applied to the local
+      // render (scene.metadata.localAvatarLoadout, stashed above) so other
+      // players' ghost of us matches what we see locally. Sent exactly once
+      // per connection - on the "open" transition, not per frame - and again
+      // on every reconnect's fresh "open", since the server has no other way
+      // to learn this guest's generated avatar (see the note above at
+      // localAvatarDefinition).
+      const localAvatarLoadout = scene.metadata?.localAvatarLoadout as Record<string, string> | undefined;
       worldSocket.onStatusChange((status) => {
         console.info(`[world] socket ${status}`);
+        if (status === 'open' && localAvatarLoadout) {
+          activeWorldSocket.sendLoadout(localAvatarLoadout);
+        }
       });
       worldSocket.connect();
 

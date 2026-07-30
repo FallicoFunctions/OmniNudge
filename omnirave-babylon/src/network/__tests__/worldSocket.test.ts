@@ -173,6 +173,18 @@ describe('createWorldSocket', () => {
     ]);
   });
 
+  it('sends loadout with the exact expected shape', () => {
+    const { worldSocket, getLastSocket } = setup();
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+
+    worldSocket.sendLoadout({ av: '1', bb: 'f', ht: '68', tp: 'mesh-neon' });
+
+    expect(getLastSocket().sent).toEqual([
+      JSON.stringify({ type: 'loadout', loadout: { av: '1', bb: 'f', ht: '68', tp: 'mesh-neon' } }),
+    ]);
+  });
+
   it('dispatches parsed world_snapshot players to snapshot callbacks', () => {
     const { worldSocket, getLastSocket } = setup();
     worldSocket.connect();

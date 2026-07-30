@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	// maxMessageBytes bounds inbound WebSocket frames. Move/chat/respawn
-	// events are small JSON payloads; this is generous headroom while still
-	// blocking abusive oversized frames.
+	// maxMessageBytes bounds inbound WebSocket frames. Move/chat/respawn/
+	// loadout events are small JSON payloads; this is generous headroom while
+	// still blocking abusive oversized frames. Note this is a HARDER cap than
+	// world.ValidateLoadout's per-entry budget: a frame that large never
+	// reaches the loadout validator at all.
 	maxMessageBytes = 4096
 	// maxChatBodyLength caps a chat message body after trimming whitespace.
 	maxChatBodyLength = 500
@@ -27,8 +29,10 @@ const (
 	// stripped outright, but an unbounded count would let one message stretch
 	// a chat bubble down the screen or push the log around.
 	maxChatBodyNewlines = 4
-	// inboundEventsPerSecond/inboundEventBurst bound how many move/chat/respawn
-	// events a single connection may push per second. Events over budget are
+	// inboundEventsPerSecond/inboundEventBurst bound how many move/chat/
+	// respawn/loadout events a single connection may push per second. The
+	// limiter is consumed once per inbound frame BEFORE the event-type switch,
+	// so it covers every event type including loadout. Events over budget are
 	// dropped (ignored), not disconnected.
 	inboundEventsPerSecond = 20
 	inboundEventBurst      = 20
@@ -148,6 +152,19 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case "respawn":
 			h.world.RespawnPlayer(clientSession.PlayerID)
 			h.broadcastSnapshots()
+		case "loadout":
+			// Untrusted client input: bounds-checked and stripped of control
+			// characters before it is stored or broadcast. Rejected payloads
+			// are ignored outright, leaving the player's existing loadout
+			// (from the world-session JWT, or a previous accepted event) in
+			// place.
+			loadout, ok := sanitizeLoadout(event.Loadout)
+			if !ok {
+				continue
+			}
+
+			h.world.SetPlayerLoadout(clientSession.PlayerID, player, loadout)
+			h.broadcastSnapshots()
 		case "chat":
 			body := sanitizeChatBody(event.Body)
 			if body == "" {
@@ -205,6 +222,60 @@ func sanitizeChatBody(raw string) string {
 	}
 
 	return body
+}
+
+// sanitizeLoadout bounds-checks and cleans an inbound "loadout" event before
+// it is applied to the world and broadcast to every other player.
+//
+// It enforces the SAME limits the profile REST handler enforces - they both
+// call world.ValidateLoadout - so an avatar published over the socket can
+// never be larger than one persisted through the profile API. Control runes
+// are stripped from keys and values the way sanitizeChatBody strips them from
+// a chat body: a loadout is single-line option-id data, so unlike chat there
+// is no newline exemption here.
+//
+// Returns ok=false when the payload must be ignored: over budget (before or
+// after stripping), or a key that is empty once stripped.
+func sanitizeLoadout(raw world.Loadout) (world.Loadout, bool) {
+	if len(raw) == 0 {
+		return nil, false
+	}
+	if err := world.ValidateLoadout(raw); err != nil {
+		return nil, false
+	}
+
+	cleaned := make(world.Loadout, len(raw))
+	for key, value := range raw {
+		cleanKey := stripControlRunes(key)
+		if cleanKey == "" {
+			return nil, false
+		}
+		cleaned[cleanKey] = stripControlRunes(value)
+	}
+
+	// Stripping can collapse two distinct raw keys onto one cleaned key, so
+	// the bounds are re-checked against what would actually be stored.
+	if err := world.ValidateLoadout(cleaned); err != nil {
+		return nil, false
+	}
+
+	return cleaned, true
+}
+
+func stripControlRunes(raw string) string {
+	if !strings.ContainsFunc(raw, unicode.IsControl) {
+		return raw
+	}
+
+	var builder strings.Builder
+	builder.Grow(len(raw))
+	for _, r := range raw {
+		if unicode.IsControl(r) {
+			continue
+		}
+		builder.WriteRune(r)
+	}
+	return builder.String()
 }
 
 func (h *WSHandler) registerConn(playerID string, cc *clientConn) {
