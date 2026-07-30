@@ -154,25 +154,12 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
 	utils.RespondSuccess(c, profile)
 }
 
-const (
-	maxLoadoutKeys      = 32
-	maxLoadoutKeyLength = 128
-	maxLoadoutValueLen  = 128
-)
-
+// validateLoadoutPayload delegates to the single shared bounds check beside
+// the Loadout type. The world socket's "loadout" event enforces the exact
+// same limits through the same helper, so the persisted profile and the live
+// broadcast can never drift apart.
 func validateLoadoutPayload(payload map[string]string) error {
-	if len(payload) > maxLoadoutKeys {
-		return fmt.Errorf("loadout has too many entries: %d (max %d)", len(payload), maxLoadoutKeys)
-	}
-	for key, value := range payload {
-		if len(key) > maxLoadoutKeyLength {
-			return fmt.Errorf("loadout key %q exceeds max length %d", key, maxLoadoutKeyLength)
-		}
-		if len(value) > maxLoadoutValueLen {
-			return fmt.Errorf("loadout value for key %q exceeds max length %d", key, maxLoadoutValueLen)
-		}
-	}
-	return nil
+	return omniraveworld.ValidateLoadout(payload)
 }
 
 func isAuthoritativeVenueID(venue string) bool {
