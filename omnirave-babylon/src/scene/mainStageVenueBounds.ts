@@ -117,18 +117,38 @@ export const SKYDECK_TERRACE_TOP_Y = 7.12;
 
 // Landing at the head of the access ramp; its north edge IS the deck's south
 // edge, so the two surfaces abut at one height with no step.
-export const SKYDECK_LANDING_X_MIN = 41;
-export const SKYDECK_LANDING_X_MAX = 45;
+//
+// Player-flagged (2026-07-31): this used to be a narrow x 41..45 strip -
+// only as wide as the ramp itself - while the deck above spans the full
+// x 31..47, so the two together read as an L (a wide arm to the north, a
+// narrow arm poking south) instead of the one rectangular standing platform
+// a landing at the top of a ramp should be. Widened to match the deck's own
+// x span exactly, so deck+landing now tile one uninterrupted x 31..47
+// rectangle (see SKYDECK_RAIL_RUNS below, simplified from 9 runs with an L
+// notch down to a plain 5-side perimeter now that there is no notch).
+export const SKYDECK_LANDING_X_MIN = SKYDECK_X_MIN;
+export const SKYDECK_LANDING_X_MAX = SKYDECK_X_MAX;
 export const SKYDECK_LANDING_Z_MIN = -11;
 
 // Access ramp: a straight run along x on the open flank ground SOUTH of the
 // wing terrace (the terrace starts at z -5.16, so a ramp climbing north
 // would have driven straight through it). Foot at x 61 - just inside the
-// envelope blocker's walkable face at x 62 - climbing inboard to the landing
-// at x 45. Rise 8.6 over run 16 is 28.25 degrees, inside the ~30 degree
-// ceiling, and the cascade court's north rim (z -16.45) stays clear.
+// envelope blocker's walkable face at x 62 - climbing inboard to x 45. Rise
+// 8.6 over run 16 is 28.25 degrees, inside the ~30 degree ceiling, and the
+// cascade court's north rim (z -16.45) stays clear.
+//
+// SKYDECK_RAMP_HEAD_X is a STANDALONE 45, not `= SKYDECK_LANDING_X_MAX`
+// anymore: the landing widened (above) to match the deck, but the ramp's
+// own run/rise/slope must not move with it - moving the head out to the
+// new x 47 edge would shorten the run to 14 and steepen the climb to ~31
+// degrees, over the ceiling. The ramp's last ~2m (x 45..47) now runs UNDER
+// the widened landing slab instead of meeting it at a flush edge - at x 47
+// the ramp surface is already ~1m below deck height, well clear of the
+// landing slab's underside, so the two don't fight for the same space; the
+// ramp simply reads as emerging from beneath the platform's edge, which is
+// the same "ramp emerges from under something" any real platform stair does.
 export const SKYDECK_RAMP_FOOT_X = 61;
-export const SKYDECK_RAMP_HEAD_X = SKYDECK_LANDING_X_MAX;
+export const SKYDECK_RAMP_HEAD_X = 45;
 export const SKYDECK_RAMP_Z_MIN = SKYDECK_LANDING_Z_MIN;
 export const SKYDECK_RAMP_Z_MAX = -7;
 
@@ -142,15 +162,33 @@ export const SKYDECK_PIERS: readonly { x: number; z: number }[] = [
   { x: 43, z: -5.5 },
 ];
 
-// The guard-railing runs around the deck and landing, in +x-side
+// The guard-railing runs around the deck+landing rectangle, in +x-side
 // coordinates; the -x side is these mirrored. `axis` is the direction the run
 // travels, `fixed` its other coordinate. ONE table, read by both
 // createVipSkydeck.ts (which draws the rails) and
 // createMainStageCollisionBlockers.ts (which makes them solid), so the
 // picture and the collision can never disagree about where the openings are.
-// The openings are load-bearing: the deck's inboard rail breaks for the wing
-// bridge, its south rail breaks for the landing, and the landing's outboard
-// rail breaks for the ramp head.
+//
+// Now that the landing matches the deck's own x span (see
+// SKYDECK_LANDING_X_MIN/MAX above), deck+landing tile one uninterrupted
+// rectangle with no internal notch - this table is a plain 5-side perimeter
+// (north/east/west-south/west-north/south), down from the previous 9 runs
+// that fenced an L-shaped notch. THREE openings are load-bearing: the west
+// run's break for the wing bridge mouth, the south run's break for the ramp
+// mouth, and the east run's break for the same ramp (its rotated slab's AABB
+// reaches x 47 too, not just the x 31..45 the south run covers - see both
+// runs' own comments below).
+//
+// Player-flagged (2026-07-31, in-engine): the ramp's own box (x 45..61,
+// z -11..-7) still crosses the platform's new x 31..47 span in its last 2m
+// (x 45..47), and right at its head the ramp's walking surface sits AT deck
+// height - so a 'south' run spanning the FULL x 31..47 put a flat, deck-
+// height rail bar directly across the ramp's own approach, physically
+// blocking the climb. The fix mirrors the west run's wing-bridge gap: south
+// stops at SKYDECK_RAMP_HEAD_X, leaving x 45..47 open for the ramp (which
+// already has its own dedicated sloped balustrade there, built separately in
+// createVipSkydeck.ts's "Ramp balustrade" section - this run was never
+// meant to double it).
 export interface SkydeckRailRun {
   axis: 'x' | 'z';
   fixed: number;
@@ -185,15 +223,20 @@ export const WING_BRIDGE_PIER_XS: readonly number[] = [6.4, 17, 26.25];
 export const WING_BRIDGE_PIER_SIZE = 1;
 
 export const SKYDECK_RAIL_RUNS: readonly SkydeckRailRun[] = [
-  { name: 'deck-north', axis: 'x', fixed: SKYDECK_Z_MAX, from: SKYDECK_X_MIN, to: SKYDECK_X_MAX },
-  { name: 'deck-east', axis: 'z', fixed: SKYDECK_X_MAX, from: SKYDECK_Z_MIN, to: SKYDECK_Z_MAX },
-  { name: 'deck-west-south', axis: 'z', fixed: SKYDECK_X_MIN, from: SKYDECK_Z_MIN, to: -WING_BRIDGE_HALF_WIDTH },
-  { name: 'deck-west-north', axis: 'z', fixed: SKYDECK_X_MIN, from: WING_BRIDGE_HALF_WIDTH, to: SKYDECK_Z_MAX },
-  { name: 'deck-south-west', axis: 'x', fixed: SKYDECK_Z_MIN, from: SKYDECK_X_MIN, to: SKYDECK_LANDING_X_MIN },
-  { name: 'deck-south-east', axis: 'x', fixed: SKYDECK_Z_MIN, from: SKYDECK_LANDING_X_MAX, to: SKYDECK_X_MAX },
-  { name: 'landing-west', axis: 'z', fixed: SKYDECK_LANDING_X_MIN, from: SKYDECK_LANDING_Z_MIN, to: SKYDECK_Z_MIN },
-  { name: 'landing-east', axis: 'z', fixed: SKYDECK_LANDING_X_MAX, from: SKYDECK_RAMP_Z_MAX, to: SKYDECK_Z_MIN },
-  { name: 'landing-south', axis: 'x', fixed: SKYDECK_LANDING_Z_MIN, from: SKYDECK_LANDING_X_MIN, to: SKYDECK_LANDING_X_MAX },
+  { name: 'north', axis: 'x', fixed: SKYDECK_Z_MAX, from: SKYDECK_X_MIN, to: SKYDECK_X_MAX },
+  // `from: SKYDECK_RAMP_Z_MAX`, not SKYDECK_LANDING_Z_MIN: the ramp's own
+  // rotated slab reaches all the way up to x 47 (its AABB spans x 44.81..61
+  // - see SKYDECK_RAMP_HEAD_X's comment), and near its head its real walking
+  // height is close enough to deck height to graze this rail's y band. This
+  // exact opening existed in the pre-widening table too (the old 'landing-
+  // east' run started here for the same reason) - it was lost when 'deck-
+  // east'+'landing-east' merged into one run spanning the full z range,
+  // in-engine playtest (2026-07-31) found the climb walled a second time
+  // right where this run used to stop short.
+  { name: 'east', axis: 'z', fixed: SKYDECK_X_MAX, from: SKYDECK_RAMP_Z_MAX, to: SKYDECK_Z_MAX },
+  { name: 'west-south', axis: 'z', fixed: SKYDECK_X_MIN, from: SKYDECK_LANDING_Z_MIN, to: -WING_BRIDGE_HALF_WIDTH },
+  { name: 'west-north', axis: 'z', fixed: SKYDECK_X_MIN, from: WING_BRIDGE_HALF_WIDTH, to: SKYDECK_Z_MAX },
+  { name: 'south', axis: 'x', fixed: SKYDECK_LANDING_Z_MIN, from: SKYDECK_X_MIN, to: SKYDECK_RAMP_HEAD_X },
 ];
 
 // Back-plaza spawn point (matches ZoneMainStage's spawn in layout.go).
