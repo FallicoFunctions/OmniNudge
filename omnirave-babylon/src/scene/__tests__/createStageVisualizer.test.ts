@@ -67,6 +67,40 @@ describe('createStageVisualizer', () => {
     visualizer.dispose();
   });
 
+  it('culls the 16-cell block on each flank blocking the VIP skydeck ramp landing', () => {
+    buildPanels();
+    const visualizer = createStageVisualizer(scene, { getFrequencyData: zeroSource });
+    const mesh = barMesh();
+    (mesh as unknown as { _thinInstanceDataStorage: { worldMatrices: unknown } })._thinInstanceDataStorage.worldMatrices = null;
+    const matrices = mesh.thinInstanceGetWorldMatrices();
+
+    // 48 columns x 8 rows, column-major index i = c * 8 + r (see the build
+    // loop). Columns 0-7 and 40-47, rows 1-2, mirror the exact 8x2x2=32
+    // cells (16 per flank) the in-engine screenshot flagged as blocking the
+    // ramp landing at SKYDECK_X_MIN/SKYDECK_DECK_Y.
+    let culledCount = 0;
+    let litCount = 0;
+    for (let c = 0; c < 48; c++) {
+      for (let r = 0; r < 8; r++) {
+        const i = c * 8 + r;
+        // Scale x lives at element 0 of the column-major 4x4 matrix.
+        const scaleX = matrices[i].m[0];
+        const isCulledCell = (c <= 7 || c >= 40) && (r === 1 || r === 2);
+        if (isCulledCell) {
+          expect(scaleX).toBe(0);
+          culledCount++;
+        } else {
+          expect(scaleX).toBeGreaterThan(0);
+          litCount++;
+        }
+      }
+    }
+    expect(culledCount).toBe(32);
+    expect(litCount).toBe(384 - 32);
+
+    visualizer.dispose();
+  });
+
   it('returns an inert no-op when no hero panels exist', () => {
     const visualizer = createStageVisualizer(scene, { getFrequencyData: zeroSource });
     expect(visualizer.panels).toBe(0);
@@ -136,6 +170,141 @@ describe('createStageVisualizer', () => {
     visualizer.dispose();
   });
 
+  it('sizes the unit to the §13.3 Main Stage target (~300ft x 100ft in meters)', () => {
+    buildPanels();
+    const visualizer = createStageVisualizer(scene, { getFrequencyData: zeroSource });
+    // The VIP-landing cutout (see isVipLandingCell) splits the backing into
+    // 5 segments - the overall unit footprint is their COMBINED extent, not
+    // any single segment's (the center one alone is narrower than the unit).
+    const segmentNames = [
+      'main-stage-visualizer-backing',
+      'main-stage-visualizer-backing-right-lower',
+      'main-stage-visualizer-backing-right-upper',
+      'main-stage-visualizer-backing-left-lower',
+      'main-stage-visualizer-backing-left-upper',
+    ];
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const name of segmentNames) {
+      const segment = scene.getMeshByName(name);
+      expect(segment != null).toBe(true);
+      // minimumWorld/maximumWorld need an up-to-date world matrix, which a
+      // freshly created (never rendered) mesh does not have yet.
+      segment!.computeWorldMatrix(true);
+      const bounds = segment!.getBoundingInfo().boundingBox;
+      minX = Math.min(minX, bounds.minimumWorld.x);
+      maxX = Math.max(maxX, bounds.maximumWorld.x);
+      minY = Math.min(minY, bounds.minimumWorld.y);
+      maxY = Math.max(maxY, bounds.maximumWorld.y);
+    }
+    expect(Math.round((maxX - minX) * 100) / 100).toBeCloseTo(300 * 0.3048, 1);
+    expect(Math.round((maxY - minY) * 100) / 100).toBeCloseTo(100 * 0.3048, 1);
+    visualizer.dispose();
+  });
+
+  it('leaves an actual gap in the backing over the VIP-landing cutout, not just a dimmer draw', () => {
+    buildPanels();
+    const visualizer = createStageVisualizer(scene, { getFrequencyData: zeroSource });
+    const segmentNames = [
+      'main-stage-visualizer-backing',
+      'main-stage-visualizer-backing-right-lower',
+      'main-stage-visualizer-backing-right-upper',
+      'main-stage-visualizer-backing-left-lower',
+      'main-stage-visualizer-backing-left-upper',
+    ];
+    const segments = segmentNames.map((name) => {
+      const segment = scene.getMeshByName(name)!;
+      segment.computeWorldMatrix(true);
+      return segment.getBoundingInfo().boundingBox;
+    });
+
+    // A point deep in the right-flank cutout band (skydeck deck height, near
+    // the unit's right edge - the exact region flagged as blocking the ramp
+    // landing): no segment's world bounds should contain it on either axis
+    // at once - if one did, the "hole" would actually be covered.
+    const probeX = 44;
+    const probeY = 10;
+    const covered = segments.some(
+      (b) => probeX >= b.minimumWorld.x && probeX <= b.maximumWorld.x && probeY >= b.minimumWorld.y && probeY <= b.maximumWorld.y,
+    );
+    expect(covered).toBe(false);
+
+    // The mirrored left-flank point must be equally uncovered.
+    const coveredLeft = segments.some(
+      (b) => -probeX >= b.minimumWorld.x && -probeX <= b.maximumWorld.x && probeY >= b.minimumWorld.y && probeY <= b.maximumWorld.y,
+    );
+    expect(coveredLeft).toBe(false);
+
+    // A point just below the cutout band, same x, MUST still be covered -
+    // this is a hole, not a missing flank.
+    const coveredBelow = segments.some(
+      (b) => probeX >= b.minimumWorld.x && probeX <= b.maximumWorld.x && 4 >= b.minimumWorld.y && 4 <= b.maximumWorld.y,
+    );
+    expect(coveredBelow).toBe(true);
+
+    visualizer.dispose();
+  });
+
+  it('shows the track-start title card on a trackId change and clears it after its window', () => {
+    buildPanels();
+    const visualizer = createStageVisualizer(scene, { getFrequencyData: zeroSource });
+
+    expect(visualizer.isShowingTitleCard).toBe(false);
+    visualizer.setTrackInfo('Test Artist', 'Test Track', 'track-1');
+    expect(visualizer.isShowingTitleCard).toBe(true);
+
+    // Well within the window: still showing.
+    visualizer.update(2);
+    expect(visualizer.isShowingTitleCard).toBe(true);
+
+    // Advance past the title card's visible window.
+    visualizer.update(10);
+    expect(visualizer.isShowingTitleCard).toBe(false);
+
+    visualizer.dispose();
+  });
+
+  it('does not re-trigger the title card when the same track is reported again', () => {
+    buildPanels();
+    const visualizer = createStageVisualizer(scene, { getFrequencyData: zeroSource });
+
+    visualizer.setTrackInfo('Test Artist', 'Test Track', 'track-1');
+    expect(visualizer.isShowingTitleCard).toBe(true);
+    visualizer.update(10);
+    expect(visualizer.isShowingTitleCard).toBe(false);
+
+    // Same trackId again (e.g. a routine snapshot refresh): must stay cleared.
+    visualizer.setTrackInfo('Test Artist', 'Test Track', 'track-1');
+    expect(visualizer.isShowingTitleCard).toBe(false);
+
+    // A genuinely new track still triggers it.
+    visualizer.setTrackInfo('New Artist', 'New Track', 'track-2');
+    expect(visualizer.isShowingTitleCard).toBe(true);
+
+    visualizer.dispose();
+  });
+
+  it('falls back to the existing procedural branding when no fireworks video is configured (regression guard)', () => {
+    buildPanels();
+    // No fireworksVideoUrl passed - the current real state (no asset exists).
+    const visualizer = createStageVisualizer(scene, { getFrequencyData: zeroSource });
+
+    expect(visualizer.isFireworksVideoActive).toBe(false);
+    visualizer.setEventState({ phase: 'active' });
+    expect(() => visualizer.update(0.016)).not.toThrow();
+    expect(visualizer.isFireworksVideoActive).toBe(false);
+
+    // A few more frames to confirm it never lazily engages.
+    for (let i = 0; i < 5; i++) {
+      visualizer.update(0.016);
+    }
+    expect(visualizer.isFireworksVideoActive).toBe(false);
+
+    visualizer.dispose();
+  });
+
   it('disposes its own meshes, material and texture on dispose, leaving none behind', () => {
     // Asserting on the visualizer's OWN named resources rather than raw scene
     // counts: NullEngine lazily creates a shared `default material` as a side
@@ -144,6 +313,12 @@ describe('createStageVisualizer', () => {
     buildPanels();
     const ownNames = [
       'main-stage-visualizer-backing',
+      // The VIP-landing cutout (see isVipLandingCell) splits the backing
+      // into 5 segments sharing one material - all 5 names must be gone too.
+      'main-stage-visualizer-backing-right-lower',
+      'main-stage-visualizer-backing-right-upper',
+      'main-stage-visualizer-backing-left-lower',
+      'main-stage-visualizer-backing-left-upper',
       'main-stage-visualizer-bars',
       'main-stage-visualizer-material',
       'main-stage-visualizer-bar-material',

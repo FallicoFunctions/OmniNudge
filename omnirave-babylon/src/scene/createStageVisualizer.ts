@@ -8,25 +8,51 @@ import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
+import { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import { VertexBuffer } from '@babylonjs/core/Buffers/buffer.js';
+import { VideoTexture } from '@babylonjs/core/Materials/Textures/videoTexture.js';
 import type { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import type { Scene } from '@babylonjs/core/scene';
 
+import { SKYDECK_DECK_Y, SKYDECK_X_MIN } from './mainStageVenueBounds';
+
 // The Main Stage's hero visualizer, rebuilt as ONE large TRUE-3D unit
 // (player-flagged: the previous two 8x7 flat panels read as small 2D screens).
-// It now fills the purple glow region - a single 31x12 face centered at
-// (0, 18) with its backing at z=-3, facing the crowd (-z) - and the spectrum
-// itself is a field of ~384 thin-instanced boxes that physically EXTRUDE
-// toward the crowd with the music, up to ~2.5 deep. The old hero panel meshes
-// are hidden (not disposed - dispose() re-enables them); their haze meshes
-// stay on as the glow atmosphere behind the new unit.
+// It fills a face centered at (0, 18) with its backing at z=-3, facing the
+// crowd (-z) - and the spectrum itself is a field of ~384 thin-instanced
+// boxes that physically EXTRUDE toward the crowd with the music, up to ~2.5
+// deep. The old hero panel meshes are hidden (not disposed - dispose()
+// re-enables them); their haze meshes stay on as the glow atmosphere behind
+// the new unit.
+//
+// Sizing (2026-07-30): resized from the original 31x12 (sized only to fit the
+// old haze region) to §13.3's stated Main Stage target of ~300ft x 100ft
+// (91.44m x 30.48m). Investigated whether this needed a Blender-side change
+// first: the "haze glow" atmosphere and the hidden `main-stage-hero-screen-
+// panel-l/r` meshes are NOT Blender assets at all - both are procedural
+// PBRMaterial planes authored in createMainStagePresentationRig.ts
+// (createHeroScreenPanels / its haze pass), sized 8x6.5 / 17x13 for the OLD
+// small unit. There is no corresponding Blender geometry to resize or
+// re-export for this screen (confirmed: no object named hero-screen-panel or
+// haze exists anywhere in assets-src/main-stage/main-stage.blend). Enlarging
+// that haze pair to visually back the new 91x30 screen would mean editing
+// createMainStagePresentationRig.ts, which is out of this file's ownership
+// scope for this task (a parallel task owns other scene files) - flagged
+// separately rather than done here to avoid merge contention. The mismatch is
+// latent-only: the flat panels the haze is paired with are already hidden
+// while this unit is alive, so it is not a live visual defect today, only a
+// risk if something ever re-enables those old panels.
 //
 // Audio-reactive content is driven by LIVE frequency analysis of the synced
 // track (docs/superpowers/specs/2026-06-04-omnirave-3d-runtime-design.md
-// §13.3 / §13.3.1): every client plays the same server-synced audio, so local
+// §13 / §13.3.1): every client plays the same server-synced audio, so local
 // analysis yields ~the same picture on every client. The backing plane's
 // DynamicTexture carries only the text/mode layers (OMNIRAVE wordmark beat,
-// fireworks countdown, active-mode video placeholder); the bars are geometry.
+// track-start title card, fireworks countdown, active-mode branding); the
+// bars are geometry. §13.3.1's fireworks "pre-authored visualizer VIDEO" is
+// wired as an optional VideoTexture swap (see `fireworksVideoUrl`) that falls
+// back to the procedural branding draw when no video asset is configured -
+// the current real state, since no such video has been authored yet.
 
 // Old flat hero-screen panels, hidden while this unit is alive.
 const DEFAULT_HERO_SCREEN_MESH_NAMES = [
@@ -34,10 +60,12 @@ const DEFAULT_HERO_SCREEN_MESH_NAMES = [
   'main-stage-hero-screen-panel-r',
 ] as const;
 
-// Unit geometry (measured from the live scene: the haze glow spans
-// x -15.5..15.5, y 12..24, z -7.5..-2.5).
-const UNIT_WIDTH = 31;
-const UNIT_HEIGHT = 12;
+// Unit geometry: §13.3's Main Stage target, ~300ft wide x 100ft tall,
+// converted at 0.3048 m/ft. (Position (0, 18, -3) is unchanged from the
+// original small unit - only the size is spec-driven here.)
+const FEET_TO_METERS = 0.3048;
+const UNIT_WIDTH = 300 * FEET_TO_METERS; // 91.44m
+const UNIT_HEIGHT = 100 * FEET_TO_METERS; // 30.48m
 const UNIT_CENTER_Y = 18;
 const BACKING_Z = -3;
 // Bar cells rest just in front of the backing and extrude toward the crowd.
@@ -53,10 +81,69 @@ const CELL_HEIGHT = UNIT_HEIGHT / ROW_COUNT;
 // Gap between cells so the field reads as a grid of blocks, not a slab.
 const CELL_FILL = 0.8;
 
-// Backing texture resolution (31:12 face; 1024x396 keeps text crisp without a
-// heavy per-frame fill).
+// Player-flagged: at the new 91.44m width the field's outer columns now run
+// past the VIP skydeck ramp landings on both flanks (SKYDECK_X_MIN=31,
+// screen edge=45.72 - the skydeck's own upper bound of 47 is outside the
+// screen anyway), physically standing in the walk path onto the deck. Cull
+// those columns' cells near deck height rather than shrinking the whole
+// field. `>=` on the ABSOLUTE column-center x mirrors the same cull to both
+// flanks from one check. The row test keeps a cell if its center is within
+// one cell-height of the deck surface - the row actually at deck height plus
+// the one above it for a standing player's headroom (verified: exactly the
+// 2 rows / 16-cells-per-side the in-engine screenshot flagged).
+function isVipLandingCell(columnCenterX: number, rowCenterY: number): boolean {
+  return Math.abs(columnCenterX) >= SKYDECK_X_MIN && Math.abs(rowCenterY - SKYDECK_DECK_Y) <= CELL_HEIGHT;
+}
+
+// Player-flagged (round 2): culling the bar-field cells left the solid
+// backing PLANE still filling that space - the LED boxes were gone but the
+// black panel behind them still blocked the ramp landing. The backing needs
+// an actual geometric hole over the same region, not just a dimmer draw:
+// built from these two values (how many columns deep the cutout reaches
+// on each flank, and which row band it spans), derived by SCANNING
+// isVipLandingCell rather than re-deriving the boundary by hand, so the
+// bar-field cull and the backing cutout can never quietly drift apart.
+function computeCutoutColumnDepth(): number {
+  let depth = 0;
+  for (let c = 0; c < COLUMN_COUNT / 2; c++) {
+    const x = -UNIT_WIDTH / 2 + (c + 0.5) * CELL_WIDTH;
+    if (isVipLandingCell(x, SKYDECK_DECK_Y)) {
+      depth += 1;
+    }
+  }
+  return depth;
+}
+
+function computeCutoutRowRange(): { startRow: number; rowCount: number } {
+  let startRow = -1;
+  let rowCount = 0;
+  for (let r = 0; r < ROW_COUNT; r++) {
+    const y = UNIT_CENTER_Y - UNIT_HEIGHT / 2 + (r + 0.5) * CELL_HEIGHT;
+    if (isVipLandingCell(UNIT_WIDTH / 2, y)) {
+      if (startRow === -1) {
+        startRow = r;
+      }
+      rowCount += 1;
+    }
+  }
+  return { startRow, rowCount };
+}
+
+const CUTOUT_COLUMN_DEPTH = computeCutoutColumnDepth();
+const { startRow: CUTOUT_ROW_START, rowCount: CUTOUT_ROW_COUNT } = computeCutoutRowRange();
+// World-space rectangle of ONE flank's cutout (mirrored for the other flank
+// by negating x). unitLeft/unitBottom are the full unit's own edges.
+const UNIT_LEFT_X = -UNIT_WIDTH / 2;
+const UNIT_BOTTOM_Y = UNIT_CENTER_Y - UNIT_HEIGHT / 2;
+const CUTOUT_INNER_X = UNIT_WIDTH / 2 - CUTOUT_COLUMN_DEPTH * CELL_WIDTH;
+const CUTOUT_Y_MIN = UNIT_BOTTOM_Y + CUTOUT_ROW_START * CELL_HEIGHT;
+const CUTOUT_Y_MAX = CUTOUT_Y_MIN + CUTOUT_ROW_COUNT * CELL_HEIGHT;
+
+// Backing texture resolution, matched to the unit's ~3:1 aspect (91.44:30.48)
+// so text isn't stretched; 1024x342 keeps text crisp without a heavy
+// per-frame fill.
 const TEXTURE_WIDTH = 1024;
-const TEXTURE_HEIGHT = 396;
+const TEXTURE_HEIGHT = 342;
 
 // Number of spectrum bins read. The analyser reports 128; the lowest 64 carry
 // the most visible musical motion (same policy as the old flat screen).
@@ -75,11 +162,21 @@ const CYAN = { r: 34 / 255, g: 205 / 255, b: 240 / 255 };
 // Unlit floor color for unlit cells: faint grid presence, below bloom.
 const DIM_LEVEL = 0.045;
 
+// §13.3 track-start title card: visible for TITLE_CARD_SECONDS when a new
+// track is reported, easing in/out over TITLE_CARD_FADE_SECONDS at each end -
+// same beat shape as the OMNIRAVE wordmark, distinct from the always-on
+// bottom-right Now Playing HUD (src/ui/createPlayerHud.ts).
+const TITLE_CARD_SECONDS = 6;
+const TITLE_CARD_FADE_SECONDS = 0.8;
+
 export type StageVisualizerMode = 'normal' | 'lead_in' | 'active';
 
 export interface StageEventStateInput {
   phase: string;
   countdownSeconds?: number;
+  // 1-based minute within the 3-minute active window (§5.1.1's "end of minute
+  // 1/2/3" OMNIRAVE sky-write beats key off this, not elapsed wall time).
+  activeMinute?: number;
 }
 
 export interface StageVisualizerOptions {
@@ -89,6 +186,16 @@ export interface StageVisualizerOptions {
   // audio).
   getFrequencyData: (target: Uint8Array) => void;
   heroScreenMeshNames?: readonly string[];
+  // §13.3.1 fireworks event: "a special pre-authored visualizer VIDEO for the
+  // fireworks" instead of the procedural branding draw below. NO video asset
+  // has been authored/sourced yet - this option is plumbing only. When (and
+  // if) one is produced, host it at a stable URL (e.g. under public/assets/
+  // venues/main-stage/, such as `/assets/venues/main-stage/fireworks-
+  // visualizer.mp4`) and pass that resolved URL here; the caller wires this
+  // in separately. Falsy (the current real state) or a failed/unusable
+  // VideoTexture both fall back to the existing procedural branding draw
+  // with zero behavior change.
+  fireworksVideoUrl?: string;
 }
 
 export interface StageVisualizer {
@@ -96,9 +203,20 @@ export interface StageVisualizer {
   update: (dtSeconds: number) => void;
   // Switch modes from the active zone's fireworks event (or null for none).
   setEventState: (state: StageEventStateInput | null) => void;
+  // §13.3 track-start title card: call whenever the active zone's media
+  // changes (e.g. from ZoneMediaState). Diffs trackId against the last seen
+  // value internally, so calling again with the same trackId is a no-op -
+  // callers do not need to track "did the track change" themselves.
+  setTrackInfo: (artist: string, title: string, trackId: string) => void;
   dispose: () => void;
   // Number of old hero panels this unit replaced (0 = inert no-op).
   readonly panels: number;
+  // Whether the track-start title card is currently showing (test/debug
+  // observability - primitive, not a Babylon object).
+  readonly isShowingTitleCard: boolean;
+  // Whether the fireworks VideoTexture is currently driving the screen
+  // (always false when `fireworksVideoUrl` is absent or unusable).
+  readonly isFireworksVideoActive: boolean;
 }
 
 // Pure mode mapping, split out so the mode switch is unit-testable without a
@@ -120,8 +238,11 @@ export function resolveVisualizerMode(state: StageEventStateInput | null | undef
 const NOOP_VISUALIZER: StageVisualizer = {
   update() {},
   setEventState() {},
+  setTrackInfo() {},
   dispose() {},
   panels: 0,
+  isShowingTitleCard: false,
+  isFireworksVideoActive: false,
 };
 
 export function createStageVisualizer(scene: Scene, options: StageVisualizerOptions): StageVisualizer {
@@ -144,13 +265,82 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
   // --- Backing plane: text/mode layers only -------------------------------
   // CreatePlane's front face normal is -z, which is exactly the crowd side
   // (players stand at z<0), so no rotation is needed.
-  const backing = MeshBuilder.CreatePlane(
-    'main-stage-visualizer-backing',
-    { width: UNIT_WIDTH, height: UNIT_HEIGHT },
-    scene,
-  );
-  backing.position.set(0, UNIT_CENTER_Y, BACKING_Z);
-  backing.isPickable = false;
+  //
+  // Built as 5 segments, not 1: a single full-unit plane would leave the
+  // VIP-landing cutout (see isVipLandingCell) as an LED-less but still
+  // solid black rectangle - the boxes were gone but the panel behind them
+  // still blocked the ramp. One center block (the un-cut middle) plus a
+  // below/above pair per flank (split around the cutout row band) tiles the
+  // full unit with an actual hole where the cutout is. All 5 share ONE
+  // material/texture; each just samples its own sub-rect of it via UV, so
+  // this changes presentation geometry only - the draw pipeline below is
+  // completely unchanged.
+  function createBackingSegment(name: string, xMin: number, xMax: number, yMin: number, yMax: number): Mesh {
+    const segment = MeshBuilder.CreatePlane(name, { width: xMax - xMin, height: yMax - yMin }, scene);
+    segment.position.set((xMin + xMax) / 2, (yMin + yMax) / 2, BACKING_Z);
+    segment.isPickable = false;
+
+    // Default plane UVs are exactly 0 or 1 per corner, so lerping from those
+    // exact endpoints to this segment's fractional sub-rect of the FULL
+    // unit's texture space repositions every corner correctly regardless of
+    // Babylon's internal vertex winding/order - no need to know it.
+    const uMin = (xMin - UNIT_LEFT_X) / UNIT_WIDTH;
+    const uMax = (xMax - UNIT_LEFT_X) / UNIT_WIDTH;
+    const vMin = (yMin - UNIT_BOTTOM_Y) / UNIT_HEIGHT;
+    const vMax = (yMax - UNIT_BOTTOM_Y) / UNIT_HEIGHT;
+    const uv = segment.getVerticesData(VertexBuffer.UVKind);
+    if (uv) {
+      for (let i = 0; i < uv.length; i += 2) {
+        uv[i] = uMin + uv[i] * (uMax - uMin);
+        uv[i + 1] = vMin + uv[i + 1] * (vMax - vMin);
+      }
+      segment.setVerticesData(VertexBuffer.UVKind, uv, false, 2);
+    }
+    return segment;
+  }
+
+  const unitRightX = UNIT_LEFT_X + UNIT_WIDTH;
+  const unitTopY = UNIT_BOTTOM_Y + UNIT_HEIGHT;
+  const backingSegments = [
+    // Center: full height, the un-cut middle between both flanks.
+    createBackingSegment(
+      'main-stage-visualizer-backing',
+      -CUTOUT_INNER_X,
+      CUTOUT_INNER_X,
+      UNIT_BOTTOM_Y,
+      unitTopY,
+    ),
+    // Right flank, below and above the cutout row band.
+    createBackingSegment(
+      'main-stage-visualizer-backing-right-lower',
+      CUTOUT_INNER_X,
+      unitRightX,
+      UNIT_BOTTOM_Y,
+      CUTOUT_Y_MIN,
+    ),
+    createBackingSegment(
+      'main-stage-visualizer-backing-right-upper',
+      CUTOUT_INNER_X,
+      unitRightX,
+      CUTOUT_Y_MAX,
+      unitTopY,
+    ),
+    // Left flank (mirrored), below and above the cutout row band.
+    createBackingSegment(
+      'main-stage-visualizer-backing-left-lower',
+      UNIT_LEFT_X,
+      -CUTOUT_INNER_X,
+      UNIT_BOTTOM_Y,
+      CUTOUT_Y_MIN,
+    ),
+    createBackingSegment(
+      'main-stage-visualizer-backing-left-upper',
+      UNIT_LEFT_X,
+      -CUTOUT_INNER_X,
+      CUTOUT_Y_MAX,
+      unitTopY,
+    ),
+  ];
 
   // PBR, not StandardMaterial: verified in-engine that this venue's pipeline
   // renders StandardMaterial surfaces flat white (both its emissive-texture
@@ -165,7 +355,9 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
   backingMaterial.roughness = 1;
   backingMaterial.disableLighting = true;
   backingMaterial.backFaceCulling = true;
-  backing.material = backingMaterial;
+  for (const segment of backingSegments) {
+    segment.material = backingMaterial;
+  }
 
   // NullEngine / jsdom-without-canvas has no usable 2D context: the texture
   // text layers are skipped there, but the 3D bar field still builds and
@@ -233,13 +425,19 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
   for (let c = 0; c < COLUMN_COUNT; c++) {
     const x = -UNIT_WIDTH / 2 + (c + 0.5) * CELL_WIDTH;
     for (let r = 0; r < ROW_COUNT; r++) {
+      const y = UNIT_CENTER_Y - UNIT_HEIGHT / 2 + (r + 0.5) * CELL_HEIGHT;
       const i = c * ROW_COUNT + r;
       const o = i * 16;
-      matrices[o + 0] = CELL_WIDTH * CELL_FILL;
-      matrices[o + 5] = CELL_HEIGHT * CELL_FILL;
+      // VIP skydeck landing cull (see isVipLandingCell): zero scale here and
+      // ONLY here - updateBars() never touches offsets 0/5, so a zeroed cell
+      // stays a permanently invisible (zero-volume) box no matter what the
+      // audio-reactive pass later writes to its depth/color.
+      const culled = isVipLandingCell(x, y);
+      matrices[o + 0] = culled ? 0 : CELL_WIDTH * CELL_FILL;
+      matrices[o + 5] = culled ? 0 : CELL_HEIGHT * CELL_FILL;
       matrices[o + 10] = BAR_REST_DEPTH;
       matrices[o + 12] = x;
-      matrices[o + 13] = UNIT_CENTER_Y - UNIT_HEIGHT / 2 + (r + 0.5) * CELL_HEIGHT;
+      matrices[o + 13] = y;
       matrices[o + 14] = BACKING_Z - 0.05 - BAR_REST_DEPTH / 2;
       matrices[o + 15] = 1;
       colors[i * 4 + 3] = 1;
@@ -268,6 +466,54 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
   let elapsed = 0;
   let mode: StageVisualizerMode = 'normal';
   let countdownSeconds = 0;
+
+  // --- Track-start title card state ---------------------------------------
+  let lastTrackId: string | null = null;
+  let trackArtist = '';
+  let trackTitle = '';
+  // Seconds remaining in the title-card window; 0 = not showing.
+  let titleCardRemaining = 0;
+
+  // --- Fireworks video-texture state (§13.3.1, plumbing only) -------------
+  let fireworksVideoTexture: VideoTexture | null = null;
+  // Set once construction/loading fails, so we don't retry every frame.
+  let fireworksVideoFailed = false;
+
+  // Lazily builds (once) and returns the fireworks VideoTexture, or null if
+  // no URL is configured or construction/loading failed. Guarded exactly like
+  // the DynamicTexture/2D-context setup above: NullEngine/vitest has no
+  // usable video decoding, so a construction or load failure here must
+  // degrade to the procedural branding draw, never throw or hang.
+  function ensureFireworksVideoTexture(): VideoTexture | null {
+    if (fireworksVideoTexture || fireworksVideoFailed) {
+      return fireworksVideoTexture;
+    }
+    if (!options.fireworksVideoUrl) {
+      return null;
+    }
+    try {
+      const video = new VideoTexture(
+        'main-stage-fireworks-video',
+        options.fireworksVideoUrl,
+        scene,
+        false,
+        true,
+        Texture.TRILINEAR_SAMPLINGMODE,
+        { autoPlay: true, loop: true, muted: true, autoUpdateTexture: true },
+        (message, error) => {
+          console.warn('[stageVisualizer] fireworks video failed to load; falling back to procedural branding.', message, error);
+          fireworksVideoFailed = true;
+          fireworksVideoTexture?.dispose();
+          fireworksVideoTexture = null;
+        },
+      );
+      fireworksVideoTexture = video;
+    } catch (error) {
+      console.warn('[stageVisualizer] fireworks VideoTexture unavailable; falling back to procedural branding.', error);
+      fireworksVideoFailed = true;
+    }
+    return fireworksVideoTexture;
+  }
 
   // Average the bins covered by a column's mirrored position (low frequencies
   // at the CENTER, highs at the edges - mirroring the old flat screen's look).
@@ -379,6 +625,40 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     }
   }
 
+  // §13.3: "stage title card at track start shows `Artist Name - Track
+  // Title`" - same text format as the bottom-right Now Playing HUD, but a
+  // brief full-screen beat on the venue screen rather than an always-on
+  // corner readout. Eases in/out over TITLE_CARD_FADE_SECONDS at each end of
+  // its TITLE_CARD_SECONDS window.
+  function drawTitleCard(context: CanvasRenderingContext2D): void {
+    context.fillStyle = '#04060c';
+    context.fillRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+
+    let alpha = 1;
+    if (titleCardRemaining > TITLE_CARD_SECONDS - TITLE_CARD_FADE_SECONDS) {
+      alpha = (TITLE_CARD_SECONDS - titleCardRemaining) / TITLE_CARD_FADE_SECONDS;
+    } else if (titleCardRemaining < TITLE_CARD_FADE_SECONDS) {
+      alpha = titleCardRemaining / TITLE_CARD_FADE_SECONDS;
+    }
+    alpha = Math.max(0, Math.min(1, alpha));
+
+    context.save();
+    context.globalAlpha = alpha;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    if ('shadowColor' in context) {
+      context.shadowColor = '#e92ad6';
+      context.shadowBlur = 34;
+    }
+    context.fillStyle = '#eafcff';
+    context.font = 'bold 64px sans-serif';
+    context.fillText(trackArtist, TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.42);
+    context.fillStyle = '#29d3f0';
+    context.font = 'bold 50px sans-serif';
+    context.fillText(trackTitle, TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.6);
+    context.restore();
+  }
+
   function drawCountdown(context: CanvasRenderingContext2D): void {
     context.fillStyle = '#04060c';
     context.fillRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
@@ -405,10 +685,11 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     context.restore();
   }
 
-  function drawFireworksPlaceholder(context: CanvasRenderingContext2D): void {
-    // Placeholder for the future pre-authored fireworks visualizer VIDEO. The
-    // MODE/hook is what matters here; the actual asset drops in later, so this
-    // is deliberately, visibly labeled as a placeholder.
+  function drawEventBranding(context: CanvasRenderingContext2D): void {
+    // §5.1.1 "special screen mode during the event... includes `Main Stage +
+    // OmniRave`". The actual fireworks visuals live in 3D space (the sky
+    // above the stage, via createFireworksShow) - this screen is the
+    // branding beat, not a video placeholder.
     const hue = (elapsed * 40) % 360;
     context.fillStyle = `hsl(${hue}, 70%, 12%)`;
     context.fillRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
@@ -416,21 +697,45 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     context.fillStyle = '#eafcff';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.font = 'bold 110px sans-serif';
+    context.font = 'bold 90px sans-serif';
     if ('shadowColor' in context) {
       context.shadowColor = `hsl(${hue}, 90%, 60%)`;
       context.shadowBlur = 40;
     }
-    context.fillText('FIREWORKS', TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.42);
-    context.font = 'bold 40px sans-serif';
-    if ('shadowColor' in context) {
-      context.shadowBlur = 0;
-    }
-    context.fillStyle = '#9fb4c4';
-    context.fillText('[ VISUALIZER VIDEO — PLACEHOLDER ]', TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.7);
+    context.fillText('MAIN STAGE', TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.4);
+    context.font = 'bold 70px sans-serif';
+    context.fillStyle = '#29d3f0';
+    context.fillText('+ OMNIRAVE', TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.6);
   }
 
+  // True only while the fireworks VideoTexture is actually backing the
+  // screen this frame; exposed as a primitive via isFireworksVideoActive.
+  let fireworksVideoActive = false;
+
   function paintBacking(): void {
+    // §13.3.1 fireworks video takes over the material's texture entirely
+    // (its own frames, not a canvas draw) - checked before the ctx-dependent
+    // guard below since it does not need the 2D canvas path at all.
+    if (mode === 'active') {
+      const video = ensureFireworksVideoTexture();
+      if (video) {
+        fireworksVideoActive = true;
+        if (backingMaterial.emissiveTexture !== video) {
+          backingMaterial.emissiveTexture = video;
+        }
+        return;
+      }
+    }
+    if (fireworksVideoActive) {
+      // Leaving active mode, or the video just failed: hand the material
+      // back to the DynamicTexture so the canvas draws below are visible
+      // again.
+      fireworksVideoActive = false;
+      if (texture && backingMaterial.emissiveTexture !== texture) {
+        backingMaterial.emissiveTexture = texture;
+      }
+    }
+
     if (!ctx || !offCtx || !offscreen || !texture) {
       return;
     }
@@ -449,7 +754,14 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     if (mode === 'lead_in') {
       drawCountdown(offCtx);
     } else if (mode === 'active') {
-      drawFireworksPlaceholder(offCtx);
+      // No usable video (absent option or failed load): fall back to the
+      // existing procedural branding exactly as before - zero regression.
+      drawEventBranding(offCtx);
+    } else if (titleCardRemaining > 0) {
+      // Composes with the normal/lead_in/active dispatch above rather than
+      // replacing it: the title card only ever pre-empts the ordinary
+      // reactive draw, never the fireworks countdown or branding.
+      drawTitleCard(offCtx);
     } else {
       drawNormal(offCtx);
     }
@@ -464,23 +776,45 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     get panels() {
       return oldPanels.length;
     },
+    get isShowingTitleCard() {
+      return titleCardRemaining > 0;
+    },
+    get isFireworksVideoActive() {
+      return fireworksVideoActive;
+    },
     setEventState(state) {
       mode = resolveVisualizerMode(state);
       countdownSeconds = state?.countdownSeconds ?? 0;
+    },
+    setTrackInfo(artist, title, trackId) {
+      if (trackId === lastTrackId) {
+        // Same track re-reported (e.g. a routine snapshot refresh): no-op.
+        return;
+      }
+      lastTrackId = trackId;
+      trackArtist = artist;
+      trackTitle = title;
+      titleCardRemaining = TITLE_CARD_SECONDS;
     },
     update(dtSeconds) {
       // Guard against NaN/negative deltas from a stalled first frame.
       const dt = dtSeconds > 0 ? dtSeconds : 0;
       elapsed += dt;
+      if (titleCardRemaining > 0) {
+        titleCardRemaining = Math.max(0, titleCardRemaining - dt);
+      }
       updateBars(dt);
       paintBacking();
     },
     dispose() {
       barMesh.dispose();
       barMaterial.dispose();
-      backing.dispose();
+      for (const segment of backingSegments) {
+        segment.dispose();
+      }
       backingMaterial.dispose();
       texture?.dispose();
+      fireworksVideoTexture?.dispose();
       // Hand the stage back exactly as found: the flat panels return.
       for (const panel of oldPanels) {
         panel.setEnabled(true);
