@@ -36,20 +36,70 @@ export const VENUE_ENVELOPE_BLOCKER_THICKNESS = 4;
 
 // --- Cascade fountain footprint -----------------------------------------
 // Each flank carries a tiered cascade FOUNTAIN. Its base stone is an
-// OCTAGON, not a rectangle. Measured live from the shipped venue (right
-// flank base-stone footprint x 54.3..82, z -41.3..-16.5), the octagon's
-// convex fit is the ellipse below: centre (68.15, -28.9), semi-axes
-// sx 13.85, sz 12.4. The left flank is the exact X-mirror (centre -68.15,
-// same axes).
+// OCTAGON, not a rectangle, not an ellipse either: centre (68.15, -28.9)
+// (the left flank is the exact X-mirror, centre -68.15).
 //
 // This is the SINGLE SOURCE OF TRUTH shared by BOTH the paving keep-out
 // (createCascadeCourtPaving.ts) and the collision blockers
 // (createMainStageCollisionBlockers.ts). Treating the octagon as a rectangle
 // left the octagon's corners (a) walled by invisible collision where no
-// stone is visible and (b) missing floor tiles. Both modules import this
-// ellipse so the walkable floor and the invisible walls can never disagree
-// about the fountain's real outline: corner cells are paved AND walk-through.
+// stone is visible and (b) missing floor tiles - fixed once already by
+// fitting an ellipse to the octagon. That ellipse fit was itself imprecise
+// though (player-flagged, 2026-07-31, in-engine): an ellipse can match an
+// octagon's VERTICES or its FLAT EDGE MIDPOINTS, never both - fitted to
+// (roughly) the vertices, it overshot by up to ~1m at the flat edges
+// (worst at the -x edge: ellipse+margin reached r=14.15, but the real stone
+// there measured r=13.25), wrongly culling several rows of paving tiles
+// that should have been floor.
+//
+// FOUNTAIN_STONE_RADII replaces the ellipse as the actual shape test: the
+// real outer stone radius, ray-measured live in-engine every 10 degrees
+// around the centre (see fountainStoneRadiusAt's interpolation below for
+// how a shared, single lookup drives both consumers exactly like the
+// ellipse used to). FOUNTAIN_ELLIPSE stays only as the (cx, cz) centre
+// reference other modules (e.g. createCascadeCourtLightFloor.ts's "distance
+// to fountain centre" glow gradient) already read and do not need the shape
+// for.
 export const FOUNTAIN_ELLIPSE = { cx: 68.15, cz: -28.9, sx: 13.85, sz: 12.4 } as const;
+
+// Measured outer stone radius (metres) at 10-degree steps starting at 0
+// degrees (+x axis from centre), going counterclockwise - i.e. index i is
+// the radius at angle (i * 10) degrees. Ray-cast against the venue's actual
+// stone meshes (shell/coping/waterline/gold-inlay), NOT the water surface,
+// mist, planting, canopy, or lanterns, which overhang or sit apart from the
+// stone's own footprint and would give a misleading edge.
+export const FOUNTAIN_STONE_RADII: readonly number[] = [
+  13.24, 12.39, 11.97, 12.17, 12.8, 13.94, 13.17, 12.55, 12.35, 12.31, 11.86, 11.79, 12.08, 12.07, 11.64, 11.58, 11.82,
+  12.3, 13.25, 13.38, 12.71, 12.46, 11.88, 11.24, 10.98, 11.06, 11.02, 11.28, 11.93, 13.08, 12.81, 12.65, 12.88, 13.17,
+  13.16, 13.55,
+];
+const FOUNTAIN_STONE_ANGLE_STEP_DEG = 360 / FOUNTAIN_STONE_RADII.length;
+
+// Linear interpolation between the two nearest sampled angles - the octagon
+// is a smooth-enough shape (no vertex is more than one 10-degree step from
+// its neighbours) that a straight line between samples reads as accurate as
+// the ellipse ever did, without either of its systematic gaps.
+export function fountainStoneRadiusAt(angleRad: number): number {
+  const angleDeg = ((angleRad * 180) / Math.PI + 360) % 360;
+  const stepIndex = angleDeg / FOUNTAIN_STONE_ANGLE_STEP_DEG;
+  const i0 = Math.floor(stepIndex) % FOUNTAIN_STONE_RADII.length;
+  const i1 = (i0 + 1) % FOUNTAIN_STONE_RADII.length;
+  const t = stepIndex - Math.floor(stepIndex);
+  return FOUNTAIN_STONE_RADII[i0] + (FOUNTAIN_STONE_RADII[i1] - FOUNTAIN_STONE_RADII[i0]) * t;
+}
+
+// True when (x, z) sits inside the fountain's real stone footprint (plus
+// marginMeters), in +x-flank coordinates - the -x flank mirrors x, exactly
+// like the ellipse test it replaces.
+export function isInsideFountainStone(x: number, z: number, marginMeters: number): boolean {
+  const dx = x - FOUNTAIN_ELLIPSE.cx;
+  const dz = z - FOUNTAIN_ELLIPSE.cz;
+  const distance = Math.hypot(dx, dz);
+  if (distance === 0) {
+    return true;
+  }
+  return distance <= fountainStoneRadiusAt(Math.atan2(dz, dx)) + marginMeters;
+}
 
 // Front-of-house sound booth, placed by ACOUSTICS rather than eyeballing.
 // Measured from the venue's own PA: the main line arrays hang at x +/-16,
