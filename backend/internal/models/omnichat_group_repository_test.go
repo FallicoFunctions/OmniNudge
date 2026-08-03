@@ -128,6 +128,79 @@ func TestOmniChatGroupRepositoryMembershipInviteAndMessageLifecycle(t *testing.T
 	require.NotContains(t, recipients, member.ID, "blocked members must not receive websocket fan-out")
 }
 
+func TestOmniChatGroupRepositoryBlockedFormerAdminCannotUsePrivilegedActions(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	users := models.NewUserRepository(db.Pool)
+	owner := &models.User{Username: "group_blocked_owner", PasswordHash: "hash", Role: "user"}
+	admin := &models.User{Username: "group_blocked_admin", PasswordHash: "hash", Role: "user"}
+	member := &models.User{Username: "group_blocked_member", PasswordHash: "hash", Role: "user"}
+	for _, user := range []*models.User{owner, admin, member} {
+		require.NoError(t, users.Create(ctx, user))
+	}
+
+	repo := models.NewOmniChatGroupRepository(db.Pool)
+	group, err := repo.CreateGroup(ctx, owner.ID, "Original group", "Original description", nil)
+	require.NoError(t, err)
+	require.NotNil(t, group)
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO omnichat_group_members(group_id,user_id,role)
+		VALUES($1,$2,'admin'),($1,$3,'member')
+	`, group.ID, admin.ID, member.ID)
+	require.NoError(t, err)
+
+	invite, err := repo.CreateInvite(ctx, group.ID, owner.ID, nil, hex.EncodeToString(digestBytesForTest("blocked-admin-invite")), 1, time.Now().Add(time.Hour))
+	require.NoError(t, err)
+	require.NotNil(t, invite)
+	_, err = db.Pool.Exec(ctx, `INSERT INTO blocked_users(blocker_id,blocked_id) VALUES($1,$2)`, owner.ID, admin.ID)
+	require.NoError(t, err)
+
+	updated, err := repo.UpdateGroup(ctx, group.ID, admin.ID, "Mutated", "Mutated", "private")
+	require.NoError(t, err)
+	require.Nil(t, updated)
+	var name, description, visibility string
+	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT name,description,visibility FROM omnichat_groups WHERE id=$1`, group.ID).Scan(&name, &description, &visibility))
+	require.Equal(t, "Original group", name)
+	require.Equal(t, "Original description", description)
+	require.Equal(t, "private", visibility)
+
+	removed, err := repo.RemoveMember(ctx, group.ID, admin.ID, member.ID)
+	require.NoError(t, err)
+	require.False(t, removed)
+	var memberRole string
+	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT role FROM omnichat_group_members WHERE group_id=$1 AND user_id=$2`, group.ID, member.ID).Scan(&memberRole))
+	require.Equal(t, "member", memberRole)
+
+	created, err := repo.CreateInvite(ctx, group.ID, admin.ID, nil, hex.EncodeToString(digestBytesForTest("blocked-admin-new-invite")), 1, time.Now().Add(time.Hour))
+	require.NoError(t, err)
+	require.Nil(t, created)
+	invites, err := repo.ListInvites(ctx, group.ID, admin.ID)
+	require.NoError(t, err)
+	require.Empty(t, invites)
+	revoked, err := repo.RevokeInvite(ctx, group.ID, invite.ID, admin.ID)
+	require.NoError(t, err)
+	require.False(t, revoked)
+	var revokedAt *time.Time
+	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT revoked_at FROM omnichat_group_invites WHERE id=$1`, invite.ID).Scan(&revokedAt))
+	require.Nil(t, revokedAt)
+
+	_, err = db.Pool.Exec(ctx, `INSERT INTO blocked_users(blocker_id,blocked_id) VALUES($1,$2)`, owner.ID, member.ID)
+	require.NoError(t, err)
+	promoted, err := repo.SetMemberRole(ctx, group.ID, owner.ID, member.ID, "admin")
+	require.NoError(t, err)
+	require.False(t, promoted, "an owner must not promote a blocked member")
+	transferred, err := repo.TransferOwnership(ctx, group.ID, owner.ID, member.ID)
+	require.NoError(t, err)
+	require.False(t, transferred, "an owner must not transfer ownership to a blocked member")
+	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT role FROM omnichat_group_members WHERE group_id=$1 AND user_id=$2`, group.ID, member.ID).Scan(&memberRole))
+	require.Equal(t, "member", memberRole)
+}
+
 func TestOmniChatGroupRepositoryRechecksPersonaAccess(t *testing.T) {
 	ctx := context.Background()
 	db, err := database.NewTest()

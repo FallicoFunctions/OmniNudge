@@ -149,7 +149,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 		ProTierBytes:  cfg.Media.ProTierQuotaBytes,
 	}
 	mediaRepo := models.NewMediaFileRepository(db.Pool)
-	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, nil, mediaQuota, false)
+	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, nil, mediaQuota, false, false)
 	storageHandler := handlers.NewStorageHandler(mediaRepo, mediaQuota)
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo, hubSettingsRepo)

@@ -29,8 +29,8 @@ func (*cancelledGenerationStoreFake) MarkGenerationJobRunning(context.Context, u
 func (*cancelledGenerationStoreFake) UpdateGenerationProgress(context.Context, uuid.UUID, int) error {
 	return nil
 }
-func (*cancelledGenerationStoreFake) MarkGenerationJobFailed(context.Context, uuid.UUID, string, string) error {
-	return nil
+func (*cancelledGenerationStoreFake) MarkGenerationJobFailed(context.Context, uuid.UUID, string, string) (bool, error) {
+	return true, nil
 }
 func (*cancelledGenerationStoreFake) CompleteGenerationJob(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, int64, int64) error {
 	return nil
@@ -48,6 +48,23 @@ func (*cancellableFalFake) Result(context.Context, string, string) (*fal.Result,
 func (f *cancellableFalFake) Cancel(context.Context, string, string) error {
 	f.cancelCalls++
 	return nil
+}
+
+type generationBillingFake struct {
+	refundUserID      int
+	refundOperationID uuid.UUID
+	refundCalls       int
+	refundContextErr  error
+	refundErr         error
+}
+
+func (*generationBillingFake) CaptureOwned(context.Context, int, uuid.UUID) error { return nil }
+func (f *generationBillingFake) RefundOwned(ctx context.Context, userID int, operationID uuid.UUID) error {
+	f.refundUserID = userID
+	f.refundOperationID = operationID
+	f.refundCalls++
+	f.refundContextErr = ctx.Err()
+	return f.refundErr
 }
 
 type generationClaimStoreFake struct {
@@ -71,11 +88,11 @@ func (f *generationClaimStoreFake) MarkGenerationJobRunning(context.Context, uui
 func (*generationClaimStoreFake) UpdateGenerationProgress(context.Context, uuid.UUID, int) error {
 	return nil
 }
-func (f *generationClaimStoreFake) MarkGenerationJobFailed(ctx context.Context, _ uuid.UUID, code, detail string) error {
+func (f *generationClaimStoreFake) MarkGenerationJobFailed(ctx context.Context, _ uuid.UUID, code, detail string) (bool, error) {
 	f.failureCode = code
 	f.failureText = detail
 	f.failureCtxErr = ctx.Err()
-	return f.markErr
+	return f.markErr == nil, f.markErr
 }
 func (*generationClaimStoreFake) CompleteGenerationJob(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, int64, int64) error {
 	return nil
@@ -243,15 +260,69 @@ func TestBuildFalGenerationSpecRequiresSourceURLForImageToVideo(t *testing.T) {
 func TestOmniChatGenerationHandlerStopsProviderWorkWhenJobIsCancelled(t *testing.T) {
 	provider := &cancellableFalFake{}
 	jobID := uuid.New()
+	operationID := uuid.New()
+	billing := &generationBillingFake{}
 	handler := &OmniChatGenerationHandler{
-		jobs:     &cancelledGenerationStoreFake{job: &models.OmniChatGenerationJob{ID: jobID, Status: models.OmniChatGenerationStatusCancelled}},
+		jobs: &cancelledGenerationStoreFake{job: &models.OmniChatGenerationJob{
+			ID: jobID, OwnerUserID: 41, Status: models.OmniChatGenerationStatusCancelled,
+			BillingOperationID: &operationID,
+		}},
 		provider: provider,
+		billing:  billing,
 	}
 
 	cancelled, err := handler.stopIfGenerationCancelled(context.Background(), jobID, "fal-ai/model", "provider-job")
 	require.NoError(t, err)
 	require.True(t, cancelled)
 	require.Equal(t, 1, provider.cancelCalls)
+	require.Equal(t, 1, billing.refundCalls)
+	require.Equal(t, 41, billing.refundUserID)
+	require.Equal(t, operationID, billing.refundOperationID)
+	require.NoError(t, billing.refundContextErr)
+}
+
+func TestOmniChatGenerationHandlerSurfacesCancellationRefundFailure(t *testing.T) {
+	operationID := uuid.New()
+	refundErr := errors.New("wallet unavailable")
+	handler := &OmniChatGenerationHandler{
+		jobs: &cancelledGenerationStoreFake{job: &models.OmniChatGenerationJob{
+			ID: uuid.New(), OwnerUserID: 41, Status: models.OmniChatGenerationStatusCancelled,
+			BillingOperationID: &operationID,
+		}},
+		provider: &cancellableFalFake{},
+		billing:  &generationBillingFake{refundErr: refundErr},
+	}
+
+	cancelled, err := handler.stopIfGenerationCancelled(context.Background(), handler.jobs.(*cancelledGenerationStoreFake).job.ID, "fal-ai/model", "provider-job")
+	require.True(t, cancelled)
+	require.ErrorIs(t, err, refundErr)
+}
+
+func TestOmniChatGenerationHandlerStopsProviderWorkWhenReconciliationFailsJob(t *testing.T) {
+	provider := &cancellableFalFake{}
+	jobID := uuid.New()
+	operationID := uuid.New()
+	billing := &generationBillingFake{}
+	handler := &OmniChatGenerationHandler{
+		jobs: &cancelledGenerationStoreFake{job: &models.OmniChatGenerationJob{
+			ID: jobID, OwnerUserID: 41, Status: models.OmniChatGenerationStatusFailed,
+			BillingOperationID: &operationID,
+		}},
+		provider: provider,
+		billing:  billing,
+	}
+
+	stopped, err := handler.stopIfGenerationCancelled(
+		context.Background(),
+		jobID,
+		"fal-ai/model",
+		"provider-job",
+	)
+	require.NoError(t, err)
+	require.True(t, stopped)
+	require.Equal(t, 1, provider.cancelCalls)
+	require.Equal(t, 1, billing.refundCalls)
+	require.Equal(t, operationID, billing.refundOperationID)
 }
 
 func TestOmniChatGenerationHandlerCancelsSubmittedWorkWhenClaimLosesRace(t *testing.T) {

@@ -150,18 +150,21 @@ func NewVirusScanHandler(
 				return fmt.Errorf("direct-upload promotion is unavailable for media %d", media.ID)
 			}
 			destinationKey := "uploads/" + strings.TrimPrefix(media.StoragePath, "pending-uploads/")
-			publicURL, copyErr := copier.CopyObject(ctx, media.StoragePath, destinationKey)
+			_, copyErr := copier.CopyObject(ctx, media.StoragePath, destinationKey)
 			if copyErr != nil {
 				return fmt.Errorf("promote scanned media %d: %w", media.ID, copyErr)
 			}
-			if updateErr := updater.UpdateStorageLocation(ctx, media.ID, destinationKey, publicURL); updateErr != nil {
+			// Keep the browser on the authorization gateway. Direct object/CDN
+			// URLs are bearer credentials and would expose private attachments.
+			gatewayURL := "/uploads/" + destinationKey
+			if updateErr := updater.UpdateStorageLocation(ctx, media.ID, destinationKey, gatewayURL); updateErr != nil {
 				return fmt.Errorf("publish scanned media %d: %w", media.ID, updateErr)
 			}
 			if deleteErr := storageSvc.Delete(ctx, media.StoragePath); deleteErr != nil {
 				log.Printf("failed to remove staged copy for clean media %d: %v", media.ID, deleteErr)
 			}
 			media.StoragePath = destinationKey
-			media.StorageURL = publicURL
+			media.StorageURL = gatewayURL
 			thumbnailSourceKey = destinationKey
 		}
 
@@ -183,6 +186,7 @@ func NewVirusScanHandler(
 }
 
 func validateStagedUpload(path string, media *models.MediaFile) error {
+	// #nosec G304 -- path is derived from a server-owned staged-storage download, never a client filesystem path.
 	file, err := os.Open(path)
 	if err != nil {
 		return err

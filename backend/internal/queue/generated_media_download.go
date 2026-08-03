@@ -230,7 +230,14 @@ func validateGeneratedMediaContents(file *os.File, expectedKind, contentType str
 			if _, err := file.ReadAt(header[8:16], offset+8); err != nil {
 				return errors.New("generated video container is unreadable")
 			}
-			boxSize = int64(binary.BigEndian.Uint64(header[8:16]))
+			extendedSize := binary.BigEndian.Uint64(header[8:16])
+			// ISO BMFF extended sizes are unsigned. Reject values outside the
+			// signed file-offset domain before converting so a hostile container
+			// can never wrap to a negative box size.
+			if extendedSize > uint64(1<<63-1) {
+				return errors.New("generated video container has an invalid box size")
+			}
+			boxSize = int64(extendedSize)
 			headerSize = 16
 		} else if boxSize == 0 {
 			boxSize = size - offset

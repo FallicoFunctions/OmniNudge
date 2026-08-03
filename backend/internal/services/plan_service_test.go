@@ -34,12 +34,21 @@ func TestPlanService_Upgrade(t *testing.T) {
 
 	plan, expiresAt, err := repo.GetPlan(ctx, userID)
 	require.NoError(t, err)
-	assert.Equal(t, models.PlanPaid, plan)
+	assert.Equal(t, models.PlanPlus, plan)
 	require.NotNil(t, expiresAt)
 
 	// Expiry should be ~30 days from now (within a 5-minute window)
 	expectedExpiry := time.Now().Add(30 * 24 * time.Hour)
 	assert.WithinDuration(t, expectedExpiry, *expiresAt, 5*time.Minute)
+}
+
+func TestPlanServiceUpgradeToPremiumAndRejectsUnknownPlan(t *testing.T) {
+	svc, repo, userID := newPlanService(t)
+	require.NoError(t, svc.UpgradeToPlan(context.Background(), userID, "premium", 1))
+	plan, _, err := repo.GetPlan(context.Background(), userID)
+	require.NoError(t, err)
+	require.Equal(t, "premium", plan)
+	require.Error(t, svc.UpgradeToPlan(context.Background(), userID, "enterprise", 1))
 }
 
 func TestPlanService_Upgrade_ExtendsExistingPlan(t *testing.T) {

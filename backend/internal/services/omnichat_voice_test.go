@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services/speech"
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,7 @@ import (
 type omniChatVoiceStoreFake struct {
 	source  *models.OmniChatSpeechSource
 	saved   *models.OmniChatSpeechAudio
+	cached  *models.OmniChatSpeechAudio
 	saveErr error
 }
 
@@ -25,24 +27,105 @@ func (f *omniChatVoiceStoreFake) GetSpeechSourceOwned(context.Context, int, int,
 	return f.source, nil
 }
 func (f *omniChatVoiceStoreFake) GetCachedSpeechOwned(context.Context, int, int, string, string) (*models.OmniChatSpeechAudio, error) {
-	return nil, nil
+	return f.cached, nil
 }
 func (f *omniChatVoiceStoreFake) SaveSpeechAudio(_ context.Context, audio *models.OmniChatSpeechAudio) error {
 	f.saved = audio
+	if f.saveErr == nil {
+		f.cached = audio
+	}
 	return f.saveErr
+}
+
+type omniChatVoiceBillingFake struct {
+	included   bool
+	reserved   []uuid.UUID
+	captures   []uuid.UUID
+	refunds    []uuid.UUID
+	captureErr error
+	refundErr  error
+}
+
+func (f *omniChatVoiceBillingFake) Included(context.Context, *int, string) (bool, error) {
+	return f.included, nil
+}
+func (f *omniChatVoiceBillingFake) ReserveOwned(_ context.Context, _ int, operationID uuid.UUID, _ string) (*models.OmniCreditsUsageReservation, error) {
+	f.reserved = append(f.reserved, operationID)
+	return &models.OmniCreditsUsageReservation{OperationID: operationID}, nil
+}
+func (f *omniChatVoiceBillingFake) CaptureOwned(_ context.Context, _ int, operationID uuid.UUID) error {
+	f.captures = append(f.captures, operationID)
+	return f.captureErr
+}
+func (f *omniChatVoiceBillingFake) RefundOwned(_ context.Context, _ int, operationID uuid.UUID) error {
+	f.refunds = append(f.refunds, operationID)
+	return f.refundErr
 }
 
 type omniChatSpeechSynthesizerFake struct {
 	request speech.Request
 	audio   *speech.Audio
+	err     error
 }
 
 func (f *omniChatSpeechSynthesizerFake) Synthesize(_ context.Context, _ string, request speech.Request) (*speech.Audio, error) {
 	f.request = request
+	if f.err != nil {
+		return nil, f.err
+	}
 	if f.audio != nil {
 		return f.audio, nil
 	}
 	return &speech.Audio{Bytes: []byte("wav"), ContentType: "audio/wav", Extension: ".wav"}, nil
+}
+
+func TestOmniChatVoiceServiceRetriesCaptureBeforeServingCachedSpeech(t *testing.T) {
+	store := &omniChatVoiceStoreFake{source: &models.OmniChatSpeechSource{
+		OwnerUserID: 7, PersonaID: 22, MessageID: 33, Text: "Hello",
+		Voice: &models.OmniChatPersonaVoice{PersonaID: 22, Provider: "elevenlabs", VoiceID: "voice-22", Speed: 1},
+	}}
+	billing := &omniChatVoiceBillingFake{captureErr: errors.New("database unavailable")}
+	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{},
+		map[string]speech.Synthesizer{"elevenlabs": &omniChatSpeechSynthesizerFake{}},
+		map[string]string{"elevenlabs": "default-model"}).SetBilling(billing)
+
+	_, err := service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
+	require.ErrorContains(t, err, "database unavailable")
+	require.NotNil(t, store.cached)
+	require.NotNil(t, store.cached.BillingOperationID)
+
+	billing.captureErr = nil
+	audio, err := service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
+	require.NoError(t, err)
+	require.Equal(t, store.cached, audio)
+	require.Len(t, billing.captures, 2)
+	require.Equal(t, billing.captures[0], billing.captures[1])
+}
+
+func TestOmniChatVoiceServiceSurfacesRefundFailureAndUsesNewAttemptID(t *testing.T) {
+	store := &omniChatVoiceStoreFake{
+		source: &models.OmniChatSpeechSource{
+			OwnerUserID: 7, PersonaID: 22, MessageID: 33, Text: "Hello",
+			Voice: &models.OmniChatPersonaVoice{PersonaID: 22, Provider: "elevenlabs", VoiceID: "voice-22", Speed: 1},
+		},
+		saveErr: errors.New("cache unavailable"),
+	}
+	billing := &omniChatVoiceBillingFake{refundErr: errors.New("refund unavailable")}
+	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{},
+		map[string]speech.Synthesizer{"elevenlabs": &omniChatSpeechSynthesizerFake{}},
+		map[string]string{"elevenlabs": "default-model"}).SetBilling(billing)
+
+	_, err := service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
+	require.ErrorContains(t, err, "cache unavailable")
+	require.ErrorContains(t, err, "refund unavailable")
+	require.Len(t, billing.reserved, 1)
+
+	store.saveErr = nil
+	billing.refundErr = nil
+	_, err = service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
+	require.NoError(t, err)
+	require.Len(t, billing.reserved, 2)
+	require.NotEqual(t, billing.reserved[0], billing.reserved[1])
 }
 
 type concurrentSpeechSynthesizerFake struct{ calls atomic.Int32 }
@@ -99,7 +182,7 @@ func TestOmniChatVoiceServicePassesCharacterLanguageToProvider(t *testing.T) {
 		},
 	}}
 	synthesizer := &omniChatSpeechSynthesizerFake{}
-	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, map[string]speech.Synthesizer{"elevenlabs": synthesizer}, map[string]string{"elevenlabs": "default-model"})
+	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, map[string]speech.Synthesizer{"elevenlabs": synthesizer}, map[string]string{"elevenlabs": "default-model"}).SetBilling(&omniChatVoiceBillingFake{included: true})
 
 	_, err := service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
 	require.NoError(t, err)
@@ -115,7 +198,7 @@ func TestOmniChatVoiceServiceDeletesUploadedAudioWhenCachePersistenceFails(t *te
 		saveErr: errors.New("database unavailable"),
 	}
 	storage := &omniChatVoiceStorageFake{}
-	service := NewOmniChatVoiceService(store, storage, map[string]speech.Synthesizer{"elevenlabs": &omniChatSpeechSynthesizerFake{}}, map[string]string{"elevenlabs": "default-model"})
+	service := NewOmniChatVoiceService(store, storage, map[string]speech.Synthesizer{"elevenlabs": &omniChatSpeechSynthesizerFake{}}, map[string]string{"elevenlabs": "default-model"}).SetBilling(&omniChatVoiceBillingFake{included: true})
 
 	_, err := service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
 	require.Error(t, err)
@@ -131,7 +214,7 @@ func TestOmniChatVoiceServiceCleanupSurvivesCancelledRequestContext(t *testing.T
 		saveErr: errors.New("database unavailable"),
 	}
 	storage := &omniChatVoiceStorageFake{}
-	service := NewOmniChatVoiceService(store, storage, map[string]speech.Synthesizer{"elevenlabs": &omniChatSpeechSynthesizerFake{}}, map[string]string{"elevenlabs": "default-model"})
+	service := NewOmniChatVoiceService(store, storage, map[string]speech.Synthesizer{"elevenlabs": &omniChatSpeechSynthesizerFake{}}, map[string]string{"elevenlabs": "default-model"}).SetBilling(&omniChatVoiceBillingFake{included: true})
 	requestContext, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -153,7 +236,7 @@ func TestOmniChatVoiceServiceCoalescesConcurrentSpeechGeneration(t *testing.T) {
 		},
 	}}
 	synthesizer := &concurrentSpeechSynthesizerFake{}
-	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, map[string]speech.Synthesizer{"elevenlabs": synthesizer}, map[string]string{"elevenlabs": "default-model"})
+	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, map[string]speech.Synthesizer{"elevenlabs": synthesizer}, map[string]string{"elevenlabs": "default-model"}).SetBilling(&omniChatVoiceBillingFake{included: true})
 	start := make(chan struct{})
 	errorsByRequest := make(chan error, 2)
 	var requests sync.WaitGroup
@@ -184,7 +267,7 @@ func TestOmniChatVoiceServiceRoutesVoiceboxAndStoresWAV(t *testing.T) {
 		},
 	}}
 	voicebox := &omniChatSpeechSynthesizerFake{}
-	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, map[string]speech.Synthesizer{"voicebox": voicebox}, map[string]string{"voicebox": "kokoro"})
+	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, map[string]speech.Synthesizer{"voicebox": voicebox}, map[string]string{"voicebox": "kokoro"}).SetBilling(&omniChatVoiceBillingFake{included: true})
 
 	audio, err := service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
 
@@ -205,7 +288,7 @@ func TestOmniChatVoiceServiceRejectsMismatchedAudioMetadata(t *testing.T) {
 	voicebox := &omniChatSpeechSynthesizerFake{audio: &speech.Audio{
 		Bytes: []byte("not-an-mp3"), ContentType: "audio/wav", Extension: ".mp3",
 	}}
-	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, map[string]speech.Synthesizer{"voicebox": voicebox}, map[string]string{"voicebox": "kokoro"})
+	service := NewOmniChatVoiceService(store, &omniChatVoiceStorageFake{}, map[string]speech.Synthesizer{"voicebox": voicebox}, map[string]string{"voicebox": "kokoro"}).SetBilling(&omniChatVoiceBillingFake{included: true})
 
 	_, err := service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
 

@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -54,7 +55,7 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 	require.NoError(t, err)
 
 	repo := models.NewOmniChatMediaRepository(db.Pool)
-	job, err := repo.CreateGenerationJob(ctx, owner.ID, normalized, "test")
+	job, err := repo.CreateGenerationJob(ctx, owner.ID, withGenerationBillingReservation(t, ctx, db.Pool, owner.ID, normalized), "test")
 	require.NoError(t, err)
 	require.Equal(t, models.OmniChatGenerationStatusQueued, job.Status)
 
@@ -69,7 +70,7 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 	media := &models.MediaFile{
 		UserID: owner.ID, Filename: "generated.png", OriginalFilename: "generated.png",
 		FileType: "image/png", FileSize: 1024, StorageURL: "https://cdn.example.test/generated.png",
-		StoragePath: "omnichat/generated/test.png", ScanStatus: models.MediaScanStatusClean,
+		StoragePath: fmt.Sprintf("omnichat/generated/%d/%s.png", owner.ID, job.ID), ScanStatus: models.MediaScanStatusClean,
 	}
 	asset := &models.OmniChatMediaAsset{}
 	media.FileSize = 0
@@ -122,10 +123,11 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 		ExtensionsJSON:     []byte(`{}`),
 	})
 	require.NoError(t, err)
-	deletionJob, err := repo.CreateGenerationJob(ctx, owner.ID, models.OmniChatGenerationRequest{
+	deletionRequest := withGenerationBillingReservation(t, ctx, db.Pool, owner.ID, models.OmniChatGenerationRequest{
 		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeCreate,
 		PersonaID: ownedPersona.ID, Prompt: "A quiet room", EffectivePrompt: "A quiet room", AspectRatio: "1:1",
-	}, "test")
+	})
+	deletionJob, err := repo.CreateGenerationJob(ctx, owner.ID, deletionRequest, "test")
 	require.NoError(t, err)
 	deleted, err = models.NewBotPersonaRepository(db.Pool).DeleteOwned(ctx, owner.ID, ownedPersona.ID)
 	require.NoError(t, err)
@@ -144,7 +146,7 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT storage_used_bytes FROM users WHERE id = $1`, owner.ID).Scan(&trackedBytes))
 	require.Equal(t, int64(1024), trackedBytes)
 
-	secondJob, err := repo.CreateGenerationJob(ctx, owner.ID, normalized, "test")
+	secondJob, err := repo.CreateGenerationJob(ctx, owner.ID, withGenerationBillingReservation(t, ctx, db.Pool, owner.ID, normalized), "test")
 	require.NoError(t, err)
 	marked, err = repo.MarkGenerationJobRunning(ctx, secondJob.ID, "provider-request-2")
 	require.NoError(t, err)
@@ -152,7 +154,7 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 	secondMedia := &models.MediaFile{
 		UserID: owner.ID, Filename: "generated-2.png", OriginalFilename: "generated-2.png",
 		FileType: "image/png", FileSize: 2048, StorageURL: "https://cdn.example.test/generated-2.png",
-		StoragePath: "omnichat/generated/test-2.png", ScanStatus: models.MediaScanStatusClean,
+		StoragePath: fmt.Sprintf("omnichat/generated/%d/%s.png", owner.ID, secondJob.ID), ScanStatus: models.MediaScanStatusClean,
 	}
 	secondAsset := &models.OmniChatMediaAsset{}
 	require.NoError(t, repo.CompleteGenerationJob(ctx, secondJob.ID, secondMedia, secondAsset, 1<<30, 50<<30))
@@ -167,6 +169,85 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, secondPage, 1)
 	require.NotEqual(t, firstPage[0].ID, secondPage[0].ID, "composite gallery cursors must not skip equal timestamps")
+
+	deletedAsset, err := repo.DeleteMediaAssetOwned(ctx, secondAsset.ID, other.ID)
+	require.NoError(t, err)
+	require.False(t, deletedAsset, "foreign owners must not learn whether an asset exists")
+
+	_, err = db.Pool.Exec(ctx, `UPDATE media_files SET user_id=$1 WHERE id=$2`, other.ID, secondMedia.ID)
+	require.NoError(t, err)
+	deletedAsset, err = repo.DeleteMediaAssetOwned(ctx, secondAsset.ID, owner.ID)
+	require.NoError(t, err)
+	require.False(t, deletedAsset, "asset and media-file ownership must agree before deletion")
+	_, err = db.Pool.Exec(ctx, `UPDATE media_files SET user_id=$1 WHERE id=$2`, owner.ID, secondMedia.ID)
+	require.NoError(t, err)
+
+	groupID := uuid.New()
+	groupMessageID := uuid.New()
+	_, err = db.Pool.Exec(ctx, `INSERT INTO omnichat_groups(id,owner_user_id,name) VALUES($1,$2,'Media group')`, groupID, owner.ID)
+	require.NoError(t, err)
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO omnichat_group_messages(id,group_id,sender_type,sender_user_id,content)
+		VALUES($1,$2,'user',$3,'Shared in the group')
+	`, groupMessageID, groupID, owner.ID)
+	require.NoError(t, err)
+	_, err = db.Pool.Exec(ctx, `INSERT INTO omnichat_group_message_attachments(message_id,asset_id) VALUES($1,$2)`, groupMessageID, secondAsset.ID)
+	require.NoError(t, err)
+	deletedAsset, err = repo.DeleteMediaAssetOwned(ctx, secondAsset.ID, owner.ID)
+	require.ErrorIs(t, err, models.ErrOmniChatMediaInUse)
+	require.False(t, deletedAsset)
+	_, err = db.Pool.Exec(ctx, `DELETE FROM omnichat_group_message_attachments WHERE message_id=$1 AND asset_id=$2`, groupMessageID, secondAsset.ID)
+	require.NoError(t, err)
+
+	deletedAsset, err = repo.DeleteMediaAssetOwned(ctx, secondAsset.ID, owner.ID)
+	require.NoError(t, err)
+	require.True(t, deletedAsset)
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT storage_used_bytes FROM users WHERE id = $1
+	`, owner.ID).Scan(&trackedBytes))
+	require.Equal(t, int64(1024), trackedBytes)
+	var queuedPath string
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT storage_path FROM omnichat_media_deletion_queue WHERE storage_path = $1
+	`, secondMedia.StoragePath).Scan(&queuedPath))
+	require.Equal(t, secondMedia.StoragePath, queuedPath)
+	deletedView, err := repo.GetMediaAssetOwned(ctx, secondAsset.ID, owner.ID)
+	require.NoError(t, err)
+	require.Nil(t, deletedView)
+
+	socialRepo := models.NewOmniChatSocialRepository(db.Pool)
+	publication, err := socialRepo.PublishAssetOwned(ctx, owner.ID, asset.ID, "Shared scene")
+	require.NoError(t, err)
+	deletedAsset, err = repo.DeleteMediaAssetOwned(ctx, asset.ID, owner.ID)
+	require.ErrorIs(t, err, models.ErrOmniChatMediaInUse)
+	require.False(t, deletedAsset)
+	removed, err := socialRepo.RemovePublicationOwned(ctx, publication.ID, owner.ID)
+	require.NoError(t, err)
+	require.True(t, removed)
+	deletedAsset, err = repo.DeleteMediaAssetOwned(ctx, asset.ID, owner.ID)
+	require.NoError(t, err)
+	require.True(t, deletedAsset, "unpublished media should be deletable")
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT storage_used_bytes FROM users WHERE id = $1
+	`, owner.ID).Scan(&trackedBytes))
+	require.Zero(t, trackedBytes)
+}
+
+func TestIsOmniChatGeneratedStoragePath(t *testing.T) {
+	itemID := uuid.New()
+	require.True(t, models.IsOmniChatGeneratedStoragePath(fmt.Sprintf("omnichat/generated/7/%s.png", itemID)))
+	require.True(t, models.IsOmniChatGeneratedStoragePathForOwner(fmt.Sprintf("omnichat/generated/7/%s.mp4", itemID), 7))
+	require.False(t, models.IsOmniChatGeneratedStoragePathForOwner(fmt.Sprintf("omnichat/generated/7/%s.png", itemID), 8))
+	for _, unsafe := range []string{
+		"", "/omnichat/generated/7/item.png", "omnichat/generated/../secret",
+		"omnichat/generated//item.png", `omnichat\generated\item.png`, "uploads/item.png",
+		"omnichat/generated/0/" + itemID.String() + ".png",
+		"omnichat/generated/7/not-a-uuid.png",
+		"omnichat/generated/7/" + itemID.String() + ".exe",
+		"omnichat/generated/7/" + itemID.String() + ".PNG",
+	} {
+		require.False(t, models.IsOmniChatGeneratedStoragePath(unsafe), unsafe)
+	}
 }
 
 func TestOmniChatMediaRepositoryCancelsRunningGeneration(t *testing.T) {
@@ -194,7 +275,7 @@ func TestOmniChatMediaRepositoryCancelsRunningGeneration(t *testing.T) {
 	})
 	require.NoError(t, err)
 	repo := models.NewOmniChatMediaRepository(db.Pool)
-	job, err := repo.CreateGenerationJob(ctx, owner.ID, normalized, "test")
+	job, err := repo.CreateGenerationJob(ctx, owner.ID, withGenerationBillingReservation(t, ctx, db.Pool, owner.ID, normalized), "test")
 	require.NoError(t, err)
 	marked, err := repo.MarkGenerationJobRunning(ctx, job.ID, "provider-request")
 	require.NoError(t, err)

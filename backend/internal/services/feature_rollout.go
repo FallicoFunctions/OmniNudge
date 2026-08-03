@@ -1,19 +1,17 @@
 package services
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/binary"
+	"strconv"
 )
 
 // hashUserID creates a consistent hash for a user+feature combination
 // Same user will always get same hash for same feature
 func hashUserID(userID int, featureKey string) uint32 {
-	data := []byte(featureKey)
-	userBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(userBytes, uint32(userID))
-	data = append(data, userBytes...)
-
-	hash := md5.Sum(data)
+	data := append([]byte(featureKey), 0)
+	data = strconv.AppendInt(data, int64(userID), 10)
+	hash := sha256.Sum256(data)
 	return binary.LittleEndian.Uint32(hash[:4])
 }
 

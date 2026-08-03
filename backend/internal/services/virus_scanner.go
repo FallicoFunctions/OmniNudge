@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
 	"strings"
@@ -68,6 +69,7 @@ func (s *ClamAVScanner) Ping(ctx context.Context) error {
 }
 
 func (s *ClamAVScanner) ScanFile(ctx context.Context, filePath string) (VirusScanResult, error) {
+	// #nosec G304 -- callers pass server-created staging/temp paths; this internal scanner is not exposed to client paths.
 	f, err := os.Open(filePath)
 	if err != nil {
 		return VirusScanResult{}, fmt.Errorf("open file for scan: %w", err)
@@ -145,7 +147,11 @@ func writeNullTerminated(w io.Writer, cmd string) error {
 }
 
 func writeChunk(w io.Writer, payload []byte) error {
+	if uint64(len(payload)) > uint64(math.MaxUint32) {
+		return fmt.Errorf("clamav chunk exceeds uint32 framing limit: %d bytes", len(payload))
+	}
 	header := make([]byte, 4)
+	// #nosec G115 -- the explicit MaxUint32 guard above proves the conversion is bounded.
 	binary.BigEndian.PutUint32(header, uint32(len(payload)))
 	if _, err := w.Write(header); err != nil {
 		return err

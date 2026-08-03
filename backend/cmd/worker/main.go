@@ -140,7 +140,8 @@ func main() {
 		fal.NewClient(cfg.OmniChatMedia.FalAPIKey),
 		cfg.OmniChatMedia,
 		cfg.VirusScan.FailClosed,
-	).SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes)
+	).SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
+		SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), models.NewUserRepository(db.Pool)))
 	handlers := queue.JobHandlers{
 		VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed, storageService, queueClient),
 		Transcription:       queue.NewUnsupportedHandler(queue.JobTypeTranscription, "transcription backend pipeline is not yet implemented"),

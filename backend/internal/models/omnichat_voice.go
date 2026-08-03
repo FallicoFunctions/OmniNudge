@@ -38,17 +38,18 @@ type OmniChatSpeechSource struct {
 }
 
 type OmniChatSpeechAudio struct {
-	ID              uuid.UUID
-	OwnerUserID     int
-	PersonaID       int
-	MessageID       int
-	TextHash        string
-	VoiceConfigHash string
-	StoragePath     string
-	FileType        string
-	FileSize        int64
-	CreatedAt       time.Time
-	ExpiresAt       time.Time
+	ID                 uuid.UUID
+	OwnerUserID        int
+	PersonaID          int
+	MessageID          int
+	TextHash           string
+	VoiceConfigHash    string
+	StoragePath        string
+	FileType           string
+	FileSize           int64
+	BillingOperationID *uuid.UUID
+	CreatedAt          time.Time
+	ExpiresAt          time.Time
 }
 
 type OmniChatCallSession struct {
@@ -88,13 +89,108 @@ func NewOmniChatVoiceRepository(pool *pgxpool.Pool) *OmniChatVoiceRepository {
 func defaultBrowserVoice(personaID int) *OmniChatPersonaVoice {
 	// A deterministic per-persona seed gives every character a stable vocal
 	// cadence even when the browser only exposes a small set of base voices.
-	seed := uint32(personaID) * 2654435761
+	// Keep the arithmetic signed and bounded. Persona IDs originate from the
+	// database, but this fallback is exported and must not turn an unexpected
+	// negative or wide integer into a wrapped unsigned voice seed.
+	speedOffset := positiveModulo(personaID, 31)
+	pitchOffset := positiveModulo(personaID/31, 71)
 	return &OmniChatPersonaVoice{
 		PersonaID: personaID, Provider: "browser", VoiceID: fmt.Sprintf("browser-%d", personaID),
 		VoiceName: "Character voice", ModelID: "browser-native",
-		Stability: 0.5, SimilarityBoost: 0.75, Speed: 0.85 + float32(seed%31)/100,
-		Pitch: 0.75 + float32((seed>>8)%71)/100, Active: true,
+		Stability: 0.5, SimilarityBoost: 0.75, Speed: 0.85 + float32(speedOffset)/100,
+		Pitch: 0.75 + float32(pitchOffset)/100, Active: true,
 	}
+}
+
+func positiveModulo(value, modulus int) int {
+	if modulus <= 0 {
+		return 0
+	}
+	value %= modulus
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
+// DefaultOmniChatBrowserVoice returns the canonical on-device fallback used
+// when an administrator intentionally removes a server-synthesized preset.
+func DefaultOmniChatBrowserVoice(personaID int) *OmniChatPersonaVoice {
+	return defaultBrowserVoice(personaID)
+}
+
+// ListPersonaVoices returns one canonical voice profile for every persona in
+// the admin catalog. It loads persisted profiles in one query and fills any
+// gaps with deterministic browser fallbacks, avoiding an N+1 admin request.
+func (r *OmniChatVoiceRepository) ListPersonaVoices(ctx context.Context) ([]*OmniChatPersonaVoice, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, updated_at
+		FROM bot_personas
+		ORDER BY name
+		LIMIT $1
+	`, maxPersonaListSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := make([]int, 0)
+	personaUpdatedAt := make(map[int]time.Time)
+	for rows.Next() {
+		var id int
+		var updatedAt time.Time
+		if err := rows.Scan(&id, &updatedAt); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+		personaUpdatedAt[id] = updatedAt
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if len(ids) == 0 {
+		return []*OmniChatPersonaVoice{}, nil
+	}
+
+	voiceRows, err := r.pool.Query(ctx, `
+		SELECT persona_id,provider,voice_id,voice_name,model_id,stability,similarity_boost,style,speed,pitch,language_code,live_video_replica_id,live_video_persona_id,active,updated_at
+		FROM omnichat_persona_voices
+		WHERE persona_id = ANY($1) AND active=TRUE
+	`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer voiceRows.Close()
+
+	persisted := make(map[int]*OmniChatPersonaVoice, len(ids))
+	for voiceRows.Next() {
+		voice := &OmniChatPersonaVoice{}
+		if err := voiceRows.Scan(
+			&voice.PersonaID, &voice.Provider, &voice.VoiceID, &voice.VoiceName, &voice.ModelID,
+			&voice.Stability, &voice.SimilarityBoost, &voice.Style, &voice.Speed, &voice.Pitch,
+			&voice.LanguageCode, &voice.LiveVideoReplicaID, &voice.LiveVideoPersonaID,
+			&voice.Active, &voice.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		persisted[voice.PersonaID] = voice
+	}
+	if err := voiceRows.Err(); err != nil {
+		return nil, err
+	}
+
+	voices := make([]*OmniChatPersonaVoice, 0, len(ids))
+	for _, id := range ids {
+		if voice := persisted[id]; voice != nil {
+			voices = append(voices, voice)
+			continue
+		}
+		fallback := defaultBrowserVoice(id)
+		fallback.UpdatedAt = personaUpdatedAt[id]
+		voices = append(voices, fallback)
+	}
+	return voices, nil
 }
 
 func (r *OmniChatVoiceRepository) GetPersonaVoice(ctx context.Context, personaID int) (*OmniChatPersonaVoice, error) {
@@ -144,6 +240,10 @@ func (r *OmniChatVoiceRepository) UpsertPersonaVoiceAuthorized(ctx context.Conte
 		INSERT INTO omnichat_persona_voices(persona_id,provider,voice_id,voice_name,model_id,stability,similarity_boost,style,speed,pitch,language_code,live_video_replica_id,live_video_persona_id,configured_by,active)
 		SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,TRUE FROM bot_personas p JOIN users u ON u.id=$14
 		WHERE p.id=$1 AND (p.owner_user_id=$14 OR u.role IN ('admin','moderator'))
+		  -- Provider-account live avatar IDs are operator-managed secrets. A
+		  -- character owner may not bind arbitrary IDs from OmniChat's shared
+		  -- Tavus account; only a moderator can provision those fields.
+		  AND (u.role IN ('admin','moderator') OR ($12::varchar IS NULL AND $13::varchar IS NULL))
 		ON CONFLICT(persona_id) DO UPDATE SET provider=EXCLUDED.provider,voice_id=EXCLUDED.voice_id,voice_name=EXCLUDED.voice_name,model_id=EXCLUDED.model_id,stability=EXCLUDED.stability,similarity_boost=EXCLUDED.similarity_boost,style=EXCLUDED.style,speed=EXCLUDED.speed,pitch=EXCLUDED.pitch,language_code=EXCLUDED.language_code,live_video_replica_id=EXCLUDED.live_video_replica_id,live_video_persona_id=EXCLUDED.live_video_persona_id,configured_by=EXCLUDED.configured_by,active=TRUE,updated_at=NOW()
 	`, voice.PersonaID, voice.Provider, voice.VoiceID, voice.VoiceName, voice.ModelID, voice.Stability, voice.SimilarityBoost, voice.Style, voice.Speed, voice.Pitch, voice.LanguageCode, voice.LiveVideoReplicaID, voice.LiveVideoPersonaID, userID)
 	return tag.RowsAffected() > 0, err
@@ -172,7 +272,7 @@ func (r *OmniChatVoiceRepository) GetSpeechSourceOwned(ctx context.Context, user
 
 func (r *OmniChatVoiceRepository) GetCachedSpeechOwned(ctx context.Context, userID, messageID int, textHash, voiceHash string) (*OmniChatSpeechAudio, error) {
 	a := &OmniChatSpeechAudio{}
-	err := r.pool.QueryRow(ctx, `SELECT id,owner_user_id,persona_id,message_id,text_hash,voice_config_hash,storage_path,file_type,file_size,created_at,expires_at FROM omnichat_speech_audio WHERE owner_user_id=$1 AND message_id=$2 AND text_hash=$3 AND voice_config_hash=$4 AND expires_at>NOW()`, userID, messageID, textHash, voiceHash).Scan(&a.ID, &a.OwnerUserID, &a.PersonaID, &a.MessageID, &a.TextHash, &a.VoiceConfigHash, &a.StoragePath, &a.FileType, &a.FileSize, &a.CreatedAt, &a.ExpiresAt)
+	err := r.pool.QueryRow(ctx, `SELECT id,owner_user_id,persona_id,message_id,text_hash,voice_config_hash,storage_path,file_type,file_size,billing_operation_id,created_at,expires_at FROM omnichat_speech_audio WHERE owner_user_id=$1 AND message_id=$2 AND text_hash=$3 AND voice_config_hash=$4 AND expires_at>NOW()`, userID, messageID, textHash, voiceHash).Scan(&a.ID, &a.OwnerUserID, &a.PersonaID, &a.MessageID, &a.TextHash, &a.VoiceConfigHash, &a.StoragePath, &a.FileType, &a.FileSize, &a.BillingOperationID, &a.CreatedAt, &a.ExpiresAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -183,7 +283,7 @@ func (r *OmniChatVoiceRepository) SaveSpeechAudio(ctx context.Context, a *OmniCh
 	if a.ID == uuid.Nil {
 		a.ID = uuid.New()
 	}
-	return r.pool.QueryRow(ctx, `INSERT INTO omnichat_speech_audio(id,owner_user_id,persona_id,message_id,text_hash,voice_config_hash,storage_path,file_type,file_size) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(message_id,text_hash,voice_config_hash) DO UPDATE SET expires_at=NOW()+INTERVAL '30 days' RETURNING id,storage_path,file_type,file_size,created_at,expires_at`, a.ID, a.OwnerUserID, a.PersonaID, a.MessageID, a.TextHash, a.VoiceConfigHash, a.StoragePath, a.FileType, a.FileSize).Scan(&a.ID, &a.StoragePath, &a.FileType, &a.FileSize, &a.CreatedAt, &a.ExpiresAt)
+	return r.pool.QueryRow(ctx, `INSERT INTO omnichat_speech_audio(id,owner_user_id,persona_id,message_id,text_hash,voice_config_hash,storage_path,file_type,file_size,billing_operation_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(message_id,text_hash,voice_config_hash) DO UPDATE SET expires_at=NOW()+INTERVAL '30 days' RETURNING id,storage_path,file_type,file_size,billing_operation_id,created_at,expires_at`, a.ID, a.OwnerUserID, a.PersonaID, a.MessageID, a.TextHash, a.VoiceConfigHash, a.StoragePath, a.FileType, a.FileSize, a.BillingOperationID).Scan(&a.ID, &a.StoragePath, &a.FileType, &a.FileSize, &a.BillingOperationID, &a.CreatedAt, &a.ExpiresAt)
 }
 
 func (r *OmniChatVoiceRepository) StartCallOwned(ctx context.Context, userID, conversationID int, mode string) (*OmniChatCallSession, error) {
@@ -233,9 +333,12 @@ func (r *OmniChatVoiceRepository) GetLiveCallContextOwned(ctx context.Context, u
 	result := &OmniChatLiveCallContext{}
 	var systemPrompt string
 	err := r.pool.QueryRow(ctx, `
-		SELECT p.name,LEFT(p.system_prompt,8000),COALESCE(v.live_video_replica_id,''),COALESCE(v.live_video_persona_id,'')
+		SELECT p.name,LEFT(p.system_prompt,8000),
+		       CASE WHEN configurator.role IN ('admin','moderator') THEN COALESCE(v.live_video_replica_id,'') ELSE '' END,
+		       CASE WHEN configurator.role IN ('admin','moderator') THEN COALESCE(v.live_video_persona_id,'') ELSE '' END
 		FROM bot_conversations c JOIN bot_personas p ON p.id=c.persona_id
 		LEFT JOIN omnichat_persona_voices v ON v.persona_id=p.id AND v.active=TRUE
+		LEFT JOIN users configurator ON configurator.id=v.configured_by
 		WHERE c.id=$1 AND c.user_id=$2 AND c.archived_at IS NULL AND p.is_active=TRUE
 		  AND ((p.owner_user_id IS NULL AND p.visibility='public') OR p.owner_user_id=$2)
 	`, conversationID, userID).Scan(&result.PersonaName, &systemPrompt, &result.LiveVideoReplicaID, &result.LiveVideoPersonaID)

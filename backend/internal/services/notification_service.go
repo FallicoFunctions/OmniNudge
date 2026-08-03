@@ -699,7 +699,7 @@ func (s *NotificationService) deliverNotification(ctx context.Context, notificat
 			// Decide if we should send push (e.g. if user is offline)
 			if !online {
 				go func() {
-					pushCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					pushCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 					defer cancel()
 					s.sendPushToUser(pushCtx, notification)
 				}()
@@ -873,7 +873,7 @@ func nextDailyDigestRunAt(now time.Time, tz string) time.Time {
 func (s *NotificationService) SendMessagePush(ctx context.Context, senderID int, recipientID int, message *models.Message) {
 	// Entire process is async to avoid blocking the chat request (P0-042-FLAW: Latency)
 	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 		defer cancel()
 
 		// 1. Check user settings for push

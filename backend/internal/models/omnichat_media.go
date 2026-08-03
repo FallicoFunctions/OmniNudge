@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -66,48 +69,51 @@ type OmniChatSceneState struct {
 // and the dedicated Create experience. EffectivePrompt is server-computed and
 // never accepted from a client.
 type OmniChatGenerationRequest struct {
-	Kind            OmniChatMediaKind      `json:"kind"`
-	Mode            OmniChatGenerationMode `json:"mode"`
-	PersonaID       int                    `json:"persona_id"`
-	ConversationID  *int                   `json:"conversation_id,omitempty"`
-	SourceMessageID *int                   `json:"source_message_id,omitempty"`
-	SourceAssetID   *uuid.UUID             `json:"source_asset_id,omitempty"`
-	Prompt          string                 `json:"prompt"`
-	NegativePrompt  string                 `json:"negative_prompt,omitempty"`
-	AspectRatio     string                 `json:"aspect_ratio,omitempty"`
-	DurationSeconds int                    `json:"duration_seconds,omitempty"`
-	Scene           OmniChatSceneState     `json:"scene,omitempty"`
-	EffectivePrompt string                 `json:"-"`
+	Kind               OmniChatMediaKind      `json:"kind"`
+	Mode               OmniChatGenerationMode `json:"mode"`
+	PersonaID          int                    `json:"persona_id"`
+	ConversationID     *int                   `json:"conversation_id,omitempty"`
+	SourceMessageID    *int                   `json:"source_message_id,omitempty"`
+	SourceAssetID      *uuid.UUID             `json:"source_asset_id,omitempty"`
+	Prompt             string                 `json:"prompt"`
+	NegativePrompt     string                 `json:"negative_prompt,omitempty"`
+	AspectRatio        string                 `json:"aspect_ratio,omitempty"`
+	DurationSeconds    int                    `json:"duration_seconds,omitempty"`
+	Scene              OmniChatSceneState     `json:"scene,omitempty"`
+	RequestID          uuid.UUID              `json:"request_id,omitempty"`
+	EffectivePrompt    string                 `json:"-"`
+	BillingOperationID *uuid.UUID             `json:"-"`
 }
 
 // OmniChatGenerationJob is an asynchronous image/video generation request.
 // Provider error details are kept internal; ErrorCode is safe for clients.
 type OmniChatGenerationJob struct {
-	ID               uuid.UUID                `json:"id"`
-	OwnerUserID      int                      `json:"owner_user_id"`
-	PersonaID        int                      `json:"persona_id"`
-	ConversationID   *int                     `json:"conversation_id,omitempty"`
-	SourceMessageID  *int                     `json:"source_message_id,omitempty"`
-	SourceAssetID    *uuid.UUID               `json:"source_asset_id,omitempty"`
-	OutputAssetID    *uuid.UUID               `json:"output_asset_id,omitempty"`
-	OutputMessageID  *int                     `json:"output_message_id,omitempty"`
-	Kind             OmniChatMediaKind        `json:"kind"`
-	Mode             OmniChatGenerationMode   `json:"mode"`
-	Status           OmniChatGenerationStatus `json:"status"`
-	Prompt           string                   `json:"prompt"`
-	NegativePrompt   string                   `json:"negative_prompt,omitempty"`
-	EffectivePrompt  string                   `json:"-"`
-	AspectRatio      string                   `json:"aspect_ratio"`
-	DurationSeconds  int                      `json:"duration_seconds,omitempty"`
-	Scene            OmniChatSceneState       `json:"scene"`
-	Provider         string                   `json:"provider,omitempty"`
-	ProviderJobID    string                   `json:"-"`
-	Progress         int                      `json:"progress"`
-	ErrorCode        string                   `json:"error_code,omitempty"`
-	ProviderMetadata json.RawMessage          `json:"-"`
-	CreatedAt        time.Time                `json:"created_at"`
-	StartedAt        *time.Time               `json:"started_at,omitempty"`
-	CompletedAt      *time.Time               `json:"completed_at,omitempty"`
+	ID                 uuid.UUID                `json:"id"`
+	OwnerUserID        int                      `json:"owner_user_id"`
+	PersonaID          int                      `json:"persona_id"`
+	ConversationID     *int                     `json:"conversation_id,omitempty"`
+	SourceMessageID    *int                     `json:"source_message_id,omitempty"`
+	SourceAssetID      *uuid.UUID               `json:"source_asset_id,omitempty"`
+	OutputAssetID      *uuid.UUID               `json:"output_asset_id,omitempty"`
+	OutputMessageID    *int                     `json:"output_message_id,omitempty"`
+	Kind               OmniChatMediaKind        `json:"kind"`
+	Mode               OmniChatGenerationMode   `json:"mode"`
+	Status             OmniChatGenerationStatus `json:"status"`
+	Prompt             string                   `json:"prompt"`
+	NegativePrompt     string                   `json:"negative_prompt,omitempty"`
+	EffectivePrompt    string                   `json:"-"`
+	AspectRatio        string                   `json:"aspect_ratio"`
+	DurationSeconds    int                      `json:"duration_seconds,omitempty"`
+	Scene              OmniChatSceneState       `json:"scene"`
+	Provider           string                   `json:"provider,omitempty"`
+	ProviderJobID      string                   `json:"-"`
+	Progress           int                      `json:"progress"`
+	ErrorCode          string                   `json:"error_code,omitempty"`
+	ProviderMetadata   json.RawMessage          `json:"-"`
+	BillingOperationID *uuid.UUID               `json:"-"`
+	CreatedAt          time.Time                `json:"created_at"`
+	StartedAt          *time.Time               `json:"started_at,omitempty"`
+	CompletedAt        *time.Time               `json:"completed_at,omitempty"`
 }
 
 type OmniChatMediaCursor struct {
@@ -165,7 +171,10 @@ type OmniChatMediaRepository struct {
 	pool *pgxpool.Pool
 }
 
-var ErrOmniChatStorageQuotaExceeded = errors.New("omnichat storage quota exceeded")
+var (
+	ErrOmniChatStorageQuotaExceeded = errors.New("omnichat storage quota exceeded")
+	ErrOmniChatMediaInUse           = errors.New("omnichat media is used by shared content")
+)
 
 func NewOmniChatMediaRepository(pool *pgxpool.Pool) *OmniChatMediaRepository {
 	return &OmniChatMediaRepository{pool: pool}
@@ -198,17 +207,36 @@ func (r *OmniChatMediaRepository) CreateGenerationJob(ctx context.Context, owner
 	if request.DurationSeconds > 0 {
 		duration = request.DurationSeconds
 	}
-	err = r.pool.QueryRow(ctx, `
+	query := `
 		INSERT INTO omnichat_generation_jobs (
 			id, owner_user_id, persona_id, conversation_id, source_message_id,
 			source_asset_id, kind, mode, prompt, negative_prompt, effective_prompt,
-			aspect_ratio, duration_seconds, scene_snapshot, provider
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULLIF($15, ''))
+			aspect_ratio, duration_seconds, scene_snapshot, provider, billing_operation_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULLIF($15, ''), $16)
 		RETURNING created_at, progress
-	`, job.ID, ownerUserID, request.PersonaID, request.ConversationID, request.SourceMessageID,
-		request.SourceAssetID, request.Kind, request.Mode, request.Prompt, request.NegativePrompt,
-		request.EffectivePrompt, request.AspectRatio, duration, sceneJSON, provider,
-	).Scan(&job.CreatedAt, &job.Progress)
+	`
+	if request.RequestID == uuid.Nil {
+		err = r.pool.QueryRow(ctx, query, job.ID, ownerUserID, request.PersonaID, request.ConversationID, request.SourceMessageID,
+			request.SourceAssetID, request.Kind, request.Mode, request.Prompt, request.NegativePrompt,
+			request.EffectivePrompt, request.AspectRatio, duration, sceneJSON, provider, request.BillingOperationID,
+		).Scan(&job.CreatedAt, &job.Progress)
+	} else {
+		tx, beginErr := r.pool.BeginTx(ctx, pgx.TxOptions{})
+		if beginErr != nil {
+			return nil, beginErr
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		err = tx.QueryRow(ctx, query, job.ID, ownerUserID, request.PersonaID, request.ConversationID, request.SourceMessageID,
+			request.SourceAssetID, request.Kind, request.Mode, request.Prompt, request.NegativePrompt,
+			request.EffectivePrompt, request.AspectRatio, duration, sceneJSON, provider, request.BillingOperationID,
+		).Scan(&job.CreatedAt, &job.Progress)
+		if err == nil {
+			err = completeOmniChatRequestInTx(ctx, tx, OmniChatRequestCompletion{UserID: ownerUserID, RequestID: request.RequestID}, job)
+		}
+		if err == nil {
+			err = tx.Commit(ctx)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -222,6 +250,7 @@ const omniChatGenerationJobSelect = `
 	COALESCE(duration_seconds, 0), scene_snapshot, COALESCE(provider, ''),
 	COALESCE(provider_job_id, ''), progress, COALESCE(error_code, ''),
 	provider_metadata, created_at, started_at, completed_at
+	,billing_operation_id
 `
 
 func scanOmniChatGenerationJob(scanner interface{ Scan(...any) error }) (*OmniChatGenerationJob, error) {
@@ -232,7 +261,7 @@ func scanOmniChatGenerationJob(scanner interface{ Scan(...any) error }) (*OmniCh
 		&job.SourceAssetID, &job.OutputAssetID, &job.OutputMessageID, &job.Kind, &job.Mode, &job.Status, &job.Prompt,
 		&job.NegativePrompt, &job.EffectivePrompt, &job.AspectRatio, &job.DurationSeconds,
 		&sceneJSON, &job.Provider, &job.ProviderJobID, &job.Progress, &job.ErrorCode,
-		&job.ProviderMetadata, &job.CreatedAt, &job.StartedAt, &job.CompletedAt,
+		&job.ProviderMetadata, &job.CreatedAt, &job.StartedAt, &job.CompletedAt, &job.BillingOperationID,
 	)
 	if err != nil {
 		return nil, err
@@ -297,7 +326,8 @@ func (r *OmniChatMediaRepository) MarkGenerationJobRunning(ctx context.Context, 
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE omnichat_generation_jobs
 		SET status = 'running', progress = GREATEST(progress, 1),
-		    provider_job_id = NULLIF($2, ''), started_at = COALESCE(started_at, NOW())
+		    provider_job_id = NULLIF($2, ''), started_at = COALESCE(started_at, NOW()),
+		    last_activity_at=NOW()
 		WHERE id = $1 AND status = 'queued'
 	`, id, providerJobID)
 	return tag.RowsAffected() > 0, err
@@ -309,26 +339,26 @@ func (r *OmniChatMediaRepository) UpdateGenerationProgress(ctx context.Context, 
 	}
 	_, err := r.pool.Exec(ctx, `
 		UPDATE omnichat_generation_jobs
-		SET progress = GREATEST(progress, $2)
+		SET progress = GREATEST(progress, $2),last_activity_at=NOW()
 		WHERE id = $1 AND status = 'running'
 	`, id, progress)
 	return err
 }
 
-func (r *OmniChatMediaRepository) MarkGenerationJobFailed(ctx context.Context, id uuid.UUID, safeCode, providerError string) error {
-	_, err := r.pool.Exec(ctx, `
+func (r *OmniChatMediaRepository) MarkGenerationJobFailed(ctx context.Context, id uuid.UUID, safeCode, providerError string) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
 		UPDATE omnichat_generation_jobs
 		SET status = 'failed', error_code = $2, provider_error = $3,
-		    completed_at = NOW()
+		    completed_at = NOW(),last_activity_at=NOW()
 		WHERE id = $1 AND status IN ('queued', 'running')
 	`, id, safeCode, providerError)
-	return err
+	return tag.RowsAffected() > 0, err
 }
 
 func (r *OmniChatMediaRepository) CancelGenerationJobOwned(ctx context.Context, id uuid.UUID, ownerUserID int) (bool, error) {
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE omnichat_generation_jobs
-		SET status = 'cancelled', cancelled_at = NOW(), completed_at = NOW()
+		SET status = 'cancelled', cancelled_at = NOW(), completed_at = NOW(),last_activity_at=NOW()
 		WHERE id = $1 AND owner_user_id = $2 AND status IN ('queued', 'running')
 	`, id, ownerUserID)
 	return tag.RowsAffected() > 0, err
@@ -382,7 +412,7 @@ func (r *OmniChatMediaRepository) CompleteGenerationJob(ctx context.Context, job
 		return err
 	}
 	storageLimit := freeTierBytes
-	paidActive := plan == "paid" && (planExpiresAt == nil || planExpiresAt.After(time.Now()))
+	paidActive := (plan == "plus" || plan == "premium") && (planExpiresAt == nil || planExpiresAt.After(time.Now()))
 	if paidActive || role == "admin" || role == "moderator" {
 		storageLimit = proTierBytes
 	}
@@ -472,9 +502,9 @@ func (r *OmniChatMediaRepository) CompleteGenerationJob(ctx context.Context, job
 
 	tag, err := tx.Exec(ctx, `
 		UPDATE omnichat_generation_jobs
-		SET status = 'succeeded', progress = 100, output_asset_id = $2,
-		    output_message_id = $3,
-		    completed_at = NOW(), provider_error = NULL
+			SET status = 'succeeded', progress = 100, output_asset_id = $2,
+			    output_message_id = $3,
+			    completed_at = NOW(), provider_error = NULL,last_activity_at=NOW()
 		WHERE id = $1 AND status = 'running'
 	`, jobID, asset.ID, outputMessageID)
 	if err != nil {
@@ -523,6 +553,159 @@ func (r *OmniChatMediaRepository) GetMediaAssetOwned(ctx context.Context, id uui
 		return nil, nil
 	}
 	return asset, err
+}
+
+// DeleteMediaAssetOwned removes a private generated asset and its tracked
+// media row in one transaction, while placing the backing object in a durable
+// deletion outbox. Shared snapshots/publications remain immutable, so assets
+// referenced by either must be unpublished and no longer referenced before
+// deletion.
+func (r *OmniChatMediaRepository) DeleteMediaAssetOwned(ctx context.Context, id uuid.UUID, ownerUserID int) (bool, error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var mediaFileID int
+	var storagePath string
+	err = tx.QueryRow(ctx, `
+		SELECT media_file_id, mf.storage_path
+		FROM omnichat_media_assets a
+		JOIN media_files mf
+		  ON mf.id = a.media_file_id
+		 AND mf.user_id = a.owner_user_id
+		WHERE a.id = $1 AND a.owner_user_id = $2 AND a.deleted_at IS NULL
+		FOR UPDATE OF a, mf
+	`, id, ownerUserID).Scan(&mediaFileID, &storagePath)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !IsOmniChatGeneratedStoragePathForOwner(storagePath, ownerUserID) {
+		return false, errors.New("refusing to delete media with an invalid storage path")
+	}
+
+	var shared bool
+	err = tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM omnichat_publications
+			WHERE asset_id = $1 AND status <> 'removed'
+			UNION ALL
+			SELECT 1
+			FROM omnichat_chat_snapshot_attachments attachment
+			JOIN omnichat_publications publication
+			  ON publication.snapshot_id = attachment.snapshot_id
+			 AND publication.status <> 'removed'
+			WHERE attachment.asset_id = $1
+			UNION ALL
+			SELECT 1
+			FROM omnichat_group_message_attachments
+			WHERE asset_id = $1
+		)
+	`, id).Scan(&shared)
+	if err != nil {
+		return false, err
+	}
+	if shared {
+		return false, ErrOmniChatMediaInUse
+	}
+
+	// Once every public reference has been removed, prune the immutable public
+	// copies before deleting their private backing asset. Removed publications
+	// are no longer user-visible and retaining them would make deletion
+	// impossible because their foreign keys intentionally use RESTRICT.
+	if _, err = tx.Exec(ctx, `
+		DELETE FROM omnichat_publications
+		WHERE asset_id = $1 AND status = 'removed'
+	`, id); err != nil {
+		return false, err
+	}
+	if _, err = tx.Exec(ctx, `
+		DELETE FROM omnichat_publications
+		WHERE snapshot_id IN (
+			SELECT snapshot_id
+			FROM omnichat_chat_snapshot_attachments
+			WHERE asset_id = $1
+		) AND status = 'removed'
+	`, id); err != nil {
+		return false, err
+	}
+	if _, err = tx.Exec(ctx, `
+		DELETE FROM omnichat_chat_snapshots snapshot
+		WHERE EXISTS (
+			SELECT 1 FROM omnichat_chat_snapshot_attachments attachment
+			WHERE attachment.snapshot_id = snapshot.id AND attachment.asset_id = $1
+		)
+		  AND NOT EXISTS (
+			SELECT 1 FROM omnichat_publications publication
+			WHERE publication.snapshot_id = snapshot.id
+		)
+	`, id); err != nil {
+		return false, err
+	}
+
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO omnichat_media_deletion_queue(storage_path, owner_user_id)
+		VALUES ($1, $2)
+		ON CONFLICT (storage_path) DO NOTHING
+	`, storagePath, ownerUserID); err != nil {
+		return false, err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM bot_message_attachments WHERE asset_id = $1`, id); err != nil {
+		return false, err
+	}
+	tag, err := tx.Exec(ctx, `DELETE FROM omnichat_media_assets WHERE id = $1 AND owner_user_id = $2`, id, ownerUserID)
+	if err != nil {
+		return false, err
+	}
+	if tag.RowsAffected() != 1 {
+		return false, nil
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM media_files WHERE id = $1 AND user_id = $2`, mediaFileID, ownerUserID); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func IsOmniChatGeneratedStoragePath(storagePath string) bool {
+	if storagePath == "" || strings.Contains(storagePath, `\`) {
+		return false
+	}
+	cleaned := path.Clean(storagePath)
+	if cleaned != storagePath {
+		return false
+	}
+	parts := strings.Split(cleaned, "/")
+	if len(parts) != 4 || parts[0] != "omnichat" || parts[1] != "generated" {
+		return false
+	}
+	ownerUserID, err := strconv.Atoi(parts[2])
+	if err != nil || ownerUserID <= 0 {
+		return false
+	}
+	extension := path.Ext(parts[3])
+	switch extension {
+	case ".png", ".jpg", ".jpeg", ".webp", ".mp4":
+	default:
+		return false
+	}
+	_, err = uuid.Parse(strings.TrimSuffix(parts[3], extension))
+	return err == nil
+}
+
+func IsOmniChatGeneratedStoragePathForOwner(storagePath string, ownerUserID int) bool {
+	if ownerUserID <= 0 || !IsOmniChatGeneratedStoragePath(storagePath) {
+		return false
+	}
+	parts := strings.Split(storagePath, "/")
+	pathOwnerUserID, err := strconv.Atoi(parts[2])
+	return err == nil && pathOwnerUserID == ownerUserID
 }
 
 func (r *OmniChatMediaRepository) ListMediaAssetsOwned(ctx context.Context, ownerUserID int, kind *OmniChatMediaKind, before *OmniChatMediaCursor, limit int) ([]*OmniChatMediaAsset, error) {

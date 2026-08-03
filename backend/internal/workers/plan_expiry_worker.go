@@ -10,7 +10,7 @@ import (
 
 const planExpiryCheckInterval = 1 * time.Hour
 
-// PlanExpiryWorker runs hourly and downgrades users whose paid plan has
+// PlanExpiryWorker runs hourly and downgrades users whose subscription has
 // elapsed. It is intentionally simple: no advisory lock needed since
 // UpdatePlan is idempotent (downgrading an already-free user is a no-op).
 type PlanExpiryWorker struct {

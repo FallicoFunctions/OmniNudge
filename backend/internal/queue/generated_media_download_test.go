@@ -62,6 +62,20 @@ func TestValidateGeneratedMediaContentsChecksMP4BoxStructure(t *testing.T) {
 	require.Error(t, validateGeneratedMediaContents(broken, "video", "video/mp4", 12))
 }
 
+func TestValidateGeneratedMediaContentsRejectsExtendedMP4BoxSizeOutsideInt64(t *testing.T) {
+	content := []byte{
+		0, 0, 0, 1, 'f', 't', 'y', 'p',
+		0x80, 0, 0, 0, 0, 0, 0, 0,
+	}
+	file, err := os.CreateTemp("", "omnichat-overflow-video-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(file.Name()) })
+	_, err = file.Write(content)
+	require.NoError(t, err)
+
+	require.EqualError(t, validateGeneratedMediaContents(file, "video", "video/mp4", int64(len(content))), "generated video container has an invalid box size")
+}
+
 type generatedMediaDialerFake struct{ calls int }
 
 func (f *generatedMediaDialerFake) DialContext(context.Context, string, string) (net.Conn, error) {

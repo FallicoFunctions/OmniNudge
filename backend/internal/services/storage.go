@@ -54,7 +54,7 @@ type LocalStorageService struct {
 }
 
 func NewLocalStorageService(baseDir string, baseURL string) (*LocalStorageService, error) {
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
+	if err := os.MkdirAll(baseDir, 0o750); err != nil {
 		return nil, fmt.Errorf("local storage: create base directory: %w", err)
 	}
 	canonicalBase, err := filepath.EvalSymlinks(baseDir)
@@ -149,7 +149,7 @@ func (s *LocalStorageService) Upload(ctx context.Context, key string, body io.Re
 	if err := s.rejectSymlinkPath(path, true); err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return "", fmt.Errorf("local storage: mkdir for %q: %w", key, err)
 	}
 	if err := s.rejectSymlinkPath(path, true); err != nil {
@@ -190,6 +190,7 @@ func (s *LocalStorageService) Download(ctx context.Context, key string) (io.Read
 	if err := s.rejectSymlinkPath(path, true); err != nil {
 		return nil, err
 	}
+	// #nosec G304 -- resolveKey confines the key to canonical baseDir and rejectSymlinkPath rejects every symlink component.
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("local storage: open %q: %w", key, err)

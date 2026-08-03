@@ -129,6 +129,7 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 
 			// Save to JSON file
 			filePath := filepath.Join(tempDir, dataType+".json")
+			// #nosec G304 -- filePath combines a private os.MkdirTemp root with an allowlisted export data type.
 			file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 			if err != nil {
 				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to create export file: %v", err))
@@ -162,6 +163,7 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		}
 		for _, f := range files {
 			fPath := filepath.Join(tempDir, f.Name())
+			// #nosec G304 -- fPath comes from entries enumerated inside the private export temp directory.
 			fileToZip, err := os.Open(fPath)
 			if err != nil {
 				_ = zipWriter.Close()
@@ -198,6 +200,7 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		}
 
 		// 4. Upload to storage
+		// #nosec G304 -- zipPath is created by this worker inside its private export temp directory.
 		finalZip, err := os.Open(zipPath)
 		if err != nil {
 			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to open ZIP for upload: %v", err))

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -45,7 +46,8 @@ func Setup(ctx context.Context, serviceName, version string) (shutdown func(cont
 	var sampler sdktrace.Sampler
 
 	if endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); endpoint != "" {
-		log.Printf("OpenTelemetry: exporting traces to %s", endpoint)
+		// #nosec G706 -- singleLineLogValue strips CR/LF before the environment value reaches the log.
+		log.Printf("OpenTelemetry: exporting traces to %q", singleLineLogValue(endpoint))
 		exporter, err = otlptracegrpc.New(ctx,
 			otlptracegrpc.WithEndpoint(endpoint),
 			otlptracegrpc.WithInsecure(),
@@ -61,7 +63,8 @@ func Setup(ctx context.Context, serviceName, version string) (shutdown func(cont
 			if parsed, parseErr := strconv.ParseFloat(rateStr, 64); parseErr == nil && parsed >= 0 && parsed <= 1 {
 				sampleRate = parsed
 			} else {
-				log.Printf("OpenTelemetry: invalid OTEL_TRACE_SAMPLE_RATE %q, using default %.2f", rateStr, sampleRate)
+				// #nosec G706 -- singleLineLogValue strips CR/LF before the environment value reaches the log.
+				log.Printf("OpenTelemetry: invalid OTEL_TRACE_SAMPLE_RATE %q, using default %.2f", singleLineLogValue(rateStr), sampleRate)
 			}
 		}
 		log.Printf("OpenTelemetry: sampling rate %.1f%%", sampleRate*100)
@@ -90,6 +93,15 @@ func Setup(ctx context.Context, serviceName, version string) (shutdown func(cont
 	))
 
 	return tp.Shutdown, nil
+}
+
+func singleLineLogValue(value string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '\r' || r == '\n' {
+			return -1
+		}
+		return r
+	}, value)
 }
 
 // Tracer returns a named tracer from the global provider.

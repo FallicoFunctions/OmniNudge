@@ -12,30 +12,31 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Server        ServerConfig
-	Database      DatabaseConfig
-	Reddit        RedditConfig
-	JWT           JWTConfig
-	Redis         RedisConfig
-	Media         MediaConfig
-	VirusScan     VirusScanConfig
-	Encryption    EncryptionConfig
-	Turnstile     TurnstileConfig
-	Firebase      FirebaseConfig
-	SMTP          SMTPConfig
-	Retention     RetentionConfig
-	Storage       StorageConfig
-	FrontendURL   string
-	AppEnv        string
-	MetricsToken  string // Bearer token for /metrics endpoint; empty = unrestricted (dev only)
-	AsynqmonToken string // Bearer token for /admin/queues dashboard; empty = unrestricted (dev only)
-	TURN          TURNConfig
-	Gemini        GeminiConfig
-	OpenRouter    OpenRouterConfig
-	OmniChatMedia OmniChatMediaConfig
-	OmniChatVoice OmniChatVoiceConfig
-	Crypto        CryptoConfig
-	OAuth         OAuthConfig
+	Server                    ServerConfig
+	Database                  DatabaseConfig
+	Reddit                    RedditConfig
+	JWT                       JWTConfig
+	Redis                     RedisConfig
+	Media                     MediaConfig
+	VirusScan                 VirusScanConfig
+	Encryption                EncryptionConfig
+	Turnstile                 TurnstileConfig
+	Firebase                  FirebaseConfig
+	SMTP                      SMTPConfig
+	Retention                 RetentionConfig
+	Storage                   StorageConfig
+	FrontendURL               string
+	AppEnv                    string
+	MetricsToken              string // Bearer token for /metrics endpoint; empty = unrestricted (dev only)
+	AsynqmonToken             string // Bearer token for /admin/queues dashboard; empty = unrestricted (dev only)
+	TURN                      TURNConfig
+	Gemini                    GeminiConfig
+	OpenRouter                OpenRouterConfig
+	OmniChatMedia             OmniChatMediaConfig
+	OmniChatVoice             OmniChatVoiceConfig
+	OmniChatBillingOffersJSON string
+	Crypto                    CryptoConfig
+	OAuth                     OAuthConfig
 }
 
 // OAuthConfig holds client credentials for social login providers.
@@ -69,8 +70,14 @@ type GeminiConfig struct {
 // OpenRouterConfig holds OpenRouter API configuration for OmniChat bot personas.
 // When APIKey is empty the generate endpoint returns a 503.
 type OpenRouterConfig struct {
-	APIKey string // OPENROUTER_API_KEY
-	Model  string // OPENROUTER_MODEL — defaults to openrouter/free
+	APIKey            string // OPENROUTER_API_KEY
+	Model             string // OPENROUTER_MODEL — fixed low-cost model for moderation and legacy callers
+	StandardModel     string // OMNICHAT_MODEL_STANDARD_PRIMARY
+	StandardFallback  string // OMNICHAT_MODEL_STANDARD_FALLBACK
+	PlusModel         string // OMNICHAT_MODEL_PLUS_PRIMARY
+	PremiumQuickModel string // OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY
+	PremiumDeepModel  string // OMNICHAT_MODEL_PREMIUM_DEEP_PRIMARY
+	UltraFastModel    string // OMNICHAT_MODEL_ULTRA_FAST_PRIMARY
 }
 
 // OmniChatMediaConfig keeps generative-media credentials server-side and
@@ -337,8 +344,14 @@ func Load() (*Config, error) {
 			Model:  getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
 		},
 		OpenRouter: OpenRouterConfig{
-			APIKey: getEnv("OPENROUTER_API_KEY", ""),
-			Model:  getEnv("OPENROUTER_MODEL", "openrouter/free"),
+			APIKey:            getEnv("OPENROUTER_API_KEY", ""),
+			Model:             getEnv("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free"),
+			StandardModel:     getEnv("OMNICHAT_MODEL_STANDARD_PRIMARY", "google/gemini-2.5-flash-lite"),
+			StandardFallback:  getEnv("OMNICHAT_MODEL_STANDARD_FALLBACK", "mistralai/mistral-large-2512"),
+			PlusModel:         getEnv("OMNICHAT_MODEL_PLUS_PRIMARY", "mistralai/mistral-large-2512"),
+			PremiumQuickModel: getEnv("OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY", "anthropic/claude-sonnet-5"),
+			PremiumDeepModel:  getEnv("OMNICHAT_MODEL_PREMIUM_DEEP_PRIMARY", "anthropic/claude-sonnet-5"),
+			UltraFastModel:    getEnv("OMNICHAT_MODEL_ULTRA_FAST_PRIMARY", "anthropic/claude-opus-4.8"),
 		},
 		OmniChatMedia: OmniChatMediaConfig{
 			Provider:            getEnv("OMNICHAT_MEDIA_PROVIDER", "fal"),
@@ -365,6 +378,7 @@ func Load() (*Config, error) {
 			TavusReplicaID:          getEnv("TAVUS_REPLICA_ID", ""),
 			TavusPersonaID:          getEnv("TAVUS_PERSONA_ID", ""),
 		},
+		OmniChatBillingOffersJSON: getEnv("OMNICHAT_BILLING_OFFERS_JSON", ""),
 		OAuth: OAuthConfig{
 			GoogleClientID:      getEnv("GOOGLE_CLIENT_ID", ""),
 			GoogleClientSecret:  getEnv("GOOGLE_CLIENT_SECRET", ""),

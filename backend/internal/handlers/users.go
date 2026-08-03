@@ -799,13 +799,14 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	}
 
 	uploadDir := filepath.Join("uploads", "avatars")
-	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+	if err := os.MkdirAll(uploadDir, 0o750); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to prepare avatar storage")
 		return
 	}
 
 	filename := fmt.Sprintf("avatar_%d_%d%s", userID, time.Now().UnixNano(), ext)
 	originalPath := filepath.Join(uploadDir, filename)
+	// #nosec G304 -- originalPath combines a fixed upload directory with a server-generated UUID filename.
 	dst, err := os.Create(originalPath)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to create avatar file")
@@ -1000,13 +1001,14 @@ func (h *UsersHandler) UploadMyBanner(c *gin.Context) {
 	}
 
 	uploadDir := filepath.Join("uploads", "banners")
-	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+	if err := os.MkdirAll(uploadDir, 0o750); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to prepare banner storage")
 		return
 	}
 
 	filename := fmt.Sprintf("banner_%d_%d%s", userID, time.Now().UnixNano(), ext)
 	filePath := filepath.Join(uploadDir, filename)
+	// #nosec G304 -- filePath combines a fixed upload directory with a server-generated UUID filename.
 	dst, err := os.Create(filePath)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to create banner file")

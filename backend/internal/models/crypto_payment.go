@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 // Plan constants
 const (
 	PlanFree = "free"
-	PlanPaid = "paid"
+	PlanPlus = "plus"
 )
 
 // Coin constants
@@ -35,18 +36,77 @@ const (
 // confirmed (plan upgraded), insufficient (amount too low), or failed
 // (invalid tx / wrong recipient).
 type CryptoPayment struct {
-	ID               int64
-	UserID           int
-	TXID             string
-	Coin             string
-	USDPriceAtSubmit float64
-	AmountReceived   float64
-	USDValue         float64
-	PlanMonths       int
-	Status           string
-	Confirmations    int
-	CreatedAt        time.Time
-	ConfirmedAt      *time.Time
+	ID                   int64
+	UserID               int
+	TXID                 string
+	Coin                 string
+	USDPriceAtSubmit     float64
+	AmountReceived       float64
+	USDValue             float64
+	PlanMonths           int
+	Status               string
+	Confirmations        int
+	CreatedAt            time.Time
+	ConfirmedAt          *time.Time
+	EntitlementAppliedAt *time.Time
+}
+
+// ConfirmAndApplyPlan atomically claims a confirmed payment and extends the
+// user's plan exactly once. It is safe across handler/worker races and multiple
+// application replicas.
+func (r *CryptoPaymentRepository) ConfirmAndApplyPlan(ctx context.Context, id int64, confirmations int, confirmedAt time.Time) (bool, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var userID, months int
+	var status string
+	var appliedAt *time.Time
+	err = tx.QueryRow(ctx, `
+		SELECT user_id,plan_months,status,entitlement_applied_at
+		FROM crypto_payments
+		WHERE id=$1
+		FOR UPDATE
+	`, id).Scan(&userID, &months, &status, &appliedAt)
+	if err != nil {
+		return false, fmt.Errorf("claim crypto payment: %w", err)
+	}
+	if appliedAt != nil {
+		return false, tx.Commit(ctx)
+	}
+	if status != StatusPending && status != StatusConfirmed {
+		return false, fmt.Errorf("crypto payment cannot be confirmed from status %q", status)
+	}
+	if months < 1 || months > 24 {
+		return false, errors.New("crypto payment has invalid plan duration")
+	}
+	tag, err := tx.Exec(ctx, `
+		UPDATE users
+		SET plan=$2,
+		    plan_expires_at=GREATEST(COALESCE(plan_expires_at, NOW()), NOW())
+		        + make_interval(days => $3 * 30)
+		WHERE id=$1
+	`, userID, PlanPlus, months)
+	if err != nil {
+		return false, fmt.Errorf("apply crypto payment entitlement: %w", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return false, fmt.Errorf("crypto payment user not found: %d", userID)
+	}
+	_, err = tx.Exec(ctx, `
+		UPDATE crypto_payments
+		SET status=$2,confirmations=$3,confirmed_at=$4,entitlement_applied_at=$4
+		WHERE id=$1
+	`, id, StatusConfirmed, confirmations, confirmedAt)
+	if err != nil {
+		return false, fmt.Errorf("record crypto payment entitlement: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // CryptoPaymentRepository handles all database operations for crypto payments.

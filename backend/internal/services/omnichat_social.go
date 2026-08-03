@@ -25,7 +25,7 @@ type OmniChatPublicContentModerator interface {
 type OmniChatSocialStore interface {
 	PublishAssetOwned(ctx context.Context, ownerUserID int, assetID uuid.UUID, caption string) (*models.OmniChatPublication, error)
 	ReadChatShareTextOwned(ctx context.Context, ownerUserID, conversationID int, messageIDs []int) (string, string, error)
-	PublishChatSnapshotOwned(ctx context.Context, ownerUserID, conversationID int, messageIDs []int, title, caption, expectedDigest string) (*models.OmniChatPublication, error)
+	PublishChatSnapshotOwned(ctx context.Context, ownerUserID, conversationID int, messageIDs []int, title, caption, expectedDigest string, requestID uuid.UUID) (*models.OmniChatPublication, error)
 	AddPublicationComment(ctx context.Context, publicationID uuid.UUID, authorUserID int, parentID *uuid.UUID, body string) (*models.OmniChatPublicationComment, error)
 }
 
@@ -51,7 +51,7 @@ func (s *OmniChatSocialService) PublishAsset(ctx context.Context, ownerUserID in
 	return s.store.PublishAssetOwned(ctx, ownerUserID, assetID, caption)
 }
 
-func (s *OmniChatSocialService) PublishChat(ctx context.Context, ownerUserID, conversationID int, messageIDs []int, title, caption string) (*models.OmniChatPublication, error) {
+func (s *OmniChatSocialService) PublishChat(ctx context.Context, ownerUserID, conversationID int, messageIDs []int, title, caption string, requestID uuid.UUID) (*models.OmniChatPublication, error) {
 	title, err := normalizeOmniChatPublicText(title, 160, false)
 	if err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func (s *OmniChatSocialService) PublishChat(ctx context.Context, ownerUserID, co
 	if err != nil {
 		return nil, err
 	}
-	if len(messageIDs) < 1 || len(messageIDs) > 100 || hasDuplicateInts(messageIDs) {
+	if len(messageIDs) < 1 || len(messageIDs) > 100 || hasDuplicateInts(messageIDs) || requestID == uuid.Nil {
 		return nil, ErrOmniChatSocialInvalidInput
 	}
 	shareText, digest, err := s.store.ReadChatShareTextOwned(ctx, ownerUserID, conversationID, messageIDs)
@@ -74,7 +74,7 @@ func (s *OmniChatSocialService) PublishChat(ctx context.Context, ownerUserID, co
 	if err := s.requireModerationApproval(ctx, moderationText); err != nil {
 		return nil, err
 	}
-	publication, err := s.store.PublishChatSnapshotOwned(ctx, ownerUserID, conversationID, messageIDs, title, caption, digest)
+	publication, err := s.store.PublishChatSnapshotOwned(ctx, ownerUserID, conversationID, messageIDs, title, caption, digest, requestID)
 	if err != nil {
 		return nil, err
 	}

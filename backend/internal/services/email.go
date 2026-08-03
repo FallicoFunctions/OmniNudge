@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -196,7 +197,9 @@ func (s *EmailService) sendViaMailgunAPI(to []string, subject, body, htmlBody st
 	if htmlBody != "" {
 		_ = writer.WriteField("html", htmlBody)
 	}
-	writer.Close()
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("email: close mailgun multipart body: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, &buf)
 	if err != nil {
@@ -281,7 +284,12 @@ func (s *EmailService) sendWithTLS(addr string, auth smtp.Auth, message string, 
 	}
 
 	if _, err = writer.Write([]byte(message)); err != nil {
-		writer.Close()
+		if closeErr := writer.Close(); closeErr != nil {
+			return errors.Join(
+				fmt.Errorf("email: smtp write message: %w", err),
+				fmt.Errorf("email: smtp close after write failure: %w", closeErr),
+			)
+		}
 		return fmt.Errorf("email: smtp write message: %w", err)
 	}
 

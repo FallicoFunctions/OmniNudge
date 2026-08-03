@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -46,7 +47,7 @@ type User struct {
 	BannedBy            *int       `json:"banned_by,omitempty"`
 
 	// Subscription plan
-	Plan          string     `json:"plan"`                      // "free" | "paid"
+	Plan          string     `json:"plan"`                      // "free" | "plus" | "premium"
 	PlanExpiresAt *time.Time `json:"plan_expires_at,omitempty"` // nil for free tier
 
 	// Timestamps
@@ -152,7 +153,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 	query := `
 		INSERT INTO users (username, username_normalized, email, email_lookup_hash, email_encrypted, password_hash, avatar_url, bio, nsfw)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id, created_at, last_seen, role, nsfw, token_version
+		RETURNING id, created_at, last_seen, role, nsfw, token_version, plan, plan_expires_at
 	`
 
 	return r.pool.QueryRow(ctx, query,
@@ -165,7 +166,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 		user.AvatarURL,
 		user.Bio,
 		user.NSFW,
-	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW, &user.TokenVersion)
+	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW, &user.TokenVersion, &user.Plan, &user.PlanExpiresAt)
 }
 
 // GetByID retrieves a user by their internal ID
@@ -175,7 +176,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	query := `
 		SELECT id, username, email, email_encrypted, email_verified, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, deleted_at, permanent_deletion_at, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
-		       last_agent_post_at, last_agent_browse_at
+		       last_agent_post_at, last_agent_browse_at, plan, plan_expires_at
 		FROM users WHERE id = $1
 	`
 
@@ -205,6 +206,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 		&user.LastSeen,
 		&user.LastAgentPostAt,
 		&user.LastAgentBrowseAt,
+		&user.Plan,
+		&user.PlanExpiresAt,
 	)
 
 	if err != nil {
@@ -350,7 +353,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 	return r.queryUser(ctx, `
 		SELECT id, username, email, email_encrypted, email_verified, password_hash, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, deleted_at, permanent_deletion_at, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
-		       last_agent_post_at, last_agent_browse_at
+		       last_agent_post_at, last_agent_browse_at, plan, plan_expires_at
 		FROM users WHERE username_normalized = $1
 	`, normalizedUsername)
 }
@@ -385,6 +388,8 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 		&user.LastSeen,
 		&user.LastAgentPostAt,
 		&user.LastAgentBrowseAt,
+		&user.Plan,
+		&user.PlanExpiresAt,
 	)
 
 	if err != nil {
@@ -444,6 +449,8 @@ func scanEmailLookupUser(row userRowScanner, user *User) error {
 		&user.LastAgentPostAt,
 		&user.LastAgentBrowseAt,
 		&user.PasswordHash,
+		&user.Plan,
+		&user.PlanExpiresAt,
 	)
 }
 
@@ -469,7 +476,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, e
 	const columns = `
 		SELECT id, username, email, email_encrypted, email_verified, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
-		       last_agent_post_at, last_agent_browse_at, password_hash
+		       last_agent_post_at, last_agent_browse_at, password_hash, plan, plan_expires_at
 	`
 	user := &User{}
 	err = scanEmailLookupUser(r.pool.QueryRow(ctx, columns+`
@@ -975,6 +982,55 @@ func (r *UserRepository) UpdatePlan(ctx context.Context, userID int, plan string
 	return nil
 }
 
+// ExtendPlan atomically adds paid time from the later of the current expiry or
+// database time. A single SQL statement prevents concurrent renewals from
+// overwriting one another.
+func (r *UserRepository) ExtendPlan(ctx context.Context, userID int, plan string, months int) error {
+	if userID <= 0 || (plan != PlanPlus && plan != "premium") || months < 1 || months > 24 {
+		return errors.New("invalid plan extension")
+	}
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE users
+		SET plan=$2,
+		    plan_expires_at=GREATEST(COALESCE(plan_expires_at, NOW()), NOW())
+		        + make_interval(days => $3 * 30)
+		WHERE id=$1
+	`, userID, plan, months)
+	if err != nil {
+		return fmt.Errorf("extend user plan: %w", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return fmt.Errorf("user not found: %d", userID)
+	}
+	return nil
+}
+
+// DowngradeExpiredPlans atomically rechecks expiry in the UPDATE predicate so
+// a concurrent renewal cannot be overwritten by a stale list-then-write pass.
+func (r *UserRepository) DowngradeExpiredPlans(ctx context.Context) ([]int, error) {
+	rows, err := r.pool.Query(ctx, `
+		UPDATE users
+		SET plan='free', plan_expires_at=NULL
+		WHERE plan <> 'free'
+		  AND plan_expires_at IS NOT NULL
+		  AND plan_expires_at < NOW()
+		RETURNING id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("downgrade expired plans: %w", err)
+	}
+	defer rows.Close()
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // GetPlan returns the user's current plan and its expiry time.
 func (r *UserRepository) GetPlan(ctx context.Context, userID int) (string, *time.Time, error) {
 	var plan string
@@ -990,7 +1046,7 @@ func (r *UserRepository) GetPlan(ctx context.Context, userID int) (string, *time
 	return plan, expiresAt, nil
 }
 
-// ListUsersWithExpiredPlans returns IDs of paid users whose plan_expires_at
+// ListUsersWithExpiredPlans returns IDs of subscribed users whose plan_expires_at
 // is in the past. The expiry worker uses this to downgrade accounts.
 func (r *UserRepository) ListUsersWithExpiredPlans(ctx context.Context) ([]int, error) {
 	query := `

@@ -246,7 +246,7 @@ func TestVirusScanHandler_PromotesCleanDirectUploadBeforePublishing(t *testing.T
 	require.NoError(t, err)
 	require.Equal(t, models.MediaScanStatusClean, updated.ScanStatus)
 	require.Equal(t, fmt.Sprintf("uploads/%d/upload-id/clean.png", userID), updated.StoragePath)
-	require.Equal(t, "https://cdn.example/"+updated.StoragePath, updated.StorageURL)
+	require.Equal(t, "/uploads/"+updated.StoragePath, updated.StorageURL)
 	require.Equal(t, [][2]string{{stagingKey, updated.StoragePath}}, storage.copies)
 	_, err = storage.GetObjectSize(context.Background(), stagingKey)
 	require.Error(t, err)

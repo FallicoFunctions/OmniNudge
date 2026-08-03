@@ -520,13 +520,21 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 
 		// Check slow mode (skip for admins/owners)
 		var userRole string
-		h.pool.QueryRow(c.Request.Context(), `
+		roleErr := h.pool.QueryRow(c.Request.Context(), `
 			SELECT role FROM conversation_participants WHERE conversation_id=$1 AND user_id=$2
-		`, req.ConversationID, userID).Scan(&userRole) //nolint:errcheck // role lookup failure defaults to no exemption; non-fatal
+		`, req.ConversationID, userID).Scan(&userRole)
+		if roleErr != nil && !errors.Is(roleErr, pgx.ErrNoRows) {
+			RespondError(c, http.StatusServiceUnavailable, "Message permissions are temporarily unavailable")
+			return
+		}
 
 		if userRole != "admin" && userRole != "owner" {
 			var slowMode int
-			h.pool.QueryRow(c.Request.Context(), `SELECT slow_mode_seconds FROM conversations WHERE id=$1`, req.ConversationID).Scan(&slowMode) //nolint:errcheck // slow-mode lookup failure defaults to 0 (no slow mode); non-fatal
+			slowModeErr := h.pool.QueryRow(c.Request.Context(), `SELECT slow_mode_seconds FROM conversations WHERE id=$1`, req.ConversationID).Scan(&slowMode)
+			if slowModeErr != nil {
+				RespondError(c, http.StatusServiceUnavailable, "Message permissions are temporarily unavailable")
+				return
+			}
 			if slowMode > 0 && h.cache != nil {
 				cacheKey := fmt.Sprintf("slowmode:%d:%d", req.ConversationID, userID)
 				if val, exists, _ := h.cache.Get(c.Request.Context(), cacheKey); exists {

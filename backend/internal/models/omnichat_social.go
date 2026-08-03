@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"strings"
 	"time"
 
@@ -107,6 +108,21 @@ type OmniChatExploreCursor struct {
 type OmniChatCommentCursor struct {
 	CreatedAt time.Time
 	ID        uuid.UUID
+}
+
+type OmniChatPublicationReport struct {
+	ID               uuid.UUID `json:"id"`
+	PublicationID    uuid.UUID `json:"publication_id"`
+	ReporterUserID   int       `json:"reporter_user_id"`
+	ReporterUsername string    `json:"reporter_username"`
+	AuthorUserID     int       `json:"author_user_id"`
+	AuthorUsername   string    `json:"author_username"`
+	ContentKind      string    `json:"content_kind"`
+	Caption          string    `json:"caption"`
+	Reason           string    `json:"reason"`
+	Details          string    `json:"details"`
+	Status           string    `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 type OmniChatSocialRepository struct{ pool *pgxpool.Pool }
@@ -229,32 +245,44 @@ func (r *OmniChatSocialRepository) ReadChatShareTextOwned(ctx context.Context, o
 	if err != nil {
 		return "", "", err
 	}
-	defer rows.Close()
+	type selectedMessage struct {
+		id            int
+		role, content string
+		created       time.Time
+	}
+	selected := make([]selectedMessage, 0, len(messageIDs))
 	var text strings.Builder
-	hash := sha256.New()
-	count := 0
 	for rows.Next() {
-		var id int
-		var role, content string
-		var created time.Time
-		if err := rows.Scan(&id, &role, &content, &created); err != nil {
+		var message selectedMessage
+		if err := rows.Scan(&message.id, &message.role, &message.content, &message.created); err != nil {
+			rows.Close()
 			return "", "", err
 		}
-		fmt.Fprintf(hash, "%d\x00%s\x00%s\x00%s\n", id, role, content, created.UTC().Format(time.RFC3339Nano))
-		fmt.Fprintf(&text, "%s: %s\n", role, content)
-		count++
+		selected = append(selected, message)
+		fmt.Fprintf(&text, "%s: %s\n", message.role, message.content)
 	}
+	rows.Close()
 	if err := rows.Err(); err != nil {
 		return "", "", err
 	}
-	if count != len(messageIDs) {
+	if len(selected) != len(messageIDs) {
 		return "", "", nil
 	}
-	return text.String(), hex.EncodeToString(hash.Sum(nil)), nil
+	digest := sha256.New()
+	for _, message := range selected {
+		writeOmniChatSnapshotMessageDigest(digest, message.id, message.role, message.content, message.created)
+		if err := writeOmniChatSnapshotAttachmentDigest(ctx, r.pool, digest, message.id, ownerUserID); err != nil {
+			return "", "", err
+		}
+	}
+	return text.String(), hex.EncodeToString(digest.Sum(nil)), nil
 }
 
-func (r *OmniChatSocialRepository) PublishChatSnapshotOwned(ctx context.Context, ownerUserID, conversationID int, messageIDs []int, title, caption, expectedDigest string) (*OmniChatPublication, error) {
+func (r *OmniChatSocialRepository) PublishChatSnapshotOwned(ctx context.Context, ownerUserID, conversationID int, messageIDs []int, title, caption, expectedDigest string, requestID uuid.UUID) (*OmniChatPublication, error) {
 	if len(messageIDs) < 1 || len(messageIDs) > 200 {
+		return nil, nil
+	}
+	if requestID == uuid.Nil {
 		return nil, nil
 	}
 	tx, err := r.pool.Begin(ctx)
@@ -262,6 +290,23 @@ func (r *OmniChatSocialRepository) PublishChatSnapshotOwned(ctx context.Context,
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1::text))`, requestID); err != nil {
+		return nil, err
+	}
+	var existingPublicationID uuid.UUID
+	err = tx.QueryRow(ctx, `
+		SELECT id FROM omnichat_publications
+		WHERE author_user_id=$1 AND client_request_id=$2
+	`, ownerUserID, requestID).Scan(&existingPublicationID)
+	if err == nil {
+		if err = tx.Commit(ctx); err != nil {
+			return nil, err
+		}
+		return r.GetPublicationAccessible(ctx, existingPublicationID, &ownerUserID)
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
 	var personaID int
 	err = tx.QueryRow(ctx, `SELECT persona_id FROM bot_conversations WHERE id = $1 AND user_id = $2 AND archived_at IS NULL FOR SHARE`, conversationID, ownerUserID).Scan(&personaID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -298,11 +343,14 @@ func (r *OmniChatSocialRepository) PublishChatSnapshotOwned(ctx context.Context,
 	if len(selected) != len(messageIDs) {
 		return nil, nil
 	}
-	hash := sha256.New()
+	digest := sha256.New()
 	for _, message := range selected {
-		fmt.Fprintf(hash, "%d\x00%s\x00%s\x00%s\n", message.id, message.role, message.content, message.created.UTC().Format(time.RFC3339Nano))
+		writeOmniChatSnapshotMessageDigest(digest, message.id, message.role, message.content, message.created)
+		if err := writeOmniChatSnapshotAttachmentDigest(ctx, tx, digest, message.id, ownerUserID); err != nil {
+			return nil, err
+		}
 	}
-	if expectedDigest == "" || !strings.EqualFold(expectedDigest, hex.EncodeToString(hash.Sum(nil))) {
+	if expectedDigest == "" || !strings.EqualFold(expectedDigest, hex.EncodeToString(digest.Sum(nil))) {
 		return nil, nil
 	}
 	excerpt := selected[0].content
@@ -339,9 +387,9 @@ func (r *OmniChatSocialRepository) PublishChatSnapshotOwned(ctx context.Context,
 	}
 	publicationID := uuid.New()
 	_, err = tx.Exec(ctx, `
-		INSERT INTO omnichat_publications (id, author_user_id, persona_id, content_kind, snapshot_id, caption, is_nsfw)
-		SELECT $1,$2,$3,'chat',$4,$5,p.is_nsfw FROM bot_personas p WHERE p.id=$3
-	`, publicationID, ownerUserID, personaID, snapshotID, caption)
+		INSERT INTO omnichat_publications (id, author_user_id, persona_id, content_kind, snapshot_id, caption, is_nsfw, client_request_id)
+		SELECT $1,$2,$3,'chat',$4,$5,p.is_nsfw,$6 FROM bot_personas p WHERE p.id=$3
+	`, publicationID, ownerUserID, personaID, snapshotID, caption, requestID)
 	if err != nil {
 		return nil, err
 	}
@@ -349,6 +397,43 @@ func (r *OmniChatSocialRepository) PublishChatSnapshotOwned(ctx context.Context,
 		return nil, err
 	}
 	return r.GetPublicationAccessible(ctx, publicationID, &ownerUserID)
+}
+
+type omniChatSnapshotAttachmentQuerier interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}
+
+func writeOmniChatSnapshotMessageDigest(digest hash.Hash, id int, role, content string, created time.Time) {
+	fmt.Fprintf(digest, "message\x00%d\x00%s\x00%s\x00%s\n", id, role, content, created.UTC().Format(time.RFC3339Nano))
+}
+
+func writeOmniChatSnapshotAttachmentDigest(ctx context.Context, querier omniChatSnapshotAttachmentQuerier, digest hash.Hash, messageID, ownerUserID int) error {
+	rows, err := querier.Query(ctx, `
+		SELECT ma.position, ma.asset_id
+		FROM bot_message_attachments ma
+		JOIN omnichat_media_assets a ON a.id=ma.asset_id
+		WHERE ma.message_id=$1 AND a.owner_user_id=$2
+		  AND a.safety_status='approved' AND a.deleted_at IS NULL
+		ORDER BY ma.position, ma.asset_id
+		LIMIT 10
+	`, messageID, ownerUserID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var position int
+		var assetID uuid.UUID
+		if err := rows.Scan(&position, &assetID); err != nil {
+			return err
+		}
+		writeOmniChatSnapshotAttachmentDigestValue(digest, position, assetID)
+	}
+	return rows.Err()
+}
+
+func writeOmniChatSnapshotAttachmentDigestValue(digest hash.Hash, position int, assetID uuid.UUID) {
+	fmt.Fprintf(digest, "attachment\x00%d\x00%s\n", position, assetID)
 }
 
 func (r *OmniChatSocialRepository) ListExplore(ctx context.Context, viewerUserID *int, kind string, before *OmniChatExploreCursor, limit int) ([]*OmniChatPublication, error) {
@@ -381,6 +466,53 @@ func (r *OmniChatSocialRepository) ListExplore(ctx context.Context, viewerUserID
 		  ))
 		ORDER BY p.published_at DESC, p.id DESC LIMIT $5
 	`, viewerUserID, kind, beforeTime, beforeID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	publications := make([]*OmniChatPublication, 0, limit)
+	for rows.Next() {
+		publication, err := scanOmniChatPublication(rows)
+		if err != nil {
+			return nil, err
+		}
+		publications = append(publications, publication)
+	}
+	return publications, rows.Err()
+}
+
+func (r *OmniChatSocialRepository) ListBookmarkedPublications(ctx context.Context, userID int, before *OmniChatExploreCursor, limit int) ([]*OmniChatPublication, error) {
+	if limit < 1 || limit > 50 {
+		limit = 20
+	}
+	var beforeTime *time.Time
+	var beforeID *uuid.UUID
+	if before != nil {
+		beforeTime = &before.PublishedAt
+		beforeID = &before.ID
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT `+omniChatPublicationSelect+`
+		FROM omnichat_publication_bookmarks bookmark
+		JOIN omnichat_publications p ON p.id=bookmark.publication_id
+		JOIN users u ON u.id=p.author_user_id
+		JOIN bot_personas bp ON bp.id=p.persona_id
+		LEFT JOIN omnichat_media_assets a ON a.id=p.asset_id
+		LEFT JOIN media_files mf ON mf.id=a.media_file_id
+		LEFT JOIN omnichat_chat_snapshots s ON s.id=p.snapshot_id
+		JOIN users viewer ON viewer.id=$1 AND viewer.deleted=FALSE AND viewer.banned=FALSE
+		WHERE bookmark.user_id=$1 AND p.status='published'
+		  AND ($2::timestamptz IS NULL OR (p.published_at,p.id)<($2,$3))
+		  AND u.deleted=FALSE AND u.banned=FALSE
+		  AND (p.is_nsfw=FALSE OR viewer.nsfw=TRUE)
+		  AND NOT EXISTS (
+			SELECT 1 FROM blocked_users bu
+			WHERE (bu.blocker_id=$1 AND bu.blocked_id=p.author_user_id)
+			   OR (bu.blocker_id=p.author_user_id AND bu.blocked_id=$1)
+		  )
+		ORDER BY p.published_at DESC,p.id DESC
+		LIMIT $4
+	`, userID, beforeTime, beforeID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -644,12 +776,33 @@ func (r *OmniChatSocialRepository) SetFollowing(ctx context.Context, followerUse
 	return err
 }
 
-func (r *OmniChatSocialRepository) ContinueChatSnapshot(ctx context.Context, publicationID uuid.UUID, userID int) (*BotConversation, error) {
+func (r *OmniChatSocialRepository) ContinueChatSnapshot(ctx context.Context, publicationID uuid.UUID, userID int, requestID uuid.UUID) (*BotConversation, error) {
+	if requestID == uuid.Nil {
+		return nil, nil
+	}
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1::text))`, requestID); err != nil {
+		return nil, err
+	}
+	existing := &BotConversation{UserID: userID, Settings: &ConversationSettings{}}
+	err = tx.QueryRow(ctx, `
+		SELECT id,persona_id,title,created_at,last_message_at
+		FROM bot_conversations
+		WHERE user_id=$1 AND continue_request_id=$2
+	`, userID, requestID).Scan(&existing.ID, &existing.PersonaID, &existing.Title, &existing.CreatedAt, &existing.LastMessageAt)
+	if err == nil {
+		if err = tx.Commit(ctx); err != nil {
+			return nil, err
+		}
+		return existing, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
 	var snapshotID uuid.UUID
 	var personaID int
 	var snapshotTitle string
@@ -681,9 +834,9 @@ func (r *OmniChatSocialRepository) ContinueChatSnapshot(ctx context.Context, pub
 	}
 	conversation := &BotConversation{UserID: userID, PersonaID: personaID, Title: &title, Settings: &ConversationSettings{}}
 	err = tx.QueryRow(ctx, `
-		INSERT INTO bot_conversations (user_id, persona_id, title, remixed_from_publication_id)
-		VALUES ($1,$2,$3,$4) RETURNING id, created_at, last_message_at
-	`, userID, personaID, title, publicationID).Scan(&conversation.ID, &conversation.CreatedAt, &conversation.LastMessageAt)
+		INSERT INTO bot_conversations (user_id, persona_id, title, remixed_from_publication_id, continue_request_id)
+		VALUES ($1,$2,$3,$4,$5) RETURNING id, created_at, last_message_at
+	`, userID, personaID, title, publicationID, requestID).Scan(&conversation.ID, &conversation.CreatedAt, &conversation.LastMessageAt)
 	if err != nil {
 		return nil, err
 	}
@@ -742,6 +895,103 @@ func (r *OmniChatSocialRepository) ReportPublication(ctx context.Context, public
 		ON CONFLICT (publication_id, reporter_user_id) DO UPDATE SET reason = EXCLUDED.reason, details = EXCLUDED.details, status = 'open', created_at = NOW()
 	`, uuid.New(), publicationID, reporterUserID, reason, details)
 	return err
+}
+
+func (r *OmniChatSocialRepository) ListPublicationReports(ctx context.Context, status string, limit int) ([]*OmniChatPublicationReport, error) {
+	if limit < 1 || limit > 200 {
+		limit = 100
+	}
+	if status == "" {
+		status = "open"
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT report.id,report.publication_id,report.reporter_user_id,reporter.username,
+		       publication.author_user_id,author.username,publication.content_kind,
+		       publication.caption,report.reason,report.details,report.status,report.created_at
+		FROM omnichat_publication_reports report
+		JOIN omnichat_publications publication ON publication.id=report.publication_id
+		JOIN users reporter ON reporter.id=report.reporter_user_id
+		JOIN users author ON author.id=publication.author_user_id
+		WHERE ($1='' OR report.status=$1)
+		ORDER BY report.created_at,report.id
+		LIMIT $2
+	`, status, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	reports := make([]*OmniChatPublicationReport, 0, limit)
+	for rows.Next() {
+		report := &OmniChatPublicationReport{}
+		if err := rows.Scan(
+			&report.ID, &report.PublicationID, &report.ReporterUserID, &report.ReporterUsername,
+			&report.AuthorUserID, &report.AuthorUsername, &report.ContentKind, &report.Caption,
+			&report.Reason, &report.Details, &report.Status, &report.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		reports = append(reports, report)
+	}
+	return reports, rows.Err()
+}
+
+func (r *OmniChatSocialRepository) ResolvePublicationReport(ctx context.Context, reportID uuid.UUID, reviewerUserID int, resolution string) (bool, error) {
+	if resolution != "removed" && resolution != "dismissed" {
+		return false, nil
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	var publicationID uuid.UUID
+	var assetID *uuid.UUID
+	err = tx.QueryRow(ctx, `
+		SELECT publication.id,publication.asset_id
+		FROM omnichat_publication_reports report
+		JOIN omnichat_publications publication ON publication.id=report.publication_id
+		WHERE report.id=$1 AND report.status IN ('open','reviewing')
+		FOR UPDATE OF report,publication
+	`, reportID).Scan(&publicationID, &assetID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if resolution == "removed" {
+		if _, err = tx.Exec(ctx, `
+			UPDATE omnichat_publications
+			SET status='removed',removed_at=NOW(),updated_at=NOW()
+			WHERE id=$1
+		`, publicationID); err != nil {
+			return false, err
+		}
+		if assetID != nil {
+			if _, err = tx.Exec(ctx, `UPDATE omnichat_media_assets SET visibility='private' WHERE id=$1`, *assetID); err != nil {
+				return false, err
+			}
+		}
+		if _, err = tx.Exec(ctx, `
+			UPDATE omnichat_publication_reports
+			SET status='resolved',resolution='removed',reviewed_by=$2,reviewed_at=NOW()
+			WHERE publication_id=$1 AND status IN ('open','reviewing')
+		`, publicationID, reviewerUserID); err != nil {
+			return false, err
+		}
+	} else {
+		if _, err = tx.Exec(ctx, `
+			UPDATE omnichat_publication_reports
+			SET status='dismissed',resolution='dismissed',reviewed_by=$2,reviewed_at=NOW()
+			WHERE id=$1
+		`, reportID, reviewerUserID); err != nil {
+			return false, err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *OmniChatSocialRepository) RemovePublicationOwned(ctx context.Context, publicationID uuid.UUID, ownerUserID int) (bool, error) {

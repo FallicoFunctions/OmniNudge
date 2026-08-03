@@ -29,7 +29,26 @@ type liveCallVoiceData struct {
 	cancelOnAttach   context.CancelFunc
 	endContextErr    error
 	voicePersonaID   int
+	upsertCalls      int
 }
+
+type liveCallBilling struct {
+	reserveErr error
+	captures   int
+	refunds    int
+}
+
+func (b *liveCallBilling) ReserveOwned(context.Context, int, uuid.UUID, string) (*models.OmniCreditsUsageReservation, error) {
+	if b.reserveErr != nil {
+		return nil, b.reserveErr
+	}
+	return &models.OmniCreditsUsageReservation{}, nil
+}
+func (b *liveCallBilling) CaptureOwned(context.Context, int, uuid.UUID) error {
+	b.captures++
+	return nil
+}
+func (b *liveCallBilling) RefundOwned(context.Context, int, uuid.UUID) error { b.refunds++; return nil }
 
 func (d *liveCallVoiceData) GetPersonaVoice(context.Context, int) (*models.OmniChatPersonaVoice, error) {
 	return nil, nil
@@ -57,7 +76,29 @@ func TestOmniChatVoiceHandlerReadsExistingPersonaIDWildcard(t *testing.T) {
 	require.Contains(t, response.Body.String(), `"persona_id":42`)
 }
 func (d *liveCallVoiceData) UpsertPersonaVoiceAuthorized(context.Context, int, *models.OmniChatPersonaVoice) (bool, error) {
-	return false, nil
+	d.upsertCalls++
+	return true, nil
+}
+
+func TestOmniChatVoiceHandlerRejectsUnprivilegedLiveAvatarConfiguration(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	data := &liveCallVoiceData{}
+	handler := NewOmniChatVoiceHandler(data, nil, nil, nil, "", "")
+	router := gin.New()
+	router.PUT("/omnichat/personas/:id/voice", func(c *gin.Context) {
+		c.Set("user_id", 9)
+		c.Set("role", "user")
+		handler.UpdatePersonaVoice(c)
+	})
+
+	payload := `{"provider":"elevenlabs","voice_id":"voice_42","voice_name":"Sadie","model_id":"eleven_multilingual_v2","stability":0.5,"similarity_boost":0.75,"style":0,"speed":1,"pitch":1,"live_video_replica_id":"another-users-replica","live_video_persona_id":"another-users-persona"}`
+	request := httptest.NewRequest(http.MethodPut, "/omnichat/personas/42/voice", strings.NewReader(payload))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusForbidden, response.Code)
+	require.Zero(t, data.upsertCalls, "provider identifiers must be rejected before persistence")
 }
 func (d *liveCallVoiceData) StartCallOwned(_ context.Context, userID, conversationID int, mode string) (*models.OmniChatCallSession, error) {
 	d.startCalls++
@@ -128,7 +169,8 @@ func TestOmniChatVoiceHandlerStartsPrivateProviderBackedLiveVideo(t *testing.T) 
 	defer provider.Close()
 
 	data := &liveCallVoiceData{}
-	handler := NewOmniChatVoiceHandler(data, nil, nil, tavus.NewClient("secret", provider.URL), "", "")
+	billing := &liveCallBilling{}
+	handler := NewOmniChatVoiceHandler(data, nil, nil, tavus.NewClient("secret", provider.URL), "", "").SetBilling(billing)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.POST("/omnichat/conversations/:id/calls", func(c *gin.Context) {
@@ -145,6 +187,7 @@ func TestOmniChatVoiceHandlerStartsPrivateProviderBackedLiveVideo(t *testing.T) 
 	require.Contains(t, response.Body.String(), `"live_video_url":"https://omnichat.daily.co/provider-call-42?t=private-token"`)
 	require.Equal(t, "tavus", data.attachedProvider)
 	require.Equal(t, "provider-call-42", data.attachedSession)
+	require.Equal(t, 1, billing.captures)
 }
 
 func TestOmniChatVoiceHandlerDoesNotEndActiveProviderForUnknownConversation(t *testing.T) {
@@ -159,7 +202,8 @@ func TestOmniChatVoiceHandlerDoesNotEndActiveProviderForUnknownConversation(t *t
 		activeProviders: []models.OmniChatCallProviderSession{{Provider: "tavus", SessionID: "existing-call"}},
 		startNotFound:   true,
 	}
-	handler := NewOmniChatVoiceHandler(data, nil, nil, tavus.NewClient("secret", provider.URL), "", "")
+	billing := &liveCallBilling{}
+	handler := NewOmniChatVoiceHandler(data, nil, nil, tavus.NewClient("secret", provider.URL), "", "").SetBilling(billing)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.POST("/omnichat/conversations/:id/calls", func(c *gin.Context) {
@@ -212,7 +256,8 @@ func TestOmniChatVoiceHandlerCleansUpCreatedProviderAfterRequestCancellation(t *
 	attachResult := false
 	requestContext, cancel := context.WithCancel(context.Background())
 	data := &liveCallVoiceData{attachResult: &attachResult, cancelOnAttach: cancel}
-	handler := NewOmniChatVoiceHandler(data, nil, nil, tavus.NewClient("secret", provider.URL), "", "")
+	billing := &liveCallBilling{}
+	handler := NewOmniChatVoiceHandler(data, nil, nil, tavus.NewClient("secret", provider.URL), "", "").SetBilling(billing)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.POST("/omnichat/conversations/:id/calls", func(c *gin.Context) {
@@ -228,4 +273,19 @@ func TestOmniChatVoiceHandlerCleansUpCreatedProviderAfterRequestCancellation(t *
 	require.Equal(t, 1, endRequests, "a provider session created before disconnect must be closed")
 	require.Equal(t, 1, data.endCalls, "the superseded local call must be ended")
 	require.NoError(t, data.endContextErr, "cleanup must not inherit the cancelled HTTP context")
+	require.Equal(t, 1, billing.refunds)
+}
+
+func TestOmniChatVoiceHandlerRejectsVideoCallWithInsufficientCredits(t *testing.T) {
+	data := &liveCallVoiceData{}
+	handler := NewOmniChatVoiceHandler(data, nil, nil, tavus.NewClient("secret", "http://127.0.0.1"), "", "").SetBilling(&liveCallBilling{reserveErr: models.ErrOmniCreditsInsufficient})
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/omnichat/conversations/:id/calls", func(c *gin.Context) { c.Set("user_id", 9); handler.StartCall(c) })
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/omnichat/conversations/81/calls", strings.NewReader(`{"mode":"video"}`))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(response, request)
+	require.Equal(t, http.StatusPaymentRequired, response.Code)
+	require.Equal(t, 1, data.endCalls)
 }

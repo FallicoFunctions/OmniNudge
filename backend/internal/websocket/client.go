@@ -278,14 +278,10 @@ func (c *Client) checkRateLimit() bool {
 // readPump pumps messages from the WebSocket connection to the hub
 func (c *Client) readPump() {
 	defer func() {
-		// Non-blocking send to unregister: if hub.Run() has already exited
-		// (e.g. during server shutdown), the unregister channel has no reader
-		// and a blocking send would leak this goroutine permanently.
-		select {
-		case c.Hub.unregister <- c:
-		default:
+		c.Hub.Unregister(c)
+		if err := c.Conn.Close(); err != nil {
+			zlog.Debug().Err(err).Int("user_id", c.UserID).Msg("websocket: close read connection")
 		}
-		c.Conn.Close()
 		zlog.Info().
 			Int("user_id", c.UserID).
 			Dur("duration", time.Since(c.ConnectedAt)).
@@ -387,7 +383,9 @@ func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.Conn.Close()
+		if err := c.Conn.Close(); err != nil {
+			zlog.Debug().Err(err).Int("user_id", c.UserID).Msg("websocket: close write connection")
+		}
 	}()
 
 	for {

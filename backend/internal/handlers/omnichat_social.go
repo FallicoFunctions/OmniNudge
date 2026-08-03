@@ -19,12 +19,13 @@ import (
 
 type OmniChatSocialPublisher interface {
 	PublishAsset(ctx context.Context, ownerUserID int, assetID uuid.UUID, caption string) (*models.OmniChatPublication, error)
-	PublishChat(ctx context.Context, ownerUserID, conversationID int, messageIDs []int, title, caption string) (*models.OmniChatPublication, error)
+	PublishChat(ctx context.Context, ownerUserID, conversationID int, messageIDs []int, title, caption string, requestID uuid.UUID) (*models.OmniChatPublication, error)
 	AddComment(ctx context.Context, publicationID uuid.UUID, authorUserID int, parentID *uuid.UUID, body string) (*models.OmniChatPublicationComment, error)
 }
 
 type OmniChatSocialStore interface {
 	ListExplore(ctx context.Context, viewerUserID *int, kind string, before *models.OmniChatExploreCursor, limit int) ([]*models.OmniChatPublication, error)
+	ListBookmarkedPublications(ctx context.Context, userID int, before *models.OmniChatExploreCursor, limit int) ([]*models.OmniChatPublication, error)
 	GetPublicationAccessible(ctx context.Context, id uuid.UUID, viewerUserID *int) (*models.OmniChatPublication, error)
 	SetPublicationLiked(ctx context.Context, publicationID uuid.UUID, userID int, liked bool) error
 	ListPublicationComments(ctx context.Context, publicationID uuid.UUID, viewerUserID *int, after *models.OmniChatCommentCursor, limit int) ([]*models.OmniChatPublicationComment, error)
@@ -32,11 +33,13 @@ type OmniChatSocialStore interface {
 	SetPublicationBookmarked(ctx context.Context, publicationID uuid.UUID, userID int, bookmarked bool) error
 	CanFollow(ctx context.Context, followerUserID, followedUserID int) (bool, error)
 	SetFollowing(ctx context.Context, followerUserID, followedUserID int, following bool) error
-	ContinueChatSnapshot(ctx context.Context, publicationID uuid.UUID, userID int) (*models.BotConversation, error)
+	ContinueChatSnapshot(ctx context.Context, publicationID uuid.UUID, userID int, requestID uuid.UUID) (*models.BotConversation, error)
 	ReportPublication(ctx context.Context, publicationID uuid.UUID, reporterUserID int, reason, details string) error
 	RemovePublicationOwned(ctx context.Context, publicationID uuid.UUID, ownerUserID int) (bool, error)
 	PublicAssetStoragePath(ctx context.Context, assetID uuid.UUID, viewerUserID *int) (string, string, error)
 	DeleteCommentOwned(ctx context.Context, id uuid.UUID, userID int, moderator bool) (bool, error)
+	ListPublicationReports(ctx context.Context, status string, limit int) ([]*models.OmniChatPublicationReport, error)
+	ResolvePublicationReport(ctx context.Context, reportID uuid.UUID, reviewerUserID int, resolution string) (bool, error)
 }
 
 type OmniChatSocialHandler struct {
@@ -109,6 +112,35 @@ func (h *OmniChatSocialHandler) GetPublication(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"publication": publication})
 }
 
+func (h *OmniChatSocialHandler) ListBookmarks(c *gin.Context) {
+	var before *models.OmniChatExploreCursor
+	if raw := strings.TrimSpace(c.Query("before")); raw != "" {
+		parsed, err := time.Parse(time.RFC3339Nano, raw)
+		if err != nil {
+			RespondError(c, http.StatusBadRequest, "Invalid pagination cursor")
+			return
+		}
+		beforeID, err := uuid.Parse(strings.TrimSpace(c.Query("before_id")))
+		if err != nil {
+			RespondError(c, http.StatusBadRequest, "Invalid pagination cursor")
+			return
+		}
+		before = &models.OmniChatExploreCursor{PublishedAt: parsed, ID: beforeID}
+	} else if strings.TrimSpace(c.Query("before_id")) != "" {
+		RespondError(c, http.StatusBadRequest, "Invalid pagination cursor")
+		return
+	}
+	publications, err := h.store.ListBookmarkedPublications(c.Request.Context(), c.GetInt("user_id"), before, parseBoundedLimit(c, 20, 50))
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load saved publications")
+		return
+	}
+	for _, publication := range publications {
+		decoratePublicPublication(publication)
+	}
+	c.JSON(http.StatusOK, gin.H{"publications": publications})
+}
+
 func (h *OmniChatSocialHandler) PublishAsset(c *gin.Context) {
 	var request struct {
 		AssetID uuid.UUID `json:"asset_id"`
@@ -124,16 +156,17 @@ func (h *OmniChatSocialHandler) PublishAsset(c *gin.Context) {
 
 func (h *OmniChatSocialHandler) PublishChat(c *gin.Context) {
 	var request struct {
-		ConversationID int    `json:"conversation_id"`
-		MessageIDs     []int  `json:"message_ids"`
-		Title          string `json:"title"`
-		Caption        string `json:"caption"`
+		ConversationID int       `json:"conversation_id"`
+		MessageIDs     []int     `json:"message_ids"`
+		Title          string    `json:"title"`
+		Caption        string    `json:"caption"`
+		RequestID      uuid.UUID `json:"idempotency_key"`
 	}
-	if err := decodeStrictJSON(c, &request); err != nil || request.ConversationID <= 0 {
+	if err := decodeStrictJSON(c, &request); err != nil || request.ConversationID <= 0 || request.RequestID == uuid.Nil {
 		RespondError(c, http.StatusBadRequest, "Invalid chat publish request")
 		return
 	}
-	publication, err := h.publisher.PublishChat(c.Request.Context(), c.GetInt("user_id"), request.ConversationID, request.MessageIDs, request.Title, request.Caption)
+	publication, err := h.publisher.PublishChat(c.Request.Context(), c.GetInt("user_id"), request.ConversationID, request.MessageIDs, request.Title, request.Caption, request.RequestID)
 	h.respondPublished(c, publication, err)
 }
 
@@ -359,7 +392,14 @@ func (h *OmniChatSocialHandler) ContinueChat(c *gin.Context) {
 	if !ok {
 		return
 	}
-	conversation, err := h.store.ContinueChatSnapshot(c.Request.Context(), id, c.GetInt("user_id"))
+	var request struct {
+		RequestID uuid.UUID `json:"idempotency_key"`
+	}
+	if err := decodeStrictJSON(c, &request); err != nil || request.RequestID == uuid.Nil {
+		RespondError(c, http.StatusBadRequest, "Invalid continue request")
+		return
+	}
+	conversation, err := h.store.ContinueChatSnapshot(c.Request.Context(), id, c.GetInt("user_id"), request.RequestID)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to continue chat")
 		return
@@ -477,11 +517,57 @@ func (h *OmniChatSocialHandler) GetPublicMediaContent(c *gin.Context) {
 	// Access depends on the current viewer's NSFW preference and block graph.
 	// Never let a browser, proxy, or CDN replay an authorized response to a
 	// different viewer using the same asset URL.
-	c.Header("Cache-Control", "private, no-store")
-	c.Writer.Header().Add("Vary", "Authorization")
-	c.Writer.Header().Add("Vary", "Cookie")
+	if viewer == nil {
+		// Anonymous authorization has no viewer-specific block or preference
+		// state. A short shared cache reduces storage bandwidth while bounding
+		// the delay before an unpublish takes effect.
+		c.Header("Cache-Control", "public, max-age=300, s-maxage=300")
+	} else {
+		c.Header("Cache-Control", "private, no-store")
+		c.Writer.Header().Add("Vary", "Authorization")
+		c.Writer.Header().Add("Vary", "Cookie")
+	}
 	c.Header("X-Content-Type-Options", "nosniff")
 	_, _ = io.Copy(c.Writer, &io.LimitedReader{R: reader, N: objectSize})
+}
+
+func (h *OmniChatSocialHandler) ListReports(c *gin.Context) {
+	status := strings.TrimSpace(c.Query("status"))
+	if status != "" && status != "open" && status != "reviewing" && status != "resolved" && status != "dismissed" {
+		RespondError(c, http.StatusBadRequest, "Invalid report status")
+		return
+	}
+	reports, err := h.store.ListPublicationReports(c.Request.Context(), status, parseBoundedLimit(c, 100, 200))
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load publication reports")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"reports": reports})
+}
+
+func (h *OmniChatSocialHandler) ResolveReport(c *gin.Context) {
+	reportID, ok := parseUUIDParam(c, "report_id")
+	if !ok {
+		return
+	}
+	var request struct {
+		Resolution string `json:"resolution"`
+	}
+	if err := decodeStrictJSON(c, &request); err != nil ||
+		(request.Resolution != "removed" && request.Resolution != "dismissed") {
+		RespondError(c, http.StatusBadRequest, "Invalid report resolution")
+		return
+	}
+	resolved, err := h.store.ResolvePublicationReport(c.Request.Context(), reportID, c.GetInt("user_id"), request.Resolution)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to resolve publication report")
+		return
+	}
+	if !resolved {
+		RespondError(c, http.StatusNotFound, "Publication report not found")
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func decoratePublicPublication(publication *models.OmniChatPublication) {

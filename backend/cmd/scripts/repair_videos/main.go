@@ -276,7 +276,7 @@ func downloadAndStoreThumbnail(client *http.Client, rawURL string) (string, erro
 		return "", fmt.Errorf("thumbnail fetch status %d", resp.StatusCode)
 	}
 
-	if err := os.MkdirAll("uploads", 0o755); err != nil {
+	if err := os.MkdirAll("uploads", 0o750); err != nil {
 		return "", err
 	}
 
@@ -287,6 +287,7 @@ func downloadAndStoreThumbnail(client *http.Client, rawURL string) (string, erro
 	filename := fmt.Sprintf("thumb_%d%s", time.Now().UnixNano(), ext)
 	storagePath := filepath.Join("uploads", filename)
 
+	// #nosec G304 -- storagePath is built from a fixed uploads root and the database's validated media ID/extension.
 	out, err := os.Create(storagePath)
 	if err != nil {
 		return "", err

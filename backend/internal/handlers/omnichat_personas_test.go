@@ -33,7 +33,7 @@ func setupOmniChatPersonaTestEnv(t *testing.T) (*gin.Engine, *models.UserReposit
 
 	userRepo := models.NewUserRepository(db.Pool)
 	personaRepo := models.NewBotPersonaRepository(db.Pool)
-	handler := NewOmniChatHandler(personaRepo, nil, nil, &services.ChatbotService{})
+	handler := NewOmniChatHandler(personaRepo, nil, nil, &services.ChatbotService{}, nil)
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {

@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"math"
 	"os"
 	"strconv"
 	"sync"
@@ -31,8 +30,8 @@ func poolIntEnv(key string, defaultVal int32) int32 {
 	if s == "" {
 		return defaultVal
 	}
-	v, err := strconv.Atoi(s)
-	if err != nil || v <= 0 || v > math.MaxInt32 {
+	v, err := strconv.ParseInt(s, 10, 32)
+	if err != nil || v <= 0 {
 		zlog.Warn().
 			Str("key", key).
 			Str("value", s).

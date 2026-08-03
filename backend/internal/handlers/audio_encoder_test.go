@@ -3,17 +3,62 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type audioEncoderStorageFake struct {
+	uploadKey string
+	deleteKey string
+}
+
+func (f *audioEncoderStorageFake) Upload(_ context.Context, key string, body io.Reader, _ string) (string, error) {
+	f.uploadKey = key
+	_, err := io.Copy(io.Discard, body)
+	return "https://storage.test/" + key, err
+}
+
+func (*audioEncoderStorageFake) Download(context.Context, string) (io.ReadCloser, error) {
+	return nil, nil
+}
+
+func (f *audioEncoderStorageFake) Delete(_ context.Context, key string) error {
+	f.deleteKey = key
+	return nil
+}
+
+func (*audioEncoderStorageFake) GetSignedURL(context.Context, string, time.Duration) (string, error) {
+	return "", nil
+}
+
+func (*audioEncoderStorageFake) List(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+
+func (*audioEncoderStorageFake) GeneratePresignedPutURL(context.Context, string, string, time.Duration) (string, error) {
+	return "", nil
+}
+
+func (*audioEncoderStorageFake) PublicURL(key string) string {
+	return "https://storage.test/" + key
+}
+
+func (*audioEncoderStorageFake) GetObjectSize(context.Context, string) (int64, error) {
+	return 0, nil
+}
+
+var _ services.StorageService = (*audioEncoderStorageFake)(nil)
 
 func setupAudioEncoderHandler(t *testing.T) (*AudioEncoderHandler, func()) {
 	db, err := database.NewTest()
@@ -155,4 +200,50 @@ func TestCheckFFmpegAvailability(t *testing.T) {
 	} else {
 		t.Log("ffmpeg is available")
 	}
+}
+
+func TestPersistEncodedAudioUsesConfiguredStorageAndOwnerBoundObjectKey(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+	user := &models.User{Username: "audio_storage_owner", PasswordHash: "hash", Role: "user"}
+	require.NoError(t, models.NewUserRepository(db.Pool).Create(ctx, user))
+
+	storage := &audioEncoderStorageFake{}
+	handler := NewAudioEncoderHandler(
+		models.NewMediaFileRepository(db.Pool),
+		models.NewUserSettingsRepository(db.Pool),
+		nil,
+	).SetStorageService(storage)
+
+	media, err := handler.persistEncodedAudio(
+		ctx,
+		user.ID,
+		"original.wav",
+		[]byte("encoded-webm"),
+		3,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, media)
+	require.Equal(t, storage.uploadKey, media.StorageObjectKey)
+	require.Equal(t, "/uploads/"+storage.uploadKey, media.StorageURL)
+	require.Equal(t, "audio/webm", media.FileType)
+	require.Equal(t, models.MediaScanStatusClean, media.ScanStatus)
+	require.Regexp(t, `^[1-9][0-9]*/voice/[0-9a-f-]+\.webm$`, media.StorageObjectKey)
+	require.Equal(t, "uploads/"+media.StorageObjectKey, media.StoragePath)
+
+	require.NoError(t, models.NewMediaFileRepository(db.Pool).DeleteByID(ctx, media.ID))
+	var queuedOwner int
+	var queuedScope string
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT owner_user_id,storage_scope
+		FROM media_file_deletion_queue
+		WHERE storage_path=$1
+	`, media.StorageObjectKey).Scan(&queuedOwner, &queuedScope))
+	require.Equal(t, user.ID, queuedOwner)
+	require.Equal(t, "canonical_owned", queuedScope)
 }

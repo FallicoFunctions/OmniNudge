@@ -31,7 +31,7 @@ type omniChatGenerationJobStore interface {
 	GetMediaAssetOwned(ctx context.Context, id uuid.UUID, ownerUserID int) (*models.OmniChatMediaAsset, error)
 	MarkGenerationJobRunning(ctx context.Context, id uuid.UUID, providerJobID string) (bool, error)
 	UpdateGenerationProgress(ctx context.Context, id uuid.UUID, progress int) error
-	MarkGenerationJobFailed(ctx context.Context, id uuid.UUID, safeCode, providerError string) error
+	MarkGenerationJobFailed(ctx context.Context, id uuid.UUID, safeCode, providerError string) (bool, error)
 	CompleteGenerationJob(ctx context.Context, jobID uuid.UUID, media *models.MediaFile, asset *models.OmniChatMediaAsset, freeTierBytes, proTierBytes int64) error
 }
 
@@ -56,6 +56,18 @@ type OmniChatGenerationHandler struct {
 	failClosed       bool
 	storageQuotaFree int64
 	storageQuotaPro  int64
+	billing          interface {
+		CaptureOwned(context.Context, int, uuid.UUID) error
+		RefundOwned(context.Context, int, uuid.UUID) error
+	}
+}
+
+func (h *OmniChatGenerationHandler) SetBilling(billing interface {
+	CaptureOwned(context.Context, int, uuid.UUID) error
+	RefundOwned(context.Context, int, uuid.UUID) error
+}) *OmniChatGenerationHandler {
+	h.billing = billing
+	return h
 }
 
 func NewOmniChatGenerationHandler(
@@ -138,7 +150,34 @@ func (h *OmniChatGenerationHandler) recordGenerationFailure(ctx context.Context,
 	}
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 	defer cancel()
-	return h.jobs.MarkGenerationJobFailed(cleanupCtx, jobID, code, "generation failed")
+	job, err := h.jobs.GetGenerationJobForProcessing(cleanupCtx, jobID)
+	if err != nil {
+		return err
+	}
+	marked, err := h.jobs.MarkGenerationJobFailed(cleanupCtx, jobID, code, "generation failed")
+	if err != nil {
+		return err
+	}
+	if !marked {
+		job, err = h.jobs.GetGenerationJobForProcessing(cleanupCtx, jobID)
+		if err != nil {
+			return err
+		}
+	}
+	if job == nil || job.BillingOperationID == nil || h.billing == nil {
+		return nil
+	}
+	switch job.Status {
+	case models.OmniChatGenerationStatusSucceeded:
+		return h.billing.CaptureOwned(cleanupCtx, job.OwnerUserID, *job.BillingOperationID)
+	case models.OmniChatGenerationStatusFailed, models.OmniChatGenerationStatusCancelled:
+		return h.billing.RefundOwned(cleanupCtx, job.OwnerUserID, *job.BillingOperationID)
+	default:
+		if marked {
+			return h.billing.RefundOwned(cleanupCtx, job.OwnerUserID, *job.BillingOperationID)
+		}
+		return errors.New("generation terminal transition was not applied")
+	}
 }
 
 func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID) error {
@@ -153,6 +192,12 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 		return permanentGenerationFailure("job_not_found", errors.New("generation job not found"))
 	}
 	if job.Status == models.OmniChatGenerationStatusSucceeded || job.Status == models.OmniChatGenerationStatusCancelled || job.Status == models.OmniChatGenerationStatusFailed {
+		if job.BillingOperationID != nil && h.billing != nil {
+			if job.Status == models.OmniChatGenerationStatusSucceeded {
+				return h.billing.CaptureOwned(ctx, job.OwnerUserID, *job.BillingOperationID)
+			}
+			return h.billing.RefundOwned(ctx, job.OwnerUserID, *job.BillingOperationID)
+		}
 		return nil
 	}
 
@@ -288,7 +333,7 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 	}
 	defer file.Close()
 	storageKey := fmt.Sprintf("omnichat/generated/%d/%s%s", job.OwnerUserID, job.ID.String(), download.Extension)
-	storageURL, err := h.storage.Upload(ctx, storageKey, file, download.ContentType)
+	_, err = h.storage.Upload(ctx, storageKey, file, download.ContentType)
 	if err != nil {
 		return fmt.Errorf("store generated media: %w", err)
 	}
@@ -304,7 +349,9 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 		UserID: job.OwnerUserID, Filename: filepath.Base(storageKey),
 		OriginalFilename: "omnichat-generated" + download.Extension,
 		FileType:         download.ContentType, FileSize: download.Size,
-		StorageURL: storageURL, StoragePath: storageKey,
+		// Generated assets are private by default. Never persist a direct
+		// storage/CDN URL that could bypass the owner/publication access gates.
+		StorageURL: "/uploads/" + storageKey, StoragePath: storageKey,
 		ScanStatus: models.MediaScanStatusClean,
 	}
 	if width > 0 {
@@ -329,6 +376,14 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 		return fmt.Errorf("complete generation job: %w", err)
 	}
 	committed = true
+	if job.BillingOperationID != nil {
+		if h.billing == nil {
+			return errors.New("generation billing is not configured")
+		}
+		if err := h.billing.CaptureOwned(ctx, job.OwnerUserID, *job.BillingOperationID); err != nil {
+			return fmt.Errorf("capture generation credits: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -356,7 +411,10 @@ func (h *OmniChatGenerationHandler) stopIfGenerationCancelled(ctx context.Contex
 	if err != nil {
 		return false, fmt.Errorf("check generation cancellation: %w", err)
 	}
-	if current != nil && current.Status != models.OmniChatGenerationStatusCancelled {
+	if current != nil &&
+		current.Status != models.OmniChatGenerationStatusCancelled &&
+		current.Status != models.OmniChatGenerationStatusFailed &&
+		current.Status != models.OmniChatGenerationStatusSucceeded {
 		return false, nil
 	}
 	if providerJobID != "" {
@@ -368,6 +426,17 @@ func (h *OmniChatGenerationHandler) stopIfGenerationCancelled(ctx context.Contex
 			// completed, so a provider-side cancellation failure must not revive
 			// or retry the local job.
 			zlog.Warn().Err(err).Str("job_id", jobID.String()).Msg("failed to cancel OmniChat provider job")
+		}
+	}
+	if current != nil &&
+		current.Status != models.OmniChatGenerationStatusSucceeded &&
+		current.BillingOperationID != nil &&
+		h.billing != nil {
+		refundCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		err := h.billing.RefundOwned(refundCtx, current.OwnerUserID, *current.BillingOperationID)
+		cancel()
+		if err != nil {
+			return true, fmt.Errorf("refund cancelled generation reservation: %w", err)
 		}
 	}
 	return true, nil
