@@ -282,10 +282,12 @@ export default function OmniChatStudioPage() {
     if (selectedId === null || !selectedVoiceQuery.data) return;
     const presetId =
       selectedVoiceQuery.data.provider === 'voicebox' &&
-      voiceCatalogQuery.data?.presets.some(
+      voiceCatalogQuery.data?.presets.find(
         (preset) => preset.voice_id === selectedVoiceQuery.data.voice_id
       )
-        ? selectedVoiceQuery.data.voice_id
+        ? voiceCatalogQuery.data.presets.find(
+            (preset) => preset.voice_id === selectedVoiceQuery.data?.voice_id
+          )?.id ?? ''
         : '';
     setSelectedVoicePresetId(presetId);
     setBaselineVoicePresetId(presetId);
