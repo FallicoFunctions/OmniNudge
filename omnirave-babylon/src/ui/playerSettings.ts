@@ -39,7 +39,8 @@ export const GRAPHICS_LEVEL_MAX = 10;
 
 export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   uiTheme: DEFAULT_UI_THEME,
-  cameraFollow: 'follow',
+  // Sec 7: default camera mode is Free Camera; Auto-Follow is opt-in.
+  cameraFollow: 'free',
   graphicsAuto: true,
   graphicsLevel: 5,
   displayNames: true,
@@ -63,7 +64,7 @@ export function normalizePlayerSettings(raw: unknown): PlayerSettings {
   const source = (raw ?? {}) as Partial<Record<keyof PlayerSettings, unknown>>;
   return {
     uiTheme: resolveUiThemeId(source.uiTheme),
-    cameraFollow: source.cameraFollow === 'free' ? 'free' : 'follow',
+    cameraFollow: source.cameraFollow === 'follow' ? 'follow' : 'free',
     graphicsAuto: source.graphicsAuto === undefined ? true : source.graphicsAuto !== false,
     graphicsLevel: clampGraphicsLevel(source.graphicsLevel),
     displayNames: source.displayNames === undefined ? true : source.displayNames !== false,

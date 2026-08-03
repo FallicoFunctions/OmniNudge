@@ -115,7 +115,17 @@ export async function createMainStageScene(engine: AbstractEngine) {
     playerRig.setHeightInches(localAvatarDefinition.heightInches);
     return localAvatarDefinition;
   };
-  const cameraRig = createFollowCameraRig(scene, playerRig.root);
+  // Reuses the player's own solid-geometry lists so the camera collision ray
+  // checks the same venue walls AND floor the player controller already
+  // collides against - no second parallel mesh list. Both are passed by
+  // REFERENCE: solidCollisionMeshes is complete by this point, but
+  // collisionMeshes (the ground-ray list) still grows below (VIP skydeck /
+  // wing bridge floors) - the camera rig re-reads the live array each frame,
+  // so those later pushes are picked up automatically.
+  const cameraRig = createFollowCameraRig(scene, playerRig.root, {
+    solidCollisionMeshes: stageAssets.solidCollisionMeshes,
+    groundCollisionMeshes: stageAssets.collisionMeshes,
+  });
   cameraRig.applyCheckpointView(PLAYABLE_START_CAMERA);
 
   scene.activeCamera = cameraRig.camera;
