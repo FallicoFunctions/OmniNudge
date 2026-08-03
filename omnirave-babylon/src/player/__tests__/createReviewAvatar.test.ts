@@ -25,10 +25,17 @@ describe('createReviewAvatar', () => {
     expect(scene.getMeshByName('review-avatar-torso')).not.toBeNull();
     expect(scene.getMeshByName('review-avatar-left-leg')).not.toBeNull();
     expect(scene.getMeshByName('review-avatar-right-arm')).not.toBeNull();
-    // Every part hangs under the avatar root. Shoes are one level deeper -
+    // Every part hangs under the visual pivot (which absorbs the body's
+    // authored-facing-negative-Z correction - see createReviewAvatar.ts),
+    // one level under the avatar root. Shoes are one level deeper still -
     // they parent to their leg so they swing with the walk cycle.
+    const visualPivot = scene.getTransformNodeByName('review-avatar-visual-pivot')!;
+    expect(visualPivot.parent).toBe(avatar.root);
+    expect(visualPivot.rotation.y).toBeCloseTo(Math.PI);
     expect(
-      avatar.meshes.every((mesh) => mesh.parent === avatar.root || mesh.parent?.parent === avatar.root),
+      avatar.meshes.every(
+        (mesh) => mesh.parent === visualPivot || mesh.parent?.parent === visualPivot,
+      ),
     ).toBe(true);
     expect(avatar.meshes.every((mesh) => mesh.isPickable === false)).toBe(true);
     expect(avatar.meshes.every((mesh) => mesh.checkCollisions === false)).toBe(true);
