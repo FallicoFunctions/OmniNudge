@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/google/uuid"
@@ -28,8 +30,11 @@ func NewGuestService(sanctions repository.SanctionRepository, worldSocketURL str
 }
 
 func (s *GuestService) CreateGuestLaunchSession() *model.LaunchSession {
+	// PlayerID needs real collision resistance (it's the world server's map
+	// key), so it keeps the uuid suffix. GuestName/PlayerName are cosmetic and
+	// spec §10.1 wants the display form `GuestXXXX` (digits only, no hyphen).
 	suffix := uuid.NewString()[:6]
-	guestName := fmt.Sprintf("Guest-%s", suffix)
+	guestName := fmt.Sprintf("Guest%04d", randomGuestNumber())
 	return &model.LaunchSession{
 		GameSlug:    "omnirave",
 		Mode:        model.LaunchModeGuest,
@@ -38,6 +43,18 @@ func (s *GuestService) CreateGuestLaunchSession() *model.LaunchSession {
 		GuestName:   guestName,
 		PlayerName:  guestName,
 	}
+}
+
+// randomGuestNumber returns 0..9999. crypto/rand, not math/rand: this is a
+// player-visible identity string, not just test fixture data.
+func randomGuestNumber() int64 {
+	n, err := rand.Int(rand.Reader, big.NewInt(10000))
+	if err != nil {
+		// Astronomically unlikely (crypto/rand backed by the OS CSPRNG); a
+		// display-only fallback is fine, it never touches PlayerID identity.
+		return 0
+	}
+	return n.Int64()
 }
 
 func (s *GuestService) ExchangeBootstrap(ctx context.Context, token, remoteIP string) (*model.SessionExchangeResponse, error) {
