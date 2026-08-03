@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   GRID_SPACING,
   MAX_POINTS,
+  countdownKeyFor,
   createHologramGrid,
   planHologramLattice,
 } from '../createHologramGrid';
@@ -217,6 +218,107 @@ describe('createHologramGrid', () => {
     const grid = createHologramGrid(scene, { getFrequencyData: loudSource });
     grid.update(0.016);
     expect(grid.litPoints).toBe(grid.pointCount);
+    grid.dispose();
+  });
+
+  it('lead_in countdown produces a lit/legible formation distinct from idle cube', () => {
+    const grid = createHologramGrid(scene, { getFrequencyData: zeroSource });
+    // Idle cube: the whole lattice lights (existing baseline behaviour).
+    grid.update(0.016);
+    expect(grid.formationOverride).toBe('none');
+    expect(grid.litPoints).toBe(grid.pointCount);
+
+    // lead_in: the countdown formation takes over - a DIFFERENT formation
+    // (never the held/morphing shape-library cube) for as long as the event
+    // is in its 10s countdown window.
+    grid.setEventState({ phase: 'lead_in', countdownSeconds: 10 });
+    grid.update(0.016);
+    expect(grid.formationOverride).toBe('countdown');
+    // No real 2D canvas exists under jsdom/NullEngine (see the other tests'
+    // "Not implemented: HTMLCanvasElement's getContext()" warning), so the
+    // countdown formation cannot sample real digit pixels here; it correctly
+    // reports zero lit points rather than accidentally lighting the full
+    // cube, which is itself the distinguishing, testable signal.
+    expect(grid.litPoints).toBe(0);
+    grid.dispose();
+  });
+
+  it('countdownKeyFor: first tick shows the announcement phrase, then digits 10 down to 1', () => {
+    // Very first tick of the 10s lead-in: the announcement beat, not "10" yet.
+    expect(countdownKeyFor(10)).toBe('phrase');
+    expect(countdownKeyFor(9.6)).toBe('phrase');
+    // Once past the announcement threshold, the digit takes over immediately -
+    // still within the SAME integer second ceil(9.4) === 10.
+    expect(countdownKeyFor(9.4)).toBe('10');
+    expect(countdownKeyFor(9.0001)).toBe('10');
+    expect(countdownKeyFor(9)).toBe('9');
+    expect(countdownKeyFor(5.5)).toBe('6');
+    expect(countdownKeyFor(1.0)).toBe('1');
+    expect(countdownKeyFor(0.4)).toBe('1');
+    expect(countdownKeyFor(0)).toBe('1');
+  });
+
+  it('a full simulated 10s countdown never throws while the digit key keeps changing', () => {
+    const grid = createHologramGrid(scene, { getFrequencyData: zeroSource });
+    grid.setEventState({ phase: 'lead_in', countdownSeconds: 10 });
+    grid.update(0.016);
+    expect(grid.formationOverride).toBe('countdown');
+
+    // Step through the whole 10s window; the override stays 'countdown'
+    // throughout regardless of which digit/phrase is currently cached, and
+    // resampling on every key change must not throw or allocate unsafely.
+    for (let cd = 10; cd >= 0.2; cd -= 0.2) {
+      grid.setEventState({ phase: 'lead_in', countdownSeconds: cd });
+      expect(() => grid.update(0.05)).not.toThrow();
+      expect(grid.formationOverride).toBe('countdown');
+    }
+    grid.dispose();
+  });
+
+  it('active minute 1 and minute 3 hold the drone-spelled OMNIRAVE wordmark; minute 3 is brighter', () => {
+    const minute1Grid = createHologramGrid(scene, { getFrequencyData: loudSource });
+    minute1Grid.setEventState({ phase: 'active', activeMinute: 1 });
+    let minute1Peak = 0;
+    for (let i = 0; i < 10; i++) {
+      minute1Grid.update(0.016);
+      minute1Peak = minute1Grid.peakBrightness;
+    }
+    expect(minute1Grid.formationOverride).toBe('wordmark');
+    minute1Grid.dispose();
+
+    const minute3Grid = createHologramGrid(scene, { getFrequencyData: loudSource });
+    minute3Grid.setEventState({ phase: 'active', activeMinute: 3 });
+    let minute3Peak = 0;
+    for (let i = 0; i < 10; i++) {
+      minute3Grid.update(0.016);
+      minute3Peak = minute3Grid.peakBrightness;
+    }
+    expect(minute3Grid.formationOverride).toBe('wordmark');
+    // "each is bigger than the last" (§5.1.1): minute 3's escalation reads
+    // brighter than minute 1's under identical (loud) audio.
+    expect(minute3Peak).toBeGreaterThan(minute1Peak);
+    minute3Grid.dispose();
+  });
+
+  it('active minute 2 does NOT trigger the drone wordmark path (the parallel firework-letter beat owns it)', () => {
+    const grid = createHologramGrid(scene, { getFrequencyData: loudSource });
+    grid.setEventState({ phase: 'active', activeMinute: 2 });
+    for (let i = 0; i < 10; i++) {
+      grid.update(0.016);
+    }
+    expect(grid.formationOverride).toBe('none');
+    grid.dispose();
+  });
+
+  it('recovery phase and a missing/zero activeMinute fall back to normal behaviour, no special formation', () => {
+    const grid = createHologramGrid(scene, { getFrequencyData: loudSource });
+    grid.setEventState({ phase: 'recovery', activeMinute: 0 });
+    grid.update(0.016);
+    expect(grid.formationOverride).toBe('none');
+
+    grid.setEventState({ phase: 'active' }); // activeMinute absent
+    grid.update(0.016);
+    expect(grid.formationOverride).toBe('none');
     grid.dispose();
   });
 

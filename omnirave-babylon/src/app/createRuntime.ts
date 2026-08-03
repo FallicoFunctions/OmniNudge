@@ -319,6 +319,7 @@ export async function createRuntime(host: HTMLElement) {
       cascadeCourtLightFloor?.dispose();
       hologramGrid?.dispose();
       stageAtmospherics?.dispose();
+      fireworksShow?.dispose();
       cleanupOwnedResources();
       activeEngine.dispose();
     };
@@ -341,6 +342,7 @@ export async function createRuntime(host: HTMLElement) {
     let cascadeCourtLightFloor: import('../scene/createCascadeCourtLightFloor').CascadeCourtLightFloor | undefined;
     let hologramGrid: import('../scene/createHologramGrid').HologramGrid | undefined;
     let stageAtmospherics: import('../scene/createStageAtmospherics').StageAtmospherics | undefined;
+    let fireworksShow: import('../scene/createFireworksShow').FireworksShow | undefined;
     // Latest active-zone media from the world snapshot; the HUD reads it on a
     // 1s tick instead of re-rendering on every snapshot.
     let activeZoneId = 'main_stage';
@@ -440,11 +442,20 @@ export async function createRuntime(host: HTMLElement) {
         activeZoneId = snapshot.activeZone;
         activeZoneMedia = activeMedia;
         activePlayers = snapshot.players;
+        // Sec 13.3 track-start title card. setTrackInfo diffs trackId
+        // internally, so a same-track repeat snapshot is a no-op here.
+        if (activeMedia) {
+          stageVisualizer?.setTrackInfo(activeMedia.artist, activeMedia.title, activeMedia.trackId);
+        }
         // Drive the stage screen's event mode (countdown / fireworks video)
         // from the active zone's scheduled event, if any.
         const activeEvent = snapshot.zoneEvents.find((zone) => zone.zoneId === snapshot.activeZone) ?? null;
         const eventState = activeEvent
-          ? { phase: activeEvent.phase, countdownSeconds: activeEvent.countdownSeconds }
+          ? {
+              phase: activeEvent.phase,
+              countdownSeconds: activeEvent.countdownSeconds,
+              activeMinute: activeEvent.activeMinute,
+            }
           : null;
         stageVisualizer?.setEventState(eventState);
         immersiveAudioShow?.setEventState(eventState);
@@ -452,6 +463,7 @@ export async function createRuntime(host: HTMLElement) {
         cascadeCourtLightFloor?.setEventState(eventState);
         hologramGrid?.setEventState(eventState);
         stageAtmospherics?.setEventState(eventState);
+        fireworksShow?.setEventState(eventState);
       });
       // Sec 6.2/6.5: publish the SAME loadout that was applied to the local
       // render (scene.metadata.localAvatarLoadout, stashed above) so other
@@ -718,6 +730,15 @@ export async function createRuntime(host: HTMLElement) {
     });
     const activeStageAtmospherics = stageAtmospherics;
 
+    // §5.1.1 Main Stage scheduled event: aerial sky bursts + stage-level pyro,
+    // idle (no launches) outside the event's active phase. Shares the same
+    // spectrum closure for palette/beat coherence with the rest of the venue.
+    const { createFireworksShow } = await import('../scene/createFireworksShow');
+    fireworksShow = createFireworksShow(scene, {
+      getFrequencyData: getStageFrequencyData,
+    });
+    const activeFireworksShow = fireworksShow;
+
     const runtime = {
       canvas,
       debugPanel,
@@ -772,6 +793,7 @@ export async function createRuntime(host: HTMLElement) {
       activeCascadeCourtLightFloor.update(deltaSeconds);
       activeHologramGrid.update(deltaSeconds);
       activeStageAtmospherics.update(deltaSeconds);
+      activeFireworksShow.update(deltaSeconds);
       // Feed the stage show's spill-light pulse real bass energy when audio is
       // live; null keeps it on its estimated 126BPM beat clock.
       playerRuntime?.stageShow?.setAudioEnergy?.(activeImmersiveAudioShow.bassLevel);
