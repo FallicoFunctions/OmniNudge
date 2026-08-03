@@ -40,6 +40,11 @@ func (w *World) AddPlayer(session PlayerSession) *Player {
 	spawn := w.cfg.SpawnPoint
 	if session.ReturnPoint != nil && w.cfg.Walkable.IsValid(*session.ReturnPoint) {
 		spawn = *session.ReturnPoint
+	} else {
+		// Sec 8: deconflict a fresh join against whoever's already standing at
+		// the primary spawn point (a returning-user's saved ReturnPoint skips
+		// this - they're going back to a specific spot, not joining fresh).
+		spawn = w.cfg.ZoneMap.SpawnFor(w.cfg.ZoneMap.ZoneFor(spawn), w.occupiedPositions(w.cfg.ZoneMap.ZoneFor(spawn), ""))
 	}
 
 	player := &Player{
@@ -79,8 +84,22 @@ func (w *World) RespawnPlayer(playerID string) {
 		return
 	}
 
-	player.Position = w.cfg.ZoneMap.layout.SpawnFor(player.Zone)
+	player.Position = w.cfg.ZoneMap.SpawnFor(player.Zone, w.occupiedPositions(player.Zone, playerID))
 	player.Zone = w.cfg.ZoneMap.ZoneFor(player.Position)
+}
+
+// occupiedPositions returns the current positions of every player already in
+// zone, excluding excludeID (so a respawning/rejoining player never counts as
+// crowding its own spawn point). Caller must already hold w.mu.
+func (w *World) occupiedPositions(zone ZoneID, excludeID string) []Vec3 {
+	positions := make([]Vec3, 0, len(w.players))
+	for id, player := range w.players {
+		if id == excludeID || player.Zone != zone {
+			continue
+		}
+		positions = append(positions, player.Position)
+	}
+	return positions
 }
 
 // RemovePlayer deletes playerID's entry only if it still belongs to session

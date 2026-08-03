@@ -21,9 +21,9 @@ func TestDefaultZoneMap_UsesApprovedVenueIDs(t *testing.T) {
 func TestLayout_UsesApprovedVenueSpawnsAndBoundaries(t *testing.T) {
 	layout := DefaultLayout()
 
-	require.Equal(t, Vec3{X: 0, Y: 0, Z: -48}, layout.SpawnFor(ZoneMainStage))
-	require.Equal(t, Vec3{X: 42, Y: 0, Z: 36}, layout.SpawnFor(ZoneUnderground))
-	require.Equal(t, Vec3{X: -34, Y: 0, Z: 36}, layout.SpawnFor(ZonePlurrPartay))
+	require.Equal(t, Vec3{X: 0, Y: 0, Z: -48}, layout.SpawnFor(ZoneMainStage, nil))
+	require.Equal(t, Vec3{X: 42, Y: 0, Z: 36}, layout.SpawnFor(ZoneUnderground, nil))
+	require.Equal(t, Vec3{X: -34, Y: 0, Z: 36}, layout.SpawnFor(ZonePlurrPartay, nil))
 
 	require.Equal(t, ZoneMainStage, layout.ZoneFor(Vec3{X: -8, Y: 0, Z: 6}))
 	require.Equal(t, ZoneUnderground, layout.ZoneFor(Vec3{X: 42, Y: 0, Z: 40}))
