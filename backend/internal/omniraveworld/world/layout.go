@@ -1,5 +1,16 @@
 package world
 
+import "math"
+
+// Sec 8: spawn is "one exact point plus a 15-foot fallback zone shaped to
+// venue geometry", used when the exact point is occupied. 15ft ~= 4.572m.
+// spawnCrowdRadius is how close another player has to be to the CANDIDATE
+// point to count as "occupying" it - smaller than the fallback radius itself,
+// so points near the edge of the zone aren't rejected by someone standing
+// all the way over at the primary point.
+const spawnFallbackRadiusMeters = 4.572
+const spawnCrowdRadiusMeters = 1.5
+
 type layoutZone struct {
 	id     ZoneID
 	bounds Bounds
@@ -43,12 +54,82 @@ func DefaultLayout() Layout {
 	}
 }
 
-func (l Layout) SpawnFor(zone ZoneID) Vec3 {
-	spawn, ok := l.spawns[zone]
-	if ok {
-		return spawn
+// SpawnFor returns zone's spawn point, falling back to one of a ring of
+// candidate points within spawnFallbackRadiusMeters of the primary point when
+// the primary point is occupied (any position in `occupied` within
+// spawnCrowdRadiusMeters of it). Candidates are clamped to the zone's own
+// bounds rectangle, so "shaped to venue geometry" at this coarse
+// server-authority level just means "still inside the zone" - fine per-object
+// obstacle avoidance is the client's own collision, same as normal movement.
+// occupied may be nil (e.g. process boot, before anyone has joined).
+func (l Layout) SpawnFor(zone ZoneID, occupied []Vec3) Vec3 {
+	primary, ok := l.spawns[zone]
+	if !ok {
+		primary = l.spawns[ZoneMainStage]
+		zone = ZoneMainStage
 	}
-	return l.spawns[ZoneMainStage]
+
+	bounds, hasBounds := l.boundsFor(zone)
+	if !isSpawnCrowded(primary, occupied) {
+		return primary
+	}
+
+	for _, candidate := range spawnFallbackRing(primary) {
+		if hasBounds {
+			candidate = clampToBounds(candidate, bounds)
+		}
+		if !isSpawnCrowded(candidate, occupied) {
+			return candidate
+		}
+	}
+
+	// Every candidate is crowded (a packed venue): don't dead-end, just reuse
+	// the primary point - stacking briefly is better than refusing to spawn.
+	return primary
+}
+
+func (l Layout) boundsFor(zone ZoneID) (Bounds, bool) {
+	for _, z := range l.zones {
+		if z.id == zone {
+			return z.bounds, true
+		}
+	}
+	return Bounds{}, false
+}
+
+// spawnFallbackRing returns 8 candidate points evenly spaced around center at
+// spawnFallbackRadiusMeters - a coarse approximation of "a 15-foot fallback
+// zone", cheap enough to compute per spawn without authoring per-venue shapes
+// by hand until real venue geometry is available server-side.
+func spawnFallbackRing(center Vec3) []Vec3 {
+	const points = 8
+	ring := make([]Vec3, points)
+	for i := 0; i < points; i++ {
+		angle := 2 * math.Pi * float64(i) / float64(points)
+		ring[i] = Vec3{
+			X: center.X + spawnFallbackRadiusMeters*math.Cos(angle),
+			Y: center.Y,
+			Z: center.Z + spawnFallbackRadiusMeters*math.Sin(angle),
+		}
+	}
+	return ring
+}
+
+func clampToBounds(point Vec3, bounds Bounds) Vec3 {
+	point.X = math.Min(bounds.MaxX, math.Max(bounds.MinX, point.X))
+	point.Z = math.Min(bounds.MaxZ, math.Max(bounds.MinZ, point.Z))
+	return point
+}
+
+func isSpawnCrowded(point Vec3, occupied []Vec3) bool {
+	for _, other := range occupied {
+		dx := point.X - other.X
+		dz := point.Z - other.Z
+		if dx*dx+dz*dz <= spawnCrowdRadiusMeters*spawnCrowdRadiusMeters {
+			return true
+		}
+	}
+	return false
 }
 
 func (l Layout) ZoneFor(point Vec3) ZoneID {
