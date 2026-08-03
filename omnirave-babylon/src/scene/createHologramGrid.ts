@@ -243,7 +243,17 @@ const VENUE_SENTINEL_MESH = 'main-stage-hero-screen-panel-l';
 // The canopy plates to free up. Matched by REGEX rather than by exact merged
 // name so that merge-name drift (the "+N" suffix is the member count, and the
 // stem is derived from the first member's name) cannot silently break this.
-const CANOPY_PLATE_PATTERN = /V113_CrownShell/;
+//
+// Player-flagged (2026-07-31): V127_CrownScreenShadowCoffer/
+// VerticalKeystone are two small, NOT-merged pieces that graze this same
+// volume's stage-side face (see the volume comment above) - trim from
+// whatever overhead screen concept the V113 canopy plates originally
+// belonged to. They were never part of the V113 hide/restore pair, so once
+// the canopy plates went away they read as orphaned fragments floating with
+// nothing around them. Folded into the SAME hide-on-create/restore-on-
+// dispose list rather than given a separate one, since they are the exact
+// same kind of "owner wants the space back, not the geometry deleted" case.
+const CANOPY_PLATE_PATTERN = /V113_CrownShell|V127_CrownScreen/;
 
 export type HologramShapeName = 'cube' | 'sphere' | 'helix' | 'wave' | 'wordmark';
 

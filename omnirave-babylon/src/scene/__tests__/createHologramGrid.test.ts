@@ -6,10 +6,17 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { GRID_SPACING, MAX_POINTS, createHologramGrid, planHologramLattice } from '../createHologramGrid';
+import {
+  GRID_SPACING,
+  MAX_POINTS,
+  createHologramGrid,
+  planHologramLattice,
+} from '../createHologramGrid';
 
 const LAMELLA = 'merged:V113_CrownShellLamellaArray+1';
 const GOLD_SEAM = 'merged:V113_CrownShellGoldSeamArray+1';
+const SHADOW_COFFER = 'V127_CrownScreenShadowCoffer';
+const VERTICAL_KEYSTONE = 'V127_CrownScreenVerticalKeystone';
 
 describe('createHologramGrid', () => {
   let engine: NullEngine;
@@ -25,6 +32,11 @@ describe('createHologramGrid', () => {
     // The V113 canopy plates whose airspace the hologram takes over.
     MeshBuilder.CreatePlane(LAMELLA, { size: 1 }, scene);
     MeshBuilder.CreatePlane(GOLD_SEAM, { size: 1 }, scene);
+    // Player-flagged (2026-07-31): small V127 crown-screen fragments that
+    // graze this same volume and were left orphaned once the V113 plates
+    // above were hidden - folded into the same hide/restore pair.
+    MeshBuilder.CreatePlane(SHADOW_COFFER, { size: 1 }, scene);
+    MeshBuilder.CreatePlane(VERTICAL_KEYSTONE, { size: 1 }, scene);
   });
 
   afterEach(() => {
@@ -64,21 +76,29 @@ describe('createHologramGrid', () => {
     bare.dispose();
   });
 
-  it('HIDES the V113 canopy plates on create and RESTORES them on dispose', () => {
+  it('HIDES the V113 canopy plates and V127 crown-screen fragments on create and RESTORES them on dispose', () => {
     expect(plateEnabled(LAMELLA)).toBe(true);
     expect(plateEnabled(GOLD_SEAM)).toBe(true);
+    expect(plateEnabled(SHADOW_COFFER)).toBe(true);
+    expect(plateEnabled(VERTICAL_KEYSTONE)).toBe(true);
 
     const grid = createHologramGrid(scene, { getFrequencyData: zeroSource });
-    expect(grid.hiddenPlateCount).toBe(2);
+    expect(grid.hiddenPlateCount).toBe(4);
     expect(plateEnabled(LAMELLA)).toBe(false);
     expect(plateEnabled(GOLD_SEAM)).toBe(false);
+    expect(plateEnabled(SHADOW_COFFER)).toBe(false);
+    expect(plateEnabled(VERTICAL_KEYSTONE)).toBe(false);
     // Hidden, NOT deleted: the meshes are still in the scene.
     expect(scene.getMeshByName(LAMELLA) != null).toBe(true);
     expect(scene.getMeshByName(GOLD_SEAM) != null).toBe(true);
+    expect(scene.getMeshByName(SHADOW_COFFER) != null).toBe(true);
+    expect(scene.getMeshByName(VERTICAL_KEYSTONE) != null).toBe(true);
 
     grid.dispose();
     expect(plateEnabled(LAMELLA)).toBe(true);
     expect(plateEnabled(GOLD_SEAM)).toBe(true);
+    expect(plateEnabled(SHADOW_COFFER)).toBe(true);
+    expect(plateEnabled(VERTICAL_KEYSTONE)).toBe(true);
   });
 
   it('instance count matches the spacing arithmetic and stays under MAX_POINTS', () => {
