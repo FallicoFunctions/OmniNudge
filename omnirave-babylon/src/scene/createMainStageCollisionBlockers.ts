@@ -16,6 +16,11 @@ import {
   SKYDECK_PIER_SIZE,
   SKYDECK_RAIL_HEIGHT,
   SKYDECK_RAIL_RUNS,
+  SKYDECK_RAMP_FOOT_X,
+  SKYDECK_RAMP_HEAD_X,
+  SKYDECK_RAMP_Z_MAX,
+  SKYDECK_RAMP_Z_MIN,
+  SKYDECK_SLAB_THICKNESS,
   WING_BRIDGE_DECK_Y,
   WING_BRIDGE_HALF_SPAN,
   WING_BRIDGE_HALF_WIDTH,
@@ -64,9 +69,36 @@ interface CollisionBlockerSpec {
 // phantom walls come from. It is 4m wide with a visible balustrade, and
 // stepping off it drops you onto the flank ground the ramp starts from.
 const RAIL_BLOCKER_THICKNESS = 0.3;
-// Piers stand on the flank ground, so their rows only need to cover the
-// capsule band; a full-height row would add nothing and reach into the deck.
-const PIER_BLOCKER_HEIGHT = 3;
+// Piers stand on the flank ground, so their rows only need to cover a
+// standing capsule's height at ground level (~1.8m, matching
+// createPlayerRig.ts's REFERENCE_CAPSULE_HEIGHT_METERS) - tall enough to
+// stop someone walking sideways into the visible column, short enough to
+// stay well clear of anyone climbing the ramp DIRECTLY ABOVE that same pier.
+//
+// Player-flagged (2026-07-31, in-engine, two passes): this was originally a
+// FLAT 3m for every pier. The pier at x55 sits under the ramp's own
+// shallow/foot-end slope, where the ramp's real walking surface is only
+// ~3.2m up there - 3m rose to within 0.2m of a climbing player's FEET,
+// walling the climb outright. The first fix matched each pier's blocker
+// height to createVipSkydeck.ts's own `carriedTopY - slab thickness` calc
+// (i.e. flush with the ramp's underside) - still wrong, because a pier's
+// whole JOB is holding the ramp up from just below its surface, so "flush
+// with the underside" is ALWAYS within a slab-thickness of a climbing
+// player's feet, not a real fix. 1.8m gives every pier here real clearance
+// (>1.4m at the tightest, x55) rather than grazing the boundary. The min()
+// against each pier's own carriedTopY is a safety clamp, not the primary
+// fix: it only bites if a future pier ever sits somewhere the ramp/deck
+// itself dips below capsule height, shrinking the row automatically instead
+// of silently regressing this exact bug again.
+const PIER_CAPSULE_CLEARANCE_HEIGHT = 1.8;
+const RAMP_RUN = SKYDECK_RAMP_FOOT_X - SKYDECK_RAMP_HEAD_X;
+function pierBlockerHeight(pierX: number): number {
+  const carriedTopY =
+    pierX >= SKYDECK_RAMP_HEAD_X
+      ? ((SKYDECK_RAMP_FOOT_X - pierX) / RAMP_RUN) * SKYDECK_DECK_Y
+      : SKYDECK_DECK_Y;
+  return Math.max(0.5, Math.min(PIER_CAPSULE_CLEARANCE_HEIGHT, carriedTopY - SKYDECK_SLAB_THICKNESS));
+}
 
 // --- Cascade fountain collision (octagon, not rectangle) ----------------
 // The cascade fountain's base is an OCTAGON; treating it as an axis-aligned
@@ -131,6 +163,56 @@ function railBlocker(
   };
 }
 
+// Ramp balustrade collision. Previously none at all - the comment above the
+// ramp's exclusion from elevatedStructureBlockers explains why an
+// axis-aligned box hugging the slope was rejected (walls the flank ground
+// beside the ramp's low end); a single box ROTATED to match the slope was
+// never built either, because resolveHorizontalCollision only tests
+// axis-aligned WORLD bounding boxes - a long thin rail rotated ~28 degrees
+// has a world AABB that balloons to roughly the ramp's full rise in height,
+// phantom-walling the whole corridor rather than just the true rail edge.
+//
+// Player-flagged (2026-07-31, in-engine): walking clean through the visible
+// balustrade was worse than either failure mode, so this steps short,
+// axis-aligned segments across the run instead - the same technique
+// fountainCollisionColumns already uses for a curved edge. Each segment's
+// floor is pinned to the ramp's own walking height at the segment's HIGHER
+// (head-ward) end, never its lower end, so a segment can float a little
+// above the true surface near its low end but can never dip below it and
+// wall the climb itself - the exact failure the pier-height bug hit
+// elsewhere on this same ramp.
+const RAMP_RAIL_SEGMENT_COUNT = 16;
+
+function rampRailBlockers(): CollisionBlockerSpec[] {
+  const specs: CollisionBlockerSpec[] = [];
+  const segmentRun = RAMP_RUN / RAMP_RAIL_SEGMENT_COUNT;
+  for (const side of [1, -1] as const) {
+    const tag = side > 0 ? 'r' : 'l';
+    for (const [edgeLabel, edgeZ] of [
+      ['south', SKYDECK_RAMP_Z_MIN + RAIL_BLOCKER_THICKNESS / 2],
+      ['north', SKYDECK_RAMP_Z_MAX - RAIL_BLOCKER_THICKNESS / 2],
+    ] as const) {
+      for (let i = 0; i < RAMP_RAIL_SEGMENT_COUNT; i++) {
+        // xHigh is this segment's head-ward (higher) end; x increases toward
+        // the foot, where the walking surface gets lower.
+        const xHigh = SKYDECK_RAMP_HEAD_X + i * segmentRun;
+        const xCenter = xHigh + segmentRun / 2;
+        const floorY = ((SKYDECK_RAMP_FOOT_X - xHigh) / RAMP_RUN) * SKYDECK_DECK_Y;
+        specs.push({
+          name: `main-stage-blocker-skydeck-ramp-rail-${tag}-${edgeLabel}-${i}`,
+          x: side * xCenter,
+          y: floorY + SKYDECK_RAIL_HEIGHT / 2,
+          z: edgeZ,
+          width: segmentRun,
+          height: SKYDECK_RAIL_HEIGHT,
+          depth: RAIL_BLOCKER_THICKNESS,
+        });
+      }
+    }
+  }
+  return specs;
+}
+
 function elevatedStructureBlockers(): CollisionBlockerSpec[] {
   const specs: CollisionBlockerSpec[] = [];
   for (const side of [1, -1] as const) {
@@ -139,13 +221,14 @@ function elevatedStructureBlockers(): CollisionBlockerSpec[] {
       specs.push(railBlocker(`main-stage-blocker-skydeck-${tag}-${line.name}`, line, SKYDECK_DECK_Y, side));
     }
     SKYDECK_PIERS.forEach((pier, index) => {
+      const height = pierBlockerHeight(pier.x);
       specs.push({
         name: `main-stage-blocker-skydeck-pier-${tag}-${index}`,
         x: side * pier.x,
-        y: PIER_BLOCKER_HEIGHT / 2,
+        y: height / 2,
         z: pier.z,
         width: SKYDECK_PIER_SIZE,
-        height: PIER_BLOCKER_HEIGHT,
+        height,
         depth: SKYDECK_PIER_SIZE,
       });
     });
@@ -214,6 +297,7 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
   },
   ...fountainCollisionColumns(),
   ...elevatedStructureBlockers(),
+  ...rampRailBlockers(),
 ];
 
 const SOLID_SOURCE_NAME_PATTERNS: readonly RegExp[] = [
