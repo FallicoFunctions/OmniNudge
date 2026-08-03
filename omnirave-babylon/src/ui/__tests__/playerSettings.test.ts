@@ -30,7 +30,7 @@ function createMemoryStorage(seed: Record<string, string> = {}): Storage {
 describe('playerSettings', () => {
   it('defaults to the spec theme and sensible control modes', () => {
     expect(DEFAULT_PLAYER_SETTINGS.uiTheme).toBe('luminous-panels');
-    expect(DEFAULT_PLAYER_SETTINGS.cameraFollow).toBe('follow');
+    expect(DEFAULT_PLAYER_SETTINGS.cameraFollow).toBe('free');
     expect(DEFAULT_PLAYER_SETTINGS.graphicsAuto).toBe(true);
     expect(DEFAULT_PLAYER_SETTINGS.displayNames).toBe(true);
     expect(DEFAULT_PLAYER_SETTINGS.crouchMode).toBe('hold');

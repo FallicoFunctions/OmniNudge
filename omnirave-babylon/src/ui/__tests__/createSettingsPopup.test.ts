@@ -75,16 +75,18 @@ describe('createSettingsPopup', () => {
 
   it('applies Camera Follow immediately', () => {
     const onCameraFollowChange = vi.fn();
+    // Sec 7's default is Free Camera, so clicking "follow" first (the
+    // non-default option) is what actually exercises a change here.
     const { segment } = setup({ onCameraFollowChange });
 
-    segment('camera-follow', 'free').click();
-    expect(onCameraFollowChange).toHaveBeenCalledTimes(1);
-    expect(onCameraFollowChange.mock.calls[0][0]).toBe('free');
-    expect(segment('camera-follow', 'free').getAttribute('aria-pressed')).toBe('true');
-    expect(segment('camera-follow', 'follow').getAttribute('aria-pressed')).toBe('false');
-
     segment('camera-follow', 'follow').click();
-    expect(onCameraFollowChange.mock.calls[1][0]).toBe('follow');
+    expect(onCameraFollowChange).toHaveBeenCalledTimes(1);
+    expect(onCameraFollowChange.mock.calls[0][0]).toBe('follow');
+    expect(segment('camera-follow', 'follow').getAttribute('aria-pressed')).toBe('true');
+    expect(segment('camera-follow', 'free').getAttribute('aria-pressed')).toBe('false');
+
+    segment('camera-follow', 'free').click();
+    expect(onCameraFollowChange.mock.calls[1][0]).toBe('free');
   });
 
   it('applies the crouch mode immediately', () => {
@@ -170,11 +172,13 @@ describe('createSettingsPopup', () => {
     const onChange = vi.fn();
     const { popup, segment } = setup({ onChange });
 
-    segment('camera-follow', 'free').click();
+    // Sec 7's default is Free Camera, so "follow" is the non-default option
+    // that actually exercises a change here.
+    segment('camera-follow', 'follow').click();
 
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange.mock.calls[0][0].cameraFollow).toBe('free');
-    expect(popup.settings().cameraFollow).toBe('free');
+    expect(onChange.mock.calls[0][0].cameraFollow).toBe('follow');
+    expect(popup.settings().cameraFollow).toBe('follow');
   });
 
   it('renders the settings it was handed on load', () => {

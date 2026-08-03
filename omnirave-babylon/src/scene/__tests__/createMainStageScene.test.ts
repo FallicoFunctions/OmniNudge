@@ -134,10 +134,17 @@ describe('createMainStageScene', () => {
     expect((camera!.lockedTarget as TransformNode).position.y).toBeCloseTo(1.35);
     expect((camera!.lockedTarget as TransformNode).position.z).toBeCloseTo(-48);
 
-    camera!.radius = 20;
+    // Sec 7.2 camera collision: camera.radius is now resolved EVERY frame
+    // from the rig's own requested-distance + collision state (both camera
+    // modes track position - see CameraFollowMode's doc comment), so poking
+    // camera.radius directly no longer sticks; that is correct, not a
+    // regression. The real invariant this test guards is that idle repeated
+    // renders resolve to a STABLE distance rather than drifting.
+    scene.render();
+    const radiusAfterFirstRender = camera!.radius;
     scene.render();
 
-    expect(camera!.radius).toBeCloseTo(20);
+    expect(camera!.radius).toBeCloseTo(radiusAfterFirstRender);
   });
 
   it('hides the embodied avatar when zoomed into first-person', async () => {
@@ -147,11 +154,16 @@ describe('createMainStageScene', () => {
     const scene = await createMainStageScene(engine);
     const camera = scene.activeCamera as ArcRotateCamera | null;
     const avatarBody = scene.getMeshByName('review-avatar-body');
+    const cameraRig = scene.metadata?.reviewRuntime?.cameraRig;
 
     expect(camera).not.toBeNull();
     expect(avatarBody).not.toBeNull();
 
-    camera!.radius = 0.1;
+    // Sec 7.2: camera.radius is resolved from the rig's own requested
+    // distance every frame, so the zoom has to go through the rig's zoom()
+    // (which updates that requested distance) rather than a direct
+    // camera.radius write, which the sync loop would just overwrite.
+    cameraRig!.zoom(-100);
     scene.render();
 
     expect(avatarBody!.visibility).toBe(0);
@@ -469,13 +481,39 @@ describe('createMainStageScene', () => {
     expect(runtime!.routeProgress.completedCount).toBeGreaterThanOrEqual(1);
     expect(runtime!.routeProgress.activeCheckpoint?.id).toBe('promenade_mid');
     expect(runtime!.reviewAvatar.root.metadata?.animationState).toBe('run');
-    // Two ground resolves per controller step, two steps, over the ground
-    // mesh plus the seven authored walkable surfaces the skydecks and the
-    // wing bridge add to collisionMeshes (6 skydeck decks/landings/ramps +
-    // 1 bridge deck): 8 x 2 x 2.
-    expect(intersectsMesh).toHaveBeenCalledTimes(32);
-    // Still ONE ray instance reused across every frame - no per-frame alloc.
-    expect(rayInstances.size).toBe(1);
+    // Two contributors to this global Ray.prototype spy: playerController's
+    // own ground-detection ray (two resolves per controller step, two steps,
+    // over the ground mesh plus the nine authored walkable surfaces the
+    // skydecks and the wing bridge add to collisionMeshes: 10 x 2 x 2 = 40),
+    // plus the follow-camera rig's collision ray (sec 7.2), which now runs
+    // every frame in BOTH camera modes (see createFollowCameraRig.ts's
+    // CameraFollowMode doc comment) against solidCollisionMeshes (this
+    // venue's authored blockers, generated unconditionally by
+    // createMainStageCollisionBlockers, independent of this test's mocked
+    // mainMeshes) AND, as of 2026-07-31, ALSO against collisionMeshes (the
+    // SAME ground/floor list the player's own ray uses) - looking up used to
+    // swing the camera to a low position with nothing to stop it clipping
+    // through the floor, since only walls/rails were ever checked. That
+    // second list means the walkable-surface count now affects BOTH rays,
+    // not just the ground-detection one.
+    //
+    // The walkable-surface count went 8 -> 10 when the VIP skydeck landing
+    // split into two boxes (createVipSkydeck.ts's LANDING_MAIN/LANDING_MOUTH
+    // - a single full-width slab overhung the ramp's own sloped surface at
+    // its shallow end), adding one more walkable mesh per side.
+    //
+    // The blocker-row count grew when the ramp's own balustrade got real
+    // collision for the first time (rampRailBlockers in
+    // createMainStageCollisionBlockers.ts, 16 segments x 2 edges x 2 sides =
+    // 64 new blocker rows) - the ramp previously had none at all, so a
+    // player could walk clean through the visible rail. 298 is the actual
+    // observed count with all of the above in place; re-derive by running
+    // the test if this ever needs to change again rather than hand-computing
+    // it.
+    expect(intersectsMesh).toHaveBeenCalledTimes(298);
+    // Exactly TWO ray instances (ground-detection + camera-collision), each
+    // reused across every frame - no per-frame allocation for either.
+    expect(rayInstances.size).toBe(2);
   });
 
   it('bumps production-surface materials to the venue light budget, not just the rig ran before them', async () => {
