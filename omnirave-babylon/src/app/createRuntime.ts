@@ -1,6 +1,8 @@
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { WebGPUEngine } from '@babylonjs/core/Engines/webgpuEngine';
 import { parsePerfFlags } from './perfFlags';
+import { exchangeLaunchSession, parseSessionExchangeParams } from '../network/sessionExchange';
+import { runtimeLogin, runtimeLogout, runtimeSignup, RuntimeAuthError, type RuntimeAuthSession } from '../network/runtimeAuth';
 import './webgpuShaders';
 import '@babylonjs/core/Shaders/bloomMerge.fragment';
 import '@babylonjs/core/Shaders/extractHighlights.fragment';
@@ -23,7 +25,7 @@ import {
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import type { createMainStageScene } from '../scene/createMainStageScene';
 import { resolveTravelCameraOffsets, TRAVEL_CAMERA_DISTANCE } from '../player/cameraRigMath';
-import { generateAvatarDefinition, serializeAvatarLoadout } from '../player/avatarDefinition';
+import { generateAvatarDefinition, hasAvatarLoadout, parseAvatarLoadout, serializeAvatarLoadout } from '../player/avatarDefinition';
 import { BACK_PLAZA_SPAWN } from '../scene/reviewRouteData';
 import type { ReviewCheckpoint } from '../scene/reviewRouteData';
 import { createDebugPanel } from '../ui/createDebugPanel';
@@ -35,6 +37,7 @@ import { createHudNotice } from '../ui/createHudNotice';
 import { createSettingsPopup } from '../ui/createSettingsPopup';
 import { createTopLeftControls } from '../ui/createTopLeftControls';
 import { createTopRightControls } from '../ui/createTopRightControls';
+import { createAuthPopup } from '../ui/createAuthPopup';
 import { loadPlayerSettings, savePlayerSettings } from '../ui/playerSettings';
 import { applyUiTheme } from '../ui/uiTheme';
 import { RUNTIME_CONFIG } from './runtimeConfig';
@@ -63,6 +66,30 @@ declare global {
       scene: Awaited<ReturnType<typeof createMainStageScene>>;
     };
   }
+}
+
+// FALLBACK ONLY: applySessionUpgrade (below, inside createRuntime) hot-swaps
+// login/signup/logout in place via worldSocket.reconnect - this reload path
+// now only fires when there is no worldSocket to reconnect at all, i.e. the
+// no-world dev/review scaffold (see the module banner comment). It reuses the
+// exact same `?world=&wtoken=` boot path perfFlags.worldUrl/worldToken
+// already take precedence for (see the comment above resolvedWorldUrl below),
+// so that dev-only path still boots through tested code rather than a
+// bespoke one. `acct=1` survives the reload only when the session is an
+// account, which is what puts the top-right controls back into 'account' vs
+// 'guest' mode on the other side.
+function navigateToSession(session: RuntimeAuthSession): void {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('mode');
+  url.searchParams.delete('handoff');
+  url.searchParams.set('world', session.worldSocketUrl);
+  url.searchParams.set('wtoken', session.worldSessionToken);
+  if (session.mode === 'account') {
+    url.searchParams.set('acct', '1');
+  } else {
+    url.searchParams.delete('acct');
+  }
+  window.location.href = url.toString();
 }
 
 function createWebGlEngine(canvas: HTMLCanvasElement) {
@@ -116,6 +143,51 @@ export async function createRuntime(host: HTMLElement) {
   // remains the automatic fallback, and ?perf=webgl forces it for
   // debugging comparisons.
   const perfFlags = parsePerfFlags(window.location.search);
+  // The real launch flow (backend's SessionService.BuildLaunchURL) redirects
+  // here with `?mode=<account|guest>&handoff=<one-time token>`, NOT a world
+  // socket URL/token directly - those only exist after exchanging the
+  // handoff via POST /omnigame/session/exchange (see sessionExchange.ts).
+  // Direct `?world=&wtoken=` (perfFlags) takes precedence when present -
+  // that remains the local dev/review shortcut the module comment there
+  // describes. exchangeLaunchSession resolves to null on any failure (no
+  // handoff param, expired/consumed token, network error), which correctly
+  // falls through to no world connection rather than throwing during boot.
+  let resolvedWorldUrl = perfFlags.worldUrl;
+  let resolvedWorldToken = perfFlags.worldToken;
+  // Covers three ways the top-right controls can end up in 'account' mode:
+  // the perfFlags.worldUrl/worldToken dev shortcut carries no identity of its
+  // own, so ?acct=1 (set by navigateToSession after an in-game login/signup/
+  // logout) is the only signal there; a real omninudge.com handoff carries
+  // its own mode below and overrides this default once exchanged.
+  let resolvedSessionMode: import('../ui/createTopRightControls').SessionMode = perfFlags.accountMode
+    ? 'account'
+    : 'guest';
+  // An SSO'd account's saved appearance, when the handoff carried one - see
+  // its use below at localAvatarDefinition, which applies this instead of
+  // generating a random guest look when present.
+  let resolvedAccountLoadout: Record<string, string> | undefined;
+  if (!resolvedWorldUrl || !resolvedWorldToken) {
+    const exchangeParams = parseSessionExchangeParams(window.location.search);
+    if (exchangeParams) {
+      const exchanged = await exchangeLaunchSession(exchangeParams);
+      if (exchanged) {
+        resolvedWorldUrl = exchanged.worldSocketUrl;
+        resolvedWorldToken = exchanged.worldSessionToken;
+        // An SSO'd omninudge.com account player must never see a Log In /
+        // Sign Up prompt for an identity they already have.
+        resolvedSessionMode = exchanged.mode === 'account' ? 'account' : 'guest';
+        resolvedAccountLoadout = exchanged.loadout;
+      } else {
+        console.warn('[world] session exchange failed; continuing without a world connection');
+      }
+    }
+  }
+  // The local player's current serialized appearance - starts as the guest's
+  // randomly generated one (see localAvatarDefinition below) and is
+  // reassigned in place by applySessionUpgrade on login/signup/logout, so the
+  // world socket's onStatusChange('open') handler always (re)publishes
+  // whichever loadout is current, including across an in-place reconnect.
+  let localAvatarLoadout: Record<string, string> = {};
   let engine: RuntimeEngine | undefined;
   let hud: HTMLElement | undefined;
   let perfOverlay: HTMLElement | undefined;
@@ -141,6 +213,7 @@ export async function createRuntime(host: HTMLElement) {
   // behind ?debug=1, also owned DOM torn down in cleanup.
   let topLeftControls: import('../ui/createTopLeftControls').TopLeftControls | undefined;
   let topRightControls: import('../ui/createTopRightControls').TopRightControls | undefined;
+  let authPopup: import('../ui/createAuthPopup').AuthPopup | undefined;
   let settingsPopup: import('../ui/createSettingsPopup').SettingsPopup | undefined;
   let hudNotice: import('../ui/createHudNotice').HudNotice | undefined;
   let handleCanvasPick: ((event: MouseEvent) => void) | undefined;
@@ -180,6 +253,7 @@ export async function createRuntime(host: HTMLElement) {
     settingsPopup?.dispose();
     topLeftControls?.dispose();
     topRightControls?.dispose();
+    authPopup?.dispose();
     hudNotice?.dispose();
     canvas.remove();
   };
@@ -214,16 +288,22 @@ export async function createRuntime(host: HTMLElement) {
     // Sec 6.2: guests get a RANDOM GENERATED avatar, cannot edit it, and it is
     // not persisted - so it is generated fresh here at boot and applied to the
     // local body (which also applies sec 6.5's height effects to the rig).
-    // The serialized form is the loadout other players would dress this ghost
-    // from, and is published below (once the world socket connects) via a
-    // "loadout" event so other players actually see it - the world-session
-    // JWT alone only carries an account player's persisted loadout, not a
-    // guest's freshly generated one.
-    const localAvatarDefinition = generateAvatarDefinition();
+    // An SSO'd account player (arrived via the real omninudge.com handoff -
+    // see resolvedAccountLoadout above) gets their own saved appearance
+    // instead - they must see themselves as they saved themselves, not a
+    // random guest. The serialized form is the loadout other players would
+    // dress this ghost from, and is published below (once the world socket
+    // connects) via a "loadout" event so other players actually see it too.
+    const localAvatarDefinition = hasAvatarLoadout(resolvedAccountLoadout)
+      ? parseAvatarLoadout(resolvedAccountLoadout)
+      : generateAvatarDefinition();
     reviewRuntime?.setAvatarDefinition?.(localAvatarDefinition);
+    localAvatarLoadout = hasAvatarLoadout(resolvedAccountLoadout)
+      ? (resolvedAccountLoadout as Record<string, string>)
+      : serializeAvatarLoadout(localAvatarDefinition);
     scene.metadata = {
       ...scene.metadata,
-      localAvatarLoadout: serializeAvatarLoadout(localAvatarDefinition),
+      localAvatarLoadout,
     };
     const reviewCheckpoints = reviewRuntime?.checkpoints as readonly ReviewCheckpoint[] | undefined;
 
@@ -362,7 +442,7 @@ export async function createRuntime(host: HTMLElement) {
     // (dev/review path), where the HUD hides both count lines instead of
     // inventing numbers.
     let activePlayers: readonly import('../network/worldSocket').WorldPlayer[] | null = null;
-    if (perfFlags.worldUrl && perfFlags.worldToken) {
+    if (resolvedWorldUrl && resolvedWorldToken) {
       const [{ createWorldSocket }, { createRemotePlayerRigs }, { createStageMediaPlayer }] = await Promise.all([
         import('../network/worldSocket'),
         import('../player/createRemotePlayerRigs'),
@@ -375,8 +455,8 @@ export async function createRuntime(host: HTMLElement) {
       reviewRuntime?.setRemotePlayerCollisionSource?.(remotePlayerRigs.collisionTargets);
       stageMediaPlayer = createStageMediaPlayer();
       worldSocket = createWorldSocket({
-        url: perfFlags.worldUrl,
-        token: perfFlags.worldToken,
+        url: resolvedWorldUrl,
+        token: resolvedWorldToken,
       });
       const activeWorldSocket = worldSocket;
 
@@ -405,11 +485,11 @@ export async function createRuntime(host: HTMLElement) {
           onTextEntryActiveChange(active) {
             reviewRuntime?.input?.setTextEntryActive?.(active);
           },
-          // Sec 10.2: guests cannot mute others, and every player is a guest
-          // until the auth block. That block flips this to true (or calls
-          // chatPanel.setCanMute(true) on upgrade) - the mute mechanism, the
-          // `Muted Users` view, and message filtering are already complete.
-          canMute: false,
+          // Sec 10.2: guests cannot mute others. resolvedSessionMode is fixed
+          // for the lifetime of this boot (login/signup/logout always reload -
+          // see navigateToSession), so it is safe to read once here rather
+          // than needing the setCanMute(true) upgrade path.
+          canMute: resolvedSessionMode === 'account',
           debugChromePresent: perfFlags.debug,
         });
         const activeChatPanel = chatPanel;
@@ -479,13 +559,13 @@ export async function createRuntime(host: HTMLElement) {
         fireworksShow?.setEventState(eventState);
       });
       // Sec 6.2/6.5: publish the SAME loadout that was applied to the local
-      // render (scene.metadata.localAvatarLoadout, stashed above) so other
-      // players' ghost of us matches what we see locally. Sent exactly once
-      // per connection - on the "open" transition, not per frame - and again
-      // on every reconnect's fresh "open", since the server has no other way
-      // to learn this guest's generated avatar (see the note above at
-      // localAvatarDefinition).
-      const localAvatarLoadout = scene.metadata?.localAvatarLoadout as Record<string, string> | undefined;
+      // render (the outer localAvatarLoadout variable) so other players'
+      // ghost of us matches what we see locally. Sent on every "open"
+      // transition - the initial connect AND every applySessionUpgrade
+      // reconnect - by READING the outer variable at fire time rather than
+      // closing over a snapshot of it, so a login/signup that reassigns it
+      // just before reconnecting publishes the new appearance, not the stale
+      // guest one this closure was created with.
       worldSocket.onStatusChange((status) => {
         console.info(`[world] socket ${status}`);
         if (status === 'open' && localAvatarLoadout) {
@@ -686,17 +766,100 @@ export async function createRuntime(host: HTMLElement) {
       });
 
       hudNotice = createHudNotice(host, { debugChromePresent: perfFlags.debug });
-      // AUTH IS A LATER BLOCK. Nothing here calls an auth endpoint or fakes a
-      // session; the buttons answer honestly instead of doing nothing, and
-      // swap to the real handlers when that block lands.
-      const accountsLaterNotice = () => {
-        hudNotice?.show('Accounts arrive in a later update - you are raving as a guest.');
+
+      // backend/internal/omnigame/api/handlers/runtime_auth_handler.go's
+      // login/signup/logout endpoints all return the same session-exchange
+      // response shape a fresh launch gets. Player-flagged (2026-08-02): a
+      // full-page reload into it went black and re-booted the whole scene -
+      // applySessionUpgrade instead hot-swaps in place: worldSocket.reconnect
+      // keeps every chat/media/remote-player listener already registered
+      // (see that method's own comment), and the local avatar mesh updates
+      // live via reviewRuntime.setAvatarDefinition, exactly like an avatar
+      // colorway change already does. currentVenue is the world server's own
+      // idea of "where you are right now" (activeZoneId, updated by every
+      // snapshot below) so an account upgrade mid-session keeps the player in
+      // the same venue rather than bouncing them back to main_stage.
+      const applySessionUpgrade = (session: import('../network/runtimeAuth').RuntimeAuthSession) => {
+        const nextMode: import('../ui/createTopRightControls').SessionMode =
+          session.mode === 'account' ? 'account' : 'guest';
+
+        if (hasAvatarLoadout(session.loadout)) {
+          // An existing account's saved appearance (or one just seeded from
+          // this guest's own currentLoadout below, on a brand-new account).
+          localAvatarLoadout = session.loadout;
+        } else if (nextMode === 'guest') {
+          // Logout: back to an anonymous guest, so a fresh random look - sec
+          // 6.2's same "guests get a random generated avatar" rule the boot
+          // path above already applies.
+          localAvatarLoadout = serializeAvatarLoadout(generateAvatarDefinition());
+        }
+        reviewRuntime?.setAvatarDefinition?.(parseAvatarLoadout(localAvatarLoadout));
+        scene.metadata = { ...scene.metadata, localAvatarLoadout };
+
+        if (!worldSocket) {
+          // No world connection to hot-swap (dev/review scaffold - see the
+          // module banner comment): nothing here to reconnect in place, so
+          // fall back to the reload every other boot path already handles.
+          navigateToSession(session);
+          return;
+        }
+        worldSocket.reconnect(session.worldSocketUrl, session.worldSessionToken);
+        topRightControls?.setMode(nextMode);
+        chatPanel?.setCanMute(nextMode === 'account');
+        // No reload to carry the popup away this time - close it ourselves.
+        // A no-op when already closed (e.g. the logout call site below).
+        authPopup?.close();
+        hudNotice?.show(
+          nextMode === 'account' ? `Logged in as ${session.playerName}` : 'Logged out - now raving as a guest.',
+        );
       };
+
+      authPopup = createAuthPopup({
+        async onSubmit(mode, fields) {
+          try {
+            const session =
+              mode === 'login'
+                ? await runtimeLogin({
+                    username: fields.username,
+                    password: fields.password,
+                    currentVenue: activeZoneId,
+                    currentLoadout: localAvatarLoadout,
+                  })
+                : await runtimeSignup({
+                    username: fields.username,
+                    password: fields.password,
+                    email: fields.email,
+                    acceptTerms: fields.acceptTerms,
+                    acceptPrivacyPolicy: fields.acceptPrivacyPolicy,
+                    currentVenue: activeZoneId,
+                    currentLoadout: localAvatarLoadout,
+                  });
+            applySessionUpgrade(session);
+            return { ok: true };
+          } catch (err) {
+            const message = err instanceof RuntimeAuthError ? err.message : 'Something went wrong. Try again.';
+            return { ok: false, message };
+          }
+        },
+      });
+
       topRightControls = createTopRightControls(host, {
-        mode: 'guest',
-        onLogIn: accountsLaterNotice,
-        onSignUp: accountsLaterNotice,
-        onLogout: accountsLaterNotice,
+        mode: resolvedSessionMode,
+        authPanel: authPopup.element,
+        onLogIn() {
+          authPopup?.open('login');
+        },
+        onSignUp() {
+          authPopup?.open('signup');
+        },
+        async onLogout() {
+          try {
+            const session = await runtimeLogout(activeZoneId);
+            applySessionUpgrade(session);
+          } catch {
+            hudNotice?.show('Could not log out. Try again.');
+          }
+        },
         debugChromePresent: perfFlags.debug,
       });
     }

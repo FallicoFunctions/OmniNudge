@@ -369,6 +369,57 @@ describe('createWorldSocket', () => {
     expect(clock.pendingCount()).toBe(1);
   });
 
+  it('reconnect swaps to the new url/token without needing new listeners', () => {
+    const { worldSocket, webSocketFactory, getLastSocket } = setup();
+    const statuses: string[] = [];
+    worldSocket.onStatusChange((status) => statuses.push(status));
+
+    worldSocket.connect();
+    const oldSocket = getLastSocket();
+    oldSocket.triggerOpen();
+    expect(webSocketFactory).toHaveBeenCalledWith('wss://example.test/ws?token=jwt-token');
+
+    worldSocket.reconnect('wss://example.test/ws', 'new-jwt-token');
+
+    expect(oldSocket.closed).toBe(true);
+    expect(webSocketFactory).toHaveBeenCalledTimes(2);
+    expect(webSocketFactory).toHaveBeenLastCalledWith('wss://example.test/ws?token=new-jwt-token');
+    // The listener registered before reconnect is still live on this same
+    // instance - no re-wiring required by the caller.
+    getLastSocket().triggerOpen();
+    expect(statuses).toEqual(['connecting', 'open', 'connecting', 'open']);
+  });
+
+  it('reconnect cancels a pending drop-triggered retry and resets its backoff', () => {
+    const { worldSocket, webSocketFactory, getLastSocket, clock } = setup();
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    getLastSocket().triggerServerClose();
+    expect(clock.pendingCount()).toBe(1);
+
+    worldSocket.reconnect('wss://example.test/ws', 'new-jwt-token');
+    expect(clock.pendingCount()).toBe(0);
+    expect(webSocketFactory).toHaveBeenCalledTimes(2);
+
+    // Backoff restarts at 1s rather than continuing where the old attempt left off.
+    getLastSocket().triggerOpen();
+    getLastSocket().triggerServerClose();
+    clock.advance(999);
+    expect(webSocketFactory).toHaveBeenCalledTimes(2);
+    clock.advance(1);
+    expect(webSocketFactory).toHaveBeenCalledTimes(3);
+  });
+
+  it('reconnect after dispose is a no-op', () => {
+    const { worldSocket, webSocketFactory, getLastSocket } = setup();
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    worldSocket.dispose();
+
+    worldSocket.reconnect('wss://example.test/ws', 'new-jwt-token');
+    expect(webSocketFactory).toHaveBeenCalledTimes(1);
+  });
+
   it('dispose cancels pending reconnect and stops further retries', () => {
     const { worldSocket, webSocketFactory, getLastSocket, clock } = setup();
     worldSocket.connect();

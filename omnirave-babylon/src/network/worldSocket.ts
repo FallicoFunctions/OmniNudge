@@ -91,6 +91,14 @@ export interface WorldSocketOptions {
 
 export interface WorldSocket {
   connect: () => void;
+  // Swaps the connection to a new url/token (an in-place login/signup/logout
+  // identity upgrade - see createRuntime.ts's navigateToSession callers)
+  // WITHOUT tearing down this instance: every onSnapshot/onChat/onStatusChange
+  // listener already registered stays registered, so callers never need to
+  // re-wire chat/media/remote-player-rig plumbing just to change who the
+  // local player is. dispose() is deliberately terminal (see its comment) and
+  // cannot be reused for this - reconnect is the separate, non-terminal path.
+  reconnect: (url: string, token: string) => void;
   dispose: () => void;
   sendMove: (position: Vec3) => void;
   sendRespawn: () => void;
@@ -122,6 +130,11 @@ function buildConnectUrl(url: string, token: string): string {
 export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
   const clock = options.clock ?? defaultClock;
   const webSocketFactory = options.webSocketFactory ?? defaultWebSocketFactory;
+
+  // Mutable so reconnect() can swap identity without recreating this closure
+  // (and therefore without losing every listener already registered on it).
+  let currentUrl = options.url;
+  let currentToken = options.token;
 
   let socket: WorldSocketLike | null = null;
   let disposed = false;
@@ -236,7 +249,7 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     }
 
     setStatus('connecting');
-    const connectUrl = buildConnectUrl(options.url, options.token);
+    const connectUrl = buildConnectUrl(currentUrl, currentToken);
     const nextSocket = webSocketFactory(connectUrl);
     socket = nextSocket;
 
@@ -259,6 +272,32 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     nextSocket.onmessage = (event) => {
       handleMessage(event.data);
     };
+  }
+
+  function reconnect(url: string, token: string): void {
+    if (disposed) {
+      return;
+    }
+    currentUrl = url;
+    currentToken = token;
+    // A fresh identity swap is not a network drop: cancel any pending
+    // drop-triggered auto-reconnect and reset its backoff, so this doesn't
+    // race a scheduleReconnect() timer that would otherwise fire later and
+    // re-open with whatever credentials happened to be current at that time.
+    clearReconnectTimer();
+    reconnectAttempt = 0;
+    if (socket) {
+      // Detach handlers before closing so the old socket's close event does
+      // not itself run onclose's scheduleReconnect path with the socket we
+      // are intentionally replacing right here.
+      socket.onclose = null;
+      socket.onerror = null;
+      socket.onmessage = null;
+      socket.onopen = null;
+      socket.close();
+      socket = null;
+    }
+    connect();
   }
 
   function dispose(): void {
@@ -343,6 +382,7 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
 
   return {
     connect,
+    reconnect,
     dispose,
     sendMove,
     sendRespawn,

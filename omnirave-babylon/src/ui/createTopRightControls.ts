@@ -11,11 +11,12 @@
 // click/blur listener: an unrelated click anywhere else must leave the armed
 // confirm alone.
 //
-// AUTH IS A LATER BLOCK. This component is purely presentational - it never
-// calls an auth endpoint and holds no session state; it renders the mode it is
-// handed and reports clicks. The runtime currently passes mode 'guest' and
-// callbacks that surface a "later update" notice (see createRuntime), so the
-// buttons still do something honest rather than being dead controls.
+// This component is still purely presentational - it never calls an auth
+// endpoint and holds no session state; it renders the mode it is handed and
+// reports clicks. `onLogIn`/`onSignUp` are wired by the caller (createRuntime)
+// to open the real auth panel (createAuthPopup), which is mounted into this
+// block's slot exactly the way createTopLeftControls mounts the settings
+// popup - a caller-owned panel, not built here.
 //
 // Pure DOM: no Babylon imports, safe under jsdom.
 
@@ -25,6 +26,8 @@ export const LOGOUT_CONFIRM_WINDOW_MS = 3000;
 
 export interface CreateTopRightControlsOptions {
   mode?: SessionMode;
+  /** Auth popup body, built by createAuthPopup and owned by the caller. */
+  authPanel?: HTMLElement;
   onLogIn?: () => void;
   onSignUp?: () => void;
   onLogout?: () => void;
@@ -60,6 +63,15 @@ export function createTopRightControls(
   const logoutButton = createButton('Logout', 'logout');
   row.append(logInButton, signUpButton, logoutButton);
   element.appendChild(row);
+
+  const authPanel = options.authPanel;
+  if (authPanel) {
+    const slot = document.createElement('div');
+    slot.className = 'hud-controls__slot';
+    slot.appendChild(authPanel);
+    element.appendChild(slot);
+  }
+
   host.appendChild(element);
 
   let mode: SessionMode = options.mode ?? 'guest';
