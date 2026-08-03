@@ -14,23 +14,9 @@ import {
   createCascadeCourtPaving,
   planCascadeCourtPaving,
 } from '../createCascadeCourtPaving';
-import {
-  FOUNTAIN_ELLIPSE,
-  VENUE_ENVELOPE_BLOCKER_THICKNESS,
-  VENUE_WALKABLE_X_MAX,
-} from '../mainStageVenueBounds';
+import { FOUNTAIN_ELLIPSE, VENUE_ENVELOPE_BLOCKER_THICKNESS, VENUE_WALKABLE_X_MAX } from '../mainStageVenueBounds';
 
 const TILE_HALF = 0.9;
-
-// The fountain's octagon convex fit. A tile centre inside this ellipse is the
-// only thing the keep-out removes; everything outside (including the octagon's
-// corners) must stay paved.
-function insideFountainEllipse(x: number, z: number, margin = 0): boolean {
-  const { cx, cz, sx, sz } = FOUNTAIN_ELLIPSE;
-  const dx = (x - cx) / (sx + margin);
-  const dz = (z - cz) / (sz + margin);
-  return dx * dx + dz * dz <= 1;
-}
 
 // Primitives only - never hand a Babylon object to expect().
 function thinInstanceCountOf(scene: Scene, name: string): number {
@@ -85,7 +71,7 @@ describe('createCascadeCourtPaving', () => {
     expect(pieces.filter((mesh) => mesh.checkCollisions).length).toBe(0);
   });
 
-  it('stays inside the flank plaza ring and never onto the cascade fountain', () => {
+  it('stays inside the flank plaza ring', () => {
     // The plaza's outer edge stops at the envelope blocker's walkable face.
     expect(PLAZA_X_MAX).toBe(VENUE_WALKABLE_X_MAX - VENUE_ENVELOPE_BLOCKER_THICKNESS / 2);
 
@@ -97,26 +83,40 @@ describe('createCascadeCourtPaving', () => {
       expect(tile.x + TILE_HALF).toBeLessThanOrEqual(PLAZA_X_MAX);
       expect(tile.z - TILE_HALF).toBeGreaterThanOrEqual(PLAZA_Z_MIN);
       expect(tile.z + TILE_HALF).toBeLessThanOrEqual(PLAZA_Z_MAX);
-
-      // No tile centre falls inside the fountain ellipse keep-out.
-      expect(insideFountainEllipse(tile.x, tile.z)).toBe(false);
     }
   });
 
-  it('fills the octagon corners the old rectangle walled off', () => {
+  it('paves the whole plaza uniformly, including under the fountain', () => {
+    // Player-flagged (2026-07-31): every prior pass here tried to CUT the
+    // paving around the fountain's footprint (rectangle, then ellipse, then
+    // the real octagon radius) and each attempt left some bare-ground gap
+    // somewhere at the boundary. The actual intent is simpler: the tile
+    // floor is laid first, uniformly, and the fountain sits on top of it -
+    // so there is no keep-out at all anymore. Collision (still shape-aware,
+    // in createMainStageCollisionBlockers.ts) is what stops a player from
+    // walking through the stone; the paving layer no longer needs to know
+    // the fountain's shape.
     const plan = planCascadeCourtPaving();
-    // A corner cell the old axis-aligned rectangle (x 52..66, z -42..-15)
-    // excluded is now paved: a tile centre near (54, -40) - outside the
-    // ellipse - is present.
+
+    // A corner cell the old axis-aligned rectangle keep-out used to exclude.
     const corner = plan.tiles.filter(
       (tile) => tile.x > 53 && tile.x < 56 && tile.z > -42 && tile.z < -39,
     );
     expect(corner.length).toBeGreaterThan(0);
-    // But a tile centre inside the ellipse (e.g. near (60, -28)) is still absent.
+    // A tile centre ON the stone itself (e.g. near (60, -28)) is now present
+    // too - previously excluded by every keep-out variant tried.
     const underFountain = plan.tiles.filter(
       (tile) => tile.x > 58 && tile.x < 62 && tile.z > -30 && tile.z < -26,
     );
-    expect(underFountain.length).toBe(0);
+    expect(underFountain.length).toBeGreaterThan(0);
+    // Regression guard: tiles near x 54.7, z -31..-25 sat inside every
+    // keep-out variant tried (rectangle, ellipse, real-octagon-plus-margin)
+    // despite the fountain barely reaching that far - real bare ground with
+    // missing floor at the flat edge. Paved now, same as everywhere else.
+    const previouslyMissing = plan.tiles.filter(
+      (tile) => tile.x > 53.5 && tile.x < 56 && tile.z > -31 && tile.z < -25,
+    );
+    expect(previouslyMissing.length).toBeGreaterThan(0);
   });
 
   it('paves the whole ring: an inner strip plus both end bands', () => {

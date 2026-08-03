@@ -9,11 +9,7 @@ import type { Material } from '@babylonjs/core/Materials/material';
 import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { Scene } from '@babylonjs/core/scene';
 
-import {
-  FOUNTAIN_ELLIPSE,
-  VENUE_ENVELOPE_BLOCKER_THICKNESS,
-  VENUE_WALKABLE_X_MAX,
-} from './mainStageVenueBounds';
+import { VENUE_ENVELOPE_BLOCKER_THICKNESS, VENUE_WALKABLE_X_MAX } from './mainStageVenueBounds';
 import { createPlateMaterial, GOLD_PLATE_MATERIAL, PEARL_PLATE_MATERIAL } from './venuePlateFamily';
 
 // Decorative paving for the two Cascade Court flank plazas, which read "a bit
@@ -36,25 +32,20 @@ export const PLAZA_X_MAX = VENUE_WALKABLE_X_MAX - VENUE_ENVELOPE_BLOCKER_THICKNE
 export const PLAZA_Z_MIN = -50;
 export const PLAZA_Z_MAX = -10;
 
-// The cascade fountain's base is an OCTAGON, shared with the collision module
-// as the FOUNTAIN_ELLIPSE convex fit (see mainStageVenueBounds.ts). The old
-// keep-out was an axis-aligned RECTANGLE, which left the octagon's corners
-// unpaved (owner: bare ground in the corners). The keep-out is now a per-tile
-// ELLIPSE test (see keepOutOfFountain): a tile is dropped only if its CENTRE
-// falls inside the ellipse, inflated by FOUNTAIN_KEEPOUT_MARGIN so no tile
-// visibly pokes under the coping. Every tile whose centre is outside the
-// ellipse - including the octagon's corners - is kept.
-const FOUNTAIN_KEEPOUT_MARGIN = 0.3;
-
-// True when (x, z) sits inside the fountain ellipse (plus keep-out margin), in
-// +x-flank coordinates. The -x flank mirrors x, and the ellipse is symmetric
-// about its own centre, so |x| against the +x-flank centre covers both.
-function keepOutOfFountain(x: number, z: number): boolean {
-  const { cx, cz, sx, sz } = FOUNTAIN_ELLIPSE;
-  const dx = (x - cx) / (sx + FOUNTAIN_KEEPOUT_MARGIN);
-  const dz = (z - cz) / (sz + FOUNTAIN_KEEPOUT_MARGIN);
-  return dx * dx + dz * dz <= 1;
-}
+// Player-flagged (2026-07-31): earlier passes here tried to CUT the paving
+// around the fountain's footprint - first as a rectangle (left the octagon's
+// corners bare), then as an ellipse fit (over-culled several rows at the
+// flat edges), then as the real measured octagon radius (correct, but still
+// left a couple of tiles right at the true edge inside the module's own
+// keep-out margin). The owner's actual intent turned out to be simpler than
+// any of that: pave the WHOLE plaza uniformly, as if the tile floor were
+// laid first and the fountain built on top of it - exactly what a real
+// tiled plaza with a fountain centrepiece looks like. There is no keep-out
+// at all now; the fountain's own solid geometry simply sits over/hides the
+// tiles beneath it, and its collision (createMainStageCollisionBlockers.ts's
+// fountainCollisionColumns, still using the real octagon radius) is what
+// actually stops a player from walking through the stone - the paving layer
+// no longer needs to know the fountain's shape at all.
 
 const TILE_SIZE = 1.8;
 const SEAM_WIDTH = 0.14;
@@ -109,14 +100,12 @@ export function planCascadeCourtPaving(): PavingPlan {
     for (let row = 0; row < rows; row++) {
       const x = originX + (column + 0.5) * TILE_PITCH;
       const z = originZ + (row + 0.5) * TILE_PITCH;
-      // Keep-out is the fountain ELLIPSE, tested against the tile centre, so
-      // the octagon's corners (outside the ellipse) stay paved.
-      if (keepOutOfFountain(x, z)) continue;
+      // No fountain keep-out: the whole plaza pave uniformly, fountain and
+      // all - see the module comment above.
       tiles.push({ tone: toneFor(column, row), x, z });
 
       // Band seams: on the +x edge of every BAND_SIZE-th column and the +z
-      // edge of every BAND_SIZE-th row, emitted per tile so a seam never
-      // runs across the cascade footprint the tiles just avoided.
+      // edge of every BAND_SIZE-th row.
       if (column % BAND_SIZE === BAND_SIZE - 1) {
         seams.push({ length: TILE_PITCH, yaw: Math.PI / 2, x: x + TILE_PITCH / 2, z });
       }

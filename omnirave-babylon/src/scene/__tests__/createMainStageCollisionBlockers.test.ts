@@ -245,4 +245,19 @@ describe('createMainStageCollisionBlockers cascade fountain (octagon ellipse)', 
       expect(blockedAtFountain(-x, z)).toBe(true);
     }
   });
+
+  it('does not wall the -x flat edge the old ellipse fit overshot (player-flagged, 2026-07-31)', () => {
+    // The ellipse this replaced reached r~14.15 at this edge; the real
+    // stone measures r~13.25 there (see FOUNTAIN_STONE_RADII) - a ~1m gap
+    // that both walled empty ground here AND (in createCascadeCourtPaving)
+    // wrongly culled several rows of paving tiles at the same spot. Tested
+    // at z -27/-25, not right at the fountain's own cz=-28.9: within about
+    // 0.4m of the true edge is FOUNTAIN_COLUMN_Z_MARGIN's OWN deliberate
+    // collision safety margin (unrelated to the ellipse-vs-real-shape bug
+    // this test guards), not something this check should fight.
+    for (const z of [-27, -25]) {
+      expect(blockedAtFountain(54.7, z)).toBe(false);
+      expect(blockedAtFountain(-54.7, z)).toBe(false);
+    }
+  });
 });

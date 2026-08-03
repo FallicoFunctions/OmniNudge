@@ -11,6 +11,8 @@ import {
   FOH_BOOTH_X,
   FOH_BOOTH_Z,
   FOUNTAIN_ELLIPSE,
+  FOUNTAIN_STONE_RADII,
+  fountainStoneRadiusAt,
   SKYDECK_DECK_Y,
   SKYDECK_PIERS,
   SKYDECK_PIER_SIZE,
@@ -105,12 +107,19 @@ function pierBlockerHeight(pierX: number): number {
 // rectangle (the old clustered V150_CascadeCourtCoping boxes, measured
 // x[54.3,65.1] z[-39.4,-18.8]) walled the octagon's corners with invisible
 // collision where no stone stands - "stopped when walking in front of the
-// fountain even though there is nothing there". Instead we hug the shared
-// FOUNTAIN_ELLIPSE convex fit with a row of thin COLUMN boxes stepping across
-// x: each column's z-half-extent tapers as sz*sqrt(1 - ((xc-cx)/sx)^2), so the
-// boxes are short in z at the inner/outer tips and span the full height at the
-// middle - following the ellipse instead of boxing its corners. 14 columns per
-// flank keep the x step ~1.98m (edge error well under 0.6m).
+// fountain even though there is nothing there". That was fixed once already
+// by hugging an ellipse fit to the octagon with a row of thin COLUMN boxes
+// stepping across x. The ellipse fit itself was imprecise though (player-
+// flagged, 2026-07-31, in-engine): it overshot the real stone by up to ~1m
+// at the flat edges, wrongly culling paving tiles there (see
+// FOUNTAIN_STONE_RADII's own comment in mainStageVenueBounds.ts for the
+// measured data). Each column's z-half-extent now comes from
+// fountainZHalfExtentAtX - a binary search against the REAL measured
+// footprint (convex, so a vertical slice crosses its boundary at most
+// twice) instead of the ellipse's closed-form solve - so the boxes are
+// short in z at the inner/outer tips and span the full height at the middle
+// exactly matching the real stone, not an ellipse's approximation of it.
+// 14 columns per flank keep the x step ~1.98m (edge error well under 0.6m).
 const FOUNTAIN_COLUMN_COUNT = 14;
 // Inflate each column's z-extent so no real stone edge pokes through
 // unblocked, while staying tight enough that the corner cells (x 52..62,
@@ -118,17 +127,42 @@ const FOUNTAIN_COLUMN_COUNT = 14;
 const FOUNTAIN_COLUMN_Z_MARGIN = 0.4;
 // Same y band as the other cascade collision: floor through capsule.
 const FOUNTAIN_COLLISION_HEIGHT = 3;
+const FOUNTAIN_MAX_STONE_RADIUS = Math.max(...FOUNTAIN_STONE_RADII);
+
+// Binary search for the largest |dz| (offset from the fountain centre, in
+// +x-flank-local coordinates) still inside the real stone footprint at a
+// fixed x offset `dx` - valid because the footprint is convex, so a
+// vertical slice at any dx crosses its boundary at most twice (never
+// re-enters after exiting). Runs once at module load (this whole spec list
+// is built once, not per frame), so precision costs nothing.
+function fountainZHalfExtentAtX(dx: number): number {
+  if (Math.abs(dx) >= FOUNTAIN_MAX_STONE_RADIUS) {
+    return 0;
+  }
+  let lo = 0;
+  let hi = FOUNTAIN_MAX_STONE_RADIUS;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    const distance = Math.hypot(dx, mid);
+    const angle = Math.atan2(mid, dx);
+    if (distance <= fountainStoneRadiusAt(angle)) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo;
+}
 
 function fountainCollisionColumns(): CollisionBlockerSpec[] {
   const specs: CollisionBlockerSpec[] = [];
-  const { cx, cz, sx, sz } = FOUNTAIN_ELLIPSE;
-  const sliceWidth = (2 * sx) / FOUNTAIN_COLUMN_COUNT;
+  const { cx, cz } = FOUNTAIN_ELLIPSE;
+  const sliceWidth = (2 * FOUNTAIN_MAX_STONE_RADIUS) / FOUNTAIN_COLUMN_COUNT;
   for (const side of [1, -1] as const) {
     const tag = side > 0 ? 'r' : 'l';
     for (let i = 0; i < FOUNTAIN_COLUMN_COUNT; i++) {
-      const xCenter = cx - sx + (i + 0.5) * sliceWidth;
-      const t = (xCenter - cx) / sx;
-      const zHalf = sz * Math.sqrt(Math.max(0, 1 - t * t)) + FOUNTAIN_COLUMN_Z_MARGIN;
+      const xCenter = cx - FOUNTAIN_MAX_STONE_RADIUS + (i + 0.5) * sliceWidth;
+      const zHalf = fountainZHalfExtentAtX(xCenter - cx) + FOUNTAIN_COLUMN_Z_MARGIN;
       specs.push({
         name: `main-stage-blocker-cascade-fountain-${tag}-${i}`,
         x: side * xCenter,
