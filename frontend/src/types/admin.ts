@@ -1,4 +1,4 @@
-import type { PersonaCategory } from './omnichat';
+import type { OmniChatResponseFeedbackReason, PersonaCategory } from './omnichat';
 
 // Admin panel types
 
@@ -77,4 +77,41 @@ export interface AdminOmniChatPersona {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export type AdminOmniChatResponseFeedbackStatus = 'new' | 'reviewed' | 'promoted' | 'dismissed';
+
+export interface AdminOmniChatResponseFeedback {
+  id: string;
+  status: AdminOmniChatResponseFeedbackStatus;
+  reason: OmniChatResponseFeedbackReason;
+  conversation_id: number;
+  message_id: number;
+  persona_id: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminOmniChatResponseFeedbackDetail extends AdminOmniChatResponseFeedback {
+  note?: string;
+  response_snapshot: string;
+  prior_user_snapshot: string;
+  scene_state_snapshot: Record<string, unknown>;
+}
+
+export type AdminOmniChatPublicationReportStatus = 'open' | 'reviewing' | 'resolved' | 'dismissed';
+
+export interface AdminOmniChatPublicationReport {
+  id: string;
+  publication_id: string;
+  reporter_user_id: number;
+  reporter_username: string;
+  author_user_id: number;
+  author_username: string;
+  content_kind: 'image' | 'video' | 'chat';
+  caption: string;
+  reason: string;
+  details: string;
+  status: AdminOmniChatPublicationReportStatus;
+  created_at: string;
 }

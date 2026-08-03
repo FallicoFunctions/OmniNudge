@@ -56,9 +56,9 @@ export const mediaService = {
     formData.append('file', file);
 
     const response = await api.post<MediaFile>('/media/upload', formData, {
-      // Let the browser add the multipart boundary. A manually supplied
-      // Content-Type omits it in some clients and causes malformed uploads.
-      headers: {},
+      // Clear the instance default Content-Type so the browser sets
+      // multipart/form-data with the correct boundary.
+      headers: { 'Content-Type': undefined },
     });
 
     return response.data;
@@ -72,7 +72,7 @@ export const mediaService = {
     });
 
     const response = await api.post<BatchUploadResponse>('/media/batch-upload', formData, {
-      headers: {},
+      headers: { 'Content-Type': undefined },
     });
 
     return response.data;

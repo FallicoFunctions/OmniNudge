@@ -11,6 +11,7 @@ type ModalProps = {
   closeOnOverlayClick?: boolean;
   ariaLabelledBy?: string;
   ariaDescribedBy?: string;
+  ariaBusy?: boolean;
   animation?: 'default' | 'quick-chat' | 'none';
   restoreFocusTo?: HTMLElement | null;
 };
@@ -24,6 +25,7 @@ export function Modal({
   closeOnOverlayClick = false,
   ariaLabelledBy,
   ariaDescribedBy,
+  ariaBusy,
   animation = 'default',
   restoreFocusTo,
 }: ModalProps) {
@@ -62,6 +64,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={ariaLabelledBy}
         aria-describedby={ariaDescribedBy}
+        aria-busy={ariaBusy}
         role="dialog"
       >
         {children}

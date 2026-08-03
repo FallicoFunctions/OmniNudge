@@ -3462,7 +3462,9 @@
       "userManagement": "Gestion de usuarios",
       "hubModerators": "Moderadores del hub",
       "banActivity": "Actividad de baneos",
-      "bugReports": "Reportes de bugs"
+      "bugReports": "Reportes de bugs",
+      "omnichatPersonas": "Personajes de OmniChat",
+      "responseFeedback": "Comentarios sobre respuestas"
     },
     "roles": {
       "user": "Usuario",
@@ -3634,6 +3636,11 @@
         "screenshotAlt": "Captura del reporte",
         "noScreenshot": "No hay captura disponible."
       }
+    },
+    "responseFeedback": {
+      "title": "Comentarios de respuestas de OmniChat", "subtitle": "Revisa respuestas reportadas y destaca señales de calidad útiles.", "loading": "Cargando comentarios de respuestas...", "loadError": "No se pudieron cargar los comentarios de respuestas.", "updateError": "No se pudo actualizar el estado del comentario.", "filters": "Filtros de comentarios de respuestas", "status": "Estado", "reason": "Motivo", "allStatuses": "Todos los estados", "allReasons": "Todos los motivos", "count": "{{count}} informes", "empty": "No se encontraron comentarios de respuestas.", "submitted": "Enviado", "detail": "Detalle del informe", "note": "Nota del usuario", "noNote": "No se proporcionó nota.", "responseSnapshot": "Instantánea de respuesta", "priorUserSnapshot": "Instantánea previa del usuario", "sceneFacts": "Datos de escena", "unavailable": "No disponible", "actions": "Acciones de revisión", "page": "Página {{page}}",
+      "statuses": { "new": "Nuevo", "reviewed": "Revisado", "promoted": "Promovido", "dismissed": "Descartado" },
+      "reasons": { "role_ownership": "Rol o propiedad", "user_agency": "Autonomía del usuario", "narration_format": "Narración o formato", "repetition_length": "Repetición o longitud", "grammar_artifact": "Gramática o artefacto", "character_mismatch": "No coincide con el personaje", "other": "Otro" }
     },
     "moderators": {
       "selectHub": "Seleccionar hub",
@@ -3925,6 +3932,10 @@
     }
   },
   "omnichat": {
+    "galleryDelete": { "action": "Eliminar creación", "title": "¿Eliminar esta creación?", "description": "Esto elimina permanentemente el archivo de tu galería y de los archivos adjuntos del chat. No se puede deshacer.", "confirm": "Eliminar permanentemente", "deleting": "Eliminando...", "sharedError": "Deja de publicar esta creación en Explorar antes de eliminarla.", "genericError": "No se pudo eliminar esta creación.", "unpublishFirst": "Deja de publicar en Explorar antes de eliminar" },
+    "groupManagement": { "confirmDelete": "¿Eliminar permanentemente este grupo y toda su conversación?" },
+    "commerce": { "title": "Planes y OmniCredits", "subtitle": "Tu saldo y todas las ofertas mostradas provienen del servidor.", "wallet": "Cartera", "balanceBreakdown": "{{purchased}} comprados · {{subscription}} de suscripción", "plans": "Planes", "choosePlan": "Elegir {{plan}}", "creditPacks": "Paquetes de créditos", "creditName": "{{count}} OmniCredits", "buyPack": "Comprar {{pack}}", "recentUsage": "Uso reciente", "noUsage": "Aún no hay uso de créditos.", "loading": "Cargando opciones de compra…", "redirecting": "Abriendo el pago seguro…", "notConfigured": "Las opciones de compra aún no están configuradas.", "offerNames": { "plus": "Plus", "premium": "Premium", "unknown": "Suscripción" }, "period": { "month": "mes", "days": "{{count}} días" }, "features": { "profiles": "Más perfiles de personajes", "media": "Créditos de medios incluidos", "priority": "Generación prioritaria" }, "usage": { "voice": "Llamada de voz", "image": "Generación de imagen", "video": "Generación de video", "other": "Ajuste de créditos" }, "errors": { "load": "No se pudieron cargar los datos de facturación.", "secureCheckout": "No se pudo abrir un pago seguro. Inténtalo de nuevo." } },
+    "videoPaywall": { "title": "Desbloquear {{feature}}", "description": "El video requiere OmniCredits. Un plan válido puede incluir créditos; la disponibilidad y el costo se confirman de forma segura antes de usarlo.", "viewOptions": "Ver planes y créditos", "features": { "scene_video": "video de escena", "video_call": "videollamadas" } },
     "categories": {
       "all": "Todos",
       "roleplay": "Rol",
@@ -3983,6 +3994,26 @@
       "continueFailed": "No se pudo abrir el chat. Inténtalo de nuevo.",
       "resumeExisting": "Continuar tu chat existente"
     },
+    "responseReport": {
+      "title": "Reportar una respuesta",
+      "description": "Elige qué salió mal. Tus comentarios ayudan a mejorar las respuestas futuras.",
+      "close": "Cerrar el reporte de respuesta",
+      "reasonLabel": "¿Qué salió mal?",
+      "reasons": {
+        "role_ownership": "Confundió quién hizo o poseía algo",
+        "user_agency": "Eliminó mis opciones o actuó por mí",
+        "narration_format": "La narración o el formato fueron incorrectos",
+        "repetition_length": "Fue repetitiva o tuvo una longitud incorrecta",
+        "grammar_artifact": "Tuvo errores gramaticales o artefactos de generación",
+        "character_mismatch": "No coincidió con el personaje",
+        "other": "Otro problema"
+      },
+      "noteLabel": "Nota opcional",
+      "notePlaceholder": "Cuéntanos qué habría sido mejor",
+      "cancel": "Cancelar",
+      "sending": "Enviando…",
+      "submit": "Enviar reporte"
+    },
     "chat": {
       "invalidConversation": "No se pudo encontrar esta conversación.",
       "back": "Volver a Descubrir",
@@ -4011,7 +4042,15 @@
       "inputPlaceholder": "Di o haz algo...",
       "send": "Enviar mensaje",
       "rateLimited": "Te estás moviendo demasiado rápido — espera un momento antes de enviar otro mensaje.",
+      "allowanceRemaining": "{{remaining}} de {{limit}} respuestas gratuitas disponibles · 24 horas móviles",
+      "allowanceEmpty": "No hay respuestas gratuitas disponibles.",
+      "allowanceNext": "Tu próxima respuesta estará disponible el {{time}}.",
+      "allowanceGuestCta": "Regístrate para obtener 250 respuestas",
+      "allowanceUpgradeCta": "Mejora para obtener respuestas ilimitadas",
       "regenerateResponse": "Regenerar respuesta",
+      "reportResponse": "Reportar respuesta",
+      "reportResponseThanks": "Gracias. Esta respuesta se añadió a la cola de revisión de calidad.",
+      "reportResponseFailed": "No se pudo guardar el reporte. Inténtalo de nuevo.",
       "regenerationFailed": "No se pudo regenerar esta respuesta. Se conservó la original.",
       "editResponse": "Editar respuesta",
       "saveEdit": "Guardar",
@@ -4041,6 +4080,10 @@
       "discover": "Descubrir",
       "search": "Buscar",
       "chat": "Chat",
+      "groups": "Grupos",
+      "create": "Crear",
+      "explore": "Explorar",
+      "characters": "Personajes",
       "studio": "Studio",
       "searchPlaceholder": "Buscar personas...",
       "clearSearch": "Borrar búsqueda",

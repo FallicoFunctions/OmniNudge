@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Download, FileUp, Plus, Trash2, Volume2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
@@ -840,7 +840,9 @@ export default function OmniChatStudioPage() {
                 <ErrorMessage>{t('omnichat.studio.loadPersonasError')}</ErrorMessage>
               )}
               <div className="space-y-2">
-                {(personasQuery.data ?? []).map((persona) => (
+                {(personasQuery.data ?? []).map((persona) => {
+                  const personaAvatarSrc = resolveMediaUrl(persona.avatar_url, persona.updated_at);
+                  return (
                   <button
                     key={persona.id}
                     type="button"
@@ -855,9 +857,9 @@ export default function OmniChatStudioPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="h-12 w-12 overflow-hidden rounded-2xl bg-[var(--color-surface)]">
-                        {persona.avatar_url ? (
+                        {personaAvatarSrc ? (
                           <img
-                            src={resolveMediaUrl(persona.avatar_url, persona.updated_at)}
+                            src={personaAvatarSrc}
                             alt={persona.name}
                             className="h-full w-full object-cover"
                           />
@@ -873,7 +875,8 @@ export default function OmniChatStudioPage() {
                       </div>
                     </div>
                   </button>
-                ))}
+                );
+                })}
               </div>
             </div>
           </aside>

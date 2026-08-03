@@ -3462,7 +3462,9 @@
       "userManagement": "ادارة المستخدمين",
       "hubModerators": "مشرفو المحور",
       "banActivity": "نشاط الحظر",
-      "bugReports": "تقارير الاخطاء"
+      "bugReports": "تقارير الاخطاء",
+      "omnichatPersonas": "شخصيات OmniChat",
+      "responseFeedback": "ملاحظات الردود"
     },
     "roles": {
       "user": "مستخدم",
@@ -3634,6 +3636,11 @@
         "screenshotAlt": "لقطة شاشة للتقرير",
         "noScreenshot": "لا توجد لقطة شاشة."
       }
+    },
+    "responseFeedback": {
+      "title": "ملاحظات ردود OmniChat", "subtitle": "راجع الردود المُبلّغ عنها وروّج لإشارات الجودة المفيدة.", "loading": "جارٍ تحميل ملاحظات الردود...", "loadError": "تعذر تحميل ملاحظات الردود.", "updateError": "تعذر تحديث حالة الملاحظة.", "filters": "فلاتر ملاحظات الردود", "status": "الحالة", "reason": "السبب", "allStatuses": "كل الحالات", "allReasons": "كل الأسباب", "count": "{{count}} بلاغ", "empty": "لم يتم العثور على ملاحظات للردود.", "submitted": "وقت الإرسال", "detail": "تفاصيل البلاغ", "note": "ملاحظة المُبلّغ", "noNote": "لم تُقدَّم ملاحظة.", "responseSnapshot": "لقطة الرد", "priorUserSnapshot": "لقطة المستخدم السابقة", "sceneFacts": "حقائق المشهد", "unavailable": "غير متاح", "actions": "إجراءات المراجعة", "page": "الصفحة {{page}}",
+      "statuses": { "new": "جديد", "reviewed": "تمت المراجعة", "promoted": "تمت الترقية", "dismissed": "مرفوض" },
+      "reasons": { "role_ownership": "الدور أو الملكية", "user_agency": "حرية المستخدم", "narration_format": "السرد أو التنسيق", "repetition_length": "التكرار أو الطول", "grammar_artifact": "قواعد أو أثر", "character_mismatch": "لا يطابق الشخصية", "other": "أخرى" }
     },
     "moderators": {
       "selectHub": "اختر محورا",
@@ -3925,6 +3932,10 @@
     }
   },
   "omnichat": {
+    "galleryDelete": { "action": "حذف الإنشاء", "title": "حذف هذا الإنشاء؟", "description": "سيؤدي هذا إلى حذف الملف نهائيًا من معرضك ومن مرفقات المحادثة. لا يمكن التراجع عن ذلك.", "confirm": "حذف نهائي", "deleting": "جارٍ الحذف...", "sharedError": "ألغِ نشر هذا الإنشاء من الاستكشاف قبل حذفه.", "genericError": "تعذر حذف هذا الإنشاء.", "unpublishFirst": "ألغِ النشر من الاستكشاف قبل الحذف" },
+    "groupManagement": { "confirmDelete": "هل تريد حذف هذه المجموعة وسجل محادثتها بالكامل نهائيًا؟" },
+    "commerce": { "title": "الخطط وOmniCredits", "subtitle": "يأتي رصيدك وكل عرض معروض من الخادم.", "wallet": "المحفظة", "balanceBreakdown": "{{purchased}} مشتراة · {{subscription}} من الاشتراك", "plans": "الخطط", "choosePlan": "اختر {{plan}}", "creditPacks": "حزم الرصيد", "creditName": "{{count}} OmniCredits", "buyPack": "شراء {{pack}}", "recentUsage": "الاستخدام الأخير", "noUsage": "لا يوجد استخدام للرصيد بعد.", "loading": "جارٍ تحميل خيارات الشراء…", "redirecting": "جارٍ فتح الدفع الآمن…", "notConfigured": "خيارات الشراء غير مهيأة بعد.", "offerNames": { "plus": "بلس", "premium": "بريميوم", "unknown": "اشتراك" }, "period": { "month": "شهر", "days": "{{count}} يومًا" }, "features": { "profiles": "ملفات شخصيات أكثر", "media": "رصيد وسائط مضمن", "priority": "إنشاء بأولوية" }, "usage": { "voice": "مكالمة صوتية", "image": "إنشاء صورة", "video": "إنشاء فيديو", "other": "تعديل الرصيد" }, "errors": { "load": "تعذر تحميل تفاصيل الفوترة.", "secureCheckout": "تعذر فتح دفع آمن. حاول مرة أخرى." } },
+    "videoPaywall": { "title": "فتح {{feature}}", "description": "يتطلب الفيديو OmniCredits. قد تتضمن الخطة المؤهلة رصيدًا؛ ويتم تأكيد التوفر والتكلفة بأمان قبل الاستخدام.", "viewOptions": "عرض الخطط والرصيد", "features": { "scene_video": "فيديو المشهد", "video_call": "مكالمات الفيديو" } },
     "categories": {
       "all": "الكل",
       "roleplay": "تقمص أدوار",
@@ -3983,6 +3994,26 @@
       "continueFailed": "تعذّر فتح المحادثة. حاول مجددًا.",
       "resumeExisting": "متابعة محادثتك الحالية بدلًا من ذلك"
     },
+    "responseReport": {
+      "title": "الإبلاغ عن رد",
+      "description": "اختر الخطأ الذي حدث. تساعد ملاحظاتك في تحسين الردود المستقبلية.",
+      "close": "إغلاق بلاغ الرد",
+      "reasonLabel": "ما الخطأ الذي حدث؟",
+      "reasons": {
+        "role_ownership": "خلط بين من قام بالفعل أو يملك الشيء",
+        "user_agency": "ألغى خياراتي أو تصرف نيابةً عني",
+        "narration_format": "كان السرد أو التنسيق غير صحيح",
+        "repetition_length": "كان مكررًا أو بطول غير مناسب",
+        "grammar_artifact": "احتوى على أخطاء لغوية أو آثار توليد",
+        "character_mismatch": "لم يتوافق مع الشخصية",
+        "other": "مشكلة أخرى"
+      },
+      "noteLabel": "ملاحظة اختيارية",
+      "notePlaceholder": "أخبرنا بما كان يمكن أن يكون أفضل",
+      "cancel": "إلغاء",
+      "sending": "جارٍ الإرسال…",
+      "submit": "إرسال البلاغ"
+    },
     "chat": {
       "invalidConversation": "تعذّر العثور على هذه المحادثة.",
       "back": "العودة إلى الاستكشاف",
@@ -4011,7 +4042,15 @@
       "inputPlaceholder": "قل أو افعل شيئًا...",
       "send": "إرسال الرسالة",
       "rateLimited": "أنت تتحرك بسرعة كبيرة — يُرجى الانتظار لحظة قبل إرسال رسالة أخرى.",
+      "allowanceRemaining": "{{remaining}} من أصل {{limit}} ردًا مجانيًا متاحًا · 24 ساعة متجددة",
+      "allowanceEmpty": "لا توجد ردود مجانية متاحة.",
+      "allowanceNext": "سيصبح ردك التالي متاحًا في {{time}}.",
+      "allowanceGuestCta": "سجّل للحصول على 250 ردًا",
+      "allowanceUpgradeCta": "رقِّ للحصول على ردود غير محدودة",
       "regenerateResponse": "إعادة إنشاء الرد",
+      "reportResponse": "الإبلاغ عن الرد",
+      "reportResponseThanks": "شكرًا. أُضيف هذا الرد إلى قائمة مراجعة الجودة.",
+      "reportResponseFailed": "تعذّر حفظ بلاغ الرد. حاول مجددًا.",
       "regenerationFailed": "تعذّرت إعادة إنشاء هذا الرد. تم الاحتفاظ بالرد الأصلي.",
       "editResponse": "تعديل الرد",
       "saveEdit": "حفظ",
@@ -4041,6 +4080,10 @@
       "discover": "اكتشف",
       "search": "بحث",
       "chat": "الدردشة",
+      "groups": "المجموعات",
+      "create": "إنشاء",
+      "explore": "استكشاف",
+      "characters": "الشخصيات",
       "studio": "الاستوديو",
       "searchPlaceholder": "البحث عن شخصيات...",
       "clearSearch": "مسح البحث",

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import OmniChatChatPage from '../OmniChatChatPage';
 
@@ -17,6 +17,10 @@ const {
   mockDeleteConversation,
   mockDeletePersonaConversations,
   mockPublishChat,
+  mockGetModelSelection,
+  mockSetModelSelection,
+  mockGetAllowance,
+  mockCreateOmniChatRequestId,
 } = vi.hoisted(() => ({
   mockListPersonas: vi.fn(),
   mockListConversations: vi.fn(),
@@ -29,12 +33,20 @@ const {
   mockDeleteConversation: vi.fn(),
   mockDeletePersonaConversations: vi.fn(),
   mockPublishChat: vi.fn(),
+  mockGetModelSelection: vi.fn(),
+  mockSetModelSelection: vi.fn(),
+  mockGetAllowance: vi.fn(),
+  mockCreateOmniChatRequestId: vi.fn(),
 }));
 
 let mockIsAuthenticated = true;
+let mockUserPlan: 'free' | 'plus' | 'premium' = 'free';
 
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ isAuthenticated: mockIsAuthenticated }),
+  useAuth: () => ({
+    isAuthenticated: mockIsAuthenticated,
+    user: mockIsAuthenticated ? { id: 1, username: 'tester', plan: mockUserPlan } : null,
+  }),
 }));
 
 vi.mock('../../components/omnichat/PersonaAvatar', () => ({
@@ -54,6 +66,8 @@ vi.mock('../../components/omnichat/OmniChatShell', () => ({
 }));
 
 vi.mock('../../services/omnichatService', () => ({
+  createOmniChatRequestId: () => mockCreateOmniChatRequestId(),
+  createOmniChatSocialRequestId: () => 'social-request-id',
   omnichatService: {
     listPersonas: (...args: unknown[]) => mockListPersonas(...args),
     listConversations: (...args: unknown[]) => mockListConversations(...args),
@@ -69,6 +83,16 @@ vi.mock('../../services/omnichatService', () => ({
     createConversation: vi.fn(),
     createConversationWithMessages: vi.fn(),
     sendPreviewMessage: vi.fn(),
+    getModelSelection: (...args: unknown[]) => mockGetModelSelection(...args),
+    setModelSelection: (...args: unknown[]) => mockSetModelSelection(...args),
+    getAllowance: (...args: unknown[]) => mockGetAllowance(...args),
+    getBillingCatalog: vi.fn().mockResolvedValue([]),
+    getBillingWallet: vi.fn().mockResolvedValue({
+      purchased_balance: 0,
+      subscription_balance: 0,
+    }),
+    getBillingUsage: vi.fn().mockResolvedValue({ usage: [] }),
+    createBillingCheckout: vi.fn(),
   },
   omnichatQueryKeys: {
     personas: () => ['omnichat', 'personas'],
@@ -77,6 +101,11 @@ vi.mock('../../services/omnichatService', () => ({
     generation: (id: string) => ['omnichat', 'generation', id],
     generations: ['omnichat', 'generations'],
     gallery: () => ['omnichat', 'gallery', 'all'],
+    modelSelection: (id: number) => ['omnichat', 'model-selection', id],
+    allowance: (authenticated: boolean) => ['omnichat', 'allowance', authenticated],
+    billingCatalog: ['omnichat', 'billing', 'catalog'],
+    billingWallet: ['omnichat', 'billing', 'wallet'],
+    billingUsage: () => ['omnichat', 'billing', 'usage', 50],
   },
 }));
 
@@ -128,6 +157,9 @@ describe('OmniChatChatPage', () => {
     localStorage.clear();
     sessionStorage.clear();
     mockIsAuthenticated = true;
+    mockUserPlan = 'free';
+    mockCreateOmniChatRequestId.mockReset();
+    mockCreateOmniChatRequestId.mockReturnValue('123e4567-e89b-42d3-a456-426614174000');
     mockMatchMedia();
 
     const persona = {
@@ -170,6 +202,16 @@ describe('OmniChatChatPage', () => {
       },
       messages: [],
     });
+    mockGetModelSelection.mockResolvedValue({
+      account_tier: 'free',
+      default_model_key: 'standard',
+      effective_model_key: 'standard',
+    });
+    mockSetModelSelection.mockResolvedValue({
+      account_tier: 'free',
+      default_model_key: 'standard',
+      effective_model_key: 'standard',
+    });
     mockSendMessage.mockResolvedValue({
       id: 7,
       conversation_id: 42,
@@ -210,6 +252,15 @@ describe('OmniChatChatPage', () => {
       created_at: '2026-07-02T10:16:00Z',
     });
     mockPublishChat.mockResolvedValue({ id: 'publication-1' });
+    mockGetAllowance.mockResolvedValue({
+      tier: 'free',
+      allowed: true,
+      unlimited: false,
+      limit: 250,
+      used: 0,
+      remaining: 250,
+      window_seconds: 86400,
+    });
     mockRegenerateMessage.mockResolvedValue({
       id: 2,
       conversation_id: 42,
@@ -230,6 +281,28 @@ describe('OmniChatChatPage', () => {
     mockDeletePersonaConversations.mockResolvedValue(undefined);
   });
 
+  it('shows an exhausted rolling allowance and prevents another send', async () => {
+    const nextReplyAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    mockGetAllowance.mockResolvedValueOnce({
+      tier: 'free',
+      allowed: false,
+      unlimited: false,
+      limit: 250,
+      used: 250,
+      remaining: 0,
+      reset_at: nextReplyAt,
+      window_seconds: 86400,
+    });
+
+    renderPage();
+
+    expect(await screen.findByText(/No free replies available/i)).toBeInTheDocument();
+    const composer = screen.getByPlaceholderText('Say or do something...');
+    fireEvent.change(composer, { target: { value: 'One more message' } });
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Upgrade for unlimited replies/i })).toBeVisible();
+  });
+
   it('shows a public persona opening immediately in a direct guest chat', async () => {
     mockIsAuthenticated = false;
 
@@ -237,6 +310,158 @@ describe('OmniChatChatPage', () => {
 
     expect((await screen.findAllByText(/The fire gutters/)).length).toBeGreaterThan(0);
     expect(screen.getByText('Sign in to save your chat')).toBeInTheDocument();
+  });
+
+  it('opens login when a guest tries to change the conversation model', async () => {
+    mockIsAuthenticated = false;
+    const authListener = vi.fn();
+    window.addEventListener('open-auth-modal', authListener);
+
+    renderPage('/omnichat/c/guest?persona=9');
+    fireEvent.click(await screen.findByRole('button', { name: /change conversation model/i }));
+    fireEvent.click(screen.getByRole('button', { name: /select plus/i }));
+
+    expect(authListener).toHaveBeenCalledOnce();
+    window.removeEventListener('open-auth-modal', authListener);
+  });
+
+  it('opens the video-credit paywall when scene generation returns 402', async () => {
+    mockCreateGeneration.mockRejectedValueOnce(
+      Object.assign(new Error('payment required'), { status: 402 })
+    );
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /scene video/i }));
+
+    expect(await screen.findByRole('heading', { name: /unlock scene video/i })).toBeInTheDocument();
+    expect(screen.getByText(/video requires omnicredits/i)).toBeInTheDocument();
+  });
+
+  it('replays a failed scene-generation request when the user chooses Retry', async () => {
+    mockCreateOmniChatRequestId
+      .mockReturnValueOnce('scene-request-id')
+      .mockReturnValueOnce('unexpected-new-id');
+    mockCreateGeneration
+      .mockRejectedValueOnce(new Error('generation provider unavailable'))
+      .mockResolvedValueOnce({
+        id: 'generation-2',
+        owner_user_id: 1,
+        persona_id: 9,
+        conversation_id: 42,
+        kind: 'image',
+        mode: 'contextual',
+        status: 'queued',
+        prompt:
+          'Show the current scene as a candid photo, preserving the character, setting, outfit, mood, and activity.',
+        aspect_ratio: '4:5',
+        scene: {},
+        progress: 0,
+        created_at: '2026-07-02T10:16:00Z',
+      });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /scene photo/i }));
+    const retryButton = await screen.findByRole('button', { name: 'Retry' });
+    fireEvent.click(retryButton);
+
+    await waitFor(() => expect(mockCreateGeneration).toHaveBeenCalledTimes(2));
+    expect(mockCreateGeneration.mock.calls[0][0]).toBe(mockCreateGeneration.mock.calls[1][0]);
+    expect(mockCreateGeneration.mock.calls[1][0]).toMatchObject({ request_id: 'scene-request-id' });
+    expect(mockCreateOmniChatRequestId).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens commerce and restores an authenticated message when direct send returns 402', async () => {
+    mockSendMessage.mockRejectedValueOnce(
+      Object.assign(new Error('payment required'), { status: 402 })
+    );
+    renderPage();
+
+    const composer = await screen.findByPlaceholderText('Say or do something...');
+    fireEvent.change(composer, { target: { value: 'Continue this scene.' } });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+
+    expect(
+      await screen.findByRole('heading', { name: 'Plans and OmniCredits' })
+    ).toBeInTheDocument();
+    expect(composer).toHaveValue('Continue this scene.');
+    expect(screen.queryByText('Continue this scene.', { selector: 'p' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/No free replies available/i)).not.toBeInTheDocument();
+  });
+
+  it('shows Plus and Premium comparisons when a free member selects a locked model', async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /change conversation model/i }));
+    fireEvent.click(screen.getByRole('button', { name: /select plus/i }));
+
+    expect(
+      screen.getByRole('heading', { name: /choose the conversation experience/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /choose plus/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /choose premium/i })).toBeInTheDocument();
+  });
+
+  it('continues from a locked model upsell into the configured commerce flow', async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /change conversation model/i }));
+    fireEvent.click(screen.getByRole('button', { name: /select plus/i }));
+    fireEvent.click(screen.getByRole('button', { name: /choose plus/i }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Plans and OmniCredits' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: /choose the conversation experience/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('uses the server account tier when the cached auth plan is stale', async () => {
+    mockUserPlan = 'premium';
+    mockGetModelSelection.mockResolvedValueOnce({
+      account_tier: 'free',
+      default_model_key: 'standard',
+      effective_model_key: 'standard',
+    });
+
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /change conversation model/i }));
+    fireEvent.click(screen.getByRole('button', { name: /select premium deep/i }));
+
+    expect(
+      screen.getByRole('heading', { name: /choose the conversation experience/i })
+    ).toBeInTheDocument();
+    expect(mockSetModelSelection).not.toHaveBeenCalled();
+  });
+
+  it('fails closed to Standard when a stale client cache contains a retired model key', async () => {
+    mockGetModelSelection.mockResolvedValueOnce({
+      account_tier: 'free',
+      default_model_key: 'free',
+      effective_model_key: 'free',
+    });
+
+    renderPage();
+
+    await waitFor(() => expect(mockGetModelSelection).toHaveBeenCalledWith(42));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    });
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Change conversation model. Current model: Standard',
+      })
+    ).toBeInTheDocument();
+  });
+
+  it('opens the model selector from the compact mobile header', async () => {
+    mockMatchMedia({ mobile: true });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /change conversation model/i }));
+
+    expect(
+      screen.getByRole('heading', { name: /choose how this chat thinks/i })
+    ).toBeInTheDocument();
   });
 
   it('collapses the right profile pane fully and reopens it from the chat header', async () => {
@@ -641,8 +866,167 @@ describe('OmniChatChatPage', () => {
 
     expect(await screen.findByText('Hello from the launch test.')).toBeInTheDocument();
     expect(await screen.findByText('Reply from the bot.')).toBeInTheDocument();
-    expect(mockSendMessage).toHaveBeenCalledWith(42, 'Hello from the launch test.');
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      42,
+      'Hello from the launch test.',
+      '123e4567-e89b-42d3-a456-426614174000',
+      expect.any(AbortSignal)
+    );
     expect(mockSendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses the original request ID when a failed send is retried unchanged', async () => {
+    mockCreateOmniChatRequestId
+      .mockReturnValueOnce('send-request-id')
+      .mockReturnValueOnce('unexpected-new-id');
+    mockSendMessage
+      .mockRejectedValueOnce(new Error('temporary network failure'))
+      .mockResolvedValueOnce({
+        id: 8,
+        conversation_id: 42,
+        role: 'assistant',
+        content: 'The safely replayed reply.',
+        failed: false,
+        created_at: '2026-07-02T10:17:00Z',
+      });
+    renderPage();
+
+    const composer = await screen.findByPlaceholderText('Say or do something...');
+    fireEvent.change(composer, { target: { value: 'Please continue safely.' } });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+    await waitFor(() => expect(composer).toHaveValue('Please continue safely.'));
+
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => expect(mockSendMessage).toHaveBeenCalledTimes(2));
+    expect(mockSendMessage.mock.calls.map((call) => call[2])).toEqual([
+      'send-request-id',
+      'send-request-id',
+    ]);
+    expect(mockCreateOmniChatRequestId).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('The safely replayed reply.')).toBeInTheDocument();
+  });
+
+  it('keeps identical text as separate deliberate user messages', async () => {
+    mockCreateOmniChatRequestId
+      .mockReturnValueOnce('first-send-id')
+      .mockReturnValueOnce('second-send-id');
+    mockSendMessage
+      .mockResolvedValueOnce({
+        id: 7,
+        conversation_id: 42,
+        role: 'assistant',
+        content: 'First acknowledgment.',
+        failed: false,
+        created_at: '2026-07-02T10:16:00Z',
+      })
+      .mockResolvedValueOnce({
+        id: 8,
+        conversation_id: 42,
+        role: 'assistant',
+        content: 'Second acknowledgment.',
+        failed: false,
+        created_at: '2026-07-02T10:17:00Z',
+      });
+    mockGetConversation.mockResolvedValue({
+      conversation: {
+        id: 42,
+        user_id: 1,
+        persona_id: 9,
+        title: 'Campfire Thread',
+        created_at: '2026-07-02T10:00:00Z',
+        last_message_at: '2026-07-02T10:15:00Z',
+      },
+      messages: [
+        {
+          id: 1,
+          conversation_id: 42,
+          role: 'assistant',
+          content: 'An earlier turn is loaded.',
+          failed: false,
+          created_at: '2026-07-02T10:15:00Z',
+        },
+      ],
+    });
+    renderPage();
+
+    const composer = await screen.findByPlaceholderText('Say or do something...');
+    await screen.findByText('An earlier turn is loaded.');
+    fireEvent.change(composer, { target: { value: 'Okay.' } });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+    await screen.findByText('First acknowledgment.');
+    fireEvent.change(composer, { target: { value: 'Okay.' } });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+
+    expect(await screen.findByText('Second acknowledgment.')).toBeInTheDocument();
+    expect(screen.getAllByText('Okay.')).toHaveLength(2);
+    expect(mockSendMessage.mock.calls.map((call) => call[2])).toEqual([
+      'first-send-id',
+      'second-send-id',
+    ]);
+  });
+
+  it('settles a stalled HTTP send when the completed reply arrives live', async () => {
+    let requestSignal: AbortSignal | undefined;
+    mockSendMessage.mockImplementation(
+      (_conversationId: number, _content: string, _requestId: string, signal?: AbortSignal) => {
+        requestSignal = signal;
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('The request was cancelled', 'AbortError')),
+            { once: true }
+          );
+        });
+      }
+    );
+
+    renderPage();
+
+    const composer = await screen.findByPlaceholderText('Say or do something...');
+    fireEvent.change(composer, { target: { value: 'Keep going.' } });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => expect(composer).toBeDisabled());
+    expect(requestSignal).toBeDefined();
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('omnichat-message-complete', {
+          detail: {
+            id: 7,
+            conversation_id: 42,
+            role: 'assistant',
+            content: 'A delayed reply from an older request.',
+            failed: false,
+            request_id: 'older-request-id',
+            created_at: '2026-07-02T10:16:30Z',
+          },
+        })
+      );
+    });
+    expect(requestSignal?.aborted).toBe(false);
+    expect(composer).toBeDisabled();
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('omnichat-message-complete', {
+          detail: {
+            id: 8,
+            conversation_id: 42,
+            role: 'assistant',
+            content: 'The live reply completed.',
+            failed: false,
+            request_id: '123e4567-e89b-42d3-a456-426614174000',
+            created_at: '2026-07-02T10:17:00Z',
+          },
+        })
+      );
+    });
+
+    expect(await screen.findByText('The live reply completed.')).toBeInTheDocument();
+    await waitFor(() => expect(composer).not.toBeDisabled());
+    expect(requestSignal?.aborted).toBe(true);
   });
 
   it('turns an explicit in-chat photo request into contextual scene generation', async () => {
@@ -663,6 +1047,7 @@ describe('OmniChatChatPage', () => {
           conversation_id: 42,
           source_message_id: 7,
           prompt: 'Show me what your outfit looks like today',
+          request_id: '123e4567-e89b-42d3-a456-426614174000',
         })
       )
     );
@@ -712,7 +1097,13 @@ describe('OmniChatChatPage', () => {
     );
     fireEvent.click(regenerateButton);
 
-    await waitFor(() => expect(mockRegenerateMessage).toHaveBeenCalledWith(42, 2));
+    await waitFor(() =>
+      expect(mockRegenerateMessage).toHaveBeenCalledWith(
+        42,
+        2,
+        '123e4567-e89b-42d3-a456-426614174000'
+      )
+    );
     expect(await screen.findByText('A sharper replacement reply.')).toBeInTheDocument();
     expect(screen.queryByText('The original weak reply.')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Regenerate response' })).toHaveLength(1);
@@ -807,6 +1198,109 @@ describe('OmniChatChatPage', () => {
     expect(screen.getByText('Preserve this reply.')).toBeInTheDocument();
   });
 
+  it('reuses the original request ID when a failed regeneration is retried', async () => {
+    mockCreateOmniChatRequestId
+      .mockReturnValueOnce('regenerate-request-id')
+      .mockReturnValueOnce('unexpected-new-id');
+    mockRegenerateMessage
+      .mockRejectedValueOnce(new Error('temporary network failure'))
+      .mockResolvedValueOnce({
+        id: 2,
+        conversation_id: 42,
+        role: 'assistant',
+        content: 'A safely replayed replacement.',
+        failed: false,
+        created_at: '2026-07-02T10:17:00Z',
+      });
+    mockGetConversation.mockResolvedValue({
+      conversation: {
+        id: 42,
+        user_id: 1,
+        persona_id: 9,
+        title: 'Campfire Thread',
+        created_at: '2026-07-02T10:00:00Z',
+        last_message_at: '2026-07-02T10:15:00Z',
+      },
+      messages: [
+        {
+          id: 1,
+          conversation_id: 42,
+          role: 'user',
+          content: 'Please retry.',
+          failed: false,
+          created_at: '2026-07-02T10:15:00Z',
+        },
+        {
+          id: 2,
+          conversation_id: 42,
+          role: 'assistant',
+          content: 'Preserve this reply.',
+          failed: false,
+          created_at: '2026-07-02T10:16:00Z',
+        },
+      ],
+    });
+    renderPage();
+
+    const regenerateButton = await screen.findByRole('button', { name: 'Regenerate response' });
+    fireEvent.click(regenerateButton);
+    await screen.findByText("Couldn't regenerate this response. The original was kept.");
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate response' }));
+
+    await waitFor(() => expect(mockRegenerateMessage).toHaveBeenCalledTimes(2));
+    expect(mockRegenerateMessage.mock.calls.map((call) => call[2])).toEqual([
+      'regenerate-request-id',
+      'regenerate-request-id',
+    ]);
+    expect(mockCreateOmniChatRequestId).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('A safely replayed replacement.')).toBeInTheDocument();
+  });
+
+  it('opens commerce without replacing or erroring the reply when regeneration returns 402', async () => {
+    mockRegenerateMessage.mockRejectedValueOnce(
+      Object.assign(new Error('payment required'), { status: 402 })
+    );
+    mockGetConversation.mockResolvedValue({
+      conversation: {
+        id: 42,
+        user_id: 1,
+        persona_id: 9,
+        title: 'Campfire Thread',
+        created_at: '2026-07-02T10:00:00Z',
+        last_message_at: '2026-07-02T10:15:00Z',
+      },
+      messages: [
+        {
+          id: 1,
+          conversation_id: 42,
+          role: 'user',
+          content: 'Please retry.',
+          failed: false,
+          created_at: '2026-07-02T10:15:00Z',
+        },
+        {
+          id: 2,
+          conversation_id: 42,
+          role: 'assistant',
+          content: 'Keep the original reply.',
+          failed: false,
+          created_at: '2026-07-02T10:16:00Z',
+        },
+      ],
+    });
+
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Regenerate response' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Plans and OmniCredits' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Keep the original reply.')).toBeInTheDocument();
+    expect(
+      screen.queryByText("Couldn't regenerate this response. The original was kept.")
+    ).not.toBeInTheDocument();
+  });
+
   it('archives one preview chat after the two-step delete flow', async () => {
     renderPage();
 
@@ -873,7 +1367,12 @@ describe('OmniChatChatPage', () => {
     expect(screen.getByRole('dialog', { name: 'Publish chat to Explore' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Publish 2 messages' }));
     await waitFor(() =>
-      expect(mockPublishChat).toHaveBeenCalledWith(42, [1, 2], 'Campfire Thread')
+      expect(mockPublishChat).toHaveBeenCalledWith(
+        42,
+        [1, 2],
+        'Campfire Thread',
+        'social-request-id'
+      )
     );
   });
 });

@@ -42,6 +42,13 @@ export const voiceMessagesService = {
       `${API_BASE_URL}/messages/${encodeURIComponent(messageId)}/voice`
     );
     if (!resp.ok) throw new Error(await resp.text());
-    return resp.json();
+    const voiceMessage: VoiceMessageResponse = await resp.json();
+    // The API returns an authenticated, same-service playback route rather
+    // than a storage-provider bearer URL. Keep it absolute for cross-origin
+    // development setups, so authenticatedFetch includes session cookies.
+    if (voiceMessage.signed_url.startsWith('/')) {
+      voiceMessage.signed_url = `${API_BASE_URL}${voiceMessage.signed_url}`;
+    }
+    return voiceMessage;
   },
 };

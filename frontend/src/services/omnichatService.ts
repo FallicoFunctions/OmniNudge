@@ -2,6 +2,7 @@ import { api } from '../lib/api';
 import type {
   PreviewMessageRequest,
   PreviewMessageResponse,
+  OmniChatAllowanceState,
   BotConversation,
   BotConversationDetail,
   BotMessage,
@@ -23,12 +24,63 @@ import type {
   OmniChatVoiceCatalog,
   OmniChatCallSession,
   OmniChatSceneState,
+  OmniChatModelSelection,
+  OmniChatModelKey,
+  OmniChatModelScope,
+  OmniChatResponseFeedbackRequest,
 } from '../types/omnichat';
 import { API_BASE_URL } from '../lib/api';
 import { authenticatedFetch } from './authSession';
+import type {
+  OmniChatBillingOffer,
+  OmniChatBillingUsage,
+  OmniChatCheckoutResponse,
+  OmniChatVideoEntitlement,
+  OmniChatWallet,
+} from '../types/omnichatCommerce';
+
+// The backend limits a completion attempt to 25 seconds, then gives its
+// persisted reply (including a safe fallback) up to 10 seconds to commit.
+// Keep a five-second transport margin so the client receives that definitive
+// outcome without recreating the former 30+ second stranded-composer UX.
+const OMNICHAT_SEND_TIMEOUT_MS = 40_000;
 
 function getApiUrl(path: string): URL {
   return new URL(`${API_BASE_URL.replace(/\/$/, '')}${path}`);
+}
+
+export function createOmniChatCheckoutIdempotencyId(): string {
+  return createOmniChatRequestId();
+}
+
+/**
+ * Creates the opaque identifier that ties one user intent to all transport
+ * attempts. Callers must create it before invoking a mutation, never inside a
+ * request function that TanStack Query or application code could retry.
+ */
+export function createOmniChatRequestId(): string {
+  if (typeof globalThis.crypto?.randomUUID !== 'function') {
+    throw new Error('Secure request identifiers are unavailable');
+  }
+  return globalThis.crypto.randomUUID();
+}
+
+export function createOmniChatSocialRequestId(): string {
+  return createOmniChatRequestId();
+}
+
+export function isSafeOmniChatCheckoutURL(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      Boolean(url.hostname) &&
+      url.username === '' &&
+      url.password === ''
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -87,15 +139,52 @@ export const omnichatService = {
     return api.get<BotConversationDetail>(`/omnichat/conversations/${conversationId}`);
   },
 
-  async sendMessage(conversationId: number, content: string): Promise<BotMessage> {
-    return api.post<BotMessage>(`/omnichat/conversations/${conversationId}/messages`, {
-      content,
-    });
+  async sendMessage(
+    conversationId: number,
+    content: string,
+    requestId: string,
+    signal?: AbortSignal
+  ): Promise<BotMessage> {
+    const requestController = new AbortController();
+    const abortFromCaller = () => requestController.abort(signal?.reason);
+    const timeout = globalThis.setTimeout(() => {
+      requestController.abort(new DOMException('The OmniChat reply timed out', 'TimeoutError'));
+    }, OMNICHAT_SEND_TIMEOUT_MS);
+
+    if (signal?.aborted) abortFromCaller();
+    else signal?.addEventListener('abort', abortFromCaller, { once: true });
+
+    try {
+      return await api.post<BotMessage>(
+        `/omnichat/conversations/${conversationId}/messages`,
+        { content, request_id: requestId },
+        { signal: requestController.signal }
+      );
+    } finally {
+      globalThis.clearTimeout(timeout);
+      signal?.removeEventListener('abort', abortFromCaller);
+    }
   },
 
-  async regenerateMessage(conversationId: number, messageId: number): Promise<BotMessage> {
+  async regenerateMessage(
+    conversationId: number,
+    messageId: number,
+    requestId: string
+  ): Promise<BotMessage> {
     return api.post<BotMessage>(
-      `/omnichat/conversations/${conversationId}/messages/${messageId}/regenerate`
+      `/omnichat/conversations/${conversationId}/messages/${messageId}/regenerate`,
+      { request_id: requestId }
+    );
+  },
+
+  async reportResponseFeedback(
+    conversationId: number,
+    messageId: number,
+    feedback: OmniChatResponseFeedbackRequest
+  ): Promise<void> {
+    await api.post(
+      `/omnichat/conversations/${conversationId}/messages/${messageId}/feedback`,
+      feedback
     );
   },
 
@@ -114,6 +203,24 @@ export const omnichatService = {
     await api.put(`/omnichat/conversations/${conversationId}/settings`, { settings });
   },
 
+  async getModelSelection(conversationId: number): Promise<OmniChatModelSelection> {
+    return api.get<OmniChatModelSelection>(
+      `/omnichat/model-selection?conversation_id=${encodeURIComponent(conversationId)}`
+    );
+  },
+
+  async setModelSelection(
+    conversationId: number,
+    modelKey: OmniChatModelKey,
+    scope: OmniChatModelScope
+  ): Promise<OmniChatModelSelection> {
+    return api.put<OmniChatModelSelection>('/omnichat/model-selection', {
+      conversation_id: conversationId,
+      model_key: modelKey,
+      scope,
+    });
+  },
+
   async forkConversation(conversationId: number): Promise<BotConversation> {
     return api.post<BotConversation>(`/omnichat/conversations/${conversationId}/fork`);
   },
@@ -128,6 +235,10 @@ export const omnichatService = {
 
   async sendPreviewMessage(req: PreviewMessageRequest): Promise<PreviewMessageResponse> {
     return api.post<PreviewMessageResponse>('/omnichat/preview/messages', req);
+  },
+
+  async getAllowance(): Promise<OmniChatAllowanceState> {
+    return api.get<OmniChatAllowanceState>('/omnichat/allowance');
   },
 
   async createConversationWithMessages(
@@ -266,6 +377,40 @@ export const omnichatService = {
     return response.asset;
   },
 
+  async deleteMediaAsset(assetId: string): Promise<void> {
+    await api.delete(`/omnichat/media/${encodeURIComponent(assetId)}`);
+  },
+
+  async getBillingCatalog(): Promise<OmniChatBillingOffer[]> {
+    const response = await api.get<{ offers: OmniChatBillingOffer[] }>('/omnichat/billing/catalog');
+    return response.offers ?? [];
+  },
+
+  async getBillingWallet(): Promise<OmniChatWallet> {
+    const response = await api.get<{ wallet: OmniChatWallet }>('/omnichat/billing/wallet');
+    return response.wallet;
+  },
+
+  async getBillingUsage(limit = 50): Promise<OmniChatBillingUsage> {
+    return api.get<OmniChatBillingUsage>(
+      `/omnichat/billing/usage?limit=${encodeURIComponent(limit)}`
+    );
+  },
+
+  async getVideoEntitlement(): Promise<OmniChatVideoEntitlement> {
+    return api.get<OmniChatVideoEntitlement>('/omnichat/billing/video-entitlement');
+  },
+
+  async createBillingCheckout(
+    offerId: string,
+    idempotencyId: string
+  ): Promise<OmniChatCheckoutResponse> {
+    return api.post<OmniChatCheckoutResponse>('/omnichat/billing/checkout', {
+      offer_id: offerId,
+      idempotency_id: idempotencyId,
+    });
+  },
+
   async getMediaAssetContent(assetId: string, publicContentUrl?: string): Promise<Blob> {
     const contentUrl = resolveApiMediaContentUrl(assetId, publicContentUrl);
     const response = await authenticatedFetch(contentUrl, {
@@ -330,6 +475,7 @@ export const omnichatService = {
     conversationId: number,
     messageIds: number[],
     title: string,
+    idempotencyKey: string,
     caption = ''
   ): Promise<OmniChatPublication> {
     const response = await api.post<{ publication: OmniChatPublication }>(
@@ -339,6 +485,7 @@ export const omnichatService = {
         message_ids: messageIds,
         title,
         caption,
+        idempotency_key: idempotencyKey,
       }
     );
     return response.publication;
@@ -350,6 +497,20 @@ export const omnichatService = {
 
   async setPublicationBookmarked(id: string, bookmarked: boolean): Promise<void> {
     await api.put(`/omnichat/explore/${encodeURIComponent(id)}/bookmark`, { bookmarked });
+  },
+
+  async listBookmarkedPublications(
+    before?: string,
+    beforeId?: string,
+    limit = 20
+  ): Promise<OmniChatPublication[]> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (before) params.set('before', before);
+    if (beforeId) params.set('before_id', beforeId);
+    const response = await api.get<{ publications: OmniChatPublication[] }>(
+      `/omnichat/explore/bookmarks?${params.toString()}`
+    );
+    return response.publications ?? [];
   },
 
   async listPublicationComments(
@@ -394,9 +555,10 @@ export const omnichatService = {
     await api.put(`/omnichat/explore/users/${userId}/follow`, { following });
   },
 
-  async continueSharedChat(id: string): Promise<BotConversation> {
+  async continueSharedChat(id: string, idempotencyKey: string): Promise<BotConversation> {
     const response = await api.post<{ conversation: BotConversation }>(
-      `/omnichat/explore/${encodeURIComponent(id)}/continue`
+      `/omnichat/explore/${encodeURIComponent(id)}/continue`,
+      { idempotency_key: idempotencyKey }
     );
     return response.conversation;
   },
@@ -457,6 +619,7 @@ export const omnichatService = {
   async sendGroupMessage(
     id: string,
     content: string,
+    idempotencyKey: string,
     responderPersonaIds: number[] = []
   ): Promise<OmniChatGroupMessage[]> {
     const response = await api.post<{ messages: OmniChatGroupMessage[] }>(
@@ -464,6 +627,7 @@ export const omnichatService = {
       {
         content,
         responder_persona_ids: responderPersonaIds,
+        idempotency_key: idempotencyKey,
       }
     );
     return response.messages;
@@ -481,6 +645,58 @@ export const omnichatService = {
     return response.group;
   },
 
+  async updateGroup(
+    id: string,
+    name: string,
+    description: string,
+    visibility: OmniChatGroup['visibility']
+  ): Promise<OmniChatGroup> {
+    const response = await api.patch<{ group: OmniChatGroup }>(
+      `/omnichat/groups/${encodeURIComponent(id)}`,
+      { name, description, visibility }
+    );
+    return response.group;
+  },
+
+  async leaveGroup(id: string): Promise<void> {
+    await api.delete(`/omnichat/groups/${encodeURIComponent(id)}/members/me`);
+  },
+
+  async setGroupMemberRole(id: string, userId: number, role: 'admin' | 'member'): Promise<void> {
+    await api.patch(`/omnichat/groups/${encodeURIComponent(id)}/members/${userId}/role`, {
+      role,
+    });
+  },
+
+  async removeGroupMember(id: string, userId: number): Promise<void> {
+    await api.delete(`/omnichat/groups/${encodeURIComponent(id)}/members/${userId}`);
+  },
+
+  async transferGroupOwnership(id: string, userId: number): Promise<void> {
+    await api.post(`/omnichat/groups/${encodeURIComponent(id)}/members/${userId}/transfer`, {});
+  },
+
+  async listGroupInvites(id: string): Promise<OmniChatGroupInvite[]> {
+    const response = await api.get<{ invites: OmniChatGroupInvite[] }>(
+      `/omnichat/groups/${encodeURIComponent(id)}/invites`
+    );
+    return response.invites ?? [];
+  },
+
+  async revokeGroupInvite(id: string, inviteId: string): Promise<void> {
+    await api.delete(
+      `/omnichat/groups/${encodeURIComponent(id)}/invites/${encodeURIComponent(inviteId)}`
+    );
+  },
+
+  async archiveGroup(id: string): Promise<void> {
+    await api.post(`/omnichat/groups/${encodeURIComponent(id)}/archive`, {});
+  },
+
+  async deleteGroup(id: string): Promise<void> {
+    await api.delete(`/omnichat/groups/${encodeURIComponent(id)}`);
+  },
+
   async getPersonaVoice(personaId: number): Promise<OmniChatPersonaVoice> {
     const response = await api.get<{ voice: OmniChatPersonaVoice }>(
       `/omnichat/personas/${personaId}/voice`
@@ -492,11 +708,12 @@ export const omnichatService = {
     return api.get<OmniChatVoiceCatalog>('/omnichat/voice-presets');
   },
 
-  async previewVoicePreset(presetId: string): Promise<Blob> {
+  async previewVoicePreset(presetId: string, signal?: AbortSignal): Promise<Blob> {
     const response = await authenticatedFetch(
       `${API_BASE_URL}/omnichat/voice-presets/${encodeURIComponent(presetId)}/preview`,
       {
         method: 'POST',
+        signal,
       }
     );
     if (!response.ok) throw new Error('Voice preview is unavailable');
@@ -553,12 +770,21 @@ export const omnichatQueryKeys = {
   generation: (id: string) => ['omnichat', 'generation', id] as const,
   generations: ['omnichat', 'generations'] as const,
   gallery: (kind?: OmniChatMediaKind) => ['omnichat', 'gallery', kind ?? 'all'] as const,
+  media: (id: string) => ['omnichat', 'media', id] as const,
+  billingCatalog: ['omnichat', 'billing', 'catalog'] as const,
+  billingWallet: ['omnichat', 'billing', 'wallet'] as const,
+  billingUsage: (limit = 50) => ['omnichat', 'billing', 'usage', limit] as const,
+  videoEntitlement: ['omnichat', 'billing', 'video-entitlement'] as const,
   explore: (kind?: string) => ['omnichat', 'explore', kind ?? 'all'] as const,
   publication: (id: string) => ['omnichat', 'publication', id] as const,
   publicationComments: (id: string) => ['omnichat', 'publication', id, 'comments'] as const,
   groups: ['omnichat', 'groups'] as const,
   group: (id: string) => ['omnichat', 'group', id] as const,
   groupMessages: (id: string) => ['omnichat', 'group-messages', id] as const,
+  allowance: (authenticated: boolean) =>
+    ['omnichat', 'allowance', authenticated ? 'account' : 'guest'] as const,
   personaVoice: (id: number) => ['omnichat', 'persona-voice', id] as const,
   voicePresets: ['omnichat', 'voice-presets'] as const,
+  modelSelection: (conversationId: number) =>
+    ['omnichat', 'model-selection', conversationId] as const,
 };

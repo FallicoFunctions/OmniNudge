@@ -32,8 +32,9 @@ function logMissingTranslation(
   console.warn(`[i18n] Missing translation key "${key}" for language "${languageLabel}"`);
 }
 
-if (!i18n.isInitialized) {
-  i18n
+export const i18nReady: Promise<typeof i18n> = i18n.isInitialized
+  ? Promise.resolve(i18n)
+  : i18n
     .use(HttpBackend) // Load translations from /locales
     .use(LanguageDetector) // Detect user language
     .use(initReactI18next) // Pass i18n instance to react-i18next
@@ -65,8 +66,8 @@ if (!i18n.isInitialized) {
         caches: ['localStorage'],
         lookupLocalStorage: 'i18nextLng',
       },
-    });
-}
+    })
+    .then(() => i18n);
 
 function applyLanguageToDocument(language: string | null | undefined): void {
   syncDocumentLanguageAttributes(language);

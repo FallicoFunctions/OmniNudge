@@ -254,5 +254,49 @@ describe('adminService - Ban System', () => {
       });
       expect(result).toEqual(mockResponse.persona);
     });
+
+    it('fetches all persona voices in one admin request', async () => {
+      const voices = [
+        {
+          persona_id: 9,
+          provider: 'voicebox' as const,
+          voice_id: 'af_bella',
+          voice_name: 'Bella',
+          model_id: 'kokoro',
+          stability: 0.5,
+          similarity_boost: 0.75,
+          style: 0,
+          speed: 1,
+          pitch: 1,
+          active: true,
+        },
+      ];
+      vi.mocked(api.get).mockResolvedValue({ voices });
+
+      await expect(adminService.listOmniChatPersonaVoices()).resolves.toEqual(voices);
+      expect(api.get).toHaveBeenCalledWith('/admin/omnichat/persona-voices');
+    });
+
+    it('assigns a server-owned voice preset to a persona', async () => {
+      const voice = {
+        persona_id: 9,
+        provider: 'voicebox' as const,
+        voice_id: 'af_bella',
+        voice_name: 'Bella',
+        model_id: 'kokoro',
+        stability: 0.5,
+        similarity_boost: 0.75,
+        style: 0,
+        speed: 1,
+        pitch: 1,
+        active: true,
+      };
+      vi.mocked(api.put).mockResolvedValue({ voice });
+
+      await expect(adminService.updateOmniChatPersonaVoice(9, 'af_bella')).resolves.toEqual(voice);
+      expect(api.put).toHaveBeenCalledWith('/admin/omnichat/personas/9/voice', {
+        preset_id: 'af_bella',
+      });
+    });
   });
 });

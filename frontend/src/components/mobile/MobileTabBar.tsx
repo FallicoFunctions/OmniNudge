@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Home, Search, Plus, MessageCircle, Menu } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { TabBarItem } from './TabBarItem';
 import { CreateMenuSheet } from './CreateMenuSheet';

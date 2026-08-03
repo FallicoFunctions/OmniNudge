@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link } from 'react-router';
 import { adminService } from '../services/adminService';
 import { api } from '../lib/api';
 import { bugReportService } from '../services/bugReportService';
@@ -14,6 +14,8 @@ import { resolveMediaUrl } from '../utils/mediaUrl';
 import { useFormat } from '../hooks/useFormat';
 import { useTranslation } from 'react-i18next';
 import AdminPersonasTab from '../components/admin/AdminPersonasTab';
+import OmniChatResponseFeedbackTab from '../components/admin/OmniChatResponseFeedbackTab';
+import OmniChatPublicationReportsTab from '../components/admin/OmniChatPublicationReportsTab';
 
 type TabType =
   | 'stats'
@@ -23,7 +25,9 @@ type TabType =
   | 'bug-reports'
   | 'analytics'
   | 'retention'
-  | 'personas';
+  | 'personas'
+  | 'response-feedback'
+  | 'publication-reports';
 
 export default function AdminPage() {
   const { t } = useTranslation();
@@ -103,7 +107,27 @@ export default function AdminPage() {
                 : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)]'
             }`}
           >
-            OmniChat Personas
+            {t('adminPage.tabs.omnichatPersonas')}
+          </button>
+          <button
+            onClick={() => setActiveTab('response-feedback')}
+            className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
+              activeTab === 'response-feedback'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)]'
+            }`}
+          >
+            {t('adminPage.tabs.responseFeedback')}
+          </button>
+          <button
+            onClick={() => setActiveTab('publication-reports')}
+            className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
+              activeTab === 'publication-reports'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)]'
+            }`}
+          >
+            Explore Reports
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
@@ -140,6 +164,8 @@ export default function AdminPage() {
       {activeTab === 'ban-activity' && <BanActivityTab />}
       {activeTab === 'bug-reports' && <BugReportsTab />}
       {activeTab === 'personas' && <AdminPersonasTab />}
+      {activeTab === 'response-feedback' && <OmniChatResponseFeedbackTab />}
+      {activeTab === 'publication-reports' && <OmniChatPublicationReportsTab />}
       {activeTab === 'analytics' && <AnalyticsTab />}
       {activeTab === 'retention' && <RetentionTab />}
     </div>

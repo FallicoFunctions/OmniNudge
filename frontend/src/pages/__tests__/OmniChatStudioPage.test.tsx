@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import OmniChatStudioPage from '../OmniChatStudioPage';
 
@@ -332,6 +332,48 @@ describe('OmniChatStudioPage', () => {
       screen.getByRole('group', { name: 'Male voices' }).querySelectorAll('option')
     ).toHaveLength(6);
     expect(screen.getByText('Custom voice cloning is coming later.')).toBeInTheDocument();
+  });
+
+  it('maps a saved provider voice ID back to its stable catalog option ID', async () => {
+    const savedPersona = await mockCreatePersona();
+    mockListMyPersonas.mockResolvedValue([savedPersona]);
+    mockGetPersonaDefinition.mockResolvedValue(savedPersona);
+    mockListVoicePresets.mockResolvedValue({
+      voicebox_available: true,
+      voice_cloning_enabled: false,
+      presets: [
+        {
+          id: 'heart-catalog-v2',
+          name: 'Heart',
+          gender: 'female',
+          provider: 'voicebox',
+          voice_id: 'provider-heart-v1',
+          model_id: 'kokoro',
+          language_code: 'en',
+        },
+      ],
+    });
+    mockGetPersonaVoice.mockResolvedValue({
+      persona_id: 77,
+      provider: 'voicebox',
+      voice_id: 'provider-heart-v1',
+      voice_name: 'Heart',
+      model_id: 'kokoro',
+      stability: 0.5,
+      similarity_boost: 0.75,
+      style: 0,
+      speed: 1,
+      pitch: 1,
+      language_code: 'en',
+      active: true,
+    });
+
+    renderPage();
+
+    await screen.findByDisplayValue('Hello there.');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Character voice')).toHaveValue('heart-catalog-v2')
+    );
   });
 
   it('persists the browser fallback when no local preset is selected', async () => {

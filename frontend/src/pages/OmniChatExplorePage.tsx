@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import {
   Bookmark,
   Film,
@@ -21,10 +21,14 @@ import OmniChatShell from '../components/omnichat/OmniChatShell';
 import OmniChatMediaAssetView from '../components/omnichat/OmniChatMediaAssetView';
 import type { SidebarTab } from '../components/omnichat/OmniChatSidebar';
 import type { OmniChatPublication, OmniChatPublicationKind } from '../types/omnichat';
-import { omnichatQueryKeys, omnichatService } from '../services/omnichatService';
+import {
+  createOmniChatSocialRequestId,
+  omnichatQueryKeys,
+  omnichatService,
+} from '../services/omnichatService';
 import { useAuth } from '../contexts/AuthContext';
 
-type ExploreFilter = 'all' | OmniChatPublicationKind;
+type ExploreFilter = 'all' | 'saved' | OmniChatPublicationKind;
 
 function getSafePublicationShareUrl(path: string, publicationId: string): string {
   const fallback = new URL(
@@ -65,12 +69,14 @@ export function OmniChatExploreWorkspace() {
     queryKey: omnichatQueryKeys.explore(filter),
     initialPageParam: undefined as { before: string; beforeId: string } | undefined,
     queryFn: ({ pageParam }) =>
-      omnichatService.listExplore(
-        filter === 'all' ? undefined : filter,
-        pageParam?.before,
-        pageParam?.beforeId,
-        20
-      ),
+      filter === 'saved'
+        ? omnichatService.listBookmarkedPublications(pageParam?.before, pageParam?.beforeId, 20)
+        : omnichatService.listExplore(
+            filter === 'all' ? undefined : filter,
+            pageParam?.before,
+            pageParam?.beforeId,
+            20
+          ),
     getNextPageParam: (lastPage) => {
       if (lastPage.length < 20) return undefined;
       const last = lastPage[lastPage.length - 1];
@@ -102,6 +108,7 @@ export function OmniChatExploreWorkspace() {
                 ['image', ImageIcon, 'Images'],
                 ['video', Film, 'Videos'],
                 ['chat', MessageCircle, 'Chats'],
+                ['saved', Bookmark, 'Saved'],
               ] as const
             ).map(([value, Icon, label]) => (
               <button
@@ -166,6 +173,7 @@ function OmniChatPublicationCard({
   const { isAuthenticated, user } = useAuth();
   const [actionError, setActionError] = useState('');
   const [showReport, setShowReport] = useState(false);
+  const [reportReason, setReportReason] = useState('other');
   const [reportDetails, setReportDetails] = useState('');
   const requireAuth = (action: () => void) => {
     if (!isAuthenticated) {
@@ -196,16 +204,18 @@ function OmniChatPublicationCard({
     onError: () => setActionError('Save could not be updated.'),
   });
   const continueMutation = useMutation({
-    mutationFn: () => omnichatService.continueSharedChat(publication.id),
+    mutationFn: (requestId: string) =>
+      omnichatService.continueSharedChat(publication.id, requestId),
     onSuccess: (conversation) => navigate(`/omnichat/c/${conversation.id}`),
     onError: () => setActionError('This chat could not be continued.'),
   });
   const reportMutation = useMutation({
     mutationFn: () =>
-      omnichatService.reportPublication(publication.id, 'other', reportDetails.trim()),
+      omnichatService.reportPublication(publication.id, reportReason, reportDetails.trim()),
     onSuccess: () => {
       setShowReport(false);
       setReportDetails('');
+      setReportReason('other');
       setActionError('Report submitted.');
     },
     onError: () => setActionError('Report could not be submitted.'),
@@ -367,6 +377,26 @@ function OmniChatPublicationCard({
             className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3"
           >
             <label className="text-xs text-white/55">
+              Category
+              <select
+                aria-label="Report reason"
+                value={reportReason}
+                onChange={(event) => setReportReason(event.target.value)}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-[#15161d] p-3 text-sm text-white outline-none"
+              >
+                <option value="minor_safety">Minor safety</option>
+                <option value="sexual_content">Sexual content</option>
+                <option value="violence">Violence or threats</option>
+                <option value="harassment">Harassment</option>
+                <option value="hate">Hate</option>
+                <option value="self_harm">Self-harm</option>
+                <option value="impersonation">Impersonation</option>
+                <option value="copyright">Copyright</option>
+                <option value="spam">Spam</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label className="text-xs text-white/55">
               Why are you reporting this? (optional)
               <textarea
                 aria-label="Report details"
@@ -388,7 +418,9 @@ function OmniChatPublicationCard({
         {publication.content_kind === 'chat' && (
           <button
             type="button"
-            onClick={() => requireAuth(() => continueMutation.mutate())}
+            onClick={() =>
+              requireAuth(() => continueMutation.mutate(createOmniChatSocialRequestId()))
+            }
             disabled={continueMutation.isPending}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:opacity-45"
           >

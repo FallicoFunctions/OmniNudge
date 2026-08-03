@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
 import i18n from './i18n/config';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';

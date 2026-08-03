@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../../services/adminService';
 import { mediaService } from '../../services/mediaService';
+import { omnichatService } from '../../services/omnichatService';
 import type { AdminOmniChatPersona } from '../../types/admin';
+import type { OmniChatPersonaVoice } from '../../types/omnichat';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { normalizeUploadedMediaUrl } from '../../utils/uploadedMediaUrl';
 import MediaUploadField from '../common/MediaUploadField';
@@ -21,12 +23,58 @@ export default function AdminPersonasTab() {
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   const [saveSuccesses, setSaveSuccesses] = useState<Record<number, string>>({});
+  const [voiceSelections, setVoiceSelections] = useState<Record<number, string>>({});
+  const [voiceSuccesses, setVoiceSuccesses] = useState<Record<number, string>>({});
+  const [voicePreviewErrors, setVoicePreviewErrors] = useState<Record<number, string>>({});
+  const [previewingPersonaId, setPreviewingPersonaId] = useState<number | null>(null);
   const [hoveredPersonaId, setHoveredPersonaId] = useState<number | null>(null);
+  const activeVoicePreview = useRef<{ audio: HTMLAudioElement; url: string } | null>(null);
+  const voicePreviewAbortRef = useRef<AbortController | null>(null);
+
+  const releaseVoicePreview = useCallback(
+    (preview: { audio: HTMLAudioElement; url: string } | null = activeVoicePreview.current) => {
+      if (!preview) return;
+      preview.audio.pause();
+      URL.revokeObjectURL(preview.url);
+      if (activeVoicePreview.current === preview) activeVoicePreview.current = null;
+    },
+    []
+  );
 
   const personasQuery = useQuery({
     queryKey: ['adminOmniChatPersonas'],
     queryFn: () => adminService.listOmniChatPersonas(),
   });
+
+  const voicesQuery = useQuery({
+    queryKey: ['adminOmniChatPersonaVoices'],
+    queryFn: () => adminService.listOmniChatPersonaVoices(),
+  });
+
+  const voiceCatalogQuery = useQuery({
+    queryKey: ['omnichat', 'voice-presets'],
+    queryFn: () => omnichatService.listVoicePresets(),
+  });
+
+  const voiceByPersonaId = useMemo(
+    () => new Map((voicesQuery.data ?? []).map((voice) => [voice.persona_id, voice])),
+    [voicesQuery.data]
+  );
+
+  const presetByVoiceId = useMemo(
+    () =>
+      new Map((voiceCatalogQuery.data?.presets ?? []).map((preset) => [preset.voice_id, preset])),
+    [voiceCatalogQuery.data]
+  );
+
+  const femaleVoicePresets = useMemo(
+    () => (voiceCatalogQuery.data?.presets ?? []).filter((preset) => preset.gender === 'female'),
+    [voiceCatalogQuery.data]
+  );
+  const maleVoicePresets = useMemo(
+    () => (voiceCatalogQuery.data?.presets ?? []).filter((preset) => preset.gender === 'male'),
+    [voiceCatalogQuery.data]
+  );
 
   useEffect(() => {
     if (!personasQuery.data) return;
@@ -44,6 +92,35 @@ export default function AdminPersonasTab() {
       return next;
     });
   }, [personasQuery.data]);
+
+  useEffect(() => {
+    if (!voicesQuery.data || !voiceCatalogQuery.data) return;
+    setVoiceSelections((current) => {
+      const next = { ...current };
+      for (const voice of voicesQuery.data) {
+        if (next[voice.persona_id] !== undefined) continue;
+        if (voice.provider === 'browser') {
+          next[voice.persona_id] = '';
+        } else if (presetByVoiceId.has(voice.voice_id)) {
+          next[voice.persona_id] = voice.voice_id;
+        } else {
+          next[voice.persona_id] = '__current_custom__';
+        }
+      }
+      return next;
+    });
+  }, [presetByVoiceId, voiceCatalogQuery.data, voicesQuery.data]);
+
+  useEffect(
+    () => () => {
+      voicePreviewAbortRef.current?.abort(
+        new DOMException('The voice preview page was closed', 'AbortError')
+      );
+      voicePreviewAbortRef.current = null;
+      releaseVoicePreview();
+    },
+    [releaseVoicePreview]
+  );
 
   const saveMutation = useMutation({
     mutationFn: ({ personaId, draft }: { personaId: number; draft: PersonaDraft }) =>
@@ -64,6 +141,29 @@ export default function AdminPersonasTab() {
         ...current,
         [updatedPersona.id]: 'Media saved.',
       }));
+    },
+  });
+
+  const saveVoiceMutation = useMutation({
+    mutationFn: ({ personaId, presetId }: { personaId: number; presetId: string }) =>
+      adminService.updateOmniChatPersonaVoice(personaId, presetId),
+    onSuccess: (voice) => {
+      queryClient.setQueryData<OmniChatPersonaVoice[]>(
+        ['adminOmniChatPersonaVoices'],
+        (current = []) => {
+          const exists = current.some((candidate) => candidate.persona_id === voice.persona_id);
+          return exists
+            ? current.map((candidate) =>
+                candidate.persona_id === voice.persona_id ? voice : candidate
+              )
+            : [...current, voice];
+        }
+      );
+      setVoiceSelections((current) => ({
+        ...current,
+        [voice.persona_id]: voice.provider === 'browser' ? '' : voice.voice_id,
+      }));
+      setVoiceSuccesses((current) => ({ ...current, [voice.persona_id]: 'Voice saved.' }));
     },
   });
 
@@ -142,8 +242,65 @@ export default function AdminPersonasTab() {
     });
   };
 
-  if (personasQuery.isLoading) {
+  const updateVoiceSelection = (personaId: number, presetId: string) => {
+    setVoiceSelections((current) => ({ ...current, [personaId]: presetId }));
+    setVoiceSuccesses((current) => {
+      if (!current[personaId]) return current;
+      const next = { ...current };
+      delete next[personaId];
+      return next;
+    });
+    setVoicePreviewErrors((current) => {
+      if (!current[personaId]) return current;
+      const next = { ...current };
+      delete next[personaId];
+      return next;
+    });
+  };
+
+  const previewVoice = async (personaId: number, presetId: string) => {
+    if (!presetId || presetId === '__current_custom__') return;
+    voicePreviewAbortRef.current?.abort(
+      new DOMException('A newer voice preview was requested', 'AbortError')
+    );
+    const controller = new AbortController();
+    voicePreviewAbortRef.current = controller;
+    let createdPreview: { audio: HTMLAudioElement; url: string } | null = null;
+    setPreviewingPersonaId(personaId);
+    setVoicePreviewErrors((current) => ({ ...current, [personaId]: '' }));
+    try {
+      const blob = await omnichatService.previewVoicePreset(presetId, controller.signal);
+      if (controller.signal.aborted) return;
+      releaseVoicePreview();
+      if (typeof URL.createObjectURL !== 'function') return;
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      createdPreview = { audio, url };
+      activeVoicePreview.current = createdPreview;
+      audio.addEventListener('ended', () => releaseVoicePreview(createdPreview), { once: true });
+      await audio.play();
+    } catch (error) {
+      releaseVoicePreview(createdPreview);
+      if ((error as Error).name === 'AbortError' || voicePreviewAbortRef.current !== controller)
+        return;
+      setVoicePreviewErrors((current) => ({
+        ...current,
+        [personaId]: error instanceof Error ? error.message : 'Voice preview failed',
+      }));
+    } finally {
+      if (voicePreviewAbortRef.current === controller) {
+        voicePreviewAbortRef.current = null;
+        setPreviewingPersonaId((current) => (current === personaId ? null : current));
+      }
+    }
+  };
+
+  if (personasQuery.isLoading || voicesQuery.isLoading || voiceCatalogQuery.isLoading) {
     return <LoadingMessage>Loading OmniChat personas...</LoadingMessage>;
+  }
+
+  if (personasQuery.isError || voicesQuery.isError || voiceCatalogQuery.isError) {
+    return <p className="text-sm text-red-400">Failed to load OmniChat persona management.</p>;
   }
 
   if (!sortedPersonas.length) {
@@ -174,6 +331,14 @@ export default function AdminPersonasTab() {
           const avatarUploading = uploading[`${persona.id}:avatar_url`] === true;
           const videoUploading = uploading[`${persona.id}:preview_video_url`] === true;
           const galleryUploading = uploading[`${persona.id}:gallery_urls`] === true;
+          const voice = voiceByPersonaId.get(persona.id);
+          const voiceSelection = voiceSelections[persona.id] ?? '';
+          const isVoiceSaving =
+            saveVoiceMutation.isPending && saveVoiceMutation.variables?.personaId === persona.id;
+          const isVoicePreviewing = previewingPersonaId === persona.id;
+          const currentVoiceIsCustom = Boolean(
+            voice && voice.provider !== 'browser' && !presetByVoiceId.has(voice.voice_id)
+          );
 
           return (
             <section
@@ -268,6 +433,108 @@ export default function AdminPersonasTab() {
                     )}
                   </div>
                 </div>
+              </div>
+
+              <div className="mt-4 space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                    Character Voice
+                  </h3>
+                  <p className="text-xs text-[var(--color-text-secondary)]">
+                    Assign one of the six female or six male server voices. Browser fallback keeps
+                    speech on the user's device.
+                  </p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),auto,auto] md:items-end">
+                  <label className="space-y-1 text-sm text-[var(--color-text-primary)]">
+                    <span className="block text-xs font-medium text-[var(--color-text-secondary)]">
+                      Voice for {persona.name}
+                    </span>
+                    <select
+                      aria-label={`${persona.name} voice`}
+                      value={voiceSelection}
+                      onChange={(event) => updateVoiceSelection(persona.id, event.target.value)}
+                      className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2"
+                    >
+                      <option value="">Browser fallback</option>
+                      {currentVoiceIsCustom && (
+                        <option value="__current_custom__">
+                          Current custom voice ({voice?.voice_name})
+                        </option>
+                      )}
+                      <optgroup label="Female voices">
+                        {femaleVoicePresets.map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {preset.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Male voices">
+                        {maleVoicePresets.map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {preset.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    aria-label={`Preview ${persona.name} voice`}
+                    onClick={() => previewVoice(persona.id, voiceSelection)}
+                    disabled={
+                      !voiceSelection ||
+                      voiceSelection === '__current_custom__' ||
+                      !voiceCatalogQuery.data?.voicebox_available ||
+                      previewingPersonaId !== null
+                    }
+                    className="rounded-xl border border-[var(--color-border)] px-4 py-2 text-sm font-medium disabled:opacity-50"
+                  >
+                    {isVoicePreviewing ? 'Previewing...' : 'Preview'}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Save ${persona.name} voice`}
+                    onClick={() =>
+                      saveVoiceMutation.mutate({
+                        personaId: persona.id,
+                        presetId: voiceSelection,
+                      })
+                    }
+                    disabled={
+                      saveVoiceMutation.isPending ||
+                      voiceSelection === '__current_custom__' ||
+                      (Boolean(voiceSelection) && !voiceCatalogQuery.data?.voicebox_available)
+                    }
+                    className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    {isVoiceSaving ? 'Saving...' : 'Save voice'}
+                  </button>
+                </div>
+                {!voiceCatalogQuery.data?.voicebox_available && (
+                  <p role="status" className="text-xs text-amber-400">
+                    Voicebox is offline. Existing assignments remain intact; start Voicebox to
+                    preview or assign a server voice.
+                  </p>
+                )}
+                {voicePreviewErrors[persona.id] && (
+                  <p role="alert" className="text-xs text-red-400">
+                    {voicePreviewErrors[persona.id]}
+                  </p>
+                )}
+                {saveVoiceMutation.isError &&
+                  saveVoiceMutation.variables?.personaId === persona.id && (
+                    <p role="alert" className="text-xs text-red-400">
+                      {saveVoiceMutation.error instanceof Error
+                        ? saveVoiceMutation.error.message
+                        : 'Voice save failed'}
+                    </p>
+                  )}
+                {voiceSuccesses[persona.id] && !isVoiceSaving && (
+                  <p role="status" className="text-xs text-emerald-400">
+                    {voiceSuccesses[persona.id]}
+                  </p>
+                )}
               </div>
 
               <div className="mt-4 space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
@@ -368,7 +635,9 @@ export default function AdminPersonasTab() {
                       },
                     })
                   }
-                  disabled={isSaving || avatarUploading || videoUploading || galleryUploading}
+                  disabled={
+                    saveMutation.isPending || avatarUploading || videoUploading || galleryUploading
+                  }
                   className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
                 >
                   {isSaving ? 'Saving...' : 'Save media'}

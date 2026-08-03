@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { postsService } from '../services/postsService';
 import { hubsService, type Hub } from '../services/hubsService';
