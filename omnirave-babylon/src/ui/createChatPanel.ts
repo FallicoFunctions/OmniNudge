@@ -103,6 +103,7 @@ export interface ChatPanel {
   mutedUsers: () => readonly MutedChatUser[];
   isTextEntryActive: () => boolean;
   focusInput: () => void;
+  clearDraft: () => void;
   dispose: () => void;
 }
 
@@ -692,6 +693,11 @@ export function createChatPanel(
       Array.from(muted, ([playerId, playerName]) => ({ playerId, playerName })),
     isTextEntryActive: () => textEntryActive,
     focusInput: () => input.focus(),
+    // Sec 8.3: manual respawn "clears typed chat input text" - a draft the
+    // player never sent should not survive a respawn.
+    clearDraft: () => {
+      input.value = '';
+    },
     dispose() {
       clearAutoOpenTimer();
       clearHintTimer();

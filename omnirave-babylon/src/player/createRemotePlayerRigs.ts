@@ -19,6 +19,7 @@ import { createChatBubbleStack, type ChatBubbleStack } from './createChatBubbleS
 import { createNameplate, type Nameplate } from './createNameplate';
 import { isLabelVisibleAtDistance, resolveLabelDistanceScale } from './labelDistanceMath';
 import { resolveAvatarAnimationState } from './avatarAnimationState';
+import type { RemotePlayerCollisionTarget } from './playerController';
 import type { WorldSnapshot } from '../network/worldSocket';
 
 // Renders every OTHER player from world snapshots as an embodied avatar
@@ -31,6 +32,19 @@ import type { WorldSnapshot } from '../network/worldSocket';
 const SNAP_DISTANCE = 8;
 // Exponential smoothing rate for position (higher = tighter tracking).
 const LERP_RATE = 10;
+// Sec 7.8 player-vs-player collision: createRuntime.ts sends the LOCAL
+// playerRig's eye-tracked root.position straight to the server (see
+// createRuntime.ts's worldSocket.sendMove call), and every client
+// reconstructs remote ghosts at that same value - so a remote entry's
+// root.position.y is an EYE height, exactly like the local rig's, not a foot
+// position. These reference constants (matching createPlayerRig.ts's own
+// REFERENCE_EYE_HEIGHT_METERS / REFERENCE_CAPSULE_HEIGHT_METERS /
+// REFERENCE_RADIUS_METERS) approximate every remote body as the same
+// reference-height capsule; per-player height-scaled precision is a later
+// refinement, not needed for a first-pass "don't walk through each other."
+const REMOTE_COLLISION_EYE_HEIGHT_METERS = 1.65;
+const REMOTE_COLLISION_CAPSULE_HEIGHT_METERS = 1.8;
+const REMOTE_COLLISION_RADIUS_METERS = 0.35;
 // Sec 6.2/6.4: a remote player's whole look arrives in their world loadout as
 // an AvatarDefinition (see avatarDefinition.ts). A loadout with no avatar keys
 // - an older client, or garbage - still has to render SOMEBODY, so it falls
@@ -70,6 +84,13 @@ export interface RemotePlayerRigs {
   applySnapshot: (snapshot: WorldSnapshot) => void;
   /** The definition a ghost is currently dressed from (sec 6.2 sync). */
   avatarDefinitionOf: (playerId: string) => AvatarDefinition | null;
+  /**
+   * Sec 7.8 player-vs-player collision feed for playerController's
+   * getRemotePlayerCollisionTargets option. Returns the SAME pooled array
+   * (and the same object instances) every call, refreshed in place - no
+   * per-frame allocation, safe to call from the render loop.
+   */
+  collisionTargets: () => readonly RemotePlayerCollisionTarget[];
   count: () => number;
   dispose: () => void;
   /** Settings-popup `Display Names` (design doc sec 9.6 / 10.1). */
@@ -123,6 +144,10 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
   let disposed = false;
   let lastSnapshotAt: number | null = null;
   let nameplatesVisible = true;
+  // Pooled, grown-but-never-shrunk-and-recreated: collisionTargets() below
+  // reuses these object instances across frames instead of allocating a
+  // fresh array/object per entry every render frame.
+  const collisionTargetsPool: RemotePlayerCollisionTarget[] = [];
 
   const spawnEntry = (
     id: string,
@@ -226,6 +251,25 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
 
     avatarDefinitionOf(playerId) {
       return entries.get(playerId)?.definition ?? null;
+    },
+
+    collisionTargets() {
+      let i = 0;
+      for (const entry of entries.values()) {
+        let slot = collisionTargetsPool[i];
+        if (!slot) {
+          slot = { x: 0, z: 0, footY: 0, radiusMeters: 0, heightMeters: 0 };
+          collisionTargetsPool[i] = slot;
+        }
+        slot.x = entry.root.position.x;
+        slot.z = entry.root.position.z;
+        slot.footY = entry.root.position.y - REMOTE_COLLISION_EYE_HEIGHT_METERS;
+        slot.radiusMeters = REMOTE_COLLISION_RADIUS_METERS;
+        slot.heightMeters = REMOTE_COLLISION_CAPSULE_HEIGHT_METERS;
+        i += 1;
+      }
+      collisionTargetsPool.length = i;
+      return collisionTargetsPool;
     },
 
     count() {

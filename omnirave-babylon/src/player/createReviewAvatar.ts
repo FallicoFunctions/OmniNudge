@@ -41,6 +41,17 @@ export async function createReviewAvatar(scene: Scene): Promise<ReviewAvatar> {
     ...root.metadata,
     avatarKind: 'festival-runner',
   };
+  // Every part below (chestGlow/visor at negative z, hair/halo at positive z)
+  // was authored with the body's face toward LOCAL -Z. playerController.ts
+  // and createRemotePlayerRigs.ts both set `root.rotation.y` via the standard
+  // `atan2(moveX, moveZ)` convention, which points LOCAL +Z at the travel
+  // direction - the opposite of this body's front, so the character walked
+  // backwards. Rather than special-case that formula (used identically, and
+  // correctly, in two places) or re-author every part's z sign, this single
+  // pivot between root and the meshes absorbs the 180 degree correction once.
+  const visualPivot = new TransformNode('review-avatar-visual-pivot', scene);
+  visualPivot.parent = root;
+  visualPivot.rotation.y = Math.PI;
   const meshes: AbstractMesh[] = [];
 
   const primary = createAvatarMaterial(scene, 'review-avatar-primary', '#f4efe2', 0.18);
@@ -132,7 +143,7 @@ export async function createReviewAvatar(scene: Scene): Promise<ReviewAvatar> {
   }
 
   for (const mesh of meshes) {
-    mesh.parent = root;
+    mesh.parent = visualPivot;
     mesh.checkCollisions = false;
     mesh.isPickable = false;
   }

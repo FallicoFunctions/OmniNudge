@@ -15,7 +15,7 @@ import {
 } from '../player/avatarDefinition';
 import { createFollowCameraRig } from '../player/createFollowCameraRig';
 import { createInputMap } from '../player/createInputMap';
-import { createPlayerController } from '../player/playerController';
+import { createPlayerController, type LadderZone, type RemotePlayerCollisionTarget } from '../player/playerController';
 import { createPlayerRig } from '../player/createPlayerRig';
 import { createReviewAvatar } from '../player/createReviewAvatar';
 import { createAtmosphereRig } from './createAtmosphereRig';
@@ -216,11 +216,44 @@ export async function createMainStageScene(engine: AbstractEngine) {
   // the side LED decks answering each other. Unfreezes only what it animates.
   const stageShow = createStageShow(scene);
 
+  // Sec 7.7 ladder: derived from the ladder mesh's own world bounding box
+  // rather than hand-authored coordinates, so it can never drift out of sync
+  // with wherever the venue asset actually sits. A small horizontal margin
+  // widens the attach footprint past the rungs themselves so approaching from
+  // slightly off-axis still attaches. facingYaw 0 is an approximation (this
+  // venue's authored assets export with consistent world axes) - revisit
+  // in-engine if the avatar snaps facing the wrong way.
+  const ladderMesh = scene.getMeshByName('production-tower-service-ladder');
+  const ladders: LadderZone[] = [];
+  if (ladderMesh) {
+    const bounds = ladderMesh.getBoundingInfo().boundingBox;
+    const margin = 0.6;
+    ladders.push({
+      minX: bounds.minimumWorld.x - margin,
+      maxX: bounds.maximumWorld.x + margin,
+      minZ: bounds.minimumWorld.z - margin,
+      maxZ: bounds.maximumWorld.z + margin,
+      baseY: bounds.minimumWorld.y,
+      topY: bounds.maximumWorld.y,
+      facingYaw: 0,
+    });
+  }
+
+  // Sec 7.8 player-vs-player collision: playerController is constructed here,
+  // before createRuntime.ts builds remotePlayerRigs (which needs the scene
+  // this function returns), so the getter is a level of indirection - the
+  // world/multiplayer path calls setRemotePlayerCollisionSource once
+  // remotePlayerRigs exists; the dev/review path (no world connection) never
+  // calls it, and the getter below simply returns no targets.
+  let remotePlayerCollisionSource: (() => readonly RemotePlayerCollisionTarget[]) | undefined;
+
   const playerController = createPlayerController({
     avatarRoot: reviewAvatar.root,
     camera: cameraRig.camera,
     collisionMeshes: stageAssets.collisionMeshes,
+    getRemotePlayerCollisionTargets: () => remotePlayerCollisionSource?.() ?? [],
     input: input.state,
+    ladders,
     playerRig,
     solidCollisionMeshes: stageAssets.solidCollisionMeshes,
   });
@@ -331,6 +364,10 @@ export async function createMainStageScene(engine: AbstractEngine) {
       input,
       playerRig,
       playerController,
+      /** Sec 7.8: wired once by the world/multiplayer path once remotePlayerRigs exists. */
+      setRemotePlayerCollisionSource(source: () => readonly RemotePlayerCollisionTarget[]) {
+        remotePlayerCollisionSource = source;
+      },
       routeProgress,
       completionCelebration,
       avatarColorways: USER_AVATAR_COLORWAYS,

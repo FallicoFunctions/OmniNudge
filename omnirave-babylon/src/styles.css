@@ -721,6 +721,49 @@ body,
   display: none;
 }
 
+/* Sprint stamina bar (sec 9.4 bottom-center, sec 7.4). Sits above dead
+   center-bottom so a future emote bar can dock at the true bottom edge
+   without overlapping this one. */
+.stamina-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  z-index: 4;
+  width: 220px;
+  padding: 6px 8px;
+  border: 1px solid var(--hud-panel-border);
+  border-radius: var(--hud-radius);
+  background: var(--hud-panel-bg);
+  box-shadow: var(--hud-shadow);
+  backdrop-filter: var(--hud-blur);
+  pointer-events: none;
+}
+
+.stamina-bar__track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.stamina-bar__fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: var(--hud-accent);
+  transition: width 0.12s linear;
+}
+
+.stamina-bar--low .stamina-bar__fill {
+  background: #e2574c;
+}
+
+.stamina-bar--unusable .stamina-bar__fill {
+  background: var(--hud-text-muted);
+}
+
 .stage-audio-dev-controls {
   position: absolute;
   /* Bottom-left: keeps clear of the bottom-right perf/FPS readout. */
