@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
-import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Link, Outlet, useNavigate, useLocation } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
@@ -497,14 +497,14 @@ export default function MainLayout() {
 
       {/* Plan expiry warning banner */}
       {(() => {
-        if (user?.plan !== 'paid' || !user.plan_expires_at) return null;
+        if ((user?.plan !== 'plus' && user?.plan !== 'premium') || !user.plan_expires_at) return null;
         const daysLeft = Math.ceil(
           (new Date(user.plan_expires_at).getTime() - MODULE_LOAD_TIME) / (1000 * 60 * 60 * 24)
         );
         if (daysLeft > 3 || daysLeft <= 0) return null;
         return (
           <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 px-4 py-2 text-center text-sm text-amber-800 dark:text-amber-200">
-            Your paid plan expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''}.{' '}
+            Your {user.plan} plan expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''}.{' '}
             <button
               type="button"
               onClick={() => setShowUpgradeModal(true)}

@@ -6,7 +6,8 @@ import {
   useQueryClient,
   type InfiniteData,
 } from '@tanstack/react-query';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import {
   Check,
   Copy,
@@ -14,6 +15,7 @@ import {
   MessageSquarePlus,
   Plus,
   Send,
+  Settings,
   UserPlus,
   UsersRound,
   X,
@@ -23,19 +25,28 @@ import PersonaAvatar from '../components/omnichat/PersonaAvatar';
 import { Modal } from '../components/common/Modal';
 import type { SidebarTab } from '../components/omnichat/OmniChatSidebar';
 import type { OmniChatGroupMessage } from '../types/omnichat';
-import { omnichatQueryKeys, omnichatService } from '../services/omnichatService';
+import type { OmniChatGroup } from '../types/omnichat';
+import {
+  createOmniChatSocialRequestId,
+  omnichatQueryKeys,
+  omnichatService,
+} from '../services/omnichatService';
+import { useAuth } from '../contexts/AuthContext';
 
 const GROUP_MESSAGE_PAGE_SIZE = 100;
 const GROUP_LIST_PAGE_SIZE = 50;
 
 export function OmniChatGroupsWorkspace() {
   const queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [draft, setDraft] = useState('');
   const [responders, setResponders] = useState<number[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [inviteUrl, setInviteUrl] = useState('');
+  const [showManage, setShowManage] = useState(false);
   const attemptedInviteRef = useRef('');
 
   const groupsQuery = useInfiniteQuery({
@@ -76,24 +87,30 @@ export function OmniChatGroupsWorkspace() {
     mutationFn: omnichatService.joinGroup,
     onSuccess: (group) => {
       setSelectedGroupId(group.id);
-      setSearchParams({}, { replace: true });
       void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.groups });
     },
   });
-  const inviteToken = searchParams.get('invite') ?? '';
+  const inviteToken = new URLSearchParams(location.hash.replace(/^#/, '')).get('invite') ?? '';
   const joinGroup = joinMutation.mutate;
   useEffect(() => {
     if (!inviteToken || attemptedInviteRef.current === inviteToken) return;
     attemptedInviteRef.current = inviteToken;
     // Remove the bearer-style invite from browser history and same-origin
     // Referer headers before making any network requests.
-    setSearchParams({}, { replace: true });
+    navigate(`${location.pathname}${location.search}`, { replace: true });
     joinGroup(inviteToken);
-  }, [inviteToken, joinGroup, setSearchParams]);
+  }, [inviteToken, joinGroup, location.pathname, location.search, navigate]);
 
   const sendMutation = useMutation({
-    mutationFn: ({ content, personaIds }: { content: string; personaIds: number[] }) =>
-      omnichatService.sendGroupMessage(selectedGroupId, content, personaIds),
+    mutationFn: ({
+      content,
+      personaIds,
+      requestId,
+    }: {
+      content: string;
+      personaIds: number[];
+      requestId: string;
+    }) => omnichatService.sendGroupMessage(selectedGroupId, content, requestId, personaIds),
     onSuccess: (messages) => {
       queryClient.setQueryData<InfiniteData<OmniChatGroupMessage[]>>(
         omnichatQueryKeys.groupMessages(selectedGroupId),
@@ -117,7 +134,7 @@ export function OmniChatGroupsWorkspace() {
     onSuccess: ({ token }) =>
       setInviteUrl(
         new URL(
-          `/omnichat/groups?invite=${encodeURIComponent(token)}`,
+          `/omnichat/groups#invite=${encodeURIComponent(token)}`,
           window.location.origin
         ).toString()
       ),
@@ -126,7 +143,11 @@ export function OmniChatGroupsWorkspace() {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!draft.trim() || !selectedGroupId) return;
-    sendMutation.mutate({ content: draft.trim(), personaIds: responders });
+    sendMutation.mutate({
+      content: draft.trim(),
+      personaIds: responders,
+      requestId: createOmniChatSocialRequestId(),
+    });
   };
   const selectedGroup = groupQuery.data;
   const groups = groupsQuery.data?.pages.flat() ?? [];
@@ -235,13 +256,24 @@ export function OmniChatGroupsWorkspace() {
                     characters
                   </p>
                 </div>
+                {(selectedGroup.viewer_role === 'owner' ||
+                  selectedGroup.viewer_role === 'admin') && (
+                  <button
+                    type="button"
+                    onClick={() => inviteMutation.mutate()}
+                    disabled={inviteMutation.isPending}
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs font-medium text-white/60 hover:text-white"
+                  >
+                    <UserPlus size={14} /> Invite
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => inviteMutation.mutate()}
-                  disabled={inviteMutation.isPending}
-                  className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs font-medium text-white/60 hover:text-white"
+                  aria-label="Manage group"
+                  onClick={() => setShowManage(true)}
+                  className="rounded-full border border-white/10 p-2 text-white/60 hover:text-white"
                 >
-                  <UserPlus size={14} /> Invite
+                  <Settings size={15} />
                 </button>
               </header>
               {inviteUrl && (
@@ -259,6 +291,14 @@ export function OmniChatGroupsWorkspace() {
                   </button>
                 </div>
               )}
+              {inviteMutation.isError && (
+                <p
+                  role="alert"
+                  className="border-b border-white/10 px-4 py-2 text-xs text-rose-300"
+                >
+                  This invite could not be created.
+                </p>
+              )}
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
                 {messagesQuery.hasNextPage && (
                   <div className="flex justify-center">
@@ -275,10 +315,10 @@ export function OmniChatGroupsWorkspace() {
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex gap-3 ${message.sender_type === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex gap-3 ${message.sender_user_id === user?.id ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[82%] ${message.sender_type === 'user' ? 'order-1' : ''}`}
+                      className={`max-w-[82%] ${message.sender_user_id === user?.id ? 'order-1' : ''}`}
                     >
                       <p
                         className={`mb-1 text-xs ${message.sender_type === 'persona' ? 'text-indigo-300' : 'text-white/35'}`}
@@ -286,7 +326,7 @@ export function OmniChatGroupsWorkspace() {
                         {message.sender_name}
                       </p>
                       <div
-                        className={`rounded-3xl px-4 py-3 text-sm leading-6 ${message.sender_type === 'user' ? 'bg-indigo-500 text-white' : 'border border-white/8 bg-white/[0.055] text-white/78'}`}
+                        className={`rounded-3xl px-4 py-3 text-sm leading-6 ${message.sender_user_id === user?.id ? 'bg-indigo-500 text-white' : 'border border-white/8 bg-white/[0.055] text-white/78'}`}
                       >
                         {message.content}
                       </div>
@@ -370,7 +410,269 @@ export function OmniChatGroupsWorkspace() {
           }}
         />
       )}
+      {showManage && selectedGroup && (
+        <GroupManagementDialog
+          group={selectedGroup}
+          currentUserId={user?.id ?? 0}
+          onClose={() => setShowManage(false)}
+          onChanged={() => {
+            void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.groups });
+            void queryClient.invalidateQueries({
+              queryKey: omnichatQueryKeys.group(selectedGroup.id),
+            });
+          }}
+          onRemoved={() => {
+            setShowManage(false);
+            setSelectedGroupId('');
+            void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.groups });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function GroupManagementDialog({
+  group,
+  currentUserId,
+  onClose,
+  onChanged,
+  onRemoved,
+}: {
+  group: OmniChatGroup;
+  currentUserId: number;
+  onClose: () => void;
+  onChanged: () => void;
+  onRemoved: () => void;
+}) {
+  const { t } = useTranslation();
+  const [name, setName] = useState(group.name);
+  const [description, setDescription] = useState(group.description);
+  const [visibility, setVisibility] = useState<OmniChatGroup['visibility']>(group.visibility);
+  const [actionError, setActionError] = useState('');
+  const canManage = group.viewer_role === 'owner' || group.viewer_role === 'admin';
+  const invitesQuery = useQuery({
+    queryKey: ['omnichat', 'group-invites', group.id],
+    queryFn: () => omnichatService.listGroupInvites(group.id),
+    enabled: canManage,
+  });
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      omnichatService.updateGroup(group.id, name.trim(), description.trim(), visibility),
+    onSuccess: () => {
+      setActionError('');
+      onChanged();
+    },
+    onError: () => setActionError('Group settings could not be updated.'),
+  });
+  const actionMutation = useMutation({
+    mutationFn: (action: () => Promise<void>) => action(),
+    onSuccess: () => {
+      setActionError('');
+      onChanged();
+    },
+    onError: () => setActionError('That group action could not be completed.'),
+  });
+  const removeGroup = (action: () => Promise<void>) => {
+    actionMutation.mutate(async () => {
+      await action();
+      onRemoved();
+    });
+  };
+
+  return (
+    <Modal
+      isOpen
+      onClose={actionMutation.isPending ? undefined : onClose}
+      ariaLabelledBy="omnichat-manage-group-title"
+      overlayClassName="bg-black/75"
+      className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[30px] border border-white/10 bg-[#181920] p-6 shadow-2xl"
+    >
+      <div className="flex items-center justify-between">
+        <h2 id="omnichat-manage-group-title" className="text-xl font-semibold text-white">
+          Manage group
+        </h2>
+        <button type="button" aria-label="Close group management" onClick={onClose}>
+          <X className="text-white/55" />
+        </button>
+      </div>
+
+      {canManage && (
+        <form
+          className="mt-5 space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            updateMutation.mutate();
+          }}
+        >
+          <input
+            aria-label="Group name"
+            value={name}
+            maxLength={100}
+            onChange={(event) => setName(event.target.value)}
+            className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white"
+          />
+          <textarea
+            aria-label="Group description"
+            value={description}
+            maxLength={1000}
+            onChange={(event) => setDescription(event.target.value)}
+            className="min-h-20 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white"
+          />
+          <select
+            aria-label="Group visibility"
+            value={visibility}
+            onChange={(event) => setVisibility(event.target.value as OmniChatGroup['visibility'])}
+            className="w-full rounded-2xl border border-white/10 bg-[#111218] px-4 py-3 text-white"
+          >
+            <option value="private">Private</option>
+            <option value="invite">Invite only</option>
+            <option value="public">Public</option>
+          </select>
+          <button
+            type="submit"
+            disabled={!name.trim() || updateMutation.isPending}
+            className="rounded-xl bg-indigo-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            Save settings
+          </button>
+        </form>
+      )}
+
+      <h3 className="mt-7 text-sm font-semibold uppercase tracking-wider text-white/45">Members</h3>
+      <div className="mt-2 space-y-2">
+        {group.members.map((member) => (
+          <div
+            key={member.user_id}
+            className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/8 px-3 py-2"
+          >
+            <span className="min-w-0 flex-1 truncate text-sm text-white">@{member.username}</span>
+            <span className="text-xs capitalize text-white/40">{member.role}</span>
+            {group.viewer_role === 'owner' && member.role !== 'owner' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    actionMutation.mutate(() =>
+                      omnichatService.setGroupMemberRole(
+                        group.id,
+                        member.user_id,
+                        member.role === 'admin' ? 'member' : 'admin'
+                      )
+                    )
+                  }
+                  className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/60"
+                >
+                  {member.role === 'admin' ? 'Make member' : 'Make admin'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    actionMutation.mutate(() =>
+                      omnichatService.transferGroupOwnership(group.id, member.user_id)
+                    )
+                  }
+                  className="rounded-lg border border-amber-400/20 px-2 py-1 text-xs text-amber-200"
+                >
+                  Transfer
+                </button>
+              </>
+            )}
+            {canManage &&
+              member.role !== 'owner' &&
+              member.user_id !== currentUserId &&
+              (group.viewer_role === 'owner' || member.role === 'member') && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    actionMutation.mutate(() =>
+                      omnichatService.removeGroupMember(group.id, member.user_id)
+                    )
+                  }
+                  className="rounded-lg border border-rose-400/20 px-2 py-1 text-xs text-rose-200"
+                >
+                  Remove
+                </button>
+              )}
+          </div>
+        ))}
+      </div>
+
+      {canManage && (
+        <>
+          <h3 className="mt-7 text-sm font-semibold uppercase tracking-wider text-white/45">
+            Active invites
+          </h3>
+          <div className="mt-2 space-y-2">
+            {invitesQuery.data?.map((invite) => (
+              <div
+                key={invite.id}
+                className="flex items-center gap-3 rounded-2xl border border-white/8 px-3 py-2 text-xs text-white/55"
+              >
+                <span className="flex-1">
+                  {invite.use_count}/{invite.max_uses} uses · expires{' '}
+                  {new Date(invite.expires_at).toLocaleDateString()}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    actionMutation.mutate(async () => {
+                      await omnichatService.revokeGroupInvite(group.id, invite.id);
+                      await invitesQuery.refetch();
+                    })
+                  }
+                  className="text-rose-200"
+                >
+                  Revoke
+                </button>
+              </div>
+            ))}
+            {!invitesQuery.isLoading && (invitesQuery.data?.length ?? 0) === 0 && (
+              <p className="text-sm text-white/35">No active invites.</p>
+            )}
+          </div>
+        </>
+      )}
+
+      <div className="mt-7 flex flex-wrap gap-2 border-t border-white/10 pt-5">
+        {group.viewer_role !== 'owner' && (
+          <button
+            type="button"
+            onClick={() => removeGroup(() => omnichatService.leaveGroup(group.id))}
+            className="rounded-xl border border-rose-400/25 px-4 py-2 text-sm text-rose-200"
+          >
+            Leave group
+          </button>
+        )}
+        {group.viewer_role === 'owner' && (
+          <>
+            <button
+              type="button"
+              onClick={() => removeGroup(() => omnichatService.archiveGroup(group.id))}
+              className="rounded-xl border border-amber-400/25 px-4 py-2 text-sm text-amber-200"
+            >
+              Archive group
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(t('omnichat.groupManagement.confirmDelete'))) {
+                  removeGroup(() => omnichatService.deleteGroup(group.id));
+                }
+              }}
+              className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Delete group
+            </button>
+          </>
+        )}
+      </div>
+      {actionError && (
+        <p role="alert" className="mt-3 text-sm text-rose-300">
+          {actionError}
+        </p>
+      )}
+    </Modal>
   );
 }
 

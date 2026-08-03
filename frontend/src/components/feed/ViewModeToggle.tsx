@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { useMultiColumnFeed } from '../../contexts/MultiColumnFeedContext';
 
 export function ViewModeToggle() {

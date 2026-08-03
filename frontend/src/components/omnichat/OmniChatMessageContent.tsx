@@ -1,7 +1,15 @@
 import { parseOmniChatMessage } from '../../utils/omnichatMessageFormatting';
 
-export default function OmniChatMessageContent({ content }: { content: string }) {
-  const segments = parseOmniChatMessage(content);
+export default function OmniChatMessageContent({
+  content,
+  isAssistant = false,
+}: {
+  content: string;
+  isAssistant?: boolean;
+}) {
+  const segments = parseOmniChatMessage(content, {
+    repairAssistantFormatting: isAssistant,
+  });
   if (segments.length === 0) {
     return null;
   }

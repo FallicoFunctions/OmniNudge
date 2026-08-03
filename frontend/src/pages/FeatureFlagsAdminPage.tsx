@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router';
 import featureFlagService, { type CreateFeatureFlagRequest } from '../services/featureFlagService';
 import { useFormat } from '../hooks/useFormat';
 import type { FeatureFlagAudit, FeatureFlag } from '../types/featureFlags';

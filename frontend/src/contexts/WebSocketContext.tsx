@@ -74,7 +74,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const reconnectTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const reconnectAttemptsRef = useRef(0);
-  const isCleanupRef = useRef(false);
   const recentMessageIdsRef = useRef<Set<number>>(new Set());
   const activeConnectionIdRef = useRef(0);
 
@@ -803,7 +802,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    isCleanupRef.current = false;
+    let disposed = false;
     const typingTimeouts = typingTimeoutsRef.current;
 
     const connect = async () => {
@@ -819,14 +818,14 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         console.warn('[WebSocket] Failed to fetch WebSocket token; skipping connect', error);
         setIsConnected(false);
         setConnectionState('reconnecting');
-        if (!isCleanupRef.current) {
+        if (!disposed) {
           reconnectAttemptsRef.current += 1;
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
           reconnectTimerRef.current = setTimeout(connect, delay);
         }
         return;
       }
-      if (isCleanupRef.current) return;
+      if (disposed) return;
 
       const url = new URL(API_BASE_URL);
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -862,15 +861,17 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         handleMessage(event);
       };
 
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         if (isStaleSocket()) {
           return;
         }
         setIsConnected(false);
         setConnectionState('reconnecting');
-        console.log('[WebSocket] Disconnected');
+        console.log(
+          `[WebSocket] Disconnected (code=${event.code}, clean=${event.wasClean}, reason=${event.reason || 'none'})`
+        );
 
-        if (isCleanupRef.current) return;
+        if (disposed) return;
         // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s.
         // Reconnect even if the socket never opened, so refreshed tokens can recover long-lived sessions.
         reconnectAttemptsRef.current += 1;
@@ -885,7 +886,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         if (isStaleSocket()) {
           return;
         }
-        if (!isCleanupRef.current) {
+        if (!disposed) {
           console.error('[WebSocket] Error:', error);
         }
       };
@@ -895,7 +896,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     return () => {
       console.log('[WebSocket] Cleaning up...');
-      isCleanupRef.current = true;
+      disposed = true;
       setIsConnected(false);
       setConnectionState('idle');
       if (reconnectTimerRef.current) {

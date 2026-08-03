@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent 
 import { useTranslation } from 'react-i18next';
 import { useFormat } from '../../hooks/useFormat';
 import { flushSync } from 'react-dom';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { FlairBadge } from './FlairBadge';
 import {
   getDisplayDomain,

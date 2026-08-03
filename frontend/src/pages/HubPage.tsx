@@ -7,7 +7,7 @@ import {
   useQueryClient,
   useInfiniteQuery,
 } from '@tanstack/react-query';
-import { useNavigate, useParams, useLocation, Link, Navigate } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, Link, Navigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import {
   hubsService,

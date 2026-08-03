@@ -1,19 +1,26 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OmniChatCreateWorkspace } from '../OmniChatCreatePage';
 import { omnichatService } from '../../services/omnichatService';
 
+let mockIsAuthenticated = true;
+
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ isAuthenticated: true, user: { id: 9 } }),
+  useAuth: () => ({ isAuthenticated: mockIsAuthenticated, user: mockIsAuthenticated ? { id: 9 } : null }),
 }));
 vi.mock('../../components/omnichat/OmniChatMediaAssetView', () => ({
   default: () => <div>gallery scene</div>,
 }));
 vi.mock('../../services/omnichatService', () => ({
+  createOmniChatRequestId: () => '123e4567-e89b-42d3-a456-426614174000',
   omnichatQueryKeys: {
     personas: () => ['omnichat', 'personas'],
-    gallery: () => ['omnichat', 'gallery'],
+    gallery: (kind?: string) => ['omnichat', 'gallery', kind ?? 'all'],
+    media: (id: string) => ['omnichat', 'media', id],
+    billingCatalog: ['omnichat', 'billing', 'catalog'],
+    billingWallet: ['omnichat', 'billing', 'wallet'],
+    billingUsage: () => ['omnichat', 'billing', 'usage', 50],
     generation: (id: string) => ['omnichat', 'generation', id],
     explore: () => ['omnichat', 'explore'],
   },
@@ -24,12 +31,18 @@ vi.mock('../../services/omnichatService', () => ({
     getGeneration: vi.fn(),
     cancelGeneration: vi.fn(),
     publishMedia: vi.fn(),
+    deleteMediaAsset: vi.fn(),
+    getBillingCatalog: vi.fn(),
+    getBillingWallet: vi.fn(),
+    getBillingUsage: vi.fn(),
+    createBillingCheckout: vi.fn(),
   },
 }));
 
 describe('OmniChatCreateWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIsAuthenticated = true;
     vi.mocked(omnichatService.listPersonas).mockResolvedValue([
       {
         id: 42,
@@ -94,6 +107,7 @@ describe('OmniChatCreateWorkspace', () => {
           persona_id: 42,
           prompt: 'Sadie at the park',
           aspect_ratio: '4:5',
+          request_id: '123e4567-e89b-42d3-a456-426614174000',
         })
       )
     );
@@ -147,6 +161,33 @@ describe('OmniChatCreateWorkspace', () => {
         })
       )
     );
+  });
+
+  it('opens auth for an unauthenticated generation and opens the video paywall on 402', async () => {
+    mockIsAuthenticated = false;
+    const authListener = vi.fn();
+    window.addEventListener('open-auth-modal', authListener);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><OmniChatCreateWorkspace /></QueryClientProvider>);
+    await screen.findByRole('option', { name: 'Sadie' });
+    fireEvent.change(screen.getByLabelText('Prompt'), { target: { value: 'A short clip' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Generate image' }));
+    expect(authListener).toHaveBeenCalledOnce();
+    expect(omnichatService.createGeneration).not.toHaveBeenCalled();
+    window.removeEventListener('open-auth-modal', authListener);
+
+    view.unmount();
+    mockIsAuthenticated = true;
+    vi.mocked(omnichatService.createGeneration).mockRejectedValue(
+      Object.assign(new Error('payment required'), { status: 402 })
+    );
+    const nextClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={nextClient}><OmniChatCreateWorkspace /></QueryClientProvider>);
+    await screen.findByRole('option', { name: 'Sadie' });
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }));
+    fireEvent.change(screen.getByLabelText('Prompt'), { target: { value: 'A short clip' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Generate video' }));
+    expect(await screen.findByRole('heading', { name: /unlock scene video/i })).toBeInTheDocument();
   });
 
   it('publishes a private gallery creation to Explore', async () => {
@@ -203,6 +244,75 @@ describe('OmniChatCreateWorkspace', () => {
 
     await waitFor(() => expect(omnichatService.publishMedia).toHaveBeenCalledWith('asset-1'));
     expect(await screen.findByText('Published')).toBeInTheDocument();
+  });
+
+  it('confirms and deletes a private gallery creation', async () => {
+    vi.mocked(omnichatService.listGallery).mockResolvedValue([{
+      id: 'asset-delete', owner_user_id: 9, persona_id: 42, generation_job_id: 'job-delete', kind: 'image', file_type: 'image/png', content_url: '/omnichat/media/asset-delete/content', prompt: 'Delete me', scene: {}, visibility: 'private', created_at: '2026-07-20T00:00:00Z',
+    }]);
+    vi.mocked(omnichatService.deleteMediaAsset).mockResolvedValue();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const invalidateQueries = vi.spyOn(client, 'invalidateQueries');
+    render(<QueryClientProvider client={client}><OmniChatCreateWorkspace /></QueryClientProvider>);
+    fireEvent.click(screen.getByRole('button', { name: /gallery/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /delete creation/i }));
+    expect(screen.getByRole('dialog', { name: /delete this creation/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /delete permanently/i }));
+    await waitFor(() => expect(omnichatService.deleteMediaAsset).toHaveBeenCalledWith('asset-delete'));
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['omnichat', 'gallery'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['omnichat', 'conversation'] });
+    expect(screen.queryByRole('dialog', { name: /delete this creation/i })).not.toBeInTheDocument();
+  });
+
+  it('lets the user cancel deletion and disables dismissal while deletion is pending', async () => {
+    vi.mocked(omnichatService.listGallery).mockResolvedValue([{
+      id: 'asset-delete', owner_user_id: 9, persona_id: 42, generation_job_id: 'job-delete', kind: 'image', file_type: 'image/png', content_url: '/omnichat/media/asset-delete/content', prompt: 'Delete me', scene: {}, visibility: 'private', created_at: '2026-07-20T00:00:00Z',
+    }]);
+    let resolveDelete!: () => void;
+    vi.mocked(omnichatService.deleteMediaAsset).mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveDelete = resolve;
+      })
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><OmniChatCreateWorkspace /></QueryClientProvider>);
+    fireEvent.click(screen.getByRole('button', { name: /gallery/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /delete creation/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+    expect(omnichatService.deleteMediaAsset).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /delete creation/i }));
+    fireEvent.click(screen.getByRole('button', { name: /delete permanently/i }));
+    const dialog = screen.getByRole('dialog', { name: /delete this creation/i });
+    await waitFor(() => expect(dialog).toHaveAttribute('aria-busy', 'true'));
+    expect(screen.getByRole('button', { name: /^cancel$/i })).toBeDisabled();
+    await act(async () => {
+      resolveDelete();
+    });
+  });
+
+  it('explains a 409 and requires public creations to be unpublished first', async () => {
+    vi.mocked(omnichatService.listGallery).mockResolvedValue([
+      {
+        id: 'private-asset', owner_user_id: 9, persona_id: 42, generation_job_id: 'job-private', kind: 'image', file_type: 'image/png', content_url: '/omnichat/media/private-asset/content', prompt: 'Private', scene: {}, visibility: 'private', created_at: '2026-07-20T00:00:00Z',
+      },
+      {
+        id: 'public-asset', owner_user_id: 9, persona_id: 42, generation_job_id: 'job-public', kind: 'image', file_type: 'image/png', content_url: '/omnichat/media/public-asset/content', prompt: 'Public', scene: {}, visibility: 'public', created_at: '2026-07-20T00:00:01Z',
+      },
+    ]);
+    vi.mocked(omnichatService.deleteMediaAsset).mockRejectedValue(
+      Object.assign(new Error('shared'), { status: 409 })
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><OmniChatCreateWorkspace /></QueryClientProvider>);
+    fireEvent.click(screen.getByRole('button', { name: /gallery/i }));
+    const deleteButtons = await screen.findAllByRole('button', { name: /delete creation/i });
+    expect(deleteButtons).toHaveLength(1);
+    expect(screen.getByText(/unpublish from explore before deleting/i)).toBeInTheDocument();
+
+    fireEvent.click(deleteButtons[0]);
+    fireEvent.click(screen.getByRole('button', { name: /delete permanently/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/unpublish this creation/i);
   });
 
   it('cancels an in-progress generation without leaving a permanent spinner', async () => {

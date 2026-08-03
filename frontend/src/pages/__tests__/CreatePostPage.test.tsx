@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, type InitialEntry } from 'react-router-dom';
+import { MemoryRouter, type InitialEntry } from 'react-router';
 import i18n from 'i18next';
 
 // --- Context mocks ---

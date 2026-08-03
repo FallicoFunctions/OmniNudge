@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OmniChatGroupsWorkspace } from '../OmniChatGroupsPage';
 import { omnichatService } from '../../services/omnichatService';
@@ -9,6 +9,7 @@ vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ isAuthenticated: true, user: { id: 9 } }),
 }));
 vi.mock('../../services/omnichatService', () => ({
+  createOmniChatSocialRequestId: () => 'group-request-id',
   omnichatQueryKeys: {
     groups: ['omnichat', 'groups'],
     group: (id: string) => ['omnichat', 'group', id],
@@ -24,6 +25,15 @@ vi.mock('../../services/omnichatService', () => ({
     createGroup: vi.fn(),
     createGroupInvite: vi.fn(),
     joinGroup: vi.fn(),
+    updateGroup: vi.fn(),
+    leaveGroup: vi.fn(),
+    setGroupMemberRole: vi.fn(),
+    removeGroupMember: vi.fn(),
+    transferGroupOwnership: vi.fn(),
+    listGroupInvites: vi.fn(),
+    revokeGroupInvite: vi.fn(),
+    archiveGroup: vi.fn(),
+    deleteGroup: vi.fn(),
   },
 }));
 
@@ -53,6 +63,7 @@ describe('OmniChatGroupsWorkspace', () => {
     vi.mocked(omnichatService.listGroupMessages).mockResolvedValue([]);
     vi.mocked(omnichatService.listPersonas).mockResolvedValue([]);
     vi.mocked(omnichatService.sendGroupMessage).mockResolvedValue([]);
+    vi.mocked(omnichatService.listGroupInvites).mockResolvedValue([]);
   });
 
   it('lets a member address a character in a shared group', async () => {
@@ -76,6 +87,7 @@ describe('OmniChatGroupsWorkspace', () => {
       expect(omnichatService.sendGroupMessage).toHaveBeenCalledWith(
         'group-1',
         'What did you bring?',
+        'group-request-id',
         [42]
       )
     );
@@ -88,10 +100,10 @@ describe('OmniChatGroupsWorkspace', () => {
     });
     function LocationProbe() {
       const location = useLocation();
-      return <span data-testid="location-search">{location.search}</span>;
+      return <span data-testid="location-hash">{location.hash}</span>;
     }
     render(
-      <MemoryRouter initialEntries={['/omnichat/groups?invite=bad-token']}>
+      <MemoryRouter initialEntries={['/omnichat/groups#invite=bad-token']}>
         <QueryClientProvider client={client}>
           <OmniChatGroupsWorkspace />
           <LocationProbe />
@@ -100,7 +112,7 @@ describe('OmniChatGroupsWorkspace', () => {
     );
 
     await waitFor(() => expect(omnichatService.joinGroup).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByTestId('location-search')).toBeEmptyDOMElement());
+    await waitFor(() => expect(screen.getByTestId('location-hash')).toBeEmptyDOMElement());
     expect(vi.mocked(omnichatService.joinGroup).mock.calls[0]?.[0]).toBe('bad-token');
     await new Promise((resolve) => window.setTimeout(resolve, 50));
     expect(omnichatService.joinGroup).toHaveBeenCalledTimes(1);

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { MarkdownInput } from '../common/MarkdownInput';
 import { MarkdownRenderer } from '../common/MarkdownRenderer';
 import { useFormat } from '../../hooks/useFormat';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 export interface CommentActionHandlers<T extends LocalCommentBase> {
   vote: (comment: T, value: 1 | -1) => Promise<void>;

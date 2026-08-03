@@ -82,6 +82,20 @@ export interface ConversationSettings {
   user_gender: string;
 }
 
+/** Subscription entitlement, distinct from the conversation profile a member chooses. */
+export type OmniChatAccountTier = 'free' | 'plus' | 'premium';
+
+/** User-facing conversation profiles. Provider and reasoning settings remain server-side. */
+export type OmniChatModelKey = 'standard' | 'plus' | 'premium_quick' | 'premium_deep' | 'ultra_fast';
+export type OmniChatModelScope = 'this_chat' | 'all_chats';
+
+export interface OmniChatModelSelection {
+  account_tier: OmniChatAccountTier;
+  default_model_key: OmniChatModelKey;
+  conversation_model_key?: OmniChatModelKey;
+  effective_model_key: OmniChatModelKey;
+}
+
 export interface BotConversation {
   id: number;
   user_id: number;
@@ -103,8 +117,24 @@ export interface BotMessage {
   role: BotMessageRole;
   content: string;
   failed: boolean;
+  request_id?: string;
   attachments?: OmniChatMessageMediaAsset[];
   created_at: string;
+}
+
+export type OmniChatResponseFeedbackReason =
+  | 'role_ownership'
+  | 'user_agency'
+  | 'narration_format'
+  | 'repetition_length'
+  | 'grammar_artifact'
+  | 'character_mismatch'
+  | 'other';
+
+/** A report intentionally excludes prompt, provider, and response-content data. */
+export interface OmniChatResponseFeedbackRequest {
+  reason: OmniChatResponseFeedbackReason;
+  note?: string;
 }
 
 export type OmniChatMediaKind = 'image' | 'video';
@@ -127,6 +157,8 @@ export interface OmniChatSceneState {
 }
 
 export interface OmniChatGenerationRequest {
+  /** One stable UUID for this user intent; required for server-side replay safety. */
+  request_id: string;
   kind: OmniChatMediaKind;
   mode: OmniChatGenerationMode;
   persona_id: number;
@@ -398,4 +430,15 @@ export interface PreviewMessageResponse {
   role: 'assistant';
   content: string;
   failed: boolean;
+}
+
+export interface OmniChatAllowanceState {
+	tier: 'guest' | 'free' | 'paid';
+	allowed: boolean;
+	unlimited: boolean;
+	limit?: number;
+	used?: number;
+	remaining?: number;
+	reset_at?: string;
+	window_seconds?: number;
 }

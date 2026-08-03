@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import OmniChatConversationsPage from '../OmniChatConversationsPage';
 
@@ -17,7 +17,10 @@ const { mockListConversations, mockListPersonas, mockGetGuestPersonaIds } = vi.h
 let mockIsAuthenticated = true;
 
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ isAuthenticated: mockIsAuthenticated }),
+  useAuth: () => ({
+    isAuthenticated: mockIsAuthenticated,
+    user: mockIsAuthenticated ? { id: 1, username: 'tester', plan: 'free' } : null,
+  }),
 }));
 
 vi.mock('../../hooks/useOmniChatLayoutMode', () => ({
@@ -49,6 +52,20 @@ vi.mock('../../services/omnichatService', () => ({
   omnichatService: {
     listPersonas: (...args: unknown[]) => mockListPersonas(...args),
     listConversations: (...args: unknown[]) => mockListConversations(...args),
+    getModelSelection: vi.fn().mockResolvedValue({
+      account_tier: 'free',
+      default_model_key: 'standard',
+      effective_model_key: 'standard',
+    }),
+    getAllowance: vi.fn().mockResolvedValue({
+      tier: 'paid',
+      allowed: true,
+      unlimited: true,
+    }),
+    getBillingCatalog: vi.fn(),
+    getBillingWallet: vi.fn(),
+    getBillingUsage: vi.fn(),
+    createBillingCheckout: vi.fn(),
   },
   omnichatQueryKeys: {
     personas: () => ['omnichat', 'personas'],
@@ -57,6 +74,11 @@ vi.mock('../../services/omnichatService', () => ({
     generation: (id: string) => ['omnichat', 'generation', id],
     generations: ['omnichat', 'generations'],
     gallery: () => ['omnichat', 'gallery', 'all'],
+    modelSelection: (id: number) => ['omnichat', 'model-selection', id],
+    allowance: (authenticated: boolean) => ['omnichat', 'allowance', authenticated],
+    billingCatalog: ['omnichat', 'billing', 'catalog'],
+    billingWallet: ['omnichat', 'billing', 'wallet'],
+    billingUsage: () => ['omnichat', 'billing', 'usage', 50],
   },
 }));
 

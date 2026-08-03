@@ -7,13 +7,14 @@ import {
   type CSSProperties,
   type FormEvent,
 } from 'react';
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   ChevronLeft,
   ChevronRight,
   Film,
+  Flag,
   Image as ImageIcon,
   Loader2,
   Check,
@@ -27,6 +28,7 @@ import {
   Trash2,
   Video as VideoIcon,
   X,
+  Zap,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import PersonaAvatar from '../components/omnichat/PersonaAvatar';
@@ -37,10 +39,20 @@ import OmniChatMediaAssetView from '../components/omnichat/OmniChatMediaAssetVie
 import OmniChatSpeakButton from '../components/omnichat/OmniChatSpeakButton';
 import OmniChatCallModal from '../components/omnichat/OmniChatCallModal';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
+import OmniChatModelSelectorModal from '../components/omnichat/OmniChatModelSelectorModal';
+import OmniChatUpgradeModal from '../components/omnichat/OmniChatUpgradeModal';
+import OmniChatResponseReportModal from '../components/omnichat/OmniChatResponseReportModal';
+import OmniChatCommerceModal from '../components/omnichat/OmniChatCommerceModal';
+import OmniChatVideoPaywallModal from '../components/omnichat/OmniChatVideoPaywallModal';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { Modal } from '../components/common/Modal';
 import { useAuth } from '../contexts/AuthContext';
-import { omnichatService, omnichatQueryKeys } from '../services/omnichatService';
+import {
+  createOmniChatRequestId,
+  createOmniChatSocialRequestId,
+  omnichatService,
+  omnichatQueryKeys,
+} from '../services/omnichatService';
 import type {
   BotConversation,
   BotConversationDetail,
@@ -48,9 +60,15 @@ import type {
   BotPersona,
   OmniChatRegenerationTokenPayload,
   OmniChatGenerationJob,
+  OmniChatGenerationRequest,
   OmniChatMediaKind,
   OmniChatTokenPayload,
+  OmniChatAccountTier,
+  OmniChatModelKey,
+  OmniChatModelScope,
+  OmniChatResponseFeedbackRequest,
 } from '../types/omnichat';
+
 import {
   clearGuestMessages,
   getGuestPersonaIds,
@@ -66,12 +84,32 @@ import { resolveMediaUrl } from '../utils/mediaUrl';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { OMNICHAT_PERSONA_TRANSITION_NAME } from '../utils/omnichatViewTransitions';
 import { detectOmniChatMediaIntent } from '../utils/omnichatMediaIntent';
+import { OMNICHAT_MODEL_LABELS } from '../utils/omnichatModelProfiles';
 
 type ChatFilter = 'all' | 'unread' | 'favorites';
 type ProfileTab = 'profile' | 'gallery';
 type MobileChatPane = 'list' | 'chat' | 'profile';
 type ActiveBotConversation = BotConversation & { persona: BotPersona };
 type PreviewDeleteScope = 'one' | 'all';
+
+type PendingMediaIntent = Pick<
+  OmniChatGenerationRequest,
+  'kind' | 'prompt' | 'conversation_id' | 'persona_id' | 'request_id'
+>;
+
+type PendingSendIntent = {
+  conversationId: number;
+  content: string;
+  requestId: string;
+  optimisticMessageId: number;
+  mediaIntent: PendingMediaIntent | null;
+};
+
+type PendingRegenerationIntent = {
+  conversationId: number;
+  messageId: number;
+  requestId: string;
+};
 
 const PROFILE_PANE_COLLAPSED_KEY = 'omnichat_profile_pane_collapsed';
 const CHAT_LIST_COLLAPSED_KEY = 'omnichat_chat_list_collapsed';
@@ -80,6 +118,10 @@ const PROFILE_DRAWER_WIDTH = 360;
 const CHAT_LIST_WIDTH_WIDE = 340;
 const CHAT_LIST_WIDTH_COMPACT = 320;
 const CHAT_LIST_WIDTH_COLLAPSED = 88;
+
+function isOmniChatAccountTier(value: unknown): value is OmniChatAccountTier {
+  return value === 'free' || value === 'plus' || value === 'premium';
+}
 
 function isOmniChatTokenPayload(value: unknown): value is OmniChatTokenPayload {
   if (!value || typeof value !== 'object') return false;
@@ -322,7 +364,7 @@ function ConversationRow({
 }
 
 export default function OmniChatChatPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -366,17 +408,29 @@ export default function OmniChatChatPage() {
   const [editDraft, setEditDraft] = useState('');
   const [editError, setEditError] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [showOmniChatUpgrade, setShowOmniChatUpgrade] = useState(false);
+  const [preferredUpgradeTier, setPreferredUpgradeTier] = useState<'plus' | 'premium'>('plus');
+  const [modelSelectionError, setModelSelectionError] = useState('');
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [newChatMenuOpen, setNewChatMenuOpen] = useState(false);
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const [mediaGenerationError, setMediaGenerationError] = useState<string | null>(null);
   const [shareChatError, setShareChatError] = useState('');
+  const [reportingMessageId, setReportingMessageId] = useState<number | null>(null);
+  const [responseReportError, setResponseReportError] = useState('');
+  const [responseReportNotice, setResponseReportNotice] = useState('');
   const [pendingChatShare, setPendingChatShare] = useState<{
     conversationId: number;
     messageIds: number[];
     title: string;
+    idempotencyKey: string;
   } | null>(null);
   const [callMode, setCallMode] = useState<'voice' | 'video' | null>(null);
+  const [showCommerce, setShowCommerce] = useState(false);
+  const [videoPaywallFeature, setVideoPaywallFeature] = useState<
+    'scene_video' | 'video_call' | null
+  >(null);
   const [activeMediaJob, setActiveMediaJob] = useState<OmniChatGenerationJob | null>(null);
   const [guestMessages, setGuestMessages] = useState<BotMessage[]>([]);
   const [guestPersona, setGuestPersona] = useState<BotPersona | null>(null);
@@ -412,12 +466,14 @@ export default function OmniChatChatPage() {
   const nextOptimisticId = useRef(-1);
   const scrollRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
-  const pendingMediaIntentRef = useRef<{
-    kind: OmniChatMediaKind;
-    prompt: string;
-    conversationId: number;
-    personaId: number;
-  } | null>(null);
+  const sendMessageAbortRef = useRef<AbortController | null>(null);
+  const sendCompletedLiveRef = useRef(false);
+  const pendingMediaIntentRef = useRef<PendingMediaIntent | null>(null);
+  // Retain each uncertain user intent until it succeeds, its content changes, or its chat changes.
+  // A retry then replays the same backend request rather than risking a duplicate assistant reply.
+  const pendingSendIntentRef = useRef<PendingSendIntent | null>(null);
+  const pendingRegenerationIntentRef = useRef<PendingRegenerationIntent | null>(null);
+  const pendingMediaGenerationRef = useRef<OmniChatGenerationRequest | null>(null);
 
   const personasQuery = useQuery({
     queryKey: omnichatQueryKeys.personas(),
@@ -429,6 +485,37 @@ export default function OmniChatChatPage() {
     queryFn: () => omnichatService.listConversations(),
     enabled: isAuthenticated,
   });
+
+  const allowanceQuery = useQuery({
+    queryKey: omnichatQueryKeys.allowance(isAuthenticated),
+    queryFn: () => omnichatService.getAllowance(),
+    staleTime: 15_000,
+  });
+  const allowance = allowanceQuery.data;
+  const allowanceExhausted = Boolean(
+    allowance && !allowance.unlimited && (allowance.remaining ?? 0) <= 0
+  );
+  const allowanceResetLabel = useMemo(() => {
+    if (!allowance?.reset_at) return '';
+    return new Intl.DateTimeFormat(i18n.resolvedLanguage, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(new Date(allowance.reset_at));
+  }, [allowance?.reset_at, i18n.resolvedLanguage]);
+
+  useEffect(() => {
+    if (!allowance?.reset_at || !allowanceExhausted) return;
+    const delay = Math.max(0, new Date(allowance.reset_at).getTime() - Date.now() + 250);
+    const timer = window.setTimeout(
+      () => {
+        queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.allowance(isAuthenticated) });
+      },
+      Math.min(delay, 2_147_000_000)
+    );
+    return () => window.clearTimeout(timer);
+  }, [allowance?.reset_at, allowanceExhausted, isAuthenticated, queryClient]);
 
   const activePersonaById = useMemo(
     () => new Map((personasQuery.data ?? []).map((persona) => [Number(persona.id), persona])),
@@ -492,6 +579,50 @@ export default function OmniChatChatPage() {
     queryFn: () => omnichatService.getConversation(selectedConversationId as number),
     enabled: selectedConversationId !== null && !isGuest,
   });
+
+  const modelSelectionQuery = useQuery({
+    queryKey: omnichatQueryKeys.modelSelection(selectedConversationId ?? -1),
+    queryFn: () => omnichatService.getModelSelection(selectedConversationId as number),
+    enabled: isAuthenticated && selectedConversationId !== null && !isGuest,
+  });
+
+  const setModelSelectionMutation = useMutation({
+    mutationFn: ({ model, scope }: { model: OmniChatModelKey; scope: OmniChatModelScope }) =>
+      omnichatService.setModelSelection(selectedConversationId as number, model, scope),
+    onSuccess: (selection) => {
+      queryClient.setQueryData(
+        omnichatQueryKeys.modelSelection(selectedConversationId as number),
+        selection
+      );
+      if (selection.conversation_model_key === undefined) {
+        queryClient.invalidateQueries({ queryKey: ['omnichat', 'model-selection'] });
+      }
+      setModelSelectionError('');
+      setShowModelSelector(false);
+    },
+    onError: () => setModelSelectionError('The model could not be changed. Please try again.'),
+  });
+
+  const requestedModelKey = modelSelectionQuery.data?.effective_model_key as string | undefined;
+  const effectiveModelKey: OmniChatModelKey =
+    requestedModelKey &&
+    Object.prototype.hasOwnProperty.call(OMNICHAT_MODEL_LABELS, requestedModelKey)
+      ? (requestedModelKey as OmniChatModelKey)
+      : 'standard';
+  const modelLabel = OMNICHAT_MODEL_LABELS[effectiveModelKey];
+  const serverAccountTier = modelSelectionQuery.data?.account_tier;
+  const effectiveAccountTier: OmniChatAccountTier = isOmniChatAccountTier(serverAccountTier)
+    ? serverAccountTier
+    : 'free';
+
+  const requestAuthenticationForModel = () => {
+    setShowModelSelector(false);
+    window.dispatchEvent(
+      new CustomEvent('open-auth-modal', {
+        detail: { mode: 'login', redirectTo: `${location.pathname}${location.search}` },
+      })
+    );
+  };
 
   useEffect(() => {
     setStoredGuestPersonaIds(getGuestPersonaIds());
@@ -656,12 +787,6 @@ export default function OmniChatChatPage() {
       if (detail.conversation_id !== selectedConversationId) return;
       setStreamingText((prev) => prev + detail.token);
     };
-    const onComplete = (event: Event) => {
-      const detail = (event as CustomEvent<BotMessage>).detail;
-      if (!isConversationMessage(detail)) return;
-      if (detail.conversation_id !== selectedConversationId) return;
-      setStreamingText('');
-    };
     const onRegenerationToken = (event: Event) => {
       const detail = (event as CustomEvent<OmniChatRegenerationTokenPayload>).detail;
       if (!isOmniChatRegenerationTokenPayload(detail)) return;
@@ -673,18 +798,21 @@ export default function OmniChatChatPage() {
       const detail = (event as CustomEvent<BotMessage>).detail;
       if (!isConversationMessage(detail)) return;
       if (detail.conversation_id !== selectedConversationId) return;
+      const pending = pendingRegenerationIntentRef.current;
+      if (pending && detail.request_id !== pending.requestId) return;
+      if (pending && detail.request_id === pending.requestId) {
+        pendingRegenerationIntentRef.current = null;
+      }
       setRegeneratingMessageId((current) => (current === detail.id ? null : current));
       setRegenerationText('');
       setRegenerationError(false);
     };
 
     window.addEventListener('omnichat-token', onToken);
-    window.addEventListener('omnichat-message-complete', onComplete);
     window.addEventListener('omnichat-regeneration-token', onRegenerationToken);
     window.addEventListener('omnichat-message-regenerated', onRegenerated);
     return () => {
       window.removeEventListener('omnichat-token', onToken);
-      window.removeEventListener('omnichat-message-complete', onComplete);
       window.removeEventListener('omnichat-regeneration-token', onRegenerationToken);
       window.removeEventListener('omnichat-message-regenerated', onRegenerated);
     };
@@ -770,9 +898,21 @@ export default function OmniChatChatPage() {
     mutationFn: (request: Parameters<typeof omnichatService.createGeneration>[0]) =>
       omnichatService.createGeneration(request),
     onMutate: () => setMediaGenerationError(null),
-    onSuccess: (job) => setActiveMediaJob(job),
-    onError: () =>
-      setMediaGenerationError('Scene generation could not be started. Please try again.'),
+    onSuccess: (job, request) => {
+      if (pendingMediaGenerationRef.current?.request_id === request.request_id) {
+        pendingMediaGenerationRef.current = null;
+      }
+      setActiveMediaJob(job);
+    },
+    onError: (error, request) => {
+      pendingMediaGenerationRef.current = request;
+      if ((error as Error & { status?: number }).status === 402) {
+        if (request.kind === 'video') setVideoPaywallFeature('scene_video');
+        else setShowCommerce(true);
+        return;
+      }
+      setMediaGenerationError('Scene generation could not be started. Please try again.');
+    },
   });
 
   const activeMediaJobQuery = useQuery({
@@ -799,32 +939,41 @@ export default function OmniChatChatPage() {
     }
   }, [activeMediaJobQuery.data, queryClient]);
 
-  const sendMessageMutation = useMutation({
-    mutationFn: (content: string) =>
-      omnichatService.sendMessage(selectedConversationId as number, content),
-    onSuccess: (assistantMessage) => {
+  const completeAssistantMessage = useCallback(
+    (assistantMessage: BotMessage) => {
+      if (
+        pendingSendIntentRef.current?.conversationId === assistantMessage.conversation_id &&
+        pendingSendIntentRef.current.requestId === assistantMessage.request_id
+      ) {
+        pendingSendIntentRef.current = null;
+      }
       queryClient.setQueryData<BotConversationDetail | undefined>(
-        omnichatQueryKeys.conversation(selectedConversationId as number),
+        omnichatQueryKeys.conversation(assistantMessage.conversation_id),
         (prev) => {
           if (!prev) return prev;
           if (prev.messages.some((message) => message.id === assistantMessage.id)) return prev;
           return { ...prev, messages: [...prev.messages, assistantMessage] };
         }
       );
-      queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
+      void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
+      void queryClient.invalidateQueries({
+        queryKey: omnichatQueryKeys.allowance(isAuthenticated),
+      });
       setStreamingText('');
+
       const pendingIntent = pendingMediaIntentRef.current;
       pendingMediaIntentRef.current = null;
       if (
         pendingIntent &&
         !assistantMessage.failed &&
-        pendingIntent.conversationId === assistantMessage.conversation_id
+        pendingIntent.conversation_id === assistantMessage.conversation_id
       ) {
         mediaGenerationMutation.mutate({
+          request_id: pendingIntent.request_id,
           kind: pendingIntent.kind,
           mode: 'contextual',
-          persona_id: pendingIntent.personaId,
-          conversation_id: pendingIntent.conversationId,
+          persona_id: pendingIntent.persona_id,
+          conversation_id: pendingIntent.conversation_id,
           source_message_id: assistantMessage.id,
           prompt: pendingIntent.prompt,
           aspect_ratio: pendingIntent.kind === 'video' ? '16:9' : '4:5',
@@ -832,27 +981,127 @@ export default function OmniChatChatPage() {
         });
       }
     },
-    onError: (error) => {
+    [isAuthenticated, mediaGenerationMutation, queryClient]
+  );
+
+  const sendMessageMutation = useMutation({
+    mutationFn: ({
+      content,
+      requestId,
+    }: {
+      content: string;
+      optimisticMessageId: number;
+      requestId: string;
+    }) => {
+      sendMessageAbortRef.current?.abort();
+      sendCompletedLiveRef.current = false;
+      const controller = new AbortController();
+      sendMessageAbortRef.current = controller;
+      return omnichatService.sendMessage(
+        selectedConversationId as number,
+        content,
+        requestId,
+        controller.signal
+      );
+    },
+    onSuccess: (assistantMessage, intent) => {
+      if (pendingSendIntentRef.current?.requestId === intent.requestId) {
+        pendingSendIntentRef.current = null;
+      }
+      sendCompletedLiveRef.current = false;
+      completeAssistantMessage(assistantMessage);
+    },
+    onError: (error, { content, optimisticMessageId, requestId }) => {
+      if (sendCompletedLiveRef.current && (error as Error).name === 'AbortError') {
+        sendCompletedLiveRef.current = false;
+        setStreamingText('');
+        return;
+      }
       pendingMediaIntentRef.current = null;
       setStreamingText('');
       const err = error as Error & { status?: number };
+      if (pendingSendIntentRef.current?.requestId === requestId) {
+        // Keep the exact request ID and draft available for a safe retry after a timeout or outage.
+        setDraft(content);
+      }
+      if (err.status === 402 && isAuthenticated) {
+        queryClient.setQueryData<BotConversationDetail | undefined>(
+          omnichatQueryKeys.conversation(selectedConversationId as number),
+          (previous) =>
+            previous
+              ? {
+                  ...previous,
+                  messages: previous.messages.filter(
+                    (message) => message.id !== optimisticMessageId
+                  ),
+                }
+              : previous
+        );
+        setDraft(content);
+        setShowCommerce(true);
+        return;
+      }
       setRateLimitError(err.status === 429 ? 'rateLimited' : null);
       queryClient.invalidateQueries({
         queryKey: omnichatQueryKeys.conversation(selectedConversationId as number),
       });
       queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
+      queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.allowance(isAuthenticated) });
+    },
+    onSettled: () => {
+      sendMessageAbortRef.current = null;
+      sendCompletedLiveRef.current = false;
     },
   });
 
+  useEffect(() => {
+    if (isGuest) return;
+    const onComplete = (event: Event) => {
+      const detail = (event as CustomEvent<BotMessage>).detail;
+      if (!isConversationMessage(detail)) return;
+      if (detail.conversation_id !== selectedConversationId) return;
+
+      const pendingController = sendMessageAbortRef.current;
+      const completesPendingRequest =
+        Boolean(detail.request_id) &&
+        detail.request_id === pendingSendIntentRef.current?.requestId;
+      completeAssistantMessage(detail);
+      if (pendingController && completesPendingRequest) {
+        sendCompletedLiveRef.current = true;
+        pendingController.abort(new DOMException('The completed reply arrived live', 'AbortError'));
+      }
+    };
+
+    window.addEventListener('omnichat-message-complete', onComplete);
+    return () => window.removeEventListener('omnichat-message-complete', onComplete);
+  }, [completeAssistantMessage, isGuest, selectedConversationId]);
+
+  useEffect(() => {
+    pendingSendIntentRef.current = null;
+    pendingRegenerationIntentRef.current = null;
+    pendingMediaIntentRef.current = null;
+    pendingMediaGenerationRef.current = null;
+    setMediaGenerationError(null);
+    setActiveMediaJob(null);
+
+    return () => {
+      sendMessageAbortRef.current?.abort();
+      sendMessageAbortRef.current = null;
+    };
+  }, [selectedConversationId]);
+
   const regenerateMessageMutation = useMutation({
-    mutationFn: ({ messageId }: { messageId: number }) =>
-      omnichatService.regenerateMessage(selectedConversationId as number, messageId),
+    mutationFn: ({ messageId, requestId }: { messageId: number; requestId: string }) =>
+      omnichatService.regenerateMessage(selectedConversationId as number, messageId, requestId),
     onMutate: ({ messageId }) => {
       setRegenerationError(false);
       setRegenerationText('');
       setRegeneratingMessageId(messageId);
     },
-    onSuccess: (message) => {
+    onSuccess: (message, intent) => {
+      if (pendingRegenerationIntentRef.current?.requestId === intent.requestId) {
+        pendingRegenerationIntentRef.current = null;
+      }
       queryClient.setQueryData<BotConversationDetail | undefined>(
         omnichatQueryKeys.conversation(message.conversation_id),
         (prev) => {
@@ -866,16 +1115,41 @@ export default function OmniChatChatPage() {
         }
       );
       queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
+      queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.allowance(isAuthenticated) });
       setRegeneratingMessageId(null);
       setRegenerationText('');
     },
-    onError: () => {
+    onError: (error) => {
       setRegeneratingMessageId(null);
       setRegenerationText('');
+      if ((error as Error & { status?: number }).status === 402 && isAuthenticated) {
+        setShowCommerce(true);
+        return;
+      }
       setRegenerationError(true);
       queryClient.invalidateQueries({
         queryKey: omnichatQueryKeys.conversation(selectedConversationId as number),
       });
+      queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.allowance(isAuthenticated) });
+    },
+  });
+
+  const responseFeedbackMutation = useMutation({
+    mutationFn: ({
+      messageId,
+      feedback,
+    }: {
+      messageId: number;
+      feedback: OmniChatResponseFeedbackRequest;
+    }) =>
+      omnichatService.reportResponseFeedback(selectedConversationId as number, messageId, feedback),
+    onSuccess: () => {
+      setReportingMessageId(null);
+      setResponseReportError('');
+      setResponseReportNotice(t('omnichat.chat.reportResponseThanks'));
+    },
+    onError: () => {
+      setResponseReportError(t('omnichat.chat.reportResponseFailed'));
     },
   });
 
@@ -1043,11 +1317,13 @@ export default function OmniChatChatPage() {
       conversationId,
       messageIds,
       title,
+      idempotencyKey,
     }: {
       conversationId: number;
       messageIds: number[];
       title: string;
-    }) => omnichatService.publishChat(conversationId, messageIds, title),
+      idempotencyKey: string;
+    }) => omnichatService.publishChat(conversationId, messageIds, title, idempotencyKey),
     onSuccess: (publication) => {
       setPendingChatShare(null);
       navigate(`/omnichat/explore/${publication.id}`);
@@ -1069,13 +1345,21 @@ export default function OmniChatChatPage() {
       messageIds,
       title:
         conversationQuery.data?.conversation.title?.trim() || `A chat with ${activePersona.name}`,
+      idempotencyKey: createOmniChatSocialRequestId(),
     });
   }, [activePersona, conversationQuery.data, selectedConversationId]);
 
   const generateCurrentScene = useCallback(
     (kind: OmniChatMediaKind) => {
-      if (!selectedConversationId || !activePersona || isGuest) return;
-      mediaGenerationMutation.mutate({
+      if (!isAuthenticated || isGuest) {
+        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+        return;
+      }
+      if (!selectedConversationId || !activePersona) return;
+      // The scene buttons intentionally start a new generation. Exact replay is exposed separately
+      // through Retry, which retains the original request ID after an uncertain failure.
+      const request: OmniChatGenerationRequest = {
+        request_id: createOmniChatRequestId(),
         kind,
         mode: 'contextual',
         persona_id: activePersona.id,
@@ -1086,24 +1370,51 @@ export default function OmniChatChatPage() {
             : 'Show the current scene as a candid photo, preserving the character, setting, outfit, mood, and activity.',
         aspect_ratio: kind === 'video' ? '16:9' : '4:5',
         duration_seconds: kind === 'video' ? 5 : undefined,
-      });
+      };
+      pendingMediaGenerationRef.current = request;
+      mediaGenerationMutation.mutate(request);
     },
-    [activePersona, isGuest, mediaGenerationMutation, selectedConversationId]
+    [activePersona, isAuthenticated, isGuest, mediaGenerationMutation, selectedConversationId]
+  );
+
+  const retryMediaGeneration = useCallback(() => {
+    const request = pendingMediaGenerationRef.current;
+    if (!request || mediaGenerationMutation.isPending) return;
+    mediaGenerationMutation.mutate(request);
+  }, [mediaGenerationMutation]);
+
+  const requestCall = useCallback(
+    (mode: 'voice' | 'video') => {
+      if (!isAuthenticated || isGuest) {
+        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+        return;
+      }
+      setCallMode(mode);
+    },
+    [isAuthenticated, isGuest]
   );
 
   const handleSubmit = useCallback(
     (event: FormEvent) => {
       event.preventDefault();
       const content = draft.trim();
-      if (!content) return;
+      if (
+        !content ||
+        allowanceExhausted ||
+        sendMessageMutation.isPending ||
+        guestIsGenerating ||
+        regeneratingMessageId !== null
+      )
+        return;
 
       setDraft('');
       setStreamingText('');
       setRegenerationError(false);
 
       if (isGuest && guestPersona) {
+        const optimisticMessageId = nextOptimisticId.current--;
         const optimisticMessage: BotMessage = {
-          id: nextOptimisticId.current--,
+          id: optimisticMessageId,
           conversation_id: 0,
           role: 'user',
           content,
@@ -1136,34 +1447,68 @@ export default function OmniChatChatPage() {
               },
             ]);
           })
+          .catch((error: Error & { status?: number }) => {
+            setGuestMessages((previous) =>
+              previous.filter((message) => message.id !== optimisticMessageId)
+            );
+            setDraft(content);
+            setRateLimitError(error.status === 429 ? 'rateLimited' : null);
+          })
           .finally(() => {
             setGuestIsGenerating(false);
+            queryClient.invalidateQueries({
+              queryKey: omnichatQueryKeys.allowance(isAuthenticated),
+            });
           });
         return;
       }
 
       if (!selectedConversationId || !activePersona) return;
 
-      const mediaIntent = detectOmniChatMediaIntent(content);
-      pendingMediaIntentRef.current = mediaIntent
-        ? {
-            kind: mediaIntent,
-            prompt: content,
-            conversationId: selectedConversationId,
-            personaId: activePersona.id,
-          }
-        : null;
+      const savedIntent = pendingSendIntentRef.current;
+      const intent =
+        savedIntent &&
+        savedIntent.conversationId === selectedConversationId &&
+        savedIntent.content === content
+          ? savedIntent
+          : (() => {
+              const mediaKind = detectOmniChatMediaIntent(content);
+              return {
+                conversationId: selectedConversationId,
+                content,
+                requestId: createOmniChatRequestId(),
+                optimisticMessageId: nextOptimisticId.current--,
+                mediaIntent: mediaKind
+                  ? {
+                      kind: mediaKind,
+                      prompt: content,
+                      conversation_id: selectedConversationId,
+                      persona_id: activePersona.id,
+                      request_id: createOmniChatRequestId(),
+                    }
+                  : null,
+              };
+            })();
 
+      pendingSendIntentRef.current = intent;
+      pendingMediaIntentRef.current = intent.mediaIntent;
+      setDraft('');
       queryClient.setQueryData<BotConversationDetail | undefined>(
         omnichatQueryKeys.conversation(selectedConversationId),
         (prev) => {
           if (!prev) return prev;
+          // Only dedupe this exact optimistic record. Matching text in an older turn is a
+          // legitimate new message (for example, a user may say “okay” twice).
+          const alreadyVisible = prev.messages.some(
+            (message) => message.id === intent.optimisticMessageId
+          );
+          if (alreadyVisible) return prev;
           return {
             ...prev,
             messages: [
               ...prev.messages,
               {
-                id: nextOptimisticId.current--,
+                id: intent.optimisticMessageId,
                 conversation_id: selectedConversationId,
                 role: 'user',
                 content,
@@ -1175,15 +1520,23 @@ export default function OmniChatChatPage() {
         }
       );
 
-      sendMessageMutation.mutate(content);
+      sendMessageMutation.mutate({
+        content: intent.content,
+        optimisticMessageId: intent.optimisticMessageId,
+        requestId: intent.requestId,
+      });
     },
     [
       activePersona,
+      allowanceExhausted,
       draft,
+      guestIsGenerating,
       guestMessages,
       guestPersona,
       isGuest,
+      isAuthenticated,
       queryClient,
+      regeneratingMessageId,
       selectedConversationId,
       sendMessageMutation,
     ]
@@ -1222,7 +1575,19 @@ export default function OmniChatChatPage() {
       setRegenerationError(false);
       if (!isGuest) {
         if (!selectedConversationId) return;
-        regenerateMessageMutation.mutate({ messageId });
+        const savedIntent = pendingRegenerationIntentRef.current;
+        const intent =
+          savedIntent &&
+          savedIntent.conversationId === selectedConversationId &&
+          savedIntent.messageId === messageId
+            ? savedIntent
+            : {
+                conversationId: selectedConversationId,
+                messageId,
+                requestId: createOmniChatRequestId(),
+              };
+        pendingRegenerationIntentRef.current = intent;
+        regenerateMessageMutation.mutate({ messageId: intent.messageId, requestId: intent.requestId });
         return;
       }
 
@@ -1578,6 +1943,17 @@ export default function OmniChatChatPage() {
                     <h2 className="truncate text-xl font-semibold tracking-tight text-white xl:text-2xl">
                       {activePersona?.name ?? ''}
                     </h2>
+                    {activePersona && (
+                      <button
+                        type="button"
+                        onClick={() => setShowModelSelector(true)}
+                        aria-label={`Change conversation model. Current model: ${modelLabel}`}
+                        className="relative z-10 mt-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.045] text-[11px] font-semibold text-white/55 transition hover:border-[#5d8fff]/50 hover:bg-[#315ca8]/15 hover:text-white sm:w-auto sm:gap-1.5 sm:px-2.5"
+                      >
+                        <Zap size={12} className="text-[#7da8ff]" />
+                        <span className="hidden sm:inline">{modelLabel}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1585,7 +1961,7 @@ export default function OmniChatChatPage() {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => setCallMode('voice')}
+                      onClick={() => requestCall('voice')}
                       aria-label={`Voice call ${activePersona.name}`}
                       className="rounded-full p-2 text-white/70"
                     >
@@ -1593,7 +1969,7 @@ export default function OmniChatChatPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setCallMode('video')}
+                      onClick={() => requestCall('video')}
                       aria-label={`Video call ${activePersona.name}`}
                       className="rounded-full p-2 text-white/70"
                     >
@@ -1619,7 +1995,7 @@ export default function OmniChatChatPage() {
                       <>
                         <button
                           type="button"
-                          onClick={() => setCallMode('voice')}
+                          onClick={() => requestCall('voice')}
                           title={`Call ${activePersona.name}`}
                           aria-label={`Voice call ${activePersona.name}`}
                           className="rounded-full p-2.5 text-white/75 hover:bg-white/5 hover:text-white"
@@ -1628,7 +2004,7 @@ export default function OmniChatChatPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setCallMode('video')}
+                          onClick={() => requestCall('video')}
                           title={`Video call ${activePersona.name}`}
                           aria-label={`Video call ${activePersona.name}`}
                           className="rounded-full p-2.5 text-white/75 hover:bg-white/5 hover:text-white"
@@ -1763,13 +2139,19 @@ export default function OmniChatChatPage() {
                             </div>
                           ) : isRegenerating ? (
                             normalizedRegenerationText ? (
-                              <OmniChatMessageContent content={normalizedRegenerationText} />
+                              <OmniChatMessageContent
+                                content={normalizedRegenerationText}
+                                isAssistant
+                              />
                             ) : (
                               <GeneratingIndicator />
                             )
                           ) : (
                             <>
-                              <OmniChatMessageContent content={message.content} />
+                              <OmniChatMessageContent
+                                content={message.content}
+                                isAssistant={message.role === 'assistant'}
+                              />
                               {message.attachments?.map((asset) => (
                                 <OmniChatMediaAssetView
                                   key={asset.id}
@@ -1812,6 +2194,25 @@ export default function OmniChatChatPage() {
                                   <Pencil size={13} />
                                 </button>
                               )}
+                              {!isGuest &&
+                                selectedConversationId &&
+                                message.role === 'assistant' &&
+                                !message.failed &&
+                                message.id > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setResponseReportError('');
+                                      setResponseReportNotice('');
+                                      setReportingMessageId(message.id);
+                                    }}
+                                    aria-label={t('omnichat.chat.reportResponse')}
+                                    title={t('omnichat.chat.reportResponse')}
+                                    className="omnichat-touch-target flex items-center justify-center rounded-full border border-white/10 bg-[#24242a] text-white/60 shadow-lg shadow-black/25 transition hover:border-white/20 hover:bg-[#2d2d34] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 md:h-7 md:min-h-0 md:w-7 md:min-w-0"
+                                  >
+                                    <Flag size={13} />
+                                  </button>
+                                )}
                               {message.role === 'assistant' &&
                                 !message.failed &&
                                 message.id > 0 &&
@@ -1835,7 +2236,7 @@ export default function OmniChatChatPage() {
                   <div className="flex justify-start">
                     <div className="rounded-[26px] border border-white/8 bg-white/[0.06] px-4 py-3 text-white">
                       {normalizedStreamingText ? (
-                        <OmniChatMessageContent content={normalizedStreamingText} />
+                        <OmniChatMessageContent content={normalizedStreamingText} isAssistant />
                       ) : (
                         <GeneratingIndicator />
                       )}
@@ -1853,6 +2254,11 @@ export default function OmniChatChatPage() {
               )}
               {shareChatError && (
                 <p className="mb-2 px-1 text-xs text-rose-300">{shareChatError}</p>
+              )}
+              {responseReportNotice && (
+                <p role="status" className="mb-2 px-1 text-xs text-emerald-300">
+                  {responseReportNotice}
+                </p>
               )}
               {isAuthenticated && activePersona && selectedConversationId && (
                 <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
@@ -1897,7 +2303,67 @@ export default function OmniChatChatPage() {
                     </span>
                   )}
                   {mediaGenerationError && (
-                    <span className="text-xs text-rose-300">{mediaGenerationError}</span>
+                    <div className="flex items-center gap-2 text-xs text-rose-300">
+                      <span>{mediaGenerationError}</span>
+                      {pendingMediaGenerationRef.current && (
+                        <button
+                          type="button"
+                          onClick={retryMediaGeneration}
+                          disabled={mediaGenerationMutation.isPending}
+                          className="rounded-full border border-rose-300/30 px-2 py-1 font-semibold text-rose-100 transition hover:bg-rose-300/10 disabled:opacity-50"
+                        >
+                          Retry
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              {allowance && !allowance.unlimited && (
+                <div
+                  className={`mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-3 py-2 text-xs ${
+                    allowanceExhausted
+                      ? 'border-amber-400/25 bg-amber-400/[0.07] text-amber-100'
+                      : 'border-white/10 bg-white/[0.035] text-white/55'
+                  }`}
+                  role="status"
+                >
+                  <span>
+                    {allowanceExhausted ? (
+                      <>
+                        {t('omnichat.chat.allowanceEmpty')}
+                        {allowanceResetLabel && (
+                          <> {t('omnichat.chat.allowanceNext', { time: allowanceResetLabel })}</>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {t('omnichat.chat.allowanceRemaining', {
+                          remaining: allowance.remaining,
+                          limit: allowance.limit,
+                        })}
+                      </>
+                    )}
+                  </span>
+                  {allowanceExhausted && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isAuthenticated || allowance.tier === 'guest') {
+                          window.dispatchEvent(
+                            new CustomEvent('open-auth-modal', { detail: 'signup' })
+                          );
+                          return;
+                        }
+                        setPreferredUpgradeTier('plus');
+                        setShowOmniChatUpgrade(true);
+                      }}
+                      className="rounded-full bg-white/10 px-3 py-1.5 font-semibold text-white transition hover:bg-white/15"
+                    >
+                      {allowance.tier === 'guest'
+                        ? t('omnichat.chat.allowanceGuestCta')
+                        : t('omnichat.chat.allowanceUpgradeCta')}
+                    </button>
                   )}
                 </div>
               )}
@@ -1921,7 +2387,15 @@ export default function OmniChatChatPage() {
                       ref={composerRef}
                       value={draft}
                       onChange={(event) => {
-                        setDraft(event.target.value);
+                        const nextDraft = event.target.value;
+                        setDraft(nextDraft);
+                        if (
+                          pendingSendIntentRef.current &&
+                          pendingSendIntentRef.current.content !== nextDraft.trim()
+                        ) {
+                          pendingSendIntentRef.current = null;
+                          pendingMediaIntentRef.current = null;
+                        }
                         if (rateLimitError) setRateLimitError(null);
                         if (regenerationError) setRegenerationError(false);
                       }}
@@ -1933,7 +2407,7 @@ export default function OmniChatChatPage() {
                         }
                       }}
                       placeholder={t('omnichat.chat.inputPlaceholder')}
-                      disabled={isGenerating || !activePersona}
+                      disabled={isGenerating || !activePersona || allowanceExhausted}
                       rows={1}
                       enterKeyHint="send"
                       style={{ minHeight: '36px', maxHeight: '160px' }}
@@ -1941,7 +2415,9 @@ export default function OmniChatChatPage() {
                     />
                     <button
                       type="submit"
-                      disabled={isGenerating || !draft.trim() || !activePersona}
+                      disabled={
+                        isGenerating || !draft.trim() || !activePersona || allowanceExhausted
+                      }
                       className="omnichat-touch-target flex flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--color-primary-dark)] disabled:opacity-50 sm:px-5"
                     >
                       {isGenerating ? (
@@ -2164,6 +2640,38 @@ export default function OmniChatChatPage() {
         />
       )}
 
+      <OmniChatModelSelectorModal
+        isOpen={showModelSelector}
+        accountTier={effectiveAccountTier}
+        currentModelKey={effectiveModelKey}
+        isGuest={!isAuthenticated || isGuest}
+        isSaving={setModelSelectionMutation.isPending}
+        error={modelSelectionError}
+        onClose={() => {
+          setShowModelSelector(false);
+          setModelSelectionError('');
+        }}
+        onApply={(model, scope) => setModelSelectionMutation.mutate({ model, scope })}
+        onRequestAuth={requestAuthenticationForModel}
+        onRequestUpgrade={(tier) => {
+          setPreferredUpgradeTier(tier);
+          setShowModelSelector(false);
+          setShowOmniChatUpgrade(true);
+        }}
+      />
+
+      <OmniChatUpgradeModal
+        isOpen={showOmniChatUpgrade}
+        currentTier={effectiveAccountTier}
+        preferredTier={preferredUpgradeTier}
+        onClose={() => setShowOmniChatUpgrade(false)}
+        onChoosePlan={(tier) => {
+          setPreferredUpgradeTier(tier);
+          setShowOmniChatUpgrade(false);
+          setShowCommerce(true);
+        }}
+      />
+
       {pendingChatShare && (
         <Modal
           isOpen
@@ -2209,6 +2717,7 @@ export default function OmniChatChatPage() {
           conversationId={selectedConversationId}
           mode={callMode}
           onClose={() => setCallMode(null)}
+          onPaymentRequired={() => setVideoPaywallFeature('video_call')}
           onAssistant={(message) => {
             queryClient.setQueryData<BotConversationDetail | undefined>(
               omnichatQueryKeys.conversation(selectedConversationId),
@@ -2223,6 +2732,32 @@ export default function OmniChatChatPage() {
           }}
         />
       )}
+
+      <OmniChatVideoPaywallModal
+        isOpen={videoPaywallFeature !== null}
+        feature={videoPaywallFeature ?? 'scene_video'}
+        onClose={() => setVideoPaywallFeature(null)}
+        onViewOptions={() => {
+          setVideoPaywallFeature(null);
+          setShowCommerce(true);
+        }}
+      />
+      <OmniChatCommerceModal isOpen={showCommerce} onClose={() => setShowCommerce(false)} />
+
+      <OmniChatResponseReportModal
+        isOpen={reportingMessageId !== null}
+        isSubmitting={responseFeedbackMutation.isPending}
+        error={responseReportError || undefined}
+        onClose={() => {
+          if (responseFeedbackMutation.isPending) return;
+          setReportingMessageId(null);
+          setResponseReportError('');
+        }}
+        onSubmit={(feedback) => {
+          if (!selectedConversationId || reportingMessageId === null) return;
+          responseFeedbackMutation.mutate({ messageId: reportingMessageId, feedback });
+        }}
+      />
 
       <SearchOverlay
         isOpen={searchOverlayOpen}

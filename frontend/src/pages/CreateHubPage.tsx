@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { hubsService, type CreateHubRequest } from '../services/hubsService';
 import { MarkdownInput } from '../components/common/MarkdownInput';

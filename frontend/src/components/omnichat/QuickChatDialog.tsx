@@ -238,7 +238,7 @@ export default function QuickChatDialog({
                 <div className="flex items-end gap-2.5">
                   <PersonaAvatar persona={persona} className="h-8 w-8 shrink-0 rounded-xl" />
                   <div className="max-w-[86%] rounded-[22px] rounded-bl-md border border-white/10 bg-white/[0.065] px-4 py-3 text-white/90 shadow-lg">
-                    <OmniChatMessageContent content={openingMessage} />
+                    <OmniChatMessageContent content={openingMessage} isAssistant />
                   </div>
                 </div>
 
@@ -278,7 +278,7 @@ export default function QuickChatDialog({
                   <div className="flex items-end gap-2.5">
                     <PersonaAvatar persona={persona} className="h-8 w-8 shrink-0 rounded-xl" />
                     <div className="max-w-[86%] rounded-[22px] rounded-bl-md border border-white/10 bg-white/[0.065] px-4 py-3 text-white/90 shadow-lg">
-                      <OmniChatMessageContent content={assistantReply} />
+                      <OmniChatMessageContent content={assistantReply} isAssistant />
                     </div>
                   </div>
                 )}

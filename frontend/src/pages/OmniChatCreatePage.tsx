@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { Film, Image as ImageIcon, ImagePlus, Images, Loader2, Send } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { Film, Image as ImageIcon, ImagePlus, Images, Loader2, Send, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
 import OmniChatMediaAssetView from '../components/omnichat/OmniChatMediaAssetView';
+import OmniChatCommerceModal from '../components/omnichat/OmniChatCommerceModal';
+import OmniChatVideoPaywallModal from '../components/omnichat/OmniChatVideoPaywallModal';
+import { Modal } from '../components/common/Modal';
 import PersonaAvatar from '../components/omnichat/PersonaAvatar';
 import type { SidebarTab } from '../components/omnichat/OmniChatSidebar';
-import { omnichatQueryKeys, omnichatService } from '../services/omnichatService';
+import {
+  createOmniChatRequestId,
+  omnichatQueryKeys,
+  omnichatService,
+} from '../services/omnichatService';
+import { useAuth } from '../contexts/AuthContext';
 import type {
   OmniChatGenerationJob,
   OmniChatMediaAsset,
@@ -18,6 +27,7 @@ const GALLERY_PAGE_SIZE = 24;
 
 export function OmniChatCreateWorkspace() {
   const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuth();
   const [kind, setKind] = useState<OmniChatMediaKind>('image');
   const [selectedPersonaId, setSelectedPersonaId] = useState(0);
   const [prompt, setPrompt] = useState('');
@@ -27,6 +37,8 @@ export function OmniChatCreateWorkspace() {
   const [sourceAssetId, setSourceAssetId] = useState('');
   const [activeJob, setActiveJob] = useState<OmniChatGenerationJob | null>(null);
   const [workspaceTab, setWorkspaceTab] = useState<'generate' | 'gallery'>('generate');
+  const [showCommerce, setShowCommerce] = useState(false);
+  const [showVideoPaywall, setShowVideoPaywall] = useState(false);
 
   const personasQuery = useQuery({
     queryKey: omnichatQueryKeys.personas(),
@@ -66,6 +78,11 @@ export function OmniChatCreateWorkspace() {
     mutationFn: (request: Parameters<typeof omnichatService.createGeneration>[0]) =>
       omnichatService.createGeneration(request),
     onSuccess: (job) => setActiveJob(job),
+    onError: (error, request) => {
+      if ((error as Error & { status?: number }).status !== 402) return;
+      if (request.kind === 'video') setShowVideoPaywall(true);
+      else setShowCommerce(true);
+    },
   });
   const cancelMutation = useMutation({
     mutationFn: (jobId: string) => omnichatService.cancelGeneration(jobId),
@@ -98,9 +115,14 @@ export function OmniChatCreateWorkspace() {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (!isAuthenticated) {
+      window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+      return;
+    }
     if (!selectedPersona || !prompt.trim()) return;
     const animateExisting = kind === 'video' && Boolean(sourceAssetId);
     createMutation.mutate({
+      request_id: createOmniChatRequestId(),
       kind,
       mode: animateExisting ? 'image_to_video' : 'create',
       persona_id: selectedPersona.id,
@@ -113,6 +135,7 @@ export function OmniChatCreateWorkspace() {
   };
 
   return (
+    <>
     <div className="min-h-[calc(100dvh-var(--omnichat-header-offset))] bg-[radial-gradient(circle_at_20%_0%,rgba(48,94,180,0.18),transparent_38%),var(--color-background)] px-4 py-6 sm:px-7 lg:px-10">
       <div className="mx-auto max-w-[1500px]">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -382,12 +405,23 @@ export function OmniChatCreateWorkspace() {
         )}
       </div>
     </div>
+    <OmniChatVideoPaywallModal
+      isOpen={showVideoPaywall}
+      feature="scene_video"
+      onClose={() => setShowVideoPaywall(false)}
+      onViewOptions={() => {
+        setShowVideoPaywall(false);
+        setShowCommerce(true);
+      }}
+    />
+    <OmniChatCommerceModal isOpen={showCommerce} onClose={() => setShowCommerce(false)} />
+    </>
   );
 }
 
 function GeneratedResult({ assetId }: { assetId: string }) {
   const assetQuery = useQuery({
-    queryKey: ['omnichat', 'media', assetId],
+    queryKey: omnichatQueryKeys.media(assetId),
     queryFn: () => omnichatService.getMediaAsset(assetId),
   });
   if (!assetQuery.data) return <Loader2 size={36} className="mx-auto animate-spin text-blue-300" />;
@@ -417,8 +451,11 @@ function GalleryGrid({
   isFetchingNextPage: boolean;
   loadMore: () => void;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [publishedAssetId, setPublishedAssetId] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<OmniChatMediaAsset | null>(null);
+  const [deleteError, setDeleteError] = useState('');
   const publishMutation = useMutation({
     mutationFn: (assetId: string) => omnichatService.publishMedia(assetId),
     onSuccess: (publication, assetId) => {
@@ -426,6 +463,20 @@ function GalleryGrid({
       void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.gallery() });
       void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.explore() });
       return publication;
+    },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (assetId: string) => omnichatService.deleteMediaAsset(assetId),
+    onSuccess: (_result, assetId) => {
+      setPendingDelete(null);
+      setDeleteError('');
+      void queryClient.invalidateQueries({ queryKey: ['omnichat', 'gallery'] });
+      void queryClient.invalidateQueries({ queryKey: ['omnichat', 'conversation'] });
+      queryClient.removeQueries({ queryKey: omnichatQueryKeys.media(assetId) });
+    },
+    onError: (error) => {
+      const status = (error as Error & { status?: number }).status;
+      setDeleteError(status === 409 ? t('omnichat.galleryDelete.sharedError') : t('omnichat.galleryDelete.genericError'));
     },
   });
   if (isLoading)
@@ -465,6 +516,7 @@ function GalleryGrid({
               <p className="text-xs capitalize text-white/30">
                 {asset.kind} · {asset.visibility}
               </p>
+              <div className="flex items-center gap-1">
               {asset.visibility === 'public' || publishedAssetId === asset.id ? (
                 <span className="text-xs font-medium text-emerald-300">Published</span>
               ) : (
@@ -482,6 +534,14 @@ function GalleryGrid({
                   Publish
                 </button>
               )}
+                {asset.visibility === 'public' || publishedAssetId === asset.id ? (
+                  <span className="max-w-32 text-end text-xs text-amber-200/75">
+                    {t('omnichat.galleryDelete.unpublishFirst')}
+                  </span>
+                ) : (
+                  <button type="button" aria-label={t('omnichat.galleryDelete.action')} onClick={() => { setPendingDelete(asset); setDeleteError(''); }} className="rounded-full p-1.5 text-white/45 hover:bg-rose-500/15 hover:text-rose-300"><Trash2 size={14} /></button>
+                )}
+              </div>
             </div>
             {publishMutation.isError && publishMutation.variables === asset.id && (
               <p className="mt-2 text-xs text-rose-300">Could not publish this creation.</p>
@@ -489,6 +549,12 @@ function GalleryGrid({
           </article>
         ))}
       </div>
+      <Modal isOpen={Boolean(pendingDelete)} onClose={deleteMutation.isPending ? undefined : () => setPendingDelete(null)} ariaLabelledBy="omnichat-gallery-delete-title" ariaDescribedBy="omnichat-gallery-delete-description" ariaBusy={deleteMutation.isPending} overlayClassName="bg-black/80" className="w-full max-w-md rounded-[26px] border border-white/10 bg-[#15161d] p-6 text-white shadow-2xl" animation="quick-chat">
+        <h2 id="omnichat-gallery-delete-title" className="text-xl font-semibold">{t('omnichat.galleryDelete.title')}</h2>
+        <p id="omnichat-gallery-delete-description" className="mt-3 text-sm leading-6 text-white/60">{t('omnichat.galleryDelete.description')}</p>
+        {deleteError && <p role="alert" className="mt-3 text-sm text-rose-300">{deleteError}</p>}
+        <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={deleteMutation.isPending} onClick={() => setPendingDelete(null)} className="rounded-full px-4 py-2 text-sm text-white/60">{t('common.cancel')}</button><button type="button" disabled={deleteMutation.isPending || !pendingDelete} onClick={() => pendingDelete && deleteMutation.mutate(pendingDelete.id)} className="rounded-full bg-rose-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">{deleteMutation.isPending ? t('omnichat.galleryDelete.deleting') : t('omnichat.galleryDelete.confirm')}</button></div>
+      </Modal>
       {hasNextPage && (
         <div className="mt-7 flex justify-center">
           <button

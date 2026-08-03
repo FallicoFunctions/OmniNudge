@@ -515,7 +515,7 @@ export function TabBarItem({
 ```typescript
 import { useState } from 'react';
 import { Home, Search, Plus, MessageCircle, Menu } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { TabBarItem } from './TabBarItem';
 import { CreateMenuSheet } from './CreateMenuSheet';
 import { MoreMenuSheet } from './MoreMenuSheet';
@@ -703,7 +703,7 @@ export function MobileTabBar() {
 **File:** `frontend/src/components/mobile/CreateMenuSheet.tsx`
 
 ```typescript
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { FileText, Users, Share2 } from 'lucide-react';
 import { BottomSheet } from './BottomSheet';
@@ -782,7 +782,7 @@ export function CreateMenuSheet({ isOpen, onClose }: CreateMenuSheetProps) {
 **File:** `frontend/src/components/mobile/MoreMenuSheet.tsx`
 
 ```typescript
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { User, Settings, Grid3x3, Info, Shield, LogOut } from 'lucide-react';
 import { BottomSheet } from './BottomSheet';
@@ -1179,13 +1179,13 @@ module.exports = {
 ```typescript
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import { MobileTabBar } from '../MobileTabBar';
 import { AuthContext } from '../../../contexts/AuthContext';
 
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useNavigate: () => mockNavigate,

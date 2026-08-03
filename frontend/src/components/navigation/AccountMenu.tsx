@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,7 +11,7 @@ interface AccountMenuProps {
   isModerator: boolean;
   onLogout: () => void;
   onBugReport: () => void;
-  plan?: 'free' | 'paid';
+  plan?: 'free' | 'plus' | 'premium';
   planExpiresAt?: string | null;
   onUpgrade?: () => void;
 }
@@ -205,7 +205,7 @@ export function AccountMenu({
             </button>
           )}
 
-          {plan === 'paid' && planExpiresAt && (
+          {(plan === 'plus' || plan === 'premium') && planExpiresAt && (
             <div className="flex items-center gap-2 px-4 py-2" role="presentation">
               <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/20 px-2 py-0.5 text-xs font-semibold text-green-700 dark:text-green-400">
                 ✓ Paid

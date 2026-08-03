@@ -135,17 +135,20 @@ export default function PersonaDetailsModal({
             <>
               <div className="grid gap-4 md:grid-cols-[200px,1fr]">
                 <div className="overflow-hidden rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-                  {definition.avatar_url ? (
-                    <img
-                      src={resolveMediaUrl(definition.avatar_url, definition.updated_at)}
-                      alt={definition.name}
-                      className="aspect-square w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex aspect-square items-center justify-center text-sm text-[var(--color-text-secondary)]">
-                      {t('omnichat.personaDetails.noAvatar')}
-                    </div>
-                  )}
+                  {(() => {
+                    const detailsAvatarSrc = resolveMediaUrl(definition.avatar_url, definition.updated_at);
+                    return detailsAvatarSrc ? (
+                      <img
+                        src={detailsAvatarSrc}
+                        alt={definition.name}
+                        className="aspect-square w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex aspect-square items-center justify-center text-sm text-[var(--color-text-secondary)]">
+                        {t('omnichat.personaDetails.noAvatar')}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <ReadOnlyInput

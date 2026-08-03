@@ -6,6 +6,7 @@ import { speakOmniChatMessage } from '../OmniChatSpeakButton';
 import type { BotPersona, OmniChatCallSession } from '../../../types/omnichat';
 
 vi.mock('../../../services/omnichatService', () => ({
+  createOmniChatRequestId: () => '123e4567-e89b-42d3-a456-426614174000',
   omnichatService: {
     startCall: vi.fn(),
     endCall: vi.fn(),
@@ -45,6 +46,29 @@ const call: OmniChatCallSession = {
 
 describe('OmniChatCallModal', () => {
   afterEach(() => vi.clearAllMocks());
+
+  it('renders above the OmniChat shell and keeps call status away from the top edge', () => {
+    vi.mocked(omnichatService.startCall).mockReturnValue(new Promise(() => undefined));
+    const view = render(
+      <div className="relative z-10">
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={12}
+          mode="voice"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+        />
+      </div>
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Voice call with Sadie' });
+    expect(dialog.parentElement).toBe(document.body);
+    const visualGroup = screen.getByTestId('omnichat-call-visual-group');
+    expect(visualGroup).toHaveClass('flex-col', 'items-center', 'justify-center', 'gap-6');
+    expect(visualGroup).toContainElement(screen.getByTestId('omnichat-call-identity'));
+    expect(visualGroup.querySelector('[data-persona-avatar="true"]')).toBeInTheDocument();
+    view.unmount();
+  });
 
   it('ends the server call session when the modal unmounts', async () => {
     vi.mocked(omnichatService.startCall).mockResolvedValue(call);
@@ -204,6 +228,38 @@ describe('OmniChatCallModal', () => {
     expect(speakOmniChatMessage).not.toHaveBeenCalled();
   });
 
+  it('aborts an in-flight AI turn when the user ends the call', async () => {
+    vi.mocked(omnichatService.startCall).mockResolvedValue(call);
+    vi.mocked(omnichatService.endCall).mockResolvedValue(undefined);
+    let requestSignal: AbortSignal | undefined;
+    vi.mocked(omnichatService.sendMessage).mockImplementation(
+      (_conversationId: number, _content: string, _requestId: string, signal?: AbortSignal) => {
+        requestSignal = signal;
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+        });
+      }
+    );
+
+    render(
+      <OmniChatCallModal
+        persona={persona}
+        conversationId={12}
+        mode="voice"
+        onClose={vi.fn()}
+        onAssistant={vi.fn()}
+      />
+    );
+    await waitFor(() => expect(omnichatService.startCall).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText('Type during call'), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send during call' }));
+    await waitFor(() => expect(requestSignal).toBeDefined());
+
+    fireEvent.click(screen.getByRole('button', { name: 'End call' }));
+
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
   it('does not expose fake call controls when session creation fails', async () => {
     vi.mocked(omnichatService.startCall).mockRejectedValue(new Error('provider unavailable'));
     render(
@@ -220,5 +276,27 @@ describe('OmniChatCallModal', () => {
     expect(screen.queryByLabelText('Type during call')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Talk' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'End call' })).toBeInTheDocument();
+  });
+
+  it('routes a video-call 402 to the paywall instead of a generic connection error', async () => {
+    const error = Object.assign(new Error('payment required'), { status: 402 });
+    vi.mocked(omnichatService.startCall).mockRejectedValue(error);
+    const onPaymentRequired = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <OmniChatCallModal
+        persona={persona}
+        conversationId={12}
+        mode="video"
+        onClose={onClose}
+        onAssistant={vi.fn()}
+        onPaymentRequired={onPaymentRequired}
+      />
+    );
+
+    await waitFor(() => expect(onPaymentRequired).toHaveBeenCalledOnce());
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByText('Connection needs attention')).not.toBeInTheDocument();
   });
 });
