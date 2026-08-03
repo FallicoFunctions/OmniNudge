@@ -1,14 +1,21 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/omninudge/backend/internal/api/middleware"
+	apiresponse "github.com/omninudge/backend/internal/api/response"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // OmniChatHandler handles HTTP requests for OmniChat bot personas and conversations.
@@ -17,6 +24,15 @@ type OmniChatHandler struct {
 	convRepo       *models.BotConversationRepository
 	messageRepo    *models.BotMessageRepository
 	chatbotService *services.ChatbotService
+	modelSelection *services.OmniChatModelSelectionService
+	allowance      *services.OmniChatAllowance
+	idempotency    OmniChatRequestIdempotencyStore
+}
+
+type OmniChatRequestIdempotencyStore interface {
+	Begin(context.Context, int, uuid.UUID, string, string, string) (*models.OmniChatRequestClaim, error)
+	Complete(context.Context, int, uuid.UUID, json.RawMessage) error
+	Fail(context.Context, int, uuid.UUID) error
 }
 
 // NewOmniChatHandler creates a new OmniChat handler.
@@ -25,13 +41,91 @@ func NewOmniChatHandler(
 	convRepo *models.BotConversationRepository,
 	messageRepo *models.BotMessageRepository,
 	chatbotService *services.ChatbotService,
+	modelSelection *services.OmniChatModelSelectionService,
+	allowances ...*services.OmniChatAllowance,
 ) *OmniChatHandler {
+	var allowance *services.OmniChatAllowance
+	if len(allowances) > 0 {
+		allowance = allowances[0]
+	}
 	return &OmniChatHandler{
 		personaRepo:    personaRepo,
 		convRepo:       convRepo,
 		messageRepo:    messageRepo,
 		chatbotService: chatbotService,
+		modelSelection: modelSelection,
+		allowance:      allowance,
 	}
+}
+
+func (h *OmniChatHandler) SetRequestIdempotency(store OmniChatRequestIdempotencyStore) *OmniChatHandler {
+	h.idempotency = store
+	return h
+}
+
+func (h *OmniChatHandler) GetAllowance(c *gin.Context) {
+	state, err := inspectOmniChatAllowance(c, h.allowance)
+	if err != nil {
+		RespondError(c, http.StatusServiceUnavailable, "Chat allowance is temporarily unavailable")
+		return
+	}
+	writeOmniChatAllowanceHeaders(c, state)
+	c.JSON(http.StatusOK, state)
+}
+
+type OmniChatSetModelSelectionRequest struct {
+	ConversationID int    `json:"conversation_id" binding:"required,min=1"`
+	ModelKey       string `json:"model_key" binding:"required"`
+	Scope          string `json:"scope" binding:"required"`
+}
+
+func (h *OmniChatHandler) GetModelSelection(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	conversationID, err := strconv.Atoi(c.Query("conversation_id"))
+	if err != nil || conversationID <= 0 {
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
+		return
+	}
+	selection, err := h.modelSelection.Get(c.Request.Context(), userID, conversationID)
+	if err != nil {
+		if errors.Is(err, models.ErrOmniChatConversationNotOwned) {
+			RespondError(c, http.StatusNotFound, "Conversation not found")
+			return
+		}
+		RespondError(c, http.StatusInternalServerError, "Failed to load model selection")
+		return
+	}
+	c.JSON(http.StatusOK, selection)
+}
+
+func (h *OmniChatHandler) SetModelSelection(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	var req OmniChatSetModelSelectionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid model selection")
+		return
+	}
+	selection, err := h.modelSelection.Set(c.Request.Context(), userID, req.ConversationID, req.ModelKey, req.Scope)
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrInvalidOmniChatModelSelection):
+			RespondError(c, http.StatusBadRequest, "Invalid model selection")
+		case errors.Is(err, services.ErrOmniChatModelUpgradeRequired):
+			RespondError(c, http.StatusForbidden, "This model requires a plan upgrade")
+		case errors.Is(err, models.ErrOmniChatConversationNotOwned):
+			RespondError(c, http.StatusNotFound, "Conversation not found")
+		default:
+			RespondError(c, http.StatusInternalServerError, "Failed to update model selection")
+		}
+		return
+	}
+	c.JSON(http.StatusOK, selection)
 }
 
 // ListPersonas returns the active bot persona catalog, optionally filtered by ?category=.
@@ -407,7 +501,8 @@ func decorateOmniChatMessageAttachments(messages []*models.BotMessage, viewerUse
 
 // OmniChatSendMessageRequest is the request body for sending a message in an OmniChat conversation.
 type OmniChatSendMessageRequest struct {
-	Content string `json:"content" binding:"required"`
+	Content   string    `json:"content" binding:"required"`
+	RequestID uuid.UUID `json:"request_id"`
 }
 
 // SendMessage sends a user message and generates the persona's reply.
@@ -435,14 +530,40 @@ func (h *OmniChatHandler) SendMessage(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Invalid message content")
 		return
 	}
+	claim, ok := h.claimOmniChatRequest(c, userID, req.RequestID, "chat_send", fmt.Sprintf("conversation:%d", conversationID), struct {
+		Content string `json:"content"`
+	}{Content: content})
+	if !ok {
+		return
+	}
+	if claim.Replay {
+		c.Data(http.StatusOK, "application/json", claim.Response)
+		return
+	}
+	completed := false
+	defer func() {
+		if !completed {
+			h.failOmniChatRequest(userID, req.RequestID)
+		}
+	}()
+	lease, ok := reserveOmniChatAllowance(c, h.allowance, 1)
+	if !ok {
+		return
+	}
+	successfulReplies := 0
+	defer commitOmniChatAllowance(h.allowance, lease, &successfulReplies)
 
-	assistantMsg, err := h.chatbotService.SendMessage(c.Request.Context(), userID, conversationID, content)
+	assistantMsg, err := h.chatbotService.SendMessage(services.WithOmniChatClientRequestID(c.Request.Context(), req.RequestID), userID, conversationID, content)
 	if err != nil {
+		if respondOmniChatCreditsRequired(c, err) {
+			return
+		}
 		if errors.Is(err, services.ErrNotFound) {
 			RespondError(c, http.StatusNotFound, "Conversation not found")
 			return
 		}
 		if assistantMsg != nil {
+			completed = true
 			// Generation failed but the exchange was persisted (assistantMsg.Failed
 			// is set with safe, user-facing copy) — return it rather than a 500.
 			c.JSON(http.StatusOK, assistantMsg)
@@ -451,6 +572,10 @@ func (h *OmniChatHandler) SendMessage(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to send message")
 		return
 	}
+	if !assistantMsg.Failed {
+		successfulReplies = 1
+	}
+	completed = true
 
 	c.JSON(http.StatusOK, assistantMsg)
 }
@@ -473,14 +598,56 @@ func (h *OmniChatHandler) RegenerateMessage(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
+	var req struct {
+		RequestID uuid.UUID `json:"request_id"`
+	}
+	if err := decodeStrictJSON(c, &req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid regenerate request")
+		return
+	}
+	claim, ok := h.claimOmniChatRequest(c, userID, req.RequestID, "chat_regenerate", fmt.Sprintf("conversation:%d", conversationID), struct {
+		MessageID int `json:"message_id"`
+	}{MessageID: messageID})
+	if !ok {
+		return
+	}
+	if claim.Replay {
+		c.Data(http.StatusOK, "application/json", claim.Response)
+		return
+	}
+	completed := false
+	defer func() {
+		if !completed {
+			h.failOmniChatRequest(userID, req.RequestID)
+		}
+	}()
+	lease, ok := reserveOmniChatAllowance(c, h.allowance, 1)
+	if !ok {
+		return
+	}
+	successfulReplies := 0
+	defer commitOmniChatAllowance(h.allowance, lease, &successfulReplies)
 
 	message, err := h.chatbotService.RegenerateMessage(
-		c.Request.Context(),
+		services.WithOmniChatClientRequestID(c.Request.Context(), req.RequestID),
 		userID,
 		conversationID,
 		messageID,
 	)
 	if err != nil {
+		// The regenerated reply may already be durably replaced and linked to
+		// a reserved billing operation when only the final capture failed.
+		// Reconciliation will capture it; return the persisted response so the
+		// browser and database do not diverge.
+		if message != nil {
+			completed = true
+			successfulReplies = 1
+			c.JSON(http.StatusOK, message)
+			return
+		}
+		if respondOmniChatCreditsRequired(c, err) {
+			return
+		}
 		switch {
 		case errors.Is(err, services.ErrNotFound):
 			RespondError(c, http.StatusNotFound, "Conversation not found")
@@ -491,8 +658,60 @@ func (h *OmniChatHandler) RegenerateMessage(c *gin.Context) {
 		}
 		return
 	}
+	if !message.Failed {
+		successfulReplies = 1
+	}
+	completed = true
 
 	c.JSON(http.StatusOK, message)
+}
+
+func (h *OmniChatHandler) claimOmniChatRequest(c *gin.Context, userID int, requestID uuid.UUID, scope, resource string, payload any) (*models.OmniChatRequestClaim, bool) {
+	if requestID == uuid.Nil {
+		RespondError(c, http.StatusBadRequest, "A valid request_id is required")
+		return nil, false
+	}
+	if h.idempotency == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Request replay protection is temporarily unavailable")
+		return nil, false
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to prepare request")
+		return nil, false
+	}
+	claim, err := h.idempotency.Begin(c.Request.Context(), userID, requestID, scope, resource, models.OmniChatRequestPayloadHash(encoded))
+	if err == nil {
+		return claim, true
+	}
+	switch {
+	case errors.Is(err, models.ErrOmniChatRequestConflict):
+		RespondError(c, http.StatusConflict, "request_id was already used for a different request")
+	case errors.Is(err, models.ErrOmniChatRequestInProgress), errors.Is(err, models.ErrOmniChatConversationBusy):
+		RespondError(c, http.StatusConflict, "A matching conversation request is already in progress")
+	default:
+		RespondError(c, http.StatusServiceUnavailable, "Request replay protection is temporarily unavailable")
+	}
+	return nil, false
+}
+
+func (h *OmniChatHandler) failOmniChatRequest(userID int, requestID uuid.UUID) {
+	if h.idempotency == nil || requestID == uuid.Nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := h.idempotency.Fail(ctx, userID, requestID); err != nil {
+		zlog.Error().Err(err).Int("user_id", userID).Str("request_id", requestID.String()).Msg("omnichat: failed to release request idempotency claim")
+	}
+}
+
+func respondOmniChatCreditsRequired(c *gin.Context, err error) bool {
+	if !errors.Is(err, models.ErrOmniCreditsInsufficient) {
+		return false
+	}
+	RespondError(c, http.StatusPaymentRequired, "This response requires OmniCredits")
+	return true
 }
 
 type editAssistantMessageRequest struct {
@@ -569,6 +788,12 @@ func (h *OmniChatHandler) PreviewSendMessage(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Invalid message history")
 		return
 	}
+	lease, ok := reserveOmniChatAllowance(c, h.allowance, 1)
+	if !ok {
+		return
+	}
+	successfulReplies := 0
+	defer commitOmniChatAllowance(h.allowance, lease, &successfulReplies)
 
 	var viewerUserID *int
 	if userID, ok := middleware.GetOptionalUserID(c); ok {
@@ -584,10 +809,84 @@ func (h *OmniChatHandler) PreviewSendMessage(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to generate reply")
 		return
 	}
+	if !failed && fullText != "" {
+		successfulReplies = 1
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"role":    "assistant",
 		"content": fullText,
 		"failed":  failed,
 	})
+}
+
+func reserveOmniChatAllowance(c *gin.Context, allowance *services.OmniChatAllowance, count int) (*services.OmniChatAllowanceLease, bool) {
+	if allowance == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Chat allowance is temporarily unavailable")
+		return nil, false
+	}
+	var userID *int
+	if value, ok := middleware.GetOptionalUserID(c); ok {
+		userID = &value
+	}
+	lease, err := allowance.Reserve(c.Request.Context(), userID, c.ClientIP(), count)
+	if err != nil {
+		RespondError(c, http.StatusServiceUnavailable, "Chat allowance is temporarily unavailable")
+		return nil, false
+	}
+	writeOmniChatAllowanceHeaders(c, lease.State)
+	if !lease.State.Allowed {
+		status := http.StatusTooManyRequests
+		message := "Your rolling chat allowance has been used"
+		if lease.State.CreditsRequired {
+			status = http.StatusPaymentRequired
+			message = "OmniCredits are required to continue beyond your rolling chat allowance"
+		}
+		response := apiresponse.NewErrorResponse(status, message, apiresponse.RequestIDFromContext(c))
+		c.JSON(status, gin.H{
+			"error": response.Error, "code": response.Code, "message": response.Message,
+			"request_id": response.RequestID, "allowance": lease.State,
+		})
+		return nil, false
+	}
+	return lease, true
+}
+
+func inspectOmniChatAllowance(c *gin.Context, allowance *services.OmniChatAllowance) (services.OmniChatAllowanceState, error) {
+	if allowance == nil {
+		return services.OmniChatAllowanceState{}, errors.New("chat allowance is unavailable")
+	}
+	var userID *int
+	if value, ok := middleware.GetOptionalUserID(c); ok {
+		userID = &value
+	}
+	return allowance.Status(c.Request.Context(), userID, c.ClientIP())
+}
+
+func commitOmniChatAllowance(allowance *services.OmniChatAllowance, lease *services.OmniChatAllowanceLease, successfulReplies *int) {
+	if allowance == nil || lease == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	// A transition failure cannot replace a response that was already
+	// delivered, but it must remain observable with its operation context.
+	// Unlinked overage holds are conservatively refunded by reconciliation.
+	if err := allowance.Commit(ctx, lease, *successfulReplies); err != nil {
+		zlog.Error().Err(err).Int("successful_replies", *successfulReplies).
+			Msg("omnichat: failed to finalize allowance reservation")
+	}
+}
+
+func writeOmniChatAllowanceHeaders(c *gin.Context, state services.OmniChatAllowanceState) {
+	c.Header("X-OmniChat-Allowance-Tier", state.Tier)
+	if state.Unlimited {
+		c.Header("X-OmniChat-Allowance-Unlimited", "true")
+		return
+	}
+	c.Header("X-OmniChat-Allowance-Limit", strconv.Itoa(state.Limit))
+	c.Header("X-OmniChat-Allowance-Remaining", strconv.Itoa(state.Remaining))
+	if state.ResetAt != nil {
+		c.Header("X-OmniChat-Allowance-Reset", state.ResetAt.UTC().Format(time.RFC3339))
+	}
 }

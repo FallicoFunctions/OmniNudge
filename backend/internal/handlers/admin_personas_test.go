@@ -16,6 +16,7 @@ import (
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,7 +34,8 @@ func setupAdminPersonaTestEnv(t *testing.T) (*gin.Engine, *models.UserRepository
 
 	userRepo := models.NewUserRepository(db.Pool)
 	personaRepo := models.NewBotPersonaRepository(db.Pool)
-	handler := NewAdminPersonaHandler(personaRepo)
+	voiceRepo := models.NewOmniChatVoiceRepository(db.Pool)
+	handler := NewAdminPersonaHandler(personaRepo, voiceRepo)
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -52,7 +54,9 @@ func setupAdminPersonaTestEnv(t *testing.T) (*gin.Engine, *models.UserRepository
 	adminRoutes.Use(middleware.RequireRole("admin"))
 	{
 		adminRoutes.GET("/personas", handler.ListPersonas)
+		adminRoutes.GET("/persona-voices", handler.ListPersonaVoices)
 		adminRoutes.PUT("/personas/:id", handler.UpdatePersonaMedia)
+		adminRoutes.PUT("/personas/:id/voice", handler.UpdatePersonaVoice)
 	}
 
 	cleanup := func() {
@@ -71,6 +75,8 @@ func createAdminPersonaTestUser(t *testing.T, repo *models.UserRepository, usern
 	}
 	err := repo.Create(ctx, user)
 	require.NoError(t, err)
+	require.NoError(t, repo.UpdateRole(ctx, user.ID, role))
+	user.Role = role
 	return user
 }
 
@@ -271,4 +277,144 @@ func TestAdminPersonaHandlerRequiresAdminRole(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusForbidden, w.Code)
+
+	req, _ = http.NewRequest(http.MethodGet, "/api/v1/admin/omnichat/persona-voices", nil)
+	setAdminPersonaTestHeaders(req, user.ID, "user")
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestAdminPersonaHandlerListsCanonicalPersonaVoices(t *testing.T) {
+	router, userRepo, personaRepo, pool, cleanup := setupAdminPersonaTestEnv(t)
+	defer cleanup()
+
+	admin := createAdminPersonaTestUser(t, userRepo, "persona_voice_admin_list", "admin")
+	persona := seedAdminPersona(t, pool, personaRepo)
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO omnichat_persona_voices (
+			persona_id, provider, voice_id, voice_name, model_id, stability,
+			similarity_boost, style, speed, pitch, live_video_replica_id,
+			live_video_persona_id, configured_by
+		) VALUES ($1, 'browser', 'browser-admin', 'Admin voice', 'browser-native',
+			0.5, 0.75, 0, 1, 1, 'private-replica', 'private-persona', $2)
+	`, persona.ID, admin.ID)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/admin/omnichat/persona-voices", nil)
+	setAdminPersonaTestHeaders(req, admin.ID, "admin")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var response struct {
+		Voices []*models.OmniChatPersonaVoice `json:"voices"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	var found *models.OmniChatPersonaVoice
+	for _, voice := range response.Voices {
+		if voice.PersonaID == persona.ID {
+			found = voice
+			break
+		}
+	}
+	require.NotNil(t, found)
+	require.Equal(t, "browser", found.Provider)
+	require.NotEmpty(t, found.VoiceID)
+	require.Nil(t, found.LiveVideoReplicaID)
+	require.Nil(t, found.LiveVideoPersonaID)
+}
+
+func TestAdminPersonaHandlerAssignsOnlyCanonicalPreset(t *testing.T) {
+	router, userRepo, personaRepo, pool, cleanup := setupAdminPersonaTestEnv(t)
+	defer cleanup()
+
+	admin := createAdminPersonaTestUser(t, userRepo, "persona_voice_admin_assign", "admin")
+	persona := seedAdminPersona(t, pool, personaRepo)
+	preset, ok := services.FindOmniChatVoicePreset("af_bella")
+	require.True(t, ok)
+	body := bytes.NewBufferString(`{"preset_id":"af_bella"}`)
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/admin/omnichat/personas/"+strconv.Itoa(persona.ID)+"/voice", body)
+	req.Header.Set("Content-Type", "application/json")
+	setAdminPersonaTestHeaders(req, admin.ID, "admin")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var response struct {
+		Voice *models.OmniChatPersonaVoice `json:"voice"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.NotNil(t, response.Voice)
+	require.Equal(t, preset.Provider, response.Voice.Provider)
+	require.Equal(t, preset.VoiceID, response.Voice.VoiceID)
+	require.Equal(t, preset.Name, response.Voice.VoiceName)
+	require.Equal(t, preset.ModelID, response.Voice.ModelID)
+	require.Nil(t, response.Voice.LiveVideoReplicaID)
+	require.Nil(t, response.Voice.LiveVideoPersonaID)
+}
+
+func TestAdminPersonaHandlerAssignsCanonicalBrowserFallback(t *testing.T) {
+	router, userRepo, personaRepo, pool, cleanup := setupAdminPersonaTestEnv(t)
+	defer cleanup()
+
+	admin := createAdminPersonaTestUser(t, userRepo, "persona_voice_admin_fallback", "admin")
+	persona := seedAdminPersona(t, pool, personaRepo)
+	path := "/api/v1/admin/omnichat/personas/" + strconv.Itoa(persona.ID) + "/voice"
+	req, _ := http.NewRequest(http.MethodPut, path, bytes.NewBufferString(`{"preset_id":"  "}`))
+	req.Header.Set("Content-Type", "application/json")
+	setAdminPersonaTestHeaders(req, admin.ID, "admin")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var response struct {
+		Voice *models.OmniChatPersonaVoice `json:"voice"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.NotNil(t, response.Voice)
+	expected := models.DefaultOmniChatBrowserVoice(persona.ID)
+	require.Equal(t, expected.Provider, response.Voice.Provider)
+	require.Equal(t, expected.VoiceID, response.Voice.VoiceID)
+	require.Equal(t, expected.ModelID, response.Voice.ModelID)
+	require.Nil(t, response.Voice.LiveVideoReplicaID)
+	require.Nil(t, response.Voice.LiveVideoPersonaID)
+}
+
+func TestAdminPersonaHandlerReturnsNotFoundForMissingVoicePersona(t *testing.T) {
+	router, userRepo, _, _, cleanup := setupAdminPersonaTestEnv(t)
+	defer cleanup()
+
+	admin := createAdminPersonaTestUser(t, userRepo, "persona_voice_admin_missing", "admin")
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/admin/omnichat/personas/2147483647/voice", bytes.NewBufferString(`{"preset_id":"af_bella"}`))
+	req.Header.Set("Content-Type", "application/json")
+	setAdminPersonaTestHeaders(req, admin.ID, "admin")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
+}
+
+func TestAdminPersonaHandlerRejectsUnknownOrExpandedVoicePayloads(t *testing.T) {
+	router, userRepo, personaRepo, pool, cleanup := setupAdminPersonaTestEnv(t)
+	defer cleanup()
+
+	admin := createAdminPersonaTestUser(t, userRepo, "persona_voice_admin_invalid", "admin")
+	persona := seedAdminPersona(t, pool, personaRepo)
+	path := "/api/v1/admin/omnichat/personas/" + strconv.Itoa(persona.ID) + "/voice"
+
+	for name, payload := range map[string]string{
+		"missing preset field": `{}`,
+		"unknown preset":       `{"preset_id":"not-a-preset"}`,
+		"provider injection":   `{"preset_id":"af_bella","provider":"elevenlabs"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			req, _ := http.NewRequest(http.MethodPut, path, bytes.NewBufferString(payload))
+			req.Header.Set("Content-Type", "application/json")
+			setAdminPersonaTestHeaders(req, admin.ID, "admin")
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+	}
 }

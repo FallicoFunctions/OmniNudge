@@ -36,6 +36,22 @@ type OmniChatVoiceService struct {
 	providers     map[string]speech.Synthesizer
 	defaultModels map[string]string
 	speechGroup   singleflight.Group
+	billing       interface {
+		Included(context.Context, *int, string) (bool, error)
+		ReserveOwned(context.Context, int, uuid.UUID, string) (*models.OmniCreditsUsageReservation, error)
+		CaptureOwned(context.Context, int, uuid.UUID) error
+		RefundOwned(context.Context, int, uuid.UUID) error
+	}
+}
+
+func (s *OmniChatVoiceService) SetBilling(billing interface {
+	Included(context.Context, *int, string) (bool, error)
+	ReserveOwned(context.Context, int, uuid.UUID, string) (*models.OmniCreditsUsageReservation, error)
+	CaptureOwned(context.Context, int, uuid.UUID) error
+	RefundOwned(context.Context, int, uuid.UUID) error
+}) *OmniChatVoiceService {
+	s.billing = billing
+	return s
 }
 
 func NewOmniChatVoiceService(store OmniChatVoiceStore, storage StorageService, providers map[string]speech.Synthesizer, defaultModels map[string]string) *OmniChatVoiceService {
@@ -70,7 +86,13 @@ func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, co
 		return nil, err
 	}
 	if cached != nil {
+		if err := s.captureCachedSpeech(ctx, userID, cached); err != nil {
+			return nil, err
+		}
 		return cached, nil
+	}
+	if s.billing == nil {
+		return nil, errors.New("character speech billing is unavailable")
 	}
 	key := fmt.Sprintf("%d:%d:%s:%s", userID, messageID, textHash, voiceHash)
 	result := s.speechGroup.DoChan(key, func() (any, error) {
@@ -83,9 +105,40 @@ func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, co
 			return nil, err
 		}
 		if cached != nil {
+			if err := s.captureCachedSpeech(workCtx, userID, cached); err != nil {
+				return nil, err
+			}
 			return cached, nil
 		}
-		return s.generateSpeech(workCtx, synthesizer, source, userID, messageID, textHash, voiceHash)
+		var billingOperation uuid.UUID
+		included, err := s.billing.Included(workCtx, &userID, models.OmniCreditsUsageVoice)
+		if err != nil {
+			return nil, err
+		}
+		if !included {
+			billingOperation = uuid.New()
+			if _, err := s.billing.ReserveOwned(workCtx, userID, billingOperation, models.OmniCreditsUsageVoice); err != nil {
+				if errors.Is(err, models.ErrOmniCreditsInsufficient) {
+					return nil, ErrOmniChatPaidFeatureRequired
+				}
+				return nil, err
+			}
+		}
+		audio, err := s.generateSpeech(workCtx, synthesizer, source, userID, messageID, textHash, voiceHash, billingOperation)
+		if err != nil {
+			if billingOperation != uuid.Nil {
+				if refundErr := s.billing.RefundOwned(workCtx, userID, billingOperation); refundErr != nil {
+					return nil, errors.Join(err, fmt.Errorf("refund speech reservation: %w", refundErr))
+				}
+			}
+			return nil, err
+		}
+		if billingOperation != uuid.Nil {
+			if err := s.billing.CaptureOwned(workCtx, userID, billingOperation); err != nil {
+				return nil, err
+			}
+		}
+		return audio, nil
 	})
 	select {
 	case <-ctx.Done():
@@ -102,7 +155,20 @@ func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, co
 	}
 }
 
-func (s *OmniChatVoiceService) generateSpeech(ctx context.Context, synthesizer speech.Synthesizer, source *models.OmniChatSpeechSource, userID, messageID int, textHash, voiceHash string) (*models.OmniChatSpeechAudio, error) {
+func (s *OmniChatVoiceService) captureCachedSpeech(ctx context.Context, userID int, cached *models.OmniChatSpeechAudio) error {
+	if cached == nil || cached.BillingOperationID == nil {
+		return nil
+	}
+	if s.billing == nil {
+		return errors.New("character speech billing is unavailable")
+	}
+	if err := s.billing.CaptureOwned(ctx, userID, *cached.BillingOperationID); err != nil {
+		return fmt.Errorf("capture cached speech reservation: %w", err)
+	}
+	return nil
+}
+
+func (s *OmniChatVoiceService) generateSpeech(ctx context.Context, synthesizer speech.Synthesizer, source *models.OmniChatSpeechSource, userID, messageID int, textHash, voiceHash string, billingOperation uuid.UUID) (*models.OmniChatSpeechAudio, error) {
 	model := source.Voice.ModelID
 	if strings.TrimSpace(model) == "" {
 		model = s.defaultModels[source.Voice.Provider]
@@ -129,6 +195,9 @@ func (s *OmniChatVoiceService) generateSpeech(ctx context.Context, synthesizer s
 		return nil, err
 	}
 	audio := &models.OmniChatSpeechAudio{OwnerUserID: userID, PersonaID: source.PersonaID, MessageID: messageID, TextHash: textHash, VoiceConfigHash: voiceHash, StoragePath: path, FileType: generated.ContentType, FileSize: int64(len(generated.Bytes))}
+	if billingOperation != uuid.Nil {
+		audio.BillingOperationID = &billingOperation
+	}
 	if err = s.store.SaveSpeechAudio(ctx, audio); err != nil {
 		s.deleteSpeechObject(ctx, path)
 		return nil, err

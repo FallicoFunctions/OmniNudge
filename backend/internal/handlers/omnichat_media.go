@@ -28,14 +28,31 @@ type OmniChatMediaStore interface {
 	CancelGenerationJobOwned(ctx context.Context, id uuid.UUID, ownerUserID int) (bool, error)
 	ListMediaAssetsOwned(ctx context.Context, ownerUserID int, kind *models.OmniChatMediaKind, before *models.OmniChatMediaCursor, limit int) ([]*models.OmniChatMediaAsset, error)
 	GetMediaAssetOwned(ctx context.Context, id uuid.UUID, ownerUserID int) (*models.OmniChatMediaAsset, error)
+	DeleteMediaAssetOwned(ctx context.Context, id uuid.UUID, ownerUserID int) (bool, error)
 	SetConversationSceneOwned(ctx context.Context, conversationID, ownerUserID int, scene models.OmniChatSceneState) (bool, error)
 	GetConversationSceneOwned(ctx context.Context, conversationID, ownerUserID int) (*models.OmniChatSceneState, error)
 }
 
 type OmniChatMediaHandler struct {
-	creator OmniChatGenerationCreator
-	store   OmniChatMediaStore
-	storage services.StorageService
+	creator     OmniChatGenerationCreator
+	store       OmniChatMediaStore
+	storage     services.StorageService
+	idempotency OmniChatRequestIdempotencyStore
+	billing     interface {
+		RefundOwned(context.Context, int, uuid.UUID) error
+	}
+}
+
+func (h *OmniChatMediaHandler) SetRequestIdempotency(store OmniChatRequestIdempotencyStore) *OmniChatMediaHandler {
+	h.idempotency = store
+	return h
+}
+
+func (h *OmniChatMediaHandler) SetBilling(billing interface {
+	RefundOwned(context.Context, int, uuid.UUID) error
+}) *OmniChatMediaHandler {
+	h.billing = billing
+	return h
 }
 
 func omniChatMediaResponseMetadata(fileType string) (extension string, maxBytes int64, ok bool) {
@@ -72,6 +89,21 @@ func (h *OmniChatMediaHandler) CreateGeneration(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
+	claim, ok := h.claimMediaGenerationRequest(c, userID, request)
+	if !ok {
+		return
+	}
+	if claim.Replay {
+		c.JSON(http.StatusOK, gin.H{"job": json.RawMessage(claim.Response)})
+		return
+	}
+	completed := false
+	defer func() {
+		if !completed {
+			h.failMediaGenerationRequest(userID, request.RequestID)
+		}
+	}()
+	request.BillingOperationID = services.DeriveOmniChatRequestBillingOperationID(userID, "media_generation", request.RequestID)
 	if h.creator == nil {
 		RespondError(c, http.StatusServiceUnavailable, "Media generation is not configured")
 		return
@@ -81,14 +113,79 @@ func (h *OmniChatMediaHandler) CreateGeneration(c *gin.Context) {
 		switch {
 		case errors.Is(err, services.ErrOmniChatGenerationResourceNotFound):
 			RespondError(c, http.StatusNotFound, "Generation resource not found")
+		case errors.Is(err, services.ErrOmniChatGenerationSafetyRejected):
+			RespondError(c, http.StatusUnprocessableEntity, "This media request cannot be generated")
 		case errors.Is(err, services.ErrOmniChatGenerationUnavailable):
 			RespondError(c, http.StatusServiceUnavailable, "Media generation is temporarily unavailable")
+		case errors.Is(err, services.ErrOmniChatPaidFeatureRequired):
+			RespondError(c, http.StatusPaymentRequired, "Video generation requires OmniCredits")
 		default:
 			RespondError(c, http.StatusInternalServerError, "Failed to create generation")
 		}
 		return
 	}
+	completed = true
 	c.JSON(http.StatusAccepted, gin.H{"job": job})
+}
+
+func (h *OmniChatMediaHandler) claimMediaGenerationRequest(c *gin.Context, userID int, request models.OmniChatGenerationRequest) (*models.OmniChatRequestClaim, bool) {
+	if request.RequestID == uuid.Nil {
+		RespondError(c, http.StatusBadRequest, "A valid request_id is required")
+		return nil, false
+	}
+	if h.idempotency == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Request replay protection is temporarily unavailable")
+		return nil, false
+	}
+	payload := struct {
+		Kind            models.OmniChatMediaKind      `json:"kind"`
+		Mode            models.OmniChatGenerationMode `json:"mode"`
+		PersonaID       int                           `json:"persona_id"`
+		ConversationID  *int                          `json:"conversation_id,omitempty"`
+		SourceMessageID *int                          `json:"source_message_id,omitempty"`
+		SourceAssetID   *uuid.UUID                    `json:"source_asset_id,omitempty"`
+		Prompt          string                        `json:"prompt"`
+		NegativePrompt  string                        `json:"negative_prompt,omitempty"`
+		AspectRatio     string                        `json:"aspect_ratio,omitempty"`
+		DurationSeconds int                           `json:"duration_seconds,omitempty"`
+		Scene           models.OmniChatSceneState     `json:"scene,omitempty"`
+	}{
+		Kind: request.Kind, Mode: request.Mode, PersonaID: request.PersonaID,
+		ConversationID: request.ConversationID, SourceMessageID: request.SourceMessageID,
+		SourceAssetID: request.SourceAssetID, Prompt: request.Prompt, NegativePrompt: request.NegativePrompt,
+		AspectRatio: request.AspectRatio, DurationSeconds: request.DurationSeconds, Scene: request.Scene,
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to prepare generation request")
+		return nil, false
+	}
+	resource := fmt.Sprintf("persona:%d", request.PersonaID)
+	if request.ConversationID != nil {
+		resource = fmt.Sprintf("conversation:%d:persona:%d", *request.ConversationID, request.PersonaID)
+	}
+	claim, err := h.idempotency.Begin(c.Request.Context(), userID, request.RequestID, "media_generation", resource, models.OmniChatRequestPayloadHash(encoded))
+	if err == nil {
+		return claim, true
+	}
+	switch {
+	case errors.Is(err, models.ErrOmniChatRequestConflict):
+		RespondError(c, http.StatusConflict, "request_id was already used for a different request")
+	case errors.Is(err, models.ErrOmniChatRequestInProgress):
+		RespondError(c, http.StatusConflict, "This generation request is already in progress")
+	default:
+		RespondError(c, http.StatusServiceUnavailable, "Request replay protection is temporarily unavailable")
+	}
+	return nil, false
+}
+
+func (h *OmniChatMediaHandler) failMediaGenerationRequest(userID int, requestID uuid.UUID) {
+	if h.idempotency == nil || requestID == uuid.Nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = h.idempotency.Fail(ctx, userID, requestID)
 }
 
 func (h *OmniChatMediaHandler) GetGeneration(c *gin.Context) {
@@ -123,7 +220,20 @@ func (h *OmniChatMediaHandler) CancelGeneration(c *gin.Context) {
 	if !ok {
 		return
 	}
-	cancelled, err := h.store.CancelGenerationJobOwned(c.Request.Context(), jobID, c.GetInt("user_id"))
+	userID := c.GetInt("user_id")
+	job, err := h.store.GetGenerationJobOwned(c.Request.Context(), jobID, userID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to cancel generation")
+		return
+	}
+	if job == nil {
+		RespondError(c, http.StatusNotFound, "Generation not found")
+		return
+	}
+	cancelled := job.Status == models.OmniChatGenerationStatusCancelled
+	if !cancelled {
+		cancelled, err = h.store.CancelGenerationJobOwned(c.Request.Context(), jobID, userID)
+	}
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to cancel generation")
 		return
@@ -131,6 +241,19 @@ func (h *OmniChatMediaHandler) CancelGeneration(c *gin.Context) {
 	if !cancelled {
 		RespondError(c, http.StatusConflict, "Generation can no longer be cancelled")
 		return
+	}
+	if job.BillingOperationID != nil {
+		if h.billing == nil {
+			RespondError(c, http.StatusServiceUnavailable, "Generation billing is temporarily unavailable")
+			return
+		}
+		refundCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 15*time.Second)
+		err = h.billing.RefundOwned(refundCtx, userID, *job.BillingOperationID)
+		cancel()
+		if err != nil {
+			RespondError(c, http.StatusServiceUnavailable, "Generation billing is temporarily unavailable")
+			return
+		}
 	}
 	c.Status(http.StatusNoContent)
 }
@@ -180,6 +303,27 @@ func (h *OmniChatMediaHandler) GetAsset(c *gin.Context) {
 	}
 	decorateOmniChatAsset(asset)
 	c.JSON(http.StatusOK, gin.H{"asset": asset})
+}
+
+func (h *OmniChatMediaHandler) DeleteAsset(c *gin.Context) {
+	assetID, ok := parseUUIDParam(c, "id")
+	if !ok {
+		return
+	}
+	deleted, err := h.store.DeleteMediaAssetOwned(c.Request.Context(), assetID, c.GetInt("user_id"))
+	if err != nil {
+		if errors.Is(err, models.ErrOmniChatMediaInUse) {
+			RespondError(c, http.StatusConflict, "Unpublish this media before deleting it")
+			return
+		}
+		RespondError(c, http.StatusInternalServerError, "Failed to delete media")
+		return
+	}
+	if !deleted {
+		RespondError(c, http.StatusNotFound, "Media not found")
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (h *OmniChatMediaHandler) GetAssetContent(c *gin.Context) {

@@ -115,6 +115,20 @@ type OmniChatVoiceHandler struct {
 	livePersonaID       string
 	voiceboxAvailable   bool
 	voiceCloningEnabled bool
+	billing             interface {
+		ReserveOwned(context.Context, int, uuid.UUID, string) (*models.OmniCreditsUsageReservation, error)
+		CaptureOwned(context.Context, int, uuid.UUID) error
+		RefundOwned(context.Context, int, uuid.UUID) error
+	}
+}
+
+func (h *OmniChatVoiceHandler) SetBilling(billing interface {
+	ReserveOwned(context.Context, int, uuid.UUID, string) (*models.OmniCreditsUsageReservation, error)
+	CaptureOwned(context.Context, int, uuid.UUID) error
+	RefundOwned(context.Context, int, uuid.UUID) error
+}) *OmniChatVoiceHandler {
+	h.billing = billing
+	return h
 }
 
 func (h *OmniChatVoiceHandler) ConfigureVoiceCatalog(voiceboxAvailable, voiceCloningEnabled bool) *OmniChatVoiceHandler {
@@ -147,7 +161,7 @@ func (h *OmniChatVoiceHandler) PreviewVoicePreset(c *gin.Context) {
 		return
 	}
 	c.Header("Content-Type", audio.ContentType)
-	c.Header("Cache-Control", "private, max-age=86400")
+	c.Header("Cache-Control", "private, no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Data(http.StatusOK, audio.ContentType, audio.Bytes)
 }
@@ -190,6 +204,16 @@ func (h *OmniChatVoiceHandler) UpdatePersonaVoice(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Invalid voice profile")
 		return
 	}
+	// Tavus replica/persona IDs address resources under OmniChat's provider
+	// account. A user who owns a custom character may choose a voice, but must
+	// never be able to probe or consume another character's live avatar by
+	// supplying arbitrary provider identifiers. Live-avatar wiring is an
+	// operator-controlled capability until per-user provider accounts exist.
+	if (voice.LiveVideoReplicaID != nil || voice.LiveVideoPersonaID != nil) &&
+		c.GetString("role") != "admin" && c.GetString("role") != "moderator" {
+		RespondError(c, http.StatusForbidden, "Only moderators can configure live avatar video")
+		return
+	}
 	updated, err := h.data.UpsertPersonaVoiceAuthorized(c.Request.Context(), c.GetInt("user_id"), voice)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update character voice")
@@ -221,6 +245,10 @@ func (h *OmniChatVoiceHandler) GetMessageSpeech(c *gin.Context) {
 	}
 	if errors.Is(err, services.ErrNotFound) {
 		RespondError(c, http.StatusNotFound, "Message not found")
+		return
+	}
+	if errors.Is(err, services.ErrOmniChatPaidFeatureRequired) {
+		RespondError(c, http.StatusPaymentRequired, "Character speech requires OmniCredits")
 		return
 	}
 	if err != nil {
@@ -256,7 +284,10 @@ func (h *OmniChatVoiceHandler) GetMessageSpeech(c *gin.Context) {
 	defer reader.Close()
 	c.Header("Content-Type", audio.FileType)
 	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
-	c.Header("Cache-Control", "private, max-age=86400")
+	// A conversation/message URL can be reused by a different account in the
+	// same browser. Do not let a browser disk cache turn this authorized speech
+	// response into cross-account content disclosure.
+	c.Header("Cache-Control", "private, no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
 	_, _ = io.Copy(c.Writer, &io.LimitedReader{R: reader, N: objectSize})
 }
@@ -297,13 +328,44 @@ func (h *OmniChatVoiceHandler) StartCall(c *gin.Context) {
 		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return
 	}
+	// StartCallOwned has already ended the prior local call. Reclaim its
+	// provider session on every subsequent path, including billing failures.
 	for _, active := range activeProviders {
 		h.endProviderSessionBestEffort(c.Request.Context(), active.CallID, userID, active.Provider, active.SessionID)
+	}
+	videoReserved := false
+	refundVideo := func() {
+		if videoReserved {
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 15*time.Second)
+			defer cancel()
+			if err := h.billing.RefundOwned(cleanupCtx, userID, session.ID); err != nil {
+				zlog.Error().Err(err).Str("call_id", session.ID.String()).Msg("failed to refund live video reservation; reconciliation will retry")
+			}
+			videoReserved = false
+		}
+	}
+	if request.Mode == "video" {
+		if h.billing == nil {
+			h.endLocalCallBestEffort(c.Request.Context(), session.ID, userID)
+			RespondError(c, http.StatusServiceUnavailable, "Video billing is not configured")
+			return
+		}
+		if _, err := h.billing.ReserveOwned(c.Request.Context(), userID, session.ID, models.OmniCreditsUsageVideo); err != nil {
+			h.endLocalCallBestEffort(c.Request.Context(), session.ID, userID)
+			if errors.Is(err, models.ErrOmniCreditsInsufficient) {
+				RespondError(c, http.StatusPaymentRequired, "Video calls require OmniCredits")
+			} else {
+				RespondError(c, http.StatusServiceUnavailable, "Video billing is temporarily unavailable")
+			}
+			return
+		}
+		videoReserved = true
 	}
 	if request.Mode == "video" && h.liveVideo != nil && h.liveVideo.Configured() {
 		callContext, contextErr := h.data.GetLiveCallContextOwned(c.Request.Context(), userID, conversationID)
 		if contextErr != nil || callContext == nil {
 			h.endLocalCallBestEffort(c.Request.Context(), session.ID, userID)
+			refundVideo()
 			RespondError(c, http.StatusInternalServerError, "Failed to prepare live video call")
 			return
 		}
@@ -313,6 +375,7 @@ func (h *OmniChatVoiceHandler) StartCall(c *gin.Context) {
 		}
 		if replicaID == "" || personaID == "" {
 			h.endLocalCallBestEffort(c.Request.Context(), session.ID, userID)
+			refundVideo()
 			RespondError(c, http.StatusServiceUnavailable, "This character does not have a live avatar configured")
 			return
 		}
@@ -324,15 +387,24 @@ func (h *OmniChatVoiceHandler) StartCall(c *gin.Context) {
 		})
 		if providerErr != nil {
 			h.endLocalCallBestEffort(c.Request.Context(), session.ID, userID)
+			refundVideo()
 			RespondError(c, http.StatusServiceUnavailable, "Live avatar video is temporarily unavailable")
 			return
 		}
 		attached, attachErr := h.data.AttachCallProviderOwned(c.Request.Context(), session.ID, userID, "tavus", providerSession.ConversationID)
 		if attachErr != nil || !attached {
 			h.cleanupUnattachedProviderCall(c.Request.Context(), session.ID, userID, providerSession.ConversationID)
+			refundVideo()
 			RespondError(c, http.StatusConflict, "Live video call was superseded")
 			return
 		}
+		if err := h.billing.CaptureOwned(c.Request.Context(), userID, session.ID); err != nil {
+			h.cleanupUnattachedProviderCall(c.Request.Context(), session.ID, userID, providerSession.ConversationID)
+			refundVideo()
+			RespondError(c, http.StatusServiceUnavailable, "Video billing is temporarily unavailable")
+			return
+		}
+		videoReserved = false
 		session.LiveVideoURL = providerSession.JoinURL
 	}
 	c.JSON(http.StatusCreated, gin.H{"session": session})

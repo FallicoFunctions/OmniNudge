@@ -7,45 +7,66 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHubRegister_LastConnectionWinsPerUser(t *testing.T) {
+func TestHubRegister_KeepsEveryConnectionForTheSameUser(t *testing.T) {
 	hub := NewHub()
 	go hub.Run()
+	t.Cleanup(hub.Shutdown)
 
-	first := &Client{Hub: hub, UserID: 42, Send: make(chan *Message, 1)}
-	second := &Client{Hub: hub, UserID: 42, Send: make(chan *Message, 1)}
+	first := &Client{Hub: hub, UserID: 42, Send: make(chan *Message, 8)}
+	second := &Client{Hub: hub, UserID: 42, Send: make(chan *Message, 8)}
 
 	hub.Register(first)
-	// Drain initial state to avoid buffer interference in assertions.
-	select {
-	case <-first.Send:
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timed out waiting for first client initial state")
-	}
+	waitForMessageType(t, first.Send, "initial_state")
 
 	hub.Register(second)
+	waitForMessageType(t, second.Send, "initial_state")
 
-	// Replaced client channel should be closed.
-	select {
-	case _, ok := <-first.Send:
-		require.False(t, ok, "first client send channel should be closed when replaced")
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timed out waiting for first client channel close")
-	}
+	drainMessages(first.Send)
+	drainMessages(second.Send)
+	hub.Broadcast(&Message{RecipientID: 42, Type: "same_user_event"})
 
-	// New client should receive initial state as active connection.
-	select {
-	case msg := <-second.Send:
-		require.Equal(t, "initial_state", msg.Type)
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timed out waiting for second client initial state")
-	}
+	waitForMessageType(t, first.Send, "same_user_event")
+	waitForMessageType(t, second.Send, "same_user_event")
 
 	require.True(t, hub.IsUserOnline(42))
+}
+
+func TestHubUnregister_OneConnectionLeavesTheUserOnline(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	t.Cleanup(hub.Shutdown)
+
+	first := &Client{Hub: hub, UserID: 42, Send: make(chan *Message, 8)}
+	second := &Client{Hub: hub, UserID: 42, Send: make(chan *Message, 8)}
+	observer := &Client{Hub: hub, UserID: 99, Send: make(chan *Message, 8)}
+	hub.Register(first)
+	waitForMessageType(t, first.Send, "initial_state")
+	hub.Register(second)
+	waitForMessageType(t, second.Send, "initial_state")
+	hub.Register(observer)
+	waitForMessageType(t, observer.Send, "initial_state")
+	drainMessages(first.Send)
+	drainMessages(second.Send)
+	drainMessages(observer.Send)
+
+	hub.Unregister(first)
+	waitForClosedChannel(t, first.Send)
+	require.True(t, hub.IsUserOnline(42))
+	assertNoMessageType(t, observer.Send, "user_offline")
+
+	hub.Broadcast(&Message{RecipientID: 42, Type: "remaining_connection_event"})
+	waitForMessageType(t, second.Send, "remaining_connection_event")
+
+	hub.Unregister(second)
+	waitForClosedChannel(t, second.Send)
+	waitForMessageType(t, observer.Send, "user_offline")
+	require.False(t, hub.IsUserOnline(42))
 }
 
 func TestHubBroadcastFeatureFlagUpdate_FansOutToAllConnectedClients(t *testing.T) {
 	hub := NewHub()
 	go hub.Run()
+	t.Cleanup(hub.Shutdown)
 
 	clientA := &Client{Hub: hub, UserID: 101, Send: make(chan *Message, 8)}
 	clientB := &Client{Hub: hub, UserID: 202, Send: make(chan *Message, 8)}
@@ -74,6 +95,27 @@ func TestHubBroadcastFeatureFlagUpdate_FansOutToAllConnectedClients(t *testing.T
 	require.True(t, ok, "client B should receive typed feature flag payload")
 	require.Equal(t, "new_ui", payloadB.Key)
 	require.True(t, payloadB.Enabled)
+}
+
+func waitForClosedChannel(t *testing.T, ch <-chan *Message) {
+	t.Helper()
+
+	select {
+	case _, ok := <-ch:
+		require.False(t, ok)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for channel to close")
+	}
+}
+
+func assertNoMessageType(t *testing.T, ch <-chan *Message, unexpectedType string) {
+	t.Helper()
+
+	select {
+	case msg := <-ch:
+		require.NotEqual(t, unexpectedType, msg.Type)
+	case <-time.After(25 * time.Millisecond):
+	}
 }
 
 func drainMessages(ch <-chan *Message) {

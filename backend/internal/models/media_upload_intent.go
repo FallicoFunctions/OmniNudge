@@ -15,6 +15,16 @@ var (
 	ErrUploadIntentInvalid = errors.New("upload intent is invalid or expired")
 )
 
+const mediaUploadIntentLockNamespace int64 = 14_800
+const maxMediaUploadIntentUserID int64 = 1<<31 - 1
+
+func mediaUploadIntentLockKey(userID int) (int64, error) {
+	if userID <= 0 || int64(userID) > maxMediaUploadIntentUserID {
+		return 0, ErrUploadIntentInvalid
+	}
+	return mediaUploadIntentLockNamespace<<32 | int64(userID), nil
+}
+
 type MediaUploadIntent struct {
 	ID               uuid.UUID `json:"upload_id"`
 	UserID           int       `json:"-"`
@@ -39,7 +49,11 @@ func (r *MediaFileRepository) ReserveUploadIntent(ctx context.Context, intent *M
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
 
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1, $2)`, int32(14800), int32(intent.UserID)); err != nil {
+	lockKey, err := mediaUploadIntentLockKey(intent.UserID)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, lockKey); err != nil {
 		return err
 	}
 	var usedBytes, reservedBytes int64
@@ -133,7 +147,11 @@ func (r *MediaFileRepository) FinalizeUploadIntent(
 		return 0, false, ErrUploadIntentInvalid
 	}
 
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1, $2)`, int32(14800), int32(userID)); err != nil {
+	lockKey, err := mediaUploadIntentLockKey(userID)
+	if err != nil {
+		return 0, false, err
+	}
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, lockKey); err != nil {
 		return 0, false, err
 	}
 	var usedBytes int64

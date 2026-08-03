@@ -28,6 +28,7 @@ type MediaFile struct {
 	StorageURL       string     `json:"storage_url"`
 	ThumbnailURL     *string    `json:"thumbnail_url,omitempty"`
 	StoragePath      string     `json:"storage_path"`
+	StorageObjectKey string     `json:"-"`
 	Width            *int       `json:"width,omitempty"`
 	Height           *int       `json:"height,omitempty"`
 	Duration         *int       `json:"duration,omitempty"`
@@ -58,9 +59,10 @@ func (r *MediaFileRepository) Create(ctx context.Context, media *MediaFile) erro
 	query := `
 		INSERT INTO media_files (
 			user_id, filename, original_filename, file_type, file_size,
-			storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, scan_status
+			storage_url, thumbnail_url, storage_path, storage_object_key,
+			width, height, duration, used_in_message_id, scan_status
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING id, uploaded_at, scan_status, scanned_at, scan_error, quarantined_at
 	`
 
@@ -73,6 +75,7 @@ func (r *MediaFileRepository) Create(ctx context.Context, media *MediaFile) erro
 		media.StorageURL,
 		media.ThumbnailURL,
 		media.StoragePath,
+		media.StorageObjectKey,
 		media.Width,
 		media.Height,
 		media.Duration,
@@ -92,7 +95,7 @@ func (r *MediaFileRepository) Create(ctx context.Context, media *MediaFile) erro
 func (r *MediaFileRepository) GetByStorageURL(ctx context.Context, storageURL string) (*MediaFile, error) {
 	query := `
 		SELECT id, user_id, filename, original_filename, file_type, file_size,
-		       storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, uploaded_at,
+		       storage_url, thumbnail_url, storage_path, storage_object_key, width, height, duration, used_in_message_id, uploaded_at,
 		       scan_status, scanned_at, scan_error, quarantined_at
 		FROM media_files
 		WHERE storage_url = $1
@@ -108,6 +111,7 @@ func (r *MediaFileRepository) GetByStorageURL(ctx context.Context, storageURL st
 		&media.StorageURL,
 		&media.ThumbnailURL,
 		&media.StoragePath,
+		&media.StorageObjectKey,
 		&media.Width,
 		&media.Height,
 		&media.Duration,
@@ -128,7 +132,7 @@ func (r *MediaFileRepository) GetByStorageURL(ctx context.Context, storageURL st
 func (r *MediaFileRepository) GetByID(ctx context.Context, id int) (*MediaFile, error) {
 	query := `
 		SELECT id, user_id, filename, original_filename, file_type, file_size,
-		       storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, uploaded_at,
+		       storage_url, thumbnail_url, storage_path, storage_object_key, width, height, duration, used_in_message_id, uploaded_at,
 		       scan_status, scanned_at, scan_error, quarantined_at
 		FROM media_files
 		WHERE id = $1
@@ -144,6 +148,7 @@ func (r *MediaFileRepository) GetByID(ctx context.Context, id int) (*MediaFile, 
 		&media.StorageURL,
 		&media.ThumbnailURL,
 		&media.StoragePath,
+		&media.StorageObjectKey,
 		&media.Width,
 		&media.Height,
 		&media.Duration,
@@ -161,6 +166,70 @@ func (r *MediaFileRepository) GetByID(ctx context.Context, id int) (*MediaFile, 
 		return nil, err
 	}
 	return media, nil
+}
+
+// CanUserAccessMedia reports whether a user may retrieve a tracked media
+// object through the upload gateway. Storage URLs are not capabilities: a
+// clean object remains private unless it belongs to the requester, is attached
+// to a conversation they participate in, or the requester is a moderator.
+func (r *MediaFileRepository) CanUserAccessMedia(ctx context.Context, mediaID, userID int) (bool, error) {
+	if r == nil || r.pool == nil || mediaID <= 0 || userID <= 0 {
+		return false, nil
+	}
+	var allowed bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM media_files mf
+			JOIN users requester
+			  ON requester.id=$2 AND requester.deleted=FALSE AND requester.banned=FALSE
+			WHERE mf.id=$1
+			  AND (
+				mf.user_id=$2
+				OR requester.role IN ('admin','moderator')
+				OR EXISTS (
+					SELECT 1
+					FROM messages m
+					JOIN conversations c ON c.id=m.conversation_id
+					WHERE m.media_file_id=mf.id
+					  AND (
+						c.user1_id=$2 OR c.user2_id=$2
+						OR EXISTS (
+							SELECT 1 FROM conversation_participants cp
+							WHERE cp.conversation_id=c.id AND cp.user_id=$2
+						)
+					  )
+				)
+			  )
+		)
+	`, mediaID, userID).Scan(&allowed)
+	return allowed, err
+}
+
+// IsMediaPubliclyAccessible is intentionally narrow: it permits media that an
+// operator has attached to an active default persona's public presentation.
+// User uploads and private/custom persona assets remain non-capability data.
+func (r *MediaFileRepository) IsMediaPubliclyAccessible(ctx context.Context, mediaID int) (bool, error) {
+	if r == nil || r.pool == nil || mediaID <= 0 {
+		return false, nil
+	}
+	var allowed bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM media_files mf
+			JOIN bot_personas p
+			  ON p.is_active=TRUE
+			 AND p.owner_user_id IS NULL
+			 AND (
+				p.avatar_url=mf.storage_url
+				OR p.preview_video_url=mf.storage_url
+				OR mf.storage_url=ANY(COALESCE(p.gallery_urls, ARRAY[]::TEXT[]))
+			 )
+			WHERE mf.id=$1 AND mf.scan_status='clean'
+		)
+	`, mediaID).Scan(&allowed)
+	return allowed, err
 }
 
 // GetTotalStorageByUserID returns total bytes currently stored by a user.
@@ -202,7 +271,7 @@ func (r *MediaFileRepository) GetTrackedStorageByUserID(ctx context.Context, use
 func (r *MediaFileRepository) FindByStoragePath(ctx context.Context, storagePath string) (*MediaFile, error) {
 	query := `
 		SELECT id, user_id, filename, original_filename, file_type, file_size,
-		       storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, uploaded_at,
+		       storage_url, thumbnail_url, storage_path, storage_object_key, width, height, duration, used_in_message_id, uploaded_at,
 		       scan_status, scanned_at, scan_error, quarantined_at
 		FROM media_files
 		WHERE storage_path = $1
@@ -219,6 +288,7 @@ func (r *MediaFileRepository) FindByStoragePath(ctx context.Context, storagePath
 		&media.StorageURL,
 		&media.ThumbnailURL,
 		&media.StoragePath,
+		&media.StorageObjectKey,
 		&media.Width,
 		&media.Height,
 		&media.Duration,
@@ -250,7 +320,9 @@ func (r *MediaFileRepository) UpdateThumbnailURL(ctx context.Context, mediaID in
 
 func (r *MediaFileRepository) UpdateStorageLocation(ctx context.Context, mediaID int, storagePath, storageURL string) error {
 	_, err := r.pool.Exec(ctx, `
-		UPDATE media_files SET storage_path=$2, storage_url=$3 WHERE id=$1
+		UPDATE media_files
+		SET storage_path=$2, storage_object_key=$2, storage_url=$3
+		WHERE id=$1
 	`, mediaID, storagePath, storageURL)
 	return err
 }
@@ -268,7 +340,7 @@ func (r *MediaFileRepository) DeleteByID(ctx context.Context, mediaID int) error
 func (r *MediaFileRepository) GetByPublicURL(ctx context.Context, publicURL string) (*MediaFile, error) {
 	query := `
 		SELECT id, user_id, filename, original_filename, file_type, file_size,
-		       storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, uploaded_at,
+		       storage_url, thumbnail_url, storage_path, storage_object_key, width, height, duration, used_in_message_id, uploaded_at,
 		       scan_status, scanned_at, scan_error, quarantined_at
 		FROM media_files
 		WHERE storage_url = $1 OR thumbnail_url = $1
@@ -285,6 +357,7 @@ func (r *MediaFileRepository) GetByPublicURL(ctx context.Context, publicURL stri
 		&media.StorageURL,
 		&media.ThumbnailURL,
 		&media.StoragePath,
+		&media.StorageObjectKey,
 		&media.Width,
 		&media.Height,
 		&media.Duration,

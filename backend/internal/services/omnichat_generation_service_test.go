@@ -55,27 +55,28 @@ func (f *generationStoreFake) MessageBelongsToConversation(_ context.Context, _,
 
 func (f *generationStoreFake) CreateGenerationJob(_ context.Context, ownerUserID int, req models.OmniChatGenerationRequest, provider string) (*models.OmniChatGenerationJob, error) {
 	f.created = &models.OmniChatGenerationJob{
-		ID:              uuid.New(),
-		OwnerUserID:     ownerUserID,
-		PersonaID:       req.PersonaID,
-		ConversationID:  req.ConversationID,
-		SourceMessageID: req.SourceMessageID,
-		Kind:            req.Kind,
-		Mode:            req.Mode,
-		Status:          models.OmniChatGenerationStatusQueued,
-		Prompt:          req.Prompt,
-		EffectivePrompt: req.EffectivePrompt,
-		Scene:           req.Scene,
-		Provider:        provider,
+		ID:                 uuid.New(),
+		OwnerUserID:        ownerUserID,
+		PersonaID:          req.PersonaID,
+		ConversationID:     req.ConversationID,
+		SourceMessageID:    req.SourceMessageID,
+		Kind:               req.Kind,
+		Mode:               req.Mode,
+		Status:             models.OmniChatGenerationStatusQueued,
+		Prompt:             req.Prompt,
+		EffectivePrompt:    req.EffectivePrompt,
+		BillingOperationID: req.BillingOperationID,
+		Scene:              req.Scene,
+		Provider:           provider,
 	}
 	return f.created, nil
 }
 
-func (f *generationStoreFake) MarkGenerationJobFailed(ctx context.Context, _ uuid.UUID, safeCode, providerError string) error {
+func (f *generationStoreFake) MarkGenerationJobFailed(ctx context.Context, _ uuid.UUID, safeCode, providerError string) (bool, error) {
 	f.failedCode = safeCode
 	f.failedError = providerError
 	f.markContextErr = ctx.Err()
-	return f.markErr
+	return f.markErr == nil, f.markErr
 }
 
 type generationEnqueuerFake struct {
@@ -83,9 +84,68 @@ type generationEnqueuerFake struct {
 	err   error
 }
 
+type generationModeratorFake struct {
+	allowed bool
+	err     error
+	prompt  string
+	kind    models.OmniChatMediaKind
+}
+
+type generationServiceBillingFake struct{}
+
+func (generationServiceBillingFake) ReserveOwned(_ context.Context, _ int, operationID uuid.UUID, usageKind string) (*models.OmniCreditsUsageReservation, error) {
+	return &models.OmniCreditsUsageReservation{OperationID: operationID, UsageKind: usageKind}, nil
+}
+func (generationServiceBillingFake) RefundOwned(context.Context, int, uuid.UUID) error { return nil }
+
+type refundedOperationGenerationBillingFake struct {
+	operations []uuid.UUID
+}
+
+func (f *refundedOperationGenerationBillingFake) ReserveOwned(_ context.Context, _ int, operationID uuid.UUID, usageKind string) (*models.OmniCreditsUsageReservation, error) {
+	f.operations = append(f.operations, operationID)
+	if len(f.operations) == 1 {
+		return nil, models.ErrOmniCreditsReservationRefunded
+	}
+	return &models.OmniCreditsUsageReservation{OperationID: operationID, UsageKind: usageKind}, nil
+}
+func (*refundedOperationGenerationBillingFake) RefundOwned(context.Context, int, uuid.UUID) error {
+	return nil
+}
+
+func (f *generationModeratorFake) AllowPrivateMedia(_ context.Context, prompt string, kind models.OmniChatMediaKind) (bool, error) {
+	f.prompt = prompt
+	f.kind = kind
+	return f.allowed, f.err
+}
+
 func (f *generationEnqueuerFake) EnqueueOmniChatGeneration(_ context.Context, id uuid.UUID) error {
 	f.jobID = id
 	return f.err
+}
+
+func TestOmniChatGenerationServiceAdvancesAfterRefundedStableOperation(t *testing.T) {
+	store := &generationStoreFake{}
+	billing := &refundedOperationGenerationBillingFake{}
+	service := NewOmniChatGenerationService(
+		&generationPersonaReaderFake{persona: &models.BotPersona{ID: 42}},
+		nil,
+		store,
+		&generationEnqueuerFake{},
+		"fal",
+	).SetBilling(billing).SetPromptModerator(&generationModeratorFake{allowed: true})
+	stable := uuid.New()
+	job, err := service.CreateGeneration(context.Background(), 9, models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeCreate,
+		PersonaID: 42, Prompt: "A sunny park", BillingOperationID: &stable,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	require.Len(t, billing.operations, 2)
+	require.Equal(t, stable, billing.operations[0])
+	require.NotEqual(t, stable, billing.operations[1])
+	require.NotNil(t, store.created.BillingOperationID)
+	require.Equal(t, billing.operations[1], *store.created.BillingOperationID)
 }
 
 func TestOmniChatGenerationServiceCreateUsesStoredSceneAndEnqueues(t *testing.T) {
@@ -102,7 +162,7 @@ func TestOmniChatGenerationServiceCreateUsesStoredSceneAndEnqueues(t *testing.T)
 		store,
 		enqueuer,
 		"fal",
-	)
+	).SetBilling(generationServiceBillingFake{}).SetPromptModerator(&generationModeratorFake{allowed: true})
 
 	job, err := service.CreateGeneration(context.Background(), 9, models.OmniChatGenerationRequest{
 		Kind:            models.OmniChatMediaKindImage,
@@ -176,7 +236,7 @@ func TestOmniChatGenerationServiceCreateMarksJobFailedWhenQueueUnavailable(t *te
 		store,
 		enqueuer,
 		"fal",
-	)
+	).SetBilling(generationServiceBillingFake{}).SetPromptModerator(&generationModeratorFake{allowed: true})
 
 	_, err := service.CreateGeneration(context.Background(), 9, models.OmniChatGenerationRequest{
 		Kind:      models.OmniChatMediaKindImage,
@@ -196,7 +256,7 @@ func TestOmniChatGenerationServiceUsesIndependentContextToRecordQueueFailure(t *
 	service := NewOmniChatGenerationService(
 		&generationPersonaReaderFake{persona: &models.BotPersona{ID: 42}},
 		&generationConversationReaderFake{}, store, nil, "fal",
-	)
+	).SetBilling(generationServiceBillingFake{}).SetPromptModerator(&generationModeratorFake{allowed: true})
 	requestCtx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -225,4 +285,73 @@ func TestOmniChatGenerationServiceRejectsUnsupportedProviderBeforeCreatingJob(t 
 
 	require.ErrorIs(t, err, ErrOmniChatGenerationUnavailable)
 	require.Nil(t, store.created)
+}
+
+func TestOmniChatGenerationServiceModeratesEffectivePromptBeforeCreatingJob(t *testing.T) {
+	store := &generationStoreFake{}
+	moderator := &generationModeratorFake{allowed: false}
+	service := NewOmniChatGenerationService(
+		&generationPersonaReaderFake{persona: &models.BotPersona{ID: 42}},
+		&generationConversationReaderFake{}, store, &generationEnqueuerFake{}, "fal",
+	).SetBilling(generationServiceBillingFake{}).SetPromptModerator(moderator)
+
+	_, err := service.CreateGeneration(context.Background(), 9, models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeCreate,
+		PersonaID: 42, Prompt: "unsafe request",
+	})
+
+	require.ErrorIs(t, err, ErrOmniChatGenerationSafetyRejected)
+	require.Equal(t, "Requested scene:\nunsafe request", moderator.prompt)
+	require.Equal(t, models.OmniChatMediaKindImage, moderator.kind)
+	require.Nil(t, store.created)
+}
+
+func TestOmniChatGenerationServiceFailsClosedWhenPromptModerationFails(t *testing.T) {
+	store := &generationStoreFake{}
+	service := NewOmniChatGenerationService(
+		&generationPersonaReaderFake{persona: &models.BotPersona{ID: 42}},
+		&generationConversationReaderFake{}, store, &generationEnqueuerFake{}, "fal",
+	).SetPromptModerator(&generationModeratorFake{err: errors.New("moderator unavailable")})
+
+	_, err := service.CreateGeneration(context.Background(), 9, models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeCreate,
+		PersonaID: 42, Prompt: "portrait",
+	})
+
+	require.ErrorIs(t, err, ErrOmniChatGenerationUnavailable)
+	require.Nil(t, store.created)
+}
+
+func TestOmniChatGenerationServiceFailsClosedWhenPromptModeratorIsMissing(t *testing.T) {
+	store := &generationStoreFake{}
+	service := NewOmniChatGenerationService(
+		&generationPersonaReaderFake{persona: &models.BotPersona{ID: 42}},
+		&generationConversationReaderFake{}, store, &generationEnqueuerFake{}, "fal",
+	)
+
+	_, err := service.CreateGeneration(context.Background(), 9, models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeCreate,
+		PersonaID: 42, Prompt: "portrait",
+	})
+
+	require.ErrorIs(t, err, ErrOmniChatGenerationUnavailable)
+	require.Nil(t, store.created)
+}
+
+func TestOmniChatGenerationServiceModeratesNegativePromptWithEffectivePrompt(t *testing.T) {
+	store := &generationStoreFake{}
+	moderator := &generationModeratorFake{allowed: true}
+	service := NewOmniChatGenerationService(
+		&generationPersonaReaderFake{persona: &models.BotPersona{ID: 42}},
+		&generationConversationReaderFake{}, store, &generationEnqueuerFake{}, "fal",
+	).SetBilling(generationServiceBillingFake{}).SetPromptModerator(moderator)
+
+	_, err := service.CreateGeneration(context.Background(), 9, models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeCreate,
+		PersonaID: 42, Prompt: "portrait", NegativePrompt: "unsafe negative instruction",
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, moderator.prompt, "Requested scene:\nportrait")
+	require.Contains(t, moderator.prompt, "Requested exclusions:\nunsafe negative instruction")
 }

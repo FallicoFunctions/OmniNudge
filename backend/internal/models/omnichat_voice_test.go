@@ -16,3 +16,13 @@ func TestDefaultBrowserVoiceIsStableAndCharacterSpecific(t *testing.T) {
 	require.NotEqual(t, first.VoiceID, second.VoiceID)
 	require.True(t, first.Speed != second.Speed || first.Pitch != second.Pitch)
 }
+
+func TestDefaultBrowserVoiceKeepsUnexpectedIDsInSafeRanges(t *testing.T) {
+	for _, personaID := range []int{-1, 0, 1} {
+		voice := DefaultOmniChatBrowserVoice(personaID)
+		require.GreaterOrEqual(t, voice.Speed, float32(0.85))
+		require.LessOrEqual(t, voice.Speed, float32(1.15))
+		require.GreaterOrEqual(t, voice.Pitch, float32(0.75))
+		require.LessOrEqual(t, voice.Pitch, float32(1.45))
+	}
+}

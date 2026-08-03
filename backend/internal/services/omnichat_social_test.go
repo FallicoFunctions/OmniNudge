@@ -25,7 +25,7 @@ func (f *omniChatSocialStoreFake) PublishAssetOwned(_ context.Context, _ int, _ 
 func (f *omniChatSocialStoreFake) ReadChatShareTextOwned(_ context.Context, _, _ int, _ []int) (string, string, error) {
 	return f.shareText, f.shareDigest, nil
 }
-func (f *omniChatSocialStoreFake) PublishChatSnapshotOwned(_ context.Context, _, _ int, _ []int, _, _, digest string) (*models.OmniChatPublication, error) {
+func (f *omniChatSocialStoreFake) PublishChatSnapshotOwned(_ context.Context, _, _ int, _ []int, _, _, digest string, _ uuid.UUID) (*models.OmniChatPublication, error) {
 	f.publishedDigest = digest
 	return &models.OmniChatPublication{ID: uuid.New()}, nil
 }
@@ -63,7 +63,7 @@ func TestOmniChatSocialServiceModeratesExactChatSnapshotBeforePublish(t *testing
 	moderator := &omniChatModeratorFake{allowed: true}
 	service := NewOmniChatSocialService(store, moderator)
 
-	publication, err := service.PublishChat(context.Background(), 7, 9, []int{11, 12}, "Park meeting", "A good memory")
+	publication, err := service.PublishChat(context.Background(), 7, 9, []int{11, 12}, "Park meeting", "A good memory", uuid.New())
 	require.NoError(t, err)
 	require.NotNil(t, publication)
 	require.Equal(t, "digest-1", store.publishedDigest)

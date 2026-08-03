@@ -99,7 +99,7 @@ func TestPaymentsHandler_SubmitCryptoPayment_ImmediateConfirmation(t *testing.T)
 	// User plan should be upgraded
 	plan, expiresAt, err := userRepo.GetPlan(ctx, userID)
 	require.NoError(t, err)
-	assert.Equal(t, models.PlanPaid, plan)
+	assert.Equal(t, models.PlanPlus, plan)
 	assert.NotNil(t, expiresAt)
 }
 

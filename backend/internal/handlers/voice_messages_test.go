@@ -45,8 +45,10 @@ func (m *mockStorage) List(_ context.Context, _ string) ([]string, error) { retu
 func (m *mockStorage) GeneratePresignedPutURL(_ context.Context, _, _ string, _ time.Duration) (string, error) {
 	return "https://storage.test/presigned", nil
 }
-func (m *mockStorage) PublicURL(key string) string                              { return "https://storage.test/" + key }
-func (m *mockStorage) GetObjectSize(_ context.Context, _ string) (int64, error) { return 1024, nil }
+func (m *mockStorage) PublicURL(key string) string { return "https://storage.test/" + key }
+func (m *mockStorage) GetObjectSize(_ context.Context, _ string) (int64, error) {
+	return int64(len("audio")), nil
+}
 
 func setupVoiceHandlerTest(t *testing.T) (*VoiceMessagesHandler, *database.Database, int, int, int, func()) {
 	t.Helper()
@@ -243,4 +245,47 @@ func TestGetVoiceMessage_InvalidID(t *testing.T) {
 	handler.GetVoiceMessage(c)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestVoiceMessagePlaybackUsesAuthenticatedGateway(t *testing.T) {
+	handler, db, senderID, recipientID, msgID, _ := setupVoiceHandlerTest(t)
+	ctx := context.Background()
+	var voiceID int
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		INSERT INTO voice_messages (message_id, duration_seconds, storage_key, file_size, mime_type, scan_status)
+		VALUES ($1, 1, 'voice/test.webm', 5, 'audio/webm', 'clean')
+		RETURNING id
+	`, msgID).Scan(&voiceID))
+
+	gin.SetMode(gin.TestMode)
+	metadataWriter := httptest.NewRecorder()
+	metadataContext, _ := gin.CreateTestContext(metadataWriter)
+	metadataContext.Request = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/messages/%d/voice", msgID), nil)
+	metadataContext.Set("user_id", recipientID)
+	metadataContext.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", msgID)}}
+	handler.GetVoiceMessage(metadataContext)
+	require.Equal(t, http.StatusOK, metadataWriter.Code, metadataWriter.Body.String())
+	assert.Contains(t, metadataWriter.Body.String(), fmt.Sprintf(`"signed_url":"/voice/%d/download"`, voiceID))
+	assert.NotContains(t, metadataWriter.Body.String(), "storage.test")
+
+	downloadWriter := httptest.NewRecorder()
+	downloadContext, _ := gin.CreateTestContext(downloadWriter)
+	downloadContext.Request = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/voice/%d/download", voiceID), nil)
+	downloadContext.Set("user_id", recipientID)
+	downloadContext.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", voiceID)}}
+	handler.DownloadVoice(downloadContext)
+	assert.Equal(t, http.StatusOK, downloadWriter.Code, downloadWriter.Body.String())
+	assert.Equal(t, "audio", downloadWriter.Body.String())
+	assert.Equal(t, "private, no-store", downloadWriter.Header().Get("Cache-Control"))
+
+	outsider := &models.User{Username: uniqueVoiceUsername("outsider"), PasswordHash: "hash"}
+	require.NoError(t, models.NewUserRepository(db.Pool).Create(ctx, outsider))
+	forbiddenWriter := httptest.NewRecorder()
+	forbiddenContext, _ := gin.CreateTestContext(forbiddenWriter)
+	forbiddenContext.Request = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/voice/%d/download", voiceID), nil)
+	forbiddenContext.Set("user_id", outsider.ID)
+	forbiddenContext.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", voiceID)}}
+	handler.DownloadVoice(forbiddenContext)
+	assert.Equal(t, http.StatusForbidden, forbiddenWriter.Code)
+	assert.NotEqual(t, senderID, outsider.ID)
 }

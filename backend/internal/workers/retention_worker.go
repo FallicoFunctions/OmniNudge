@@ -5,14 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"path"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/config"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/services/speech"
 )
@@ -61,8 +64,8 @@ func NewRetentionWorker(db *pgxpool.Pool, scrubber *services.ScrubberService, st
 	}
 }
 
-// Start waits until 2 AM then runs daily. Blocks until ctx is cancelled.
-// Does NOT run immediately on startup — first run is at the scheduled time.
+// Start runs billing reconciliation frequently and the heavier retention pass
+// daily at 2 AM.
 func (w *RetentionWorker) Start(ctx context.Context) {
 	now := time.Now()
 	next2AM := time.Date(now.Year(), now.Month(), now.Day(), 2, 0, 0, 0, now.Location())
@@ -72,20 +75,18 @@ func (w *RetentionWorker) Start(ctx context.Context) {
 	initialDelay := time.Until(next2AM)
 	log.Printf("[RETENTION] First run in %v (at %v)", initialDelay, next2AM)
 
-	select {
-	case <-time.After(initialDelay):
-		w.runAllJobs(ctx)
-	case <-ctx.Done():
-		return
-	}
-
-	ticker := time.NewTicker(24 * time.Hour)
-	defer ticker.Stop()
+	dailyTimer := time.NewTimer(initialDelay)
+	defer dailyTimer.Stop()
+	reconcileTicker := time.NewTicker(5 * time.Minute)
+	defer reconcileTicker.Stop()
 
 	for {
 		select {
-		case <-ticker.C:
+		case <-dailyTimer.C:
 			w.runAllJobs(ctx)
+			dailyTimer.Reset(24 * time.Hour)
+		case <-reconcileTicker.C:
+			w.cleanupOrphanedOmniCreditsReservations(ctx)
 		case <-ctx.Done():
 			log.Println("[RETENTION] Shutting down")
 			return
@@ -111,9 +112,13 @@ func (w *RetentionWorker) runAllJobs(ctx context.Context) {
 	w.cleanupExpiredAuthSessions(ctx)
 	w.cleanupExpiredAuthTokens(ctx)
 	w.cleanupExpiredDirectUploads(ctx)
+	w.cleanupDeletedUserMedia(ctx)
+	w.cleanupDeletedOmniChatMedia(ctx)
 	w.cleanupDeletedOmniChatSpeech(ctx)
 	w.cleanupExpiredOmniChatSpeech(ctx)
 	w.cleanupAbandonedOmniChatCalls(ctx)
+	w.cleanupOrphanedOmniCreditsReservations(ctx)
+	w.cleanupExpiredOmniChatRequestIdempotency(ctx)
 	w.cleanupExpiredMessages(ctx)
 	w.cleanupCallLogs(ctx)
 	w.cleanupExpiredNotifications(ctx)
@@ -121,6 +126,419 @@ func (w *RetentionWorker) runAllJobs(ctx context.Context) {
 	w.anonymizeAnalytics(ctx)
 
 	log.Println("[RETENTION] All daily cleanup jobs finished")
+}
+
+// cleanupExpiredOmniChatRequestIdempotency bounds durable replay records to
+// seven days. This comfortably covers network retries while avoiding an
+// unbounded history of request fingerprints and response snapshots.
+func (w *RetentionWorker) cleanupExpiredOmniChatRequestIdempotency(ctx context.Context) {
+	const batchSize = 1000
+	if w.cfg.DryRun {
+		var count int
+		if err := w.db.QueryRow(ctx, `SELECT COUNT(*) FROM omnichat_request_idempotency WHERE updated_at < NOW() - INTERVAL '7 days'`).Scan(&count); err != nil {
+			log.Printf("[RETENTION] Failed to inspect expired OmniChat request idempotency rows: %v", err)
+			return
+		}
+		log.Printf("[RETENTION][DRY-RUN] Would delete %d expired OmniChat request idempotency rows", count)
+		return
+	}
+	for {
+		tag, err := w.db.Exec(ctx, `
+			DELETE FROM omnichat_request_idempotency
+			WHERE ctid IN (
+				SELECT ctid FROM omnichat_request_idempotency
+				WHERE updated_at < NOW() - INTERVAL '7 days'
+				LIMIT $1
+			)
+		`, batchSize)
+		if err != nil {
+			log.Printf("[RETENTION] Failed to delete expired OmniChat request idempotency rows: %v", err)
+			return
+		}
+		if tag.RowsAffected() < batchSize {
+			return
+		}
+	}
+}
+
+func safeQueuedStorageObjectKey(storagePath string) bool {
+	if storagePath == "" || len(storagePath) > 2048 || strings.ContainsRune(storagePath, '\x00') ||
+		strings.Contains(storagePath, `\`) || path.IsAbs(storagePath) {
+		return false
+	}
+	cleaned := path.Clean(storagePath)
+	return cleaned == storagePath && cleaned != "." && cleaned != ".." && !strings.HasPrefix(cleaned, "../")
+}
+
+func safeQueuedStorageObjectKeyForOwner(storagePath, scope string, ownerUserID int) bool {
+	if ownerUserID <= 0 || !safeQueuedStorageObjectKey(storagePath) {
+		return false
+	}
+	switch scope {
+	case "canonical_owned":
+		owner := fmt.Sprintf("%d/", ownerUserID)
+		return strings.HasPrefix(storagePath, owner) ||
+			strings.HasPrefix(storagePath, "uploads/"+owner) ||
+			strings.HasPrefix(storagePath, "pending-uploads/"+owner)
+	case "legacy_unscoped":
+		// Historical multipart objects were written at the storage root and
+		// historical voice files under voice/. This scope can only be assigned
+		// by the database trigger/backfill, never by a client request.
+		return !strings.Contains(storagePath, "/") ||
+			(strings.HasPrefix(storagePath, "voice/") && strings.Count(storagePath, "/") == 1)
+	default:
+		return false
+	}
+}
+
+// cleanupDeletedUserMedia drains the durable outbox for ordinary user
+// uploads. The queue receives only paths copied from trusted media_files rows,
+// but keys are still revalidated before reaching either local or S3 storage.
+func (w *RetentionWorker) cleanupDeletedUserMedia(ctx context.Context) {
+	if w.db == nil || w.storage == nil || w.cfg.DryRun {
+		return
+	}
+	const batchSize = 200
+	for batch := 0; batch < 50; batch++ {
+		rows, err := w.db.Query(ctx, `
+			SELECT storage_path, owner_user_id, storage_scope, attempts
+			FROM media_file_deletion_queue
+			WHERE status='pending' AND next_attempt_at <= NOW()
+			ORDER BY next_attempt_at, queued_at
+			LIMIT $1
+		`, batchSize)
+		if err != nil {
+			if !isUndefinedTableError(err) {
+				log.Printf("[RETENTION] Failed to query deleted user media: %v", err)
+			}
+			return
+		}
+		type queuedDeletion struct {
+			storagePath string
+			ownerUserID int
+			scope       string
+			attempts    int
+		}
+		items := make([]queuedDeletion, 0, batchSize)
+		for rows.Next() {
+			var item queuedDeletion
+			if err := rows.Scan(&item.storagePath, &item.ownerUserID, &item.scope, &item.attempts); err != nil {
+				rows.Close()
+				log.Printf("[RETENTION] Failed to scan deleted user media: %v", err)
+				return
+			}
+			items = append(items, item)
+		}
+		rowsErr := rows.Err()
+		rows.Close()
+		if rowsErr != nil {
+			log.Printf("[RETENTION] Failed while reading deleted user media: %v", rowsErr)
+			return
+		}
+		if len(items) == 0 {
+			return
+		}
+		successes := 0
+		for _, item := range items {
+			if !safeQueuedStorageObjectKeyForOwner(item.storagePath, item.scope, item.ownerUserID) {
+				if _, err := w.db.Exec(ctx, `
+					UPDATE media_file_deletion_queue
+					SET attempts=attempts+1,status='dead_letter',
+					    last_error_at=NOW(),last_error_code='invalid_storage_path',
+					    dead_lettered_at=NOW()
+					WHERE storage_path=$1
+				`, item.storagePath); err != nil {
+					log.Printf("[RETENTION] Failed to quarantine invalid user-media deletion: %v", err)
+				}
+				continue
+			}
+			deleteCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			deleteErr := w.storage.Delete(deleteCtx, item.storagePath)
+			cancel()
+			if deleteErr != nil {
+				targetStatus := "pending"
+				if item.attempts+1 >= 10 {
+					targetStatus = "dead_letter"
+				}
+				if _, err := w.db.Exec(ctx, `
+					UPDATE media_file_deletion_queue
+					SET attempts=attempts+1,status=$2,last_error_at=NOW(),
+					    last_error_code='storage_delete_failed',
+					    next_attempt_at=NOW()+make_interval(
+					        secs => LEAST(3600,CAST(power(2,LEAST(attempts,11)) AS INTEGER))
+					    ),
+					    dead_lettered_at=CASE WHEN $2='dead_letter' THEN NOW() ELSE NULL END
+					WHERE storage_path=$1
+				`, item.storagePath, targetStatus); err != nil {
+					log.Printf("[RETENTION] Failed to defer user-media deletion: %v", err)
+				}
+				continue
+			}
+			if _, err := w.db.Exec(ctx, `DELETE FROM media_file_deletion_queue WHERE storage_path=$1`, item.storagePath); err != nil {
+				log.Printf("[RETENTION] Failed to acknowledge deleted user media: %v", err)
+				return
+			}
+			successes++
+		}
+		if len(items) < batchSize || successes == 0 {
+			return
+		}
+	}
+	log.Printf("[RETENTION] Deleted user media cleanup reached the per-run batch limit")
+}
+
+// cleanupOrphanedOmniCreditsReservations repairs the narrow crash window
+// between a durable credit hold and creation of its provider-backed resource.
+// Delivered chat or speech responses and successful generation jobs are
+// captured. Stale active jobs are failed before refund; a call with a durable
+// provider session is billable, while an unlinked hold is refunded.
+func (w *RetentionWorker) cleanupOrphanedOmniCreditsReservations(ctx context.Context) {
+	if w.db == nil || w.cfg.DryRun {
+		return
+	}
+	rows, err := w.db.Query(ctx, `
+		SELECT reservation.user_id,
+		       reservation.operation_id,
+		       generation.status,
+		       generation.last_activity_at,
+		       call_session.status,
+		       call_session.provider_session_id,
+		       speech.id,
+		       chat_delivery.operation_id
+		FROM omnicredits_usage_reservations reservation
+		LEFT JOIN omnichat_generation_jobs generation
+		  ON generation.billing_operation_id = reservation.operation_id
+		 AND generation.owner_user_id = reservation.user_id
+		LEFT JOIN omnichat_call_sessions call_session
+		  ON call_session.id = reservation.operation_id
+			 AND call_session.user_id = reservation.user_id
+		LEFT JOIN omnichat_speech_audio speech
+		  ON speech.billing_operation_id = reservation.operation_id
+		 AND speech.owner_user_id = reservation.user_id
+		LEFT JOIN omnichat_chat_billing_deliveries chat_delivery
+		  ON chat_delivery.operation_id = reservation.operation_id
+		 AND chat_delivery.user_id = reservation.user_id
+		WHERE reservation.status = 'reserved'
+		  AND reservation.updated_at < NOW() - INTERVAL '15 minutes'
+		ORDER BY reservation.updated_at
+		LIMIT 500
+	`)
+	if err != nil {
+		if !isUndefinedTableError(err) {
+			log.Printf("[RETENTION] Failed to query orphaned OmniCredits reservations: %v", err)
+		}
+		return
+	}
+	type reservationCandidate struct {
+		userID             int
+		operationID        string
+		generationStatus   *string
+		generationActivity *time.Time
+		callStatus         *string
+		providerSessionID  *string
+		speechID           *string
+		chatOperationID    *string
+	}
+	candidates := make([]reservationCandidate, 0, 500)
+	for rows.Next() {
+		var candidate reservationCandidate
+		if err := rows.Scan(
+			&candidate.userID,
+			&candidate.operationID,
+			&candidate.generationStatus,
+			&candidate.generationActivity,
+			&candidate.callStatus,
+			&candidate.providerSessionID,
+			&candidate.speechID,
+			&candidate.chatOperationID,
+		); err != nil {
+			rows.Close()
+			log.Printf("[RETENTION] Failed to scan orphaned OmniCredits reservation: %v", err)
+			return
+		}
+		candidates = append(candidates, candidate)
+	}
+	rowsErr := rows.Err()
+	rows.Close()
+	if rowsErr != nil {
+		log.Printf("[RETENTION] Failed while reading orphaned OmniCredits reservations: %v", rowsErr)
+		return
+	}
+
+	credits := models.NewOmniCreditsRepository(w.db)
+	for _, candidate := range candidates {
+		operationID, parseErr := uuid.Parse(candidate.operationID)
+		if parseErr != nil {
+			log.Printf("[RETENTION] Ignoring malformed OmniCredits operation id")
+			continue
+		}
+		if candidate.chatOperationID != nil {
+			_, err = credits.CaptureUsage(ctx, candidate.userID, operationID)
+		} else if candidate.generationStatus != nil {
+			switch *candidate.generationStatus {
+			case string(models.OmniChatGenerationStatusSucceeded):
+				_, err = credits.CaptureUsage(ctx, candidate.userID, operationID)
+			case string(models.OmniChatGenerationStatusFailed), string(models.OmniChatGenerationStatusCancelled):
+				_, err = credits.RefundUsage(ctx, candidate.userID, operationID)
+			case string(models.OmniChatGenerationStatusQueued):
+				if candidate.generationActivity == nil || candidate.generationActivity.After(time.Now().Add(-2*time.Hour)) {
+					continue
+				}
+				tag, updateErr := w.db.Exec(ctx, `
+						UPDATE omnichat_generation_jobs
+						SET status='failed',error_code='queue_stale',
+						    provider_error='generation queue lease expired',
+						    completed_at=NOW(),last_activity_at=NOW()
+						WHERE billing_operation_id=$1 AND owner_user_id=$2
+						  AND status='queued' AND last_activity_at<NOW()-INTERVAL '2 hours'
+					`, operationID, candidate.userID)
+				if updateErr != nil || tag.RowsAffected() != 1 {
+					continue
+				}
+				_, err = credits.RefundUsage(ctx, candidate.userID, operationID)
+			case string(models.OmniChatGenerationStatusRunning):
+				if candidate.generationActivity == nil || candidate.generationActivity.After(time.Now().Add(-24*time.Hour)) {
+					continue
+				}
+				tag, updateErr := w.db.Exec(ctx, `
+						UPDATE omnichat_generation_jobs
+						SET status='failed',error_code='provider_stale',
+						    provider_error='generation provider lease expired',
+						    completed_at=NOW(),last_activity_at=NOW()
+						WHERE billing_operation_id=$1 AND owner_user_id=$2
+						  AND status='running' AND last_activity_at<NOW()-INTERVAL '24 hours'
+					`, operationID, candidate.userID)
+				if updateErr != nil || tag.RowsAffected() != 1 {
+					continue
+				}
+				_, err = credits.RefundUsage(ctx, candidate.userID, operationID)
+			default:
+				continue
+			}
+		} else if candidate.speechID != nil {
+			_, err = credits.CaptureUsage(ctx, candidate.userID, operationID)
+		} else if candidate.callStatus != nil && candidate.providerSessionID != nil && strings.TrimSpace(*candidate.providerSessionID) != "" {
+			_, err = credits.CaptureUsage(ctx, candidate.userID, operationID)
+		} else {
+			if candidate.callStatus != nil && *candidate.callStatus == "active" {
+				if _, updateErr := w.db.Exec(ctx, `
+					UPDATE omnichat_call_sessions
+					SET status='failed', ended_at=COALESCE(ended_at, NOW())
+					WHERE id=$1 AND user_id=$2 AND status='active' AND provider_session_id IS NULL
+				`, operationID, candidate.userID); updateErr != nil {
+					log.Printf("[RETENTION] Failed to close unprovisioned OmniChat call: %v", updateErr)
+					continue
+				}
+			}
+			_, err = credits.RefundUsage(ctx, candidate.userID, operationID)
+		}
+		if err != nil && !errors.Is(err, models.ErrOmniCreditsConflict) && !errors.Is(err, models.ErrOmniCreditsReservationNotFound) {
+			log.Printf("[RETENTION] Failed to reconcile OmniCredits reservation: %v", err)
+		}
+	}
+}
+
+// cleanupDeletedOmniChatMedia drains the durable object-deletion outbox
+// populated when a user deletes a generated gallery asset. The row remains
+// until storage confirms deletion, so transient storage failures never orphan
+// untracked billable objects.
+func (w *RetentionWorker) cleanupDeletedOmniChatMedia(ctx context.Context) {
+	if w.db == nil || w.storage == nil || w.cfg.DryRun {
+		return
+	}
+	const batchSize = 200
+	for batch := 0; batch < 50; batch++ {
+		rows, err := w.db.Query(ctx, `
+			SELECT storage_path, owner_user_id, attempts
+			FROM omnichat_media_deletion_queue
+			WHERE status = 'pending' AND next_attempt_at <= NOW()
+			ORDER BY next_attempt_at, queued_at
+			LIMIT $1
+		`, batchSize)
+		if err != nil {
+			if !isUndefinedTableError(err) {
+				log.Printf("[RETENTION] Failed to query deleted OmniChat media: %v", err)
+			}
+			return
+		}
+		type queuedMediaDeletion struct {
+			storagePath string
+			ownerUserID *int
+			attempts    int
+		}
+		items := make([]queuedMediaDeletion, 0, batchSize)
+		for rows.Next() {
+			var item queuedMediaDeletion
+			if err := rows.Scan(&item.storagePath, &item.ownerUserID, &item.attempts); err != nil {
+				rows.Close()
+				log.Printf("[RETENTION] Failed to scan deleted OmniChat media: %v", err)
+				return
+			}
+			items = append(items, item)
+		}
+		rowsErr := rows.Err()
+		rows.Close()
+		if rowsErr != nil {
+			log.Printf("[RETENTION] Failed while reading deleted OmniChat media: %v", rowsErr)
+			return
+		}
+		if len(items) == 0 {
+			return
+		}
+
+		successes := 0
+		for _, item := range items {
+			if item.ownerUserID == nil || !models.IsOmniChatGeneratedStoragePathForOwner(item.storagePath, *item.ownerUserID) {
+				if _, err := w.db.Exec(ctx, `
+					UPDATE omnichat_media_deletion_queue
+					SET attempts = attempts + 1,
+					    status = 'dead_letter',
+					    last_error_at = NOW(),
+					    last_error_code = 'invalid_storage_path',
+					    dead_lettered_at = NOW()
+					WHERE storage_path = $1
+				`, item.storagePath); err != nil {
+					log.Printf("[RETENTION] Failed to quarantine invalid OmniChat media deletion: %v", err)
+				}
+				continue
+			}
+			deleteCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			err := w.storage.Delete(deleteCtx, item.storagePath)
+			cancel()
+			if err != nil {
+				targetStatus := "pending"
+				if item.attempts+1 >= 10 {
+					targetStatus = "dead_letter"
+				}
+				if _, updateErr := w.db.Exec(ctx, `
+					UPDATE omnichat_media_deletion_queue
+					SET attempts = attempts + 1,
+					    status = $2,
+					    last_error_at = NOW(),
+					    last_error_code = 'storage_delete_failed',
+					    next_attempt_at = NOW() + make_interval(
+					        secs => LEAST(3600, CAST(power(2, LEAST(attempts, 11)) AS INTEGER))
+					    ),
+					    dead_lettered_at = CASE WHEN $2 = 'dead_letter' THEN NOW() ELSE NULL END
+					WHERE storage_path = $1
+				`, item.storagePath, targetStatus); updateErr != nil {
+					log.Printf("[RETENTION] Failed to defer OmniChat media deletion: %v", updateErr)
+				}
+				continue
+			}
+			if _, err = w.db.Exec(ctx, `
+				DELETE FROM omnichat_media_deletion_queue WHERE storage_path = $1
+			`, item.storagePath); err != nil {
+				log.Printf("[RETENTION] Failed to acknowledge deleted OmniChat media: %v", err)
+				return
+			}
+			successes++
+		}
+		if len(items) < batchSize || successes == 0 {
+			return
+		}
+	}
+	log.Printf("[RETENTION] Deleted OmniChat media cleanup reached the per-run batch limit")
 }
 
 func (w *RetentionWorker) cleanupExpiredAuthTokens(ctx context.Context) {

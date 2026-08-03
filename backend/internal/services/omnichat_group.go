@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -17,11 +16,13 @@ import (
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services/openrouter"
 	"github.com/omninudge/backend/internal/websocket"
+	zlog "github.com/rs/zerolog/log"
 )
 
 type OmniChatGroupStore interface {
-	CreateUserMessage(ctx context.Context, groupID uuid.UUID, userID int, content string, replyToID *uuid.UUID) (*models.OmniChatGroupMessage, error)
-	CreatePersonaMessage(ctx context.Context, groupID uuid.UUID, personaID int, content string, replyToID *uuid.UUID, failed bool) (*models.OmniChatGroupMessage, error)
+	GetMessageBatchByRequest(ctx context.Context, groupID uuid.UUID, userID int, requestID uuid.UUID) ([]*models.OmniChatGroupMessage, error)
+	ValidateGroupSend(ctx context.Context, groupID uuid.UUID, userID int, personaIDs []int) (*models.OmniChatGroupSendContext, error)
+	CreateMessageBatch(ctx context.Context, groupID uuid.UUID, userID int, requestID uuid.UUID, content string, replyToID *uuid.UUID, replies []models.OmniChatGroupPersonaReply) ([]*models.OmniChatGroupMessage, bool, error)
 	ListMessagesForMember(ctx context.Context, groupID uuid.UUID, userID int, before *models.OmniChatGroupMessageCursor, limit int) ([]*models.OmniChatGroupMessage, error)
 	GetPersonaInGroup(ctx context.Context, groupID uuid.UUID, personaID int) (*models.BotPersona, error)
 	ListGroupPersonas(ctx context.Context, groupID uuid.UUID) ([]*models.OmniChatGroupPersona, error)
@@ -35,101 +36,115 @@ type omniChatGroupBroadcaster interface{ Broadcast(*websocket.Message) }
 type OmniChatGroupService struct {
 	store       OmniChatGroupStore
 	completion  chatCompletionClient
+	modelRouter OmniChatCompletionResolver
 	broadcaster omniChatGroupBroadcaster
 }
 
-func NewOmniChatGroupService(store OmniChatGroupStore, completion chatCompletionClient, broadcaster omniChatGroupBroadcaster) *OmniChatGroupService {
-	return &OmniChatGroupService{store: store, completion: completion, broadcaster: broadcaster}
+func NewOmniChatGroupService(store OmniChatGroupStore, completion chatCompletionClient, broadcaster omniChatGroupBroadcaster, modelRouters ...OmniChatCompletionResolver) *OmniChatGroupService {
+	var modelRouter OmniChatCompletionResolver
+	if len(modelRouters) > 0 {
+		modelRouter = modelRouters[0]
+	}
+	return &OmniChatGroupService{store: store, completion: completion, modelRouter: modelRouter, broadcaster: broadcaster}
 }
 
-func (s *OmniChatGroupService) SendMessage(ctx context.Context, groupID uuid.UUID, userID int, content string, replyToID *uuid.UUID, responderPersonaIDs []int) ([]*models.OmniChatGroupMessage, error) {
+func (s *OmniChatGroupService) SendMessage(ctx context.Context, groupID uuid.UUID, userID int, requestID uuid.UUID, content string, replyToID *uuid.UUID, responderPersonaIDs []int) ([]*models.OmniChatGroupMessage, bool, error) {
 	content = normalizePlainText(content)
-	if content == "" || utf8.RuneCountInString(content) > 10_000 || len(responderPersonaIDs) > 3 || hasDuplicateInts(responderPersonaIDs) {
-		return nil, ErrOmniChatSocialInvalidInput
+	if requestID == uuid.Nil || content == "" || utf8.RuneCountInString(content) > 10_000 || len(responderPersonaIDs) > 3 || hasDuplicateInts(responderPersonaIDs) {
+		return nil, false, ErrOmniChatSocialInvalidInput
 	}
-	userMessage, err := s.store.CreateUserMessage(ctx, groupID, userID, content, replyToID)
+	existing, err := s.store.GetMessageBatchByRequest(ctx, groupID, userID, requestID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	if userMessage == nil {
-		return nil, ErrNotFound
+	if len(existing) > 0 {
+		return existing, false, nil
 	}
-	results := []*models.OmniChatGroupMessage{userMessage}
-	s.broadcastGroupMessage(ctx, groupID, userMessage)
+	sendContext, err := s.store.ValidateGroupSend(ctx, groupID, userID, responderPersonaIDs)
+	if err != nil {
+		return nil, false, err
+	}
+	if sendContext == nil {
+		return nil, false, ErrNotFound
+	}
 
 	if len(responderPersonaIDs) == 0 {
-		personas, err := s.store.ListGroupPersonas(ctx, groupID)
+		messages, created, err := s.store.CreateMessageBatch(ctx, groupID, userID, requestID, content, replyToID, nil)
 		if err != nil {
-			return results, err
+			return nil, false, err
 		}
-		lowerContent := strings.ToLower(content)
-		for _, persona := range personas {
-			if strings.Contains(lowerContent, strings.ToLower(persona.Name)) || strings.Contains(lowerContent, "@"+strings.ToLower(strings.ReplaceAll(persona.Name, " ", ""))) {
-				responderPersonaIDs = append(responderPersonaIDs, persona.PersonaID)
-				if len(responderPersonaIDs) == 3 {
-					break
-				}
+		if len(messages) == 0 {
+			return nil, false, ErrNotFound
+		}
+		if created {
+			for _, message := range messages {
+				s.broadcastGroupMessage(ctx, groupID, message)
 			}
 		}
+		return messages, created, nil
 	}
-	if len(responderPersonaIDs) == 0 {
-		return results, nil
-	}
-	if s.completion == nil {
-		return results, errors.New("group character completion is unavailable")
+	completion := s.completion
+	if s.modelRouter != nil {
+		completion, _ = s.modelRouter.Resolve(ctx, userID, 0)
 	}
 
 	history, err := s.store.ListMessagesForMember(ctx, groupID, userID, nil, 40)
 	if err != nil {
-		return results, err
+		return nil, false, err
 	}
-	personas := make([]*models.BotPersona, len(responderPersonaIDs))
-	for index, personaID := range responderPersonaIDs {
-		persona, err := s.store.GetPersonaInGroup(ctx, groupID, personaID)
-		if err != nil {
-			return results, err
-		}
-		if persona == nil {
-			return results, ErrNotFound
-		}
-		personas[index] = persona
-	}
+	history = append(history, &models.OmniChatGroupMessage{
+		SenderType: "user", SenderUserID: &userID, SenderName: sendContext.SenderName,
+		SenderAvatarURL: sendContext.SenderAvatarURL, Content: content,
+	})
 	type generatedReply struct {
 		content string
 		failed  bool
 	}
-	replies := make([]generatedReply, len(personas))
-	generationCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 60*time.Second)
+	replies := make([]generatedReply, len(sendContext.Personas))
+	generationCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), generationRequestTimeout)
 	defer cancel()
 	var generationGroup sync.WaitGroup
-	for index, persona := range personas {
+	for index, persona := range sendContext.Personas {
 		generationGroup.Add(1)
 		go func(index int, persona *models.BotPersona) {
 			defer generationGroup.Done()
-			replies[index].content, replies[index].failed = s.generatePersonaReply(generationCtx, persona, history)
+			if completion == nil {
+				replies[index] = generatedReply{content: "I couldn't respond just now.", failed: true}
+				return
+			}
+			replies[index].content, replies[index].failed = generateGroupPersonaReply(generationCtx, completion, persona, history)
 		}(index, persona)
 	}
 	generationGroup.Wait()
 	persistenceCtx, persistCancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 	defer persistCancel()
-
-	// Persist in the requested responder order so clients receive a stable
-	// transcript even though model calls run concurrently.
+	replyInputs := make([]models.OmniChatGroupPersonaReply, 0, len(responderPersonaIDs))
 	for index, personaID := range responderPersonaIDs {
-		personaMessage, err := s.store.CreatePersonaMessage(persistenceCtx, groupID, personaID, replies[index].content, &userMessage.ID, replies[index].failed)
-		if err != nil {
-			return results, err
-		}
-		if personaMessage == nil {
-			return results, ErrNotFound
-		}
-		results = append(results, personaMessage)
-		s.broadcastGroupMessage(persistenceCtx, groupID, personaMessage)
+		replyInputs = append(replyInputs, models.OmniChatGroupPersonaReply{
+			PersonaID: personaID, Content: replies[index].content, Failed: replies[index].failed,
+		})
 	}
-	return results, nil
+	messages, created, err := s.store.CreateMessageBatch(persistenceCtx, groupID, userID, requestID, content, replyToID, replyInputs)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(messages) == 0 {
+		return nil, false, ErrNotFound
+	}
+	if created {
+		for _, message := range messages {
+			s.broadcastGroupMessage(persistenceCtx, groupID, message)
+		}
+	}
+	return messages, created, nil
 }
 
 func (s *OmniChatGroupService) generatePersonaReply(ctx context.Context, persona *models.BotPersona, history []*models.OmniChatGroupMessage) (string, bool) {
+	return generateGroupPersonaReply(ctx, s.completion, persona, history)
+}
+
+func generateGroupPersonaReply(ctx context.Context, completion chatCompletionClient, persona *models.BotPersona, history []*models.OmniChatGroupMessage) (string, bool) {
+	history = filterArtifactContaminatedGroupHistory(history)
 	var transcript strings.Builder
 	for _, message := range history {
 		fmt.Fprintf(&transcript, "%s: %s\n", message.SenderName, message.Content)
@@ -142,18 +157,32 @@ You are one participant in a group with humans and possibly other characters. Sp
 		{Role: openrouter.RoleSystem, Content: systemPrompt},
 		{Role: openrouter.RoleUser, Content: "<untrusted_group_transcript>\n" + transcript.String() + "</untrusted_group_transcript>\nReply only as " + persona.Name + "."},
 	}
-	text, err := s.completion.Generate(ctx, messages, func(string) {})
-	if err != nil {
-		return "I couldn't respond just now.", true
+	retryForHygiene := false
+	for attempt := 0; attempt < 2; attempt++ {
+		generationMessages := messages
+		if attempt > 0 && retryForHygiene {
+			generationMessages = messagesWithAssistantHygieneRetry(messages)
+		}
+		attemptCtx, cancelAttempt := context.WithTimeout(ctx, defaultGenerationAttemptTimeout)
+		text, err := completion.Generate(attemptCtx, generationMessages, func(string) {})
+		cancelAttempt()
+		text = normalizeAssistantMessageContent(text)
+		if err != nil || text == "" {
+			retryForHygiene = err == nil && text == ""
+			continue
+		}
+		if valid, _ := validateAssistantOutputHygiene(text); !valid {
+			// Do not include untrusted model content in logs.
+			zlog.Warn().Int("persona_id", persona.ID).Int("attempt", attempt+1).Msg("omnichat group: rejected provider output before delivery")
+			retryForHygiene = true
+			continue
+		}
+		if runes := []rune(text); len(runes) > 10_000 {
+			text = string(runes[:10_000])
+		}
+		return text, false
 	}
-	text = normalizeAssistantMessageContent(text)
-	if text == "" {
-		return "I couldn't respond just now.", true
-	}
-	if runes := []rune(text); len(runes) > 10_000 {
-		text = string(runes[:10_000])
-	}
-	return text, false
+	return "I couldn't respond just now.", true
 }
 
 func (s *OmniChatGroupService) CreateInvite(ctx context.Context, groupID uuid.UUID, creatorUserID int, inviteeUserID *int, maxUses int) (string, *models.OmniChatGroupInvite, error) {

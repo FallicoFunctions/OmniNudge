@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -105,6 +106,7 @@ type BotMessage struct {
 	Role           string                       `json:"role"` // 'user' or 'assistant'
 	Content        string                       `json:"content"`
 	Failed         bool                         `json:"failed"`
+	RequestID      *uuid.UUID                   `json:"request_id,omitempty"`
 	Attachments    []*OmniChatMessageMediaAsset `json:"attachments,omitempty"`
 	CreatedAt      time.Time                    `json:"created_at"`
 }
@@ -866,13 +868,18 @@ func (r *BotConversationRepository) ForkConversation(ctx context.Context, userID
 	}
 
 	query := `
-		INSERT INTO bot_conversations (user_id, persona_id, title, settings_user_name, settings_user_age, settings_user_gender)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO bot_conversations (
+			user_id, persona_id, title, settings_user_name, settings_user_age,
+			settings_user_gender, scene_state
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, (
+			SELECT scene_state FROM bot_conversations WHERE id = $7
+		))
 		RETURNING id, created_at, last_message_at
 	`
 	newConv := &BotConversation{UserID: userID, PersonaID: original.PersonaID, Title: &title}
 	err = tx.QueryRow(ctx, query, userID, original.PersonaID, &title,
-		settings.UserName, settings.UserAge, settings.UserGender,
+		settings.UserName, settings.UserAge, settings.UserGender, originalID,
 	).Scan(&newConv.ID, &newConv.CreatedAt, &newConv.LastMessageAt)
 	if err != nil {
 		return nil, err
@@ -908,6 +915,7 @@ func (r *BotConversationRepository) ForkConversation(ctx context.Context, userID
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
+	copiedMessageIDs := make(map[int]int, len(sourceMessages))
 	for _, message := range sourceMessages {
 		var copiedMessageID int
 		if err = tx.QueryRow(ctx, `
@@ -920,6 +928,47 @@ func (r *BotConversationRepository) ForkConversation(ctx context.Context, userID
 			INSERT INTO bot_message_attachments (message_id, asset_id, position)
 			SELECT $1, asset_id, position FROM bot_message_attachments WHERE message_id = $2
 		`, copiedMessageID, message.id); err != nil {
+			return nil, err
+		}
+		copiedMessageIDs[message.id] = copiedMessageID
+	}
+
+	var sourceCheckpointMessageID int
+	var sourceCheckpointState []byte
+	err = tx.QueryRow(ctx, `
+		SELECT message_id, state
+		FROM omnichat_conversation_scene_state_checkpoints
+		WHERE conversation_id = $1 AND owner_user_id = $2
+		ORDER BY message_id DESC
+		LIMIT 1
+	`, originalID, userID).Scan(&sourceCheckpointMessageID, &sourceCheckpointState)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	if err == nil {
+		targetCheckpointMessageID, ok := copiedMessageIDs[sourceCheckpointMessageID]
+		if !ok {
+			return nil, errors.New("fork conversation: scene checkpoint message was not copied")
+		}
+		if _, err = tx.Exec(ctx, `
+			INSERT INTO omnichat_conversation_scene_states (
+				conversation_id, owner_user_id, active_turn_actor, subject,
+				action, target, action_status, location, state
+			)
+			VALUES (
+				$1, $2, $3::jsonb->>'active_turn_actor', $3::jsonb->'event'->>'subject',
+				$3::jsonb->'event'->>'action', $3::jsonb->'event'->>'target',
+				$3::jsonb->>'status', $3::jsonb->>'location', $3
+			)
+		`, newConv.ID, userID, sourceCheckpointState); err != nil {
+			return nil, err
+		}
+		if _, err = tx.Exec(ctx, `
+			INSERT INTO omnichat_conversation_scene_state_checkpoints (
+				conversation_id, message_id, owner_user_id, source_revision, state
+			)
+			VALUES ($1, $2, $3, 1, $4)
+		`, newConv.ID, targetCheckpointMessageID, userID, sourceCheckpointState); err != nil {
 			return nil, err
 		}
 	}
@@ -977,6 +1026,13 @@ type BotMessageRepository struct {
 	pool *pgxpool.Pool
 }
 
+// OmniChatRequestCompletion is server-created metadata that lets a message
+// write complete the durable client request mapping in the same transaction.
+type OmniChatRequestCompletion struct {
+	UserID    int
+	RequestID uuid.UUID
+}
+
 // NewBotMessageRepository creates a new bot message repository.
 func NewBotMessageRepository(pool *pgxpool.Pool) *BotMessageRepository {
 	return &BotMessageRepository{pool: pool}
@@ -984,14 +1040,115 @@ func NewBotMessageRepository(pool *pgxpool.Pool) *BotMessageRepository {
 
 // Create inserts a new message (user or assistant turn) into a conversation.
 func (r *BotMessageRepository) Create(ctx context.Context, conversationID int, role, content string, failed bool) (*BotMessage, error) {
+	return r.CreateWithBilling(ctx, conversationID, role, content, failed, nil, nil)
+}
+
+// CreateUserTurnWithRequestID creates a request-owned user turn, or returns
+// the existing turn when an interrupted request is retried. The unique index
+// is the durable guard; a retry cannot append a second user turn.
+func (r *BotMessageRepository) CreateUserTurnWithRequestID(ctx context.Context, conversationID int, content string, requestID uuid.UUID) (*BotMessage, bool, error) {
+	if requestID == uuid.Nil {
+		return nil, false, errors.New("user turn request id is required")
+	}
+	m := &BotMessage{}
+	err := r.pool.QueryRow(ctx, `
+		INSERT INTO bot_messages(conversation_id,role,content,failed,client_request_id)
+		VALUES($1,'user',$2,FALSE,$3)
+		ON CONFLICT (conversation_id,client_request_id) WHERE role='user' AND client_request_id IS NOT NULL
+		DO NOTHING
+		RETURNING id,conversation_id,role,content,failed,created_at
+	`, conversationID, content, requestID).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+	if err == nil {
+		return m, false, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, err
+	}
+	err = r.pool.QueryRow(ctx, `
+		SELECT id,conversation_id,role,content,failed,created_at
+		FROM bot_messages
+		WHERE conversation_id=$1 AND role='user' AND client_request_id=$2
+	`, conversationID, requestID).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+	if err != nil {
+		return nil, false, err
+	}
+	if m.Content != content {
+		return nil, false, errors.New("request-owned user turn content conflict")
+	}
+	return m, true, nil
+}
+
+func (r *BotMessageRepository) GetUserTurnByRequestID(ctx context.Context, conversationID int, requestID uuid.UUID) (*BotMessage, error) {
+	if requestID == uuid.Nil {
+		return nil, errors.New("user turn request id is required")
+	}
+	m := &BotMessage{}
+	err := r.pool.QueryRow(ctx, `
+		SELECT id,conversation_id,role,content,failed,created_at
+		FROM bot_messages
+		WHERE conversation_id=$1 AND role='user' AND client_request_id=$2
+	`, conversationID, requestID).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// CreateWithBilling atomically links a successful assistant response to the
+// credit reservation that paid for it. Both billing values must be nil or
+// non-nil; the database also enforces the assistant/success boundary.
+func (r *BotMessageRepository) CreateWithBilling(ctx context.Context, conversationID int, role, content string, failed bool, billingUserID *int, billingOperationID *uuid.UUID, completions ...*OmniChatRequestCompletion) (*BotMessage, error) {
+	if (billingUserID == nil) != (billingOperationID == nil) {
+		return nil, errors.New("bot message billing identity must be complete")
+	}
+	completion, err := onlyOmniChatRequestCompletion(completions)
+	if err != nil {
+		return nil, err
+	}
 	m := &BotMessage{ConversationID: conversationID, Role: role, Content: content, Failed: failed}
 	query := `
 		INSERT INTO bot_messages (conversation_id, role, content, failed)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at
 	`
-	err := r.pool.QueryRow(ctx, query, conversationID, role, content, failed).Scan(&m.ID, &m.CreatedAt)
+	if billingOperationID == nil && completion == nil {
+		err := r.pool.QueryRow(ctx, query, conversationID, role, content, failed).Scan(&m.ID, &m.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		return m, nil
+	}
+	if billingOperationID != nil && (role != BotMessageRoleAssistant || failed) {
+		return nil, errors.New("only successful assistant messages can have billing deliveries")
+	}
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	err = tx.QueryRow(ctx, query, conversationID, role, content, failed).Scan(&m.ID, &m.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if billingOperationID != nil {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO omnichat_chat_billing_deliveries(user_id, operation_id, message_id)
+			VALUES($1,$2,$3)
+		`, *billingUserID, *billingOperationID, m.ID); err != nil {
+			return nil, err
+		}
+	}
+	if completion != nil {
+		requestID := completion.RequestID
+		m.RequestID = &requestID
+		if err := completeOmniChatRequestInTx(ctx, tx, *completion, m); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -1209,6 +1366,26 @@ func (r *BotMessageRepository) ListBeforeMessageID(ctx context.Context, conversa
 // and still contains the content the caller originally read. The content
 // check prevents two concurrent regenerations from overwriting each other.
 func (r *BotMessageRepository) ReplaceLatestAssistantContent(ctx context.Context, conversationID, messageID int, expectedContent, content string) (*BotMessage, error) {
+	return r.ReplaceLatestAssistantContentWithBilling(ctx, conversationID, messageID, expectedContent, content, nil, nil)
+}
+
+// ReplaceLatestAssistantContentWithBilling records a regenerated response and
+// its reservation in the same statement, preserving the lost-update guard.
+func (r *BotMessageRepository) ReplaceLatestAssistantContentWithBilling(
+	ctx context.Context,
+	conversationID, messageID int,
+	expectedContent, content string,
+	billingUserID *int,
+	billingOperationID *uuid.UUID,
+	completions ...*OmniChatRequestCompletion,
+) (*BotMessage, error) {
+	if (billingUserID == nil) != (billingOperationID == nil) {
+		return nil, errors.New("bot message billing identity must be complete")
+	}
+	completion, err := onlyOmniChatRequestCompletion(completions)
+	if err != nil {
+		return nil, err
+	}
 	query := `
 		UPDATE bot_messages AS target
 		SET content = $4, failed = FALSE
@@ -1224,16 +1401,79 @@ func (r *BotMessageRepository) ReplaceLatestAssistantContent(ctx context.Context
 		  )
 		RETURNING target.id, target.conversation_id, target.role, target.content, target.failed, target.created_at
 	`
+	var tx pgx.Tx
+	queryer := interface {
+		QueryRow(context.Context, string, ...any) pgx.Row
+	}(r.pool)
+	if billingOperationID != nil || completion != nil {
+		var err error
+		tx, err = r.pool.BeginTx(ctx, pgx.TxOptions{})
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		queryer = tx
+	}
 	m := &BotMessage{}
-	err := r.pool.QueryRow(ctx, query, messageID, conversationID, BotMessageRoleAssistant, content, expectedContent).
-		Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+	err = queryer.QueryRow(
+		ctx, query, messageID, conversationID, BotMessageRoleAssistant, content, expectedContent,
+	).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
+	if billingOperationID != nil {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO omnichat_chat_billing_deliveries(user_id, operation_id, message_id)
+			VALUES($1,$2,$3)
+		`, *billingUserID, *billingOperationID, m.ID); err != nil {
+			return nil, err
+		}
+	}
+	if completion != nil {
+		requestID := completion.RequestID
+		m.RequestID = &requestID
+		if err := completeOmniChatRequestInTx(ctx, tx, *completion, m); err != nil {
+			return nil, err
+		}
+	}
+	if billingOperationID != nil || completion != nil {
+		if err := tx.Commit(ctx); err != nil {
+			return nil, err
+		}
+	}
 	return m, nil
+}
+
+func onlyOmniChatRequestCompletion(values []*OmniChatRequestCompletion) (*OmniChatRequestCompletion, error) {
+	if len(values) == 0 || values[0] == nil {
+		return nil, nil
+	}
+	if len(values) != 1 || values[0].UserID <= 0 || values[0].RequestID == uuid.Nil {
+		return nil, errors.New("bot message request completion is invalid")
+	}
+	return values[0], nil
+}
+
+func completeOmniChatRequestInTx(ctx context.Context, tx pgx.Tx, completion OmniChatRequestCompletion, response any) error {
+	payload, err := json.Marshal(response)
+	if err != nil {
+		return fmt.Errorf("marshal idempotent OmniChat response: %w", err)
+	}
+	tag, err := tx.Exec(ctx, `
+		UPDATE omnichat_request_idempotency
+		SET status='completed', response_json=$3, updated_at=NOW()
+		WHERE user_id=$1 AND client_request_id=$2 AND status='pending'
+	`, completion.UserID, completion.RequestID, payload)
+	if err != nil {
+		return fmt.Errorf("complete idempotent OmniChat request: %w", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return errors.New("idempotent OmniChat request completion was not accepted")
+	}
+	return nil
 }
 
 // EditLatestAssistantContent atomically records the previous text and replaces

@@ -1,28 +1,51 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
+	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/services"
 )
+
+// trackedMediaAccessAuthorizer is intentionally separate from the broad media
+// repository port. Deployments that cannot authoritatively check access must
+// fail closed for tracked objects instead of treating storage URLs as bearer
+// credentials.
+type trackedMediaAccessAuthorizer interface {
+	CanUserAccessMedia(context.Context, int, int) (bool, error)
+}
+
+type publicTrackedMediaAuthorizer interface {
+	IsMediaPubliclyAccessible(context.Context, int) (bool, error)
+}
 
 type UploadsHandler struct {
 	mediaRepo   ports.MediaFileRepository
 	uploadsRoot string
+	storage     services.StorageService
 }
 
-func NewUploadsHandler(mediaRepo ports.MediaFileRepository, uploadsRoot string) *UploadsHandler {
+func NewUploadsHandler(mediaRepo ports.MediaFileRepository, uploadsRoot string, storageServices ...services.StorageService) *UploadsHandler {
 	if uploadsRoot == "" {
 		uploadsRoot = "./uploads"
+	}
+	var storage services.StorageService
+	if len(storageServices) > 0 {
+		storage = storageServices[0]
 	}
 	return &UploadsHandler{
 		mediaRepo:   mediaRepo,
 		uploadsRoot: uploadsRoot,
+		storage:     storage,
 	}
 }
 
@@ -38,6 +61,12 @@ func NewUploadsHandler(mediaRepo ports.MediaFileRepository, uploadsRoot string) 
 // @Failure      410       {object}  gin.H
 // @Router       /uploads/{filepath} [get]
 func (h *UploadsHandler) ServeUpload(c *gin.Context) {
+	// The global static-asset middleware treats /uploads as public. Override it
+	// before every early return so an anonymous miss cannot poison a shared
+	// cache for an authorized viewer, and so private thumbnails never become
+	// public merely because their filename contains "_thumb".
+	c.Header("Cache-Control", "private, no-store")
+
 	cleanRelPath, ok := cleanUploadPath(c.Param("filepath"))
 	if !ok {
 		RespondError(c, http.StatusBadRequest, "Invalid file path")
@@ -46,6 +75,7 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 	publicURL := "/uploads/" + filepath.ToSlash(cleanRelPath)
 	allowUntracked := isUntrackedUploadPathAllowed(cleanRelPath)
 	storagePath := filepath.ToSlash(filepath.Join("uploads", cleanRelPath))
+	publicUntrackedAsset := false
 
 	if h.mediaRepo != nil {
 		media, err := h.mediaRepo.GetByPublicURL(c.Request.Context(), publicURL)
@@ -75,7 +105,26 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 				c.Status(http.StatusNotFound)
 				return
 			}
+			publicUntrackedAsset = true
 		} else {
+			userID, authenticated := c.Get("user_id")
+			requesterID, validUserID := userID.(int)
+			authorizer, supportsAuthorization := h.mediaRepo.(trackedMediaAccessAuthorizer)
+			allowed := false
+			var accessErr error
+			if authenticated && validUserID && requesterID > 0 && supportsAuthorization {
+				allowed, accessErr = authorizer.CanUserAccessMedia(c.Request.Context(), media.ID, requesterID)
+			} else if publicAuthorizer, publicOK := h.mediaRepo.(publicTrackedMediaAuthorizer); publicOK {
+				allowed, accessErr = publicAuthorizer.IsMediaPubliclyAccessible(c.Request.Context(), media.ID)
+			}
+			if accessErr != nil {
+				RespondError(c, http.StatusInternalServerError, "Failed to validate media access")
+				return
+			}
+			if !allowed {
+				c.Status(http.StatusNotFound)
+				return
+			}
 			switch media.ScanStatus {
 			case models.MediaScanStatusClean:
 			case models.MediaScanStatusInfected:
@@ -92,6 +141,8 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 	} else if !allowUntracked {
 		RespondError(c, http.StatusServiceUnavailable, "Upload access validation unavailable")
 		return
+	} else {
+		publicUntrackedAsset = true
 	}
 
 	absRoot, err := filepath.Abs(h.uploadsRoot)
@@ -117,8 +168,10 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 				RespondError(c, http.StatusInternalServerError, "Failed to validate media access")
 				return
 			}
-			if media != nil && (media.ScanStatus == models.MediaScanStatusClean) && strings.HasPrefix(media.StorageURL, "http") {
-				c.Redirect(http.StatusTemporaryRedirect, media.StorageURL)
+			if media != nil && media.ScanStatus == models.MediaScanStatusClean {
+				if h.serveRemoteTrackedMedia(c, media) {
+					return
+				}
 				return
 			}
 		}
@@ -126,11 +179,59 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 		return
 	}
 
-	if isThumbnailPath(cleanRelPath) {
-		// Thumbnails are immutable assets generated from immutable upload names.
-		c.Header("Cache-Control", "public, max-age=2592000")
+	if publicUntrackedAsset {
+		// Public profile assets use immutable names and may be shared-cached.
+		c.Header("Cache-Control", "public, max-age=604800, immutable")
+		c.Writer.Header().Del("Pragma")
+		c.Writer.Header().Del("Expires")
 	}
 	c.File(absFile)
+}
+
+// serveRemoteTrackedMedia proxies an authorized remote object instead of
+// redirecting a browser to its CloudFront/S3 URL. A storage URL must never be
+// a public bearer credential for a private conversation attachment.
+func (h *UploadsHandler) serveRemoteTrackedMedia(c *gin.Context, media *models.MediaFile) bool {
+	if h.storage == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Media storage is unavailable")
+		return true
+	}
+	key := strings.TrimSpace(media.StorageObjectKey)
+	if key == "" {
+		// Rows written before storage_object_key was introduced are safe only
+		// when the legacy path is an uploads-relative key.
+		key = strings.TrimPrefix(filepath.ToSlash(media.StoragePath), "uploads/")
+	}
+	if key == "" || strings.HasPrefix(key, "/") || strings.Contains(key, "..") {
+		RespondError(c, http.StatusNotFound, "Media not found")
+		return true
+	}
+	objectSize, err := h.storage.GetObjectSize(c.Request.Context(), key)
+	if err != nil || objectSize <= 0 || objectSize != media.FileSize || objectSize > maxUploadSize {
+		RespondError(c, http.StatusNotFound, "Media not found")
+		return true
+	}
+	reader, err := h.storage.Download(c.Request.Context(), key)
+	if err != nil {
+		RespondError(c, http.StatusNotFound, "Media not found")
+		return true
+	}
+	defer reader.Close()
+	c.Header("Content-Type", media.FileType)
+	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename=%q`, safeUploadResponseFilename(media.Filename)))
+	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
+	c.Header("Cache-Control", "private, no-store")
+	c.Header("X-Content-Type-Options", "nosniff")
+	_, _ = io.Copy(c.Writer, &io.LimitedReader{R: reader, N: objectSize})
+	return true
+}
+
+func safeUploadResponseFilename(filename string) string {
+	filename = strings.ReplaceAll(filepath.Base(filename), `"`, "")
+	if filename == "" || filename == "." {
+		return "media"
+	}
+	return filename
 }
 
 func cleanUploadPath(rawPath string) (string, bool) {
@@ -147,13 +248,7 @@ func cleanUploadPath(rawPath string) (string, bool) {
 
 func isUntrackedUploadPathAllowed(cleanRelPath string) bool {
 	return strings.HasPrefix(cleanRelPath, "avatars/") ||
-		strings.HasPrefix(cleanRelPath, "banners/") ||
-		strings.HasPrefix(cleanRelPath, "voice/")
-}
-
-func isThumbnailPath(cleanRelPath string) bool {
-	base := strings.ToLower(filepath.Base(cleanRelPath))
-	return strings.Contains(base, "_thumb") || strings.Contains(base, "_pdfthumb")
+		strings.HasPrefix(cleanRelPath, "banners/")
 }
 
 func deriveTrackedMediaURL(publicURL string) (string, bool) {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -226,4 +227,135 @@ func (r *ResilientRedisCache) IncrementWithTTL(ctx context.Context, key string, 
 		return 0, errors.New("redis counter returned an invalid value")
 	}
 	return count, nil
+}
+
+const reserveRollingWindowScript = `
+	redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
+	local used = redis.call('ZCARD', KEYS[1])
+	local requested = #ARGV - 4
+	if used + requested > tonumber(ARGV[4]) then
+		local oldest = redis.call('ZRANGE', KEYS[1], 0, 0, 'WITHSCORES')
+		if used > 0 then redis.call('PEXPIRE', KEYS[1], ARGV[3]) end
+		return {0, used, oldest[2] or ''}
+	end
+	for index = 5, #ARGV do
+		local added = redis.call('ZADD', KEYS[1], 'NX', ARGV[2], ARGV[index])
+		if added ~= 1 then return redis.error_reply('duplicate rolling window member') end
+	end
+	used = redis.call('ZCARD', KEYS[1])
+	redis.call('PEXPIRE', KEYS[1], ARGV[3])
+	local oldest = redis.call('ZRANGE', KEYS[1], 0, 0, 'WITHSCORES')
+	return {1, used, oldest[2] or ''}
+`
+
+const inspectRollingWindowScript = `
+	redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
+	local used = redis.call('ZCARD', KEYS[1])
+	if used == 0 then
+		redis.call('DEL', KEYS[1])
+		return {1, 0, ''}
+	end
+	redis.call('PEXPIRE', KEYS[1], ARGV[2])
+	local oldest = redis.call('ZRANGE', KEYS[1], 0, 0, 'WITHSCORES')
+	return {1, used, oldest[2] or ''}
+`
+
+func (r *ResilientRedisCache) ReserveRollingWindow(ctx context.Context, key string, memberIDs []string, now time.Time, window time.Duration, limit int) (RollingWindowSnapshot, error) {
+	if key == "" || len(memberIDs) == 0 || window <= 0 || limit < 1 {
+		return RollingWindowSnapshot{}, errors.New("invalid rolling window reservation")
+	}
+	if err := validateRollingMemberIDs(memberIDs); err != nil {
+		return RollingWindowSnapshot{}, err
+	}
+	args := make([]any, 0, 4+len(memberIDs))
+	args = append(args, now.Add(-window).UnixMilli(), now.UnixMilli(), positiveMilliseconds(window), limit)
+	for _, memberID := range memberIDs {
+		args = append(args, memberID)
+	}
+	return r.evalRollingWindow(ctx, reserveRollingWindowScript, key, args...)
+}
+
+func (r *ResilientRedisCache) InspectRollingWindow(ctx context.Context, key string, now time.Time, window time.Duration) (RollingWindowSnapshot, error) {
+	if key == "" || window <= 0 {
+		return RollingWindowSnapshot{}, errors.New("invalid rolling window inspection")
+	}
+	return r.evalRollingWindow(ctx, inspectRollingWindowScript, key, now.Add(-window).UnixMilli(), positiveMilliseconds(window))
+}
+
+func (r *ResilientRedisCache) ReleaseRollingWindow(ctx context.Context, key string, memberIDs []string) error {
+	if key == "" {
+		return errors.New("rolling window key is required")
+	}
+	if len(memberIDs) == 0 {
+		return nil
+	}
+	args := make([]any, len(memberIDs))
+	for index, memberID := range memberIDs {
+		args[index] = memberID
+	}
+	detached := context.WithoutCancel(ctx)
+	_, err := r.breaker.Execute(func() (any, error) {
+		if redisErr := r.client.ZRem(detached, key, args...).Err(); redisErr != nil {
+			return nil, fmt.Errorf("redis rolling window release: %w", redisErr)
+		}
+		return nil, nil
+	})
+	return err
+}
+
+func (r *ResilientRedisCache) evalRollingWindow(ctx context.Context, script, key string, args ...any) (RollingWindowSnapshot, error) {
+	detached := context.WithoutCancel(ctx)
+	value, err := r.breaker.Execute(func() (any, error) {
+		result, redisErr := r.client.Eval(detached, script, []string{key}, args...).Slice()
+		if redisErr != nil {
+			return nil, fmt.Errorf("redis rolling window: %w", redisErr)
+		}
+		return result, nil
+	})
+	if err != nil {
+		return RollingWindowSnapshot{}, err
+	}
+	result, ok := value.([]interface{})
+	if !ok || len(result) != 3 {
+		return RollingWindowSnapshot{}, errors.New("redis rolling window returned an invalid result")
+	}
+	allowed, err := redisInteger(result[0])
+	if err != nil {
+		return RollingWindowSnapshot{}, err
+	}
+	used, err := redisInteger(result[1])
+	if err != nil || used < 0 {
+		return RollingWindowSnapshot{}, errors.New("redis rolling window returned an invalid count")
+	}
+	var oldestAt *time.Time
+	if raw := fmt.Sprint(result[2]); raw != "" && raw != "<nil>" {
+		milliseconds, parseErr := strconv.ParseFloat(raw, 64)
+		if parseErr != nil {
+			return RollingWindowSnapshot{}, errors.New("redis rolling window returned an invalid timestamp")
+		}
+		value := time.UnixMilli(int64(milliseconds)).UTC()
+		oldestAt = &value
+	}
+	return RollingWindowSnapshot{Allowed: allowed == 1, Used: int(used), OldestAt: oldestAt}, nil
+}
+
+func redisInteger(value interface{}) (int64, error) {
+	switch typed := value.(type) {
+	case int64:
+		return typed, nil
+	case string:
+		return strconv.ParseInt(typed, 10, 64)
+	case []byte:
+		return strconv.ParseInt(string(typed), 10, 64)
+	default:
+		return 0, errors.New("redis rolling window returned an invalid integer")
+	}
+}
+
+func positiveMilliseconds(duration time.Duration) int64 {
+	milliseconds := duration.Milliseconds()
+	if milliseconds < 1 {
+		return 1
+	}
+	return milliseconds
 }

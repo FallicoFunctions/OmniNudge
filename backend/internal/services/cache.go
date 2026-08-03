@@ -24,6 +24,24 @@ type AtomicCounter interface {
 	IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error)
 }
 
+// RollingWindowSnapshot is the atomic state of a per-subject rolling window.
+// OldestAt is nil when the window is empty.
+type RollingWindowSnapshot struct {
+	Allowed  bool
+	Used     int
+	OldestAt *time.Time
+}
+
+// RollingWindowStore atomically reserves and releases uniquely identified
+// events. It is used for provider-cost allowances where a fixed-window counter
+// would reset a user's entire balance at once and concurrent requests must not
+// overspend the limit.
+type RollingWindowStore interface {
+	ReserveRollingWindow(ctx context.Context, key string, memberIDs []string, now time.Time, window time.Duration, limit int) (RollingWindowSnapshot, error)
+	InspectRollingWindow(ctx context.Context, key string, now time.Time, window time.Duration) (RollingWindowSnapshot, error)
+	ReleaseRollingWindow(ctx context.Context, key string, memberIDs []string) error
+}
+
 // NoopCache is a no-op cache implementation
 type NoopCache struct{}
 
@@ -33,6 +51,15 @@ func (NoopCache) Set(ctx context.Context, key string, value string, ttl time.Dur
 }
 func (NoopCache) IncrementWithTTL(context.Context, string, time.Duration) (int64, error) {
 	return 1, nil
+}
+func (NoopCache) ReserveRollingWindow(context.Context, string, []string, time.Time, time.Duration, int) (RollingWindowSnapshot, error) {
+	return RollingWindowSnapshot{}, errors.New("rolling window storage is unavailable")
+}
+func (NoopCache) InspectRollingWindow(context.Context, string, time.Time, time.Duration) (RollingWindowSnapshot, error) {
+	return RollingWindowSnapshot{}, errors.New("rolling window storage is unavailable")
+}
+func (NoopCache) ReleaseRollingWindow(context.Context, string, []string) error {
+	return errors.New("rolling window storage is unavailable")
 }
 
 // defaultMemoryCacheMaxSize is the default maximum number of entries in a
@@ -44,15 +71,21 @@ const defaultMemoryCacheMaxSize = 10_000
 // Call Stop() to release the background cleanup goroutine when the cache is
 // no longer needed (e.g. during server shutdown or in tests).
 type MemoryCache struct {
-	data    map[string]*cacheEntry
-	maxSize int
-	mutex   sync.RWMutex
-	stopCh  chan struct{}
+	data           map[string]*cacheEntry
+	rollingWindows map[string]*rollingWindowEntry
+	maxSize        int
+	mutex          sync.RWMutex
+	stopCh         chan struct{}
 }
 
 type cacheEntry struct {
 	value      string
 	expiration time.Time
+}
+
+type rollingWindowEntry struct {
+	events map[string]time.Time
+	window time.Duration
 }
 
 // NewMemoryCache creates an in-memory cache with a default cap of 10,000 entries
@@ -70,9 +103,10 @@ func NewMemoryCacheWithMax(maxSize int) *MemoryCache {
 		maxSize = defaultMemoryCacheMaxSize
 	}
 	cache := &MemoryCache{
-		data:    make(map[string]*cacheEntry, maxSize),
-		maxSize: maxSize,
-		stopCh:  make(chan struct{}),
+		data:           make(map[string]*cacheEntry, maxSize),
+		rollingWindows: make(map[string]*rollingWindowEntry),
+		maxSize:        maxSize,
+		stopCh:         make(chan struct{}),
 	}
 	go cache.cleanup()
 	return cache
@@ -158,6 +192,113 @@ func (m *MemoryCache) IncrementWithTTL(_ context.Context, key string, ttl time.D
 	return 1, nil
 }
 
+func (m *MemoryCache) ReserveRollingWindow(_ context.Context, key string, memberIDs []string, now time.Time, window time.Duration, limit int) (RollingWindowSnapshot, error) {
+	if key == "" || len(memberIDs) == 0 || window <= 0 || limit < 1 {
+		return RollingWindowSnapshot{}, errors.New("invalid rolling window reservation")
+	}
+	if err := validateRollingMemberIDs(memberIDs); err != nil {
+		return RollingWindowSnapshot{}, err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	entry := m.rollingWindows[key]
+	if entry == nil {
+		if len(m.data)+len(m.rollingWindows) >= m.maxSize {
+			return RollingWindowSnapshot{}, errors.New("memory cache is at capacity")
+		}
+		entry = &rollingWindowEntry{events: make(map[string]time.Time, len(memberIDs)), window: window}
+		m.rollingWindows[key] = entry
+	}
+	entry.window = window
+	events := entry.events
+	pruneRollingEvents(events, now.Add(-window))
+	if len(events)+len(memberIDs) > limit {
+		if len(events) == 0 {
+			delete(m.rollingWindows, key)
+		}
+		return rollingSnapshot(events, false), nil
+	}
+	for _, memberID := range memberIDs {
+		if _, exists := events[memberID]; exists {
+			return RollingWindowSnapshot{}, errors.New("duplicate rolling window member ID")
+		}
+		events[memberID] = now
+	}
+	return rollingSnapshot(events, true), nil
+}
+
+func validateRollingMemberIDs(memberIDs []string) error {
+	seen := make(map[string]struct{}, len(memberIDs))
+	for _, memberID := range memberIDs {
+		if memberID == "" {
+			return errors.New("rolling window member ID is required")
+		}
+		if _, exists := seen[memberID]; exists {
+			return errors.New("duplicate rolling window member ID")
+		}
+		seen[memberID] = struct{}{}
+	}
+	return nil
+}
+
+func (m *MemoryCache) InspectRollingWindow(_ context.Context, key string, now time.Time, window time.Duration) (RollingWindowSnapshot, error) {
+	if key == "" || window <= 0 {
+		return RollingWindowSnapshot{}, errors.New("invalid rolling window inspection")
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	entry := m.rollingWindows[key]
+	if entry == nil {
+		return RollingWindowSnapshot{Allowed: true}, nil
+	}
+	entry.window = window
+	events := entry.events
+	pruneRollingEvents(events, now.Add(-window))
+	if len(events) == 0 {
+		delete(m.rollingWindows, key)
+	}
+	return rollingSnapshot(events, true), nil
+}
+
+func (m *MemoryCache) ReleaseRollingWindow(_ context.Context, key string, memberIDs []string) error {
+	if key == "" {
+		return errors.New("rolling window key is required")
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	entry := m.rollingWindows[key]
+	if entry == nil {
+		return nil
+	}
+	events := entry.events
+	for _, memberID := range memberIDs {
+		delete(events, memberID)
+	}
+	if len(events) == 0 {
+		delete(m.rollingWindows, key)
+	}
+	return nil
+}
+
+func pruneRollingEvents(events map[string]time.Time, cutoff time.Time) {
+	for memberID, occurredAt := range events {
+		if !occurredAt.After(cutoff) {
+			delete(events, memberID)
+		}
+	}
+}
+
+func rollingSnapshot(events map[string]time.Time, allowed bool) RollingWindowSnapshot {
+	var oldest *time.Time
+	for _, occurredAt := range events {
+		if oldest == nil || occurredAt.Before(*oldest) {
+			value := occurredAt
+			oldest = &value
+		}
+	}
+	return RollingWindowSnapshot{Allowed: allowed, Used: len(events), OldestAt: oldest}
+}
+
 // cleanup removes expired entries every minute until Stop() is called.
 func (m *MemoryCache) cleanup() {
 	ticker := time.NewTicker(1 * time.Minute)
@@ -173,6 +314,12 @@ func (m *MemoryCache) cleanup() {
 			for key, entry := range m.data {
 				if now.After(entry.expiration) {
 					delete(m.data, key)
+				}
+			}
+			for key, entry := range m.rollingWindows {
+				pruneRollingEvents(entry.events, now.Add(-entry.window))
+				if len(entry.events) == 0 {
+					delete(m.rollingWindows, key)
 				}
 			}
 			m.mutex.Unlock()
@@ -237,4 +384,40 @@ func (ic *InstrumentedCache) IncrementWithTTL(ctx context.Context, key string, t
 		metrics.CacheErrors.WithLabelValues(ic.cacheType, "increment").Inc()
 	}
 	return count, err
+}
+
+func (ic *InstrumentedCache) ReserveRollingWindow(ctx context.Context, key string, memberIDs []string, now time.Time, window time.Duration, limit int) (RollingWindowSnapshot, error) {
+	store, ok := ic.inner.(RollingWindowStore)
+	if !ok {
+		return RollingWindowSnapshot{}, errors.New("cache does not support rolling windows")
+	}
+	result, err := store.ReserveRollingWindow(ctx, key, memberIDs, now, window, limit)
+	if err != nil {
+		metrics.CacheErrors.WithLabelValues(ic.cacheType, "rolling_reserve").Inc()
+	}
+	return result, err
+}
+
+func (ic *InstrumentedCache) InspectRollingWindow(ctx context.Context, key string, now time.Time, window time.Duration) (RollingWindowSnapshot, error) {
+	store, ok := ic.inner.(RollingWindowStore)
+	if !ok {
+		return RollingWindowSnapshot{}, errors.New("cache does not support rolling windows")
+	}
+	result, err := store.InspectRollingWindow(ctx, key, now, window)
+	if err != nil {
+		metrics.CacheErrors.WithLabelValues(ic.cacheType, "rolling_inspect").Inc()
+	}
+	return result, err
+}
+
+func (ic *InstrumentedCache) ReleaseRollingWindow(ctx context.Context, key string, memberIDs []string) error {
+	store, ok := ic.inner.(RollingWindowStore)
+	if !ok {
+		return errors.New("cache does not support rolling windows")
+	}
+	err := store.ReleaseRollingWindow(ctx, key, memberIDs)
+	if err != nil {
+		metrics.CacheErrors.WithLabelValues(ic.cacheType, "rolling_release").Inc()
+	}
+	return err
 }

@@ -422,7 +422,8 @@ func main() {
 			fal.NewClient(cfg.OmniChatMedia.FalAPIKey),
 			cfg.OmniChatMedia,
 			cfg.VirusScan.FailClosed,
-		).SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes)
+		).SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
+			SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), models.NewUserRepository(db.Pool)))
 		jobWorker.RegisterAllHandlers(queue.JobHandlers{
 			EmailSend:           queue.NewEmailHandler(emailService),
 			DataExport:          queue.NewDataExportHandler(db.Pool, storageService, cfg.Encryption.Key, emailService),
@@ -528,7 +529,7 @@ func main() {
 	planSvc := services.NewPlanService(models.NewUserRepository(db.Pool))
 	cryptoPaymentRepo := models.NewCryptoPaymentRepository(db.Pool)
 
-	go workers.NewCryptoPaymentWorker(cryptoPaymentRepo, planSvc, cryptoVerifySvc).Start(workerCtx)
+	go workers.NewCryptoPaymentWorker(cryptoPaymentRepo, cryptoVerifySvc).Start(workerCtx)
 	go workers.NewPlanExpiryWorker(planSvc).Start(workerCtx)
 
 	// Initialize repositories for email verification
@@ -565,7 +566,7 @@ func main() {
 		FreeTierBytes: cfg.Media.FreeTierQuotaBytes,
 		ProTierBytes:  cfg.Media.ProTierQuotaBytes,
 	}
-	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient, mediaQuota, cfg.VirusScan.FailClosed)
+	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient, mediaQuota, cfg.VirusScan.FailClosed, cfg.VirusScan.Enabled)
 	mediaHandler.SetPresignedUploadRepository(mediaRepo)
 	// Inject storage service so all uploads go through the configured backend.
 	mediaHandler.SetStorageService(storageService)
@@ -595,7 +596,7 @@ func main() {
 	friendsHandler := handlers.NewFriendsHandler(userFriendshipRepo, userRepo, userSettingsRepo, hub, db.Pool)
 	slideshowHandler := handlers.NewSlideshowHandler(db.Pool, slideshowRepo, conversationRepo, hub)
 	mediaGalleryHandler := handlers.NewMediaGalleryHandler(db.Pool)
-	uploadsHandler := handlers.NewUploadsHandler(mediaRepo, "./uploads")
+	uploadsHandler := handlers.NewUploadsHandler(mediaRepo, "./uploads", storageService)
 	userStatusHandler := handlers.NewUserStatusHandler(hub, db.Pool)
 	presenceStore := services.NewPresenceStore(10 * time.Minute)
 	subredditPresenceHandler := handlers.NewSubredditPresenceHandler(presenceStore)
@@ -617,7 +618,11 @@ func main() {
 	hubSettingsHandler := handlers.NewHubSettingsHandler(hubRepo, hubSettingsRepo, userRepo)
 	hubWikiHandler := handlers.NewHubWikiHandler(hubRepo, hubSettingsRepo, hubWikiRepo)
 	accessRequestHandler := handlers.NewAccessRequestHandler(hubAccessRequestRepo, hubRepo, hubSettingsRepo, userRepo)
-	audioEncoderHandler := handlers.NewAudioEncoderHandler(mediaRepo, userSettingsRepo, queueClient)
+	audioEncoderHandler := handlers.NewAudioEncoderHandler(
+		mediaRepo,
+		userSettingsRepo,
+		queueClient,
+	).SetStorageService(storageService)
 	voiceHandler := handlers.NewVoiceMessagesHandler(db.Pool, voiceStorage, virusScanner, hub, queueClient, cfg.VirusScan.FailClosed)
 	featureFlagsHandler := handlers.NewFeatureFlagHandler(featureFlagService)
 	accountDeletionHandler := handlers.NewAccountDeletionHandler(db.Pool, queueClient)
@@ -636,17 +641,87 @@ func main() {
 	)
 
 	// OmniChat: AI chat bot personas, backed by OpenRouter.
-	zlog.Info().Bool("openrouter_key_set", cfg.OpenRouter.APIKey != "").Str("openrouter_model", cfg.OpenRouter.Model).Msg("OmniChat config")
+	zlog.Info().
+		Bool("openrouter_key_set", cfg.OpenRouter.APIKey != "").
+		Str("moderation_model", cfg.OpenRouter.Model).
+		Str("standard_model", cfg.OpenRouter.StandardModel).
+		Bool("standard_fallback_set", cfg.OpenRouter.StandardFallback != "").
+		Bool("plus_model_set", cfg.OpenRouter.PlusModel != "").
+		Bool("premium_quick_model_set", cfg.OpenRouter.PremiumQuickModel != "").
+		Bool("premium_deep_model_set", cfg.OpenRouter.PremiumDeepModel != "").
+		Bool("ultra_fast_model_set", cfg.OpenRouter.UltraFastModel != "").
+		Msg("OmniChat config")
 	botPersonaRepo := models.NewBotPersonaRepository(db.Pool)
 	botConversationRepo := models.NewBotConversationRepository(db.Pool)
+	omniChatModelPreferenceRepo := models.NewOmniChatModelPreferenceRepository(db.Pool)
 	botMessageRepo := models.NewBotMessageRepository(db.Pool)
 	omniChatMediaRepo := models.NewOmniChatMediaRepository(db.Pool)
 	omniChatSocialRepo := models.NewOmniChatSocialRepository(db.Pool)
 	omniChatGroupRepo := models.NewOmniChatGroupRepository(db.Pool)
 	omniChatVoiceRepo := models.NewOmniChatVoiceRepository(db.Pool)
+	omniChatResponseFeedbackRepo := models.NewOmniChatResponseFeedbackRepository(db.Pool)
+	omniChatSceneStateRepo := models.NewOmniChatConversationSceneStateRepository(db.Pool)
+	omniCreditsRepo := models.NewOmniCreditsRepository(db.Pool)
+	omniChatBilling := services.NewOmniChatBillingService(omniCreditsRepo, models.NewUserRepository(db.Pool))
+	omniChatBillingOffers, billingOffersErr := services.ParseOmniChatBillingOffers(cfg.OmniChatBillingOffersJSON)
+	if billingOffersErr != nil {
+		zlog.Fatal().Err(billingOffersErr).Msg("Invalid OmniChat billing offer configuration")
+	}
+	if err := omniChatBilling.ConfigureOffers(omniChatBillingOffers); err != nil {
+		zlog.Fatal().Err(err).Msg("Invalid OmniChat billing offers")
+	}
 	openrouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey, cfg.OpenRouter.Model)
-	chatbotService := services.NewChatbotService(db.Pool, botPersonaRepo, botConversationRepo, botMessageRepo, openrouterClient, hub)
-	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService)
+	omniChatModelRouter := services.NewConfiguredProfiledOmniChatModelRouter(
+		models.NewUserRepository(db.Pool),
+		omniChatModelPreferenceRepo,
+		cfg.OpenRouter.APIKey,
+		map[services.OmniChatModelProfileKey]string{
+			services.OmniChatModelProfileStandard:     cfg.OpenRouter.StandardModel,
+			services.OmniChatModelProfilePlus:         cfg.OpenRouter.PlusModel,
+			services.OmniChatModelProfilePremiumQuick: cfg.OpenRouter.PremiumQuickModel,
+			services.OmniChatModelProfilePremiumDeep:  cfg.OpenRouter.PremiumDeepModel,
+			services.OmniChatModelProfileUltraFast:    cfg.OpenRouter.UltraFastModel,
+		},
+		cfg.OpenRouter.StandardFallback,
+	)
+	omniChatModelSelectionService := services.NewOmniChatModelSelectionService(
+		models.NewUserRepository(db.Pool), omniChatModelPreferenceRepo,
+	)
+	omniChatAllowanceCache := cache
+	if cfg.AppEnv == "production" && !redisAvailable {
+		// A process-local allowance can be reset by restarting or bypassed by
+		// reaching another replica. Provider-cost enforcement must therefore
+		// fail closed in production until shared Redis storage is healthy.
+		omniChatAllowanceCache = services.NoopCache{}
+		zlog.Error().Msg("OmniChat free allowance disabled: Redis is required in production")
+	}
+	omniChatAllowance := services.NewOmniChatAllowance(
+		omniChatAllowanceCache,
+		models.NewUserRepository(db.Pool),
+	).SetBilling(omniChatBilling)
+	omniChatSceneStateExtractor := services.NewModelConversationSceneStateExtractor(
+		openrouter.NewClient(cfg.OpenRouter.APIKey, cfg.OpenRouter.StandardModel),
+	)
+	omniChatSceneStateCoordinator := services.NewConversationSceneStateCoordinator(
+		omniChatSceneStateRepo,
+		omniChatSceneStateExtractor,
+	)
+	chatbotService := services.NewChatbotService(
+		db.Pool,
+		botPersonaRepo,
+		botConversationRepo,
+		botMessageRepo,
+		openrouterClient,
+		hub,
+		omniChatModelRouter,
+	).SetConversationSceneStateCoordinator(omniChatSceneStateCoordinator).
+		SetBilling(omniChatBilling)
+	omniChatRequestIdempotencyRepo := models.NewOmniChatRequestIdempotencyRepository(db.Pool)
+	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService, omniChatModelSelectionService, omniChatAllowance).
+		SetRequestIdempotency(omniChatRequestIdempotencyRepo)
+	omniChatResponseFeedbackHandler := handlers.NewOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
+	adminOmniChatResponseFeedbackHandler := handlers.NewAdminOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
+	omniChatBillingHandler := handlers.NewOmniChatBillingHandler(omniChatBilling, nil)
 	var omniChatGenerationEnqueuer services.OmniChatGenerationEnqueuer
 	if queueClient != nil {
 		omniChatGenerationEnqueuer = queueClient
@@ -654,15 +729,18 @@ func main() {
 	omniChatGenerationService := services.NewOmniChatGenerationService(
 		botPersonaRepo, botConversationRepo, omniChatMediaRepo,
 		omniChatGenerationEnqueuer, cfg.OmniChatMedia.Provider,
-	)
-	omniChatMediaHandler := handlers.NewOmniChatMediaHandler(omniChatGenerationService, omniChatMediaRepo, storageService)
+	).SetBilling(omniChatBilling).
+		SetPromptModerator(services.NewOpenRouterOmniChatMediaModerator(openrouterClient))
+	omniChatMediaHandler := handlers.NewOmniChatMediaHandler(omniChatGenerationService, omniChatMediaRepo, storageService).
+		SetBilling(omniChatBilling).
+		SetRequestIdempotency(omniChatRequestIdempotencyRepo)
 	omniChatSocialService := services.NewOmniChatSocialService(
 		omniChatSocialRepo,
 		services.NewOpenRouterOmniChatModerator(openrouterClient),
 	)
 	omniChatSocialHandler := handlers.NewOmniChatSocialHandler(omniChatSocialService, omniChatSocialRepo, storageService)
-	omniChatGroupService := services.NewOmniChatGroupService(omniChatGroupRepo, openrouterClient, hub)
-	omniChatGroupHandler := handlers.NewOmniChatGroupHandler(omniChatGroupService, omniChatGroupRepo)
+	omniChatGroupService := services.NewOmniChatGroupService(omniChatGroupRepo, openrouterClient, hub, omniChatModelRouter)
+	omniChatGroupHandler := handlers.NewOmniChatGroupHandler(omniChatGroupService, omniChatGroupRepo, omniChatAllowance)
 	voiceProviders := map[string]speech.Synthesizer{
 		"elevenlabs": elevenlabs.NewClient(cfg.OmniChatVoice.ElevenLabsAPIKey, cfg.OmniChatVoice.ElevenLabsBaseURL, cfg.OmniChatVoice.ElevenLabsEnableLogging),
 	}
@@ -681,15 +759,16 @@ func main() {
 		voiceStorage,
 		voiceProviders,
 		map[string]string{"elevenlabs": cfg.OmniChatVoice.DefaultModel, "voicebox": "kokoro"},
-	)
+	).SetBilling(omniChatBilling)
 	omniChatVoiceHandler := handlers.NewOmniChatVoiceHandler(
 		omniChatVoiceRepo, omniChatVoiceService, voiceStorage,
 		liveVideoClient,
 		cfg.OmniChatVoice.TavusReplicaID, cfg.OmniChatVoice.TavusPersonaID,
-	).ConfigureVoiceCatalog(voiceboxAvailable, cfg.OmniChatVoice.VoiceCloningEnabled)
-	adminPersonaHandler := handlers.NewAdminPersonaHandler(botPersonaRepo)
-	omniChatRateLimiter := middleware.OmniChatRateLimiter(cache)
+	).ConfigureVoiceCatalog(voiceboxAvailable, cfg.OmniChatVoice.VoiceCloningEnabled).
+		SetBilling(omniChatBilling)
+	adminPersonaHandler := handlers.NewAdminPersonaHandler(botPersonaRepo, omniChatVoiceRepo)
 	omniChatMediaRateLimiter := middleware.OmniChatMediaGenerationRateLimiter(cache)
+	omniChatMessageRateLimiter := middleware.OmniChatRateLimiter(cache)
 	omniChatSocialRateLimiter := middleware.OmniChatSocialRateLimiter(cache)
 	omniChatVoiceRateLimiter := middleware.OmniChatVoiceRateLimiter(cache)
 	omniChatCallRateLimiter := middleware.OmniChatCallRateLimiter(cache)
@@ -774,9 +853,13 @@ func main() {
 	router.Use(middleware.Timeout(30 * time.Second))
 	router.Use(monitoring.MetricsMiddleware())
 
-	// Serve uploads through scan-aware gate (fail-closed for media files)
-	router.GET("/uploads/*filepath", uploadsHandler.ServeUpload)
-	router.HEAD("/uploads/*filepath", uploadsHandler.ServeUpload)
+	// Serve uploads through a scan- and ownership-aware gateway. Public avatar
+	// and banner paths remain anonymous; all tracked media and voice recordings
+	// are authorized by their dedicated authenticated handlers.
+	uploads := router.Group("")
+	uploads.Use(middleware.AuthOptional(authService))
+	uploads.GET("/uploads/*filepath", uploadsHandler.ServeUpload)
+	uploads.HEAD("/uploads/*filepath", uploadsHandler.ServeUpload)
 
 	// Health check — used by load balancers and uptime monitors.
 	// Version is intentionally omitted to avoid exposing the exact commit hash publicly.
@@ -1109,11 +1192,12 @@ func main() {
 		omniChatPublic.Use(middleware.AuthOptional(authService))
 		{
 			omniChatPublic.GET("/personas", omniChatHandler.ListPersonas)
-			omniChatPublic.POST("/preview/messages", omniChatRateLimiter.Middleware(), omniChatHandler.PreviewSendMessage)
+			omniChatPublic.GET("/allowance", omniChatHandler.GetAllowance)
+			omniChatPublic.POST("/preview/messages", omniChatMessageRateLimiter.Middleware(), omniChatHandler.PreviewSendMessage)
 			omniChatPublic.GET("/explore", omniChatSocialHandler.ListExplore)
 			omniChatPublic.GET("/explore/:id", omniChatSocialHandler.GetPublication)
 			omniChatPublic.GET("/explore/:id/comments", omniChatSocialHandler.ListComments)
-			omniChatPublic.GET("/explore/media/:asset_id/content", omniChatSocialHandler.GetPublicMediaContent)
+			omniChatPublic.GET("/explore/media/:asset_id/content", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.GetPublicMediaContent)
 		}
 
 		// Protected routes (auth required)
@@ -1273,12 +1357,20 @@ func main() {
 			protected.POST("/omnichat/conversations", omniChatHandler.CreateConversation)
 			protected.GET("/omnichat/conversations", omniChatHandler.ListConversations)
 			protected.GET("/omnichat/conversations/:id", omniChatHandler.GetConversation)
+			protected.GET("/omnichat/model-selection", omniChatHandler.GetModelSelection)
+			protected.PUT("/omnichat/model-selection", omniChatHandler.SetModelSelection)
 			protected.PUT("/omnichat/conversations/:id/settings", omniChatHandler.UpdateConversationSettings)
 			protected.POST("/omnichat/conversations/:id/fork", omniChatHandler.ForkConversation)
 			protected.DELETE("/omnichat/conversations/:id", omniChatHandler.DeleteConversation)
-			protected.POST("/omnichat/conversations/:id/messages", omniChatRateLimiter.Middleware(), omniChatHandler.SendMessage)
-			protected.POST("/omnichat/conversations/:id/messages/:message_id/regenerate", omniChatRateLimiter.Middleware(), omniChatHandler.RegenerateMessage)
-			protected.PATCH("/omnichat/conversations/:id/messages/:message_id", omniChatRateLimiter.Middleware(), omniChatHandler.EditAssistantMessage)
+			protected.POST("/omnichat/conversations/:id/messages", omniChatMessageRateLimiter.Middleware(), omniChatHandler.SendMessage)
+			protected.POST("/omnichat/conversations/:id/messages/:message_id/regenerate", omniChatMessageRateLimiter.Middleware(), omniChatHandler.RegenerateMessage)
+			protected.PATCH("/omnichat/conversations/:id/messages/:message_id", omniChatHandler.EditAssistantMessage)
+			protected.POST("/omnichat/conversations/:id/messages/:message_id/feedback", omniChatSocialRateLimiter.Middleware(), omniChatResponseFeedbackHandler.Submit)
+			protected.GET("/omnichat/billing/catalog", omniChatBillingHandler.Catalog)
+			protected.GET("/omnichat/billing/wallet", omniChatBillingHandler.Wallet)
+			protected.GET("/omnichat/billing/usage", omniChatBillingHandler.Usage)
+			protected.GET("/omnichat/billing/video-entitlement", omniChatBillingHandler.VideoEntitlement)
+			protected.POST("/omnichat/billing/checkout", omniChatBillingHandler.CreateCheckout)
 			protected.GET("/omnichat/conversations/:id/scene", omniChatMediaHandler.GetConversationScene)
 			protected.PUT("/omnichat/conversations/:id/scene", omniChatMediaHandler.UpdateConversationScene)
 			protected.POST("/omnichat/generations", omniChatMediaRateLimiter.Middleware(), omniChatMediaHandler.CreateGeneration)
@@ -1288,10 +1380,12 @@ func main() {
 			protected.GET("/omnichat/gallery", omniChatMediaHandler.ListGallery)
 			protected.GET("/omnichat/media/:id", omniChatMediaHandler.GetAsset)
 			protected.GET("/omnichat/media/:id/content", omniChatMediaHandler.GetAssetContent)
+			protected.DELETE("/omnichat/media/:id", omniChatMediaHandler.DeleteAsset)
 			protected.POST("/omnichat/explore/publish/media", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.PublishAsset)
 			protected.POST("/omnichat/explore/publish/chat", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.PublishChat)
 			protected.PUT("/omnichat/explore/:id/like", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.SetLike)
 			protected.PUT("/omnichat/explore/:id/bookmark", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.SetBookmark)
+			protected.GET("/omnichat/explore/bookmarks", omniChatSocialHandler.ListBookmarks)
 			protected.POST("/omnichat/explore/:id/comments", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.AddComment)
 			protected.DELETE("/omnichat/explore/comments/:comment_id", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.DeleteComment)
 			protected.POST("/omnichat/explore/:id/share", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.RecordShare)
@@ -1302,9 +1396,18 @@ func main() {
 			protected.POST("/omnichat/groups", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.CreateGroup)
 			protected.GET("/omnichat/groups", omniChatGroupHandler.ListGroups)
 			protected.GET("/omnichat/groups/:group_id", omniChatGroupHandler.GetGroup)
+			protected.PATCH("/omnichat/groups/:group_id", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.UpdateGroup)
+			protected.DELETE("/omnichat/groups/:group_id", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.DeleteGroup)
+			protected.POST("/omnichat/groups/:group_id/archive", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.ArchiveGroup)
+			protected.DELETE("/omnichat/groups/:group_id/members/me", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.LeaveGroup)
+			protected.PATCH("/omnichat/groups/:group_id/members/:user_id/role", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.SetMemberRole)
+			protected.DELETE("/omnichat/groups/:group_id/members/:user_id", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.RemoveMember)
+			protected.POST("/omnichat/groups/:group_id/members/:user_id/transfer", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.TransferOwnership)
 			protected.GET("/omnichat/groups/:group_id/messages", omniChatGroupHandler.ListMessages)
-			protected.POST("/omnichat/groups/:group_id/messages", omniChatRateLimiter.Middleware(), omniChatGroupHandler.SendMessage)
+			protected.POST("/omnichat/groups/:group_id/messages", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.SendMessage)
 			protected.POST("/omnichat/groups/:group_id/invites", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.CreateInvite)
+			protected.GET("/omnichat/groups/:group_id/invites", omniChatGroupHandler.ListInvites)
+			protected.DELETE("/omnichat/groups/:group_id/invites/:invite_id", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.RevokeInvite)
 			protected.POST("/omnichat/groups/join", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.AcceptInvite)
 			protected.GET("/omnichat/voice-presets", omniChatVoiceHandler.ListVoicePresets)
 			protected.POST("/omnichat/voice-presets/:preset_id/preview", omniChatVoiceRateLimiter.Middleware(), omniChatVoiceHandler.PreviewVoicePreset)
@@ -1573,6 +1676,14 @@ func main() {
 				admin.GET("/bug-reports", bugReportsHandler.GetBugReports)
 				admin.PUT("/bug-reports/:id", bugReportsHandler.UpdateBugReport)
 
+				// OmniChat response-quality review. The handler returns only stored
+				// feedback snapshots, never persona prompts or provider settings.
+				admin.GET("/omnichat/response-feedback", adminOmniChatResponseFeedbackHandler.List)
+				admin.GET("/omnichat/response-feedback/:id", adminOmniChatResponseFeedbackHandler.Get)
+				admin.PATCH("/omnichat/response-feedback/:id/status", adminOmniChatResponseFeedbackHandler.Transition)
+				admin.GET("/omnichat/publication-reports", omniChatSocialHandler.ListReports)
+				admin.PATCH("/omnichat/publication-reports/:report_id", omniChatSocialHandler.ResolveReport)
+
 				// Known bugs management
 				admin.POST("/known-bugs", bugReportsHandler.CreateKnownBug)
 				admin.PUT("/known-bugs/:id", bugReportsHandler.UpdateKnownBug)
@@ -1600,7 +1711,9 @@ func main() {
 
 				// OmniChat persona media management
 				admin.GET("/omnichat/personas", adminPersonaHandler.ListPersonas)
+				admin.GET("/omnichat/persona-voices", adminPersonaHandler.ListPersonaVoices)
 				admin.PUT("/omnichat/personas/:id", adminPersonaHandler.UpdatePersonaMedia)
+				admin.PUT("/omnichat/personas/:id/voice", adminPersonaHandler.UpdatePersonaVoice)
 			}
 
 			// WebSocket endpoint for real-time messaging

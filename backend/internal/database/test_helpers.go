@@ -12,6 +12,7 @@ import (
 type Database = DB
 
 const (
+	// #nosec G101 -- fixed localhost-only credentials for the disposable test database, never a deployed secret.
 	defaultTestDSN      = "postgres://postgres:postgres@localhost:5432/omninudge_test?sslmode=disable"
 	testAdvisoryLockKey = int64(0x6f6d6e69) // 'omni'
 )

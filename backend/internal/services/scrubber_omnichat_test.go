@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestScrubUserDeletesOmniChatSpeechBeforeCascadeAndFailsClosedWithoutVoiceStorage(t *testing.T) {
+func TestScrubUserQueuesOmniChatSpeechDeletionTransactionally(t *testing.T) {
 	ctx := context.Background()
 	db, err := database.NewTest()
 	require.NoError(t, err)
@@ -36,19 +36,15 @@ func TestScrubUserDeletesOmniChatSpeechBeforeCascadeAndFailsClosedWithoutVoiceSt
 	require.NoError(t, err)
 
 	scrubber := NewScrubberService(db.Pool, voiceStorage)
-	err = scrubber.ScrubUser(ctx, user.ID)
-	require.EqualError(t, err, "OmniChat voice storage is unavailable for permanent deletion")
+	require.NoError(t, scrubber.ScrubUser(ctx, user.ID))
 	var speechCount, userCount int
 	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM omnichat_speech_audio WHERE storage_path=$1`, key).Scan(&speechCount))
-	require.Equal(t, 1, speechCount)
-	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE id=$1`, user.ID).Scan(&userCount))
-	require.Equal(t, 1, userCount)
-
-	require.NoError(t, scrubber.SetVoiceStorage(voiceStorage).ScrubUser(ctx, user.ID))
-	_, err = voiceStorage.Download(ctx, key)
-	require.Error(t, err)
-	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM omnichat_speech_deletion_queue WHERE storage_path=$1`, key).Scan(&speechCount))
 	require.Zero(t, speechCount)
 	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE id=$1`, user.ID).Scan(&userCount))
 	require.Zero(t, userCount)
+	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM omnichat_speech_deletion_queue WHERE storage_path=$1`, key).Scan(&speechCount))
+	require.Equal(t, 1, speechCount)
+	audio, err := voiceStorage.Download(ctx, key)
+	require.NoError(t, err, "storage deletion must wait until after the database transaction commits")
+	require.NoError(t, audio.Close())
 }

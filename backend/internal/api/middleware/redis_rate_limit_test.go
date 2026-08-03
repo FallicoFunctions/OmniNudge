@@ -81,6 +81,32 @@ func TestOmniChatRateLimiterFailsClosedWhenCounterUnavailable(t *testing.T) {
 	require.Equal(t, "5", response.Header().Get("Retry-After"))
 }
 
+func TestOmniChatRateLimiterEnforcesTwelveRequestBurstBoundary(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cache := services.NewMemoryCache()
+	t.Cleanup(cache.Stop)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", 42)
+		c.Next()
+	})
+	router.POST("/omnichat", OmniChatRateLimiter(cache).Middleware(), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	for index := 0; index < 13; index++ {
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/omnichat", nil))
+		if index < 12 {
+			require.Equal(t, http.StatusNoContent, response.Code)
+			require.Equal(t, "12", response.Header().Get("X-RateLimit-Limit"))
+			continue
+		}
+		require.Equal(t, http.StatusTooManyRequests, response.Code)
+		require.Equal(t, "60", response.Header().Get("Retry-After"))
+	}
+}
+
 func TestFriendRequestRateLimiterFailsClosedWhenCounterUnavailable(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -104,6 +130,7 @@ func TestSecuritySensitiveRateLimitersFailClosed(t *testing.T) {
 		"password reset": PasswordResetRateLimiter(failingRateLimitCache{}),
 		"AI generation":  AIDesignRateLimiter(failingRateLimitCache{}),
 		"AI refinement":  ChatDesignRateLimiter(failingRateLimitCache{}),
+		"OmniChat reply": OmniChatRateLimiter(failingRateLimitCache{}),
 	}
 
 	for name, limiter := range tests {

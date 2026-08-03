@@ -86,10 +86,14 @@ func (r *FeatureFlagRepository) ListFlags(ctx context.Context, environment strin
 		}
 
 		if len(metadataJSON) > 0 {
-			json.Unmarshal(metadataJSON, &flag.Metadata) //nolint:errcheck // unmarshal failure leaves field at zero value; non-fatal
+			if err := json.Unmarshal(metadataJSON, &flag.Metadata); err != nil {
+				return nil, fmt.Errorf("decode feature flag %q metadata: %w", flag.Key, err)
+			}
 		}
 		if len(rollbackJSON) > 0 {
-			json.Unmarshal(rollbackJSON, &flag.Rollback) //nolint:errcheck // unmarshal failure leaves field at zero value; non-fatal
+			if err := json.Unmarshal(rollbackJSON, &flag.Rollback); err != nil {
+				return nil, fmt.Errorf("decode feature flag %q rollback config: %w", flag.Key, err)
+			}
 		}
 
 		flags = append(flags, &flag)
@@ -252,10 +256,14 @@ func (r *FeatureFlagRepository) GetAuditLog(ctx context.Context, key string, lim
 		}
 
 		if len(oldValueJSON) > 0 {
-			json.Unmarshal(oldValueJSON, &log.OldValue) //nolint:errcheck // unmarshal failure leaves field at zero value; non-fatal
+			if err := json.Unmarshal(oldValueJSON, &log.OldValue); err != nil {
+				return nil, fmt.Errorf("decode feature flag audit %d old value: %w", log.ID, err)
+			}
 		}
 		if len(newValueJSON) > 0 {
-			json.Unmarshal(newValueJSON, &log.NewValue) //nolint:errcheck // unmarshal failure leaves field at zero value; non-fatal
+			if err := json.Unmarshal(newValueJSON, &log.NewValue); err != nil {
+				return nil, fmt.Errorf("decode feature flag audit %d new value: %w", log.ID, err)
+			}
 		}
 
 		logs = append(logs, &log)

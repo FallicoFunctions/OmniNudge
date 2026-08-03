@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/api/middleware"
@@ -167,13 +168,8 @@ func (h *PaymentsHandler) SubmitCryptoPayment(c *gin.Context) {
 	}
 
 	if result.Confirmed {
-		now := c.Request.Context().Value("now") // nil in production — that's fine
-		_ = now
-		if err := h.payRepo.UpdateStatus(c.Request.Context(), id, models.StatusConfirmed, result.Confirmations, nil); err != nil {
-			log.Printf("[payments] confirm status update failed: %v", err)
-		}
-		if err := h.planSvc.Upgrade(c.Request.Context(), userID, req.PlanMonths); err != nil {
-			log.Printf("[payments] plan upgrade failed for user %d: %v", userID, err)
+		if _, err := h.payRepo.ConfirmAndApplyPlan(c.Request.Context(), id, result.Confirmations, time.Now()); err != nil {
+			log.Printf("[payments] atomic payment entitlement failed for user %d: %v", userID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "payment confirmed but plan upgrade failed, contact support"})
 			return
 		}

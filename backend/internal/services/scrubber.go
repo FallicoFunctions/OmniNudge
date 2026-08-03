@@ -18,9 +18,8 @@ type ScrubberService struct {
 	voiceStorage StorageService
 }
 
-// SetVoiceStorage supplies the dedicated backend used for OmniChat speech.
-// Account erasure deliberately fails closed when speech objects exist but this
-// backend is unavailable, preventing a database cascade from orphaning audio.
+// SetVoiceStorage is retained for constructor compatibility. Speech deletion
+// is now committed to a durable database outbox and drained after commit.
 func (s *ScrubberService) SetVoiceStorage(storage StorageService) *ScrubberService {
 	s.voiceStorage = storage
 	return s
@@ -33,18 +32,11 @@ func NewScrubberService(db *pgxpool.Pool, storage StorageService) *ScrubberServi
 	}
 }
 
-// ScrubMediaFile deletes a single media file from storage and removes its DB record.
-// Idempotent: returns nil if the file does not exist.
+// ScrubMediaFile removes the database record. Its DELETE trigger commits the
+// storage key to a durable outbox in the same transaction; retention deletes
+// the object only after this method succeeds.
 func (s *ScrubberService) ScrubMediaFile(ctx context.Context, mediaFileID int) error {
-	var storagePath string
-	err := s.db.QueryRow(ctx, "SELECT storage_path FROM media_files WHERE id = $1", mediaFileID).Scan(&storagePath)
-	if err != nil {
-		return nil // not found or already deleted
-	}
-	if delErr := s.storage.Delete(ctx, storagePath); delErr != nil {
-		log.Printf("[SCRUBBER] Warning: failed to delete media file %s from storage: %v", storagePath, delErr)
-	}
-	_, err = s.db.Exec(ctx, "DELETE FROM media_files WHERE id = $1", mediaFileID)
+	_, err := s.db.Exec(ctx, "DELETE FROM media_files WHERE id = $1", mediaFileID)
 	return err
 }
 
@@ -93,24 +85,12 @@ func (s *ScrubberService) ScrubUser(ctx context.Context, userID int) error {
 		}
 	}
 
-	// 2. Fetch and delete media files from storage
-	rows, err := tx.Query(ctx, "SELECT storage_path FROM media_files WHERE user_id = $1", userID)
-	if err == nil {
-		var paths []string
-		for rows.Next() {
-			var path string
-			if err := rows.Scan(&path); err == nil {
-				paths = append(paths, path)
-			}
-		}
-		rows.Close()
-
-		for _, path := range paths {
-			_ = s.storage.Delete(ctx, path)
-			log.Printf("[SCRUBBER] Deleted media file: %s", path)
-		}
+	// 2. Delete media rows transactionally. Database triggers queue every
+	// backing object for post-commit deletion, so a later rollback cannot
+	// restore a row whose blob has already been destroyed.
+	if _, err = tx.Exec(ctx, "DELETE FROM media_files WHERE user_id = $1", userID); err != nil {
+		return fmt.Errorf("failed to queue user media deletion: %w", err)
 	}
-	_, _ = tx.Exec(ctx, "DELETE FROM media_files WHERE user_id = $1", userID)
 
 	// 3. Clean up export files
 	// Standard path for exports is exports/{user_id}/...
@@ -143,10 +123,9 @@ func (s *ScrubberService) ScrubUser(ctx context.Context, userID int) error {
 	return nil
 }
 
-// scrubOmniChatSpeech deletes dedicated speech blobs before any user, persona,
-// conversation, or message cascade can remove their database rows. Rows are
-// selected for every cascade root that belongs to the account; the trigger
-// outbox covers any other deletion path and retries it through retention.
+// scrubOmniChatSpeech validates dedicated speech keys and removes their rows.
+// The speech DELETE trigger records the objects transactionally; retention
+// performs the irreversible storage deletion after commit.
 func (s *ScrubberService) scrubOmniChatSpeech(ctx context.Context, tx pgx.Tx, userID int) error {
 	rows, err := tx.Query(ctx, `
 		SELECT id, storage_path
@@ -165,44 +144,26 @@ func (s *ScrubberService) scrubOmniChatSpeech(ctx context.Context, tx pgx.Tx, us
 	}
 	defer rows.Close()
 
-	type speechObject struct {
-		id   string
-		path string
-	}
-	objects := make([]speechObject, 0)
+	ids := make([]string, 0)
 	for rows.Next() {
-		var object speechObject
-		if err := rows.Scan(&object.id, &object.path); err != nil {
+		var id, storagePath string
+		if err := rows.Scan(&id, &storagePath); err != nil {
 			return fmt.Errorf("failed to scan OmniChat speech for deletion: %w", err)
 		}
-		if !speech.IsOmniChatStoragePath(object.path) {
+		if !speech.IsOmniChatStoragePath(storagePath) {
 			return errors.New("refusing to delete OmniChat speech with an invalid storage path")
 		}
-		objects = append(objects, object)
+		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("failed to read OmniChat speech for deletion: %w", err)
 	}
-	if len(objects) == 0 {
+	if len(ids) == 0 {
 		return nil
 	}
-	if s.voiceStorage == nil {
-		return errors.New("OmniChat voice storage is unavailable for permanent deletion")
-	}
-	for _, object := range objects {
-		if err := s.voiceStorage.Delete(ctx, object.path); err != nil {
-			return fmt.Errorf("failed to delete OmniChat speech object: %w", err)
-		}
-	}
-	for _, object := range objects {
-		if _, err := tx.Exec(ctx, `DELETE FROM omnichat_speech_audio WHERE id=$1`, object.id); err != nil {
+	for _, id := range ids {
+		if _, err := tx.Exec(ctx, `DELETE FROM omnichat_speech_audio WHERE id=$1`, id); err != nil {
 			return fmt.Errorf("failed to delete OmniChat speech record: %w", err)
-		}
-		// The DELETE trigger records every erased path in the durable cleanup
-		// outbox. This object was synchronously deleted above, so acknowledge
-		// its tombstone in the same transaction.
-		if _, err := tx.Exec(ctx, `DELETE FROM omnichat_speech_deletion_queue WHERE storage_path=$1`, object.path); err != nil {
-			return fmt.Errorf("failed to acknowledge OmniChat speech deletion: %w", err)
 		}
 	}
 	return nil

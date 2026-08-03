@@ -92,6 +92,11 @@ func TestMigrateSeedsDefaultOmniChatPersonas(t *testing.T) {
 			require.Containsf(t, seed.postHistory, "[Conversation Handoff]", "narrative personas should retain reply handoff rules for %s", slug)
 		} else {
 			require.NotContainsf(t, seed.postHistory, "[Conversation Handoff]", "social personas should not force reply handoffs for %s", slug)
+			require.NotContainsf(t, seed.postHistory, "inner thoughts", "social personas should not encourage internal-monologue narration for %s", slug)
+			require.Containsf(t, seed.firstMessage, "*I ", "social persona starter narration should use first person for %s", slug)
+			require.Containsf(t, seed.example, "\n\n", "social persona examples should demonstrate at least two conversational blocks for %s", slug)
+			require.NotContainsf(t, seed.example, "*She ", "social persona examples should not demonstrate third-person narration for %s", slug)
+			require.NotContainsf(t, seed.example, "*He ", "social persona examples should not demonstrate third-person narration for %s", slug)
 			expectedStyle := models.ResponseStyleProfileNaturalDialogue
 			if slug == "dr-harold-whitcomb" {
 				expectedStyle = models.ResponseStyleProfileProfessional
@@ -115,7 +120,7 @@ func TestMigrateSeedsDefaultOmniChatPersonas(t *testing.T) {
 		  AND post_history_instructions LIKE '%Wrap actions, inner thoughts, scene-setting, and narration in single asterisks%'
 		  AND post_history_instructions LIKE '%Write spoken dialogue as plain regular text without surrounding quotation marks%'
 	`).Scan(&outputFormattedCount))
-	require.Equal(t, len(expectedSlugs), outputFormattedCount)
+	require.Equal(t, len(narrativeSlugs), outputFormattedCount)
 
 	require.Equal(t, 1, personas["ruleskeeper-dm"].id)
 	require.Equal(t, 2, personas["pirate-story-narrator"].id)
@@ -171,6 +176,94 @@ func TestMigrateSeedsDefaultOmniChatPersonas(t *testing.T) {
 		  AND system_prompt LIKE '%Do not rename Eldritch Blast as Chaos Bolt%'
 	`).Scan(&dmSpellGuardrailCount))
 	require.Equal(t, 2, dmSpellGuardrailCount)
+}
+
+func TestMigrateSeedsNonDestructiveDefaultOmniChatVoices(t *testing.T) {
+	db, err := NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, DropSchema(ctx, db))
+	require.NoError(t, db.Migrate(ctx))
+
+	expected := map[string]string{
+		"pirate-story-narrator":      "bm_george",
+		"high-school-story-narrator": "af_sarah",
+		"ruleskeeper-dm":             "am_adam",
+		"malachar-warlock-dm":        "am_onyx",
+		"ella-morgan":                "af_bella",
+		"scarlett-voss":              "af_nova",
+		"pink-sadie":                 "af_heart",
+		"rhett-callahan":             "am_liam",
+		"max-rosen":                  "am_echo",
+		"dr-harold-whitcomb":         "am_eric",
+	}
+
+	rows, err := db.Pool.Query(ctx, `
+		SELECT p.slug, v.provider, v.voice_id, v.model_id, v.language_code, v.configured_by
+		FROM bot_personas p
+		JOIN omnichat_persona_voices v ON v.persona_id = p.id
+		WHERE p.slug = ANY($1)
+	`, mapKeys(expected))
+	require.NoError(t, err)
+	defer rows.Close()
+
+	actual := make(map[string]string)
+	for rows.Next() {
+		var slug, provider, voiceID, modelID string
+		var languageCode *string
+		var configuredBy *int
+		require.NoError(t, rows.Scan(&slug, &provider, &voiceID, &modelID, &languageCode, &configuredBy))
+		require.Equal(t, "voicebox", provider)
+		require.Equal(t, "kokoro", modelID)
+		require.NotNil(t, languageCode)
+		require.Equal(t, "en", *languageCode)
+		require.Nil(t, configuredBy)
+		actual[slug] = voiceID
+	}
+	require.NoError(t, rows.Err())
+	require.Equal(t, expected, actual)
+
+	var adminID int
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		INSERT INTO users (username, username_normalized, password_hash, role)
+		VALUES ('default_voice_admin', 'default_voice_admin', 'hash', 'admin')
+		RETURNING id
+	`).Scan(&adminID))
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE omnichat_persona_voices v
+		SET provider='browser', voice_id='browser-custom', voice_name='Custom',
+		    model_id='browser-native', language_code=NULL, configured_by=$1
+		FROM bot_personas p
+		WHERE v.persona_id=p.id AND p.slug='ella-morgan'
+	`, adminID)
+	require.NoError(t, err)
+	migrationSQL, err := fs.ReadFile(migrationsFS, "migrations/153_omnichat_default_persona_voices.up.sql")
+	require.NoError(t, err)
+	_, err = db.Pool.Exec(ctx, string(migrationSQL))
+	require.NoError(t, err)
+
+	var provider, voiceID string
+	var configuredBy *int
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT v.provider, v.voice_id, v.configured_by
+		FROM omnichat_persona_voices v
+		JOIN bot_personas p ON p.id=v.persona_id
+		WHERE p.slug='ella-morgan'
+	`).Scan(&provider, &voiceID, &configuredBy))
+	require.Equal(t, "browser", provider)
+	require.Equal(t, "browser-custom", voiceID)
+	require.NotNil(t, configuredBy)
+	require.Equal(t, adminID, *configuredBy)
+}
+
+func mapKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 func TestSpellResolutionGuardrailMigrationRollsBackCleanly(t *testing.T) {

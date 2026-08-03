@@ -14,6 +14,7 @@ import (
 var (
 	ErrOmniChatGenerationResourceNotFound = errors.New("omnichat generation resource not found")
 	ErrOmniChatGenerationUnavailable      = errors.New("omnichat generation unavailable")
+	ErrOmniChatGenerationSafetyRejected   = errors.New("omnichat generation safety rejected")
 )
 
 type OmniChatGenerationPersonaReader interface {
@@ -30,11 +31,20 @@ type OmniChatGenerationStore interface {
 	GetMediaAssetOwned(ctx context.Context, id uuid.UUID, ownerUserID int) (*models.OmniChatMediaAsset, error)
 	MessageBelongsToConversation(ctx context.Context, messageID, conversationID int) (bool, error)
 	CreateGenerationJob(ctx context.Context, ownerUserID int, request models.OmniChatGenerationRequest, provider string) (*models.OmniChatGenerationJob, error)
-	MarkGenerationJobFailed(ctx context.Context, id uuid.UUID, safeCode, providerError string) error
+	MarkGenerationJobFailed(ctx context.Context, id uuid.UUID, safeCode, providerError string) (bool, error)
 }
 
 type OmniChatGenerationEnqueuer interface {
 	EnqueueOmniChatGeneration(ctx context.Context, id uuid.UUID) error
+}
+
+type OmniChatGenerationBilling interface {
+	ReserveOwned(context.Context, int, uuid.UUID, string) (*models.OmniCreditsUsageReservation, error)
+	RefundOwned(context.Context, int, uuid.UUID) error
+}
+
+type OmniChatMediaPromptModerator interface {
+	AllowPrivateMedia(ctx context.Context, prompt string, kind models.OmniChatMediaKind) (bool, error)
 }
 
 // OmniChatGenerationService authorizes every reference before a job is
@@ -46,6 +56,18 @@ type OmniChatGenerationService struct {
 	store         OmniChatGenerationStore
 	enqueuer      OmniChatGenerationEnqueuer
 	provider      string
+	billing       OmniChatGenerationBilling
+	moderator     OmniChatMediaPromptModerator
+}
+
+func (s *OmniChatGenerationService) SetBilling(billing OmniChatGenerationBilling) *OmniChatGenerationService {
+	s.billing = billing
+	return s
+}
+
+func (s *OmniChatGenerationService) SetPromptModerator(moderator OmniChatMediaPromptModerator) *OmniChatGenerationService {
+	s.moderator = moderator
+	return s
 }
 
 func NewOmniChatGenerationService(
@@ -133,21 +155,86 @@ func (s *OmniChatGenerationService) CreateGeneration(ctx context.Context, ownerU
 	if err != nil {
 		return nil, err
 	}
+	moderationPrompt := "Requested scene:\n" + normalized.EffectivePrompt
+	if normalized.NegativePrompt != "" {
+		moderationPrompt += "\n\nRequested exclusions:\n" + normalized.NegativePrompt
+	}
+	if s.moderator == nil {
+		return nil, ErrOmniChatGenerationUnavailable
+	}
+	allowed, moderationErr := s.moderator.AllowPrivateMedia(ctx, moderationPrompt, normalized.Kind)
+	if moderationErr != nil {
+		return nil, ErrOmniChatGenerationUnavailable
+	}
+	if !allowed {
+		return nil, ErrOmniChatGenerationSafetyRejected
+	}
+	var billingOperationID uuid.UUID
+	if normalized.Kind == models.OmniChatMediaKindImage || normalized.Kind == models.OmniChatMediaKindVideo {
+		if s.billing == nil {
+			return nil, ErrOmniChatPaidFeatureRequired
+		}
+		if s.billing != nil {
+			usageKind := models.OmniCreditsUsageImage
+			if normalized.Kind == models.OmniChatMediaKindVideo {
+				usageKind = models.OmniCreditsUsageVideo
+			}
+			billingOperationID = uuid.New()
+			if normalized.BillingOperationID != nil && *normalized.BillingOperationID != uuid.Nil {
+				billingOperationID = *normalized.BillingOperationID
+			}
+			if _, err := s.billing.ReserveOwned(ctx, ownerUserID, billingOperationID, usageKind); err != nil {
+				if normalized.BillingOperationID != nil && errors.Is(err, models.ErrOmniCreditsReservationRefunded) {
+					// A failed attempt may have already refunded its stable operation.
+					// Reservation records are immutable, so a retry uses a fresh,
+					// server-created operation after that confirmed closure.
+					billingOperationID = uuid.New()
+					if _, retryErr := s.billing.ReserveOwned(ctx, ownerUserID, billingOperationID, usageKind); retryErr == nil {
+						normalized.BillingOperationID = &billingOperationID
+					} else if errors.Is(retryErr, models.ErrOmniCreditsInsufficient) {
+						return nil, ErrOmniChatPaidFeatureRequired
+					} else {
+						return nil, fmt.Errorf("reserve generation retry credits: %w", retryErr)
+					}
+				} else {
+					if errors.Is(err, models.ErrOmniCreditsInsufficient) {
+						return nil, ErrOmniChatPaidFeatureRequired
+					}
+					return nil, fmt.Errorf("reserve video generation credits: %w", err)
+				}
+			}
+			normalized.BillingOperationID = &billingOperationID
+		}
+	}
+	refundReservation := func() error {
+		if billingOperationID == uuid.Nil {
+			return nil
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+		return s.billing.RefundOwned(cleanupCtx, ownerUserID, billingOperationID)
+	}
+	withRefund := func(base error) error {
+		if refundErr := refundReservation(); refundErr != nil {
+			return errors.Join(base, fmt.Errorf("refund generation reservation: %w", refundErr))
+		}
+		return base
+	}
 	job, err := s.store.CreateGenerationJob(ctx, ownerUserID, normalized, s.provider)
 	if err != nil {
-		return nil, fmt.Errorf("create generation job: %w", err)
+		return nil, withRefund(fmt.Errorf("create generation job: %w", err))
 	}
 	if s.enqueuer == nil {
 		if err := s.markQueueFailure(ctx, job.ID); err != nil {
-			return nil, ErrOmniChatGenerationUnavailable
+			return nil, withRefund(ErrOmniChatGenerationUnavailable)
 		}
-		return nil, ErrOmniChatGenerationUnavailable
+		return nil, withRefund(ErrOmniChatGenerationUnavailable)
 	}
 	if err := s.enqueuer.EnqueueOmniChatGeneration(ctx, job.ID); err != nil {
 		if markErr := s.markQueueFailure(ctx, job.ID); markErr != nil {
-			return nil, ErrOmniChatGenerationUnavailable
+			return nil, withRefund(ErrOmniChatGenerationUnavailable)
 		}
-		return nil, fmt.Errorf("%w: enqueue generation", ErrOmniChatGenerationUnavailable)
+		return nil, withRefund(fmt.Errorf("%w: enqueue generation", ErrOmniChatGenerationUnavailable))
 	}
 	return job, nil
 }
@@ -163,7 +250,8 @@ func (s *OmniChatGenerationService) markQueueFailure(ctx context.Context, jobID 
 	}
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 	defer cancel()
-	return s.store.MarkGenerationJobFailed(cleanupCtx, jobID, "queue_unavailable", "generation could not be queued")
+	_, err := s.store.MarkGenerationJobFailed(cleanupCtx, jobID, "queue_unavailable", "generation could not be queued")
+	return err
 }
 
 func omniChatSceneIsEmpty(scene models.OmniChatSceneState) bool {

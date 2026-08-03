@@ -52,6 +52,7 @@ type MediaHandler struct {
 	queueClient         queue.MediaJobEnqueuer
 	quota               MediaQuotaConfig
 	virusScanFailClosed bool
+	virusScanEnabled    bool
 	// s3Service is set only when STORAGE_BACKEND=s3; nil for local storage.
 	s3Service *services.S3StorageService
 	// storageBackend is "local" or "s3".
@@ -76,6 +77,7 @@ func NewMediaHandler(
 	queueClient queue.MediaJobEnqueuer,
 	quota MediaQuotaConfig,
 	virusScanFailClosed bool,
+	virusScanEnabled bool,
 ) *MediaHandler {
 	if quota.FreeTierBytes <= 0 {
 		quota.FreeTierBytes = 1 * 1024 * 1024 * 1024
@@ -89,6 +91,7 @@ func NewMediaHandler(
 		queueClient:         queueClient,
 		quota:               quota,
 		virusScanFailClosed: virusScanFailClosed,
+		virusScanEnabled:    virusScanEnabled,
 		storageBackend:      "local",
 	}
 }
@@ -163,8 +166,8 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		return
 	}
 
-	uploadDir := "uploads"
-	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+	uploadDir := filepath.Join("uploads", strconv.Itoa(userID))
+	if err := os.MkdirAll(uploadDir, 0o750); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to prepare storage directory")
 		return
 	}
@@ -179,7 +182,9 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	}
 	newName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
 	storagePath := filepath.Join(uploadDir, newName)
+	storageObjectKey := filepath.ToSlash(filepath.Join(strconv.Itoa(userID), newName))
 
+	// #nosec G304 -- storagePath uses a numeric authenticated user directory and server-generated filename.
 	dst, err := os.Create(storagePath)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to create file")
@@ -318,36 +323,15 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		return
 	}
 
-	storageURL := "/uploads/" + newName
-	if h.storageService != nil {
-		uploadFile, openErr := os.Open(storagePath)
-		if openErr != nil {
-			_ = os.Remove(storagePath)
-			RespondError(c, http.StatusInternalServerError, "Failed to open file for storage upload")
-			return
-		}
-		uploadedURL, uploadErr := h.storageService.Upload(c.Request.Context(), newName, uploadFile, contentType)
-		uploadFile.Close()
-		if uploadErr != nil {
-			_ = os.Remove(storagePath)
-			zlog.Error().Err(uploadErr).Str("key", newName).Msg("storage upload failed")
-			RespondError(c, http.StatusInternalServerError, "Failed to upload file to storage backend")
-			return
-		}
-		storageURL = uploadedURL
-		if h.storageBackend == "s3" {
-			_ = os.Remove(storagePath)
-		}
-	}
-
 	media := &models.MediaFile{
 		UserID:           userID,
 		Filename:         newName,
 		OriginalFilename: safeName,
 		FileType:         contentType,
 		FileSize:         total,
-		StorageURL:       storageURL,
+		StorageURL:       "/uploads/" + storageObjectKey,
 		StoragePath:      storagePath,
+		StorageObjectKey: storageObjectKey,
 		UsedInMessageID:  nil,
 	}
 
@@ -370,7 +354,43 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		}
 	}
 
+	if h.storageService != nil {
+		// #nosec G304 -- storagePath uses a numeric authenticated user directory and server-generated filename.
+		uploadFile, openErr := os.Open(storagePath)
+		if openErr != nil {
+			_ = os.Remove(storagePath)
+			RespondError(c, http.StatusInternalServerError, "Failed to open file for storage upload")
+			return
+		}
+		_, uploadErr := h.storageService.Upload(c.Request.Context(), storageObjectKey, uploadFile, contentType)
+		closeErr := uploadFile.Close()
+		if uploadErr != nil {
+			_ = os.Remove(storagePath)
+			zlog.Error().Err(uploadErr).Str("key", storageObjectKey).Msg("storage upload failed")
+			RespondError(c, http.StatusInternalServerError, "Failed to upload file to storage backend")
+			return
+		}
+		if closeErr != nil {
+			_ = os.Remove(storagePath)
+			zlog.Error().Err(closeErr).Str("key", storageObjectKey).Msg("storage upload file close failed")
+			RespondError(c, http.StatusInternalServerError, "Failed to finalize storage upload")
+			return
+		}
+		// The object backend's URL may be a public CloudFront/S3 URL. Keep the
+		// client-visible value on our ownership-aware upload gateway instead.
+		media.StorageURL = "/uploads/" + storageObjectKey
+		if h.storageBackend == "s3" {
+			_ = os.Remove(storagePath)
+		}
+	}
+
 	if err := h.mediaRepo.Create(c.Request.Context(), media); err != nil {
+		if h.storageService != nil {
+			if deleteErr := h.storageService.Delete(c.Request.Context(), storageObjectKey); deleteErr != nil {
+				zlog.Warn().Err(deleteErr).Str("key", storageObjectKey).Msg("failed to rollback stored upload")
+			}
+		}
+		_ = os.Remove(storagePath)
 		RespondError(c, http.StatusInternalServerError, "Failed to save media record")
 		return
 	}
@@ -572,8 +592,8 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, role
 	}
 	defer file.Close()
 
-	uploadDir := "uploads"
-	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+	uploadDir := filepath.Join("uploads", strconv.Itoa(userID))
+	if err := os.MkdirAll(uploadDir, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to prepare storage directory: %w", err)
 	}
 
@@ -583,7 +603,9 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, role
 	}
 	newName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
 	storagePath := filepath.Join(uploadDir, newName)
+	storageObjectKey := filepath.ToSlash(filepath.Join(strconv.Itoa(userID), newName))
 
+	// #nosec G304 -- storagePath uses a numeric authenticated user directory and server-generated filename.
 	dst, err := os.Create(storagePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create file: %w", err)
@@ -645,41 +667,15 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, role
 		return nil, fmt.Errorf("invalid document structure: %w", err)
 	}
 
-	batchStorageURL := "/uploads/" + newName
-	if h.storageService != nil {
-		uploadFile, openErr := os.Open(storagePath)
-		if openErr != nil {
-			_ = os.Remove(storagePath)
-			return nil, fmt.Errorf("failed to open file for storage upload: %w", openErr)
-		}
-		uploadedURL, uploadErr := h.storageService.Upload(ctx, newName, uploadFile, contentType)
-		uploadFile.Close()
-		if uploadErr != nil {
-			_ = os.Remove(storagePath)
-			return nil, fmt.Errorf("failed to upload file to storage backend: %w", uploadErr)
-		}
-		batchStorageURL = uploadedURL
-		if h.storageBackend == "s3" {
-			_ = os.Remove(storagePath)
-		}
-	}
-
-	// Use the actual on-disk size — header.Size is client-controlled and cannot
-	// be trusted for quota accounting.
-	actualInfo, statErr := os.Stat(storagePath)
-	actualSize := header.Size // fallback if stat fails (should not happen)
-	if statErr == nil {
-		actualSize = actualInfo.Size()
-	}
-
 	media := &models.MediaFile{
 		UserID:           userID,
 		Filename:         newName,
 		OriginalFilename: safeName,
 		FileType:         contentType,
-		FileSize:         actualSize,
-		StorageURL:       batchStorageURL,
+		FileSize:         totalWritten,
+		StorageURL:       "/uploads/" + storageObjectKey,
 		StoragePath:      storagePath,
+		StorageObjectKey: storageObjectKey,
 	}
 
 	// Extract dimensions for images (thumbnail generation is async when queue is available)
@@ -706,7 +702,36 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, role
 		}
 	}
 
+	if h.storageService != nil {
+		// #nosec G304 -- storagePath uses a numeric authenticated user directory and server-generated filename.
+		uploadFile, openErr := os.Open(storagePath)
+		if openErr != nil {
+			_ = os.Remove(storagePath)
+			return nil, fmt.Errorf("failed to open file for storage upload: %w", openErr)
+		}
+		_, uploadErr := h.storageService.Upload(ctx, storageObjectKey, uploadFile, contentType)
+		closeErr := uploadFile.Close()
+		if uploadErr != nil {
+			_ = os.Remove(storagePath)
+			return nil, fmt.Errorf("failed to upload file to storage backend: %w", uploadErr)
+		}
+		if closeErr != nil {
+			_ = os.Remove(storagePath)
+			return nil, fmt.Errorf("failed to close file after storage upload: %w", closeErr)
+		}
+		// Do not return a direct storage/CDN URL for a private upload.
+		media.StorageURL = "/uploads/" + storageObjectKey
+		if h.storageBackend == "s3" {
+			_ = os.Remove(storagePath)
+		}
+	}
+
 	if err := h.mediaRepo.Create(ctx, media); err != nil {
+		if h.storageService != nil {
+			if deleteErr := h.storageService.Delete(ctx, storageObjectKey); deleteErr != nil {
+				zlog.Warn().Err(deleteErr).Str("key", storageObjectKey).Msg("failed to rollback stored batch upload")
+			}
+		}
 		_ = os.Remove(storagePath)
 		return nil, fmt.Errorf("failed to save media record: %w", err)
 	}
@@ -723,25 +748,36 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, role
 }
 
 func (h *MediaHandler) schedulePostUploadJobs(ctx context.Context, media *models.MediaFile) error {
-	if h.queueClient != nil {
-		if err := h.queueClient.EnqueueVirusScan(ctx, media.ID, media.StoragePath, media.Filename, media.UserID); err != nil {
+	if h.virusScanEnabled && h.queueClient != nil {
+		storageObjectKey := media.StorageObjectKey
+		if storageObjectKey == "" {
+			storageObjectKey = media.StoragePath
+		}
+		if err := h.queueClient.EnqueueVirusScan(ctx, media.ID, storageObjectKey, media.Filename, media.UserID); err != nil {
 			zlog.Warn().Err(err).Int("media_id", media.ID).Msg("failed to enqueue virus scan")
-			if markErr := h.mediaRepo.MarkScanError(ctx, media.ID, "virus scan queue unavailable"); markErr != nil {
-				zlog.Warn().Err(markErr).Int("media_id", media.ID).Msg("failed to mark media scan error")
-			}
 			if h.virusScanFailClosed {
+				if markErr := h.mediaRepo.MarkScanError(ctx, media.ID, "virus scan queue unavailable"); markErr != nil {
+					zlog.Warn().Err(markErr).Int("media_id", media.ID).Msg("failed to mark media scan error")
+				}
 				return err
+			}
+			if markErr := h.mediaRepo.MarkScanClean(ctx, media.ID); markErr != nil {
+				zlog.Warn().Err(markErr).Int("media_id", media.ID).Msg("failed to mark media scan clean")
 			}
 		}
 
 		return nil
 	}
 
-	if markErr := h.mediaRepo.MarkScanError(ctx, media.ID, "virus scan queue unavailable"); markErr != nil {
-		zlog.Warn().Err(markErr).Int("media_id", media.ID).Msg("failed to mark media scan error")
-	}
 	if h.virusScanFailClosed {
+		if markErr := h.mediaRepo.MarkScanError(ctx, media.ID, "virus scan queue unavailable"); markErr != nil {
+			zlog.Warn().Err(markErr).Int("media_id", media.ID).Msg("failed to mark media scan error")
+		}
 		return fmt.Errorf("virus scan queue unavailable")
+	}
+
+	if markErr := h.mediaRepo.MarkScanClean(ctx, media.ID); markErr != nil {
+		zlog.Warn().Err(markErr).Int("media_id", media.ID).Msg("failed to mark media scan clean")
 	}
 
 	if !services.IsImageType(media.FileType) {

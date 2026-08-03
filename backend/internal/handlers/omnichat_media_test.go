@@ -22,6 +22,22 @@ type omniChatGenerationCreatorFake struct {
 	err     error
 }
 
+type omniChatRequestIdempotencyFake struct {
+	claim *models.OmniChatRequestClaim
+	err   error
+}
+
+func (f *omniChatRequestIdempotencyFake) Begin(context.Context, int, uuid.UUID, string, string, string) (*models.OmniChatRequestClaim, error) {
+	if f.claim == nil {
+		return &models.OmniChatRequestClaim{}, f.err
+	}
+	return f.claim, f.err
+}
+func (*omniChatRequestIdempotencyFake) Complete(context.Context, int, uuid.UUID, json.RawMessage) error {
+	return nil
+}
+func (*omniChatRequestIdempotencyFake) Fail(context.Context, int, uuid.UUID) error { return nil }
+
 func (f *omniChatGenerationCreatorFake) CreateGeneration(_ context.Context, _ int, request models.OmniChatGenerationRequest) (*models.OmniChatGenerationJob, error) {
 	f.request = request
 	return f.job, f.err
@@ -31,6 +47,8 @@ type omniChatMediaReaderFake struct {
 	job           *models.OmniChatGenerationJob
 	asset         *models.OmniChatMediaAsset
 	galleryCursor *models.OmniChatMediaCursor
+	deleteResult  bool
+	deleteErr     error
 }
 
 type omniChatMediaStorageFake struct {
@@ -89,6 +107,10 @@ func (f *omniChatMediaReaderFake) GetMediaAssetOwned(_ context.Context, _ uuid.U
 	return f.asset, nil
 }
 
+func (f *omniChatMediaReaderFake) DeleteMediaAssetOwned(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
+	return f.deleteResult, f.deleteErr
+}
+
 func (f *omniChatMediaReaderFake) SetConversationSceneOwned(_ context.Context, _, _ int, _ models.OmniChatSceneState) (bool, error) {
 	return true, nil
 }
@@ -99,7 +121,7 @@ func (f *omniChatMediaReaderFake) GetConversationSceneOwned(_ context.Context, _
 
 func newOmniChatMediaTestRouter(creator OmniChatGenerationCreator, reader OmniChatMediaStore) *gin.Engine {
 	gin.SetMode(gin.TestMode)
-	handler := NewOmniChatMediaHandler(creator, reader, nil)
+	handler := NewOmniChatMediaHandler(creator, reader, nil).SetRequestIdempotency(&omniChatRequestIdempotencyFake{})
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("user_id", 9)
@@ -133,7 +155,7 @@ func TestOmniChatMediaHandlerCreateGenerationReturnsAcceptedJob(t *testing.T) {
 		ID: jobID, OwnerUserID: 9, Status: models.OmniChatGenerationStatusQueued,
 	}}
 	router := newOmniChatMediaTestRouter(creator, &omniChatMediaReaderFake{})
-	body := []byte(`{"kind":"image","mode":"contextual","persona_id":42,"conversation_id":7,"prompt":"show me"}`)
+	body := []byte(`{"kind":"image","mode":"contextual","persona_id":42,"conversation_id":7,"prompt":"show me","request_id":"` + uuid.NewString() + `"}`)
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/generations", bytes.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
@@ -194,6 +216,34 @@ func TestOmniChatMediaHandlerRejectsOversizedStoredObjectBeforeDownload(t *testi
 
 	require.Equal(t, http.StatusConflict, response.Code)
 	require.Zero(t, storage.downloadCalls)
+}
+
+func TestOmniChatMediaHandlerDeletesOwnedAsset(t *testing.T) {
+	assetID := uuid.New()
+	store := &omniChatMediaReaderFake{deleteResult: true}
+	handler := NewOmniChatMediaHandler(&omniChatGenerationCreatorFake{}, store, nil)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set("user_id", 9); c.Next() })
+	router.DELETE("/media/:id", handler.DeleteAsset)
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodDelete, "/media/"+assetID.String(), nil))
+
+	require.Equal(t, http.StatusNoContent, response.Code)
+}
+
+func TestOmniChatMediaHandlerRefusesSharedAssetDeletion(t *testing.T) {
+	assetID := uuid.New()
+	store := &omniChatMediaReaderFake{deleteErr: models.ErrOmniChatMediaInUse}
+	handler := NewOmniChatMediaHandler(&omniChatGenerationCreatorFake{}, store, nil)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set("user_id", 9); c.Next() })
+	router.DELETE("/media/:id", handler.DeleteAsset)
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodDelete, "/media/"+assetID.String(), nil))
+
+	require.Equal(t, http.StatusConflict, response.Code)
 }
 
 func TestDecodeStrictJSONRejectsBodyBeyondLimit(t *testing.T) {

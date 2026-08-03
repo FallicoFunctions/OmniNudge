@@ -40,49 +40,49 @@ func TestCryptoPaymentRepository_Create(t *testing.T) {
 		{
 			name: "creates BTC payment",
 			payment: models.CryptoPayment{
-				UserID:            userID,
-				TXID:              "abc123btc",
-				Coin:              models.CoinBTC,
-				USDPriceAtSubmit:  45000.00,
-				AmountReceived:    0.000067,
-				USDValue:          3.015,
-				PlanMonths:        1,
+				UserID:           userID,
+				TXID:             "abc123btc",
+				Coin:             models.CoinBTC,
+				USDPriceAtSubmit: 45000.00,
+				AmountReceived:   0.000067,
+				USDValue:         3.015,
+				PlanMonths:       1,
 			},
 		},
 		{
 			name: "creates ETH payment",
 			payment: models.CryptoPayment{
-				UserID:            userID,
-				TXID:              "abc123eth",
-				Coin:              models.CoinETH,
-				USDPriceAtSubmit:  2500.00,
-				AmountReceived:    0.001196,
-				USDValue:          2.99,
-				PlanMonths:        1,
+				UserID:           userID,
+				TXID:             "abc123eth",
+				Coin:             models.CoinETH,
+				USDPriceAtSubmit: 2500.00,
+				AmountReceived:   0.001196,
+				USDValue:         2.99,
+				PlanMonths:       1,
 			},
 		},
 		{
 			name: "creates CAH payment",
 			payment: models.CryptoPayment{
-				UserID:            userID,
-				TXID:              "abc123cah",
-				Coin:              models.CoinCAH,
-				USDPriceAtSubmit:  0.05,
-				AmountReceived:    39.8,
-				USDValue:          1.99,
-				PlanMonths:        1,
+				UserID:           userID,
+				TXID:             "abc123cah",
+				Coin:             models.CoinCAH,
+				USDPriceAtSubmit: 0.05,
+				AmountReceived:   39.8,
+				USDValue:         1.99,
+				PlanMonths:       1,
 			},
 		},
 		{
 			name: "rejects duplicate txid+coin",
 			payment: models.CryptoPayment{
-				UserID:            userID,
-				TXID:              "abc123btc", // duplicate
-				Coin:              models.CoinBTC,
-				USDPriceAtSubmit:  45000.00,
-				AmountReceived:    0.000067,
-				USDValue:          3.015,
-				PlanMonths:        1,
+				UserID:           userID,
+				TXID:             "abc123btc", // duplicate
+				Coin:             models.CoinBTC,
+				USDPriceAtSubmit: 45000.00,
+				AmountReceived:   0.000067,
+				USDValue:         3.015,
+				PlanMonths:       1,
 			},
 			wantErr: true,
 		},
@@ -210,12 +210,12 @@ func TestUserRepository_UpdatePlan(t *testing.T) {
 
 	t.Run("upgrades to paid with expiry", func(t *testing.T) {
 		expires := time.Now().Add(30 * 24 * time.Hour)
-		err := repo.UpdatePlan(ctx, userID, models.PlanPaid, &expires)
+		err := repo.UpdatePlan(ctx, userID, models.PlanPlus, &expires)
 		require.NoError(t, err)
 
 		plan, expiresAt, err := repo.GetPlan(ctx, userID)
 		require.NoError(t, err)
-		assert.Equal(t, models.PlanPaid, plan)
+		assert.Equal(t, models.PlanPlus, plan)
 		assert.NotNil(t, expiresAt)
 	})
 
@@ -238,13 +238,13 @@ func TestUserRepository_ListUsersWithExpiredPlans(t *testing.T) {
 	// User with expired plan
 	expiredID := createTestUser(t, repo, "expired_plan_user")
 	pastExpiry := time.Now().Add(-1 * time.Hour)
-	err := repo.UpdatePlan(ctx, expiredID, models.PlanPaid, &pastExpiry)
+	err := repo.UpdatePlan(ctx, expiredID, models.PlanPlus, &pastExpiry)
 	require.NoError(t, err)
 
 	// User with active plan
 	activeID := createTestUser(t, repo, "active_plan_user")
 	futureExpiry := time.Now().Add(30 * 24 * time.Hour)
-	err = repo.UpdatePlan(ctx, activeID, models.PlanPaid, &futureExpiry)
+	err = repo.UpdatePlan(ctx, activeID, models.PlanPlus, &futureExpiry)
 	require.NoError(t, err)
 
 	// Free user (should not appear)

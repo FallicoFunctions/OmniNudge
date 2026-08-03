@@ -179,6 +179,29 @@ func (h *BlockingHandler) BlockUser(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to block user")
 		return
 	}
+	if _, err = tx.Exec(ctx, `
+		DELETE FROM omnichat_follows
+		WHERE (follower_user_id=$1 AND followed_user_id=$2)
+		   OR (follower_user_id=$2 AND followed_user_id=$1)
+	`, blockerID, blockedUser.ID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to block user")
+		return
+	}
+	// A block involving an OmniChat group owner revokes the other party's
+	// membership immediately instead of leaving an inaccessible row consuming
+	// the member cap. Blocks between two non-owner members keep both memberships
+	// and are enforced per-message.
+	if _, err = tx.Exec(ctx, `
+		DELETE FROM omnichat_group_members member
+		USING omnichat_groups g
+		WHERE member.group_id=g.id AND member.role <> 'owner' AND (
+			(g.owner_user_id=$1 AND member.user_id=$2) OR
+			(g.owner_user_id=$2 AND member.user_id=$1)
+		)
+	`, blockerID, blockedUser.ID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to block user")
+		return
+	}
 
 	if err = tx.Commit(ctx); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to block user")

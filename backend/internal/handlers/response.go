@@ -32,6 +32,8 @@ func errorCodeFromStatus(status int) string {
 		return "not_found"
 	case http.StatusConflict:
 		return "conflict"
+	case http.StatusPaymentRequired:
+		return "payment_required"
 	case http.StatusTooManyRequests:
 		return "rate_limited"
 	case http.StatusRequestEntityTooLarge:

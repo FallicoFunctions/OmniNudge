@@ -21,10 +21,11 @@ import (
 const (
 	AccessTokenCookieName  = "omni_access"
 	RefreshTokenCookieName = "omni_refresh"
-	CSRFTokenCookieName    = "omni_csrf"
-	AccessTokenTTL         = 15 * time.Minute
-	DefaultSessionTTL      = 24 * time.Hour
-	PersistentSessionTTL   = 30 * 24 * time.Hour
+	// #nosec G101 -- this is a public cookie name, not a credential or secret.
+	CSRFTokenCookieName  = "omni_csrf"
+	AccessTokenTTL       = 15 * time.Minute
+	DefaultSessionTTL    = 24 * time.Hour
+	PersistentSessionTTL = 30 * 24 * time.Hour
 )
 
 var ErrInvalidAuthSession = errors.New("invalid authentication session")

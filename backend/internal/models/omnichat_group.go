@@ -75,6 +75,18 @@ type OmniChatGroupCursor struct {
 	ID            uuid.UUID
 }
 
+type OmniChatGroupSendContext struct {
+	SenderName      string
+	SenderAvatarURL *string
+	Personas        []*BotPersona
+}
+
+type OmniChatGroupPersonaReply struct {
+	PersonaID int
+	Content   string
+	Failed    bool
+}
+
 type OmniChatGroupRepository struct{ pool *pgxpool.Pool }
 
 func NewOmniChatGroupRepository(pool *pgxpool.Pool) *OmniChatGroupRepository {
@@ -255,6 +267,11 @@ func (r *OmniChatGroupRepository) CreateInvite(ctx context.Context, groupID uuid
 		JOIN omnichat_groups g ON g.id=m.group_id
 		WHERE m.group_id=$2 AND m.user_id=$3 AND m.role IN ('owner','admin')
 		  AND g.archived_at IS NULL
+		  AND NOT EXISTS (
+			SELECT 1 FROM blocked_users actor_block
+			WHERE (actor_block.blocker_id=$3 AND actor_block.blocked_id=g.owner_user_id)
+			   OR (actor_block.blocker_id=g.owner_user_id AND actor_block.blocked_id=$3)
+		  )
 		  AND ($4::int IS NULL OR EXISTS (
 			SELECT 1 FROM users invitee
 			WHERE invitee.id=$4 AND invitee.deleted=FALSE AND invitee.banned=FALSE
@@ -367,6 +384,213 @@ func (r *OmniChatGroupRepository) CreatePersonaMessage(ctx context.Context, grou
 	return message, err
 }
 
+func (r *OmniChatGroupRepository) ValidateGroupSend(ctx context.Context, groupID uuid.UUID, userID int, personaIDs []int) (*OmniChatGroupSendContext, error) {
+	send := &OmniChatGroupSendContext{}
+	err := r.pool.QueryRow(ctx, `
+		SELECT sender.username,sender.avatar_url
+		FROM omnichat_group_members member
+		JOIN omnichat_groups g ON g.id=member.group_id
+		JOIN users sender ON sender.id=member.user_id AND sender.deleted=FALSE AND sender.banned=FALSE
+		WHERE member.group_id=$1 AND member.user_id=$2 AND g.archived_at IS NULL
+		  AND NOT EXISTS (
+			SELECT 1 FROM blocked_users bu
+			WHERE (bu.blocker_id=$2 AND bu.blocked_id=g.owner_user_id)
+			   OR (bu.blocker_id=g.owner_user_id AND bu.blocked_id=$2)
+		  )
+	`, groupID, userID).Scan(&send.SenderName, &send.SenderAvatarURL)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	send.Personas = make([]*BotPersona, 0, len(personaIDs))
+	for _, personaID := range personaIDs {
+		persona, err := r.GetPersonaInGroup(ctx, groupID, personaID)
+		if err != nil {
+			return nil, err
+		}
+		if persona == nil {
+			return nil, nil
+		}
+		send.Personas = append(send.Personas, persona)
+	}
+	return send, nil
+}
+
+func (r *OmniChatGroupRepository) GetMessageBatchByRequest(ctx context.Context, groupID uuid.UUID, userID int, requestID uuid.UUID) ([]*OmniChatGroupMessage, error) {
+	if requestID == uuid.Nil {
+		return nil, nil
+	}
+	var userMessageID uuid.UUID
+	err := r.pool.QueryRow(ctx, `
+		SELECT message.id
+		FROM omnichat_group_messages message
+		JOIN omnichat_group_members member ON member.group_id=message.group_id AND member.user_id=$2
+		JOIN omnichat_groups g ON g.id=message.group_id AND g.archived_at IS NULL
+		WHERE message.group_id=$1 AND message.sender_user_id=$2 AND message.client_request_id=$3
+		  AND NOT EXISTS (
+			SELECT 1 FROM blocked_users bu
+			WHERE (bu.blocker_id=$2 AND bu.blocked_id=g.owner_user_id)
+			   OR (bu.blocker_id=g.owner_user_id AND bu.blocked_id=$2)
+		  )
+	`, groupID, userID, requestID).Scan(&userMessageID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return listOmniChatGroupMessageBatch(ctx, r.pool, groupID, userMessageID)
+}
+
+// CreateMessageBatch persists one client send and all generated character
+// replies atomically. Replaying requestID returns the committed batch without
+// creating messages or moving group activity a second time.
+func (r *OmniChatGroupRepository) CreateMessageBatch(
+	ctx context.Context,
+	groupID uuid.UUID,
+	userID int,
+	requestID uuid.UUID,
+	content string,
+	replyToID *uuid.UUID,
+	replies []OmniChatGroupPersonaReply,
+) ([]*OmniChatGroupMessage, bool, error) {
+	if requestID == uuid.Nil {
+		return nil, false, nil
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback(ctx)
+	var lockedGroupID uuid.UUID
+	err = tx.QueryRow(ctx, `
+		SELECT g.id
+		FROM omnichat_groups g
+		JOIN omnichat_group_members member ON member.group_id=g.id AND member.user_id=$2
+		JOIN users sender ON sender.id=$2 AND sender.deleted=FALSE AND sender.banned=FALSE
+		WHERE g.id=$1 AND g.archived_at IS NULL
+		  AND NOT EXISTS (
+			SELECT 1 FROM blocked_users bu
+			WHERE (bu.blocker_id=$2 AND bu.blocked_id=g.owner_user_id)
+			   OR (bu.blocker_id=g.owner_user_id AND bu.blocked_id=$2)
+		  )
+		FOR UPDATE OF g
+	`, groupID, userID).Scan(&lockedGroupID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	var existingMessageID uuid.UUID
+	err = tx.QueryRow(ctx, `
+		SELECT id FROM omnichat_group_messages
+		WHERE group_id=$1 AND sender_user_id=$2 AND client_request_id=$3
+	`, groupID, userID, requestID).Scan(&existingMessageID)
+	if err == nil {
+		messages, err := listOmniChatGroupMessageBatch(ctx, tx, groupID, existingMessageID)
+		if err != nil {
+			return nil, false, err
+		}
+		if err = tx.Commit(ctx); err != nil {
+			return nil, false, err
+		}
+		return messages, false, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, err
+	}
+	if replyToID != nil {
+		var replyExists bool
+		if err = tx.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM omnichat_group_messages
+				WHERE id=$1 AND group_id=$2 AND deleted_at IS NULL
+			)
+		`, *replyToID, groupID).Scan(&replyExists); err != nil {
+			return nil, false, err
+		}
+		if !replyExists {
+			return nil, false, nil
+		}
+	}
+	userMessageID := uuid.New()
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO omnichat_group_messages(
+			id,group_id,sender_type,sender_user_id,reply_to_id,content,client_request_id
+		) VALUES ($1,$2,'user',$3,$4,$5,$6)
+	`, userMessageID, groupID, userID, replyToID, content, requestID); err != nil {
+		return nil, false, err
+	}
+	for index, reply := range replies {
+		tag, err := tx.Exec(ctx, `
+			INSERT INTO omnichat_group_messages(
+				id,group_id,sender_type,sender_persona_id,reply_to_id,content,failed,batch_position
+			)
+			SELECT $1,$2,'persona',$3,$4,$5,$6,$7
+			FROM omnichat_group_personas gp
+			JOIN omnichat_groups g ON g.id=gp.group_id
+			JOIN bot_personas persona ON persona.id=gp.persona_id
+			WHERE gp.group_id=$2 AND gp.persona_id=$3 AND g.archived_at IS NULL
+			  AND persona.is_active=TRUE
+			  AND ((persona.owner_user_id IS NULL AND persona.visibility='public') OR persona.owner_user_id=g.owner_user_id)
+		`, uuid.New(), groupID, reply.PersonaID, userMessageID, reply.Content, reply.Failed, index+1)
+		if err != nil {
+			return nil, false, err
+		}
+		if tag.RowsAffected() != 1 {
+			return nil, false, nil
+		}
+	}
+	if _, err = tx.Exec(ctx, `UPDATE omnichat_groups SET last_message_at=NOW(),updated_at=NOW() WHERE id=$1`, groupID); err != nil {
+		return nil, false, err
+	}
+	messages, err := listOmniChatGroupMessageBatch(ctx, tx, groupID, userMessageID)
+	if err != nil {
+		return nil, false, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return nil, false, err
+	}
+	return messages, true, nil
+}
+
+type omniChatGroupMessageQuerier interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}
+
+func listOmniChatGroupMessageBatch(ctx context.Context, querier omniChatGroupMessageQuerier, groupID, userMessageID uuid.UUID) ([]*OmniChatGroupMessage, error) {
+	rows, err := querier.Query(ctx, `
+		SELECT message.id,message.group_id,message.sender_type,message.sender_user_id,message.sender_persona_id,
+		       COALESCE(sender.username,persona.name,'System'),COALESCE(sender.avatar_url,persona.avatar_url),
+		       message.reply_to_id,message.content,message.failed,message.created_at
+		FROM omnichat_group_messages message
+		LEFT JOIN users sender ON sender.id=message.sender_user_id
+		LEFT JOIN bot_personas persona ON persona.id=message.sender_persona_id
+		WHERE message.group_id=$1 AND (message.id=$2 OR message.reply_to_id=$2)
+		ORDER BY message.batch_position,message.id
+	`, groupID, userMessageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	messages := make([]*OmniChatGroupMessage, 0)
+	for rows.Next() {
+		message := &OmniChatGroupMessage{}
+		if err := rows.Scan(
+			&message.ID, &message.GroupID, &message.SenderType, &message.SenderUserID,
+			&message.SenderPersonaID, &message.SenderName, &message.SenderAvatarURL,
+			&message.ReplyToID, &message.Content, &message.Failed, &message.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		messages = append(messages, message)
+	}
+	return messages, rows.Err()
+}
+
 func (r *OmniChatGroupRepository) ListMessagesForMember(ctx context.Context, groupID uuid.UUID, userID int, before *OmniChatGroupMessageCursor, limit int) ([]*OmniChatGroupMessage, error) {
 	if limit < 1 || limit > 200 {
 		limit = 100
@@ -469,4 +693,198 @@ func (r *OmniChatGroupRepository) GetPersonaInGroup(ctx context.Context, groupID
 		return nil, nil
 	}
 	return persona, err
+}
+
+func (r *OmniChatGroupRepository) UpdateGroup(ctx context.Context, groupID uuid.UUID, userID int, name, description, visibility string) (*OmniChatGroup, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE omnichat_groups g
+		SET name=$3,description=$4,visibility=$5,updated_at=NOW()
+		FROM omnichat_group_members member
+		WHERE g.id=$1 AND member.group_id=g.id AND member.user_id=$2
+		  AND member.role IN ('owner','admin') AND g.archived_at IS NULL
+			  AND NOT EXISTS (
+				SELECT 1 FROM blocked_users actor_block
+				WHERE (actor_block.blocker_id=$2 AND actor_block.blocked_id=g.owner_user_id)
+				   OR (actor_block.blocker_id=g.owner_user_id AND actor_block.blocked_id=$2)
+			  )
+		`, groupID, userID, name, description, visibility)
+	if err != nil {
+		return nil, err
+	}
+	if tag.RowsAffected() == 0 {
+		return nil, nil
+	}
+	return r.GetGroupForMember(ctx, groupID, userID)
+}
+
+func (r *OmniChatGroupRepository) LeaveGroup(ctx context.Context, groupID uuid.UUID, userID int) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
+		DELETE FROM omnichat_group_members member
+		USING omnichat_groups g
+		WHERE member.group_id=$1 AND member.user_id=$2 AND member.role <> 'owner'
+		  AND g.id=member.group_id AND g.archived_at IS NULL
+	`, groupID, userID)
+	return tag.RowsAffected() > 0, err
+}
+
+func (r *OmniChatGroupRepository) SetMemberRole(ctx context.Context, groupID uuid.UUID, ownerUserID, targetUserID int, role string) (bool, error) {
+	if role != "admin" && role != "member" || ownerUserID == targetUserID {
+		return false, nil
+	}
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE omnichat_group_members target
+		SET role=$4
+		FROM omnichat_groups g
+		JOIN omnichat_group_members owner
+		  ON owner.group_id=g.id AND owner.user_id=$2 AND owner.role='owner'
+		WHERE target.group_id=$1 AND target.user_id=$3 AND target.role <> 'owner'
+		  AND g.id=target.group_id AND g.archived_at IS NULL
+			  AND NOT EXISTS (
+				SELECT 1 FROM blocked_users actor_block
+				WHERE (actor_block.blocker_id=$2 AND actor_block.blocked_id=g.owner_user_id)
+				   OR (actor_block.blocker_id=g.owner_user_id AND actor_block.blocked_id=$2)
+			  )
+			  AND (
+				$4 <> 'admin'
+				OR NOT EXISTS (
+					SELECT 1 FROM blocked_users target_block
+					WHERE (target_block.blocker_id=$3 AND target_block.blocked_id=g.owner_user_id)
+					   OR (target_block.blocker_id=g.owner_user_id AND target_block.blocked_id=$3)
+				)
+			  )
+		`, groupID, ownerUserID, targetUserID, role)
+	return tag.RowsAffected() > 0, err
+}
+
+func (r *OmniChatGroupRepository) RemoveMember(ctx context.Context, groupID uuid.UUID, actorUserID, targetUserID int) (bool, error) {
+	if actorUserID == targetUserID {
+		return false, nil
+	}
+	tag, err := r.pool.Exec(ctx, `
+		DELETE FROM omnichat_group_members target
+		USING omnichat_groups g,omnichat_group_members actor
+		WHERE target.group_id=$1 AND target.user_id=$3 AND target.role <> 'owner'
+		  AND g.id=target.group_id AND g.archived_at IS NULL
+		  AND actor.group_id=g.id AND actor.user_id=$2 AND actor.role IN ('owner','admin')
+		  AND (actor.role='owner' OR target.role='member')
+		  AND NOT EXISTS (
+			SELECT 1 FROM blocked_users actor_block
+			WHERE (actor_block.blocker_id=$2 AND actor_block.blocked_id=g.owner_user_id)
+			   OR (actor_block.blocker_id=g.owner_user_id AND actor_block.blocked_id=$2)
+		  )
+	`, groupID, actorUserID, targetUserID)
+	return tag.RowsAffected() > 0, err
+}
+
+func (r *OmniChatGroupRepository) TransferOwnership(ctx context.Context, groupID uuid.UUID, ownerUserID, targetUserID int) (bool, error) {
+	if ownerUserID == targetUserID {
+		return false, nil
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	var targetRole string
+	err = tx.QueryRow(ctx, `
+		SELECT target.role
+		FROM omnichat_groups g
+		JOIN omnichat_group_members owner ON owner.group_id=g.id AND owner.user_id=$2 AND owner.role='owner'
+		JOIN omnichat_group_members target ON target.group_id=g.id AND target.user_id=$3
+		WHERE g.id=$1 AND g.owner_user_id=$2 AND g.archived_at IS NULL
+			  AND NOT EXISTS (
+				SELECT 1 FROM blocked_users actor_block
+				WHERE (actor_block.blocker_id=$2 AND actor_block.blocked_id=g.owner_user_id)
+				   OR (actor_block.blocker_id=g.owner_user_id AND actor_block.blocked_id=$2)
+			  )
+			  AND NOT EXISTS (
+				SELECT 1 FROM blocked_users target_block
+				WHERE (target_block.blocker_id=$3 AND target_block.blocked_id=g.owner_user_id)
+				   OR (target_block.blocker_id=g.owner_user_id AND target_block.blocked_id=$3)
+			  )
+			FOR UPDATE OF g,owner,target
+	`, groupID, ownerUserID, targetUserID).Scan(&targetRole)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE omnichat_group_members SET role='admin' WHERE group_id=$1 AND user_id=$2`, groupID, ownerUserID); err != nil {
+		return false, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE omnichat_group_members SET role='owner' WHERE group_id=$1 AND user_id=$2`, groupID, targetUserID); err != nil {
+		return false, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE omnichat_groups SET owner_user_id=$2,updated_at=NOW() WHERE id=$1`, groupID, targetUserID); err != nil {
+		return false, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *OmniChatGroupRepository) ListInvites(ctx context.Context, groupID uuid.UUID, userID int) ([]*OmniChatGroupInvite, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT invite.id,invite.group_id,invite.invitee_user_id,invite.max_uses,
+		       invite.use_count,invite.expires_at,invite.created_at
+		FROM omnichat_group_invites invite
+		JOIN omnichat_group_members member ON member.group_id=invite.group_id AND member.user_id=$2
+		JOIN omnichat_groups g ON g.id=invite.group_id
+		WHERE invite.group_id=$1 AND member.role IN ('owner','admin')
+		  AND invite.revoked_at IS NULL AND invite.expires_at>NOW()
+		  AND invite.use_count<invite.max_uses AND g.archived_at IS NULL
+		  AND NOT EXISTS (
+			SELECT 1 FROM blocked_users actor_block
+			WHERE (actor_block.blocker_id=$2 AND actor_block.blocked_id=g.owner_user_id)
+			   OR (actor_block.blocker_id=g.owner_user_id AND actor_block.blocked_id=$2)
+		  )
+		ORDER BY invite.created_at DESC,invite.id DESC
+	`, groupID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	invites := make([]*OmniChatGroupInvite, 0)
+	for rows.Next() {
+		invite := &OmniChatGroupInvite{}
+		if err := rows.Scan(&invite.ID, &invite.GroupID, &invite.InviteeUserID, &invite.MaxUses, &invite.UseCount, &invite.ExpiresAt, &invite.CreatedAt); err != nil {
+			return nil, err
+		}
+		invites = append(invites, invite)
+	}
+	return invites, rows.Err()
+}
+
+func (r *OmniChatGroupRepository) RevokeInvite(ctx context.Context, groupID, inviteID uuid.UUID, userID int) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE omnichat_group_invites invite
+		SET revoked_at=NOW()
+		FROM omnichat_group_members member
+		JOIN omnichat_groups g ON g.id=member.group_id
+		WHERE invite.id=$1 AND invite.group_id=$2
+		  AND member.group_id=invite.group_id AND member.user_id=$3
+		  AND member.role IN ('owner','admin') AND invite.revoked_at IS NULL
+		  AND NOT EXISTS (
+			SELECT 1 FROM blocked_users actor_block
+			WHERE (actor_block.blocker_id=$3 AND actor_block.blocked_id=g.owner_user_id)
+			   OR (actor_block.blocker_id=g.owner_user_id AND actor_block.blocked_id=$3)
+		  )
+	`, inviteID, groupID, userID)
+	return tag.RowsAffected() > 0, err
+}
+
+func (r *OmniChatGroupRepository) ArchiveGroup(ctx context.Context, groupID uuid.UUID, ownerUserID int) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE omnichat_groups
+		SET archived_at=NOW(),updated_at=NOW()
+		WHERE id=$1 AND owner_user_id=$2 AND archived_at IS NULL
+	`, groupID, ownerUserID)
+	return tag.RowsAffected() > 0, err
+}
+
+func (r *OmniChatGroupRepository) DeleteGroup(ctx context.Context, groupID uuid.UUID, ownerUserID int) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM omnichat_groups WHERE id=$1 AND owner_user_id=$2`, groupID, ownerUserID)
+	return tag.RowsAffected() > 0, err
 }

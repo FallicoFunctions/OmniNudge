@@ -89,6 +89,7 @@ func NewOAuthHandler(
 			ClientSecret: discordClientSecret,
 			RedirectURL:  backendURL + "/api/v1/auth/oauth/discord/callback",
 			Scopes:       []string{"identify", "email"},
+			// #nosec G101 -- public OAuth provider endpoints contain no credentials.
 			Endpoint: oauth2.Endpoint{
 				AuthURL:  "https://discord.com/api/oauth2/authorize",
 				TokenURL: "https://discord.com/api/oauth2/token",
@@ -102,6 +103,7 @@ func NewOAuthHandler(
 			ClientSecret: githubClientSecret,
 			RedirectURL:  backendURL + "/api/v1/auth/oauth/github/callback",
 			Scopes:       []string{"read:user", "user:email"},
+			// #nosec G101 -- public OAuth provider endpoints contain no credentials.
 			Endpoint: oauth2.Endpoint{
 				AuthURL:  "https://github.com/login/oauth/authorize",
 				TokenURL: "https://github.com/login/oauth/access_token",
@@ -119,6 +121,7 @@ func (h *OAuthHandler) oauthErrorURL(reason string) string {
 }
 
 func (h *OAuthHandler) writeOAuthStateCookie(c *gin.Context, value string, maxAge int) {
+	// #nosec G124 -- Secure follows deployment mode; OAuth state is HttpOnly and SameSite=Lax for the provider callback.
 	cookie := &http.Cookie{
 		Name: "oauth_state", Value: value, Path: "/api/v1/auth/oauth/",
 		MaxAge: maxAge, HttpOnly: true, Secure: h.secureCookie, SameSite: http.SameSiteLaxMode,
@@ -277,6 +280,7 @@ func (h *OAuthHandler) finishOAuthLogin(c *gin.Context, provider string, info *o
 	}
 
 	if pending != nil {
+		// #nosec G124 -- Secure follows deployment mode; pending signup is HttpOnly and SameSite=Strict.
 		http.SetCookie(c.Writer, &http.Cookie{
 			Name: "omni_oauth_pending", Value: pending.Token,
 			Path: "/api/v1/auth/oauth/complete", MaxAge: 600,
@@ -481,6 +485,7 @@ func (h *OAuthHandler) CompleteSignup(c *gin.Context) {
 	}
 
 	h.deletePendingSignup(c.Request.Context(), pendingToken)
+	// #nosec G124 -- deletion cookie preserves Secure, HttpOnly, and SameSite attributes.
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name: "omni_oauth_pending", Value: "", Path: "/api/v1/auth/oauth/complete",
 		MaxAge: -1, Expires: time.Unix(1, 0), HttpOnly: true,
