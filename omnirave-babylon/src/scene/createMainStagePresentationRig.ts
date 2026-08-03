@@ -176,27 +176,13 @@ function createHeroScreenPanels(scene: Scene) {
     panels.push(panel);
   }
 
-  for (const panel of panels) {
-    const haze = MeshBuilder.CreatePlane(
-      `${panel.name}-haze`,
-      { width: 17, height: 13, sideOrientation: Mesh.DOUBLESIDE },
-      scene,
-    );
-    haze.position.copyFrom(panel.position);
-    haze.position.z -= 1.4;
-    haze.isPickable = false;
-    // Always face the camera: seen edge-on from side checkpoints the flat
-    // glow sheet reads as a pink glass pane instead of air.
-    haze.billboardMode = Mesh.BILLBOARDMODE_ALL;
-    const hazeMaterial = new PBRMaterial(`${panel.name}-haze-material`, scene);
-    hazeMaterial.unlit = true;
-    hazeMaterial.albedoColor = new Color3(0, 0, 0);
-    hazeMaterial.emissiveColor = new Color3(0.5, 0.22, 0.62);
-    hazeMaterial.emissiveIntensity = 0.5;
-    hazeMaterial.alpha = 0.2;
-    hazeMaterial.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
-    haze.material = hazeMaterial;
-  }
+  // Player-flagged (2026-07-31): the haze glow plane that used to back this
+  // screen (a large billboarded plane, always facing the camera) read as a
+  // "purple haze floating in the air in front of the stage" from anywhere
+  // in the venue, not as atmosphere behind the screen - removed outright
+  // rather than resized again. Sec 13.3: createStageVisualizer.ts's live
+  // hero unit (91.44m x 30.48m, centered at x=0 y=18) is the actual screen;
+  // this rig's own panels below stay hidden, superseded by that unit.
 
   return panels;
 }
