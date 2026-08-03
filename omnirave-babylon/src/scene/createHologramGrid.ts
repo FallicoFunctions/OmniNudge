@@ -206,8 +206,18 @@ const LEAD_IN_BRIGHT_SCALE = 0.55;
 // Per-channel safety clamp: peaks bloom but never wash fully white.
 const CHANNEL_CAP = 1.8;
 
-// lead_in "charges": the formation contracts toward the volume centre and dims.
-const LEAD_IN_CONVERGE = 0.55;
+// --- Countdown + sky-write escalation (§5.1.1) ------------------------------
+// lead_in now renders the actual countdown text/digits (see the countdown
+// shape below) instead of a generic converge-toward-centre; digits should
+// SNAP crisply rather than lazily drift, so they get their own tight tau
+// instead of the shape library's MORPH_TAU_SECONDS/SETTLE_TAU_SECONDS.
+const COUNTDOWN_TAU_SECONDS = 0.12;
+// "end of minute 1/3" drone-spelled OMNIRAVE beats (minute 2 is the parallel
+// firework-letter agent's beat - left alone here). Minute 3's wordmark reuses
+// SETTLE_TAU_SECONDS (the existing floaty-hold constant) rather than adding a
+// new tau just for this.
+const MINUTE3_SPREAD_SCALE = 1.06; // "bigger than the last": widen the spread a bit (still inside the 0.92 sampling margin, so it can't clip the volume)
+const MINUTE3_BRIGHT_SCALE = 1.35; // "bigger/brighter final" beat - MAX_BRIGHTNESS and CHANNEL_CAP below still clamp this, so it cannot white out
 
 // --- Shape tuning ----------------------------------------------------------
 const SPHERE_RADIUS = 8.4; // fits the 20m-high volume with headroom
@@ -226,6 +236,28 @@ const WORDMARK_TEXT = 'OMNIRAVE';
 // wordmark's point budget, and it must stay well under the lattice count.
 const WORDMARK_CANVAS_W = 112;
 const WORDMARK_CANVAS_H = 22;
+const WORDMARK_SPAN_FRAC = 0.92;
+
+// COUNTDOWN: same canvas-sampling technique as the wordmark, generalised to
+// draw an arbitrary short string. Two beats per §5.1.1:
+//  - the first tick of the 10s lead-in (countdownSeconds >= 9.5) announces the
+//    event before the numbers take over.
+//  - every following tick shows just the integer, replacing the previous
+//    digit only when it changes (see countdownKeyFor).
+// DESIGN CALL: the spec's literal "Fireworks begin in" is 19 characters -
+// at this swarm's point density (a ~40x25-ish grid feel) a phrase that long
+// reads as mush, not legible drone-show text. "FIREWORKS IN" is the shortest
+// phrase that still reads as an announcement rather than a stray word, so
+// that is what actually gets sampled onto the sky.
+const COUNTDOWN_PHRASE_TEXT = 'FIREWORKS IN';
+const COUNTDOWN_PHRASE_CANVAS_W = 128;
+const COUNTDOWN_PHRASE_CANVAS_H = 24;
+const COUNTDOWN_PHRASE_SPAN_FRAC = 0.92;
+// Digits get a squarer canvas (one or two glyphs, not a wide phrase) so a
+// single numeral fills the frame instead of sitting tiny in a wide strip.
+const COUNTDOWN_DIGIT_CANVAS_W = 64;
+const COUNTDOWN_DIGIT_CANVAS_H = 72;
+const COUNTDOWN_DIGIT_SPAN_FRAC = 0.5;
 
 export interface HologramGridOptions {
   // Fills the passed array with the current byte frequency spectrum (the SAME
@@ -281,6 +313,11 @@ export interface HologramGrid {
   readonly peakColorB: number;
   /** How many V113 canopy plate meshes this module hid (and will restore). */
   readonly hiddenPlateCount: number;
+  /** Which §5.1.1 formation override is bypassing the shape-library
+   *  sequencer THIS frame: 'countdown' during lead_in, 'wordmark' during the
+   *  active-minute 1/3 sky-write beats, 'none' otherwise (including active
+   *  minute 2, which is the parallel firework-letter agent's beat). */
+  readonly formationOverride: 'none' | 'countdown' | 'wordmark';
 }
 
 const NOOP_GRID: HologramGrid = {
@@ -298,6 +335,7 @@ const NOOP_GRID: HologramGrid = {
   peakColorG: 0,
   peakColorB: 0,
   hiddenPlateCount: 0,
+  formationOverride: 'none',
 };
 
 // --- The shape library -----------------------------------------------------
@@ -345,6 +383,12 @@ interface ShapeContext {
   /** Flat [x,y, x,y, ...] wordmark samples, or null when unavailable. */
   wordmark: Float32Array | null;
   wordmarkCount: number;
+  /** Flat [x,y, x,y, ...] samples for the CURRENT countdown beat (phrase or
+   *  digit), or null when unavailable. Swapped by the sequencer only when the
+   *  countdown text actually changes - see countdownKeyFor / the cache in
+   *  createHologramGrid. */
+  countdownPoints: Float32Array | null;
+  countdownCount: number;
 }
 
 type ShapeFn = (ctx: ShapeContext, i: number, out: ShapePoint) => void;
@@ -433,6 +477,31 @@ const shapeWordmark: ShapeFn = (ctx, i, out) => {
   out.hue = (px - VOLUME_MIN_X) / VOLUME_WIDTH;
 };
 
+// COUNTDOWN: same technique as the wordmark (sample an offscreen canvas into
+// a plane facing the crowd), but reads ctx.countdownPoints - the sequencer
+// swaps that array only when the displayed text actually changes (see
+// countdownKeyFor). Not a member of SHAPE_ORDER/SHAPE_FNS: it is an OVERRIDE
+// applied directly during lead_in, bypassing the normal shape-library
+// sequencer entirely (see the update() loop), so it never competes with the
+// held/morphing formation for a SHAPE_ORDER slot.
+const shapeCountdown: ShapeFn = (ctx, i, out) => {
+  if (ctx.countdownPoints === null || ctx.countdownCount === 0 || i >= ctx.countdownCount) {
+    out.x = ctx.homeX[i];
+    out.y = ctx.homeY[i];
+    out.z = ctx.homeZ[i];
+    out.w = 0;
+    out.hue = 0;
+    return;
+  }
+  const px = ctx.countdownPoints[i * 2];
+  const py = ctx.countdownPoints[i * 2 + 1];
+  out.x = px;
+  out.y = py;
+  out.z = WORDMARK_Z + Math.sin(ctx.time * 1.2 + px * 0.25) * 0.5;
+  out.w = 1;
+  out.hue = (px - VOLUME_MIN_X) / VOLUME_WIDTH;
+};
+
 const SHAPE_ORDER: readonly HologramShapeName[] = ['cube', 'sphere', 'helix', 'wave', 'wordmark'];
 const SHAPE_FNS: Readonly<Record<HologramShapeName, ShapeFn>> = {
   cube: shapeCube,
@@ -448,50 +517,59 @@ function smoothstep01(t: number): number {
   return x * x * (3 - 2 * x);
 }
 
-// Sample 'OMNIRAVE' into a flat [x,y,...] array of world positions on the
-// wordmark plane, capped at `capacity` points. Returns null when no 2D canvas
-// context exists (NullEngine / node / jsdom without canvas support) - every
-// step is guarded because a throwing getContext must not take the venue down.
-function sampleWordmarkPoints(capacity: number): Float32Array | null {
+// Sample an arbitrary short string into a flat [x,y,...] array of world
+// positions on the wordmark plane, capped at `capacity` points. Returns null
+// when no 2D canvas context exists (NullEngine / node / jsdom without canvas
+// support) - every step is guarded because a throwing getContext must not
+// take the venue down. Generalised from the original 'OMNIRAVE'-only sampler
+// so the countdown digits/phrase can reuse the exact same technique.
+function sampleTextPoints(
+  text: string,
+  canvasW: number,
+  canvasH: number,
+  fontPx: number,
+  capacity: number,
+  spanFrac: number,
+): Float32Array | null {
   try {
     if (typeof document === 'undefined' || typeof document.createElement !== 'function') {
       return null;
     }
     const canvas = document.createElement('canvas');
-    canvas.width = WORDMARK_CANVAS_W;
-    canvas.height = WORDMARK_CANVAS_H;
+    canvas.width = canvasW;
+    canvas.height = canvasH;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       return null;
     }
     ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, WORDMARK_CANVAS_W, WORDMARK_CANVAS_H);
+    ctx.fillRect(0, 0, canvasW, canvasH);
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = `bold ${Math.round(WORDMARK_CANVAS_H * 0.82)}px sans-serif`;
-    ctx.fillText(WORDMARK_TEXT, WORDMARK_CANVAS_W / 2, WORDMARK_CANVAS_H / 2);
-    const image = ctx.getImageData(0, 0, WORDMARK_CANVAS_W, WORDMARK_CANVAS_H);
+    ctx.font = `bold ${fontPx}px sans-serif`;
+    ctx.fillText(text, canvasW / 2, canvasH / 2);
+    const image = ctx.getImageData(0, 0, canvasW, canvasH);
     const data = image?.data;
-    if (!data || data.length < WORDMARK_CANVAS_W * WORDMARK_CANVAS_H * 4) {
+    if (!data || data.length < canvasW * canvasH * 4) {
       return null;
     }
 
     // Letters span most of the volume width; height follows the canvas aspect
     // so the type is not stretched.
-    const spanX = VOLUME_WIDTH * 0.92;
-    const spanY = (spanX * WORDMARK_CANVAS_H) / WORDMARK_CANVAS_W;
+    const spanX = VOLUME_WIDTH * spanFrac;
+    const spanY = (spanX * canvasH) / canvasW;
     const out: number[] = [];
-    for (let py = 0; py < WORDMARK_CANVAS_H && out.length < capacity * 2; py++) {
-      for (let px = 0; px < WORDMARK_CANVAS_W && out.length < capacity * 2; px++) {
-        const o = (py * WORDMARK_CANVAS_W + px) * 4;
+    for (let py = 0; py < canvasH && out.length < capacity * 2; py++) {
+      for (let px = 0; px < canvasW && out.length < capacity * 2; px++) {
+        const o = (py * canvasW + px) * 4;
         // Luminance threshold: anti-aliased edges below half brightness are
         // dropped so the letterforms stay crisp at this point budget.
         if (data[o] + data[o + 1] + data[o + 2] < 380) {
           continue;
         }
-        const u = (px + 0.5) / WORDMARK_CANVAS_W - 0.5;
-        const v = 0.5 - (py + 0.5) / WORDMARK_CANVAS_H;
+        const u = (px + 0.5) / canvasW - 0.5;
+        const v = 0.5 - (py + 0.5) / canvasH;
         out.push(CENTER_X + u * spanX, CENTER_Y + v * spanY);
       }
     }
@@ -503,6 +581,52 @@ function sampleWordmarkPoints(capacity: number): Float32Array | null {
   } catch {
     return null;
   }
+}
+
+function sampleWordmarkPoints(capacity: number): Float32Array | null {
+  return sampleTextPoints(
+    WORDMARK_TEXT,
+    WORDMARK_CANVAS_W,
+    WORDMARK_CANVAS_H,
+    Math.round(WORDMARK_CANVAS_H * 0.82),
+    capacity,
+    WORDMARK_SPAN_FRAC,
+  );
+}
+
+// The countdown text/digit shown right now, keyed so the sequencer can tell
+// when it actually needs to resample (never every frame - see the cache in
+// createHologramGrid). countdownSeconds counts DOWN from 10, so ">= 9.5" is
+// "the very first tick" per the design note above shapeCountdown/the phrase
+// constants. Exported so the digit-selection logic is unit-testable without
+// a real 2D canvas (jsdom/NullEngine have none).
+export function countdownKeyFor(countdownSeconds: number): string {
+  if (countdownSeconds >= 9.5) {
+    return 'phrase';
+  }
+  const n = Math.max(1, Math.min(10, Math.ceil(countdownSeconds)));
+  return String(n);
+}
+
+function sampleCountdownPoints(key: string, capacity: number): Float32Array | null {
+  if (key === 'phrase') {
+    return sampleTextPoints(
+      COUNTDOWN_PHRASE_TEXT,
+      COUNTDOWN_PHRASE_CANVAS_W,
+      COUNTDOWN_PHRASE_CANVAS_H,
+      Math.round(COUNTDOWN_PHRASE_CANVAS_H * 0.78),
+      capacity,
+      COUNTDOWN_PHRASE_SPAN_FRAC,
+    );
+  }
+  return sampleTextPoints(
+    key,
+    COUNTDOWN_DIGIT_CANVAS_W,
+    COUNTDOWN_DIGIT_CANVAS_H,
+    Math.round(COUNTDOWN_DIGIT_CANVAS_H * 0.82),
+    capacity,
+    COUNTDOWN_DIGIT_SPAN_FRAC,
+  );
 }
 
 export function createHologramGrid(scene: Scene, options: HologramGridOptions): HologramGrid {
@@ -650,9 +774,19 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     spectrum: freqData,
     wordmark,
     wordmarkCount,
+    countdownPoints: null,
+    countdownCount: 0,
   };
   const outA: ShapePoint = { x: 0, y: 0, z: 0, w: 0, hue: 0 };
   const outB: ShapePoint = { x: 0, y: 0, z: 0, w: 0, hue: 0 };
+
+  // Countdown text cache: each digit (and the phrase beat) is sampled ONCE
+  // and reused for every hourly cycle after the first, keyed by
+  // countdownKeyFor's key. Resampling only happens on a key change, never
+  // per-frame (see the update() loop).
+  const countdownCache = new Map<string, Float32Array | null>();
+  let countdownSeconds = 0;
+  let lastCountdownKey = '';
 
   // --- Palette state -------------------------------------------------------
   const paletteScratchFrom: RaveColor = { r: 0, g: 0, b: 0 };
@@ -706,6 +840,11 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
   let audioPresent = false;
   let elapsed = 0;
   let mode: StageVisualizerMode = 'normal';
+  // 1-based minute within the active window, or undefined outside it. Only
+  // the integer arrives over the wire (no sub-minute timing), so minute 1's
+  // wordmark is held for the WHOLE minute rather than timed to its last few
+  // seconds - see the forceWordmark comment in update().
+  let activeMinute: number | undefined;
 
   let shapeIndex = 0;
   let previousShapeIndex = 0;
@@ -718,6 +857,7 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
   let peakColorRValue = 0;
   let peakColorGValue = 0;
   let peakColorBValue = 0;
+  let formationOverrideValue: 'none' | 'countdown' | 'wordmark' = 'none';
 
   function update(dtSeconds: number): void {
     const dt = dtSeconds > 0 ? dtSeconds : 0;
@@ -798,6 +938,34 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     const fromShape = SHAPE_FNS[SHAPE_ORDER[previousShapeIndex]];
     const toShape = SHAPE_FNS[SHAPE_ORDER[shapeIndex]];
 
+    // --- lead_in countdown text (resample only on a key change) ---
+    if (leadIn) {
+      const key = countdownKeyFor(countdownSeconds);
+      if (key !== lastCountdownKey) {
+        lastCountdownKey = key;
+        let pts = countdownCache.get(key);
+        if (pts === undefined) {
+          pts = sampleCountdownPoints(key, POINT_COUNT);
+          countdownCache.set(key, pts);
+        }
+        shapeCtx.countdownPoints = pts;
+        shapeCtx.countdownCount = pts ? Math.min(POINT_COUNT, pts.length >> 1) : 0;
+      }
+    }
+
+    // --- formation OVERRIDES (bypass the shape-library sequencer entirely) ---
+    // lead_in: the countdown formation IS the display, replacing the old
+    // generic converge-toward-centre behaviour. active minute 1/3: hold the
+    // drone-spelled OMNIRAVE wordmark (§5.1.1's "end of minute 1/3" sky-write
+    // beats; minute 2 is the parallel firework-letter agent's beat, left
+    // alone here - see resolveVisualizerMode/activeMinute above).
+    const forceWordmark = active && (activeMinute === 1 || activeMinute === 3);
+    const wordmarkBig = active && activeMinute === 3;
+    const overrideShape = leadIn ? shapeCountdown : forceWordmark ? shapeWordmark : null;
+    const overrideSpread = wordmarkBig ? MINUTE3_SPREAD_SCALE : 1;
+    const overrideBrightMult = wordmarkBig ? MINUTE3_BRIGHT_SCALE : 1;
+    formationOverrideValue = leadIn ? 'countdown' : forceWordmark ? 'wordmark' : 'none';
+
     // --- palette timeline (saturated core, then de-greyed) ---
     const colorPhase = elapsed * PALETTE_PHASE_SPEED;
     for (let k = 0; k < PALETTE_LUT_SIZE; k++) {
@@ -828,8 +996,17 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     const driftZ = idle ? Math.cos(elapsed * 0.09) * 1.2 : 0;
 
     // Formation easing constant: faster while morphing so the 2.5s window
-    // actually lands, slower once settled for a floaty hold.
-    const easeK = 1 - Math.exp(-dt / (morphing ? MORPH_TAU_SECONDS : SETTLE_TAU_SECONDS));
+    // actually lands, slower once settled for a floaty hold. The countdown
+    // gets its own tight tau so digits SNAP instead of lazily drifting; the
+    // minute 1/3 wordmark reuses the existing floaty settle tau.
+    const easeTau = leadIn
+      ? COUNTDOWN_TAU_SECONDS
+      : forceWordmark
+        ? SETTLE_TAU_SECONDS
+        : morphing
+          ? MORPH_TAU_SECONDS
+          : SETTLE_TAU_SECONDS;
+    const easeK = 1 - Math.exp(-dt / easeTau);
 
     shapeCtx.time = elapsed;
     shapeCtx.energy = energy;
@@ -843,28 +1020,46 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     let lit = 0;
 
     for (let i = 0; i < POINT_COUNT; i++) {
-      // Target = the incoming formation, crossfaded from the outgoing one.
-      // Both are deterministic functions of the index, so the swarm morphs IN
-      // TANDEM: every point travels the same eased path shape at the same time.
-      toShape(shapeCtx, i, outB);
-      let tx = outB.x;
-      let ty = outB.y;
-      let tz = outB.z;
-      let tw = outB.w;
-      let thue = outB.hue;
-      if (morphing) {
-        fromShape(shapeCtx, i, outA);
-        tx = outA.x + (tx - outA.x) * morph01;
-        ty = outA.y + (ty - outA.y) * morph01;
-        tz = outA.z + (tz - outA.z) * morph01;
-        tw = outA.w + (tw - outA.w) * morph01;
-        thue = outA.hue + (thue - outA.hue) * morph01;
-      }
-      if (leadIn) {
-        // Charge: the formation contracts toward the volume centre.
-        tx = CENTER_X + (tx - CENTER_X) * LEAD_IN_CONVERGE;
-        ty = CENTER_Y + (ty - CENTER_Y) * LEAD_IN_CONVERGE;
-        tz = CENTER_Z + (tz - CENTER_Z) * LEAD_IN_CONVERGE;
+      let tx: number;
+      let ty: number;
+      let tz: number;
+      let tw: number;
+      let thue: number;
+      if (overrideShape) {
+        // Override formation (countdown or the minute 1/3 wordmark beat):
+        // still a deterministic function of the index, so the swarm still
+        // moves IN TANDEM - it just bypasses the held/morphing library shape.
+        overrideShape(shapeCtx, i, outB);
+        tx = outB.x;
+        ty = outB.y;
+        tz = outB.z;
+        tw = outB.w;
+        thue = outB.hue;
+        if (overrideSpread !== 1 && tw > 0) {
+          // Minute 3: "bigger than the last" - widen the wordmark's spread
+          // about the volume centre (still inside the sampler's margin).
+          tx = CENTER_X + (tx - CENTER_X) * overrideSpread;
+          ty = CENTER_Y + (ty - CENTER_Y) * overrideSpread;
+        }
+      } else {
+        // Target = the incoming formation, crossfaded from the outgoing one.
+        // Both are deterministic functions of the index, so the swarm morphs
+        // IN TANDEM: every point travels the same eased path shape at the
+        // same time.
+        toShape(shapeCtx, i, outB);
+        tx = outB.x;
+        ty = outB.y;
+        tz = outB.z;
+        tw = outB.w;
+        thue = outB.hue;
+        if (morphing) {
+          fromShape(shapeCtx, i, outA);
+          tx = outA.x + (tx - outA.x) * morph01;
+          ty = outA.y + (ty - outA.y) * morph01;
+          tz = outA.z + (tz - outA.z) * morph01;
+          tw = outA.w + (tw - outA.w) * morph01;
+          thue = outA.hue + (thue - outA.hue) * morph01;
+        }
       }
       tx += driftX;
       ty += driftY;
@@ -895,7 +1090,7 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
         continue;
       }
       lit += 1;
-      const bright = globalBright * tw;
+      const bright = globalBright * tw * overrideBrightMult;
       if (bright > peak) {
         peak = bright;
         peakIdx = i;
@@ -930,6 +1125,9 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     pointCount: POINT_COUNT,
     spacing: plan.spacing,
     hiddenPlateCount: hiddenPlates.length,
+    get formationOverride() {
+      return formationOverrideValue;
+    },
     get currentShape() {
       return SHAPE_ORDER[shapeIndex];
     },
@@ -957,6 +1155,8 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     update,
     setEventState(state) {
       mode = resolveVisualizerMode(state);
+      countdownSeconds = state?.countdownSeconds ?? 0;
+      activeMinute = state?.activeMinute;
     },
     dispose() {
       // Give the canopy back exactly as it was: hidden, never deleted.
