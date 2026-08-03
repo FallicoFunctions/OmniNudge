@@ -11,13 +11,19 @@ export interface PerfFlags {
   minimalLights: boolean;
   webgl: boolean;
   debug: boolean;
-  // World connection: ?world=<ws url>&wtoken=<world session JWT>. Both must be
-  // present for the runtime to open a world socket. OmniRave is
-  // multiplayer-only and the shipped game always supplies them; leaving them
-  // off is a local dev/review convenience so the preview server can boot the
-  // scene without a world backend, not a supported way to play.
+  // World connection override: ?world=<ws url>&wtoken=<world session JWT>.
+  // Both must be present to take effect. This is a local dev/review
+  // shortcut ONLY - the real shipped launch flow hands off `?mode=&handoff=`
+  // instead, which createRuntime.ts exchanges for a world socket URL/token
+  // via sessionExchange.ts. Leaving all four params off boots the scene with
+  // no world backend at all (solo dev/review), not a supported way to play.
   worldUrl: string | null;
   worldToken: string | null;
+  // Set by createAuthPopup's post-login/signup reload (?acct=1) alongside a
+  // fresh world/wtoken pair, so the top-right controls boot straight into
+  // 'account' mode instead of flashing 'guest' for one frame. Logout's reload
+  // omits it, which is what puts the controls back into 'guest' mode.
+  accountMode: boolean;
 }
 
 export function parsePerfFlags(search: string): PerfFlags {
@@ -45,5 +51,6 @@ export function parsePerfFlags(search: string): PerfFlags {
     debug: tokens.has('debug') || debugParam === '1' || debugParam === '',
     worldUrl: params.get('world'),
     worldToken: params.get('wtoken'),
+    accountMode: params.get('acct') === '1',
   };
 }

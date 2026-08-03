@@ -12,6 +12,7 @@ describe('parsePerfFlags', () => {
       debug: false,
       worldUrl: null,
       worldToken: null,
+      accountMode: false,
     });
   });
 
@@ -24,6 +25,7 @@ describe('parsePerfFlags', () => {
       debug: false,
       worldUrl: null,
       worldToken: null,
+      accountMode: false,
     });
   });
 
@@ -47,5 +49,13 @@ describe('parsePerfFlags', () => {
 
   it('ignores debug=0', () => {
     expect(parsePerfFlags('?debug=0').debug).toBe(false);
+  });
+
+  it('enables account mode via acct=1', () => {
+    expect(parsePerfFlags('?acct=1').accountMode).toBe(true);
+  });
+
+  it('defaults account mode off without the param', () => {
+    expect(parsePerfFlags('').accountMode).toBe(false);
   });
 });
