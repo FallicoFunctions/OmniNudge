@@ -1,4 +1,4 @@
-import { NullEngine, Scene, TransformNode } from '@babylonjs/core';
+import { MeshBuilder, NullEngine, Scene, TransformNode } from '@babylonjs/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createFollowCameraRig } from '../createFollowCameraRig';
@@ -70,6 +70,9 @@ describe('createFollowCameraRig', () => {
     const target = new TransformNode('player-root', scene);
     target.position.set(5, 2, -8);
     const rig = createFollowCameraRig(scene, target);
+    // Sec 7's Free Camera default doesn't re-anchor to the target; this test
+    // is about focus-settle math under Auto-Follow, so opt into it explicitly.
+    rig.setFollowMode('follow');
     rig.applyCheckpointView({
       alpha: 0,
       beta: 1.1,
@@ -161,6 +164,7 @@ describe('createFollowCameraRig', () => {
     const target = new TransformNode('player-root', scene);
     target.position.set(32, 8.5, 4);
     const rig = createFollowCameraRig(scene, target);
+    rig.setFollowMode('follow');
 
     rig.applyCheckpointView({
       alpha: -2.8,
@@ -194,6 +198,7 @@ describe('createFollowCameraRig', () => {
     const target = new TransformNode('player-root', scene);
     target.position.set(0, 1.7, 0);
     const rig = createFollowCameraRig(scene, target);
+    rig.setFollowMode('follow');
 
     rig.applyCheckpointView({
       alpha: -Math.PI / 2,
@@ -221,6 +226,7 @@ describe('createFollowCameraRig', () => {
     const target = new TransformNode('player-root', scene);
     target.position.set(0, 1.7, 0);
     const rig = createFollowCameraRig(scene, target);
+    rig.setFollowMode('follow');
 
     rig.applyCheckpointView({
       alpha: -Math.PI / 2,
@@ -243,6 +249,7 @@ describe('createFollowCameraRig', () => {
     const target = new TransformNode('player-root', scene);
     target.position.set(0, 1.7, 0);
     const rig = createFollowCameraRig(scene, target);
+    rig.setFollowMode('follow');
 
     rig.applyCheckpointView({
       alpha: -Math.PI / 2,
@@ -301,6 +308,7 @@ describe('createFollowCameraRig', () => {
     const target = new TransformNode('player-root', scene);
     target.position.set(0, 1.7, 0);
     const rig = createFollowCameraRig(scene, target);
+    rig.setFollowMode('follow');
 
     rig.applyCheckpointView({
       alpha: -Math.PI / 2,
@@ -316,28 +324,114 @@ describe('createFollowCameraRig', () => {
     expect(rig.camera.position.y).toBeLessThan(rig.targetAnchor.position.y);
   });
 
-  it('stops tracking the player in Free Camera mode and resumes on Auto-Follow', () => {
+  it('tracks the player position in both Free Camera and Auto-Follow', () => {
+    // Sec 7.2: the player must never leave frame in either mode - an earlier
+    // version of this rig froze the anchor in Free Camera mode, which read
+    // as a broken camera the moment Free Camera became the sec 7.2 default.
     engine = new NullEngine();
     const scene = new Scene(engine);
     const target = new TransformNode('player-root', scene);
     target.position.set(0, 1.7, 0);
     const rig = createFollowCameraRig(scene, target);
 
-    expect(rig.followMode()).toBe('follow');
-    target.position.set(10, 1.7, 4);
-    rig.syncZoomState();
-    expect(rig.targetAnchor.position.x).toBeCloseTo(10);
-
-    rig.setFollowMode('free');
     expect(rig.followMode()).toBe('free');
-    target.position.set(40, 1.7, 4);
+    target.position.set(10, 1.7, 4);
     const freeState = rig.syncZoomState();
-    // The anchor stayed where Free Camera was engaged - the player walked away.
     expect(rig.targetAnchor.position.x).toBeCloseTo(10);
     expect(Number.isNaN(freeState.distance)).toBe(false);
 
     rig.setFollowMode('follow');
+    expect(rig.followMode()).toBe('follow');
+    target.position.set(40, 1.7, 4);
     rig.syncZoomState();
     expect(rig.targetAnchor.position.x).toBeCloseTo(40);
+  });
+
+  describe('camera collision (sec 7.2)', () => {
+    it('clamps the camera distance inward when a raycast hit is closer than the requested distance', () => {
+      engine = new NullEngine();
+      const scene = new Scene(engine);
+      const target = new TransformNode('player-root', scene);
+      // Sits between the player (origin) and the requested camera position
+      // 10m back along -z, so the collision ray must hit it.
+      const blocker = MeshBuilder.CreateBox('blocker', { size: 1 }, scene);
+      blocker.position.set(0, 0, -3);
+      const rig = createFollowCameraRig(scene, target, { solidCollisionMeshes: [blocker] });
+      rig.setFollowMode('follow');
+
+      rig.applyCheckpointView({
+        alpha: 0,
+        beta: 1.1,
+        radius: 10,
+        focusOffset: { x: 0, y: 0, z: 0 },
+        positionOffset: { x: 0, y: 0, z: -10 },
+      });
+
+      const state = rig.syncZoomState(0.016);
+
+      // Box near face is ~2.5m out; clamp lands short of that, well below
+      // the 10m requested distance.
+      expect(state.distance).toBeLessThan(3);
+      expect(rig.camera.radius).toBeLessThan(3);
+    });
+
+    it('eases the camera back out toward the requested distance instead of snapping once the obstruction clears', () => {
+      engine = new NullEngine();
+      const scene = new Scene(engine);
+      const target = new TransformNode('player-root', scene);
+      const blocker = MeshBuilder.CreateBox('blocker', { size: 1 }, scene);
+      blocker.position.set(0, 0, -3);
+      const rig = createFollowCameraRig(scene, target, { solidCollisionMeshes: [blocker] });
+      rig.setFollowMode('follow');
+
+      rig.applyCheckpointView({
+        alpha: 0,
+        beta: 1.1,
+        radius: 10,
+        focusOffset: { x: 0, y: 0, z: 0 },
+        positionOffset: { x: 0, y: 0, z: -10 },
+      });
+
+      rig.syncZoomState(0.016);
+      const clampedDistance = rig.camera.radius;
+      expect(clampedDistance).toBeLessThan(3);
+
+      // Obstruction moves out of the way entirely.
+      blocker.position.set(50, 0, 0);
+
+      const easingState = rig.syncZoomState(0.1);
+      // Moving back out, but NOT an instant pop to the full 10m.
+      expect(easingState.distance).toBeGreaterThan(clampedDistance);
+      expect(easingState.distance).toBeLessThan(10);
+
+      // Enough elapsed time recovers the full requested distance, and never
+      // overshoots it.
+      const recoveredState = rig.syncZoomState(5);
+      expect(recoveredState.distance).toBeCloseTo(10);
+      expect(recoveredState.distance).toBeLessThanOrEqual(10);
+    });
+
+    it('never eases the camera past the mode-resolved requested distance even with no obstruction', () => {
+      engine = new NullEngine();
+      const scene = new Scene(engine);
+      const target = new TransformNode('player-root', scene);
+      const rig = createFollowCameraRig(scene, target);
+      rig.setFollowMode('follow');
+
+      rig.applyCheckpointView({
+        alpha: 0,
+        beta: 1.1,
+        radius: 10,
+        focusOffset: { x: 0, y: 0, z: 0 },
+        positionOffset: { x: 0, y: 0, z: -10 },
+      });
+
+      // A huge delta with nothing in the way must still land exactly on the
+      // requested distance, never past it.
+      const state = rig.syncZoomState(1000);
+
+      expect(state.distance).toBeCloseTo(10);
+      expect(rig.camera.radius).toBeCloseTo(10);
+    });
   });
 });
