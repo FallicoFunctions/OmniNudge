@@ -11,15 +11,28 @@ import { AVATAR_REFERENCE_HEIGHT_INCHES, resolveAvatarHeightScale } from './avat
 const REFERENCE_EYE_HEIGHT_METERS = 1.65;
 const REFERENCE_RADIUS_METERS = 0.35;
 const REFERENCE_CAPSULE_HEIGHT_METERS = 1.8;
+// Sec 7.5: crouch shrinks eye line and capsule height only - radius is left
+// alone, so crouching does not change how tightly a player can squeeze past
+// solids horizontally, only what they can duck under / how tall they stand.
+const CROUCH_HEIGHT_SCALE = 0.62;
 
 export interface PlayerRig {
   avatarAnchor: TransformNode;
   capsule: ReturnType<typeof MeshBuilder.CreateCapsule>;
+  /** True while crouched (sec 7.5). Toggle with setCrouched. */
+  crouched: boolean;
   eyeHeightMeters: number;
   /** Sec 6.5 body height driving scale / eye level / collision capsule. */
   heightInches: number;
   radiusMeters: number;
   root: TransformNode;
+  /**
+   * Composes with setHeightInches rather than fighting it: crouch always
+   * scales relative to whatever body height is currently applied, so a tall
+   * avatar's crouch and a short avatar's crouch both read as "the same
+   * proportional duck," not a fixed offset. No-ops if already in that state.
+   */
+  setCrouched: (crouched: boolean) => void;
   /**
    * Sec 6.5: height must NOT affect movement speed, sprint speed, or jump
    * power. This value is deliberately not derived from heightInches, and
@@ -54,28 +67,52 @@ export function createPlayerRig(scene: Scene, spawn: Vector3): PlayerRig {
   capsule.isVisible = false;
   capsule.checkCollisions = true;
 
+  // Body-height scale from the last setHeightInches call, kept separate from
+  // rig.eyeHeightMeters so setCrouched can re-derive the crouched presence
+  // off the CURRENT body height instead of stacking off whatever the eye
+  // height happened to be last.
+  let bodyHeightScale = 1;
+
+  // Single code path for both setHeightInches and setCrouched: re-derives eye
+  // height, capsule scale/offset, and avatar anchor from bodyHeightScale +
+  // rig.crouched. Keeps the root's world FOOT position fixed across the call.
+  const applyStandingPresence = () => {
+    const crouchScale = rig.crouched ? CROUCH_HEIGHT_SCALE : 1;
+    const nextEyeHeight = REFERENCE_EYE_HEIGHT_METERS * bodyHeightScale * crouchScale;
+    // playerController keeps root.position.y at (ground + eyeHeightMeters),
+    // so shifting the eye line must move the root by the same delta or the
+    // player teleports vertically for one frame.
+    root.position.y += nextEyeHeight - rig.eyeHeightMeters;
+    rig.eyeHeightMeters = nextEyeHeight;
+
+    const capsuleHeightScale = bodyHeightScale * crouchScale;
+    capsule.scaling.set(bodyHeightScale, capsuleHeightScale, bodyHeightScale);
+    capsule.position.y = -(nextEyeHeight - (REFERENCE_CAPSULE_HEIGHT_METERS / 2) * capsuleHeightScale);
+    avatarAnchor.position.y = -nextEyeHeight;
+  };
+
   const rig: PlayerRig = {
     avatarAnchor,
     root,
     capsule,
+    crouched: false,
     speedMetersPerSecond: 4.5,
     eyeHeightMeters: REFERENCE_EYE_HEIGHT_METERS,
     heightInches: 0,
     radiusMeters: REFERENCE_RADIUS_METERS,
     setHeightInches(heightInches: number) {
-      const scale = resolveAvatarHeightScale(heightInches);
-      const nextEyeHeight = REFERENCE_EYE_HEIGHT_METERS * scale;
-      // playerController keeps root.position.y at (ground + eyeHeightMeters),
-      // so shifting the eye line must move the root by the same delta or the
-      // player teleports vertically for one frame.
-      root.position.y += nextEyeHeight - rig.eyeHeightMeters;
-      rig.eyeHeightMeters = nextEyeHeight;
-      rig.radiusMeters = REFERENCE_RADIUS_METERS * scale;
+      bodyHeightScale = resolveAvatarHeightScale(heightInches);
+      rig.radiusMeters = REFERENCE_RADIUS_METERS * bodyHeightScale;
       rig.heightInches = Math.round(heightInches);
-      capsule.scaling.setAll(scale);
-      capsule.position.y = -(nextEyeHeight - (REFERENCE_CAPSULE_HEIGHT_METERS / 2) * scale);
-      avatarAnchor.position.y = -nextEyeHeight;
-      return scale;
+      applyStandingPresence();
+      return bodyHeightScale;
+    },
+    setCrouched(crouched: boolean) {
+      if (crouched === rig.crouched) {
+        return;
+      }
+      rig.crouched = crouched;
+      applyStandingPresence();
     },
   };
 

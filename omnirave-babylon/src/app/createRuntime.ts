@@ -126,6 +126,11 @@ export async function createRuntime(host: HTMLElement) {
   // owned DOM like the overlays above, so it is torn down in cleanup too.
   let playerHud: import('../ui/createPlayerHud').PlayerHud | undefined;
   let playerHudTimer: number | undefined;
+  // Sec 9.4 bottom-center HUD: sprint stamina + emote bar. Neither is gated
+  // behind ?debug=1 - they're player-facing chrome like the rest of this
+  // block, just built here since they share this block's DOM host.
+  let staminaBar: import('../ui/createStaminaBar').StaminaBar | undefined;
+  let emoteBar: import('../ui/createEmoteBar').EmoteBar | undefined;
   // Player-facing chat panel (design sec 9.8 / 10.2 / 10.3 / 10.4). Chat is
   // venue-local and server-broadcast, so it REQUIRES the world connection:
   // without a socket there is nothing to send to and no one to hear it, and
@@ -167,6 +172,8 @@ export async function createRuntime(host: HTMLElement) {
       playerHudTimer = undefined;
     }
     playerHud?.dispose();
+    staminaBar?.dispose();
+    emoteBar?.dispose();
     chatPanel?.dispose();
     // Settings popup first: it lives inside the top-left block's slot and owns
     // a document keydown listener.
@@ -201,6 +208,8 @@ export async function createRuntime(host: HTMLElement) {
     const { createMainStageScene: createScene } = await import('../scene/createMainStageScene');
     const scene = await createScene(activeEngine);
     const reviewRuntime = scene.metadata?.reviewRuntime;
+    // Sec 8.2: ghosting starts on "first entry" - a fresh boot is exactly that.
+    reviewRuntime?.playerController?.beginSpawnGhost?.();
 
     // Sec 6.2: guests get a RANDOM GENERATED avatar, cannot edit it, and it is
     // not persisted - so it is generated fresh here at boot and applied to the
@@ -360,6 +369,10 @@ export async function createRuntime(host: HTMLElement) {
         import('../media/stageMediaPlayer'),
       ]);
       remotePlayerRigs = createRemotePlayerRigs(scene);
+      // Sec 7.8: playerController was constructed before this rig existed
+      // (see createMainStageScene's setRemotePlayerCollisionSource), so this
+      // is the one-time hookup for local-vs-remote-player collision.
+      reviewRuntime?.setRemotePlayerCollisionSource?.(remotePlayerRigs.collisionTargets);
       stageMediaPlayer = createStageMediaPlayer();
       worldSocket = createWorldSocket({
         url: perfFlags.worldUrl,
@@ -525,6 +538,28 @@ export async function createRuntime(host: HTMLElement) {
       playerHudTimer = window.setInterval(refreshPlayerHud, 1000);
     }
 
+    // Sec 9.4/7.4 sprint stamina bar. Updated every render frame (not the 1s
+    // HUD tick above) since stamina drains/recovers continuously and needs to
+    // read as responsive while sprinting.
+    {
+      const { createStaminaBar } = await import('../ui/createStaminaBar');
+      staminaBar = createStaminaBar(host);
+    }
+
+    // Sec 9.4/9.7 emote bar UI shell. onEmoteSelected has nothing to drive
+    // yet - the avatar emote/animation system (sec 6/7.6) is blocked and
+    // parked pending sourced art, so this intentionally stays a real no-op
+    // rather than faking playback. The bar's own active-highlight/hover
+    // states work regardless.
+    {
+      const { createEmoteBar } = await import('../ui/createEmoteBar');
+      emoteBar = createEmoteBar(host, {
+        onEmoteSelected() {
+          // No-op: nothing to animate until avatars unblock (see comment above).
+        },
+      });
+    }
+
     // Render-scale state. Declared here (ahead of the render loop) because the
     // settings popup's Graphics controls write to it from click handlers.
     let perfFrameCounter = 0;
@@ -581,21 +616,34 @@ export async function createRuntime(host: HTMLElement) {
         localChatBubbles?.clear();
         const spawn = reviewRuntime?.spawn ?? BACK_PLAZA_SPAWN;
         reviewRuntime?.playerRig?.root.position.set(spawn.x, spawn.y, spawn.z);
+        // Sec 8.2/8.3: manual respawn re-arms the no-collision grace period.
+        reviewRuntime?.playerController?.beginSpawnGhost?.();
         const input = reviewRuntime?.input?.state;
         if (input) {
           input.sprint = false;
           input.crouch = false;
         }
+        // Sec 8.3 "clears typed chat input text".
+        chatPanel?.clearDraft();
+        // Sec 8.3 "keeps current camera zoom": read the rig's live radius
+        // before repositioning rather than forcing a fixed checkpoint
+        // distance - only the orientation resets, not the player's chosen
+        // zoom level.
+        const currentRadius = reviewRuntime?.cameraRig?.camera.radius ?? TRAVEL_CAMERA_DISTANCE;
         const travelView = resolveTravelCameraOffsets(undefined);
         scene.onAfterRenderObservable.addOnce(() => {
           reviewRuntime?.cameraRig?.applyCheckpointView({
             alpha: 0,
             beta: 1.12,
-            radius: TRAVEL_CAMERA_DISTANCE,
+            radius: currentRadius,
             ...travelView,
           });
         });
         topLeftControls?.openPanel(null);
+        // Sec 8.3: the world server is the authority on this player's
+        // position - without this, other clients never see the respawn and a
+        // reconnect would restore the pre-respawn position.
+        worldSocket?.sendRespawn();
       };
 
       settingsPopup = createSettingsPopup({
@@ -798,6 +846,9 @@ export async function createRuntime(host: HTMLElement) {
       // live; null keeps it on its estimated 126BPM beat clock.
       playerRuntime?.stageShow?.setAudioEnergy?.(activeImmersiveAudioShow.bassLevel);
       const playerController = playerRuntime?.playerController;
+      if (playerController) {
+        staminaBar?.update({ stamina0to1: playerController.stamina0to1 });
+      }
       if (playerReadout && playerPosition && playerController) {
         const state = playerRuntime?.reviewAvatar?.root.metadata?.animationState ?? playerController.animationState;
         const groundedLabel = playerController.grounded ? 'grounded' : 'airborne';
