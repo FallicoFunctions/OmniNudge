@@ -5,3 +5,7 @@ public/audio/*
 
 # Timestamped .blend safety backups (local only)
 assets-src/main-stage/backups/
+assets-src/avatars/body-bases/backups/
+
+# Local-only review screenshots from the avatar body generation pipeline
+assets-src/avatars/body-bases/review-renders/
