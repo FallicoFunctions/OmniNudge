@@ -581,3 +581,89 @@ func TestZoneMediaState_WireFieldNames(t *testing.T) {
 	require.Equal(t, float64(60), decoded["playheadSeconds"])
 	require.Equal(t, "main-stage-set-01", decoded["trackId"])
 }
+
+// TestMaybeAnnounceFireworks_ExactWordingAtFiveAndOneMinuteMarks pins sec
+// 5.1.1's global chat announcements: exact body text, sent to every connected
+// player, at :55 and :59 past the hour (5/1 minutes before the :00 show).
+func TestMaybeAnnounceFireworks_ExactWordingAtFiveAndOneMinuteMarks(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	handler := NewWSHandler(worldState, mediaState, authService, []string{"https://play.omninudge.com"})
+	testServer := httptest.NewServer(handler)
+	defer testServer.Close()
+
+	baseURL := "ws" + testServer.URL[len("http"):]
+	conn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer conn.Close()
+
+	var joinSnapshot map[string]any
+	require.NoError(t, conn.ReadJSON(&joinSnapshot))
+
+	fiveMinuteMark := time.Date(2026, 6, 4, 14, 55, 0, 0, time.UTC)
+	handler.setNow(func() time.Time { return fiveMinuteMark })
+	handler.maybeAnnounceFireworks()
+
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var fiveMinuteMessage map[string]any
+	require.NoError(t, conn.ReadJSON(&fiveMinuteMessage))
+	require.Equal(t, "chat_message", fiveMinuteMessage["type"])
+	require.Equal(t, world.SystemChatName, fiveMinuteMessage["playerName"])
+	require.Equal(t, "", fiveMinuteMessage["playerId"])
+	require.Equal(t, "Main Stage fireworks in 5 minutes", fiveMinuteMessage["body"])
+
+	// Same minute again: must NOT re-fire (dedupe latch).
+	handler.maybeAnnounceFireworks()
+
+	oneMinuteMark := time.Date(2026, 6, 4, 14, 59, 0, 0, time.UTC)
+	handler.setNow(func() time.Time { return oneMinuteMark })
+	handler.maybeAnnounceFireworks()
+
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var oneMinuteMessage map[string]any
+	require.NoError(t, conn.ReadJSON(&oneMinuteMessage))
+	require.Equal(t, "Main Stage fireworks in 1 minute", oneMinuteMessage["body"])
+
+	// No third message queued: confirms the 5-minute dedupe above held (the
+	// only two reads that succeeded are the 5-minute and 1-minute messages).
+	_ = conn.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+	var unexpected map[string]any
+	require.Error(t, conn.ReadJSON(&unexpected))
+}
+
+// TestMaybeAnnounceFireworks_RearmsAfterTheHour confirms the latch resets at
+// the top of the hour so next hour's 5-minute mark can fire again.
+func TestMaybeAnnounceFireworks_RearmsAfterTheHour(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	handler := NewWSHandler(worldState, mediaState, authService, []string{"https://play.omninudge.com"})
+	testServer := httptest.NewServer(handler)
+	defer testServer.Close()
+
+	baseURL := "ws" + testServer.URL[len("http"):]
+	conn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer conn.Close()
+
+	var joinSnapshot map[string]any
+	require.NoError(t, conn.ReadJSON(&joinSnapshot))
+
+	handler.setNow(func() time.Time { return time.Date(2026, 6, 4, 14, 59, 0, 0, time.UTC) })
+	handler.maybeAnnounceFireworks()
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var firstHour map[string]any
+	require.NoError(t, conn.ReadJSON(&firstHour))
+	require.Equal(t, "Main Stage fireworks in 1 minute", firstHour["body"])
+
+	handler.setNow(func() time.Time { return time.Date(2026, 6, 4, 15, 0, 0, 0, time.UTC) })
+	handler.maybeAnnounceFireworks()
+
+	handler.setNow(func() time.Time { return time.Date(2026, 6, 4, 15, 59, 0, 0, time.UTC) })
+	handler.maybeAnnounceFireworks()
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var secondHour map[string]any
+	require.NoError(t, conn.ReadJSON(&secondHour))
+	require.Equal(t, "Main Stage fireworks in 1 minute", secondHour["body"])
+}

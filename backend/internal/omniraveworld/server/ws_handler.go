@@ -38,6 +38,13 @@ const (
 	inboundEventBurst      = 20
 	// writeTimeout bounds how long a single WriteJSON may block a broadcast.
 	writeTimeout = 5 * time.Second
+	// scheduleTickInterval drives the background broadcast that keeps zone
+	// event countdowns/phases live for players who are not otherwise
+	// generating move/chat/respawn/loadout traffic (sec 14.1: the global event
+	// clock runs 24/7 independent of player activity, so idle players must
+	// still see the countdown tick and the fireworks phase advance without
+	// having to move first).
+	scheduleTickInterval = 1 * time.Second
 )
 
 // clientConn pairs a connection with a mutex serializing writes to it.
@@ -67,6 +74,12 @@ type WSHandler struct {
 	mu       sync.Mutex
 	conns    map[string]*clientConn
 	schedule world.EventSchedule
+	// announceMu guards lastAnnounceMinute, the dedupe latch for the Main
+	// Stage 5-minute/1-minute global chat announcements (sec 5.1.1). It is
+	// separate from nowMu/mu because it is only ever touched from the single
+	// scheduler goroutine plus tests, never from a connection's read loop.
+	announceMu         sync.Mutex
+	lastAnnounceMinute int
 }
 
 // setNow overrides the clock used for zone-event/media snapshots. It exists
@@ -87,13 +100,14 @@ func (h *WSHandler) currentTime() time.Time {
 
 func NewWSHandler(worldState *world.World, mediaState *world.MediaState, authService *services.AuthService, allowedOrigins []string) *WSHandler {
 	handler := &WSHandler{
-		world:    worldState,
-		media:    mediaState,
-		auth:     authService,
-		now:      func() time.Time { return time.Now().UTC() },
-		origins:  make(map[string]struct{}, len(allowedOrigins)),
-		conns:    make(map[string]*clientConn),
-		schedule: world.NewEventSchedule(),
+		world:              worldState,
+		media:              mediaState,
+		auth:               authService,
+		now:                func() time.Time { return time.Now().UTC() },
+		origins:            make(map[string]struct{}, len(allowedOrigins)),
+		conns:              make(map[string]*clientConn),
+		schedule:           world.NewEventSchedule(),
+		lastAnnounceMinute: -1,
 	}
 	for _, origin := range allowedOrigins {
 		handler.origins[origin] = struct{}{}
@@ -303,6 +317,70 @@ func (h *WSHandler) writeSnapshot(cc *clientConn, playerID string, zoneMedia []w
 		"zoneEvents":      snapshot.ZoneEvents,
 		"currentPlayerId": snapshot.CurrentPlayerID,
 		"activeZone":      snapshot.ActiveZone,
+	})
+}
+
+// StartScheduler launches the background goroutine that keeps zone events
+// live and fires the Main Stage scheduled-event chat announcements, for the
+// lifetime of ctx. Sec 14.1's global clock runs "24/7, even when no players
+// are online" - a purely broadcast-triggered snapshot (only sent on player
+// move/chat/respawn/loadout) would leave an idle player's countdown frozen,
+// and would never fire an announcement with nobody around to trigger one.
+//
+// Production wiring (server.go) calls this exactly once per process. Tests
+// construct a *WSHandler directly via NewWSHandler and never call this, so
+// the 1-second ticker never runs concurrently with a test's own deterministic
+// setNow-driven assertions.
+func (h *WSHandler) StartScheduler(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(scheduleTickInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				h.broadcastSnapshots()
+				h.maybeAnnounceFireworks()
+			}
+		}
+	}()
+}
+
+// maybeAnnounceFireworks sends the sec 5.1.1 global chat announcements at
+// exactly 5 minutes and 1 minute before the Main Stage fireworks show
+// (`:00` every hour). lastAnnounceMinute latches which of the two has already
+// fired this hour so a 1-second tick rate cannot double-send either one.
+func (h *WSHandler) maybeAnnounceFireworks() {
+	now := h.currentTime()
+	minute := now.Minute()
+
+	h.announceMu.Lock()
+	if minute == 0 {
+		// Past the hour: re-arm both announcements for the next hour's show.
+		h.lastAnnounceMinute = -1
+		h.announceMu.Unlock()
+		return
+	}
+	if minute != 55 && minute != 59 {
+		h.announceMu.Unlock()
+		return
+	}
+	if h.lastAnnounceMinute == minute {
+		h.announceMu.Unlock()
+		return
+	}
+	h.lastAnnounceMinute = minute
+	h.announceMu.Unlock()
+
+	remaining := "5 minutes"
+	if minute == 59 {
+		remaining = "1 minute"
+	}
+	h.broadcastChatMessage(world.ChatMessage{
+		PlayerName: world.SystemChatName,
+		Body:       "Main Stage fireworks in " + remaining,
+		CreatedAt:  now,
 	})
 }
 
