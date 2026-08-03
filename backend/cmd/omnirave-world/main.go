@@ -32,7 +32,7 @@ func main() {
 		authService.SetUserRepository(userRepo)
 	}
 
-	handler := server.New(world.NewWorld(world.DefaultConfig()), mediaState, authService, allowedRuntimeOrigins(runtimeURL))
+	handler := server.NewWithScheduler(context.Background(), world.NewWorld(world.DefaultConfig()), mediaState, authService, allowedRuntimeOrigins(runtimeURL))
 	addr := ":" + port
 
 	// This server holds long-lived WebSocket connections, so ReadTimeout/WriteTimeout
