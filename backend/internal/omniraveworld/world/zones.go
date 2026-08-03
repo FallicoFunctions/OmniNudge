@@ -23,6 +23,12 @@ func (m ZoneMap) ZoneFor(position Vec3) ZoneID {
 	return m.layout.ZoneFor(position)
 }
 
+// SpawnFor returns a spawn point for zone, deconflicting against occupied
+// positions per sec 8's 15-foot fallback zone (see Layout.SpawnFor).
+func (m ZoneMap) SpawnFor(zone ZoneID, occupied []Vec3) Vec3 {
+	return m.layout.SpawnFor(zone, occupied)
+}
+
 type WalkableMap struct {
 	layout Layout
 }
@@ -40,7 +46,7 @@ type Config struct {
 func DefaultConfig() Config {
 	layout := DefaultLayout()
 	return Config{
-		SpawnPoint: layout.SpawnFor(ZoneMainStage),
+		SpawnPoint: layout.SpawnFor(ZoneMainStage, nil),
 		ZoneMap:    ZoneMap{layout: layout},
 		Walkable:   WalkableMap{layout: layout},
 	}
