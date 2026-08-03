@@ -12,6 +12,9 @@ import {
   SKYDECK_LANDING_X_MIN,
   SKYDECK_LANDING_Z_MIN,
   SKYDECK_RAMP_FOOT_X,
+  SKYDECK_RAMP_HEAD_X,
+  SKYDECK_RAMP_Z_MAX,
+  SKYDECK_RAMP_Z_MIN,
   SKYDECK_SLAB_THICKNESS,
   SKYDECK_X_MAX,
   SKYDECK_X_MIN,
@@ -87,9 +90,12 @@ describe('createVipSkydeck', () => {
       expect(names.filter((name) => name.startsWith(`vip-skydeck-trim-${tag}-`)).length).toBe(4);
       expect(names.filter((name) => name.startsWith(`vip-skydeck-post-${tag}-`)).length).toBe(6);
       expect(names.filter((name) => name.startsWith(`vip-skydeck-pier-${tag}-`)).length).toBe(4);
+      // 5 perimeter runs (down from 9 - the L-shaped notch's rails are gone
+      // now that the landing matches the deck's own x span) x 2 (top/mid
+      // rail per run) = 10 exactly.
       expect(
         names.filter((name) => name.startsWith(`vip-skydeck-rail-${tag}-`)).length,
-      ).toBeGreaterThan(10);
+      ).toBe(10);
       expect(
         names.filter((name) => name.startsWith(`vip-skydeck-ramp-rail-${tag}-`)).length,
       ).toBe(4);
@@ -138,28 +144,44 @@ describe('createVipSkydeck', () => {
     // Head at deck height, so ramp and landing meet with no step.
     expect(ramp.maxY).toBeCloseTo(SKYDECK_DECK_Y, 4);
 
-    const landing = boundsOf(scene, (name) => name === 'vip-skydeck-landing-r');
-    expect(landing.minX).toBeCloseTo(SKYDECK_LANDING_X_MIN, 5);
-    expect(landing.maxX).toBeCloseTo(SKYDECK_LANDING_X_MAX, 5);
-    expect(landing.minZ).toBeCloseTo(SKYDECK_LANDING_Z_MIN, 5);
+    // Landing is now two boxes (see createVipSkydeck.ts's LANDING_MAIN/
+    // LANDING_MOUTH comment): a full-width MAIN block where the ramp never
+    // passes underneath, and a narrower MOUTH block clipped to the ramp's
+    // own head x - a single full-width slab across the whole depth
+    // overhung the ramp's sloped surface at its shallow end.
+    const landingMain = boundsOf(scene, (name) => name === 'vip-skydeck-landing-r');
+    expect(landingMain.minX).toBeCloseTo(SKYDECK_LANDING_X_MIN, 5);
+    expect(landingMain.maxX).toBeCloseTo(SKYDECK_LANDING_X_MAX, 5);
+    expect(landingMain.minZ).toBeCloseTo(SKYDECK_RAMP_Z_MAX, 5);
     // North edge of the landing IS the south edge of the deck.
-    expect(landing.maxZ).toBeCloseTo(SKYDECK_Z_MIN, 5);
-    expect(landing.maxY).toBeCloseTo(SKYDECK_DECK_Y, 5);
+    expect(landingMain.maxZ).toBeCloseTo(SKYDECK_Z_MIN, 5);
+    expect(landingMain.maxY).toBeCloseTo(SKYDECK_DECK_Y, 5);
+
+    const landingMouth = boundsOf(scene, (name) => name === 'vip-skydeck-landing-mouth-r');
+    expect(landingMouth.minX).toBeCloseTo(SKYDECK_LANDING_X_MIN, 5);
+    // Clipped to the ramp's own head x, not the widened deck edge - this is
+    // exactly the fix: no slab reaches over the ramp's own footprint.
+    expect(landingMouth.maxX).toBeCloseTo(SKYDECK_RAMP_HEAD_X, 5);
+    expect(landingMouth.minZ).toBeCloseTo(SKYDECK_LANDING_Z_MIN, 5);
+    expect(landingMouth.maxZ).toBeCloseTo(SKYDECK_RAMP_Z_MAX, 5);
+    expect(landingMouth.maxY).toBeCloseTo(SKYDECK_DECK_Y, 5);
 
     // Shallow enough for the capsule: the run never exceeds 30 degrees.
     expect(skydeck.rampSlopeDegrees).toBeGreaterThan(20);
     expect(skydeck.rampSlopeDegrees).toBeLessThan(30);
   });
 
-  it('marks only the deck, landing and ramp as walkable floor', () => {
+  it('marks only the deck, landing (both boxes) and ramp as walkable floor', () => {
     const skydeck = createVipSkydeck(scene);
 
-    expect(skydeck.walkableMeshes.length).toBe(6);
+    expect(skydeck.walkableMeshes.length).toBe(8);
     const walkableNames = skydeck.walkableMeshes.map((mesh) => mesh.name).sort();
     expect(walkableNames).toEqual([
       'vip-skydeck-deck-l',
       'vip-skydeck-deck-r',
       'vip-skydeck-landing-l',
+      'vip-skydeck-landing-mouth-l',
+      'vip-skydeck-landing-mouth-r',
       'vip-skydeck-landing-r',
       'vip-skydeck-ramp-l',
       'vip-skydeck-ramp-r',
@@ -174,10 +196,15 @@ describe('createVipSkydeck', () => {
     expect(railsWithCollision).toBe(0);
   });
 
-  it('blocks the deck railing line at deck height without walling the ground below', () => {
+  it('blocks the deck+landing perimeter at deck height without walling the ground below', () => {
     const blockers = createMainStageCollisionBlockers(scene, []);
     const skydeckRows = blockers.filter((mesh) => mesh.name.startsWith('main-stage-blocker-skydeck-'));
-    expect(skydeckRows.length).toBe(26);
+    // 5 perimeter runs x 2 sides (down from 9 runs / 26 rows - the L-shaped
+    // notch's rails are gone now that the landing matches the deck's own x
+    // span) + 4 piers x 2 sides = 18, + the ramp's own balustrade collision
+    // (16 segments x 2 edges x 2 sides = 64, added 2026-07-31 so the
+    // previously walk-through rail actually stops you) = 82.
+    expect(skydeckRows.length).toBe(82);
 
     const blockedAt = (x: number, z: number, feetY: number, headY: number) =>
       blockers.some((mesh) => {
@@ -197,8 +224,65 @@ describe('createVipSkydeck', () => {
     expect(blockedAt(39, SKYDECK_Z_MAX, SKYDECK_DECK_Y, SKYDECK_DECK_Y + 1.65)).toBe(true);
     // The bridge mouth in the inboard rail stays open.
     expect(blockedAt(SKYDECK_X_MIN, 0, SKYDECK_DECK_Y, SKYDECK_DECK_Y + 1.65)).toBe(false);
-    // The landing mouth in the south rail stays open.
+    // Deck and landing now abut with no seam rail across their ENTIRE
+    // shared width (not just the old narrow landing's x 41..45) - walking
+    // from one to the other is never blocked anywhere along z SKYDECK_Z_MIN.
     expect(blockedAt(43, SKYDECK_Z_MIN, SKYDECK_DECK_Y, SKYDECK_DECK_Y + 1.65)).toBe(false);
+    // Regression guard: x 33 sat under the OLD 'deck-south-west' notch rail
+    // (it fenced x 31..41 at this z) before the landing widened to remove
+    // the notch entirely - it must be open now too.
+    expect(blockedAt(33, SKYDECK_Z_MIN, SKYDECK_DECK_Y, SKYDECK_DECK_Y + 1.65)).toBe(false);
+    // The new south perimeter rail (at the widened landing's own south edge,
+    // not the old narrow strip's) stops you at a point that is only part of
+    // the platform's footprint NOW that it is a full-width rectangle.
+    expect(blockedAt(33, SKYDECK_LANDING_Z_MIN, SKYDECK_DECK_Y, SKYDECK_DECK_Y + 1.65)).toBe(true);
+    // Regression guard (in-engine playtest, 2026-07-31): the south run used
+    // to span the FULL x 31..47, putting a flat deck-height rail directly
+    // across the ramp's own head (x 45..47, where the ramp's climbing
+    // surface arrives at ~deck height) - physically blocking the climb. The
+    // south run now stops at SKYDECK_RAMP_HEAD_X, so the ramp mouth must be
+    // open at deck height along its whole x 45..47 span. Tested at the
+    // ramp's own CENTER z, not its edge z (SKYDECK_LANDING_Z_MIN) - the edge
+    // is now correctly blocked by the ramp's own side-rail collision added
+    // just below, a separate, later fix for a separate bug.
+    const rampCenterZForMouthCheck = (SKYDECK_RAMP_Z_MIN + SKYDECK_RAMP_Z_MAX) / 2;
+    expect(blockedAt(46, rampCenterZForMouthCheck, SKYDECK_DECK_Y, SKYDECK_DECK_Y + 1.65)).toBe(false);
+    expect(blockedAt(SKYDECK_RAMP_HEAD_X + 0.1, rampCenterZForMouthCheck, SKYDECK_DECK_Y, SKYDECK_DECK_Y + 1.65)).toBe(
+      false,
+    );
+    // Regression guard (in-engine playtest, 2026-07-31): the pier at x 55
+    // (near the ramp's shallow/foot end) used to get a FLAT 3m collision
+    // blocker regardless of position, while the ramp's real walking surface
+    // right above it sits at only ~3.2m there - the blocker rose ABOVE the
+    // floor and walled the climb outright (a player's feet at ~3.2m
+    // overlapped the blocker's 0..3m band). The blocker is now capped at a
+    // capsule-height clearance well below that, so a player standing on the
+    // ramp's actual surface there must be clear.
+    const rampSurfaceYAtPier1 = ((SKYDECK_RAMP_FOOT_X - 55) / (SKYDECK_RAMP_FOOT_X - SKYDECK_RAMP_HEAD_X)) * SKYDECK_DECK_Y;
+    expect(blockedAt(55, -9, rampSurfaceYAtPier1, rampSurfaceYAtPier1 + 1.65)).toBe(false);
+    // Regression guard (in-engine playtest, 2026-07-31, second find on the
+    // SAME climb): the ramp's rotated slab reaches all the way to x 47 (its
+    // AABB spans x 44.81..61), and right there its real walking height is
+    // close enough to deck height to graze the 'east' perimeter rail - which
+    // used to span the FULL z LANDING_Z_MIN..Z_MAX, covering the ramp's own
+    // z -11..-7 band. The east run now stops short at SKYDECK_RAMP_Z_MAX,
+    // so a player nearing the top of the climb at x 47 must be clear too.
+    expect(blockedAt(SKYDECK_X_MAX, -9, 8.5, 10.15)).toBe(false);
+
+    // Player-flagged (2026-07-31): the ramp's own balustrade had NO
+    // collision at all - clicking on the visible rail picked straight
+    // through it to an unrelated venue mesh behind it, and a player could
+    // walk clean off either edge mid-climb. rampRailBlockers() now steps
+    // segmented collision along both edges; at x 53 (mid-climb) the real
+    // walking surface is at ((61-53)/16)*8.6 = 4.3m, so a player standing at
+    // that height right at the south/north edge must now be stopped...
+    const rampSurfaceYAt53 = ((SKYDECK_RAMP_FOOT_X - 53) / (SKYDECK_RAMP_FOOT_X - SKYDECK_RAMP_HEAD_X)) * SKYDECK_DECK_Y;
+    expect(blockedAt(53, SKYDECK_RAMP_Z_MIN + 0.05, rampSurfaceYAt53, rampSurfaceYAt53 + 1.5)).toBe(true);
+    expect(blockedAt(53, SKYDECK_RAMP_Z_MAX - 0.05, rampSurfaceYAt53, rampSurfaceYAt53 + 1.5)).toBe(true);
+    // ...while the ramp's own CENTER (where every real climb happens) must
+    // stay completely open at that same height.
+    const rampCenterZ = (SKYDECK_RAMP_Z_MIN + SKYDECK_RAMP_Z_MAX) / 2;
+    expect(blockedAt(53, rampCenterZ, rampSurfaceYAt53, rampSurfaceYAt53 + 1.5)).toBe(false);
 
     // Ground level under the whole structure stays walkable - including the
     // vip_terrace route objective at (32, 2) and the ramp corridor.

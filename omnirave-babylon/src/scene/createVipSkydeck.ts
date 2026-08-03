@@ -58,10 +58,30 @@ const DECK_CENTER_X = (SKYDECK_X_MIN + SKYDECK_X_MAX) / 2;
 const DECK_CENTER_Z = (SKYDECK_Z_MIN + SKYDECK_Z_MAX) / 2;
 const SLAB_CENTER_Y = SKYDECK_DECK_Y - SKYDECK_SLAB_THICKNESS / 2;
 
-const LANDING_WIDTH = SKYDECK_LANDING_X_MAX - SKYDECK_LANDING_X_MIN;
-const LANDING_DEPTH = SKYDECK_Z_MIN - SKYDECK_LANDING_Z_MIN;
-const LANDING_CENTER_X = (SKYDECK_LANDING_X_MIN + SKYDECK_LANDING_X_MAX) / 2;
-const LANDING_CENTER_Z = (SKYDECK_LANDING_Z_MIN + SKYDECK_Z_MIN) / 2;
+// Player-flagged (2026-07-31, in-engine): a single slab spanning the full
+// LANDING_X_MIN..LANDING_X_MAX width for the whole LANDING_Z_MIN..Z_MIN
+// depth overhung the ramp - the ramp's own sloped surface passes under x
+// 45..47 at only ~7.5..8.3m (SKYDECK_SLAB_THICKNESS+ below the slab's flat
+// 8.6m top there), so the slab read as a low ceiling hovering over the
+// ramp's last few meters instead of a clean platform edge. The landing is
+// therefore TWO boxes, not one: a full-width MAIN block over the part of
+// its footprint the ramp never reaches (z RAMP_Z_MAX..Z_MIN), and a
+// narrower MOUTH block clipped to SKYDECK_RAMP_HEAD_X over the part the
+// ramp actually occupies (z LANDING_Z_MIN..RAMP_Z_MAX) - the ramp's own
+// walking surface is the floor for x 45..47 in that band instead, exactly
+// as it already was before the landing widened. This leaves a small (2m x
+// 4m) notch at the ramp mouth, unavoidable given a physical ramp has to
+// pass through that exact volume - everywhere else stays the full
+// rectangle the platform widening was for.
+const LANDING_MAIN_WIDTH = SKYDECK_X_MAX - SKYDECK_LANDING_X_MIN;
+const LANDING_MAIN_DEPTH = SKYDECK_Z_MIN - SKYDECK_RAMP_Z_MAX;
+const LANDING_MAIN_CENTER_X = (SKYDECK_LANDING_X_MIN + SKYDECK_X_MAX) / 2;
+const LANDING_MAIN_CENTER_Z = (SKYDECK_RAMP_Z_MAX + SKYDECK_Z_MIN) / 2;
+
+const LANDING_MOUTH_WIDTH = SKYDECK_RAMP_HEAD_X - SKYDECK_LANDING_X_MIN;
+const LANDING_MOUTH_DEPTH = SKYDECK_RAMP_Z_MAX - SKYDECK_LANDING_Z_MIN;
+const LANDING_MOUTH_CENTER_X = (SKYDECK_LANDING_X_MIN + SKYDECK_RAMP_HEAD_X) / 2;
+const LANDING_MOUTH_CENTER_Z = (SKYDECK_LANDING_Z_MIN + SKYDECK_RAMP_Z_MAX) / 2;
 
 const RAMP_RUN = SKYDECK_RAMP_FOOT_X - SKYDECK_RAMP_HEAD_X;
 const RAMP_RISE = SKYDECK_DECK_Y;
@@ -171,14 +191,28 @@ export function createVipSkydeck(scene: Scene): VipSkydeckHandle {
       pearl.material,
       true,
     );
+    // Landing: two boxes, not one - see the LANDING_MAIN/LANDING_MOUTH
+    // comment above for why (the ramp's own sloped surface passes under the
+    // mouth region; a single full-width slab there overhung it).
     box(
       `vip-skydeck-landing-${tag}`,
-      LANDING_WIDTH,
+      LANDING_MAIN_WIDTH,
       SKYDECK_SLAB_THICKNESS,
-      LANDING_DEPTH,
-      sx(LANDING_CENTER_X),
+      LANDING_MAIN_DEPTH,
+      sx(LANDING_MAIN_CENTER_X),
       SLAB_CENTER_Y,
-      LANDING_CENTER_Z,
+      LANDING_MAIN_CENTER_Z,
+      pearl.material,
+      true,
+    );
+    box(
+      `vip-skydeck-landing-mouth-${tag}`,
+      LANDING_MOUTH_WIDTH,
+      SKYDECK_SLAB_THICKNESS,
+      LANDING_MOUTH_DEPTH,
+      sx(LANDING_MOUTH_CENTER_X),
+      SLAB_CENTER_Y,
+      LANDING_MOUTH_CENTER_Z,
       pearl.material,
       true,
     );
