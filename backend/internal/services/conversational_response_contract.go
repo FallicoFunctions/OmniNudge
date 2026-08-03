@@ -96,34 +96,34 @@ type PersonalDraftSourceCounters struct {
 // each completed provider draft. Provider failures are attempt outcomes rather
 // than drafts and remain in the existing typed provider counters.
 type PersonalDraftTerminalCounters struct {
-	AcceptedRaw         int `json:"accepted_raw"`
-	AcceptedSingleBlock int `json:"accepted_single_block"`
-	AcceptedRepair      int `json:"accepted_repair"`
-	AcceptedFallback    int `json:"accepted_fallback"`
+	AcceptedRaw          int `json:"accepted_raw"`
+	AcceptedSingleBlock  int `json:"accepted_single_block"`
+	AcceptedRepair       int `json:"accepted_repair"`
+	AcceptedFallback     int `json:"accepted_fallback"`
 	AcceptedDialogueOnly int `json:"accepted_dialogue_only"`
-	RetryHygiene        int `json:"retry_hygiene"`
-	RetryContract       int `json:"retry_contract"`
-	RetryEmpty          int `json:"retry_empty"`
+	RetryHygiene         int `json:"retry_hygiene"`
+	RetryContract        int `json:"retry_contract"`
+	RetryEmpty           int `json:"retry_empty"`
 }
 
 // PersonalDraftCounters contains counters only. It must never grow fields that
 // retain prompts, responses, routes, provider IDs, user IDs, or raw errors.
 type PersonalDraftCounters struct {
-	AcceptedRaw             int `json:"accepted_raw"`
-	AcceptedSingleBlock     int `json:"accepted_single_block"`
-	AcceptedRepair          int `json:"accepted_repair"`
-	AcceptedFallback        int `json:"accepted_fallback"`
-	AcceptedDialogueOnly    int `json:"accepted_dialogue_only"`
-	RejectedHygiene         int `json:"rejected_hygiene"`
-	RejectedLengthOrBlocks  int `json:"rejected_length_or_blocks"`
-	RejectedNarration       int `json:"rejected_narration"`
-	RejectedOwnership       int `json:"rejected_ownership"`
-	RejectedQuestionBudget  int `json:"rejected_question_budget"`
-	RejectedOtherFormatting int `json:"rejected_other_formatting"`
-	RejectedOtherSemantics  int `json:"rejected_other_semantics"`
-	ProviderTimeout         int `json:"provider_timeout"`
-	ProviderRateLimit       int `json:"provider_rate_limit"`
-	ProviderTransport       int `json:"provider_transport"`
+	AcceptedRaw             int                           `json:"accepted_raw"`
+	AcceptedSingleBlock     int                           `json:"accepted_single_block"`
+	AcceptedRepair          int                           `json:"accepted_repair"`
+	AcceptedFallback        int                           `json:"accepted_fallback"`
+	AcceptedDialogueOnly    int                           `json:"accepted_dialogue_only"`
+	RejectedHygiene         int                           `json:"rejected_hygiene"`
+	RejectedLengthOrBlocks  int                           `json:"rejected_length_or_blocks"`
+	RejectedNarration       int                           `json:"rejected_narration"`
+	RejectedOwnership       int                           `json:"rejected_ownership"`
+	RejectedQuestionBudget  int                           `json:"rejected_question_budget"`
+	RejectedOtherFormatting int                           `json:"rejected_other_formatting"`
+	RejectedOtherSemantics  int                           `json:"rejected_other_semantics"`
+	ProviderTimeout         int                           `json:"provider_timeout"`
+	ProviderRateLimit       int                           `json:"provider_rate_limit"`
+	ProviderTransport       int                           `json:"provider_transport"`
 	RawSources              PersonalDraftSourceCounters   `json:"raw_sources"`
 	TerminalTransitions     PersonalDraftTerminalCounters `json:"terminal_transitions"`
 }
@@ -397,12 +397,16 @@ func generatePersonaCompletionWithClient(
 	}
 
 	var lastErr error
+	lengthOnlyRetry := false
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		if err := generationCtx.Err(); err != nil {
 			return "", err
 		}
 		generationMessages := messages
-		if attempt > 0 && errors.Is(lastErr, ErrAssistantOutputHygiene) {
+		if attempt > 0 && lengthOnlyRetry {
+			generationMessages = messagesWithPersonalLengthOnlyRecovery(messages)
+			lengthOnlyRetry = false
+		} else if attempt > 0 && errors.Is(lastErr, ErrAssistantOutputHygiene) {
 			generationMessages = messagesWithAssistantHygieneRetry(messages)
 		} else if attempt > 0 && errors.Is(lastErr, ErrConversationalResponseContract) {
 			if attempt == maxAttempts-1 {
@@ -419,6 +423,9 @@ func generatePersonaCompletionWithClient(
 		candidate, err := generateBufferedAssistantCandidate(attemptCtx, completion, generationMessages, personalMode)
 		cancelAttempt()
 		candidate = normalizeAssistantMessageContent(candidate)
+		if personalMode && candidate != "" {
+			recordPersonalDraftSource(ctx, classifyPersonalDraftSource(candidate))
+		}
 		if err != nil {
 			lastErr = err
 			if personalMode {
@@ -460,6 +467,8 @@ func generatePersonaCompletionWithClient(
 				finalizeErr = recoveryErr
 			}
 			lastErr = finalizeErr
+			recordPersonalDraftTerminal(ctx, personalDraftTerminalRetryContract)
+			lengthOnlyRetry = personalMode && isLengthOnlyPersonalDraft(candidate)
 			log := zlog.Warn().Int("attempt", attempt+1)
 			if persona != nil {
 				log = log.Int("persona_id", persona.ID)
@@ -500,6 +509,11 @@ func containsSystemPrompt(messages []openrouter.Message) bool {
 }
 
 func finalizePersonalConversationDraft(ctx context.Context, persona *models.BotPersona, candidate string, onChunk openrouter.StreamCallback) (string, error) {
+	if recovered, err := parseAndValidatePersonalDialogueOnlyJSON(candidate); err == nil {
+		recordPersonalDraftOutcome(ctx, personalDraftAcceptedDialogue)
+		recordPersonalDraftTerminal(ctx, personalDraftTerminalAcceptedDialogue)
+		return deliverBufferedConversation(recovered, onChunk), nil
+	}
 	if valid, _ := validatePersonalConversationResponse(candidate); valid {
 		recordPersonalDraftOutcome(ctx, personalDraftAcceptedRaw)
 		return deliverBufferedConversation(candidate, onChunk), nil
@@ -582,6 +596,22 @@ Each array item must be 12 to 30 words of plain spoken dialogue. Use no narratio
 	return retry
 }
 
+func messagesWithPersonalLengthOnlyRecovery(messages []openrouter.Message) []openrouter.Message {
+	retry := messagesWithPersonalDialogueOnlyRecovery(messages)
+	for index := range retry {
+		if retry[index].Role == openrouter.RoleSystem {
+			retry[index].Content = strings.Replace(
+				retry[index].Content,
+				"[Personal Dialogue-Only Recovery]",
+				"[Personal Length-Only Recovery]",
+				1,
+			)
+			return retry
+		}
+	}
+	return retry
+}
+
 func deliverBufferedConversation(response string, onChunk openrouter.StreamCallback) string {
 	if onChunk != nil {
 		onChunk(response)
@@ -615,6 +645,7 @@ func repairPersonalConversationDraft(response string) string {
 	response = markUnmarkedNarration(response)
 	response = removeSurplusNarration(response)
 	response = removeDialogueFormattingQuotes(response)
+	response = limitPersonalDraftQuestions(response)
 	blocks := blankLinePattern.Split(strings.TrimSpace(response), -1)
 	cleaned := make([]string, 0, len(blocks))
 	for _, block := range blocks {
@@ -638,6 +669,20 @@ func repairPersonalConversationDraft(response string) string {
 	}
 
 	return strings.Join(blocks, "\n\n")
+}
+
+func limitPersonalDraftQuestions(response string) string {
+	seen := false
+	return strings.Map(func(char rune) rune {
+		if char != '?' && char != '？' {
+			return char
+		}
+		if !seen {
+			seen = true
+			return char
+		}
+		return '.'
+	}, response)
 }
 
 // sanitizePersonalConversationFallback is the final deterministic delivery
@@ -803,6 +848,26 @@ func partitionPersonalConversationBlocks(blocks []string) ([]string, bool) {
 	if len(words) < 24 || len(words) > 100 {
 		return nil, false
 	}
+	if len(blocks) >= 2 && len(blocks) <= 4 {
+		mediumBlocks := len(blocks)
+		shortFinal := len(blocks) >= 3 && len(strings.Fields(blocks[len(blocks)-1])) <= 10
+		if shortFinal {
+			mediumBlocks--
+		}
+		if mediumBlocks >= 2 && mediumBlocks <= 3 {
+			valid := true
+			for index := 0; index < mediumBlocks; index++ {
+				count := len(strings.Fields(blocks[index]))
+				if count < 12 || count > 30 {
+					valid = false
+					break
+				}
+			}
+			if valid && (!shortFinal || len(strings.Fields(blocks[len(blocks)-1])) > 0) {
+				return blocks, true
+			}
+		}
+	}
 
 	shapes := []conversationalBlockShape{{mediumBlocks: 2}, {mediumBlocks: 3}}
 	if len(blocks) >= 3 && len(strings.Fields(blocks[len(blocks)-1])) <= 10 {
@@ -933,6 +998,89 @@ func recordPersonalDraftRejections(ctx context.Context, response string) {
 	}
 }
 
+func classifyPersonalDraftSource(response string) personalDraftSource {
+	trimmed := strings.TrimSpace(response)
+	if trimmed == "" {
+		return personalDraftSourceEmpty
+	}
+	if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+		if _, err := parseAndValidatePersonalDialogueOnlyJSON(trimmed); err == nil {
+			return personalDraftSourceShapeValid
+		}
+		return personalDraftSourceInvalidDialogueEnvelope
+	}
+	if valid, _ := meetsConversationalLengthBudget(trimmed); valid {
+		return personalDraftSourceShapeValid
+	}
+
+	words := len(strings.Fields(trimmed))
+	if words < 24 {
+		return personalDraftSourceUnder24
+	}
+	if words > 100 {
+		return personalDraftSourceOver100
+	}
+	if _, ok := partitionPersonalConversationBlocks(
+		blankLinePattern.Split(trimmed, -1),
+	); ok {
+		return personalDraftSourceRepairablePartition
+	}
+	if words <= 60 {
+		return personalDraftSourceUnpartitionable24To60
+	}
+	return personalDraftSourceUnpartitionable61To100
+}
+
+func isLengthOnlyPersonalDraft(response string) bool {
+	if classifyPersonalDraftSource(response) != personalDraftSourceUnder24 {
+		return false
+	}
+	lower := strings.ToLower(response)
+	if strings.Contains(lower, "absolute") || strings.Contains(lower, "she ") || strings.Contains(lower, " her ") {
+		return false
+	}
+	if valid, _ := validatePersonalConversationFormatting(response); !valid {
+		return false
+	}
+	if valid, _ := validatePersonalConversationSemantics(response); !valid {
+		return false
+	}
+	return true
+}
+
+func parseAndValidatePersonalDialogueOnlyJSON(raw string) (string, error) {
+	type recoveryEnvelope struct {
+		Paragraphs []string `json:"paragraphs"`
+	}
+
+	decoder := json.NewDecoder(strings.NewReader(strings.TrimSpace(raw)))
+	decoder.DisallowUnknownFields()
+	var envelope recoveryEnvelope
+	if err := decoder.Decode(&envelope); err != nil {
+		return "", fmt.Errorf("invalid dialogue-only recovery JSON: %w", err)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return "", errors.New("invalid dialogue-only recovery JSON: trailing data")
+		}
+		return "", fmt.Errorf("invalid dialogue-only recovery JSON: %w", err)
+	}
+	if len(envelope.Paragraphs) != 2 {
+		return "", errors.New("dialogue-only recovery must contain exactly two paragraphs")
+	}
+	for index, paragraph := range envelope.Paragraphs {
+		if strings.TrimSpace(paragraph) != paragraph || paragraph == "" {
+			return "", fmt.Errorf("dialogue-only recovery paragraph %d is empty or padded", index+1)
+		}
+	}
+	recovered := strings.Join(envelope.Paragraphs, "\n\n")
+	if valid, detail := validatePersonalDialogueOnlyRecovery(recovered); !valid {
+		return "", errors.New(detail)
+	}
+	return recovered, nil
+}
+
 func validatePersonalDialogueOnlyRecovery(response string) (bool, string) {
 	blocks := blankLinePattern.Split(strings.TrimSpace(response), -1)
 	if len(blocks) != 2 {
@@ -948,7 +1096,7 @@ func validatePersonalDialogueOnlyRecovery(response string) (bool, string) {
 			)
 		}
 	}
-	if strings.ContainsAny(response, "*`") {
+	if strings.ContainsAny(response, "*`<｜>") {
 		return false, "dialogue-only recovery contains narration or presentation markup"
 	}
 	if containsUnmarkedNarration(response) || countUnmarkedThirdPersonNarrationSignals(response) > 0 {
