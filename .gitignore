@@ -49,6 +49,10 @@ PHASE1_USER_TEST_PLAN.md
 *.swo
 *~
 
+# Python test/runtime caches
+__pycache__/
+*.pyc
+
 # Firebase credentials (KEEP SECRET!)
 firebase-admin-key.json
 Firebase_Cloud_Messaging_API.txt
@@ -95,3 +99,6 @@ frontend/storybook-static/
 .env.*
 !.env.example
 !monitoring/.env.example
+
+# Compiled one-off CLI binaries built from backend/cmd
+backend/omnichat_prompt_preview
