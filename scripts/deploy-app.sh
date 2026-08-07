@@ -94,9 +94,44 @@ JWT_SECRET=$JWT_SECRET
 
 # File Storage
 UPLOAD_DIR=/var/www/omninudge/uploads
+STORAGE_BACKEND=local
 
-# Redis (optional)
+# Redis (required for the durable generation queue)
 REDIS_ADDR=localhost:6379
+
+# OmniChat chat and self-hosted media/video calls. Values may be exported in
+# /root/.omninudge-credentials before running this bootstrap script; empty
+# provider credentials keep the corresponding feature disabled until setup.
+OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+OMNICHAT_MEDIA_PROVIDER=runpod
+RUNPOD_API_KEY=${RUNPOD_API_KEY:-}
+RUNPOD_BASE_URL=${RUNPOD_BASE_URL:-https://api.runpod.ai/v2}
+RUNPOD_IMAGE_ENDPOINT_ID=${RUNPOD_IMAGE_ENDPOINT_ID:-}
+RUNPOD_VIDEO_ENDPOINT_ID=${RUNPOD_VIDEO_ENDPOINT_ID:-}
+RUNPOD_INPUT_HOSTS=${RUNPOD_INPUT_HOSTS:-$DOMAIN}
+RUNPOD_OUTPUT_HOSTS=${RUNPOD_OUTPUT_HOSTS:-storage.googleapis.com}
+RUNPOD_POD_API_URL=${RUNPOD_POD_API_URL:-https://api.runpod.io/graphql}
+RUNPOD_NETWORK_VOLUME_ID=${RUNPOD_NETWORK_VOLUME_ID:-}
+RUNPOD_AVATAR_IMAGE=${RUNPOD_AVATAR_IMAGE:-}
+RUNPOD_AVATAR_GPU_TYPE_ID=${RUNPOD_AVATAR_GPU_TYPE_ID:-}
+RUNPOD_AVATAR_GPU_COUNT=${RUNPOD_AVATAR_GPU_COUNT:-1}
+RUNPOD_AVATAR_CONTAINER_DISK_GB=${RUNPOD_AVATAR_CONTAINER_DISK_GB:-40}
+RUNPOD_AVATAR_VOLUME_GB=${RUNPOD_AVATAR_VOLUME_GB:-0}
+RUNPOD_AVATAR_VCPU=${RUNPOD_AVATAR_VCPU:-4}
+RUNPOD_AVATAR_MEMORY_GB=${RUNPOD_AVATAR_MEMORY_GB:-16}
+RUNPOD_AVATAR_VOLUME_MOUNT_PATH=${RUNPOD_AVATAR_VOLUME_MOUNT_PATH:-/models}
+RUNPOD_AVATAR_PORTS=${RUNPOD_AVATAR_PORTS:-}
+RUNPOD_WORKER_BACKEND_URL=${RUNPOD_WORKER_BACKEND_URL:-https://$DOMAIN}
+RUNPOD_REQUEST_TIMEOUT_SECONDS=${RUNPOD_REQUEST_TIMEOUT_SECONDS:-900}
+RUNPOD_MEDIA_POLL_SECONDS=${RUNPOD_MEDIA_POLL_SECONDS:-2}
+LIVEKIT_URL=${LIVEKIT_URL:-}
+LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-}
+LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-}
+LIVEKIT_ROOM_PREFIX=${LIVEKIT_ROOM_PREFIX:-omnichat}
+LIVEKIT_TOKEN_TTL_SECONDS=${LIVEKIT_TOKEN_TTL_SECONDS:-600}
+VOICEBOX_ENABLED=${VOICEBOX_ENABLED:-true}
+VOICEBOX_BASE_URL=${VOICEBOX_BASE_URL:-http://127.0.0.1:17493}
+VOICEBOX_TIMEOUT_SECONDS=${VOICEBOX_TIMEOUT_SECONDS:-120}
 EOF
 
 chown root:omninudge backend/.env
@@ -107,6 +142,7 @@ echo ""
 echo "Step 2: Creating frontend .env.production..."
 cat > frontend/.env.production <<EOF
 VITE_API_URL=https://$DOMAIN/api/v1
+VITE_LIVEKIT_HOSTS=${VITE_LIVEKIT_HOSTS:-livekit.$DOMAIN}
 EOF
 
 echo "✓ Frontend .env.production created"
@@ -117,10 +153,13 @@ cd backend
 export PATH=$PATH:/usr/local/go/bin
 go mod download
 go build -o omninudge-server ./cmd/server
+go build -o omninudge-worker ./cmd/worker
 chown root:omninudge /var/www/omninudge/backend
 chmod 750 /var/www/omninudge/backend
 chown root:omninudge omninudge-server
 chmod 750 omninudge-server
+chown root:omninudge omninudge-worker
+chmod 750 omninudge-worker
 echo "✓ Backend built successfully"
 
 echo ""
@@ -209,6 +248,49 @@ systemctl restart omninudge-backend
 
 echo "✓ Backend service started"
 
+cat > /etc/systemd/system/omninudge-worker.service <<EOF
+[Unit]
+Description=OmniNudge Background Worker
+After=network.target postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=omninudge
+Group=omninudge
+SupplementaryGroups=www-data
+WorkingDirectory=/var/www/omninudge/backend
+ExecStart=/var/www/omninudge/backend/omninudge-worker
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+UMask=0027
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/www/omninudge/uploads
+
+EnvironmentFile=/var/www/omninudge/backend/.env
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl enable omninudge-worker
+systemctl restart omninudge-worker
+echo "✓ Background worker service started"
+
 echo ""
 echo "Step 8: Configuring Nginx..."
 cat > /etc/nginx/snippets/omninudge-common-security.conf <<'NGINXEOF'
@@ -217,11 +299,11 @@ add_header X-Content-Type-Options "nosniff" always;
 add_header X-Frame-Options "DENY" always;
 add_header X-XSS-Protection "0" always;
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-add_header Permissions-Policy 'camera=(self "https://daily.co" "https://*.daily.co"), microphone=(self "https://daily.co" "https://*.daily.co"), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()' always;
+add_header Permissions-Policy 'camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()' always;
 NGINXEOF
 
 cat > /etc/nginx/snippets/omninudge-frontend-csp.conf <<'NGINXEOF'
-add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' wss: https://*.googleapis.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com; media-src 'self' blob: https:; worker-src 'self' blob:; frame-src 'self' https://daily.co https://*.daily.co; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' wss: https://*.googleapis.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com; media-src 'self' blob: https:; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" always;
 NGINXEOF
 
 cat > /etc/nginx/sites-available/omninudge <<'NGINXEOF'
@@ -373,7 +455,9 @@ echo "Your app is now live at: https://$DOMAIN"
 echo ""
 echo "Service management:"
 echo "  - View logs: journalctl -u omninudge-backend -f"
+echo "  - View worker logs: journalctl -u omninudge-worker -f"
 echo "  - Restart backend: systemctl restart omninudge-backend"
+echo "  - Restart worker: systemctl restart omninudge-worker"
 echo "  - Restart nginx: systemctl restart nginx"
 echo ""
 echo "Credentials saved in: /root/.omninudge-credentials"
