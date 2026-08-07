@@ -1,5 +1,12 @@
 import type { OmniChatMediaKind } from '../types/omnichat';
 
+export interface OmniChatMediaCommand {
+  kind: OmniChatMediaKind;
+  prompt: string;
+}
+
+const DIRECT_COMMAND = /^\s*\/(photo|image|pic|picture|selfie|video|clip)\b([\s\S]*)$/i;
+
 const DIRECT_VIDEO_REQUEST =
   /\b(?:send|show|make|create|generate|record|take)\s+(?:me\s+)?(?:a\s+)?(?:short\s+)?(?:video|clip)\b|\b(?:video|clip)\s+of\b/i;
 const MOTION_REQUEST =
@@ -17,4 +24,19 @@ export function detectOmniChatMediaIntent(message: string): OmniChatMediaKind | 
   if (DIRECT_VIDEO_REQUEST.test(normalized) || MOTION_REQUEST.test(normalized)) return 'video';
   if (DIRECT_IMAGE_REQUEST.test(normalized) || APPEARANCE_REQUEST.test(normalized)) return 'image';
   return null;
+}
+
+// Slash commands are intentionally strict: only a command at the beginning
+// of a message can bypass the language model. This prevents ordinary prose
+// containing “/video” from spending a media credit unexpectedly.
+export function parseOmniChatMediaCommand(message: string): OmniChatMediaCommand | null {
+  const match = DIRECT_COMMAND.exec(message);
+  if (!match) return null;
+  const command = match[1].toLowerCase();
+  const prompt = match[2].trim();
+  if (!prompt) return null;
+  return {
+    kind: command === 'video' || command === 'clip' ? 'video' : 'image',
+    prompt,
+  };
 }

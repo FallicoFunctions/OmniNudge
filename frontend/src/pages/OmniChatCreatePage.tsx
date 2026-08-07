@@ -15,6 +15,7 @@ import {
   omnichatQueryKeys,
   omnichatService,
 } from '../services/omnichatService';
+import { mediaGenerationErrorMessage } from '../utils/omnichatMediaErrors';
 import { useAuth } from '../contexts/AuthContext';
 import type {
   OmniChatGenerationJob,
@@ -24,6 +25,7 @@ import type {
 
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 const GALLERY_PAGE_SIZE = 24;
+type MediaCreateRequest = Parameters<typeof omnichatService.createGeneration>[0];
 
 export function OmniChatCreateWorkspace() {
   const queryClient = useQueryClient();
@@ -36,6 +38,7 @@ export function OmniChatCreateWorkspace() {
   const [duration, setDuration] = useState(5);
   const [sourceAssetId, setSourceAssetId] = useState('');
   const [activeJob, setActiveJob] = useState<OmniChatGenerationJob | null>(null);
+  const [lastRequest, setLastRequest] = useState<MediaCreateRequest | null>(null);
   const [workspaceTab, setWorkspaceTab] = useState<'generate' | 'gallery'>('generate');
   const [showCommerce, setShowCommerce] = useState(false);
   const [showVideoPaywall, setShowVideoPaywall] = useState(false);
@@ -77,11 +80,17 @@ export function OmniChatCreateWorkspace() {
   const createMutation = useMutation({
     mutationFn: (request: Parameters<typeof omnichatService.createGeneration>[0]) =>
       omnichatService.createGeneration(request),
-    onSuccess: (job) => setActiveJob(job),
+    onSuccess: (job, request) => {
+      setActiveJob(job);
+      setLastRequest(request);
+    },
     onError: (error, request) => {
-      if ((error as Error & { status?: number }).status !== 402) return;
-      if (request.kind === 'video') setShowVideoPaywall(true);
-      else setShowCommerce(true);
+      const status = (error as Error & { status?: number }).status;
+      setLastRequest(request);
+      if (status === 402) {
+        if (request.kind === 'video') setShowVideoPaywall(true);
+        else setShowCommerce(true);
+      }
     },
   });
   const cancelMutation = useMutation({
@@ -121,7 +130,7 @@ export function OmniChatCreateWorkspace() {
     }
     if (!selectedPersona || !prompt.trim()) return;
     const animateExisting = kind === 'video' && Boolean(sourceAssetId);
-    createMutation.mutate({
+    const request: MediaCreateRequest = {
       request_id: createOmniChatRequestId(),
       kind,
       mode: animateExisting ? 'image_to_video' : 'create',
@@ -131,7 +140,15 @@ export function OmniChatCreateWorkspace() {
       aspect_ratio: aspectRatio as '1:1' | '3:4' | '4:3' | '4:5' | '5:4' | '9:16' | '16:9',
       duration_seconds: kind === 'video' ? duration : undefined,
       source_asset_id: animateExisting ? sourceAssetId : undefined,
-    });
+    };
+    setActiveJob(null);
+    createMutation.mutate(request);
+  };
+
+  const retryLastRequest = () => {
+    if (!lastRequest || createMutation.isPending) return;
+    setActiveJob(null);
+    createMutation.mutate({ ...lastRequest, request_id: createOmniChatRequestId() });
   };
 
   return (
@@ -317,9 +334,9 @@ export function OmniChatCreateWorkspace() {
               </button>
               {createMutation.isError && (
                 <p className="text-sm text-rose-300">
-                  {createMutation.error instanceof Error
-                    ? createMutation.error.message
-                    : 'Generation could not be started.'}
+                  {mediaGenerationErrorMessage(
+                    (createMutation.error as Error & { status?: number })?.status
+                  )}
                 </p>
               )}
             </form>
@@ -333,9 +350,18 @@ export function OmniChatCreateWorkspace() {
                     <div className="rounded-3xl border border-rose-400/20 bg-rose-500/10 p-8 text-rose-100">
                       <p className="font-semibold">Generation failed</p>
                       <p className="mt-2 text-sm text-rose-100/65">
-                        {activeJob.error_code?.replaceAll('_', ' ') ||
-                          'Please try a different prompt.'}
+                        {mediaGenerationErrorMessage(undefined, activeJob.error_code)}
                       </p>
+                      {lastRequest && (
+                        <button
+                          type="button"
+                          onClick={retryLastRequest}
+                          disabled={createMutation.isPending}
+                          className="mt-5 rounded-full border border-rose-200/25 px-4 py-2 text-sm font-semibold text-rose-50 transition hover:bg-rose-200/10 disabled:opacity-50"
+                        >
+                          {createMutation.isPending ? 'Retrying…' : 'Retry generation'}
+                        </button>
+                      )}
                     </div>
                   ) : activeJob.status === 'cancelled' ? (
                     <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 text-white/70">
@@ -429,7 +455,7 @@ function GeneratedResult({ assetId }: { assetId: string }) {
     <>
       <OmniChatMediaAssetView
         asset={assetQuery.data}
-        className="mx-auto max-h-[620px] min-h-80 w-full"
+        className="mx-auto min-h-80 w-full"
       />
       <p className="mt-4 text-sm text-emerald-300">Saved to your private gallery</p>
     </>

@@ -3638,9 +3638,43 @@
       }
     },
     "responseFeedback": {
-      "title": "Comentarios de respuestas de OmniChat", "subtitle": "Revisa respuestas reportadas y destaca señales de calidad útiles.", "loading": "Cargando comentarios de respuestas...", "loadError": "No se pudieron cargar los comentarios de respuestas.", "updateError": "No se pudo actualizar el estado del comentario.", "filters": "Filtros de comentarios de respuestas", "status": "Estado", "reason": "Motivo", "allStatuses": "Todos los estados", "allReasons": "Todos los motivos", "count": "{{count}} informes", "empty": "No se encontraron comentarios de respuestas.", "submitted": "Enviado", "detail": "Detalle del informe", "note": "Nota del usuario", "noNote": "No se proporcionó nota.", "responseSnapshot": "Instantánea de respuesta", "priorUserSnapshot": "Instantánea previa del usuario", "sceneFacts": "Datos de escena", "unavailable": "No disponible", "actions": "Acciones de revisión", "page": "Página {{page}}",
-      "statuses": { "new": "Nuevo", "reviewed": "Revisado", "promoted": "Promovido", "dismissed": "Descartado" },
-      "reasons": { "role_ownership": "Rol o propiedad", "user_agency": "Autonomía del usuario", "narration_format": "Narración o formato", "repetition_length": "Repetición o longitud", "grammar_artifact": "Gramática o artefacto", "character_mismatch": "No coincide con el personaje", "other": "Otro" }
+      "title": "Comentarios de respuestas de OmniChat",
+      "subtitle": "Revisa respuestas reportadas y destaca señales de calidad útiles.",
+      "loading": "Cargando comentarios de respuestas...",
+      "loadError": "No se pudieron cargar los comentarios de respuestas.",
+      "updateError": "No se pudo actualizar el estado del comentario.",
+      "filters": "Filtros de comentarios de respuestas",
+      "status": "Estado",
+      "reason": "Motivo",
+      "allStatuses": "Todos los estados",
+      "allReasons": "Todos los motivos",
+      "count": "{{count}} informes",
+      "empty": "No se encontraron comentarios de respuestas.",
+      "submitted": "Enviado",
+      "detail": "Detalle del informe",
+      "note": "Nota del usuario",
+      "noNote": "No se proporcionó nota.",
+      "responseSnapshot": "Instantánea de respuesta",
+      "priorUserSnapshot": "Instantánea previa del usuario",
+      "sceneFacts": "Datos de escena",
+      "unavailable": "No disponible",
+      "actions": "Acciones de revisión",
+      "page": "Página {{page}}",
+      "statuses": {
+        "new": "Nuevo",
+        "reviewed": "Revisado",
+        "promoted": "Promovido",
+        "dismissed": "Descartado"
+      },
+      "reasons": {
+        "role_ownership": "Rol o propiedad",
+        "user_agency": "Autonomía del usuario",
+        "narration_format": "Narración o formato",
+        "repetition_length": "Repetición o longitud",
+        "grammar_artifact": "Gramática o artefacto",
+        "character_mismatch": "No coincide con el personaje",
+        "other": "Otro"
+      }
     },
     "moderators": {
       "selectHub": "Seleccionar hub",
@@ -3932,10 +3966,68 @@
     }
   },
   "omnichat": {
-    "galleryDelete": { "action": "Eliminar creación", "title": "¿Eliminar esta creación?", "description": "Esto elimina permanentemente el archivo de tu galería y de los archivos adjuntos del chat. No se puede deshacer.", "confirm": "Eliminar permanentemente", "deleting": "Eliminando...", "sharedError": "Deja de publicar esta creación en Explorar antes de eliminarla.", "genericError": "No se pudo eliminar esta creación.", "unpublishFirst": "Deja de publicar en Explorar antes de eliminar" },
-    "groupManagement": { "confirmDelete": "¿Eliminar permanentemente este grupo y toda su conversación?" },
-    "commerce": { "title": "Planes y OmniCredits", "subtitle": "Tu saldo y todas las ofertas mostradas provienen del servidor.", "wallet": "Cartera", "balanceBreakdown": "{{purchased}} comprados · {{subscription}} de suscripción", "plans": "Planes", "choosePlan": "Elegir {{plan}}", "creditPacks": "Paquetes de créditos", "creditName": "{{count}} OmniCredits", "buyPack": "Comprar {{pack}}", "recentUsage": "Uso reciente", "noUsage": "Aún no hay uso de créditos.", "loading": "Cargando opciones de compra…", "redirecting": "Abriendo el pago seguro…", "notConfigured": "Las opciones de compra aún no están configuradas.", "offerNames": { "plus": "Plus", "premium": "Premium", "unknown": "Suscripción" }, "period": { "month": "mes", "days": "{{count}} días" }, "features": { "profiles": "Más perfiles de personajes", "media": "Créditos de medios incluidos", "priority": "Generación prioritaria" }, "usage": { "voice": "Llamada de voz", "image": "Generación de imagen", "video": "Generación de video", "other": "Ajuste de créditos" }, "errors": { "load": "No se pudieron cargar los datos de facturación.", "secureCheckout": "No se pudo abrir un pago seguro. Inténtalo de nuevo." } },
-    "videoPaywall": { "title": "Desbloquear {{feature}}", "description": "El video requiere OmniCredits. Un plan válido puede incluir créditos; la disponibilidad y el costo se confirman de forma segura antes de usarlo.", "viewOptions": "Ver planes y créditos", "features": { "scene_video": "video de escena", "video_call": "videollamadas" } },
+    "galleryDelete": {
+      "action": "Eliminar creación",
+      "title": "¿Eliminar esta creación?",
+      "description": "Esto elimina permanentemente el archivo de tu galería y de los archivos adjuntos del chat. No se puede deshacer.",
+      "confirm": "Eliminar permanentemente",
+      "deleting": "Eliminando...",
+      "sharedError": "Deja de publicar esta creación en Explorar antes de eliminarla.",
+      "genericError": "No se pudo eliminar esta creación.",
+      "unpublishFirst": "Deja de publicar en Explorar antes de eliminar"
+    },
+    "groupManagement": {
+      "confirmDelete": "¿Eliminar permanentemente este grupo y toda su conversación?"
+    },
+    "commerce": {
+      "title": "Planes y OmniCredits",
+      "subtitle": "Tu saldo y todas las ofertas mostradas provienen del servidor.",
+      "wallet": "Cartera",
+      "balanceBreakdown": "{{purchased}} comprados · {{subscription}} de suscripción",
+      "plans": "Planes",
+      "choosePlan": "Elegir {{plan}}",
+      "creditPacks": "Paquetes de créditos",
+      "creditName": "{{count}} OmniCredits",
+      "buyPack": "Comprar {{pack}}",
+      "recentUsage": "Uso reciente",
+      "noUsage": "Aún no hay uso de créditos.",
+      "loading": "Cargando opciones de compra…",
+      "redirecting": "Abriendo el pago seguro…",
+      "notConfigured": "Las opciones de compra aún no están configuradas.",
+      "offerNames": {
+        "plus": "Plus",
+        "premium": "Premium",
+        "unknown": "Suscripción"
+      },
+      "period": {
+        "month": "mes",
+        "days": "{{count}} días"
+      },
+      "features": {
+        "profiles": "Más perfiles de personajes",
+        "media": "Créditos de medios incluidos",
+        "priority": "Generación prioritaria"
+      },
+      "usage": {
+        "voice": "Llamada de voz",
+        "image": "Generación de imagen",
+        "video": "Generación de video",
+        "other": "Ajuste de créditos"
+      },
+      "errors": {
+        "load": "No se pudieron cargar los datos de facturación.",
+        "secureCheckout": "No se pudo abrir un pago seguro. Inténtalo de nuevo."
+      }
+    },
+    "videoPaywall": {
+      "title": "Desbloquear {{feature}}",
+      "description": "El video requiere OmniCredits. Un plan válido puede incluir créditos; la disponibilidad y el costo se confirman de forma segura antes de usarlo.",
+      "viewOptions": "Ver planes y créditos",
+      "features": {
+        "scene_video": "video de escena",
+        "video_call": "videollamadas"
+      }
+    },
     "categories": {
       "all": "Todos",
       "roleplay": "Rol",
@@ -4068,7 +4160,8 @@
       "profile": "Perfil",
       "gallery": "Galería",
       "showProfileImage": "Mostrar imagen de perfil",
-      "showProfileVideo": "Mostrar video de perfil"
+      "showProfileVideo": "Mostrar video de perfil",
+      "mediaOnlyPreview": "Envió una foto"
     },
     "exitToSite": "Salir a OmniNudge",
     "header": {
@@ -4182,7 +4275,8 @@
         "galleryUrls": "Imágenes de galería",
         "galleryUrlsPlaceholder": "Una imagen subida por línea",
         "characterBookJson": "JSON del libro de personaje",
-        "extensionsJson": "JSON de extensiones"
+        "extensionsJson": "JSON de extensiones",
+        "galleryUrlsHelp": "Añade hasta 4 fotos. Usa la misma cara en todas: enseñan al generador de imágenes cómo es tu personaje, y las caras distintas producen resultados inconsistentes. Varía la expresión, la iluminación y el ángulo, e incluye al menos una con expresión neutra y boca cerrada. Solo se usa la cara, así que las fotos de cuerpo entero no aportan más que la cara que contienen."
       },
       "responseStyles": {
         "inherit": {

@@ -3638,9 +3638,43 @@
       }
     },
     "responseFeedback": {
-      "title": "OmniChat Response Feedback", "subtitle": "Review reported replies and promote useful quality signals.", "loading": "Loading response feedback...", "loadError": "Unable to load response feedback.", "updateError": "Unable to update the feedback status.", "filters": "Response feedback filters", "status": "Status", "reason": "Reason", "allStatuses": "All statuses", "allReasons": "All reasons", "count": "{{count}} reports", "empty": "No response feedback found.", "submitted": "Submitted", "detail": "Report detail", "note": "Reporter note", "noNote": "No note provided.", "responseSnapshot": "Response snapshot", "priorUserSnapshot": "Prior user snapshot", "sceneFacts": "Scene facts", "unavailable": "Unavailable", "actions": "Review actions", "page": "Page {{page}}",
-      "statuses": { "new": "New", "reviewed": "Reviewed", "promoted": "Promoted", "dismissed": "Dismissed" },
-      "reasons": { "role_ownership": "Role or ownership", "user_agency": "User agency", "narration_format": "Narration or format", "repetition_length": "Repetition or length", "grammar_artifact": "Grammar or artifact", "character_mismatch": "Character mismatch", "other": "Other" }
+      "title": "OmniChat Response Feedback",
+      "subtitle": "Review reported replies and promote useful quality signals.",
+      "loading": "Loading response feedback...",
+      "loadError": "Unable to load response feedback.",
+      "updateError": "Unable to update the feedback status.",
+      "filters": "Response feedback filters",
+      "status": "Status",
+      "reason": "Reason",
+      "allStatuses": "All statuses",
+      "allReasons": "All reasons",
+      "count": "{{count}} reports",
+      "empty": "No response feedback found.",
+      "submitted": "Submitted",
+      "detail": "Report detail",
+      "note": "Reporter note",
+      "noNote": "No note provided.",
+      "responseSnapshot": "Response snapshot",
+      "priorUserSnapshot": "Prior user snapshot",
+      "sceneFacts": "Scene facts",
+      "unavailable": "Unavailable",
+      "actions": "Review actions",
+      "page": "Page {{page}}",
+      "statuses": {
+        "new": "New",
+        "reviewed": "Reviewed",
+        "promoted": "Promoted",
+        "dismissed": "Dismissed"
+      },
+      "reasons": {
+        "role_ownership": "Role or ownership",
+        "user_agency": "User agency",
+        "narration_format": "Narration or format",
+        "repetition_length": "Repetition or length",
+        "grammar_artifact": "Grammar or artifact",
+        "character_mismatch": "Character mismatch",
+        "other": "Other"
+      }
     },
     "moderators": {
       "selectHub": "Select Hub",
@@ -3932,10 +3966,68 @@
     }
   },
   "omnichat": {
-    "galleryDelete": { "action": "Delete creation", "title": "Delete this creation?", "description": "This permanently removes the file from your gallery and from chat attachments. This cannot be undone.", "confirm": "Delete permanently", "deleting": "Deleting...", "sharedError": "Unpublish this creation from Explore before deleting it.", "genericError": "This creation could not be deleted.", "unpublishFirst": "Unpublish from Explore before deleting" },
-    "groupManagement": { "confirmDelete": "Delete this group and its entire transcript permanently?" },
-    "commerce": { "title": "Plans and OmniCredits", "subtitle": "Your balance and every displayed offer come from the server.", "wallet": "Wallet", "balanceBreakdown": "{{purchased}} purchased · {{subscription}} subscription", "plans": "Plans", "choosePlan": "Choose {{plan}}", "creditPacks": "Credit packs", "creditName": "{{count}} OmniCredits", "buyPack": "Buy {{pack}}", "recentUsage": "Recent usage", "noUsage": "No credit usage yet.", "loading": "Loading purchase options…", "redirecting": "Opening secure checkout…", "notConfigured": "Purchase options are not configured yet.", "offerNames": { "plus": "Plus", "premium": "Premium", "unknown": "Subscription" }, "period": { "month": "month", "days": "{{count}} days" }, "features": { "profiles": "More character profiles", "media": "Included media credits", "priority": "Priority generation" }, "usage": { "voice": "Voice call", "image": "Image generation", "video": "Video generation", "other": "Credit adjustment" }, "errors": { "load": "Billing details could not be loaded.", "secureCheckout": "A secure checkout could not be opened. Please try again." } },
-    "videoPaywall": { "title": "Unlock {{feature}}", "description": "Video requires OmniCredits. An eligible plan may include credits; availability and cost are confirmed securely before use.", "viewOptions": "View plans and credits", "features": { "scene_video": "scene video", "video_call": "video calls" } },
+    "galleryDelete": {
+      "action": "Delete creation",
+      "title": "Delete this creation?",
+      "description": "This permanently removes the file from your gallery and from chat attachments. This cannot be undone.",
+      "confirm": "Delete permanently",
+      "deleting": "Deleting...",
+      "sharedError": "Unpublish this creation from Explore before deleting it.",
+      "genericError": "This creation could not be deleted.",
+      "unpublishFirst": "Unpublish from Explore before deleting"
+    },
+    "groupManagement": {
+      "confirmDelete": "Delete this group and its entire transcript permanently?"
+    },
+    "commerce": {
+      "title": "Plans and OmniCredits",
+      "subtitle": "Your balance and every displayed offer come from the server.",
+      "wallet": "Wallet",
+      "balanceBreakdown": "{{purchased}} purchased · {{subscription}} subscription",
+      "plans": "Plans",
+      "choosePlan": "Choose {{plan}}",
+      "creditPacks": "Credit packs",
+      "creditName": "{{count}} OmniCredits",
+      "buyPack": "Buy {{pack}}",
+      "recentUsage": "Recent usage",
+      "noUsage": "No credit usage yet.",
+      "loading": "Loading purchase options…",
+      "redirecting": "Opening secure checkout…",
+      "notConfigured": "Purchase options are not configured yet.",
+      "offerNames": {
+        "plus": "Plus",
+        "premium": "Premium",
+        "unknown": "Subscription"
+      },
+      "period": {
+        "month": "month",
+        "days": "{{count}} days"
+      },
+      "features": {
+        "profiles": "More character profiles",
+        "media": "Included media credits",
+        "priority": "Priority generation"
+      },
+      "usage": {
+        "voice": "Voice call",
+        "image": "Image generation",
+        "video": "Video generation",
+        "other": "Credit adjustment"
+      },
+      "errors": {
+        "load": "Billing details could not be loaded.",
+        "secureCheckout": "A secure checkout could not be opened. Please try again."
+      }
+    },
+    "videoPaywall": {
+      "title": "Unlock {{feature}}",
+      "description": "Video requires OmniCredits. An eligible plan may include credits; availability and cost are confirmed securely before use.",
+      "viewOptions": "View plans and credits",
+      "features": {
+        "scene_video": "scene video",
+        "video_call": "video calls"
+      }
+    },
     "categories": {
       "all": "All",
       "roleplay": "Roleplay",
@@ -4068,7 +4160,8 @@
       "profile": "Profile",
       "gallery": "Gallery",
       "showProfileImage": "Show profile image",
-      "showProfileVideo": "Show profile video"
+      "showProfileVideo": "Show profile video",
+      "mediaOnlyPreview": "Sent a photo"
     },
     "exitToSite": "Exit to OmniNudge",
     "header": {
@@ -4182,7 +4275,8 @@
         "galleryUrls": "Gallery Images",
         "galleryUrlsPlaceholder": "One uploaded image per line",
         "characterBookJson": "Character Book JSON",
-        "extensionsJson": "Extensions JSON"
+        "extensionsJson": "Extensions JSON",
+        "galleryUrlsHelp": "Add up to 4 photos. Use the same face in every one — these teach the image generator what your character looks like, and mismatched faces produce inconsistent results. Vary the expression, lighting and angle, and include at least one with a neutral, closed-mouth expression. Only the face is used, so full-body shots add nothing beyond the face they contain."
       },
       "responseStyles": {
         "inherit": {

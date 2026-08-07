@@ -41,6 +41,7 @@ describe('OmniChatMediaAssetView', () => {
     expect(screen.getByLabelText('Loading generated image')).toBeInTheDocument();
     const image = await screen.findByRole('img', { name: 'Sadie at the park' });
     expect(image).toHaveAttribute('src', 'blob:generated-media');
+    expect(image).toHaveClass('object-contain');
     expect(omnichatService.getMediaAssetContent).toHaveBeenCalledWith(
       baseAsset.id,
       baseAsset.content_url
@@ -52,6 +53,7 @@ describe('OmniChatMediaAssetView', () => {
 
     await waitFor(() => expect(document.querySelector('video')).toBeTruthy());
     expect(document.querySelector('video')).toHaveAttribute('controls');
+    expect(document.querySelector('video')).toHaveClass('object-contain');
   });
 
   it('loads public video with viewer authentication before rendering it', async () => {

@@ -377,7 +377,9 @@ export default function OmniChatDiscoverPage() {
     const items: Array<BotConversation & { persona: BotPersona }> = [];
 
     for (const conv of conversations) {
-      if (!conv.last_message_preview) continue;
+      // An image-only latest message has no preview text but the thread is
+      // still resumable; skipping it would hide it from Continue chatting.
+      if (!conv.last_message_preview && !conv.last_message_media_only) continue;
       const latestPersona = activePersonaById.get(Number(conv.persona_id));
       if (!latestPersona) continue;
       const persona = { ...(conv.persona ?? latestPersona), ...latestPersona };
