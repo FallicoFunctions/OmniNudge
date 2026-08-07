@@ -1,0 +1,11 @@
+{
+  "project": "OmniNudge AI Chat Bot",
+  "project_role": "independent-feature-worktree",
+  "integration_target": "OmniNudge",
+  "default_policy": {
+    "review_required": true,
+    "approval_policy": "safe-autonomous",
+    "preserve_uncommitted_changes": true
+  },
+  "tasks": []
+}

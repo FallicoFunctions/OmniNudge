@@ -69,9 +69,9 @@ The repository includes a Go backend, a React frontend, background jobs, media p
 - ClamAV for upload scanning
 - FFmpeg for audio processing
 - Firebase Cloud Messaging for push notifications
-- Fal queue-backed image and video generation
-- Optional ElevenLabs speech synthesis with per-character browser voice fallback
-- Optional Tavus CVI private WebRTC rooms for real-time, lip-synced character video calls
+- RunPod scale-to-zero GPU workers for image and video generation
+- Local Voicebox speech synthesis with optional on-demand GPU voice processing
+- Self-hosted LiveKit rooms with on-demand avatar rendering for character video calls
 - Prometheus, OpenTelemetry, Sentry, and Pyroscope integration points
 - Gemini-backed hub AI designer endpoint
 

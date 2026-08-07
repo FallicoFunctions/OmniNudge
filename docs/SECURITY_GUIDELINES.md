@@ -268,7 +268,7 @@ Content-Security-Policy:
   connect-src 'self' wss: https://*.googleapis.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com;
   media-src 'self' blob: https:;
   worker-src 'self' blob:;
-  frame-src 'self' https://daily.co https://*.daily.co;
+  frame-src 'self';
   object-src 'none';
   base-uri 'self';
   form-action 'self';
@@ -277,7 +277,7 @@ Content-Security-Policy:
 **What this prevents:**
 - `script-src 'self'` - Only scripts from our domain
 - `style-src 'unsafe-inline'` - Inline styles allowed (for user CSS) but no external stylesheets
-- `frame-src` - Frames are limited to same-origin and trusted Daily live-avatar rooms
+- `frame-src` - Frames are limited to same-origin; live calls use authenticated WebRTC connections
 - `object-src 'none'` - No Flash, plugins
 - `form-action 'self'` - Forms only submit to our domain
 
