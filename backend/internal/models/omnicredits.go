@@ -71,8 +71,12 @@ type OmniCreditsUsageReservation struct {
 	SubscriptionEpoch   *uuid.UUID
 	Status              string
 	AlreadyApplied      bool
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	// AdminBypass is a server-only entitlement marker. It is true only for a
+	// persisted administrator reservation that intentionally has no ledger row;
+	// callers must omit billing foreign-key links for that operation.
+	AdminBypass bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type OmniCreditsUsageEntry struct {

@@ -17,6 +17,11 @@ func TestDefaultOmniChatModelProfilesAreServerOwnedNamedOffers(t *testing.T) {
 		OmniChatModelProfileUltraFast,
 	}, []OmniChatModelProfileKey{profiles[0].Key, profiles[1].Key, profiles[2].Key, profiles[3].Key, profiles[4].Key})
 
+	standard := profiles[0]
+	require.Equal(t, "google/gemini-3.1-flash-lite", standard.ModelKey)
+	require.Equal(t, OmniChatModelReasoningEffortLow, standard.ReasoningEffort)
+	require.Equal(t, OmniChatModelSpeedStandard, standard.Speed)
+
 	quick := profiles[2]
 	require.Equal(t, OmniChatModelTierPremium, quick.RequiredTier)
 	require.Equal(t, "anthropic/claude-sonnet-5", quick.ModelKey)

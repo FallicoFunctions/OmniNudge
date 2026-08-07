@@ -33,7 +33,7 @@ func SecurityHeaders() gin.HandlerFunc {
 			"font-src 'self' data:",                                // Allow fonts from self and data URLs
 			"connect-src 'self' ws: wss:",                          // Allow WebSocket connections
 			"media-src 'self' blob: https:",                        // Allow media from self, blobs, and HTTPS CDN redirects
-			"frame-src 'self' https://daily.co https://*.daily.co", // Private Tavus/Daily live-avatar rooms
+			"frame-src 'self'",                               // LiveKit uses the first-party client, not an embedded provider frame
 			"object-src 'none'",                                    // Block plugins (Flash, etc.)
 			"frame-ancestors 'none'",                               // Prevent clickjacking
 			"base-uri 'self'",                                      // Restrict <base> tag
@@ -66,8 +66,8 @@ func SecurityHeaders() gin.HandlerFunc {
 		// Permissions-Policy: Control browser features
 		// Disable unnecessary features to reduce attack surface
 		permissions := []string{
-			`camera=(self "https://daily.co" "https://*.daily.co")`,     // Same-origin calls and trusted Tavus/Daily rooms
-			`microphone=(self "https://daily.co" "https://*.daily.co")`, // Same-origin voice and trusted Tavus/Daily rooms
+			"camera=(self)",
+			"microphone=(self)",
 			"geolocation=()",   // Disable geolocation
 			"payment=()",       // Disable payment API
 			"usb=()",           // Disable USB access

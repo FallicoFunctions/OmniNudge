@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -15,8 +14,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/services/liveavatar"
 	"github.com/omninudge/backend/internal/services/speech"
-	"github.com/omninudge/backend/internal/services/tavus"
 	zlog "github.com/rs/zerolog/log"
 )
 
@@ -37,27 +36,13 @@ func normalizeOmniChatVoiceProfile(voice *models.OmniChatPersonaVoice) error {
 			voice.LanguageCode = &language
 		}
 	}
-	for _, value := range []*string{voice.LiveVideoReplicaID, voice.LiveVideoPersonaID} {
-		if value != nil {
-			trimmed := strings.TrimSpace(*value)
-			*value = trimmed
-		}
-	}
-	if voice.LiveVideoReplicaID != nil && *voice.LiveVideoReplicaID == "" {
-		voice.LiveVideoReplicaID = nil
-	}
-	if voice.LiveVideoPersonaID != nil && *voice.LiveVideoPersonaID == "" {
-		voice.LiveVideoPersonaID = nil
-	}
 	if (voice.Provider != "browser" && voice.Provider != "elevenlabs" && voice.Provider != "voicebox") ||
 		!omniChatVoiceIDPattern.MatchString(voice.VoiceID) || voice.VoiceName == "" ||
 		len([]rune(voice.VoiceName)) > 100 || (voice.ModelID != "" && !omniChatVoiceModelPattern.MatchString(voice.ModelID)) ||
 		(voice.LanguageCode != nil && !omniChatVoiceLanguagePattern.MatchString(*voice.LanguageCode)) ||
 		voice.Stability < 0 || voice.Stability > 1 || voice.SimilarityBoost < 0 || voice.SimilarityBoost > 1 ||
 		voice.Style < 0 || voice.Style > 1 || voice.Speed < 0.7 || voice.Speed > 1.2 ||
-		voice.Pitch < 0.5 || voice.Pitch > 2 ||
-		((voice.LiveVideoReplicaID == nil) != (voice.LiveVideoPersonaID == nil)) ||
-		(voice.LiveVideoReplicaID != nil && (!omniChatVoiceIDPattern.MatchString(*voice.LiveVideoReplicaID) || !omniChatVoiceIDPattern.MatchString(*voice.LiveVideoPersonaID))) {
+		voice.Pitch < 0.5 || voice.Pitch > 2 {
 		return errors.New("invalid voice profile")
 	}
 	if voice.Provider == "voicebox" {
@@ -83,8 +68,6 @@ func publicOmniChatVoiceProfile(voice *models.OmniChatPersonaVoice) *models.Omni
 		return nil
 	}
 	public := *voice
-	public.LiveVideoReplicaID = nil
-	public.LiveVideoPersonaID = nil
 	return &public
 }
 
@@ -110,9 +93,7 @@ type OmniChatVoiceHandler struct {
 	data                OmniChatVoiceData
 	speech              OmniChatSpeechCreator
 	storage             services.StorageService
-	liveVideo           *tavus.Client
-	liveReplicaID       string
-	livePersonaID       string
+	liveVideo           liveVideoClient
 	voiceboxAvailable   bool
 	voiceCloningEnabled bool
 	billing             interface {
@@ -120,6 +101,16 @@ type OmniChatVoiceHandler struct {
 		CaptureOwned(context.Context, int, uuid.UUID) error
 		RefundOwned(context.Context, int, uuid.UUID) error
 	}
+}
+
+type liveVideoClient interface {
+	Configured() bool
+	Start(context.Context, liveavatar.StartRequest) (*liveavatar.Session, error)
+	EndConversation(context.Context, string) error
+}
+
+type liveVideoTokenRefresher interface {
+	RefreshToken(context.Context, uuid.UUID, int) (string, error)
 }
 
 func (h *OmniChatVoiceHandler) SetBilling(billing interface {
@@ -166,8 +157,8 @@ func (h *OmniChatVoiceHandler) PreviewVoicePreset(c *gin.Context) {
 	c.Data(http.StatusOK, audio.ContentType, audio.Bytes)
 }
 
-func NewOmniChatVoiceHandler(data OmniChatVoiceData, speech OmniChatSpeechCreator, storage services.StorageService, liveVideo *tavus.Client, liveReplicaID, livePersonaID string) *OmniChatVoiceHandler {
-	return &OmniChatVoiceHandler{data: data, speech: speech, storage: storage, liveVideo: liveVideo, liveReplicaID: strings.TrimSpace(liveReplicaID), livePersonaID: strings.TrimSpace(livePersonaID)}
+func NewOmniChatVoiceHandler(data OmniChatVoiceData, speech OmniChatSpeechCreator, storage services.StorageService, liveVideo liveVideoClient, _ ...string) *OmniChatVoiceHandler {
+	return &OmniChatVoiceHandler{data: data, speech: speech, storage: storage, liveVideo: liveVideo}
 }
 
 func (h *OmniChatVoiceHandler) GetPersonaVoice(c *gin.Context) {
@@ -204,16 +195,8 @@ func (h *OmniChatVoiceHandler) UpdatePersonaVoice(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Invalid voice profile")
 		return
 	}
-	// Tavus replica/persona IDs address resources under OmniChat's provider
-	// account. A user who owns a custom character may choose a voice, but must
-	// never be able to probe or consume another character's live avatar by
-	// supplying arbitrary provider identifiers. Live-avatar wiring is an
-	// operator-controlled capability until per-user provider accounts exist.
-	if (voice.LiveVideoReplicaID != nil || voice.LiveVideoPersonaID != nil) &&
-		c.GetString("role") != "admin" && c.GetString("role") != "moderator" {
-		RespondError(c, http.StatusForbidden, "Only moderators can configure live avatar video")
-		return
-	}
+	// Live avatar workers are selected by the deployment, not by client-supplied
+	// provider identifiers. The request may configure speech only.
 	updated, err := h.data.UpsertPersonaVoiceAuthorized(c.Request.Context(), c.GetInt("user_id"), voice)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update character voice")
@@ -369,21 +352,13 @@ func (h *OmniChatVoiceHandler) StartCall(c *gin.Context) {
 			RespondError(c, http.StatusInternalServerError, "Failed to prepare live video call")
 			return
 		}
-		replicaID, personaID := callContext.LiveVideoReplicaID, callContext.LiveVideoPersonaID
-		if replicaID == "" || personaID == "" {
-			replicaID, personaID = h.liveReplicaID, h.livePersonaID
+		avatarURL := ""
+		if callContext.AvatarURL != nil {
+			avatarURL = *callContext.AvatarURL
 		}
-		if replicaID == "" || personaID == "" {
-			h.endLocalCallBestEffort(c.Request.Context(), session.ID, userID)
-			refundVideo()
-			RespondError(c, http.StatusServiceUnavailable, "This character does not have a live avatar configured")
-			return
-		}
-		providerSession, providerErr := h.liveVideo.CreateConversation(c.Request.Context(), tavus.CreateConversationRequest{
-			ReplicaID: replicaID, PersonaID: personaID,
-			ConversationName:      callContext.PersonaName + " on OmniChat",
-			ConversationalContext: callContext.Context,
-			MemoryStores:          []string{fmt.Sprintf("omnichat-user-%d-persona-%d", userID, session.PersonaID)},
+		providerSession, providerErr := h.liveVideo.Start(c.Request.Context(), liveavatar.StartRequest{
+			CallID: session.ID, UserID: userID, PersonaID: session.PersonaID,
+			PersonaName: callContext.PersonaName, AvatarURL: avatarURL, Context: callContext.Context,
 		})
 		if providerErr != nil {
 			h.endLocalCallBestEffort(c.Request.Context(), session.ID, userID)
@@ -391,21 +366,30 @@ func (h *OmniChatVoiceHandler) StartCall(c *gin.Context) {
 			RespondError(c, http.StatusServiceUnavailable, "Live avatar video is temporarily unavailable")
 			return
 		}
-		attached, attachErr := h.data.AttachCallProviderOwned(c.Request.Context(), session.ID, userID, "tavus", providerSession.ConversationID)
+		if providerSession == nil || providerSession.ProviderSessionID == "" {
+			h.endLocalCallBestEffort(c.Request.Context(), session.ID, userID)
+			refundVideo()
+			RespondError(c, http.StatusServiceUnavailable, "Live avatar video is temporarily unavailable")
+			return
+		}
+		attached, attachErr := h.data.AttachCallProviderOwned(c.Request.Context(), session.ID, userID, liveavatar.ProviderName, providerSession.ProviderSessionID)
 		if attachErr != nil || !attached {
-			h.cleanupUnattachedProviderCall(c.Request.Context(), session.ID, userID, providerSession.ConversationID)
+			h.cleanupUnattachedProviderCall(c.Request.Context(), session.ID, userID, providerSession.ProviderSessionID)
 			refundVideo()
 			RespondError(c, http.StatusConflict, "Live video call was superseded")
 			return
 		}
 		if err := h.billing.CaptureOwned(c.Request.Context(), userID, session.ID); err != nil {
-			h.cleanupUnattachedProviderCall(c.Request.Context(), session.ID, userID, providerSession.ConversationID)
+			h.cleanupUnattachedProviderCall(c.Request.Context(), session.ID, userID, providerSession.ProviderSessionID)
 			refundVideo()
 			RespondError(c, http.StatusServiceUnavailable, "Video billing is temporarily unavailable")
 			return
 		}
 		videoReserved = false
-		session.LiveVideoURL = providerSession.JoinURL
+		session.LiveVideoURL = providerSession.LiveKitURL
+		session.LiveVideoToken = providerSession.ParticipantToken
+		session.LiveVideoRoom = providerSession.RoomName
+		session.LiveVideoTokenTTLSeconds = providerSession.TokenTTLSeconds
 	}
 	c.JSON(http.StatusCreated, gin.H{"session": session})
 }
@@ -459,8 +443,38 @@ func (h *OmniChatVoiceHandler) EndCall(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// RefreshCallToken keeps long-running LiveKit calls alive without restarting
+// the RunPod avatar worker. The active provider row is checked first so a
+// token cannot be minted for an ended or superseded call.
+func (h *OmniChatVoiceHandler) RefreshCallToken(c *gin.Context) {
+	id, ok := parseUUIDParam(c, "call_id")
+	if !ok {
+		return
+	}
+	provider, providerSessionID, active, err := h.data.GetActiveCallProviderOwned(c.Request.Context(), id, c.GetInt("user_id"))
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to refresh call")
+		return
+	}
+	if !active || provider != liveavatar.ProviderName || providerSessionID == "" {
+		RespondError(c, http.StatusNotFound, "Active video call not found")
+		return
+	}
+	refresher, ok := h.liveVideo.(liveVideoTokenRefresher)
+	if !ok {
+		RespondError(c, http.StatusServiceUnavailable, "Live video token refresh is unavailable")
+		return
+	}
+	token, err := refresher.RefreshToken(c.Request.Context(), id, c.GetInt("user_id"))
+	if err != nil || strings.TrimSpace(token) == "" {
+		RespondError(c, http.StatusServiceUnavailable, "Live video token refresh is unavailable")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"live_video_token": token})
+}
+
 func (h *OmniChatVoiceHandler) endProviderSessionBestEffort(ctx context.Context, callID uuid.UUID, userID int, provider, providerSessionID string) {
-	if provider != "tavus" || providerSessionID == "" || h.liveVideo == nil {
+	if provider != liveavatar.ProviderName || providerSessionID == "" || h.liveVideo == nil {
 		return
 	}
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)

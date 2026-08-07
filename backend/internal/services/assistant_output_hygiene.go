@@ -20,6 +20,7 @@ var (
 	providerTemplateDelimiterPattern = regexp.MustCompile(`(?i)(?:<\|(?:end|eot(?:_id)?|im_end|im_start|assistant|user|system|start_header_id|end_header_id|begin_of_text|end_of_text|endoftext)\|>|\[/?INST\]|<</?SYS>>|</?think>)`)
 	providerMetaLeakPattern          = regexp.MustCompile(`(?i)\b(?:opening|starting|beginning)\s+(?:a\s+)?new\s+(?:response|reply|completion|message)\b`)
 	providerPlanningLeadPattern      = regexp.MustCompile(`(?is)^\s*"?\s*(?:we|i)\s+need\s+to\s+(?:continue|write|generate|produce|answer|respond)\b.{0,200}\b(?:dialogue|response|reply|character|user)\b`)
+	serverPromptMarkerPattern        = regexp.MustCompile(`(?i)\[(?:platform response style|conversation integrity|post-history instructions|character definition|example dialogue|actor and state continuity|personal conversation mode|server scene continuity state|user profile metadata|character lorebook|additional lorebook context|provider output retry|personal response shape retry|personal length-only recovery|personal dialogue-only recovery)(?:\s*:[^\]]*)?\]`)
 )
 
 // validateAssistantOutputHygiene deliberately detects only high-confidence
@@ -40,6 +41,9 @@ func validateAssistantOutputHygiene(content string) (bool, string) {
 	}
 	if providerPlanningLeadPattern.MatchString(content) {
 		return false, "response contains provider planning text"
+	}
+	if serverPromptMarkerPattern.MatchString(content) {
+		return false, "response contains a server prompt marker"
 	}
 	for _, r := range content {
 		if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {

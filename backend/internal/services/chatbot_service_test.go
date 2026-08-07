@@ -21,6 +21,23 @@ type stubChatCompletionClient struct {
 	generate func(ctx context.Context, messages []openrouter.Message, onChunk openrouter.StreamCallback) (string, error)
 }
 
+// optionsAwareSequenceChatCompletionClient models the production client's
+// bounded-options capability while keeping the ordinary Generate path useful
+// for earlier retry attempts.
+type optionsAwareSequenceChatCompletionClient struct {
+	generate func(ctx context.Context, messages []openrouter.Message, onChunk openrouter.StreamCallback) (string, error)
+	options  []openrouter.GenerationOptions
+}
+
+func (c *optionsAwareSequenceChatCompletionClient) Generate(ctx context.Context, messages []openrouter.Message, onChunk openrouter.StreamCallback) (string, error) {
+	return c.generate(ctx, messages, onChunk)
+}
+
+func (c *optionsAwareSequenceChatCompletionClient) GenerateWithOptions(ctx context.Context, messages []openrouter.Message, onChunk openrouter.StreamCallback, options openrouter.GenerationOptions) (string, error) {
+	c.options = append(c.options, options)
+	return c.generate(ctx, messages, onChunk)
+}
+
 type optionsAwareChatCompletionClient struct {
 	options openrouter.GenerationOptions
 }
@@ -383,6 +400,31 @@ func TestUserFacingGenerationErrorDoesNotMislabelContractFailureAsProviderBusy(t
 
 	err = fmt.Errorf("%w: checkpoint unavailable", ErrConversationSceneStateUnavailable)
 	require.Equal(t, "I couldn't safely maintain the conversation state — please try again.", userFacingGenerationError(err))
+
+	err = fmt.Errorf("wrapped: %w", openrouter.ErrAccessDenied)
+	require.Equal(t, "OmniChat is temporarily unavailable.", userFacingGenerationError(err))
+}
+
+func TestGeneratePersonaCompletionFailsFastWhenProviderAccessIsDenied(t *testing.T) {
+	persona := &models.BotPersona{
+		Name:                 "Sadie Hart",
+		ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue,
+	}
+	messages := []openrouter.Message{{Role: openrouter.RoleSystem, Content: "server-owned prompt"}}
+	var calls int
+	var delivered []string
+	client := stubChatCompletionClient{generate: func(_ context.Context, _ []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+		calls++
+		return "", fmt.Errorf("wrapped: %w", openrouter.ErrAccessDenied)
+	}}
+
+	_, err := generatePersonaCompletionWithClient(context.Background(), client, persona, messages, func(chunk string) {
+		delivered = append(delivered, chunk)
+	})
+
+	require.ErrorIs(t, err, openrouter.ErrAccessDenied)
+	require.Equal(t, 1, calls, "provider access denial must bypass conversational retries")
+	require.Empty(t, delivered)
 }
 
 func TestGeneratePersonaCompletionRetriesMalformedSingleBlockWithShapeCorrection(t *testing.T) {
@@ -429,7 +471,7 @@ func TestGeneratePersonaCompletionRetriesConflictingTurnOwnership(t *testing.T) 
 Actually, your leg is the target because this is my turn, and I am going to make you nervous this time.`
 
 	var calls int
-	client := stubChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+	client := &optionsAwareSequenceChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
 		calls++
 		if calls == 1 {
 			return conflicting, nil
@@ -454,16 +496,16 @@ Actually, your leg is the target because this is my turn, and I am going to make
 	require.Equal(t, "original system prompt", originalMessages[0].Content)
 }
 
-func TestGeneratePersonaCompletionTruncatesOversizedDraftIntoDeliverableResponse(t *testing.T) {
+func TestGeneratePersonaCompletionRecoversOversizedDraftIntoDeliverableResponse(t *testing.T) {
 	persona := &models.BotPersona{Name: "Sadie Hart", ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue}
 	var calls int
-	service := &ChatbotService{openrouter: stubChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+	service := &ChatbotService{openrouter: &optionsAwareSequenceChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
 		calls++
 		if calls == 1 {
 			return strings.TrimSpace(strings.Repeat("still listening carefully ", 50)), nil
 		}
-		require.Contains(t, messages[0].Content, "[Personal Response Shape Retry]")
-		return "I am still listening carefully, and I can keep this reply concise without cutting the thought off halfway through.\n\nThe response now has enough room to sound natural while staying well inside the delivery limit.", nil
+		require.Contains(t, messages[0].Content, "[Personal Length-Only Recovery]")
+		return `{"paragraphs":["I am still listening carefully, and I can keep this reply concise without cutting the thought off halfway through.","The response now has enough room to sound natural while staying well inside the delivery limit."]}`, nil
 	}}}
 
 	response, err := service.generatePersonaCompletion(context.Background(), persona, []openrouter.Message{{Role: openrouter.RoleSystem, Content: "system"}}, nil)
@@ -551,11 +593,27 @@ Her fingers halt their climb. She pulls her hand back slowly, as if the warmth o
 	require.Equal(t, []string{response}, delivered)
 }
 
+func TestStructuredRecoveryRejectsClientWithoutGenerationOptions(t *testing.T) {
+	client := stubChatCompletionClient{generate: func(_ context.Context, _ []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+		return "unstructured", nil
+	}}
+
+	_, err := generateBufferedAssistantCandidateWithOptions(
+		context.Background(), client,
+		[]openrouter.Message{{Role: openrouter.RoleSystem, Content: "system"}},
+		true,
+		openrouter.GenerationOptions{ResponseFormat: "json_object"},
+	)
+
+	require.ErrorIs(t, err, ErrGenerationOptionsUnsupported)
+	require.ErrorIs(t, err, ErrConversationalResponseContract)
+}
+
 func TestGeneratePersonaCompletionUsesDialogueOnlyRecoveryAfterThreeRejectedDrafts(t *testing.T) {
 	persona := &models.BotPersona{Name: "Sadie Hart", ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue}
 	originalMessages := []openrouter.Message{{Role: openrouter.RoleSystem, Content: "original system prompt"}}
 	calls := 0
-	client := stubChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+	client := &optionsAwareSequenceChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
 		calls++
 		switch calls {
 		case 1:
@@ -580,6 +638,13 @@ func TestGeneratePersonaCompletionUsesDialogueOnlyRecoveryAfterThreeRejectedDraf
 	require.NoError(t, err)
 	require.Equal(t, 4, calls)
 	require.Equal(t, []string{response}, delivered)
+	require.Len(t, client.options, 4)
+	for _, options := range client.options[:3] {
+		require.Equal(t, 256, options.MaxTokens)
+		require.Empty(t, options.ResponseFormat)
+	}
+	require.Equal(t, 256, client.options[3].MaxTokens)
+	require.Equal(t, "json_object", client.options[3].ResponseFormat)
 	valid, detail := validatePersonalConversationResponse(response)
 	require.True(t, valid, detail)
 	require.Equal(t, "original system prompt", originalMessages[0].Content)
@@ -588,7 +653,7 @@ func TestGeneratePersonaCompletionUsesDialogueOnlyRecoveryAfterThreeRejectedDraf
 func TestGeneratePersonaCompletionRejectsBriefDialogueOnlyRecovery(t *testing.T) {
 	persona := &models.BotPersona{Name: "Sadie Hart", ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue}
 	calls := 0
-	client := stubChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+	client := &optionsAwareSequenceChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
 		calls++
 		if calls < 4 {
 			return "She watches him closely while her expression changes. Her hand pulls back when the meaning of his words finally lands.", nil
@@ -610,12 +675,12 @@ func TestGeneratePersonaCompletionRejectsBriefDialogueOnlyRecovery(t *testing.T)
 func TestGeneratePersonaCompletionRejectsThreeMalformedPersonalDraftsWithoutDelivery(t *testing.T) {
 	persona := &models.BotPersona{Name: "Sadie Hart", ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue}
 	calls := 0
-	client := stubChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+	client := &optionsAwareSequenceChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
 		calls++
 		if calls == 4 {
 			require.Contains(t, messages[0].Content, "[Personal Dialogue-Only Recovery]")
 		}
-		return "She watches him in silence before her hand moves away. Her expression changes while she waits for him to continue.", nil
+		return "She watches him in silence before her hand moves away. Her hand pulls back while she waits for him to continue.", nil
 	}}
 
 	var delivered []string
@@ -750,6 +815,15 @@ func TestValidatePersonalConversationResponseRejectsNarrationAndDialogueRegressi
 	require.False(t, validResponse)
 	require.Contains(t, detail, "quotation marks")
 
+	singleQuotedDialogue := "'I understand why you're hesitating, and I am not going to pretend this moment feels simple.'\n\n'We can slow down and say what we actually mean before either of us decides anything.'"
+	validResponse, detail = validatePersonalConversationResponse(singleQuotedDialogue)
+	require.False(t, validResponse)
+	require.Contains(t, detail, "quotation marks")
+	require.True(t, containsDialogueFormattingQuotes("I pause. 'We can slow down and talk honestly.'"))
+	require.NotContains(t, removeDialogueFormattingQuotes("'We can slow down and talk honestly.'"), "'")
+	require.Equal(t, "I'm still here.", removeDialogueFormattingQuotes("'I'm still here.'"))
+	require.Equal(t, "I pause. We can slow down and talk honestly. We continue.", removeDialogueFormattingQuotes("I pause. \"We can slow down and talk honestly.\" We continue."))
+
 	unmarkedNarration := "My breath hitches, and I force myself to keep my hand steady along the seam of your jeans.\n\nYou are not even a little nervous? I swallow, my gaze still locked on yours. You are really going to make me doubt myself, aren't you?"
 	validResponse, detail = validatePersonalConversationResponse(unmarkedNarration)
 	require.False(t, validResponse)
@@ -767,6 +841,65 @@ func TestValidatePersonalConversationResponseRejectsNarrationAndDialogueRegressi
 	thirdPartyDialogue := "She stares at that report every morning because the numbers still do not make sense to anybody here.\n\nI think we should ask her directly instead of inventing another explanation for what she meant."
 	validResponse, detail = validatePersonalConversationResponse(thirdPartyDialogue)
 	require.True(t, validResponse, detail)
+
+	ownedPhysicalThirdPerson := "Sadie slides her hand from the table and watches me carefully, closely.\n\nI want to answer honestly, but I need another moment before I decide."
+	validResponse, detail = validatePersonalConversationResponse(ownedPhysicalThirdPerson)
+	require.False(t, validResponse)
+	require.Contains(t, detail, "third-person narration")
+
+	pronounOwnedPhysicalThirdPerson := "She slides her hand from the table and watches me carefully, closely.\n\nI want to answer honestly, but I need another moment before I decide."
+	validResponse, detail = validatePersonalConversationResponse(pronounOwnedPhysicalThirdPerson)
+	require.False(t, validResponse)
+	require.Contains(t, detail, "third-person narration")
+
+	foreignBodyFirstPerson := "*I slide her hand away from the table.* I want to answer honestly without guessing what she means.\n\nWe can pause and decide together before either of us moves today."
+	validResponse, detail = validatePersonalConversationResponse(foreignBodyFirstPerson)
+	require.False(t, validResponse)
+	require.Contains(t, detail, "another character's body")
+
+	foreignBodyModifierFirstPerson := "*I slide her left hand away from the table.* I want to answer honestly without guessing what she means.\n\nWe can pause and decide together before either of us moves today."
+	validResponse, detail = validatePersonalConversationResponse(foreignBodyModifierFirstPerson)
+	require.False(t, validResponse)
+	require.Contains(t, detail, "another character's body")
+
+	pronounTargetPhysicalThirdPerson := "She reaches for your hand and waits for your answer in the quiet room.\n\nI want to answer honestly, but I need another moment before I decide."
+	validResponse, detail = validatePersonalConversationResponse(pronounTargetPhysicalThirdPerson)
+	require.False(t, validResponse)
+	require.Contains(t, detail, "third-person narration")
+
+	articlePhysicalThirdPerson := "She slides a hand toward the table and watches me carefully, closely.\n\nI want to answer honestly, but I need another moment before I decide."
+	validResponse, detail = validatePersonalConversationResponse(articlePhysicalThirdPerson)
+	require.False(t, validResponse)
+	require.Contains(t, detail, "third-person narration")
+
+	articleSceneThirdPerson := "The denim is warm, his pulse thudding under her fingertips like a tiny drumbeat.\n\nI want to answer honestly, but I need another moment before I decide."
+	validResponse, detail = validatePersonalConversationResponse(articleSceneThirdPerson)
+	require.False(t, validResponse)
+	require.Contains(t, detail, "third-person narration")
+
+	ordinaryArticleDialogue := "The plan is clear, and I want to follow it without guessing what anybody means.\n\nI want to answer honestly, but I need another moment before I decide."
+	validResponse, detail = validatePersonalConversationResponse(ordinaryArticleDialogue)
+	require.True(t, validResponse, detail)
+
+	bodyVerbPhysicalThirdPerson := "Her lips parting in surprise changes the mood immediately for both of us right now.\n\nI want to answer honestly, but I need another moment before I decide."
+	validResponse, detail = validatePersonalConversationResponse(bodyVerbPhysicalThirdPerson)
+	require.False(t, validResponse)
+	require.Contains(t, detail, "third-person narration")
+
+	unmarkedForeignBody := "I slide her leg away from the chair and try to explain what I meant clearly.\n\nWe can pause and decide together before either of us moves today."
+	validResponse, detail = validatePersonalConversationResponse(unmarkedForeignBody)
+	require.False(t, validResponse)
+	require.Contains(t, detail, "unmarked narration")
+
+	unmarkedLegNarration := "My leg shifts under the table while I gather my thoughts today.\n\nI want to answer honestly, but I need another moment before I decide."
+	validResponse, detail = validatePersonalConversationResponse(unmarkedLegNarration)
+	require.False(t, validResponse)
+	require.Contains(t, detail, "unmarked narration")
+
+	unmarkedJawNarration := "My jaw clenches before I answer, and I make myself breathe slowly.\n\nWe can pause and decide together before either of us moves today."
+	validResponse, detail = validatePersonalConversationResponse(unmarkedJawNarration)
+	require.False(t, validResponse)
+	require.Contains(t, detail, "unmarked narration")
 }
 
 func TestValidatePersonalConversationResponseRejectsReciprocalTurnOwnershipFlip(t *testing.T) {
@@ -871,6 +1004,16 @@ Tell me to stop if I go too far. I might not trust myself to listen.
 	require.NotContains(t, repaired, "I swallow, voice tight")
 	require.NotContains(t, repaired, "I press my fingers")
 	require.NotContains(t, repaired, "My voice drops")
+}
+
+func TestRepairPersonalConversationDraftLeavesAmbiguousMarkedNarrationForRetry(t *testing.T) {
+	draft := `*My mother said I should be careful.* I understand the concern and want to answer honestly.
+
+*I swallow and look away.* We can slow down before making any decision together.`
+
+	repaired := repairPersonalConversationDraft(draft)
+
+	require.Equal(t, draft, repaired)
 }
 
 func TestRepairPersonalConversationDraftMergesExtraShortDialogueBlocks(t *testing.T) {
@@ -1176,7 +1319,7 @@ func TestRegenerateMessageReplacesLatestReplyFromOriginalTurnState(t *testing.T)
 	require.Nil(t, notLatest)
 }
 
-func TestRegenerateMessagePreservesOriginalReplyWhenGenerationFails(t *testing.T) {
+func TestRegenerateMessagePreservesOriginalReplyWhenSceneContractOrProviderFails(t *testing.T) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
 	t.Cleanup(db.Close)
@@ -1217,27 +1360,46 @@ func TestRegenerateMessagePreservesOriginalReplyWhenGenerationFails(t *testing.T
 	original, err := messageRepo.Create(ctx, conversation.ID, models.BotMessageRoleAssistant, "Keep this original reply.", false)
 	require.NoError(t, err)
 
+	providerMode := "scene-conflict"
+	generationCalls := 0
 	service := NewChatbotService(
 		db.Pool,
 		personaRepo,
 		convRepo,
 		messageRepo,
-		stubChatCompletionClient{
+		&optionsAwareSequenceChatCompletionClient{
 			generate: func(_ context.Context, _ []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
-				return "", openrouter.ErrRateLimited
+				generationCalls++
+				if providerMode == "rate-limit" {
+					return "", openrouter.ErrRateLimited
+				}
+				return "*I pull you closer onto my lap despite everything you just told me.*\n\nNo, I heard your refusal, but I am continuing because I want this.", nil
 			},
 		},
 		websocket.NewHub(),
 	)
+	sceneState := testConversationSceneState(conversation.ID, user.ID)
+	sceneState.BoundaryFacts = []models.OmniChatSceneBoundaryFact{{Subject: "user", Kind: models.OmniChatSceneBoundaryConsent, Value: models.OmniChatSceneBoundaryDeclined}}
+	service.SetConversationSceneStateCoordinator(&conversationSceneStatePreparerFake{state: &sceneState})
 
 	updated, err := service.RegenerateMessage(ctx, user.ID, conversation.ID, original.ID)
-	require.ErrorIs(t, err, openrouter.ErrRateLimited)
+	require.ErrorIs(t, err, ErrConversationalResponseContract)
 	require.Nil(t, updated)
+	require.Equal(t, personalConversationAttempts, generationCalls)
 
 	messages, err := messageRepo.ListByConversationID(ctx, conversation.ID, 10)
 	require.NoError(t, err)
 	require.Len(t, messages, 2)
 	require.Equal(t, original.ID, messages[1].ID)
+	require.Equal(t, "Keep this original reply.", messages[1].Content)
+
+	providerMode = "rate-limit"
+	updated, err = service.RegenerateMessage(ctx, user.ID, conversation.ID, original.ID)
+	require.ErrorIs(t, err, openrouter.ErrRateLimited)
+	require.Nil(t, updated)
+	messages, err = messageRepo.ListByConversationID(ctx, conversation.ID, 10)
+	require.NoError(t, err)
+	require.Len(t, messages, 2)
 	require.Equal(t, "Keep this original reply.", messages[1].Content)
 }
 

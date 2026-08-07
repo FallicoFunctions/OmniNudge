@@ -225,11 +225,18 @@ func (s *OmniChatBillingService) WalletOwned(ctx context.Context, userID int) (*
 }
 
 func (s *OmniChatBillingService) CanReserveVideoOwned(ctx context.Context, userID int) (bool, int64, error) {
+	admin, err := isOmniChatAdmin(ctx, s.adminReader, userID)
+	if err != nil {
+		return false, 0, fmt.Errorf("omnichat billing: administrator entitlement lookup: %w", err)
+	}
+	cost := s.costs[models.OmniCreditsUsageVideo]
+	if admin {
+		return true, cost, nil
+	}
 	wallet, err := s.WalletOwned(ctx, userID)
 	if err != nil {
 		return false, 0, err
 	}
-	cost := s.costs[models.OmniCreditsUsageVideo]
 	return wallet.PurchasedBalance+wallet.SubscriptionBalance >= cost, cost, nil
 }
 
@@ -275,16 +282,25 @@ func (s *OmniChatSubscriptionActivationService) Activate(ctx context.Context, ev
 }
 
 type OmniChatBillingService struct {
-	credits OmniChatBillingCredits
-	plans   OmniChatPlanReader
-	costs   map[string]int64
-	offers  []OmniChatBillingOffer
+	credits     OmniChatBillingCredits
+	plans       OmniChatPlanReader
+	adminReader OmniChatAdminReader
+	costs       map[string]int64
+	offers      []OmniChatBillingOffer
 }
 
 func NewOmniChatBillingService(credits OmniChatBillingCredits, plans OmniChatPlanReader) *OmniChatBillingService {
 	return &OmniChatBillingService{credits: credits, plans: plans, costs: map[string]int64{
 		models.OmniCreditsUsageChat: 1, models.OmniCreditsUsageVoice: 2, models.OmniCreditsUsageImage: 10, models.OmniCreditsUsageVideo: 40,
 	}}
+}
+
+// SetAdminReader enables the server-owned administrator entitlement. The
+// reader is optional so isolated services and tests remain fail-closed by
+// default. It must be backed by the authenticated user's persisted record.
+func (s *OmniChatBillingService) SetAdminReader(reader OmniChatAdminReader) *OmniChatBillingService {
+	s.adminReader = reader
+	return s
 }
 
 func (s *OmniChatBillingService) ConfigureOffers(offers []OmniChatBillingOffer) error {
@@ -310,7 +326,8 @@ func (s *OmniChatBillingService) ConfigureOffers(offers []OmniChatBillingOffer) 
 
 // Included reports server-owned entitlements. Guests can chat through the
 // rolling allowance; active subscriptions include chat and voice. Image and
-// video always require a durable credit reservation.
+// video normally require a durable credit reservation, while persisted admins
+// receive the same server-authorized access without a credit debit.
 func (s *OmniChatBillingService) Included(ctx context.Context, userID *int, usageKind string) (bool, error) {
 	if userID == nil {
 		if usageKind == models.OmniCreditsUsageChat {
@@ -318,7 +335,17 @@ func (s *OmniChatBillingService) Included(ctx context.Context, userID *int, usag
 		}
 		return false, ErrOmniChatGuestFeatureDenied
 	}
-	if *userID <= 0 || s.plans == nil {
+	if *userID <= 0 {
+		return false, errors.New("omnichat billing: plan lookup unavailable")
+	}
+	admin, err := isOmniChatAdmin(ctx, s.adminReader, *userID)
+	if err != nil {
+		return false, fmt.Errorf("omnichat billing: administrator entitlement lookup: %w", err)
+	}
+	if admin {
+		return true, nil
+	}
+	if s.plans == nil {
 		return false, errors.New("omnichat billing: plan lookup unavailable")
 	}
 	if usageKind == models.OmniCreditsUsageImage || usageKind == models.OmniCreditsUsageVideo {
@@ -334,8 +361,21 @@ func (s *OmniChatBillingService) Included(ctx context.Context, userID *int, usag
 
 func (s *OmniChatBillingService) ReserveOwned(ctx context.Context, userID int, operationID uuid.UUID, usageKind string) (*models.OmniCreditsUsageReservation, error) {
 	cost, ok := s.costs[usageKind]
-	if !ok || s.credits == nil {
+	if !ok {
 		return nil, fmt.Errorf("omnichat billing: unsupported usage kind")
+	}
+	admin, err := isOmniChatAdmin(ctx, s.adminReader, userID)
+	if err != nil {
+		return nil, fmt.Errorf("omnichat billing: administrator entitlement lookup: %w", err)
+	}
+	if admin {
+		return &models.OmniCreditsUsageReservation{
+			UserID: userID, OperationID: operationID, UsageKind: usageKind,
+			Cost: 0, Status: models.OmniCreditsReservationCaptured, AdminBypass: true,
+		}, nil
+	}
+	if s.credits == nil {
+		return nil, fmt.Errorf("omnichat billing: credits unavailable")
 	}
 	return s.credits.ReserveUsage(ctx, userID, operationID, usageKind, cost)
 }
@@ -345,17 +385,50 @@ func (s *OmniChatBillingService) ReserveOwned(ctx context.Context, userID int, o
 // accepted so callers cannot accidentally create a free or overflowing hold.
 func (s *OmniChatBillingService) ReserveChatMultiplierOwned(ctx context.Context, userID int, operationID uuid.UUID, multiplier int64) (*models.OmniCreditsUsageReservation, error) {
 	baseCost, ok := s.costs[models.OmniCreditsUsageChat]
-	if !ok || s.credits == nil || multiplier < 1 || multiplier > 100 || baseCost > (1<<63-1)/multiplier {
+	if !ok || multiplier < 1 || multiplier > 100 || baseCost > (1<<63-1)/multiplier {
 		return nil, fmt.Errorf("omnichat billing: invalid chat multiplier")
+	}
+	admin, err := isOmniChatAdmin(ctx, s.adminReader, userID)
+	if err != nil {
+		return nil, fmt.Errorf("omnichat billing: administrator entitlement lookup: %w", err)
+	}
+	if admin {
+		return &models.OmniCreditsUsageReservation{
+			UserID: userID, OperationID: operationID, UsageKind: models.OmniCreditsUsageChat,
+			Cost: 0, Status: models.OmniCreditsReservationCaptured, AdminBypass: true,
+		}, nil
+	}
+	if s.credits == nil {
+		return nil, fmt.Errorf("omnichat billing: credits unavailable")
 	}
 	return s.credits.ReserveUsage(ctx, userID, operationID, models.OmniCreditsUsageChat, baseCost*multiplier)
 }
 
 func (s *OmniChatBillingService) CaptureOwned(ctx context.Context, userID int, operationID uuid.UUID) error {
-	_, err := s.credits.CaptureUsage(ctx, userID, operationID)
+	admin, err := isOmniChatAdmin(ctx, s.adminReader, userID)
+	if err != nil {
+		return fmt.Errorf("omnichat billing: administrator entitlement lookup: %w", err)
+	}
+	if admin {
+		return nil
+	}
+	if s.credits == nil {
+		return errors.New("omnichat billing: credits unavailable")
+	}
+	_, err = s.credits.CaptureUsage(ctx, userID, operationID)
 	return err
 }
 func (s *OmniChatBillingService) RefundOwned(ctx context.Context, userID int, operationID uuid.UUID) error {
-	_, err := s.credits.RefundUsage(ctx, userID, operationID)
+	admin, err := isOmniChatAdmin(ctx, s.adminReader, userID)
+	if err != nil {
+		return fmt.Errorf("omnichat billing: administrator entitlement lookup: %w", err)
+	}
+	if admin {
+		return nil
+	}
+	if s.credits == nil {
+		return errors.New("omnichat billing: credits unavailable")
+	}
+	_, err = s.credits.RefundUsage(ctx, userID, operationID)
 	return err
 }

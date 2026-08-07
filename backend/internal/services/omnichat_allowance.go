@@ -52,10 +52,11 @@ type OmniChatAllowanceBilling interface {
 }
 
 type OmniChatAllowance struct {
-	store   RollingWindowStore
-	plans   OmniChatPlanReader
-	billing OmniChatAllowanceBilling
-	now     func() time.Time
+	store       RollingWindowStore
+	plans       OmniChatPlanReader
+	billing     OmniChatAllowanceBilling
+	adminReader OmniChatAdminReader
+	now         func() time.Time
 }
 
 func NewOmniChatAllowance(cache Cache, plans OmniChatPlanReader) *OmniChatAllowance {
@@ -65,6 +66,14 @@ func NewOmniChatAllowance(cache Cache, plans OmniChatPlanReader) *OmniChatAllowa
 
 func (a *OmniChatAllowance) SetBilling(billing OmniChatAllowanceBilling) *OmniChatAllowance {
 	a.billing = billing
+	return a
+}
+
+// SetAdminReader makes the rolling allowance unlimited for persisted admin
+// accounts. The check happens before Redis access so administrators are not
+// blocked when the free-tier allowance store is unavailable.
+func (a *OmniChatAllowance) SetAdminReader(reader OmniChatAdminReader) *OmniChatAllowance {
+	a.adminReader = reader
 	return a
 }
 
@@ -229,7 +238,17 @@ func (a *OmniChatAllowance) subject(ctx context.Context, userID *int, guestIP st
 			limit: OmniChatGuestReplyLimit,
 		}, nil
 	}
-	if *userID <= 0 || a.plans == nil {
+	if *userID <= 0 {
+		return omniChatAllowanceSubject{}, errors.New("registered allowance plan lookup is unavailable")
+	}
+	admin, err := isOmniChatAdmin(ctx, a.adminReader, *userID)
+	if err != nil {
+		return omniChatAllowanceSubject{}, fmt.Errorf("load allowance administrator entitlement: %w", err)
+	}
+	if admin {
+		return omniChatAllowanceSubject{tier: OmniChatAllowanceTierPaid, unlimited: true}, nil
+	}
+	if a.plans == nil {
 		return omniChatAllowanceSubject{}, errors.New("registered allowance plan lookup is unavailable")
 	}
 	plan, expiresAt, err := a.plans.GetPlan(ctx, *userID)

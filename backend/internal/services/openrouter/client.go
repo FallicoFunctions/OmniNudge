@@ -45,6 +45,17 @@ var ErrNotConfigured = errors.New("openrouter: API key not configured")
 // ErrRateLimited is returned when OpenRouter (or its upstream provider) rate limits the request.
 var ErrRateLimited = errors.New("openrouter: rate limited")
 
+// ErrProviderIncomplete identifies an SSE response that ended without a
+// completion sentinel or contained malformed data frames. It is kept distinct
+// from transport failures so privacy-safe bakeoff metrics can distinguish an
+// unavailable/incomplete provider reply from a network failure.
+var ErrProviderIncomplete = errors.New("openrouter: provider response incomplete")
+
+// ErrAccessDenied identifies authentication, billing-authorization, or
+// entitlement failures without disclosing which account or provider detail
+// caused the denial. These failures are not transient and must not be retried.
+var ErrAccessDenied = errors.New("openrouter: provider access denied")
+
 // ErrTransportOrProvider identifies a transport or upstream-provider failure
 // without requiring callers to inspect error text. Concrete errors deliberately
 // keep provider bodies, request IDs, routes, and transport topology out of
@@ -91,6 +102,10 @@ type GenerationOptions struct {
 	MaxTokens       int
 	ReasoningEffort string
 	Speed           string
+	// ResponseFormat is an optional server-owned output contract. The only
+	// supported value is json_object; callers must still validate the decoded
+	// content because provider JSON mode does not enforce OmniChat semantics.
+	ResponseFormat string
 }
 
 // GenerationTelemetry is aggregate, content-free transport and billing
@@ -169,12 +184,13 @@ func newClient(apiKey, model, endpoint string, httpClient *http.Client) *Client 
 }
 
 type chatRequest struct {
-	Model     string                `json:"model"`
-	Messages  []Message             `json:"messages"`
-	Stream    bool                  `json:"stream"`
-	MaxTokens int                   `json:"max_tokens,omitempty"`
-	Reasoning *reasoningPreferences `json:"reasoning,omitempty"`
-	Speed     string                `json:"speed,omitempty"`
+	Model          string                `json:"model"`
+	Messages       []Message             `json:"messages"`
+	Stream         bool                  `json:"stream"`
+	MaxTokens      int                   `json:"max_tokens,omitempty"`
+	Reasoning      *reasoningPreferences `json:"reasoning,omitempty"`
+	Speed          string                `json:"speed,omitempty"`
+	ResponseFormat *responseFormat       `json:"response_format,omitempty"`
 	// Keep a pinned model, but let OpenRouter prefer its lowest-latency
 	// compatible provider. This is routing metadata only; provider identities
 	// remain server-side and are never sent to the browser.
@@ -186,8 +202,13 @@ type reasoningPreferences struct {
 	Exclude bool   `json:"exclude"`
 }
 
+type responseFormat struct {
+	Type string `json:"type"`
+}
+
 type providerPreferences struct {
-	Sort string `json:"sort"`
+	Sort              string `json:"sort"`
+	RequireParameters bool   `json:"require_parameters,omitempty"`
 }
 
 type streamChunk struct {
@@ -202,7 +223,7 @@ type streamChunk struct {
 		} `json:"delta"`
 	} `json:"choices"`
 	Error *struct {
-		Message string `json:"message"`
+		Code json.RawMessage `json:"code"`
 	} `json:"error"`
 	Usage *struct {
 		PromptTokens      int64 `json:"prompt_tokens"`
@@ -318,7 +339,9 @@ func (c *Client) GenerateWithOptions(ctx context.Context, messages []Message, on
 	}
 	effort := strings.ToLower(strings.TrimSpace(options.ReasoningEffort))
 	speed := strings.ToLower(strings.TrimSpace(options.Speed))
-	if !validReasoningEffort(effort) || (speed != "" && speed != "fast") {
+	responseFormatName := strings.ToLower(strings.TrimSpace(options.ResponseFormat))
+	if !validReasoningEffort(effort) || (speed != "" && speed != "fast") ||
+		(responseFormatName != "" && responseFormatName != "json_object") {
 		return "", errors.New("openrouter: generation options are invalid")
 	}
 	if c.httpClient == nil || c.endpoint == "" {
@@ -338,7 +361,20 @@ func (c *Client) GenerateWithOptions(ctx context.Context, messages []Message, on
 		MaxTokens: options.MaxTokens,
 		Reasoning: reasoning,
 		Speed:     speed,
-		Provider:  &providerPreferences{Sort: "latency"},
+		ResponseFormat: func() *responseFormat {
+			if responseFormatName == "" {
+				return nil
+			}
+			return &responseFormat{Type: responseFormatName}
+		}(),
+		// Structured recovery must never be routed through a provider that
+		// silently ignores response_format. OpenRouter's require_parameters
+		// flag makes that contract fail closed while preserving the normal
+		// latency preference for unstructured requests.
+		Provider: &providerPreferences{
+			Sort:              "latency",
+			RequireParameters: responseFormatName != "",
+		},
 	})
 	if err != nil {
 		return "", fmt.Errorf("openrouter: encode request: %w", err)
@@ -371,11 +407,18 @@ func (c *Client) GenerateWithOptions(ctx context.Context, messages []Message, on
 		routing.merge(routingMetadataFromHeaders(resp.Header))
 
 		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+			var body []byte
+			if !httpStatusIsAccessDenied(resp.StatusCode) {
+				body, _ = io.ReadAll(io.LimitReader(resp.Body, 2048))
+			}
 			closeOpenRouterResponseBody(resp.Body)
 			callTelemetry.HTTPAttempts++
 			callTelemetry.HTTPFailures++
 			callTelemetry.TotalAttemptLatency += time.Since(attemptStartedAt)
+
+			if httpStatusIsAccessDenied(resp.StatusCode) {
+				return "", ErrAccessDenied
+			}
 
 			if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
 				if attempt == maxRetries {
@@ -428,6 +471,12 @@ func (c *Client) GenerateWithOptions(ctx context.Context, messages []Message, on
 	}
 
 	return "", ErrRateLimited
+}
+
+func httpStatusIsAccessDenied(statusCode int) bool {
+	return statusCode == http.StatusUnauthorized ||
+		statusCode == http.StatusPaymentRequired ||
+		statusCode == http.StatusForbidden
 }
 
 // closeOpenRouterResponseBody observes close failures without allowing a
@@ -518,6 +567,8 @@ func processStreamWithTelemetry(body io.ReadCloser, onChunk StreamCallback) (str
 	var routing streamMetadata
 	var telemetry GenerationTelemetry
 	generatedRunes := 0
+	sawDone := false
+	malformedData := false
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 64*1024), maxStreamLineBytes)
 
@@ -532,11 +583,16 @@ func processStreamWithTelemetry(body io.ReadCloser, onChunk StreamCallback) (str
 			continue
 		}
 		if data == "[DONE]" {
+			sawDone = true
 			break
 		}
 
 		var chunk streamChunk
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			// A malformed data frame cannot be ignored: doing so could turn a
+			// truncated or provider-corrupted response into deliverable text.
+			// Keep the concrete parser error out of logs and user-facing errors.
+			malformedData = true
 			continue
 		}
 		routing.merge(routingMetadataFromChunk(chunk))
@@ -551,6 +607,9 @@ func processStreamWithTelemetry(body io.ReadCloser, onChunk StreamCallback) (str
 			}
 		}
 		if chunk.Error != nil {
+			if streamErrorCodeIsAccessDenied(chunk.Error.Code) {
+				return full.String(), routing, telemetry, ErrAccessDenied
+			}
 			return full.String(), routing, telemetry, newTransportOrProviderError("openrouter: provider returned a streaming error", nil)
 		}
 		for _, choice := range chunk.Choices {
@@ -571,8 +630,23 @@ func processStreamWithTelemetry(body io.ReadCloser, onChunk StreamCallback) (str
 	if err := scanner.Err(); err != nil {
 		return full.String(), routing, telemetry, newTransportOrProviderError("openrouter: stream read error", err)
 	}
+	if malformedData {
+		return full.String(), routing, telemetry, fmt.Errorf("%w: malformed streaming data", ErrProviderIncomplete)
+	}
+	if !sawDone {
+		return full.String(), routing, telemetry, fmt.Errorf("%w: stream ended before completion", ErrProviderIncomplete)
+	}
 
 	return full.String(), routing, telemetry, nil
+}
+
+func streamErrorCodeIsAccessDenied(code json.RawMessage) bool {
+	switch strings.TrimSpace(string(code)) {
+	case "401", "402", "403", `"401"`, `"402"`, `"403"`:
+		return true
+	default:
+		return false
+	}
 }
 
 func validateRequest(model string, messages []Message) error {

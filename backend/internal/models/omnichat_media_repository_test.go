@@ -74,9 +74,9 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 	}
 	asset := &models.OmniChatMediaAsset{}
 	media.FileSize = 0
-	require.EqualError(t, repo.CompleteGenerationJob(ctx, job.ID, media, asset, 1<<30, 50<<30), "generated media file size must be positive")
+	require.EqualError(t, repo.CompleteGenerationJob(ctx, job.ID, media, asset, 1<<30, 50<<30, models.OmniChatGenerationProvenance{WorkerBuild: "test-build", ActualPrompt: "rendered prompt"}), "generated media file size must be positive")
 	media.FileSize = 1024
-	require.NoError(t, repo.CompleteGenerationJob(ctx, job.ID, media, asset, 1<<30, 50<<30))
+	require.NoError(t, repo.CompleteGenerationJob(ctx, job.ID, media, asset, 1<<30, 50<<30, models.OmniChatGenerationProvenance{WorkerBuild: "test-build", ActualPrompt: "rendered prompt"}))
 	require.NotEqual(t, uuid.Nil, asset.ID)
 	require.Equal(t, models.OmniChatAssetVisibilityPrivate, asset.Visibility)
 
@@ -89,6 +89,10 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 	messages, err := messageRepo.ListByConversationID(ctx, conversation.ID, 20)
 	require.NoError(t, err)
 	require.Len(t, messages, 2)
+	require.Empty(t, messages[1].Content, "media replies should not add canned chat text")
+	var mediaOnly bool
+	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT media_only FROM bot_messages WHERE id = $1`, messages[1].ID).Scan(&mediaOnly))
+	require.True(t, mediaOnly)
 	require.Len(t, messages[1].Attachments, 1)
 	require.Equal(t, asset.ID, messages[1].Attachments[0].ID)
 
@@ -102,6 +106,9 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 	forkedMessages, err := messageRepo.ListByConversationID(ctx, fork.ID, 20)
 	require.NoError(t, err)
 	require.Len(t, forkedMessages, 2)
+	var forkedMediaOnly bool
+	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT media_only FROM bot_messages WHERE id = $1`, forkedMessages[1].ID).Scan(&forkedMediaOnly))
+	require.True(t, forkedMediaOnly)
 	require.Len(t, forkedMessages[1].Attachments, 1)
 	require.Equal(t, asset.ID, forkedMessages[1].Attachments[0].ID)
 
@@ -157,7 +164,11 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 		StoragePath: fmt.Sprintf("omnichat/generated/%d/%s.png", owner.ID, secondJob.ID), ScanStatus: models.MediaScanStatusClean,
 	}
 	secondAsset := &models.OmniChatMediaAsset{}
-	require.NoError(t, repo.CompleteGenerationJob(ctx, secondJob.ID, secondMedia, secondAsset, 1<<30, 50<<30))
+	require.NoError(t, repo.CompleteGenerationJob(ctx, secondJob.ID, secondMedia, secondAsset, 1<<30, 50<<30, models.OmniChatGenerationProvenance{}))
+	secondCompleted, err := repo.GetGenerationJobOwned(ctx, secondJob.ID, owner.ID)
+	require.NoError(t, err)
+	require.NotNil(t, secondCompleted.OutputMessageID)
+	secondOutputMessageID := *secondCompleted.OutputMessageID
 	sharedCreatedAt := "2026-07-21T00:00:00Z"
 	_, err = db.Pool.Exec(ctx, `UPDATE omnichat_media_assets SET created_at=$1 WHERE id=ANY($2)`, sharedCreatedAt, []uuid.UUID{asset.ID, secondAsset.ID})
 	require.NoError(t, err)
@@ -214,6 +225,11 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 	deletedView, err := repo.GetMediaAssetOwned(ctx, secondAsset.ID, owner.ID)
 	require.NoError(t, err)
 	require.Nil(t, deletedView)
+	var outputMessageExists bool
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM bot_messages WHERE id = $1)
+	`, secondOutputMessageID).Scan(&outputMessageExists))
+	require.False(t, outputMessageExists, "deleting the last generated attachment removes its empty media-only chat turn")
 
 	socialRepo := models.NewOmniChatSocialRepository(db.Pool)
 	publication, err := socialRepo.PublishAssetOwned(ctx, owner.ID, asset.ID, "Shared scene")
@@ -248,6 +264,42 @@ func TestIsOmniChatGeneratedStoragePath(t *testing.T) {
 	} {
 		require.False(t, models.IsOmniChatGeneratedStoragePath(unsafe), unsafe)
 	}
+}
+
+func TestOmniChatMediaRepositoryPersistsExplicitlyUnbilledAdminGeneration(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	userRepo := models.NewUserRepository(db.Pool)
+	owner := &models.User{Username: "om_media_admin_owner", PasswordHash: "hash", Role: "admin"}
+	require.NoError(t, userRepo.Create(ctx, owner))
+
+	var personaID int
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug, name, category, system_prompt, visibility, source_format, is_active)
+		VALUES ('media-admin-persona', 'Media Admin', 'original', 'Stay in character.', 'public', 'native', TRUE)
+		RETURNING id
+	`).Scan(&personaID))
+
+	unbilled := false
+	repo := models.NewOmniChatMediaRepository(db.Pool)
+	job, err := repo.CreateGenerationJob(ctx, owner.ID, models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeCreate,
+		PersonaID: personaID, Prompt: "Portrait at sunset", EffectivePrompt: "Portrait at sunset",
+		AspectRatio: "1:1", BillingRequired: &unbilled,
+	}, "test")
+	require.NoError(t, err)
+	require.False(t, job.BillingRequired)
+	require.Nil(t, job.BillingOperationID)
+
+	stored, err := repo.GetGenerationJobOwned(ctx, job.ID, owner.ID)
+	require.NoError(t, err)
+	require.False(t, stored.BillingRequired)
+	require.Nil(t, stored.BillingOperationID)
 }
 
 func TestOmniChatMediaRepositoryCancelsRunningGeneration(t *testing.T) {

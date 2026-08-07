@@ -294,10 +294,9 @@ func TestAdminPersonaHandlerListsCanonicalPersonaVoices(t *testing.T) {
 	_, err := pool.Exec(context.Background(), `
 		INSERT INTO omnichat_persona_voices (
 			persona_id, provider, voice_id, voice_name, model_id, stability,
-			similarity_boost, style, speed, pitch, live_video_replica_id,
-			live_video_persona_id, configured_by
+			similarity_boost, style, speed, pitch, configured_by
 		) VALUES ($1, 'browser', 'browser-admin', 'Admin voice', 'browser-native',
-			0.5, 0.75, 0, 1, 1, 'private-replica', 'private-persona', $2)
+			0.5, 0.75, 0, 1, 1, $2)
 	`, persona.ID, admin.ID)
 	require.NoError(t, err)
 
@@ -321,8 +320,6 @@ func TestAdminPersonaHandlerListsCanonicalPersonaVoices(t *testing.T) {
 	require.NotNil(t, found)
 	require.Equal(t, "browser", found.Provider)
 	require.NotEmpty(t, found.VoiceID)
-	require.Nil(t, found.LiveVideoReplicaID)
-	require.Nil(t, found.LiveVideoPersonaID)
 }
 
 func TestAdminPersonaHandlerAssignsOnlyCanonicalPreset(t *testing.T) {
@@ -350,8 +347,6 @@ func TestAdminPersonaHandlerAssignsOnlyCanonicalPreset(t *testing.T) {
 	require.Equal(t, preset.VoiceID, response.Voice.VoiceID)
 	require.Equal(t, preset.Name, response.Voice.VoiceName)
 	require.Equal(t, preset.ModelID, response.Voice.ModelID)
-	require.Nil(t, response.Voice.LiveVideoReplicaID)
-	require.Nil(t, response.Voice.LiveVideoPersonaID)
 }
 
 func TestAdminPersonaHandlerAssignsCanonicalBrowserFallback(t *testing.T) {
@@ -377,8 +372,6 @@ func TestAdminPersonaHandlerAssignsCanonicalBrowserFallback(t *testing.T) {
 	require.Equal(t, expected.Provider, response.Voice.Provider)
 	require.Equal(t, expected.VoiceID, response.Voice.VoiceID)
 	require.Equal(t, expected.ModelID, response.Voice.ModelID)
-	require.Nil(t, response.Voice.LiveVideoReplicaID)
-	require.Nil(t, response.Voice.LiveVideoPersonaID)
 }
 
 func TestAdminPersonaHandlerReturnsNotFoundForMissingVoicePersona(t *testing.T) {

@@ -50,7 +50,15 @@ type omniChatCompletionProfileResolver interface {
 type TieredOmniChatModelRouter struct {
 	plans       OmniChatPlanReader
 	preferences OmniChatModelPreferenceReader
+	adminReader OmniChatAdminReader
 	clients     map[OmniChatModelProfileKey]chatCompletionClient
+}
+
+// SetAdminReader makes model routing honor the persisted administrator role
+// while retaining the same server-owned profile catalog and provider routes.
+func (r *TieredOmniChatModelRouter) SetAdminReader(reader OmniChatAdminReader) *TieredOmniChatModelRouter {
+	r.adminReader = reader
+	return r
 }
 
 func NewTieredOmniChatModelRouter(
@@ -117,16 +125,26 @@ func NewConfiguredProfiledOmniChatModelRouter(
 ) *TieredOmniChatModelRouter {
 	profiles := configureOmniChatProfileRoutes(DefaultOmniChatModelProfiles(), modelsByProfile)
 	clients := make(map[OmniChatModelProfileKey]chatCompletionClient, len(profiles))
-	for _, profile := range profiles {
+	for index := range profiles {
+		profile := &profiles[index]
 		model := strings.TrimSpace(profile.ModelKey)
+		if model == "" && profile.Key == OmniChatModelProfileStandard {
+			// A deployment that intentionally leaves the standard primary
+			// blank must still have a usable free route when its configured
+			// fallback is present. Treat that fallback as the primary route;
+			// otherwise the free resolver would return a nil client.
+			model = strings.TrimSpace(standardFallback)
+			profile.ModelKey = model
+		}
 		if model == "" {
 			continue
 		}
+		profile.ModelKey = model
 		primary := chatCompletionClient(openrouter.NewClient(apiKey, model))
 		if profile.Key == OmniChatModelProfileStandard {
 			fallback := strings.TrimSpace(standardFallback)
 			if fallback != "" && fallback != model {
-				fallbackProfile := profile
+				fallbackProfile := *profile
 				fallbackProfile.ModelKey = fallback
 				primary = &fallbackChatCompletionClient{
 					primary: primary,
@@ -140,6 +158,99 @@ func NewConfiguredProfiledOmniChatModelRouter(
 		clients[profile.Key] = primary
 	}
 	return newProfiledOmniChatModelRouter(plans, preferences, profiles, clients)
+}
+
+// ValidateConfiguredOmniChatModelRoutes checks deployment-owned route syntax
+// before any provider client is constructed. Paid profiles may be left blank
+// intentionally and fall back through the catalog; the standard profile must
+// always have either a primary or a standard fallback route.
+func ValidateConfiguredOmniChatModelRoutes(modelsByProfile map[OmniChatModelProfileKey]string, standardFallback string) error {
+	known := make(map[OmniChatModelProfileKey]struct{}, len(DefaultOmniChatModelProfiles()))
+	for _, profile := range DefaultOmniChatModelProfiles() {
+		known[profile.Key] = struct{}{}
+	}
+	for key := range modelsByProfile {
+		if _, ok := known[key]; !ok {
+			return fmt.Errorf("omnichat model routes: unknown profile %q", key)
+		}
+	}
+	configured := ConfiguredOmniChatModelProfiles(modelsByProfile)
+	standardFallback = strings.TrimSpace(standardFallback)
+	if standardFallback != "" && !openrouter.IsValidModelRoute(standardFallback) {
+		return errors.New("omnichat model routes: standard fallback route is invalid")
+	}
+	standardConfigured := ""
+	for _, profile := range configured {
+		route := strings.TrimSpace(profile.ModelKey)
+		if profile.Key == OmniChatModelProfileStandard {
+			standardConfigured = route
+			if route == "" {
+				route = standardFallback
+			}
+		}
+		if route != "" && !openrouter.IsValidModelRoute(route) {
+			return fmt.Errorf("omnichat model routes: profile %q route is invalid", profile.Key)
+		}
+	}
+	if standardConfigured == "" && standardFallback == "" {
+		return errors.New("omnichat model routes: standard profile requires a primary or fallback route")
+	}
+	return nil
+}
+
+// ResolveConfiguredOmniChatModelRoutes returns the effective deployment route
+// for every catalog profile. Blank paid routes inherit their catalog fallback;
+// the standard profile uses the explicit standard fallback. The returned map
+// includes unresolved keys with an empty value so callers cannot accidentally
+// reintroduce a catalog default and make an unconfigured paid request.
+func ResolveConfiguredOmniChatModelRoutes(modelsByProfile map[OmniChatModelProfileKey]string, standardFallback string) (map[OmniChatModelProfileKey]string, error) {
+	// The resolver is used for deployment-owned maps, so an omitted profile is
+	// intentionally unconfigured rather than silently inheriting the catalog's
+	// example route. Config.Load supplies every key in production; normalizing
+	// here keeps partial callers fail-closed as well.
+	normalizedRoutes := make(map[OmniChatModelProfileKey]string, len(DefaultOmniChatModelProfiles()))
+	for _, profile := range DefaultOmniChatModelProfiles() {
+		route := ""
+		if modelsByProfile != nil {
+			route = modelsByProfile[profile.Key]
+		}
+		normalizedRoutes[profile.Key] = route
+	}
+	if modelsByProfile != nil {
+		for key, route := range modelsByProfile {
+			normalizedRoutes[key] = route
+		}
+	}
+	if err := ValidateConfiguredOmniChatModelRoutes(normalizedRoutes, standardFallback); err != nil {
+		return nil, err
+	}
+	profiles := ConfiguredOmniChatModelProfiles(normalizedRoutes)
+	profilesByKey := make(map[OmniChatModelProfileKey]OmniChatModelProfile, len(profiles))
+	for _, profile := range profiles {
+		profilesByKey[profile.Key] = profile
+	}
+	resolving := make(map[OmniChatModelProfileKey]bool, len(profiles))
+	var resolve func(OmniChatModelProfileKey) string
+	resolve = func(key OmniChatModelProfileKey) string {
+		profile, exists := profilesByKey[key]
+		if !exists || resolving[key] {
+			return ""
+		}
+		if route := strings.TrimSpace(profile.ModelKey); route != "" {
+			return route
+		}
+		resolving[key] = true
+		defer delete(resolving, key)
+		if key == OmniChatModelProfileStandard {
+			return strings.TrimSpace(standardFallback)
+		}
+		return resolve(profile.FallbackProfileKey)
+	}
+	routes := make(map[OmniChatModelProfileKey]string, len(profiles))
+	for _, profile := range profiles {
+		routes[profile.Key] = resolve(profile.Key)
+	}
+	return routes, nil
 }
 
 // configureOmniChatProfileRoutes returns a copy whose model metadata matches
@@ -282,6 +393,14 @@ func (c *fallbackChatCompletionClient) generate(ctx context.Context, messages []
 	if ctx.Err() != nil {
 		return "", err
 	}
+	if errors.Is(err, openrouter.ErrAccessDenied) {
+		return "", err
+	}
+	if errors.Is(err, ErrGenerationOptionsUnsupported) {
+		// A structured-output request is a server-owned contract. Do not
+		// silently retry it through a client that would drop the options.
+		return "", err
+	}
 	zlog.Warn().Msg("omnichat: primary model failed; attempting configured fallback")
 	return generateWithOptionalOptions(ctx, c.fallback, messages, onChunk, options, withOptions)
 }
@@ -290,6 +409,9 @@ func generateWithOptionalOptions(ctx context.Context, completion chatCompletionC
 	if withOptions {
 		if optioned, ok := completion.(generationOptionsClient); ok {
 			return optioned.GenerateWithOptions(ctx, messages, onChunk, options)
+		}
+		if strings.TrimSpace(options.ResponseFormat) != "" {
+			return "", ErrGenerationOptionsUnsupported
 		}
 	}
 	return completion.Generate(ctx, messages, onChunk)
@@ -309,20 +431,32 @@ func (r *TieredOmniChatModelRouter) ResolveProfile(ctx context.Context, userID, 
 		return nil, standard
 	}
 	freeClient, _ := r.clientForProfile(OmniChatModelProfileStandard)
-	if userID <= 0 || conversationID <= 0 || r.plans == nil || r.preferences == nil {
+	if userID <= 0 || conversationID <= 0 || r.preferences == nil {
 		return freeClient, standard
 	}
 
-	plan, expiresAt, err := r.plans.GetPlan(ctx, userID)
+	entitlement := OmniChatModelTierFree
+	admin, err := isOmniChatAdmin(ctx, r.adminReader, userID)
 	if err != nil {
-		zlog.Warn().Msg("omnichat: model entitlement lookup failed; using free tier")
+		zlog.Warn().Err(err).Msg("omnichat: administrator entitlement lookup failed; using free tier")
 		return freeClient, standard
 	}
-	if expiresAt != nil && !expiresAt.After(time.Now()) {
-		return freeClient, standard
+	if admin {
+		entitlement = OmniChatModelTierPremium
+	} else {
+		if r.plans == nil {
+			return freeClient, standard
+		}
+		plan, expiresAt, planErr := r.plans.GetPlan(ctx, userID)
+		if planErr != nil {
+			zlog.Warn().Err(planErr).Msg("omnichat: model entitlement lookup failed; using free tier")
+			return freeClient, standard
+		}
+		if expiresAt != nil && !expiresAt.After(time.Now()) {
+			return freeClient, standard
+		}
+		entitlement = modelTierForStoredPlan(plan)
 	}
-
-	entitlement := modelTierForStoredPlan(plan)
 	selectedKey, err := r.preferences.GetEffectiveModelKey(ctx, userID, conversationID)
 	if err != nil {
 		zlog.Warn().Msg("omnichat: model preference lookup failed; using free tier")

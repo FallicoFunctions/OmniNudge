@@ -284,7 +284,7 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 		messages = append(messages, openrouter.Message{Role: role, Content: m.Content})
 	}
 
-	fullText, genErr := generatePersonaCompletionWithClient(chatCtx, completion, persona, messages, func(token string) {
+	fullText, genErr := generatePersonaCompletionWithClientAndSceneState(chatCtx, completion, persona, messages, sceneState, func(token string) {
 		s.hub.Broadcast(&websocket.Message{
 			RecipientID: userID,
 			Type:        "omnichat_token",
@@ -419,7 +419,7 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 		messages = append(messages, openrouter.Message{Role: role, Content: m.Content})
 	}
 
-	fullText, genErr := generatePersonaCompletionWithClient(chatCtx, completion, persona, messages, func(token string) {
+	fullText, genErr := generatePersonaCompletionWithClientAndSceneState(chatCtx, completion, persona, messages, sceneState, func(token string) {
 		s.hub.Broadcast(&websocket.Message{
 			RecipientID: userID,
 			Type:        "omnichat_regeneration_token",
@@ -503,20 +503,34 @@ func (s *ChatbotService) reserveResponseProfile(ctx context.Context, userID int,
 	if stableOperationID != nil && *stableOperationID != uuid.Nil {
 		operationID = *stableOperationID
 	}
-	if _, err := s.billing.ReserveChatMultiplierOwned(ctx, userID, operationID, int64(profile.CreditMultiplier)); err != nil {
+	reservation, err := s.billing.ReserveChatMultiplierOwned(ctx, userID, operationID, int64(profile.CreditMultiplier))
+	if err != nil {
 		// A prior attempt with this client UUID may have reached a durable
 		// refund before a recoverable transport failure. Reservation rows are
 		// append-only, so advance to a new server-owned attempt operation only
 		// after the repository confirms the old stable operation is closed.
 		if stableOperationID != nil && errors.Is(err, models.ErrOmniCreditsReservationRefunded) {
 			operationID = uuid.New()
-			if _, retryErr := s.billing.ReserveChatMultiplierOwned(ctx, userID, operationID, int64(profile.CreditMultiplier)); retryErr == nil {
+			reservation, retryErr := s.billing.ReserveChatMultiplierOwned(ctx, userID, operationID, int64(profile.CreditMultiplier))
+			if retryErr == nil {
+				if reservation == nil {
+					return nil, false, errors.New("chatbot: reserve retry response credits returned no reservation")
+				}
+				if reservation.AdminBypass {
+					return nil, true, nil
+				}
 				return &operationID, false, nil
 			} else {
 				return nil, false, fmt.Errorf("chatbot: reserve retry response credits: %w", retryErr)
 			}
 		}
 		return nil, false, fmt.Errorf("chatbot: reserve response credits: %w", err)
+	}
+	if reservation == nil {
+		return nil, false, errors.New("chatbot: reserve response credits returned no reservation")
+	}
+	if reservation.AdminBypass {
+		return nil, true, nil
 	}
 	return &operationID, false, nil
 }
@@ -948,6 +962,9 @@ func userFacingGenerationError(err error) string {
 	}
 	if errors.Is(err, openrouter.ErrRateLimited) {
 		return "I'm a bit overwhelmed right now — please try again in a moment."
+	}
+	if errors.Is(err, openrouter.ErrAccessDenied) {
+		return "OmniChat is temporarily unavailable."
 	}
 	if errors.Is(err, ErrConversationalResponseContract) {
 		return "I couldn't produce a clean response this time — please try again."

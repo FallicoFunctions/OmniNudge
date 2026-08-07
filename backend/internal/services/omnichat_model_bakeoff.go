@@ -2,6 +2,9 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -168,13 +171,27 @@ type OmniChatBakeOffCaseReport struct {
 }
 
 type OmniChatBakeOffCheckReport struct {
-	Expectation           PersonaQualityExpectation `json:"expectation"`
-	Passed                bool                      `json:"passed"`
-	PassedRepetitions     int                       `json:"passed_repetitions"`
-	AssessedRepetitions   int                       `json:"assessed_repetitions"`
-	UnassessedRepetitions int                       `json:"unassessed_repetitions"`
-	TotalRepetitions      int                       `json:"total_repetitions"`
-	PassRate              float64                   `json:"pass_rate"`
+	Expectation           PersonaQualityExpectation        `json:"expectation"`
+	Passed                bool                             `json:"passed"`
+	PassedRepetitions     int                              `json:"passed_repetitions"`
+	AssessedRepetitions   int                              `json:"assessed_repetitions"`
+	UnassessedRepetitions int                              `json:"unassessed_repetitions"`
+	TotalRepetitions      int                              `json:"total_repetitions"`
+	PassRate              float64                          `json:"pass_rate"`
+	Diagnostics           map[PersonaQualityDiagnostic]int `json:"diagnostics,omitempty"`
+}
+
+// MarshalJSON fails closed if a future evaluator accidentally places
+// sensitive text in the diagnostic field. Only fixed enum keys can cross the
+// report serialization boundary.
+func (r OmniChatBakeOffCheckReport) MarshalJSON() ([]byte, error) {
+	for diagnostic, count := range r.Diagnostics {
+		if !validPersonaQualityDiagnostic(diagnostic) || count <= 0 {
+			return nil, errors.New("omnichat bake-off report: invalid privacy-safe diagnostic")
+		}
+	}
+	type reportJSON OmniChatBakeOffCheckReport
+	return json.Marshal(reportJSON(r))
 }
 
 // OmniChatBakeOffInvariantReport is a privacy-safe aggregate for one explicit
@@ -257,21 +274,23 @@ type OmniChatBakeOffMetrics struct {
 type OmniChatBakeOffGenerationFailureCategory string
 
 const (
-	OmniChatBakeOffFailureTimeoutOrCancelled  OmniChatBakeOffGenerationFailureCategory = "timeout_or_cancelled"
-	OmniChatBakeOffFailureRateLimit           OmniChatBakeOffGenerationFailureCategory = "rate_limit"
-	OmniChatBakeOffFailureProviderIncomplete  OmniChatBakeOffGenerationFailureCategory = "provider_incomplete"
-	OmniChatBakeOffFailureContractRejected    OmniChatBakeOffGenerationFailureCategory = "contract_rejected"
-	OmniChatBakeOffFailureTransportOrProvider OmniChatBakeOffGenerationFailureCategory = "transport_or_provider"
-	OmniChatBakeOffFailureUnknown             OmniChatBakeOffGenerationFailureCategory = "unknown"
+	OmniChatBakeOffFailureTimeoutOrCancelled   OmniChatBakeOffGenerationFailureCategory = "timeout_or_cancelled"
+	OmniChatBakeOffFailureRateLimit            OmniChatBakeOffGenerationFailureCategory = "rate_limit"
+	OmniChatBakeOffFailureProviderAccessDenied OmniChatBakeOffGenerationFailureCategory = "provider_access_denied"
+	OmniChatBakeOffFailureProviderIncomplete   OmniChatBakeOffGenerationFailureCategory = "provider_incomplete"
+	OmniChatBakeOffFailureContractRejected     OmniChatBakeOffGenerationFailureCategory = "contract_rejected"
+	OmniChatBakeOffFailureTransportOrProvider  OmniChatBakeOffGenerationFailureCategory = "transport_or_provider"
+	OmniChatBakeOffFailureUnknown              OmniChatBakeOffGenerationFailureCategory = "unknown"
 )
 
 type OmniChatBakeOffGenerationFailureCounts struct {
-	TimeoutOrCancelled  int `json:"timeout_or_cancelled"`
-	RateLimit           int `json:"rate_limit"`
-	ProviderIncomplete  int `json:"provider_incomplete"`
-	ContractRejected    int `json:"contract_rejected"`
-	TransportOrProvider int `json:"transport_or_provider"`
-	Unknown             int `json:"unknown"`
+	TimeoutOrCancelled   int `json:"timeout_or_cancelled"`
+	RateLimit            int `json:"rate_limit"`
+	ProviderAccessDenied int `json:"provider_access_denied"`
+	ProviderIncomplete   int `json:"provider_incomplete"`
+	ContractRejected     int `json:"contract_rejected"`
+	TransportOrProvider  int `json:"transport_or_provider"`
+	Unknown              int `json:"unknown"`
 }
 
 func (counts *OmniChatBakeOffGenerationFailureCounts) add(category OmniChatBakeOffGenerationFailureCategory) {
@@ -280,6 +299,8 @@ func (counts *OmniChatBakeOffGenerationFailureCounts) add(category OmniChatBakeO
 		counts.TimeoutOrCancelled++
 	case OmniChatBakeOffFailureRateLimit:
 		counts.RateLimit++
+	case OmniChatBakeOffFailureProviderAccessDenied:
+		counts.ProviderAccessDenied++
 	case OmniChatBakeOffFailureProviderIncomplete:
 		counts.ProviderIncomplete++
 	case OmniChatBakeOffFailureContractRejected:
@@ -294,6 +315,7 @@ func (counts *OmniChatBakeOffGenerationFailureCounts) add(category OmniChatBakeO
 func (counts *OmniChatBakeOffGenerationFailureCounts) addCounts(other OmniChatBakeOffGenerationFailureCounts) {
 	counts.TimeoutOrCancelled += other.TimeoutOrCancelled
 	counts.RateLimit += other.RateLimit
+	counts.ProviderAccessDenied += other.ProviderAccessDenied
 	counts.ProviderIncomplete += other.ProviderIncomplete
 	counts.ContractRejected += other.ContractRejected
 	counts.TransportOrProvider += other.TransportOrProvider
@@ -306,8 +328,12 @@ func classifyOmniChatBakeOffGenerationFailure(err error) OmniChatBakeOffGenerati
 		return OmniChatBakeOffFailureTimeoutOrCancelled
 	case errors.Is(err, openrouter.ErrRateLimited):
 		return OmniChatBakeOffFailureRateLimit
-	case errors.Is(err, ErrAssistantOutputHygiene):
+	case errors.Is(err, openrouter.ErrAccessDenied):
+		return OmniChatBakeOffFailureProviderAccessDenied
+	case errors.Is(err, openrouter.ErrProviderIncomplete):
 		return OmniChatBakeOffFailureProviderIncomplete
+	case errors.Is(err, ErrAssistantOutputHygiene):
+		return OmniChatBakeOffFailureContractRejected
 	case errors.Is(err, ErrConversationalResponseContract):
 		return OmniChatBakeOffFailureContractRejected
 	case errors.Is(err, openrouter.ErrTransportOrProvider), errors.Is(err, openrouter.ErrNotConfigured):
@@ -333,6 +359,9 @@ type omniChatBakeOffTTFTClient interface {
 }
 
 type OmniChatBakeOffReport struct {
+	CorpusVersion        string                              `json:"corpus_version"`
+	CorpusFingerprint    string                              `json:"corpus_fingerprint"`
+	PersonaFingerprint   string                              `json:"persona_fingerprint"`
 	Repetitions          int                                 `json:"repetitions"`
 	CompletedRepetitions int                                 `json:"completed_repetitions"`
 	StopReason           string                              `json:"stop_reason,omitempty"`
@@ -349,6 +378,9 @@ func RunBlindOmniChatModelBakeOff(ctx context.Context, candidates []OmniChatBake
 		return OmniChatBakeOffReport{}, err
 	}
 	report := OmniChatBakeOffReport{
+		CorpusVersion:        OmniChatPersonaQualityCorpusVersion,
+		CorpusFingerprint:    PersonaQualityCorpusFingerprint(cases),
+		PersonaFingerprint:   PersonaQualityPersonaFingerprint(personas, cases),
 		Repetitions:          1,
 		CompletedRepetitions: 1,
 		Candidates:           make([]OmniChatBakeOffCandidateReport, 0, len(candidates)),
@@ -379,6 +411,20 @@ func RunBlindOmniChatModelBakeOff(ctx context.Context, candidates []OmniChatBake
 			caseCompletionLatency = append(caseCompletionLatency, time.Since(caseStartedAt))
 			if err != nil {
 				client.recordFailedCase(err)
+				// A caller-level cancellation/deadline means the matrix itself
+				// cannot produce another complete case. Propagate it so the
+				// repeated runner can preserve only completed repetitions instead
+				// of manufacturing a failed case from an interrupted run.
+				if ctx.Err() != nil && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+					return OmniChatBakeOffReport{}, ctx.Err()
+				}
+				if errors.Is(err, openrouter.ErrAccessDenied) {
+					// Authentication, billing authorization, and entitlement
+					// failures are terminal for the entire paid matrix. Return only
+					// the fixed sentinel so an upstream error cannot expose account
+					// detail through the CLI, logs, or a partial report.
+					return OmniChatBakeOffReport{}, openrouter.ErrAccessDenied
+				}
 				failedChecks := make([]PersonaQualityCheck, 0, len(qualityCase.Expectations))
 				for _, expectation := range qualityCase.Expectations {
 					failedChecks = append(failedChecks, PersonaQualityCheck{
@@ -409,6 +455,10 @@ func RunBlindOmniChatModelBakeOff(ctx context.Context, candidates []OmniChatBake
 				Checks:   make([]OmniChatBakeOffCheckReport, 0, len(result.Checks)),
 			}
 			for _, check := range result.Checks {
+				diagnostics := map[PersonaQualityDiagnostic]int(nil)
+				if check.Diagnostic != "" {
+					diagnostics = map[PersonaQualityDiagnostic]int{check.Diagnostic: 1}
+				}
 				caseReport.Checks = append(caseReport.Checks, OmniChatBakeOffCheckReport{
 					Expectation: check.Expectation, Passed: check.Passed,
 					PassedRepetitions:     map[bool]int{true: 1}[check.Assessed && check.Passed],
@@ -416,6 +466,7 @@ func RunBlindOmniChatModelBakeOff(ctx context.Context, candidates []OmniChatBake
 					UnassessedRepetitions: map[bool]int{true: 1}[!check.Assessed],
 					TotalRepetitions:      1,
 					PassRate:              map[bool]float64{true: 1}[check.Assessed && check.Passed],
+					Diagnostics:           diagnostics,
 				})
 			}
 			candidateReport.Cases = append(candidateReport.Cases, caseReport)
@@ -481,9 +532,12 @@ func runRepeatedBlindOmniChatModelBakeOff(ctx context.Context, repetitions int, 
 	}
 
 	aggregate := OmniChatBakeOffReport{
-		Repetitions:      repetitions,
-		Candidates:       make([]OmniChatBakeOffCandidateReport, len(candidates)),
-		CandidateMapping: make(map[string]OmniChatBakeOffCandidate, len(candidates)),
+		CorpusVersion:      OmniChatPersonaQualityCorpusVersion,
+		CorpusFingerprint:  PersonaQualityCorpusFingerprint(cases),
+		PersonaFingerprint: PersonaQualityPersonaFingerprint(personas, cases),
+		Repetitions:        repetitions,
+		Candidates:         make([]OmniChatBakeOffCandidateReport, len(candidates)),
+		CandidateMapping:   make(map[string]OmniChatBakeOffCandidate, len(candidates)),
 	}
 	indexByBlindID := make(map[string]int, len(candidates))
 	for index, candidate := range candidates {
@@ -505,6 +559,16 @@ func runRepeatedBlindOmniChatModelBakeOff(ctx context.Context, repetitions int, 
 		rotatedCases = append(rotatedCases, cases[:caseOffset]...)
 		run, err := RunBlindOmniChatModelBakeOff(ctx, rotated, personas, rotatedCases, newClient)
 		if err != nil {
+			// Preserve only fully completed repetitions when the caller's
+			// deadline/cancellation interrupts a long paid run. The caller can
+			// serialize this explicitly marked partial report for diagnostics,
+			// while access-denied and other failures remain fail-closed with no
+			// partial qualification artifact.
+			if aggregate.CompletedRepetitions > 0 && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+				aggregate.StopReason = "timeout_or_cancelled"
+				finalizeOmniChatBakeOffReport(&aggregate)
+				return aggregate, err
+			}
 			return OmniChatBakeOffReport{}, err
 		}
 		for _, current := range run.Candidates {
@@ -613,6 +677,14 @@ func mergeOmniChatBakeOffCandidateReport(aggregate *OmniChatBakeOffCandidateRepo
 			targetCheck.AssessedRepetitions += currentCheck.AssessedRepetitions
 			targetCheck.UnassessedRepetitions += currentCheck.UnassessedRepetitions
 			targetCheck.PassedRepetitions += currentCheck.PassedRepetitions
+			if len(currentCheck.Diagnostics) > 0 {
+				if targetCheck.Diagnostics == nil {
+					targetCheck.Diagnostics = make(map[PersonaQualityDiagnostic]int, len(currentCheck.Diagnostics))
+				}
+				for diagnostic, count := range currentCheck.Diagnostics {
+					targetCheck.Diagnostics[diagnostic] += count
+				}
+			}
 		}
 	}
 }
@@ -859,6 +931,11 @@ func (c *instrumentedOmniChatBakeOffClient) generate(ctx context.Context, messag
 	if withOptions {
 		if optioned, ok := c.client.(generationOptionsClient); ok {
 			response, err = optioned.GenerateWithOptions(ctx, messages, wrapped, options)
+		} else if strings.TrimSpace(options.ResponseFormat) != "" {
+			// Structured recovery is a server-owned contract. Do not let an
+			// offline bake-off silently measure an unstructured request when its
+			// test/provider client lacks the options surface.
+			err = ErrGenerationOptionsUnsupported
 		} else {
 			response, err = c.client.Generate(ctx, messages, wrapped)
 		}
@@ -1060,6 +1137,10 @@ type OmniChatBakeOffQualityGate struct {
 	ExpectedBoundaryChecks           int
 	ExpectedRejectedInjectionChecks  int
 	ExpectedNoPromptDisclosureChecks int
+	ExpectedCorpusVersion            string
+	ExpectedCorpusFingerprint        string
+	ExpectedPersonaFingerprint       string
+	RequirePersonaFingerprint        bool
 }
 
 type OmniChatBakeOffQualityGateResult struct {
@@ -1084,6 +1165,10 @@ func DefaultOmniChatBakeOffQualityGate() OmniChatBakeOffQualityGate {
 		ExpectedBoundaryChecks:           30,
 		ExpectedRejectedInjectionChecks:  30,
 		ExpectedNoPromptDisclosureChecks: 90,
+		ExpectedCorpusVersion:            OmniChatPersonaQualityCorpusVersion,
+		ExpectedCorpusFingerprint:        OmniChatCompanionBakeOffCorpusFingerprint,
+		ExpectedPersonaFingerprint:       OmniChatCompanionPersonaFingerprint,
+		RequirePersonaFingerprint:        true,
 	}
 }
 
@@ -1103,14 +1188,28 @@ func EvaluateOmniChatBakeOffQualityGate(report OmniChatBakeOffReport, gate OmniC
 		result.Passed = false
 		result.RunFailures = append(result.RunFailures, "run_stopped")
 	}
+	if gate.ExpectedCorpusVersion != "" && report.CorpusVersion != gate.ExpectedCorpusVersion {
+		result.Passed = false
+		result.RunFailures = append(result.RunFailures, "unexpected_corpus_version")
+	}
+	if gate.ExpectedCorpusFingerprint != "" && report.CorpusFingerprint != gate.ExpectedCorpusFingerprint {
+		result.Passed = false
+		result.RunFailures = append(result.RunFailures, "unexpected_corpus_fingerprint")
+	}
+	if gate.ExpectedPersonaFingerprint != "" && report.PersonaFingerprint != gate.ExpectedPersonaFingerprint {
+		result.Passed = false
+		result.RunFailures = append(result.RunFailures, "unexpected_persona_fingerprint")
+	} else if gate.RequirePersonaFingerprint && !validSHA256Fingerprint(report.PersonaFingerprint) {
+		result.Passed = false
+		result.RunFailures = append(result.RunFailures, "missing_or_invalid_persona_fingerprint")
+	}
 	matrixFailures := omniChatBakeOffQualificationMatrixFailures(report, gate)
 	if len(matrixFailures) > 0 {
 		result.Passed = false
 		result.RunFailures = append(result.RunFailures, matrixFailures...)
 	}
 	for _, candidate := range report.Candidates {
-		if strings.TrimSpace(candidate.BlindID) == "" || candidate.TotalCases <= 0 ||
-			candidate.Score.ResponseIntegrityTotal <= 0 || candidate.Score.FormatContractTotal <= 0 {
+		if strings.TrimSpace(candidate.BlindID) == "" || candidate.TotalCases <= 0 || !validOmniChatBakeOffScore(candidate.Score) {
 			return OmniChatBakeOffQualityGateResult{}, fmt.Errorf("omnichat bake-off gate: candidate metrics are incomplete")
 		}
 		failures := make([]string, 0, 6)
@@ -1217,7 +1316,35 @@ func EvaluateOmniChatBakeOffQualityGate(report OmniChatBakeOffReport, gate OmniC
 	return result, nil
 }
 
+func validOmniChatBakeOffScore(score OmniChatBakeOffScore) bool {
+	for _, counts := range [][2]int{
+		{score.ResponseIntegrityPassed, score.ResponseIntegrityTotal},
+		{score.FormatContractPassed, score.FormatContractTotal},
+		{score.LeakagePassed, score.LeakageTotal},
+	} {
+		if counts[0] < 0 || counts[1] < 0 || counts[0] > counts[1] {
+			return false
+		}
+	}
+	return true
+}
+
 func validOmniChatBakeOffQualityGate(gate OmniChatBakeOffQualityGate) bool {
+	if gate.ExpectedCorpusVersion != "" && strings.TrimSpace(gate.ExpectedCorpusVersion) != gate.ExpectedCorpusVersion {
+		return false
+	}
+	if gate.ExpectedCorpusFingerprint != "" && strings.TrimSpace(gate.ExpectedCorpusFingerprint) != gate.ExpectedCorpusFingerprint {
+		return false
+	}
+	if gate.ExpectedCorpusFingerprint != "" && !validSHA256Fingerprint(gate.ExpectedCorpusFingerprint) {
+		return false
+	}
+	if gate.ExpectedPersonaFingerprint != "" && strings.TrimSpace(gate.ExpectedPersonaFingerprint) != gate.ExpectedPersonaFingerprint {
+		return false
+	}
+	if gate.ExpectedPersonaFingerprint != "" && !validSHA256Fingerprint(gate.ExpectedPersonaFingerprint) {
+		return false
+	}
 	for _, value := range []float64{
 		gate.MinCasePassRate, gate.MinBehaviorPassRate, gate.MinBoundaryPassRate, gate.MinInjectionPassRate,
 		gate.MinResponseIntegrityPassRate, gate.MinFormatPassRate, gate.MinLeakagePassRate,
@@ -1295,7 +1422,11 @@ func omniChatBakeOffQualificationMatrixFailures(report OmniChatBakeOffReport, ga
 			if gate.ExpectedCheckRepetitions > 0 && caseReport.TotalRepetitions != gate.ExpectedCheckRepetitions {
 				caseMatrixComplete = false
 			}
-			if caseReport.PassedRepetitions < 0 || caseReport.PassedRepetitions > caseReport.TotalRepetitions || len(caseReport.Checks) == 0 {
+			if caseReport.TotalRepetitions <= 0 ||
+				caseReport.PassedRepetitions < 0 || caseReport.PassedRepetitions > caseReport.TotalRepetitions ||
+				caseReport.Passed != (caseReport.PassedRepetitions == caseReport.TotalRepetitions) ||
+				!sameRate(caseReport.PassRate, ratio(caseReport.PassedRepetitions, caseReport.TotalRepetitions)) ||
+				len(caseReport.Checks) == 0 {
 				caseMatrixComplete = false
 			}
 			seenChecks := make(map[PersonaQualityExpectation]struct{}, len(caseReport.Checks))
@@ -1314,6 +1445,32 @@ func omniChatBakeOffQualificationMatrixFailures(report OmniChatBakeOffReport, ga
 					check.UnassessedRepetitions < 0 ||
 					check.AssessedRepetitions+check.UnassessedRepetitions != check.TotalRepetitions ||
 					check.PassedRepetitions > check.AssessedRepetitions {
+					caseMatrixComplete = false
+				}
+				expectedPassed := check.UnassessedRepetitions == 0 &&
+					check.AssessedRepetitions == check.TotalRepetitions &&
+					check.PassedRepetitions == check.AssessedRepetitions
+				if check.Passed != expectedPassed || !sameRate(check.PassRate, ratio(check.PassedRepetitions, check.AssessedRepetitions)) {
+					caseMatrixComplete = false
+				}
+				assessedFailures := check.AssessedRepetitions - check.PassedRepetitions
+				diagnosticTotal := 0
+				for diagnostic, count := range check.Diagnostics {
+					if !validPersonaQualityDiagnostic(diagnostic) || count <= 0 || count > check.TotalRepetitions {
+						caseMatrixComplete = false
+						continue
+					}
+					if diagnosticTotal > assessedFailures-count {
+						caseMatrixComplete = false
+						continue
+					}
+					diagnosticTotal += count
+				}
+				if check.Expectation == PersonaExpectationNoPromptDisclosure {
+					if diagnosticTotal != assessedFailures {
+						caseMatrixComplete = false
+					}
+				} else if diagnosticTotal != 0 {
 					caseMatrixComplete = false
 				}
 			}
@@ -1356,6 +1513,30 @@ func omniChatBakeOffQualificationMatrixFailures(report OmniChatBakeOffReport, ga
 		failures = append(failures, "incomplete_invariant_matrix")
 	}
 	return failures
+}
+
+func validPersonaQualityDiagnostic(diagnostic PersonaQualityDiagnostic) bool {
+	switch diagnostic {
+	case PersonaQualityDiagnosticPromptOverlapProtectedInstruction,
+		PersonaQualityDiagnosticPromptOverlapCharacterContext,
+		PersonaQualityDiagnosticPromptOverlapExampleDialogue,
+		PersonaQualityDiagnosticPromptOverlapOtherContext:
+		return true
+	default:
+		return false
+	}
+}
+
+func validSHA256Fingerprint(value string) bool {
+	if len(value) != sha256.Size*2 {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
+}
+
+func sameRate(left, right float64) bool {
+	return !math.IsNaN(left) && !math.IsInf(left, 0) && math.Abs(left-right) <= 1e-12
 }
 
 func equalStrings(left, right []string) bool {
@@ -1452,8 +1633,12 @@ func validateOmniChatBakeOffInputs(candidates []OmniChatBakeOffCandidate, person
 		seen[id] = struct{}{}
 	}
 	for _, qualityCase := range cases {
-		if personas[qualityCase.PersonaSlug] == nil {
+		persona := personas[qualityCase.PersonaSlug]
+		if persona == nil {
 			return fmt.Errorf("omnichat bake-off: missing persona %q", qualityCase.PersonaSlug)
+		}
+		if qualityCaseDuplicatesExampleUserTurn(qualityCase.Prompt, persona.ExampleDialogue) {
+			return fmt.Errorf("omnichat bake-off: case %q duplicates an example dialogue user turn", qualityCase.ID)
 		}
 	}
 	return nil

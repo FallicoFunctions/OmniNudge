@@ -47,13 +47,18 @@ The OmniNudge backend has comprehensive test coverage across all major systems:
 2. **Environment Variable**
    ```bash
    export TEST_DATABASE_URL="postgres://<your-username>@localhost:5432/omninudge_test?sslmode=disable"
+
+   # The integration harness uses these small, on-demand pools by default.
+   # Set them explicitly in CI if the runner should not rely on the defaults.
+   export TEST_DB_MAX_CONNS=4
+   export TEST_DB_MIN_CONNS=0
    ```
 
 ### Run All Tests
 
 ```bash
 cd backend
-go test ./...
+go test -p 1 ./...
 ```
 
 ### Run Specific Package
@@ -81,7 +86,7 @@ go test ./internal/services -run TestNewUserVelocityThreshold -v
 ### With Coverage
 
 ```bash
-go test ./... -cover
+go test -p 1 ./... -cover
 ```
 
 ## Test Organization
@@ -232,7 +237,7 @@ func uniqueName(base string) string {
 }
 ```
 
-This allows running `go test ./...` multiple times on the same database without cleanup.
+This allows running `go test -p 1 ./...` multiple times on the same database without cleanup.
 
 ### Database Cleanup
 
@@ -295,7 +300,7 @@ For CI/CD pipelines:
   run: |
     createdb omninudge_test
     cd backend
-    go test ./... -v
+    go test -p 1 ./... -v
 ```
 
 ## Coverage Goals

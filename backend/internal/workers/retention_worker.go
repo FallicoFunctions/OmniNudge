@@ -45,8 +45,9 @@ func (w *RetentionWorker) SetVoiceStorage(storage services.StorageService) *Rete
 	return w
 }
 
-// SetLiveCallEnder supplies the provider client used to reclaim Tavus rooms
-// after a client disconnect or a transient endpoint cleanup failure.
+// SetLiveCallEnder supplies the self-hosted avatar worker client used to
+// reclaim RunPod workers after a client disconnect or transient cleanup
+// failure.
 func (w *RetentionWorker) SetLiveCallEnder(ender interface {
 	EndConversation(context.Context, string) error
 }) *RetentionWorker {
@@ -740,7 +741,7 @@ func (w *RetentionWorker) cleanupAbandonedOmniChatCalls(ctx context.Context) {
 	}
 	rows, err := w.db.Query(ctx, `
 		SELECT id FROM omnichat_call_sessions
-		WHERE provider='tavus' AND provider_session_id IS NOT NULL
+		WHERE provider='runpod_livekit' AND provider_session_id IS NOT NULL
 		  AND (status <> 'active' OR last_activity_at < NOW()-INTERVAL '2 hours')
 		ORDER BY last_activity_at
 		LIMIT 500
@@ -780,7 +781,7 @@ func (w *RetentionWorker) cleanupAbandonedOmniChatCalls(ctx context.Context) {
 			UPDATE omnichat_call_sessions
 			SET status='ended',ended_at=COALESCE(ended_at,NOW()),
 			    last_activity_at=CASE WHEN status='active' THEN NOW() ELSE last_activity_at END
-			WHERE id=$1 AND provider='tavus' AND provider_session_id IS NOT NULL
+			WHERE id=$1 AND provider='runpod_livekit' AND provider_session_id IS NOT NULL
 			  AND (status <> 'active' OR last_activity_at < NOW()-INTERVAL '2 hours')
 			RETURNING provider_session_id
 		`, callID).Scan(&providerSessionID)

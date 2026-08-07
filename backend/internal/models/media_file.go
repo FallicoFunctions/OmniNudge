@@ -221,10 +221,18 @@ func (r *MediaFileRepository) IsMediaPubliclyAccessible(ctx context.Context, med
 			JOIN bot_personas p
 			  ON p.is_active=TRUE
 			 AND p.owner_user_id IS NULL
-			 AND (
-				p.avatar_url=mf.storage_url
-				OR p.preview_video_url=mf.storage_url
-				OR mf.storage_url=ANY(COALESCE(p.gallery_urls, ARRAY[]::TEXT[]))
+			 AND EXISTS (
+				SELECT 1
+				FROM unnest(
+					ARRAY[p.avatar_url, p.preview_video_url]
+					|| COALESCE(p.gallery_urls, ARRAY[]::TEXT[])
+				) AS persona_media(url)
+				WHERE NULLIF(BTRIM(persona_media.url), '') IS NOT NULL
+				  AND NULLIF(regexp_replace(regexp_replace(persona_media.url, '^https?://[^/]+/', ''), '^/+', ''), '') IN (
+					NULLIF(regexp_replace(regexp_replace(COALESCE(mf.storage_url, ''), '^https?://[^/]+/', ''), '^/+', ''), ''),
+					NULLIF(regexp_replace(regexp_replace(COALESCE(mf.storage_path, ''), '^https?://[^/]+/', ''), '^/+', ''), ''),
+					NULLIF(regexp_replace(regexp_replace(COALESCE('/uploads/' || mf.storage_object_key, ''), '^https?://[^/]+/', ''), '^/+', ''), '')
+				)
 			 )
 			WHERE mf.id=$1 AND mf.scan_status='clean'
 		)

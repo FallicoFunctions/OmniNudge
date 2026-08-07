@@ -74,7 +74,7 @@ func generatedMediaDialContext(resolver generatedMediaResolver, dialer generated
 	}
 }
 
-func validateGeneratedMediaURL(rawURL string) error {
+func validateGeneratedMediaURL(rawURL string, additionalHosts ...string) error {
 	parsed, err := url.Parse(rawURL)
 	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" {
 		return errors.New("generated media URL is invalid")
@@ -86,21 +86,51 @@ func validateGeneratedMediaURL(rawURL string) error {
 		return errors.New("generated media URL uses an untrusted port")
 	}
 	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
-	trusted := host == "fal.media" || strings.HasSuffix(host, ".fal.media") || host == "storage.googleapis.com"
-	if !trusted {
+	if ip := net.ParseIP(host); ip != nil && (!ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsMulticast()) {
+		return errors.New("generated media host is not trusted")
+	}
+	if !generatedMediaHostTrusted(host, additionalHosts...) {
 		return errors.New("generated media host is not trusted")
 	}
 	return nil
 }
 
-func downloadGeneratedMedia(ctx context.Context, rawURL string, kind modelsMediaKind, maxBytes int64) (*generatedMediaDownload, func(), error) {
-	if err := validateGeneratedMediaURL(rawURL); err != nil {
+func generatedMediaHostTrusted(host string, additionalHosts ...string) bool {
+	allowed := []string{"storage.googleapis.com"}
+	allowed = append(allowed, additionalHosts...)
+	for _, candidate := range allowed {
+		candidate = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(candidate, ".")))
+		candidate = strings.TrimPrefix(candidate, ".")
+		if candidate == "" || strings.ContainsAny(candidate, "/:@?&#") {
+			continue
+		}
+		// Output hosts are deployment-owned origins, not DNS suffixes. Accepting
+		// arbitrary subdomains would let a future provider configuration
+		// accidentally trust an unrelated tenant-controlled host beneath the
+		// configured domain. Wildcard behavior must be expressed explicitly by
+		// configuring each concrete output hostname.
+		if host == candidate {
+			return true
+		}
+	}
+	return false
+}
+
+func downloadGeneratedMedia(ctx context.Context, rawURL string, kind modelsMediaKind, maxBytes int64, additionalHosts ...string) (*generatedMediaDownload, func(), error) {
+	if err := validateGeneratedMediaURL(rawURL, additionalHosts...); err != nil {
 		return nil, nil, err
 	}
-	if maxBytes <= 0 {
+	// The bounded copy below reads maxBytes+1 so it can distinguish an exact
+	// limit from an oversized response. Reject the only value that would make
+	// that addition overflow and turn the limit negative.
+	if maxBytes <= 0 || maxBytes >= int64(1<<63-1) {
 		return nil, nil, errors.New("generated media size limit is invalid")
 	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
+	baseTransport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		baseTransport = &http.Transport{}
+	}
+	transport := baseTransport.Clone()
 	// Resolve once inside DialContext, validate every answer, and dial the
 	// validated IP directly. This closes DNS-rebinding and environment-proxy
 	// paths that a hostname-only allowlist would leave open.
@@ -113,7 +143,7 @@ func downloadGeneratedMedia(ctx context.Context, rawURL string, kind modelsMedia
 			if len(via) >= 3 {
 				return errors.New("too many generated media redirects")
 			}
-			return validateGeneratedMediaURL(request.URL.String())
+			return validateGeneratedMediaURL(request.URL.String(), additionalHosts...)
 		},
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)

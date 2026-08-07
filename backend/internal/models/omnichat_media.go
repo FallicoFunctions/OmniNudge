@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -57,12 +58,25 @@ type OmniChatSceneState struct {
 	Lighting        string   `json:"lighting,omitempty"`
 	Activity        string   `json:"activity,omitempty"`
 	Outfit          string   `json:"outfit,omitempty"`
+	Accessories     []string `json:"accessories,omitempty"`
 	Pose            string   `json:"pose,omitempty"`
 	Expression      string   `json:"expression,omitempty"`
 	Mood            string   `json:"mood,omitempty"`
-	CameraDirection string   `json:"camera_direction,omitempty"`
-	OtherCharacters []string `json:"other_characters,omitempty"`
-	RecentEvents    []string `json:"recent_events,omitempty"`
+	CameraDirection string `json:"camera_direction,omitempty"`
+	// ViewerPosition is where the user's body is in the scene. The image is shot
+	// from the user's point of view, so this decides what is in the foreground:
+	// a user lying on the bed must see the bed, not the character standing in
+	// front of it with the bed behind her.
+	ViewerPosition string `json:"viewer_position,omitempty"`
+	// SubjectAppearance is the persona's stable physical description, resolved
+	// from the persona rather than from conversation state.
+	SubjectAppearance string   `json:"subject_appearance,omitempty"`
+	OtherCharacters   []string `json:"other_characters,omitempty"`
+	RecentEvents      []string `json:"recent_events,omitempty"`
+	// IncludeUserBody is server-derived, never client-supplied. Scene images
+	// are shot from the user's point of view and show the persona alone unless
+	// the tracked interaction actually puts the user's body in frame.
+	IncludeUserBody bool `json:"include_user_body,omitempty"`
 }
 
 // OmniChatGenerationRequest is accepted by both contextual chat generation
@@ -83,6 +97,21 @@ type OmniChatGenerationRequest struct {
 	RequestID          uuid.UUID              `json:"request_id,omitempty"`
 	EffectivePrompt    string                 `json:"-"`
 	BillingOperationID *uuid.UUID             `json:"-"`
+	// BillingRequired is server-owned. Normal media jobs must carry a durable
+	// OmniCredits reservation; only the persisted administrator entitlement may
+	// explicitly set this false.
+	BillingRequired *bool `json:"-"`
+}
+
+// OmniChatMediaCommandRequest is the narrow request accepted by the chat
+// media-command endpoint. The conversation and persona are resolved from the
+// authenticated route; callers cannot choose either one in this payload.
+type OmniChatMediaCommandRequest struct {
+	RequestID       uuid.UUID         `json:"request_id"`
+	Kind            OmniChatMediaKind `json:"kind"`
+	Prompt          string            `json:"prompt"`
+	AspectRatio     string            `json:"aspect_ratio,omitempty"`
+	DurationSeconds int               `json:"duration_seconds,omitempty"`
 }
 
 // OmniChatGenerationJob is an asynchronous image/video generation request.
@@ -114,6 +143,11 @@ type OmniChatGenerationJob struct {
 	CreatedAt          time.Time                `json:"created_at"`
 	StartedAt          *time.Time               `json:"started_at,omitempty"`
 	CompletedAt        *time.Time               `json:"completed_at,omitempty"`
+	BillingRequired    bool                     `json:"-"`
+	// IdentityProfile is resolved from the persona immediately before provider
+	// submission. It is intentionally transient: generation jobs retain the
+	// scene/prompt snapshot, while deployable model paths remain server config.
+	IdentityProfile OmniChatMediaIdentityProfile `json:"-"`
 }
 
 type OmniChatMediaCursor struct {
@@ -203,6 +237,11 @@ func (r *OmniChatMediaRepository) CreateGenerationJob(ctx context.Context, owner
 		Scene:           request.Scene,
 		Provider:        provider,
 	}
+	billingRequired := true
+	if request.BillingRequired != nil {
+		billingRequired = *request.BillingRequired
+	}
+	job.BillingRequired = billingRequired
 	var duration any
 	if request.DurationSeconds > 0 {
 		duration = request.DurationSeconds
@@ -211,14 +250,14 @@ func (r *OmniChatMediaRepository) CreateGenerationJob(ctx context.Context, owner
 		INSERT INTO omnichat_generation_jobs (
 			id, owner_user_id, persona_id, conversation_id, source_message_id,
 			source_asset_id, kind, mode, prompt, negative_prompt, effective_prompt,
-			aspect_ratio, duration_seconds, scene_snapshot, provider, billing_operation_id
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULLIF($15, ''), $16)
+			aspect_ratio, duration_seconds, scene_snapshot, provider, billing_operation_id, billing_required
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULLIF($15, ''), $16, $17)
 		RETURNING created_at, progress
 	`
 	if request.RequestID == uuid.Nil {
 		err = r.pool.QueryRow(ctx, query, job.ID, ownerUserID, request.PersonaID, request.ConversationID, request.SourceMessageID,
 			request.SourceAssetID, request.Kind, request.Mode, request.Prompt, request.NegativePrompt,
-			request.EffectivePrompt, request.AspectRatio, duration, sceneJSON, provider, request.BillingOperationID,
+			request.EffectivePrompt, request.AspectRatio, duration, sceneJSON, provider, request.BillingOperationID, billingRequired,
 		).Scan(&job.CreatedAt, &job.Progress)
 	} else {
 		tx, beginErr := r.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -228,7 +267,7 @@ func (r *OmniChatMediaRepository) CreateGenerationJob(ctx context.Context, owner
 		defer func() { _ = tx.Rollback(ctx) }()
 		err = tx.QueryRow(ctx, query, job.ID, ownerUserID, request.PersonaID, request.ConversationID, request.SourceMessageID,
 			request.SourceAssetID, request.Kind, request.Mode, request.Prompt, request.NegativePrompt,
-			request.EffectivePrompt, request.AspectRatio, duration, sceneJSON, provider, request.BillingOperationID,
+			request.EffectivePrompt, request.AspectRatio, duration, sceneJSON, provider, request.BillingOperationID, billingRequired,
 		).Scan(&job.CreatedAt, &job.Progress)
 		if err == nil {
 			err = completeOmniChatRequestInTx(ctx, tx, OmniChatRequestCompletion{UserID: ownerUserID, RequestID: request.RequestID}, job)
@@ -250,7 +289,7 @@ const omniChatGenerationJobSelect = `
 	COALESCE(duration_seconds, 0), scene_snapshot, COALESCE(provider, ''),
 	COALESCE(provider_job_id, ''), progress, COALESCE(error_code, ''),
 	provider_metadata, created_at, started_at, completed_at
-	,billing_operation_id
+	,billing_operation_id, billing_required
 `
 
 func scanOmniChatGenerationJob(scanner interface{ Scan(...any) error }) (*OmniChatGenerationJob, error) {
@@ -261,7 +300,7 @@ func scanOmniChatGenerationJob(scanner interface{ Scan(...any) error }) (*OmniCh
 		&job.SourceAssetID, &job.OutputAssetID, &job.OutputMessageID, &job.Kind, &job.Mode, &job.Status, &job.Prompt,
 		&job.NegativePrompt, &job.EffectivePrompt, &job.AspectRatio, &job.DurationSeconds,
 		&sceneJSON, &job.Provider, &job.ProviderJobID, &job.Progress, &job.ErrorCode,
-		&job.ProviderMetadata, &job.CreatedAt, &job.StartedAt, &job.CompletedAt, &job.BillingOperationID,
+		&job.ProviderMetadata, &job.CreatedAt, &job.StartedAt, &job.CompletedAt, &job.BillingOperationID, &job.BillingRequired,
 	)
 	if err != nil {
 		return nil, err
@@ -290,6 +329,27 @@ func (r *OmniChatMediaRepository) GetGenerationJobForProcessing(ctx context.Cont
 		FROM omnichat_generation_jobs
 		WHERE id = $1
 	`, id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return job, err
+}
+
+// GetGenerationJobForSourceMessageOwned finds the provider job created for a
+// persisted direct media command. Source messages are owner-scoped so this
+// lookup can safely recover an accepted job after a response/idempotency write
+// was interrupted.
+func (r *OmniChatMediaRepository) GetGenerationJobForSourceMessageOwned(ctx context.Context, ownerUserID, sourceMessageID int) (*OmniChatGenerationJob, error) {
+	if ownerUserID <= 0 || sourceMessageID <= 0 {
+		return nil, errors.New("generation source lookup requires positive identifiers")
+	}
+	job, err := scanOmniChatGenerationJob(r.pool.QueryRow(ctx, `
+		SELECT `+omniChatGenerationJobSelect+`
+		FROM omnichat_generation_jobs
+		WHERE owner_user_id = $1 AND source_message_id = $2
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1
+	`, ownerUserID, sourceMessageID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -366,7 +426,38 @@ func (r *OmniChatMediaRepository) CancelGenerationJobOwned(ctx context.Context, 
 
 // CompleteGenerationJob atomically creates the media file and private gallery
 // asset, then links the job output. Callers must persist/scan the bytes first.
-func (r *OmniChatMediaRepository) CompleteGenerationJob(ctx context.Context, jobID uuid.UUID, media *MediaFile, asset *OmniChatMediaAsset, freeTierBytes, proTierBytes int64) error {
+// OmniChatGenerationProvenance records what actually rendered an asset. The
+// worker build is the only reliable way to tell which GPU image served a job:
+// a RunPod template can be pointed at a stale tag, which makes prompt changes
+// look ineffective when they were simply never deployed.
+type OmniChatGenerationProvenance struct {
+	WorkerBuild  string `json:"worker_build,omitempty"`
+	ActualPrompt string `json:"actual_prompt,omitempty"`
+}
+
+const (
+	omniChatProvenanceMaxBuildRunes  = 128
+	omniChatProvenanceMaxPromptRunes = 4000
+)
+
+// encode bounds provider-supplied text before it is stored. The worker is
+// trusted infrastructure, but its output still ends up in a JSONB column and
+// must not be able to grow a row without limit.
+func (p OmniChatGenerationProvenance) encode() ([]byte, error) {
+	p.WorkerBuild = boundProvenanceText(p.WorkerBuild, omniChatProvenanceMaxBuildRunes)
+	p.ActualPrompt = boundProvenanceText(p.ActualPrompt, omniChatProvenanceMaxPromptRunes)
+	return json.Marshal(p)
+}
+
+func boundProvenanceText(value string, maximum int) string {
+	value = strings.Join(strings.Fields(value), " ")
+	if utf8.RuneCountInString(value) <= maximum {
+		return value
+	}
+	return string([]rune(value)[:maximum])
+}
+
+func (r *OmniChatMediaRepository) CompleteGenerationJob(ctx context.Context, jobID uuid.UUID, media *MediaFile, asset *OmniChatMediaAsset, freeTierBytes, proTierBytes int64, provenance OmniChatGenerationProvenance) error {
 	if media == nil || asset == nil {
 		return errors.New("generated media metadata is required")
 	}
@@ -471,16 +562,12 @@ func (r *OmniChatMediaRepository) CompleteGenerationJob(ctx context.Context, job
 
 	var outputMessageID *int
 	if conversationID != nil {
-		messageText := "Here is the scene you asked for."
-		if kind == OmniChatMediaKindVideo {
-			messageText = "Here is the scene in motion."
-		}
 		createdMessageID := 0
 		err = tx.QueryRow(ctx, `
-			INSERT INTO bot_messages (conversation_id, role, content, failed)
-			VALUES ($1, $2, $3, FALSE)
+			INSERT INTO bot_messages (conversation_id, role, content, failed, media_only)
+			VALUES ($1, $2, '', FALSE, TRUE)
 			RETURNING id
-		`, *conversationID, BotMessageRoleAssistant, messageText).Scan(&createdMessageID)
+		`, *conversationID, BotMessageRoleAssistant).Scan(&createdMessageID)
 		if err != nil {
 			return err
 		}
@@ -500,13 +587,17 @@ func (r *OmniChatMediaRepository) CompleteGenerationJob(ctx context.Context, job
 		outputMessageID = &createdMessageID
 	}
 
+	provenanceJSON, err := provenance.encode()
+	if err != nil {
+		return fmt.Errorf("encode generation provenance: %w", err)
+	}
 	tag, err := tx.Exec(ctx, `
 		UPDATE omnichat_generation_jobs
 			SET status = 'succeeded', progress = 100, output_asset_id = $2,
-			    output_message_id = $3,
+			    output_message_id = $3, provider_metadata = $4,
 			    completed_at = NOW(), provider_error = NULL,last_activity_at=NOW()
 		WHERE id = $1 AND status = 'running'
-	`, jobID, asset.ID, outputMessageID)
+	`, jobID, asset.ID, outputMessageID, provenanceJSON)
 	if err != nil {
 		return err
 	}
@@ -654,7 +745,44 @@ func (r *OmniChatMediaRepository) DeleteMediaAssetOwned(ctx context.Context, id 
 	`, storagePath, ownerUserID); err != nil {
 		return false, err
 	}
+	// Media replies are represented by an empty assistant message whose only
+	// visible content is the generated asset. Remove that shell when this was
+	// its last attachment; otherwise deleting a gallery item would leave an
+	// empty turn in the conversation. Messages with text or other attachments
+	// remain intact.
+	if _, err = tx.Exec(ctx, `
+		DELETE FROM bot_messages m
+		WHERE m.media_only = TRUE
+		  AND m.role = $1
+		  AND char_length(m.content) = 0
+		  AND EXISTS (
+			SELECT 1
+			FROM bot_message_attachments target
+			WHERE target.message_id = m.id AND target.asset_id = $2
+		  )
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM bot_message_attachments remaining
+			WHERE remaining.message_id = m.id AND remaining.asset_id <> $2
+		  )
+	`, BotMessageRoleAssistant, id); err != nil {
+		return false, err
+	}
 	if _, err = tx.Exec(ctx, `DELETE FROM bot_message_attachments WHERE asset_id = $1`, id); err != nil {
+		return false, err
+	}
+	// Keep the conversation ordering metadata accurate after removing a
+	// generated reply. The asset still exists at this point, so its original
+	// conversation can be used safely; NULL conversation assets need no update.
+	if _, err = tx.Exec(ctx, `
+		UPDATE bot_conversations c
+		SET last_message_at = (
+			SELECT MAX(m.created_at) FROM bot_messages m WHERE m.conversation_id = c.id
+		)
+		WHERE c.id = (
+			SELECT conversation_id FROM omnichat_media_assets WHERE id = $1
+		)
+	`, id); err != nil {
 		return false, err
 	}
 	tag, err := tx.Exec(ctx, `DELETE FROM omnichat_media_assets WHERE id = $1 AND owner_user_id = $2`, id, ownerUserID)
@@ -757,10 +885,14 @@ func (r *OmniChatMediaRepository) SetConversationSceneOwned(ctx context.Context,
 
 func (r *OmniChatMediaRepository) GetConversationSceneOwned(ctx context.Context, conversationID, ownerUserID int) (*OmniChatSceneState, error) {
 	var sceneJSON []byte
+	var continuityJSON []byte
 	err := r.pool.QueryRow(ctx, `
-		SELECT scene_state FROM bot_conversations
-		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
-	`, conversationID, ownerUserID).Scan(&sceneJSON)
+		SELECT c.scene_state, COALESCE(s.state, '{}'::jsonb)
+		FROM bot_conversations c
+		LEFT JOIN omnichat_conversation_scene_states s
+			ON s.conversation_id = c.id AND s.owner_user_id = c.user_id
+		WHERE c.id = $1 AND c.user_id = $2 AND c.archived_at IS NULL
+	`, conversationID, ownerUserID).Scan(&sceneJSON, &continuityJSON)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -771,7 +903,82 @@ func (r *OmniChatMediaRepository) GetConversationSceneOwned(ctx context.Context,
 	if err := json.Unmarshal(sceneJSON, scene); err != nil {
 		return nil, err
 	}
+	if len(continuityJSON) > 0 && string(continuityJSON) != "{}" {
+		var continuity OmniChatConversationSceneState
+		if err := json.Unmarshal(continuityJSON, &continuity); err == nil {
+			mergeConversationContinuityIntoMediaScene(scene, continuity)
+		}
+	}
 	return scene, nil
+}
+
+// mergeConversationContinuityIntoMediaScene bridges the newer server-owned
+// scene-state record into the provider-neutral media scene contract. Legacy
+// per-conversation scene fields remain authoritative when present; continuity
+// fills only missing visual facts so older callers and dedicated Create-page
+// requests remain backwards compatible.
+func mergeConversationContinuityIntoMediaScene(scene *OmniChatSceneState, continuity OmniChatConversationSceneState) {
+	if scene == nil {
+		return
+	}
+	fill := func(target *string, values ...string) {
+		if *target != "" {
+			return
+		}
+		for _, value := range values {
+			if strings.TrimSpace(value) != "" {
+				*target = value
+				return
+			}
+		}
+	}
+	// A physical room description beats a bare place name: an image model can
+	// draw "stone walls, iron rings, a single caged bulb" but not "dungeon".
+	fill(&scene.Location, continuity.Setting.Description, continuity.Setting.Place, continuity.Location)
+	fill(&scene.Activity, continuity.Event.Action)
+	fill(&scene.TimeOfDay, continuity.Setting.TimeOfDay)
+	fill(&scene.Lighting, continuity.Setting.Lighting)
+	fill(&scene.Pose, continuity.Staging.PersonaPose)
+	fill(&scene.Expression, continuity.Staging.PersonaExpression)
+	fill(&scene.Mood, continuity.Staging.Mood)
+	fill(&scene.CameraDirection, continuity.Staging.Proximity)
+
+	persona := continuity.actor(OmniChatSceneActorPersona)
+	if persona != nil {
+		// Outfit must stay clothing-only. Appending body state to it produced
+		// "black latex bodysuit with red lace trim; standing in front of the bed
+		// with dirty blonde hair", which is not something a renderer can dress
+		// a character in and wastes a scarce prompt-token budget.
+		fill(&scene.Outfit, persona.Appearance.Outfit)
+		fill(&scene.Pose, persona.Appearance.BodyState)
+		if len(scene.Accessories) == 0 {
+			scene.Accessories = append(scene.Accessories, persona.Appearance.Accessories...)
+		}
+	}
+
+	// The shot is from the user's point of view, so their tracked position is a
+	// camera fact even when their body is not in frame.
+	if viewer := continuity.actor(OmniChatSceneActorUser); viewer != nil {
+		fill(&scene.ViewerPosition, viewer.Appearance.BodyState)
+	}
+
+	if len(scene.OtherCharacters) == 0 {
+		for _, actor := range continuity.Actors {
+			if actor.Kind == OmniChatSceneActorNPC && actor.Label != "" {
+				scene.OtherCharacters = append(scene.OtherCharacters, actor.Label)
+			}
+		}
+	}
+	scene.IncludeUserBody = continuity.UserBodyIsVisible()
+}
+
+func (s OmniChatConversationSceneState) actor(kind OmniChatSceneActorKind) *OmniChatSceneActor {
+	for index := range s.Actors {
+		if s.Actors[index].Kind == kind {
+			return &s.Actors[index]
+		}
+	}
+	return nil
 }
 
 // GetRecentConversationEventsOwned returns a compact chronological transcript

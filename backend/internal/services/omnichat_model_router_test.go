@@ -185,6 +185,21 @@ func TestConfiguredTieredRouterUsesPinnedFallbackAfterBoundedPrimaryFailure(t *t
 	require.Equal(t, 1, fallback.calls)
 }
 
+func TestConfiguredTieredRouterDoesNotFallbackOnProviderAccessDenial(t *testing.T) {
+	primary := &modelRouterCompletionFake{name: "primary", err: openrouter.ErrAccessDenied}
+	firstFallback := &modelRouterCompletionFake{name: "first-fallback"}
+	secondFallback := &modelRouterCompletionFake{name: "second-fallback"}
+	nestedFallback := &fallbackChatCompletionClient{primary: firstFallback, fallback: secondFallback}
+	client := &fallbackChatCompletionClient{primary: primary, fallback: nestedFallback}
+
+	_, err := client.Generate(context.Background(), []openrouter.Message{{Role: openrouter.RoleUser, Content: "hello"}}, nil)
+
+	require.ErrorIs(t, err, openrouter.ErrAccessDenied)
+	require.Equal(t, 1, primary.calls)
+	require.Zero(t, firstFallback.calls)
+	require.Zero(t, secondFallback.calls)
+}
+
 func TestProfileClientOverridesProviderControlsWithServerOwnedProfile(t *testing.T) {
 	upstream := &modelRouterOptionsFake{}
 	profile, ok := FindOmniChatModelProfile(OmniChatModelProfileUltraFast)
@@ -246,6 +261,61 @@ func TestConfiguredProfileRoutesUseTheActualProviderForExecutionControls(t *test
 	require.Empty(t, upstream.options.Speed)
 }
 
+func TestConfiguredProfiledRouterUsesStandardFallbackWhenPrimaryIsBlank(t *testing.T) {
+	router := NewConfiguredProfiledOmniChatModelRouter(
+		&modelRouterPlanReaderFake{plan: "free"},
+		&modelRouterPreferenceReaderFake{},
+		"test-key",
+		map[OmniChatModelProfileKey]string{OmniChatModelProfileStandard: ""},
+		"mistralai/mistral-small-2506",
+	)
+
+	client, resolvedKey := router.clientForProfile(OmniChatModelProfileStandard)
+	profiled, ok := client.(*profileChatCompletionClient)
+
+	require.NotNil(t, client)
+	require.True(t, ok)
+	require.Equal(t, OmniChatModelProfileStandard, resolvedKey)
+	require.Equal(t, "mistralai/mistral-small-2506", profiled.profile.ModelKey)
+}
+
+func TestValidateConfiguredOmniChatModelRoutesFailsClosedForInvalidDeploymentInput(t *testing.T) {
+	require.NoError(t, ValidateConfiguredOmniChatModelRoutes(
+		map[OmniChatModelProfileKey]string{OmniChatModelProfileStandard: ""},
+		"mistralai/mistral-small-2506",
+	))
+	require.Error(t, ValidateConfiguredOmniChatModelRoutes(
+		map[OmniChatModelProfileKey]string{OmniChatModelProfileStandard: "not a route"},
+		"mistralai/mistral-small-2506",
+	))
+	require.Error(t, ValidateConfiguredOmniChatModelRoutes(
+		map[OmniChatModelProfileKey]string{OmniChatModelProfileStandard: "google/gemini-3.1-flash-lite"},
+		"bad route",
+	))
+	require.Error(t, ValidateConfiguredOmniChatModelRoutes(
+		map[OmniChatModelProfileKey]string{OmniChatModelProfileKey("unknown"): "vendor/model"},
+		"mistralai/mistral-small-2506",
+	))
+	require.Error(t, ValidateConfiguredOmniChatModelRoutes(
+		map[OmniChatModelProfileKey]string{OmniChatModelProfileStandard: ""},
+		"",
+	))
+}
+
+func TestResolveConfiguredOmniChatModelRoutesUsesEffectiveFallbackChain(t *testing.T) {
+	routes, err := ResolveConfiguredOmniChatModelRoutes(map[OmniChatModelProfileKey]string{
+		OmniChatModelProfileStandard:     "",
+		OmniChatModelProfilePlus:         "",
+		OmniChatModelProfilePremiumQuick: "configured/quick",
+	}, "configured/standard-fallback")
+
+	require.NoError(t, err)
+	require.Equal(t, "configured/standard-fallback", routes[OmniChatModelProfileStandard])
+	require.Equal(t, "configured/standard-fallback", routes[OmniChatModelProfilePlus])
+	require.Equal(t, "configured/quick", routes[OmniChatModelProfilePremiumQuick])
+	require.Equal(t, "configured/quick", routes[OmniChatModelProfilePremiumDeep], "an omitted paid profile should inherit only its configured fallback")
+}
+
 func TestProfiledRouterFallsBackWithFallbackProfilesOwnControls(t *testing.T) {
 	ultra := &modelRouterOptionsFake{modelRouterCompletionFake: modelRouterCompletionFake{err: errors.New("fast preview unavailable")}}
 	deep := &modelRouterOptionsFake{}
@@ -271,6 +341,33 @@ func TestProfiledRouterFallsBackWithFallbackProfilesOwnControls(t *testing.T) {
 	require.Equal(t, 1, deep.calls)
 	require.Empty(t, deep.options.Speed)
 	require.Equal(t, "high", deep.options.ReasoningEffort)
+}
+
+func TestGenerateWithOptionalOptionsRejectsStructuredOutputWithoutOptionsClient(t *testing.T) {
+	client := &modelRouterCompletionFake{}
+
+	_, err := generateWithOptionalOptions(
+		context.Background(), client, nil, nil,
+		openrouter.GenerationOptions{ResponseFormat: "json_object"}, true,
+	)
+
+	require.ErrorIs(t, err, ErrGenerationOptionsUnsupported)
+	require.Zero(t, client.calls)
+}
+
+func TestFallbackRouterDoesNotDowngradeStructuredOutputOnUnsupportedPrimary(t *testing.T) {
+	primary := &modelRouterCompletionFake{}
+	fallback := &modelRouterCompletionFake{}
+	client := &fallbackChatCompletionClient{primary: primary, fallback: fallback}
+
+	_, err := client.GenerateWithOptions(
+		context.Background(), nil, nil,
+		openrouter.GenerationOptions{ResponseFormat: "json_object"},
+	)
+
+	require.ErrorIs(t, err, ErrGenerationOptionsUnsupported)
+	require.Zero(t, primary.calls)
+	require.Zero(t, fallback.calls)
 }
 
 func TestProfiledRouterResolvesStoredCreditProfileForMeteredExecution(t *testing.T) {

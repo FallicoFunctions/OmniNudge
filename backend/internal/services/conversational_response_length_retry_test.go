@@ -38,6 +38,12 @@ func TestClassifyPersonalDraftSourceUsesOnePrivacySafeBucket(t *testing.T) {
 			response: fixedWordSentence("First", 12) + "\n\n" + fixedWordSentence("Second", 12),
 			expected: personalDraftSourceShapeValid,
 		},
+		{
+			name: "valid dialogue envelope",
+			response: `{"paragraphs":["I understand what you mean, and I will answer directly without inventing anything you did not actually say.",` +
+				`"We can keep this grounded and continue from the facts you established instead of turning it into another speech."]}`,
+			expected: personalDraftSourceValidDialogueEnvelope,
+		},
 		{name: "under 24", response: fixedWordSentence("Short", 23), expected: personalDraftSourceUnder24},
 		{
 			name:     "repairable partition",
@@ -103,7 +109,7 @@ func TestRepairPersonalConversationDraftPreservesThreeMediumBlocksAndShortFinal(
 func TestLengthOnlyFailureUsesEarlyStrictDialogueJSONRetry(t *testing.T) {
 	ctx, diagnostics := withPersonalDraftDiagnostics(context.Background())
 	calls := 0
-	client := stubChatCompletionClient{generate: func(attemptCtx context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+	client := &optionsAwareSequenceChatCompletionClient{generate: func(attemptCtx context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
 		calls++
 		if calls == 1 {
 			return "Too short.", nil
@@ -132,11 +138,49 @@ func TestLengthOnlyFailureUsesEarlyStrictDialogueJSONRetry(t *testing.T) {
 
 	counters := diagnostics.snapshot()
 	require.Equal(t, 1, counters.RawSources.Under24Words)
-	require.Equal(t, 1, counters.RawSources.ShapeValid)
+	require.Equal(t, 1, counters.RawSources.ValidDialogueEnvelope)
 	require.Equal(t, 1, counters.TerminalTransitions.RetryContract)
 	require.Equal(t, 1, counters.TerminalTransitions.AcceptedDialogueOnly)
 	require.Equal(t, 2, counters.RawSources.total())
 	require.Equal(t, 2, counters.TerminalTransitions.total())
+}
+
+type responseFormatRecordingClient struct {
+	calls   int
+	options []openrouter.GenerationOptions
+}
+
+func (c *responseFormatRecordingClient) Generate(context.Context, []openrouter.Message, openrouter.StreamCallback) (string, error) {
+	return "", fmt.Errorf("unbounded generation should not be used")
+}
+
+func (c *responseFormatRecordingClient) GenerateWithOptions(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback, options openrouter.GenerationOptions) (string, error) {
+	c.calls++
+	c.options = append(c.options, options)
+	if c.calls == 1 {
+		return "Too short.", nil
+	}
+	if len(messages) == 0 || !strings.Contains(messages[0].Content, "[Personal Length-Only Recovery]") {
+		return "", fmt.Errorf("length recovery prompt was not selected")
+	}
+	return `{"paragraphs":["I understand what you mean, and I will answer directly without inventing anything you did not actually say.","We can keep this grounded and continue from the facts you established instead of turning it into another speech."]}`, nil
+}
+
+func TestStrictRecoveryRequestsProviderJSONMode(t *testing.T) {
+	client := &responseFormatRecordingClient{}
+	response, err := generatePersonaCompletionWithClient(
+		context.Background(),
+		client,
+		&models.BotPersona{ID: 1, ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue},
+		[]openrouter.Message{{Role: openrouter.RoleSystem, Content: "system"}},
+		nil,
+	)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, response)
+	require.Len(t, client.options, 2)
+	require.Equal(t, "", client.options[0].ResponseFormat)
+	require.Equal(t, "json_object", client.options[1].ResponseFormat)
 }
 
 func TestLengthRetryIsNotUsedWhenDraftHasAnyOtherContractFailure(t *testing.T) {
@@ -148,7 +192,7 @@ func TestLengthRetryIsNotUsedWhenDraftHasAnyOtherContractFailure(t *testing.T) {
 		{name: "ownership", draft: "Your turn, use my leg. My turn now, so I will use your leg."},
 		{name: "question budget", draft: "Are you sure? Do you want to continue?"},
 		{name: "formatting", draft: `"This quoted reply is much too short to satisfy the contract."`},
-		{name: "other semantics", draft: "You absolute. This reply is still much too short to satisfy the contract."},
+		{name: "other semantics", draft: "You absolute . This reply is still much too short to satisfy the contract."},
 	}
 
 	for _, test := range tests {
@@ -174,6 +218,24 @@ func TestLengthRetryIsNotUsedWhenDraftHasAnyOtherContractFailure(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, 2, calls)
+		})
+	}
+}
+
+func TestLengthOnlyRetryCoversEveryPureLengthBucket(t *testing.T) {
+	tests := []struct {
+		name  string
+		draft string
+	}{
+		{name: "under 24", draft: fixedWordSentence("Short", 23)},
+		{name: "unpartitionable 24 to 60", draft: fixedWordSentence("Only", 40)},
+		{name: "unpartitionable 61 to 100", draft: fixedWordSentence("Only", 61)},
+		{name: "over 100", draft: fixedWordSentence("Only", 101)},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.True(t, isLengthOnlyPersonalDraft(test.draft))
 		})
 	}
 }
@@ -209,7 +271,7 @@ func TestStrictPersonalDialogueJSONFailsClosed(t *testing.T) {
 
 func TestMalformedEarlyLengthRecoveryReturnsToGenericRetryPath(t *testing.T) {
 	calls := 0
-	client := stubChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+	client := &optionsAwareSequenceChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
 		calls++
 		switch calls {
 		case 1:

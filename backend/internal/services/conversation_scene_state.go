@@ -18,10 +18,14 @@ import (
 )
 
 const (
-	conversationSceneExtractionTimeout  = 3 * time.Second
+	// The extractor now returns setting, staging, and per-actor appearance in
+	// addition to continuity facts. Three seconds truncated that reliably,
+	// which silently dropped every visual field back to the conservative delta.
+	conversationSceneExtractionTimeout  = 15 * time.Second
 	conversationSceneMaxMessageRunes    = 4000
 	conversationSceneMaxTranscriptRunes = 12000
 	conversationSceneMaxTextRunes       = 256
+	conversationSceneMaxAccessories     = 8
 )
 
 var ErrConversationSceneStateUnavailable = errors.New("conversation scene state is unavailable")
@@ -78,10 +82,11 @@ func (c *ConversationSceneStateCoordinator) PrepareForGeneration(
 	if ownerUserID < 1 || conversationID < 1 || persona == nil || len(history) == 0 {
 		return nil, errors.New("conversation scene state: owned conversation, persona, and history are required")
 	}
-	throughMessageID := history[len(history)-1].ID
-	if throughMessageID < 1 {
+	lastMessage := history[len(history)-1]
+	if lastMessage == nil || lastMessage.ID < 1 {
 		return nil, errors.New("conversation scene state: history message IDs are required")
 	}
+	throughMessageID := lastMessage.ID
 	checkpoint, err := c.store.GetLatestCheckpointAtOrBeforeOwned(ctx, ownerUserID, conversationID, throughMessageID)
 	if err != nil {
 		return nil, fmt.Errorf("conversation scene state: load checkpoint: %w", err)
@@ -92,10 +97,21 @@ func (c *ConversationSceneStateCoordinator) PrepareForGeneration(
 		if err := checkpoint.Validate(); err != nil {
 			return nil, fmt.Errorf("conversation scene state: stored checkpoint invalid: %w", err)
 		}
-		base = *checkpoint
-		checkpointMessageID = checkpoint.CheckpointMessageID
-		if checkpointMessageID == throughMessageID {
-			return checkpoint, nil
+		if err := validateConversationSceneStateMode(checkpoint, persona); err != nil {
+			// A checkpoint produced for another conversation mode must never be
+			// reused for personal generation. Rebuild from the full bounded
+			// history so an NPC/system actor cannot poison every later reply.
+			zlog.Warn().
+				Err(err).
+				Int("conversation_id", conversationID).
+				Int("through_message_id", throughMessageID).
+				Msg("conversation scene state: rebuilding incompatible checkpoint")
+		} else {
+			base = *checkpoint
+			checkpointMessageID = checkpoint.CheckpointMessageID
+			if checkpointMessageID == throughMessageID {
+				return checkpoint, nil
+			}
 		}
 	}
 
@@ -133,7 +149,7 @@ func (c *ConversationSceneStateCoordinator) PrepareForGeneration(
 	next.Revision = base.Revision
 	next.CheckpointMessageID = 0
 	normalizeConversationSceneState(&next, persona)
-	if err := next.Validate(); err != nil {
+	if err := validateConversationSceneState(next, persona); err != nil {
 		zlog.Warn().
 			Err(err).
 			Int("conversation_id", conversationID).
@@ -145,13 +161,30 @@ func (c *ConversationSceneStateCoordinator) PrepareForGeneration(
 		next.Revision = base.Revision
 		next.CheckpointMessageID = 0
 		normalizeConversationSceneState(&next, persona)
-		if fallbackErr := next.Validate(); fallbackErr != nil {
+		if fallbackErr := validateConversationSceneState(next, persona); fallbackErr != nil {
 			return nil, fmt.Errorf("conversation scene state: conservative state invalid: %w", fallbackErr)
 		}
 	}
 	stored, err := c.store.UpsertOwned(ctx, next)
 	if err != nil {
-		return nil, fmt.Errorf("conversation scene state: persist state: %w", err)
+		if !errors.Is(err, models.ErrOmniChatSceneStateConflict) {
+			return nil, fmt.Errorf("conversation scene state: persist state: %w", err)
+		}
+		// Regeneration reconstructs a historical branch while the current
+		// conversation row may already contain a newer revision. Preserve the
+		// branch as a checkpoint without overwriting that newer current state.
+		zlog.Warn().
+			Int("conversation_id", conversationID).
+			Int("through_message_id", throughMessageID).
+			Msg("conversation scene state: preserving historical branch after revision conflict")
+		if next.Revision < 1 {
+			// Checkpoint source_revision is database-constrained to be positive.
+			// A regeneration branch can legitimately have no prior checkpoint,
+			// so give that immutable branch its own first revision rather than
+			// attempting to insert source_revision=0.
+			next.Revision = 1
+		}
+		stored = &next
 	}
 	if err := c.store.SaveCheckpointOwned(ctx, *stored, throughMessageID); err != nil {
 		return nil, fmt.Errorf("conversation scene state: persist checkpoint: %w", err)
@@ -189,7 +222,16 @@ In personal mode, use only actor keys "user" and "persona". In roleplay mode, pr
 active_turn_actor is who may act next. event.subject and event.target must reference an actor key. status must be "proposed" or "completed".
 Keep location "unspecified" unless a location is explicit. Ownership subjects should be short concrete nouns such as "leg", "phone", or "coffee".
 Boundary facts use kind "consent" or "boundary" and value "allowed", "declined", or "required".
-Required keys: actors, active_turn_actor, event, status, location, ownership_facts, boundary_facts. Do not add keys.`
+
+This state is also the only source of visual truth for generated scene images, so track what the scene physically looks like.
+setting.place is the short name of the location. setting.description is the concrete physical room: surfaces, walls, furniture, fixtures, and objects the transcript established. Write what a camera would see, not narrative mood. setting.time_of_day and setting.lighting record explicit light sources and time.
+Each actor carries appearance.outfit (the specific garments currently worn, including how they fit when the transcript describes it, such as "black latex bodysuit, so tight her breasts strain against the fabric"), appearance.accessories (a list of short concrete nouns for non-clothing items in hand or on the body, such as "flogger", "headphones", "leather collar"), and appearance.body_state (visible physical condition such as "wrists bound behind her back", "barefoot", "kneeling on stone").
+The user's appearance.body_state must record where the user physically is, such as "lying back against the headboard of the bed", because generated images are shot from the user's point of view and their position decides what is in the foreground.
+Clothing, accessories, and body state persist across turns. Change them only when the transcript explicitly says they changed; removing a garment is a change, walking to another room is not.
+staging.persona_pose is the persona's posture at this instant. staging.persona_expression is her face. staging.mood is the emotional tone. staging.proximity is where she is relative to the user, such as "standing over the seated user" or "across the room".
+Leave any visual field as an empty string, or accessories as an empty list, when the transcript has not established it. Never invent a detail to fill a field.
+
+Required keys: actors, active_turn_actor, event, status, location, setting, staging, ownership_facts, boundary_facts. Each actor requires key, kind, label, and appearance. Do not add keys.`
 
 func (e *ModelConversationSceneStateExtractor) Extract(
 	ctx context.Context,
@@ -200,8 +242,12 @@ func (e *ModelConversationSceneStateExtractor) Extract(
 	if e == nil || e.client == nil {
 		return models.OmniChatConversationSceneState{}, errors.New("conversation scene state: extraction client is unavailable")
 	}
+	personaName := ""
+	if persona != nil {
+		personaName = strings.TrimSpace(persona.Name)
+	}
 	input := sceneExtractionInput{
-		PersonaName: strings.TrimSpace(persona.Name),
+		PersonaName: personaName,
 		Mode:        conversationSceneMode(persona),
 		PriorState:  prior,
 		Transcript:  buildSceneExtractionTranscript(messages),
@@ -216,7 +262,13 @@ func (e *ModelConversationSceneStateExtractor) Extract(
 	}
 	var response string
 	if optioned, ok := e.client.(generationOptionsClient); ok {
-		response, err = optioned.GenerateWithOptions(ctx, request, func(string) {}, openrouter.GenerationOptions{MaxTokens: 600})
+		// Scene state is consumed by a strict decoder and is never user-facing.
+		// Ask providers for their JSON object mode so prose/code-fence leakage
+		// fails closed less often while preserving the same bounded token budget.
+		response, err = optioned.GenerateWithOptions(ctx, request, func(string) {}, openrouter.GenerationOptions{
+			MaxTokens:      1400,
+			ResponseFormat: "json_object",
+		})
 	} else {
 		response, err = e.client.Generate(ctx, request, func(string) {})
 	}
@@ -244,12 +296,32 @@ func conversationSceneMode(persona *models.BotPersona) string {
 	return "roleplay"
 }
 
+func validateConversationSceneStateMode(state *models.OmniChatConversationSceneState, persona *models.BotPersona) error {
+	if state == nil || !personaUsesPersonalConversationMode(persona) {
+		return nil
+	}
+	if !validPersonalResponseConstraintSceneState(state) {
+		return errors.New("conversation scene state: personal mode requires exactly user and persona actors")
+	}
+	return nil
+}
+
+func validateConversationSceneState(state models.OmniChatConversationSceneState, persona *models.BotPersona) error {
+	if err := state.Validate(); err != nil {
+		return err
+	}
+	return validateConversationSceneStateMode(&state, persona)
+}
+
 func buildSceneExtractionTranscript(messages []*models.BotMessage) []sceneExtractionTranscriptMessage {
 	reversed := make([]sceneExtractionTranscriptMessage, 0, len(messages))
 	remaining := conversationSceneMaxTranscriptRunes
 	for index := len(messages) - 1; index >= 0 && remaining > 0; index-- {
 		message := messages[index]
 		if message == nil {
+			continue
+		}
+		if message.Role != models.BotMessageRoleUser && message.Role != models.BotMessageRoleAssistant {
 			continue
 		}
 		maximum := min(conversationSceneMaxMessageRunes, remaining)
@@ -327,7 +399,16 @@ func normalizeConversationSceneState(state *models.OmniChatConversationSceneStat
 	for index := range state.Actors {
 		state.Actors[index].Key = normalizeSceneStateText(state.Actors[index].Key)
 		state.Actors[index].Label = normalizeSceneStateText(state.Actors[index].Label)
+		normalizeSceneAppearance(&state.Actors[index].Appearance)
 	}
+	state.Setting.Place = normalizeSceneStateText(state.Setting.Place)
+	state.Setting.Description = normalizeSceneStateText(state.Setting.Description)
+	state.Setting.TimeOfDay = normalizeSceneStateText(state.Setting.TimeOfDay)
+	state.Setting.Lighting = normalizeSceneStateText(state.Setting.Lighting)
+	state.Staging.PersonaPose = normalizeSceneStateText(state.Staging.PersonaPose)
+	state.Staging.PersonaExpression = normalizeSceneStateText(state.Staging.PersonaExpression)
+	state.Staging.Mood = normalizeSceneStateText(state.Staging.Mood)
+	state.Staging.Proximity = normalizeSceneStateText(state.Staging.Proximity)
 	state.ActiveTurnActor = normalizeSceneStateText(state.ActiveTurnActor)
 	state.Event.Subject = normalizeSceneStateText(state.Event.Subject)
 	state.Event.Action = normalizeSceneStateText(state.Event.Action)
@@ -347,6 +428,29 @@ func normalizeConversationSceneState(state *models.OmniChatConversationSceneStat
 		fallback := newConservativeConversationSceneState(state.OwnerUserID, state.ConversationID, persona)
 		state.Actors = fallback.Actors
 	}
+}
+
+// normalizeSceneAppearance bounds appearance text and drops empty or excess
+// accessories. An over-long accessory list is truncated rather than rejected so
+// one greedy extraction does not discard an otherwise good scene update.
+func normalizeSceneAppearance(appearance *models.OmniChatSceneAppearance) {
+	if appearance == nil {
+		return
+	}
+	appearance.Outfit = normalizeSceneStateText(appearance.Outfit)
+	appearance.BodyState = normalizeSceneStateText(appearance.BodyState)
+	accessories := make([]string, 0, len(appearance.Accessories))
+	for _, accessory := range appearance.Accessories {
+		accessory = normalizeSceneStateText(accessory)
+		if accessory == "" {
+			continue
+		}
+		accessories = append(accessories, accessory)
+		if len(accessories) == conversationSceneMaxAccessories {
+			break
+		}
+	}
+	appearance.Accessories = accessories
 }
 
 func normalizeSceneStateText(value string) string {

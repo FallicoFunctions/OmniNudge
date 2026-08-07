@@ -181,10 +181,12 @@ func OmniChatRateLimiter(cache services.Cache) *RedisRateLimiter {
 }
 
 // OmniChatMediaGenerationRateLimiter isolates costly image/video jobs from
-// ordinary character messages so one activity cannot unexpectedly lock out the
-// other while still enforcing a distributed provider-cost boundary.
+// ordinary character messages. Each authenticated user gets one generation
+// request per rolling minute. The versioned key intentionally leaves behind
+// stale hourly counters from the previous policy without letting them block a
+// fresh request after the policy change.
 func OmniChatMediaGenerationRateLimiter(cache services.Cache) *RedisRateLimiter {
-	return NewRedisRateLimiter(cache, 10, time.Hour, "rate:omnichat_media").FailClosed()
+	return NewRedisRateLimiter(cache, 1, time.Minute, "rate:omnichat_media_v2").FailClosed()
 }
 
 func OmniChatSocialRateLimiter(cache services.Cache) *RedisRateLimiter {

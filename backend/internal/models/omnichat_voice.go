@@ -12,21 +12,19 @@ import (
 )
 
 type OmniChatPersonaVoice struct {
-	PersonaID          int       `json:"persona_id"`
-	Provider           string    `json:"provider"`
-	VoiceID            string    `json:"voice_id"`
-	VoiceName          string    `json:"voice_name"`
-	ModelID            string    `json:"model_id"`
-	Stability          float32   `json:"stability"`
-	SimilarityBoost    float32   `json:"similarity_boost"`
-	Style              float32   `json:"style"`
-	Speed              float32   `json:"speed"`
-	Pitch              float32   `json:"pitch"`
-	LanguageCode       *string   `json:"language_code,omitempty"`
-	LiveVideoReplicaID *string   `json:"live_video_replica_id,omitempty"`
-	LiveVideoPersonaID *string   `json:"live_video_persona_id,omitempty"`
-	Active             bool      `json:"active"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	PersonaID       int       `json:"persona_id"`
+	Provider        string    `json:"provider"`
+	VoiceID         string    `json:"voice_id"`
+	VoiceName       string    `json:"voice_name"`
+	ModelID         string    `json:"model_id"`
+	Stability       float32   `json:"stability"`
+	SimilarityBoost float32   `json:"similarity_boost"`
+	Style           float32   `json:"style"`
+	Speed           float32   `json:"speed"`
+	Pitch           float32   `json:"pitch"`
+	LanguageCode    *string   `json:"language_code,omitempty"`
+	Active          bool      `json:"active"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type OmniChatSpeechSource struct {
@@ -53,25 +51,27 @@ type OmniChatSpeechAudio struct {
 }
 
 type OmniChatCallSession struct {
-	ID               uuid.UUID  `json:"id"`
-	UserID           int        `json:"user_id"`
-	PersonaID        int        `json:"persona_id"`
-	ConversationID   int        `json:"conversation_id"`
-	Mode             string     `json:"mode"`
-	Status           string     `json:"status"`
-	RecordingEnabled bool       `json:"recording_enabled"`
-	TurnCount        int        `json:"turn_count"`
-	StartedAt        time.Time  `json:"started_at"`
-	LastActivityAt   time.Time  `json:"last_activity_at"`
-	EndedAt          *time.Time `json:"ended_at,omitempty"`
-	LiveVideoURL     string     `json:"live_video_url,omitempty"`
+	ID                       uuid.UUID  `json:"id"`
+	UserID                   int        `json:"user_id"`
+	PersonaID                int        `json:"persona_id"`
+	ConversationID           int        `json:"conversation_id"`
+	Mode                     string     `json:"mode"`
+	Status                   string     `json:"status"`
+	RecordingEnabled         bool       `json:"recording_enabled"`
+	TurnCount                int        `json:"turn_count"`
+	StartedAt                time.Time  `json:"started_at"`
+	LastActivityAt           time.Time  `json:"last_activity_at"`
+	EndedAt                  *time.Time `json:"ended_at,omitempty"`
+	LiveVideoURL             string     `json:"live_video_url,omitempty"`
+	LiveVideoToken           string     `json:"live_video_token,omitempty"`
+	LiveVideoRoom            string     `json:"live_video_room,omitempty"`
+	LiveVideoTokenTTLSeconds int        `json:"live_video_token_ttl_seconds,omitempty"`
 }
 
 type OmniChatLiveCallContext struct {
-	PersonaName        string
-	Context            string
-	LiveVideoReplicaID string
-	LiveVideoPersonaID string
+	PersonaName string
+	AvatarURL   *string
+	Context     string
 }
 
 type OmniChatCallProviderSession struct {
@@ -154,7 +154,7 @@ func (r *OmniChatVoiceRepository) ListPersonaVoices(ctx context.Context) ([]*Omn
 	}
 
 	voiceRows, err := r.pool.Query(ctx, `
-		SELECT persona_id,provider,voice_id,voice_name,model_id,stability,similarity_boost,style,speed,pitch,language_code,live_video_replica_id,live_video_persona_id,active,updated_at
+		SELECT persona_id,provider,voice_id,voice_name,model_id,stability,similarity_boost,style,speed,pitch,language_code,active,updated_at
 		FROM omnichat_persona_voices
 		WHERE persona_id = ANY($1) AND active=TRUE
 	`, ids)
@@ -169,7 +169,7 @@ func (r *OmniChatVoiceRepository) ListPersonaVoices(ctx context.Context) ([]*Omn
 		if err := voiceRows.Scan(
 			&voice.PersonaID, &voice.Provider, &voice.VoiceID, &voice.VoiceName, &voice.ModelID,
 			&voice.Stability, &voice.SimilarityBoost, &voice.Style, &voice.Speed, &voice.Pitch,
-			&voice.LanguageCode, &voice.LiveVideoReplicaID, &voice.LiveVideoPersonaID,
+			&voice.LanguageCode,
 			&voice.Active, &voice.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -196,9 +196,9 @@ func (r *OmniChatVoiceRepository) ListPersonaVoices(ctx context.Context) ([]*Omn
 func (r *OmniChatVoiceRepository) GetPersonaVoice(ctx context.Context, personaID int) (*OmniChatPersonaVoice, error) {
 	voice := &OmniChatPersonaVoice{PersonaID: personaID}
 	err := r.pool.QueryRow(ctx, `
-		SELECT provider,voice_id,voice_name,model_id,stability,similarity_boost,style,speed,pitch,language_code,live_video_replica_id,live_video_persona_id,active,updated_at
+		SELECT provider,voice_id,voice_name,model_id,stability,similarity_boost,style,speed,pitch,language_code,active,updated_at
 		FROM omnichat_persona_voices WHERE persona_id=$1 AND active=TRUE
-	`, personaID).Scan(&voice.Provider, &voice.VoiceID, &voice.VoiceName, &voice.ModelID, &voice.Stability, &voice.SimilarityBoost, &voice.Style, &voice.Speed, &voice.Pitch, &voice.LanguageCode, &voice.LiveVideoReplicaID, &voice.LiveVideoPersonaID, &voice.Active, &voice.UpdatedAt)
+	`, personaID).Scan(&voice.Provider, &voice.VoiceID, &voice.VoiceName, &voice.ModelID, &voice.Stability, &voice.SimilarityBoost, &voice.Style, &voice.Speed, &voice.Pitch, &voice.LanguageCode, &voice.Active, &voice.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		var updatedAt time.Time
 		checkErr := r.pool.QueryRow(ctx, `SELECT updated_at FROM bot_personas WHERE id=$1 AND is_active=TRUE`, personaID).Scan(&updatedAt)
@@ -237,15 +237,11 @@ func (r *OmniChatVoiceRepository) GetPersonaVoiceAccessible(ctx context.Context,
 
 func (r *OmniChatVoiceRepository) UpsertPersonaVoiceAuthorized(ctx context.Context, userID int, voice *OmniChatPersonaVoice) (bool, error) {
 	tag, err := r.pool.Exec(ctx, `
-		INSERT INTO omnichat_persona_voices(persona_id,provider,voice_id,voice_name,model_id,stability,similarity_boost,style,speed,pitch,language_code,live_video_replica_id,live_video_persona_id,configured_by,active)
-		SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,TRUE FROM bot_personas p JOIN users u ON u.id=$14
-		WHERE p.id=$1 AND (p.owner_user_id=$14 OR u.role IN ('admin','moderator'))
-		  -- Provider-account live avatar IDs are operator-managed secrets. A
-		  -- character owner may not bind arbitrary IDs from OmniChat's shared
-		  -- Tavus account; only a moderator can provision those fields.
-		  AND (u.role IN ('admin','moderator') OR ($12::varchar IS NULL AND $13::varchar IS NULL))
-		ON CONFLICT(persona_id) DO UPDATE SET provider=EXCLUDED.provider,voice_id=EXCLUDED.voice_id,voice_name=EXCLUDED.voice_name,model_id=EXCLUDED.model_id,stability=EXCLUDED.stability,similarity_boost=EXCLUDED.similarity_boost,style=EXCLUDED.style,speed=EXCLUDED.speed,pitch=EXCLUDED.pitch,language_code=EXCLUDED.language_code,live_video_replica_id=EXCLUDED.live_video_replica_id,live_video_persona_id=EXCLUDED.live_video_persona_id,configured_by=EXCLUDED.configured_by,active=TRUE,updated_at=NOW()
-	`, voice.PersonaID, voice.Provider, voice.VoiceID, voice.VoiceName, voice.ModelID, voice.Stability, voice.SimilarityBoost, voice.Style, voice.Speed, voice.Pitch, voice.LanguageCode, voice.LiveVideoReplicaID, voice.LiveVideoPersonaID, userID)
+		INSERT INTO omnichat_persona_voices(persona_id,provider,voice_id,voice_name,model_id,stability,similarity_boost,style,speed,pitch,language_code,configured_by,active)
+		SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,TRUE FROM bot_personas p JOIN users u ON u.id=$12
+		WHERE p.id=$1 AND (p.owner_user_id=$12 OR u.role IN ('admin','moderator'))
+		ON CONFLICT(persona_id) DO UPDATE SET provider=EXCLUDED.provider,voice_id=EXCLUDED.voice_id,voice_name=EXCLUDED.voice_name,model_id=EXCLUDED.model_id,stability=EXCLUDED.stability,similarity_boost=EXCLUDED.similarity_boost,style=EXCLUDED.style,speed=EXCLUDED.speed,pitch=EXCLUDED.pitch,language_code=EXCLUDED.language_code,configured_by=EXCLUDED.configured_by,active=TRUE,updated_at=NOW()
+	`, voice.PersonaID, voice.Provider, voice.VoiceID, voice.VoiceName, voice.ModelID, voice.Stability, voice.SimilarityBoost, voice.Style, voice.Speed, voice.Pitch, voice.LanguageCode, userID)
 	return tag.RowsAffected() > 0, err
 }
 
@@ -333,15 +329,11 @@ func (r *OmniChatVoiceRepository) GetLiveCallContextOwned(ctx context.Context, u
 	result := &OmniChatLiveCallContext{}
 	var systemPrompt string
 	err := r.pool.QueryRow(ctx, `
-		SELECT p.name,LEFT(p.system_prompt,8000),
-		       CASE WHEN configurator.role IN ('admin','moderator') THEN COALESCE(v.live_video_replica_id,'') ELSE '' END,
-		       CASE WHEN configurator.role IN ('admin','moderator') THEN COALESCE(v.live_video_persona_id,'') ELSE '' END
+		SELECT p.name,p.avatar_url,LEFT(p.system_prompt,8000)
 		FROM bot_conversations c JOIN bot_personas p ON p.id=c.persona_id
-		LEFT JOIN omnichat_persona_voices v ON v.persona_id=p.id AND v.active=TRUE
-		LEFT JOIN users configurator ON configurator.id=v.configured_by
 		WHERE c.id=$1 AND c.user_id=$2 AND c.archived_at IS NULL AND p.is_active=TRUE
 		  AND ((p.owner_user_id IS NULL AND p.visibility='public') OR p.owner_user_id=$2)
-	`, conversationID, userID).Scan(&result.PersonaName, &systemPrompt, &result.LiveVideoReplicaID, &result.LiveVideoPersonaID)
+	`, conversationID, userID).Scan(&result.PersonaName, &result.AvatarURL, &systemPrompt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

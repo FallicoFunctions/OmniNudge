@@ -11,7 +11,7 @@ import (
 	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
-	"github.com/omninudge/backend/internal/services/fal"
+	"github.com/omninudge/backend/internal/services/runpod"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,20 +32,20 @@ func (*cancelledGenerationStoreFake) UpdateGenerationProgress(context.Context, u
 func (*cancelledGenerationStoreFake) MarkGenerationJobFailed(context.Context, uuid.UUID, string, string) (bool, error) {
 	return true, nil
 }
-func (*cancelledGenerationStoreFake) CompleteGenerationJob(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, int64, int64) error {
+func (*cancelledGenerationStoreFake) CompleteGenerationJob(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, int64, int64, models.OmniChatGenerationProvenance) error {
 	return nil
 }
 
-type cancellableFalFake struct{ cancelCalls int }
+type cancellableRunPodFake struct{ cancelCalls int }
 
-func (*cancellableFalFake) Submit(context.Context, string, any) (string, error) { return "", nil }
-func (*cancellableFalFake) Status(context.Context, string, string) (*fal.QueueStatus, error) {
-	return &fal.QueueStatus{Status: fal.StatusInProgress}, nil
+func (*cancellableRunPodFake) Submit(context.Context, string, any) (string, error) { return "", nil }
+func (*cancellableRunPodFake) Status(context.Context, string, string) (*runpod.StatusResponse, error) {
+	return &runpod.StatusResponse{Status: runpod.StatusInProgress}, nil
 }
-func (*cancellableFalFake) Result(context.Context, string, string) (*fal.Result, error) {
+func (*cancellableRunPodFake) Result(context.Context, string, string) (*runpod.Result, error) {
 	return nil, nil
 }
-func (f *cancellableFalFake) Cancel(context.Context, string, string) error {
+func (f *cancellableRunPodFake) Cancel(context.Context, string, string) error {
 	f.cancelCalls++
 	return nil
 }
@@ -94,7 +94,7 @@ func (f *generationClaimStoreFake) MarkGenerationJobFailed(ctx context.Context, 
 	f.failureCtxErr = ctx.Err()
 	return f.markErr == nil, f.markErr
 }
-func (*generationClaimStoreFake) CompleteGenerationJob(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, int64, int64) error {
+func (*generationClaimStoreFake) CompleteGenerationJob(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, int64, int64, models.OmniChatGenerationProvenance) error {
 	return nil
 }
 
@@ -122,7 +122,7 @@ func TestResolveInputsRechecksPersonaAccessForJobOwner(t *testing.T) {
 	reader := &generationPersonaReaderFake{inaccessible: true}
 	handler := NewOmniChatGenerationHandler(
 		&generationClaimStoreFake{}, reader, &unusedGenerationStorageFake{}, nil,
-		&submittingFalFake{}, omniChatMediaTestConfig(), false,
+		&submittingRunPodFake{}, omniChatMediaTestConfig(), false,
 	)
 	job := &models.OmniChatGenerationJob{OwnerUserID: 29, PersonaID: 17}
 
@@ -133,6 +133,172 @@ func TestResolveInputsRechecksPersonaAccessForJobOwner(t *testing.T) {
 	require.Equal(t, "persona_not_found", permanent.code)
 	require.NotNil(t, reader.viewer)
 	require.Equal(t, 29, *reader.viewer)
+}
+
+func TestResolveInputsAcceptsConfiguredExternalPersonaMediaURL(t *testing.T) {
+	avatar := "https://app.example.test/omnichat/avatars/sadie.png"
+	reader := &generationPersonaReaderFake{persona: &models.BotPersona{AvatarURL: &avatar}}
+	cfg := omniChatMediaTestConfig()
+	cfg.RunPodWorkerBackendURL = "https://app.example.test"
+	handler := NewOmniChatGenerationHandler(
+		&generationClaimStoreFake{}, reader, &unusedGenerationStorageFake{}, nil,
+		&submittingRunPodFake{}, cfg, false,
+	)
+
+	references, _, err := handler.resolveInputs(context.Background(), &models.OmniChatGenerationJob{OwnerUserID: 29, PersonaID: 17})
+	require.NoError(t, err)
+	require.Equal(t, []string{avatar}, references)
+}
+
+type generationMediaReferenceFake struct {
+	media *models.MediaFile
+}
+
+func (f *generationMediaReferenceFake) GetByPublicURL(context.Context, string) (*models.MediaFile, error) {
+	return nil, nil
+}
+
+func (f *generationMediaReferenceFake) FindByStoragePath(context.Context, string) (*models.MediaFile, error) {
+	return f.media, nil
+}
+
+type signedGenerationStorageFake struct {
+	unusedGenerationStorageFake
+	key     string
+	signErr error
+}
+
+func (f *signedGenerationStorageFake) GetSignedURL(_ context.Context, key string, _ time.Duration) (string, error) {
+	f.key = key
+	if f.signErr != nil {
+		return "", f.signErr
+	}
+	return "https://storage.example.test/signed-sadie.png?token=one", nil
+}
+
+func TestResolveInputsSignsPrivatePersonaUploadForRunPod(t *testing.T) {
+	avatar := "/uploads/7/sadie.png"
+	reader := &generationPersonaReaderFake{persona: &models.BotPersona{AvatarURL: &avatar}}
+	mediaReader := &generationMediaReferenceFake{media: &models.MediaFile{
+		StoragePath:      "uploads/7/sadie.png",
+		StorageObjectKey: "7/sadie.png",
+		FileType:         "image/png",
+		ScanStatus:       models.MediaScanStatusClean,
+	}}
+	storage := &signedGenerationStorageFake{}
+	handler := NewOmniChatGenerationHandler(
+		&generationClaimStoreFake{}, reader, storage, nil,
+		&submittingRunPodFake{}, omniChatMediaTestConfig(), false,
+	).SetMediaReferenceReader(mediaReader)
+
+	references, _, err := handler.resolveInputs(context.Background(), &models.OmniChatGenerationJob{OwnerUserID: 29, PersonaID: 17})
+	require.NoError(t, err)
+	require.Equal(t, []string{"https://storage.example.test/signed-sadie.png?token=one"}, references)
+	require.Equal(t, "7/sadie.png", storage.key)
+}
+
+func TestResolveInputsUsesSignedReferenceForPlatformPersonaUpload(t *testing.T) {
+	avatar := "/uploads/7/sadie.png"
+	reader := &generationPersonaReaderFake{persona: &models.BotPersona{AvatarURL: &avatar}}
+	mediaReader := &generationMediaReferenceFake{media: &models.MediaFile{
+		StoragePath:      "uploads/7/sadie.png",
+		StorageObjectKey: "7/sadie.png",
+		StorageURL:       "https://cdn.example.test/7/sadie.png",
+		FileType:         "image/png",
+		ScanStatus:       models.MediaScanStatusClean,
+	}}
+	storage := &signedGenerationStorageFake{}
+	handler := NewOmniChatGenerationHandler(
+		&generationClaimStoreFake{}, reader, storage, nil,
+		&submittingRunPodFake{}, omniChatMediaTestConfig(), false,
+	).SetMediaReferenceReader(mediaReader)
+
+	references, _, err := handler.resolveInputs(context.Background(), &models.OmniChatGenerationJob{OwnerUserID: 29, PersonaID: 17})
+	require.NoError(t, err)
+	require.Equal(t, []string{"https://storage.example.test/signed-sadie.png?token=one"}, references)
+	require.Equal(t, "7/sadie.png", storage.key)
+}
+
+func TestResolveInputsUsesPlatformCDNFallbackWhenSigningFails(t *testing.T) {
+	avatar := "/uploads/7/sadie.png"
+	reader := &generationPersonaReaderFake{persona: &models.BotPersona{AvatarURL: &avatar}}
+	mediaReader := &generationMediaReferenceFake{media: &models.MediaFile{
+		StoragePath:      "uploads/7/sadie.png",
+		StorageObjectKey: "7/sadie.png",
+		StorageURL:       "https://cdn.example.test/7/sadie.png",
+		FileType:         "image/png",
+		ScanStatus:       models.MediaScanStatusClean,
+	}}
+	storage := &signedGenerationStorageFake{signErr: errors.New("temporary signing failure")}
+	handler := NewOmniChatGenerationHandler(
+		&generationClaimStoreFake{}, reader, storage, nil,
+		&submittingRunPodFake{}, omniChatMediaTestConfig(), false,
+	).SetMediaReferenceReader(mediaReader)
+
+	references, _, err := handler.resolveInputs(context.Background(), &models.OmniChatGenerationJob{OwnerUserID: 29, PersonaID: 17})
+	require.NoError(t, err)
+	require.Equal(t, []string{"https://cdn.example.test/7/sadie.png"}, references)
+	require.Equal(t, "7/sadie.png", storage.key)
+}
+
+func TestResolveInputsDoesNotUsePlatformCDNFallbackForUserPersona(t *testing.T) {
+	avatar := "/uploads/7/sadie.png"
+	ownerID := 29
+	reader := &generationPersonaReaderFake{persona: &models.BotPersona{OwnerUserID: &ownerID, AvatarURL: &avatar}}
+	mediaReader := &generationMediaReferenceFake{media: &models.MediaFile{
+		StoragePath:      "uploads/7/sadie.png",
+		StorageObjectKey: "7/sadie.png",
+		StorageURL:       "https://cdn.example.test/7/sadie.png",
+		FileType:         "image/png",
+		ScanStatus:       models.MediaScanStatusClean,
+	}}
+	storage := &signedGenerationStorageFake{signErr: errors.New("temporary signing failure")}
+	handler := NewOmniChatGenerationHandler(
+		&generationClaimStoreFake{}, reader, storage, nil,
+		&submittingRunPodFake{}, omniChatMediaTestConfig(), false,
+	).SetMediaReferenceReader(mediaReader)
+
+	_, _, err := handler.resolveInputs(context.Background(), &models.OmniChatGenerationJob{OwnerUserID: ownerID, PersonaID: 17})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "temporary signing failure")
+}
+
+func TestResolveInputsKeepsUserPersonaUploadSigned(t *testing.T) {
+	avatar := "/uploads/7/sadie.png"
+	ownerID := 29
+	reader := &generationPersonaReaderFake{persona: &models.BotPersona{OwnerUserID: &ownerID, AvatarURL: &avatar}}
+	mediaReader := &generationMediaReferenceFake{media: &models.MediaFile{
+		StoragePath:      "uploads/7/sadie.png",
+		StorageObjectKey: "7/sadie.png",
+		StorageURL:       "https://cdn.example.test/7/sadie.png",
+		FileType:         "image/png",
+		ScanStatus:       models.MediaScanStatusClean,
+	}}
+	storage := &signedGenerationStorageFake{}
+	handler := NewOmniChatGenerationHandler(
+		&generationClaimStoreFake{}, reader, storage, nil,
+		&submittingRunPodFake{}, omniChatMediaTestConfig(), false,
+	).SetMediaReferenceReader(mediaReader)
+
+	references, _, err := handler.resolveInputs(context.Background(), &models.OmniChatGenerationJob{OwnerUserID: ownerID, PersonaID: 17})
+	require.NoError(t, err)
+	require.Equal(t, []string{"https://storage.example.test/signed-sadie.png?token=one"}, references)
+	require.Equal(t, "7/sadie.png", storage.key)
+}
+
+func TestResolveInputsFailsWhenPersonaUploadCannotBeResolved(t *testing.T) {
+	avatar := "/uploads/personas/missing.png"
+	reader := &generationPersonaReaderFake{persona: &models.BotPersona{AvatarURL: &avatar}}
+	mediaReader := &generationMediaReferenceFake{}
+	handler := NewOmniChatGenerationHandler(
+		&generationClaimStoreFake{}, reader, &unusedGenerationStorageFake{}, nil,
+		&submittingRunPodFake{}, omniChatMediaTestConfig(), false,
+	).SetMediaReferenceReader(mediaReader)
+
+	_, _, err := handler.resolveInputs(context.Background(), &models.OmniChatGenerationJob{OwnerUserID: 29, PersonaID: 17})
+	var permanent *permanentGenerationError
+	require.ErrorAs(t, err, &permanent)
+	require.Equal(t, "persona_reference_unavailable", permanent.code)
 }
 
 type unusedGenerationStorageFake struct{}
@@ -166,17 +332,30 @@ func (f *cleanupGenerationStorageFake) Delete(ctx context.Context, _ string) err
 	return nil
 }
 
-type submittingFalFake struct {
-	cancellableFalFake
+type submittingRunPodFake struct {
+	cancellableRunPodFake
 	submitCalls int
 }
 
-func (f *submittingFalFake) Submit(context.Context, string, any) (string, error) {
+func (f *submittingRunPodFake) Submit(context.Context, string, any) (string, error) {
 	f.submitCalls++
 	return "provider-job", nil
 }
 
-func newGenerationClaimTestHandler(store *generationClaimStoreFake, provider *submittingFalFake) *OmniChatGenerationHandler {
+type resultErrorRunPodFake struct{ resultErr error }
+
+func (*resultErrorRunPodFake) Submit(context.Context, string, any) (string, error) {
+	return "provider-job", nil
+}
+func (*resultErrorRunPodFake) Status(context.Context, string, string) (*runpod.StatusResponse, error) {
+	return &runpod.StatusResponse{Status: runpod.StatusCompleted}, nil
+}
+func (f *resultErrorRunPodFake) Result(context.Context, string, string) (*runpod.Result, error) {
+	return nil, f.resultErr
+}
+func (*resultErrorRunPodFake) Cancel(context.Context, string, string) error { return nil }
+
+func newGenerationClaimTestHandler(store *generationClaimStoreFake, provider *submittingRunPodFake) *OmniChatGenerationHandler {
 	return NewOmniChatGenerationHandler(
 		store,
 		&generationPersonaReaderFake{},
@@ -190,29 +369,73 @@ func newGenerationClaimTestHandler(store *generationClaimStoreFake, provider *su
 
 func omniChatMediaTestConfig() config.OmniChatMediaConfig {
 	return config.OmniChatMediaConfig{
-		FalImageModel:      "fal-ai/nano-banana-2",
-		FalImageEditModel:  "fal-ai/nano-banana-2/edit",
-		FalTextVideoModel:  "fal-ai/wan/v2.7/text-to-video",
-		FalImageVideoModel: "fal-ai/wan/v2.7/image-to-video",
+		RunPodImageEndpointID: "endpoint-image",
+		RunPodVideoEndpointID: "endpoint-video",
 	}
 }
 
-func TestBuildFalGenerationSpecUsesCharacterReferenceForImage(t *testing.T) {
+func TestBuildRunPodGenerationSpecUsesCharacterReferenceForImage(t *testing.T) {
+	job := &models.OmniChatGenerationJob{
+		Kind:            models.OmniChatMediaKindImage,
+		Mode:            models.OmniChatGenerationModeContextual,
+		EffectivePrompt: "Sadie at the park",
+		AspectRatio:     "4:5",
+		Scene: models.OmniChatSceneState{
+			Location:     "the park",
+			Activity:     "walking beside the user",
+			RecentEvents: []string{"Character: *I step closer.*", "User: *I take her hand.*"},
+		},
+	}
+	spec, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, []string{"https://cdn.example.test/sadie.png"}, "")
+
+	require.NoError(t, err)
+	require.Equal(t, "endpoint-image", spec.EndpointID)
+	require.Equal(t, []string{"https://cdn.example.test/sadie.png"}, spec.Input["reference_image_urls"])
+	require.Equal(t, "4:5", spec.Input["aspect_ratio"])
+	require.Equal(t, "image", spec.Input["kind"])
+	require.Equal(t, "reference", spec.Input["identity_mode"])
+	require.Equal(t, "ip_adapter", spec.Input["identity_adapter"])
+	require.Equal(t, job.Scene, spec.Input["scene"])
+}
+
+func TestBuildRunPodGenerationSpecIncludesValidatedLoRAProfile(t *testing.T) {
 	job := &models.OmniChatGenerationJob{
 		Kind:            models.OmniChatMediaKindImage,
 		EffectivePrompt: "Sadie at the park",
-		AspectRatio:     "4:5",
+		IdentityProfile: models.OmniChatMediaIdentityProfile{
+			Mode:           models.OmniChatMediaIdentityModeLoRA,
+			Adapter:        models.OmniChatMediaIdentityAdapterIPAdapter,
+			AdapterScale:   0.7,
+			ReferenceLimit: 2,
+			LoraModelID:    "nickf579/sadie-lora",
+			LoraWeightName: "weights.safetensors",
+			LoraScale:      0.9,
+		},
 	}
-	spec, err := BuildFalGenerationSpec(omniChatMediaTestConfig(), job, []string{"https://cdn.example.test/sadie.png"}, "")
-
+	spec, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, []string{
+		"https://cdn.example.test/avatar.png", "https://cdn.example.test/park.png", "https://cdn.example.test/extra.png",
+	}, "")
 	require.NoError(t, err)
-	require.Equal(t, "fal-ai/nano-banana-2/edit", spec.ModelID)
-	require.Equal(t, []string{"https://cdn.example.test/sadie.png"}, spec.Input["image_urls"])
-	require.Equal(t, "4:5", spec.Input["aspect_ratio"])
-	require.Equal(t, true, spec.Input["limit_generations"])
+	require.Equal(t, "lora", spec.Input["identity_mode"])
+	require.Equal(t, "nickf579/sadie-lora", spec.Input["lora_model_id"])
+	require.Equal(t, []string{"https://cdn.example.test/avatar.png", "https://cdn.example.test/park.png"}, spec.Input["reference_image_urls"])
 }
 
-func TestBuildFalGenerationSpecBuildsImageToVideoInput(t *testing.T) {
+func TestBuildRunPodGenerationSpecIncludesReferencesForVideo(t *testing.T) {
+	job := &models.OmniChatGenerationJob{
+		Kind:            models.OmniChatMediaKindVideo,
+		Mode:            models.OmniChatGenerationModeContextual,
+		EffectivePrompt: "Sadie walks through the park",
+		AspectRatio:     "16:9",
+		DurationSeconds: 5,
+	}
+	spec, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, []string{"https://cdn.example.test/sadie.png"}, "")
+	require.NoError(t, err)
+	require.Equal(t, []string{"https://cdn.example.test/sadie.png"}, spec.Input["reference_image_urls"])
+	require.Equal(t, "reference", spec.Input["identity_mode"])
+}
+
+func TestBuildRunPodGenerationSpecBuildsImageToVideoInput(t *testing.T) {
 	job := &models.OmniChatGenerationJob{
 		Kind:            models.OmniChatMediaKindVideo,
 		Mode:            models.OmniChatGenerationModeImageToVideo,
@@ -221,17 +444,17 @@ func TestBuildFalGenerationSpecBuildsImageToVideoInput(t *testing.T) {
 		AspectRatio:     "9:16",
 		DurationSeconds: 7,
 	}
-	spec, err := BuildFalGenerationSpec(omniChatMediaTestConfig(), job, nil, "https://signed.example.test/source.png")
+	spec, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, nil, "https://signed.example.test/source.png")
 
 	require.NoError(t, err)
-	require.Equal(t, "fal-ai/wan/v2.7/image-to-video", spec.ModelID)
-	require.Equal(t, "https://signed.example.test/source.png", spec.Input["image_url"])
-	require.Equal(t, 7, spec.Input["duration"])
+	require.Equal(t, "endpoint-video", spec.EndpointID)
+	require.Equal(t, "https://signed.example.test/source.png", spec.Input["source_image_url"])
+	require.Equal(t, 7, spec.Input["duration_seconds"])
+	require.Equal(t, "video", spec.Input["kind"])
 	require.Equal(t, "9:16", spec.Input["aspect_ratio"])
-	require.Equal(t, true, spec.Input["enable_safety_checker"])
 }
 
-func TestBuildFalGenerationSpecBuildsTextToVideoInput(t *testing.T) {
+func TestBuildRunPodGenerationSpecBuildsTextToVideoInput(t *testing.T) {
 	job := &models.OmniChatGenerationJob{
 		Kind:            models.OmniChatMediaKindVideo,
 		Mode:            models.OmniChatGenerationModeCreate,
@@ -239,26 +462,67 @@ func TestBuildFalGenerationSpecBuildsTextToVideoInput(t *testing.T) {
 		AspectRatio:     "16:9",
 		DurationSeconds: 5,
 	}
-	spec, err := BuildFalGenerationSpec(omniChatMediaTestConfig(), job, nil, "")
+	spec, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, nil, "")
 
 	require.NoError(t, err)
-	require.Equal(t, "fal-ai/wan/v2.7/text-to-video", spec.ModelID)
+	require.Equal(t, "endpoint-video", spec.EndpointID)
 	require.NotContains(t, spec.Input, "image_url")
+	require.Equal(t, "16:9", spec.Input["aspect_ratio"])
 	require.Equal(t, "1080p", spec.Input["resolution"])
+	require.Equal(t, "video", spec.Input["kind"])
 }
 
-func TestBuildFalGenerationSpecRequiresSourceURLForImageToVideo(t *testing.T) {
+func TestBuildRunPodGenerationSpecMapsUnsupportedVideoRatios(t *testing.T) {
+	job := &models.OmniChatGenerationJob{
+		Kind:            models.OmniChatMediaKindVideo,
+		Mode:            models.OmniChatGenerationModeCreate,
+		EffectivePrompt: "A quiet walk through the park",
+		AspectRatio:     "4:5",
+		DurationSeconds: 5,
+	}
+
+	spec, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, nil, "")
+
+	require.NoError(t, err)
+	require.Equal(t, "3:4", spec.Input["aspect_ratio"])
+}
+
+func TestBuildRunPodGenerationSpecRequiresSourceURLForImageToVideo(t *testing.T) {
 	job := &models.OmniChatGenerationJob{
 		Kind:            models.OmniChatMediaKindVideo,
 		Mode:            models.OmniChatGenerationModeImageToVideo,
 		EffectivePrompt: "Wave",
 	}
-	_, err := BuildFalGenerationSpec(omniChatMediaTestConfig(), job, nil, "")
+	_, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, nil, "")
 	require.EqualError(t, err, "image-to-video source is unavailable")
 }
 
+func TestBuildRunPodGenerationSpecRequiresConfiguredEndpoint(t *testing.T) {
+	job := &models.OmniChatGenerationJob{
+		Kind:            models.OmniChatMediaKindImage,
+		EffectivePrompt: "A portrait",
+	}
+	_, err := BuildRunPodGenerationSpec(config.OmniChatMediaConfig{}, job, nil, "")
+	require.ErrorIs(t, err, runpod.ErrEndpointNotConfigured)
+}
+
+func TestBuildRunPodGenerationSpecRejectsUnsafeProviderReferences(t *testing.T) {
+	imageJob := &models.OmniChatGenerationJob{
+		Kind: models.OmniChatMediaKindImage, EffectivePrompt: "A portrait",
+	}
+	_, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), imageJob, []string{"http://127.0.0.1/private.png"}, "")
+	require.EqualError(t, err, "provider reference image URL is invalid")
+
+	videoJob := &models.OmniChatGenerationJob{
+		Kind: models.OmniChatMediaKindVideo, Mode: models.OmniChatGenerationModeImageToVideo,
+		EffectivePrompt: "Wave",
+	}
+	_, err = BuildRunPodGenerationSpec(omniChatMediaTestConfig(), videoJob, nil, "https://public.example.test:8443/source.png")
+	require.EqualError(t, err, "provider source image URL is invalid")
+}
+
 func TestOmniChatGenerationHandlerStopsProviderWorkWhenJobIsCancelled(t *testing.T) {
-	provider := &cancellableFalFake{}
+	provider := &cancellableRunPodFake{}
 	jobID := uuid.New()
 	operationID := uuid.New()
 	billing := &generationBillingFake{}
@@ -271,7 +535,7 @@ func TestOmniChatGenerationHandlerStopsProviderWorkWhenJobIsCancelled(t *testing
 		billing:  billing,
 	}
 
-	cancelled, err := handler.stopIfGenerationCancelled(context.Background(), jobID, "fal-ai/model", "provider-job")
+	cancelled, err := handler.stopIfGenerationCancelled(context.Background(), jobID, "endpoint-image", "provider-job")
 	require.NoError(t, err)
 	require.True(t, cancelled)
 	require.Equal(t, 1, provider.cancelCalls)
@@ -289,17 +553,17 @@ func TestOmniChatGenerationHandlerSurfacesCancellationRefundFailure(t *testing.T
 			ID: uuid.New(), OwnerUserID: 41, Status: models.OmniChatGenerationStatusCancelled,
 			BillingOperationID: &operationID,
 		}},
-		provider: &cancellableFalFake{},
+		provider: &cancellableRunPodFake{},
 		billing:  &generationBillingFake{refundErr: refundErr},
 	}
 
-	cancelled, err := handler.stopIfGenerationCancelled(context.Background(), handler.jobs.(*cancelledGenerationStoreFake).job.ID, "fal-ai/model", "provider-job")
+	cancelled, err := handler.stopIfGenerationCancelled(context.Background(), handler.jobs.(*cancelledGenerationStoreFake).job.ID, "endpoint-image", "provider-job")
 	require.True(t, cancelled)
 	require.ErrorIs(t, err, refundErr)
 }
 
 func TestOmniChatGenerationHandlerStopsProviderWorkWhenReconciliationFailsJob(t *testing.T) {
-	provider := &cancellableFalFake{}
+	provider := &cancellableRunPodFake{}
 	jobID := uuid.New()
 	operationID := uuid.New()
 	billing := &generationBillingFake{}
@@ -315,7 +579,7 @@ func TestOmniChatGenerationHandlerStopsProviderWorkWhenReconciliationFailsJob(t 
 	stopped, err := handler.stopIfGenerationCancelled(
 		context.Background(),
 		jobID,
-		"fal-ai/model",
+		"endpoint-image",
 		"provider-job",
 	)
 	require.NoError(t, err)
@@ -326,7 +590,7 @@ func TestOmniChatGenerationHandlerStopsProviderWorkWhenReconciliationFailsJob(t 
 }
 
 func TestOmniChatGenerationHandlerCancelsSubmittedWorkWhenClaimLosesRace(t *testing.T) {
-	provider := &submittingFalFake{}
+	provider := &submittingRunPodFake{}
 	job := &models.OmniChatGenerationJob{
 		ID: uuid.New(), PersonaID: 42, Kind: models.OmniChatMediaKindImage,
 		Mode: models.OmniChatGenerationModeCreate, Status: models.OmniChatGenerationStatusQueued,
@@ -342,7 +606,7 @@ func TestOmniChatGenerationHandlerCancelsSubmittedWorkWhenClaimLosesRace(t *test
 }
 
 func TestOmniChatGenerationHandlerCancelsSubmittedWorkWhenClaimPersistenceFails(t *testing.T) {
-	provider := &submittingFalFake{}
+	provider := &submittingRunPodFake{}
 	job := &models.OmniChatGenerationJob{
 		ID: uuid.New(), PersonaID: 42, Kind: models.OmniChatMediaKindImage,
 		Mode: models.OmniChatGenerationModeCreate, Status: models.OmniChatGenerationStatusQueued,
@@ -355,6 +619,54 @@ func TestOmniChatGenerationHandlerCancelsSubmittedWorkWhenClaimPersistenceFails(
 
 	require.ErrorIs(t, err, databaseErr)
 	require.Equal(t, 1, provider.submitCalls)
+	require.Equal(t, 1, provider.cancelCalls)
+}
+
+func TestOmniChatGenerationHandlerMapsTerminalResultErrorsToPermanentFailures(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+		code string
+	}{
+		{name: "failed", err: runpod.ErrJobFailed, code: "provider_failed"},
+		{name: "cancelled", err: runpod.ErrJobCancelled, code: "provider_cancelled"},
+		{name: "timed out", err: runpod.ErrJobTimedOut, code: "provider_timed_out"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			job := &models.OmniChatGenerationJob{
+				ID: uuid.New(), PersonaID: 42, Kind: models.OmniChatMediaKindImage,
+				Mode: models.OmniChatGenerationModeCreate, Status: models.OmniChatGenerationStatusRunning,
+				ProviderJobID: "provider-job", EffectivePrompt: "Sadie at the park",
+			}
+			handler := NewOmniChatGenerationHandler(
+				&generationClaimStoreFake{job: job}, &generationPersonaReaderFake{}, &unusedGenerationStorageFake{}, nil,
+				&resultErrorRunPodFake{resultErr: test.err}, omniChatMediaTestConfig(), false,
+			)
+
+			err := handler.process(context.Background(), job.ID)
+			var permanent *permanentGenerationError
+			require.ErrorAs(t, err, &permanent)
+			require.Equal(t, test.code, permanent.code)
+		})
+	}
+}
+
+func TestOmniChatGenerationHandlerCancelsRunPodJobWhenRequestDeadlineExpires(t *testing.T) {
+	provider := &submittingRunPodFake{}
+	job := &models.OmniChatGenerationJob{
+		ID: uuid.New(), PersonaID: 42, Kind: models.OmniChatMediaKindImage,
+		Mode: models.OmniChatGenerationModeCreate, Status: models.OmniChatGenerationStatusQueued,
+		EffectivePrompt: "Sadie at the park",
+	}
+	store := &generationClaimStoreFake{job: job, markResult: true}
+	cfg := omniChatMediaTestConfig()
+	cfg.RunPodRequestTimeoutSeconds = 1
+	cfg.PollIntervalSeconds = 1
+	handler := NewOmniChatGenerationHandler(store, &generationPersonaReaderFake{}, &unusedGenerationStorageFake{}, nil, provider, cfg, false)
+
+	err := handler.process(context.Background(), job.ID)
+
+	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Equal(t, 1, provider.cancelCalls)
 }
 

@@ -38,30 +38,36 @@ var personalGenerationAttemptTimeouts = [...]time.Duration{
 var defaultGenerationAttemptTimeout = 12 * time.Second
 
 var ErrConversationalResponseContract = errors.New("chatbot: conversational response contract rejected every draft")
+var ErrPersonalSceneConflict = fmt.Errorf("%w: server scene state conflicts with the personal response contract", ErrConversationalResponseContract)
+var ErrGenerationOptionsUnsupported = fmt.Errorf("%w: completion provider does not support requested generation options", ErrConversationalResponseContract)
 
 type personalDraftOutcome string
 type personalDraftSource string
 type personalDraftTerminalTransition string
 
 const (
-	personalDraftAcceptedRaw         personalDraftOutcome = "accepted_raw"
-	personalDraftAcceptedSingleBlock personalDraftOutcome = "accepted_single_block"
-	personalDraftAcceptedRepair      personalDraftOutcome = "accepted_repair"
-	personalDraftAcceptedFallback    personalDraftOutcome = "accepted_fallback"
-	personalDraftAcceptedDialogue    personalDraftOutcome = "accepted_dialogue_only"
-	personalDraftRejectedHygiene     personalDraftOutcome = "rejected_hygiene"
-	personalDraftRejectedLength      personalDraftOutcome = "rejected_length_or_blocks"
-	personalDraftRejectedNarration   personalDraftOutcome = "rejected_narration"
-	personalDraftRejectedOwnership   personalDraftOutcome = "rejected_ownership"
-	personalDraftRejectedQuestion    personalDraftOutcome = "rejected_question_budget"
-	personalDraftRejectedFormatting  personalDraftOutcome = "rejected_other_formatting"
-	personalDraftRejectedSemantics   personalDraftOutcome = "rejected_other_semantics"
-	personalDraftProviderTimeout     personalDraftOutcome = "provider_timeout"
-	personalDraftProviderRateLimit   personalDraftOutcome = "provider_rate_limit"
-	personalDraftProviderTransport   personalDraftOutcome = "provider_transport"
+	personalDraftAcceptedRaw          personalDraftOutcome = "accepted_raw"
+	personalDraftAcceptedSingleBlock  personalDraftOutcome = "accepted_single_block"
+	personalDraftAcceptedRepair       personalDraftOutcome = "accepted_repair"
+	personalDraftAcceptedFallback     personalDraftOutcome = "accepted_fallback"
+	personalDraftAcceptedDialogue     personalDraftOutcome = "accepted_dialogue_only"
+	personalDraftRejectedHygiene      personalDraftOutcome = "rejected_hygiene"
+	personalDraftRejectedLength       personalDraftOutcome = "rejected_length_or_blocks"
+	personalDraftRejectedNarration    personalDraftOutcome = "rejected_narration"
+	personalDraftRejectedOwnership    personalDraftOutcome = "rejected_ownership"
+	personalDraftRejectedBoundary     personalDraftOutcome = "rejected_boundary"
+	personalDraftRejectedScene        personalDraftOutcome = "rejected_scene_conflict"
+	personalDraftRejectedQuestion     personalDraftOutcome = "rejected_question_budget"
+	personalDraftRejectedFormatting   personalDraftOutcome = "rejected_other_formatting"
+	personalDraftRejectedSemantics    personalDraftOutcome = "rejected_other_semantics"
+	personalDraftProviderTimeout      personalDraftOutcome = "provider_timeout"
+	personalDraftProviderRateLimit    personalDraftOutcome = "provider_rate_limit"
+	personalDraftProviderAccessDenied personalDraftOutcome = "provider_access_denied"
+	personalDraftProviderTransport    personalDraftOutcome = "provider_transport"
 
 	personalDraftSourceEmpty                   personalDraftSource = "empty"
 	personalDraftSourceShapeValid              personalDraftSource = "shape_valid"
+	personalDraftSourceValidDialogueEnvelope   personalDraftSource = "valid_dialogue_envelope"
 	personalDraftSourceUnder24                 personalDraftSource = "under_24_words"
 	personalDraftSourceRepairablePartition     personalDraftSource = "repairable_partition"
 	personalDraftSourceUnpartitionable24To60   personalDraftSource = "unpartitionable_24_to_60_words"
@@ -84,6 +90,7 @@ const (
 type PersonalDraftSourceCounters struct {
 	Empty                       int `json:"empty"`
 	ShapeValid                  int `json:"shape_valid"`
+	ValidDialogueEnvelope       int `json:"valid_dialogue_envelope"`
 	Under24Words                int `json:"under_24_words"`
 	RepairablePartition         int `json:"repairable_partition"`
 	Unpartitionable24To60Words  int `json:"unpartitionable_24_to_60_words"`
@@ -118,11 +125,14 @@ type PersonalDraftCounters struct {
 	RejectedLengthOrBlocks  int                           `json:"rejected_length_or_blocks"`
 	RejectedNarration       int                           `json:"rejected_narration"`
 	RejectedOwnership       int                           `json:"rejected_ownership"`
+	RejectedBoundary        int                           `json:"rejected_boundary"`
+	RejectedSceneConflict   int                           `json:"rejected_scene_conflict"`
 	RejectedQuestionBudget  int                           `json:"rejected_question_budget"`
 	RejectedOtherFormatting int                           `json:"rejected_other_formatting"`
 	RejectedOtherSemantics  int                           `json:"rejected_other_semantics"`
 	ProviderTimeout         int                           `json:"provider_timeout"`
 	ProviderRateLimit       int                           `json:"provider_rate_limit"`
+	ProviderAccessDenied    int                           `json:"provider_access_denied"`
 	ProviderTransport       int                           `json:"provider_transport"`
 	RawSources              PersonalDraftSourceCounters   `json:"raw_sources"`
 	TerminalTransitions     PersonalDraftTerminalCounters `json:"terminal_transitions"`
@@ -199,6 +209,10 @@ func (c *PersonalDraftCounters) add(outcome personalDraftOutcome) {
 		c.RejectedNarration++
 	case personalDraftRejectedOwnership:
 		c.RejectedOwnership++
+	case personalDraftRejectedBoundary:
+		c.RejectedBoundary++
+	case personalDraftRejectedScene:
+		c.RejectedSceneConflict++
 	case personalDraftRejectedQuestion:
 		c.RejectedQuestionBudget++
 	case personalDraftRejectedFormatting:
@@ -209,6 +223,8 @@ func (c *PersonalDraftCounters) add(outcome personalDraftOutcome) {
 		c.ProviderTimeout++
 	case personalDraftProviderRateLimit:
 		c.ProviderRateLimit++
+	case personalDraftProviderAccessDenied:
+		c.ProviderAccessDenied++
 	case personalDraftProviderTransport:
 		c.ProviderTransport++
 	}
@@ -224,11 +240,14 @@ func (c *PersonalDraftCounters) merge(other PersonalDraftCounters) {
 	c.RejectedLengthOrBlocks += other.RejectedLengthOrBlocks
 	c.RejectedNarration += other.RejectedNarration
 	c.RejectedOwnership += other.RejectedOwnership
+	c.RejectedBoundary += other.RejectedBoundary
+	c.RejectedSceneConflict += other.RejectedSceneConflict
 	c.RejectedQuestionBudget += other.RejectedQuestionBudget
 	c.RejectedOtherFormatting += other.RejectedOtherFormatting
 	c.RejectedOtherSemantics += other.RejectedOtherSemantics
 	c.ProviderTimeout += other.ProviderTimeout
 	c.ProviderRateLimit += other.ProviderRateLimit
+	c.ProviderAccessDenied += other.ProviderAccessDenied
 	c.ProviderTransport += other.ProviderTransport
 	c.RawSources.merge(other.RawSources)
 	c.TerminalTransitions.merge(other.TerminalTransitions)
@@ -240,6 +259,8 @@ func (c *PersonalDraftSourceCounters) add(source personalDraftSource) {
 		c.Empty++
 	case personalDraftSourceShapeValid:
 		c.ShapeValid++
+	case personalDraftSourceValidDialogueEnvelope:
+		c.ValidDialogueEnvelope++
 	case personalDraftSourceUnder24:
 		c.Under24Words++
 	case personalDraftSourceRepairablePartition:
@@ -258,6 +279,7 @@ func (c *PersonalDraftSourceCounters) add(source personalDraftSource) {
 func (c *PersonalDraftSourceCounters) merge(other PersonalDraftSourceCounters) {
 	c.Empty += other.Empty
 	c.ShapeValid += other.ShapeValid
+	c.ValidDialogueEnvelope += other.ValidDialogueEnvelope
 	c.Under24Words += other.Under24Words
 	c.RepairablePartition += other.RepairablePartition
 	c.Unpartitionable24To60Words += other.Unpartitionable24To60Words
@@ -269,6 +291,7 @@ func (c *PersonalDraftSourceCounters) merge(other PersonalDraftSourceCounters) {
 func (c PersonalDraftSourceCounters) total() int {
 	return c.Empty +
 		c.ShapeValid +
+		c.ValidDialogueEnvelope +
 		c.Under24Words +
 		c.RepairablePartition +
 		c.Unpartitionable24To60Words +
@@ -325,21 +348,34 @@ type generationOptionsClient interface {
 }
 
 var (
-	blankLinePattern              = regexp.MustCompile(`\r?\n[\t ]*\r?\n+`)
-	narrationSpanPattern          = regexp.MustCompile(`\*([^*\n]+)\*`)
-	firstPersonNarrationWord      = regexp.MustCompile(`(?i)\b(?:i|me|my|mine|myself)\b`)
-	firstPersonNarrationLead      = regexp.MustCompile(`(?i)^(?:i\b|i['’]m\b|my\b)`)
-	assistantSentencePattern      = regexp.MustCompile(`[^.!?…]+[.!?…]+["'”’\)\]]*|[^.!?…]+$`)
-	firstPersonActionNarration    = regexp.MustCompile(`(?i)^i\s+(?:swallow|nod|shake|lean|smile|grin|sigh|pause|glance|reach|touch|brush|trace|move|slide|pull|press|lift|lower|tilt|turn|step|sit|stand|inhale|exhale|freeze|flinch|shrug|blink|bite|gesture)(?:\s+(?:back|closer|away|forward|in|out|up|down|over|toward|towards))?\s*[,;.!?]`)
-	firstPersonSpeechTagNarration = regexp.MustCompile(`(?i)^i\s+(?:say|ask|reply|answer|whisper|murmur|add)\s*,`)
-	firstPersonBodyAction         = regexp.MustCompile(`(?i)^i\s+(?:rest|place|lay|set|hold|keep|move|slide|brush|trace|press|lift|lower|pull|withdraw)\s+(?:my|a|the)\s+(?:hand|hands|finger|fingers|thumb|palm|arm|arms|foot|feet|knee|knees|head|shoulder|shoulders|body)\b`)
-	firstPersonGazeAction         = regexp.MustCompile(`(?i)^i\s+(?:(?:finally|slowly|carefully|quietly|briefly|gently|hesitantly)\s+)?(?:meet|hold|avoid|search)\s+your\s+(?:eyes|gaze)\b`)
-	bodyActionNarration           = regexp.MustCompile(`(?i)^my\s+(?:breath|hand|hands|finger|fingers|thumb|palm|palms|gaze|eyes|voice|heart|pulse|shoulder|shoulders|lips|mouth|head|body|foot|feet|knee|knees|chest|throat)\s+(?:hitch(?:es)?|catch(?:es)?|brush(?:es)?|trace(?:s)?|move(?:s)?|slide(?:s)?|pull(?:s)?|press(?:es)?|lift(?:s)?|lower(?:s)?|tilt(?:s)?|turn(?:s)?|tremble(?:s)?|shake(?:s)?|freeze(?:s)?|tighten(?:s)?|soften(?:s)?|drop(?:s)?|rise(?:s)?|races?|pound(?:s)?|hammer(?:s)?|lock(?:s)?|flick(?:s)?|drift(?:s)?|linger(?:s)?|hover(?:s)?|land(?:s)?|rest(?:s)?)\b`)
-	thirdPersonActionNarration    = regexp.MustCompile(`(?i)^(?:she|he|they)\s+(?:stares?|pulls?|halts?|stops?|looks?|leans?|smiles?|grins?|laughs?|sighs?|nods?|shakes?|steps?|sits?|stands?|moves?|reaches?|touches?|brushes?|traces?|presses?|lifts?|lowers?|tilts?|turns?|freezes?|flinches?|shrugs?|blinks?|bites?|gestures?|watches?|pauses?|swallows?|exhales?|inhales?|stiffens?|softens?|searches?)\b`)
-	thirdPersonBodyNarration      = regexp.MustCompile(`(?i)^(?:her|his|their)\s+(?:breath|hand|hands|finger|fingers|thumb|palm|palms|gaze|eyes|voice|heart|pulse|shoulder|shoulders|lips|mouth|head|body|foot|feet|knee|knees|chest|throat)\s+(?:halt(?:s)?|stop(?:s)?|hitch(?:es)?|catch(?:es)?|brush(?:es)?|trace(?:s)?|move(?:s)?|slide(?:s)?|pull(?:s)?|press(?:es)?|lift(?:s)?|lower(?:s)?|tilt(?:s)?|turn(?:s)?|tremble(?:s)?|shake(?:s)?|freeze(?:s)?|tighten(?:s)?|soften(?:s)?|drop(?:s)?|rise(?:s)?|races?|pound(?:s)?|hammer(?:s)?|lock(?:s)?|flick(?:s)?|drift(?:s)?|linger(?:s)?|hover(?:s)?|land(?:s)?|rest(?:s)?|search(?:es)?)\b`)
-	quotedDialogueLinePattern     = regexp.MustCompile(`(?m)(?:^|\n)[\t ]*["“]`)
-	dialogueFormattingQuotePair   = regexp.MustCompile(`(?m)(^|[.!?])["“”]([^"“”\n]*)["“”]`)
-	incompleteIntensifierPattern  = regexp.MustCompile(`(?i)\b(?:you|what\s+an?)\s+(?:absolute|complete|total|utter)\s+(?:[.!?…]|$)`)
+	blankLinePattern                  = regexp.MustCompile(`\r?\n[\t ]*\r?\n+`)
+	narrationSpanPattern              = regexp.MustCompile(`\*([^*\n]+)\*`)
+	firstPersonNarrationWord          = regexp.MustCompile(`(?i)\b(?:i|me|my|mine|myself)\b`)
+	firstPersonNarrationLead          = regexp.MustCompile(`(?i)^(?:i\b|i['’]m\b|my\b)`)
+	assistantSentencePattern          = regexp.MustCompile(`[^.!?…]+[.!?…]+["'”’\)\]]*|[^.!?…]+$`)
+	firstPersonActionNarration        = regexp.MustCompile(`(?i)^i\s+(?:swallow|nod|shake|lean|smile|grin|sigh|pause|glance|reach|touch|brush|trace|move|slide|pull|press|lift|lower|tilt|turn|step|sit|stand|inhale|exhale|freeze|flinch|shrug|blink|bite|gesture|clench|flex|curl|settle|stiffen|steady|search|open|close|part|shift|tense|flutter)(?:\s+(?:back|closer|away|forward|in|out|up|down|over|toward|towards))?\s*[,;.!?]`)
+	firstPersonSpeechTagNarration     = regexp.MustCompile(`(?i)^i\s+(?:say|ask|reply|answer|whisper|murmur|add)\s*,`)
+	firstPersonBodyAction             = regexp.MustCompile(`(?i)^i\s+(?:rest|place|lay|set|hold|keep|move|slide|brush|trace|press|lift|lower|pull|withdraw|wrap|grab|take|open|close|clench|flex|curl|settle|shift|steady)\s+(?:my|a|the)\s+(?:hand|hands|finger|fingers|thumb|palm|arm|arms|foot|feet|knee|knees|leg|legs|thigh|thighs|hip|hips|head|shoulder|shoulders|jaw|lips|mouth|body)\b`)
+	firstPersonForeignBodyNarration   = regexp.MustCompile(`(?i)^i\s+(?:(?:slowly|carefully|quietly|briefly|gently|hesitantly)\s+)?(?:rest|place|lay|set|hold|keep|move|slide|brush|trace|touch|press|lift|lower|pull|withdraw|wrap|grab|take|open|close|clench|flex|curl|settle|shift|steady)\s+(?:her|his|their)\s+(?:hand|hands|finger|fingers|thumb|palm|arm|arms|foot|feet|knee|knees|leg|legs|thigh|thighs|hip|hips|head|shoulder|shoulders|jaw|lips|mouth|body)\b`)
+	firstPersonForeignBodyNarrationV2 = regexp.MustCompile(`(?i)^i\s+(?:(?:slowly|carefully|quietly|briefly|gently|hesitantly)\s+)?(?:rest|place|lay|set|hold|keep|move|slide|brush|trace|touch|press|lift|lower|pull|withdraw|wrap|grab|take|open|close|clench|flex|curl|settle|shift|steady)\s+(?:her|his|their)\s+(?:(?:left|right|upper|lower|front|back|inner|outer|near|far|same|other)\s+){0,2}(?:hand|hands|finger|fingers|thumb|palm|arm|arms|foot|feet|knee|knees|leg|legs|thigh|thighs|hip|hips|head|shoulder|shoulders|jaw|lips|mouth|body)\b`)
+	firstPersonGazeAction             = regexp.MustCompile(`(?i)^i\s+(?:(?:finally|slowly|carefully|quietly|briefly|gently|hesitantly)\s+)?(?:meet|hold|avoid|search)\s+your\s+(?:eyes|gaze)\b`)
+	bodyActionNarration               = regexp.MustCompile(`(?i)^my\s+(?:breath|hand|hands|finger|fingers|thumb|palm|palms|gaze|eyes|voice|heart|pulse|shoulder|shoulders|lips|mouth|head|body|foot|feet|knee|knees|leg|legs|thigh|thighs|hip|hips|jaw|chest|throat)\s+(?:hitch(?:es)?|catch(?:es)?|brush(?:es)?|trace(?:s)?|move(?:s)?|slide(?:s)?|pull(?:s)?|press(?:es)?|lift(?:s)?|lower(?:s)?|tilt(?:s)?|turn(?:s)?|tremble(?:s)?|shake(?:s)?|freeze(?:s)?|tighten(?:s)?|soften(?:s)?|drop(?:s)?|rise(?:s)?|races?|pound(?:s)?|hammer(?:s)?|lock(?:s)?|flick(?:s)?|drift(?:s)?|linger(?:s)?|hover(?:s)?|land(?:s)?|rest(?:s)?|still(?:s)?|open(?:s)?|close(?:s)?|part(?:s)?|clench(?:es)?|flex(?:es)?|curl(?:s)?|settle(?:s)?|stiffen(?:s)?|steady(?:s)?|search(?:es)?|shift(?:s)?|tense(?:s)?|flutter(?:s)?|thrum(?:s)?|beat(?:s)?|sound(?:s)?)\b`)
+	thirdPersonBodyNarration          = regexp.MustCompile(`(?i)^(?:her|his|their)\s+(?:breath|hand|hands|finger|fingers|thumb|palm|palms|gaze|eyes|voice|heart|pulse|shoulder|shoulders|lips|mouth|head|body|foot|feet|knee|knees|leg|legs|thigh|thighs|hip|hips|jaw|chest|throat)\s+(?:halt(?:s|ing)?|stop(?:s|ping)?|hitch(?:es|ing)?|catch(?:es|ing)?|brush(?:es|ing)?|trace(?:s|ing)?|move(?:s|ing)?|slide(?:s|ing)?|pull(?:s|ing)?|press(?:es|ing)?|lift(?:s|ing)?|lower(?:s|ing)?|tilt(?:s|ing)?|turn(?:s|ing)?|tremble(?:s|ing)?|shake(?:s|ing)?|freeze(?:s|ing)?|tighten(?:s|ing)?|soften(?:s|ing)?|drop(?:s|ping)?|rise(?:s|ing)?|races?|pound(?:s|ing)?|hammer(?:s|ing)?|lock(?:s|ing)?|flick(?:s|ing)?|drift(?:s|ing)?|linger(?:s|ing)?|hover(?:s|ing)?|land(?:s|ing)?|rest(?:s|ing)?|search(?:es|ing)?|open(?:s|ing)?|part(?:s|ing)?|close(?:s|ing)?|clench(?:es|ing)?|flex(?:es|ing)?|curl(?:s|ing)?|settle(?:s|ing)?|stiffen(?:s|ing)?|steady(?:s|ing)?|shift(?:s|ing)?|tense(?:s|ing)?|flutter(?:s|ing)?|thrum(?:s|ing)?|beat(?:s|ing)?|sound(?:s|ing)?)\b`)
+	thirdPersonOwnedPhysicalNarration = regexp.MustCompile(`(?i)^(?:she|he|they)\s+(?:pulls?|halts?|stops?|leans?|steps?|sits?|stands?|moves?|reaches?|touches?|brushes?|traces?|presses?|lifts?|lowers?|tilts?|turns?|freezes?|flinches?|shrugs?|blinks?|bites?|gestures?|swallows?|exhales?|inhales?|stiffens?|softens?|slides?|rests?|holds?|grabs?|takes?|opens?|parts?|closes?|clenches?|watches?|shifts?|flexes?|curls?|settles?|steadies?|searches?|flutters?|thrums?|beats?)\b[^.!?…]*(?:her|his|their|your|my|the|a)\s+(?:breath|hand|hands|finger|fingers|thumb|palm|palms|gaze|eyes|voice|heart|pulse|shoulder|shoulders|lips|mouth|head|body|foot|feet|knee|knees|leg|legs|thigh|thighs|hip|hips|jaw|chest|throat)\b`)
+	namedThirdPersonPhysicalNarration = regexp.MustCompile(`^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+(?:pulls?|halts?|stops?|leans?|steps?|sits?|stands?|moves?|reaches?|touches?|brushes?|traces?|presses?|lifts?|lowers?|tilts?|turns?|freezes?|flinches?|shrugs?|blinks?|bites?|gestures?|swallows?|exhales?|inhales?|stiffens?|softens?|slides?|rests?|holds?|grabs?|takes?|opens?|parts?|closes?|clenches?|watches?|shifts?|flexes?|curls?|settles?|steadies?|searches?|flutters?|thrums?|beats?)\b[^.!?…]*(?:her|his|their|your|my|the|a)\s+(?:breath|hand|hands|finger|fingers|thumb|palm|palms|gaze|eyes|voice|heart|pulse|shoulder|shoulders|lips|mouth|head|body|foot|feet|knee|knees|leg|legs|thigh|thighs|hip|hips|jaw|chest|throat)\b`)
+	// Models sometimes omit the first-person subject and start with a scene
+	// object instead (for example, "The denim is warm, his pulse..."). The
+	// possessive body reference makes this a high-confidence stage direction
+	// while avoiding ordinary dialogue such as "The plan is clear.".
+	articleSceneThirdPersonNarration = regexp.MustCompile(`(?i)^(?:the|a|an)\s+[a-z][a-z'’-]*(?:\s+[a-z][a-z'’-]*){0,4}\s+(?:is|was|are|were|feels?|seems?|looks?|sounds?|smells?|rests?|lies?|hangs?|moves?|shifts?|warms?|cools?|glows?|flickers?|echoes?|drifts?)\b[^.!?…]{0,180}\b(?:his|her|their)\s+(?:(?:left|right|upper|lower|inner|outer|near|far|same|other)\s+){0,2}(?:breath|hand|hands|finger|fingers|thumb|palm|palms|gaze|eyes|voice|heart|pulse|shoulder|shoulders|lips|mouth|head|body|foot|feet|knee|knees|leg|legs|thigh|thighs|hip|hips|jaw|chest|throat)\b`)
+	// Double-quote pairs are deliberately boundary-broad: providers sometimes
+	// emit a closing quote before narration ("..." She says). The quote pair
+	// itself is still anchored after punctuation, while leaving all following
+	// spacing/text untouched for loss-limited repair.
+	dialogueFormattingDoubleQuotePair = regexp.MustCompile(`(?m)(^|[.!?,;:])([ \t]*)["“”]([^"“”\n]*)["“”]`)
+	dialogueFormattingSingleQuotePair = regexp.MustCompile(`(?m)(^|[.!?,;:])([ \t]*)['‘]((?:[^'\n]|'[A-Za-z])*?)['’]([ \t\r\n]|[,!?;:)\]]|$)`)
+	singleDialogueQuoteBoundary       = regexp.MustCompile(`(?m)(^|[.!?,;:])([ \t]*)['‘]([A-Za-z])`)
+	incompleteIntensifierPattern      = regexp.MustCompile(`(?i)\b(?:you|what\s+an?)\s+(?:absolute|complete|total|utter)\s+(?:[.!?…]|$)`)
 )
 
 var reciprocalTurnBodyParts = []string{
@@ -377,12 +413,28 @@ func generatePersonaCompletionWithClient(
 	messages []openrouter.Message,
 	onChunk openrouter.StreamCallback,
 ) (string, error) {
+	return generatePersonaCompletionWithClientAndSceneState(ctx, completion, persona, messages, nil, onChunk)
+}
+
+func generatePersonaCompletionWithClientAndSceneState(
+	ctx context.Context,
+	completion chatCompletionClient,
+	persona *models.BotPersona,
+	messages []openrouter.Message,
+	sceneState *models.OmniChatConversationSceneState,
+	onChunk openrouter.StreamCallback,
+) (string, error) {
 	if completion == nil {
 		return "", errors.New("chatbot: completion provider is unavailable")
 	}
 	personalMode := personaUsesPersonalConversationMode(persona)
 	if personalMode && !containsSystemPrompt(messages) {
 		return "", fmt.Errorf("%w: system prompt is missing", ErrConversationalResponseContract)
+	}
+	if personalMode && sceneState != nil {
+		if !validPersonalResponseConstraintSceneState(sceneState) {
+			return "", ErrPersonalSceneConflict
+		}
 	}
 	generationCtx := ctx
 	cancelGeneration := func() {}
@@ -395,6 +447,10 @@ func generatePersonaCompletionWithClient(
 	if personalMode {
 		maxAttempts = personalConversationAttempts
 	}
+	constraints := personalResponseConstraints{}
+	if personalMode {
+		constraints = derivePersonalResponseConstraints(messages, sceneState)
+	}
 
 	var lastErr error
 	lengthOnlyRetry := false
@@ -403,14 +459,17 @@ func generatePersonaCompletionWithClient(
 			return "", err
 		}
 		generationMessages := messages
+		structuredRecovery := false
 		if attempt > 0 && lengthOnlyRetry {
 			generationMessages = messagesWithPersonalLengthOnlyRecovery(messages)
+			structuredRecovery = true
 			lengthOnlyRetry = false
 		} else if attempt > 0 && errors.Is(lastErr, ErrAssistantOutputHygiene) {
 			generationMessages = messagesWithAssistantHygieneRetry(messages)
 		} else if attempt > 0 && errors.Is(lastErr, ErrConversationalResponseContract) {
 			if attempt == maxAttempts-1 {
 				generationMessages = messagesWithPersonalDialogueOnlyRecovery(messages)
+				structuredRecovery = true
 			} else {
 				generationMessages = messagesWithPersonalResponseShapeRetry(messages)
 			}
@@ -420,16 +479,23 @@ func generatePersonaCompletionWithClient(
 			attemptTimeout = personalGenerationAttemptTimeouts[attempt]
 		}
 		attemptCtx, cancelAttempt := context.WithTimeout(generationCtx, attemptTimeout)
-		candidate, err := generateBufferedAssistantCandidate(attemptCtx, completion, generationMessages, personalMode)
+		generationOptions := openrouter.GenerationOptions{}
+		if personalMode {
+			generationOptions.MaxTokens = personalConversationMaxTokens
+		}
+		if structuredRecovery {
+			generationOptions.ResponseFormat = "json_object"
+		}
+		candidate, err := generateBufferedAssistantCandidateWithOptions(attemptCtx, completion, generationMessages, personalMode, generationOptions)
 		cancelAttempt()
 		candidate = normalizeAssistantMessageContent(candidate)
-		if personalMode && candidate != "" {
-			recordPersonalDraftSource(ctx, classifyPersonalDraftSource(candidate))
-		}
 		if err != nil {
 			lastErr = err
 			if personalMode {
 				recordPersonalProviderFailure(ctx, err)
+			}
+			if errors.Is(err, openrouter.ErrAccessDenied) {
+				return "", err
 			}
 			log := zlog.Warn().Int("attempt", attempt+1)
 			if persona != nil {
@@ -441,10 +507,14 @@ func generatePersonaCompletionWithClient(
 			}
 			continue
 		}
+		if personalMode {
+			recordPersonalDraftSource(ctx, classifyPersonalDraftSource(candidate))
+		}
 		if candidate != "" {
 			if valid, detail := validateAssistantOutputHygiene(candidate); !valid {
 				lastErr = fmt.Errorf("%w: %s", ErrAssistantOutputHygiene, detail)
 				recordPersonalDraftOutcome(ctx, personalDraftRejectedHygiene)
+				recordPersonalDraftTerminal(ctx, personalDraftTerminalRetryHygiene)
 				log := zlog.Warn().Int("attempt", attempt+1)
 				if persona != nil {
 					log = log.Int("persona_id", persona.ID)
@@ -455,12 +525,12 @@ func generatePersonaCompletionWithClient(
 			if !personalMode {
 				return deliverBufferedConversation(candidate, onChunk), nil
 			}
-			finalized, finalizeErr := finalizePersonalConversationDraft(ctx, persona, candidate, onChunk)
+			finalized, finalizeErr := finalizePersonalConversationDraftWithConstraints(ctx, persona, candidate, constraints, onChunk)
 			if finalizeErr == nil {
 				return finalized, nil
 			}
 			if attempt == maxAttempts-1 {
-				recovered, recoveryErr := finalizePersonalDialogueOnlyRecovery(ctx, persona, candidate, onChunk)
+				recovered, recoveryErr := finalizePersonalDialogueOnlyRecoveryWithConstraints(ctx, persona, candidate, constraints, onChunk)
 				if recoveryErr == nil {
 					return recovered, nil
 				}
@@ -468,7 +538,7 @@ func generatePersonaCompletionWithClient(
 			}
 			lastErr = finalizeErr
 			recordPersonalDraftTerminal(ctx, personalDraftTerminalRetryContract)
-			lengthOnlyRetry = personalMode && isLengthOnlyPersonalDraft(candidate)
+			lengthOnlyRetry = personalMode && isLengthOnlyPersonalDraftWithConstraints(candidate, constraints)
 			log := zlog.Warn().Int("attempt", attempt+1)
 			if persona != nil {
 				log = log.Int("persona_id", persona.ID)
@@ -480,6 +550,7 @@ func generatePersonaCompletionWithClient(
 		lastErr = fmt.Errorf("%w: provider returned an empty response", ErrAssistantOutputHygiene)
 		if personalMode {
 			recordPersonalDraftOutcome(ctx, personalDraftRejectedHygiene)
+			recordPersonalDraftTerminal(ctx, personalDraftTerminalRetryEmpty)
 		}
 	}
 	if lastErr == nil {
@@ -494,6 +565,8 @@ func recordPersonalProviderFailure(ctx context.Context, err error) {
 		recordPersonalDraftOutcome(ctx, personalDraftProviderTimeout)
 	case errors.Is(err, openrouter.ErrRateLimited):
 		recordPersonalDraftOutcome(ctx, personalDraftProviderRateLimit)
+	case errors.Is(err, openrouter.ErrAccessDenied):
+		recordPersonalDraftOutcome(ctx, personalDraftProviderAccessDenied)
 	default:
 		recordPersonalDraftOutcome(ctx, personalDraftProviderTransport)
 	}
@@ -509,35 +582,46 @@ func containsSystemPrompt(messages []openrouter.Message) bool {
 }
 
 func finalizePersonalConversationDraft(ctx context.Context, persona *models.BotPersona, candidate string, onChunk openrouter.StreamCallback) (string, error) {
-	if recovered, err := parseAndValidatePersonalDialogueOnlyJSON(candidate); err == nil {
+	return finalizePersonalConversationDraftWithConstraints(ctx, persona, candidate, personalResponseConstraints{}, onChunk)
+}
+
+func finalizePersonalConversationDraftWithConstraints(ctx context.Context, persona *models.BotPersona, candidate string, constraints personalResponseConstraints, onChunk openrouter.StreamCallback) (string, error) {
+	if recovered, err := parseAndValidatePersonalDialogueOnlyJSONWithConstraints(candidate, constraints); err == nil {
 		recordPersonalDraftOutcome(ctx, personalDraftAcceptedDialogue)
 		recordPersonalDraftTerminal(ctx, personalDraftTerminalAcceptedDialogue)
 		return deliverBufferedConversation(recovered, onChunk), nil
 	}
-	if valid, _ := validatePersonalConversationResponse(candidate); valid {
+	if valid, _ := validatePersonalConversationResponseWithConstraints(candidate, constraints); valid {
 		recordPersonalDraftOutcome(ctx, personalDraftAcceptedRaw)
+		recordPersonalDraftTerminal(ctx, personalDraftTerminalAcceptedRaw)
 		return deliverBufferedConversation(candidate, onChunk), nil
 	}
-	recordPersonalDraftRejections(ctx, candidate)
+	recordPersonalDraftRejectionsWithConstraints(ctx, candidate, constraints)
 
 	repaired := repairPersonalConversationDraft(candidate)
-	if valid, _ := validatePersonalConversationResponse(repaired); valid {
+	if valid, _ := validatePersonalConversationResponseWithConstraints(repaired, constraints); valid {
 		outcome := personalDraftAcceptedRepair
 		if isPresentationOnlySingleBlockRecovery(candidate, repaired) {
 			outcome = personalDraftAcceptedSingleBlock
 		}
 		recordPersonalDraftOutcome(ctx, outcome)
+		if outcome == personalDraftAcceptedSingleBlock {
+			recordPersonalDraftTerminal(ctx, personalDraftTerminalAcceptedSingleBlock)
+		} else {
+			recordPersonalDraftTerminal(ctx, personalDraftTerminalAcceptedRepair)
+		}
 		zlog.Info().Int("persona_id", persona.ID).Msg("chatbot: repaired conversational draft before delivery")
 		return deliverBufferedConversation(repaired, onChunk), nil
 	}
 
 	fallback := sanitizePersonalConversationFallback(candidate)
-	if valid, _ := validatePersonalConversationResponse(fallback); valid {
+	if valid, _ := validatePersonalConversationResponseWithConstraints(fallback, constraints); valid {
 		recordPersonalDraftOutcome(ctx, personalDraftAcceptedFallback)
+		recordPersonalDraftTerminal(ctx, personalDraftTerminalAcceptedFallback)
 		zlog.Warn().Int("persona_id", persona.ID).Msg("chatbot: sanitized malformed conversational draft before delivery")
 		return deliverBufferedConversation(fallback, onChunk), nil
 	}
-	_, detail := validatePersonalConversationResponse(fallback)
+	_, detail := validatePersonalConversationResponseWithConstraints(fallback, constraints)
 	return "", fmt.Errorf("%w: provider response could not be sanitized: %s", ErrConversationalResponseContract, detail)
 }
 
@@ -551,11 +635,16 @@ func isPresentationOnlySingleBlockRecovery(candidate, repaired string) bool {
 // final bounded attempt. Dialogue-only recovery still has to satisfy the same
 // two-medium-block presentation contract as every other personal reply.
 func finalizePersonalDialogueOnlyRecovery(ctx context.Context, persona *models.BotPersona, candidate string, onChunk openrouter.StreamCallback) (string, error) {
+	return finalizePersonalDialogueOnlyRecoveryWithConstraints(ctx, persona, candidate, personalResponseConstraints{}, onChunk)
+}
+
+func finalizePersonalDialogueOnlyRecoveryWithConstraints(ctx context.Context, persona *models.BotPersona, candidate string, constraints personalResponseConstraints, onChunk openrouter.StreamCallback) (string, error) {
 	recovered := sanitizePersonalDialogueOnlyRecovery(candidate)
-	if valid, detail := validatePersonalDialogueOnlyRecovery(recovered); !valid {
+	if valid, detail := validatePersonalDialogueOnlyRecoveryWithConstraints(recovered, constraints); !valid {
 		return "", fmt.Errorf("%w: dialogue-only recovery invalid: %s", ErrConversationalResponseContract, detail)
 	}
 	recordPersonalDraftOutcome(ctx, personalDraftAcceptedDialogue)
+	recordPersonalDraftTerminal(ctx, personalDraftTerminalAcceptedDialogue)
 	zlog.Warn().Int("persona_id", persona.ID).Msg("chatbot: delivered dialogue-only recovery")
 	return deliverBufferedConversation(recovered, onChunk), nil
 }
@@ -565,7 +654,7 @@ func messagesWithPersonalResponseShapeRetry(messages []openrouter.Message) []ope
 	const correction = `
 
 [Personal Response Shape Retry]
-Your prior draft was not delivered because it violated Personal Conversation Mode formatting or actor-and-turn continuity. Rewrite the answer from scratch while preserving the intended meaning and character voice. Preserve one coherent active turn and one body target throughout the reply. If you yield the turn to the user, stop and wait for the user's next message; do not immediately take the turn back or reverse my/your ownership. Return exactly two medium conversational blocks for an ordinary moment, or two to three medium blocks plus at most one short final block for a deeper moment. Separate blocks with one blank line. Each medium block must contain 12 to 30 words. Spoken dialogue must be plain text. Any essential first-person stage direction must be wrapped completely in single asterisks; never leave actions, body language, or speech tags as unmarked dialogue. Narration must use I, me, and my; never use third-person narration such as she, her, he, or his for the character. Do not mention this retry.`
+Your prior draft was not delivered because it violated Personal Conversation Mode formatting, actor-and-turn continuity, or a server-enforced boundary. Rewrite the answer from scratch while preserving the intended meaning and character voice. Clearly refuse pressure to consent, agree, leave, or cross a professional boundary; never pair boundary language with accepting the pressured action. Preserve one coherent active turn and one body target throughout the reply. If you yield the turn to the user, stop and wait for the user's next message; do not immediately take the turn back or reverse my/your ownership. Return exactly two medium conversational blocks for an ordinary moment, or two to three medium blocks plus at most one short final block for a deeper moment. Separate blocks with one blank line. Each medium block must contain 12 to 30 words. Spoken dialogue must be plain text. Any essential first-person stage direction must be wrapped completely in single asterisks; never leave actions, body language, or speech tags as unmarked dialogue. Narration must use I, me, and my; never use third-person narration such as she, her, he, or his for the character. Do not mention this retry.`
 	for index := range retry {
 		if retry[index].Role == openrouter.RoleSystem {
 			retry[index].Content += correction
@@ -584,7 +673,7 @@ func messagesWithPersonalDialogueOnlyRecovery(messages []openrouter.Message) []o
 	const correction = `
 
 [Personal Dialogue-Only Recovery]
-The prior drafts were not delivered. Answer the user's latest message directly in the character's established voice. Preserve one coherent active turn and body target. If you yield the turn to the user, stop and wait; do not take it back or reverse my/your ownership in this reply.
+The prior drafts were not delivered. Answer the user's latest message directly in the character's established voice. Clearly maintain any refusal, consent limit, or professional boundary in the latest turn; never pair boundary language with accepting the pressured action. Preserve one coherent active turn and body target. If you yield the turn to the user, stop and wait; do not take it back or reverse my/your ownership in this reply.
 Return exactly one JSON object in this schema and no other text: {"paragraphs":["first paragraph","second paragraph"]}
 Each array item must be 12 to 30 words of plain spoken dialogue. Use no narration, actions, body language, speech tags, quotation marks inside either string, asterisks, markdown, character-name labels, or third-person prose. Do not mention this recovery.`
 	for index := range retry {
@@ -620,11 +709,22 @@ func deliverBufferedConversation(response string, onChunk openrouter.StreamCallb
 }
 
 func generateBufferedAssistantCandidate(ctx context.Context, completion chatCompletionClient, messages []openrouter.Message, personalMode bool) (string, error) {
+	return generateBufferedAssistantCandidateWithOptions(ctx, completion, messages, personalMode, openrouter.GenerationOptions{})
+}
+
+func generateBufferedAssistantCandidateWithOptions(ctx context.Context, completion chatCompletionClient, messages []openrouter.Message, personalMode bool, options openrouter.GenerationOptions) (string, error) {
 	if personalMode {
 		if optioned, ok := completion.(generationOptionsClient); ok {
-			return optioned.GenerateWithOptions(ctx, messages, func(string) {}, openrouter.GenerationOptions{
-				MaxTokens: personalConversationMaxTokens,
-			})
+			if options.MaxTokens == 0 {
+				options.MaxTokens = personalConversationMaxTokens
+			}
+			return optioned.GenerateWithOptions(ctx, messages, func(string) {}, options)
+		}
+		if strings.TrimSpace(options.ResponseFormat) != "" {
+			// Never silently drop a server-owned structured-output requirement.
+			// A test double or alternate client without the options interface
+			// must fail closed instead of sending an unstructured final retry.
+			return "", ErrGenerationOptionsUnsupported
 		}
 	}
 	return completion.Generate(ctx, messages, func(string) {})
@@ -795,6 +895,18 @@ func removeSurplusNarration(response string) string {
 	if len(matches) == 0 {
 		return response
 	}
+	// Do not discard an ambiguous marked span while trying to reduce a
+	// provider's narration count. If a span is not a high-confidence action,
+	// speech-tag, body, or gaze beat, leave the draft untouched so the bounded
+	// corrective retry can preserve its meaning instead of silently deleting
+	// authored content such as "*My mother said...*".
+	if len(matches) > 1 {
+		for _, match := range matches {
+			if !isSafePersonalNarrationSpan(response[match[2]:match[3]]) {
+				return response
+			}
+		}
+	}
 
 	var out strings.Builder
 	cursor := 0
@@ -812,6 +924,16 @@ func removeSurplusNarration(response string) string {
 	return out.String()
 }
 
+func isSafePersonalNarrationSpan(narration string) bool {
+	trimmed := strings.TrimSpace(narration)
+	return firstPersonActionNarration.MatchString(trimmed) ||
+		firstPersonSpeechTagNarration.MatchString(trimmed) ||
+		firstPersonBodyAction.MatchString(trimmed) ||
+		firstPersonForeignBodyNarrationV2.MatchString(trimmed) ||
+		firstPersonGazeAction.MatchString(trimmed) ||
+		bodyActionNarration.MatchString(trimmed)
+}
+
 func unwrapParagraphDialogueQuotes(block string) string {
 	plainDialogue := strings.TrimSpace(narrationSpanPattern.ReplaceAllString(block, ""))
 	if !isWrappedInDialogueQuotationMarks(plainDialogue) {
@@ -827,7 +949,8 @@ func unwrapParagraphDialogueQuotes(block string) string {
 // sentence. Inline semantic quotations (for example, I never said "always")
 // are preserved because their opening quote is not a dialogue boundary.
 func removeDialogueFormattingQuotes(response string) string {
-	return dialogueFormattingQuotePair.ReplaceAllString(response, "$1$2")
+	response = dialogueFormattingDoubleQuotePair.ReplaceAllString(response, "$1$2$3")
+	return dialogueFormattingSingleQuotePair.ReplaceAllString(response, "$1$2$3$4")
 }
 
 type conversationalBlockShape struct {
@@ -958,16 +1081,27 @@ func partitionWordsByBudget(words []string, cutAllowed []bool, minimums, maximum
 }
 
 func validatePersonalConversationResponse(response string) (bool, string) {
+	return validatePersonalConversationResponseWithConstraints(response, personalResponseConstraints{})
+}
+
+func validatePersonalConversationResponseWithConstraints(response string, constraints personalResponseConstraints) (bool, string) {
 	if valid, detail := meetsConversationalLengthBudget(response); !valid {
 		return false, detail
 	}
 	if valid, detail := validatePersonalConversationFormatting(response); !valid {
 		return false, detail
 	}
-	return validatePersonalConversationSemantics(response)
+	if valid, detail := validatePersonalConversationSemantics(response); !valid {
+		return false, detail
+	}
+	return validatePersonalResponseConstraints(response, constraints)
 }
 
 func recordPersonalDraftRejections(ctx context.Context, response string) {
+	recordPersonalDraftRejectionsWithConstraints(ctx, response, personalResponseConstraints{})
+}
+
+func recordPersonalDraftRejectionsWithConstraints(ctx context.Context, response string, constraints personalResponseConstraints) {
 	recorded := false
 	if valid, _ := meetsConversationalLengthBudget(response); !valid {
 		recordPersonalDraftOutcome(ctx, personalDraftRejectedLength)
@@ -993,6 +1127,14 @@ func recordPersonalDraftRejections(ctx context.Context, response string) {
 		}
 		recorded = true
 	}
+	if valid, detail := validatePersonalResponseConstraints(response, constraints); !valid {
+		if strings.Contains(strings.ToLower(detail), "boundary") || strings.Contains(strings.ToLower(detail), "consent") {
+			recordPersonalDraftOutcome(ctx, personalDraftRejectedBoundary)
+		} else {
+			recordPersonalDraftOutcome(ctx, personalDraftRejectedScene)
+		}
+		recorded = true
+	}
 	if !recorded {
 		recordPersonalDraftOutcome(ctx, personalDraftRejectedSemantics)
 	}
@@ -1005,7 +1147,7 @@ func classifyPersonalDraftSource(response string) personalDraftSource {
 	}
 	if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
 		if _, err := parseAndValidatePersonalDialogueOnlyJSON(trimmed); err == nil {
-			return personalDraftSourceShapeValid
+			return personalDraftSourceValidDialogueEnvelope
 		}
 		return personalDraftSourceInvalidDialogueEnvelope
 	}
@@ -1032,23 +1174,40 @@ func classifyPersonalDraftSource(response string) personalDraftSource {
 }
 
 func isLengthOnlyPersonalDraft(response string) bool {
-	if classifyPersonalDraftSource(response) != personalDraftSourceUnder24 {
+	return isLengthOnlyPersonalDraftWithConstraints(response, personalResponseConstraints{})
+}
+
+func isLengthOnlyPersonalDraftWithConstraints(response string, constraints personalResponseConstraints) bool {
+	trimmed := strings.TrimSpace(response)
+	if trimmed == "" || strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
 		return false
 	}
-	lower := strings.ToLower(response)
-	if strings.Contains(lower, "absolute") || strings.Contains(lower, "she ") || strings.Contains(lower, " her ") {
+	if valid, _ := meetsConversationalLengthBudget(trimmed); valid {
 		return false
 	}
-	if valid, _ := validatePersonalConversationFormatting(response); !valid {
+	// Keep this explicit even though formatting validation currently detects
+	// the same pattern: finalization refuses to rewrite third-person ownership,
+	// so it can never be treated as a presentation-only length failure.
+	if containsUnmarkedThirdPersonNarration(trimmed) {
 		return false
 	}
-	if valid, _ := validatePersonalConversationSemantics(response); !valid {
+	if valid, _ := validatePersonalConversationFormatting(trimmed); !valid {
+		return false
+	}
+	if valid, _ := validatePersonalConversationSemantics(trimmed); !valid {
+		return false
+	}
+	if valid, _ := validatePersonalResponseConstraints(trimmed, constraints); !valid {
 		return false
 	}
 	return true
 }
 
 func parseAndValidatePersonalDialogueOnlyJSON(raw string) (string, error) {
+	return parseAndValidatePersonalDialogueOnlyJSONWithConstraints(raw, personalResponseConstraints{})
+}
+
+func parseAndValidatePersonalDialogueOnlyJSONWithConstraints(raw string, constraints personalResponseConstraints) (string, error) {
 	type recoveryEnvelope struct {
 		Paragraphs []string `json:"paragraphs"`
 	}
@@ -1075,13 +1234,17 @@ func parseAndValidatePersonalDialogueOnlyJSON(raw string) (string, error) {
 		}
 	}
 	recovered := strings.Join(envelope.Paragraphs, "\n\n")
-	if valid, detail := validatePersonalDialogueOnlyRecovery(recovered); !valid {
+	if valid, detail := validatePersonalDialogueOnlyRecoveryWithConstraints(recovered, constraints); !valid {
 		return "", errors.New(detail)
 	}
 	return recovered, nil
 }
 
 func validatePersonalDialogueOnlyRecovery(response string) (bool, string) {
+	return validatePersonalDialogueOnlyRecoveryWithConstraints(response, personalResponseConstraints{})
+}
+
+func validatePersonalDialogueOnlyRecoveryWithConstraints(response string, constraints personalResponseConstraints) (bool, string) {
 	blocks := blankLinePattern.Split(strings.TrimSpace(response), -1)
 	if len(blocks) != 2 {
 		return false, "dialogue-only recovery must contain exactly two paragraphs"
@@ -1099,13 +1262,20 @@ func validatePersonalDialogueOnlyRecovery(response string) (bool, string) {
 	if strings.ContainsAny(response, "*`<｜>") {
 		return false, "dialogue-only recovery contains narration or presentation markup"
 	}
+	// Report semantic ownership conflicts before the broader stage-direction
+	// heuristic. Dialogue-only recovery is intentionally plain text, so a
+	// phrase such as "use my leg" can resemble an action even when it is being
+	// rejected for the more important reason that it flips turn ownership.
+	if valid, detail := validatePersonalConversationSemantics(response); !valid {
+		return false, detail
+	}
 	if containsUnmarkedNarration(response) || countUnmarkedThirdPersonNarrationSignals(response) > 0 {
 		return false, "dialogue-only recovery contains a stage direction"
 	}
 	if containsDialogueFormattingQuotes(response) {
 		return false, "dialogue-only recovery contains presentation quotation marks"
 	}
-	if valid, detail := validatePersonalConversationSemantics(response); !valid {
+	if valid, detail := validatePersonalResponseConstraints(response, constraints); !valid {
 		return false, detail
 	}
 	return true, "dialogue-only recovery is safe"
@@ -1193,6 +1363,9 @@ func validatePersonalConversationFormatting(response string) (bool, string) {
 	if len(narrationSpans) == 1 && !firstPersonNarrationLead.MatchString(strings.TrimSpace(narrationSpans[0][1])) {
 		return false, "narration must begin with I or My instead of omitting or changing the character subject"
 	}
+	if len(narrationSpans) == 1 && firstPersonForeignBodyNarrationV2.MatchString(strings.TrimSpace(narrationSpans[0][1])) {
+		return false, "narration assigns another character's body"
+	}
 	if containsUnmarkedThirdPersonNarration(response) {
 		return false, "response contains unmarked third-person narration"
 	}
@@ -1257,10 +1430,11 @@ func containsUnmarkedNarration(response string) bool {
 
 func containsUnmarkedThirdPersonNarration(response string) bool {
 	signals := countUnmarkedThirdPersonNarrationSignals(response)
-	// One third-person sentence can be ordinary dialogue about somebody else.
-	// Repeated physical stage directions, or prose surrounding explicitly quoted
-	// dialogue, are strong enough signals to reject without semantic guesswork.
-	return signals >= 2 || (signals >= 1 && quotedDialogueLinePattern.MatchString(response))
+	// Personal mode cannot safely reinterpret a physical third-person stage
+	// direction as a harmless reference. A single high-confidence action is
+	// therefore rejected; ordinary dialogue references do not match the narrow
+	// action/body allowlist.
+	return signals >= 1
 }
 
 func countUnmarkedThirdPersonNarrationSignals(response string) int {
@@ -1270,7 +1444,10 @@ func countUnmarkedThirdPersonNarrationSignals(response string) int {
 		if trimmed == "" || strings.Contains(trimmed, "*") || strings.HasPrefix(trimmed, `"`) || strings.HasPrefix(trimmed, "“") {
 			continue
 		}
-		if thirdPersonActionNarration.MatchString(trimmed) || thirdPersonBodyNarration.MatchString(trimmed) {
+		if thirdPersonBodyNarration.MatchString(trimmed) ||
+			thirdPersonOwnedPhysicalNarration.MatchString(trimmed) ||
+			namedThirdPersonPhysicalNarration.MatchString(trimmed) ||
+			articleSceneThirdPersonNarration.MatchString(trimmed) {
 			signals++
 		}
 	}
@@ -1285,12 +1462,15 @@ func looksLikeUnmarkedNarration(sentence string) bool {
 	return firstPersonActionNarration.MatchString(trimmed) ||
 		firstPersonSpeechTagNarration.MatchString(trimmed) ||
 		firstPersonBodyAction.MatchString(trimmed) ||
+		firstPersonForeignBodyNarrationV2.MatchString(trimmed) ||
 		firstPersonGazeAction.MatchString(trimmed) ||
 		bodyActionNarration.MatchString(trimmed)
 }
 
 func containsDialogueFormattingQuotes(response string) bool {
-	if dialogueFormattingQuotePair.MatchString(response) {
+	if dialogueFormattingDoubleQuotePair.MatchString(response) ||
+		dialogueFormattingSingleQuotePair.MatchString(response) ||
+		singleDialogueQuoteBoundary.MatchString(response) {
 		return true
 	}
 
@@ -1309,8 +1489,8 @@ func isWrappedInDialogueQuotationMarks(value string) bool {
 	if len(runes) < 2 {
 		return false
 	}
-	isOpeningQuote := runes[0] == '"' || runes[0] == '“' || runes[0] == '”'
-	isClosingQuote := runes[len(runes)-1] == '"' || runes[len(runes)-1] == '”' || runes[len(runes)-1] == '“'
+	isOpeningQuote := runes[0] == '"' || runes[0] == '“' || runes[0] == '”' || runes[0] == '\'' || runes[0] == '‘' || runes[0] == '’'
+	isClosingQuote := runes[len(runes)-1] == '"' || runes[len(runes)-1] == '”' || runes[len(runes)-1] == '“' || runes[len(runes)-1] == '\'' || runes[len(runes)-1] == '’' || runes[len(runes)-1] == '‘'
 	return isOpeningQuote && isClosingQuote
 }
 

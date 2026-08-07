@@ -56,7 +56,7 @@ func TestOmniChatSocialRepositoryPublishEngageAndContinueLifecycle(t *testing.T)
 		UserID: owner.ID, Filename: "social.png", OriginalFilename: "social.png",
 		FileType: "image/png", FileSize: 1024, StorageURL: "https://cdn.example.test/social.png",
 		StoragePath: "omnichat/generated/social.png", ScanStatus: models.MediaScanStatusClean,
-	}, asset, 1<<30, 50<<30))
+	}, asset, 1<<30, 50<<30, models.OmniChatGenerationProvenance{}))
 
 	social := models.NewOmniChatSocialRepository(db.Pool)
 	publication, err := social.PublishAssetOwned(ctx, owner.ID, asset.ID, "A day at the park")

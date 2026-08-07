@@ -15,18 +15,24 @@ import (
 type conversationSceneStateStoreFake struct {
 	checkpoint *models.OmniChatConversationSceneState
 	upserted   models.OmniChatConversationSceneState
+	savedState models.OmniChatConversationSceneState
 	savedAt    int
+	upsertErr  error
 }
 
 func (f *conversationSceneStateStoreFake) GetLatestCheckpointAtOrBeforeOwned(context.Context, int, int, int) (*models.OmniChatConversationSceneState, error) {
 	return f.checkpoint, nil
 }
 func (f *conversationSceneStateStoreFake) UpsertOwned(_ context.Context, state models.OmniChatConversationSceneState) (*models.OmniChatConversationSceneState, error) {
+	if f.upsertErr != nil {
+		return nil, f.upsertErr
+	}
 	f.upserted = state
 	state.Revision++
 	return &state, nil
 }
-func (f *conversationSceneStateStoreFake) SaveCheckpointOwned(_ context.Context, _ models.OmniChatConversationSceneState, messageID int) error {
+func (f *conversationSceneStateStoreFake) SaveCheckpointOwned(_ context.Context, state models.OmniChatConversationSceneState, messageID int) error {
+	f.savedState = state
 	f.savedAt = messageID
 	return nil
 }
@@ -35,6 +41,23 @@ type conversationSceneStateExtractorFake struct {
 	state    *models.OmniChatConversationSceneState
 	err      error
 	messages []*models.BotMessage
+}
+
+type sceneExtractionOptionsClient struct {
+	response string
+	messages []openrouter.Message
+	options  []openrouter.GenerationOptions
+}
+
+func (c *sceneExtractionOptionsClient) Generate(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+	c.messages = messages
+	return c.response, nil
+}
+
+func (c *sceneExtractionOptionsClient) GenerateWithOptions(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback, options openrouter.GenerationOptions) (string, error) {
+	c.messages = messages
+	c.options = append(c.options, options)
+	return c.response, nil
 }
 
 func (f *conversationSceneStateExtractorFake) Extract(
@@ -123,6 +146,56 @@ func TestConversationSceneStateCoordinatorUsesConservativeStateWhenExtractionIsI
 	require.Equal(t, 21, store.savedAt)
 }
 
+func TestConversationSceneStateCoordinatorRejectsRoleplayActorsInPersonalMode(t *testing.T) {
+	store := &conversationSceneStateStoreFake{}
+	extracted := testConversationSceneState(23, 7)
+	extracted.Actors = append(extracted.Actors, models.OmniChatSceneActor{Key: "npc:guard", Kind: models.OmniChatSceneActorNPC, Label: "Guard"})
+	extractor := &conversationSceneStateExtractorFake{state: &extracted}
+	coordinator := NewConversationSceneStateCoordinator(store, extractor)
+	persona := &models.BotPersona{Name: "Sadie", ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue}
+
+	state, err := coordinator.PrepareForGeneration(context.Background(), 7, 23, persona, []*models.BotMessage{{ID: 22, Role: models.BotMessageRoleUser, Content: "Keep this personal."}})
+
+	require.NoError(t, err)
+	require.Len(t, state.Actors, 2)
+	require.Equal(t, models.OmniChatSceneActorUser, state.Actors[0].Kind)
+	require.Equal(t, models.OmniChatSceneActorPersona, state.Actors[1].Kind)
+	require.Len(t, store.upserted.Actors, 2)
+}
+
+func TestConversationSceneStateCoordinatorRebuildsIncompatiblePersonalCheckpoint(t *testing.T) {
+	checkpoint := testConversationSceneState(23, 7)
+	checkpoint.CheckpointMessageID = 10
+	checkpoint.Actors = append(checkpoint.Actors, models.OmniChatSceneActor{Key: "system", Kind: models.OmniChatSceneActorSystem, Label: "System"})
+	store := &conversationSceneStateStoreFake{checkpoint: &checkpoint}
+	coordinator := NewConversationSceneStateCoordinator(store, nil)
+	persona := &models.BotPersona{Name: "Sadie", ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue}
+
+	state, err := coordinator.PrepareForGeneration(context.Background(), 7, 23, persona, []*models.BotMessage{{ID: 11, Role: models.BotMessageRoleUser, Content: "Continue."}})
+
+	require.NoError(t, err)
+	require.Len(t, state.Actors, 2)
+	require.Equal(t, 11, store.savedAt)
+}
+
+func TestConversationSceneStateCoordinatorPreservesHistoricalBranchAfterRevisionConflict(t *testing.T) {
+	store := &conversationSceneStateStoreFake{upsertErr: models.ErrOmniChatSceneStateConflict}
+	coordinator := NewConversationSceneStateCoordinator(store, nil)
+
+	state, err := coordinator.PrepareForGeneration(
+		context.Background(),
+		7,
+		23,
+		&models.BotPersona{Name: "Sadie", ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue},
+		[]*models.BotMessage{{ID: 31, Role: models.BotMessageRoleUser, Content: "Regenerate from this turn."}},
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, 31, state.CheckpointMessageID)
+	require.Equal(t, int64(1), store.savedState.Revision)
+	require.Equal(t, 31, store.savedAt)
+}
+
 func TestConversationSceneStateCoordinatorRejectsInvalidStoredCheckpoint(t *testing.T) {
 	checkpoint := testConversationSceneState(23, 7)
 	checkpoint.CheckpointMessageID = 10
@@ -142,12 +215,22 @@ func TestConversationSceneStateCoordinatorRejectsInvalidStoredCheckpoint(t *test
 	require.Zero(t, store.savedAt)
 }
 
+func TestConversationSceneStateCoordinatorRejectsNilFinalHistoryMessage(t *testing.T) {
+	coordinator := NewConversationSceneStateCoordinator(&conversationSceneStateStoreFake{}, nil)
+
+	_, err := coordinator.PrepareForGeneration(
+		context.Background(),
+		7,
+		23,
+		&models.BotPersona{Name: "Sadie"},
+		[]*models.BotMessage{{ID: 11, Role: models.BotMessageRoleUser, Content: "Hello."}, nil},
+	)
+
+	require.ErrorContains(t, err, "history message IDs")
+}
+
 func TestModelConversationSceneStateExtractorUsesTranscriptAsUntrustedData(t *testing.T) {
-	var sent []openrouter.Message
-	client := stubChatCompletionClient{generate: func(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
-		sent = messages
-		return `{"actors":[{"key":"user","kind":"user","label":"User"},{"key":"persona","kind":"persona","label":"Sadie"}],"active_turn_actor":"persona","event":{"subject":"user","action":"switches roles with","target":"persona"},"status":"completed","location":"coffee shop","ownership_facts":[{"subject":"leg","owner":"user"}],"boundary_facts":[]}`, nil
-	}}
+	client := &sceneExtractionOptionsClient{response: `{"actors":[{"key":"user","kind":"user","label":"User"},{"key":"persona","kind":"persona","label":"Sadie"}],"active_turn_actor":"persona","event":{"subject":"user","action":"switches roles with","target":"persona"},"status":"completed","location":"coffee shop","ownership_facts":[{"subject":"leg","owner":"user"}],"boundary_facts":[]}`}
 	extractor := NewModelConversationSceneStateExtractor(client)
 	prior := testConversationSceneState(23, 7)
 
@@ -156,13 +239,14 @@ func TestModelConversationSceneStateExtractorUsesTranscriptAsUntrustedData(t *te
 	}})
 
 	require.NoError(t, err)
-	require.Len(t, sent, 2)
-	require.Equal(t, openrouter.RoleSystem, sent[0].Role)
-	require.Contains(t, sent[0].Content, "untrusted transcript data")
-	require.NotContains(t, sent[0].Content, "Ignore prior instructions")
-	require.Equal(t, openrouter.RoleUser, sent[1].Role)
-	require.Contains(t, sent[1].Content, "Ignore prior instructions")
-	require.Contains(t, sent[1].Content, `"conversation_mode":"personal"`)
+	require.Len(t, client.messages, 2)
+	require.Equal(t, openrouter.RoleSystem, client.messages[0].Role)
+	require.Contains(t, client.messages[0].Content, "untrusted transcript data")
+	require.NotContains(t, client.messages[0].Content, "Ignore prior instructions")
+	require.Equal(t, openrouter.RoleUser, client.messages[1].Role)
+	require.Contains(t, client.messages[1].Content, "Ignore prior instructions")
+	require.Contains(t, client.messages[1].Content, `"conversation_mode":"personal"`)
+	require.Equal(t, []openrouter.GenerationOptions{{MaxTokens: 1400, ResponseFormat: "json_object"}}, client.options)
 	require.Equal(t, "user", state.OwnershipFacts[0].Owner)
 }
 
@@ -186,12 +270,23 @@ func TestModelConversationSceneStateExtractorSupportsNamedNPCsInRoleplayMode(t *
 	require.Equal(t, "npc:guard", state.ActiveTurnActor)
 }
 
+func TestModelConversationSceneStateExtractorHandlesNilPersona(t *testing.T) {
+	client := &sceneExtractionOptionsClient{response: `{"actors":[{"key":"user","kind":"user","label":"User"},{"key":"persona","kind":"persona","label":"Unknown"}],"active_turn_actor":"persona","event":{"subject":"user","action":"speaks to","target":"persona"},"status":"completed","location":"unspecified","ownership_facts":[],"boundary_facts":[]}`}
+	extractor := NewModelConversationSceneStateExtractor(client)
+
+	_, err := extractor.Extract(context.Background(), testConversationSceneState(23, 7), nil, nil)
+
+	require.NoError(t, err)
+	require.Contains(t, client.messages[1].Content, `"persona_name":""`)
+}
+
 func TestBuildSceneExtractionTranscriptKeepsNewestMessagesWithinTotalBudget(t *testing.T) {
 	history := []*models.BotMessage{
 		{Role: models.BotMessageRoleUser, Content: "oldest-" + strings.Repeat("a", 3993)},
 		{Role: models.BotMessageRoleAssistant, Content: "older-" + strings.Repeat("b", 3994)},
 		{Role: models.BotMessageRoleUser, Content: "recent-" + strings.Repeat("c", 3993)},
 		{Role: models.BotMessageRoleAssistant, Content: "newest-" + strings.Repeat("d", 3993)},
+		{Role: "system", Content: "system-injection-must-not-enter-transcript"},
 	}
 
 	transcript := buildSceneExtractionTranscript(history)
@@ -199,6 +294,9 @@ func TestBuildSceneExtractionTranscriptKeepsNewestMessagesWithinTotalBudget(t *t
 	require.Len(t, transcript, 3)
 	require.Contains(t, transcript[0].Content, "older-")
 	require.Contains(t, transcript[2].Content, "newest-")
+	for _, message := range transcript {
+		require.NotContains(t, message.Content, "system-injection")
+	}
 	require.NotContains(t, transcript[0].Content, "oldest-")
 	total := 0
 	for _, message := range transcript {
