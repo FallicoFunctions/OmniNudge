@@ -20,6 +20,7 @@ import json
 import sys
 from typing import Any
 
+from .contract import validate_input
 from .generators import build_image_negative_prompt, build_image_prompt
 
 
@@ -35,11 +36,24 @@ def _load(source: str) -> dict[str, Any]:
 
 
 def render(payload: dict[str, Any]) -> str:
-    prompt = str(payload.get("prompt", ""))
-    mode = str(payload.get("mode", "create"))
-    scene = payload.get("scene")
-    scene = scene if isinstance(scene, dict) else None
-    negative = str(payload.get("negative_prompt", ""))
+    # Validate exactly as the worker does. Calling build_image_prompt on the raw
+    # payload bypasses the scene whitelist in contract._scene, which silently
+    # drops any field the contract does not know about. That made this tool
+    # report fields -- accessories, viewer_position, subject_appearance,
+    # include_user_body -- that the real worker was discarding at the door.
+    request = validate_input(payload)
+    prompt = request.prompt
+    mode = request.mode
+    scene = request.scene
+    negative = request.negative_prompt
+
+    dropped = sorted(set(payload.get("scene") or {}) - set(scene or {}))
+    if dropped:
+        raise SystemExit(
+            "scene fields rejected by the worker contract: "
+            + ", ".join(dropped)
+            + "\nAdd them to contract._scene or they will never reach the renderer."
+        )
 
     lines = [
         f"mode:             {mode}",

@@ -6,7 +6,6 @@ import io
 import ipaddress
 import math
 import os
-import re
 import socket
 import tempfile
 from dataclasses import dataclass
@@ -33,8 +32,27 @@ DEFAULT_IMAGE_NEGATIVE_PROMPT = (
 
 DEFAULT_IP_ADAPTER_MODEL_ID = "h94/IP-Adapter"
 DEFAULT_IP_ADAPTER_SUBFOLDER = "sdxl_models"
-DEFAULT_IP_ADAPTER_WEIGHT = "ip-adapter_sdxl.bin"
-DEFAULT_CONTROLNET_MODEL_ID = "thibaud/controlnet-openpose-sdxl-1.0"
+# The plus-face adapter is trained on cropped faces and is the only variant in
+# this repo that reproduces a specific person. The general ip-adapter_sdxl
+# transfers overall style and composition, which reads as "same vibe, different
+# woman" once the scene prompt takes over.
+DEFAULT_IP_ADAPTER_WEIGHT = "ip-adapter-plus-face_sdxl_vit-h.safetensors"
+# Every *_vit-h adapter needs the ViT-H encoder at the repo root, not the
+# ViT-bigG encoder under sdxl_models/. Loading the wrong one does not raise; it
+# silently produces weak, generic identity conditioning.
+DEFAULT_IP_ADAPTER_IMAGE_ENCODER = "models/image_encoder"
+# The general "plus" adapter encodes the whole reference, which is where body
+# shape and proportions come from. Same ViT-H encoder as the face adapter, so
+# both can share one image encoder.
+DEFAULT_BODY_ADAPTER_WEIGHT = "ip-adapter-plus_sdxl_vit-h.safetensors"
+# Vanilla SDXL base is safety-tuned and renders a generic idealized face, which
+# fights both persona likeness and the adult content this product generates.
+DEFAULT_IMAGE_MODEL_ID = "SG161222/RealVisXL_V5.0"
+
+
+# Distinguishes "caller has not detected yet" from a genuine "no face found",
+# so passing None short-circuits detection instead of retriggering it.
+_UNSET_BOX: Any = object()
 
 
 def _positive_int_env(name: str, default: int, *, minimum: int, maximum: int) -> int:
@@ -66,8 +84,12 @@ def image_pipeline_settings(model_id: str) -> tuple[int, float, float]:
     """
     normalized = model_id.strip().lower()
     is_distilled = "turbo" in normalized or "schnell" in normalized
-    default_steps = 4 if is_distilled else 25
-    default_guidance = 0.0 if is_distilled else 7.5
+    # Photoreal SDXL finetunes are trained for lower guidance than SDXL base.
+    # Running them at 7.5 oversaturates skin and hardens edges, which reads as
+    # "AI render" rather than photograph.
+    is_photoreal = any(name in normalized for name in ("realvis", "juggernaut", "lustify"))
+    default_steps = 4 if is_distilled else (30 if is_photoreal else 25)
+    default_guidance = 0.0 if is_distilled else (5.0 if is_photoreal else 7.5)
     # A reference is identity guidance, not a composition lock. A slightly
     # stronger denoise lets the requested location and action replace the
     # avatar's original background while retaining recognizable features.
@@ -84,253 +106,97 @@ def build_image_negative_prompt(
     request_prompt: str = "",
     scene: dict[str, Any] | None = None,
 ) -> str:
-    """Keep common rendering defects out of every generated image."""
+    """Keep common rendering defects out of every generated image.
+
+    Scene-specific negatives are derived from structured state, never from
+    substring matches on transcript text. Keyword sniffing previously appended a
+    two-person BDSM negative block to any scene whose location merely contained
+    the word "dungeon".
+    """
     custom = " ".join(request_negative_prompt.split()).strip()
     parts = [DEFAULT_IMAGE_NEGATIVE_PROMPT]
+    scene = scene or {}
     if mode.strip().lower() == "contextual":
-        location_match = re.search(r"\bLocation:\s*([^\.]+)", request_prompt, flags=re.IGNORECASE)
-        location = location_match.group(1).strip().lower() if location_match else ""
-        if scene:
-            location = str(scene.get("location", location)).strip().lower() or location
-        indoor_terms = (
-            "dungeon", "room", "bedroom", "bathroom", "kitchen", "office", "studio",
-            "bar", "club", "cellar", "castle", "prison", "interior", "indoors",
-        )
-        if any(term in location for term in indoor_terms):
+        location = _scene_text(scene, "location").lower()
+        if location and any(term in location for term in _INDOOR_TERMS):
             parts.append("forest, trees, foliage, outdoor landscape, sky, campsite, park background")
-        scene_text = " ".join(
-            str(value)
-            for key, value in (scene or {}).items()
-            if key in {"location", "activity", "outfit", "pose", "mood", "recent_events"}
-        )
-        intimate_text = f"{request_prompt} {scene_text}"
-        intimate = _is_intimate_scene(intimate_text)
-        if intimate:
-            direct_oral = "dick" in intimate_text.lower() and "mouth" in intimate_text.lower()
-            parts.append(
-                "casual street clothes, blouse, sweater, jeans, pajamas, solitary standing pose, "
-                "shirt, dress, trousers, fabric covering the character, standing alone, empty hallway, "
-                "ordinary speaking portrait, fashion catalog, "
-                "third person, duplicate character, twin, extra duplicate body, extra limbs, extra legs, fused bodies"
-            )
-            if direct_oral:
-                # This cue describes one persona and one male user. Explicitly
-                # suppressing an additional woman prevents adult checkpoints
-                # from turning a two-person pose into a group composition.
-                parts.append(
-                    "second woman, extra woman, additional female, multiple women, threesome, group scene, "
-                    "female user, third adult, fourth adult"
-                )
+        if scene.get("include_user_body"):
+            # The frame intentionally contains two people, so duplicate
+            # suppression must not ask the model to remove the second body.
+            parts.append("third person, extra adult, duplicate subject, twin, fused bodies, extra limbs")
         else:
-            # A contextual intimate scene intentionally contains two people.
-            # Keep duplicate suppression for ordinary portraits without asking
-            # the model to remove the user's required body from the frame.
-            parts.append("duplicate person, extra faces")
+            parts.append("second subject, duplicate subject, extra person, extra faces, crowd, bystander")
+        # An adult-tuned checkpoint drifts to nude regardless of the positive
+        # prompt, so a tracked outfit has to be defended from the negative side.
+        # But only the parts the outfit actually covers: a lower-body-only
+        # outfit means topless is correct, and blanket-negating "topless" told
+        # the model to invent a top over an explicit g-string-only scene.
+        outfit = _visible_outfit(scene)
+        if outfit:
+            if _covers_upper_body(outfit):
+                parts.append("nude, naked, topless, undressed, exposed breasts, bare skin instead of clothing")
+            else:
+                parts.append("shirt, top, bra, blouse, covered chest, fully clothed")
+        # An adult checkpoint's prior is a slim fitness build, which quietly
+        # overrides a fuller figure stated in the positive prompt. When the
+        # persona is described as full, defend that from the negative side too.
+        if _describes_full_figure(_scene_text(scene, "subject_appearance")):
+            parts.append("slim, skinny, thin, athletic build, toned abs, flat stomach, fitness model, petite")
+        # "Smiling at camera" is a very strong portrait prior. When the scene
+        # tracked a different expression, say so explicitly.
+        expression = _scene_text(scene, "expression").lower()
+        if expression and not any(
+            cue in expression for cue in ("smil", "grin", "laugh", "happy", "beam", "playful", "joy")
+        ):
+            parts.append("smiling, grinning, laughing, cheerful expression")
     if custom:
         parts.append(custom)
     return ", ".join(parts)
 
 
-def _is_intimate_scene(value: str) -> bool:
-    lowered = value.lower()
-    return any(
-        cue in lowered
-        for cue in (
-            "bdsm", "dungeon", "dominant", "submissive", "restraint", "restrained",
-            "bound", "collar", "cuffs", "handcuff", "blindfold", "whip", "chain",
-            "naked", "nude", "undress", "dick", "cock", "pussy", "cum", "semen",
-            "fingers deep", "thrust hard", "rub my", "on my knees",
-        )
-    )
-
-
-def _scene_recent_context(scene: dict[str, Any], fallback: str) -> str:
-    values = scene.get("recent_events") if isinstance(scene, dict) else None
-    if isinstance(values, list):
-        cleaned = [_clean_scene_event(value) for value in values]
-        cleaned = [value for value in cleaned if value]
-        if cleaned:
-            # The list is chronological. Put the latest physical beat first so
-            # the diffusion model does not spend its limited context on stale
-            # earlier action.
-            recent = "; ".join(reversed(cleaned[-3:]))
-            if len(recent) > 420:
-                recent = recent[:420].rsplit(" ", 1)[0]
-            return recent
-    return fallback
-
-
-def _clean_scene_event(value: Any) -> str:
-    """Keep visual action from a stored transcript, never dialogue metadata."""
-    text = " ".join(str(value).split()).strip()
-    if not text:
-        return ""
-    role = ""
-    match = re.match(r"^(user|character|persona)\s*:\s*", text, flags=re.IGNORECASE)
-    if match:
-        role = match.group(1).lower()
-        text = text[match.end():].strip()
-
-    narrated = re.findall(r"\*([^*]+)\*", text)
-    if not narrated:
-        # Scene events are bounded before they reach the worker. A long
-        # narration can therefore end after an opening asterisk. The tail is
-        # still the physical direction and must not be discarded, otherwise
-        # the renderer falls back to a generic standing portrait.
-        marker = text.find("*")
-        if marker >= 0 and text[marker + 1 :].strip():
-            narrated = [text[marker + 1 :]]
-    if narrated:
-        text = " ".join(" ".join(segment.split()) for segment in narrated).strip()
-    elif role == "user":
-        # A user turn is useful only when it contains a concrete physical
-        # direction. Ordinary speech must not become a caption-like prompt.
-        lower = text.lower()
-        cues = (
-            "hand", "arm", "leg", "knee", "foot", "body", "skin", "mouth", "lips", "face", "hair",
-            "touch", "hold", "grab", "move", "place", "put", "press", "slide", "stroke", "rub",
-            "lean", "stand", "sit", "walk", "kneel", "lie", "bend", "turn", "pull", "push",
-            "undress", "naked", "nude", "kiss", "lick", "moan", "trembl",
-        )
-        if not any(cue in lower for cue in cues):
-            return ""
-
-    # Quoted dialogue is not a visual instruction. Strip it even when it is
-    # adjacent to narration so the diffusion model cannot render text.
-    text = re.sub(r"\"[^\"]*\"|“[^”]*”", " ", text)
-    text = re.sub(r"\s+", " ", text).strip(" .")
-    return text[:220].rsplit(" ", 1)[0] if len(text) > 220 else text
-
-
-def _visual_scene_composition(recent: str) -> str:
-    """Translate transcript action into a concrete camera composition."""
-    lowered = recent.lower()
-    if not lowered:
-        return ""
-    if "dick" in lowered and "mouth" in lowered:
-        return (
-            "Exactly two adults are in frame: one adult man (the user) and one adult woman (the persona), with no other people. "
-            "The adult man's torso, hips, legs, and one arm are clearly visible across the lower foreground, "
-            "with only his face cropped out; the woman kneels between his legs and leans forward with her mouth close "
-            "to his groin in a clearly intimate interaction, with her face and hands visible. Show the connected pose, "
-            "not a standing portrait, and do not create a second woman or duplicate body."
-        )
-    intimate_cues = (
-        "dick", "cock", "pussy", "fingers deep", "thrust", "rub", "mouth", "naked",
-        "nude", "restrain", "cuff", "collar", "straddle", "blindfold",
-    )
-    if any(cue in lowered for cue in intimate_cues):
-        return (
-            "The adult user's torso, hips, legs, and arms are clearly visible on padded dungeon furniture, with the "
-            "user's face outside the frame, while the character kneels or straddles them and leans over with her "
-            "hands visibly engaged in the interaction; show the connected pose and do not show the character alone "
-            "or create a duplicate character."
-        )
-    return ""
-
-
-_OPENPOSE_LIMBS = (
-    (0, 1), (1, 2), (2, 3), (3, 4), (1, 5), (5, 6), (6, 7),
-    (1, 8), (8, 9), (9, 10), (8, 11), (11, 12), (8, 13), (13, 14),
-    (0, 15), (15, 17), (0, 16), (16, 18),
-)
-_OPENPOSE_COLORS = (
-    (255, 0, 0), (255, 85, 0), (255, 170, 0), (255, 255, 0),
-    (170, 255, 0), (85, 255, 0), (0, 255, 0), (0, 255, 85),
-    (0, 255, 170), (0, 255, 255), (0, 170, 255), (0, 85, 255),
-    (0, 0, 255), (85, 0, 255), (170, 0, 255), (255, 0, 255),
-    (255, 0, 170), (255, 0, 85),
+_INDOOR_TERMS = (
+    "dungeon", "room", "bedroom", "bathroom", "kitchen", "office", "studio",
+    "bar", "club", "cellar", "castle", "prison", "interior", "indoors",
 )
 
 
-def _draw_openpose_person(
-    draw: Any,
-    points: list[tuple[float, float]],
-    width: int,
-    height: int,
-    *,
-    include_head: bool = True,
-) -> None:
-    """Draw an OpenPose-style skeleton for the scene layout ControlNet."""
-    scaled = [(int(x * width), int(y * height)) for x, y in points]
-    limb_width = max(8, round(min(width, height) * 0.012))
-    joint_radius = max(10, round(min(width, height) * 0.018))
-    excluded = {0, 15, 16, 17, 18} if not include_head else set()
-    for index, (start, end) in enumerate(_OPENPOSE_LIMBS):
-        if start >= len(scaled) or end >= len(scaled) or start in excluded or end in excluded:
+def _scene_text(scene: dict[str, Any], key: str) -> str:
+    value = scene.get(key)
+    if not isinstance(value, str):
+        return ""
+    # Values arrive as sentence fragments and are re-punctuated below, so a
+    # trailing period here would double up.
+    return " ".join(value.split()).strip().rstrip(".")
+
+
+def _scene_list(scene: dict[str, Any], key: str) -> list[str]:
+    values = scene.get(key)
+    if not isinstance(values, list):
+        return []
+    cleaned = []
+    for value in values:
+        if not isinstance(value, str):
             continue
-        color = _OPENPOSE_COLORS[index % len(_OPENPOSE_COLORS)]
-        draw.line((scaled[start], scaled[end]), fill=color, width=limb_width)
-    for index, (x, y) in enumerate(scaled):
-        if index in excluded:
-            continue
-        color = _OPENPOSE_COLORS[index % len(_OPENPOSE_COLORS)]
-        draw.ellipse(
-            (x - joint_radius, y - joint_radius, x + joint_radius, y + joint_radius),
-            fill=color,
-        )
+        text = " ".join(value.split()).strip()
+        if text:
+            cleaned.append(text)
+    return cleaned
 
 
-def build_pose_control_image(width: int, height: int, recent: str):
-    """Create a deterministic two-person pose map for intimate scene images.
+def _scene_recent_context(scene: dict[str, Any], fallback: str = "") -> str:
+    """Return the most recent physical beats, latest first.
 
-    The fallback identity adapter supplies appearance, while OpenPose supplies
-    the missing spatial constraint. The user's face is deliberately kept out
-    of the layout so the adapter has only one face to identify as the persona.
+    The backend already strips role labels and dialogue from these events, so
+    this only bounds and orders them. Latest first keeps the current action
+    inside the model's effective text window.
     """
-    try:
-        from PIL import Image, ImageDraw  # type: ignore
-    except ImportError as exc:  # pragma: no cover - exercised in image
-        raise ModelError("Pillow is not installed") from exc
-    if width <= 0 or height <= 0:
-        raise ModelError("pose control dimensions are invalid")
-    image = Image.new("RGB", (width, height), (0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    lowered = recent.lower()
-    if "dick" in lowered and "mouth" in lowered:
-        # Persona kneels and leans toward the user's lower body. The user is
-        # a partial horizontal skeleton; this leaves their face out of frame.
-        persona = [
-            (0.53, 0.64), (0.50, 0.69), (0.40, 0.70), (0.35, 0.77), (0.42, 0.82),
-            (0.60, 0.70), (0.65, 0.77), (0.58, 0.82), (0.50, 0.82), (0.40, 0.92),
-            (0.28, 1.02), (0.56, 1.02), (0.68, 0.92), (0.78, 1.02),
-            (0.50, 0.64), (0.56, 0.64), (0.46, 0.65), (0.60, 0.65),
-        ]
-        user = [
-            (0.10, 0.78), (0.22, 0.80), (0.31, 0.75), (0.31, 0.86), (0.42, 0.88),
-            (0.31, 0.75), (0.42, 0.76), (0.53, 0.80), (0.58, 0.84), (0.68, 0.72),
-            (0.80, 0.62), (0.94, 0.58), (0.58, 0.88), (0.72, 0.83), (0.92, 0.78),
-            (0.11, 0.77), (0.15, 0.77), (0.06, 0.78), (0.19, 0.80),
-        ]
-    else:
-        persona = [
-            (0.50, 0.28), (0.50, 0.37), (0.40, 0.40), (0.35, 0.53), (0.32, 0.62),
-            (0.60, 0.40), (0.65, 0.53), (0.68, 0.62), (0.50, 0.61), (0.45, 0.64),
-            (0.36, 0.79), (0.31, 0.91), (0.55, 0.64), (0.64, 0.79), (0.69, 0.91),
-            (0.47, 0.28), (0.53, 0.28), (0.43, 0.30), (0.57, 0.30),
-        ]
-        user = [
-            (0.10, 0.78), (0.22, 0.80), (0.31, 0.75), (0.31, 0.86), (0.42, 0.88),
-            (0.31, 0.75), (0.42, 0.76), (0.53, 0.80), (0.58, 0.84), (0.68, 0.72),
-            (0.80, 0.62), (0.94, 0.58), (0.58, 0.88), (0.72, 0.83), (0.92, 0.78),
-            (0.11, 0.77), (0.15, 0.77), (0.06, 0.78), (0.19, 0.80),
-        ]
-    _draw_openpose_person(draw, persona, width, height)
-    # The user's face must remain outside the frame. A nose/eye skeleton here
-    # makes OpenPose invent a second face even when the text prompt excludes
-    # it, so render only the user's neck, torso, limbs, and hips.
-    _draw_openpose_person(draw, user, width, height, include_head=False)
-    return image
-
-
-def _pose_control_enabled(request: GenerationRequest, *, image_to_image: bool = False) -> bool:
-    if image_to_image or request.mode.strip().lower() != "contextual":
-        return False
-    configured = os.getenv("OMNICHAT_POSE_CONTROL_ENABLED", "1").strip().lower()
-    if configured in {"0", "false", "no", "off"}:
-        return False
-    recent = _scene_recent_context(request.scene, "")
-    return bool(_visual_scene_composition(recent))
+    cleaned = _scene_list(scene if isinstance(scene, dict) else {}, "recent_events")
+    if not cleaned:
+        return fallback
+    recent = "; ".join(reversed(cleaned[-3:]))
+    if len(recent) > 420:
+        recent = recent[:420].rsplit(" ", 1)[0]
+    return recent
 
 
 def build_image_prompt(
@@ -338,150 +204,236 @@ def build_image_prompt(
     mode: str = "create",
     scene: dict[str, Any] | None = None,
 ) -> str:
-    """Turn scene direction into an environment-forward photographic shot.
+    """Turn structured scene state into an environment-forward photographic shot.
 
-    A persona reference is supplied through identity conditioning for identity,
-    not composition. Contextual requests must explicitly prioritize the scene;
-    otherwise a close-up avatar can overpower the prompt and be returned nearly
-    unchanged.
+    Contextual requests are serialized from the ``scene`` dict the backend
+    sends. The backend owns what the scene contains, including how many people
+    are in frame; this function only phrases it for a diffusion model.
+
+    Earlier versions re-parsed the backend's prose prompt with regexes and
+    inferred composition from transcript keywords. That produced a canned
+    dungeon description for any location containing "dungeon" and forced a
+    second body into the frame, which is what made generated scenes ignore the
+    actual roleplay.
     """
-    prompt = " ".join(request_prompt.split()).strip()
-    # Provider prompts can contain conversation prose. The explicit visual
-    # framing makes the image model treat it as direction rather than as text
-    # to draw, while the negative prompt handles residual typography artifacts.
-    if mode.strip().lower() == "contextual":
-        # The backend prompt contains a long, provider-neutral scene contract.
-        # SDXL Turbo has a short effective text window; putting that contract
-        # before the actual location causes the model to truncate the scene
-        # and reuse the reference composition. Extract the structured fields
-        # and put the visual anchors first instead of sending the contract
-        # twice.
-        def field(*labels: str) -> str:
-            for label in labels:
-                match = re.search(
-                    rf"\b{label}:\s*(.*?)(?=\.\s+(?:[A-Za-z][A-Za-z ]*):|\.\s+Requested view:|$)",
-                    prompt,
-                    flags=re.IGNORECASE,
-                )
-                if match:
-                    value = " ".join(match.group(1).split()).strip(" .")
-                    if value:
-                        return value
-            return ""
-
-        scene = scene or {}
-        location = str(scene.get("location", "")).strip() or field("Location visual direction", "Location")
-        location = location.lower()
-        indoor_terms = (
-            "dungeon", "room", "bedroom", "bathroom", "kitchen", "office", "studio",
-            "bar", "club", "cellar", "castle", "prison", "interior", "indoors",
+    prompt = " ".join(request_prompt.split()).strip().rstrip(".")
+    if mode.strip().lower() != "contextual":
+        # The reference may be a person, anime art, or an object. Describing it
+        # as "the subject" lets the reference decide; asserting a human here
+        # would fight a legitimate request such as "chair on a mountain".
+        return (
+            "A single coherent photorealistic image. Use the supplied reference only "
+            "for the subject's identity and appearance; do not copy "
+            f"its background, crop, lighting, or framing. {prompt}."
         )
-        if "dungeon" in location or "underground" in location:
-            location = (
-                "an enclosed underground stone-walled room with rough masonry, "
-                "a low ceiling, iron fixtures, and warm practical lamps"
-            )
-        elif any(term in location for term in indoor_terms):
-            location = (
-                "an enclosed interior room with visible walls, floor, ceiling, "
-                "and practical indoor lighting"
-            )
-        elif not location:
-            location = "the requested setting"
 
-        activity = str(scene.get("activity", "")).strip() or field("Current activity", "Activity")
-        outfit = str(scene.get("outfit", "")).strip() or field("Character outfit", "Outfit")
-        pose = str(scene.get("pose", "")).strip() or field("Pose")
-        expression = str(scene.get("expression", "")).strip() or field("Expression")
-        mood = str(scene.get("mood", "")).strip() or field("Mood")
-        lighting = str(scene.get("lighting", "")).strip() or field("Lighting")
-        camera = str(scene.get("camera_direction", "")).strip() or field("Camera direction")
-        requested_view = field("Requested view")
-        recent = _scene_recent_context(scene, field("Recent physical context"))
-        scene_text = " ".join([location, activity, outfit, pose, expression, mood, recent])
-        intimate = _is_intimate_scene(scene_text)
-        explicit = _is_intimate_scene(f"{recent} {outfit} {pose}")
+    scene = scene or {}
+    return _budgeted_contextual_prompt(scene)
 
-        composition = _visual_scene_composition(recent)
-        # Keep the high-value action in the first SDXL text window. A verbose
-        # masonry description can otherwise consume the tokens that describe
-        # the connected bodies and clothing state.
-        prompt_location = "an enclosed stone dungeon" if intimate else location
-        parts = [f"Photorealistic environmental photograph in {prompt_location}."]
-        if intimate:
-            if explicit:
-                if "dick" in recent.lower() and "mouth" in recent.lower():
-                    parts.append(
-                        "Exactly two adults only: one adult woman, the persona, and one adult man, the user; no other people. "
-                        "Private BDSM dungeon scene. The nude persona is the only woman in frame and kneels between the man's legs "
-                        "with her mouth close to his unclothed groin. The man's torso, hips, legs, and one arm fill the foreground; "
-                        "his penis is directed toward the persona's mouth; crop his face out. Persona face and hands visible; "
-                        "one persona; no clothing; do not add a second woman."
-                    )
-                else:
-                    parts.append(
-                        "Adult BDSM roleplay scene: two connected nude adults; persona kneels or straddles the user "
-                        "in the active interaction. User's unclothed torso, hips, legs, and one arm fill the foreground; "
-                        "crop the user's face out; one persona; no clothing."
-                    )
-            else:
-                parts.append(
-                    "Adult BDSM roleplay scene in a private dungeon: two connected adults; the persona physically "
-                    "engages the user in the described pose, never standing alone."
-                )
-            parts.append(
-                "Use the reference only for the persona's face, hair, and distinctive appearance; never duplicate "
-                "the persona and never copy the reference background, crop, lighting, or pose."
-            )
-        else:
-            parts.append(
-                "Show one coherent character matching the supplied identity reference; "
-                "use the reference for face, hair, and distinctive appearance only."
-            )
-        if composition and not intimate:
-            # Raw transcript prose often describes several sequential beats
-            # and can pull a diffusion model toward an incoherent pose. Keep
-            # the decisive visual composition, while using the raw events only
-            # for cue detection and continuity bookkeeping.
-            parts.append(f"Primary visual action that must be visible in the frame: {composition}")
-        elif recent and not intimate:
-            parts.append(f"Primary visual action that must be visible in the frame: {recent}.")
-        generic_activity = activity.lower() in {
-            "speaks to", "talks to", "converses with", "stands nearby", "looks at", "interacts with",
-        }
-        if activity and not (intimate and recent and generic_activity):
-            if intimate:
-                parts.append(f"Current physical activity: {activity}, continuing the intimate interaction.")
-            else:
-                parts.append(f"The character {activity}.")
-        if pose:
-            parts.append(f"Pose: {pose}.")
-        if outfit:
-            parts.append(f"Outfit: {outfit}.")
-        if expression:
-            parts.append(f"Expression: {expression}.")
-        if mood:
-            parts.append(f"Mood: {mood}.")
-        if lighting:
-            parts.append(f"Lighting: {lighting}.")
-        if camera:
-            parts.append(f"Camera: {camera}.")
-        if requested_view:
-            parts.append(f"Requested view: {requested_view}.")
-        parts.append(
-            "Use medium or full-body framing so the setting and action are visible. "
-            "The requested setting must fill the frame; do not copy the reference background, "
-            "crop, lighting, or pose. Do not make a headshot, selfie, collage, duplicate, "
-            "or split character."
-        )
-        if any(term in location for term in indoor_terms) or "underground" in location:
-            parts.append("Interior-only: show walls, floor, ceiling, and practical indoor lighting; do not place trees, foliage, sky, or outdoor landscape.")
-        return " ".join(parts)
-    return (
-        "A single coherent photorealistic image. Use the supplied reference only "
-        "for the character's identity, face, hair, and appearance; do not copy "
-        f"its background, crop, lighting, or framing. {prompt}."
+
+# With chunked encoding the 77-token ceiling is lifted, so the budget exists
+# only to stop a runaway transcript, not to ration real scene facts. Ordering
+# still matters: earlier tokens land in the first chunk and carry more weight.
+# Without chunking this must stay near 58 or the tail is silently discarded.
+CONTEXTUAL_PROMPT_MAX_WORDS = 150
+TRUNCATED_PROMPT_MAX_WORDS = 58
+
+
+def _clause_words(clause: str) -> int:
+    return len(clause.split())
+
+
+def _budgeted_contextual_prompt(scene: dict[str, Any]) -> str:
+    """Spend the 77-token window on visual facts, highest value first.
+
+    Ordering is deliberate and was derived from real failures: an earlier
+    version led with a long room description plus instruction boilerplate, which
+    consumed the whole window. Outfit appeared at word 93 and accessories at
+    132, so the model never saw them and rendered the character nude, smiling,
+    and without her jewellery while getting the room exactly right.
+
+    Negative-space instructions ("do not add anyone else") are deliberately not
+    here; a diffusion model does not act on them and they belong in the negative
+    prompt, which has its own separate budget.
+    """
+    outfit = _visible_outfit(scene)
+    accessories = _scene_list(scene, "accessories")
+    expression = _scene_text(scene, "expression")
+    activity = _scene_text(scene, "activity")
+    pose = _scene_text(scene, "pose")
+    location = _short_location(scene)
+    mood = _scene_text(scene, "mood")
+    others = _scene_list(scene, "other_characters")
+    appearance = _scene_text(scene, "subject_appearance")
+    viewer = _scene_text(scene, "viewer_position")
+
+    # Tag-style, comma separated. SDXL responds better to dense descriptors
+    # than to prose, and full sentences spend the scarce 77-token window on
+    # grammar. Gender-neutral throughout: the reference may be anime art or an
+    # object, and "she/her" would fight a legitimate non-human request.
+    clauses: list[str] = ["photorealistic full-body photograph"]
+    if scene.get("include_user_body"):
+        # Only stated when the tracked interaction actually puts the viewer in
+        # frame. High priority because it changes the composition.
+        clauses.append("two people, the viewer's body in the foreground, viewer's face out of frame")
+    if appearance:
+        clauses.append(appearance)
+    if outfit:
+        clauses.append(f"wearing {outfit}")
+    if accessories:
+        clauses.append(", ".join(_worn_first(accessories)[:3]))
+    # Activity is what the hands are doing and pose is how the body is held.
+    # They are complementary; picking one dropped "playing with breasts" in
+    # favour of "leaning forward over the bed".
+    if activity:
+        clauses.append(activity)
+    if pose:
+        clauses.append(pose)
+    if expression:
+        clauses.append(f"{expression} expression")
+    if not activity and not pose and not expression:
+        # Structured state is preferred, but fall back to the latest tracked
+        # beat so a sparse scene still describes what is happening.
+        recent = _scene_recent_context(scene).split(";")[0].strip()
+        if recent:
+            clauses.append(recent)
+    if viewer:
+        # The camera sits where the user is, so their position decides the
+        # foreground. Without this a user lying on the bed got a shot of the
+        # character with the bed behind her. Kept terse: a verbose camera note
+        # starves the location clause that follows it.
+        clauses.append(f"POV from {_first_words(viewer, 6)}")
+    if location:
+        clauses.append(f"in {location}")
+    if others:
+        clauses.append(f"also present: {', '.join(others[:2])}")
+    if mood:
+        clauses.append(f"{mood} mood")
+
+    default_budget = (
+        CONTEXTUAL_PROMPT_MAX_WORDS if long_prompt_enabled() else TRUNCATED_PROMPT_MAX_WORDS
     )
+    budget = _positive_int_env(
+        "OMNICHAT_PROMPT_MAX_WORDS", default_budget, minimum=20, maximum=400
+    )
+    selected: list[str] = []
+    used = 0
+    for clause in clauses:
+        length = _clause_words(clause)
+        if used + length > budget:
+            # Strict priority: stop rather than skip ahead to a shorter, less
+            # important clause, so the ordering above is what actually ships.
+            break
+        selected.append(clause)
+        used += length
+    return ", ".join(selected) + "."
+
+
+_WORN_ACCESSORY_CUES = (
+    "earring", "necklace", "collar", "choker", "bracelet", "ring", "anklet",
+    "glasses", "mask", "blindfold", "cuff", "hat", "watch", "piercing", "chain",
+    "stocking", "glove", "boot", "heel", "harness",
+)
+
+
+def _worn_first(accessories: list[str]) -> list[str]:
+    """Prefer accessories worn on the body over props merely held.
+
+    The accessory list is capped to fit the token budget, and a held prop can
+    otherwise crowd out jewellery. Worn items sit on the character and are what
+    a viewer notices missing; a flogger in hand is easier to lose.
+    """
+    worn = [item for item in accessories if any(cue in item.lower() for cue in _WORN_ACCESSORY_CUES)]
+    held = [item for item in accessories if item not in worn]
+    return worn + held
+
+
+def _visible_outfit(scene: dict[str, Any]) -> str:
+    """Return clothing only, and never the string the extractor uses for nude."""
+    outfit = _scene_text(scene, "outfit")
+    if not outfit:
+        return ""
+    if outfit.strip().lower() in {"none", "nude", "naked", "unspecified", "no clothing"}:
+        return ""
+    return outfit
+
+
+# Garments that cover the torso. Anything else -- a thong, panties, shorts,
+# stockings -- leaves the chest bare, so negating "topless" for those outfits
+# fights the scene instead of defending it.
+_UPPER_BODY_GARMENTS = (
+    "top", "shirt", "blouse", "bra", "bodysuit", "dress", "corset", "harness",
+    "sweater", "tee", "tank", "camisole", "jacket", "coat", "robe", "lingerie",
+    "catsuit", "leotard", "bikini", "crop", "bodice", "vest", "hoodie", "gown",
+)
+
+
+# Words that mean a fuller body. Describing one in the positive prompt is not
+# enough on its own: the checkpoint's default person is slim and wins ties.
+_FULL_FIGURE_CUES = (
+    "curvy", "full", "soft", "plus size", "plus-size", "thick", "heavy",
+    "wide hips", "chubby", "voluptuous", "plump", "rounded", "untoned",
+)
+
+
+def _describes_full_figure(appearance: str) -> bool:
+    lowered = appearance.lower()
+    return any(cue in lowered for cue in _FULL_FIGURE_CUES)
+
+
+def _covers_upper_body(outfit: str) -> bool:
+    return any(garment in outfit.lower() for garment in _UPPER_BODY_GARMENTS)
+
+
+def _short_location(scene: dict[str, Any]) -> str:
+    """Compress the room description so it cannot eat the whole token budget.
+
+    Truncation stops at a clause boundary. Cutting mid-phrase leaves fragments
+    like "multiple closets; walls" that read as their own visual instruction.
+    """
+    location = _scene_text(scene, "location").rstrip(" .")
+    if not location:
+        return ""
+    cap = _location_word_cap()
+    if len(location.split()) <= cap:
+        return location
+    kept: list[str] = []
+    for clause in location.replace(";", ",").split(","):
+        clause = clause.strip()
+        if not clause:
+            continue
+        if kept and len(" ".join(kept + [clause]).split()) > cap:
+            break
+        kept.append(clause)
+    if kept:
+        return _first_words(", ".join(kept), cap)
+    return _first_words(location, cap)
+
+
+# With chunked encoding there is room for the room. The cap only exists to stop
+# a pathological description, and drops to 8 when the 77-token ceiling applies.
+_LOCATION_MAX_WORDS = 40
+_TRUNCATED_LOCATION_MAX_WORDS = 8
+
+
+def _location_word_cap() -> int:
+    return _LOCATION_MAX_WORDS if long_prompt_enabled() else _TRUNCATED_LOCATION_MAX_WORDS
+
+
+# Truncating mid-phrase leaves danglers like "against the headboard of", which
+# read as their own half-instruction. Drop trailing function words instead.
+_DANGLING_TAIL_WORDS = frozenset(
+    ("of", "the", "a", "an", "and", "with", "in", "on", "at", "to", "from", "by", "for", "her", "his", "their")
+)
+
+
+def _first_words(value: str, count: int) -> str:
+    words = value.split()
+    if len(words) > count:
+        words = words[:count]
+    while words and words[-1].strip(" .,;").lower() in _DANGLING_TAIL_WORDS:
+        words.pop()
+    return " ".join(words).rstrip(" .,;")
 
 
 def contextual_image_strength(model_id: str) -> float:
@@ -607,6 +559,24 @@ def _download_images(urls: tuple[str, ...]) -> list[Any]:
     return [_download_image(url) for url in urls]
 
 
+def _download_reference_images(urls: tuple[str, ...]) -> list[Any]:
+    """Download every persona reference, tolerating failures after the anchor.
+
+    The first URL is the persona's avatar and is required: without it there is
+    no identity at all. Gallery extras only refine the embedding, so a single
+    broken or expired gallery URL must not fail the whole generation.
+    """
+    if not urls:
+        return []
+    images = [_download_image(urls[0])]
+    for url in urls[1:]:
+        try:
+            images.append(_download_image(url))
+        except ModelError as exc:
+            print(f"omnichat: skipping unusable identity reference: {exc}", flush=True)
+    return images
+
+
 def _resize_image(image: Any, width: int, height: int) -> Any:
     """Normalize provider output to the contract's requested dimensions."""
     if image.width == width and image.height == height:
@@ -618,7 +588,7 @@ def _resize_image(image: Any, width: int, height: int) -> Any:
     return image.resize((width, height), Image.Resampling.LANCZOS)
 
 
-def _focus_identity_reference(image: Any) -> Any:
+def _focus_identity_reference(image: Any, box: tuple[int, int, int, int] | None = _UNSET_BOX) -> Any:
     """Remove most reference background before IP-Adapter sees the identity.
 
     A normal avatar often contains a recognizable location (for example a
@@ -638,10 +608,20 @@ def _focus_identity_reference(image: Any) -> Any:
     width, height = image.size
     if width <= 0 or height <= 0:
         raise ModelError("identity reference dimensions are invalid")
+
+    if box is _UNSET_BOX:
+        box = _detect_face_box(image)
+    if box is not None:
+        focused = _crop_to_face(image, box)
+        return _matte_identity_reference(focused)
     # Keep the crop tight enough that an outdoor avatar backdrop cannot become
     # a second scene instruction. The face and hair are sufficient for the
     # reference adapter; the text prompt supplies body, clothing, and setting.
-    side = max(1, int(min(width, height) * 0.62))
+    # The plus-face adapter is trained on face crops and degrades when given a
+    # wide frame, so this is deliberately tighter than a half-body portrait and
+    # is tunable while the crop is being dialed in against real avatars.
+    crop_ratio = _bounded_float_env("OMNICHAT_IDENTITY_CROP_RATIO", 0.48, minimum=0.2, maximum=1.0)
+    side = max(1, int(min(width, height) * crop_ratio))
     left = max(0, (width - side) // 2)
     top = max(0, int((height - side) * 0.04))
     crop = image.crop((left, top, min(width, left + side), min(height, top + side)))
@@ -664,45 +644,305 @@ def _focus_identity_reference(image: Any) -> Any:
     return Image.composite(focused, neutral, mask)
 
 
-def _identity_reference_image(references: list[Any]) -> Any:
-    """Select one curated identity crop for the configured IP-Adapter.
+def _detect_face_box(image: Any) -> tuple[int, int, int, int] | None:
+    """Locate the largest human face, or None when there isn't one.
 
-    Diffusers interprets a list passed to ``ip_adapter_image`` as one image per
-    loaded adapter, not as multiple reference photos for one adapter. A contact
-    sheet therefore creates duplicate people in the output. Until a true
-    embedding aggregator or a persona LoRA is configured, one clean anchor is
-    the only deterministic reference input.
+    The fixed geometric crop assumed a portrait-ish avatar with the face near
+    the top centre. A 1920x1080 avatar broke that badly: the crop sliced the
+    chin and mouth off and pushed the face against the frame edge, so the
+    adapter was shown a partial face and produced a merely similar stranger.
+
+    Returning None is a normal outcome, not an error. Anime art and non-human
+    references have no detectable face and fall through to the geometric crop,
+    which is the behaviour they need.
     """
-    focused = [_focus_identity_reference(image) for image in references]
+    if os.getenv("OMNICHAT_FACE_DETECT", "1").strip().lower() in {"0", "false", "no", "off"}:
+        return None
+    try:
+        import cv2  # type: ignore
+        import numpy as np  # type: ignore
+    except ImportError:
+        return None
+    try:
+        cascade_path = os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")
+        if not os.path.exists(cascade_path):
+            return None
+        detector = cv2.CascadeClassifier(cascade_path)
+        frame = np.array(image.convert("RGB"))[:, :, ::-1]
+        grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # A generous minimum size avoids locking onto background faces.
+        smallest = max(32, int(min(image.size) * 0.08))
+        faces = detector.detectMultiScale(grey, 1.1, 5, minSize=(smallest, smallest))
+        if len(faces) == 0:
+            return None
+        x, y, w, h = max(faces, key=lambda box: int(box[2]) * int(box[3]))
+        return int(x), int(y), int(w), int(h)
+    except Exception:  # pragma: no cover - detector/runtime specific
+        return None
+
+
+def _crop_to_face(image: Any, box: tuple[int, int, int, int]) -> Any:
+    """Square crop centred on the face, with room for hair, chin and neck."""
+    from PIL import Image, ImageOps  # type: ignore
+
+    width, height = image.size
+    x, y, w, h = box
+    centre_x = x + w / 2
+    # Bias upward: the detector's box stops at the hairline, but hair is a
+    # large part of how a person is recognised.
+    centre_y = y + h * 0.45
+    margin = _bounded_float_env("OMNICHAT_FACE_CROP_MARGIN", 2.1, minimum=1.0, maximum=4.0)
+    side = max(16, int(max(w, h) * margin))
+    side = min(side, min(width, height))
+    left = int(min(max(0, centre_x - side / 2), width - side))
+    top = int(min(max(0, centre_y - side / 2), height - side))
+    crop = image.crop((left, top, left + side, top + side)).convert("RGB")
+    return ImageOps.fit(crop, (768, 768), method=Image.Resampling.LANCZOS)
+
+
+def _matte_identity_reference(focused: Any) -> Any:
+    """Fade the frame edge to neutral grey so scenery is not read as identity."""
+    from PIL import Image, ImageDraw, ImageFilter  # type: ignore
+
+    neutral = Image.new("RGB", focused.size, (128, 128, 128))
+    mask = Image.new("L", focused.size, 0)
+    draw = ImageDraw.Draw(mask)
+    size = focused.width
+    draw.ellipse((int(size * 0.04), int(-size * 0.08), int(size * 0.96), int(size * 1.08)), fill=255)
+    mask = mask.filter(ImageFilter.GaussianBlur(max(12, int(size * 0.035))))
+    return Image.composite(focused, neutral, mask)
+
+
+def _identity_reference_images(references: list[Any], boxes: list[Any] | None = None) -> list[Any]:
+    """Face-crop every supplied reference, best anchor first."""
+    if boxes is None:
+        boxes = [_UNSET_BOX] * len(references)
+    focused = [_focus_identity_reference(image, box) for image, box in zip(references, boxes)]
     if not focused:
         raise ModelError("identity reference is unavailable")
-    return focused[0]
+    return focused
 
 
-def identity_conditioning_kwargs(request: GenerationRequest, references: list[Any]) -> dict[str, Any]:
-    """Build one background-minimized IP-Adapter identity input.
+def _identity_reference_image(references: list[Any]) -> Any:
+    """Return the single primary anchor, for the one-image fallback path."""
+    return _identity_reference_images(references)[0]
 
-    The reference image controls identity only. The scene prompt controls
-    location, pose, outfit, and framing, so a portrait's original background
-    cannot silently become the generated scene.
+
+def body_adapter_enabled() -> bool:
+    """Whether the whole-image adapter is loaded alongside the face adapter.
+
+    The face adapter is trained on face crops and carries no body information,
+    so figure and proportions drift between generations. The general "plus"
+    adapter conditions on the whole reference and fixes that, at the cost of
+    also carrying clothing, pose and background, which fight the scene prompt.
+    It therefore runs at a much lower scale than the face adapter, and can be
+    switched off entirely without a rebuild.
     """
-    if not references:
-        return {}
-    return {"ip_adapter_image": _identity_reference_image(references)}
+    return os.getenv("OMNICHAT_BODY_ADAPTER", "1").strip().lower() not in {"0", "false", "no", "off"}
 
 
-def contextual_identity_adapter_scale(request: GenerationRequest) -> float:
-    """Lower identity strength for contextual scenes so composition can change."""
-    requested = max(0.1, min(1.5, float(request.identity_adapter_scale)))
-    configured = _bounded_float_env(
-        "OMNICHAT_CONTEXT_IDENTITY_ADAPTER_SCALE",
-        0.1,
-        minimum=0.1,
-        maximum=1.5,
-    )
-    if request.mode.strip().lower() != "contextual":
-        return requested
-    return min(requested, configured)
+def body_adapter_scale() -> float:
+    return _bounded_float_env("OMNICHAT_BODY_ADAPTER_SCALE", 0.3, minimum=0.0, maximum=1.0)
+
+
+def identity_adapter_weights() -> list[str]:
+    """Adapter weight files in the order their images must be supplied.
+
+    Order is load order, and diffusers requires ip_adapter_image to be a list
+    of exactly this length. Getting the count wrong raises ValueError and fails
+    the whole generation, so both are derived from this one list.
+    """
+    face = os.getenv("OMNICHAT_IP_ADAPTER_WEIGHT", DEFAULT_IP_ADAPTER_WEIGHT)
+    if not body_adapter_enabled():
+        return [face]
+    return [os.getenv("OMNICHAT_BODY_ADAPTER_WEIGHT", DEFAULT_BODY_ADAPTER_WEIGHT), face]
+
+
+def _body_reference_image(image: Any) -> Any:
+    """Whole-frame reference for the body adapter, squared without cropping.
+
+    The face adapter gets a tight face crop; this one deliberately keeps the
+    full figure. Letterboxing to neutral grey preserves proportions, which is
+    the entire point of this adapter, where a centre-crop would distort them.
+    """
+    from PIL import Image  # type: ignore
+
+    width, height = image.size
+    side = max(width, height)
+    canvas = Image.new("RGB", (side, side), (128, 128, 128))
+    canvas.paste(image.convert("RGB"), ((side - width) // 2, (side - height) // 2))
+    return canvas.resize((768, 768), Image.Resampling.LANCZOS)
+
+
+def build_ip_adapter_images(references: list[Any]) -> list[Any]:
+    """Build one entry per loaded adapter, in load order.
+
+    Diffusers reads the outer list as one entry per adapter and each inner list
+    as several references for that adapter, batching and attending over them.
+    Using that native path rather than hand-averaging embeddings keeps the
+    maths inside diffusers' own tested code.
+
+    The persona's avatar is repeated so it carries more weight than curated
+    extras; otherwise a few mediocre additions would drag the identity away
+    from the canonical face over time.
+    """
+    # Route by face size. A full-body reference has a small face, and
+    # upscaling that crop to 768px feeds the face adapter a blurry face, which
+    # dilutes the very signal it exists to provide. Such references still carry
+    # good body information, so they go to the body adapter only.
+    # Detect once per reference. Haar is ~284ms on a 2016x3072 photo, and the
+    # three consumers below would otherwise each re-detect the same unmodified
+    # image: 18 detections for six references instead of six.
+    boxes = [_detect_face_box(image) for image in references]
+
+    pairs = [
+        (image, box)
+        for image, box in zip(references, boxes)
+        if _face_is_detailed_enough(image, box)
+    ]
+    if not pairs:
+        # The anchor is always a face reference even if it fails the size test;
+        # without it there is no identity conditioning at all.
+        pairs = [(references[0], boxes[0])]
+
+    faces = _identity_reference_images([p[0] for p in pairs], [p[1] for p in pairs])
+    anchor_repeat = _positive_int_env("OMNICHAT_IDENTITY_ANCHOR_REPEAT", 2, minimum=1, maximum=4)
+    face_entry = [faces[0]] * anchor_repeat + faces[1:]
+    if not body_adapter_enabled():
+        return [face_entry]
+    # A close portrait carries no proportions and would dilute them, so the body
+    # adapter only sees references where the body is actually in frame. The two
+    # roles are separate: portraits teach the face, full-length shots teach the
+    # figure, and most references serve only one of the two.
+    body_sources = [
+        image for image, box in zip(references, boxes) if not _is_close_portrait(image, box)
+    ]
+    if not body_sources:
+        body_sources = references
+    bodies = [_body_reference_image(image) for image in body_sources]
+    return [bodies, face_entry]
+
+
+def _is_close_portrait(image: Any, box: tuple[int, int, int, int] | None = _UNSET_BOX) -> bool:
+    """Whether the frame is mostly face, leaving no usable body information."""
+    if box is _UNSET_BOX:
+        box = _detect_face_box(image)
+    if box is None:
+        return False
+    try:
+        height = image.size[1]
+    except Exception:
+        return False
+    minimum = _bounded_float_env("OMNICHAT_PORTRAIT_FACE_RATIO", 0.30, minimum=0.05, maximum=1.0)
+    return height > 0 and (box[3] / height) >= minimum
+
+
+def _face_is_detailed_enough(image: Any, box: tuple[int, int, int, int] | None = _UNSET_BOX) -> bool:
+    """Whether this reference's face survives encoding at full detail.
+
+    The CLIP image encoder consumes 224x224 regardless of what it is handed, so
+    the only thing that matters is whether the native face crop is at least that
+    large. If it is, the crop is downscaled and loses nothing.
+
+    An earlier version compared the face against the frame's short edge, which
+    rejected perfectly good frontal faces in full-length shots: a 155px face in
+    a 1023px-wide photo crops to 325px natively, comfortably above 224. That
+    threshold discarded real identity information for no reason.
+    """
+    if box is _UNSET_BOX:
+        box = _detect_face_box(image)
+    if box is None:
+        # No detectable face (a profile view, anime art, an object). The
+        # geometric top-anchored crop handles these acceptably, so they stay
+        # available rather than being dropped.
+        return True
+    margin = _bounded_float_env("OMNICHAT_FACE_CROP_MARGIN", 2.1, minimum=1.0, maximum=4.0)
+    minimum = _positive_int_env("OMNICHAT_FACE_MIN_CROP_PX", 224, minimum=64, maximum=1024)
+    return int(max(box[2], box[3]) * margin) >= minimum
+
+
+def identity_adapter_scale(request: GenerationRequest) -> float:
+    """Use the identity strength the server resolved for this persona.
+
+    Contextual scenes were previously clamped to 0.1, the floor, to stop the
+    avatar's background leaking into the new setting. That is not what adapter
+    scale controls: background leakage is handled by _focus_identity_reference,
+    which crops to the face and mattes the surroundings to neutral grey. The
+    clamp only removed identity, so every contextual scene rendered a stranger.
+    """
+    return max(0.1, min(1.5, float(request.identity_adapter_scale)))
+
+
+def _chunk_token_ids(token_ids: list[int], chunk_size: int) -> list[list[int]]:
+    if not token_ids:
+        return [[]]
+    return [token_ids[index : index + chunk_size] for index in range(0, len(token_ids), chunk_size)]
+
+
+def encode_long_prompt(pipe: Any, prompt: str, negative_prompt: str) -> dict[str, Any]:
+    """Encode prompts of any length for SDXL by chunking the CLIP context.
+
+    CLIP's 77-token limit is a property of its positional embedding table, not
+    of the UNet: cross-attention consumes a sequence of arbitrary length. So the
+    prompt is split into 75-token chunks, each encoded with its own BOS/EOS, and
+    the per-chunk hidden states are concatenated back into one long sequence.
+    This is the same technique consumer tools use to accept paragraphs.
+
+    SDXL has two text encoders whose penultimate hidden states are concatenated
+    on the feature axis (768 + 1280 = 2048). The pooled embedding is a single
+    vector for the whole prompt and is taken from the second encoder's first
+    chunk. Positive and negative are padded to an equal chunk count because the
+    UNet requires both sequences to be the same length.
+    """
+    import torch  # type: ignore
+
+    tokenizers = [pipe.tokenizer, pipe.tokenizer_2]
+    encoders = [pipe.text_encoder, pipe.text_encoder_2]
+    device = getattr(pipe, "_execution_device", None) or "cuda"
+    max_length = int(getattr(tokenizers[0], "model_max_length", 77))
+    chunk_size = max(1, max_length - 2)
+
+    # Chunk counts must match across prompts and across both encoders.
+    chunk_count = 1
+    for text in (prompt, negative_prompt):
+        for tokenizer in tokenizers:
+            ids = tokenizer(text, truncation=False, add_special_tokens=False).input_ids
+            chunk_count = max(chunk_count, len(_chunk_token_ids(list(ids), chunk_size)))
+
+    encoded: dict[str, Any] = {}
+    for text, embed_key, pooled_key in (
+        (prompt, "prompt_embeds", "pooled_prompt_embeds"),
+        (negative_prompt, "negative_prompt_embeds", "negative_pooled_prompt_embeds"),
+    ):
+        per_encoder_states = []
+        pooled = None
+        for tokenizer, encoder in zip(tokenizers, encoders):
+            bos = tokenizer.bos_token_id
+            eos = tokenizer.eos_token_id
+            pad = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else eos
+            chunks = _chunk_token_ids(list(tokenizer(text, truncation=False, add_special_tokens=False).input_ids), chunk_size)
+            while len(chunks) < chunk_count:
+                chunks.append([])
+
+            states = []
+            for index, chunk in enumerate(chunks):
+                ids = [bos] + chunk + [eos]
+                ids += [pad] * (max_length - len(ids))
+                tensor = torch.tensor([ids[:max_length]], dtype=torch.long, device=device)
+                output = encoder(tensor, output_hidden_states=True)
+                # SDXL conditions on the penultimate layer, not the final one.
+                states.append(output.hidden_states[-2])
+                if index == 0 and encoder is encoders[-1]:
+                    pooled = output[0]
+            per_encoder_states.append(torch.cat(states, dim=1))
+
+        encoded[embed_key] = torch.cat(per_encoder_states, dim=-1)
+        encoded[pooled_key] = pooled
+    return encoded
+
+
+def long_prompt_enabled() -> bool:
+    return os.getenv("OMNICHAT_LONG_PROMPT", "1").strip().lower() not in {"0", "false", "no", "off"}
 
 
 @dataclass
@@ -717,53 +957,57 @@ class ImageGenerator:
         # without requiring a Hugging Face credential. A gated model can still
         # be selected explicitly through OMNICHAT_IMAGE_MODEL_ID together with
         # a read-only HF_TOKEN in the RunPod endpoint environment.
-        self.model_id = os.getenv("OMNICHAT_IMAGE_MODEL_ID", "stabilityai/stable-diffusion-xl-base-1.0")
+        self.model_id = os.getenv("OMNICHAT_IMAGE_MODEL_ID", DEFAULT_IMAGE_MODEL_ID)
         self._pipeline = None
         self._pipeline_key: tuple[Any, ...] | None = None
 
     def _load(self, request: GenerationRequest, *, image_to_image: bool = False):
         has_references = bool(request.reference_image_urls) and not image_to_image
-        use_pose_control = _pose_control_enabled(request, image_to_image=image_to_image)
-        adapter_scale = contextual_identity_adapter_scale(request)
+        adapter_scale = identity_adapter_scale(request)
+        adapter_weights = identity_adapter_weights()
         key = (
             "image2image" if image_to_image else "text2image",
             has_references,
-            use_pose_control,
             request.identity_mode,
             request.identity_adapter,
             round(adapter_scale, 4),
+            tuple(adapter_weights),
+            round(body_adapter_scale(), 4),
             request.lora_model_id or "",
             request.lora_weight_name or "",
         )
         if self._pipeline is not None and self._pipeline_key == key:
             return self._pipeline
+        # Drop the cache before rebuilding. self._pipeline is replaced partway
+        # through the load, so leaving the old key in place would make a later
+        # request matching that key return the half-configured replacement --
+        # typically a pipeline with no IP-Adapter, which then fails with
+        # "Got 2 images and 0 IP Adapters" on every subsequent job.
+        self._pipeline = None
+        self._pipeline_key = None
         torch, dtype = _device_dtype()
         try:
-            if use_pose_control:
-                from diffusers import ControlNetModel, StableDiffusionXLControlNetPipeline  # type: ignore
+            from diffusers import AutoPipelineForImage2Image, AutoPipelineForText2Image  # type: ignore
 
-                controlnet = ControlNetModel.from_pretrained(
-                    os.getenv("OMNICHAT_CONTROLNET_MODEL_ID", DEFAULT_CONTROLNET_MODEL_ID),
-                    torch_dtype=dtype,
-                )
-                self._pipeline = StableDiffusionXLControlNetPipeline.from_pretrained(
-                    self.model_id,
-                    controlnet=controlnet,
-                    torch_dtype=dtype,
-                    use_safetensors=True,
-                )
-            else:
-                from diffusers import AutoPipelineForImage2Image, AutoPipelineForText2Image  # type: ignore
-
-                cls = AutoPipelineForImage2Image if image_to_image else AutoPipelineForText2Image
-                self._pipeline = cls.from_pretrained(self.model_id, torch_dtype=dtype, use_safetensors=True)
+            cls = AutoPipelineForImage2Image if image_to_image else AutoPipelineForText2Image
+            self._pipeline = cls.from_pretrained(self.model_id, torch_dtype=dtype, use_safetensors=True)
             if has_references:
+                subfolder = os.getenv("OMNICHAT_IP_ADAPTER_SUBFOLDER", DEFAULT_IP_ADAPTER_SUBFOLDER)
+                # Both adapters live in the same repo and share the ViT-H image
+                # encoder, which diffusers loads once for the first adapter.
                 self._pipeline.load_ip_adapter(
                     os.getenv("OMNICHAT_IP_ADAPTER_MODEL_ID", DEFAULT_IP_ADAPTER_MODEL_ID),
-                    subfolder=os.getenv("OMNICHAT_IP_ADAPTER_SUBFOLDER", DEFAULT_IP_ADAPTER_SUBFOLDER),
-                    weight_name=os.getenv("OMNICHAT_IP_ADAPTER_WEIGHT", DEFAULT_IP_ADAPTER_WEIGHT),
+                    subfolder=[subfolder] * len(adapter_weights),
+                    weight_name=adapter_weights,
+                    image_encoder_folder=os.getenv(
+                        "OMNICHAT_IP_ADAPTER_IMAGE_ENCODER", DEFAULT_IP_ADAPTER_IMAGE_ENCODER
+                    ),
                 )
-                self._pipeline.set_ip_adapter_scale(adapter_scale)
+                # One scale per adapter, in load order. The body adapter runs
+                # far weaker: it also carries clothing, pose and background,
+                # which compete with the scene prompt.
+                scales = [adapter_scale] if len(adapter_weights) == 1 else [body_adapter_scale(), adapter_scale]
+                self._pipeline.set_ip_adapter_scale(scales)
             if request.identity_mode == "lora":
                 if not request.lora_model_id or not request.lora_weight_name:
                     raise ModelError("LoRA identity profile is incomplete")
@@ -777,6 +1021,8 @@ class ImageGenerator:
             self._pipeline.enable_model_cpu_offload()
             self._pipeline_key = key
         except Exception as exc:  # pragma: no cover - model/runtime specific
+            self._pipeline = None
+            self._pipeline_key = None
             raise ModelError("image model could not be loaded") from exc
         return self._pipeline
 
@@ -784,7 +1030,10 @@ class ImageGenerator:
         # The configured SDXL IP-Adapter consumes one image. Do not download
         # unused gallery references (or allow a later bad reference to fail an
         # otherwise valid generation) until a multi-image adapter is enabled.
-        references = _download_images(request.reference_image_urls[:1])
+        # Several references are fused into one identity signal below. A bad
+        # extra photo must not fail an otherwise valid generation, so download
+        # failures past the first anchor are tolerated.
+        references = _download_reference_images(request.reference_image_urls)
         pipe = self._load(request, image_to_image=image_to_image)
         torch, _ = _device_dtype()
         generator = torch.Generator(device="cuda")
@@ -810,19 +1059,19 @@ class ImageGenerator:
             "num_inference_steps": steps,
             "guidance_scale": guidance_scale,
         }
-        use_pose_control = _pose_control_enabled(request, image_to_image=image_to_image)
-        if use_pose_control:
-            kwargs["image"] = build_pose_control_image(
-                request.width,
-                request.height,
-                _scene_recent_context(request.scene, ""),
-            )
-            kwargs["controlnet_conditioning_scale"] = _bounded_float_env(
-                "OMNICHAT_POSE_CONTROL_SCALE",
-                0.85,
-                minimum=0.0,
-                maximum=2.0,
-            )
+        if long_prompt_enabled():
+            # Lifts CLIP's 77-token ceiling so the full scene description is
+            # conditioned on. Falls back to the truncated text path rather than
+            # failing a generation, because the text path still produces a valid
+            # image from the highest-priority clauses.
+            try:
+                embeds = encode_long_prompt(pipe, rendered_prompt, rendered_negative_prompt)
+                kwargs.pop("prompt", None)
+                kwargs.pop("negative_prompt", None)
+                kwargs.update(embeds)
+            except Exception as exc:  # pragma: no cover - model/runtime specific
+                print(f"omnichat: long-prompt encoding unavailable, truncating instead: {exc}", flush=True)
+
         if image_to_image and references:
             # Diffusers may preserve an input image's native frame when it is
             # passed to image-to-image. Fit it first so the generated asset
@@ -831,7 +1080,10 @@ class ImageGenerator:
             kwargs["image"] = _fit_reference_image(references[0], request.width, request.height)
             kwargs["strength"] = strength
         elif references:
-            kwargs.update(identity_conditioning_kwargs(request, references))
+            # Diffusers requires exactly one entry per loaded adapter and
+            # raises ValueError otherwise, so this list is always built from
+            # the same source as the adapter weights.
+            kwargs["ip_adapter_image"] = build_ip_adapter_images(references)
         try:
             with torch.inference_mode():
                 result = pipe(**kwargs)
