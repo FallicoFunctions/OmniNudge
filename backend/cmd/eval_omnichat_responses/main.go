@@ -129,23 +129,28 @@ func configuredEvaluationProfile(
 	if cfg == nil {
 		return services.OmniChatModelProfile{}, fmt.Errorf("configuration is required")
 	}
-	profiles := services.ConfiguredOmniChatModelProfiles(map[services.OmniChatModelProfileKey]string{
+	catalogProfile, found := services.FindOmniChatModelProfile(key)
+	if !found {
+		return services.OmniChatModelProfile{}, fmt.Errorf("unknown profile %q", key)
+	}
+	routes, err := services.ResolveConfiguredOmniChatModelRoutes(map[services.OmniChatModelProfileKey]string{
 		services.OmniChatModelProfileStandard:     cfg.OpenRouter.StandardModel,
 		services.OmniChatModelProfilePlus:         cfg.OpenRouter.PlusModel,
 		services.OmniChatModelProfilePremiumQuick: cfg.OpenRouter.PremiumQuickModel,
 		services.OmniChatModelProfilePremiumDeep:  cfg.OpenRouter.PremiumDeepModel,
 		services.OmniChatModelProfileUltraFast:    cfg.OpenRouter.UltraFastModel,
-	})
-	for _, profile := range profiles {
-		if profile.Key != key {
-			continue
-		}
-		if override := strings.TrimSpace(modelOverride); override != "" {
-			profile.ModelKey = override
-		}
-		return profile, nil
+	}, cfg.OpenRouter.StandardFallback)
+	if err != nil {
+		return services.OmniChatModelProfile{}, err
 	}
-	return services.OmniChatModelProfile{}, fmt.Errorf("unknown profile %q", key)
+	catalogProfile.ModelKey = routes[key]
+	if override := strings.TrimSpace(modelOverride); override != "" {
+		if !openrouter.IsValidModelRoute(override) {
+			return services.OmniChatModelProfile{}, fmt.Errorf("model override is not a valid named route")
+		}
+		catalogProfile.ModelKey = override
+	}
+	return catalogProfile, nil
 }
 
 func loadRequiredPublicPersonas(

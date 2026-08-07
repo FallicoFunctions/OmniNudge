@@ -16,10 +16,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
+	zlog "github.com/rs/zerolog/log"
 )
 
 type OmniChatGenerationCreator interface {
 	CreateGeneration(ctx context.Context, ownerUserID int, request models.OmniChatGenerationRequest) (*models.OmniChatGenerationJob, error)
+}
+
+type OmniChatMediaCommandCreator interface {
+	CreateConversationMediaCommand(ctx context.Context, ownerUserID, conversationID int, request models.OmniChatMediaCommandRequest) (*models.OmniChatGenerationJob, *models.BotMessage, error)
 }
 
 type OmniChatMediaStore interface {
@@ -34,11 +39,12 @@ type OmniChatMediaStore interface {
 }
 
 type OmniChatMediaHandler struct {
-	creator     OmniChatGenerationCreator
-	store       OmniChatMediaStore
-	storage     services.StorageService
-	idempotency OmniChatRequestIdempotencyStore
-	billing     interface {
+	creator        OmniChatGenerationCreator
+	commandCreator OmniChatMediaCommandCreator
+	store          OmniChatMediaStore
+	storage        services.StorageService
+	idempotency    OmniChatRequestIdempotencyStore
+	billing        interface {
 		RefundOwned(context.Context, int, uuid.UUID) error
 	}
 }
@@ -71,7 +77,8 @@ func omniChatMediaResponseMetadata(fileType string) (extension string, maxBytes 
 }
 
 func NewOmniChatMediaHandler(creator OmniChatGenerationCreator, store OmniChatMediaStore, storage services.StorageService) *OmniChatMediaHandler {
-	return &OmniChatMediaHandler{creator: creator, store: store, storage: storage}
+	commandCreator, _ := creator.(OmniChatMediaCommandCreator)
+	return &OmniChatMediaHandler{creator: creator, commandCreator: commandCreator, store: store, storage: storage}
 }
 
 func (h *OmniChatMediaHandler) CreateGeneration(c *gin.Context) {
@@ -105,7 +112,7 @@ func (h *OmniChatMediaHandler) CreateGeneration(c *gin.Context) {
 	}()
 	request.BillingOperationID = services.DeriveOmniChatRequestBillingOperationID(userID, "media_generation", request.RequestID)
 	if h.creator == nil {
-		RespondError(c, http.StatusServiceUnavailable, "Media generation is not configured")
+		RespondErrorCoded(c, http.StatusServiceUnavailable, "generation_not_configured", "Media generation is not configured")
 		return
 	}
 	job, err := h.creator.CreateGeneration(c.Request.Context(), userID, request)
@@ -113,12 +120,12 @@ func (h *OmniChatMediaHandler) CreateGeneration(c *gin.Context) {
 		switch {
 		case errors.Is(err, services.ErrOmniChatGenerationResourceNotFound):
 			RespondError(c, http.StatusNotFound, "Generation resource not found")
-		case errors.Is(err, services.ErrOmniChatGenerationSafetyRejected):
-			RespondError(c, http.StatusUnprocessableEntity, "This media request cannot be generated")
 		case errors.Is(err, services.ErrOmniChatGenerationUnavailable):
-			RespondError(c, http.StatusServiceUnavailable, "Media generation is temporarily unavailable")
+			RespondErrorCoded(c, http.StatusServiceUnavailable, "generation_unavailable", "Media generation is temporarily unavailable")
 		case errors.Is(err, services.ErrOmniChatPaidFeatureRequired):
-			RespondError(c, http.StatusPaymentRequired, "Video generation requires OmniCredits")
+			RespondError(c, http.StatusPaymentRequired, "Media generation requires OmniCredits")
+		case errors.Is(err, services.ErrOmniChatGenerationSafetyRejected):
+			RespondErrorCoded(c, http.StatusUnprocessableEntity, "safety_rejected", "This request cannot be generated")
 		default:
 			RespondError(c, http.StatusInternalServerError, "Failed to create generation")
 		}
@@ -128,13 +135,130 @@ func (h *OmniChatMediaHandler) CreateGeneration(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"job": job})
 }
 
+type omniChatMediaCommandPayload struct {
+	RequestID       uuid.UUID                `json:"request_id"`
+	Kind            models.OmniChatMediaKind `json:"kind"`
+	Prompt          string                   `json:"prompt"`
+	AspectRatio     string                   `json:"aspect_ratio,omitempty"`
+	DurationSeconds int                      `json:"duration_seconds,omitempty"`
+}
+
+// CreateConversationMediaCommand persists a direct /photo or /video command,
+// then queues media without asking the chat model to answer the command.
+func (h *OmniChatMediaHandler) CreateConversationMediaCommand(c *gin.Context) {
+	userID := c.GetInt("user_id")
+	if userID <= 0 {
+		RespondError(c, http.StatusUnauthorized, "Authentication required")
+		return
+	}
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || conversationID <= 0 {
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
+		return
+	}
+	var payload omniChatMediaCommandPayload
+	if err := decodeStrictJSON(c, &payload); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid media command")
+		return
+	}
+	if payload.RequestID == uuid.Nil {
+		RespondError(c, http.StatusBadRequest, "A valid request_id is required")
+		return
+	}
+	if payload.Kind != models.OmniChatMediaKindImage && payload.Kind != models.OmniChatMediaKindVideo {
+		RespondError(c, http.StatusBadRequest, "kind must be image or video")
+		return
+	}
+	claimPayload := struct {
+		Kind            models.OmniChatMediaKind `json:"kind"`
+		Prompt          string                   `json:"prompt"`
+		AspectRatio     string                   `json:"aspect_ratio,omitempty"`
+		DurationSeconds int                      `json:"duration_seconds,omitempty"`
+	}{payload.Kind, strings.TrimSpace(payload.Prompt), strings.TrimSpace(payload.AspectRatio), payload.DurationSeconds}
+	encodedPayload, err := json.Marshal(claimPayload)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to prepare media command")
+		return
+	}
+	if h.idempotency == nil {
+		RespondErrorCoded(c, http.StatusServiceUnavailable, "replay_protection_unavailable", "Request replay protection is temporarily unavailable")
+		return
+	}
+	claim, err := h.idempotency.Begin(
+		c.Request.Context(), userID, payload.RequestID, "media_command",
+		fmt.Sprintf("conversation:%d", conversationID), models.OmniChatRequestPayloadHash(encodedPayload),
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, models.ErrOmniChatRequestConflict):
+			RespondError(c, http.StatusConflict, "request_id was already used for a different request")
+		case errors.Is(err, models.ErrOmniChatRequestInProgress):
+			RespondError(c, http.StatusConflict, "This media command is already in progress")
+		default:
+			// The browser only ever sees a generic 503, so an unexpected
+			// failure here is otherwise invisible. A missing scope in the
+			// idempotency CHECK constraint hid a completely broken /photo
+			// command behind "temporarily unavailable" with nothing logged.
+			zlog.Error().Err(err).Int("user_id", userID).Int("conversation_id", conversationID).
+				Msg("omnichat media command: idempotency claim failed")
+			RespondErrorCoded(c, http.StatusServiceUnavailable, "replay_protection_unavailable", "Request replay protection is temporarily unavailable")
+		}
+		return
+	}
+	if claim.Replay {
+		c.Data(http.StatusOK, "application/json", claim.Response)
+		return
+	}
+	completed := false
+	defer func() {
+		if !completed {
+			h.failMediaGenerationRequest(userID, payload.RequestID)
+		}
+	}()
+	if h.commandCreator == nil {
+		RespondErrorCoded(c, http.StatusServiceUnavailable, "generation_not_configured", "Media generation is not configured")
+		return
+	}
+	job, message, err := h.commandCreator.CreateConversationMediaCommand(c.Request.Context(), userID, conversationID, models.OmniChatMediaCommandRequest{
+		RequestID: payload.RequestID, Kind: payload.Kind, Prompt: payload.Prompt,
+		AspectRatio: payload.AspectRatio, DurationSeconds: payload.DurationSeconds,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrOmniChatGenerationResourceNotFound):
+			RespondError(c, http.StatusNotFound, "Conversation not found")
+		case errors.Is(err, services.ErrOmniChatGenerationUnavailable):
+			RespondErrorCoded(c, http.StatusServiceUnavailable, "generation_unavailable", "Media generation is temporarily unavailable")
+		case errors.Is(err, services.ErrOmniChatPaidFeatureRequired):
+			RespondError(c, http.StatusPaymentRequired, "Media generation requires OmniCredits")
+		case errors.Is(err, services.ErrOmniChatGenerationSafetyRejected):
+			RespondErrorCoded(c, http.StatusUnprocessableEntity, "safety_rejected", "This request cannot be generated")
+		default:
+			RespondError(c, http.StatusBadRequest, err.Error())
+		}
+		return
+	}
+	response := gin.H{"job": job, "message": message}
+	encodedResponse, err := json.Marshal(response)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to prepare media command response")
+		return
+	}
+	if err := h.idempotency.Complete(c.Request.Context(), userID, payload.RequestID, encodedResponse); err != nil {
+		RespondErrorCoded(c, http.StatusServiceUnavailable, "replay_completion_failed", "Media command replay protection is temporarily unavailable")
+		return
+	}
+	completed = true
+	c.JSON(http.StatusAccepted, response)
+}
+
 func (h *OmniChatMediaHandler) claimMediaGenerationRequest(c *gin.Context, userID int, request models.OmniChatGenerationRequest) (*models.OmniChatRequestClaim, bool) {
 	if request.RequestID == uuid.Nil {
 		RespondError(c, http.StatusBadRequest, "A valid request_id is required")
 		return nil, false
 	}
 	if h.idempotency == nil {
-		RespondError(c, http.StatusServiceUnavailable, "Request replay protection is temporarily unavailable")
+		RespondErrorCoded(c, http.StatusServiceUnavailable, "replay_protection_unavailable", "Request replay protection is temporarily unavailable")
 		return nil, false
 	}
 	payload := struct {
@@ -174,7 +298,7 @@ func (h *OmniChatMediaHandler) claimMediaGenerationRequest(c *gin.Context, userI
 	case errors.Is(err, models.ErrOmniChatRequestInProgress):
 		RespondError(c, http.StatusConflict, "This generation request is already in progress")
 	default:
-		RespondError(c, http.StatusServiceUnavailable, "Request replay protection is temporarily unavailable")
+		RespondErrorCoded(c, http.StatusServiceUnavailable, "replay_protection_unavailable", "Request replay protection is temporarily unavailable")
 	}
 	return nil, false
 }

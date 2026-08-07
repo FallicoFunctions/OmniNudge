@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ type Config struct {
 	OpenRouter                OpenRouterConfig
 	OmniChatMedia             OmniChatMediaConfig
 	OmniChatVoice             OmniChatVoiceConfig
+	LiveKit                   LiveKitConfig
 	OmniChatBillingOffersJSON string
 	Crypto                    CryptoConfig
 	OAuth                     OAuthConfig
@@ -81,19 +83,33 @@ type OpenRouterConfig struct {
 }
 
 // OmniChatMediaConfig keeps generative-media credentials server-side and
-// makes individual model choices deploy-time configuration rather than UI
-// concerns. Fal's queue API is the initial implementation behind the provider
-// interface.
+// makes worker endpoint choices deploy-time configuration rather than UI
+// concerns. RunPod endpoints are owned by the deployment and expose the
+// stable OmniChat media-worker contract consumed by the queue.
 type OmniChatMediaConfig struct {
-	Provider            string
-	FalAPIKey           string
-	FalImageModel       string
-	FalImageEditModel   string
-	FalTextVideoModel   string
-	FalImageVideoModel  string
-	MaxImageBytes       int64
-	MaxVideoBytes       int64
-	PollIntervalSeconds int
+	Provider                    string
+	RunPodAPIKey                string
+	RunPodBaseURL               string
+	RunPodImageEndpointID       string
+	RunPodVideoEndpointID       string
+	RunPodInputHosts            []string
+	RunPodOutputHosts           []string
+	RunPodPodAPIURL             string
+	RunPodNetworkVolumeID       string
+	RunPodAvatarImage           string
+	RunPodAvatarGPUTypeID       string
+	RunPodAvatarGPUCount        int
+	RunPodAvatarDiskGB          int
+	RunPodAvatarVolumeGB        int
+	RunPodAvatarVCPU            int
+	RunPodAvatarMemoryGB        int
+	RunPodAvatarVolumeMountPath string
+	RunPodAvatarPorts           []string
+	RunPodWorkerBackendURL      string
+	RunPodRequestTimeoutSeconds int
+	MaxImageBytes               int64
+	MaxVideoBytes               int64
+	PollIntervalSeconds         int
 }
 
 type OmniChatVoiceConfig struct {
@@ -105,10 +121,17 @@ type OmniChatVoiceConfig struct {
 	VoiceboxBaseURL         string
 	VoiceboxTimeoutSeconds  int
 	VoiceCloningEnabled     bool
-	TavusAPIKey             string
-	TavusBaseURL            string
-	TavusReplicaID          string
-	TavusPersonaID          string
+}
+
+// LiveKitConfig contains only server-side room-signing credentials. The API
+// returns short-lived participant tokens; the secret never reaches a browser
+// or a GPU worker.
+type LiveKitConfig struct {
+	URL            string
+	APIKey         string
+	APISecret      string
+	RoomPrefix     string
+	TokenTTLSecond int
 }
 
 // TURNConfig holds coturn TURN server configuration for WebRTC relay
@@ -346,7 +369,7 @@ func Load() (*Config, error) {
 		OpenRouter: OpenRouterConfig{
 			APIKey:            getEnv("OPENROUTER_API_KEY", ""),
 			Model:             getEnv("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free"),
-			StandardModel:     getEnv("OMNICHAT_MODEL_STANDARD_PRIMARY", "google/gemini-2.5-flash-lite"),
+			StandardModel:     getEnv("OMNICHAT_MODEL_STANDARD_PRIMARY", "google/gemini-3.1-flash-lite"),
 			StandardFallback:  getEnv("OMNICHAT_MODEL_STANDARD_FALLBACK", "mistralai/mistral-large-2512"),
 			PlusModel:         getEnv("OMNICHAT_MODEL_PLUS_PRIMARY", "mistralai/mistral-large-2512"),
 			PremiumQuickModel: getEnv("OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY", "anthropic/claude-sonnet-5"),
@@ -354,15 +377,29 @@ func Load() (*Config, error) {
 			UltraFastModel:    getEnv("OMNICHAT_MODEL_ULTRA_FAST_PRIMARY", "anthropic/claude-opus-4.8"),
 		},
 		OmniChatMedia: OmniChatMediaConfig{
-			Provider:            getEnv("OMNICHAT_MEDIA_PROVIDER", "fal"),
-			FalAPIKey:           getEnv("FAL_KEY", ""),
-			FalImageModel:       getEnv("FAL_IMAGE_MODEL", "fal-ai/nano-banana-2"),
-			FalImageEditModel:   getEnv("FAL_IMAGE_EDIT_MODEL", "fal-ai/nano-banana-2/edit"),
-			FalTextVideoModel:   getEnv("FAL_TEXT_VIDEO_MODEL", "fal-ai/wan/v2.7/text-to-video"),
-			FalImageVideoModel:  getEnv("FAL_IMAGE_VIDEO_MODEL", "fal-ai/wan/v2.7/image-to-video"),
-			MaxImageBytes:       getEnvAsPositiveInt64("OMNICHAT_MAX_IMAGE_BYTES", 25*1024*1024),
-			MaxVideoBytes:       getEnvAsPositiveInt64("OMNICHAT_MAX_VIDEO_BYTES", 200*1024*1024),
-			PollIntervalSeconds: getEnvAsPositiveInt("OMNICHAT_MEDIA_POLL_SECONDS", 2),
+			Provider:                    getEnv("OMNICHAT_MEDIA_PROVIDER", "runpod"),
+			RunPodAPIKey:                getEnv("RUNPOD_API_KEY", ""),
+			RunPodBaseURL:               getEnv("RUNPOD_BASE_URL", "https://api.runpod.ai/v2"),
+			RunPodImageEndpointID:       getEnv("RUNPOD_IMAGE_ENDPOINT_ID", ""),
+			RunPodVideoEndpointID:       getEnv("RUNPOD_VIDEO_ENDPOINT_ID", ""),
+			RunPodInputHosts:            getEnvAsStringList("RUNPOD_INPUT_HOSTS"),
+			RunPodOutputHosts:           getEnvAsStringList("RUNPOD_OUTPUT_HOSTS"),
+			RunPodPodAPIURL:             getEnv("RUNPOD_POD_API_URL", "https://api.runpod.io/graphql"),
+			RunPodNetworkVolumeID:       getEnv("RUNPOD_NETWORK_VOLUME_ID", ""),
+			RunPodAvatarImage:           getEnv("RUNPOD_AVATAR_IMAGE", ""),
+			RunPodAvatarGPUTypeID:       getEnv("RUNPOD_AVATAR_GPU_TYPE_ID", ""),
+			RunPodAvatarGPUCount:        getEnvAsPositiveInt("RUNPOD_AVATAR_GPU_COUNT", 1),
+			RunPodAvatarDiskGB:          getEnvAsPositiveInt("RUNPOD_AVATAR_CONTAINER_DISK_GB", 40),
+			RunPodAvatarVolumeGB:        getEnvAsPositiveInt("RUNPOD_AVATAR_VOLUME_GB", 0),
+			RunPodAvatarVCPU:            getEnvAsPositiveInt("RUNPOD_AVATAR_VCPU", 4),
+			RunPodAvatarMemoryGB:        getEnvAsPositiveInt("RUNPOD_AVATAR_MEMORY_GB", 16),
+			RunPodAvatarVolumeMountPath: getEnv("RUNPOD_AVATAR_VOLUME_MOUNT_PATH", "/models"),
+			RunPodAvatarPorts:           getEnvAsStringList("RUNPOD_AVATAR_PORTS"),
+			RunPodWorkerBackendURL:      getEnv("RUNPOD_WORKER_BACKEND_URL", ""),
+			RunPodRequestTimeoutSeconds: getEnvAsPositiveInt("RUNPOD_REQUEST_TIMEOUT_SECONDS", 900),
+			MaxImageBytes:               getEnvAsPositiveInt64("OMNICHAT_MAX_IMAGE_BYTES", 25*1024*1024),
+			MaxVideoBytes:               getEnvAsPositiveInt64("OMNICHAT_MAX_VIDEO_BYTES", 200*1024*1024),
+			PollIntervalSeconds:         getEnvAsPositiveInt("RUNPOD_MEDIA_POLL_SECONDS", 2),
 		},
 		OmniChatVoice: OmniChatVoiceConfig{
 			ElevenLabsAPIKey:        getEnv("ELEVENLABS_API_KEY", ""),
@@ -373,10 +410,13 @@ func Load() (*Config, error) {
 			VoiceboxBaseURL:         getEnv("VOICEBOX_BASE_URL", "http://127.0.0.1:17493"),
 			VoiceboxTimeoutSeconds:  getEnvAsPositiveInt("VOICEBOX_TIMEOUT_SECONDS", 120),
 			VoiceCloningEnabled:     getEnvAsBool("OMNICHAT_VOICE_CLONING_ENABLED", false),
-			TavusAPIKey:             getEnv("TAVUS_API_KEY", ""),
-			TavusBaseURL:            getEnv("TAVUS_BASE_URL", "https://tavusapi.com"),
-			TavusReplicaID:          getEnv("TAVUS_REPLICA_ID", ""),
-			TavusPersonaID:          getEnv("TAVUS_PERSONA_ID", ""),
+		},
+		LiveKit: LiveKitConfig{
+			URL:            getEnv("LIVEKIT_URL", ""),
+			APIKey:         getEnv("LIVEKIT_API_KEY", ""),
+			APISecret:      getEnv("LIVEKIT_API_SECRET", ""),
+			RoomPrefix:     getEnv("LIVEKIT_ROOM_PREFIX", "omnichat"),
+			TokenTTLSecond: getEnvAsPositiveInt("LIVEKIT_TOKEN_TTL_SECONDS", 600),
 		},
 		OmniChatBillingOffersJSON: getEnv("OMNICHAT_BILLING_OFFERS_JSON", ""),
 		OAuth: OAuthConfig{
@@ -390,8 +430,52 @@ func Load() (*Config, error) {
 			BackendURL:          getEnv("BACKEND_URL", "http://localhost:8080"),
 		},
 	}
+	// RunPod workers return signed URLs from the same private object store that
+	// the API uses for application-owned media. Trust that deployment-owned
+	// HTTPS origin automatically so a Cloudflare R2/MinIO endpoint cannot be
+	// accidentally omitted from RUNPOD_OUTPUT_HOSTS. Explicit environment
+	// entries remain supported for a separate worker output origin or CDN.
+	cfg.OmniChatMedia.RunPodOutputHosts = appendHTTPSOriginHost(
+		cfg.OmniChatMedia.RunPodOutputHosts,
+		cfg.Storage.S3Endpoint,
+	)
+	cfg.OmniChatMedia.RunPodOutputHosts = appendHTTPSOriginHost(
+		cfg.OmniChatMedia.RunPodOutputHosts,
+		cfg.Storage.CloudFrontURL,
+	)
+	// Image-to-video workers fetch signed source images from the same storage
+	// endpoint. The worker has its own explicit allow-list, while this list is
+	// used by the API-side URL validator and must cover the same deployment
+	// origins.
+	cfg.OmniChatMedia.RunPodInputHosts = appendHTTPSOriginHost(
+		cfg.OmniChatMedia.RunPodInputHosts,
+		cfg.Storage.S3Endpoint,
+	)
+	cfg.OmniChatMedia.RunPodInputHosts = appendHTTPSOriginHost(
+		cfg.OmniChatMedia.RunPodInputHosts,
+		cfg.Storage.CloudFrontURL,
+	)
+	cfg.OmniChatMedia.RunPodInputHosts = appendHTTPSOriginHost(
+		cfg.OmniChatMedia.RunPodInputHosts,
+		cfg.OmniChatMedia.RunPodWorkerBackendURL,
+	)
 
 	return cfg, nil
+}
+
+func appendHTTPSOriginHost(hosts []string, rawOrigin string) []string {
+	parsed, err := url.Parse(strings.TrimSpace(rawOrigin))
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" ||
+		parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return hosts
+	}
+	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
+	for _, candidate := range hosts {
+		if strings.EqualFold(strings.TrimSuffix(strings.TrimSpace(candidate), "."), host) {
+			return hosts
+		}
+	}
+	return append(hosts, host)
 }
 
 // DatabaseURL returns the PostgreSQL connection string

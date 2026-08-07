@@ -83,32 +83,52 @@ func (f *generatedMediaDialerFake) DialContext(context.Context, string, string) 
 	return nil, errors.New("test dial stopped")
 }
 
-func TestValidateGeneratedMediaURLAllowsKnownFalHosts(t *testing.T) {
-	for _, rawURL := range []string{
-		"https://fal.media/files/a/output.mp4",
-		"https://v3.fal.media/files/a/output.png",
-		"https://storage.googleapis.com/falserverless/output.png",
+func TestValidateGeneratedMediaURLAllowsConfiguredRunPodOutputHosts(t *testing.T) {
+	for _, test := range []struct {
+		rawURL string
+		hosts  []string
+	}{
+		{rawURL: "https://storage.googleapis.com/media/output.png"},
+		{rawURL: "https://media.example.test/output.png", hosts: []string{"media.example.test"}},
 	} {
+		rawURL, hosts := test.rawURL, test.hosts
 		t.Run(rawURL, func(t *testing.T) {
-			require.NoError(t, validateGeneratedMediaURL(rawURL))
+			require.NoError(t, validateGeneratedMediaURL(rawURL, hosts...))
 		})
 	}
 }
 
 func TestValidateGeneratedMediaURLRejectsSSRFAndUntrustedHosts(t *testing.T) {
 	for _, rawURL := range []string{
-		"http://v3.fal.media/files/output.png",
+		"http://media.example.test/files/output.png",
 		"https://127.0.0.1/output.png",
 		"https://169.254.169.254/latest/meta-data",
-		"https://fal.media.evil.example/output.png",
-		"https://user:pass@fal.media/output.png",
-		"https://fal.media:8443/output.png",
+		"https://media.example.test.evil.example/output.png",
+		"https://user:pass@storage.googleapis.com/output.png",
+		"https://storage.googleapis.com:8443/output.png",
+		"https://media.example.test:8443/output.png",
+		"https://[ff02::1]/output.png",
 		"data:text/html,<script>alert(1)</script>",
 	} {
 		t.Run(rawURL, func(t *testing.T) {
 			require.Error(t, validateGeneratedMediaURL(rawURL))
 		})
 	}
+}
+
+func TestValidateGeneratedMediaURLRequiresExactConfiguredOutputHost(t *testing.T) {
+	require.Error(t, validateGeneratedMediaURL("https://tenant.media.example.test/output.png", "media.example.test"))
+}
+
+func TestValidateGeneratedMediaURLRejectsPrivateIPEvenWhenConfigured(t *testing.T) {
+	require.Error(t, validateGeneratedMediaURL("https://127.0.0.1/output.png", "127.0.0.1"))
+}
+
+func TestDownloadGeneratedMediaRejectsOverflowingSizeLimit(t *testing.T) {
+	_, _, err := downloadGeneratedMedia(
+		context.Background(), "https://storage.googleapis.com/output.png", "image", int64(1<<63-1),
+	)
+	require.EqualError(t, err, "generated media size limit is invalid")
 }
 
 func TestValidateGeneratedMediaContentsRejectsExcessiveMP4BoxCount(t *testing.T) {
@@ -135,7 +155,7 @@ func TestGeneratedMediaDialRejectsPrivateDNSAnswersBeforeConnecting(t *testing.T
 		generatedMediaResolverFake{addresses: []net.IPAddr{{IP: net.ParseIP("169.254.169.254")}}},
 		dialer,
 	)
-	_, err := dial(context.Background(), "tcp", "v3.fal.media:443")
+	_, err := dial(context.Background(), "tcp", "media.example.test:443")
 	require.Error(t, err)
 	require.Zero(t, dialer.calls, "private DNS answers must never reach the network dialer")
 }

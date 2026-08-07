@@ -107,6 +107,41 @@ func TestOmniChatRateLimiterEnforcesTwelveRequestBurstBoundary(t *testing.T) {
 	}
 }
 
+func TestOmniChatMediaGenerationRateLimiterAllowsOnePerMinutePerUser(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cache := services.NewMemoryCache()
+	t.Cleanup(cache.Stop)
+	limiter := OmniChatMediaGenerationRateLimiter(cache)
+	router := gin.New()
+	router.POST("/omnichat/generations", func(c *gin.Context) {
+		c.Set("user_id", 42)
+		c.Next()
+	}, limiter.Middleware(), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	first := httptest.NewRecorder()
+	router.ServeHTTP(first, httptest.NewRequest(http.MethodPost, "/omnichat/generations", nil))
+	require.Equal(t, http.StatusNoContent, first.Code)
+	require.Equal(t, "1", first.Header().Get("X-RateLimit-Limit"))
+
+	second := httptest.NewRecorder()
+	router.ServeHTTP(second, httptest.NewRequest(http.MethodPost, "/omnichat/generations", nil))
+	require.Equal(t, http.StatusTooManyRequests, second.Code)
+	require.Equal(t, "60", second.Header().Get("Retry-After"))
+
+	otherUser := gin.New()
+	otherUser.POST("/omnichat/generations", func(c *gin.Context) {
+		c.Set("user_id", 43)
+		c.Next()
+	}, limiter.Middleware(), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+	other := httptest.NewRecorder()
+	otherUser.ServeHTTP(other, httptest.NewRequest(http.MethodPost, "/omnichat/generations", nil))
+	require.Equal(t, http.StatusNoContent, other.Code)
+}
+
 func TestFriendRequestRateLimiterFailsClosedWhenCounterUnavailable(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

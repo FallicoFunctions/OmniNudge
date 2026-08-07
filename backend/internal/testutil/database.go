@@ -6,6 +6,7 @@ package testutil
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/database"
@@ -39,9 +40,10 @@ func NewTestDatabase(t *testing.T) *TestDatabase {
 	td := &TestDatabase{DB: db, Pool: db.Pool}
 
 	t.Cleanup(func() {
-		resetCtx := context.Background()
+		resetCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 		if err := database.ResetTestData(resetCtx, db); err != nil {
-			t.Logf("reset test data: %v", err)
+			t.Errorf("reset test data: %v", err)
 		}
 		db.Close()
 	})

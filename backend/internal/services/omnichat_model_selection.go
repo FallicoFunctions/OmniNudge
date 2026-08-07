@@ -31,12 +31,20 @@ type OmniChatModelSelection struct {
 }
 
 type OmniChatModelSelectionService struct {
-	plans OmniChatPlanReader
-	store OmniChatModelSelectionStore
+	plans       OmniChatPlanReader
+	store       OmniChatModelSelectionStore
+	adminReader OmniChatAdminReader
 }
 
 func NewOmniChatModelSelectionService(plans OmniChatPlanReader, store OmniChatModelSelectionStore) *OmniChatModelSelectionService {
 	return &OmniChatModelSelectionService{plans: plans, store: store}
+}
+
+// SetAdminReader lets persisted administrators select any configured model
+// profile without changing the entitlement returned to ordinary accounts.
+func (s *OmniChatModelSelectionService) SetAdminReader(reader OmniChatAdminReader) *OmniChatModelSelectionService {
+	s.adminReader = reader
+	return s
 }
 
 func (s *OmniChatModelSelectionService) Get(ctx context.Context, userID, conversationID int) (*OmniChatModelSelection, error) {
@@ -102,6 +110,16 @@ func (s *OmniChatModelSelectionService) Set(ctx context.Context, userID, convers
 }
 
 func (s *OmniChatModelSelectionService) accountTier(ctx context.Context, userID int) (OmniChatModelTier, error) {
+	admin, err := isOmniChatAdmin(ctx, s.adminReader, userID)
+	if err != nil {
+		return OmniChatModelTierFree, err
+	}
+	if admin {
+		return OmniChatModelTierPremium, nil
+	}
+	if s.plans == nil {
+		return OmniChatModelTierFree, errors.New("omnichat model entitlement lookup unavailable")
+	}
 	plan, expiresAt, err := s.plans.GetPlan(ctx, userID)
 	if err != nil {
 		return OmniChatModelTierFree, err

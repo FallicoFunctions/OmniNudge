@@ -32,6 +32,7 @@ func TestGenerateWithOptionsSendsCompletionTokenLimit(t *testing.T) {
 	require.Equal(t, 256, received.MaxTokens)
 	require.NotNil(t, received.Provider)
 	require.Equal(t, "latency", received.Provider.Sort)
+	require.False(t, received.Provider.RequireParameters)
 }
 
 func TestGenerateWithOptionsSendsServerOwnedReasoningAndSpeedProfile(t *testing.T) {
@@ -58,6 +59,25 @@ func TestGenerateWithOptionsSendsServerOwnedReasoningAndSpeedProfile(t *testing.
 	require.Equal(t, "fast", received.Speed)
 }
 
+func TestGenerateWithOptionsSendsJSONResponseFormat(t *testing.T) {
+	var received chatRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&received))
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, err := io.WriteString(w, "data: [DONE]\n\n")
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+	client := newClient("secret-key", "openai/gpt-5-mini", server.URL, server.Client())
+
+	_, err := client.GenerateWithOptions(context.Background(), []Message{{Role: RoleUser, Content: "hello"}}, nil, GenerationOptions{ResponseFormat: "json_object"})
+
+	require.NoError(t, err)
+	require.Equal(t, &responseFormat{Type: "json_object"}, received.ResponseFormat)
+	require.NotNil(t, received.Provider)
+	require.True(t, received.Provider.RequireParameters)
+}
+
 func TestGenerateWithOptionsRejectsUnknownProviderControlsBeforeRequest(t *testing.T) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
@@ -69,6 +89,7 @@ func TestGenerateWithOptionsRejectsUnknownProviderControlsBeforeRequest(t *testi
 	_, err := client.GenerateWithOptions(context.Background(), []Message{{Role: RoleUser, Content: "hello"}}, nil, GenerationOptions{
 		ReasoningEffort: "ultrathink",
 		Speed:           "turbo",
+		ResponseFormat:  "xml",
 	})
 
 	require.EqualError(t, err, "openrouter: generation options are invalid")
@@ -122,6 +143,32 @@ func TestClientDoesNotExposeProviderErrorBody(t *testing.T) {
 	require.ErrorIs(t, err, ErrTransportOrProvider)
 }
 
+func TestClientFailsFastOnProviderAccessDenialWithoutExposingBody(t *testing.T) {
+	for _, statusCode := range []int{
+		http.StatusUnauthorized,
+		http.StatusPaymentRequired,
+		http.StatusForbidden,
+	} {
+		t.Run(http.StatusText(statusCode), func(t *testing.T) {
+			var calls atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				calls.Add(1)
+				http.Error(w, "secret billing and account detail", statusCode)
+			}))
+			defer server.Close()
+			client := newClient("secret-key", "openrouter/free", server.URL, server.Client())
+
+			_, err := client.Generate(context.Background(), []Message{{Role: RoleUser, Content: "hello"}}, nil)
+
+			require.EqualError(t, err, "openrouter: provider access denied")
+			require.ErrorIs(t, err, ErrAccessDenied)
+			require.NotContains(t, err.Error(), "billing")
+			require.NotContains(t, err.Error(), "account")
+			require.EqualValues(t, 1, calls.Load(), "access denial must never be retried")
+		})
+	}
+}
+
 func TestProcessStreamTypesProviderAndTransportFailuresWithoutExposingDetails(t *testing.T) {
 	providerBody := io.NopCloser(strings.NewReader("data: {\"error\":{\"message\":\"secret provider detail\"}}\n"))
 	_, providerErr := processStream(providerBody, nil)
@@ -134,6 +181,26 @@ func TestProcessStreamTypesProviderAndTransportFailuresWithoutExposingDetails(t 
 	require.EqualError(t, transportErr, "openrouter: stream read error")
 	require.ErrorIs(t, transportErr, ErrTransportOrProvider)
 	require.NotContains(t, transportErr.Error(), "secret transport topology")
+}
+
+func TestProcessStreamTypesAccessDenialWithoutExposingProviderDetail(t *testing.T) {
+	for _, code := range []string{"401", `"402"`, "403"} {
+		t.Run(code, func(t *testing.T) {
+			body := io.NopCloser(strings.NewReader(`data: {"error":{"code":` + code + `,"message":"secret billing and account detail"}}` + "\n"))
+			var delivered []string
+
+			text, _, _, err := processStreamWithTelemetry(body, func(chunk string) {
+				delivered = append(delivered, chunk)
+			})
+
+			require.Empty(t, text)
+			require.Empty(t, delivered)
+			require.EqualError(t, err, "openrouter: provider access denied")
+			require.ErrorIs(t, err, ErrAccessDenied)
+			require.NotContains(t, err.Error(), "billing")
+			require.NotContains(t, err.Error(), "account")
+		})
+	}
 }
 
 type failingReadCloser struct {
@@ -155,6 +222,30 @@ func TestProcessStreamStopsAtGeneratedResponseLimit(t *testing.T) {
 	_, err := processStream(body, nil)
 
 	require.EqualError(t, err, "openrouter: generated response exceeds size limit")
+}
+
+func TestProcessStreamRejectsEOFWithoutDoneSentinel(t *testing.T) {
+	body := io.NopCloser(strings.NewReader(`data: {"choices":[{"delta":{"content":"partial"}}]}` + "\n"))
+
+	text, err := processStream(body, nil)
+
+	require.Equal(t, "partial", text)
+	require.EqualError(t, err, "openrouter: provider response incomplete: stream ended before completion")
+	require.ErrorIs(t, err, ErrProviderIncomplete)
+}
+
+func TestProcessStreamRejectsMalformedDataEvenWithDoneSentinel(t *testing.T) {
+	body := io.NopCloser(strings.NewReader(
+		`data: {"choices":[{"delta":{"content":"partial"}}]}` + "\n" +
+			"data: not-json\n" +
+			"data: [DONE]\n",
+	))
+
+	text, err := processStream(body, nil)
+
+	require.Equal(t, "partial", text)
+	require.EqualError(t, err, "openrouter: provider response incomplete: malformed streaming data")
+	require.ErrorIs(t, err, ErrProviderIncomplete)
 }
 
 func TestProcessStreamCapturesSafeRoutingMetadata(t *testing.T) {

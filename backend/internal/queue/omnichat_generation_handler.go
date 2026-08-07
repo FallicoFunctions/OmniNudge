@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	pathpkg "path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -17,13 +18,17 @@ import (
 	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
-	"github.com/omninudge/backend/internal/services/fal"
+	"github.com/omninudge/backend/internal/services/runpod"
 	zlog "github.com/rs/zerolog/log"
 )
 
-type FalGenerationSpec struct {
-	ModelID string
-	Input   map[string]any
+// maxProviderReferenceImages must not exceed the worker's MAX_REFERENCE_IMAGES,
+// which rejects an over-long list outright rather than truncating it.
+const maxProviderReferenceImages = 8
+
+type RunPodGenerationSpec struct {
+	EndpointID string
+	Input      map[string]any
 }
 
 type omniChatGenerationJobStore interface {
@@ -32,26 +37,35 @@ type omniChatGenerationJobStore interface {
 	MarkGenerationJobRunning(ctx context.Context, id uuid.UUID, providerJobID string) (bool, error)
 	UpdateGenerationProgress(ctx context.Context, id uuid.UUID, progress int) error
 	MarkGenerationJobFailed(ctx context.Context, id uuid.UUID, safeCode, providerError string) (bool, error)
-	CompleteGenerationJob(ctx context.Context, jobID uuid.UUID, media *models.MediaFile, asset *models.OmniChatMediaAsset, freeTierBytes, proTierBytes int64) error
+	CompleteGenerationJob(ctx context.Context, jobID uuid.UUID, media *models.MediaFile, asset *models.OmniChatMediaAsset, freeTierBytes, proTierBytes int64, provenance models.OmniChatGenerationProvenance) error
 }
 
 type omniChatPersonaReader interface {
 	GetAccessibleByID(ctx context.Context, id int, viewerUserID *int) (*models.BotPersona, error)
 }
 
-type falGenerationClient interface {
-	Submit(ctx context.Context, modelID string, input any) (string, error)
-	Status(ctx context.Context, modelID, requestID string) (*fal.QueueStatus, error)
-	Result(ctx context.Context, modelID, requestID string) (*fal.Result, error)
-	Cancel(ctx context.Context, modelID, requestID string) error
+// mediaReferenceReader resolves persona upload metadata without exposing the
+// storage URL as a browser-facing capability. The generation worker uses the
+// returned storage object key to mint a short-lived URL for RunPod.
+type mediaReferenceReader interface {
+	GetByPublicURL(ctx context.Context, publicURL string) (*models.MediaFile, error)
+	FindByStoragePath(ctx context.Context, storagePath string) (*models.MediaFile, error)
+}
+
+type runPodGenerationClient interface {
+	Submit(ctx context.Context, endpointID string, input any) (string, error)
+	Status(ctx context.Context, endpointID, jobID string) (*runpod.StatusResponse, error)
+	Result(ctx context.Context, endpointID, jobID string) (*runpod.Result, error)
+	Cancel(ctx context.Context, endpointID, jobID string) error
 }
 
 type OmniChatGenerationHandler struct {
 	jobs             omniChatGenerationJobStore
 	personas         omniChatPersonaReader
+	mediaReferences  mediaReferenceReader
 	storage          services.StorageService
 	scanner          services.VirusScanner
-	provider         falGenerationClient
+	provider         runPodGenerationClient
 	config           config.OmniChatMediaConfig
 	failClosed       bool
 	storageQuotaFree int64
@@ -75,7 +89,7 @@ func NewOmniChatGenerationHandler(
 	personas omniChatPersonaReader,
 	storage services.StorageService,
 	scanner services.VirusScanner,
-	provider falGenerationClient,
+	provider runPodGenerationClient,
 	cfg config.OmniChatMediaConfig,
 	failClosed bool,
 ) *OmniChatGenerationHandler {
@@ -91,6 +105,15 @@ func (h *OmniChatGenerationHandler) SetStorageQuotas(freeTierBytes, proTierBytes
 		h.storageQuotaFree = freeTierBytes
 		h.storageQuotaPro = proTierBytes
 	}
+	return h
+}
+
+// SetMediaReferenceReader enables private persona uploads to be passed to the
+// GPU provider through short-lived object-store URLs. It is optional so unit
+// tests and deployments that only use absolute public persona URLs retain the
+// existing behavior.
+func (h *OmniChatGenerationHandler) SetMediaReferenceReader(reader mediaReferenceReader) *OmniChatGenerationHandler {
+	h.mediaReferences = reader
 	return h
 }
 
@@ -181,6 +204,11 @@ func (h *OmniChatGenerationHandler) recordGenerationFailure(ctx context.Context,
 }
 
 func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID) error {
+	if h.config.RunPodRequestTimeoutSeconds > 0 {
+		boundedContext, cancel := context.WithTimeout(ctx, time.Duration(h.config.RunPodRequestTimeoutSeconds)*time.Second)
+		defer cancel()
+		ctx = boundedContext
+	}
 	if h.jobs == nil || h.personas == nil || h.storage == nil || h.provider == nil {
 		return permanentGenerationFailure("provider_unavailable", errors.New("generation dependencies are not configured"))
 	}
@@ -205,15 +233,29 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 	if err != nil {
 		return err
 	}
-	spec, err := BuildFalGenerationSpec(h.config, job, references, sourceURL)
+	spec, err := BuildRunPodGenerationSpec(h.config, job, references, sourceURL)
 	if err != nil {
+		if errors.Is(err, runpod.ErrEndpointNotConfigured) {
+			return permanentGenerationFailure("provider_unavailable", err)
+		}
 		return permanentGenerationFailure("invalid_provider_request", err)
 	}
 
 	providerJobID := job.ProviderJobID
+	providerCompleted := false
+	defer func() {
+		if providerJobID == "" || providerCompleted || ctx.Err() == nil {
+			return
+		}
+		cancelContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		if cancelErr := h.provider.Cancel(cancelContext, spec.EndpointID, providerJobID); cancelErr != nil {
+			zlog.Warn().Err(cancelErr).Str("job_id", job.ID.String()).Msg("failed to cancel timed-out RunPod media job")
+		}
+	}()
 	if job.Status == models.OmniChatGenerationStatusQueued {
-		providerJobID, err = h.provider.Submit(ctx, spec.ModelID, spec.Input)
-		if errors.Is(err, fal.ErrNotConfigured) {
+		providerJobID, err = h.provider.Submit(ctx, spec.EndpointID, spec.Input)
+		if errors.Is(err, runpod.ErrNotConfigured) || errors.Is(err, runpod.ErrInvalidConfiguration) {
 			return permanentGenerationFailure("provider_unavailable", err)
 		}
 		if err != nil {
@@ -221,14 +263,14 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 		}
 		marked, err := h.jobs.MarkGenerationJobRunning(ctx, job.ID, providerJobID)
 		if err != nil {
-			h.cancelSubmittedGeneration(ctx, job.ID, spec.ModelID, providerJobID)
+			h.cancelSubmittedGeneration(ctx, job.ID, spec.EndpointID, providerJobID)
 			return fmt.Errorf("mark generation running: %w", err)
 		}
 		if !marked {
 			// A retry or concurrent worker won the database claim, or the user
 			// cancelled while Submit was in flight. Its provider request is the
 			// authoritative one, so discard this duplicate without retrying.
-			h.cancelSubmittedGeneration(ctx, job.ID, spec.ModelID, providerJobID)
+			h.cancelSubmittedGeneration(ctx, job.ID, spec.EndpointID, providerJobID)
 			return nil
 		}
 	} else if providerJobID == "" {
@@ -241,21 +283,37 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 	}
 	progress := job.Progress
 	for {
-		cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, spec.ModelID, providerJobID)
+		cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, spec.EndpointID, providerJobID)
 		if err != nil {
 			return err
 		}
 		if cancelled {
 			return nil
 		}
-		status, err := h.provider.Status(ctx, spec.ModelID, providerJobID)
+		status, err := h.provider.Status(ctx, spec.EndpointID, providerJobID)
 		if err != nil {
+			if errors.Is(err, runpod.ErrNotConfigured) || errors.Is(err, runpod.ErrEndpointNotConfigured) || errors.Is(err, runpod.ErrInvalidConfiguration) {
+				return permanentGenerationFailure("provider_unavailable", err)
+			}
 			return fmt.Errorf("poll generation: %w", err)
 		}
-		if status.Status == fal.StatusCompleted {
+		if status == nil {
+			return permanentGenerationFailure("provider_result_invalid", errors.New("RunPod returned no job status"))
+		}
+		if status.Status == runpod.StatusCompleted {
+			providerCompleted = true
 			break
 		}
-		if status.Status == fal.StatusInProgress {
+		if status.Status == runpod.StatusFailed || status.Status == runpod.StatusError {
+			return permanentGenerationFailure("provider_failed", errors.New("RunPod media job failed"))
+		}
+		if status.Status == runpod.StatusCancelled || status.Status == runpod.StatusCanceled {
+			return permanentGenerationFailure("provider_cancelled", errors.New("RunPod media job was cancelled"))
+		}
+		if status.Status == runpod.StatusTimedOut {
+			return permanentGenerationFailure("provider_timed_out", errors.New("RunPod media job timed out"))
+		}
+		if status.Status == runpod.StatusInProgress || status.Status == runpod.StatusRunning {
 			if progress < 90 {
 				progress += 5
 				if progress < 10 {
@@ -274,7 +332,7 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 		case <-timer.C:
 		}
 	}
-	cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, spec.ModelID, providerJobID)
+	cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, spec.EndpointID, providerJobID)
 	if err != nil {
 		return err
 	}
@@ -282,16 +340,28 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 		return nil
 	}
 
-	result, err := h.provider.Result(ctx, spec.ModelID, providerJobID)
+	result, err := h.provider.Result(ctx, spec.EndpointID, providerJobID)
 	if err != nil {
+		switch {
+		case errors.Is(err, runpod.ErrNotConfigured), errors.Is(err, runpod.ErrEndpointNotConfigured), errors.Is(err, runpod.ErrInvalidConfiguration):
+			return permanentGenerationFailure("provider_unavailable", err)
+		case errors.Is(err, runpod.ErrJobFailed):
+			return permanentGenerationFailure("provider_failed", err)
+		case errors.Is(err, runpod.ErrJobCancelled):
+			return permanentGenerationFailure("provider_cancelled", err)
+		case errors.Is(err, runpod.ErrJobTimedOut):
+			return permanentGenerationFailure("provider_timed_out", err)
+		}
 		return fmt.Errorf("fetch generation result: %w", err)
 	}
-	for _, flagged := range result.HasNSFWConcepts {
-		if flagged {
-			return permanentGenerationFailure("safety_rejected", errors.New("generated media was rejected by the safety checker"))
-		}
+	// Surface worker provenance as soon as it arrives. Without it, a template
+	// left pointing at an old tag silently invalidates every prompt experiment.
+	if strings.TrimSpace(result.WorkerBuild) == "" {
+		zlog.Warn().Str("job_id", job.ID.String()).Msg("OmniChat worker returned no build stamp; endpoint may be serving a pre-provenance image")
+	} else {
+		zlog.Info().Str("job_id", job.ID.String()).Str("worker_build", result.WorkerBuild).Msg("OmniChat generation rendered")
 	}
-	providerMedia, err := selectFalMediaResult(job.Kind, result)
+	providerMedia, err := selectRunPodMediaResult(job.Kind, result)
 	if err != nil {
 		return permanentGenerationFailure("provider_result_invalid", err)
 	}
@@ -299,12 +369,12 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 	if job.Kind == models.OmniChatMediaKindVideo {
 		maxBytes = h.config.MaxVideoBytes
 	}
-	download, cleanup, err := downloadGeneratedMedia(ctx, providerMedia.URL, modelsMediaKind(job.Kind), maxBytes)
+	download, cleanup, err := downloadGeneratedMedia(ctx, providerMedia.URL, modelsMediaKind(job.Kind), maxBytes, h.config.RunPodOutputHosts...)
 	if err != nil {
 		return permanentGenerationFailure("provider_result_invalid", err)
 	}
 	defer cleanup()
-	cancelled, err = h.stopIfGenerationCancelled(ctx, job.ID, spec.ModelID, providerJobID)
+	cancelled, err = h.stopIfGenerationCancelled(ctx, job.ID, spec.EndpointID, providerJobID)
 	if err != nil {
 		return err
 	}
@@ -369,7 +439,11 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 		media.Duration = &duration
 		asset.DurationSeconds = &duration
 	}
-	if err := h.jobs.CompleteGenerationJob(ctx, job.ID, media, asset, h.configQuotaFree(), h.configQuotaPro()); err != nil {
+	provenance := models.OmniChatGenerationProvenance{
+		WorkerBuild:  result.WorkerBuild,
+		ActualPrompt: result.ActualPrompt,
+	}
+	if err := h.jobs.CompleteGenerationJob(ctx, job.ID, media, asset, h.configQuotaFree(), h.configQuotaPro(), provenance); err != nil {
 		if errors.Is(err, models.ErrOmniChatStorageQuotaExceeded) {
 			return permanentGenerationFailure("storage_quota_exceeded", err)
 		}
@@ -422,7 +496,7 @@ func (h *OmniChatGenerationHandler) stopIfGenerationCancelled(ctx context.Contex
 		err := h.provider.Cancel(cancelCtx, modelID, providerJobID)
 		cancel()
 		if err != nil {
-			// The local cancellation is authoritative. Fal may already have
+			// The local cancellation is authoritative. RunPod may already have
 			// completed, so a provider-side cancellation failure must not revive
 			// or retry the local job.
 			zlog.Warn().Err(err).Str("job_id", jobID.String()).Msg("failed to cancel OmniChat provider job")
@@ -456,16 +530,52 @@ func (h *OmniChatGenerationHandler) resolveInputs(ctx context.Context, job *mode
 	if persona == nil {
 		return nil, "", permanentGenerationFailure("persona_not_found", errors.New("generation persona not found"))
 	}
-	references := make([]string, 0, 4)
-	if persona.AvatarURL != nil && safeProviderReferenceURL(*persona.AvatarURL) {
-		references = append(references, *persona.AvatarURL)
+	job.IdentityProfile = services.ResolveOmniChatMediaIdentityProfile(persona)
+	// The persona's stable look is resolved here, not carried on the job's
+	// scene snapshot, so an edited persona description applies to new renders
+	// without rewriting stored scenes.
+	if job.Scene.SubjectAppearance == "" {
+		job.Scene.SubjectAppearance = job.IdentityProfile.Appearance
 	}
-	for _, galleryURL := range persona.GalleryURLs {
-		if len(references) >= 4 {
+	references := make([]string, 0, job.IdentityProfile.ReferenceLimit)
+	seen := make(map[string]struct{}, job.IdentityProfile.ReferenceLimit)
+	preferPublicReference := persona.OwnerUserID == nil
+	appendReference := func(rawURL string) error {
+		if len(references) >= job.IdentityProfile.ReferenceLimit {
+			return nil
+		}
+		normalized, err := h.resolvePersonaReferenceURL(ctx, rawURL, preferPublicReference)
+		if err != nil {
+			return err
+		}
+		if normalized == "" {
+			return nil
+		}
+		if _, ok := seen[normalized]; ok {
+			return nil
+		}
+		seen[normalized] = struct{}{}
+		references = append(references, normalized)
+		return nil
+	}
+	if persona.AvatarURL != nil {
+		if err := appendReference(*persona.AvatarURL); err != nil {
+			return nil, "", fmt.Errorf("resolve persona avatar reference: %w", err)
+		}
+	}
+	// Private identity references win over the public gallery. gallery_urls is
+	// serialized on every persona response and rendered in the UI, so curated
+	// body references are configured out of band and must not be displayed.
+	extraReferences := job.IdentityProfile.ReferenceURLs
+	if len(extraReferences) == 0 {
+		extraReferences = persona.GalleryURLs
+	}
+	for _, referenceURL := range extraReferences {
+		if len(references) >= job.IdentityProfile.ReferenceLimit {
 			break
 		}
-		if safeProviderReferenceURL(galleryURL) {
-			references = append(references, galleryURL)
+		if err := appendReference(referenceURL); err != nil {
+			return nil, "", fmt.Errorf("resolve persona gallery reference: %w", err)
 		}
 	}
 
@@ -489,6 +599,82 @@ func (h *OmniChatGenerationHandler) resolveInputs(ctx context.Context, job *mode
 	return references, signedURL, nil
 }
 
+func (h *OmniChatGenerationHandler) resolvePersonaReferenceURL(ctx context.Context, rawURL string, preferPublicReference bool) (string, error) {
+	trimmed := strings.TrimSpace(rawURL)
+	if strings.HasPrefix(trimmed, "/uploads/") {
+		// Upload paths can point at private user media. Always resolve them
+		// through tracked metadata and sign the object for the GPU worker;
+		// publishing the backend URL directly would either leak a private asset
+		// or produce an unrelated image when the worker cannot fetch it.
+		if h.mediaReferences == nil {
+			return "", permanentGenerationFailure("persona_reference_unavailable", errors.New("persona media repository is not configured"))
+		}
+		media, err := h.mediaReferences.GetByPublicURL(ctx, trimmed)
+		if err != nil {
+			return "", err
+		}
+		if media == nil {
+			media, err = h.mediaReferences.FindByStoragePath(ctx, strings.TrimPrefix(trimmed, "/"))
+			if err != nil {
+				return "", err
+			}
+		}
+		if media == nil {
+			return "", permanentGenerationFailure("persona_reference_unavailable", errors.New("persona media record was not found"))
+		}
+		if media.ScanStatus != models.MediaScanStatusClean || !services.IsImageType(media.FileType) {
+			return "", permanentGenerationFailure("persona_reference_unavailable", errors.New("persona media is not a clean image"))
+		}
+		objectKey := strings.TrimSpace(media.StorageObjectKey)
+		if objectKey == "" {
+			objectKey = strings.TrimPrefix(filepath.ToSlash(strings.TrimSpace(media.StoragePath)), "uploads/")
+		}
+		if objectKey == "" || strings.HasPrefix(objectKey, "/") || strings.Contains(objectKey, "..") {
+			return "", permanentGenerationFailure("persona_reference_unavailable", errors.New("persona media storage key is invalid"))
+		}
+		signedURL, signErr := h.storage.GetSignedURL(ctx, objectKey, 20*time.Minute)
+		if signErr == nil && safeProviderReferenceURL(signedURL) {
+			return signedURL, nil
+		}
+		// A platform-owned avatar may still have a public CDN URL when object
+		// signing is temporarily unavailable. Keep that as a narrow fallback;
+		// user-owned personas must never fall back to a public URL.
+		if preferPublicReference {
+			if normalized := normalizeProviderReferenceURL(media.StorageURL, h.config.RunPodWorkerBackendURL); normalized != "" {
+				return normalized, nil
+			}
+		}
+		if signErr != nil {
+			return "", signErr
+		}
+		return "", permanentGenerationFailure("persona_reference_unavailable", errors.New("persona media is not externally reachable over HTTPS"))
+	}
+	if normalized := normalizeProviderReferenceURL(trimmed, h.config.RunPodWorkerBackendURL); normalized != "" {
+		return normalized, nil
+	}
+	return "", nil
+}
+
+func normalizeProviderReferenceURL(rawURL, backendURL string) string {
+	trimmed := strings.TrimSpace(rawURL)
+	if strings.HasPrefix(trimmed, "/") {
+		if pathpkg.Clean(trimmed) != trimmed || !strings.HasPrefix(trimmed, "/uploads/") {
+			return ""
+		}
+		base, err := url.Parse(strings.TrimSpace(backendURL))
+		if err != nil || base.Scheme != "https" || base.Hostname() == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" {
+			return ""
+		}
+		base.Path = strings.TrimRight(base.Path, "/")
+		resolved := base.ResolveReference(&url.URL{Path: trimmed})
+		trimmed = resolved.String()
+	}
+	if !safeProviderReferenceURL(trimmed) {
+		return ""
+	}
+	return trimmed
+}
+
 func safeProviderReferenceURL(rawURL string) bool {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil || parsed.Fragment != "" {
@@ -498,17 +684,23 @@ func safeProviderReferenceURL(rawURL string) bool {
 	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
 		return false
 	}
-	if ip := net.ParseIP(host); ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsLinkLocalUnicast()) {
+	if port := parsed.Port(); port != "" && port != "443" {
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil && (!ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast()) {
 		return false
 	}
 	return true
 }
 
-func selectFalMediaResult(kind models.OmniChatMediaKind, result *fal.Result) (*fal.MediaFile, error) {
+func selectRunPodMediaResult(kind models.OmniChatMediaKind, result *runpod.Result) (*runpod.MediaFile, error) {
 	if result == nil {
 		return nil, errors.New("provider returned no result")
 	}
 	if kind == models.OmniChatMediaKindImage {
+		if len(result.Images) == 0 && result.Image != nil {
+			result.Images = []runpod.MediaFile{*result.Image}
+		}
 		if len(result.Images) == 0 || strings.TrimSpace(result.Images[0].URL) == "" {
 			return nil, errors.New("provider returned no image")
 		}
@@ -523,9 +715,11 @@ func selectFalMediaResult(kind models.OmniChatMediaKind, result *fal.Result) (*f
 	return nil, errors.New("provider result kind is invalid")
 }
 
-// BuildFalGenerationSpec is the provider adapter boundary. Domain requests do
-// not leak Fal-specific fields into handlers, persistence, or frontend code.
-func BuildFalGenerationSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerationJob, referenceURLs []string, sourceURL string) (*FalGenerationSpec, error) {
+// BuildRunPodGenerationSpec is the provider adapter boundary. Domain requests
+// do not leak RunPod endpoint details into handlers, persistence, or frontend
+// code. The worker receives this stable input contract and owns model/runtime
+// selection inside its endpoint image.
+func BuildRunPodGenerationSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerationJob, referenceURLs []string, sourceURL string) (*RunPodGenerationSpec, error) {
 	if job == nil {
 		return nil, errors.New("generation job is required")
 	}
@@ -533,58 +727,128 @@ func BuildFalGenerationSpec(cfg config.OmniChatMediaConfig, job *models.OmniChat
 	if prompt == "" {
 		return nil, errors.New("generation prompt is unavailable")
 	}
+	normalizedReferences := make([]string, 0, len(referenceURLs))
+	for _, rawURL := range referenceURLs {
+		rawURL = strings.TrimSpace(rawURL)
+		if rawURL == "" || !safeProviderReferenceURL(rawURL) {
+			return nil, errors.New("provider reference image URL is invalid")
+		}
+		normalizedReferences = append(normalizedReferences, rawURL)
+	}
+	if len(normalizedReferences) > maxProviderReferenceImages {
+		normalizedReferences = normalizedReferences[:maxProviderReferenceImages]
+	}
+	referenceURLs = normalizedReferences
+	profile := models.NormalizeOmniChatMediaIdentityProfile(job.IdentityProfile)
+	if profile.Mode != models.OmniChatMediaIdentityModeLoRA {
+		profile.Mode = models.OmniChatMediaIdentityModeReference
+		profile.LoraModelID = ""
+		profile.LoraWeightName = ""
+	}
+	if profile.ReferenceLimit < len(referenceURLs) {
+		referenceURLs = referenceURLs[:profile.ReferenceLimit]
+	}
+	identityInput := map[string]any{
+		"identity_mode":          string(profile.Mode),
+		"identity_adapter":       profile.Adapter,
+		"identity_adapter_scale": profile.AdapterScale,
+	}
+	if profile.Mode == models.OmniChatMediaIdentityModeLoRA {
+		identityInput["lora_model_id"] = profile.LoraModelID
+		identityInput["lora_weight_name"] = profile.LoraWeightName
+		identityInput["lora_scale"] = profile.LoraScale
+	}
+	sourceURL = strings.TrimSpace(sourceURL)
+	if sourceURL != "" && !safeProviderReferenceURL(sourceURL) {
+		return nil, errors.New("provider source image URL is invalid")
+	}
+	providerMode := string(job.Mode)
+	if providerMode == "" {
+		providerMode = string(models.OmniChatGenerationModeCreate)
+	}
+	aspectRatio := job.AspectRatio
+	if aspectRatio == "" {
+		if job.Kind == models.OmniChatMediaKindVideo {
+			aspectRatio = "16:9"
+		} else {
+			aspectRatio = "1:1"
+		}
+	}
+	durationSeconds := job.DurationSeconds
+	if job.Kind == models.OmniChatMediaKindVideo && durationSeconds == 0 {
+		durationSeconds = 5
+	}
 
 	switch job.Kind {
 	case models.OmniChatMediaKindImage:
-		modelID := cfg.FalImageModel
+		endpointID := strings.TrimSpace(cfg.RunPodImageEndpointID)
 		input := map[string]any{
-			"prompt":            prompt,
-			"num_images":        1,
-			"aspect_ratio":      job.AspectRatio,
-			"output_format":     "png",
-			"resolution":        "1K",
-			"safety_tolerance":  "3",
-			"limit_generations": true,
-			"enable_web_search": false,
+			"kind":            "image",
+			"mode":            providerMode,
+			"prompt":          prompt,
+			"negative_prompt": strings.TrimSpace(job.NegativePrompt),
+			"num_images":      1,
+			"aspect_ratio":    aspectRatio,
+			"output_format":   "png",
 		}
-		if job.NegativePrompt != "" {
-			input["prompt"] = prompt + " Avoid: " + job.NegativePrompt + "."
+		if providerMode == string(models.OmniChatGenerationModeContextual) {
+			// Keep structured scene state separate from the prose prompt so the
+			// worker can use the latest physical events without parsing/truncation.
+			input["scene"] = job.Scene
+		}
+		for key, value := range identityInput {
+			input[key] = value
 		}
 		if len(referenceURLs) > 0 {
-			modelID = cfg.FalImageEditModel
-			if len(referenceURLs) > 14 {
-				referenceURLs = referenceURLs[:14]
-			}
-			input["image_urls"] = referenceURLs
+			input["reference_image_urls"] = referenceURLs
 		}
-		if strings.TrimSpace(modelID) == "" {
-			return nil, errors.New("image generation model is not configured")
+		if strings.TrimSpace(endpointID) == "" {
+			return nil, fmt.Errorf("%w: image generation endpoint", runpod.ErrEndpointNotConfigured)
 		}
-		return &FalGenerationSpec{ModelID: modelID, Input: input}, nil
+		return &RunPodGenerationSpec{EndpointID: endpointID, Input: input}, nil
 
 	case models.OmniChatMediaKindVideo:
 		input := map[string]any{
-			"prompt":                       prompt,
-			"negative_prompt":              job.NegativePrompt,
-			"aspect_ratio":                 job.AspectRatio,
-			"resolution":                   "1080p",
-			"duration":                     job.DurationSeconds,
-			"enable_safety_checker":        true,
-			"enable_output_safety_checker": true,
+			"kind":             "video",
+			"mode":             providerMode,
+			"prompt":           prompt,
+			"negative_prompt":  strings.TrimSpace(job.NegativePrompt),
+			"resolution":       "1080p",
+			"duration_seconds": durationSeconds,
+			"aspect_ratio":     runPodVideoAspectRatio(aspectRatio),
 		}
-		modelID := cfg.FalTextVideoModel
+		if providerMode == string(models.OmniChatGenerationModeContextual) {
+			input["scene"] = job.Scene
+		}
+		for key, value := range identityInput {
+			input[key] = value
+		}
+		if len(referenceURLs) > 0 {
+			input["reference_image_urls"] = referenceURLs
+		}
+		endpointID := strings.TrimSpace(cfg.RunPodVideoEndpointID)
 		if job.Mode == models.OmniChatGenerationModeImageToVideo {
 			if sourceURL == "" {
 				return nil, errors.New("image-to-video source is unavailable")
 			}
-			modelID = cfg.FalImageVideoModel
-			input["image_url"] = sourceURL
+			input["source_image_url"] = sourceURL
 		}
-		if strings.TrimSpace(modelID) == "" {
-			return nil, errors.New("video generation model is not configured")
+		if strings.TrimSpace(endpointID) == "" {
+			return nil, fmt.Errorf("%w: video generation endpoint", runpod.ErrEndpointNotConfigured)
 		}
-		return &FalGenerationSpec{ModelID: modelID, Input: input}, nil
+		return &RunPodGenerationSpec{EndpointID: endpointID, Input: input}, nil
 	default:
 		return nil, fmt.Errorf("unsupported generation kind %q", job.Kind)
+	}
+}
+
+func runPodVideoAspectRatio(aspectRatio string) string {
+	switch aspectRatio {
+	case "4:5":
+		return "3:4"
+	case "5:4":
+		return "4:3"
+	default:
+		return aspectRatio
 	}
 }

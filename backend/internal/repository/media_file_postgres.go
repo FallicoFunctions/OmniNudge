@@ -17,6 +17,19 @@ type PostgresMediaFileRepository struct {
 
 var _ ports.MediaFileRepository = (*PostgresMediaFileRepository)(nil)
 
+// IsMediaPubliclyAccessible is an optional authorization capability used by
+// the upload gateway for anonymous default-persona presentation assets. Keep
+// it on the adapter (rather than broadening the persistence port) so test and
+// alternate repositories without public-media semantics continue to fail
+// closed.
+func (r *PostgresMediaFileRepository) IsMediaPubliclyAccessible(ctx context.Context, mediaID int) (bool, error) {
+	return r.inner.IsMediaPubliclyAccessible(ctx, mediaID)
+}
+
+var _ interface {
+	IsMediaPubliclyAccessible(context.Context, int) (bool, error)
+} = (*PostgresMediaFileRepository)(nil)
+
 // NewPostgresMediaFileRepository constructs a PostgresMediaFileRepository.
 func NewPostgresMediaFileRepository(pool *pgxpool.Pool) *PostgresMediaFileRepository {
 	return &PostgresMediaFileRepository{inner: models.NewMediaFileRepository(pool)}

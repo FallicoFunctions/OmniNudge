@@ -87,16 +87,21 @@ type ConversationSettings struct {
 
 // BotConversation is a chat session between a user and a BotPersona.
 type BotConversation struct {
-	ID                 int                   `json:"id"`
-	UserID             int                   `json:"user_id"`
-	PersonaID          int                   `json:"persona_id"`
-	Persona            *BotPersona           `json:"persona,omitempty"` // Optional populated persona info
-	Title              *string               `json:"title,omitempty"`
-	LastMessagePreview *string               `json:"last_message_preview,omitempty"`
-	Settings           *ConversationSettings `json:"settings,omitempty"`
-	CreatedAt          time.Time             `json:"created_at"`
-	LastMessageAt      time.Time             `json:"last_message_at"`
-	ArchivedAt         *time.Time            `json:"archived_at,omitempty"`
+	ID                 int         `json:"id"`
+	UserID             int         `json:"user_id"`
+	PersonaID          int         `json:"persona_id"`
+	Persona            *BotPersona `json:"persona,omitempty"` // Optional populated persona info
+	Title              *string     `json:"title,omitempty"`
+	LastMessagePreview *string     `json:"last_message_preview,omitempty"`
+	// LastMessageMediaOnly reports that the newest message is a generated image
+	// or video, which carries no text. Callers must not treat an empty preview
+	// as "this conversation has no messages": that is how a conversation the
+	// user actively generated media in disappears from a list.
+	LastMessageMediaOnly bool                  `json:"last_message_media_only,omitempty"`
+	Settings             *ConversationSettings `json:"settings,omitempty"`
+	CreatedAt            time.Time             `json:"created_at"`
+	LastMessageAt        time.Time             `json:"last_message_at"`
+	ArchivedAt           *time.Time            `json:"archived_at,omitempty"`
 }
 
 // BotMessage is a single turn (user or assistant) within a BotConversation.
@@ -106,6 +111,7 @@ type BotMessage struct {
 	Role           string                       `json:"role"` // 'user' or 'assistant'
 	Content        string                       `json:"content"`
 	Failed         bool                         `json:"failed"`
+	MediaOnly      bool                         `json:"-"`
 	RequestID      *uuid.UUID                   `json:"request_id,omitempty"`
 	Attachments    []*OmniChatMessageMediaAsset `json:"attachments,omitempty"`
 	CreatedAt      time.Time                    `json:"created_at"`
@@ -644,11 +650,11 @@ func createConversationWithMessagesTx(ctx context.Context, tx pgx.Tx, userID, pe
 
 	if len(messages) > 0 {
 		insertMessageQuery := `
-			INSERT INTO bot_messages (conversation_id, role, content, failed)
-			VALUES ($1, $2, $3, $4)
+			INSERT INTO bot_messages (conversation_id, role, content, failed, media_only)
+			VALUES ($1, $2, $3, $4, $5)
 		`
 		for _, m := range messages {
-			if _, err := tx.Exec(ctx, insertMessageQuery, c.ID, m.Role, m.Content, m.Failed); err != nil {
+			if _, err := tx.Exec(ctx, insertMessageQuery, c.ID, m.Role, m.Content, m.Failed, m.MediaOnly); err != nil {
 				return nil, err
 			}
 		}
@@ -724,7 +730,7 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 	query := `
 		SELECT
 			c.id, c.user_id, c.persona_id, c.title,
-			lm.content,
+			lm.content, COALESCE(lm.media_only, FALSE),
 			c.settings_user_name, c.settings_user_age, c.settings_user_gender,
 			c.created_at, c.last_message_at, c.archived_at,
 			` + qualifySelectColumns("p", botPersonaSelectColumns) + `
@@ -732,7 +738,7 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 		INNER JOIN bot_personas p ON p.id = c.persona_id AND p.is_active
 			AND ((p.owner_user_id IS NULL AND p.visibility = 'public') OR p.owner_user_id = c.user_id)
 		LEFT JOIN LATERAL (
-			SELECT content
+			SELECT content, media_only
 			FROM bot_messages
 			WHERE conversation_id = c.id
 			ORDER BY created_at DESC, id DESC
@@ -755,7 +761,7 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 		p := &BotPersona{}
 		if err := rows.Scan(
 			&c.ID, &c.UserID, &c.PersonaID, &c.Title,
-			&c.LastMessagePreview,
+			&c.LastMessagePreview, &c.LastMessageMediaOnly,
 			&s.UserName, &s.UserAge, &s.UserGender,
 			&c.CreatedAt, &c.LastMessageAt, &c.ArchivedAt,
 			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.OwnerUserID, &p.Visibility, &p.SourceFormat,
@@ -779,14 +785,14 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 func (r *BotConversationRepository) ListByUserIDAndPersonaID(ctx context.Context, userID, personaID, limit, offset int) ([]*BotConversation, error) {
 	query := `
 		SELECT c.id, c.user_id, c.persona_id, c.title,
-		       lm.content,
+		       lm.content, COALESCE(lm.media_only, FALSE),
 		       c.settings_user_name, c.settings_user_age, c.settings_user_gender,
 		       c.created_at, c.last_message_at, c.archived_at
 		FROM bot_conversations c
 		INNER JOIN bot_personas p ON p.id = c.persona_id AND p.is_active
 			AND ((p.owner_user_id IS NULL AND p.visibility = 'public') OR p.owner_user_id = c.user_id)
 		LEFT JOIN LATERAL (
-		    SELECT content
+		    SELECT content, media_only
 		    FROM bot_messages
 		    WHERE conversation_id = c.id
 		    ORDER BY created_at DESC, id DESC
@@ -808,7 +814,7 @@ func (r *BotConversationRepository) ListByUserIDAndPersonaID(ctx context.Context
 		s := &ConversationSettings{}
 		err := rows.Scan(
 			&c.ID, &c.UserID, &c.PersonaID, &c.Title,
-			&c.LastMessagePreview,
+			&c.LastMessagePreview, &c.LastMessageMediaOnly,
 			&s.UserName, &s.UserAge, &s.UserGender,
 			&c.CreatedAt, &c.LastMessageAt, &c.ArchivedAt,
 		)
@@ -889,14 +895,15 @@ func (r *BotConversationRepository) ForkConversation(ctx context.Context, userID
 	// Copy messages and their attachments together. A bulk INSERT of just the
 	// turns used to silently drop generated media from forked conversations.
 	type sourceMessage struct {
-		id      int
-		role    string
-		content string
-		failed  bool
-		created time.Time
+		id        int
+		role      string
+		content   string
+		failed    bool
+		mediaOnly bool
+		created   time.Time
 	}
 	rows, err := tx.Query(ctx, `
-		SELECT id, role, content, failed, created_at
+		SELECT id, role, content, failed, media_only, created_at
 		FROM bot_messages WHERE conversation_id = $1 ORDER BY id
 	`, originalID)
 	if err != nil {
@@ -905,7 +912,7 @@ func (r *BotConversationRepository) ForkConversation(ctx context.Context, userID
 	sourceMessages := make([]sourceMessage, 0)
 	for rows.Next() {
 		var message sourceMessage
-		if err = rows.Scan(&message.id, &message.role, &message.content, &message.failed, &message.created); err != nil {
+		if err = rows.Scan(&message.id, &message.role, &message.content, &message.failed, &message.mediaOnly, &message.created); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -919,9 +926,9 @@ func (r *BotConversationRepository) ForkConversation(ctx context.Context, userID
 	for _, message := range sourceMessages {
 		var copiedMessageID int
 		if err = tx.QueryRow(ctx, `
-			INSERT INTO bot_messages (conversation_id, role, content, failed, created_at)
-			VALUES ($1, $2, $3, $4, $5) RETURNING id
-		`, newConv.ID, message.role, message.content, message.failed, message.created).Scan(&copiedMessageID); err != nil {
+			INSERT INTO bot_messages (conversation_id, role, content, failed, media_only, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6) RETURNING id
+		`, newConv.ID, message.role, message.content, message.failed, message.mediaOnly, message.created).Scan(&copiedMessageID); err != nil {
 			return nil, err
 		}
 		if _, err = tx.Exec(ctx, `
@@ -1059,6 +1066,7 @@ func (r *BotMessageRepository) CreateUserTurnWithRequestID(ctx context.Context, 
 		RETURNING id,conversation_id,role,content,failed,created_at
 	`, conversationID, content, requestID).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
 	if err == nil {
+		m.RequestID = &requestID
 		return m, false, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -1075,6 +1083,7 @@ func (r *BotMessageRepository) CreateUserTurnWithRequestID(ctx context.Context, 
 	if m.Content != content {
 		return nil, false, errors.New("request-owned user turn content conflict")
 	}
+	m.RequestID = &requestID
 	return m, true, nil
 }
 
@@ -1311,6 +1320,7 @@ func (r *BotMessageRepository) GetLatestAssistantForRegeneration(ctx context.Con
 		WHERE m.id = $1
 		  AND m.conversation_id = $2
 		  AND m.role = $3
+		  AND m.media_only = FALSE
 		  AND NOT EXISTS (
 			SELECT 1
 			FROM bot_messages newer

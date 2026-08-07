@@ -60,6 +60,26 @@ func RespondError(c *gin.Context, code int, msg string) {
 	c.JSON(code, resp)
 }
 
+// RespondErrorCoded attaches a machine-readable reason alongside the status.
+// Deriving the code from the status alone collapses distinct failures into one
+// opaque response: a single endpoint can return four different 503s, and a
+// client that can only see "service_unavailable" cannot tell a broken
+// dependency from a misconfiguration. The message stays user-safe; the code is
+// what clients and logs branch on.
+func RespondErrorCoded(c *gin.Context, status int, reason, msg string) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		RespondError(c, status, msg)
+		return
+	}
+	c.JSON(status, apiresponse.ErrorResponse{
+		Error:     strings.TrimSpace(msg),
+		Code:      reason,
+		Message:   strings.TrimSpace(msg),
+		RequestID: requestIDFromContext(c),
+	})
+}
+
 // hubModeratorRole returns the caller's moderator role for the given hub.
 // Site admins always receive a synthetic owner role, bypassing the DB check.
 func hubModeratorRole(c *gin.Context, repo *repository.HubSettingsRepository, hubID int, userID int) (*models.ModeratorRole, error) {

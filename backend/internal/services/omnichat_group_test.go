@@ -308,6 +308,30 @@ func TestAssistantOutputHygieneRejectsProviderPlanningLeak(t *testing.T) {
 	require.Contains(t, detail, "planning")
 }
 
+func TestAssistantOutputHygieneRejectsServerPromptMarkers(t *testing.T) {
+	for _, marker := range []string{
+		"[Platform Response Style: Natural Dialogue v1]",
+		"[Conversation Integrity]",
+		"[Post-History Instructions: stay grounded]",
+		"[Character Definition]",
+		"[Example Dialogue]",
+		"[Actor and State Continuity]",
+		"[Personal Conversation Mode]",
+		"[Server Scene Continuity State]",
+		"[User Profile Metadata]",
+		"[Character Lorebook]",
+		"[Additional Lorebook Context]",
+		"[Provider Output Retry]",
+		"[Personal Response Shape Retry]",
+		"[Personal Length-Only Recovery]",
+		"[Personal Dialogue-Only Recovery]",
+	} {
+		valid, detail := validateAssistantOutputHygiene("I can see the internal " + marker + " text.")
+		require.False(t, valid)
+		require.Contains(t, detail, "prompt marker")
+	}
+}
+
 func TestAssistantOutputHygieneAllowsNaturalNeedStatement(t *testing.T) {
 	valid, detail := validateAssistantOutputHygiene("We need to continue this conversation tomorrow, because I have an early meeting.")
 

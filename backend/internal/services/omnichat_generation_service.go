@@ -14,7 +14,6 @@ import (
 var (
 	ErrOmniChatGenerationResourceNotFound = errors.New("omnichat generation resource not found")
 	ErrOmniChatGenerationUnavailable      = errors.New("omnichat generation unavailable")
-	ErrOmniChatGenerationSafetyRejected   = errors.New("omnichat generation safety rejected")
 )
 
 type OmniChatGenerationPersonaReader interface {
@@ -34,6 +33,14 @@ type OmniChatGenerationStore interface {
 	MarkGenerationJobFailed(ctx context.Context, id uuid.UUID, safeCode, providerError string) (bool, error)
 }
 
+// OmniChatGenerationSourceReader is optional for backwards-compatible store
+// implementations. The SQL repository implements it so a request that was
+// accepted before a client disconnect cannot create a second provider job when
+// the command is retried after idempotency completion is uncertain.
+type OmniChatGenerationSourceReader interface {
+	GetGenerationJobForSourceMessageOwned(context.Context, int, int) (*models.OmniChatGenerationJob, error)
+}
+
 type OmniChatGenerationEnqueuer interface {
 	EnqueueOmniChatGeneration(ctx context.Context, id uuid.UUID) error
 }
@@ -43,21 +50,30 @@ type OmniChatGenerationBilling interface {
 	RefundOwned(context.Context, int, uuid.UUID) error
 }
 
-type OmniChatMediaPromptModerator interface {
-	AllowPrivateMedia(ctx context.Context, prompt string, kind models.OmniChatMediaKind) (bool, error)
+// OmniChatGenerationMessageWriter persists the user's slash-command turn.
+// Keeping this behind a small interface makes the media service responsible
+// for the same request-idempotent durable turn that normal chat sends use.
+type OmniChatGenerationMessageWriter interface {
+	CreateUserTurnWithRequestID(context.Context, int, string, uuid.UUID) (*models.BotMessage, bool, error)
+}
+
+type OmniChatGenerationConversationWriter interface {
+	UpdateLastMessageAt(context.Context, int) error
 }
 
 // OmniChatGenerationService authorizes every reference before a job is
 // created. The queue payload contains only the opaque job UUID, never prompts
 // or storage paths.
 type OmniChatGenerationService struct {
-	personas      OmniChatGenerationPersonaReader
-	conversations OmniChatGenerationConversationReader
-	store         OmniChatGenerationStore
-	enqueuer      OmniChatGenerationEnqueuer
-	provider      string
-	billing       OmniChatGenerationBilling
-	moderator     OmniChatMediaPromptModerator
+	personas           OmniChatGenerationPersonaReader
+	conversations      OmniChatGenerationConversationReader
+	store              OmniChatGenerationStore
+	enqueuer           OmniChatGenerationEnqueuer
+	messages           OmniChatGenerationMessageWriter
+	conversationWriter OmniChatGenerationConversationWriter
+	provider           string
+	billing            OmniChatGenerationBilling
+	moderator          OmniChatMediaPromptModerator
 }
 
 func (s *OmniChatGenerationService) SetBilling(billing OmniChatGenerationBilling) *OmniChatGenerationService {
@@ -65,9 +81,114 @@ func (s *OmniChatGenerationService) SetBilling(billing OmniChatGenerationBilling
 	return s
 }
 
+// SetPromptModerator installs the pre-provider safety classifier. Leaving it
+// unset skips moderation, which keeps local development and tests runnable
+// without an OpenRouter credential.
 func (s *OmniChatGenerationService) SetPromptModerator(moderator OmniChatMediaPromptModerator) *OmniChatGenerationService {
 	s.moderator = moderator
 	return s
+}
+
+func (s *OmniChatGenerationService) SetMessageWriter(writer OmniChatGenerationMessageWriter) *OmniChatGenerationService {
+	s.messages = writer
+	return s
+}
+
+func (s *OmniChatGenerationService) SetConversationWriter(writer OmniChatGenerationConversationWriter) *OmniChatGenerationService {
+	s.conversationWriter = writer
+	return s
+}
+
+// CreateConversationMediaCommand persists a direct /photo or /video command
+// and queues its media job without sending the command through the language
+// model. The user turn is request-idempotent and the generated asset is linked
+// to that turn by SourceMessageID, so the same command is durable in both the
+// conversation and persona gallery.
+func (s *OmniChatGenerationService) CreateConversationMediaCommand(
+	ctx context.Context,
+	ownerUserID, conversationID int,
+	input models.OmniChatMediaCommandRequest,
+) (*models.OmniChatGenerationJob, *models.BotMessage, error) {
+	if ownerUserID <= 0 || conversationID <= 0 || input.RequestID == uuid.Nil {
+		return nil, nil, ErrOmniChatGenerationResourceNotFound
+	}
+	if s.messages == nil {
+		return nil, nil, ErrOmniChatGenerationUnavailable
+	}
+	if s.personas == nil || s.conversations == nil || s.store == nil || !strings.EqualFold(strings.TrimSpace(s.provider), "runpod") {
+		return nil, nil, ErrOmniChatGenerationUnavailable
+	}
+
+	conversation, err := s.conversations.GetByID(ctx, conversationID, ownerUserID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get media command conversation: %w", err)
+	}
+	if conversation == nil {
+		return nil, nil, ErrOmniChatGenerationResourceNotFound
+	}
+	persona, err := s.personas.GetAccessibleByID(ctx, conversation.PersonaID, &ownerUserID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get media command persona: %w", err)
+	}
+	if persona == nil {
+		return nil, nil, ErrOmniChatGenerationResourceNotFound
+	}
+
+	generationRequest := models.OmniChatGenerationRequest{
+		// The command endpoint owns the request-idempotency record. The inner
+		// generation job must not complete that record with a job-only payload;
+		// the handler completes it atomically with the persisted command message.
+		RequestID:       uuid.Nil,
+		Kind:            input.Kind,
+		Mode:            models.OmniChatGenerationModeCreate,
+		PersonaID:       conversation.PersonaID,
+		ConversationID:  &conversationID,
+		Prompt:          input.Prompt,
+		AspectRatio:     input.AspectRatio,
+		DurationSeconds: input.DurationSeconds,
+	}
+	if _, err := NormalizeOmniChatGenerationRequest(generationRequest); err != nil {
+		return nil, nil, err
+	}
+
+	commandContent := mediaCommandContent(input.Kind, input.Prompt)
+	message, reused, err := s.messages.CreateUserTurnWithRequestID(ctx, conversationID, commandContent, input.RequestID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("persist media command: %w", err)
+	}
+	if reused {
+		if sourceReader, ok := s.store.(OmniChatGenerationSourceReader); ok {
+			existingJob, readErr := sourceReader.GetGenerationJobForSourceMessageOwned(ctx, ownerUserID, message.ID)
+			if readErr != nil {
+				return nil, message, fmt.Errorf("load existing media command job: %w", readErr)
+			}
+			if existingJob != nil && existingJob.Status != models.OmniChatGenerationStatusFailed && existingJob.Status != models.OmniChatGenerationStatusCancelled {
+				message.RequestID = &input.RequestID
+				return existingJob, message, nil
+			}
+		}
+	}
+	if s.conversationWriter != nil {
+		if err := s.conversationWriter.UpdateLastMessageAt(ctx, conversationID); err != nil {
+			return nil, message, fmt.Errorf("update media command conversation: %w", err)
+		}
+	}
+	generationRequest.SourceMessageID = &message.ID
+	generationRequest.BillingOperationID = DeriveOmniChatRequestBillingOperationID(ownerUserID, "media_generation", input.RequestID)
+	job, err := s.CreateGeneration(ctx, ownerUserID, generationRequest)
+	if err != nil {
+		return nil, message, err
+	}
+	message.RequestID = &input.RequestID
+	return job, message, nil
+}
+
+func mediaCommandContent(kind models.OmniChatMediaKind, prompt string) string {
+	command := "/photo"
+	if kind == models.OmniChatMediaKindVideo {
+		command = "/video"
+	}
+	return command + " " + strings.TrimSpace(prompt)
 }
 
 func NewOmniChatGenerationService(
@@ -87,9 +208,15 @@ func (s *OmniChatGenerationService) CreateGeneration(ctx context.Context, ownerU
 	if ownerUserID <= 0 {
 		return nil, ErrOmniChatGenerationResourceNotFound
 	}
-	if s.personas == nil || s.store == nil || !strings.EqualFold(strings.TrimSpace(s.provider), "fal") {
+	if s.personas == nil || s.store == nil || !strings.EqualFold(strings.TrimSpace(s.provider), "runpod") {
 		return nil, ErrOmniChatGenerationUnavailable
 	}
+	// Discard caller-supplied values for the server-owned scene fields before
+	// anything reads them. They are resolved below from tracked conversation
+	// state and the persona record, and must not be settable from a request:
+	// SubjectAppearance is injected verbatim into the image prompt and would
+	// otherwise override the persona's own description.
+	stripServerOwnedSceneFields(&input.Scene)
 
 	persona, err := s.personas.GetAccessibleByID(ctx, input.PersonaID, &ownerUserID)
 	if err != nil {
@@ -155,57 +282,52 @@ func (s *OmniChatGenerationService) CreateGeneration(ctx context.Context, ownerU
 	if err != nil {
 		return nil, err
 	}
-	moderationPrompt := "Requested scene:\n" + normalized.EffectivePrompt
-	if normalized.NegativePrompt != "" {
-		moderationPrompt += "\n\nRequested exclusions:\n" + normalized.NegativePrompt
+	// Classify before reserving credits, so a rejected request never bills.
+	if err := moderateGenerationPrompt(ctx, s.moderator, normalized); err != nil {
+		return nil, err
 	}
-	if s.moderator == nil {
-		return nil, ErrOmniChatGenerationUnavailable
-	}
-	allowed, moderationErr := s.moderator.AllowPrivateMedia(ctx, moderationPrompt, normalized.Kind)
-	if moderationErr != nil {
-		return nil, ErrOmniChatGenerationUnavailable
-	}
-	if !allowed {
-		return nil, ErrOmniChatGenerationSafetyRejected
-	}
+	billingRequired := true
 	var billingOperationID uuid.UUID
 	if normalized.Kind == models.OmniChatMediaKindImage || normalized.Kind == models.OmniChatMediaKindVideo {
 		if s.billing == nil {
 			return nil, ErrOmniChatPaidFeatureRequired
 		}
-		if s.billing != nil {
-			usageKind := models.OmniCreditsUsageImage
-			if normalized.Kind == models.OmniChatMediaKindVideo {
-				usageKind = models.OmniCreditsUsageVideo
+		usageKind := models.OmniCreditsUsageImage
+		if normalized.Kind == models.OmniChatMediaKindVideo {
+			usageKind = models.OmniCreditsUsageVideo
+		}
+		billingOperationID = uuid.New()
+		if normalized.BillingOperationID != nil && *normalized.BillingOperationID != uuid.Nil {
+			billingOperationID = *normalized.BillingOperationID
+		}
+		reservation, reserveErr := s.billing.ReserveOwned(ctx, ownerUserID, billingOperationID, usageKind)
+		if reserveErr != nil {
+			if normalized.BillingOperationID != nil && errors.Is(reserveErr, models.ErrOmniCreditsReservationRefunded) {
+				// A failed attempt may have already refunded its stable operation.
+				// Reservation records are immutable, so a retry uses a fresh,
+				// server-created operation after that confirmed closure.
+				billingOperationID = uuid.New()
+				reservation, reserveErr = s.billing.ReserveOwned(ctx, ownerUserID, billingOperationID, usageKind)
 			}
-			billingOperationID = uuid.New()
-			if normalized.BillingOperationID != nil && *normalized.BillingOperationID != uuid.Nil {
-				billingOperationID = *normalized.BillingOperationID
-			}
-			if _, err := s.billing.ReserveOwned(ctx, ownerUserID, billingOperationID, usageKind); err != nil {
-				if normalized.BillingOperationID != nil && errors.Is(err, models.ErrOmniCreditsReservationRefunded) {
-					// A failed attempt may have already refunded its stable operation.
-					// Reservation records are immutable, so a retry uses a fresh,
-					// server-created operation after that confirmed closure.
-					billingOperationID = uuid.New()
-					if _, retryErr := s.billing.ReserveOwned(ctx, ownerUserID, billingOperationID, usageKind); retryErr == nil {
-						normalized.BillingOperationID = &billingOperationID
-					} else if errors.Is(retryErr, models.ErrOmniCreditsInsufficient) {
-						return nil, ErrOmniChatPaidFeatureRequired
-					} else {
-						return nil, fmt.Errorf("reserve generation retry credits: %w", retryErr)
-					}
-				} else {
-					if errors.Is(err, models.ErrOmniCreditsInsufficient) {
-						return nil, ErrOmniChatPaidFeatureRequired
-					}
-					return nil, fmt.Errorf("reserve video generation credits: %w", err)
+			if reserveErr != nil {
+				if errors.Is(reserveErr, models.ErrOmniCreditsInsufficient) {
+					return nil, ErrOmniChatPaidFeatureRequired
 				}
+				return nil, fmt.Errorf("reserve generation credits: %w", reserveErr)
 			}
+		}
+		if reservation == nil {
+			return nil, errors.New("reserve generation credits: billing returned no reservation")
+		}
+		if reservation.AdminBypass {
+			billingRequired = false
+			billingOperationID = uuid.Nil
+			normalized.BillingOperationID = nil
+		} else {
 			normalized.BillingOperationID = &billingOperationID
 		}
 	}
+	normalized.BillingRequired = &billingRequired
 	refundReservation := func() error {
 		if billingOperationID == uuid.Nil {
 			return nil
@@ -259,4 +381,17 @@ func omniChatSceneIsEmpty(scene models.OmniChatSceneState) bool {
 		scene.Lighting == "" && scene.Activity == "" && scene.Outfit == "" &&
 		scene.Pose == "" && scene.Expression == "" && scene.Mood == "" &&
 		scene.CameraDirection == "" && len(scene.OtherCharacters) == 0 && len(scene.RecentEvents) == 0
+}
+
+// stripServerOwnedSceneFields clears the scene fields the server derives.
+// They carry JSON tags because the same struct is persisted and sent to the
+// provider, so a request body can populate them; only this scrub keeps that
+// from being authoritative.
+func stripServerOwnedSceneFields(scene *models.OmniChatSceneState) {
+	if scene == nil {
+		return
+	}
+	scene.SubjectAppearance = ""
+	scene.ViewerPosition = ""
+	scene.IncludeUserBody = false
 }

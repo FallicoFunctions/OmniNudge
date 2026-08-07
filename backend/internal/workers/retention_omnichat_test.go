@@ -589,7 +589,7 @@ func TestRetentionWorkerEndsAndClearsAbandonedOmniChatProviderSession(t *testing
 	callRepository := models.NewOmniChatVoiceRepository(db.Pool)
 	call, err := callRepository.StartCallOwned(ctx, user.ID, conversation.ID, "video")
 	require.NoError(t, err)
-	attached, err := callRepository.AttachCallProviderOwned(ctx, call.ID, user.ID, "tavus", "abandoned-provider-call")
+	attached, err := callRepository.AttachCallProviderOwned(ctx, call.ID, user.ID, "runpod_livekit", "abandoned-provider-call")
 	require.NoError(t, err)
 	require.True(t, attached)
 	require.NoError(t, db.Pool.QueryRow(ctx, `UPDATE omnichat_call_sessions SET last_activity_at=NOW()-INTERVAL '3 hours' WHERE id=$1 RETURNING id`, call.ID).Scan(&call.ID))

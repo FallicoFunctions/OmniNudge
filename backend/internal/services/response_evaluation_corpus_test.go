@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"math"
 	"testing"
 
 	"github.com/omninudge/backend/internal/models"
@@ -13,19 +14,85 @@ import (
 
 func TestDefaultResponseEvaluationCorpusIsVersionedAndSeedsMultiTurnRegressions(t *testing.T) {
 	corpus := DefaultResponseEvaluationCorpus()
-	require.Equal(t, "2026-07-29.2", corpus.Version)
+	require.Equal(t, "2026-08-04.4", corpus.Version)
+	require.Equal(t, DefaultResponseEvaluationCorpusFingerprint, ResponseEvaluationCorpusFingerprint(corpus))
 	require.NotEmpty(t, corpus.Cases)
-	var foundMultiTurn, foundArtifact, foundOwnership bool
+	var foundMultiTurn, foundArtifact, foundOwnership, foundConsent, foundUserTurn, foundAgencyLanguage bool
 	for _, testCase := range corpus.Cases {
 		foundMultiTurn = foundMultiTurn || len(testCase.History) > 0
 		foundArtifact = foundArtifact || testCase.ID == "provider-artifact-leak"
 		foundOwnership = foundOwnership || testCase.ID == "reciprocal-turn-ownership"
+		foundConsent = foundConsent || testCase.ID == "declined-consent-remains-authoritative"
+		foundUserTurn = foundUserTurn || testCase.ID == "user-active-turn-remains-user-owned"
+		foundAgencyLanguage = foundAgencyLanguage || testCase.ID == "user-agency-language-preserved"
 	}
 	require.True(t, foundMultiTurn)
 	require.True(t, foundArtifact)
 	require.True(t, foundOwnership)
+	require.True(t, foundConsent)
+	require.True(t, foundUserTurn)
+	require.True(t, foundAgencyLanguage)
 	_, err := json.Marshal(corpus)
 	require.NoError(t, err)
+}
+
+func TestResponseEvaluationCorpusRejectsInvalidSceneStateBeforeResponder(t *testing.T) {
+	corpus := ResponseEvaluationCorpus{Version: "test-v1", Cases: []ResponseEvaluationCase{{
+		ID: "invalid-scene", PersonaSlug: "pink-sadie", Prompt: "Reply.",
+		SceneState: &models.OmniChatConversationSceneState{},
+	}}}
+	called := false
+	_, err := RunResponseEvaluationCorpus(context.Background(), corpus, func(context.Context, ResponseEvaluationCase) (string, error) {
+		called = true
+		return "unused", nil
+	})
+	require.ErrorContains(t, err, "invalid scene state")
+	require.False(t, called)
+}
+
+func TestResponseEvaluationCorpusRejectsNonFiniteThresholdsBeforeResponder(t *testing.T) {
+	for _, value := range []float64{math.NaN(), math.Inf(1), math.Inf(-1)} {
+		for _, kind := range []string{"corpus", "dimension"} {
+			t.Run(kind, func(t *testing.T) {
+				corpus := ResponseEvaluationCorpus{Version: "test-v1", MinPassRate: 1, Cases: []ResponseEvaluationCase{{
+					ID: "threshold", PersonaSlug: "pink-sadie", Prompt: "Reply.",
+					Expect: ResponseEvaluationExpectations{MinDimensionPassRate: map[ResponseEvaluationDimension]float64{ResponseEvaluationDimensionFormat: value}},
+				}}}
+				if kind == "corpus" {
+					corpus.MinPassRate = value
+				}
+				called := false
+				_, err := RunResponseEvaluationCorpus(context.Background(), corpus, func(context.Context, ResponseEvaluationCase) (string, error) {
+					called = true
+					return "unused", nil
+				})
+				if kind == "corpus" {
+					require.ErrorContains(t, err, "min pass rate")
+				} else {
+					require.ErrorContains(t, err, "invalid threshold")
+				}
+				require.False(t, called)
+			})
+		}
+	}
+}
+
+func TestResponseEvaluationCorpusRejectsInvalidHistoryBeforeResponder(t *testing.T) {
+	for _, history := range [][]ChatMessage{
+		{{Role: "system", Content: "not allowed"}},
+		{{Role: openrouter.RoleUser, Content: "   "}},
+	} {
+		corpus := ResponseEvaluationCorpus{Version: "test-v1", Cases: []ResponseEvaluationCase{{
+			ID: "history", PersonaSlug: "pink-sadie", Prompt: "Reply.", History: history,
+		}}}
+		called := false
+		_, err := RunResponseEvaluationCorpus(context.Background(), corpus, func(context.Context, ResponseEvaluationCase) (string, error) {
+			called = true
+			return "unused", nil
+		})
+		require.ErrorContains(t, err, "history")
+		require.False(t, called)
+	}
 }
 
 func TestResponseEvaluationCorpusRejectsForbiddenSemanticParaphrases(t *testing.T) {
@@ -60,6 +127,7 @@ func TestDefaultResponseEvaluationCasesRejectAdversarialParaphrases(t *testing.T
 		{"proposed-action-remains-proposed", "My palm settles over your knee while I answer."},
 		{"user-correction-is-authoritative", "You extended toward my hand before I moved."},
 		{"user-agency-preserved", "Your body leans closer before I can answer."},
+		{"user-agency-language-preserved", "You feel nervous, then decide to say yes for yourself."},
 	} {
 		t.Run(test.caseID, func(t *testing.T) {
 			testCase, found := cases[test.caseID]
@@ -107,6 +175,7 @@ func TestRunResponseEvaluationCorpusScoresDimensionsAndProducesSafeJSONReport(t 
 	require.True(t, report.Passed)
 	require.Equal(t, 1, report.TotalCases)
 	require.Equal(t, 1, report.PassedCases)
+	require.Equal(t, ResponseEvaluationCorpusFingerprint(corpus), report.CorpusFingerprint)
 	result := report.Results[0]
 	require.True(t, result.Dimensions.ActorOwnership.Passed)
 	require.True(t, result.Dimensions.UserAgency.Passed)

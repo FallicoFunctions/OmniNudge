@@ -85,6 +85,11 @@ func (s *OmniChatGroupService) SendMessage(ctx context.Context, groupID uuid.UUI
 	}
 	completion := s.completion
 	if s.modelRouter != nil {
+		// Group threads are social records, not bot_conversations, so they do
+		// not currently have a conversation-scoped model preference or personal
+		// scene state. Resolve with conversationID=0 deliberately: the router
+		// fails closed to the free route until group entitlements/preferences
+		// are introduced as a separate server-owned capability.
 		completion, _ = s.modelRouter.Resolve(ctx, userID, 0)
 	}
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
@@ -52,10 +53,41 @@ const (
 	OmniChatSceneBoundaryRequired OmniChatSceneBoundaryValue = "required"
 )
 
+// OmniChatSceneAppearance is what an actor visibly looks like right now. It is
+// tracked per actor and persists across turns until the transcript changes it,
+// because an image request can arrive at any point in a scene and the wardrobe
+// established ten messages ago is still the correct answer.
+type OmniChatSceneAppearance struct {
+	Outfit      string   `json:"outfit,omitempty"`
+	Accessories []string `json:"accessories,omitempty"`
+	BodyState   string   `json:"body_state,omitempty"`
+}
+
 type OmniChatSceneActor struct {
-	Key   string                 `json:"key"`
-	Kind  OmniChatSceneActorKind `json:"kind"`
-	Label string                 `json:"label"`
+	Key        string                  `json:"key"`
+	Kind       OmniChatSceneActorKind  `json:"kind"`
+	Label      string                  `json:"label"`
+	Appearance OmniChatSceneAppearance `json:"appearance,omitempty"`
+}
+
+// OmniChatSceneSetting is the physical place the scene occupies. Description is
+// the load-bearing field: a bare place name ("dungeon") gives an image model
+// nothing, so the extractor is asked for the concrete surfaces, fixtures, and
+// objects the transcript established.
+type OmniChatSceneSetting struct {
+	Place       string `json:"place,omitempty"`
+	Description string `json:"description,omitempty"`
+	TimeOfDay   string `json:"time_of_day,omitempty"`
+	Lighting    string `json:"lighting,omitempty"`
+}
+
+// OmniChatSceneStaging is the momentary arrangement of the scene: what the
+// persona is doing at this instant and where she is relative to the user.
+type OmniChatSceneStaging struct {
+	PersonaPose       string `json:"persona_pose,omitempty"`
+	PersonaExpression string `json:"persona_expression,omitempty"`
+	Mood              string `json:"mood,omitempty"`
+	Proximity         string `json:"proximity,omitempty"`
 }
 type OmniChatSceneEvent struct {
 	Subject string `json:"subject"`
@@ -82,6 +114,8 @@ type OmniChatConversationSceneState struct {
 	Event               OmniChatSceneEvent           `json:"event"`
 	Status              OmniChatSceneStatus          `json:"status"`
 	Location            string                       `json:"location"`
+	Setting             OmniChatSceneSetting         `json:"setting,omitempty"`
+	Staging             OmniChatSceneStaging         `json:"staging,omitempty"`
 	OwnershipFacts      []OmniChatSceneOwnershipFact `json:"ownership_facts"`
 	BoundaryFacts       []OmniChatSceneBoundaryFact  `json:"boundary_facts"`
 	Revision            int64                        `json:"-"`
@@ -99,8 +133,11 @@ func (s OmniChatConversationSceneState) Validate() error {
 	}
 	keys := map[string]struct{}{}
 	for _, a := range s.Actors {
-		if !validSceneText(a.Key) || !validSceneText(a.Label) || !validActor(a.Kind) {
+		if !validSceneActorKey(a.Key, a.Kind) || !validSceneText(a.Label) || !validActor(a.Kind) {
 			return errors.New("omnichat scene state: actor key, label, and kind are required")
+		}
+		if err := validSceneAppearance(a.Appearance); err != nil {
+			return fmt.Errorf("omnichat scene state: actor %q: %w", a.Key, err)
 		}
 		if _, ok := keys[a.Key]; ok {
 			return fmt.Errorf("omnichat scene state: duplicate actor %q", a.Key)
@@ -119,20 +156,93 @@ func (s OmniChatConversationSceneState) Validate() error {
 	if !validSceneText(s.Location) {
 		return errors.New("omnichat scene state: location is required and bounded")
 	}
+	// Setting, Staging, and per-actor Appearance are optional. Checkpoints
+	// written before these fields existed are re-validated on load, so
+	// requiring them here would make every stored checkpoint unreadable.
+	for _, value := range []string{s.Setting.Place, s.Setting.Description, s.Setting.TimeOfDay, s.Setting.Lighting,
+		s.Staging.PersonaPose, s.Staging.PersonaExpression, s.Staging.Mood, s.Staging.Proximity} {
+		if !optionalSceneText(value) {
+			return errors.New("omnichat scene state: setting and staging text must be bounded")
+		}
+	}
 	if len(s.OwnershipFacts) > omniChatSceneMaxFacts || len(s.BoundaryFacts) > omniChatSceneMaxFacts {
 		return fmt.Errorf("omnichat scene state: no more than %d facts of each kind are allowed", omniChatSceneMaxFacts)
 	}
+	ownersBySubject := make(map[string]string, len(s.OwnershipFacts))
 	for _, f := range s.OwnershipFacts {
 		if !validSceneText(f.Subject) || !hasActor(keys, f.Owner) {
 			return errors.New("omnichat scene state: ownership fact must have a bounded subject and known owner")
 		}
+		subject := strings.ToLower(strings.TrimSpace(f.Subject))
+		if owner, exists := ownersBySubject[subject]; exists && owner != f.Owner {
+			return fmt.Errorf("omnichat scene state: conflicting ownership facts for %q", subject)
+		}
+		ownersBySubject[subject] = f.Owner
 	}
+	boundariesBySubjectAndKind := make(map[string]OmniChatSceneBoundaryValue, len(s.BoundaryFacts))
 	for _, f := range s.BoundaryFacts {
 		if !hasActor(keys, f.Subject) || (f.Kind != OmniChatSceneBoundaryConsent && f.Kind != OmniChatSceneBoundaryBoundary) || (f.Value != OmniChatSceneBoundaryAllowed && f.Value != OmniChatSceneBoundaryDeclined && f.Value != OmniChatSceneBoundaryRequired) {
 			return errors.New("omnichat scene state: boundary value, kind, and subject must be valid")
 		}
+		key := strings.TrimSpace(f.Subject) + "\x00" + string(f.Kind)
+		if value, exists := boundariesBySubjectAndKind[key]; exists && value != f.Value {
+			return fmt.Errorf("omnichat scene state: conflicting boundary facts for %q", f.Subject)
+		}
+		boundariesBySubjectAndKind[key] = f.Value
 	}
 	return nil
+}
+
+// physicalContactActions are the tracked event verbs that actually put the
+// user's body in the camera frame. Conversation, observation, and proximity do
+// not: a scene image is shot from the user's point of view, so the default is
+// the persona alone. Matching is substring-based against the extracted action,
+// which is a short verb phrase such as "kneels between" or "grips the wrist of".
+var physicalContactActions = []string{
+	"touch", "hold", "grip", "grab", "pull", "push", "press", "pin", "straddle",
+	"kneel between", "kiss", "lick", "suck", "bite", "stroke", "rub", "caress",
+	"embrace", "hug", "carry", "bind", "tie", "cuff", "restrain", "spank", "slap",
+	"whip", "flog", "penetrate", "thrust", "mount", "ride", "grind", "undress",
+	"unbutton", "unzip", "lean over", "lie on", "sit on", "climb onto",
+}
+
+// UserBodyIsVisible reports whether a generated image should show the user's
+// body alongside the persona.
+//
+// This replaces the worker's substring matching on raw transcript text, which
+// forced a fixed two-person composition whenever certain words appeared and
+// invented a second person for ordinary scenes.
+func (s OmniChatConversationSceneState) UserBodyIsVisible() bool {
+	if s.Event.Subject != "user" && s.Event.Target != "user" {
+		return false
+	}
+	// A user acting on themselves is still self-directed, not a shared frame.
+	if s.Event.Subject == "user" && s.Event.Target == "user" {
+		return false
+	}
+	action := stemSceneAction(s.Event.Action)
+	if action == "" {
+		return false
+	}
+	for _, contact := range physicalContactActions {
+		if strings.Contains(action, contact) {
+			return true
+		}
+	}
+	return false
+}
+
+// stemSceneAction lowercases an action phrase and drops third-person "s"
+// endings so multi-word entries match conjugated text: the extractor writes
+// "kneels between the legs of", not "kneel between".
+func stemSceneAction(action string) string {
+	fields := strings.Fields(strings.ToLower(strings.TrimSpace(action)))
+	for index, word := range fields {
+		if len(word) > 3 && strings.HasSuffix(word, "s") && !strings.HasSuffix(word, "ss") {
+			fields[index] = strings.TrimSuffix(word, "s")
+		}
+	}
+	return strings.Join(fields, " ")
 }
 
 type OmniChatConversationSceneStateRepository struct{ pool *pgxpool.Pool }
@@ -162,8 +272,18 @@ func (r *OmniChatConversationSceneStateRepository) UpsertOwned(ctx context.Conte
 		if !exists {
 			return nil, ErrOmniChatConversationNotOwned
 		}
-		if state.Revision > 0 {
+		// A zero revision is valid only for the first insert. If a current
+		// state row already exists, the update predicate can still produce
+		// no RETURNING row when a historical branch starts without a
+		// checkpoint revision; report a conflict so callers can persist that
+		// branch without overwriting current state.
+		var currentRevision int64
+		currentErr := r.pool.QueryRow(ctx, `SELECT revision FROM omnichat_conversation_scene_states WHERE conversation_id=$1 AND owner_user_id=$2`, state.ConversationID, state.OwnerUserID).Scan(&currentRevision)
+		if currentErr == nil {
 			return nil, ErrOmniChatSceneStateConflict
+		}
+		if !errors.Is(currentErr, pgx.ErrNoRows) {
+			return nil, currentErr
 		}
 		return nil, ErrOmniChatConversationNotOwned
 	}
@@ -213,7 +333,7 @@ func (r *OmniChatConversationSceneStateRepository) GetLatestCheckpointAtOrBefore
 	if r == nil || r.pool == nil {
 		return nil, errors.New("omnichat scene state: repository is unavailable")
 	}
-	s, e := scanCheckpointSceneState(r.pool.QueryRow(ctx, `SELECT owner_user_id,source_revision,created_at,created_at,state,message_id FROM omnichat_conversation_scene_state_checkpoints WHERE conversation_id=$1 AND owner_user_id=$2 AND message_id<=$3 ORDER BY message_id DESC LIMIT 1`, conversation, owner, message))
+	s, e := scanCheckpointSceneState(r.pool.QueryRow(ctx, `SELECT owner_user_id,source_revision,created_at,state,message_id FROM omnichat_conversation_scene_state_checkpoints WHERE conversation_id=$1 AND owner_user_id=$2 AND message_id<=$3 ORDER BY message_id DESC LIMIT 1`, conversation, owner, message))
 	if errors.Is(e, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -237,19 +357,72 @@ func scanCurrentSceneState(scanner interface{ Scan(...any) error }) (*OmniChatCo
 func scanCheckpointSceneState(scanner interface{ Scan(...any) error }) (*OmniChatConversationSceneState, error) {
 	s := &OmniChatConversationSceneState{}
 	var p []byte
-	err := scanner.Scan(&s.OwnerUserID, &s.Revision, &s.CreatedAt, &s.UpdatedAt, &p, &s.CheckpointMessageID)
+	err := scanner.Scan(&s.OwnerUserID, &s.Revision, &s.CreatedAt, &p, &s.CheckpointMessageID)
 	if err != nil {
 		return nil, err
 	}
+	// Checkpoints are immutable snapshots and only carry created_at. Keep the
+	// in-memory scene-state contract explicit instead of pretending there is a
+	// separate checkpoint update timestamp.
+	s.UpdatedAt = s.CreatedAt
 	if err = json.Unmarshal(p, s); err != nil {
 		return nil, fmt.Errorf("omnichat scene state: decode state: %w", err)
 	}
 	return s, nil
 }
+const omniChatSceneMaxAccessories = 8
+
+// optionalSceneText accepts an empty value but applies the same bounds and
+// control-character rules as a required one.
+func optionalSceneText(v string) bool {
+	return strings.TrimSpace(v) == "" || validSceneText(v)
+}
+
+func validSceneAppearance(a OmniChatSceneAppearance) error {
+	if !optionalSceneText(a.Outfit) || !optionalSceneText(a.BodyState) {
+		return errors.New("appearance text must be bounded")
+	}
+	if len(a.Accessories) > omniChatSceneMaxAccessories {
+		return fmt.Errorf("no more than %d accessories are allowed", omniChatSceneMaxAccessories)
+	}
+	for _, accessory := range a.Accessories {
+		if !validSceneText(accessory) {
+			return errors.New("each accessory must be a bounded non-empty noun")
+		}
+	}
+	return nil
+}
+
 func validSceneText(v string) bool {
-	return len(strings.TrimSpace(v)) > 0 && utf8.RuneCountInString(v) <= omniChatSceneMaxText
+	trimmed := strings.TrimSpace(v)
+	if len(trimmed) == 0 || utf8.RuneCountInString(trimmed) > omniChatSceneMaxText {
+		return false
+	}
+	for _, r := range trimmed {
+		if unicode.IsControl(r) {
+			return false
+		}
+	}
+	return true
 }
 func hasActor(m map[string]struct{}, k string) bool { _, ok := m[k]; return ok }
 func validActor(k OmniChatSceneActorKind) bool {
 	return k == OmniChatSceneActorUser || k == OmniChatSceneActorPersona || k == OmniChatSceneActorNPC || k == OmniChatSceneActorSystem
+}
+func validSceneActorKey(key string, kind OmniChatSceneActorKind) bool {
+	if !validSceneText(key) || strings.ContainsAny(key, " \t\r\n") {
+		return false
+	}
+	switch kind {
+	case OmniChatSceneActorUser:
+		return key == "user"
+	case OmniChatSceneActorPersona:
+		return key == "persona"
+	case OmniChatSceneActorNPC:
+		return strings.HasPrefix(key, "npc:") && len(strings.TrimPrefix(key, "npc:")) > 0
+	case OmniChatSceneActorSystem:
+		return key == "system"
+	default:
+		return false
+	}
 }

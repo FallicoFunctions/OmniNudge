@@ -28,6 +28,7 @@ import (
 type bakeOffOptions struct {
 	timeout                   time.Duration
 	repetitions               int
+	profileKeys               []services.OmniChatModelProfileKey
 	confirmPaid               bool
 	providerCostStopTargetUSD float64
 	allowProduction           bool
@@ -35,10 +36,24 @@ type bakeOffOptions struct {
 	overwriteOutput           bool
 }
 
-const conservativeBakeOffCostPerRepetitionUSD = 1.00
+const (
+	conservativeBakeOffCostPerRepetitionUSD = 1.00
+	// A complete five-profile matrix can legitimately exceed thirty minutes
+	// when strict contract recovery is exercised. Keep the default bounded for
+	// accidental long-running jobs, but leave enough headroom for an authorized
+	// paid qualification run to finish atomically.
+	defaultBakeOffTimeout = 60 * time.Minute
+	maxBakeOffTimeout     = 90 * time.Minute
+)
+
+type timedProfileGenerator interface {
+	Generate(context.Context, []openrouter.Message, openrouter.StreamCallback) (string, error)
+	GenerateWithOptions(context.Context, []openrouter.Message, openrouter.StreamCallback, openrouter.GenerationOptions) (string, error)
+	TelemetrySnapshot() openrouter.GenerationTelemetry
+}
 
 type timedProfileClient struct {
-	client  *openrouter.Client
+	client  timedProfileGenerator
 	options openrouter.GenerationOptions
 	mu      sync.Mutex
 	total   time.Duration
@@ -46,6 +61,26 @@ type timedProfileClient struct {
 }
 
 func (c *timedProfileClient) Generate(ctx context.Context, messages []openrouter.Message, onChunk openrouter.StreamCallback) (string, error) {
+	return c.generate(ctx, messages, onChunk, c.options)
+}
+
+func (c *timedProfileClient) GenerateWithOptions(ctx context.Context, messages []openrouter.Message, onChunk openrouter.StreamCallback, options openrouter.GenerationOptions) (string, error) {
+	// Recovery requests add a server-owned response format and token budget;
+	// preserve the candidate's immutable reasoning/speed controls while
+	// applying those per-attempt overrides.
+	if options.MaxTokens == 0 {
+		options.MaxTokens = c.options.MaxTokens
+	}
+	if options.ReasoningEffort == "" {
+		options.ReasoningEffort = c.options.ReasoningEffort
+	}
+	if options.Speed == "" {
+		options.Speed = c.options.Speed
+	}
+	return c.generate(ctx, messages, onChunk, options)
+}
+
+func (c *timedProfileClient) generate(ctx context.Context, messages []openrouter.Message, onChunk openrouter.StreamCallback, options openrouter.GenerationOptions) (string, error) {
 	started := time.Now()
 	var once sync.Once
 	wrapped := func(token string) {
@@ -61,7 +96,7 @@ func (c *timedProfileClient) Generate(ctx context.Context, messages []openrouter
 			onChunk(token)
 		}
 	}
-	return c.client.GenerateWithOptions(ctx, messages, wrapped, c.options)
+	return c.client.GenerateWithOptions(ctx, messages, wrapped, options)
 }
 
 func (c *timedProfileClient) BakeOffTelemetry() openrouter.GenerationTelemetry {
@@ -113,6 +148,13 @@ func executeBakeOff(options bakeOffOptions) {
 	if strings.EqualFold(strings.TrimSpace(cfg.AppEnv), "production") && !options.allowProduction {
 		fatalf("production bakeoffs are disabled; pass -allow-production only after confirming the isolated synthetic/public dataset")
 	}
+	if err := services.ValidateConfiguredOmniChatModelRoutes(configuredOmniChatModelRoutes(cfg), cfg.OpenRouter.StandardFallback); err != nil {
+		fatalf("invalid configured model routes: %v", err)
+	}
+	candidates := configuredCandidates(cfg, options.profileKeys)
+	if err := validateBakeOffRepetitions(options.repetitions, len(candidates)); err != nil {
+		fatalf("invalid configured candidate set: %v", err)
+	}
 	db, err := database.New(cfg.Database.DatabaseURL())
 	if err != nil {
 		fatalf("connect to database: %v", err)
@@ -126,7 +168,6 @@ func executeBakeOff(options bakeOffOptions) {
 		fatalf("load synthetic matrix: %v", err)
 	}
 
-	candidates := configuredCandidates(cfg)
 	report, err := services.RunRepeatedBlindOmniChatModelBakeOffWithBudget(ctx, options.repetitions, options.providerCostStopTargetUSD, candidates, personas, cases, func(candidate services.OmniChatBakeOffCandidate) services.PersonaQualityClient {
 		return &timedProfileClient{
 			client:  openrouter.NewClient(cfg.OpenRouter.APIKey, candidate.Route),
@@ -137,6 +178,7 @@ func executeBakeOff(options bakeOffOptions) {
 		if report.CompletedRepetitions > 0 {
 			gate, gateErr := services.EvaluateOmniChatBakeOffQualityGate(report, services.DefaultOmniChatBakeOffQualityGate())
 			if gateErr == nil {
+				gate = disqualifyDiagnosticProfileSubset(gate, len(options.profileKeys) > 0)
 				if writeErr := writeBlindReportOutputs(os.Stdout, options.outputPath, options.overwriteOutput, report, gate); writeErr != nil {
 					fatalf("write partial report: %v", writeErr)
 				}
@@ -148,6 +190,7 @@ func executeBakeOff(options bakeOffOptions) {
 	if err != nil {
 		fatalf("evaluate quality gate: %v", err)
 	}
+	gate = disqualifyDiagnosticProfileSubset(gate, len(options.profileKeys) > 0)
 	if err := writeBlindReportOutputs(os.Stdout, options.outputPath, options.overwriteOutput, report, gate); err != nil {
 		fatalf("write report: %v", err)
 	}
@@ -159,8 +202,9 @@ func executeBakeOff(options bakeOffOptions) {
 func parseBakeOffOptions(arguments []string, output io.Writer) (bakeOffOptions, error) {
 	flags := flag.NewFlagSet("bakeoff_omnichat_profiles", flag.ContinueOnError)
 	flags.SetOutput(output)
-	timeout := flags.Duration("timeout", 30*time.Minute, "maximum duration for the complete synthetic bakeoff")
-	repetitions := flags.Int("repetitions", 5, "number of deterministic, order-rotated repetitions (1 for diagnostics or a multiple of 5)")
+	timeout := flags.Duration("timeout", defaultBakeOffTimeout, "maximum duration for the complete synthetic bakeoff")
+	repetitions := flags.Int("repetitions", 5, "number of deterministic, order-rotated repetitions (1 or a multiple of the active candidate count)")
+	profiles := flags.String("profiles", "all", "diagnostic-only comma-separated profile keys; repeated subsets must be position-balanced (default: all)")
 	confirmPaid := flags.Bool("confirm-paid", false, "confirm that this command makes paid provider requests")
 	providerCostStopTargetUSD := flags.Float64("provider-cost-stop-target-usd", 5, "provider cost stop target in USD; checked between repetitions after a conservative $1.00-per-repetition preflight")
 	allowProduction := flags.Bool("allow-production", false, "allow an explicitly confirmed synthetic/public bakeoff in production")
@@ -169,8 +213,13 @@ func parseBakeOffOptions(arguments []string, output io.Writer) (bakeOffOptions, 
 	if err := flags.Parse(arguments); err != nil {
 		return bakeOffOptions{}, err
 	}
+	profileKeys, err := parseDiagnosticProfileKeys(*profiles)
+	if err != nil {
+		return bakeOffOptions{}, err
+	}
 	options := bakeOffOptions{
 		timeout: *timeout, repetitions: *repetitions, confirmPaid: *confirmPaid,
+		profileKeys:               profileKeys,
 		providerCostStopTargetUSD: *providerCostStopTargetUSD, allowProduction: *allowProduction,
 		outputPath: filepath.Clean(*outputPath), overwriteOutput: *overwriteOutput,
 	}
@@ -180,7 +229,11 @@ func parseBakeOffOptions(arguments []string, output io.Writer) (bakeOffOptions, 
 	if err := validateBakeOffTimeout(options.timeout); err != nil {
 		return bakeOffOptions{}, err
 	}
-	if err := validateBakeOffRepetitions(options.repetitions); err != nil {
+	activeCandidateCount := len(services.DefaultOmniChatModelProfiles())
+	if len(options.profileKeys) > 0 {
+		activeCandidateCount = len(options.profileKeys)
+	}
+	if err := validateBakeOffRepetitions(options.repetitions, activeCandidateCount); err != nil {
 		return bakeOffOptions{}, err
 	}
 	if !options.confirmPaid {
@@ -205,6 +258,54 @@ func parseBakeOffOptions(arguments []string, output io.Writer) (bakeOffOptions, 
 	return options, nil
 }
 
+func parseDiagnosticProfileKeys(value string) ([]services.OmniChatModelProfileKey, error) {
+	value = strings.TrimSpace(value)
+	if value == "all" {
+		return nil, nil
+	}
+	if value == "" {
+		return nil, fmt.Errorf("-profiles must be 'all' or a comma-separated list of profile keys")
+	}
+
+	known := map[services.OmniChatModelProfileKey]struct{}{
+		services.OmniChatModelProfileStandard: {}, services.OmniChatModelProfilePlus: {},
+		services.OmniChatModelProfilePremiumQuick: {}, services.OmniChatModelProfilePremiumDeep: {},
+		services.OmniChatModelProfileUltraFast: {},
+	}
+	parts := strings.Split(value, ",")
+	keys := make([]services.OmniChatModelProfileKey, 0, len(parts))
+	seen := make(map[services.OmniChatModelProfileKey]struct{}, len(parts))
+	for _, part := range parts {
+		key := services.OmniChatModelProfileKey(strings.TrimSpace(part))
+		if _, exists := known[key]; !exists {
+			return nil, fmt.Errorf("-profiles contains unknown profile key %q", key)
+		}
+		if _, duplicate := seen[key]; duplicate {
+			return nil, fmt.Errorf("-profiles contains duplicate profile key %q", key)
+		}
+		seen[key] = struct{}{}
+		keys = append(keys, key)
+	}
+	if len(keys) == len(known) {
+		return nil, fmt.Errorf("-profiles must be a true subset; use 'all' for the complete matrix")
+	}
+	return keys, nil
+}
+
+func disqualifyDiagnosticProfileSubset(gate services.OmniChatBakeOffQualityGateResult, subset bool) services.OmniChatBakeOffQualityGateResult {
+	if !subset {
+		return gate
+	}
+	gate.Passed = false
+	for _, failure := range gate.RunFailures {
+		if failure == "diagnostic_profile_subset" {
+			return gate
+		}
+	}
+	gate.RunFailures = append(gate.RunFailures, "diagnostic_profile_subset")
+	return gate
+}
+
 func generationOptionsForCandidate(candidate services.OmniChatBakeOffCandidate) openrouter.GenerationOptions {
 	options := openrouter.GenerationOptions{MaxTokens: 256}
 	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(candidate.Route)), "anthropic/") {
@@ -218,18 +319,22 @@ func generationOptionsForCandidate(candidate services.OmniChatBakeOffCandidate) 
 }
 
 func validateBakeOffTimeout(timeout time.Duration) error {
-	if timeout <= 0 || timeout > 30*time.Minute {
-		return fmt.Errorf("timeout must be greater than zero and no more than 30m")
+	if timeout <= 0 || timeout > maxBakeOffTimeout {
+		return fmt.Errorf("timeout must be greater than zero and no more than %s", maxBakeOffTimeout)
 	}
 	return nil
 }
 
-func validateBakeOffRepetitions(repetitions int) error {
+func validateBakeOffRepetitions(repetitions, candidateCount int) error {
 	if repetitions < 1 || repetitions > services.MaxOmniChatBakeOffRepetitions {
 		return fmt.Errorf("repetitions must be between 1 and %d", services.MaxOmniChatBakeOffRepetitions)
 	}
-	if repetitions != 1 && repetitions%5 != 0 {
-		return fmt.Errorf("repetitions must be 1 or a multiple of 5 so all five candidates occupy each execution position equally")
+	profileCount := len(services.DefaultOmniChatModelProfiles())
+	if candidateCount < 1 || candidateCount > profileCount {
+		return fmt.Errorf("active candidate count must be between 1 and %d", profileCount)
+	}
+	if repetitions != 1 && repetitions%candidateCount != 0 {
+		return fmt.Errorf("repetitions must be 1 or a multiple of the %d active candidates so every candidate occupies each execution position equally", candidateCount)
 	}
 	return nil
 }
@@ -278,15 +383,57 @@ func validateBakeOffOutputPath(outputPath string, overwrite bool) error {
 	}
 }
 
-func configuredCandidates(cfg *config.Config) []services.OmniChatBakeOffCandidate {
-	profiles := services.ConfiguredOmniChatModelProfiles(map[services.OmniChatModelProfileKey]string{
+func configuredCandidates(cfg *config.Config, selected []services.OmniChatModelProfileKey) []services.OmniChatBakeOffCandidate {
+	if cfg == nil {
+		return nil
+	}
+	routes, err := services.ResolveConfiguredOmniChatModelRoutes(configuredOmniChatModelRoutes(cfg), cfg.OpenRouter.StandardFallback)
+	if err != nil {
+		return nil
+	}
+	profiles := services.ConfiguredOmniChatModelProfiles(routes)
+	candidates := services.OmniChatBakeOffCandidatesFromProfiles(profiles)
+	configured := candidates[:0]
+	for _, candidate := range candidates {
+		if strings.TrimSpace(candidate.Route) != "" {
+			configured = append(configured, candidate)
+		}
+	}
+	candidates = configured
+	if len(selected) == 0 {
+		return reindexConfiguredCandidates(candidates)
+	}
+	selectedSet := make(map[services.OmniChatModelProfileKey]struct{}, len(selected))
+	for _, key := range selected {
+		selectedSet[key] = struct{}{}
+	}
+	filtered := make([]services.OmniChatBakeOffCandidate, 0, len(selected))
+	for _, candidate := range candidates {
+		if _, included := selectedSet[services.OmniChatModelProfileKey(candidate.Profile.Name)]; included {
+			filtered = append(filtered, candidate)
+		}
+	}
+	return reindexConfiguredCandidates(filtered)
+}
+
+func configuredOmniChatModelRoutes(cfg *config.Config) map[services.OmniChatModelProfileKey]string {
+	if cfg == nil {
+		return nil
+	}
+	return map[services.OmniChatModelProfileKey]string{
 		services.OmniChatModelProfileStandard:     cfg.OpenRouter.StandardModel,
 		services.OmniChatModelProfilePlus:         cfg.OpenRouter.PlusModel,
 		services.OmniChatModelProfilePremiumQuick: cfg.OpenRouter.PremiumQuickModel,
 		services.OmniChatModelProfilePremiumDeep:  cfg.OpenRouter.PremiumDeepModel,
 		services.OmniChatModelProfileUltraFast:    cfg.OpenRouter.UltraFastModel,
-	})
-	return services.OmniChatBakeOffCandidatesFromProfiles(profiles)
+	}
+}
+
+func reindexConfiguredCandidates(candidates []services.OmniChatBakeOffCandidate) []services.OmniChatBakeOffCandidate {
+	for index := range candidates {
+		candidates[index].BlindID = fmt.Sprintf("candidate-%c", 'a'+index)
+	}
+	return candidates
 }
 
 func writeBlindReport(output io.Writer, report services.OmniChatBakeOffReport, gate services.OmniChatBakeOffQualityGateResult) error {
@@ -320,6 +467,9 @@ func writeBlindReport(output io.Writer, report services.OmniChatBakeOffReport, g
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(map[string]any{
 		"data_boundary":         "public companion personas and synthetic prompts only",
+		"corpus_version":        report.CorpusVersion,
+		"corpus_fingerprint":    report.CorpusFingerprint,
+		"persona_fingerprint":   report.PersonaFingerprint,
 		"repetitions":           report.Repetitions,
 		"completed_repetitions": report.CompletedRepetitions,
 		"stop_reason":           report.StopReason,
@@ -433,6 +583,10 @@ func loadSyntheticMatrix(ctx context.Context, repo *models.BotPersonaRepository)
 	if err != nil {
 		return nil, nil, err
 	}
+	return selectSyntheticMatrix(catalog)
+}
+
+func selectSyntheticMatrix(catalog []*models.BotPersona) (map[string]*models.BotPersona, []services.PersonaQualityCase, error) {
 	personas := make(map[string]*models.BotPersona)
 	for _, persona := range catalog {
 		style := strings.TrimSpace(persona.ResponseStyleProfile)
@@ -442,7 +596,7 @@ func loadSyntheticMatrix(ctx context.Context, repo *models.BotPersonaRepository)
 		}
 	}
 	selected := make([]services.PersonaQualityCase, 0, len(personas)*3)
-	for _, qualityCase := range services.DefaultPersonaQualityCases() {
+	for _, qualityCase := range services.DefaultOmniChatCompanionBakeOffCases() {
 		if personas[qualityCase.PersonaSlug] == nil {
 			continue
 		}

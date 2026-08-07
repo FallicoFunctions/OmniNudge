@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -34,4 +35,47 @@ func TestGetEnvAsStringListNormalizesAndDeduplicates(t *testing.T) {
 
 	t.Setenv("TEST_STRING_LIST", "")
 	require.Nil(t, getEnvAsStringList("TEST_STRING_LIST"))
+}
+
+func TestAppendHTTPSOriginHostAddsConfiguredStorageOriginWithoutTrustingUnsafeURLs(t *testing.T) {
+	hosts := []string{"storage.googleapis.com"}
+	hosts = appendHTTPSOriginHost(hosts, "https://R2.Example.test")
+	hosts = appendHTTPSOriginHost(hosts, "https://r2.example.test")
+	hosts = appendHTTPSOriginHost(hosts, "http://internal.example.test")
+	hosts = appendHTTPSOriginHost(hosts, "https://user:secret@example.test")
+	hosts = appendHTTPSOriginHost(hosts, "https://example.test/path")
+
+	require.Equal(t, []string{"storage.googleapis.com", "r2.example.test", "example.test"}, hosts)
+}
+
+func TestLoadUsesQualifiedOmniChatStandardModelByDefault(t *testing.T) {
+	t.Setenv("DB_USER", "test")
+	t.Setenv("JWT_SECRET", "test")
+	t.Setenv("ENCRYPTION_KEY", "test")
+	t.Setenv("RUNPOD_API_KEY", "server-only")
+	t.Setenv("RUNPOD_IMAGE_ENDPOINT_ID", "image-endpoint")
+	t.Setenv("RUNPOD_VIDEO_ENDPOINT_ID", "video-endpoint")
+	t.Setenv("RUNPOD_INPUT_HOSTS", "storage.example.test,media.example.test,storage.example.test")
+	t.Setenv("RUNPOD_OUTPUT_HOSTS", "storage.googleapis.com, media.example.test,storage.googleapis.com")
+	t.Setenv("S3_ENDPOINT", "https://r2.example.test")
+	t.Setenv("CLOUDFRONT_URL", "https://cdn.example.test")
+	previous, existed := os.LookupEnv("OMNICHAT_MODEL_STANDARD_PRIMARY")
+	require.NoError(t, os.Unsetenv("OMNICHAT_MODEL_STANDARD_PRIMARY"))
+	t.Cleanup(func() {
+		if existed {
+			require.NoError(t, os.Setenv("OMNICHAT_MODEL_STANDARD_PRIMARY", previous))
+			return
+		}
+		require.NoError(t, os.Unsetenv("OMNICHAT_MODEL_STANDARD_PRIMARY"))
+	})
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, "google/gemini-3.1-flash-lite", cfg.OpenRouter.StandardModel)
+	require.Equal(t, "runpod", cfg.OmniChatMedia.Provider)
+	require.Equal(t, "server-only", cfg.OmniChatMedia.RunPodAPIKey)
+	require.Equal(t, "image-endpoint", cfg.OmniChatMedia.RunPodImageEndpointID)
+	require.Equal(t, "video-endpoint", cfg.OmniChatMedia.RunPodVideoEndpointID)
+	require.Equal(t, []string{"storage.googleapis.com", "media.example.test", "r2.example.test", "cdn.example.test"}, cfg.OmniChatMedia.RunPodOutputHosts)
+	require.Equal(t, []string{"storage.example.test", "media.example.test", "r2.example.test", "cdn.example.test"}, cfg.OmniChatMedia.RunPodInputHosts)
 }

@@ -14,6 +14,7 @@ import (
 
 func TestConfiguredEvaluationProfileUsesDeploymentRouteAndProfileControls(t *testing.T) {
 	cfg := &config.Config{}
+	cfg.OpenRouter.StandardModel = "configured/standard"
 	cfg.OpenRouter.PremiumDeepModel = "configured/deep"
 
 	profile, err := configuredEvaluationProfile(cfg, services.OmniChatModelProfilePremiumDeep, "")

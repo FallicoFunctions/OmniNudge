@@ -23,6 +23,8 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 	// Later migrations sort after the expansion. Roll them back before
 	// exercising the speech-outbox rollback guardrail.
 	for _, expected := range []string{
+		"171_omnichat_media_only_messages",
+		"170_omnichat_livekit_avatar_calls",
 		"169_omnichat_paid_request_idempotency",
 		"168_omnichat_chat_billing_operations",
 		"167_media_storage_object_keys",
@@ -51,6 +53,23 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 		require.NoError(t, db.Pool.QueryRow(ctx, `SELECT version FROM schema_migrations ORDER BY applied_at DESC, version DESC LIMIT 1`).Scan(&latest))
 		require.Equal(t, expected, latest)
 		require.NoError(t, db.MigrateDown(ctx))
+		if expected == "170_omnichat_livekit_avatar_calls" {
+			var legacyVoiceColumns bool
+			require.NoError(t, db.Pool.QueryRow(ctx, `
+				SELECT COUNT(*) = 2
+				FROM information_schema.columns
+				WHERE table_schema='public' AND table_name='omnichat_persona_voices'
+				  AND column_name IN ('live_video_replica_id','live_video_persona_id')
+			`).Scan(&legacyVoiceColumns))
+			require.True(t, legacyVoiceColumns)
+			var legacyProviderConstraint bool
+			require.NoError(t, db.Pool.QueryRow(ctx, `
+				SELECT pg_get_constraintdef(oid) LIKE '%tavus%'
+				FROM pg_constraint
+				WHERE conname='omnichat_call_sessions_provider_check'
+			`).Scan(&legacyProviderConstraint))
+			require.True(t, legacyProviderConstraint)
+		}
 	}
 	_, err = db.Pool.Exec(ctx, `INSERT INTO omnichat_speech_deletion_queue(storage_path) VALUES('omnichat/speech/pending.mp3')`)
 	require.NoError(t, err)
@@ -211,6 +230,8 @@ func TestBillingIntegrityMigrationGrandfathersLegacyImageJobs(t *testing.T) {
 	require.NoError(t, db.Migrate(ctx))
 
 	for _, expected := range []string{
+		"171_omnichat_media_only_messages",
+		"170_omnichat_livekit_avatar_calls",
 		"169_omnichat_paid_request_idempotency",
 		"168_omnichat_chat_billing_operations",
 		"167_media_storage_object_keys",

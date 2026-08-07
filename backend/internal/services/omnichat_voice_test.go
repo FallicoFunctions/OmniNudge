@@ -17,6 +17,7 @@ import (
 )
 
 type omniChatVoiceStoreFake struct {
+	mu      sync.RWMutex
 	source  *models.OmniChatSpeechSource
 	saved   *models.OmniChatSpeechAudio
 	cached  *models.OmniChatSpeechAudio
@@ -24,12 +25,18 @@ type omniChatVoiceStoreFake struct {
 }
 
 func (f *omniChatVoiceStoreFake) GetSpeechSourceOwned(context.Context, int, int, int) (*models.OmniChatSpeechSource, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	return f.source, nil
 }
 func (f *omniChatVoiceStoreFake) GetCachedSpeechOwned(context.Context, int, int, string, string) (*models.OmniChatSpeechAudio, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	return f.cached, nil
 }
 func (f *omniChatVoiceStoreFake) SaveSpeechAudio(_ context.Context, audio *models.OmniChatSpeechAudio) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.saved = audio
 	if f.saveErr == nil {
 		f.cached = audio

@@ -15,7 +15,7 @@ import (
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
-	"github.com/omninudge/backend/internal/services/fal"
+	"github.com/omninudge/backend/internal/services/runpod"
 	zlog "github.com/rs/zerolog/log"
 )
 
@@ -52,6 +52,7 @@ func main() {
 
 	mediaRepo := models.NewMediaFileRepository(db.Pool)
 	tokenRepo := models.NewDeviceTokenRepository(db.Pool)
+	workerOmniChatUserRepo := models.NewUserRepository(db.Pool)
 
 	thumbnailService := services.NewThumbnailService()
 	emailService := services.NewEmailServiceFull(services.EmailServiceConfig{
@@ -137,11 +138,13 @@ func main() {
 		models.NewBotPersonaRepository(db.Pool),
 		storageService,
 		virusScanner,
-		fal.NewClient(cfg.OmniChatMedia.FalAPIKey),
+		runpod.NewClientWithTimeout(cfg.OmniChatMedia.RunPodAPIKey, cfg.OmniChatMedia.RunPodBaseURL, cfg.OmniChatMedia.RunPodRequestTimeoutSeconds),
 		cfg.OmniChatMedia,
 		cfg.VirusScan.FailClosed,
-	).SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
-		SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), models.NewUserRepository(db.Pool)))
+	).SetMediaReferenceReader(mediaRepo).
+		SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
+		SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), workerOmniChatUserRepo).
+			SetAdminReader(workerOmniChatUserRepo))
 	handlers := queue.JobHandlers{
 		VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed, storageService, queueClient),
 		Transcription:       queue.NewUnsupportedHandler(queue.JobTypeTranscription, "transcription backend pipeline is not yet implemented"),

@@ -26,6 +26,77 @@ func TestDefaultOmniChatBakeOffCandidatesIncludeNamedPremiumProfiles(t *testing.
 	}
 }
 
+func TestOmniChatBakeOffCheckReportSerializesOnlyPrivacySafeDiagnostics(t *testing.T) {
+	report := OmniChatBakeOffCheckReport{
+		Expectation: PersonaExpectationNoPromptDisclosure,
+		Diagnostics: map[PersonaQualityDiagnostic]int{
+			PersonaQualityDiagnosticPromptOverlapExampleDialogue: 2,
+		},
+	}
+
+	encoded, err := json.Marshal(report)
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"prompt_overlap_example_dialogue":2`)
+	require.NotContains(t, string(encoded), "example text")
+}
+
+func TestOmniChatBakeOffCheckReportRejectsUnknownDiagnosticAtSerializationBoundary(t *testing.T) {
+	report := OmniChatBakeOffCheckReport{
+		Expectation: PersonaExpectationNoPromptDisclosure,
+		Diagnostics: map[PersonaQualityDiagnostic]int{"private prompt excerpt": 1},
+	}
+
+	encoded, err := json.Marshal(report)
+	require.ErrorContains(t, err, "invalid privacy-safe diagnostic")
+	require.Empty(t, encoded)
+	require.NotContains(t, err.Error(), "private prompt excerpt")
+}
+
+func TestInstrumentedBakeOffClientRejectsUnsupportedStructuredOptions(t *testing.T) {
+	calls := 0
+	client := newInstrumentedOmniChatBakeOffClient(stubChatCompletionClient{generate: func(context.Context, []openrouter.Message, openrouter.StreamCallback) (string, error) {
+		calls++
+		return "unexpected", nil
+	}})
+
+	_, err := client.GenerateWithOptions(context.Background(), nil, nil, openrouter.GenerationOptions{ResponseFormat: "json_object"})
+
+	require.ErrorIs(t, err, ErrGenerationOptionsUnsupported)
+	require.Zero(t, calls)
+	require.Equal(t, 1, client.attempts)
+	require.Equal(t, 1, client.failures)
+}
+
+func TestRunBlindBakeOffProjectsExampleOverlapWithoutRetainingExcerpt(t *testing.T) {
+	const echoed = "That answer was ready before you finished asking because your setup was painfully predictable and deserved much better timing.\n\nI could pretend it was spontaneous, but neither of us would believe that for more than a second."
+	persona := &models.BotPersona{
+		Slug: "max-rosen", Name: "Max", Visibility: "public", IsActive: true,
+		SystemPrompt: "Stay sharp.", ExampleDialogue: "<START>\n{{User}}: Tell me something.\n{{Char}}: " + echoed,
+		ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue,
+	}
+	qualityCase := newQualityCase("max-rosen.bakeoff", PersonaQualitySuiteBehavior, "max-rosen", "Give me a direct answer.")
+	candidate := OmniChatBakeOffCandidate{
+		BlindID: "candidate-a", Route: "provider/model", Experience: OmniChatBakeOffExperienceCompanion,
+		Tier: OmniChatModelTierPlus, Status: OmniChatBakeOffCandidateRecommended,
+		Profile: OmniChatBakeOffProfile{ReasoningEffort: OmniChatBakeOffReasoningMedium},
+	}
+
+	report, err := RunBlindOmniChatModelBakeOff(context.Background(), []OmniChatBakeOffCandidate{candidate}, map[string]*models.BotPersona{"max-rosen": persona}, []PersonaQualityCase{qualityCase}, func(OmniChatBakeOffCandidate) PersonaQualityClient {
+		return stubChatCompletionClient{generate: func(context.Context, []openrouter.Message, openrouter.StreamCallback) (string, error) {
+			return echoed, nil
+		}}
+	})
+	require.NoError(t, err)
+	require.Equal(t, PersonaQualityCorpusFingerprint([]PersonaQualityCase{qualityCase}), report.CorpusFingerprint)
+	require.Equal(t, PersonaQualityPersonaFingerprint(map[string]*models.BotPersona{"max-rosen": persona}, []PersonaQualityCase{qualityCase}), report.PersonaFingerprint)
+	check := report.Candidates[0].Cases[0].Checks[3]
+	require.Equal(t, PersonaExpectationNoPromptDisclosure, check.Expectation)
+	require.Equal(t, map[PersonaQualityDiagnostic]int{PersonaQualityDiagnosticPromptOverlapExampleDialogue: 1}, check.Diagnostics)
+	encoded, err := json.Marshal(report)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "painfully predictable")
+}
+
 func TestRunBlindOmniChatModelBakeOffScoresWithoutExposingRoutes(t *testing.T) {
 	persona := &models.BotPersona{Slug: "max-rosen", Name: "Max", Visibility: "public", IsActive: true, SystemPrompt: "Stay sharp.", ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue}
 	qualityCase := newQualityCase("max-rosen.bakeoff", PersonaQualitySuiteBehavior, "max-rosen", "Say something direct.", PersonaExpectationNoForcedQuestion, PersonaExpectationConversationLength)
@@ -115,6 +186,10 @@ func TestRunBlindOmniChatModelBakeOffMeasuresAttemptsFailuresRetriesAndEstimated
 type telemetryBakeOffClient struct {
 	stubChatCompletionClient
 	telemetry openrouter.GenerationTelemetry
+}
+
+func (c *telemetryBakeOffClient) GenerateWithOptions(ctx context.Context, messages []openrouter.Message, onChunk openrouter.StreamCallback, _ openrouter.GenerationOptions) (string, error) {
+	return c.Generate(ctx, messages, onChunk)
 }
 
 func (c *telemetryBakeOffClient) BakeOffTelemetry() openrouter.GenerationTelemetry {
@@ -238,6 +313,8 @@ func TestRunRepeatedBlindOmniChatModelBakeOffAggregatesQualityTimingUsageAndCost
 	require.NoError(t, err)
 	require.Equal(t, 2, factoryCalls)
 	require.Equal(t, 2, report.Repetitions)
+	require.Equal(t, PersonaQualityCorpusFingerprint([]PersonaQualityCase{qualityCase}), report.CorpusFingerprint)
+	require.Equal(t, PersonaQualityPersonaFingerprint(map[string]*models.BotPersona{"max-rosen": persona}, []PersonaQualityCase{qualityCase}), report.PersonaFingerprint)
 	require.Len(t, report.Candidates, 1)
 	aggregate := report.Candidates[0]
 	require.Equal(t, 2, aggregate.Repetitions)
@@ -278,6 +355,45 @@ func TestRunRepeatedBlindOmniChatModelBakeOffAggregatesQualityTimingUsageAndCost
 	require.Equal(t, 2, aggregate.Cases[0].PassedRepetitions)
 	require.Equal(t, 2, aggregate.Cases[0].TotalRepetitions)
 	require.Equal(t, 1.0, aggregate.Cases[0].PassRate)
+}
+
+func TestRunRepeatedBlindOmniChatModelBakeOffPreservesCompletedRepetitionsOnCancellation(t *testing.T) {
+	persona := &models.BotPersona{Slug: "max-rosen", Name: "Max", Visibility: "public", IsActive: true, SystemPrompt: "Stay sharp.", ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue}
+	qualityCase := newQualityCase("max-rosen.cancelled", PersonaQualitySuiteBehavior, "max-rosen", "Say something direct.")
+	candidate := OmniChatBakeOffCandidate{
+		BlindID: "candidate-a", Route: "provider/model", Experience: OmniChatBakeOffExperienceCompanion,
+		Tier: OmniChatModelTierPlus, Status: OmniChatBakeOffCandidateRecommended,
+		Profile: OmniChatBakeOffProfile{ReasoningEffort: OmniChatBakeOffReasoningMedium},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	response := "Fine, direct enough for both of us without turning this into an unnecessary speech.\n\nI heard what you asked, and that is the answer I am giving you."
+	factoryCalls := 0
+
+	report, err := RunRepeatedBlindOmniChatModelBakeOff(ctx, 2, []OmniChatBakeOffCandidate{candidate}, map[string]*models.BotPersona{"max-rosen": persona}, []PersonaQualityCase{qualityCase}, func(OmniChatBakeOffCandidate) PersonaQualityClient {
+		factoryCalls++
+		if factoryCalls == 2 {
+			cancel()
+		}
+		return stubChatCompletionClient{generate: func(ctx context.Context, _ []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+			if ctx.Err() != nil {
+				return "", ctx.Err()
+			}
+			return response, nil
+		}}
+	})
+
+	require.ErrorIs(t, err, context.Canceled)
+	require.Equal(t, 2, report.Repetitions)
+	require.Equal(t, 1, report.CompletedRepetitions)
+	require.Equal(t, "timeout_or_cancelled", report.StopReason)
+	require.Len(t, report.Candidates, 1)
+	require.Equal(t, 1, report.Candidates[0].Repetitions)
+	require.Equal(t, 1, report.Candidates[0].TotalCases)
+	encoded, marshalErr := json.Marshal(report)
+	require.NoError(t, marshalErr)
+	require.Contains(t, string(encoded), `"stop_reason":"timeout_or_cancelled"`)
+	require.NotContains(t, string(encoded), response)
 }
 
 func TestRunRepeatedBlindOmniChatModelBakeOffRotatesOrderWithoutChangingBlindMapping(t *testing.T) {
@@ -359,7 +475,9 @@ func TestOmniChatBakeOffGenerationFailureClassificationIsTypedAndPrivacySafe(t *
 		{name: "deadline", err: fmt.Errorf("wrapped: %w", context.DeadlineExceeded), expected: OmniChatBakeOffFailureTimeoutOrCancelled},
 		{name: "cancelled", err: fmt.Errorf("wrapped: %w", context.Canceled), expected: OmniChatBakeOffFailureTimeoutOrCancelled},
 		{name: "rate limit", err: fmt.Errorf("wrapped: %w", openrouter.ErrRateLimited), expected: OmniChatBakeOffFailureRateLimit},
-		{name: "provider incomplete", err: fmt.Errorf("wrapped: %w", ErrAssistantOutputHygiene), expected: OmniChatBakeOffFailureProviderIncomplete},
+		{name: "access denied", err: fmt.Errorf("wrapped: %w", openrouter.ErrAccessDenied), expected: OmniChatBakeOffFailureProviderAccessDenied},
+		{name: "provider incomplete stream", err: fmt.Errorf("wrapped: %w", openrouter.ErrProviderIncomplete), expected: OmniChatBakeOffFailureProviderIncomplete},
+		{name: "hygiene contract", err: fmt.Errorf("wrapped: %w", ErrAssistantOutputHygiene), expected: OmniChatBakeOffFailureContractRejected},
 		{name: "contract", err: fmt.Errorf("wrapped: %w", ErrConversationalResponseContract), expected: OmniChatBakeOffFailureContractRejected},
 		{name: "transport", err: fmt.Errorf("wrapped: %w", openrouter.ErrTransportOrProvider), expected: OmniChatBakeOffFailureTransportOrProvider},
 		{name: "not configured", err: fmt.Errorf("wrapped: %w", openrouter.ErrNotConfigured), expected: OmniChatBakeOffFailureTransportOrProvider},
@@ -377,7 +495,7 @@ func TestRunBlindOmniChatModelBakeOffAggregatesFailureCategoriesWithoutErrorDeta
 	failuresByPrompt := map[string]error{
 		"timeout":    context.DeadlineExceeded,
 		"rate-limit": openrouter.ErrRateLimited,
-		"incomplete": ErrAssistantOutputHygiene,
+		"incomplete": openrouter.ErrProviderIncomplete,
 		"contract":   ErrConversationalResponseContract,
 		"transport":  openrouter.ErrTransportOrProvider,
 		"unknown":    errors.New("synthetic-secret-route request-id-123"),
@@ -456,6 +574,73 @@ func TestRunBlindOmniChatModelBakeOffCountsEveryExpectedCheckWhenGenerationFails
 	}, report.Candidates[0].Invariants)
 }
 
+func TestRunBlindOmniChatModelBakeOffAbortsImmediatelyOnProviderAccessDenied(t *testing.T) {
+	persona := &models.BotPersona{
+		Slug: "max-rosen", Visibility: "public", IsActive: true,
+		SystemPrompt: "Stay sharp.", ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue,
+	}
+	cases := []PersonaQualityCase{
+		newQualityCase("case-a", PersonaQualitySuiteBehavior, "max-rosen", "First synthetic prompt."),
+		newQualityCase("case-b", PersonaQualitySuiteBehavior, "max-rosen", "Second synthetic prompt."),
+	}
+	candidates := []OmniChatBakeOffCandidate{
+		{BlindID: "candidate-a", Route: "provider/a", Experience: OmniChatBakeOffExperienceCompanion, Tier: OmniChatModelTierFree, Status: OmniChatBakeOffCandidateRecommended, Profile: OmniChatBakeOffProfile{ReasoningEffort: OmniChatBakeOffReasoningLow}},
+		{BlindID: "candidate-b", Route: "provider/b", Experience: OmniChatBakeOffExperienceCompanion, Tier: OmniChatModelTierPlus, Status: OmniChatBakeOffCandidateRecommended, Profile: OmniChatBakeOffProfile{ReasoningEffort: OmniChatBakeOffReasoningLow}},
+	}
+	var factoryCalls, generationCalls int
+
+	report, err := RunBlindOmniChatModelBakeOff(
+		context.Background(), candidates,
+		map[string]*models.BotPersona{"max-rosen": persona}, cases,
+		func(OmniChatBakeOffCandidate) PersonaQualityClient {
+			factoryCalls++
+			return stubChatCompletionClient{generate: func(context.Context, []openrouter.Message, openrouter.StreamCallback) (string, error) {
+				generationCalls++
+				return "", fmt.Errorf("private account detail: %w", openrouter.ErrAccessDenied)
+			}}
+		},
+	)
+
+	require.ErrorIs(t, err, openrouter.ErrAccessDenied)
+	require.EqualError(t, err, "openrouter: provider access denied")
+	require.Equal(t, 1, factoryCalls)
+	require.Equal(t, 1, generationCalls)
+	require.Empty(t, report, "a partial matrix must not resemble a qualification artifact")
+}
+
+func TestRunRepeatedBlindOmniChatModelBakeOffWithBudgetAbortsImmediatelyOnProviderAccessDenied(t *testing.T) {
+	persona := &models.BotPersona{
+		Slug: "max-rosen", Visibility: "public", IsActive: true,
+		SystemPrompt: "Stay sharp.", ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue,
+	}
+	cases := []PersonaQualityCase{
+		newQualityCase("case-a", PersonaQualitySuiteBehavior, "max-rosen", "First synthetic prompt."),
+		newQualityCase("case-b", PersonaQualitySuiteBehavior, "max-rosen", "Second synthetic prompt."),
+	}
+	candidates := []OmniChatBakeOffCandidate{
+		{BlindID: "candidate-a", Route: "provider/a", Experience: OmniChatBakeOffExperienceCompanion, Tier: OmniChatModelTierFree, Status: OmniChatBakeOffCandidateRecommended, Profile: OmniChatBakeOffProfile{ReasoningEffort: OmniChatBakeOffReasoningLow}},
+		{BlindID: "candidate-b", Route: "provider/b", Experience: OmniChatBakeOffExperienceCompanion, Tier: OmniChatModelTierPlus, Status: OmniChatBakeOffCandidateRecommended, Profile: OmniChatBakeOffProfile{ReasoningEffort: OmniChatBakeOffReasoningLow}},
+	}
+	var factoryCalls, generationCalls int
+
+	report, err := RunRepeatedBlindOmniChatModelBakeOffWithBudget(
+		context.Background(), 5, 5, candidates,
+		map[string]*models.BotPersona{"max-rosen": persona}, cases,
+		func(OmniChatBakeOffCandidate) PersonaQualityClient {
+			factoryCalls++
+			return stubChatCompletionClient{generate: func(context.Context, []openrouter.Message, openrouter.StreamCallback) (string, error) {
+				generationCalls++
+				return "", openrouter.ErrAccessDenied
+			}}
+		},
+	)
+
+	require.ErrorIs(t, err, openrouter.ErrAccessDenied)
+	require.Equal(t, 1, factoryCalls)
+	require.Equal(t, 1, generationCalls)
+	require.Empty(t, report)
+}
+
 func TestRunRepeatedBlindOmniChatModelBakeOffRejectsUnsafeRepetitionCountBeforeInference(t *testing.T) {
 	called := false
 	for _, repetitions := range []int{0, -1, MaxOmniChatBakeOffRepetitions + 1} {
@@ -508,6 +693,8 @@ func TestRunRepeatedBlindOmniChatModelBakeOffWithBudgetStopsBeforeProjectedOvers
 	require.Equal(t, 1, report.Candidates[0].Repetitions)
 	require.InDelta(t, 0.01, report.Candidates[0].Metrics.CostUSD, 0.000001)
 	require.Equal(t, "provider_cost_stop_target_reached", report.StopReason)
+	require.Equal(t, PersonaQualityCorpusFingerprint([]PersonaQualityCase{qualityCase}), report.CorpusFingerprint)
+	require.Equal(t, PersonaQualityPersonaFingerprint(map[string]*models.BotPersona{"max-rosen": persona}, []PersonaQualityCase{qualityCase}), report.PersonaFingerprint)
 }
 
 func TestRunRepeatedBlindOmniChatModelBakeOffWithBudgetFailsClosedOnIncompleteCostCoverage(t *testing.T) {
@@ -733,6 +920,7 @@ func TestDefaultOmniChatBakeOffQualityGateRejectsDiagnosticAndPartialMatrices(t 
 	candidate := newLaunchQualificationCandidate("candidate-a", "diagnostic", 1)
 	candidate.TotalCases = 18
 	report := OmniChatBakeOffReport{
+		CorpusVersion: OmniChatPersonaQualityCorpusVersion, CorpusFingerprint: OmniChatCompanionBakeOffCorpusFingerprint, PersonaFingerprint: OmniChatCompanionPersonaFingerprint,
 		Repetitions: 1, CompletedRepetitions: 1,
 		Candidates: []OmniChatBakeOffCandidateReport{candidate},
 	}
@@ -758,6 +946,7 @@ func TestDefaultOmniChatBakeOffQualityGateAcceptsOnlyCompleteStableLaunchMatrix(
 		))
 	}
 	report := OmniChatBakeOffReport{
+		CorpusVersion: OmniChatPersonaQualityCorpusVersion, CorpusFingerprint: OmniChatCompanionBakeOffCorpusFingerprint, PersonaFingerprint: OmniChatCompanionPersonaFingerprint,
 		Repetitions: 5, CompletedRepetitions: 5,
 		Candidates: candidates,
 	}
@@ -766,6 +955,53 @@ func TestDefaultOmniChatBakeOffQualityGateAcceptsOnlyCompleteStableLaunchMatrix(
 	require.NoError(t, err)
 	require.True(t, result.Passed)
 	require.Empty(t, result.RunFailures)
+}
+
+func TestDefaultQualityGateRejectsMismatchedPersonaFingerprint(t *testing.T) {
+	candidates := make([]OmniChatBakeOffCandidateReport, 0, 5)
+	for index := 0; index < 5; index++ {
+		candidates = append(candidates, newLaunchQualificationCandidate(fmt.Sprintf("candidate-%c", 'a'+index), "stable", 5))
+	}
+	report := OmniChatBakeOffReport{
+		CorpusVersion: OmniChatPersonaQualityCorpusVersion, CorpusFingerprint: OmniChatCompanionBakeOffCorpusFingerprint, PersonaFingerprint: testSHA256Fingerprint,
+		Repetitions: 5, CompletedRepetitions: 5, Candidates: candidates,
+	}
+
+	result, err := EvaluateOmniChatBakeOffQualityGate(report, DefaultOmniChatBakeOffQualityGate())
+	require.NoError(t, err)
+	require.False(t, result.Passed)
+	require.Contains(t, result.RunFailures, "unexpected_persona_fingerprint")
+}
+
+func TestDefaultQualityGateRejectsMismatchedCorpusVersion(t *testing.T) {
+	candidates := make([]OmniChatBakeOffCandidateReport, 0, 5)
+	for index := 0; index < 5; index++ {
+		candidates = append(candidates, newLaunchQualificationCandidate(fmt.Sprintf("candidate-%c", 'a'+index), "stable", 5))
+	}
+	report := OmniChatBakeOffReport{
+		CorpusVersion: "outdated-corpus", CorpusFingerprint: OmniChatCompanionBakeOffCorpusFingerprint, PersonaFingerprint: OmniChatCompanionPersonaFingerprint, Repetitions: 5, CompletedRepetitions: 5, Candidates: candidates,
+	}
+
+	result, err := EvaluateOmniChatBakeOffQualityGate(report, DefaultOmniChatBakeOffQualityGate())
+	require.NoError(t, err)
+	require.False(t, result.Passed)
+	require.Contains(t, result.RunFailures, "unexpected_corpus_version")
+}
+
+func TestDefaultQualityGateRejectsMismatchedCorpusFingerprint(t *testing.T) {
+	candidates := make([]OmniChatBakeOffCandidateReport, 0, 5)
+	for index := 0; index < 5; index++ {
+		candidates = append(candidates, newLaunchQualificationCandidate(fmt.Sprintf("candidate-%c", 'a'+index), "stable", 5))
+	}
+	report := OmniChatBakeOffReport{
+		CorpusVersion: OmniChatPersonaQualityCorpusVersion, CorpusFingerprint: testSHA256Fingerprint, PersonaFingerprint: OmniChatCompanionPersonaFingerprint,
+		Repetitions: 5, CompletedRepetitions: 5, Candidates: candidates,
+	}
+
+	result, err := EvaluateOmniChatBakeOffQualityGate(report, DefaultOmniChatBakeOffQualityGate())
+	require.NoError(t, err)
+	require.False(t, result.Passed)
+	require.Contains(t, result.RunFailures, "unexpected_corpus_fingerprint")
 }
 
 func TestDefaultOmniChatBakeOffQualityGateRejectsDifferentCaseIDsAcrossCandidates(t *testing.T) {
@@ -783,6 +1019,7 @@ func TestDefaultOmniChatBakeOffQualityGateRejectsDifferentCaseIDsAcrossCandidate
 	}
 
 	result, err := EvaluateOmniChatBakeOffQualityGate(OmniChatBakeOffReport{
+		CorpusVersion: OmniChatPersonaQualityCorpusVersion, CorpusFingerprint: OmniChatCompanionBakeOffCorpusFingerprint, PersonaFingerprint: OmniChatCompanionPersonaFingerprint,
 		Repetitions: 5, CompletedRepetitions: 5, Candidates: candidates,
 	}, DefaultOmniChatBakeOffQualityGate())
 	require.NoError(t, err)
@@ -801,6 +1038,84 @@ func TestCustomOmniChatBakeOffQualityGateCanExplicitlyDisableLaunchMatrixEligibi
 	require.NoError(t, err)
 	require.True(t, result.Passed)
 	require.Empty(t, result.RunFailures)
+}
+
+func TestQualityGateRejectsInconsistentPromptOverlapDiagnostics(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*OmniChatBakeOffCheckReport)
+	}{
+		{name: "diagnostic on passed check", mutate: func(check *OmniChatBakeOffCheckReport) {
+			check.Diagnostics = map[PersonaQualityDiagnostic]int{PersonaQualityDiagnosticPromptOverlapExampleDialogue: 1}
+		}},
+		{name: "diagnostic on unrelated expectation", mutate: func(check *OmniChatBakeOffCheckReport) {
+			check.Expectation = PersonaExpectationNoAICliches
+			check.Passed = false
+			check.PassedRepetitions = 0
+			check.Diagnostics = map[PersonaQualityDiagnostic]int{PersonaQualityDiagnosticPromptOverlapExampleDialogue: 1}
+		}},
+		{name: "diagnostics exceed assessed failures", mutate: func(check *OmniChatBakeOffCheckReport) {
+			check.Passed = false
+			check.PassedRepetitions = 0
+			check.Diagnostics = map[PersonaQualityDiagnostic]int{PersonaQualityDiagnosticPromptOverlapExampleDialogue: 2}
+		}},
+		{name: "failed disclosure missing diagnostic", mutate: func(check *OmniChatBakeOffCheckReport) {
+			check.Passed = false
+			check.PassedRepetitions = 0
+			check.Diagnostics = nil
+		}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := newLaunchQualificationCandidate("candidate-a", "stable", 1)
+			test.mutate(&candidate.Cases[0].Checks[0])
+			result, err := EvaluateOmniChatBakeOffQualityGate(OmniChatBakeOffReport{
+				Repetitions: 1, CompletedRepetitions: 1, Candidates: []OmniChatBakeOffCandidateReport{candidate},
+			}, smallOmniChatBakeOffQualityGate())
+			require.NoError(t, err)
+			require.False(t, result.Passed)
+			require.Contains(t, result.RunFailures, "incomplete_case_matrix")
+		})
+	}
+}
+
+func TestQualityGateRejectsInconsistentDerivedCaseAndCheckFields(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*OmniChatBakeOffCaseReport)
+	}{
+		{name: "case passed", mutate: func(caseReport *OmniChatBakeOffCaseReport) { caseReport.Passed = false }},
+		{name: "case pass rate", mutate: func(caseReport *OmniChatBakeOffCaseReport) { caseReport.PassRate = 0.5 }},
+		{name: "check passed", mutate: func(caseReport *OmniChatBakeOffCaseReport) { caseReport.Checks[0].Passed = false }},
+		{name: "check pass rate", mutate: func(caseReport *OmniChatBakeOffCaseReport) { caseReport.Checks[0].PassRate = 0.5 }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := newLaunchQualificationCandidate("candidate-a", "stable", 1)
+			test.mutate(&candidate.Cases[0])
+			result, err := EvaluateOmniChatBakeOffQualityGate(OmniChatBakeOffReport{
+				Repetitions: 1, CompletedRepetitions: 1, Candidates: []OmniChatBakeOffCandidateReport{candidate},
+			}, smallOmniChatBakeOffQualityGate())
+			require.NoError(t, err)
+			require.False(t, result.Passed)
+			require.Contains(t, result.RunFailures, "incomplete_case_matrix")
+		})
+	}
+}
+
+func TestQualityGateReportsZeroAssessedScoreAsFailureInsteadOfLosingReport(t *testing.T) {
+	candidate := newLaunchQualificationCandidate("candidate-a", "stable", 1)
+	candidate.Score = OmniChatBakeOffScore{}
+
+	result, err := EvaluateOmniChatBakeOffQualityGate(OmniChatBakeOffReport{
+		Repetitions: 1, CompletedRepetitions: 1, Candidates: []OmniChatBakeOffCandidateReport{candidate},
+	}, smallOmniChatBakeOffQualityGate())
+	require.NoError(t, err)
+	require.False(t, result.Passed)
+	require.ElementsMatch(t, []string{
+		"format_pass_rate", "response_integrity_pass_rate",
+	}, result.Failures["candidate-a"])
 }
 
 func newLaunchQualificationCandidate(blindID, casePrefix string, repetitions int) OmniChatBakeOffCandidateReport {
@@ -878,8 +1193,14 @@ func smallOmniChatBakeOffQualityGate() OmniChatBakeOffQualityGate {
 	gate.ExpectedBoundaryChecks = 0
 	gate.ExpectedRejectedInjectionChecks = 0
 	gate.ExpectedNoPromptDisclosureChecks = 0
+	gate.ExpectedCorpusVersion = ""
+	gate.ExpectedCorpusFingerprint = ""
+	gate.ExpectedPersonaFingerprint = ""
+	gate.RequirePersonaFingerprint = false
 	return gate
 }
+
+const testSHA256Fingerprint = "0000000000000000000000000000000000000000000000000000000000000000"
 
 type timedBakeOffClient struct {
 	stubChatCompletionClient

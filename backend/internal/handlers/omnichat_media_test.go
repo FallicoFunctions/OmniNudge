@@ -17,9 +17,12 @@ import (
 )
 
 type omniChatGenerationCreatorFake struct {
-	request models.OmniChatGenerationRequest
-	job     *models.OmniChatGenerationJob
-	err     error
+	request               models.OmniChatGenerationRequest
+	job                   *models.OmniChatGenerationJob
+	err                   error
+	commandRequest        models.OmniChatMediaCommandRequest
+	commandConversationID int
+	commandMessage        *models.BotMessage
 }
 
 type omniChatRequestIdempotencyFake struct {
@@ -41,6 +44,12 @@ func (*omniChatRequestIdempotencyFake) Fail(context.Context, int, uuid.UUID) err
 func (f *omniChatGenerationCreatorFake) CreateGeneration(_ context.Context, _ int, request models.OmniChatGenerationRequest) (*models.OmniChatGenerationJob, error) {
 	f.request = request
 	return f.job, f.err
+}
+
+func (f *omniChatGenerationCreatorFake) CreateConversationMediaCommand(_ context.Context, _ int, conversationID int, request models.OmniChatMediaCommandRequest) (*models.OmniChatGenerationJob, *models.BotMessage, error) {
+	f.commandConversationID = conversationID
+	f.commandRequest = request
+	return f.job, f.commandMessage, f.err
 }
 
 type omniChatMediaReaderFake struct {
@@ -128,6 +137,7 @@ func newOmniChatMediaTestRouter(creator OmniChatGenerationCreator, reader OmniCh
 		c.Next()
 	})
 	router.POST("/api/v1/omnichat/generations", handler.CreateGeneration)
+	router.POST("/api/v1/omnichat/conversations/:id/media-command", handler.CreateConversationMediaCommand)
 	router.GET("/api/v1/omnichat/generations/:id", handler.GetGeneration)
 	router.GET("/api/v1/omnichat/gallery", handler.ListGallery)
 	return router
@@ -169,6 +179,53 @@ func TestOmniChatMediaHandlerCreateGenerationReturnsAcceptedJob(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &payload))
 	require.Equal(t, jobID, payload.Job.ID)
+}
+
+func TestOmniChatMediaHandlerReplaysStoredGenerationResponseWithJobEnvelope(t *testing.T) {
+	jobID := uuid.New()
+	requestID := uuid.New()
+	creator := &omniChatGenerationCreatorFake{}
+	handler := NewOmniChatMediaHandler(creator, &omniChatMediaReaderFake{}, nil).SetRequestIdempotency(&omniChatRequestIdempotencyFake{
+		claim: &models.OmniChatRequestClaim{Replay: true, Response: json.RawMessage(`{"id":"` + jobID.String() + `"}`)},
+	})
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set("user_id", 9); c.Next() })
+	router.POST("/api/v1/omnichat/generations", handler.CreateGeneration)
+	body := []byte(`{"kind":"image","mode":"create","persona_id":42,"prompt":"show me","request_id":"` + requestID.String() + `"}`)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/generations", bytes.NewReader(body)))
+
+	require.Equal(t, http.StatusOK, response.Code)
+	require.JSONEq(t, `{"job":{"id":"`+jobID.String()+`"}}`, response.Body.String())
+	require.Nil(t, creator.job)
+}
+
+func TestOmniChatMediaHandlerCreateConversationMediaCommandReturnsJobAndMessage(t *testing.T) {
+	jobID := uuid.New()
+	requestID := uuid.New()
+	creator := &omniChatGenerationCreatorFake{
+		job:            &models.OmniChatGenerationJob{ID: jobID, OwnerUserID: 9, ConversationID: intPtr(7), Status: models.OmniChatGenerationStatusQueued},
+		commandMessage: &models.BotMessage{ID: 55, ConversationID: 7, Role: models.BotMessageRoleUser, Content: "/video walking down the stairs", RequestID: &requestID},
+	}
+	router := newOmniChatMediaTestRouter(creator, &omniChatMediaReaderFake{})
+	body := []byte(`{"request_id":"` + requestID.String() + `","kind":"video","prompt":"walking down the stairs"}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/conversations/7/media-command", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusAccepted, response.Code, response.Body.String())
+	require.Equal(t, 7, creator.commandConversationID)
+	require.Equal(t, models.OmniChatMediaKindVideo, creator.commandRequest.Kind)
+	require.Equal(t, "walking down the stairs", creator.commandRequest.Prompt)
+	var payload struct {
+		Job     models.OmniChatGenerationJob `json:"job"`
+		Message models.BotMessage            `json:"message"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &payload))
+	require.Equal(t, jobID, payload.Job.ID)
+	require.Equal(t, 55, payload.Message.ID)
 }
 
 func TestOmniChatMediaHandlerGetGenerationHidesForeignJob(t *testing.T) {

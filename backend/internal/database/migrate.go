@@ -33,11 +33,11 @@ func (db *DB) Migrate(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to query migrations: %w", err)
 	}
-	defer rows.Close()
 
 	for rows.Next() {
 		var version string
 		if err := rows.Scan(&version); err != nil {
+			rows.Close()
 			return fmt.Errorf("failed to scan migration version: %w", err)
 		}
 		applied[version] = true
@@ -45,8 +45,12 @@ func (db *DB) Migrate(ctx context.Context) error {
 
 	// Check for errors during iteration
 	if err := rows.Err(); err != nil {
+		rows.Close()
 		return fmt.Errorf("error iterating migration rows: %w", err)
 	}
+	// Close the result set before running migrations so the next pool
+	// acquisition cannot wait behind the connection used by SELECT.
+	rows.Close()
 
 	// Get all up migration files
 	files, err := fs.ReadDir(migrationsFS, "migrations")

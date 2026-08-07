@@ -23,15 +23,23 @@ type DB struct {
 	testLockConn *pgxpool.Conn
 }
 
-// poolIntEnv reads an env var as a positive integer, returning defaultVal on
-// missing or invalid input.
+// poolIntEnv reads an env var as an integer greater than or equal to one,
+// returning defaultVal on missing or invalid input.
 func poolIntEnv(key string, defaultVal int32) int32 {
+	return poolIntEnvWithMinimum(key, defaultVal, 1)
+}
+
+func poolIntEnvAllowZero(key string, defaultVal int32) int32 {
+	return poolIntEnvWithMinimum(key, defaultVal, 0)
+}
+
+func poolIntEnvWithMinimum(key string, defaultVal, minimum int32) int32 {
 	s := os.Getenv(key)
 	if s == "" {
 		return defaultVal
 	}
 	v, err := strconv.ParseInt(s, 10, 32)
-	if err != nil || v <= 0 {
+	if err != nil || v < int64(minimum) {
 		zlog.Warn().
 			Str("key", key).
 			Str("value", s).
@@ -44,19 +52,28 @@ func poolIntEnv(key string, defaultVal int32) int32 {
 
 // New creates a new database connection pool
 func New(databaseURL string) (*DB, error) {
+	return newWithPoolLimits(
+		databaseURL,
+		poolIntEnv("DB_MAX_CONNS", 50),
+		poolIntEnvAllowZero("DB_MIN_CONNS", 10),
+	)
+}
+
+// newWithPoolLimits creates a pool with explicit connection limits. Keeping
+// this separate from New lets the test helper use a small pool without
+// changing production defaults or mutating process-wide environment state.
+func newWithPoolLimits(databaseURL string, maxConns, minConns int32) (*DB, error) {
 	config, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	// Configure connection pool settings.
-	// DB_MAX_CONNS and DB_MIN_CONNS env vars override the compiled-in defaults.
+	// Configure connection pool settings. The caller supplies the limits so
+	// test pools can be intentionally smaller than production pools.
 	// Budget note: set DB_MAX_CONNS so that all application instances combined
 	// stay below Postgres max_connections (typically 100). For example: with 2
 	// replicas and a Postgres max of 100, set DB_MAX_CONNS=45 (leaving 10 for
 	// admin/monitoring connections).
-	maxConns := poolIntEnv("DB_MAX_CONNS", 50)
-	minConns := poolIntEnv("DB_MIN_CONNS", 10)
 	if minConns > maxConns {
 		zlog.Warn().
 			Int("min_conns", int(minConns)).
