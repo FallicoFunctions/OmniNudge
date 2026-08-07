@@ -118,3 +118,37 @@ class ContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SceneContractCompletenessTests(unittest.TestCase):
+    """The scene whitelist is the contract; omissions fail silently.
+
+    A field the backend computes but that contract._scene does not list is
+    dropped with no error and no log, and simply never reaches the renderer.
+    accessories, viewer_position, subject_appearance and include_user_body were
+    all computed correctly server-side and discarded here for hours.
+    """
+
+    def _payload(self, scene):
+        return {"kind": "image", "mode": "contextual", "prompt": "Show the scene.",
+                "aspect_ratio": "4:5", "num_images": 1, "scene": scene}
+
+    def test_every_field_the_backend_sends_survives_validation(self):
+        scene = {
+            "location": "a red and black room", "activity": "dancing",
+            "outfit": "pink g-string thong", "pose": "swaying hips",
+            "expression": "sultry", "mood": "playful",
+            "accessories": ["belly button ring", "nipple piercings"],
+            "viewer_position": "laying back against the headboard",
+            "subject_appearance": "41 year old woman, dirty blonde hair",
+            "include_user_body": True,
+        }
+        got = validate_input(self._payload(scene)).scene
+        for key in scene:
+            self.assertIn(key, got, f"scene.{key} is silently dropped by the contract")
+        self.assertEqual(got["accessories"], ["belly button ring", "nipple piercings"])
+        self.assertIs(got["include_user_body"], True)
+
+    def test_include_user_body_must_be_a_boolean(self):
+        with self.assertRaises(ContractError):
+            validate_input(self._payload({"include_user_body": "yes"}))

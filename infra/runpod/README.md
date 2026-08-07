@@ -4,19 +4,52 @@ These are the GPU workers consumed by the server-side RunPod adapter. The API
 and queue send the JSON contract in `docs/OMNICHAT_EXPANSION.md`; the workers
 return signed HTTPS object URLs and never return local paths or data URLs.
 
+## Checks
+
+Run before building. The worker package has no compiler, so static analysis is
+the only thing standing between an editing mistake and a silently wrong image:
+
+```bash
+cd infra/runpod
+python -m pyflakes omnichat_worker/*.py
+python -m unittest omnichat_worker.test_contract omnichat_worker.test_generators omnichat_worker.test_storage
+```
+
+**pyflakes specifically, not ruff.** Python permits redefining a function, so a
+duplicate `def` silently shadows the earlier one: the edited version still
+compiles and still passes tests, while the stale version is what actually runs.
+pyflakes reports it as `redefinition of unused '<name>'`; ruff's `F811` does not
+flag this case. Three such duplicates were introduced while building the
+identity pipeline, and each presented as "the fix had no effect". The unittest
+suite runs pyflakes too, so `python -m unittest` alone is sufficient.
+
 ## Build
 
 Run each build from the repository root. The repository-root context is also
 what RunPod's GitHub integration uses when it builds a Dockerfile by path:
 
 ```bash
-TAG=v38
-docker buildx build --platform linux/amd64 --push \
+TAG=v39
+docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
   --build-arg OMNICHAT_WORKER_BUILD="$TAG" \
-  -f infra/runpod/image-worker/Dockerfile -t nickf579/omnichat-image-worker:"$TAG" .
-docker buildx build --platform linux/amd64 --push \
+  --output type=image,name=docker.io/nickf579/omnichat-image-worker:"$TAG",oci-mediatypes=false,push=true \
+  -f infra/runpod/image-worker/Dockerfile .
+docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
   --build-arg OMNICHAT_WORKER_BUILD="$TAG" \
-  -f infra/runpod/video-worker/Dockerfile -t nickf579/omnichat-video-worker:"$TAG" .
+  --output type=image,name=docker.io/nickf579/omnichat-video-worker:"$TAG",oci-mediatypes=false,push=true \
+  -f infra/runpod/video-worker/Dockerfile .
+```
+
+`--provenance=false --sbom=false` and `oci-mediatypes=false` are **required**, not stylistic.
+By default `buildx` attaches a provenance attestation, which turns the push into
+an OCI image index whose second entry reports platform `unknown/unknown`.
+RunPod cannot pull that layout, and it fails silently: the worker sits in
+`initializing` forever with `unhealthy: 0` and no error anywhere. Verify after
+pushing — the MediaType must be `application/vnd.docker.distribution.manifest.v2+json`,
+not `application/vnd.oci.image.index.v1+json`:
+
+```bash
+docker buildx imagetools inspect nickf579/omnichat-image-worker:v39
 ```
 
 The explicit platform flag is required when building on Apple Silicon: RunPod
@@ -63,12 +96,25 @@ environment settings (never in the API's browser-facing configuration):
 | `OMNICHAT_OUTPUT_URL_TTL_SECONDS` | optional | optional | Presigned URL lifetime, bounded to 60–3600 seconds |
 | `OMNICHAT_INPUT_HOSTS` | required | required | Exact HTTPS hosts workers may fetch |
 | `HF_TOKEN` | optional | optional | Read-only Hugging Face token when a configured model requires gated-model access |
-| `OMNICHAT_IMAGE_MODEL_ID` | required | — | Diffusers image model identifier |
+| `OMNICHAT_WORKER_BUILD` | build-arg | build-arg | Image tag stamped at build time and returned as `worker_build` on every job |
+| `OMNICHAT_IMAGE_MODEL_ID` | required | — | Diffusers image model identifier; defaults to `SG161222/RealVisXL_V5.0` |
 | `OMNICHAT_POSE_CONTROL_ENABLED` | optional | — | `1` (default) enables the OpenPose layout pass for contextual physical scenes |
 | `OMNICHAT_CONTROLNET_MODEL_ID` | optional | — | OpenPose SDXL ControlNet; defaults to `thibaud/controlnet-openpose-sdxl-1.0` |
 | `OMNICHAT_POSE_CONTROL_SCALE` | optional | — | ControlNet strength, bounded to `0`–`2`; defaults to `0.85` |
 | `OMNICHAT_IP_ADAPTER_MODEL_ID` | required | — | Identity adapter repository; defaults to `h94/IP-Adapter` |
-| `OMNICHAT_IP_ADAPTER_SUBFOLDER` / `OMNICHAT_IP_ADAPTER_WEIGHT` | optional | — | Adapter files; defaults to `sdxl_models` / `ip-adapter_sdxl.bin` |
+| `OMNICHAT_IP_ADAPTER_SUBFOLDER` / `OMNICHAT_IP_ADAPTER_WEIGHT` | optional | — | Adapter files; defaults to `sdxl_models` / `ip-adapter-plus-face_sdxl_vit-h.safetensors` |
+| `OMNICHAT_IP_ADAPTER_IMAGE_ENCODER` | optional | — | CLIP encoder folder; defaults to `models/image_encoder`. Every `*_vit-h` adapter needs the ViT-H encoder at the repo root — pairing one with `sdxl_models/image_encoder` does not error, it silently weakens identity |
+| `OMNICHAT_IDENTITY_CROP_RATIO` | optional | — | Fraction of the reference's short edge kept before identity conditioning; defaults to `0.48`. The plus-face adapter wants a face crop, not a half-body portrait |
+| `OMNICHAT_FACE_DETECT` | optional | — | `1` (default) frames the identity crop on the detected face. `0` falls back to fixed geometry. No face found is normal (anime, objects) and always falls back |
+| `OMNICHAT_FACE_CROP_MARGIN` | optional | — | How much context around the detected face to keep; defaults to `2.1` |
+| `OMNICHAT_BODY_ADAPTER` | optional | — | `1` (default) also loads `ip-adapter-plus` so body shape comes from the references. `0` runs face-only. The face adapter carries no body information, so figure drifts between generations without this |
+| `OMNICHAT_BODY_ADAPTER_SCALE` | optional | — | Strength of the body adapter; defaults to `0.3`. Deliberately far below the face scale — it also carries clothing, pose and background, which fight the scene prompt. Raise cautiously |
+| `OMNICHAT_BODY_ADAPTER_WEIGHT` | optional | — | Body adapter file; defaults to `ip-adapter-plus_sdxl_vit-h.safetensors`. Must share the ViT-H encoder with the face adapter |
+| `OMNICHAT_FACE_MIN_CROP_PX` | optional | — | Minimum native face-crop size for a reference to feed the face adapter; defaults to `224`, the CLIP encoder input size. Larger crops are downscaled and lose nothing, so this rejects only faces that would have to be upscaled |
+| `OMNICHAT_PORTRAIT_FACE_RATIO` | optional | — | Face-to-frame-height ratio above which a reference counts as a close portrait and is kept out of the body adapter; defaults to `0.30`. A portrait carries no proportions and would dilute them |
+| `OMNICHAT_IDENTITY_ANCHOR_REPEAT` | optional | — | How many times the persona avatar is repeated among the face references; defaults to `2`, so curated extras refine identity instead of averaging it away |
+| `OMNICHAT_LONG_PROMPT` | optional | — | `1` (default) encodes prompts in 75-token chunks and concatenates the embeddings, lifting CLIP's 77-token ceiling. Set `0` to fall back to a single truncated window |
+| `OMNICHAT_PROMPT_MAX_WORDS` | optional | — | Prompt budget in words; defaults to `150` with chunking and `58` without. The lower value is not a preference — beyond it CLIP silently discards the tail |
 | `OMNICHAT_IDENTITY_FALLBACK_IMAGE2IMAGE` | optional | — | Set `1` only as an explicit migration fallback; unset/`0` fails clearly if IP-Adapter cannot load |
 | `OMNICHAT_LORA_MODEL_ALLOWLIST` | required when using LoRA | — | Comma-separated Hugging Face LoRA IDs approved for platform-owned personas |
 | `OMNICHAT_VIDEO_TEXT_MODEL_ID` | — | required | Diffusers text-to-video model identifier |
@@ -87,8 +133,9 @@ Both Dockerfiles use PyTorch 2.7.1 with CUDA 12.8. RunPod's 24 GB serverless
 tier can allocate a Blackwell MIG slice, which requires this newer runtime;
 configure the endpoint's allowed CUDA version to `12.8` to match the image.
 
-The image endpoint should allocate at least 50 GB of container disk when using
-the SDXL base checkpoint with the default OpenPose ControlNet. Model downloads
+The image endpoint should allocate at least 50 GB of container disk for the
+configured SDXL checkpoint plus the identity adapter and its CLIP encoder.
+Model downloads
 use temporary space in addition to the final cache; a small default container
 disk can fail with `No space left on device` before the first image is generated.
 

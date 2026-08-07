@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 
 MAX_PROMPT_CHARS = 8_000
 MAX_NEGATIVE_PROMPT_CHARS = 2_000
-MAX_REFERENCE_IMAGES = 4
+MAX_REFERENCE_IMAGES = 8
 MAX_NUM_IMAGES = 4
 MAX_DURATION_SECONDS = 10
 MIN_DURATION_SECONDS = 1
@@ -157,9 +157,18 @@ def _scene(raw: Any) -> dict[str, Any]:
         return {}
     if not isinstance(raw, dict):
         raise ContractError("invalid_input", "scene must be an object")
+    # This whitelist is the scene contract. A field the backend computes but
+    # that is absent here is dropped silently, with no error and no log, and
+    # simply never reaches the renderer. Every field added on the server must
+    # be added here in the same change.
     allowed_text = {
         "location", "time_of_day", "weather", "lighting", "activity",
         "outfit", "pose", "expression", "mood", "camera_direction",
+        # Where the user's body is, which decides the camera's viewpoint.
+        "viewer_position",
+        # The persona's stable physical description, resolved from the persona
+        # record rather than from conversation state.
+        "subject_appearance",
     }
     normalized: dict[str, Any] = {}
     for key in allowed_text:
@@ -167,7 +176,14 @@ def _scene(raw: Any) -> dict[str, Any]:
         if value is None:
             continue
         normalized[key] = _text(value, f"scene.{key}", MAX_SCENE_TEXT_CHARS)
-    for key in ("other_characters", "recent_events"):
+    # Server-derived boolean: whether the tracked interaction actually puts the
+    # viewer's body in frame. Without it every scene defaults to persona-only.
+    include_user_body = raw.get("include_user_body")
+    if include_user_body is not None:
+        if not isinstance(include_user_body, bool):
+            raise ContractError("invalid_input", "scene.include_user_body must be a boolean")
+        normalized["include_user_body"] = include_user_body
+    for key in ("other_characters", "recent_events", "accessories"):
         value = raw.get(key, [])
         if value is None:
             continue
