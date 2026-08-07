@@ -69,13 +69,13 @@ export default function OmniChatMediaAssetView({
 
   if (asset.kind === 'video') {
     return (
-      <div className={`relative overflow-hidden rounded-2xl bg-black ${className}`}>
+      <div className={`relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-black ${className}`}>
         <video
           src={mediaUrl}
           controls
           playsInline
           preload="metadata"
-          className="h-full w-full object-cover"
+          className="block max-h-[75vh] max-w-full object-contain"
         />
         <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/55 p-2 text-white/80 backdrop-blur">
           <Video size={14} />
@@ -85,11 +85,11 @@ export default function OmniChatMediaAssetView({
   }
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl bg-black/25 ${className}`}>
+    <div className={`relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-black/25 ${className}`}>
       <img
         src={mediaUrl}
         alt={'prompt' in asset && asset.prompt ? asset.prompt : 'Generated character scene'}
-        className="h-full w-full object-cover"
+        className="block max-h-[75vh] max-w-full object-contain"
       />
       <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/55 p-2 text-white/80 backdrop-blur">
         <ImageIcon size={14} />

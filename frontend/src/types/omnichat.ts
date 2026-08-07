@@ -103,6 +103,12 @@ export interface BotConversation {
   persona?: BotPersona;
   title?: string;
   last_message_preview?: string;
+  /**
+   * True when the newest message is a generated image or video. Such messages
+   * carry no text, so an empty preview does NOT mean the conversation is empty
+   * — treating it that way hides conversations the user generated media in.
+   */
+  last_message_media_only?: boolean;
   settings?: ConversationSettings;
   created_at: string;
   last_message_at: string;
@@ -148,12 +154,15 @@ export interface OmniChatSceneState {
   lighting?: string;
   activity?: string;
   outfit?: string;
+  accessories?: string[];
   pose?: string;
   expression?: string;
   mood?: string;
   camera_direction?: string;
   other_characters?: string[];
   recent_events?: string[];
+  /** Server-derived; the client never sets this. */
+  include_user_body?: boolean;
 }
 
 export interface OmniChatGenerationRequest {
@@ -369,8 +378,6 @@ export interface OmniChatPersonaVoice {
   speed: number;
   pitch: number;
   language_code?: string;
-  live_video_replica_id?: string;
-  live_video_persona_id?: string;
   active: boolean;
   updated_at?: string;
 }
@@ -404,6 +411,9 @@ export interface OmniChatCallSession {
   last_activity_at: string;
   ended_at?: string;
   live_video_url?: string;
+  live_video_token?: string;
+  live_video_room?: string;
+  live_video_token_ttl_seconds?: number;
 }
 
 export interface OmniChatTokenPayload {

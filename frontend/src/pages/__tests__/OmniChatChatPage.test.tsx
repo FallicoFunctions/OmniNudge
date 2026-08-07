@@ -11,6 +11,7 @@ const {
   mockGetConversation,
   mockSendMessage,
   mockCreateGeneration,
+  mockCreateMediaCommand,
   mockGetGeneration,
   mockRegenerateMessage,
   mockEditMessage,
@@ -27,6 +28,7 @@ const {
   mockGetConversation: vi.fn(),
   mockSendMessage: vi.fn(),
   mockCreateGeneration: vi.fn(),
+  mockCreateMediaCommand: vi.fn(),
   mockGetGeneration: vi.fn(),
   mockRegenerateMessage: vi.fn(),
   mockEditMessage: vi.fn(),
@@ -74,6 +76,8 @@ vi.mock('../../services/omnichatService', () => ({
     getConversation: (...args: unknown[]) => mockGetConversation(...args),
     sendMessage: (...args: unknown[]) => mockSendMessage(...args),
     createGeneration: (...args: unknown[]) => mockCreateGeneration(...args),
+    createMediaCommand: (...args: unknown[]) => mockCreateMediaCommand(...args),
+    getMediaAssetContent: vi.fn().mockRejectedValue(new Error('media not loaded in page test')),
     getGeneration: (...args: unknown[]) => mockGetGeneration(...args),
     publishChat: (...args: unknown[]) => mockPublishChat(...args),
     regenerateMessage: (...args: unknown[]) => mockRegenerateMessage(...args),
@@ -235,6 +239,32 @@ describe('OmniChatChatPage', () => {
       progress: 0,
       created_at: '2026-07-02T10:16:00Z',
     });
+    mockCreateMediaCommand.mockResolvedValue({
+      job: {
+        id: 'command-generation-1',
+        owner_user_id: 1,
+        persona_id: 9,
+        conversation_id: 42,
+        source_message_id: 8,
+        kind: 'video',
+        mode: 'create',
+        status: 'queued',
+        prompt: 'you are walking down the stairs in a red dress',
+        aspect_ratio: '16:9',
+        duration_seconds: 5,
+        scene: {},
+        progress: 0,
+        created_at: '2026-07-02T10:16:00Z',
+      },
+      message: {
+        id: 8,
+        conversation_id: 42,
+        role: 'user',
+        content: '/video you are walking down the stairs in a red dress',
+        failed: false,
+        created_at: '2026-07-02T10:16:00Z',
+      },
+    });
     mockGetGeneration.mockResolvedValue({
       id: 'generation-1',
       owner_user_id: 1,
@@ -303,6 +333,29 @@ describe('OmniChatChatPage', () => {
     expect(screen.getByRole('button', { name: /Upgrade for unlimited replies/i })).toBeVisible();
   });
 
+  it('keeps direct media commands available when the chat allowance is exhausted', async () => {
+    mockGetAllowance.mockResolvedValueOnce({
+      tier: 'free',
+      allowed: false,
+      unlimited: false,
+      limit: 250,
+      used: 250,
+      remaining: 0,
+      reset_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      window_seconds: 86400,
+    });
+
+    renderPage();
+
+    const composer = await screen.findByPlaceholderText('Say or do something...');
+    fireEvent.change(composer, { target: { value: '/photo you at the park' } });
+    expect(screen.getByRole('button', { name: 'Send message' })).not.toBeDisabled();
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => expect(mockCreateMediaCommand).toHaveBeenCalledOnce());
+    expect(mockSendMessage).not.toHaveBeenCalled();
+  });
+
   it('shows a public persona opening immediately in a direct guest chat', async () => {
     mockIsAuthenticated = false;
 
@@ -368,6 +421,157 @@ describe('OmniChatChatPage', () => {
     expect(mockCreateGeneration.mock.calls[0][0]).toBe(mockCreateGeneration.mock.calls[1][0]);
     expect(mockCreateGeneration.mock.calls[1][0]).toMatchObject({ request_id: 'scene-request-id' });
     expect(mockCreateOmniChatRequestId).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a queued scene request retryable when the provider later fails', async () => {
+    mockCreateOmniChatRequestId.mockReturnValueOnce('provider-failure-request-id');
+    mockGetGeneration.mockResolvedValueOnce({
+      id: 'generation-provider-failure',
+      owner_user_id: 1,
+      persona_id: 9,
+      conversation_id: 42,
+      kind: 'image',
+      mode: 'contextual',
+      status: 'failed',
+      error_code: 'provider_failed',
+      prompt:
+        'Show the current scene as a candid photo, preserving the character, setting, outfit, mood, and activity.',
+      aspect_ratio: '4:5',
+      scene: {},
+      progress: 1,
+      created_at: '2026-07-02T10:16:00Z',
+    });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /scene photo/i }));
+    expect(
+      await screen.findByText(/media GPU worker failed.*RunPod endpoint environment/i)
+    ).toBeInTheDocument();
+    const retryButton = screen.getByRole('button', { name: 'Retry' });
+    fireEvent.click(retryButton);
+
+    await waitFor(() => expect(mockCreateGeneration).toHaveBeenCalledTimes(2));
+    expect(mockCreateGeneration.mock.calls[0][0]).toBe(mockCreateGeneration.mock.calls[1][0]);
+    expect(mockCreateGeneration.mock.calls[1][0]).toMatchObject({
+      request_id: 'provider-failure-request-id',
+    });
+  });
+
+  it('uses the current scene context without exposing a separate scene prompt field', async () => {
+    renderPage();
+
+    expect(screen.queryByPlaceholderText('Optional prompt for the scene…')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /scene photo/i }));
+
+    await waitFor(() => expect(mockCreateGeneration).toHaveBeenCalledOnce());
+    expect(mockCreateGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'image',
+        mode: 'contextual',
+        prompt:
+          'Show the current scene as a candid photo, preserving the character, setting, outfit, mood, and activity.',
+      })
+    );
+  });
+
+  it('explains the direct media commands with a character or scene description', async () => {
+    renderPage();
+
+    await screen.findByRole('button', { name: /scene photo/i });
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.textContent?.replace(/\s+/g, ' ').trim() ===
+          'Use /photo or /video followed by a description of the character or scene to generate photos or videos.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('sends a direct media command to the media pipeline without invoking chat completion', async () => {
+    renderPage();
+
+    const composer = await screen.findByPlaceholderText('Say or do something...');
+    fireEvent.change(composer, {
+      target: { value: '/video you are walking down the stairs in a red dress' },
+    });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => expect(mockCreateMediaCommand).toHaveBeenCalledOnce());
+    expect(mockCreateMediaCommand).toHaveBeenCalledWith(42, {
+      request_id: '123e4567-e89b-42d3-a456-426614174000',
+      kind: 'video',
+      prompt: 'you are walking down the stairs in a red dress',
+      aspect_ratio: '16:9',
+      duration_seconds: 5,
+    });
+    expect(mockSendMessage).not.toHaveBeenCalled();
+    expect(
+      screen.getByText('/video you are walking down the stairs in a red dress')
+    ).toBeInTheDocument();
+  });
+
+  it('renders media-only assistant turns without canned copy or text actions', async () => {
+    mockGetConversation.mockResolvedValueOnce({
+      conversation: {
+        id: 42,
+        user_id: 1,
+        persona_id: 9,
+        title: 'Campfire Thread',
+        created_at: '2026-07-02T10:00:00Z',
+        last_message_at: '2026-07-02T10:15:00Z',
+        persona: {
+          id: 9,
+          slug: 'narrator',
+          name: 'Narrator',
+          first_message: '*The fire gutters.* You made it.',
+          category: 'roleplay',
+          is_nsfw: false,
+          is_active: true,
+          created_at: '2026-07-01T10:00:00Z',
+          updated_at: '2026-07-01T10:00:00Z',
+        },
+      },
+      messages: [
+        {
+          id: 77,
+          conversation_id: 42,
+          role: 'assistant',
+          content: '',
+          failed: false,
+          created_at: '2026-07-02T10:16:00Z',
+          attachments: [
+            {
+              id: 'asset-77',
+              kind: 'image',
+              visibility: 'private',
+              content_url: '/api/v1/omnichat/media/asset-77/content',
+              file_type: 'image/png',
+              created_at: '2026-07-02T10:16:00Z',
+            },
+          ],
+        },
+      ],
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: /retry generated media/i })).toBeInTheDocument();
+    expect(screen.queryByText('Here is the scene you asked for.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /regenerate response/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /speak message/i })).not.toBeInTheDocument();
+  });
+
+  it('opens the video-credit paywall for a direct video command', async () => {
+    mockCreateMediaCommand.mockRejectedValueOnce(
+      Object.assign(new Error('payment required'), { status: 402 })
+    );
+    renderPage();
+
+    const composer = await screen.findByPlaceholderText('Say or do something...');
+    fireEvent.change(composer, { target: { value: '/video you walking through the park' } });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+
+    expect(await screen.findByRole('heading', { name: /unlock scene video/i })).toBeInTheDocument();
   });
 
   it('opens commerce and restores an authenticated message when direct send returns 402', async () => {
@@ -609,6 +813,65 @@ describe('OmniChatChatPage', () => {
     expect(screen.queryByText('Older Thread')).not.toBeInTheDocument();
     expect(screen.getByText('Newest preview. Extra sentence.')).toBeInTheDocument();
     expect(screen.queryByText('Older preview should be hidden.')).not.toBeInTheDocument();
+  });
+
+  const mediaTestPersona = {
+    id: 9,
+    slug: 'narrator',
+    name: 'Narrator',
+    description: 'A terse, old-school text-adventure narrator.',
+    category: 'roleplay' as const,
+    avatar_url: undefined,
+    preview_video_url: undefined,
+    is_nsfw: false,
+    is_active: true,
+    created_at: '2026-07-01T10:00:00Z',
+    updated_at: '2026-07-01T10:00:00Z',
+  };
+
+  it('keeps conversations whose newest message is a generated image', async () => {
+    // A media-only message carries no text. Treating its empty preview as
+    // "no messages" made a conversation vanish from the sidebar as soon as
+    // the user generated a scene photo in it.
+    mockListConversations.mockResolvedValueOnce([
+      {
+        id: 77,
+        user_id: 1,
+        persona_id: 9,
+        title: 'Image Thread',
+        created_at: '2026-07-02T10:00:00Z',
+        last_message_at: '2026-07-02T10:15:00Z',
+        last_message_preview: '',
+        last_message_media_only: true,
+        persona: mediaTestPersona,
+      },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByText('Image Thread')).toBeInTheDocument();
+    expect(screen.getByText('Sent a photo')).toBeInTheDocument();
+  });
+
+  it('still hides conversations that have no messages at all', async () => {
+    mockListConversations.mockResolvedValueOnce([
+      {
+        id: 78,
+        user_id: 1,
+        persona_id: 9,
+        title: 'Never Used Thread',
+        created_at: '2026-07-02T10:00:00Z',
+        last_message_at: '2026-07-02T10:15:00Z',
+        persona: mediaTestPersona,
+      },
+    ]);
+
+    renderPage();
+
+    expect(
+      await screen.findByText('No conversations yet. Start chatting with a persona!')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Never Used Thread')).not.toBeInTheDocument();
   });
 
   it('hides conversation rows whose personas are no longer active', async () => {

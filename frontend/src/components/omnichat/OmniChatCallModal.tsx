@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, Mic, MicOff, PhoneOff, Send, Video } from 'lucide-react';
+import { Room, RoomEvent, Track } from 'livekit-client';
 import PersonaAvatar from './PersonaAvatar';
 import { createOmniChatRequestId, omnichatService } from '../../services/omnichatService';
 import type { BotMessage, BotPersona, OmniChatCallSession } from '../../types/omnichat';
@@ -23,9 +24,27 @@ type RecognitionConstructor = new () => BrowserRecognition;
 export function isTrustedOmniChatCallUrl(value: string): boolean {
   try {
     const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    if (
+      url.protocol !== 'wss:' ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      host === 'localhost' ||
+      host.endsWith('.local') ||
+      /^(10\.|127\.|169\.254\.|192\.168\.)/.test(host)
+    ) {
+      return false;
+    }
+    const configuredHosts = String(import.meta.env.VITE_LIVEKIT_HOSTS ?? '')
+      .split(',')
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean);
     return (
-      url.protocol === 'https:' &&
-      (url.hostname === 'daily.co' || url.hostname.endsWith('.daily.co'))
+      configuredHosts.includes(host) ||
+      host === 'livekit.omninudge.com' ||
+      host.endsWith('.omninudge.com')
     );
   } catch {
     return false;
@@ -53,8 +72,13 @@ export default function OmniChatCallModal({
   const [transcript, setTranscript] = useState('');
   const [manualText, setManualText] = useState('');
   const [liveVideoURL, setLiveVideoURL] = useState('');
+  const [liveVideoConnected, setLiveVideoConnected] = useState(false);
   const recognitionRef = useRef<BrowserRecognition | null>(null);
   const sessionRef = useRef<OmniChatCallSession | null>(null);
+  const liveKitRoomRef = useRef<Room | null>(null);
+  const liveVideoTokenRef = useRef('');
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteAudioRef = useRef<HTMLDivElement | null>(null);
   const turnAbortRef = useRef<AbortController | null>(null);
   const closedRef = useRef(false);
   const callEpochRef = useRef(0);
@@ -96,6 +120,7 @@ export default function OmniChatCallModal({
           }
           sessionRef.current = created;
           setLiveVideoURL(created.live_video_url ?? '');
+          liveVideoTokenRef.current = created.live_video_token ?? '';
           setStatus('ready');
         } else {
           void omnichatService.endCall(created.id).catch(() => undefined);
@@ -128,10 +153,113 @@ export default function OmniChatCallModal({
       stopOmniChatSpeech();
       const currentSession = sessionRef.current;
       sessionRef.current = null;
+      liveVideoTokenRef.current = '';
       if (currentSession?.status === 'active')
         void omnichatService.endCall(currentSession.id).catch(() => undefined);
     };
   }, [conversationId, mode]);
+
+  useEffect(() => {
+    if (mode !== 'video' || !liveVideoURL || !liveVideoTokenRef.current) return;
+    let active = true;
+    const room = new Room({ adaptiveStream: true, dynacast: true });
+    const videoElement = remoteVideoRef.current;
+    const audioElement = remoteAudioRef.current;
+    liveKitRoomRef.current = room;
+
+    const clearTrack = (track: Track) => {
+      const detached = track.detach();
+      (Array.isArray(detached) ? detached : [detached]).forEach((element) => element.remove());
+      if (track.kind === Track.Kind.Video && videoElement) {
+        videoElement.srcObject = null;
+        setLiveVideoConnected(false);
+      }
+    };
+    const handleTrack = (track: Track) => {
+      if (track.kind === Track.Kind.Video && videoElement) {
+        track.attach(videoElement);
+        videoElement.autoplay = true;
+        videoElement.playsInline = true;
+        setLiveVideoConnected(true);
+        return;
+      }
+      if (track.kind === Track.Kind.Audio && audioElement) {
+        const attached = track.attach();
+        (Array.isArray(attached) ? attached : [attached]).forEach((element: HTMLMediaElement) => {
+          element.autoplay = true;
+          audioElement.appendChild(element);
+        });
+      }
+    };
+    room.on(RoomEvent.TrackSubscribed, handleTrack);
+    room.on(RoomEvent.TrackUnsubscribed, clearTrack);
+    room.on(RoomEvent.Disconnected, () => {
+      if (active) setLiveVideoConnected(false);
+    });
+    void room
+      .connect(liveVideoURL, liveVideoTokenRef.current)
+      .then(async () => {
+        if (!active) return;
+        await room.localParticipant.setMicrophoneEnabled(true);
+        await room.localParticipant.setCameraEnabled(true);
+      })
+      .catch(() => {
+        if (active) setStatus('error');
+      });
+    return () => {
+      active = false;
+      room.removeAllListeners();
+      room.disconnect();
+      liveKitRoomRef.current = null;
+      setLiveVideoConnected(false);
+      if (videoElement) videoElement.srcObject = null;
+      audioElement?.replaceChildren();
+    };
+  }, [liveVideoURL, mode]);
+
+  useEffect(() => {
+    if (mode !== 'video' || !liveVideoURL) return;
+    const callID = sessionRef.current?.id;
+    if (!callID) return;
+    const tokenTTLSeconds = sessionRef.current?.live_video_token_ttl_seconds ?? 600;
+    // Refresh at half-life, with a conservative upper bound so a long call
+    // never depends on a single ten-minute token. The lower bound also keeps
+    // deliberately short staging TTLs from expiring before the refresh runs.
+    const refreshEveryMs = Math.max(
+      15_000,
+      Math.min(Math.max(tokenTTLSeconds, 30) * 500, 240_000)
+    );
+    let active = true;
+    const refresh = async () => {
+      try {
+        const token = await omnichatService.refreshCallToken(callID);
+        if (!active || closedRef.current) return;
+        liveVideoTokenRef.current = token;
+        const room = liveKitRoomRef.current;
+        if (room?.state === 'connected') {
+          // The browser SDK accepts a token during connect, but does not
+          // expose a public in-place token setter. Reconnect the same room
+          // with the refreshed token so the active Pod and its media tracks
+          // remain intact while the participant credential rolls over.
+          // Keep the existing browser capture tracks while rotating the
+          // participant credential; disconnect() stops them by default and
+          // would force a fresh permission prompt on every refresh.
+          await room.disconnect(false);
+          if (!active || closedRef.current) return;
+          await room.connect(liveVideoURL, token);
+          await room.localParticipant.setMicrophoneEnabled(true);
+          await room.localParticipant.setCameraEnabled(true);
+        }
+      } catch {
+        if (active && !closedRef.current) setStatus('error');
+      }
+    };
+    const timer = window.setInterval(() => void refresh(), refreshEveryMs);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [liveVideoURL, mode]);
 
   const sendTranscript = async (content: string) => {
     content = content.trim();
@@ -152,19 +280,39 @@ export default function OmniChatCallModal({
       );
       if (closedRef.current || callEpochRef.current !== callEpoch) return;
       onAssistant(assistant);
+      let avatarHandledSpeech = false;
+      const liveKitRoom = liveKitRoomRef.current;
+      if (mode === 'video' && liveKitRoom?.state === 'connected') {
+        try {
+          const payload = new TextEncoder().encode(
+            JSON.stringify({ type: 'assistant_text', text: assistant.content, message_id: assistant.id })
+          );
+          await liveKitRoom.localParticipant.publishData(payload, {
+            reliable: true,
+            topic: 'omnichat.assistant',
+          });
+          avatarHandledSpeech = true;
+          setStatus('ready');
+        } catch {
+          // If the avatar room drops while a turn is completing, preserve the
+          // usable call experience by falling back to local speech.
+        }
+      }
       const activeSession = sessionRef.current;
       if (activeSession)
         void omnichatService.recordCallTurn(activeSession.id).catch(() => undefined);
-      await speakOmniChatMessage({
-        personaId: persona.id,
-        conversationId,
-        messageId: assistant.id,
-        text: assistant.content,
-        onState: (speaking) => {
-          if (!closedRef.current && callEpochRef.current === callEpoch)
-            setStatus(speaking ? 'speaking' : 'ready');
-        },
-      });
+      if (!avatarHandledSpeech) {
+        await speakOmniChatMessage({
+          personaId: persona.id,
+          conversationId,
+          messageId: assistant.id,
+          text: assistant.content,
+          onState: (speaking) => {
+            if (!closedRef.current && callEpochRef.current === callEpoch)
+              setStatus(speaking ? 'speaking' : 'ready');
+          },
+        });
+      }
     } catch (error) {
       if ((error as Error).name === 'AbortError') return;
       if (!closedRef.current && callEpochRef.current === callEpoch) setStatus('error');
@@ -211,6 +359,9 @@ export default function OmniChatCallModal({
     const activeSession = sessionRef.current;
     sessionRef.current = null;
     setLiveVideoURL('');
+    liveVideoTokenRef.current = '';
+    liveKitRoomRef.current?.disconnect();
+    liveKitRoomRef.current = null;
     if (activeSession) void omnichatService.endCall(activeSession.id).catch(() => undefined);
     onClose();
   }
@@ -243,13 +394,21 @@ export default function OmniChatCallModal({
     >
       <div className="absolute inset-0">
         {mode === 'video' && liveVideoURL ? (
-          <iframe
-            src={liveVideoURL}
-            title={`Live avatar video call with ${persona.name}`}
-            allow="camera; microphone; fullscreen; display-capture"
-            referrerPolicy="no-referrer"
-            className="h-full w-full border-0"
-          />
+          <div className="relative flex h-full w-full items-center justify-center bg-black">
+            <video
+              ref={remoteVideoRef}
+              title={`Live avatar video call with ${persona.name}`}
+              autoPlay
+              playsInline
+              className={`h-full w-full object-cover ${liveVideoConnected ? 'opacity-100' : 'opacity-0'}`}
+            />
+            <div ref={remoteAudioRef} className="hidden" aria-hidden="true" />
+            {!liveVideoConnected && (
+              <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_50%_40%,rgba(99,102,241,0.34),transparent_38%),#08090d]">
+                <PersonaAvatar persona={persona} className="h-48 w-48 rounded-full sm:h-72 sm:w-72" />
+              </div>
+            )}
+          </div>
         ) : (
           <div
             data-testid="omnichat-call-visual-group"
@@ -288,7 +447,7 @@ export default function OmniChatCallModal({
               The call could not be connected. End the call and try again.
             </p>
           )}
-          {status !== 'error' && !liveVideoURL && (
+          {status !== 'error' && (
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -313,7 +472,7 @@ export default function OmniChatCallModal({
             </form>
           )}
           <div className="flex items-center justify-center gap-5">
-            {status !== 'error' && !liveVideoURL && (
+            {status !== 'error' && (
               <button
                 type="button"
                 onClick={() =>
@@ -332,7 +491,7 @@ export default function OmniChatCallModal({
                 )}
               </button>
             )}
-            {status !== 'error' && mode === 'video' && !liveVideoURL && (
+            {status !== 'error' && mode === 'video' && (
               <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/15 backdrop-blur">
                 <Video />
               </span>

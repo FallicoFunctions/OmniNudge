@@ -1340,6 +1340,12 @@ export default function OmniChatStudioPage() {
                 <span className="block text-sm font-medium text-[var(--color-text-primary)]">
                   {t('omnichat.studio.fields.galleryUrls')}
                 </span>
+                {/* Gallery images are the character's identity references. Users
+                    otherwise upload one photo, or several of different people,
+                    and get inconsistent faces with no idea why. */}
+                <p className="text-xs leading-relaxed text-[var(--color-text-muted)]">
+                  {t('omnichat.studio.fields.galleryUrlsHelp')}
+                </p>
                 <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
                   {draft.gallery_urls.length > 0 ? (
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

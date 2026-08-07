@@ -18,7 +18,10 @@ function hasClosingMarker(content: string, marker: '*' | '**', fromIndex: number
   return content.indexOf(marker, fromIndex) !== -1;
 }
 
-const QUOTED_DIALOGUE_AT_LINE_START = /(^|\n)([ \t]*)["“]([^\n"”]+?)["”](?=\s|$)/gm;
+const QUOTED_DIALOGUE_AT_LINE_START =
+  /(^|\n)([ \t]*)(?:"([^\n"“”]*?)"|“([^\n“”]*?)”|'((?:[^'\n]|'[A-Za-z])*?)'|‘([^\n‘’]*?)’)(?=\s|[,!?;:)\]]|$)/gm;
+const QUOTED_DIALOGUE_AFTER_SENTENCE =
+  /([.!?,;:])([ \t]*)(?:"([^\n"“”]*?)"|“([^\n“”]*?)”|'((?:[^'\n]|'[A-Za-z])*?)'|‘([^\n‘’]*?)’)(?=\s|[,!?;:)\]]|$)/gm;
 const ASSISTANT_SENTENCE_PATTERN = /[^.!?…]+[.!?…]+["'”’)\]]*(?:\s+|$)|[^.!?…]+$/g;
 const FIRST_PERSON_ACTION_NARRATION =
   /^i\s+(?:swallow|nod|shake|lean|smile|grin|sigh|pause|glance|reach|touch|brush|trace|move|slide|pull|press|lift|lower|tilt|turn|step|sit|stand|inhale|exhale|freeze|flinch|shrug|blink|bite|gesture)(?:\s+(?:back|closer|away|forward|in|out|up|down|over|toward|towards))?\s*[,;.!?]/i;
@@ -29,11 +32,51 @@ const FIRST_PERSON_BODY_ACTION =
 const BODY_ACTION_NARRATION =
   /^my\s+(?:breath|hand|hands|finger|fingers|thumb|palm|palms|gaze|eyes|voice|heart|pulse|shoulder|shoulders|lips|mouth|head|body|foot|feet|knee|knees|chest|throat)\s+(?:hitch(?:es)?|catch(?:es)?|brush(?:es)?|trace(?:s)?|move(?:s)?|slide(?:s)?|pull(?:s)?|press(?:es)?|lift(?:s)?|lower(?:s)?|tilt(?:s)?|turn(?:s)?|tremble(?:s)?|shake(?:s)?|freeze(?:s)?|tighten(?:s)?|soften(?:s)?|drop(?:s)?|rise(?:s)?|races?|pound(?:s)?|hammer(?:s)?|lock(?:s)?|flick(?:s)?|drift(?:s)?|linger(?:s)?|hover(?:s)?|land(?:s)?|rest(?:s)?)\b/i;
 
+function quotedDialogueText(match: RegExpMatchArray) {
+  return match[3] ?? match[4] ?? match[5] ?? match[6] ?? '';
+}
+
+type QuotedDialogueMatch = {
+  start: number;
+  quoteStart: number;
+  end: number;
+  text: string;
+};
+
+function collectQuotedDialogueMatches(content: string) {
+  const matches: QuotedDialogueMatch[] = [];
+  const collect = (pattern: RegExp) => {
+    pattern.lastIndex = 0;
+    for (const match of content.matchAll(pattern)) {
+      const matchIndex = match.index ?? 0;
+      matches.push({
+        start: matchIndex,
+        quoteStart: matchIndex + match[1].length + match[2].length,
+        end: matchIndex + match[0].length,
+        text: quotedDialogueText(match),
+      });
+    }
+  };
+  collect(QUOTED_DIALOGUE_AT_LINE_START);
+  collect(QUOTED_DIALOGUE_AFTER_SENTENCE);
+  matches.sort((left, right) => left.start - right.start);
+  return matches;
+}
+
+function shouldMarkUnquotedSurroundingNarration(content: string) {
+  const trimmed = content.trim();
+  if (!trimmed) return true;
+  if (looksLikeUnmarkedNarration(trimmed)) return true;
+  // Legacy scene replies often omit asterisks around third-person or
+  // article-led stage directions. Keep those prose-like blocks italic while
+  // leaving ordinary first-person dialogue ("I'm still here") untouched.
+  return /^(?:the|a|an|she|he|her|his|their)\b/i.test(trimmed);
+}
+
 function containsQuotedAssistantDialogue(segments: OmniChatMessageSegment[]) {
   return segments.some((segment) => {
     if (segment.italic) return false;
-    QUOTED_DIALOGUE_AT_LINE_START.lastIndex = 0;
-    return QUOTED_DIALOGUE_AT_LINE_START.test(segment.text);
+    return collectQuotedDialogueMatches(segment.text).length > 0;
   });
 }
 
@@ -54,16 +97,16 @@ function repairQuotedAssistantDialogue(
       continue;
     }
 
+    const quotedMatches = collectQuotedDialogueMatches(segment.text);
     let cursor = 0;
-    QUOTED_DIALOGUE_AT_LINE_START.lastIndex = 0;
-    for (const match of segment.text.matchAll(QUOTED_DIALOGUE_AT_LINE_START)) {
-      const matchIndex = match.index ?? 0;
-      const quoteIndex = matchIndex + match[1].length + match[2].length;
-      append(segment.text.slice(cursor, quoteIndex), false, true);
-      append(match[3], false, false);
-      cursor = matchIndex + match[0].length;
+    for (const match of quotedMatches) {
+      const prefix = segment.text.slice(cursor, match.quoteStart);
+      append(prefix, false, shouldMarkUnquotedSurroundingNarration(prefix));
+      append(match.text, false, false);
+      cursor = match.end;
     }
-    append(segment.text.slice(cursor), false, true);
+    const remaining = segment.text.slice(cursor);
+    append(remaining, false, shouldMarkUnquotedSurroundingNarration(remaining));
   }
 
   return repaired;
@@ -71,7 +114,14 @@ function repairQuotedAssistantDialogue(
 
 function looksLikeUnmarkedNarration(sentence: string) {
   const trimmed = sentence.trim();
-  if (!trimmed || trimmed.startsWith('"') || trimmed.startsWith('“')) return false;
+  if (
+    !trimmed ||
+    trimmed.startsWith('"') ||
+    trimmed.startsWith('“') ||
+    trimmed.startsWith("'") ||
+    trimmed.startsWith('‘')
+  )
+    return false;
   return (
     FIRST_PERSON_ACTION_NARRATION.test(trimmed) ||
     FIRST_PERSON_SPEECH_TAG_NARRATION.test(trimmed) ||

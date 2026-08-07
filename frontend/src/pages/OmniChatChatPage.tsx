@@ -83,7 +83,8 @@ import { loadOmniChatDefaults } from '../utils/omnichatDefaults';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { OMNICHAT_PERSONA_TRANSITION_NAME } from '../utils/omnichatViewTransitions';
-import { detectOmniChatMediaIntent } from '../utils/omnichatMediaIntent';
+import { detectOmniChatMediaIntent, parseOmniChatMediaCommand } from '../utils/omnichatMediaIntent';
+import { mediaGenerationErrorMessage } from '../utils/omnichatMediaErrors';
 import { OMNICHAT_MODEL_LABELS } from '../utils/omnichatModelProfiles';
 
 type ChatFilter = 'all' | 'unread' | 'favorites';
@@ -96,6 +97,16 @@ type PendingMediaIntent = Pick<
   OmniChatGenerationRequest,
   'kind' | 'prompt' | 'conversation_id' | 'persona_id' | 'request_id'
 >;
+
+type PendingMediaCommand = {
+  conversationId: number;
+  request: Pick<
+    OmniChatGenerationRequest,
+    'request_id' | 'kind' | 'prompt' | 'aspect_ratio' | 'duration_seconds'
+  >;
+  content: string;
+  optimisticMessageId: number;
+};
 
 type PendingSendIntent = {
   conversationId: number;
@@ -474,6 +485,7 @@ export default function OmniChatChatPage() {
   const pendingSendIntentRef = useRef<PendingSendIntent | null>(null);
   const pendingRegenerationIntentRef = useRef<PendingRegenerationIntent | null>(null);
   const pendingMediaGenerationRef = useRef<OmniChatGenerationRequest | null>(null);
+  const pendingMediaCommandRef = useRef<PendingMediaCommand | null>(null);
 
   const personasQuery = useQuery({
     queryKey: omnichatQueryKeys.personas(),
@@ -522,10 +534,15 @@ export default function OmniChatChatPage() {
     [personasQuery.data]
   );
 
-  const filteredConversations = useMemo(() => {
+  // Every conversation the user may open. The sidebar collapses these to one
+  // row per persona, but a forked thread is still addressable by route, so
+  // route validation must use this list and not the collapsed one.
+  const selectableConversations = useMemo(() => {
     const all = conversationsQuery.data ?? [];
-    const withMessages = all
-      .filter((c) => c.last_message_preview)
+    return all
+      // A media-only newest message (a generated image) has no text, so an
+      // empty preview is not the same as an empty conversation.
+      .filter((c) => c.last_message_preview || c.last_message_media_only)
       .map((conversation) => {
         const latestPersona = activePersonaById.get(Number(conversation.persona_id));
         if (!latestPersona) return null;
@@ -535,6 +552,10 @@ export default function OmniChatChatPage() {
         };
       })
       .filter((conversation): conversation is ActiveBotConversation => conversation !== null);
+  }, [activePersonaById, conversationsQuery.data]);
+
+  const filteredConversations = useMemo(() => {
+    const withMessages = selectableConversations;
     const newestByPersona = new Map<number, ActiveBotConversation>();
 
     for (const conversation of withMessages) {
@@ -562,17 +583,29 @@ export default function OmniChatChatPage() {
         preview.toLowerCase().includes(query)
       );
     });
-  }, [activePersonaById, conversationsQuery.data, directoryQuery]);
+  }, [directoryQuery, selectableConversations]);
 
   const selectedConversationId = useMemo(() => {
     if (isGuest || !isAuthenticated) return null;
     if (Number.isFinite(routeConversationId)) {
-      return filteredConversations.some((conversation) => conversation.id === routeConversationId)
+      // Validate against every openable conversation. Using the sidebar's
+      // persona-deduped list here made forked threads unreachable: the route
+      // was valid, but the id was absent from the collapsed list, so the pane
+      // fell back to "No active chat yet".
+      return selectableConversations.some(
+        (conversation) => conversation.id === routeConversationId
+      )
         ? routeConversationId
         : null;
     }
     return filteredConversations[0]?.id ?? null;
-  }, [filteredConversations, isAuthenticated, isGuest, routeConversationId]);
+  }, [
+    filteredConversations,
+    isAuthenticated,
+    isGuest,
+    routeConversationId,
+    selectableConversations,
+  ]);
 
   const conversationQuery = useQuery({
     queryKey: omnichatQueryKeys.conversation(selectedConversationId ?? -1),
@@ -676,7 +709,13 @@ export default function OmniChatChatPage() {
     queries: filteredConversations.map((conversation) => ({
       queryKey: omnichatQueryKeys.conversation(conversation.id),
       queryFn: () => omnichatService.getConversation(conversation.id),
-      enabled: isAuthenticated && !isGuest && !conversation.last_message_preview,
+      // Media-only threads already have a known placeholder, so skip the
+      // detail fetch rather than pulling a whole message history for a label.
+      enabled:
+        isAuthenticated &&
+        !isGuest &&
+        !conversation.last_message_preview &&
+        !conversation.last_message_media_only,
       staleTime: 60_000,
     })),
   });
@@ -690,6 +729,12 @@ export default function OmniChatChatPage() {
       const listPreview = getConversationPreview(conversation.last_message_preview, '');
       if (listPreview) {
         previews.set(conversation.id, listPreview);
+        continue;
+      }
+
+      // A generated image is the newest turn and has no text of its own.
+      if (conversation.last_message_media_only) {
+        previews.set(conversation.id, t('omnichat.chat.mediaOnlyPreview'));
         continue;
       }
 
@@ -899,19 +944,86 @@ export default function OmniChatChatPage() {
       omnichatService.createGeneration(request),
     onMutate: () => setMediaGenerationError(null),
     onSuccess: (job, request) => {
-      if (pendingMediaGenerationRef.current?.request_id === request.request_id) {
+      // Keep the request until the provider reaches a terminal success. A
+      // queued API response only means the job was accepted; clearing it here
+      // would leave a later provider failure with no way to retry the exact
+      // request.
+      if (
+        job.status === 'succeeded' &&
+        pendingMediaGenerationRef.current?.request_id === request.request_id
+      ) {
         pendingMediaGenerationRef.current = null;
       }
       setActiveMediaJob(job);
     },
     onError: (error, request) => {
-      pendingMediaGenerationRef.current = request;
-      if ((error as Error & { status?: number }).status === 402) {
+      const status = (error as Error & { status?: number }).status;
+      if (status === 402) {
+        pendingMediaGenerationRef.current = null;
         if (request.kind === 'video') setVideoPaywallFeature('scene_video');
         else setShowCommerce(true);
         return;
       }
-      setMediaGenerationError('Scene generation could not be started. Please try again.');
+      // Validation rejections are deterministic: retaining them as retryable
+      // requests would only make the user repeat the same failure. Provider,
+      // network, and unknown failures can be retried with the same idempotency
+      // key so an uncertain request is never duplicated.
+      const retryable = status === undefined || status >= 500 || status === 429;
+      pendingMediaGenerationRef.current = retryable ? request : null;
+      setMediaGenerationError(mediaGenerationErrorMessage(status));
+    },
+  });
+
+  const mediaCommandMutation = useMutation({
+    mutationFn: ({ conversationId, request }: PendingMediaCommand) =>
+      omnichatService.createMediaCommand(conversationId, request),
+    onMutate: () => setMediaGenerationError(null),
+    onSuccess: ({ job, message }, request) => {
+      // A queued command can still fail inside the GPU worker. Retain the
+      // request until success so the error state always offers a safe replay.
+      if (
+        job.status === 'succeeded' &&
+        pendingMediaCommandRef.current?.request.request_id === request.request.request_id
+      ) {
+        pendingMediaCommandRef.current = null;
+      }
+      setActiveMediaJob(job);
+      queryClient.setQueryData<BotConversationDetail | undefined>(
+        omnichatQueryKeys.conversation(request.conversationId),
+        (previous) => {
+          if (!previous) return previous;
+          const withoutOptimistic = previous.messages.filter(
+            (candidate) =>
+              candidate.id !== request.optimisticMessageId && candidate.id !== message.id
+          );
+          return { ...previous, messages: [...withoutOptimistic, message] };
+        }
+      );
+      void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
+    },
+    onError: (error, request) => {
+      const status = (error as Error & { status?: number }).status;
+      if (status === 402) {
+        pendingMediaCommandRef.current = null;
+        if (request.request.kind === 'video') setVideoPaywallFeature('scene_video');
+        else setShowCommerce(true);
+        return;
+      }
+      const retryable = status === undefined || status >= 500 || status === 429;
+      pendingMediaCommandRef.current = retryable ? request : null;
+      queryClient.setQueryData<BotConversationDetail | undefined>(
+        omnichatQueryKeys.conversation(request.conversationId),
+        (previous) =>
+          previous
+            ? {
+                ...previous,
+                messages: previous.messages.filter(
+                  (candidate) => candidate.id !== request.optimisticMessageId
+                ),
+              }
+            : previous
+      );
+      setMediaGenerationError(mediaGenerationErrorMessage(status));
     },
   });
 
@@ -929,13 +1041,15 @@ export default function OmniChatChatPage() {
     if (!job) return;
     setActiveMediaJob(job);
     if (job.status === 'succeeded' && job.conversation_id) {
+      pendingMediaGenerationRef.current = null;
+      pendingMediaCommandRef.current = null;
       void queryClient.invalidateQueries({
         queryKey: omnichatQueryKeys.conversation(job.conversation_id),
       });
       void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.gallery() });
     }
     if (job.status === 'failed') {
-      setMediaGenerationError('The scene could not be generated. Try adjusting the request.');
+      setMediaGenerationError(mediaGenerationErrorMessage(undefined, job.error_code));
     }
   }, [activeMediaJobQuery.data, queryClient]);
 
@@ -1063,8 +1177,7 @@ export default function OmniChatChatPage() {
 
       const pendingController = sendMessageAbortRef.current;
       const completesPendingRequest =
-        Boolean(detail.request_id) &&
-        detail.request_id === pendingSendIntentRef.current?.requestId;
+        Boolean(detail.request_id) && detail.request_id === pendingSendIntentRef.current?.requestId;
       completeAssistantMessage(detail);
       if (pendingController && completesPendingRequest) {
         sendCompletedLiveRef.current = true;
@@ -1081,6 +1194,7 @@ export default function OmniChatChatPage() {
     pendingRegenerationIntentRef.current = null;
     pendingMediaIntentRef.current = null;
     pendingMediaGenerationRef.current = null;
+    pendingMediaCommandRef.current = null;
     setMediaGenerationError(null);
     setActiveMediaJob(null);
 
@@ -1356,6 +1470,8 @@ export default function OmniChatChatPage() {
         return;
       }
       if (!selectedConversationId || !activePersona) return;
+      pendingMediaGenerationRef.current = null;
+      pendingMediaCommandRef.current = null;
       // The scene buttons intentionally start a new generation. Exact replay is exposed separately
       // through Retry, which retains the original request ID after an uncertain failure.
       const request: OmniChatGenerationRequest = {
@@ -1374,14 +1490,26 @@ export default function OmniChatChatPage() {
       pendingMediaGenerationRef.current = request;
       mediaGenerationMutation.mutate(request);
     },
-    [activePersona, isAuthenticated, isGuest, mediaGenerationMutation, selectedConversationId]
+    [
+      activePersona,
+      isAuthenticated,
+      isGuest,
+      mediaGenerationMutation,
+      selectedConversationId,
+    ]
   );
 
   const retryMediaGeneration = useCallback(() => {
+    const command = pendingMediaCommandRef.current;
+    if (command) {
+      if (mediaCommandMutation.isPending) return;
+      mediaCommandMutation.mutate(command);
+      return;
+    }
     const request = pendingMediaGenerationRef.current;
     if (!request || mediaGenerationMutation.isPending) return;
     mediaGenerationMutation.mutate(request);
-  }, [mediaGenerationMutation]);
+  }, [mediaCommandMutation, mediaGenerationMutation]);
 
   const requestCall = useCallback(
     (mode: 'voice' | 'video') => {
@@ -1398,14 +1526,32 @@ export default function OmniChatChatPage() {
     (event: FormEvent) => {
       event.preventDefault();
       const content = draft.trim();
+      const directMediaCommand = parseOmniChatMediaCommand(content);
       if (
         !content ||
-        allowanceExhausted ||
+        (allowanceExhausted && !directMediaCommand) ||
         sendMessageMutation.isPending ||
         guestIsGenerating ||
         regeneratingMessageId !== null
       )
         return;
+
+      if (directMediaCommand && (!isAuthenticated || isGuest)) {
+        setDraft(content);
+        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+        return;
+      }
+
+      const activeMediaJob = Boolean(
+        activeMediaJobQuery.data &&
+        !['succeeded', 'failed', 'cancelled'].includes(activeMediaJobQuery.data.status)
+      );
+      if (directMediaCommand && (activeMediaJob || mediaCommandMutation.isPending)) {
+        setMediaGenerationError(
+          'A media request is already running. Wait for it to finish, then try again.'
+        );
+        return;
+      }
 
       setDraft('');
       setStreamingText('');
@@ -1464,6 +1610,47 @@ export default function OmniChatChatPage() {
       }
 
       if (!selectedConversationId || !activePersona) return;
+
+      if (directMediaCommand) {
+        pendingMediaGenerationRef.current = null;
+        pendingMediaCommandRef.current = null;
+        const request: PendingMediaCommand = {
+          conversationId: selectedConversationId,
+          content,
+          optimisticMessageId: nextOptimisticId.current--,
+          request: {
+            request_id: createOmniChatRequestId(),
+            kind: directMediaCommand.kind,
+            prompt: directMediaCommand.prompt,
+            aspect_ratio: directMediaCommand.kind === 'video' ? '16:9' : '4:5',
+            duration_seconds: directMediaCommand.kind === 'video' ? 5 : undefined,
+          },
+        };
+        pendingMediaCommandRef.current = request;
+        queryClient.setQueryData<BotConversationDetail | undefined>(
+          omnichatQueryKeys.conversation(selectedConversationId),
+          (previous) =>
+            previous
+              ? {
+                  ...previous,
+                  messages: [
+                    ...previous.messages,
+                    {
+                      id: request.optimisticMessageId,
+                      conversation_id: selectedConversationId,
+                      role: 'user',
+                      content,
+                      failed: false,
+                      request_id: request.request.request_id,
+                      created_at: new Date().toISOString(),
+                    },
+                  ],
+                }
+              : previous
+        );
+        mediaCommandMutation.mutate(request);
+        return;
+      }
 
       const savedIntent = pendingSendIntentRef.current;
       const intent =
@@ -1539,6 +1726,9 @@ export default function OmniChatChatPage() {
       regeneratingMessageId,
       selectedConversationId,
       sendMessageMutation,
+      mediaCommandMutation,
+      activeMediaJobQuery.data,
+      pendingMediaCommandRef,
     ]
   );
 
@@ -1564,7 +1754,9 @@ export default function OmniChatChatPage() {
   const latestMessage = activeMessages.at(-1);
   const previousMessage = activeMessages.at(-2);
   const regeneratableMessageId =
-    latestMessage?.role === 'assistant' && previousMessage?.role === 'user'
+    latestMessage?.role === 'assistant' &&
+    latestMessage.content.trim().length > 0 &&
+    previousMessage?.role === 'user'
       ? latestMessage.id
       : null;
 
@@ -1587,7 +1779,10 @@ export default function OmniChatChatPage() {
                 requestId: createOmniChatRequestId(),
               };
         pendingRegenerationIntentRef.current = intent;
-        regenerateMessageMutation.mutate({ messageId: intent.messageId, requestId: intent.requestId });
+        regenerateMessageMutation.mutate({
+          messageId: intent.messageId,
+          requestId: intent.requestId,
+        });
         return;
       }
 
@@ -1676,6 +1871,11 @@ export default function OmniChatChatPage() {
   const isLoadingConversation = isGuest ? guestPersonaLoading : conversationQuery.isLoading;
   const isSendingMessage = sendMessageMutation.isPending || guestIsGenerating;
   const isGenerating = isSendingMessage || regeneratingMessageId !== null;
+  // Keep the composer usable when chat replies are exhausted: a direct
+  // /photo or /video request is a separate media action and must be allowed to
+  // reach its own credit/entitlement response instead of being blocked by the
+  // text-reply allowance at the input level.
+  const draftMediaCommand = parseOmniChatMediaCommand(draft.trim());
   const isEditing = editingMessageId !== null;
   const normalizedStreamingText = normalizeOmniChatMessageContent(streamingText);
   const normalizedRegenerationText = normalizeOmniChatMessageContent(regenerationText);
@@ -1897,9 +2097,9 @@ export default function OmniChatChatPage() {
               showMobileChatPane ? 'flex' : 'hidden lg:flex'
             } ${profilePaneCollapsed ? '' : 'border-r border-white/10'}`}
           >
-            <div className="flex items-center border-b border-white/10 px-5 h-16">
-              <div className="flex w-full items-center justify-between gap-4">
-                <div className="flex min-w-0 items-center gap-4">
+            <div className="flex items-center border-b border-white/10 px-3 h-16 lg:px-5">
+              <div className="flex w-full items-center justify-between gap-2 lg:gap-4">
+                <div className="flex min-w-0 items-center gap-2 lg:gap-4">
                   {mobileChatMode && (
                     <button
                       type="button"
@@ -1915,11 +2115,14 @@ export default function OmniChatChatPage() {
                       type="button"
                       onClick={() => setMobilePane('profile')}
                       className="flex-shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)] focus-visible:outline-offset-2"
-                      aria-label="Open profile pane"
+                      // The header now has an explicit "Open profile pane"
+                      // control, so the avatar describes what it actually is
+                      // rather than duplicating that label.
+                      aria-label={`View ${activePersona.name}'s profile`}
                     >
                       <PersonaAvatar
                         persona={activePersona}
-                        className={`h-14 w-14 rounded-full ${arrivedFromQuickChat ? 'omnichat-chat-avatar-arrival' : ''}`}
+                        className={`h-11 w-11 rounded-full ${arrivedFromQuickChat ? 'omnichat-chat-avatar-arrival' : ''}`}
                         style={
                           arrivedFromQuickChat
                             ? { viewTransitionName: OMNICHAT_PERSONA_TRANSITION_NAME }
@@ -1958,22 +2161,25 @@ export default function OmniChatChatPage() {
                 </div>
 
                 {mobileChatMode && isAuthenticated && activePersona && selectedConversationId && (
-                  <div className="flex items-center gap-1">
+                  // flex-shrink-0 keeps the action row from being squeezed into
+                  // the persona block; without it the extra controls overlap the
+                  // avatar and push the name out of the header entirely.
+                  <div className="flex flex-shrink-0 items-center gap-0">
                     <button
                       type="button"
                       onClick={() => requestCall('voice')}
                       aria-label={`Voice call ${activePersona.name}`}
-                      className="rounded-full p-2 text-white/70"
+                      className="rounded-full p-1.5 text-white/70"
                     >
-                      <Phone size={18} />
+                      <Phone size={17} />
                     </button>
                     <button
                       type="button"
                       onClick={() => requestCall('video')}
                       aria-label={`Video call ${activePersona.name}`}
-                      className="rounded-full p-2 text-white/70"
+                      className="rounded-full p-1.5 text-white/70"
                     >
-                      <VideoIcon size={19} />
+                      <VideoIcon size={17} />
                     </button>
                     {(conversationQuery.data?.messages.length ?? 0) > 0 && (
                       <button
@@ -1981,11 +2187,30 @@ export default function OmniChatChatPage() {
                         onClick={handleShareChat}
                         disabled={shareChatMutation.isPending}
                         aria-label="Publish this chat to Explore"
-                        className="rounded-full p-2 text-white/70 disabled:opacity-40"
+                        className="rounded-full p-1.5 text-white/70 disabled:opacity-40"
                       >
-                        <Share2 size={18} />
+                        <Share2 size={17} />
                       </button>
                     )}
+                    {/* Settings and the profile pane were desktop-only. On mobile
+                        the pane could only be reached by tapping the avatar, and
+                        chat settings were unreachable entirely. */}
+                    <button
+                      type="button"
+                      onClick={() => setShowSettings(true)}
+                      aria-label={t('omnichat.chat.settings')}
+                      className="rounded-full p-1.5 text-white/70"
+                    >
+                      <Settings size={17} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMobilePane('profile')}
+                      aria-label="Open profile pane"
+                      className="rounded-full p-1.5 text-white/70"
+                    >
+                      <ChevronRight size={17} />
+                    </button>
                   </div>
                 )}
 
@@ -2067,6 +2292,7 @@ export default function OmniChatChatPage() {
 
               <div className="space-y-4">
                 {activeMessages.map((message) => {
+                  const hasMessageText = message.content.trim().length > 0;
                   const canRegenerate = message.id === regeneratableMessageId;
                   const isRegenerating = message.id === regeneratingMessageId;
                   const isEditingMessage = message.id === editingMessageId;
@@ -2148,15 +2374,17 @@ export default function OmniChatChatPage() {
                             )
                           ) : (
                             <>
-                              <OmniChatMessageContent
-                                content={message.content}
-                                isAssistant={message.role === 'assistant'}
-                              />
+                              {hasMessageText && (
+                                <OmniChatMessageContent
+                                  content={message.content}
+                                  isAssistant={message.role === 'assistant'}
+                                />
+                              )}
                               {message.attachments?.map((asset) => (
                                 <OmniChatMediaAssetView
                                   key={asset.id}
                                   asset={asset}
-                                  className="mt-3 max-h-[32rem] min-h-52 w-full min-w-[min(70vw,18rem)] sm:min-w-80"
+                                  className="mt-3 min-h-52 w-full min-w-[min(70vw,18rem)] sm:min-w-80"
                                 />
                               ))}
                             </>
@@ -2198,7 +2426,8 @@ export default function OmniChatChatPage() {
                                 selectedConversationId &&
                                 message.role === 'assistant' &&
                                 !message.failed &&
-                                message.id > 0 && (
+                                message.id > 0 &&
+                                hasMessageText && (
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -2216,6 +2445,7 @@ export default function OmniChatChatPage() {
                               {message.role === 'assistant' &&
                                 !message.failed &&
                                 message.id > 0 &&
+                                hasMessageText &&
                                 activePersona &&
                                 selectedConversationId && (
                                   <OmniChatSpeakButton
@@ -2267,6 +2497,7 @@ export default function OmniChatChatPage() {
                     onClick={() => generateCurrentScene('image')}
                     disabled={
                       mediaGenerationMutation.isPending ||
+                      mediaCommandMutation.isPending ||
                       Boolean(
                         activeMediaJob &&
                         !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status)
@@ -2281,6 +2512,7 @@ export default function OmniChatChatPage() {
                     onClick={() => generateCurrentScene('video')}
                     disabled={
                       mediaGenerationMutation.isPending ||
+                      mediaCommandMutation.isPending ||
                       Boolean(
                         activeMediaJob &&
                         !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status)
@@ -2305,11 +2537,13 @@ export default function OmniChatChatPage() {
                   {mediaGenerationError && (
                     <div className="flex items-center gap-2 text-xs text-rose-300">
                       <span>{mediaGenerationError}</span>
-                      {pendingMediaGenerationRef.current && (
+                      {(pendingMediaGenerationRef.current || pendingMediaCommandRef.current) && (
                         <button
                           type="button"
                           onClick={retryMediaGeneration}
-                          disabled={mediaGenerationMutation.isPending}
+                          disabled={
+                            mediaGenerationMutation.isPending || mediaCommandMutation.isPending
+                          }
                           className="rounded-full border border-rose-300/30 px-2 py-1 font-semibold text-rose-100 transition hover:bg-rose-300/10 disabled:opacity-50"
                         >
                           Retry
@@ -2317,6 +2551,11 @@ export default function OmniChatChatPage() {
                       )}
                     </div>
                   )}
+                  <span className="basis-full px-1 text-[11px] text-white/35">
+                    Use <code className="rounded bg-white/10 px-1">/photo</code> or{' '}
+                    <code className="rounded bg-white/10 px-1">/video</code> followed by a
+                    description of the character or scene to generate photos or videos.
+                  </span>
                 </div>
               )}
               {allowance && !allowance.unlimited && (
@@ -2396,6 +2635,12 @@ export default function OmniChatChatPage() {
                           pendingSendIntentRef.current = null;
                           pendingMediaIntentRef.current = null;
                         }
+                        if (
+                          pendingMediaCommandRef.current &&
+                          pendingMediaCommandRef.current.content !== nextDraft.trim()
+                        ) {
+                          pendingMediaCommandRef.current = null;
+                        }
                         if (rateLimitError) setRateLimitError(null);
                         if (regenerationError) setRegenerationError(false);
                       }}
@@ -2407,7 +2652,7 @@ export default function OmniChatChatPage() {
                         }
                       }}
                       placeholder={t('omnichat.chat.inputPlaceholder')}
-                      disabled={isGenerating || !activePersona || allowanceExhausted}
+                      disabled={isGenerating || !activePersona}
                       rows={1}
                       enterKeyHint="send"
                       style={{ minHeight: '36px', maxHeight: '160px' }}
@@ -2416,7 +2661,10 @@ export default function OmniChatChatPage() {
                     <button
                       type="submit"
                       disabled={
-                        isGenerating || !draft.trim() || !activePersona || allowanceExhausted
+                        isGenerating ||
+                        !draft.trim() ||
+                        !activePersona ||
+                        (allowanceExhausted && !draftMediaCommand)
                       }
                       className="omnichat-touch-target flex flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--color-primary-dark)] disabled:opacity-50 sm:px-5"
                     >

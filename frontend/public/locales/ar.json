@@ -3638,9 +3638,43 @@
       }
     },
     "responseFeedback": {
-      "title": "ملاحظات ردود OmniChat", "subtitle": "راجع الردود المُبلّغ عنها وروّج لإشارات الجودة المفيدة.", "loading": "جارٍ تحميل ملاحظات الردود...", "loadError": "تعذر تحميل ملاحظات الردود.", "updateError": "تعذر تحديث حالة الملاحظة.", "filters": "فلاتر ملاحظات الردود", "status": "الحالة", "reason": "السبب", "allStatuses": "كل الحالات", "allReasons": "كل الأسباب", "count": "{{count}} بلاغ", "empty": "لم يتم العثور على ملاحظات للردود.", "submitted": "وقت الإرسال", "detail": "تفاصيل البلاغ", "note": "ملاحظة المُبلّغ", "noNote": "لم تُقدَّم ملاحظة.", "responseSnapshot": "لقطة الرد", "priorUserSnapshot": "لقطة المستخدم السابقة", "sceneFacts": "حقائق المشهد", "unavailable": "غير متاح", "actions": "إجراءات المراجعة", "page": "الصفحة {{page}}",
-      "statuses": { "new": "جديد", "reviewed": "تمت المراجعة", "promoted": "تمت الترقية", "dismissed": "مرفوض" },
-      "reasons": { "role_ownership": "الدور أو الملكية", "user_agency": "حرية المستخدم", "narration_format": "السرد أو التنسيق", "repetition_length": "التكرار أو الطول", "grammar_artifact": "قواعد أو أثر", "character_mismatch": "لا يطابق الشخصية", "other": "أخرى" }
+      "title": "ملاحظات ردود OmniChat",
+      "subtitle": "راجع الردود المُبلّغ عنها وروّج لإشارات الجودة المفيدة.",
+      "loading": "جارٍ تحميل ملاحظات الردود...",
+      "loadError": "تعذر تحميل ملاحظات الردود.",
+      "updateError": "تعذر تحديث حالة الملاحظة.",
+      "filters": "فلاتر ملاحظات الردود",
+      "status": "الحالة",
+      "reason": "السبب",
+      "allStatuses": "كل الحالات",
+      "allReasons": "كل الأسباب",
+      "count": "{{count}} بلاغ",
+      "empty": "لم يتم العثور على ملاحظات للردود.",
+      "submitted": "وقت الإرسال",
+      "detail": "تفاصيل البلاغ",
+      "note": "ملاحظة المُبلّغ",
+      "noNote": "لم تُقدَّم ملاحظة.",
+      "responseSnapshot": "لقطة الرد",
+      "priorUserSnapshot": "لقطة المستخدم السابقة",
+      "sceneFacts": "حقائق المشهد",
+      "unavailable": "غير متاح",
+      "actions": "إجراءات المراجعة",
+      "page": "الصفحة {{page}}",
+      "statuses": {
+        "new": "جديد",
+        "reviewed": "تمت المراجعة",
+        "promoted": "تمت الترقية",
+        "dismissed": "مرفوض"
+      },
+      "reasons": {
+        "role_ownership": "الدور أو الملكية",
+        "user_agency": "حرية المستخدم",
+        "narration_format": "السرد أو التنسيق",
+        "repetition_length": "التكرار أو الطول",
+        "grammar_artifact": "قواعد أو أثر",
+        "character_mismatch": "لا يطابق الشخصية",
+        "other": "أخرى"
+      }
     },
     "moderators": {
       "selectHub": "اختر محورا",
@@ -3932,10 +3966,68 @@
     }
   },
   "omnichat": {
-    "galleryDelete": { "action": "حذف الإنشاء", "title": "حذف هذا الإنشاء؟", "description": "سيؤدي هذا إلى حذف الملف نهائيًا من معرضك ومن مرفقات المحادثة. لا يمكن التراجع عن ذلك.", "confirm": "حذف نهائي", "deleting": "جارٍ الحذف...", "sharedError": "ألغِ نشر هذا الإنشاء من الاستكشاف قبل حذفه.", "genericError": "تعذر حذف هذا الإنشاء.", "unpublishFirst": "ألغِ النشر من الاستكشاف قبل الحذف" },
-    "groupManagement": { "confirmDelete": "هل تريد حذف هذه المجموعة وسجل محادثتها بالكامل نهائيًا؟" },
-    "commerce": { "title": "الخطط وOmniCredits", "subtitle": "يأتي رصيدك وكل عرض معروض من الخادم.", "wallet": "المحفظة", "balanceBreakdown": "{{purchased}} مشتراة · {{subscription}} من الاشتراك", "plans": "الخطط", "choosePlan": "اختر {{plan}}", "creditPacks": "حزم الرصيد", "creditName": "{{count}} OmniCredits", "buyPack": "شراء {{pack}}", "recentUsage": "الاستخدام الأخير", "noUsage": "لا يوجد استخدام للرصيد بعد.", "loading": "جارٍ تحميل خيارات الشراء…", "redirecting": "جارٍ فتح الدفع الآمن…", "notConfigured": "خيارات الشراء غير مهيأة بعد.", "offerNames": { "plus": "بلس", "premium": "بريميوم", "unknown": "اشتراك" }, "period": { "month": "شهر", "days": "{{count}} يومًا" }, "features": { "profiles": "ملفات شخصيات أكثر", "media": "رصيد وسائط مضمن", "priority": "إنشاء بأولوية" }, "usage": { "voice": "مكالمة صوتية", "image": "إنشاء صورة", "video": "إنشاء فيديو", "other": "تعديل الرصيد" }, "errors": { "load": "تعذر تحميل تفاصيل الفوترة.", "secureCheckout": "تعذر فتح دفع آمن. حاول مرة أخرى." } },
-    "videoPaywall": { "title": "فتح {{feature}}", "description": "يتطلب الفيديو OmniCredits. قد تتضمن الخطة المؤهلة رصيدًا؛ ويتم تأكيد التوفر والتكلفة بأمان قبل الاستخدام.", "viewOptions": "عرض الخطط والرصيد", "features": { "scene_video": "فيديو المشهد", "video_call": "مكالمات الفيديو" } },
+    "galleryDelete": {
+      "action": "حذف الإنشاء",
+      "title": "حذف هذا الإنشاء؟",
+      "description": "سيؤدي هذا إلى حذف الملف نهائيًا من معرضك ومن مرفقات المحادثة. لا يمكن التراجع عن ذلك.",
+      "confirm": "حذف نهائي",
+      "deleting": "جارٍ الحذف...",
+      "sharedError": "ألغِ نشر هذا الإنشاء من الاستكشاف قبل حذفه.",
+      "genericError": "تعذر حذف هذا الإنشاء.",
+      "unpublishFirst": "ألغِ النشر من الاستكشاف قبل الحذف"
+    },
+    "groupManagement": {
+      "confirmDelete": "هل تريد حذف هذه المجموعة وسجل محادثتها بالكامل نهائيًا؟"
+    },
+    "commerce": {
+      "title": "الخطط وOmniCredits",
+      "subtitle": "يأتي رصيدك وكل عرض معروض من الخادم.",
+      "wallet": "المحفظة",
+      "balanceBreakdown": "{{purchased}} مشتراة · {{subscription}} من الاشتراك",
+      "plans": "الخطط",
+      "choosePlan": "اختر {{plan}}",
+      "creditPacks": "حزم الرصيد",
+      "creditName": "{{count}} OmniCredits",
+      "buyPack": "شراء {{pack}}",
+      "recentUsage": "الاستخدام الأخير",
+      "noUsage": "لا يوجد استخدام للرصيد بعد.",
+      "loading": "جارٍ تحميل خيارات الشراء…",
+      "redirecting": "جارٍ فتح الدفع الآمن…",
+      "notConfigured": "خيارات الشراء غير مهيأة بعد.",
+      "offerNames": {
+        "plus": "بلس",
+        "premium": "بريميوم",
+        "unknown": "اشتراك"
+      },
+      "period": {
+        "month": "شهر",
+        "days": "{{count}} يومًا"
+      },
+      "features": {
+        "profiles": "ملفات شخصيات أكثر",
+        "media": "رصيد وسائط مضمن",
+        "priority": "إنشاء بأولوية"
+      },
+      "usage": {
+        "voice": "مكالمة صوتية",
+        "image": "إنشاء صورة",
+        "video": "إنشاء فيديو",
+        "other": "تعديل الرصيد"
+      },
+      "errors": {
+        "load": "تعذر تحميل تفاصيل الفوترة.",
+        "secureCheckout": "تعذر فتح دفع آمن. حاول مرة أخرى."
+      }
+    },
+    "videoPaywall": {
+      "title": "فتح {{feature}}",
+      "description": "يتطلب الفيديو OmniCredits. قد تتضمن الخطة المؤهلة رصيدًا؛ ويتم تأكيد التوفر والتكلفة بأمان قبل الاستخدام.",
+      "viewOptions": "عرض الخطط والرصيد",
+      "features": {
+        "scene_video": "فيديو المشهد",
+        "video_call": "مكالمات الفيديو"
+      }
+    },
     "categories": {
       "all": "الكل",
       "roleplay": "تقمص أدوار",
@@ -4068,7 +4160,8 @@
       "profile": "الملف الشخصي",
       "gallery": "المعرض",
       "showProfileImage": "عرض صورة الملف الشخصي",
-      "showProfileVideo": "عرض فيديو الملف الشخصي"
+      "showProfileVideo": "عرض فيديو الملف الشخصي",
+      "mediaOnlyPreview": "أرسل صورة"
     },
     "exitToSite": "الخروج إلى OmniNudge",
     "header": {
@@ -4182,7 +4275,8 @@
         "galleryUrls": "صور المعرض",
         "galleryUrlsPlaceholder": "صورة مرفوعة واحدة في كل سطر",
         "characterBookJson": "JSON كتاب الشخصية",
-        "extensionsJson": "JSON الإضافات"
+        "extensionsJson": "JSON الإضافات",
+        "galleryUrlsHelp": "أضف ما يصل إلى 4 صور. استخدم الوجه نفسه في كل صورة — فهي تُعلّم مولّد الصور كيف يبدو شخصيتك، والوجوه غير المتطابقة تنتج نتائج غير متسقة. نوّع التعبير والإضاءة والزاوية، وأضف صورة واحدة على الأقل بتعبير محايد وفم مغلق. يُستخدم الوجه فقط، لذا لا تضيف صور الجسم الكامل أكثر من الوجه الذي تحتويه."
       },
       "responseStyles": {
         "inherit": {

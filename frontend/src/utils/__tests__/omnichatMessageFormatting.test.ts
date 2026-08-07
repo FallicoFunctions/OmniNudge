@@ -63,6 +63,48 @@ describe('parseOmniChatMessage', () => {
     ]);
   });
 
+  it('repairs straight single-quoted dialogue without stripping contractions', () => {
+    expect(
+      parseOmniChatMessage(
+        "*I pause.*\n\n'Feels solid,' *I say quietly.* I’m still here.",
+        { repairAssistantFormatting: true }
+      )
+    ).toEqual([
+      { text: 'I pause.', bold: false, italic: true },
+      { text: '\n\n', bold: false, italic: true },
+      { text: 'Feels solid,', bold: false, italic: false },
+      { text: ' ', bold: false, italic: true },
+      { text: 'I say quietly.', bold: false, italic: true },
+      { text: ' I’m still here.', bold: false, italic: false },
+    ]);
+
+    expect(parseOmniChatMessage("'I'm still here.'", { repairAssistantFormatting: true })).toEqual([
+      { text: "I'm still here.", bold: false, italic: false },
+    ]);
+  });
+
+  it('removes dialogue quotes after sentence punctuation while preserving the preceding sentence', () => {
+    expect(
+      parseOmniChatMessage("I pause. 'We can slow down and talk honestly.'", {
+        repairAssistantFormatting: true,
+      })
+    ).toEqual([
+      { text: 'I pause. ', bold: false, italic: true },
+      { text: 'We can slow down and talk honestly.', bold: false, italic: false },
+    ]);
+  });
+
+  it('does not italicize ordinary speech that introduces a quoted legacy phrase', () => {
+    expect(
+      parseOmniChatMessage('Well, "we can slow down and talk honestly."', {
+        repairAssistantFormatting: true,
+      })
+    ).toEqual([
+      { text: 'Well, ', bold: false, italic: false },
+      { text: 'we can slow down and talk honestly.', bold: false, italic: false },
+    ]);
+  });
+
   it('does not alter quotation marks in user-authored text', () => {
     expect(parseOmniChatMessage('I said "leave it alone."')).toEqual([
       { text: 'I said "leave it alone."', bold: false, italic: false },

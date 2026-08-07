@@ -5,11 +5,35 @@ import { omnichatService } from '../../../services/omnichatService';
 import { speakOmniChatMessage } from '../OmniChatSpeakButton';
 import type { BotPersona, OmniChatCallSession } from '../../../types/omnichat';
 
+const roomMock = vi.hoisted(() => ({
+  localParticipant: {
+    setMicrophoneEnabled: vi.fn().mockResolvedValue(undefined),
+    setCameraEnabled: vi.fn().mockResolvedValue(undefined),
+    publishData: vi.fn().mockResolvedValue(undefined),
+  },
+  state: 'connected',
+  on: vi.fn(),
+  removeAllListeners: vi.fn(),
+  connect: vi.fn().mockResolvedValue(undefined),
+  disconnect: vi.fn(),
+}));
+
+vi.mock('livekit-client', () => ({
+  Room: class MockRoom {
+    constructor() {
+      return roomMock;
+    }
+  },
+  RoomEvent: { TrackSubscribed: 'trackSubscribed', TrackUnsubscribed: 'trackUnsubscribed', Disconnected: 'disconnected' },
+  Track: { Kind: { Video: 'video', Audio: 'audio' } },
+}));
+
 vi.mock('../../../services/omnichatService', () => ({
   createOmniChatRequestId: () => '123e4567-e89b-42d3-a456-426614174000',
   omnichatService: {
     startCall: vi.fn(),
     endCall: vi.fn(),
+    refreshCallToken: vi.fn(),
     sendMessage: vi.fn(),
     recordCallTurn: vi.fn(),
   },
@@ -45,7 +69,10 @@ const call: OmniChatCallSession = {
 };
 
 describe('OmniChatCallModal', () => {
-  afterEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
 
   it('renders above the OmniChat shell and keeps call status away from the top edge', () => {
     vi.mocked(omnichatService.startCall).mockReturnValue(new Promise(() => undefined));
@@ -132,11 +159,12 @@ describe('OmniChatCallModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('embeds a private realtime avatar room for provider-backed video calls', async () => {
+  it('connects to a private LiveKit room for provider-backed video calls', async () => {
     vi.mocked(omnichatService.startCall).mockResolvedValue({
       ...call,
       mode: 'video',
-      live_video_url: 'https://room.daily.co/call-1?t=short-lived-token',
+      live_video_url: 'wss://livekit.omninudge.com',
+      live_video_token: 'short-lived-token',
     });
     render(
       <OmniChatCallModal
@@ -148,17 +176,53 @@ describe('OmniChatCallModal', () => {
       />
     );
 
-    const frame = await screen.findByTitle('Live avatar video call with Sadie');
-    expect(frame).toHaveAttribute('src', 'https://room.daily.co/call-1?t=short-lived-token');
-    expect(frame).toHaveAttribute('allow', expect.stringContaining('camera'));
-    expect(screen.queryByLabelText('Type during call')).not.toBeInTheDocument();
+    const video = await screen.findByTitle('Live avatar video call with Sadie');
+    expect(video).toHaveAttribute('autoplay');
+    await waitFor(() => expect(roomMock.connect).toHaveBeenCalledWith('wss://livekit.omninudge.com', 'short-lived-token'));
+    expect(screen.getByLabelText('Type during call')).toBeInTheDocument();
   });
 
-  it('rejects a non-Daily call URL before it can receive camera or microphone permission', async () => {
+  it('refreshes the LiveKit participant token by reconnecting the same room', async () => {
+    vi.useFakeTimers();
     vi.mocked(omnichatService.startCall).mockResolvedValue({
       ...call,
       mode: 'video',
-      live_video_url: 'https://attacker.example/call',
+      live_video_url: 'wss://livekit.omninudge.com',
+      live_video_token: 'short-lived-token',
+      live_video_token_ttl_seconds: 30,
+    });
+    vi.mocked(omnichatService.refreshCallToken).mockResolvedValue('refreshed-token');
+    render(
+      <OmniChatCallModal
+        persona={persona}
+        conversationId={12}
+        mode="video"
+        onClose={vi.fn()}
+        onAssistant={vi.fn()}
+      />
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(roomMock.connect).toHaveBeenCalledWith('wss://livekit.omninudge.com', 'short-lived-token');
+    await act(async () => {
+      vi.advanceTimersByTime(15_000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(omnichatService.refreshCallToken).toHaveBeenCalledWith('call-1');
+    expect(roomMock.disconnect).toHaveBeenCalledWith(false);
+    expect(roomMock.connect).toHaveBeenCalledWith('wss://livekit.omninudge.com', 'refreshed-token');
+    expect(roomMock.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects an untrusted call URL before it can receive camera or microphone permission', async () => {
+    vi.mocked(omnichatService.startCall).mockResolvedValue({
+      ...call,
+      mode: 'video',
+      live_video_url: 'wss://attacker.example/call',
+      live_video_token: 'short-lived-token',
     });
     vi.mocked(omnichatService.endCall).mockResolvedValue(undefined);
     render(
@@ -176,11 +240,43 @@ describe('OmniChatCallModal', () => {
     expect(omnichatService.endCall).toHaveBeenCalledWith('call-1');
   });
 
-  it('accepts only HTTPS Daily room origins', () => {
-    expect(isTrustedOmniChatCallUrl('https://room.daily.co/call-1')).toBe(true);
-    expect(isTrustedOmniChatCallUrl('https://daily.co.evil.example/call-1')).toBe(false);
-    expect(isTrustedOmniChatCallUrl('http://room.daily.co/call-1')).toBe(false);
+  it('accepts only configured secure LiveKit room origins', () => {
+    expect(isTrustedOmniChatCallUrl('wss://livekit.omninudge.com/call-1')).toBe(true);
+    expect(isTrustedOmniChatCallUrl('wss://attacker.example/call-1')).toBe(false);
+    expect(isTrustedOmniChatCallUrl('https://livekit.omninudge.com/call-1')).toBe(false);
+    expect(isTrustedOmniChatCallUrl('http://livekit.omninudge.com/call-1')).toBe(false);
     expect(isTrustedOmniChatCallUrl('javascript:alert(1)')).toBe(false);
+  });
+
+  it('uses the avatar worker for video speech without duplicating it in the browser', async () => {
+    vi.mocked(omnichatService.startCall).mockResolvedValue({
+      ...call,
+      mode: 'video',
+      live_video_url: 'wss://livekit.omninudge.com',
+      live_video_token: 'short-lived-token',
+    });
+    vi.mocked(omnichatService.sendMessage).mockResolvedValue({
+      id: 99,
+      conversation_id: 12,
+      role: 'assistant',
+      content: 'Hello from the avatar.',
+      failed: false,
+      created_at: '',
+    });
+    render(
+      <OmniChatCallModal
+        persona={persona}
+        conversationId={12}
+        mode="video"
+        onClose={vi.fn()}
+        onAssistant={vi.fn()}
+      />
+    );
+    await waitFor(() => expect(roomMock.connect).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText('Type during call'), { target: { value: 'Hi' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send during call' }));
+    await waitFor(() => expect(roomMock.localParticipant.publishData).toHaveBeenCalled());
+    expect(speakOmniChatMessage).not.toHaveBeenCalled();
   });
 
   it('does not start late speech after the user ends a thinking call', async () => {

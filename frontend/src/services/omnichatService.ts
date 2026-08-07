@@ -336,6 +336,16 @@ export const omnichatService = {
     return response.job;
   },
 
+  async createMediaCommand(
+    conversationId: number,
+    request: Pick<OmniChatGenerationRequest, 'request_id' | 'kind' | 'prompt' | 'aspect_ratio' | 'duration_seconds'>
+  ): Promise<{ job: OmniChatGenerationJob; message: BotMessage }> {
+    return api.post<{ job: OmniChatGenerationJob; message: BotMessage }>(
+      `/omnichat/conversations/${encodeURIComponent(conversationId)}/media-command`,
+      request
+    );
+  },
+
   async getGeneration(jobId: string): Promise<OmniChatGenerationJob> {
     const response = await api.get<{ job: OmniChatGenerationJob }>(
       `/omnichat/generations/${encodeURIComponent(jobId)}`
@@ -756,6 +766,14 @@ export const omnichatService = {
 
   async endCall(callId: string): Promise<void> {
     await api.delete(`/omnichat/calls/${encodeURIComponent(callId)}`);
+  },
+
+  async refreshCallToken(callId: string): Promise<string> {
+    const response = await api.post<{ live_video_token: string }>(
+      `/omnichat/calls/${encodeURIComponent(callId)}/token`
+    );
+    if (!response.live_video_token) throw new Error('Live video token is unavailable');
+    return response.live_video_token;
   },
 
   async recordCallTurn(callId: string): Promise<void> {
