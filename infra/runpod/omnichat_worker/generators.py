@@ -1185,9 +1185,12 @@ def video_cpu_offload(total_vram_bytes: int) -> bool:
     step. On a card that cannot hold the pipeline it is the only way to run at
     all; on one that can, it is roughly a 2-3x tax for nothing.
 
-    TI2V-5B in bfloat16 is about 10 GB, the UMT5 encoder another 11, and the
-    VAE stays in float32 on top -- call it 25 GB resident. A 48 GB A40 or A6000
-    holds all of it, so the default only offloads below that.
+    Measured on an A40, which reports 44.43 GiB usable rather than the nominal
+    48: a resident pipeline sat at 42 GiB through sampling. That is far above
+    the ~25 GiB the weights alone account for, because activations dominate,
+    and it left too little headroom for the VAE -- hence the tiling enabled at
+    load. The threshold is therefore about what a card can carry in practice,
+    not what the checkpoint weighs.
     """
     setting = os.getenv("OMNICHAT_VIDEO_CPU_OFFLOAD", "auto").strip().lower()
     if setting in {"1", "true", "yes", "on"}:
@@ -1314,6 +1317,16 @@ class VideoGenerator:
                 )
                 if hasattr(pipeline, "set_adapters"):
                     pipeline.set_adapters(["omnichat_motion"], adapter_weights=[scale])
+            # Wan decodes the whole clip in a single pass, so the VAE -- not
+            # sampling -- is the memory peak: 121 frames at 720p asked for
+            # 2.5 GiB on top of 42 GiB already resident and died there, after
+            # all fifty steps had completed. Tiling decodes in blocks and is
+            # what CPU offload was previously masking. Cheap, and it applies
+            # whether or not the pipeline is resident.
+            if hasattr(pipeline, "enable_vae_tiling"):
+                pipeline.enable_vae_tiling()
+            elif hasattr(pipeline.vae, "enable_tiling"):
+                pipeline.vae.enable_tiling()
             total_vram = torch.cuda.get_device_properties(0).total_memory
             if video_cpu_offload(total_vram):
                 pipeline.enable_model_cpu_offload()
