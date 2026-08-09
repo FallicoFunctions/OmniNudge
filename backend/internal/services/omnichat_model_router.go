@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services/openrouter"
 	zlog "github.com/rs/zerolog/log"
 )
@@ -500,9 +501,9 @@ func (r *TieredOmniChatModelRouter) clientForProfile(key OmniChatModelProfileKey
 
 func modelTierForStoredPlan(plan string) OmniChatModelTier {
 	switch strings.ToLower(strings.TrimSpace(plan)) {
-	case "plus":
+	case models.PlanPlus:
 		return OmniChatModelTierPlus
-	case "premium":
+	case models.PlanPremium:
 		return OmniChatModelTierPremium
 	default:
 		return OmniChatModelTierFree

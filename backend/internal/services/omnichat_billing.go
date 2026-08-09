@@ -275,7 +275,7 @@ func (s *OmniChatSubscriptionActivationService) Activate(ctx context.Context, ev
 	if s == nil || s.store == nil {
 		return errors.New("omnichat billing: subscription activation adapter unavailable")
 	}
-	if event.ProviderEventID == uuid.Nil || event.UserID <= 0 || (event.Plan != models.PlanPlus && event.Plan != "premium") || event.Months < 1 || event.Months > 24 || event.Credits <= 0 {
+	if event.ProviderEventID == uuid.Nil || event.UserID <= 0 || (event.Plan != models.PlanPlus && event.Plan != models.PlanPremium) || event.Months < 1 || event.Months > 24 || event.Credits <= 0 {
 		return errors.New("omnichat billing: invalid confirmed subscription")
 	}
 	return s.store.ActivateConfirmedSubscription(ctx, event)
@@ -311,7 +311,7 @@ func (s *OmniChatBillingService) ConfigureOffers(offers []OmniChatBillingOffer) 
 		case "credits":
 			valid = valid && offer.Credits > 0 && offer.Plan == "" && offer.PeriodDays == 0
 		case "subscription":
-			valid = valid && (offer.Plan == models.PlanPlus || offer.Plan == "premium") && offer.Credits > 0 && offer.PeriodDays > 0
+			valid = valid && (offer.Plan == models.PlanPlus || offer.Plan == models.PlanPremium) && offer.Credits > 0 && offer.PeriodDays > 0
 		default:
 			valid = false
 		}
@@ -355,7 +355,7 @@ func (s *OmniChatBillingService) Included(ctx context.Context, userID *int, usag
 	if err != nil {
 		return false, err
 	}
-	active := (plan == models.PlanPlus || plan == "premium") && (expiresAt == nil || expiresAt.After(time.Now()))
+	active := (plan == models.PlanPlus || plan == models.PlanPremium) && (expiresAt == nil || expiresAt.After(time.Now()))
 	return usageKind == models.OmniCreditsUsageChat || (usageKind == models.OmniCreditsUsageVoice && active), nil
 }
 

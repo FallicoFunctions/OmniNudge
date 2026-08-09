@@ -59,7 +59,7 @@ func (s *PlanService) Upgrade(ctx context.Context, userID, months int) error {
 }
 
 func (s *PlanService) UpgradeToPlan(ctx context.Context, userID int, plan string, months int) error {
-	if plan != models.PlanPlus && plan != "premium" {
+	if plan != models.PlanPlus && plan != models.PlanPremium {
 		return fmt.Errorf("unsupported paid plan %q", plan)
 	}
 	if userID <= 0 || months < 1 || months > 24 {
@@ -88,7 +88,7 @@ func (s *PlanService) IsPaid(ctx context.Context, userID int) bool {
 		log.Printf("[plan] IsPaid check failed for user %d: %v", userID, err)
 		return false
 	}
-	if plan != "plus" && plan != "premium" {
+	if plan != models.PlanPlus && plan != models.PlanPremium {
 		return false
 	}
 	// Nil expiry on a subscribed plan represents a lifetime entitlement.
