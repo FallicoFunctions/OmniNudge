@@ -210,22 +210,41 @@ def post_profile(width, z_floor, z_peak):
     ]
 
 
+def _smooth_hill01(t):
+    # Symmetric smoothstep hill: 0 at t=0/1, 1 at t=0.5, C1-continuous
+    # (zero slope at the base AND at the peak) - unlike a triangle wave,
+    # there is no straight-line segment anywhere and no hard corner at the
+    # top, so it reads as a real curve rather than a sawtooth spike.
+    u = t * 2 if t <= 0.5 else (1 - t) * 2
+    return u * u * (3 - 2 * u)
+
+
+# Player-flagged (2026-08-03, in-engine): each bay used to rise to its post
+# in exactly 2 straight segments (a sharp "witch hat" triangle), which reads
+# as jagged sawtooth aliasing at any distance or grazing angle - especially
+# along a long rail viewed nearly edge-on, where several of these hard peaks
+# compress into very few pixels. RAIL_BAY_SAMPLES points per bay (sampled
+# through _smooth_hill01, same base/peak heights and the same +/-0.90 span as
+# before) turn each spike into an actual curve, preserving the "rail rises to
+# meet each post" motif without the hard edges that caused the artifact.
+RAIL_BAY_HALF_SPAN = 0.90
+RAIL_BAY_SAMPLES = 10
+
+
 def rail_profile(x_start, x_end, bay_centers, z_floor, z_peak):
     rise = z_peak - z_floor
+    base_h = z_floor + rise * 0.18
+    peak_h = z_peak + 0.04
     points = [
         (x_start, z_floor + rise * 0.20),
         (x_start + 0.50, z_floor),
     ]
     for center in bay_centers:
-        points.extend(
-            [
-                (center - 0.90, z_floor + rise * 0.18),
-                (center - 0.46, z_floor + rise * 0.56),
-                (center, z_peak + 0.04),
-                (center + 0.46, z_floor + rise * 0.56),
-                (center + 0.90, z_floor + rise * 0.18),
-            ]
-        )
+        for sample in range(RAIL_BAY_SAMPLES + 1):
+            t = sample / RAIL_BAY_SAMPLES
+            x = center - RAIL_BAY_HALF_SPAN + (2 * RAIL_BAY_HALF_SPAN) * t
+            height = base_h + (peak_h - base_h) * _smooth_hill01(t)
+            points.append((x, height))
     points.extend(
         [
             (x_end - 0.50, z_floor),
