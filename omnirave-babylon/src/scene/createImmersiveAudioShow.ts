@@ -534,6 +534,24 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
   let currentColorR = 0;
   let currentColorG = 0;
   let currentColorB = 0;
+  let layersEnabled = true;
+
+  function setLayersEnabled(enabled: boolean): void {
+    if (layersEnabled === enabled) {
+      return;
+    }
+    layersEnabled = enabled;
+    for (const cone of coneMeshes) {
+      cone.setEnabled(enabled);
+    }
+    beamMesh.setEnabled(enabled);
+    floorPulse.setEnabled(enabled);
+    if (enabled) {
+      airParticles.start();
+    } else {
+      airParticles.stop();
+    }
+  }
 
   function update(dtSeconds: number): void {
     const dt = dtSeconds > 0 ? dtSeconds : 0;
@@ -597,6 +615,20 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     const active = mode === 'active';
     const energyOverall = (bass + mids + highs) / 3;
     const flashMul = 1 + beatFlash * BEAT_FLASH_BOOST;
+
+    // No track and no scheduled event means this rig has no visual ownership.
+    // The old idle path still rendered 560 long lasers, 18 cones, a particle
+    // field and a floor sheet across the approval view, masking the authored
+    // venue even though there was no show to present.
+    if (idle) {
+      setLayersEnabled(false);
+      coneMaterialA.emissiveIntensity = 0;
+      coneMaterialB.emissiveIntensity = 0;
+      laserIntensityValue = 0;
+      floorMaterial.emissiveIntensity = 0;
+      return;
+    }
+    setLayersEnabled(true);
 
     // --- palette timeline ---
     if ((strongBurst && paletteJumpCooldown <= 0) || (active && paletteJumpCooldown <= 0 && bassEventAccum === 0)) {
