@@ -8,6 +8,7 @@ import math
 import os
 import socket
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -1176,6 +1177,29 @@ def video_pipeline_settings() -> tuple[int, float]:
     return steps, guidance
 
 
+def video_cpu_offload(total_vram_bytes: int) -> bool:
+    """Whether the pipeline is streamed from host RAM instead of held on the GPU.
+
+    enable_model_cpu_offload parks the transformer, the UMT5 text encoder and
+    the VAE in system memory and moves each one across PCIe on every denoising
+    step. On a card that cannot hold the pipeline it is the only way to run at
+    all; on one that can, it is roughly a 2-3x tax for nothing.
+
+    TI2V-5B in bfloat16 is about 10 GB, the UMT5 encoder another 11, and the
+    VAE stays in float32 on top -- call it 25 GB resident. A 48 GB A40 or A6000
+    holds all of it, so the default only offloads below that.
+    """
+    setting = os.getenv("OMNICHAT_VIDEO_CPU_OFFLOAD", "auto").strip().lower()
+    if setting in {"1", "true", "yes", "on"}:
+        return True
+    if setting in {"0", "false", "no", "off"}:
+        return False
+    minimum_gb = _positive_int_env(
+        "OMNICHAT_VIDEO_RESIDENT_MIN_VRAM_GB", 40, minimum=8, maximum=512
+    )
+    return total_vram_bytes < minimum_gb * (1024**3)
+
+
 def video_lora_settings() -> tuple[str, str, float] | None:
     """Operator-configured motion LoRA, or None when the base model is used.
 
@@ -1244,6 +1268,12 @@ class VideoResult:
     file: tempfile.NamedTemporaryFile
     duration: float
     actual_prompt: str
+    # Wall clock for the two phases that dominate a clip, reported separately
+    # because they have completely different fixes: a slow load is a cold start
+    # or an unnecessary CPU offload, a slow sample is steps or the GPU tier.
+    # Attributing one to the other is how a tuning session wastes an afternoon.
+    load_seconds: float = 0.0
+    inference_seconds: float = 0.0
 
 
 class VideoGenerator:
@@ -1284,7 +1314,11 @@ class VideoGenerator:
                 )
                 if hasattr(pipeline, "set_adapters"):
                     pipeline.set_adapters(["omnichat_motion"], adapter_weights=[scale])
-            pipeline.enable_model_cpu_offload()
+            total_vram = torch.cuda.get_device_properties(0).total_memory
+            if video_cpu_offload(total_vram):
+                pipeline.enable_model_cpu_offload()
+            else:
+                pipeline.to("cuda")
             self._pipeline = pipeline
         except Exception as exc:  # pragma: no cover - model/runtime specific
             self._pipeline = None
@@ -1302,7 +1336,9 @@ class VideoGenerator:
         from diffusers.utils import export_to_video  # type: ignore
 
         source = _download_image(request.source_image_url)
+        load_started = time.monotonic()
         pipe = self._load()
+        load_seconds = time.monotonic() - load_started
         torch, _ = _device_dtype()
         generator = torch.Generator(device="cuda")
         if request.seed is not None:
@@ -1328,8 +1364,10 @@ class VideoGenerator:
         }
         target: tempfile.NamedTemporaryFile | None = None
         try:
+            inference_started = time.monotonic()
             with torch.inference_mode():
                 result = pipe(**kwargs)
+            inference_seconds = time.monotonic() - inference_started
             frames_out = getattr(result, "frames", None)
             # Length, not truthiness. The default output type is "np", so this
             # is a numpy array, and `if not frames_out` raises "truth value of
@@ -1351,7 +1389,13 @@ class VideoGenerator:
             # Report what was actually sampled. A ten-second request is clamped
             # to the trained frame count, and the stored asset duration has to
             # match the file rather than the ask.
-            return VideoResult(target, len(frames_out) / fps, request.prompt)
+            return VideoResult(
+                target,
+                len(frames_out) / fps,
+                request.prompt,
+                load_seconds=load_seconds,
+                inference_seconds=inference_seconds,
+            )
         except ModelError:
             if target is not None:
                 Path(target.name).unlink(missing_ok=True)
