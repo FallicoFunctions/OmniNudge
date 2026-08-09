@@ -351,9 +351,9 @@ describe('createPlayerController', () => {
       playerRig: rig,
     });
 
-    // 1s at a time keeps this test cheap; stamina drains 0.25/s so 4
+    // 1s at a time keeps this test cheap; stamina drains 0.1667/s so 6
     // seconds fully empties it.
-    for (let i = 0; i < 4; i += 1) {
+    for (let i = 0; i < 6; i += 1) {
       controller.step(1);
     }
     expect(controller.stamina0to1).toBe(0);
