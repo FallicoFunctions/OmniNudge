@@ -12,8 +12,9 @@ import (
 
 // Plan constants
 const (
-	PlanFree = "free"
-	PlanPlus = "plus"
+	PlanFree    = "free"
+	PlanPlus    = "plus"
+	PlanPremium = "premium"
 )
 
 // Coin constants

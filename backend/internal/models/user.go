@@ -986,7 +986,7 @@ func (r *UserRepository) UpdatePlan(ctx context.Context, userID int, plan string
 // database time. A single SQL statement prevents concurrent renewals from
 // overwriting one another.
 func (r *UserRepository) ExtendPlan(ctx context.Context, userID int, plan string, months int) error {
-	if userID <= 0 || (plan != PlanPlus && plan != "premium") || months < 1 || months > 24 {
+	if userID <= 0 || (plan != PlanPlus && plan != PlanPremium) || months < 1 || months > 24 {
 		return errors.New("invalid plan extension")
 	}
 	tag, err := r.pool.Exec(ctx, `
