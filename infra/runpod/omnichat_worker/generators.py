@@ -1185,12 +1185,17 @@ def video_cpu_offload(total_vram_bytes: int) -> bool:
     step. On a card that cannot hold the pipeline it is the only way to run at
     all; on one that can, it is roughly a 2-3x tax for nothing.
 
-    Measured on an A40, which reports 44.43 GiB usable rather than the nominal
-    48: a resident pipeline sat at 42 GiB through sampling. That is far above
-    the ~25 GiB the weights alone account for, because activations dominate,
-    and it left too little headroom for the VAE -- hence the tiling enabled at
-    load. The threshold is therefore about what a card can carry in practice,
-    not what the checkpoint weighs.
+    The threshold is deliberately above any card this runs on today, so the
+    default behaviour is to offload. Measured on an A40, which reports 44.43
+    GiB usable rather than the nominal 48: a resident pipeline reached 42 GiB
+    during sampling and then ran out of memory decoding, because Wan decodes
+    all 121 frames in one pass. Tiled decoding is not an escape -- it is broken
+    for this VAE in diffusers 0.35.1 (see _load).
+
+    Removing the offload is also not where the time is. A render that reached
+    the decode had spent 755 seconds getting there with all fifty steps done,
+    so sampling dominates; step count and GPU class are the levers, not this.
+    The switch stays only so an 80 GiB card can hold the pipeline outright.
     """
     setting = os.getenv("OMNICHAT_VIDEO_CPU_OFFLOAD", "auto").strip().lower()
     if setting in {"1", "true", "yes", "on"}:
@@ -1198,7 +1203,7 @@ def video_cpu_offload(total_vram_bytes: int) -> bool:
     if setting in {"0", "false", "no", "off"}:
         return False
     minimum_gb = _positive_int_env(
-        "OMNICHAT_VIDEO_RESIDENT_MIN_VRAM_GB", 40, minimum=8, maximum=512
+        "OMNICHAT_VIDEO_RESIDENT_MIN_VRAM_GB", 60, minimum=8, maximum=512
     )
     return total_vram_bytes < minimum_gb * (1024**3)
 
@@ -1317,16 +1322,11 @@ class VideoGenerator:
                 )
                 if hasattr(pipeline, "set_adapters"):
                     pipeline.set_adapters(["omnichat_motion"], adapter_weights=[scale])
-            # Wan decodes the whole clip in a single pass, so the VAE -- not
-            # sampling -- is the memory peak: 121 frames at 720p asked for
-            # 2.5 GiB on top of 42 GiB already resident and died there, after
-            # all fifty steps had completed. Tiling decodes in blocks and is
-            # what CPU offload was previously masking. Cheap, and it applies
-            # whether or not the pipeline is resident.
-            if hasattr(pipeline, "enable_vae_tiling"):
-                pipeline.enable_vae_tiling()
-            elif hasattr(pipeline.vae, "enable_tiling"):
-                pipeline.vae.enable_tiling()
+            # Do not enable VAE tiling here. Wan 2.2's VAE patchifies its input
+            # from 3 channels to 12 before the first conv, and the tiled path in
+            # diffusers 0.35.1 feeds raw 3-channel tiles straight into it:
+            # "expected input[1, 3, 3, 258, 258] to have 12 channels, but got 3".
+            # It fails at encode, in seconds, before sampling starts.
             total_vram = torch.cuda.get_device_properties(0).total_memory
             if video_cpu_offload(total_vram):
                 pipeline.enable_model_cpu_offload()

@@ -1,5 +1,6 @@
 import os
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from . import generators as generator_module
@@ -737,22 +738,23 @@ class VideoFrameGeometryTests(unittest.TestCase):
 class VideoOffloadTests(unittest.TestCase):
     GIB = 1024**3
 
-    def test_a_card_that_fits_the_pipeline_keeps_it_resident(self):
-        # enable_model_cpu_offload streams every module across PCIe on each
-        # denoising step. On a 48GB A40, which holds the whole ~25GB pipeline,
-        # that was pure overhead and the largest single cost in a render.
+    def test_only_a_very_large_card_keeps_the_pipeline_resident(self):
         from .generators import video_cpu_offload
 
         with patch.dict(os.environ, {}, clear=True):
-            self.assertFalse(video_cpu_offload(48 * self.GIB))
             self.assertFalse(video_cpu_offload(80 * self.GIB))
 
-    def test_a_small_card_still_offloads(self):
+    def test_a_forty_eight_gigabyte_card_still_offloads(self):
+        # An A40 reports 44.43 GiB usable, and a resident pipeline reached
+        # 42 GiB during sampling before running out of memory in the decode.
+        # Holding this model on that card does not fit, and tiled decoding
+        # cannot rescue it -- diffusers 0.35.1 skips Wan 2.2's patchify on the
+        # tiled path and dies at encode.
         from .generators import video_cpu_offload
 
         with patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(video_cpu_offload(int(44.43 * self.GIB)))
             self.assertTrue(video_cpu_offload(24 * self.GIB))
-            self.assertTrue(video_cpu_offload(16 * self.GIB))
 
     def test_the_operator_can_force_either_way(self):
         from .generators import video_cpu_offload
@@ -767,6 +769,16 @@ class VideoOffloadTests(unittest.TestCase):
 
         with patch.dict(os.environ, {"OMNICHAT_VIDEO_RESIDENT_MIN_VRAM_GB": "20"}, clear=True):
             self.assertFalse(video_cpu_offload(24 * self.GIB))
+
+    def test_vae_tiling_is_never_enabled(self):
+        # Wan 2.2's VAE patchifies 3 channels to 12 before its first conv, and
+        # the tiled path in diffusers 0.35.1 bypasses that, failing at encode
+        # with "expected input to have 12 channels, but got 3". Re-enabling
+        # this to save memory costs a render and gains nothing.
+        source = Path(__file__).with_name("generators.py").read_text()
+        body = source.split("class VideoGenerator")[1]
+        self.assertNotIn("enable_vae_tiling()", body)
+        self.assertNotIn("vae.enable_tiling()", body)
 
 
 class VideoGeneratorContractTests(unittest.TestCase):
