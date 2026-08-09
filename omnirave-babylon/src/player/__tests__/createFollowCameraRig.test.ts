@@ -21,6 +21,7 @@ describe('createFollowCameraRig', () => {
     expect(rig.camera.radius).toBe(6);
     expect(rig.camera.lowerRadiusLimit).toBe(0.1);
     expect(rig.camera.upperRadiusLimit).toBe(140);
+    expect(rig.camera.fov).toBeCloseTo(0.96);
     expect(rig.syncZoomState().mode).toBe('third_person');
 
     rig.camera.radius = 0.1;

@@ -522,15 +522,14 @@ describe('createRuntime', () => {
     host.querySelector<HTMLButtonElement>('[data-review-checkpoint="spawn_reveal"]')?.click();
     expect(playerPositionSet).toHaveBeenCalledWith(0, 1.7, -48);
     expect(routeProgressReset).toHaveBeenCalledWith(0);
-    // Fast travel converts the authored scenery view into the standard
-    // follow framing: avatar centered, camera behind them along the
-    // authored look direction (here due +z, so the camera sits at -z).
+    // The development review harness preserves the authored scenery view so
+    // each checkpoint is an intentional approval composition.
     expect(applyCheckpointView).toHaveBeenCalledWith({
-      alpha: 0,
-      beta: 1.12,
-      radius: 7,
-      focusOffset: { x: 0, y: -0.35, z: 0 },
-      positionOffset: { x: 0, y: 2.25, z: -7 },
+      alpha: -Math.PI / 2,
+      beta: 1.08,
+      radius: 60,
+      focusOffset: { x: 0, y: 8, z: 44 },
+      positionOffset: { x: 0, y: 26.3, z: -57 },
     });
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
     renderFrame?.();
@@ -549,19 +548,18 @@ describe('createRuntime', () => {
     expect(engineDispose).not.toHaveBeenCalled();
 
     // Play Again: stops any in-flight finale, resets route progress to the
-    // start, teleports to the back-plaza spawn, and applies the same
-    // standard follow framing fast-travel uses (default north-facing since
-    // there's no authored checkpoint view to derive a look direction from).
+    // start, teleports to the back-plaza spawn, and reapplies the authored
+    // spawn-reveal composition.
     host.querySelector<HTMLButtonElement>('[data-review-restart]')?.click();
     expect(completionCelebrationStop).toHaveBeenCalledTimes(1);
     expect(routeProgressReset).toHaveBeenCalledWith(0);
     expect(playerPositionSet).toHaveBeenCalledWith(0, 1.7, -48);
     expect(applyCheckpointView).toHaveBeenCalledWith({
-      alpha: 0,
-      beta: 1.12,
-      radius: 7,
-      focusOffset: { x: 0, y: -0.35, z: 0 },
-      positionOffset: { x: 0, y: 2.25, z: -7 },
+      alpha: -Math.PI / 2,
+      beta: 1.08,
+      radius: 60,
+      focusOffset: { x: 0, y: 8, z: 44 },
+      positionOffset: { x: 0, y: 26.3, z: -57 },
     });
 
     runtime.dispose();

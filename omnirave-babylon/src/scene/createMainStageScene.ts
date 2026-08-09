@@ -42,15 +42,11 @@ import { parsePerfFlags } from '../app/perfFlags';
 import { createMainStageProductionSurfaces } from './createMainStageProductionSurfaces';
 import { loadMainStageAssets } from './loadMainStageAssets';
 import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from './reviewRouteData';
-import type { ReviewCheckpointCamera } from './reviewRouteData';
 
-const PLAYABLE_START_CAMERA: ReviewCheckpointCamera = {
-  alpha: -Math.PI / 2,
-  beta: 1.12,
-  radius: 9,
-  focusOffset: { x: 0, y: -0.35, z: 0 },
-  positionOffset: { x: 0, y: 2.25, z: -7 },
-};
+// The production entry uses the same authored landmark reveal as the review
+// route. Starting in a short over-the-shoulder shot put the camera against the
+// arrival stair and filled the frame with paving instead of the Crown.
+const PLAYABLE_START_CAMERA = MAIN_STAGE_REVIEW_ROUTE[0]!.camera;
 const TRACKPAD_CAMERA_YAW_SENSITIVITY = 0.0045;
 const TRACKPAD_CAMERA_PITCH_SENSITIVITY = 0.0032;
 // Proportional: each pinch tick scales the CURRENT follow distance, so one
@@ -171,9 +167,10 @@ export async function createMainStageScene(engine: AbstractEngine) {
   }
 
   // After every scoped light exists (pools + screen spills): bound each mesh
-  // to its nearest point lights. WebGPU's 12-buffer vertex-stage limit
-  // allows 2 rig lights + 6 here (3 base UBOs + 8 lights = 11); WebGL gains
-  // proximity-correct slot filling.
+  // to its nearest point lights. WebGPU materials cap evaluation at four
+  // simultaneous lights in applyPracticalPoolLightBudget (hemi + key + fill
+  // + nearest scoped light); this broader nearest-six list still gives that
+  // cap the correct proximity-ordered candidates and benefits WebGL.
   trimMeshLightBudget(scene, 6);
 
   // Shallow viewing angles across the LED module grids and brushed maps

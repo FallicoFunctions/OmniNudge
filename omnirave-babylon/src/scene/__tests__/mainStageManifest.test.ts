@@ -10280,6 +10280,21 @@ describe('reviewRouteData', () => {
     expect(zSteps.at(-1)).toBeGreaterThan(BACK_PLAZA_SPAWN.z);
   });
 
+  it('frames the full Crown landmark from spawn instead of aiming below its stage deck', () => {
+    const spawnReveal = MAIN_STAGE_REVIEW_ROUTE[0];
+    const absoluteFocus = {
+      y: spawnReveal.y + spawnReveal.camera.focusOffset.y,
+      z: spawnReveal.z + spawnReveal.camera.focusOffset.z,
+    };
+
+    expect(absoluteFocus.y).toBeGreaterThanOrEqual(26);
+    expect(absoluteFocus.y).toBeLessThanOrEqual(30);
+    expect(absoluteFocus.z).toBeGreaterThanOrEqual(36);
+    expect(absoluteFocus.z).toBeLessThanOrEqual(50);
+    expect(spawnReveal.z + (spawnReveal.camera.positionOffset?.z ?? 0)).toBeLessThanOrEqual(-100);
+    expect(spawnReveal.z + (spawnReveal.camera.positionOffset?.z ?? 0)).toBeGreaterThanOrEqual(-110);
+  });
+
   it('keeps the promenade and VIP review cameras close enough to judge stage detail instead of collapsing into long silhouette shots', () => {
     const promenadeCheckpoint = MAIN_STAGE_REVIEW_ROUTE.find((checkpoint) => checkpoint.id === 'promenade_mid');
     const vipCheckpoint = MAIN_STAGE_REVIEW_ROUTE.find((checkpoint) => checkpoint.id === 'vip_terrace');
@@ -10356,20 +10371,21 @@ describe('reviewRouteData', () => {
     expect(basinFocus.z).toBeGreaterThanOrEqual(16);
     expect(basinCamera.y - basinFocus.y).toBeLessThanOrEqual(12);
 
-    // VIP read is the intimate ground forecourt under the wing's sail
-    // canopies (the elevated terrace is view-only this milestone): the
-    // camera stays low - under the canopy line - and close to the player so
-    // the lantern warmth and planters fill the frame instead of a distant
-    // silhouette (the old 38-radius long shot read pitch black).
+    // VIP read is the elevated walkable skydeck, not the obsolete ground
+    // forecourt beneath its slab. Frame it from the open ramp side.
     const vipCamera = cameraPosition(vipTerrace!);
     const vipFocus = focusTarget(vipTerrace!);
-    expect(vipTerrace!.y).toBeLessThanOrEqual(2);
-    expect(vipCamera.y).toBeLessThanOrEqual(4);
+    expect(vipTerrace!.y).toBeGreaterThanOrEqual(10.2);
+    expect(vipTerrace!.y).toBeLessThanOrEqual(10.3);
+    expect(vipCamera.y).toBeGreaterThanOrEqual(14);
+    expect(vipCamera.y).toBeLessThanOrEqual(16);
+    expect(vipCamera.x).toBeGreaterThanOrEqual(34);
+    expect(vipCamera.x).toBeLessThanOrEqual(42);
     const vipFramingDistance = Math.hypot(
       vipCamera.x - vipFocus.x,
       vipCamera.y - vipFocus.y,
       vipCamera.z - vipFocus.z,
     );
-    expect(vipFramingDistance).toBeLessThanOrEqual(12);
+    expect(vipFramingDistance).toBeLessThanOrEqual(22);
   });
 });

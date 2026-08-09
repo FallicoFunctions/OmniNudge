@@ -122,15 +122,15 @@ export function createVipSkydeck(scene: Scene): VipSkydeckHandle {
   const meshes: Mesh[] = [];
   const walkableMeshes: Mesh[] = [];
 
-  // Pearl deck plate. Brighter than the crown-shell tuning the family carries
-  // (that is authored for geometry 24m overhead); this is a floor people
-  // stand on, lifted so it reads at night without becoming a lamp.
+  // Pearl deck plate. The brighter global night grade and direct key light
+  // both strike this broad horizontal surface, so its local response stays
+  // restrained enough to retain detail instead of clipping to white.
   const pearl = createPlateMaterial(scene, {
     name: 'vip-skydeck-pearl-material',
     sourceName: PEARL_PLATE_MATERIAL,
-    albedoColor: new Color3(0.42, 0.4, 0.375),
-    emissiveColor: new Color3(0.024, 0.022, 0.02),
-    emissiveIntensity: 0.3,
+    albedoColor: new Color3(0.16, 0.15, 0.14),
+    emissiveColor: new Color3(0.005, 0.0045, 0.004),
+    emissiveIntensity: 0.08,
     fallbackMetallic: 0.16,
     fallbackRoughness: 0.74,
   });
@@ -142,7 +142,7 @@ export function createVipSkydeck(scene: Scene): VipSkydeckHandle {
     sourceName: GOLD_PLATE_MATERIAL,
     albedoColor: new Color3(0.52, 0.4, 0.17),
     emissiveColor: new Color3(0.85, 0.66, 0.28),
-    emissiveIntensity: 0.45,
+    emissiveIntensity: 0.18,
     fallbackMetallic: 0.85,
     fallbackRoughness: 0.42,
   });

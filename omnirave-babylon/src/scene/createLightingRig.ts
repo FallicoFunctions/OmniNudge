@@ -20,7 +20,7 @@ export function createLightingRig(scene: Scene, perfFlags: PerfFlags = PERF_DEFA
   const hemi = new HemisphericLight('main-stage-hemi-light', new Vector3(0, 1, 0), scene);
   hemi.diffuse = new Color3(0.36, 0.41, 0.52);
   hemi.groundColor = new Color3(0.05, 0.06, 0.08);
-  hemi.intensity = 0.72;
+  hemi.intensity = 1.12;
 
   const key = new DirectionalLight(
     'main-stage-key-light',
@@ -49,15 +49,17 @@ export function createLightingRig(scene: Scene, perfFlags: PerfFlags = PERF_DEFA
   );
   fill.diffuse = new Color3(0.22, 0.34, 0.58);
   fill.specular = new Color3(0.1, 0.18, 0.34);
-  fill.intensity = 0.82;
+  fill.intensity = 1.7;
   fill.position = new Vector3(0, 24, -84);
 
   const isWebGPU = scene.getEngine().isWebGPU;
   if (perfFlags.minimalLights || isWebGPU) {
-    // WebGPU: each light costs a per-stage uniform buffer and the device
-    // limit is 12; dropping the two subtle shaping lights keeps the warm
-    // practical pools - the defining night-look element - within budget.
+    // WebGPU: each light costs a per-stage uniform buffer. Drop the secondary
+    // rim first, but retain the audience-facing fill: without it the entire
+    // Crown front renders as a black silhouette in the default WebGPU path.
     rim.setEnabled(false);
+  }
+  if (perfFlags.minimalLights) {
     fill.setEnabled(false);
   }
 
@@ -126,8 +128,8 @@ function createPracticalPoolLights(scene: Scene, perfFlags: PerfFlags) {
 // roughly halves the lighting shader cost with little visible loss, since
 // distant pools contribute almost nothing. WebGPU: each effect light costs a
 // vertex-stage uniform buffer and the device limit is 12 total (3 base + 5
-// fixed + N lights), so the budget there is 4 - which still covers hemi +
-// key + the two nearest pools since rim/fill are disabled under WebGPU.
+// fixed + N lights), so the budget there is 4 - which covers hemi + key +
+// the retained front fill + the nearest scoped pool while the rim is disabled.
 //
 // Exported so callers can re-run it after any rig that creates lit materials
 // AFTER this rig ran (e.g. the production-surface screens) - those materials
