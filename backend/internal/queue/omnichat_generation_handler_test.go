@@ -522,8 +522,12 @@ func TestBuildVideoSpecSendsMotionOnlyForASceneClip(t *testing.T) {
 	require.NoError(t, err)
 	prompt, _ := spec.Input["prompt"].(string)
 	require.Contains(t, prompt, "leaning on the railing")
-	require.Contains(t, prompt, "show me the scene")
 	require.NotContains(t, prompt, "freckles")
+	// A scene clip's request prompt is the button's fixed boilerplate. It says
+	// nothing about movement and, appended last, outweighed the clause that
+	// did, so the scene's action is the only motion instruction sent.
+	require.NotContains(t, prompt, "show me the scene")
+	require.NotContains(t, prompt, "playful")
 	require.Equal(t, "image_to_video", spec.Input["mode"])
 }
 

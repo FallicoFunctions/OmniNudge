@@ -270,6 +270,22 @@ func buildOmniChatEffectivePrompt(request models.OmniChatGenerationRequest) stri
 //
 // Create and image-to-video requests carry the user's own wording, which is
 // already an instruction about movement, so it is used as written.
+//
+// Contextual requests are the opposite: their prompt is the Scene video
+// button's fixed boilerplate ("Show the current scene in motion, preserving
+// the character, setting, outfit, mood, and activity"), which contains no
+// motion information and, appended last, outweighed the one clause that did.
+// It is dropped rather than restated.
+//
+// Three earlier fields are gone for the same reason -- each was actively
+// misleading the model rather than merely wasting budget:
+//
+//   - Pose is the subject's posture at rest, so "standing still" arrived as an
+//     instruction directly contradicting "add only motion".
+//   - Mood was the only energy cue in the string. A swaying scene tagged
+//     "playful" came back as jumping.
+//   - CameraDirection is a camera *position*, and labelling it "camera
+//     movement" invited a moving camera, which reads as motion blur.
 func BuildOmniChatVideoMotionPrompt(mode models.OmniChatGenerationMode, prompt string, scene models.OmniChatSceneState) string {
 	prompt = strings.TrimSpace(prompt)
 	if mode != models.OmniChatGenerationModeContextual {
@@ -278,19 +294,16 @@ func BuildOmniChatVideoMotionPrompt(mode models.OmniChatGenerationMode, prompt s
 	parts := []string{
 		"Animate the supplied still image.",
 		"Keep the subject's identity, appearance, outfit, lighting, and setting exactly as they appear in the image; add only motion.",
+		"Static camera, fixed framing, no camera movement.",
 	}
-	appendField := func(label, value string) {
-		if value = strings.TrimSpace(value); value != "" {
-			parts = append(parts, label+": "+value+".")
-		}
+	if motion := strings.TrimSpace(scene.Activity); motion != "" {
+		parts = append(parts, "Motion: "+motion+".")
 	}
-	appendField("Action", scene.Activity)
-	appendField("Body position", scene.Pose)
-	appendField("Mood", scene.Mood)
-	appendField("Camera movement", scene.CameraDirection)
-	if prompt != "" {
-		parts = append(parts, "Requested motion: "+prompt+".")
-	}
+	// Without an arc the model samples a slice out of the middle of a movement
+	// and the clip stops mid-gesture. Naming the start and end states is the
+	// only control over pacing the pipeline has.
+	parts = append(parts,
+		"The subject starts from the position shown in the image, performs the motion, and comes to rest before the clip ends.")
 	return strings.Join(parts, " ")
 }
 

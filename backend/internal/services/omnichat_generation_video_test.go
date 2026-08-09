@@ -17,7 +17,7 @@ func TestVideoMotionPromptDescribesMovementOnly(t *testing.T) {
 	// is what drift looks like.
 	prompt := BuildOmniChatVideoMotionPrompt(
 		models.OmniChatGenerationModeContextual,
-		"lean in closer",
+		"Show the current scene in motion, preserving the character, setting, outfit, mood, and activity.",
 		models.OmniChatSceneState{
 			Location:          "the rain-slick balcony",
 			Outfit:            "a red silk robe",
@@ -30,13 +30,34 @@ func TestVideoMotionPromptDescribesMovementOnly(t *testing.T) {
 	)
 
 	require.Contains(t, prompt, "leaning on the railing")
-	require.Contains(t, prompt, "weight on one hip")
-	require.Contains(t, prompt, "playful")
-	require.Contains(t, prompt, "slow push in")
-	require.Contains(t, prompt, "lean in closer")
 	require.NotContains(t, prompt, "freckled")
 	require.NotContains(t, prompt, "red silk robe")
 	require.NotContains(t, prompt, "rain-slick balcony")
+
+	// A resting posture read as an instruction and cancelled the motion; mood
+	// was the only energy cue and turned a sway into a jump; a camera position
+	// labelled as movement produced a moving camera.
+	require.NotContains(t, prompt, "weight on one hip")
+	require.NotContains(t, prompt, "playful")
+	require.NotContains(t, prompt, "slow push in")
+	require.Contains(t, prompt, "Static camera")
+
+	// The button's boilerplate carries no motion information and, appended
+	// last, outweighed the clause that did.
+	require.NotContains(t, prompt, "preserving the character")
+	require.NotContains(t, prompt, "..")
+}
+
+func TestVideoMotionPromptGivesTheClipAnEnding(t *testing.T) {
+	// Without a start and end state the model samples the middle of a movement
+	// and the clip stops mid-gesture.
+	prompt := BuildOmniChatVideoMotionPrompt(
+		models.OmniChatGenerationModeContextual, "",
+		models.OmniChatSceneState{Activity: "jumping up and down"},
+	)
+
+	require.Contains(t, prompt, "starts from the position shown")
+	require.Contains(t, prompt, "comes to rest before the clip ends")
 }
 
 func TestVideoMotionPromptUsesCreateRequestsAsWritten(t *testing.T) {
@@ -54,7 +75,7 @@ func TestVideoMotionPromptSurvivesAnEmptyScene(t *testing.T) {
 	prompt := BuildOmniChatVideoMotionPrompt(
 		models.OmniChatGenerationModeContextual, "look at me", models.OmniChatSceneState{})
 	require.Contains(t, prompt, "Animate the supplied still image.")
-	require.Contains(t, prompt, "look at me")
+	require.Contains(t, prompt, "comes to rest before the clip ends")
 }
 
 func TestSourceAssetIsClearedOutsideImageToVideo(t *testing.T) {
