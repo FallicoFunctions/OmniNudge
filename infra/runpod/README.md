@@ -124,7 +124,7 @@ environment settings (never in the API's browser-facing configuration):
 | `OMNICHAT_VIDEO_STEPS` | — | optional | Sampling steps, bounded to `1`–`100`; defaults to `50` per the model card. This is the first knob to lower if renders approach the endpoint timeout |
 | `OMNICHAT_VIDEO_GUIDANCE_SCALE` | — | optional | Defaults to `5.0`, the published Wan 2.2 value |
 | `OMNICHAT_VIDEO_CPU_OFFLOAD` | — | optional | `auto` (default), `1`, or `0`. `enable_model_cpu_offload` streams the transformer, text encoder and VAE across PCIe on every denoising step — necessary on a card that cannot hold the pipeline, roughly a 2–3× tax on one that can. `auto` keeps the pipeline resident above the threshold below |
-| `OMNICHAT_VIDEO_RESIDENT_MIN_VRAM_GB` | — | optional | VRAM at or above which `auto` skips offloading; defaults to `40`. TI2V-5B in bf16 (~10 GB) plus the UMT5 encoder (~11 GB) plus a float32 VAE is roughly 25 GB resident, which a 48 GB A40 or A6000 holds outright |
+| `OMNICHAT_VIDEO_RESIDENT_MIN_VRAM_GB` | — | optional | VRAM at or above which `auto` skips offloading; defaults to `60`, i.e. offload on every card in use today. An A40 reports 44.43 GiB usable and a resident pipeline reached 42 GiB during sampling before running out of memory in the decode. Do not reach for `enable_vae_tiling` to rescue it: diffusers 0.35.1 skips Wan 2.2's channel patchify on the tiled path and fails at encode |
 | `OMNICHAT_VIDEO_LORA_MODEL_ID` / `_WEIGHT_NAME` / `_SCALE` | — | optional | Operator-configured motion LoRA, applied at load. Unlike the identity LoRA this comes from the endpoint environment rather than a request, so it needs no allowlist — nothing a browser sends can reach it |
 
 Use a separate object-store credential per endpoint and grant only the bucket
