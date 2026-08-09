@@ -126,7 +126,7 @@ describe('createMainStageScene', () => {
     expect(scene.effectLayers).toHaveLength(0);
   });
 
-  it('keeps zoom state synced even while the player is idle', async () => {
+  it('boots into the authored back-plaza landmark reveal and keeps it synced while idle', async () => {
     engine = new NullEngine();
     const { createMainStageScene } = await loadCreateMainStageScene();
 
@@ -134,11 +134,11 @@ describe('createMainStageScene', () => {
     const camera = scene.activeCamera as ArcRotateCamera | null;
 
     expect(camera).not.toBeNull();
-    expect(camera!.position.y).toBeCloseTo(3.95);
-    expect(camera!.position.z).toBeCloseTo(-55);
+    expect(camera!.position.y).toBeCloseTo(30);
+    expect(camera!.position.z).toBeCloseTo(-102);
     expect(camera!.lockedTarget?.name).toBe('review-camera-target');
-    expect((camera!.lockedTarget as TransformNode).position.y).toBeCloseTo(1.35);
-    expect((camera!.lockedTarget as TransformNode).position.z).toBeCloseTo(-48);
+    expect((camera!.lockedTarget as TransformNode).position.y).toBeCloseTo(28);
+    expect((camera!.lockedTarget as TransformNode).position.z).toBeCloseTo(38);
 
     // Sec 7.2 camera collision: camera.radius is now resolved EVERY frame
     // from the rig's own requested-distance + collision state (both camera
@@ -169,7 +169,9 @@ describe('createMainStageScene', () => {
     // distance every frame, so the zoom has to go through the rig's zoom()
     // (which updates that requested distance) rather than a direct
     // camera.radius write, which the sync loop would just overwrite.
-    cameraRig!.zoom(-100);
+    // The authored reveal starts much farther out than the old 9 m follow
+    // camera, so cross the full zoom range to reach first person.
+    cameraRig!.zoom(-1_000);
     scene.render();
 
     expect(avatarBody!.visibility).toBe(0);

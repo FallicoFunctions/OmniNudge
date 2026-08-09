@@ -1,6 +1,7 @@
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -108,6 +109,19 @@ describe('createVipSkydeck', () => {
       (mesh) => mesh.name.startsWith('vip-skydeck-') && mesh.isPickable,
     ).length;
     expect(pickable).toBe(0);
+  });
+
+  it('keeps the deck and rails below the brighter night grade clipping threshold', () => {
+    createVipSkydeck(scene);
+
+    const pearl = scene.getMaterialByName('vip-skydeck-pearl-material') as PBRMaterial | null;
+    const gold = scene.getMaterialByName('vip-skydeck-gold-material') as PBRMaterial | null;
+
+    expect(pearl).not.toBeNull();
+    expect(pearl!.albedoColor.r).toBeLessThanOrEqual(0.18);
+    expect(pearl!.emissiveIntensity).toBeLessThanOrEqual(0.1);
+    expect(gold).not.toBeNull();
+    expect(gold!.emissiveIntensity).toBeLessThanOrEqual(0.2);
   });
 
   it('puts the deck on the probed 16 x 8.8m footprint at the wing-terrace height', () => {
