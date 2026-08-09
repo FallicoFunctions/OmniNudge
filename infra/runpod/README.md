@@ -117,8 +117,13 @@ environment settings (never in the API's browser-facing configuration):
 | `OMNICHAT_PROMPT_MAX_WORDS` | optional | — | Prompt budget in words; defaults to `150` with chunking and `58` without. The lower value is not a preference — beyond it CLIP silently discards the tail |
 | `OMNICHAT_IDENTITY_FALLBACK_IMAGE2IMAGE` | optional | — | Set `1` only as an explicit migration fallback; unset/`0` fails clearly if IP-Adapter cannot load |
 | `OMNICHAT_LORA_MODEL_ALLOWLIST` | required when using LoRA | — | Comma-separated Hugging Face LoRA IDs approved for platform-owned personas |
-| `OMNICHAT_VIDEO_TEXT_MODEL_ID` | — | required | Diffusers text-to-video model identifier |
-| `OMNICHAT_VIDEO_IMAGE_MODEL_ID` | — | required | Diffusers image-to-video model identifier |
+| `OMNICHAT_VIDEO_IMAGE_MODEL_ID` | — | optional | Diffusers image-to-video model; defaults to `Wan-AI/Wan2.2-TI2V-5B-Diffusers` |
+| `OMNICHAT_VIDEO_FPS` | — | optional | Sampling and export frame rate, bounded to `8`–`60`; defaults to `24`, the rate Wan 2.2 was trained at. One value drives both, because exporting at a different rate only speeds the clip up or slows it down |
+| `OMNICHAT_VIDEO_MAX_FRAMES` | — | optional | Frame ceiling, bounded to `5`–`241`; defaults to `121`. Snapped down to a legal `4k+1` length |
+| `OMNICHAT_VIDEO_MAX_AREA` | — | optional | Pixel budget for one frame; defaults to `720*1280`. The frame's shape comes from the source still, this only bounds its size |
+| `OMNICHAT_VIDEO_STEPS` | — | optional | Sampling steps, bounded to `1`–`100`; defaults to `50` per the model card. This is the first knob to lower if renders approach the endpoint timeout |
+| `OMNICHAT_VIDEO_GUIDANCE_SCALE` | — | optional | Defaults to `5.0`, the published Wan 2.2 value |
+| `OMNICHAT_VIDEO_LORA_MODEL_ID` / `_WEIGHT_NAME` / `_SCALE` | — | optional | Operator-configured motion LoRA, applied at load. Unlike the identity LoRA this comes from the endpoint environment rather than a request, so it needs no allowlist — nothing a browser sends can reach it |
 
 Use a separate object-store credential per endpoint and grant only the bucket
 operations required by the worker. The API still validates and copies every
@@ -140,8 +145,151 @@ use temporary space in addition to the final cache; a small default container
 disk can fail with `No space left on device` before the first image is generated.
 
 The video endpoint should also allocate at least 50 GB of container disk: the
-Wan text-to-video and image-to-video checkpoints are substantially larger than
-the image model and are downloaded into the worker cache on first use.
+Wan checkpoint and its UMT5 text encoder are substantially larger than the
+image model and are downloaded into the worker cache on first use.
+
+Set the video endpoint's execution timeout to at least 1800 seconds and keep
+`RUNPOD_REQUEST_TIMEOUT_SECONDS` on the API at or above it. A 121-frame render
+at 50 steps does not finish inside the 900 seconds that was enough for a single
+image, and a video job now spends part of that budget on its still as well.
+
+## Two-phase video
+
+A video is not generated from a prompt. Identity conditioning lives entirely in
+the image pipeline, so a clip sampled from text alone is a different person in a
+different room. The queue therefore renders the scene as a still through the
+**image** endpoint first, stores it as a real gallery asset, and passes its
+signed URL to the **video** endpoint as `source_image_url`.
+
+Consequences worth knowing before changing either worker:
+
+- The video worker has no text-to-video path at all. A `kind: video` request
+  without `mode: image_to_video` and a source URL is a contract error, not a
+  degraded render. The old fallback silently animated the persona's reference
+  photo, which put her in that photo's setting instead of the current scene.
+- The video input carries no references, no identity fields, no scene object and
+  no aspect ratio. All of that is already in the pixels of the still, and the
+  frame size is derived from the still's own dimensions.
+- The video prompt describes motion only. Repeating appearance would give the
+  model something to contradict.
+- The video endpoint's `OMNICHAT_INPUT_HOSTS` must include the host that signs
+  generated-asset URLs, not just persona references — the still it animates is
+  fetched from the application's own bucket.
+- Both stages stamp `worker_build`. The clip's lands in
+  `provider_metadata.worker_build` and the still's in
+  `provider_metadata.source.worker_build`, so an asset can be attributed to the
+  two images that actually produced it.
+
+`Wan-AI/Wan2.2-TI2V-5B-Diffusers` is loaded through `WanImageToVideoPipeline`
+even though its model card demonstrates `WanPipeline`: the 5B model has no CLIP
+vision encoder, and `image_processor`/`image_encoder` are optional on that
+pipeline class from diffusers 0.35 onward. If a future diffusers release breaks
+that, the symptom is a load failure rather than a bad render, and the fallback
+is to point `OMNICHAT_VIDEO_IMAGE_MODEL_ID` at `Wan-AI/Wan2.2-I2V-A14B-Diffusers`
+on a larger GPU tier with a correspondingly longer timeout.
+
+## Bringing the video endpoint back up
+
+**Done on 2026-08-08.** The endpoint now runs template `omnichat-video-wan22`
+(`95d2tt9dpk`) on `nickf579/omnichat-video-worker:v52`, with a 60 GB container
+disk, a 1800 s execution timeout, and `workersMin: 0`. A worker was observed
+reaching `ready`, so the image pulls and the container starts. The steps below
+are kept as the procedure for the next rebuild.
+
+Before that, `omnichat-video` pointed at template `6l94ogw9ch`, which was
+deleted and returned 404. Only `nickf579/omnichat-video-worker:v1` and `:v3`
+had ever been pushed, and both predate the two-phase worker. Nothing about video
+works until the steps below are done, and no amount of backend testing will
+surface that — the job fails at submission.
+
+**0. Apply pending database migrations.** `backend/.env` sets
+`DB_AUTO_MIGRATE=false`, so a schema change this feature depends on is *not*
+applied by starting the server. A missing column surfaces in the browser as
+"Media generation is temporarily unavailable" — a generic 503 that looks like a
+GPU problem and is not — and it breaks `/photo` as well as video:
+
+```bash
+cd backend && go run ./cmd/migrate -action=dry-run && go run ./cmd/migrate -action=up
+```
+
+**1. Build and push the worker.** From the repository root, with the same tag as
+the image worker so the two stay legible together:
+
+```bash
+TAG=v52 && docker buildx build --platform linux/amd64 --provenance=false --sbom=false --build-arg OMNICHAT_WORKER_BUILD="$TAG" --output type=image,name=docker.io/nickf579/omnichat-video-worker:"$TAG",oci-mediatypes=false,push=true -f infra/runpod/video-worker/Dockerfile .
+```
+
+The buildx flags are load-bearing; see the Build section above for what happens
+without them. Verify the manifest type before going further:
+
+```bash
+docker buildx imagetools inspect nickf579/omnichat-video-worker:v52
+```
+
+`MediaType` must be `application/vnd.docker.distribution.manifest.v2+json`. An
+`oci.image.index.v1+json` will pull-fail silently and leave workers stuck in
+`initializing` with no error anywhere.
+
+**2. Create a fresh template.** The old one is gone, so this is a new template,
+not an edit:
+
+- Container image: the exact tag pushed above.
+- Container disk: **at least 50 GB**; 60 GB is what is deployed. Wan 2.2
+  TI2V-5B plus its UMT5 text encoder is a ~30 GB download, and Hugging Face
+  needs scratch space on top of the final cache.
+- CUDA version: **12.8**, matching the PyTorch base image.
+- Execution timeout: **at least 1800 seconds**.
+- Environment: copy the R2/S3 block from the image template `7g36zlzlk5`
+  (`OMNICHAT_OUTPUT_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+  `AWS_REGION`, `S3_ENDPOINT`, `OMNICHAT_OUTPUT_PUBLIC_BASE_URL` if set).
+- `OMNICHAT_INPUT_HOSTS`: must include the host that signs **generated asset**
+  URLs, not only persona references. The still this worker animates comes from
+  the application's own bucket, and a missing host here fails every clip at
+  download with "reference image URL is not configured".
+- No `OMNICHAT_VIDEO_*` overrides are needed; the defaults are the published
+  Wan 2.2 values.
+
+**3. Repoint the endpoint.** Set `omnichat-video` to the new template and set
+the execution timeout to at least 1800 s.
+
+Warm workers are `workersMin`, not `workersStandby`. The REST API's
+`EndpointUpdateInput` has no `workersStandby` key and rejects the whole request
+if you send one; the `workersStandby` that appears in a GET response is a
+legacy read-only field and does not mean a worker is being held. Check
+`workersMin` (and `/v2/<endpoint>/health`) to find out what is actually
+running. On this endpoint `workersMin` was already `0`.
+
+**4. Confirm the backend agrees.** `RUNPOD_VIDEO_ENDPOINT_ID` in `backend/.env`
+must match the endpoint.
+
+`backend/.env` is already set to `RUNPOD_REQUEST_TIMEOUT_SECONDS=1800`. It
+pinned `900` before, which **overrides** the code default and aborts every clip
+part-way through its animation phase — check it after any `.env` merge.
+
+The stale worker-only `OMNICHAT_VIDEO_TEXT_MODEL_ID` and
+`OMNICHAT_VIDEO_IMAGE_MODEL_ID` entries were removed from `backend/.env`. The
+backend never read them, but they named Wan 2.1 and were the obvious thing to
+copy into a video template, which would pin the worker back to the old model.
+
+Restart the local queue worker afterwards; it does not reload `.env` on its own.
+
+### ftfy is a hard dependency of the Wan pipelines
+
+`v51` downloaded every weight, loaded the pipeline, and then died on the first
+prompt with `NameError: name 'ftfy' is not defined`, raised from
+`diffusers/pipelines/wan/pipeline_wan_i2v.py`. diffusers guards the *import* of
+ftfy behind `is_ftfy_available()` but calls `ftfy.fix_text()` unconditionally
+inside `prompt_clean()`, so it is required, not optional. It is pinned in
+`video-worker/requirements.txt`.
+
+The failure costs a full cold start and model download before it surfaces, so
+check the call directly against a built image rather than on a GPU:
+
+```bash
+docker run --rm --platform linux/amd64 --entrypoint python \
+  nickf579/omnichat-video-worker:v52 \
+  -c "from diffusers.pipelines.wan.pipeline_wan_i2v import prompt_clean; print(prompt_clean('test'))"
+```
 
 ## Persona identity conditioning
 
@@ -182,9 +330,8 @@ LoRA metadata is ignored for user-owned/imported personas, and invalid model or
 weight paths fall back to reference conditioning. The worker validates the
 same fields and can enforce an operator allowlist with
 `OMNICHAT_LORA_MODEL_ALLOWLIST`; no browser request can choose a model path.
-The video worker uses the first curated reference as its initial frame when a
-request is not already image-to-video. Additional references require a model
-profile that explicitly supports multi-image identity embeddings.
+The video worker receives none of this: it animates a still the image worker
+already conditioned, so identity is settled before it is called.
 
 ## Restarting the worker after configuration changes
 
@@ -228,10 +375,9 @@ Do not paste registry passwords, S3 secrets, or RunPod API keys into this
 repository.
 Model IDs are deployment configuration:
 
-- `OMNICHAT_IMAGE_MODEL_ID` (default `stabilityai/stable-diffusion-xl-base-1.0`; choose a gated
+- `OMNICHAT_IMAGE_MODEL_ID` (default `SG161222/RealVisXL_V5.0`; choose a gated
   model only when the endpoint also has a read-only `HF_TOKEN`)
-- `OMNICHAT_VIDEO_TEXT_MODEL_ID` (default `Wan-AI/Wan2.1-T2V-1.3B-Diffusers`)
-- `OMNICHAT_VIDEO_IMAGE_MODEL_ID` (default `Wan-AI/Wan2.1-I2V-14B-480P-Diffusers`)
+- `OMNICHAT_VIDEO_IMAGE_MODEL_ID` (default `Wan-AI/Wan2.2-TI2V-5B-Diffusers`)
 
 The worker validates all prompt, duration, aspect-ratio, reference-URL, and
 seed fields before loading a model. `test_contract.py` runs without CUDA or
