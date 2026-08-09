@@ -106,9 +106,15 @@ export function resolveVerticalDirection(input: MovementInput): number {
 // sprint again at the exact instant it ticks past 0) is the hysteresis band
 // that stops speed flickering right at the empty/recover boundary.
 
-/** Full stamina meter, 4 seconds of continuous sprint to drain from here. */
+/**
+ * Full stamina meter, 6 seconds of continuous sprint to drain from here.
+ *
+ * The meter stays normalized to 0..1 so the HUD bar keeps rendering the same
+ * fixed-width track (see `.stamina-bar` in styles.css) - a longer sprint is
+ * bought by draining slower, not by growing the meter past 1.
+ */
 export const STAMINA_MAX = 1;
-export const STAMINA_SPRINT_DRAIN_PER_SECOND = 0.25;
+export const STAMINA_SPRINT_DRAIN_PER_SECOND = 0.1667;
 /** ~6.7s from empty to full at rest. */
 export const STAMINA_RECOVERY_PER_SECOND = 0.15;
 /** Hysteresis floor: must climb back above 15% before sprint re-engages. */
