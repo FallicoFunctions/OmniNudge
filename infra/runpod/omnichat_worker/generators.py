@@ -50,11 +50,17 @@ DEFAULT_BODY_ADAPTER_WEIGHT = "ip-adapter-plus_sdxl_vit-h.safetensors"
 # fights both persona likeness and the adult content this product generates.
 DEFAULT_IMAGE_MODEL_ID = "SG161222/RealVisXL_V5.0"
 
+# Deliberately contains no anti-stillness terms. "static image, no motion,
+# frozen frame, slideshow" used to lead this list, back when the risk was Wan
+# returning a frozen frame. It now contradicts the prompt, which asks the
+# subject to come to rest before the clip ends: penalising stillness while
+# requesting it produced clips that stopped mid-gesture, blurred, having never
+# settled. Motion is what the model is for; it does not need to be pushed.
 DEFAULT_VIDEO_NEGATIVE_PROMPT = (
-    "static image, no motion, frozen frame, slideshow, jitter, flicker, strobing, "
-    "morphing face, changing face, distorted face, deformed hands, extra limbs, "
-    "duplicate person, warping, ghosting, blurry, low quality, overexposed, "
-    "compression artifacts, text, captions, watermark, signature"
+    "jitter, flicker, strobing, morphing face, changing face, distorted face, "
+    "deformed hands, extra limbs, duplicate person, warping, ghosting, blurry, "
+    "low quality, overexposed, compression artifacts, text, captions, "
+    "watermark, signature"
 )
 # Wan 2.2's 5B text-and-image-to-video model. Apache-2.0, 720p at 24fps, and it
 # fits a single 24GB GPU, which the 14B mixture-of-experts variants do not.
