@@ -74,11 +74,26 @@ user-owned/imported persona metadata can never select model weights. The image
 worker uses IP-Adapter for identity while the scene prompt controls environment
 and pose. The structured `scene` snapshot is sent separately from the prose
 prompt so recent physical events and clothing/pose fields are not lost during
-prompt compaction. A video request uses the identity anchor as its initial frame when it
-is not already image-to-video.
+prompt compaction.
 
-Video input uses `kind: "video"`, `duration_seconds`, `resolution`, and
-`aspect_ratio`; image-to-video jobs additionally include `source_image_url`.
+Video is rendered in two phases, because identity conditioning exists only in
+the image pipeline. The queue first sends the scene to the **image** endpoint
+with the same references, identity profile, scene snapshot and prompt a Scene
+photo would get; that still is stored as a real gallery asset and recorded on
+the job as `source_asset_id`. Its signed URL is then sent to the **video**
+endpoint as `source_image_url`. A Create-page `image_to_video` request already
+carries a source asset and skips the first phase.
+
+Video input therefore uses `kind: "video"`, `mode: "image_to_video"`,
+`duration_seconds`, `source_image_url`, and a motion-only `prompt`. It carries
+no references, no identity fields, no `scene` object and no `aspect_ratio`: the
+still already fixes appearance and setting, and the frame size is derived from
+the still's own dimensions. There is no text-to-video path — a video request
+without a source is a contract error rather than a degraded render.
+
+A two-phase job records both worker builds:
+`provider_metadata.worker_build` is the clip's and
+`provider_metadata.source.worker_build` is the still's.
 The worker must return a RunPod `COMPLETED` output in this shape (an
 image-only worker may return `image` or a single URL instead):
 
@@ -122,8 +137,10 @@ The API and worker must share PostgreSQL, Redis, and the same storage backend. P
 | `OMNICHAT_MEDIA_PROVIDER` | Must be `runpod` for the media queue |
 | `RUNPOD_API_KEY` | Server/worker-only RunPod credential |
 | `RUNPOD_BASE_URL` | RunPod API base URL; production uses `https://api.runpod.ai/v2` |
-| `RUNPOD_IMAGE_ENDPOINT_ID` | RunPod scale-to-zero endpoint for image generation and editing |
-| `RUNPOD_VIDEO_ENDPOINT_ID` | RunPod scale-to-zero endpoint for text-to-video and image-to-video jobs |
+| `RUNPOD_IMAGE_ENDPOINT_ID` | RunPod scale-to-zero endpoint for image generation and editing, and for the first phase of every video job |
+| `RUNPOD_IMAGE_ENDPOINT_ID_NSFW` | Optional image endpoint for accounts entitled to explicit content. Empty falls back to `RUNPOD_IMAGE_ENDPOINT_ID`. One split covers both media kinds because every explicit pixel is produced by the image phase |
+| `RUNPOD_VIDEO_ENDPOINT_ID` | RunPod scale-to-zero endpoint for image-to-video jobs |
+| `RUNPOD_REQUEST_TIMEOUT_SECONDS` | Bounds a whole generation job, including both phases of a video. Defaults to `1800`; the RunPod endpoint's own execution timeout should be at least as long |
 | `RUNPOD_INPUT_HOSTS` | Comma-separated HTTPS hostnames the GPU workers may fetch approved persona/source images from; signed query strings are allowed. HTTPS storage/CDN and `RUNPOD_WORKER_BACKEND_URL` hosts are added automatically to the API-side list |
 | `RUNPOD_OUTPUT_HOSTS` | Comma-separated HTTPS hostnames allowed for worker output downloads; HTTPS `S3_ENDPOINT`/`CLOUDFRONT_URL` hosts are added automatically |
 | `OMNICHAT_OUTPUT_BUCKET` (worker only) | Private S3-compatible bucket used by the image/video endpoint containers |
@@ -205,7 +222,7 @@ Before enabling the feature in production:
 2. Run both the API server and background worker with the same environment and storage configuration.
 3. Verify Redis connectivity; generation is deliberately unavailable without the durable queue.
 4. Verify ClamAV and keep `VIRUS_SCAN_FAIL_CLOSED=true`.
-5. Configure the RunPod API key, image/video endpoint IDs, avatar worker image/GPU, and network volume; test image, image-edit, text-video, and image-video jobs in staging because model availability and input contracts can change.
+5. Configure the RunPod API key, image/video endpoint IDs, avatar worker image/GPU, and network volume; test image, image-edit, scene-video (two-phase), and Create-page image-video jobs in staging because model availability and input contracts can change.
 6. Keep S3/R2/CloudFront CORS and object permissions private; generated files are streamed or signed by authorized application routes.
 7. Configure `OPENROUTER_API_KEY` before enabling public creation so chat and publication checks remain available.
 8. For free local speech, start Voicebox on the same host as the API, download/load Kokoro, confirm `GET http://127.0.0.1:17493/health`, and verify port `17493` is not reachable from another machine. Voicebox can start after the API; failed previews remain retryable.

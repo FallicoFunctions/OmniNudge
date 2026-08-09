@@ -35,6 +35,11 @@ import (
 // the payload must still carry a well-formed HTTPS reference.
 const placeholderReferenceURL = "https://storage.googleapis.com/omnichat-preview/persona-reference.png"
 
+// placeholderSourceStillURL stands in for the still the image phase has not
+// rendered yet. A video preview is about the motion prompt and the request
+// shape, neither of which depends on the actual frame.
+const placeholderSourceStillURL = "https://storage.googleapis.com/omnichat-preview/source-still.png"
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
@@ -47,6 +52,7 @@ func run() error {
 	ownerUserID := flag.Int("owner", 0, "owning user id for the conversation")
 	personaID := flag.Int("persona", 0, "persona id (defaults to the conversation's persona)")
 	mode := flag.String("mode", string(models.OmniChatGenerationModeContextual), "generation mode: contextual or create")
+	kind := flag.String("kind", string(models.OmniChatMediaKindImage), "media kind: image or video")
 	prompt := flag.String("prompt", "", "requested view; defaults to the Scene photo button's prompt")
 	aspect := flag.String("aspect", "4:5", "aspect ratio")
 	asJSON := flag.Bool("json", false, "emit the raw provider payload as JSON only")
@@ -54,6 +60,10 @@ func run() error {
 
 	if *conversationID < 1 || *ownerUserID < 1 {
 		return errors.New("--conversation and --owner are required")
+	}
+	mediaKind := models.OmniChatMediaKind(strings.ToLower(strings.TrimSpace(*kind)))
+	if mediaKind != models.OmniChatMediaKindImage && mediaKind != models.OmniChatMediaKindVideo {
+		return errors.New("--kind must be image or video")
 	}
 
 	_ = godotenv.Load(".env", "backend/.env")
@@ -93,7 +103,7 @@ func run() error {
 		requestedPrompt = "Show the current scene as a candid photo, preserving the character, setting, outfit, mood, and activity."
 	}
 	request := models.OmniChatGenerationRequest{
-		Kind:           models.OmniChatMediaKindImage,
+		Kind:           mediaKind,
 		Mode:           models.OmniChatGenerationMode(*mode),
 		PersonaID:      resolvedPersonaID,
 		ConversationID: conversationID,
@@ -142,16 +152,31 @@ func run() error {
 	if job.Scene.SubjectAppearance == "" {
 		job.Scene.SubjectAppearance = job.IdentityProfile.Appearance
 	}
-	spec, err := queue.BuildRunPodGenerationSpec(cfg.OmniChatMedia, job, []string{placeholderReferenceURL}, "")
+	// The image spec is what a Scene photo sends, and it is also the first
+	// phase of a video job: the queue renders this still, then animates it.
+	imageSpec, err := queue.BuildImageSpec(cfg.OmniChatMedia, job, []string{placeholderReferenceURL})
 	if err != nil {
-		return fmt.Errorf("build provider spec: %w", err)
+		return fmt.Errorf("build image spec: %w", err)
+	}
+	specs := []labelledSpec{{label: "image", spec: imageSpec}}
+	if job.Kind == models.OmniChatMediaKindVideo {
+		// The still does not exist yet at preview time, so its signed URL is
+		// stood in for. Everything else -- the motion-only prompt, the mode,
+		// the absence of references -- is exactly what the queue will send.
+		videoSpec, err := queue.BuildVideoSpec(cfg.OmniChatMedia, job, placeholderSourceStillURL)
+		if err != nil {
+			return fmt.Errorf("build video spec: %w", err)
+		}
+		specs = append(specs, labelledSpec{label: "video", spec: videoSpec})
 	}
 
-	payload, err := json.MarshalIndent(spec.Input, "", "  ")
-	if err != nil {
-		return err
-	}
 	if *asJSON {
+		// The worker preview consumes one payload, so emit the phase that is
+		// actually in question: the animation for a video, the still otherwise.
+		payload, err := json.MarshalIndent(specs[len(specs)-1].spec.Input, "", "  ")
+		if err != nil {
+			return err
+		}
 		fmt.Println(string(payload))
 		return nil
 	}
@@ -168,11 +193,24 @@ func run() error {
 	}
 	fmt.Printf("\n--- resolved scene state ---\n%s\n", sceneJSON)
 	fmt.Printf("\n--- effective prompt ---\n%s\n", normalized.EffectivePrompt)
-	fmt.Printf("\n--- provider payload (endpoint %s) ---\n%s\n", spec.EndpointID, payload)
+	for index, entry := range specs {
+		payload, err := json.MarshalIndent(entry.spec.Input, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Printf("\n--- phase %d: %s payload (endpoint %s) ---\n%s\n",
+			index+1, entry.label, entry.spec.EndpointID, payload)
+	}
 	fmt.Printf("\nPipe the payload into the worker's own preview to see the final rendered prompt:\n")
-	fmt.Printf("  go run ./cmd/omnichat_prompt_preview -conversation %d -owner %d -json > /tmp/payload.json\n", *conversationID, *ownerUserID)
+	fmt.Printf("  go run ./cmd/omnichat_prompt_preview -conversation %d -owner %d -kind %s -json > /tmp/payload.json\n",
+		*conversationID, *ownerUserID, job.Kind)
 	fmt.Printf("  (cd ../infra/runpod && python -m omnichat_worker.preview /tmp/payload.json)\n")
 	return nil
+}
+
+type labelledSpec struct {
+	label string
+	spec  *queue.RunPodGenerationSpec
 }
 
 func conversationPersonaID(ctx context.Context, db *database.DB, conversationID, ownerUserID int) (int, error) {
