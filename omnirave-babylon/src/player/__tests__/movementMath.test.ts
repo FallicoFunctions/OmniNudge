@@ -122,19 +122,19 @@ describe('stepStamina', () => {
 
     const sprintAllowed = stepStamina(state, true, 1);
     expect(sprintAllowed).toBe(true);
-    expect(state.stamina).toBeCloseTo(0.75);
+    expect(state.stamina).toBeCloseTo(0.8333);
     expect(state.depleted).toBe(false);
 
     const recovering = stepStamina(state, false, 1);
     expect(recovering).toBe(false);
-    expect(state.stamina).toBeCloseTo(0.9);
+    expect(state.stamina).toBeCloseTo(0.9833);
   });
 
   it('forces walk speed once stamina empties and holds it through the hysteresis band', () => {
     const state = createStaminaState();
 
-    // 4s of continuous sprint drains a full 1.0 budget at 0.25/s.
-    for (let i = 0; i < 4; i += 1) {
+    // 6s of continuous sprint drains a full 1.0 budget at 0.1667/s.
+    for (let i = 0; i < 6; i += 1) {
       stepStamina(state, true, 1);
     }
     expect(state.stamina).toBe(0);
