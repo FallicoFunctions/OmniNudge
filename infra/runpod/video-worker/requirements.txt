@@ -7,3 +7,9 @@ transformers==4.57.1
 safetensors==0.6.2
 imageio==2.37.0
 imageio-ffmpeg==0.6.0
+# Required by the Wan pipelines, not optional. diffusers guards the *import* of
+# ftfy behind is_ftfy_available() but calls ftfy.fix_text() unconditionally in
+# prompt_clean(), so a worker without it loads the model, downloads every
+# weight, and only then dies with "NameError: name 'ftfy' is not defined" at
+# the first prompt it encodes.
+ftfy==6.3.1

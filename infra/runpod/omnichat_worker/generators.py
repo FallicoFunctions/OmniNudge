@@ -49,6 +49,20 @@ DEFAULT_BODY_ADAPTER_WEIGHT = "ip-adapter-plus_sdxl_vit-h.safetensors"
 # fights both persona likeness and the adult content this product generates.
 DEFAULT_IMAGE_MODEL_ID = "SG161222/RealVisXL_V5.0"
 
+DEFAULT_VIDEO_NEGATIVE_PROMPT = (
+    "static image, no motion, frozen frame, slideshow, jitter, flicker, strobing, "
+    "morphing face, changing face, distorted face, deformed hands, extra limbs, "
+    "duplicate person, warping, ghosting, blurry, low quality, overexposed, "
+    "compression artifacts, text, captions, watermark, signature"
+)
+# Wan 2.2's 5B text-and-image-to-video model. Apache-2.0, 720p at 24fps, and it
+# fits a single 24GB GPU, which the 14B mixture-of-experts variants do not.
+DEFAULT_VIDEO_MODEL_ID = "Wan-AI/Wan2.2-TI2V-5B-Diffusers"
+DEFAULT_VIDEO_FPS = 24
+# The trained clip length: 121 frames is about five seconds at 24fps.
+DEFAULT_VIDEO_MAX_FRAMES = 121
+DEFAULT_VIDEO_MAX_AREA = 720 * 1280
+
 
 # Distinguishes "caller has not detected yet" from a genuine "no face found",
 # so passing None short-circuits detection instead of retriggering it.
@@ -1113,78 +1127,231 @@ class ImageGenerator:
         return self._render(request)
 
 
+def video_fps() -> int:
+    """Frames per second for both sampling and muxing.
+
+    Wan 2.2 is trained at 24fps. Exporting at a different rate than the model
+    sampled at does not resample -- it just plays the same frames faster or
+    slower -- so one value has to drive both.
+    """
+    return _positive_int_env("OMNICHAT_VIDEO_FPS", DEFAULT_VIDEO_FPS, minimum=8, maximum=60)
+
+
+def _snap_frame_count(value: int) -> int:
+    """Round a frame count down to the nearest value Wan can actually sample."""
+    return max(5, ((value - 1) // 4) * 4 + 1)
+
+
+def video_frame_count(duration_seconds: int, fps: int, max_frames: int) -> int:
+    """Pick the sampled frame count for a requested clip length.
+
+    Wan's temporal VAE only accepts 4k+1 frames, so an arbitrary
+    duration * fps product is not a legal request. Wan 2.2 is additionally
+    trained at 121 frames (about five seconds at 24fps) and degrades away from
+    that length rather than failing, which is why the ceiling is a clamp and
+    not a validation error: a ten-second request returns a good five-second
+    clip instead of ten seconds of drift.
+    """
+    if fps <= 0:
+        raise ModelError("video fps must be positive")
+    target = max(1, duration_seconds) * fps
+    nearest = round((target - 1) / 4) * 4 + 1
+    return max(5, min(_snap_frame_count(max_frames), int(nearest)))
+
+
+def video_max_frames() -> int:
+    return _positive_int_env("OMNICHAT_VIDEO_MAX_FRAMES", DEFAULT_VIDEO_MAX_FRAMES, minimum=5, maximum=241)
+
+
+def video_max_area() -> int:
+    return _positive_int_env(
+        "OMNICHAT_VIDEO_MAX_AREA", DEFAULT_VIDEO_MAX_AREA, minimum=320 * 320, maximum=1280 * 1280
+    )
+
+
+def video_pipeline_settings() -> tuple[int, float]:
+    """Sampling steps and guidance, defaulting to the published Wan 2.2 values."""
+    steps = _positive_int_env("OMNICHAT_VIDEO_STEPS", 50, minimum=1, maximum=100)
+    guidance = _bounded_float_env("OMNICHAT_VIDEO_GUIDANCE_SCALE", 5.0, minimum=0.0, maximum=20.0)
+    return steps, guidance
+
+
+def video_lora_settings() -> tuple[str, str, float] | None:
+    """Operator-configured motion LoRA, or None when the base model is used.
+
+    Unlike the identity LoRA, this comes from the endpoint environment rather
+    than from a request, so it needs no allowlist: nothing a browser sends can
+    reach it. It exists so a motion adapter can be swapped in by editing the
+    RunPod template instead of rebuilding the worker image.
+    """
+    model_id = os.getenv("OMNICHAT_VIDEO_LORA_MODEL_ID", "").strip()
+    if not model_id:
+        return None
+    weight_name = os.getenv("OMNICHAT_VIDEO_LORA_WEIGHT_NAME", "").strip()
+    scale = _bounded_float_env("OMNICHAT_VIDEO_LORA_SCALE", 0.8, minimum=0.0, maximum=2.0)
+    return model_id, weight_name, scale
+
+
+def build_video_negative_prompt(request_negative_prompt: str) -> str:
+    """Keep common video defects out of every clip.
+
+    The still already fixed appearance, so these target motion artifacts --
+    a frozen frame, a face that morphs between frames -- rather than the
+    composition defects the image negative prompt handles.
+    """
+    custom = " ".join(request_negative_prompt.split()).strip()
+    if not custom:
+        return DEFAULT_VIDEO_NEGATIVE_PROMPT
+    return f"{DEFAULT_VIDEO_NEGATIVE_PROMPT}, {custom}"
+
+
+def _video_mod_value(pipe: Any) -> int:
+    """Read the frame-size granularity the loaded pipeline requires.
+
+    Both factors are model-specific -- Wan 2.2's high-compression VAE does not
+    use the same spatial scale factor as Wan 2.1 -- so this is read off the
+    pipeline rather than hardcoded. A wrong value here does not raise; it
+    produces a latent the transformer silently crops.
+    """
+    try:
+        mod_value = int(pipe.vae_scale_factor_spatial) * int(pipe.transformer.config.patch_size[1])
+    except (AttributeError, IndexError, TypeError, ValueError) as exc:
+        raise ModelError("video pipeline does not expose its frame size granularity") from exc
+    if mod_value <= 0:
+        raise ModelError("video pipeline reported an invalid frame size granularity")
+    return mod_value
+
+
+def video_frame_dimensions(source_width: int, source_height: int, mod_value: int, max_area: int) -> tuple[int, int]:
+    """Derive the clip's frame size from the source still's own aspect ratio.
+
+    The still is authoritative. Snapping to a fixed table instead would
+    letterbox or crop it, throwing away the framing the identity pipeline just
+    produced. Returns (height, width) to match the diffusers argument order.
+    """
+    if source_width <= 0 or source_height <= 0:
+        raise ModelError("source image dimensions are invalid")
+    if mod_value <= 0:
+        raise ModelError("video frame size granularity must be positive")
+    aspect_ratio = source_height / source_width
+    height = int(round(math.sqrt(max_area * aspect_ratio)) // mod_value * mod_value)
+    width = int(round(math.sqrt(max_area / aspect_ratio)) // mod_value * mod_value)
+    return max(mod_value, height), max(mod_value, width)
+
+
 @dataclass
 class VideoResult:
     file: tempfile.NamedTemporaryFile
     duration: float
+    actual_prompt: str
 
 
 class VideoGenerator:
+    """Animates an already-rendered still.
+
+    There is deliberately no text-to-video path. Identity conditioning lives
+    entirely in the image pipeline, so a video generated from a prompt alone
+    would be a different woman in a different room. The queue renders the
+    identity-correct still first and passes it here as source_image_url.
+    """
+
     def __init__(self) -> None:
-        self.text_model_id = os.getenv("OMNICHAT_VIDEO_TEXT_MODEL_ID", "Wan-AI/Wan2.1-T2V-1.3B-Diffusers")
-        self.image_model_id = os.getenv("OMNICHAT_VIDEO_IMAGE_MODEL_ID", "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers")
-        self._text_pipeline = None
-        self._image_pipeline = None
+        self.model_id = os.getenv("OMNICHAT_VIDEO_IMAGE_MODEL_ID", DEFAULT_VIDEO_MODEL_ID)
+        self._pipeline = None
 
-    def _load(self, image_to_video: bool):
-        existing = self._image_pipeline if image_to_video else self._text_pipeline
-        if existing is not None:
-            return existing
-        torch, dtype = _device_dtype()
+    def _load(self):
+        if self._pipeline is not None:
+            return self._pipeline
+        torch, _ = _device_dtype()
         try:
-            if image_to_video:
-                from diffusers import WanImageToVideoPipeline  # type: ignore
+            from diffusers import AutoencoderKLWan, WanImageToVideoPipeline  # type: ignore
 
-                pipeline = WanImageToVideoPipeline.from_pretrained(self.image_model_id, torch_dtype=dtype)
-                self._image_pipeline = pipeline
-            else:
-                from diffusers import WanPipeline  # type: ignore
-
-                pipeline = WanPipeline.from_pretrained(self.text_model_id, torch_dtype=dtype)
-                self._text_pipeline = pipeline
+            # Wan's VAE is numerically unstable in half precision and produces
+            # black or banded frames; the transformer runs in bfloat16 while
+            # the VAE stays in float32. This split is the documented recipe,
+            # not a workaround.
+            vae = AutoencoderKLWan.from_pretrained(self.model_id, subfolder="vae", torch_dtype=torch.float32)
+            pipeline = WanImageToVideoPipeline.from_pretrained(
+                self.model_id, vae=vae, torch_dtype=torch.bfloat16
+            )
+            lora = video_lora_settings()
+            if lora is not None:
+                model_id, weight_name, scale = lora
+                pipeline.load_lora_weights(
+                    model_id,
+                    weight_name=weight_name or None,
+                    adapter_name="omnichat_motion",
+                )
+                if hasattr(pipeline, "set_adapters"):
+                    pipeline.set_adapters(["omnichat_motion"], adapter_weights=[scale])
             pipeline.enable_model_cpu_offload()
-            return pipeline
+            self._pipeline = pipeline
         except Exception as exc:  # pragma: no cover - model/runtime specific
+            self._pipeline = None
             raise ModelError("video model could not be loaded") from exc
+        return self._pipeline
 
     def render(self, request: GenerationRequest) -> VideoResult:
-        import torch  # type: ignore
+        if request.mode != "image_to_video" or not request.source_image_url:
+            # The contract already rejects this, so reaching it means the
+            # backend sent a video request without running its image phase.
+            # Failing is correct: the old fallback silently animated a persona
+            # reference photo, which rendered her in that photo's setting
+            # rather than the scene the user asked for.
+            raise ModelError("video generation requires a rendered source image")
         from diffusers.utils import export_to_video  # type: ignore
 
-        # A contextual/create request with persona references can use the
-        # first curated reference as the initial frame. This keeps identity in
-        # video even though Wan's text-to-video pipeline has no multi-image
-        # adapter input.
-        image_to_video = request.mode == "image_to_video" or bool(request.reference_image_urls)
-        pipe = self._load(image_to_video)
+        source = _download_image(request.source_image_url)
+        pipe = self._load()
+        torch, _ = _device_dtype()
         generator = torch.Generator(device="cuda")
         if request.seed is not None:
             generator = generator.manual_seed(request.seed)
-        frames = max(16, min(160, request.duration_seconds * int(os.getenv("OMNICHAT_VIDEO_FPS", str(16)))))
+        height, width = video_frame_dimensions(
+            source.width, source.height, _video_mod_value(pipe), video_max_area()
+        )
+        source = _resize_image(source, width, height)
+        fps = video_fps()
+        num_frames = video_frame_count(request.duration_seconds, fps, video_max_frames())
+        steps, guidance_scale = video_pipeline_settings()
+        rendered_negative_prompt = build_video_negative_prompt(request.negative_prompt)
         kwargs: dict[str, Any] = {
+            "image": source,
             "prompt": request.prompt,
-            "negative_prompt": request.negative_prompt or None,
-            "height": request.height,
-            "width": request.width,
-            "num_frames": frames,
+            "negative_prompt": rendered_negative_prompt,
+            "height": height,
+            "width": width,
+            "num_frames": num_frames,
             "generator": generator,
-            "num_inference_steps": int(os.getenv("OMNICHAT_VIDEO_STEPS", "30")),
+            "num_inference_steps": steps,
+            "guidance_scale": guidance_scale,
         }
-        if image_to_video:
-            source = request.source_image_url or (request.reference_image_urls[0] if request.reference_image_urls else "")
-            kwargs["image"] = _download_image(source)
         target: tempfile.NamedTemporaryFile | None = None
         try:
             with torch.inference_mode():
                 result = pipe(**kwargs)
             frames_out = getattr(result, "frames", None)
-            if not frames_out:
+            # Length, not truthiness. The default output type is "np", so this
+            # is a numpy array, and `if not frames_out` raises "truth value of
+            # an array is ambiguous" rather than testing for emptiness -- which
+            # the generic handler below then reports as a model failure.
+            if frames_out is None or len(frames_out) == 0:
                 raise ModelError("video model returned no frames")
-            frames_out = frames_out[0] if isinstance(frames_out[0], list) else frames_out
+            # Index the batch unconditionally, as the diffusers examples do.
+            # The array is (batch, num_frames, H, W, C) and the list form is a
+            # list of per-video frame lists; testing frames_out[0] for a list
+            # kept the batch axis in the array case, which exported a one-frame
+            # clip and reported its duration as 1/fps.
+            frames_out = frames_out[0]
+            if len(frames_out) == 0:
+                raise ModelError("video model returned no frames")
             target = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
             target.close()
-            export_to_video(frames_out, target.name, fps=int(os.getenv("OMNICHAT_VIDEO_FPS", "16")))
-            return VideoResult(target, float(request.duration_seconds))
+            export_to_video(frames_out, target.name, fps=fps)
+            # Report what was actually sampled. A ten-second request is clamped
+            # to the trained frame count, and the stored asset duration has to
+            # match the file rather than the ask.
+            return VideoResult(target, len(frames_out) / fps, request.prompt)
         except ModelError:
             if target is not None:
                 Path(target.name).unlink(missing_ok=True)

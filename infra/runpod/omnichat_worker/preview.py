@@ -21,7 +21,14 @@ import sys
 from typing import Any
 
 from .contract import validate_input
-from .generators import build_image_negative_prompt, build_image_prompt
+from .generators import (
+    build_image_negative_prompt,
+    build_image_prompt,
+    build_video_negative_prompt,
+    video_fps,
+    video_frame_count,
+    video_max_frames,
+)
 
 
 def _load(source: str) -> dict[str, Any]:
@@ -55,6 +62,9 @@ def render(payload: dict[str, Any]) -> str:
             + "\nAdd them to contract._scene or they will never reach the renderer."
         )
 
+    if request.kind == "video":
+        return _render_video(request)
+
     lines = [
         f"mode:             {mode}",
         f"aspect_ratio:     {payload.get('aspect_ratio', '')}",
@@ -74,6 +84,39 @@ def render(payload: dict[str, Any]) -> str:
     lines.append("")
     lines.append("--- rendered negative prompt ---")
     lines.append(build_image_negative_prompt(negative, mode, prompt, scene))
+    return "\n".join(lines)
+
+
+def _render_video(request: Any) -> str:
+    """Show what the video worker would do with an animation payload.
+
+    Rendering this through build_image_prompt would be actively misleading: the
+    video worker never calls it, and the whole point of the two-phase split is
+    that the video prompt carries motion and nothing else.
+    """
+    if request.mode != "image_to_video" or not request.source_image_url:
+        raise SystemExit(
+            "a video payload must carry mode=image_to_video and source_image_url.\n"
+            "There is no text-to-video path; the queue renders the still first."
+        )
+    fps = video_fps()
+    frames = video_frame_count(request.duration_seconds, fps, video_max_frames())
+    lines = [
+        f"mode:             {request.mode}",
+        f"source frame:     {request.source_image_url}",
+        f"duration:         {request.duration_seconds}s requested",
+        f"sampled:          {frames} frames at {fps}fps ({frames / fps:.2f}s)",
+        "frame size:       derived from the source still, not from aspect_ratio",
+        f"references:       {len(request.reference_image_urls)} (the still already carries identity)",
+        "",
+        "--- motion prompt ---",
+        request.prompt,
+        "",
+        "--- rendered negative prompt ---",
+        build_video_negative_prompt(request.negative_prompt),
+    ]
+    if frames < request.duration_seconds * fps:
+        lines.insert(4, "note:             clamped to the trained clip length; quality degrades past it")
     return "\n".join(lines)
 
 

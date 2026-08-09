@@ -648,3 +648,290 @@ class FaceDetectionReuseTests(unittest.TestCase):
         with patch.object(gen, "_detect_face_box", side_effect=AssertionError("re-detected")):
             self.assertFalse(gen._is_close_portrait(image, None))
             self.assertTrue(gen._face_is_detailed_enough(image, None))
+
+
+class VideoFrameGeometryTests(unittest.TestCase):
+    """Wan cannot sample an arbitrary frame count or frame size.
+
+    num_frames must be 4k+1 for the temporal VAE, and both frame dimensions
+    must be multiples of a model-specific granularity. Neither constraint
+    raises when violated -- the pipeline crops or errors deep inside the
+    transformer -- so both are computed here rather than trusted from a
+    request.
+    """
+
+    def test_frame_count_is_always_a_legal_wan_length(self):
+        from .generators import video_frame_count
+
+        for duration in range(1, 11):
+            for fps in (16, 24, 30):
+                frames = video_frame_count(duration, fps, 121)
+                self.assertEqual(frames % 4, 1, f"{duration}s at {fps}fps produced {frames} frames")
+                self.assertGreaterEqual(frames, 5)
+                self.assertLessEqual(frames, 121)
+
+    def test_trained_length_is_reached_at_five_seconds(self):
+        from .generators import video_frame_count
+
+        self.assertEqual(video_frame_count(5, 24, 121), 121)
+
+    def test_a_long_request_is_clamped_rather_than_honoured(self):
+        # Quality degrades away from the trained length, so a ten-second ask
+        # returns a good five-second clip instead of ten seconds of drift.
+        from .generators import video_frame_count
+
+        self.assertEqual(video_frame_count(10, 24, 121), 121)
+
+    def test_a_short_request_scales_down(self):
+        from .generators import video_frame_count
+
+        self.assertEqual(video_frame_count(1, 24, 121), 25)
+
+    def test_an_operator_ceiling_is_snapped_to_a_legal_length(self):
+        # 100 is not 4k+1; honouring it verbatim would fail inside the VAE.
+        from .generators import video_frame_count
+
+        self.assertEqual(video_frame_count(10, 24, 100), 97)
+
+    def test_frame_dimensions_follow_the_source_still(self):
+        from .generators import video_frame_dimensions
+
+        portrait_height, portrait_width = video_frame_dimensions(768, 1344, 32, 720 * 1280)
+        self.assertGreater(portrait_height, portrait_width)
+        landscape_height, landscape_width = video_frame_dimensions(1344, 768, 32, 720 * 1280)
+        self.assertGreater(landscape_width, landscape_height)
+
+    def test_frame_dimensions_are_multiples_of_the_pipeline_granularity(self):
+        from .generators import video_frame_dimensions
+
+        for mod_value in (16, 32):
+            for size in ((1024, 1024), (768, 1344), (1344, 768), (896, 1152)):
+                height, width = video_frame_dimensions(size[0], size[1], mod_value, 720 * 1280)
+                self.assertEqual(height % mod_value, 0)
+                self.assertEqual(width % mod_value, 0)
+                self.assertLessEqual(height * width, 720 * 1280)
+
+    def test_frame_dimensions_reject_an_unusable_source(self):
+        from .generators import ModelError, video_frame_dimensions
+
+        with self.assertRaises(ModelError):
+            video_frame_dimensions(0, 1024, 32, 720 * 1280)
+        with self.assertRaises(ModelError):
+            video_frame_dimensions(1024, 1024, 0, 720 * 1280)
+
+    def test_granularity_is_read_from_the_loaded_pipeline(self):
+        from .generators import ModelError, _video_mod_value
+
+        class _Transformer:
+            config = type("_Config", (), {"patch_size": (1, 2, 2)})()
+
+        class _Pipe:
+            vae_scale_factor_spatial = 16
+            transformer = _Transformer()
+
+        self.assertEqual(_video_mod_value(_Pipe()), 32)
+        with self.assertRaises(ModelError):
+            _video_mod_value(object())
+
+
+class VideoGeneratorContractTests(unittest.TestCase):
+    def test_default_model_is_the_single_gpu_wan_checkpoint(self):
+        from .generators import VideoGenerator
+
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(VideoGenerator().model_id, "Wan-AI/Wan2.2-TI2V-5B-Diffusers")
+        with patch.dict(os.environ, {"OMNICHAT_VIDEO_IMAGE_MODEL_ID": "other/model"}, clear=True):
+            self.assertEqual(VideoGenerator().model_id, "other/model")
+
+    def test_a_video_request_without_a_source_still_is_a_contract_error(self):
+        # The previous worker silently animated a persona reference photo here,
+        # which rendered her in that photo's setting rather than the current
+        # scene. There is no text-to-video path to fall back to any more.
+        from .contract import validate_input
+        from .generators import ModelError, VideoGenerator
+
+        request = validate_input({"kind": "video", "mode": "create", "prompt": "she turns to look at you"})
+        with self.assertRaises(ModelError):
+            VideoGenerator().render(request)
+
+    def test_there_is_no_text_to_video_pipeline_left(self):
+        # Deleted rather than left unreachable: a text-to-video render has no
+        # identity conditioning at all, so it must not survive as a fallback
+        # that a later edit could quietly re-enable.
+        import pathlib
+
+        source = pathlib.Path(generator_module.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("WanPipeline", source)
+        self.assertNotIn("OMNICHAT_VIDEO_TEXT_MODEL_ID", source)
+
+    def test_motion_negative_prompt_keeps_the_request_text(self):
+        from .generators import DEFAULT_VIDEO_NEGATIVE_PROMPT, build_video_negative_prompt
+
+        self.assertEqual(build_video_negative_prompt("  "), DEFAULT_VIDEO_NEGATIVE_PROMPT)
+        combined = build_video_negative_prompt("rain")
+        self.assertTrue(combined.startswith(DEFAULT_VIDEO_NEGATIVE_PROMPT))
+        self.assertTrue(combined.endswith("rain"))
+
+    def test_motion_lora_is_off_until_the_endpoint_configures_one(self):
+        from .generators import video_lora_settings
+
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertIsNone(video_lora_settings())
+        with patch.dict(
+            os.environ,
+            {
+                "OMNICHAT_VIDEO_LORA_MODEL_ID": "someone/motion-lora",
+                "OMNICHAT_VIDEO_LORA_WEIGHT_NAME": "weights.safetensors",
+                "OMNICHAT_VIDEO_LORA_SCALE": "0.55",
+            },
+            clear=True,
+        ):
+            self.assertEqual(video_lora_settings(), ("someone/motion-lora", "weights.safetensors", 0.55))
+
+    def test_sampling_and_export_share_one_frame_rate(self):
+        from .generators import video_fps
+
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(video_fps(), 24)
+        with patch.dict(os.environ, {"OMNICHAT_VIDEO_FPS": "16"}, clear=True):
+            self.assertEqual(video_fps(), 16)
+
+
+class VideoPreviewTests(unittest.TestCase):
+    """The no-GPU preview must describe the video worker, not the image one.
+
+    Rendering a video payload through build_image_prompt would print a
+    convincing image prompt that the video worker never uses, which is worse
+    than printing nothing.
+    """
+
+    def test_video_payload_reports_motion_and_sampled_length(self):
+        from .preview import render
+
+        # The input-host allowlist is ambient environment, and another test in
+        # this package sets it. Pin it rather than inherit whatever ran first.
+        with patch.dict(os.environ, {"OMNICHAT_INPUT_HOSTS": "storage.googleapis.com"}):
+            output = render({
+                "kind": "video",
+                "mode": "image_to_video",
+                "prompt": "she leans in",
+                "duration_seconds": 10,
+                "source_image_url": "https://storage.googleapis.com/omnichat/still.png",
+            })
+        self.assertIn("she leans in", output)
+        self.assertIn("121 frames at 24fps", output)
+        self.assertIn("clamped to the trained clip length", output)
+        self.assertNotIn("photorealistic", output)
+
+    def test_video_payload_without_a_source_is_reported_as_a_contract_error(self):
+        from .contract import ContractError
+        from .preview import render
+
+        with self.assertRaises((SystemExit, ContractError)):
+            render({"kind": "video", "mode": "image_to_video", "prompt": "she waves"})
+
+
+class VideoRenderOutputTests(unittest.TestCase):
+    """Drive render() past the pipeline call.
+
+    Every other video test stops at the contract guard, which is exactly how a
+    numpy-vs-list mistake in the frame handling shipped: the pipeline's output
+    shape is never exercised without a GPU unless it is faked here.
+    """
+
+    def _render(self, frames, duration_seconds=5):
+        import contextlib
+        import pathlib
+        import sys
+        import types
+
+        from PIL import Image
+
+        from . import generators as gen
+        from .contract import validate_input
+
+        captured = {}
+
+        def fake_export_to_video(frames_arg, path, fps=None):
+            captured["frames"] = frames_arg
+            captured["fps"] = fps
+            pathlib.Path(path).write_bytes(b"fake-mp4")
+
+        diffusers_module = types.ModuleType("diffusers")
+        utils_module = types.ModuleType("diffusers.utils")
+        utils_module.export_to_video = fake_export_to_video
+        diffusers_module.utils = utils_module
+
+        class _Pipe:
+            vae_scale_factor_spatial = 16
+            transformer = types.SimpleNamespace(config=types.SimpleNamespace(patch_size=(1, 2, 2)))
+
+            def __call__(self, **kwargs):
+                captured["kwargs"] = kwargs
+                return types.SimpleNamespace(frames=frames)
+
+        fake_torch = types.SimpleNamespace(
+            Generator=lambda device=None: types.SimpleNamespace(manual_seed=lambda seed: None),
+            inference_mode=contextlib.nullcontext,
+        )
+
+        with patch.dict(os.environ, {"OMNICHAT_INPUT_HOSTS": "storage.googleapis.com"}):
+            request = validate_input({
+                "kind": "video",
+                "mode": "image_to_video",
+                "prompt": "she leans in",
+                "duration_seconds": duration_seconds,
+                "source_image_url": "https://storage.googleapis.com/omnichat/still.png",
+            })
+        with patch.dict(sys.modules, {"diffusers": diffusers_module, "diffusers.utils": utils_module}), \
+                patch.object(gen, "_download_image", return_value=Image.new("RGB", (1344, 768))), \
+                patch.object(gen, "_device_dtype", return_value=(fake_torch, None)), \
+                patch.object(gen.VideoGenerator, "_load", lambda self: _Pipe()), \
+                patch.dict(os.environ, {}, clear=False):
+            result = gen.VideoGenerator().render(request)
+        self.addCleanup(lambda: pathlib.Path(result.file.name).unlink(missing_ok=True))
+        return result, captured
+
+    def test_numpy_batch_is_unwrapped_to_the_sampled_frames(self):
+        import numpy as np
+
+        # What diffusers actually returns for its default output_type="np":
+        # (batch, num_frames, height, width, channels).
+        frames = np.zeros((1, 121, 64, 64, 3), dtype=np.float32)
+        result, captured = self._render(frames)
+
+        self.assertEqual(len(captured["frames"]), 121, "the batch axis was passed through to the encoder")
+        self.assertEqual(captured["fps"], 24)
+        self.assertAlmostEqual(result.duration, 121 / 24, places=4)
+        self.assertEqual(result.actual_prompt, "she leans in")
+
+    def test_list_output_is_unwrapped_the_same_way(self):
+        from PIL import Image
+
+        frames = [[Image.new("RGB", (64, 64)) for _ in range(121)]]
+        result, captured = self._render(frames)
+
+        self.assertEqual(len(captured["frames"]), 121)
+        self.assertAlmostEqual(result.duration, 121 / 24, places=4)
+
+    def test_frame_size_and_count_reach_the_pipeline(self):
+        import numpy as np
+
+        _, captured = self._render(np.zeros((1, 121, 64, 64, 3), dtype=np.float32))
+        kwargs = captured["kwargs"]
+        # 1344x768 still, mod 32, 720*1280 budget.
+        self.assertEqual(kwargs["height"] % 32, 0)
+        self.assertEqual(kwargs["width"] % 32, 0)
+        self.assertGreater(kwargs["width"], kwargs["height"])
+        self.assertEqual(kwargs["num_frames"], 121)
+        self.assertEqual(kwargs["image"].size, (kwargs["width"], kwargs["height"]))
+
+    def test_an_empty_result_is_reported_as_no_frames(self):
+        import numpy as np
+
+        from .generators import ModelError
+
+        for empty in (np.zeros((0, 121, 64, 64, 3), dtype=np.float32), [], None):
+            with self.assertRaises(ModelError) as raised:
+                self._render(empty)
+            self.assertIn("no frames", str(raised.exception))
