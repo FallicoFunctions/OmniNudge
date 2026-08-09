@@ -30,8 +30,8 @@ body,
    The unthemed defaults duplicate `Luminous Panels`, the spec default, so the
    HUD is never unstyled between boot and the first applyUiTheme() call.
 
-   Venue-styled exceptions (auth popup, post-auth welcome card) do NOT consume
-   these tokens - neither exists yet.
+   Venue-styled exceptions (auth window, post-auth welcome card) do NOT consume
+   these tokens: they read the `--venue-*` set further down instead.
    =========================================================================== */
 .babylon-runtime-host,
 .babylon-runtime-host[data-ui-theme="luminous-panels"] {
@@ -785,6 +785,269 @@ body,
 
 .stamina-bar--unusable .stamina-bar__fill {
   background: var(--hud-text-muted);
+}
+
+/* Bottom-center emote bar (sec 9.4/9.7). Docks at the true bottom edge, under
+   the stamina bar's own 96px offset. Without this rule the bar was a static
+   block flowing off the bottom of the runtime host - present in the DOM,
+   never on screen. */
+.hud-emote-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  gap: 6px;
+}
+
+/* ===========================================================================
+   Venue windows: the auth window (sec 11.1) and the welcome card it becomes
+   (sec 11.2).
+
+   Sec 9.5 lists both as "venue-styled exceptions" that do NOT follow the core
+   UI theme selector, so they consume these `--venue-*` tokens instead of the
+   `--hud-*` ones every other surface reads. Main Stage's palette is taken
+   from the venue's own materials - V19_GatewayPearlIvory,
+   V19_ArrivalBrushedGold and V19_ArrivalCyanGlow - so the window reads as
+   part of the room the player is standing in.
+
+   Sec 11.1's geometry: bottom-CENTER, one FIXED size across venues, landscape,
+   and it rises out of the emote HUD area when it opens.
+   =========================================================================== */
+.babylon-runtime-host {
+  --venue-window-width: 520px;
+  /* Sec 11.1 "fixed size", sec 11.2 "same size and position as auth window":
+     one box for login, signup AND the welcome card, so switching modes or
+     transforming into the card never resizes the window under the player.
+     Sized to the tallest content (signup, with its email + two consents). */
+  --venue-window-height: 232px;
+  --venue-pearl: #f4efe2;
+  --venue-pearl-muted: rgba(244, 239, 226, 0.66);
+  --venue-gold: #d9b169;
+  --venue-cyan: #68d8ff;
+  --venue-window-bg: linear-gradient(150deg, rgba(14, 26, 44, 0.94), rgba(9, 18, 32, 0.9));
+}
+
+.venue-window {
+  position: absolute;
+  left: 50%;
+  /* Clear of the emote bar it rises out of, and of the stamina bar above it. */
+  bottom: 132px;
+  z-index: 6;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: var(--venue-window-width);
+  min-height: var(--venue-window-height);
+  padding: 16px 20px 18px;
+  border: 1px solid rgba(217, 177, 105, 0.55);
+  border-radius: 16px;
+  color: var(--venue-pearl);
+  background: var(--venue-window-bg);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(244, 239, 226, 0.12);
+  backdrop-filter: blur(18px);
+  font-size: 0.8rem;
+  /* Sec 11.1: rises from the emote HUD area. */
+  animation: venue-window-rise 260ms ease-out;
+  transform: translateX(-50%);
+}
+
+@keyframes venue-window-rise {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Sec 11.2's auto-dismiss fade. Duration is mirrored by
+   WELCOME_CARD_FADE_MS in createWelcomeCard.ts - keep the two in step. */
+.venue-window--fading {
+  opacity: 0;
+  transition: opacity 450ms ease-out;
+}
+
+.venue-window[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .venue-window {
+    animation: none;
+  }
+}
+
+.venue-window__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.venue-window__title {
+  margin: 0;
+  color: var(--venue-gold);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.venue-window__copy {
+  margin: 10px 0 0;
+  color: var(--venue-pearl-muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.venue-button {
+  padding: 7px 14px;
+  border: 1px solid rgba(217, 177, 105, 0.5);
+  border-radius: 999px;
+  color: var(--venue-pearl);
+  background: rgba(217, 177, 105, 0.14);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.venue-button:hover,
+.venue-button:focus-visible {
+  border-color: var(--venue-gold);
+  outline: none;
+}
+
+.venue-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.venue-button--primary {
+  border-color: rgba(104, 216, 255, 0.6);
+  background: rgba(104, 216, 255, 0.18);
+}
+
+.venue-button--primary:hover,
+.venue-button--primary:focus-visible {
+  border-color: var(--venue-cyan);
+}
+
+.venue-button--quiet {
+  padding: 5px 12px;
+  background: transparent;
+  font-size: 0.7rem;
+}
+
+/* Landscape body: credentials beside the mode-specific column. */
+.venue-auth-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin-top: 12px;
+}
+
+.venue-auth-form__columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.venue-auth-form__column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.venue-auth-form__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  /* Pinned to the bottom of the fixed-height window, so login (fewer fields)
+     and signup put their actions in exactly the same place. */
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.venue-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.venue-row--inline {
+  flex-direction: row;
+  align-items: center;
+}
+
+.venue-row[hidden] {
+  display: none;
+}
+
+.venue-row__label {
+  color: var(--venue-pearl-muted);
+  font-size: 0.72rem;
+}
+
+.venue-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(244, 239, 226, 0.24);
+  border-radius: 8px;
+  color: var(--venue-pearl);
+  background: rgba(5, 9, 18, 0.55);
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.venue-input:focus {
+  border-color: var(--venue-cyan);
+  outline: none;
+}
+
+.venue-auth-error {
+  margin: 12px 0 0;
+  color: #ff8a8a;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.venue-auth-error[hidden] {
+  display: none;
+}
+
+/* Sec 11.2: equal focus on `Edit Avatar` and `Enter VIP` - same row, same
+   width, same weight. Only the first is clickable. */
+.venue-welcome__items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 18px;
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+.venue-welcome__item {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.venue-welcome__item--informational {
+  border: 1px solid rgba(104, 216, 255, 0.4);
+  color: var(--venue-cyan);
+  background: rgba(104, 216, 255, 0.12);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .stage-audio-dev-controls {

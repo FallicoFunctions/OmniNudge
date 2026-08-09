@@ -28,17 +28,17 @@ describe('createAuthPopup', () => {
     popup.open('login');
     expect(popup.element.hidden).toBe(false);
     expect(popup.isOpen()).toBe(true);
-    expect(popup.element.querySelector('.hud-popup__title')?.textContent).toBe('Log In');
+    expect(popup.element.querySelector('.venue-window__title')?.textContent).toBe('Log In');
     // Signup-only fields stay hidden in login mode.
-    expect(popup.element.querySelector('[data-auth-field="email"]')?.closest('.hud-row')).toHaveProperty('hidden', true);
+    expect(popup.element.querySelector('[data-auth-field="email"]')?.closest('.venue-row')).toHaveProperty('hidden', true);
   });
 
   it('opening in signup mode reveals email + policy checkboxes', () => {
     const { popup } = mount();
     popup.open('signup');
-    expect(popup.element.querySelector('.hud-popup__title')?.textContent).toBe('Sign Up');
-    expect(popup.element.querySelector('[data-auth-field="email"]')?.closest('.hud-row')).toHaveProperty('hidden', false);
-    expect(popup.element.querySelector('[data-auth-field="accept-terms"]')?.closest('.hud-row')).toHaveProperty('hidden', false);
+    expect(popup.element.querySelector('.venue-window__title')?.textContent).toBe('Sign Up');
+    expect(popup.element.querySelector('[data-auth-field="email"]')?.closest('.venue-row')).toHaveProperty('hidden', false);
+    expect(popup.element.querySelector('[data-auth-field="accept-terms"]')?.closest('.venue-row')).toHaveProperty('hidden', false);
   });
 
   it('toggle switches between login and signup', () => {
@@ -46,9 +46,9 @@ describe('createAuthPopup', () => {
     popup.open('login');
     const toggle = popup.element.querySelector<HTMLButtonElement>('[data-auth-toggle]')!;
     toggle.click();
-    expect(popup.element.querySelector('.hud-popup__title')?.textContent).toBe('Sign Up');
+    expect(popup.element.querySelector('.venue-window__title')?.textContent).toBe('Sign Up');
     toggle.click();
-    expect(popup.element.querySelector('.hud-popup__title')?.textContent).toBe('Log In');
+    expect(popup.element.querySelector('.venue-window__title')?.textContent).toBe('Log In');
   });
 
   it('close hides the popup and clears fields', () => {
@@ -111,6 +111,89 @@ describe('createAuthPopup', () => {
     expect(popup.element.querySelector('[data-auth-error]')?.textContent).toBe('invalid username or password');
     const submitButton = popup.element.querySelector<HTMLButtonElement>('[data-auth-submit]')!;
     expect(submitButton.disabled).toBe(false);
+  });
+
+  // Sec 11.1: "switching between login/signup preserves relevant typed fields
+  // within the same open session" - and only CLOSING discards them.
+  it('keeps typed fields across a mode switch, and discards them on close', () => {
+    const { popup } = mount();
+    popup.open('login');
+    field(popup.element, 'username').value = 'nick';
+    field(popup.element, 'password').value = 'hunter2222';
+
+    popup.element.querySelector<HTMLButtonElement>('[data-auth-toggle]')!.click();
+    expect(field(popup.element, 'username').value).toBe('nick');
+    expect(field(popup.element, 'password').value).toBe('hunter2222');
+
+    popup.close();
+    popup.open('signup');
+    expect(field(popup.element, 'username').value).toBe('');
+  });
+
+  // Sec 11.1: the window is "not closable with `Esc`" - the top-right Close
+  // button is the only way out, so this module binds no keydown listener.
+  it('ignores Esc', () => {
+    const { popup } = mount();
+    popup.open('login');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(popup.isOpen()).toBe(true);
+    expect(popup.element.hidden).toBe(false);
+  });
+
+  it('closes on the Close button and reports it to the caller', () => {
+    const onRequestClose = vi.fn();
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    const popup = createAuthPopup({ onSubmit: vi.fn().mockResolvedValue({ ok: true }), onRequestClose });
+    host.appendChild(popup.element);
+
+    popup.open('login');
+    popup.element.querySelector<HTMLButtonElement>('[data-auth-close]')!.click();
+    expect(popup.isOpen()).toBe(false);
+    expect(onRequestClose.mock.calls.length).toBe(1);
+  });
+
+  // Sec 11.1: "focused auth typing suppresses movement keys". Moving between
+  // two fields inside the window must NOT flicker movement back on.
+  it('reports text entry while focus is inside the window, and only on the way out', () => {
+    const onTextEntryActiveChange = vi.fn();
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    const popup = createAuthPopup({
+      onSubmit: vi.fn().mockResolvedValue({ ok: true }),
+      onTextEntryActiveChange,
+    });
+    host.appendChild(popup.element);
+    popup.open('login');
+
+    const username = field(popup.element, 'username');
+    const password = field(popup.element, 'password');
+    username.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    expect(onTextEntryActiveChange.mock.calls).toEqual([[true]]);
+
+    // Tab across to the next field: focusout then focusin, same window.
+    username.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: password }));
+    password.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    expect(onTextEntryActiveChange.mock.calls).toEqual([[true]]);
+
+    // Focus leaving the window entirely releases the keyboard.
+    password.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+    expect(onTextEntryActiveChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it('releases movement keys when closed or disposed mid-typing', () => {
+    const onTextEntryActiveChange = vi.fn();
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    const popup = createAuthPopup({
+      onSubmit: vi.fn().mockResolvedValue({ ok: true }),
+      onTextEntryActiveChange,
+    });
+    host.appendChild(popup.element);
+    popup.open('login');
+    field(popup.element, 'username').dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    popup.close();
+    expect(onTextEntryActiveChange.mock.calls).toEqual([[true], [false]]);
   });
 
   it('dispose removes the element from the DOM', () => {
