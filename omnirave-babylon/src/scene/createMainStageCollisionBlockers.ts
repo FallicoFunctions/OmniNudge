@@ -6,6 +6,9 @@ import type { Scene } from '@babylonjs/core/scene';
 import type { SkydeckRailRun } from './mainStageVenueBounds';
 
 import {
+  CASCADE_BAY_X_MAX,
+  CASCADE_BAY_Z_MAX,
+  CASCADE_BAY_Z_MIN,
   FOH_BOOTH_BLOCKER_WIDTH,
   FOH_BOOTH_DECK_DEPTH,
   FOH_BOOTH_X,
@@ -32,14 +35,18 @@ import {
   VENUE_ENVELOPE_FRONT_Z,
   VENUE_WALKABLE_X_MAX,
   VENUE_WALKABLE_X_MIN,
+  VIP_BOUNDARY_HEIGHT,
+  VIP_BOUNDARY_THICKNESS,
+  VIP_BOUNDARY_Z,
+  VIP_GATE_INNER_X,
+  VIP_PROMENADE_MOUTH_HALF_X,
 } from './mainStageVenueBounds';
 
-// Side runs span the back fence up to the envelope's front edge; the back run
-// spans the two side runs corner to corner (their outer faces).
-const ENVELOPE_SIDE_DEPTH = VENUE_ENVELOPE_FRONT_Z - VENUE_ENVELOPE_BACK_Z;
-const ENVELOPE_SIDE_Z = (VENUE_ENVELOPE_FRONT_Z + VENUE_ENVELOPE_BACK_Z) / 2;
+// The back run spans the two side runs corner to corner (their outer faces).
 const ENVELOPE_BACK_WIDTH =
   VENUE_WALKABLE_X_MAX - VENUE_WALKABLE_X_MIN + VENUE_ENVELOPE_BLOCKER_THICKNESS;
+const ENVELOPE_HALF = VENUE_ENVELOPE_BLOCKER_THICKNESS / 2;
+const ENVELOPE_HEIGHT = 6;
 
 interface CollisionBlockerSpec {
   depth: number;
@@ -49,6 +56,16 @@ interface CollisionBlockerSpec {
   x: number;
   y: number;
   z: number;
+  /** Tags the blocker as the VIP gate's - see isVipGateBlocker below. */
+  vipGate?: boolean;
+}
+
+/**
+ * The VIP gate's own blockers, tagged at build time so createVipGate.ts can
+ * find them in the solid list by metadata rather than by parsing mesh names.
+ */
+export function isVipGateBlocker(mesh: AbstractMesh): boolean {
+  return Boolean((mesh.metadata as { vipGateBlocker?: boolean } | undefined)?.vipGateBlocker);
 }
 
 // Elevated architecture (createVipSkydeck.ts + createWingBridge.ts). Two
@@ -247,6 +264,172 @@ function rampRailBlockers(): CollisionBlockerSpec[] {
   return specs;
 }
 
+// --- Promenade corridor: the approach deck's angled sides ----------------
+// Player-flagged (2026-08-03): past the VIP boundary's mouth the promenade
+// deck was open at its SIDES - the deck narrows as it runs north, and the
+// ground beside the taper was walkable out to x ~18 (flood-fill verified),
+// so guests could drift off the corridor instead of being funnelled up it.
+//
+// This traces the deck's REAL silhouette rather than its bounding box.
+// merged:V151_ApproachDeckSlab+1 measures x |14.2| at the mouth but only
+// x |9.06| once it straightens out, via a two-segment taper - these are its
+// own +x vertices, read out of the mesh in-engine:
+//     z -57.0  ->  x 14.20   (mouth, flush with VIP_PROMENADE_MOUTH_HALF_X)
+//     z -49.5  ->  x 11.70
+//     z -42.0  ->  x  9.06   (taper ends; V108_ForegroundBarricadeGoldRun
+//                             and V34_BarricadeAssembly run on from here)
+// The run then continues NORTH along the barricade line to z -39, which is
+// exactly where V118_BasinWallRelief's own source blockers (measured
+// x 6.2..8.2, z -39..23) take over. Stopping there is deliberate: the owner
+// called out that V108 needs no wall of its own precisely because the basin
+// wall relief already guards that stretch, so carrying these boxes further
+// north would only double up on collision that already exists.
+const APPROACH_DECK_EDGE: readonly { x: number; z: number }[] = [
+  { x: 14.2, z: -57 },
+  { x: 11.7, z: -49.5 },
+  { x: 9.06, z: -42 },
+  { x: 9.06, z: -39 },
+];
+// Floor through well above a capsule standing ON the deck (its top face is
+// y 0.9, so a standing head reaches ~2.7).
+const PROMENADE_WALL_HEIGHT = 3;
+const PROMENADE_WALL_THICKNESS = 1;
+// Short axis-aligned steps along the taper, NOT one rotated box: this
+// module's collision only tests axis-aligned world AABBs, so a rotated run
+// would balloon its bounds across the whole corridor (the same reason
+// rampRailBlockers steps its segments).
+const PROMENADE_WALL_SEGMENT_DEPTH = 1;
+
+function approachDeckEdgeXAt(z: number): number {
+  const first = APPROACH_DECK_EDGE[0];
+  if (z <= first.z) return first.x;
+  for (let i = 1; i < APPROACH_DECK_EDGE.length; i++) {
+    const a = APPROACH_DECK_EDGE[i - 1];
+    const b = APPROACH_DECK_EDGE[i];
+    if (z <= b.z) {
+      return a.x + ((b.x - a.x) * (z - a.z)) / (b.z - a.z);
+    }
+  }
+  return APPROACH_DECK_EDGE[APPROACH_DECK_EDGE.length - 1].x;
+}
+
+function promenadeCorridorBlockers(): CollisionBlockerSpec[] {
+  const specs: CollisionBlockerSpec[] = [];
+  const zStart = APPROACH_DECK_EDGE[0].z;
+  const zEnd = APPROACH_DECK_EDGE[APPROACH_DECK_EDGE.length - 1].z;
+  const count = Math.ceil((zEnd - zStart) / PROMENADE_WALL_SEGMENT_DEPTH);
+  const step = (zEnd - zStart) / count;
+  for (const side of [1, -1] as const) {
+    const tag = side > 0 ? 'r' : 'l';
+    for (let i = 0; i < count; i++) {
+      const z0 = zStart + i * step;
+      const z1 = z0 + step;
+      // Span the edge's FULL x range over this segment (plus the wall's own
+      // thickness) so consecutive steps overlap and the staircase never
+      // leaves a diagonal slot for the capsule to slip through.
+      const xLow = Math.min(approachDeckEdgeXAt(z0), approachDeckEdgeXAt(z1)) - PROMENADE_WALL_THICKNESS / 2;
+      const xHigh = Math.max(approachDeckEdgeXAt(z0), approachDeckEdgeXAt(z1)) + PROMENADE_WALL_THICKNESS / 2;
+      specs.push({
+        name: `main-stage-blocker-promenade-edge-${tag}-${i}`,
+        x: side * ((xLow + xHigh) / 2),
+        y: PROMENADE_WALL_HEIGHT / 2,
+        z: (z0 + z1) / 2,
+        width: xHigh - xLow,
+        height: PROMENADE_WALL_HEIGHT,
+        depth: step,
+      });
+    }
+  }
+  return specs;
+}
+
+// The VIP boundary along the spawn-pylon line, from the promenade mouth out
+// to the envelope fence, leaving the centre promenade open for everyone (see
+// VIP_BOUNDARY_Z's note in mainStageVenueBounds.ts for where the line comes
+// from and why).
+//
+// TWO runs per flank, split at VIP_GATE_INNER_X, because only the outboard
+// half is gated:
+//   - `vip-boundary`: mouth -> gate line. Permanent venue boundary, solid for
+//     everyone, signed in or not.
+//   - `vip-gate`: gate line -> envelope fence. The opening every SIGNED-IN
+//     player walks through, tagged with `vipGateBlocker` metadata so
+//     createVipGate.ts can lift it out of the solid list (and drop it back on
+//     logout) without pattern-matching mesh names.
+// The split point is the arrival plinth dais's outer edge - see
+// VIP_GATE_INNER_X for the measurement and the owner's placement.
+//
+// The outer run overlaps the envelope fence's inner face rather than stopping
+// at VENUE_WALKABLE_X_MAX exactly: a run that merely touched the fence could
+// leave a hairline seam at the corner for the capsule to squeeze through.
+function vipBoundaryBlockers(): CollisionBlockerSpec[] {
+  const outerX = VENUE_WALKABLE_X_MAX + VENUE_ENVELOPE_BLOCKER_THICKNESS / 2;
+  const specs: CollisionBlockerSpec[] = [];
+  for (const side of [1, -1] as const) {
+    const tag = side > 0 ? 'right' : 'left';
+    for (const [name, fromX, toX, isGate] of [
+      [`main-stage-blocker-vip-boundary-${tag}`, VIP_PROMENADE_MOUTH_HALF_X, VIP_GATE_INNER_X, false],
+      [`main-stage-blocker-vip-gate-${tag}`, VIP_GATE_INNER_X, outerX, true],
+    ] as const) {
+      specs.push({
+        name,
+        x: side * ((fromX + toX) / 2),
+        y: VIP_BOUNDARY_HEIGHT / 2,
+        z: VIP_BOUNDARY_Z,
+        width: toX - fromX,
+        height: VIP_BOUNDARY_HEIGHT,
+        depth: VIP_BOUNDARY_THICKNESS,
+        vipGate: isGate,
+      });
+    }
+  }
+  return specs;
+}
+
+// The venue envelope's SIDE boundary, per flank. No longer one straight run:
+// it steps out into the Cascade Court bay around the fountain and the skydeck
+// ramp entrance (see CASCADE_BAY_* in mainStageVenueBounds.ts for the measured
+// footprint and why the owner asked for it), so each flank is five runs -
+// south side, the bay's three walls, north side.
+//
+// Every run overlaps its neighbours by half a thickness at the corners rather
+// than merely touching: butt-jointed boxes leave a hairline seam at the corner
+// that the capsule can squeeze through (the same reason the VIP boundary runs
+// overlap the envelope fence).
+function envelopeSideBlockers(): CollisionBlockerSpec[] {
+  const specs: CollisionBlockerSpec[] = [];
+  for (const side of [1, -1] as const) {
+    const tag = side > 0 ? 'right' : 'left';
+    const sideX = side * VENUE_WALKABLE_X_MAX;
+    const bayX = side * CASCADE_BAY_X_MAX;
+    const runs: Array<{ name: string; axis: 'x' | 'z'; fixed: number; from: number; to: number }> = [
+      // Side line, back fence -> the bay's south wall.
+      { name: `${tag}-envelope-south`, axis: 'z', fixed: sideX, from: VENUE_ENVELOPE_BACK_Z, to: CASCADE_BAY_Z_MIN },
+      // The bay: out along its south wall, up its outboard face, back in
+      // along its north wall.
+      { name: `${tag}-cascade-bay-south`, axis: 'x', fixed: CASCADE_BAY_Z_MIN, from: sideX - side * ENVELOPE_HALF, to: bayX + side * ENVELOPE_HALF },
+      { name: `${tag}-cascade-bay-outer`, axis: 'z', fixed: bayX, from: CASCADE_BAY_Z_MIN - ENVELOPE_HALF, to: CASCADE_BAY_Z_MAX + ENVELOPE_HALF },
+      { name: `${tag}-cascade-bay-north`, axis: 'x', fixed: CASCADE_BAY_Z_MAX, from: sideX - side * ENVELOPE_HALF, to: bayX + side * ENVELOPE_HALF },
+      // Side line resumes, the bay's north wall -> the envelope's front edge.
+      { name: `${tag}-envelope-north`, axis: 'z', fixed: sideX, from: CASCADE_BAY_Z_MAX, to: VENUE_ENVELOPE_FRONT_Z },
+    ];
+    for (const run of runs) {
+      const alongLength = Math.abs(run.to - run.from);
+      const alongCenter = (run.from + run.to) / 2;
+      specs.push({
+        name: `main-stage-blocker-${run.name}`,
+        x: run.axis === 'x' ? alongCenter : run.fixed,
+        y: ENVELOPE_HEIGHT / 2,
+        z: run.axis === 'x' ? run.fixed : alongCenter,
+        width: run.axis === 'x' ? alongLength : VENUE_ENVELOPE_BLOCKER_THICKNESS,
+        height: ENVELOPE_HEIGHT,
+        depth: run.axis === 'x' ? VENUE_ENVELOPE_BLOCKER_THICKNESS : alongLength,
+      });
+    }
+  }
+  return specs;
+}
+
 function elevatedStructureBlockers(): CollisionBlockerSpec[] {
   const specs: CollisionBlockerSpec[] = [];
   for (const side of [1, -1] as const) {
@@ -291,8 +474,8 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
   // (COL_Ground) ends at VENUE_GROUND_EDGE_Z (see mainStageVenueBounds.ts),
   // so the fence stays just inside it, and the sides extend to meet the back
   // fence corner-to-corner.
-  { name: 'main-stage-blocker-left-envelope', x: VENUE_WALKABLE_X_MIN, y: 3, z: ENVELOPE_SIDE_Z, width: VENUE_ENVELOPE_BLOCKER_THICKNESS, height: 6, depth: ENVELOPE_SIDE_DEPTH },
-  { name: 'main-stage-blocker-right-envelope', x: VENUE_WALKABLE_X_MAX, y: 3, z: ENVELOPE_SIDE_Z, width: VENUE_ENVELOPE_BLOCKER_THICKNESS, height: 6, depth: ENVELOPE_SIDE_DEPTH },
+  // The side runs (including the Cascade Court bay's three walls) are built
+  // by envelopeSideBlockers(), spread in below.
   { name: 'main-stage-blocker-back-envelope', x: 0, y: 3, z: VENUE_ENVELOPE_BACK_Z, width: ENVELOPE_BACK_WIDTH, height: 6, depth: VENUE_ENVELOPE_BLOCKER_THICKNESS },
   { name: 'main-stage-blocker-front-stage', x: 0, y: 5, z: 14, width: 78, height: 10, depth: 4 },
   // The cascade fountain's collision is authored by fountainCollisionColumns()
@@ -310,6 +493,21 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
   // let the capsule wedge into the box rim when stepping off the edge.
   { name: 'main-stage-blocker-basin-water-north-left', x: -13.05, y: 1.5, z: 16.3, width: 9.5, height: 3, depth: 14.2 },
   { name: 'main-stage-blocker-basin-water-north-right', x: 13.05, y: 1.5, z: 16.3, width: 9.5, height: 3, depth: 14.2 },
+  // The outer basin-coping walkway (COL_BasinCopingOuter_L/R, measured live:
+  // x |17.3..24.8|, z -47.9..14.7) is real FLOOR with no wall along its outer
+  // face south of the VIP wing shell's fascia (the source-mesh blockers built
+  // from V30_VipShellFascia/V30_VipSoffitShadow, which already guard x
+  // |17.6..27.1| for z -19..23.5 at this same edge). South of that fascia -
+  // z -47.9..-19, right where the cascade_court checkpoint (z -22) and the
+  // user's landmarks (V66_BackPlazaSightlineGoldRail, V33_BasinLanternCore)
+  // sit - the coping just ends into open FestivalField ground with nothing
+  // stopping horizontal movement (player-flagged: walking "between promenade
+  // mid and vip terrace/cascade court"). COL_Ground continues underneath, so
+  // there was never a fall-through, only the missing wall. Centered 0.3m
+  // onto the coping's own floor edge so there's no seam gap to wedge into,
+  // matching the basin-water blockers' tuck above.
+  { name: 'main-stage-blocker-basin-coping-outer-left', x: -25, y: 1.5, z: -33.45, width: 1, height: 3, depth: 28.9 },
+  { name: 'main-stage-blocker-basin-coping-outer-right', x: 25, y: 1.5, z: -33.45, width: 1, height: 3, depth: 28.9 },
   // Front-of-house sound booth (createSoundBooth.ts) - restricted crew
   // infrastructure, so players walk around it. Authored here rather than
   // pattern-matched: the source-mesh patterns above run over the loaded GLB
@@ -330,6 +528,9 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
     depth: FOH_BOOTH_DECK_DEPTH,
   },
   ...fountainCollisionColumns(),
+  ...envelopeSideBlockers(),
+  ...vipBoundaryBlockers(),
+  ...promenadeCorridorBlockers(),
   ...elevatedStructureBlockers(),
   ...rampRailBlockers(),
 ];
@@ -429,6 +630,9 @@ function createBlockerFromSpec(scene: Scene, blocker: CollisionBlockerSpec) {
     scene,
   );
   mesh.position.set(blocker.x, blocker.y, blocker.z);
+  if (blocker.vipGate) {
+    mesh.metadata = { ...mesh.metadata, vipGateBlocker: true };
+  }
   configureBlocker(mesh);
   return mesh;
 }

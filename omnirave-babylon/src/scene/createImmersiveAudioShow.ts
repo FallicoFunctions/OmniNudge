@@ -97,7 +97,11 @@ const AIR_PUNCH_BURST = 40;
 const FLOOR_WIDTH = 26;
 const FLOOR_DEPTH = 36; // z -8..-44
 const FLOOR_CENTER_Z = -26;
-const FLOOR_Y = 0.08; // above the ground plane so it never z-fights
+// Just above the ground plane so it never z-fights. Was 0.08, which is ankle
+// height on a 1.7m avatar - the glow sheet visibly sliced through everyone's
+// feet in the pit (same defect the cascade-court paving was flagged for on
+// 2026-08-03). A flat plane needs millimetres of clearance, not centimetres.
+const FLOOR_Y = 0.01;
 
 // --- Palette cycling -------------------------------------------------------
 const PALETTE_CYCLE_SECONDS = 22;

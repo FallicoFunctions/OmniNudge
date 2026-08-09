@@ -4,7 +4,12 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createMainStageCollisionBlockers } from '../createMainStageCollisionBlockers';
+import { createMainStageCollisionBlockers, isVipGateBlocker } from '../createMainStageCollisionBlockers';
+import {
+  VENUE_WALKABLE_X_MAX,
+  VIP_GATE_INNER_X,
+  VIP_PROMENADE_MOUTH_HALF_X,
+} from '../mainStageVenueBounds';
 
 describe('createMainStageCollisionBlockers clustered families', () => {
   let engine: NullEngine;
@@ -258,6 +263,175 @@ describe('createMainStageCollisionBlockers cascade fountain (octagon ellipse)', 
     for (const z of [-27, -25]) {
       expect(blockedAtFountain(54.7, z)).toBe(false);
       expect(blockedAtFountain(-54.7, z)).toBe(false);
+    }
+  });
+});
+
+// The VIP boundary along the spawn-pylon line (VIP_BOUNDARY_Z). Owner
+// decision (2026-08-03): the centre promenade is public for every guest, but
+// the flanks it runs between - cascade courts, VIP terraces, and the skydecks
+// they lead to - are VIP and sit behind this wall. A flood fill of the
+// reachable floor had found players walking SOUTH around the approach deck
+// (whose slab ends at z -57), then straight east and back north up the whole
+// flank, so this line is what makes the flanks enterable only through a gate.
+describe('createMainStageCollisionBlockers VIP boundary', () => {
+  let engine: NullEngine;
+  let scene: Scene;
+
+  beforeEach(() => {
+    engine = new NullEngine();
+    scene = new Scene(engine);
+  });
+
+  afterEach(() => {
+    scene.dispose();
+    engine.dispose();
+  });
+
+  // True when a capsule centred at (x, VIP_BOUNDARY_Z) meets one of the
+  // boundary's runs. `namePart` picks which half: the permanent inner
+  // boundary, the signed-in gate, or (default) either. Primitives only -
+  // world bounds are read out and compared as numbers, never handed to
+  // expect().
+  const blocksAt = (x: number, namePart = 'vip-'): boolean => {
+    const runs = createMainStageCollisionBlockers(scene, []).filter((mesh) =>
+      mesh.name.startsWith(`main-stage-blocker-${namePart}`),
+    );
+    return runs.some((mesh) => {
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+      return x >= bb.minimumWorld.x && x <= bb.maximumWorld.x;
+    });
+  };
+
+  it('emits a permanent inner run and a gated outer run per flank', () => {
+    const blockers = createMainStageCollisionBlockers(scene, []);
+    expect(blockers.filter((mesh) => mesh.name.startsWith('main-stage-blocker-vip-boundary-')).length).toBe(2);
+    expect(blockers.filter((mesh) => mesh.name.startsWith('main-stage-blocker-vip-gate-')).length).toBe(2);
+  });
+
+  it('leaves the centre promenade mouth open for all guests', () => {
+    expect(blocksAt(0)).toBe(false);
+    expect(blocksAt(VIP_PROMENADE_MOUTH_HALF_X - 1)).toBe(false);
+    expect(blocksAt(-(VIP_PROMENADE_MOUTH_HALF_X - 1))).toBe(false);
+  });
+
+  it('seals both flanks from the mouth out to the envelope fence', () => {
+    for (const x of [16, 24, 32, 40, 48, 56, VENUE_WALKABLE_X_MAX]) {
+      expect(blocksAt(x)).toBe(true);
+      expect(blocksAt(-x)).toBe(true);
+    }
+  });
+
+  // The owner placed the opening "beginning to the right of
+  // merged:V58_ArrivalPlinthPearlDais+1" - the daises measure x 19.32..28.68
+  // per side - so the plinth frontage stays walled even for VIP players and
+  // only the stretch outboard of it opens.
+  it('splits at the arrival plinth: the plinth frontage is permanent, everything outboard is the gate', () => {
+    for (const x of [VIP_PROMENADE_MOUTH_HALF_X + 1, 20, 24, 28]) {
+      expect(blocksAt(x, 'vip-boundary-')).toBe(true);
+      expect(blocksAt(-x, 'vip-boundary-')).toBe(true);
+      expect(blocksAt(x, 'vip-gate-')).toBe(false);
+      expect(blocksAt(-x, 'vip-gate-')).toBe(false);
+    }
+    for (const x of [VIP_GATE_INNER_X + 1, 40, 56, VENUE_WALKABLE_X_MAX]) {
+      expect(blocksAt(x, 'vip-gate-')).toBe(true);
+      expect(blocksAt(-x, 'vip-gate-')).toBe(true);
+      expect(blocksAt(x, 'vip-boundary-')).toBe(false);
+      expect(blocksAt(-x, 'vip-boundary-')).toBe(false);
+    }
+  });
+
+  it('tags only the gate runs, so createVipGate opens nothing permanent', () => {
+    const tagged = createMainStageCollisionBlockers(scene, []).filter(isVipGateBlocker);
+    expect(tagged.length).toBe(2);
+    expect(tagged.every((mesh) => mesh.name.startsWith('main-stage-blocker-vip-gate-'))).toBe(true);
+  });
+
+  it('stands tall enough that the boundary cannot be jumped', () => {
+    const runs = createMainStageCollisionBlockers(scene, []).filter((mesh) =>
+      mesh.name.startsWith('main-stage-blocker-vip-'),
+    );
+    expect(runs.length).toBe(4);
+    for (const mesh of runs) {
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+      // Reaches the floor, and clears a standing capsule several times over.
+      expect(bb.minimumWorld.y <= 0).toBe(true);
+      expect(bb.maximumWorld.y >= 4).toBe(true);
+    }
+  });
+});
+
+// The promenade corridor walls, which trace the approach deck's ANGLED sides
+// (player-flagged 2026-08-03: guests could drift off the deck sideways where
+// it tapers, onto ground walkable out to x ~18). The deck's own measured +x
+// vertices are x 14.2 @ z -57, 11.7 @ z -49.5, then 9.06 from z -42 north.
+describe('createMainStageCollisionBlockers promenade corridor', () => {
+  let engine: NullEngine;
+  let scene: Scene;
+
+  beforeEach(() => {
+    engine = new NullEngine();
+    scene = new Scene(engine);
+  });
+
+  afterEach(() => {
+    scene.dispose();
+    engine.dispose();
+  });
+
+  // Primitives only - world bounds are read out and compared as numbers,
+  // never handed to expect().
+  const edgeRuns = () =>
+    createMainStageCollisionBlockers(scene, []).filter((mesh) =>
+      mesh.name.startsWith('main-stage-blocker-promenade-edge-'),
+    );
+
+  const blockedAt = (x: number, z: number): boolean =>
+    edgeRuns().some((mesh) => {
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+      return (
+        x >= bb.minimumWorld.x &&
+        x <= bb.maximumWorld.x &&
+        z >= bb.minimumWorld.z &&
+        z <= bb.maximumWorld.z
+      );
+    });
+
+  it('walls both angled sides, tracking the taper inward as it runs north', () => {
+    // At the mouth the wall sits out near x 14.2; by the straight run it has
+    // pulled in to x ~9. Sampling the deck's own edge line at three z values
+    // proves the wall FOLLOWS the taper instead of boxing it.
+    for (const [z, edgeX] of [[-56, 13.9], [-49.5, 11.7], [-41, 9.06]] as const) {
+      expect(blockedAt(edgeX, z)).toBe(true);
+      expect(blockedAt(-edgeX, z)).toBe(true);
+    }
+  });
+
+  it('leaves the deck itself walkable all the way up the corridor', () => {
+    for (const z of [-56, -52, -49.5, -46, -42, -40]) {
+      expect(blockedAt(0, z)).toBe(false);
+      expect(blockedAt(4, z)).toBe(false);
+      expect(blockedAt(-4, z)).toBe(false);
+    }
+  });
+
+  it('stops at z -39 where V118_BasinWallRelief already guards the line', () => {
+    // Nothing north of the basin wall relief's own blocker start: doubling up
+    // there is exactly what the owner said was unnecessary.
+    for (const z of [-38, -30, -20, -10]) {
+      expect(blockedAt(9.06, z)).toBe(false);
+      expect(blockedAt(-9.06, z)).toBe(false);
+    }
+  });
+
+  it('steps in segments rather than one rotated box, with no yaw', () => {
+    const runs = edgeRuns();
+    expect(runs.length).toBeGreaterThan(20);
+    for (const mesh of runs) {
+      expect(mesh.rotation.y === 0).toBe(true);
     }
   });
 });

@@ -7,14 +7,13 @@ import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
-  CASCADE_GAP_Z_MAX,
-  CASCADE_GAP_Z_MIN,
+  BAY_FENCE_X,
+  BAY_FENCE_Z_MAX,
+  BAY_FENCE_Z_MIN,
   PERIMETER_BACK_Z,
   PERIMETER_FRONT_Z,
   PERIMETER_LEFT_X,
   PERIMETER_RIGHT_X,
-  SKYDECK_GATE_Z_MAX,
-  SKYDECK_GATE_Z_MIN,
   createVenuePerimeter,
   planVenuePerimeter,
 } from '../createVenuePerimeter';
@@ -88,94 +87,100 @@ describe('createVenuePerimeter', () => {
     expect(PERIMETER_BACK_Z).toBeGreaterThan(backFace);
     expect(PERIMETER_BACK_Z - backFace).toBeLessThanOrEqual(1);
 
+    // The straight side line still bounds everything EXCEPT the Cascade Court
+    // bay, which is the one place the boundary steps outboard (to BAY_FENCE_X).
     const plan = planVenuePerimeter();
     for (const post of plan.posts) {
-      expect(post.x).toBeGreaterThanOrEqual(PERIMETER_LEFT_X);
-      expect(post.x).toBeLessThanOrEqual(PERIMETER_RIGHT_X);
+      expect(Math.abs(post.x)).toBeLessThanOrEqual(BAY_FENCE_X);
       expect(post.z).toBeGreaterThanOrEqual(PERIMETER_BACK_Z);
       expect(post.z).toBeLessThanOrEqual(PERIMETER_FRONT_Z);
+      if (Math.abs(post.x) > PERIMETER_RIGHT_X) {
+        // Anything outboard of the side line belongs to the bay.
+        expect(post.z).toBeGreaterThanOrEqual(BAY_FENCE_Z_MIN);
+        expect(post.z).toBeLessThanOrEqual(BAY_FENCE_Z_MAX);
+      }
     }
     for (const span of plan.spans) {
-      expect(span.x).toBeGreaterThanOrEqual(PERIMETER_LEFT_X);
-      expect(span.x).toBeLessThanOrEqual(PERIMETER_RIGHT_X);
+      expect(Math.abs(span.x)).toBeLessThanOrEqual(BAY_FENCE_X);
       expect(span.z).toBeGreaterThanOrEqual(PERIMETER_BACK_Z);
       expect(span.z).toBeLessThanOrEqual(PERIMETER_FRONT_Z);
     }
   });
 
-  it('leaves the stage side open and breaks around the cascade water', () => {
+  it('leaves the stage side open', () => {
     const plan = planVenuePerimeter();
     // Nothing in front of the envelope's front edge (the stage structure is
     // the front boundary).
     expect(plan.posts.filter((post) => post.z > PERIMETER_FRONT_Z).length).toBe(0);
     // No posts on the centre line: the front is unfenced.
     expect(plan.posts.filter((post) => Math.abs(post.x) < 10 && post.z > PERIMETER_BACK_Z).length).toBe(0);
-    // No posts standing in the cascade water band on either side run.
-    const inCascadeBand = plan.posts.filter(
-      (post) =>
-        Math.abs(post.x) > 50 && post.z > CASCADE_GAP_Z_MIN && post.z < CASCADE_GAP_Z_MAX,
-    );
-    expect(inCascadeBand.length).toBe(0);
-    // But the run resumes past the gap on both sides.
-    expect(plan.posts.filter((post) => post.x === PERIMETER_LEFT_X && post.z >= CASCADE_GAP_Z_MAX).length)
-      .toBeGreaterThan(3);
-    expect(plan.posts.filter((post) => post.x === PERIMETER_RIGHT_X && post.z >= CASCADE_GAP_Z_MAX).length)
-      .toBeGreaterThan(3);
   });
 
-  it('derives the skydeck ramp gate span from the ramp constants', () => {
-    // The opening must fully clear the ramp mouth plus a margin each side, and
-    // must be anchored to the ramp so it can never drift.
-    expect(SKYDECK_GATE_Z_MIN).toBe(SKYDECK_RAMP_Z_MIN - 1.5);
-    expect(SKYDECK_GATE_Z_MAX).toBe(SKYDECK_RAMP_Z_MAX + 1.5);
-    expect(SKYDECK_GATE_Z_MIN).toBeLessThan(SKYDECK_RAMP_Z_MIN);
-    expect(SKYDECK_GATE_Z_MAX).toBeGreaterThan(SKYDECK_RAMP_Z_MAX);
-  });
-
-  it('breaks the side fence for a ramp gate on BOTH flanks, mirrored', () => {
+  // Owner request (2026-08-04): fence the fountain AND the skydeck ramp
+  // entrance IN, instead of breaking the side run around each of them. The
+  // side line used to stop at the cascade water and again at the ramp mouth,
+  // leaving the outer half of the fountain on unreachable ground beyond it.
+  it('steps out into the Cascade Court bay on both flanks, mirrored', () => {
     const plan = planVenuePerimeter();
-    for (const flankX of [PERIMETER_LEFT_X, PERIMETER_RIGHT_X]) {
-      // No post, panel or rail stands inside the gate mouth: the ramp is clear.
-      const postsInGate = plan.posts.filter(
-        (post) =>
-          Math.abs(post.x - flankX) < 1e-6 &&
-          post.z > SKYDECK_GATE_Z_MIN &&
-          post.z < SKYDECK_GATE_Z_MAX,
+    for (const side of [1, -1]) {
+      const sideX = side > 0 ? PERIMETER_RIGHT_X : PERIMETER_LEFT_X;
+      const bayX = side * BAY_FENCE_X;
+      const onLine = (value: number, line: number) => Math.abs(value - line) < 1e-6;
+
+      // The bay's outboard run stands well outside the old side line.
+      const outerRun = plan.posts.filter((post) => onLine(post.x, bayX));
+      expect(outerRun.length).toBeGreaterThan(3);
+      expect(Math.abs(bayX)).toBeGreaterThan(Math.abs(sideX));
+
+      // Both return walls reach from that run back to the side line.
+      for (const wallZ of [BAY_FENCE_Z_MIN, BAY_FENCE_Z_MAX]) {
+        const wall = plan.posts.filter((post) => onLine(post.z, wallZ) && Math.abs(post.x) > 40);
+        expect(wall.filter((post) => post.x * side > 0).length).toBeGreaterThan(2);
+      }
+
+      // The side line itself no longer runs across the bay's mouth.
+      const acrossTheMouth = plan.posts.filter(
+        (post) => onLine(post.x, sideX) && post.z > BAY_FENCE_Z_MIN && post.z < BAY_FENCE_Z_MAX,
       );
-      expect(postsInGate.length).toBe(0);
-      const spansInGate = plan.spans.filter(
-        (span) =>
-          Math.abs(span.x - flankX) < 1e-6 &&
-          span.z > SKYDECK_GATE_Z_MIN &&
-          span.z < SKYDECK_GATE_Z_MAX,
-      );
-      expect(spansInGate.length).toBe(0);
-      // The run resumes at the gate's far jamb (a post sits on the north edge)
-      // and continues to the front.
-      const jamb = plan.posts.filter(
-        (post) => Math.abs(post.x - flankX) < 1e-6 && Math.abs(post.z - SKYDECK_GATE_Z_MAX) < 1e-6,
-      );
-      expect(jamb.length).toBe(1);
-      const beyondGate = plan.posts.filter(
-        (post) => Math.abs(post.x - flankX) < 1e-6 && post.z > SKYDECK_GATE_Z_MAX,
-      );
-      expect(beyondGate.length).toBeGreaterThan(3);
+      expect(acrossTheMouth.length).toBe(0);
     }
   });
 
-  it('opens ONLY the ramp gate: cascade break and unit counts otherwise hold', () => {
+  it('encloses the fountain and the ramp entrance rather than fencing them off', () => {
     const plan = planVenuePerimeter();
-    // The gate removes exactly two posts, two panels and two rails per flank
-    // (four each across both mirrored flanks) versus the ungated side runs.
-    // Post total: back 21 + per flank (8 back-run + 5 front-run) x 2 = 47.
-    expect(plan.posts.length).toBe(47);
-    // Panels/rails share one count: back 20 + per flank (8 + 4) x 2 = 44.
-    expect(plan.spans.length).toBe(44);
-    // The cascade water break is untouched: still no unit in that band.
-    const inCascadeBand = plan.posts.filter(
-      (post) => Math.abs(post.x) > 50 && post.z > CASCADE_GAP_Z_MIN && post.z < CASCADE_GAP_Z_MAX,
+    // The fountain's own stone measures x 54.27..82.00, z -41.27..-16.45 in
+    // the venue GLB; the ramp foot sits at x ~61, z -11..-7. Both are inside
+    // the bay outline now, so no fence unit stands on either.
+    const inFountain = plan.posts.filter(
+      (post) => Math.abs(post.x) > 54 && Math.abs(post.x) < 82 && post.z > -41.3 && post.z < -16.4,
     );
-    expect(inCascadeBand.length).toBe(0);
+    expect(inFountain.length).toBe(0);
+    // Nothing on the SIDE LINE (|x| ~61, where the ramp foot lands) across the
+    // ramp mouth. The bay's own outboard run at |x| 85.4 does cross this z
+    // band, which is the point - it is the far wall, 24m clear of the ramp.
+    const inRampMouth = plan.spans.filter(
+      (span) =>
+        Math.abs(span.x) > 55 &&
+        Math.abs(span.x) < 70 &&
+        span.z >= SKYDECK_RAMP_Z_MIN &&
+        span.z <= SKYDECK_RAMP_Z_MAX,
+    );
+    expect(inRampMouth.length).toBe(0);
+    // And the bay's walls clear both: outboard of the stone, south of it, and
+    // north of the ramp mouth.
+    expect(BAY_FENCE_X).toBeGreaterThan(82);
+    expect(BAY_FENCE_Z_MIN).toBeLessThan(-41.3);
+    expect(BAY_FENCE_Z_MAX).toBeGreaterThan(SKYDECK_RAMP_Z_MAX);
+  });
+
+  it('shares every corner post between the runs that meet there', () => {
+    const plan = planVenuePerimeter();
+    const seen = new Set<string>();
+    for (const post of plan.posts) {
+      const key = `${post.x.toFixed(3)}:${post.z.toFixed(3)}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
   });
 
   it('covers each edge with posts about every 6m', () => {

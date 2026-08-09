@@ -34,6 +34,56 @@ export const VENUE_ENVELOPE_FRONT_Z = 21;
 // perimeter fence (createVenuePerimeter.ts) has to stand on.
 export const VENUE_ENVELOPE_BLOCKER_THICKNESS = 4;
 
+// --- VIP boundary (the spawn-pylon line) ---------------------------------
+// Owner decision (2026-08-03): everyone spawns together and the CENTRE
+// PROMENADE is public for all guests, but the flanks either side of it - the
+// cascade courts, the VIP terraces, and the skydecks those lead up to - are
+// VIP and have to sit behind a gate.
+//
+// The owner drew the boundary as "a line from the left V55_SpawnPylonPearlShell
+// to the right one". Those two towers measure z -57.3..-54.7 in-engine, so the
+// line is their centre, z -56 - which is exactly where a flood fill of the
+// reachable floor found an unbroken corridor running x 0..60 (players walked
+// SOUTH around the approach deck, whose slab ends at z -57, then straight east
+// and back north up the whole flank into the cascade court and on to the foot
+// of the skydeck ramp).
+//
+// The one opening is the promenade mouth: the approach deck slab guests walk
+// north from spawn (merged:V151_ApproachDeckSlab, measured x -14.2..14.2).
+export const VIP_BOUNDARY_Z = -56;
+export const VIP_PROMENADE_MOUTH_HALF_X = 14.2;
+// Tall enough that the boundary cannot be jumped, matching the envelope fence.
+export const VIP_BOUNDARY_HEIGHT = 6;
+export const VIP_BOUNDARY_THICKNESS = 1;
+
+// --- VIP gate (the signed-in opening in that boundary) -------------------
+// Owner decision (2026-08-04): every SIGNED-IN player is VIP, so for them the
+// boundary opens; guests still hit a wall, and walking into it is what raises
+// the log in / sign up popup.
+//
+// The owner placed the opening "beginning to the right of
+// merged:V58_ArrivalPlinthPearlDais+1 at the VIP terrace" - i.e. OUTBOARD of
+// the arrival plinth daises, not across the whole flank. Those daises measure
+// x 19.32..28.68 per side in the venue GLB (read out of
+// V58_ArrivalPlinthPearlDais_L/R's own vertices), so the gate starts at the
+// dais's outer edge and runs on out to the envelope fence. The stretch from
+// the promenade mouth to here stays permanently solid, which is what keeps
+// the plinth approach reading as the terrace's frontage rather than a second
+// doorway.
+export const VIP_GATE_INNER_X = 28.7;
+// How far SOUTH of the boundary line a player counts as "trying to get in".
+// Deep enough that the popup fires as they walk up to the wall (the capsule
+// stops around z -56.9, half the boundary's thickness plus its own radius
+// out) rather than only on contact, shallow enough that simply crossing the
+// paver field on the way to the promenade never trips it.
+export const VIP_GATE_APPROACH_DEPTH = 3;
+// Design doc sec 12: "if player walks 15 feet away from the VIP boundary, the
+// window auto-closes", and a window the player closed by hand "stays closed
+// until they leave the radius and return". 15 feet in the runtime's meters -
+// the ONE distance that governs both, so the auto-close and the re-arm can
+// never drift apart.
+export const VIP_GATE_PROMPT_CLEAR_DISTANCE = 4.572;
+
 // --- Cascade fountain footprint -----------------------------------------
 // Each flank carries a tiered cascade FOUNTAIN. Its base stone is an
 // OCTAGON, not a rectangle, not an ellipse either: centre (68.15, -28.9)
@@ -100,6 +150,37 @@ export function isInsideFountainStone(x: number, z: number, marginMeters: number
   }
   return distance <= fountainStoneRadiusAt(Math.atan2(dz, dx)) + marginMeters;
 }
+
+// --- Cascade Court bay (the fountain + ramp-entrance enclosure) ----------
+// Owner request (2026-08-04, in-engine screenshot): fence the fountain AND
+// the skydeck ramp entrance in on both flanks, pave the enclosed ground with
+// the LED tiles, and move the invisible walls out so the new space is
+// walkable. Until now the side boundary ran dead straight at |x| 64 and
+// simply CUT THROUGH the fountain - the outer half of the water feature
+// (stone out to |x| 82) stood on unreachable dark ground beyond the fence,
+// and the perimeter had to break around both the water and the ramp mouth to
+// avoid fencing them off. The boundary now bulges into a BAY around both, so
+// what used to be two holes in the fence is one enclosed court.
+//
+// Every bound is a BLOCKER CENTRE LINE, like VENUE_WALKABLE_X_MAX: the
+// blockers are VENUE_ENVELOPE_BLOCKER_THICKNESS wide and centred here, so the
+// face a player actually stops at is half a thickness inside (the
+// CASCADE_BAY_WALKABLE_* values below). Measured against the venue GLB:
+//   - fountain stone (V150_CascadeCourtCoping_R, the widest of the family):
+//     x 54.27..82.00, z -41.27..-16.45
+//   - skydeck ramp foot: x 61, z -11..-7 (SKYDECK_RAMP_* above)
+//   - V53_SpawnGalleryArcadePearl_R stands at x 70.5..76.8, z -82.3..-45.7,
+//     just SOUTH of the bay - which is what caps how far south the bay can
+//     reach without running the wall through that arcade.
+// The resulting walkway is ~4m outboard of the fountain stone and ~2.7m south
+// of it, and the ramp mouth keeps exactly the clearance the old fence gate
+// gave it (CASCADE_BAY_WALKABLE_Z_MAX lands on the old SKYDECK_GATE_Z_MAX).
+export const CASCADE_BAY_X_MAX = 88;
+export const CASCADE_BAY_Z_MIN = -46;
+export const CASCADE_BAY_Z_MAX = -3.5;
+export const CASCADE_BAY_WALKABLE_X_MAX = CASCADE_BAY_X_MAX - VENUE_ENVELOPE_BLOCKER_THICKNESS / 2;
+export const CASCADE_BAY_WALKABLE_Z_MIN = CASCADE_BAY_Z_MIN + VENUE_ENVELOPE_BLOCKER_THICKNESS / 2;
+export const CASCADE_BAY_WALKABLE_Z_MAX = CASCADE_BAY_Z_MAX - VENUE_ENVELOPE_BLOCKER_THICKNESS / 2;
 
 // Front-of-house sound booth, placed by ACOUSTICS rather than eyeballing.
 // Measured from the venue's own PA: the main line arrays hang at x +/-16,

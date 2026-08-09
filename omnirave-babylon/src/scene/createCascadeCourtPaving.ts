@@ -9,7 +9,13 @@ import type { Material } from '@babylonjs/core/Materials/material';
 import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { Scene } from '@babylonjs/core/scene';
 
-import { VENUE_ENVELOPE_BLOCKER_THICKNESS, VENUE_WALKABLE_X_MAX } from './mainStageVenueBounds';
+import {
+  CASCADE_BAY_WALKABLE_X_MAX,
+  CASCADE_BAY_WALKABLE_Z_MAX,
+  CASCADE_BAY_WALKABLE_Z_MIN,
+  VENUE_ENVELOPE_BLOCKER_THICKNESS,
+  VENUE_WALKABLE_X_MAX,
+} from './mainStageVenueBounds';
 import { createPlateMaterial, GOLD_PLATE_MATERIAL, PEARL_PLATE_MATERIAL } from './venuePlateFamily';
 
 // Decorative paving for the two Cascade Court flank plazas, which read "a bit
@@ -20,10 +26,29 @@ import { createPlateMaterial, GOLD_PLATE_MATERIAL, PEARL_PLATE_MATERIAL } from '
 //
 // It is flooring ON existing floor: no collision, isPickable = false.
 
-// Ground sits at y 0 across the flanks; 0.06 clears z-fighting with it the
-// same way the immersive floor pulse does at 0.08, while staying low enough
-// that the avatar never visibly steps up onto it.
-const PAVING_Y = 0.06;
+// Ground sits at y 0 across the flanks, and the player's ground ray lands the
+// avatar's feet ON that ground (these tiles are thin-instanced and
+// isPickable = false, so they are never a walkable surface in their own
+// right - see resolveGroundHeight in playerController.ts).
+//
+// Player-flagged (2026-08-03, in-engine, with a screenshot): the slab used to
+// be CENTRED at y 0.06, which put its underside at 0.04 and its top face at
+// 0.08 - the tiles floated a clear 4cm off the ground on nothing, and their
+// top face stood 8cm PROUD of the feet resting at y 0, so the avatar waded
+// through the paving at ankle height instead of walking on it. "Clears
+// z-fighting" only ever needed millimetres; 0.06 was orders of magnitude more
+// clearance than the problem called for.
+//
+// Bed the stone instead, the way real paving is laid: the slab sits mostly
+// BELOW grade with its top face just proud of it. Nothing floats (there is no
+// underside gap to see), and the surface the avatar's feet rest on is the tile
+// face itself, to within a hair that is sub-pixel at avatar scale.
+const PAVING_THICKNESS = 0.04;
+// How far the finished stone stands proud of grade. Big enough that the top
+// face never z-fights the ground plane and the gold seams still catch grazing
+// light on their edges, small enough to read as flush underfoot.
+export const PAVING_TOP_Y = 0.01;
+const PAVING_Y = PAVING_TOP_Y - PAVING_THICKNESS / 2;
 
 // The plaza ring. The outer edge stops at the envelope blocker's walkable
 // face - paving past that is behind the boundary fence and unreachable.
@@ -31,6 +56,19 @@ export const PLAZA_X_MIN = 30;
 export const PLAZA_X_MAX = VENUE_WALKABLE_X_MAX - VENUE_ENVELOPE_BLOCKER_THICKNESS / 2;
 export const PLAZA_Z_MIN = -50;
 export const PLAZA_Z_MAX = -10;
+
+// The Cascade Court BAY: the ground the boundary now encloses around the
+// fountain and the skydeck ramp entrance (owner request, 2026-08-04 - see
+// CASCADE_BAY_* in mainStageVenueBounds.ts). It was unreachable dark ground
+// outside the old straight fence line; now that players can walk it, it is
+// paved and lit like the rest of the court - "fill the space with the LED
+// tiles". Its inner edge is the old plaza's outer edge, so the two regions
+// meet with no seam, and every edge stops at a walkable face for the same
+// reason PLAZA_X_MAX does.
+export const BAY_PLAZA_X_MIN = PLAZA_X_MAX;
+export const BAY_PLAZA_X_MAX = CASCADE_BAY_WALKABLE_X_MAX;
+export const BAY_PLAZA_Z_MIN = CASCADE_BAY_WALKABLE_Z_MIN;
+export const BAY_PLAZA_Z_MAX = CASCADE_BAY_WALKABLE_Z_MAX;
 
 // Player-flagged (2026-07-31): earlier passes here tried to CUT the paving
 // around the fountain's footprint - first as a rectangle (left the octagon's
@@ -92,25 +130,63 @@ export function planCascadeCourtPaving(): PavingPlan {
 
   const columns = Math.floor((PLAZA_X_MAX - PLAZA_X_MIN) / TILE_PITCH);
   const rows = Math.floor((PLAZA_Z_MAX - PLAZA_Z_MIN) / TILE_PITCH);
-  // Centre the grid in the plaza so the leftover fraction splits evenly.
+  // Centre the grid in the plaza so the leftover fraction splits evenly. Both
+  // regions are laid on THIS one lattice - the bay's courses continue the
+  // plaza's rather than starting a second grid at its own corner, so the
+  // stone runs through unbroken where the two meet and every tone/seam index
+  // below stays global.
   const originX = PLAZA_X_MIN + (PLAZA_X_MAX - PLAZA_X_MIN - columns * TILE_PITCH) / 2;
   const originZ = PLAZA_Z_MIN + (PLAZA_Z_MAX - PLAZA_Z_MIN - rows * TILE_PITCH) / 2;
 
-  for (let column = 0; column < columns; column++) {
-    for (let row = 0; row < rows; row++) {
-      const x = originX + (column + 0.5) * TILE_PITCH;
-      const z = originZ + (row + 0.5) * TILE_PITCH;
-      // No fountain keep-out: the whole plaza pave uniformly, fountain and
-      // all - see the module comment above.
-      tiles.push({ tone: toneFor(column, row), x, z });
+  // Lattice index range whose FULL tile footprint (not just its centre) fits
+  // between `min` and `max` - the edge discipline the plaza has always had,
+  // now applied to each region.
+  const indexRange = (min: number, max: number, origin: number) => ({
+    first: Math.ceil((min - origin - (TILE_PITCH - TILE_SIZE) / 2) / TILE_PITCH),
+    last: Math.floor((max - origin + (TILE_PITCH - TILE_SIZE) / 2) / TILE_PITCH) - 1,
+  });
 
-      // Band seams: on the +x edge of every BAND_SIZE-th column and the +z
-      // edge of every BAND_SIZE-th row.
-      if (column % BAND_SIZE === BAND_SIZE - 1) {
-        seams.push({ length: TILE_PITCH, yaw: Math.PI / 2, x: x + TILE_PITCH / 2, z });
-      }
-      if (row % BAND_SIZE === BAND_SIZE - 1) {
-        seams.push({ length: TILE_PITCH, yaw: 0, x, z: z + TILE_PITCH / 2 });
+  const regions = [
+    { xMin: PLAZA_X_MIN, xMax: PLAZA_X_MAX, zMin: PLAZA_Z_MIN, zMax: PLAZA_Z_MAX },
+    // The bay's inner edge is the plaza's outer edge: an INTERIOR joint now,
+    // not a boundary, so the column straddling it is laid instead of dropped.
+    // Without that the lattice's own centring fraction left a ~1.5m strip of
+    // bare ground running right along the old fence line - the seam the two
+    // fields are meant not to have. `seen` keeps that shared column from
+    // being emitted twice.
+    {
+      xMin: BAY_PLAZA_X_MIN - TILE_PITCH,
+      xMax: BAY_PLAZA_X_MAX,
+      zMin: BAY_PLAZA_Z_MIN,
+      zMax: BAY_PLAZA_Z_MAX,
+    },
+  ];
+  const seen = new Set<string>();
+
+  for (const region of regions) {
+    const columnRange = indexRange(region.xMin, region.xMax, originX);
+    const rowRange = indexRange(region.zMin, region.zMax, originZ);
+    for (let column = columnRange.first; column <= columnRange.last; column++) {
+      for (let row = rowRange.first; row <= rowRange.last; row++) {
+        const key = `${column}:${row}`;
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        const x = originX + (column + 0.5) * TILE_PITCH;
+        const z = originZ + (row + 0.5) * TILE_PITCH;
+        // No fountain keep-out: the whole court paves uniformly, fountain and
+        // all - see the module comment above.
+        tiles.push({ tone: toneFor(column, row), x, z });
+
+        // Band seams: on the +x edge of every BAND_SIZE-th column and the +z
+        // edge of every BAND_SIZE-th row.
+        if (column % BAND_SIZE === BAND_SIZE - 1) {
+          seams.push({ length: TILE_PITCH, yaw: Math.PI / 2, x: x + TILE_PITCH / 2, z });
+        }
+        if (row % BAND_SIZE === BAND_SIZE - 1) {
+          seams.push({ length: TILE_PITCH, yaw: 0, x, z: z + TILE_PITCH / 2 });
+        }
       }
     }
   }
@@ -203,7 +279,7 @@ export function createCascadeCourtPaving(scene: Scene): CascadeCourtPavingHandle
   const source = (name: string, width: number, depth: number, material: Material) => {
     // Flat slab rather than a plane: a box needs no rotation to lie down and
     // its side faces catch the plaza's grazing light at the tile edges.
-    const mesh = MeshBuilder.CreateBox(name, { width, height: 0.04, depth }, scene);
+    const mesh = MeshBuilder.CreateBox(name, { width, height: PAVING_THICKNESS, depth }, scene);
     mesh.parent = root;
     mesh.material = material;
     mesh.isPickable = false;
