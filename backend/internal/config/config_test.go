@@ -54,6 +54,7 @@ func TestLoadUsesQualifiedOmniChatStandardModelByDefault(t *testing.T) {
 	t.Setenv("ENCRYPTION_KEY", "test")
 	t.Setenv("RUNPOD_API_KEY", "server-only")
 	t.Setenv("RUNPOD_IMAGE_ENDPOINT_ID", "image-endpoint")
+	t.Setenv("RUNPOD_IMAGE_ENDPOINT_ID_NSFW", "image-endpoint-nsfw")
 	t.Setenv("RUNPOD_VIDEO_ENDPOINT_ID", "video-endpoint")
 	t.Setenv("RUNPOD_INPUT_HOSTS", "storage.example.test,media.example.test,storage.example.test")
 	t.Setenv("RUNPOD_OUTPUT_HOSTS", "storage.googleapis.com, media.example.test,storage.googleapis.com")
@@ -75,7 +76,10 @@ func TestLoadUsesQualifiedOmniChatStandardModelByDefault(t *testing.T) {
 	require.Equal(t, "runpod", cfg.OmniChatMedia.Provider)
 	require.Equal(t, "server-only", cfg.OmniChatMedia.RunPodAPIKey)
 	require.Equal(t, "image-endpoint", cfg.OmniChatMedia.RunPodImageEndpointID)
+	require.Equal(t, "image-endpoint-nsfw", cfg.OmniChatMedia.RunPodNSFWImageEndpointID)
 	require.Equal(t, "video-endpoint", cfg.OmniChatMedia.RunPodVideoEndpointID)
+	// A video job is two provider renders inside one bounded request.
+	require.Equal(t, 1800, cfg.OmniChatMedia.RunPodRequestTimeoutSeconds)
 	require.Equal(t, []string{"storage.googleapis.com", "media.example.test", "r2.example.test", "cdn.example.test"}, cfg.OmniChatMedia.RunPodOutputHosts)
 	require.Equal(t, []string{"storage.example.test", "media.example.test", "r2.example.test", "cdn.example.test"}, cfg.OmniChatMedia.RunPodInputHosts)
 }

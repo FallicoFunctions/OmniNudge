@@ -754,7 +754,8 @@ func main() {
 		botPersonaRepo, botConversationRepo, omniChatMediaRepo,
 		omniChatGenerationEnqueuer, cfg.OmniChatMedia.Provider,
 	).SetBilling(omniChatBilling).SetMessageWriter(botMessageRepo).SetConversationWriter(botConversationRepo).
-		SetPromptModerator(services.NewOpenRouterOmniChatMediaModerator(openrouterClient))
+		SetPromptModerator(services.NewOpenRouterOmniChatMediaModerator(openrouterClient)).
+		SetContentEntitlement(omniChatUserRepo, omniChatUserRepo)
 	omniChatMediaHandler := handlers.NewOmniChatMediaHandler(omniChatGenerationService, omniChatMediaRepo, storageService).
 		SetBilling(omniChatBilling).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo)

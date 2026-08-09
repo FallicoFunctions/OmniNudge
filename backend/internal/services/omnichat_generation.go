@@ -53,6 +53,13 @@ func NormalizeOmniChatGenerationRequest(input models.OmniChatGenerationRequest) 
 		if request.SourceAssetID == nil {
 			return request, errors.New("source_asset_id is required for image-to-video generation")
 		}
+	} else {
+		// A source asset is only meaningful when the caller explicitly asked to
+		// animate one. Clearing it elsewhere keeps a single meaning for the
+		// stored column: on a scene or create video, source_asset_id set means
+		// the job's own image phase produced that still, which is what makes a
+		// retry resumable without a dedicated state column.
+		request.SourceAssetID = nil
 	}
 
 	request.Prompt = normalizePlainText(request.Prompt)
@@ -249,6 +256,41 @@ func buildOmniChatEffectivePrompt(request models.OmniChatGenerationRequest) stri
 		}
 	}
 	parts = append(parts, "Requested view: "+request.Prompt+".")
+	return strings.Join(parts, " ")
+}
+
+// BuildOmniChatVideoMotionPrompt describes how the subject should move, and
+// nothing else.
+//
+// The still handed to the video model already fixes identity, outfit, lighting
+// and setting. Restating any of that here does not reinforce it -- the video
+// model re-derives the frame from the text it is given, so an appearance
+// description competes with the pixels it was handed and shows up as drift.
+// Only the motion is new information.
+//
+// Create and image-to-video requests carry the user's own wording, which is
+// already an instruction about movement, so it is used as written.
+func BuildOmniChatVideoMotionPrompt(mode models.OmniChatGenerationMode, prompt string, scene models.OmniChatSceneState) string {
+	prompt = strings.TrimSpace(prompt)
+	if mode != models.OmniChatGenerationModeContextual {
+		return prompt
+	}
+	parts := []string{
+		"Animate the supplied still image.",
+		"Keep the subject's identity, appearance, outfit, lighting, and setting exactly as they appear in the image; add only motion.",
+	}
+	appendField := func(label, value string) {
+		if value = strings.TrimSpace(value); value != "" {
+			parts = append(parts, label+": "+value+".")
+		}
+	}
+	appendField("Action", scene.Activity)
+	appendField("Body position", scene.Pose)
+	appendField("Mood", scene.Mood)
+	appendField("Camera movement", scene.CameraDirection)
+	if prompt != "" {
+		parts = append(parts, "Requested motion: "+prompt+".")
+	}
 	return strings.Join(parts, " ")
 }
 

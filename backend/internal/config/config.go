@@ -91,6 +91,12 @@ type OmniChatMediaConfig struct {
 	RunPodAPIKey                string
 	RunPodBaseURL               string
 	RunPodImageEndpointID       string
+	// RunPodNSFWImageEndpointID serves accounts entitled to explicit content.
+	// Every explicit pixel is produced by the image phase -- a video is only an
+	// animation of a still that already exists -- so this one split covers both
+	// media kinds and no separate NSFW video endpoint is needed. Empty falls
+	// back to the standard image endpoint.
+	RunPodNSFWImageEndpointID   string
 	RunPodVideoEndpointID       string
 	RunPodInputHosts            []string
 	RunPodOutputHosts           []string
@@ -381,6 +387,7 @@ func Load() (*Config, error) {
 			RunPodAPIKey:                getEnv("RUNPOD_API_KEY", ""),
 			RunPodBaseURL:               getEnv("RUNPOD_BASE_URL", "https://api.runpod.ai/v2"),
 			RunPodImageEndpointID:       getEnv("RUNPOD_IMAGE_ENDPOINT_ID", ""),
+			RunPodNSFWImageEndpointID:   getEnv("RUNPOD_IMAGE_ENDPOINT_ID_NSFW", ""),
 			RunPodVideoEndpointID:       getEnv("RUNPOD_VIDEO_ENDPOINT_ID", ""),
 			RunPodInputHosts:            getEnvAsStringList("RUNPOD_INPUT_HOSTS"),
 			RunPodOutputHosts:           getEnvAsStringList("RUNPOD_OUTPUT_HOSTS"),
@@ -396,7 +403,10 @@ func Load() (*Config, error) {
 			RunPodAvatarVolumeMountPath: getEnv("RUNPOD_AVATAR_VOLUME_MOUNT_PATH", "/models"),
 			RunPodAvatarPorts:           getEnvAsStringList("RUNPOD_AVATAR_PORTS"),
 			RunPodWorkerBackendURL:      getEnv("RUNPOD_WORKER_BACKEND_URL", ""),
-			RunPodRequestTimeoutSeconds: getEnvAsPositiveInt("RUNPOD_REQUEST_TIMEOUT_SECONDS", 900),
+			// Bounds the whole job, and a video job is now two provider renders
+			// back to back: an SDXL still, then 121 Wan frames. 900s covered a
+			// single image and would time out the second phase mid-render.
+			RunPodRequestTimeoutSeconds: getEnvAsPositiveInt("RUNPOD_REQUEST_TIMEOUT_SECONDS", 1800),
 			MaxImageBytes:               getEnvAsPositiveInt64("OMNICHAT_MAX_IMAGE_BYTES", 25*1024*1024),
 			MaxVideoBytes:               getEnvAsPositiveInt64("OMNICHAT_MAX_VIDEO_BYTES", 200*1024*1024),
 			PollIntervalSeconds:         getEnvAsPositiveInt("RUNPOD_MEDIA_POLL_SECONDS", 2),

@@ -26,17 +26,50 @@ import (
 // which rejects an over-long list outright rather than truncating it.
 const maxProviderReferenceImages = 8
 
+// Progress is reported as one bar across however many provider calls a job
+// makes. A video job renders a still and then animates it, and the animation is
+// by far the longer half, so the still is only allowed the first stretch --
+// otherwise the bar would reach 90 and freeze for the rest of the job.
+const (
+	firstPhaseProgressFloor   = 5
+	videoStillProgressCeiling = 40
+	finalPhaseProgressCeiling = 90
+)
+
 type RunPodGenerationSpec struct {
 	EndpointID string
 	Input      map[string]any
 }
 
+// providerPhase is one RunPod round trip within a generation job.
+//
+// Submission, provider-id persistence and progress bounds differ per phase and
+// so are supplied by the caller: the image phase of a video job claims a queued
+// job, while the animation phase claims an already-running one and cannot use
+// the same transition.
+type providerPhase struct {
+	kind models.OmniChatMediaKind
+	spec *RunPodGenerationSpec
+	// providerJobID is the request being resumed on entry, and the request that
+	// was submitted on exit.
+	providerJobID string
+	submit        bool
+	progressMin   int
+	progressMax   int
+	// record durably claims the phase. False means another worker got there
+	// first and this submission is a duplicate to be cancelled.
+	record func(ctx context.Context, jobID uuid.UUID, providerJobID string) (bool, error)
+}
+
 type omniChatGenerationJobStore interface {
 	GetGenerationJobForProcessing(ctx context.Context, id uuid.UUID) (*models.OmniChatGenerationJob, error)
 	GetMediaAssetOwned(ctx context.Context, id uuid.UUID, ownerUserID int) (*models.OmniChatMediaAsset, error)
+	DeleteMediaAssetOwned(ctx context.Context, id uuid.UUID, ownerUserID int) (bool, error)
 	MarkGenerationJobRunning(ctx context.Context, id uuid.UUID, providerJobID string) (bool, error)
+	StartGenerationSecondPhase(ctx context.Context, id uuid.UUID, providerJobID string) (bool, error)
 	UpdateGenerationProgress(ctx context.Context, id uuid.UUID, progress int) error
 	MarkGenerationJobFailed(ctx context.Context, id uuid.UUID, safeCode, providerError string) (bool, error)
+	AttachIntermediateAsset(ctx context.Context, jobID uuid.UUID, media *models.MediaFile, asset *models.OmniChatMediaAsset, kind models.OmniChatMediaKind, freeTierBytes, proTierBytes int64, provenance models.OmniChatGenerationProvenance) error
 	CompleteGenerationJob(ctx context.Context, jobID uuid.UUID, media *models.MediaFile, asset *models.OmniChatMediaAsset, freeTierBytes, proTierBytes int64, provenance models.OmniChatGenerationProvenance) error
 }
 
@@ -70,6 +103,11 @@ type OmniChatGenerationHandler struct {
 	failClosed       bool
 	storageQuotaFree int64
 	storageQuotaPro  int64
+	// downloadMedia fetches a finished artifact from the provider. It is a
+	// field so the two-phase flow can be exercised without a live HTTPS host:
+	// the real implementation refuses loopback addresses by design, which
+	// makes an in-process test server unusable. Nil means the real one.
+	downloadMedia func(ctx context.Context, rawURL string, kind modelsMediaKind, maxBytes int64, additionalHosts ...string) (*generatedMediaDownload, func(), error)
 	billing          interface {
 		CaptureOwned(context.Context, int, uuid.UUID) error
 		RefundOwned(context.Context, int, uuid.UUID) error
@@ -187,6 +225,11 @@ func (h *OmniChatGenerationHandler) recordGenerationFailure(ctx context.Context,
 			return err
 		}
 	}
+	// Before the billing decision, because an unbilled administrator job still
+	// leaves a still behind and returns early below.
+	if job != nil && job.Status != models.OmniChatGenerationStatusSucceeded {
+		h.discardIntermediateAsset(cleanupCtx, job)
+	}
 	if job == nil || job.BillingOperationID == nil || h.billing == nil {
 		return nil
 	}
@@ -233,48 +276,196 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 	if err != nil {
 		return err
 	}
-	spec, err := BuildRunPodGenerationSpec(h.config, job, references, sourceURL)
-	if err != nil {
-		if errors.Is(err, runpod.ErrEndpointNotConfigured) {
-			return permanentGenerationFailure("provider_unavailable", err)
+
+	// A scene or create video has no still to animate yet. Render one through
+	// the image pipeline first, so the clip inherits the identity conditioning
+	// and scene fidelity that only the image path provides. An image-to-video
+	// request from the Create page already carries its source and skips this.
+	twoPhaseVideo := job.Kind == models.OmniChatMediaKindVideo && job.Mode != models.OmniChatGenerationModeImageToVideo
+	if twoPhaseVideo && job.SourceAssetID == nil {
+		stillURL, stopped, err := h.renderVideoSourceStill(ctx, job, references)
+		if err != nil {
+			return err
 		}
-		return permanentGenerationFailure("invalid_provider_request", err)
+		if stopped {
+			return nil
+		}
+		sourceURL = stillURL
 	}
 
-	providerJobID := job.ProviderJobID
+	var spec *RunPodGenerationSpec
+	switch job.Kind {
+	case models.OmniChatMediaKindImage:
+		spec, err = BuildImageSpec(h.config, job, references)
+	case models.OmniChatMediaKindVideo:
+		spec, err = BuildVideoSpec(h.config, job, sourceURL)
+	default:
+		err = fmt.Errorf("unsupported generation kind %q", job.Kind)
+	}
+	if err != nil {
+		return providerSpecFailure(err)
+	}
+
+	phase := &providerPhase{
+		kind:          job.Kind,
+		spec:          spec,
+		providerJobID: job.ProviderJobID,
+		progressMin:   firstPhaseProgressFloor,
+		progressMax:   finalPhaseProgressCeiling,
+	}
+	if twoPhaseVideo {
+		phase.progressMin = videoStillProgressCeiling
+	}
+	switch {
+	case job.Status == models.OmniChatGenerationStatusQueued:
+		// The job's first provider call, whichever kind it is.
+		phase.submit = true
+		phase.record = h.jobs.MarkGenerationJobRunning
+	case twoPhaseVideo && job.SourceAssetID != nil && job.ProviderJobID == "":
+		// Only AttachIntermediateAsset leaves a running job with a source asset
+		// and no provider request id, so this is the animation phase.
+		//
+		// The conditions are spelled out rather than reduced to the empty id
+		// alone: any other running job that lost its provider id is corrupt,
+		// and must keep failing permanently so it is refunded rather than left
+		// running forever.
+		phase.submit = true
+		phase.record = h.jobs.StartGenerationSecondPhase
+	}
+	result, err := h.runProviderPhase(ctx, job, phase)
+	if err != nil {
+		return err
+	}
+	if result == nil {
+		return nil
+	}
+
+	_, stopped, err := h.persistGeneratedMedia(ctx, job, job.Kind, phase, result,
+		func(media *models.MediaFile, asset *models.OmniChatMediaAsset, provenance models.OmniChatGenerationProvenance) error {
+			return h.jobs.CompleteGenerationJob(ctx, job.ID, media, asset, h.configQuotaFree(), h.configQuotaPro(), provenance)
+		})
+	if err != nil {
+		return err
+	}
+	if stopped {
+		return nil
+	}
+	if job.BillingOperationID != nil {
+		if h.billing == nil {
+			return errors.New("generation billing is not configured")
+		}
+		if err := h.billing.CaptureOwned(ctx, job.OwnerUserID, *job.BillingOperationID); err != nil {
+			return fmt.Errorf("capture generation credits: %w", err)
+		}
+	}
+	return nil
+}
+
+// renderVideoSourceStill runs the image phase of a two-phase video job and
+// returns a signed URL for the still it stored.
+//
+// The still is saved as a real gallery asset rather than a scratch file: it is
+// the only durable record of what the animation was built from, and it is what
+// makes the phase resumable without a dedicated state column.
+func (h *OmniChatGenerationHandler) renderVideoSourceStill(ctx context.Context, job *models.OmniChatGenerationJob, references []string) (string, bool, error) {
+	spec, err := BuildImageSpec(h.config, job, references)
+	if err != nil {
+		return "", false, providerSpecFailure(err)
+	}
+	phase := &providerPhase{
+		kind:          models.OmniChatMediaKindImage,
+		spec:          spec,
+		providerJobID: job.ProviderJobID,
+		progressMin:   firstPhaseProgressFloor,
+		progressMax:   videoStillProgressCeiling,
+	}
+	if job.Status == models.OmniChatGenerationStatusQueued {
+		phase.submit = true
+		phase.record = h.jobs.MarkGenerationJobRunning
+	}
+	result, err := h.runProviderPhase(ctx, job, phase)
+	if err != nil {
+		return "", false, err
+	}
+	if result == nil {
+		return "", true, nil
+	}
+	asset, stopped, err := h.persistGeneratedMedia(ctx, job, models.OmniChatMediaKindImage, phase, result,
+		func(media *models.MediaFile, asset *models.OmniChatMediaAsset, provenance models.OmniChatGenerationProvenance) error {
+			return h.jobs.AttachIntermediateAsset(ctx, job.ID, media, asset,
+				models.OmniChatMediaKindImage, h.configQuotaFree(), h.configQuotaPro(), provenance)
+		})
+	if err != nil || stopped {
+		return "", stopped, err
+	}
+	// Mirror the row the commit just wrote. The stored provider request id was
+	// cleared with it, so the animation phase submits rather than polling a
+	// finished image job.
+	job.SourceAssetID = &asset.ID
+	job.ProviderJobID = ""
+	job.Status = models.OmniChatGenerationStatusRunning
+	job.Progress = videoStillProgressCeiling
+
+	// Cancelling during the still must not buy a clip.
+	cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, "", "")
+	if err != nil {
+		return "", false, err
+	}
+	if cancelled {
+		return "", true, nil
+	}
+	stillURL, err := h.resolveSourceImageURL(ctx, job.OwnerUserID, asset.ID)
+	if err != nil {
+		return "", false, err
+	}
+	return stillURL, false, nil
+}
+
+// runProviderPhase submits (or resumes) one RunPod request and waits for it.
+//
+// A nil result with a nil error means the job reached a terminal state while
+// this phase was in flight -- cancelled by its owner, or claimed by another
+// worker -- and the caller must stop without treating it as a failure.
+func (h *OmniChatGenerationHandler) runProviderPhase(ctx context.Context, job *models.OmniChatGenerationJob, phase *providerPhase) (*runpod.Result, error) {
 	providerCompleted := false
 	defer func() {
-		if providerJobID == "" || providerCompleted || ctx.Err() == nil {
+		if phase.providerJobID == "" || providerCompleted || ctx.Err() == nil {
 			return
 		}
 		cancelContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 		defer cancel()
-		if cancelErr := h.provider.Cancel(cancelContext, spec.EndpointID, providerJobID); cancelErr != nil {
+		if cancelErr := h.provider.Cancel(cancelContext, phase.spec.EndpointID, phase.providerJobID); cancelErr != nil {
 			zlog.Warn().Err(cancelErr).Str("job_id", job.ID.String()).Msg("failed to cancel timed-out RunPod media job")
 		}
 	}()
-	if job.Status == models.OmniChatGenerationStatusQueued {
-		providerJobID, err = h.provider.Submit(ctx, spec.EndpointID, spec.Input)
+	if phase.submit {
+		submitted, err := h.provider.Submit(ctx, phase.spec.EndpointID, phase.spec.Input)
 		if errors.Is(err, runpod.ErrNotConfigured) || errors.Is(err, runpod.ErrInvalidConfiguration) {
-			return permanentGenerationFailure("provider_unavailable", err)
+			return nil, permanentGenerationFailure("provider_unavailable", err)
 		}
 		if err != nil {
-			return fmt.Errorf("submit generation: %w", err)
+			return nil, fmt.Errorf("submit generation: %w", err)
 		}
-		marked, err := h.jobs.MarkGenerationJobRunning(ctx, job.ID, providerJobID)
+		if strings.TrimSpace(submitted) == "" {
+			// Recording an empty id would store NULL and make the job
+			// indistinguishable from one whose next phase has not started.
+			return nil, permanentGenerationFailure("provider_result_invalid", errors.New("RunPod accepted a job without returning a request id"))
+		}
+		phase.providerJobID = submitted
+		claimed, err := phase.record(ctx, job.ID, submitted)
 		if err != nil {
-			h.cancelSubmittedGeneration(ctx, job.ID, spec.EndpointID, providerJobID)
-			return fmt.Errorf("mark generation running: %w", err)
+			h.cancelSubmittedGeneration(ctx, job.ID, phase.spec.EndpointID, submitted)
+			return nil, fmt.Errorf("record generation provider request: %w", err)
 		}
-		if !marked {
+		if !claimed {
 			// A retry or concurrent worker won the database claim, or the user
 			// cancelled while Submit was in flight. Its provider request is the
 			// authoritative one, so discard this duplicate without retrying.
-			h.cancelSubmittedGeneration(ctx, job.ID, spec.EndpointID, providerJobID)
-			return nil
+			h.cancelSubmittedGeneration(ctx, job.ID, phase.spec.EndpointID, submitted)
+			return nil, nil
 		}
-	} else if providerJobID == "" {
-		return permanentGenerationFailure("provider_state_invalid", errors.New("running generation is missing provider request id"))
+	} else if phase.providerJobID == "" {
+		return nil, permanentGenerationFailure("provider_state_invalid", errors.New("running generation is missing provider request id"))
 	}
 
 	pollInterval := time.Duration(h.config.PollIntervalSeconds) * time.Second
@@ -282,45 +473,48 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 		pollInterval = 2 * time.Second
 	}
 	progress := job.Progress
+	if progress < phase.progressMin {
+		progress = phase.progressMin
+	}
 	for {
-		cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, spec.EndpointID, providerJobID)
+		cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, phase.spec.EndpointID, phase.providerJobID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if cancelled {
-			return nil
+			return nil, nil
 		}
-		status, err := h.provider.Status(ctx, spec.EndpointID, providerJobID)
+		status, err := h.provider.Status(ctx, phase.spec.EndpointID, phase.providerJobID)
 		if err != nil {
 			if errors.Is(err, runpod.ErrNotConfigured) || errors.Is(err, runpod.ErrEndpointNotConfigured) || errors.Is(err, runpod.ErrInvalidConfiguration) {
-				return permanentGenerationFailure("provider_unavailable", err)
+				return nil, permanentGenerationFailure("provider_unavailable", err)
 			}
-			return fmt.Errorf("poll generation: %w", err)
+			return nil, fmt.Errorf("poll generation: %w", err)
 		}
 		if status == nil {
-			return permanentGenerationFailure("provider_result_invalid", errors.New("RunPod returned no job status"))
+			return nil, permanentGenerationFailure("provider_result_invalid", errors.New("RunPod returned no job status"))
 		}
 		if status.Status == runpod.StatusCompleted {
 			providerCompleted = true
 			break
 		}
 		if status.Status == runpod.StatusFailed || status.Status == runpod.StatusError {
-			return permanentGenerationFailure("provider_failed", errors.New("RunPod media job failed"))
+			return nil, permanentGenerationFailure("provider_failed", errors.New("RunPod media job failed"))
 		}
 		if status.Status == runpod.StatusCancelled || status.Status == runpod.StatusCanceled {
-			return permanentGenerationFailure("provider_cancelled", errors.New("RunPod media job was cancelled"))
+			return nil, permanentGenerationFailure("provider_cancelled", errors.New("RunPod media job was cancelled"))
 		}
 		if status.Status == runpod.StatusTimedOut {
-			return permanentGenerationFailure("provider_timed_out", errors.New("RunPod media job timed out"))
+			return nil, permanentGenerationFailure("provider_timed_out", errors.New("RunPod media job timed out"))
 		}
 		if status.Status == runpod.StatusInProgress || status.Status == runpod.StatusRunning {
-			if progress < 90 {
+			if progress < phase.progressMax {
 				progress += 5
-				if progress < 10 {
-					progress = 10
+				if progress > phase.progressMax {
+					progress = phase.progressMax
 				}
 				if err := h.jobs.UpdateGenerationProgress(ctx, job.ID, progress); err != nil {
-					return fmt.Errorf("update generation progress: %w", err)
+					return nil, fmt.Errorf("update generation progress: %w", err)
 				}
 			}
 		}
@@ -328,84 +522,117 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return ctx.Err()
+			return nil, ctx.Err()
 		case <-timer.C:
 		}
 	}
-	cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, spec.EndpointID, providerJobID)
+	cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, phase.spec.EndpointID, phase.providerJobID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if cancelled {
-		return nil
+		return nil, nil
 	}
 
-	result, err := h.provider.Result(ctx, spec.EndpointID, providerJobID)
+	result, err := h.provider.Result(ctx, phase.spec.EndpointID, phase.providerJobID)
 	if err != nil {
 		switch {
 		case errors.Is(err, runpod.ErrNotConfigured), errors.Is(err, runpod.ErrEndpointNotConfigured), errors.Is(err, runpod.ErrInvalidConfiguration):
-			return permanentGenerationFailure("provider_unavailable", err)
+			return nil, permanentGenerationFailure("provider_unavailable", err)
 		case errors.Is(err, runpod.ErrJobFailed):
-			return permanentGenerationFailure("provider_failed", err)
+			return nil, permanentGenerationFailure("provider_failed", err)
 		case errors.Is(err, runpod.ErrJobCancelled):
-			return permanentGenerationFailure("provider_cancelled", err)
+			return nil, permanentGenerationFailure("provider_cancelled", err)
 		case errors.Is(err, runpod.ErrJobTimedOut):
-			return permanentGenerationFailure("provider_timed_out", err)
+			return nil, permanentGenerationFailure("provider_timed_out", err)
 		}
-		return fmt.Errorf("fetch generation result: %w", err)
+		return nil, fmt.Errorf("fetch generation result: %w", err)
+	}
+	if result == nil {
+		return nil, permanentGenerationFailure("provider_result_invalid", errors.New("RunPod returned no job result"))
 	}
 	// Surface worker provenance as soon as it arrives. Without it, a template
 	// left pointing at an old tag silently invalidates every prompt experiment.
 	if strings.TrimSpace(result.WorkerBuild) == "" {
-		zlog.Warn().Str("job_id", job.ID.String()).Msg("OmniChat worker returned no build stamp; endpoint may be serving a pre-provenance image")
+		zlog.Warn().Str("job_id", job.ID.String()).Str("phase", string(phase.kind)).
+			Msg("OmniChat worker returned no build stamp; endpoint may be serving a pre-provenance image")
 	} else {
-		zlog.Info().Str("job_id", job.ID.String()).Str("worker_build", result.WorkerBuild).Msg("OmniChat generation rendered")
+		zlog.Info().Str("job_id", job.ID.String()).Str("phase", string(phase.kind)).
+			Str("worker_build", result.WorkerBuild).Msg("OmniChat generation rendered")
 	}
-	providerMedia, err := selectRunPodMediaResult(job.Kind, result)
+	return result, nil
+}
+
+// persistGeneratedMedia validates, scans and stores one provider artifact, then
+// hands it to commit for the database write that makes it durable.
+//
+// kind is a parameter rather than job.Kind: during the image phase of a video
+// job the job says "video" while the bytes on the wire are a PNG, and every
+// decision below -- which result field to read, which size cap applies, which
+// file extension the storage key gets -- follows the artifact, not the job.
+//
+// A true "stopped" return means the job went terminal mid-flight; the caller
+// must stop without treating it as a failure.
+func (h *OmniChatGenerationHandler) persistGeneratedMedia(
+	ctx context.Context,
+	job *models.OmniChatGenerationJob,
+	kind models.OmniChatMediaKind,
+	phase *providerPhase,
+	result *runpod.Result,
+	commit func(*models.MediaFile, *models.OmniChatMediaAsset, models.OmniChatGenerationProvenance) error,
+) (*models.OmniChatMediaAsset, bool, error) {
+	providerMedia, err := selectRunPodMediaResult(kind, result)
 	if err != nil {
-		return permanentGenerationFailure("provider_result_invalid", err)
+		return nil, false, permanentGenerationFailure("provider_result_invalid", err)
 	}
 	maxBytes := h.config.MaxImageBytes
-	if job.Kind == models.OmniChatMediaKindVideo {
+	if kind == models.OmniChatMediaKindVideo {
 		maxBytes = h.config.MaxVideoBytes
 	}
-	download, cleanup, err := downloadGeneratedMedia(ctx, providerMedia.URL, modelsMediaKind(job.Kind), maxBytes, h.config.RunPodOutputHosts...)
+	fetch := h.downloadMedia
+	if fetch == nil {
+		fetch = downloadGeneratedMedia
+	}
+	download, cleanup, err := fetch(ctx, providerMedia.URL, modelsMediaKind(kind), maxBytes, h.config.RunPodOutputHosts...)
 	if err != nil {
-		return permanentGenerationFailure("provider_result_invalid", err)
+		return nil, false, permanentGenerationFailure("provider_result_invalid", err)
 	}
 	defer cleanup()
-	cancelled, err = h.stopIfGenerationCancelled(ctx, job.ID, spec.EndpointID, providerJobID)
+	cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, phase.spec.EndpointID, phase.providerJobID)
 	if err != nil {
-		return err
+		return nil, false, err
 	}
 	if cancelled {
-		return nil
+		return nil, true, nil
 	}
 
 	if h.scanner == nil {
 		if h.failClosed {
-			return permanentGenerationFailure("scanner_unavailable", errors.New("virus scanner is unavailable"))
+			return nil, false, permanentGenerationFailure("scanner_unavailable", errors.New("virus scanner is unavailable"))
 		}
 	} else {
 		scanResult, err := h.scanner.ScanFile(ctx, download.Path)
 		if err != nil {
 			if h.failClosed {
-				return fmt.Errorf("scan generated media: %w", err)
+				return nil, false, fmt.Errorf("scan generated media: %w", err)
 			}
 		} else if scanResult.Infected {
-			return permanentGenerationFailure("malware_detected", errors.New("generated media failed security scanning"))
+			return nil, false, permanentGenerationFailure("malware_detected", errors.New("generated media failed security scanning"))
 		}
 	}
 
 	file, err := os.Open(download.Path)
 	if err != nil {
-		return fmt.Errorf("open generated media for storage: %w", err)
+		return nil, false, fmt.Errorf("open generated media for storage: %w", err)
 	}
 	defer file.Close()
+	// The extension is what keeps a video job's two artifacts apart: the same
+	// job id yields .png for the still and .mp4 for the clip. Do not collapse
+	// it into a fixed suffix.
 	storageKey := fmt.Sprintf("omnichat/generated/%d/%s%s", job.OwnerUserID, job.ID.String(), download.Extension)
 	_, err = h.storage.Upload(ctx, storageKey, file, download.ContentType)
 	if err != nil {
-		return fmt.Errorf("store generated media: %w", err)
+		return nil, false, fmt.Errorf("store generated media: %w", err)
 	}
 	committed := false
 	defer func() {
@@ -431,7 +658,7 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 		media.Height = &height
 	}
 	asset := &models.OmniChatMediaAsset{Width: media.Width, Height: media.Height}
-	if job.Kind == models.OmniChatMediaKindVideo {
+	if kind == models.OmniChatMediaKindVideo {
 		duration := job.DurationSeconds
 		if providerMedia.Duration > 0 {
 			duration = int(providerMedia.Duration + 0.5)
@@ -443,22 +670,52 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 		WorkerBuild:  result.WorkerBuild,
 		ActualPrompt: result.ActualPrompt,
 	}
-	if err := h.jobs.CompleteGenerationJob(ctx, job.ID, media, asset, h.configQuotaFree(), h.configQuotaPro(), provenance); err != nil {
+	if err := commit(media, asset, provenance); err != nil {
 		if errors.Is(err, models.ErrOmniChatStorageQuotaExceeded) {
-			return permanentGenerationFailure("storage_quota_exceeded", err)
+			return nil, false, permanentGenerationFailure("storage_quota_exceeded", err)
 		}
-		return fmt.Errorf("complete generation job: %w", err)
+		return nil, false, fmt.Errorf("persist generated media: %w", err)
 	}
 	committed = true
-	if job.BillingOperationID != nil {
-		if h.billing == nil {
-			return errors.New("generation billing is not configured")
-		}
-		if err := h.billing.CaptureOwned(ctx, job.OwnerUserID, *job.BillingOperationID); err != nil {
-			return fmt.Errorf("capture generation credits: %w", err)
-		}
+	return asset, false, nil
+}
+
+func providerSpecFailure(err error) error {
+	if errors.Is(err, runpod.ErrEndpointNotConfigured) {
+		return permanentGenerationFailure("provider_unavailable", err)
 	}
-	return nil
+	return permanentGenerationFailure("invalid_provider_request", err)
+}
+
+// discardIntermediateAsset removes the still a two-phase video job rendered for
+// itself when that job ends without producing its clip.
+//
+// Failure and cancellation both refund the whole reservation, so keeping the
+// still would hand out an unpaid gallery image and charge it against the
+// owner's storage quota. Deleting it also clears source_asset_id -- the foreign
+// key is ON DELETE SET NULL -- so a failed row stops looking like a job whose
+// animation phase is merely pending.
+//
+// Callers must have established that the job did not succeed.
+func (h *OmniChatGenerationHandler) discardIntermediateAsset(ctx context.Context, job *models.OmniChatGenerationJob) {
+	if h.jobs == nil || job == nil || job.SourceAssetID == nil {
+		return
+	}
+	// Only a still this job rendered for itself. An image-to-video request
+	// animates an asset the user already owns and chose from their gallery,
+	// and that must survive the failure untouched.
+	if job.Kind != models.OmniChatMediaKindVideo || job.Mode == models.OmniChatGenerationModeImageToVideo {
+		return
+	}
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+	// A best-effort cleanup: the terminal state and the refund are the parts
+	// that must not be lost, and the storage object is already tracked by the
+	// deletion queue this write feeds.
+	if _, err := h.jobs.DeleteMediaAssetOwned(cleanupCtx, *job.SourceAssetID, job.OwnerUserID); err != nil {
+		zlog.Warn().Err(err).Str("job_id", job.ID.String()).
+			Msg("failed to discard the intermediate still of an unfinished OmniChat video job")
+	}
 }
 
 func (h *OmniChatGenerationHandler) deleteGenerationObject(ctx context.Context, storageKey string) {
@@ -502,6 +759,9 @@ func (h *OmniChatGenerationHandler) stopIfGenerationCancelled(ctx context.Contex
 			zlog.Warn().Err(err).Str("job_id", jobID.String()).Msg("failed to cancel OmniChat provider job")
 		}
 	}
+	if current != nil && current.Status != models.OmniChatGenerationStatusSucceeded {
+		h.discardIntermediateAsset(ctx, current)
+	}
 	if current != nil &&
 		current.Status != models.OmniChatGenerationStatusSucceeded &&
 		current.BillingOperationID != nil &&
@@ -536,6 +796,16 @@ func (h *OmniChatGenerationHandler) resolveInputs(ctx context.Context, job *mode
 	// without rewriting stored scenes.
 	if job.Scene.SubjectAppearance == "" {
 		job.Scene.SubjectAppearance = job.IdentityProfile.Appearance
+	}
+	if job.Kind == models.OmniChatMediaKindVideo && job.SourceAssetID != nil {
+		// Nothing left to condition. The animation phase works from the still,
+		// so resolving persona references here would only add a way for an
+		// expired avatar to fail a job whose image already rendered correctly.
+		signedURL, err := h.resolveSourceImageURL(ctx, job.OwnerUserID, *job.SourceAssetID)
+		if err != nil {
+			return nil, "", err
+		}
+		return nil, signedURL, nil
 	}
 	references := make([]string, 0, job.IdentityProfile.ReferenceLimit)
 	seen := make(map[string]struct{}, job.IdentityProfile.ReferenceLimit)
@@ -582,21 +852,36 @@ func (h *OmniChatGenerationHandler) resolveInputs(ctx context.Context, job *mode
 	if job.SourceAssetID == nil {
 		return references, "", nil
 	}
-	sourceAsset, err := h.jobs.GetMediaAssetOwned(ctx, *job.SourceAssetID, job.OwnerUserID)
+	signedURL, err := h.resolveSourceImageURL(ctx, job.OwnerUserID, *job.SourceAssetID)
 	if err != nil {
-		return nil, "", fmt.Errorf("load source asset: %w", err)
+		return nil, "", err
+	}
+	return references, signedURL, nil
+}
+
+// resolveSourceImageURL mints the short-lived URL the video worker fetches its
+// initial frame from.
+//
+// Both callers go through here: a resumed job reads its stored source asset,
+// and the image phase passes the still it just created. One implementation
+// means one set of checks -- owner scope, image kind, clean scan, and a
+// publicly reachable HTTPS host -- rather than a second path that could drift.
+func (h *OmniChatGenerationHandler) resolveSourceImageURL(ctx context.Context, ownerUserID int, assetID uuid.UUID) (string, error) {
+	sourceAsset, err := h.jobs.GetMediaAssetOwned(ctx, assetID, ownerUserID)
+	if err != nil {
+		return "", fmt.Errorf("load source asset: %w", err)
 	}
 	if sourceAsset == nil || sourceAsset.Kind != models.OmniChatMediaKindImage || sourceAsset.ScanStatus != models.MediaScanStatusClean {
-		return nil, "", permanentGenerationFailure("source_unavailable", errors.New("source image is unavailable"))
+		return "", permanentGenerationFailure("source_unavailable", errors.New("source image is unavailable"))
 	}
 	signedURL, err := h.storage.GetSignedURL(ctx, sourceAsset.StoragePath, 20*time.Minute)
 	if err != nil {
-		return nil, "", fmt.Errorf("sign source image URL: %w", err)
+		return "", fmt.Errorf("sign source image URL: %w", err)
 	}
 	if !safeProviderReferenceURL(signedURL) {
-		return nil, "", permanentGenerationFailure("source_unreachable", errors.New("source image is not externally reachable over HTTPS"))
+		return "", permanentGenerationFailure("source_unreachable", errors.New("source image is not externally reachable over HTTPS"))
 	}
-	return references, signedURL, nil
+	return signedURL, nil
 }
 
 func (h *OmniChatGenerationHandler) resolvePersonaReferenceURL(ctx context.Context, rawURL string, preferPublicReference bool) (string, error) {
@@ -715,11 +1000,15 @@ func selectRunPodMediaResult(kind models.OmniChatMediaKind, result *runpod.Resul
 	return nil, errors.New("provider result kind is invalid")
 }
 
-// BuildRunPodGenerationSpec is the provider adapter boundary. Domain requests
-// do not leak RunPod endpoint details into handlers, persistence, or frontend
-// code. The worker receives this stable input contract and owns model/runtime
-// selection inside its endpoint image.
-func BuildRunPodGenerationSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerationJob, referenceURLs []string, sourceURL string) (*RunPodGenerationSpec, error) {
+// BuildImageSpec is the provider adapter boundary for image renders. Domain
+// requests do not leak RunPod endpoint details into handlers, persistence, or
+// frontend code. The worker receives this stable input contract and owns
+// model/runtime selection inside its endpoint image.
+//
+// A video job's first phase calls this too, with the same scene, identity
+// profile, references and prompt a Scene photo would get. That sharing is the
+// whole point of the two-phase design: identity conditioning is written once.
+func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerationJob, referenceURLs []string) (*RunPodGenerationSpec, error) {
 	if job == nil {
 		return nil, errors.New("generation job is required")
 	}
@@ -758,13 +1047,12 @@ func BuildRunPodGenerationSpec(cfg config.OmniChatMediaConfig, job *models.OmniC
 		identityInput["lora_weight_name"] = profile.LoraWeightName
 		identityInput["lora_scale"] = profile.LoraScale
 	}
-	sourceURL = strings.TrimSpace(sourceURL)
-	if sourceURL != "" && !safeProviderReferenceURL(sourceURL) {
-		return nil, errors.New("provider source image URL is invalid")
-	}
 	providerMode := string(job.Mode)
 	if providerMode == "" {
 		providerMode = string(models.OmniChatGenerationModeCreate)
+	}
+	if providerMode == string(models.OmniChatGenerationModeImageToVideo) {
+		return nil, errors.New("image-to-video is not an image render mode")
 	}
 	aspectRatio := job.AspectRatio
 	if aspectRatio == "" {
@@ -774,81 +1062,85 @@ func BuildRunPodGenerationSpec(cfg config.OmniChatMediaConfig, job *models.OmniC
 			aspectRatio = "1:1"
 		}
 	}
-	durationSeconds := job.DurationSeconds
-	if job.Kind == models.OmniChatMediaKindVideo && durationSeconds == 0 {
-		durationSeconds = 5
-	}
 
-	switch job.Kind {
-	case models.OmniChatMediaKindImage:
-		endpointID := strings.TrimSpace(cfg.RunPodImageEndpointID)
-		input := map[string]any{
-			"kind":            "image",
-			"mode":            providerMode,
-			"prompt":          prompt,
-			"negative_prompt": strings.TrimSpace(job.NegativePrompt),
-			"num_images":      1,
-			"aspect_ratio":    aspectRatio,
-			"output_format":   "png",
-		}
-		if providerMode == string(models.OmniChatGenerationModeContextual) {
-			// Keep structured scene state separate from the prose prompt so the
-			// worker can use the latest physical events without parsing/truncation.
-			input["scene"] = job.Scene
-		}
-		for key, value := range identityInput {
-			input[key] = value
-		}
-		if len(referenceURLs) > 0 {
-			input["reference_image_urls"] = referenceURLs
-		}
-		if strings.TrimSpace(endpointID) == "" {
-			return nil, fmt.Errorf("%w: image generation endpoint", runpod.ErrEndpointNotConfigured)
-		}
-		return &RunPodGenerationSpec{EndpointID: endpointID, Input: input}, nil
-
-	case models.OmniChatMediaKindVideo:
-		input := map[string]any{
-			"kind":             "video",
-			"mode":             providerMode,
-			"prompt":           prompt,
-			"negative_prompt":  strings.TrimSpace(job.NegativePrompt),
-			"resolution":       "1080p",
-			"duration_seconds": durationSeconds,
-			"aspect_ratio":     runPodVideoAspectRatio(aspectRatio),
-		}
-		if providerMode == string(models.OmniChatGenerationModeContextual) {
-			input["scene"] = job.Scene
-		}
-		for key, value := range identityInput {
-			input[key] = value
-		}
-		if len(referenceURLs) > 0 {
-			input["reference_image_urls"] = referenceURLs
-		}
-		endpointID := strings.TrimSpace(cfg.RunPodVideoEndpointID)
-		if job.Mode == models.OmniChatGenerationModeImageToVideo {
-			if sourceURL == "" {
-				return nil, errors.New("image-to-video source is unavailable")
-			}
-			input["source_image_url"] = sourceURL
-		}
-		if strings.TrimSpace(endpointID) == "" {
-			return nil, fmt.Errorf("%w: video generation endpoint", runpod.ErrEndpointNotConfigured)
-		}
-		return &RunPodGenerationSpec{EndpointID: endpointID, Input: input}, nil
-	default:
-		return nil, fmt.Errorf("unsupported generation kind %q", job.Kind)
+	input := map[string]any{
+		"kind":            "image",
+		"mode":            providerMode,
+		"prompt":          prompt,
+		"negative_prompt": strings.TrimSpace(job.NegativePrompt),
+		"num_images":      1,
+		"aspect_ratio":    aspectRatio,
+		"output_format":   "png",
 	}
+	if providerMode == string(models.OmniChatGenerationModeContextual) {
+		// Keep structured scene state separate from the prose prompt so the
+		// worker can use the latest physical events without parsing/truncation.
+		input["scene"] = job.Scene
+	}
+	for key, value := range identityInput {
+		input[key] = value
+	}
+	if len(referenceURLs) > 0 {
+		input["reference_image_urls"] = referenceURLs
+	}
+	// The image phase is where every explicit pixel is produced, so it is also
+	// the only place the content entitlement changes anything.
+	endpointID := strings.TrimSpace(cfg.RunPodImageEndpointID)
+	if job.AllowNSFW {
+		if nsfwEndpointID := strings.TrimSpace(cfg.RunPodNSFWImageEndpointID); nsfwEndpointID != "" {
+			endpointID = nsfwEndpointID
+		}
+	}
+	if endpointID == "" {
+		return nil, fmt.Errorf("%w: image generation endpoint", runpod.ErrEndpointNotConfigured)
+	}
+	return &RunPodGenerationSpec{EndpointID: endpointID, Input: input}, nil
 }
 
-func runPodVideoAspectRatio(aspectRatio string) string {
-	switch aspectRatio {
-	case "4:5":
-		return "3:4"
-	case "5:4":
-		return "4:3"
-	default:
-		return aspectRatio
+// BuildVideoSpec animates an existing still. There is no other video path:
+// the worker has no text-to-video pipeline, because a clip generated from a
+// prompt alone carries no identity conditioning and renders a different person.
+//
+// Neither references nor the identity profile are sent. Identity is already
+// baked into the source frame, and passing a reference photo here is exactly
+// how the previous worker ended up animating the persona's avatar in the
+// avatar's own setting instead of the requested scene.
+func BuildVideoSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerationJob, sourceURL string) (*RunPodGenerationSpec, error) {
+	if job == nil {
+		return nil, errors.New("generation job is required")
 	}
+	sourceURL = strings.TrimSpace(sourceURL)
+	if sourceURL == "" {
+		return nil, errors.New("image-to-video source is unavailable")
+	}
+	if !safeProviderReferenceURL(sourceURL) {
+		return nil, errors.New("provider source image URL is invalid")
+	}
+	// The still already describes appearance and setting. Repeating either here
+	// only gives the video model something to contradict, so the prompt carries
+	// motion alone.
+	prompt := strings.TrimSpace(services.BuildOmniChatVideoMotionPrompt(job.Mode, job.Prompt, job.Scene))
+	if prompt == "" {
+		return nil, errors.New("generation prompt is unavailable")
+	}
+	durationSeconds := job.DurationSeconds
+	if durationSeconds == 0 {
+		durationSeconds = 5
+	}
+	// No aspect ratio: the worker derives the frame from the source still's own
+	// dimensions. Sending one would invite a mismatch that letterboxes or crops
+	// the framing the image phase just produced.
+	input := map[string]any{
+		"kind":             "video",
+		"mode":             string(models.OmniChatGenerationModeImageToVideo),
+		"prompt":           prompt,
+		"negative_prompt":  strings.TrimSpace(job.NegativePrompt),
+		"duration_seconds": durationSeconds,
+		"source_image_url": sourceURL,
+	}
+	endpointID := strings.TrimSpace(cfg.RunPodVideoEndpointID)
+	if endpointID == "" {
+		return nil, fmt.Errorf("%w: video generation endpoint", runpod.ErrEndpointNotConfigured)
+	}
+	return &RunPodGenerationSpec{EndpointID: endpointID, Input: input}, nil
 }
