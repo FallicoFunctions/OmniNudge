@@ -101,6 +101,10 @@ type OmniChatGenerationRequest struct {
 	// OmniCredits reservation; only the persisted administrator entitlement may
 	// explicitly set this false.
 	BillingRequired *bool `json:"-"`
+	// AllowNSFW is server-owned and resolved from the caller's plan. It is not
+	// a client-settable field: a browser must never be able to select the
+	// explicit-content endpoint by adding a key to its request body.
+	AllowNSFW bool `json:"-"`
 }
 
 // OmniChatMediaCommandRequest is the narrow request accepted by the chat
@@ -144,6 +148,10 @@ type OmniChatGenerationJob struct {
 	StartedAt          *time.Time               `json:"started_at,omitempty"`
 	CompletedAt        *time.Time               `json:"completed_at,omitempty"`
 	BillingRequired    bool                     `json:"-"`
+	// AllowNSFW is the explicit-content entitlement resolved when the job was
+	// created. The queue worker has no user context and must read the decision
+	// off the row rather than re-deriving it.
+	AllowNSFW bool `json:"-"`
 	// IdentityProfile is resolved from the persona immediately before provider
 	// submission. It is intentionally transient: generation jobs retain the
 	// scene/prompt snapshot, while deployable model paths remain server config.
@@ -242,6 +250,7 @@ func (r *OmniChatMediaRepository) CreateGenerationJob(ctx context.Context, owner
 		billingRequired = *request.BillingRequired
 	}
 	job.BillingRequired = billingRequired
+	job.AllowNSFW = request.AllowNSFW
 	var duration any
 	if request.DurationSeconds > 0 {
 		duration = request.DurationSeconds
@@ -250,14 +259,16 @@ func (r *OmniChatMediaRepository) CreateGenerationJob(ctx context.Context, owner
 		INSERT INTO omnichat_generation_jobs (
 			id, owner_user_id, persona_id, conversation_id, source_message_id,
 			source_asset_id, kind, mode, prompt, negative_prompt, effective_prompt,
-			aspect_ratio, duration_seconds, scene_snapshot, provider, billing_operation_id, billing_required
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULLIF($15, ''), $16, $17)
+			aspect_ratio, duration_seconds, scene_snapshot, provider, billing_operation_id, billing_required,
+			allow_nsfw
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULLIF($15, ''), $16, $17, $18)
 		RETURNING created_at, progress
 	`
 	if request.RequestID == uuid.Nil {
 		err = r.pool.QueryRow(ctx, query, job.ID, ownerUserID, request.PersonaID, request.ConversationID, request.SourceMessageID,
 			request.SourceAssetID, request.Kind, request.Mode, request.Prompt, request.NegativePrompt,
 			request.EffectivePrompt, request.AspectRatio, duration, sceneJSON, provider, request.BillingOperationID, billingRequired,
+			request.AllowNSFW,
 		).Scan(&job.CreatedAt, &job.Progress)
 	} else {
 		tx, beginErr := r.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -268,6 +279,7 @@ func (r *OmniChatMediaRepository) CreateGenerationJob(ctx context.Context, owner
 		err = tx.QueryRow(ctx, query, job.ID, ownerUserID, request.PersonaID, request.ConversationID, request.SourceMessageID,
 			request.SourceAssetID, request.Kind, request.Mode, request.Prompt, request.NegativePrompt,
 			request.EffectivePrompt, request.AspectRatio, duration, sceneJSON, provider, request.BillingOperationID, billingRequired,
+			request.AllowNSFW,
 		).Scan(&job.CreatedAt, &job.Progress)
 		if err == nil {
 			err = completeOmniChatRequestInTx(ctx, tx, OmniChatRequestCompletion{UserID: ownerUserID, RequestID: request.RequestID}, job)
@@ -289,7 +301,7 @@ const omniChatGenerationJobSelect = `
 	COALESCE(duration_seconds, 0), scene_snapshot, COALESCE(provider, ''),
 	COALESCE(provider_job_id, ''), progress, COALESCE(error_code, ''),
 	provider_metadata, created_at, started_at, completed_at
-	,billing_operation_id, billing_required
+	,billing_operation_id, billing_required, allow_nsfw
 `
 
 func scanOmniChatGenerationJob(scanner interface{ Scan(...any) error }) (*OmniChatGenerationJob, error) {
@@ -300,7 +312,8 @@ func scanOmniChatGenerationJob(scanner interface{ Scan(...any) error }) (*OmniCh
 		&job.SourceAssetID, &job.OutputAssetID, &job.OutputMessageID, &job.Kind, &job.Mode, &job.Status, &job.Prompt,
 		&job.NegativePrompt, &job.EffectivePrompt, &job.AspectRatio, &job.DurationSeconds,
 		&sceneJSON, &job.Provider, &job.ProviderJobID, &job.Progress, &job.ErrorCode,
-		&job.ProviderMetadata, &job.CreatedAt, &job.StartedAt, &job.CompletedAt, &job.BillingOperationID, &job.BillingRequired,
+		&job.ProviderMetadata, &job.CreatedAt, &job.StartedAt, &job.CompletedAt, &job.BillingOperationID,
+		&job.BillingRequired, &job.AllowNSFW,
 	)
 	if err != nil {
 		return nil, err
@@ -457,34 +470,54 @@ func boundProvenanceText(value string, maximum int) string {
 	return string([]rune(value)[:maximum])
 }
 
-func (r *OmniChatMediaRepository) CompleteGenerationJob(ctx context.Context, jobID uuid.UUID, media *MediaFile, asset *OmniChatMediaAsset, freeTierBytes, proTierBytes int64, provenance OmniChatGenerationProvenance) error {
-	if media == nil || asset == nil {
-		return errors.New("generated media metadata is required")
-	}
-	if media.FileSize <= 0 {
-		return errors.New("generated media file size must be positive")
-	}
-	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
+// omniChatGenerationJobRow is the job state shared by both persistence paths.
+// A video job produces two assets -- an intermediate still and the finished
+// clip -- and each write needs the same owner, persona, conversation and scene
+// snapshot off the locked job row.
+type omniChatGenerationJobRow struct {
+	OwnerUserID     int
+	PersonaID       int
+	ConversationID  *int
+	SourceMessageID *int
+	Kind            OmniChatMediaKind
+	Prompt          string
+	SceneJSON       []byte
+}
 
-	var ownerUserID, personaID int
-	var conversationID, sourceMessageID *int
-	var kind OmniChatMediaKind
-	var prompt string
-	var sceneJSON []byte
-	err = tx.QueryRow(ctx, `
+// lockRunningGenerationJob claims the job for the duration of the transaction.
+// Only a running job can gain an asset: a cancelled or already-completed job
+// must not have media attached to it after the fact.
+func lockRunningGenerationJob(ctx context.Context, tx pgx.Tx, jobID uuid.UUID) (*omniChatGenerationJobRow, error) {
+	job := &omniChatGenerationJobRow{}
+	err := tx.QueryRow(ctx, `
 		SELECT owner_user_id, persona_id, conversation_id, source_message_id, kind, prompt, scene_snapshot
 		FROM omnichat_generation_jobs
 		WHERE id = $1 AND status = 'running'
 		FOR UPDATE
-	`, jobID).Scan(&ownerUserID, &personaID, &conversationID, &sourceMessageID, &kind, &prompt, &sceneJSON)
+	`, jobID).Scan(&job.OwnerUserID, &job.PersonaID, &job.ConversationID, &job.SourceMessageID,
+		&job.Kind, &job.Prompt, &job.SceneJSON)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if media.UserID != ownerUserID {
+	return job, nil
+}
+
+// insertGeneratedAsset writes the media file and the private gallery asset.
+//
+// kind is a parameter rather than the job's own kind because the intermediate
+// still of a video job is an image. Reading it off the job row would label the
+// PNG a video and hand the gallery an asset the player cannot open.
+func insertGeneratedAsset(
+	ctx context.Context,
+	tx pgx.Tx,
+	jobID uuid.UUID,
+	job *omniChatGenerationJobRow,
+	media *MediaFile,
+	asset *OmniChatMediaAsset,
+	kind OmniChatMediaKind,
+	freeTierBytes, proTierBytes int64,
+) error {
+	if media.UserID != job.OwnerUserID {
 		return errors.New("media owner does not match generation job owner")
 	}
 	if freeTierBytes <= 0 || proTierBytes < freeTierBytes {
@@ -493,17 +526,17 @@ func (r *OmniChatMediaRepository) CompleteGenerationJob(ctx context.Context, job
 	var storageUsed int64
 	var plan, role string
 	var planExpiresAt *time.Time
-	err = tx.QueryRow(ctx, `
+	err := tx.QueryRow(ctx, `
 		SELECT COALESCE(storage_used_bytes, 0), plan, plan_expires_at, role
 		FROM users
 		WHERE id = $1
 		FOR UPDATE
-	`, ownerUserID).Scan(&storageUsed, &plan, &planExpiresAt, &role)
+	`, job.OwnerUserID).Scan(&storageUsed, &plan, &planExpiresAt, &role)
 	if err != nil {
 		return err
 	}
 	storageLimit := freeTierBytes
-	paidActive := (plan == "plus" || plan == "premium") && (planExpiresAt == nil || planExpiresAt.After(time.Now()))
+	paidActive := (plan == PlanPlus || plan == PlanPremium) && (planExpiresAt == nil || planExpiresAt.After(time.Now()))
 	if paidActive || role == "admin" || role == "moderator" {
 		storageLimit = proTierBytes
 	}
@@ -530,33 +563,127 @@ func (r *OmniChatMediaRepository) CompleteGenerationJob(ctx context.Context, job
 	}
 
 	asset.ID = uuid.New()
-	asset.OwnerUserID = ownerUserID
-	asset.PersonaID = personaID
-	asset.ConversationID = conversationID
-	asset.SourceMessageID = sourceMessageID
+	asset.OwnerUserID = job.OwnerUserID
+	asset.PersonaID = job.PersonaID
+	asset.ConversationID = job.ConversationID
+	asset.SourceMessageID = job.SourceMessageID
 	asset.GenerationJobID = jobID
 	asset.MediaFileID = media.ID
 	asset.Kind = kind
 	asset.Visibility = OmniChatAssetVisibilityPrivate
-	asset.Prompt = prompt
+	asset.Prompt = job.Prompt
 	asset.StoragePath = media.StoragePath
 	asset.StorageURL = media.StorageURL
 	asset.FileType = media.FileType
 	asset.ScanStatus = media.ScanStatus
-	if err := json.Unmarshal(sceneJSON, &asset.Scene); err != nil {
+	if err := json.Unmarshal(job.SceneJSON, &asset.Scene); err != nil {
 		return fmt.Errorf("decode asset scene: %w", err)
 	}
-	err = tx.QueryRow(ctx, `
+	return tx.QueryRow(ctx, `
 		INSERT INTO omnichat_media_assets (
 			id, owner_user_id, persona_id, conversation_id, source_message_id,
 			generation_job_id, media_file_id, kind, visibility, prompt,
 			scene_snapshot, width, height, duration_seconds, safety_status
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'private',$9,$10,$11,$12,$13,'approved')
 		RETURNING created_at
-	`, asset.ID, ownerUserID, personaID, conversationID, sourceMessageID,
-		jobID, media.ID, kind, prompt, sceneJSON, asset.Width, asset.Height, asset.DurationSeconds,
+	`, asset.ID, job.OwnerUserID, job.PersonaID, job.ConversationID, job.SourceMessageID,
+		jobID, media.ID, kind, job.Prompt, job.SceneJSON, asset.Width, asset.Height, asset.DurationSeconds,
 	).Scan(&asset.CreatedAt)
+}
+
+// AttachIntermediateAsset stores the still rendered by the first phase of a
+// two-phase video job and records it as the job's source image.
+//
+// It deliberately does not reuse CompleteGenerationJob: that reads the kind off
+// the job row (which says video), posts a chat message (a photo message for a
+// video request is noise), and marks the job succeeded. Here the job stays
+// running so the second phase can animate what was just stored.
+func (r *OmniChatMediaRepository) AttachIntermediateAsset(ctx context.Context, jobID uuid.UUID, media *MediaFile, asset *OmniChatMediaAsset, kind OmniChatMediaKind, freeTierBytes, proTierBytes int64, provenance OmniChatGenerationProvenance) error {
+	if media == nil || asset == nil {
+		return errors.New("generated media metadata is required")
+	}
+	if media.FileSize <= 0 {
+		return errors.New("generated media file size must be positive")
+	}
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	job, err := lockRunningGenerationJob(ctx, tx, jobID)
+	if err != nil {
+		return err
+	}
+	if err := insertGeneratedAsset(ctx, tx, jobID, job, media, asset, kind, freeTierBytes, proTierBytes); err != nil {
+		return err
+	}
+	provenanceJSON, err := provenance.encode()
+	if err != nil {
+		return fmt.Errorf("encode generation provenance: %w", err)
+	}
+	// provider_job_id is cleared in the same statement that sets
+	// source_asset_id. Together they are the resume signal: source set with no
+	// provider id means the first phase landed and the second has not been
+	// submitted, so a retry submits it instead of polling a finished job.
+	tag, err := tx.Exec(ctx, `
+		UPDATE omnichat_generation_jobs
+			SET source_asset_id = $2, provider_job_id = NULL,
+			    provider_metadata = COALESCE(provider_metadata, '{}'::jsonb)
+			                        || jsonb_build_object('source', $3::jsonb),
+			    last_activity_at = NOW()
+		WHERE id = $1 AND status = 'running'
+	`, jobID, asset.ID, provenanceJSON)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return errors.New("generation job changed while attaching its source image")
+	}
+	return tx.Commit(ctx)
+}
+
+// StartGenerationSecondPhase records the provider request for the animation
+// phase of a two-phase video job.
+//
+// MarkGenerationJobRunning cannot do this: it only matches a queued job, so it
+// would silently no-op here and leave the first phase's provider id on the row
+// for a retry to poll. The provider_job_id IS NULL predicate makes this a
+// compare-and-swap, so a concurrent worker that already claimed the phase
+// causes this one to report false and cancel its duplicate submission.
+func (r *OmniChatMediaRepository) StartGenerationSecondPhase(ctx context.Context, id uuid.UUID, providerJobID string) (bool, error) {
+	if strings.TrimSpace(providerJobID) == "" {
+		return false, errors.New("provider request id is required")
+	}
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE omnichat_generation_jobs
+		SET provider_job_id = $2, last_activity_at = NOW()
+		WHERE id = $1 AND status = 'running'
+		  AND source_asset_id IS NOT NULL
+		  AND provider_job_id IS NULL
+	`, id, providerJobID)
+	return tag.RowsAffected() > 0, err
+}
+
+func (r *OmniChatMediaRepository) CompleteGenerationJob(ctx context.Context, jobID uuid.UUID, media *MediaFile, asset *OmniChatMediaAsset, freeTierBytes, proTierBytes int64, provenance OmniChatGenerationProvenance) error {
+	if media == nil || asset == nil {
+		return errors.New("generated media metadata is required")
+	}
+	if media.FileSize <= 0 {
+		return errors.New("generated media file size must be positive")
+	}
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	job, err := lockRunningGenerationJob(ctx, tx, jobID)
+	if err != nil {
+		return err
+	}
+	conversationID := job.ConversationID
+	if err := insertGeneratedAsset(ctx, tx, jobID, job, media, asset, job.Kind, freeTierBytes, proTierBytes); err != nil {
 		return err
 	}
 
@@ -591,10 +718,15 @@ func (r *OmniChatMediaRepository) CompleteGenerationJob(ctx context.Context, job
 	if err != nil {
 		return fmt.Errorf("encode generation provenance: %w", err)
 	}
+	// Merged, not replaced. A two-phase video job already recorded the still's
+	// worker build under "source", and that is the only way to tell which image
+	// rendered which stage. Merging into '{}' leaves a single-phase job with
+	// exactly the object it wrote before.
 	tag, err := tx.Exec(ctx, `
 		UPDATE omnichat_generation_jobs
 			SET status = 'succeeded', progress = 100, output_asset_id = $2,
-			    output_message_id = $3, provider_metadata = $4,
+			    output_message_id = $3,
+			    provider_metadata = COALESCE(provider_metadata, '{}'::jsonb) || $4::jsonb,
 			    completed_at = NOW(), provider_error = NULL,last_activity_at=NOW()
 		WHERE id = $1 AND status = 'running'
 	`, jobID, asset.ID, outputMessageID, provenanceJSON)
@@ -774,10 +906,17 @@ func (r *OmniChatMediaRepository) DeleteMediaAssetOwned(ctx context.Context, id 
 	// Keep the conversation ordering metadata accurate after removing a
 	// generated reply. The asset still exists at this point, so its original
 	// conversation can be used safely; NULL conversation assets need no update.
+	//
+	// COALESCE to the conversation's own creation time: last_message_at is NOT
+	// NULL, and MAX() over no rows is NULL. That happens whenever the asset had
+	// no chat message of its own to remove and the conversation has none
+	// either -- the intermediate still of a video job deliberately posts no
+	// message, so discarding one would otherwise fail on the constraint.
 	if _, err = tx.Exec(ctx, `
 		UPDATE bot_conversations c
-		SET last_message_at = (
-			SELECT MAX(m.created_at) FROM bot_messages m WHERE m.conversation_id = c.id
+		SET last_message_at = COALESCE(
+			(SELECT MAX(m.created_at) FROM bot_messages m WHERE m.conversation_id = c.id),
+			c.created_at
 		)
 		WHERE c.id = (
 			SELECT conversation_id FROM omnichat_media_assets WHERE id = $1

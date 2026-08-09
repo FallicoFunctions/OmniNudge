@@ -23,6 +23,9 @@ func (f *cancelledGenerationStoreFake) GetGenerationJobForProcessing(context.Con
 func (*cancelledGenerationStoreFake) GetMediaAssetOwned(context.Context, uuid.UUID, int) (*models.OmniChatMediaAsset, error) {
 	return nil, nil
 }
+func (*cancelledGenerationStoreFake) DeleteMediaAssetOwned(context.Context, uuid.UUID, int) (bool, error) {
+	return false, nil
+}
 func (*cancelledGenerationStoreFake) MarkGenerationJobRunning(context.Context, uuid.UUID, string) (bool, error) {
 	return false, nil
 }
@@ -33,6 +36,12 @@ func (*cancelledGenerationStoreFake) MarkGenerationJobFailed(context.Context, uu
 	return true, nil
 }
 func (*cancelledGenerationStoreFake) CompleteGenerationJob(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, int64, int64, models.OmniChatGenerationProvenance) error {
+	return nil
+}
+func (*cancelledGenerationStoreFake) StartGenerationSecondPhase(context.Context, uuid.UUID, string) (bool, error) {
+	return false, nil
+}
+func (*cancelledGenerationStoreFake) AttachIntermediateAsset(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, models.OmniChatMediaKind, int64, int64, models.OmniChatGenerationProvenance) error {
 	return nil
 }
 
@@ -82,6 +91,9 @@ func (f *generationClaimStoreFake) GetGenerationJobForProcessing(context.Context
 func (*generationClaimStoreFake) GetMediaAssetOwned(context.Context, uuid.UUID, int) (*models.OmniChatMediaAsset, error) {
 	return nil, nil
 }
+func (*generationClaimStoreFake) DeleteMediaAssetOwned(context.Context, uuid.UUID, int) (bool, error) {
+	return false, nil
+}
 func (f *generationClaimStoreFake) MarkGenerationJobRunning(context.Context, uuid.UUID, string) (bool, error) {
 	return f.markResult, f.markErr
 }
@@ -95,6 +107,12 @@ func (f *generationClaimStoreFake) MarkGenerationJobFailed(ctx context.Context, 
 	return f.markErr == nil, f.markErr
 }
 func (*generationClaimStoreFake) CompleteGenerationJob(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, int64, int64, models.OmniChatGenerationProvenance) error {
+	return nil
+}
+func (*generationClaimStoreFake) StartGenerationSecondPhase(context.Context, uuid.UUID, string) (bool, error) {
+	return false, nil
+}
+func (*generationClaimStoreFake) AttachIntermediateAsset(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, models.OmniChatMediaKind, int64, int64, models.OmniChatGenerationProvenance) error {
 	return nil
 }
 
@@ -374,7 +392,7 @@ func omniChatMediaTestConfig() config.OmniChatMediaConfig {
 	}
 }
 
-func TestBuildRunPodGenerationSpecUsesCharacterReferenceForImage(t *testing.T) {
+func TestBuildImageSpecUsesCharacterReferenceForImage(t *testing.T) {
 	job := &models.OmniChatGenerationJob{
 		Kind:            models.OmniChatMediaKindImage,
 		Mode:            models.OmniChatGenerationModeContextual,
@@ -386,7 +404,7 @@ func TestBuildRunPodGenerationSpecUsesCharacterReferenceForImage(t *testing.T) {
 			RecentEvents: []string{"Character: *I step closer.*", "User: *I take her hand.*"},
 		},
 	}
-	spec, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, []string{"https://cdn.example.test/sadie.png"}, "")
+	spec, err := BuildImageSpec(omniChatMediaTestConfig(), job, []string{"https://cdn.example.test/sadie.png"})
 
 	require.NoError(t, err)
 	require.Equal(t, "endpoint-image", spec.EndpointID)
@@ -398,7 +416,7 @@ func TestBuildRunPodGenerationSpecUsesCharacterReferenceForImage(t *testing.T) {
 	require.Equal(t, job.Scene, spec.Input["scene"])
 }
 
-func TestBuildRunPodGenerationSpecIncludesValidatedLoRAProfile(t *testing.T) {
+func TestBuildImageSpecIncludesValidatedLoRAProfile(t *testing.T) {
 	job := &models.OmniChatGenerationJob{
 		Kind:            models.OmniChatMediaKindImage,
 		EffectivePrompt: "Sadie at the park",
@@ -412,112 +430,157 @@ func TestBuildRunPodGenerationSpecIncludesValidatedLoRAProfile(t *testing.T) {
 			LoraScale:      0.9,
 		},
 	}
-	spec, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, []string{
+	spec, err := BuildImageSpec(omniChatMediaTestConfig(), job, []string{
 		"https://cdn.example.test/avatar.png", "https://cdn.example.test/park.png", "https://cdn.example.test/extra.png",
-	}, "")
+	})
 	require.NoError(t, err)
 	require.Equal(t, "lora", spec.Input["identity_mode"])
 	require.Equal(t, "nickf579/sadie-lora", spec.Input["lora_model_id"])
 	require.Equal(t, []string{"https://cdn.example.test/avatar.png", "https://cdn.example.test/park.png"}, spec.Input["reference_image_urls"])
 }
 
-func TestBuildRunPodGenerationSpecIncludesReferencesForVideo(t *testing.T) {
+func TestBuildImageSpecRendersTheStillForAVideoJob(t *testing.T) {
+	// The first phase of a video job goes through the image endpoint with the
+	// same scene, references and identity profile a Scene photo would get.
+	// That is what gives the clip its likeness and setting.
 	job := &models.OmniChatGenerationJob{
 		Kind:            models.OmniChatMediaKindVideo,
 		Mode:            models.OmniChatGenerationModeContextual,
-		EffectivePrompt: "Sadie walks through the park",
+		EffectivePrompt: "Sadie standing in the park",
 		AspectRatio:     "16:9",
 		DurationSeconds: 5,
+		Scene:           models.OmniChatSceneState{Location: "the park"},
 	}
-	spec, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, []string{"https://cdn.example.test/sadie.png"}, "")
+	spec, err := BuildImageSpec(omniChatMediaTestConfig(), job, []string{"https://cdn.example.test/sadie.png"})
+
 	require.NoError(t, err)
+	require.Equal(t, "endpoint-image", spec.EndpointID)
+	require.Equal(t, "image", spec.Input["kind"])
 	require.Equal(t, []string{"https://cdn.example.test/sadie.png"}, spec.Input["reference_image_urls"])
-	require.Equal(t, "reference", spec.Input["identity_mode"])
+	require.Equal(t, "16:9", spec.Input["aspect_ratio"])
+	// duration_seconds is only valid for video and the worker rejects it here.
+	require.NotContains(t, spec.Input, "duration_seconds")
 }
 
-func TestBuildRunPodGenerationSpecBuildsImageToVideoInput(t *testing.T) {
+func TestBuildImageSpecRoutesEntitledJobsToTheNSFWEndpoint(t *testing.T) {
+	cfg := omniChatMediaTestConfig()
+	cfg.RunPodNSFWImageEndpointID = "endpoint-image-nsfw"
+	job := &models.OmniChatGenerationJob{Kind: models.OmniChatMediaKindImage, EffectivePrompt: "A portrait"}
+
+	spec, err := BuildImageSpec(cfg, job, nil)
+	require.NoError(t, err)
+	require.Equal(t, "endpoint-image", spec.EndpointID)
+
+	job.AllowNSFW = true
+	spec, err = BuildImageSpec(cfg, job, nil)
+	require.NoError(t, err)
+	require.Equal(t, "endpoint-image-nsfw", spec.EndpointID)
+}
+
+func TestBuildImageSpecFallsBackWhenNoNSFWEndpointIsConfigured(t *testing.T) {
+	job := &models.OmniChatGenerationJob{
+		Kind: models.OmniChatMediaKindImage, EffectivePrompt: "A portrait", AllowNSFW: true,
+	}
+	spec, err := BuildImageSpec(omniChatMediaTestConfig(), job, nil)
+	require.NoError(t, err)
+	require.Equal(t, "endpoint-image", spec.EndpointID)
+}
+
+func TestBuildVideoSpecAnimatesTheRenderedStill(t *testing.T) {
 	job := &models.OmniChatGenerationJob{
 		Kind:            models.OmniChatMediaKindVideo,
 		Mode:            models.OmniChatGenerationModeImageToVideo,
-		EffectivePrompt: "She turns and waves",
+		Prompt:          "She turns and waves",
 		NegativePrompt:  "distorted hands",
 		AspectRatio:     "9:16",
 		DurationSeconds: 7,
 	}
-	spec, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, nil, "https://signed.example.test/source.png")
+	spec, err := BuildVideoSpec(omniChatMediaTestConfig(), job, "https://signed.example.test/source.png")
 
 	require.NoError(t, err)
 	require.Equal(t, "endpoint-video", spec.EndpointID)
 	require.Equal(t, "https://signed.example.test/source.png", spec.Input["source_image_url"])
 	require.Equal(t, 7, spec.Input["duration_seconds"])
 	require.Equal(t, "video", spec.Input["kind"])
-	require.Equal(t, "9:16", spec.Input["aspect_ratio"])
+	require.Equal(t, "image_to_video", spec.Input["mode"])
+	require.Equal(t, "She turns and waves", spec.Input["prompt"])
 }
 
-func TestBuildRunPodGenerationSpecBuildsTextToVideoInput(t *testing.T) {
+func TestBuildVideoSpecSendsMotionOnlyForASceneClip(t *testing.T) {
+	// The still already carries appearance and setting. Sending them again
+	// gives the video model something to contradict, which reads as drift.
 	job := &models.OmniChatGenerationJob{
 		Kind:            models.OmniChatMediaKindVideo,
-		Mode:            models.OmniChatGenerationModeCreate,
-		EffectivePrompt: "Walking through a rainy city",
-		AspectRatio:     "16:9",
+		Mode:            models.OmniChatGenerationModeContextual,
+		Prompt:          "show me the scene",
+		EffectivePrompt: "A long image prompt describing her freckles, the rain, and the neon sign",
 		DurationSeconds: 5,
+		Scene:           models.OmniChatSceneState{Activity: "leaning on the railing", Mood: "playful"},
 	}
-	spec, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, nil, "")
+	spec, err := BuildVideoSpec(omniChatMediaTestConfig(), job, "https://signed.example.test/source.png")
 
 	require.NoError(t, err)
-	require.Equal(t, "endpoint-video", spec.EndpointID)
-	require.NotContains(t, spec.Input, "image_url")
-	require.Equal(t, "16:9", spec.Input["aspect_ratio"])
-	require.Equal(t, "1080p", spec.Input["resolution"])
-	require.Equal(t, "video", spec.Input["kind"])
+	prompt, _ := spec.Input["prompt"].(string)
+	require.Contains(t, prompt, "leaning on the railing")
+	require.Contains(t, prompt, "show me the scene")
+	require.NotContains(t, prompt, "freckles")
+	require.Equal(t, "image_to_video", spec.Input["mode"])
 }
 
-func TestBuildRunPodGenerationSpecMapsUnsupportedVideoRatios(t *testing.T) {
-	job := &models.OmniChatGenerationJob{
-		Kind:            models.OmniChatMediaKindVideo,
-		Mode:            models.OmniChatGenerationModeCreate,
-		EffectivePrompt: "A quiet walk through the park",
-		AspectRatio:     "4:5",
-		DurationSeconds: 5,
-	}
-
-	spec, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, nil, "")
-
-	require.NoError(t, err)
-	require.Equal(t, "3:4", spec.Input["aspect_ratio"])
-}
-
-func TestBuildRunPodGenerationSpecRequiresSourceURLForImageToVideo(t *testing.T) {
+func TestBuildVideoSpecSendsNeitherReferencesNorAspectRatio(t *testing.T) {
+	// References are how the old worker ended up animating the avatar photo in
+	// the avatar's own setting. The frame comes from the still's dimensions,
+	// so an aspect ratio here could only contradict it.
 	job := &models.OmniChatGenerationJob{
 		Kind:            models.OmniChatMediaKindVideo,
 		Mode:            models.OmniChatGenerationModeImageToVideo,
-		EffectivePrompt: "Wave",
+		Prompt:          "She waves",
+		AspectRatio:     "4:5",
+		DurationSeconds: 5,
 	}
-	_, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), job, nil, "")
+	spec, err := BuildVideoSpec(omniChatMediaTestConfig(), job, "https://signed.example.test/source.png")
+
+	require.NoError(t, err)
+	require.NotContains(t, spec.Input, "reference_image_urls")
+	require.NotContains(t, spec.Input, "aspect_ratio")
+	require.NotContains(t, spec.Input, "identity_mode")
+	require.NotContains(t, spec.Input, "scene")
+	// The worker never read this. Sending it invited exactly the kind of
+	// silent drift the worker_build stamp exists to catch.
+	require.NotContains(t, spec.Input, "resolution")
+}
+
+func TestBuildVideoSpecRequiresSourceURL(t *testing.T) {
+	job := &models.OmniChatGenerationJob{
+		Kind:   models.OmniChatMediaKindVideo,
+		Mode:   models.OmniChatGenerationModeImageToVideo,
+		Prompt: "Wave",
+	}
+	_, err := BuildVideoSpec(omniChatMediaTestConfig(), job, "")
 	require.EqualError(t, err, "image-to-video source is unavailable")
 }
 
-func TestBuildRunPodGenerationSpecRequiresConfiguredEndpoint(t *testing.T) {
+func TestBuildImageSpecRequiresConfiguredEndpoint(t *testing.T) {
 	job := &models.OmniChatGenerationJob{
 		Kind:            models.OmniChatMediaKindImage,
 		EffectivePrompt: "A portrait",
 	}
-	_, err := BuildRunPodGenerationSpec(config.OmniChatMediaConfig{}, job, nil, "")
+	_, err := BuildImageSpec(config.OmniChatMediaConfig{}, job, nil)
 	require.ErrorIs(t, err, runpod.ErrEndpointNotConfigured)
 }
 
-func TestBuildRunPodGenerationSpecRejectsUnsafeProviderReferences(t *testing.T) {
+func TestBuildSpecsRejectUnsafeProviderReferences(t *testing.T) {
 	imageJob := &models.OmniChatGenerationJob{
 		Kind: models.OmniChatMediaKindImage, EffectivePrompt: "A portrait",
 	}
-	_, err := BuildRunPodGenerationSpec(omniChatMediaTestConfig(), imageJob, []string{"http://127.0.0.1/private.png"}, "")
+	_, err := BuildImageSpec(omniChatMediaTestConfig(), imageJob, []string{"http://127.0.0.1/private.png"})
 	require.EqualError(t, err, "provider reference image URL is invalid")
 
 	videoJob := &models.OmniChatGenerationJob{
 		Kind: models.OmniChatMediaKindVideo, Mode: models.OmniChatGenerationModeImageToVideo,
-		EffectivePrompt: "Wave",
+		Prompt: "Wave",
 	}
-	_, err = BuildRunPodGenerationSpec(omniChatMediaTestConfig(), videoJob, nil, "https://public.example.test:8443/source.png")
+	_, err = BuildVideoSpec(omniChatMediaTestConfig(), videoJob, "https://public.example.test:8443/source.png")
 	require.EqualError(t, err, "provider source image URL is invalid")
 }
 

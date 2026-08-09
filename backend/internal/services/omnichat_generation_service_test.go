@@ -80,6 +80,8 @@ func (f *generationStoreFake) CreateGenerationJob(_ context.Context, ownerUserID
 		Scene:              req.Scene,
 		Provider:           provider,
 		BillingRequired:    req.BillingRequired == nil || *req.BillingRequired,
+		AllowNSFW:          req.AllowNSFW,
+		SourceAssetID:      req.SourceAssetID,
 	}
 	return f.created, nil
 }

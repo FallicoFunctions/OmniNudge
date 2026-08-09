@@ -23,6 +23,9 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 	// Later migrations sort after the expansion. Roll them back before
 	// exercising the speech-outbox rollback guardrail.
 	for _, expected := range []string{
+		"174_omnichat_generation_allow_nsfw",
+		"173_omnichat_video_intermediate_assets",
+		"172_omnichat_media_command_idempotency_scope",
 		"171_omnichat_media_only_messages",
 		"170_omnichat_livekit_avatar_calls",
 		"169_omnichat_paid_request_idempotency",
@@ -230,6 +233,9 @@ func TestBillingIntegrityMigrationGrandfathersLegacyImageJobs(t *testing.T) {
 	require.NoError(t, db.Migrate(ctx))
 
 	for _, expected := range []string{
+		"174_omnichat_generation_allow_nsfw",
+		"173_omnichat_video_intermediate_assets",
+		"172_omnichat_media_command_idempotency_scope",
 		"171_omnichat_media_only_messages",
 		"170_omnichat_livekit_avatar_calls",
 		"169_omnichat_paid_request_idempotency",
