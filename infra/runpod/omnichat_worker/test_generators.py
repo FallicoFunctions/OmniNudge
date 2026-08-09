@@ -735,6 +735,30 @@ class VideoFrameGeometryTests(unittest.TestCase):
             _video_mod_value(object())
 
 
+class VideoNegativePromptTests(unittest.TestCase):
+    def test_stillness_is_never_penalised(self):
+        # The prompt asks the subject to come to rest before the clip ends.
+        # Penalising stillness at the same time is a contradiction, and the
+        # clips that lost that argument stopped mid-gesture and blurred.
+        from .generators import build_video_negative_prompt
+
+        rendered = build_video_negative_prompt("")
+        for banned in ("static image", "no motion", "frozen frame", "slideshow"):
+            self.assertNotIn(banned, rendered)
+
+    def test_motion_defects_are_still_covered(self):
+        from .generators import build_video_negative_prompt
+
+        rendered = build_video_negative_prompt("")
+        for expected in ("morphing face", "jitter", "ghosting", "watermark"):
+            self.assertIn(expected, rendered)
+
+    def test_a_request_negative_prompt_is_appended(self):
+        from .generators import build_video_negative_prompt
+
+        self.assertTrue(build_video_negative_prompt("teeth").endswith(", teeth"))
+
+
 class VideoOffloadTests(unittest.TestCase):
     GIB = 1024**3
 
