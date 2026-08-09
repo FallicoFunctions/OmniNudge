@@ -86,8 +86,14 @@ describe('createMainStageScene', () => {
     expect(scene.metadata?.reviewRuntime?.stageAssets).toBe(stageAssets);
     expect(stageAssets.solidCollisionMeshes.map((mesh) => mesh.name)).toEqual(
       expect.arrayContaining([
-        'main-stage-blocker-left-envelope',
-        'main-stage-blocker-right-envelope',
+        'main-stage-blocker-left-envelope-south',
+        'main-stage-blocker-left-envelope-north',
+        'main-stage-blocker-right-envelope-south',
+        'main-stage-blocker-right-envelope-north',
+        // The Cascade Court bay's three walls, per flank.
+        'main-stage-blocker-right-cascade-bay-south',
+        'main-stage-blocker-right-cascade-bay-outer',
+        'main-stage-blocker-right-cascade-bay-north',
         'main-stage-blocker-back-envelope',
         'main-stage-blocker-front-stage',
       ]),
@@ -506,11 +512,23 @@ describe('createMainStageScene', () => {
     // collision for the first time (rampRailBlockers in
     // createMainStageCollisionBlockers.ts, 16 segments x 2 edges x 2 sides =
     // 64 new blocker rows) - the ramp previously had none at all, so a
-    // player could walk clean through the visible rail. 298 is the actual
-    // observed count with all of the above in place; re-derive by running
-    // the test if this ever needs to change again rather than hand-computing
-    // it.
-    expect(intersectsMesh).toHaveBeenCalledTimes(298);
+    // player could walk clean through the visible rail. It then went 378 ->
+    // 382 when VIP gating split each flank's single boundary run in two (the
+    // permanent inner run plus the signed-in gate outboard of the arrival
+    // plinth - see vipBoundaryBlockers in createMainStageCollisionBlockers.ts
+    // and createVipGate.ts): two more blocker rows, checked by both rays.
+    // It then went 382 -> 398 when the Cascade Court bay replaced each flank's
+    // single straight envelope side run with five runs (side south, the bay's
+    // three walls, side north - envelopeSideBlockers in
+    // createMainStageCollisionBlockers.ts): eight more blocker rows, checked
+    // by both rays. 398 is the actual observed count with all of the above in
+    // place, including the two basin-coping-outer walls, the FOUR VIP
+    // boundary/gate runs along the spawn-pylon line, and the 36 stepped
+    // promenade-corridor segments that trace the approach deck's angled sides
+    // (18 per flank - all in createMainStageCollisionBlockers.ts); re-derive
+    // by running the test if this ever needs to change again rather than
+    // hand-computing it.
+    expect(intersectsMesh).toHaveBeenCalledTimes(398);
     // Exactly TWO ray instances (ground-detection + camera-collision), each
     // reused across every frame - no per-frame allocation for either.
     expect(rayInstances.size).toBe(2);
