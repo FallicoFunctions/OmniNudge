@@ -25,13 +25,24 @@ describe('createLightingRig', () => {
     expect(rig.rim.name).toBe('main-stage-rim-light');
     expect(rig.fill.name).toBe('main-stage-front-fill-light');
     expect(rig.key.intensity).toBeGreaterThan(2);
-    expect(rig.hemi.intensity).toBeGreaterThanOrEqual(0.68);
-    expect(rig.hemi.intensity).toBeLessThanOrEqual(0.82);
+    expect(rig.hemi.intensity).toBeGreaterThanOrEqual(1.0);
+    expect(rig.hemi.intensity).toBeLessThanOrEqual(1.3);
     expect(rig.rim.intensity).toBeGreaterThanOrEqual(0.9);
-    expect(rig.fill.intensity).toBeGreaterThanOrEqual(0.55);
-    expect(rig.fill.intensity).toBeLessThanOrEqual(0.9);
+    expect(rig.fill.intensity).toBeGreaterThanOrEqual(1.4);
+    expect(rig.fill.intensity).toBeLessThanOrEqual(2.1);
     expect(rig.fill.diffuse.b).toBeGreaterThan(rig.fill.diffuse.r);
     expect(rig.rim.diffuse.b).toBeGreaterThan(rig.rim.diffuse.r);
+  });
+
+  it('keeps the audience-facing fill under WebGPU so the Crown does not render as a black silhouette', () => {
+    engine = new NullEngine();
+    Object.defineProperty(engine, 'isWebGPU', { value: true });
+    scene = new Scene(engine);
+
+    const rig = createLightingRig(scene);
+
+    expect(rig.fill.isEnabled()).toBe(true);
+    expect(rig.rim.isEnabled()).toBe(false);
   });
 
   it('casts key-light shadows from the loaded stage meshes once, skipping blended and invisible meshes', async () => {

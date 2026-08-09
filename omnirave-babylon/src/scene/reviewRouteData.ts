@@ -38,8 +38,10 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
       alpha: -Math.PI / 2,
       beta: 1.08,
       radius: 60,
-      focusOffset: { x: 0, y: 12.3, z: 60 },
-      positionOffset: { x: 0, y: 26.3, z: -57 },
+      // The Crown apex reaches y~80 at z~45. Aim at its mid-height so the
+      // complete figurehead, stage threshold, and player all share the reveal.
+      focusOffset: { x: 0, y: 26.3, z: 86 },
+      positionOffset: { x: 0, y: 28.3, z: -54 },
     },
   },
   {
@@ -108,23 +110,21 @@ export const MAIN_STAGE_REVIEW_ROUTE: readonly ReviewCheckpoint[] = [
     },
   },
   {
-    // The VIP forecourt: the walkable apron behind the right wing shell,
-    // under its gold sail canopies, beside the garden planters. The old spot
-    // (32, 8.5, 4) hung in mid-air - the elevated terrace has no walkable
-    // floor this milestone - so the player fell to unlit ground and the
-    // approval capture read pitch black. Ground-level spawn plus a close,
-    // low framing keeps the avatar, the lantern warmth, and the planters in
-    // frame (verified in-engine).
+    // The walkable VIP skydeck above the right forecourt. The procedural deck
+    // now owns a real floor at y=8.6; the obsolete ground checkpoint sat under
+    // that slab and could only produce clipped approval captures.
     id: 'vip_terrace',
-    x: 32,
-    y: 1.7,
-    z: 2,
+    x: 38,
+    // Player-root elevation = 8.6 m deck surface + 1.65 m standing eye/root.
+    y: 10.25,
+    z: 0,
     camera: {
       alpha: -2.8,
       beta: 1.2,
       radius: 8,
-      focusOffset: { x: 0, y: 0.8, z: 3 },
-      positionOffset: { x: 1.5, y: 0.9, z: -5.5 },
+      // Look north from the open ramp side across the avatar and deck rails.
+      focusOffset: { x: 0, y: 0.9, z: 0 },
+      positionOffset: { x: 0, y: 4.75, z: -18 },
     },
   },
 ] as const;

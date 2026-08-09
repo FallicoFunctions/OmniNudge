@@ -233,6 +233,9 @@ export function createFollowCameraRig(
   };
 
   const camera = new ArcRotateCamera('review-camera', Math.PI, 1.1, 6, targetAnchor.position, scene);
+  // Slightly wider than Babylon's default 0.8 rad lens: the Main Stage
+  // reveal must hold the nearby avatar and the 80 m Crown apex together.
+  camera.fov = 0.96;
   camera.lockedTarget = targetAnchor;
   camera.lowerRadiusLimit = MIN_ZOOM_DISTANCE;
   camera.upperRadiusLimit = MAX_ZOOM_DISTANCE;

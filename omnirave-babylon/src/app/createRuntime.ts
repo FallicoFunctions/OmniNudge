@@ -345,22 +345,15 @@ export async function createRuntime(host: HTMLElement) {
           if (checkpointIndex >= 0) {
             reviewRuntime?.routeProgress?.reset(checkpointIndex);
           }
-          // Fast travel lands in the standard follow framing - avatar
-          // centered, facing the checkpoint's authored look direction. The
-          // raw authored views are scenery shots whose look target can sit
-          // tens of meters from the avatar; teleporting into one left the
-          // player unable to find themselves (flagged on the VIP terrace).
-          const travelView = resolveTravelCameraOffsets(checkpoint.camera);
           // Defer one frame: the player's ground-height snap runs in the next
           // onBeforeRender, and applying the camera from the pre-snap player
           // position intermittently lands it inside nearby geometry.
           scene.onAfterRenderObservable.addOnce(() => {
-            reviewRuntime?.cameraRig?.applyCheckpointView({
-              alpha: 0,
-              beta: 1.12,
-              radius: TRAVEL_CAMERA_DISTANCE,
-              ...travelView,
-            });
+            // This is an approval harness: preserve the authored scenery
+            // composition instead of replacing it with the generic 7 m
+            // travel camera, which made every checkpoint another slab-facing
+            // over-the-shoulder shot.
+            reviewRuntime?.cameraRig?.applyCheckpointView(checkpoint.camera);
           });
         },
         onRestartRoute() {
@@ -371,16 +364,11 @@ export async function createRuntime(host: HTMLElement) {
             BACK_PLAZA_SPAWN.y,
             BACK_PLAZA_SPAWN.z,
           );
-          // Same standard follow framing as a checkpoint fast-travel, facing
-          // the default north-facing direction (no authored view to derive from).
-          const travelView = resolveTravelCameraOffsets(undefined);
           scene.onAfterRenderObservable.addOnce(() => {
-            reviewRuntime?.cameraRig?.applyCheckpointView({
-              alpha: 0,
-              beta: 1.12,
-              radius: TRAVEL_CAMERA_DISTANCE,
-              ...travelView,
-            });
+            const spawnReveal = reviewCheckpoints?.[0]?.camera;
+            if (spawnReveal) {
+              reviewRuntime?.cameraRig?.applyCheckpointView(spawnReveal);
+            }
           });
         },
       });
