@@ -858,6 +858,19 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
   let peakColorGValue = 0;
   let peakColorBValue = 0;
   let formationOverrideValue: 'none' | 'countdown' | 'wordmark' = 'none';
+  let ownsCanopyVolume = true;
+
+  function setCanopyOwnership(owned: boolean): void {
+    if (ownsCanopyVolume === owned) {
+      return;
+    }
+    ownsCanopyVolume = owned;
+    point.setEnabled(owned);
+    // The old V113/V127 slabs remain superseded for this rig's whole lifetime.
+    // Re-enabling them while the points were silent merely exchanged one
+    // arrival obstruction for two enormous gold plates. dispose() still
+    // restores the exact pre-rig state for lifecycle correctness.
+  }
 
   function update(dtSeconds: number): void {
     const dt = dtSeconds > 0 ? dtSeconds : 0;
@@ -908,6 +921,18 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     const active = mode === 'active';
     const leadIn = mode === 'lead_in';
     const energy = bass * 0.55 + mids * 0.3 + highs * 0.15;
+
+    if (idle) {
+      setCanopyOwnership(false);
+      formationOverrideValue = 'none';
+      peakBrightnessValue = 0;
+      litPointsValue = 0;
+      peakColorRValue = 0;
+      peakColorGValue = 0;
+      peakColorBValue = 0;
+      return;
+    }
+    setCanopyOwnership(true);
 
     // --- choreography sequencer ---
     // Hold a formation, then morph. Advance on musical phrase (accumulated
