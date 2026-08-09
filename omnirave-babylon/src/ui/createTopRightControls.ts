@@ -14,9 +14,10 @@
 // This component is still purely presentational - it never calls an auth
 // endpoint and holds no session state; it renders the mode it is handed and
 // reports clicks. `onLogIn`/`onSignUp` are wired by the caller (createRuntime)
-// to open the real auth panel (createAuthPopup), which is mounted into this
-// block's slot exactly the way createTopLeftControls mounts the settings
-// popup - a caller-owned panel, not built here.
+// to open the real auth window (createAuthPopup). That window is NOT mounted
+// in this block: sec 11.1 anchors it near bottom-center, rising out of the
+// emote HUD area, so the runtime mounts it on the host directly. This block
+// is only the buttons that ask for it.
 //
 // Pure DOM: no Babylon imports, safe under jsdom.
 
@@ -26,8 +27,6 @@ export const LOGOUT_CONFIRM_WINDOW_MS = 3000;
 
 export interface CreateTopRightControlsOptions {
   mode?: SessionMode;
-  /** Auth popup body, built by createAuthPopup and owned by the caller. */
-  authPanel?: HTMLElement;
   onLogIn?: () => void;
   onSignUp?: () => void;
   onLogout?: () => void;
@@ -63,14 +62,6 @@ export function createTopRightControls(
   const logoutButton = createButton('Logout', 'logout');
   row.append(logInButton, signUpButton, logoutButton);
   element.appendChild(row);
-
-  const authPanel = options.authPanel;
-  if (authPanel) {
-    const slot = document.createElement('div');
-    slot.className = 'hud-controls__slot';
-    slot.appendChild(authPanel);
-    element.appendChild(slot);
-  }
 
   host.appendChild(element);
 

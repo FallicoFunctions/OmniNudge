@@ -38,6 +38,7 @@ import { createSettingsPopup } from '../ui/createSettingsPopup';
 import { createTopLeftControls } from '../ui/createTopLeftControls';
 import { createTopRightControls } from '../ui/createTopRightControls';
 import { createAuthPopup } from '../ui/createAuthPopup';
+import { createWelcomeCard } from '../ui/createWelcomeCard';
 import { loadPlayerSettings, savePlayerSettings } from '../ui/playerSettings';
 import { applyUiTheme } from '../ui/uiTheme';
 import { RUNTIME_CONFIG } from './runtimeConfig';
@@ -198,11 +199,11 @@ export async function createRuntime(host: HTMLElement) {
   // owned DOM like the overlays above, so it is torn down in cleanup too.
   let playerHud: import('../ui/createPlayerHud').PlayerHud | undefined;
   let playerHudTimer: number | undefined;
-  // Sec 9.4 bottom-center HUD: sprint stamina + emote bar. Neither is gated
-  // behind ?debug=1 - they're player-facing chrome like the rest of this
-  // block, just built here since they share this block's DOM host.
+  // Sec 9.4 bottom-center HUD: the sprint stamina bar. Not gated behind
+  // ?debug=1 - it's player-facing chrome like the rest of this block, just
+  // built here since it shares this block's DOM host. (The emote bar that
+  // shares this corner is not mounted yet - see the note further down.)
   let staminaBar: import('../ui/createStaminaBar').StaminaBar | undefined;
-  let emoteBar: import('../ui/createEmoteBar').EmoteBar | undefined;
   // Player-facing chat panel (design sec 9.8 / 10.2 / 10.3 / 10.4). Chat is
   // venue-local and server-broadcast, so it REQUIRES the world connection:
   // without a socket there is nothing to send to and no one to hear it, and
@@ -214,6 +215,8 @@ export async function createRuntime(host: HTMLElement) {
   let topLeftControls: import('../ui/createTopLeftControls').TopLeftControls | undefined;
   let topRightControls: import('../ui/createTopRightControls').TopRightControls | undefined;
   let authPopup: import('../ui/createAuthPopup').AuthPopup | undefined;
+  // Sec 11.2: what the auth window turns into after a successful login/signup.
+  let welcomeCard: import('../ui/createWelcomeCard').WelcomeCard | undefined;
   let settingsPopup: import('../ui/createSettingsPopup').SettingsPopup | undefined;
   let hudNotice: import('../ui/createHudNotice').HudNotice | undefined;
   let handleCanvasPick: ((event: MouseEvent) => void) | undefined;
@@ -246,7 +249,6 @@ export async function createRuntime(host: HTMLElement) {
     }
     playerHud?.dispose();
     staminaBar?.dispose();
-    emoteBar?.dispose();
     chatPanel?.dispose();
     // Settings popup first: it lives inside the top-left block's slot and owns
     // a document keydown listener.
@@ -254,6 +256,7 @@ export async function createRuntime(host: HTMLElement) {
     topLeftControls?.dispose();
     topRightControls?.dispose();
     authPopup?.dispose();
+    welcomeCard?.dispose();
     hudNotice?.dispose();
     canvas.remove();
   };
@@ -284,6 +287,14 @@ export async function createRuntime(host: HTMLElement) {
     const reviewRuntime = scene.metadata?.reviewRuntime;
     // Sec 8.2: ghosting starts on "first entry" - a fresh boot is exactly that.
     reviewRuntime?.playerController?.beginSpawnGhost?.();
+
+    // VIP gating (owner decision, 2026-08-04): EVERY signed-in player is VIP,
+    // so account mode is the whole entitlement check - there is no separate
+    // VIP flag to consult. The gate boots locked (see createVipGate.ts), which
+    // is already right for a guest; this opens it for a player who arrived
+    // signed in (an omninudge.com SSO handoff, or the ?acct=1 reload an
+    // in-game login falls back to when there is no socket to hot-swap).
+    reviewRuntime?.vipGate?.setUnlocked?.(resolvedSessionMode === 'account');
 
     // Sec 6.2: guests get a RANDOM GENERATED avatar, cannot edit it, and it is
     // not persisted - so it is generated fresh here at boot and applied to the
@@ -626,19 +637,17 @@ export async function createRuntime(host: HTMLElement) {
       staminaBar = createStaminaBar(host);
     }
 
-    // Sec 9.4/9.7 emote bar UI shell. onEmoteSelected has nothing to drive
-    // yet - the avatar emote/animation system (sec 6/7.6) is blocked and
-    // parked pending sourced art, so this intentionally stays a real no-op
-    // rather than faking playback. The bar's own active-highlight/hover
-    // states work regardless.
-    {
-      const { createEmoteBar } = await import('../ui/createEmoteBar');
-      emoteBar = createEmoteBar(host, {
-        onEmoteSelected() {
-          // No-op: nothing to animate until avatars unblock (see comment above).
-        },
-      });
-    }
+    // Sec 9.4/9.7 emote bar: DELIBERATELY NOT MOUNTED yet. Owner decision
+    // (2026-08-04): the bar stays off screen until the emotes behind it are
+    // actually wired, rather than showing ten slots that visibly do nothing -
+    // the avatar emote/animation system (sec 6/7.6) is blocked and parked
+    // pending sourced art.
+    //
+    // createEmoteBar.ts, its tests, and its `.hud-emote-bar` bottom-center
+    // dock in styles.css all stay as they are, so turning it back on is
+    // re-adding the createEmoteBar(host, { onEmoteSelected }) call here and
+    // nothing else. Sec 11.1's auth window keeps its position either way: it
+    // rises from this area whether or not the bar is currently in it.
 
     // Render-scale state. Declared here (ahead of the render loop) because the
     // settings popup's Graphics controls write to it from click handlers.
@@ -755,12 +764,33 @@ export async function createRuntime(host: HTMLElement) {
         },
       });
 
+      // True while the auth window on screen is the one the VIP gate raised,
+      // so only that one auto-closes when the player walks away (sec 12).
+      let vipGateOpenedAuthPopup = false;
+
       topLeftControls = createTopLeftControls(host, {
         settingsPanel: settingsPopup.element,
         avatarColorways: reviewRuntime?.avatarColorways,
         selectedAvatarColorwayId: reviewRuntime?.selectedAvatarColorway?.id,
         onSelectAvatarColorway(colorway) {
           reviewRuntime?.setAvatarColorway?.(colorway.id);
+        },
+        onPanelChange(panel) {
+          if (panel === null) {
+            return;
+          }
+          // Sec 11.2: a direct top-level UI action closes the welcome card and
+          // then proceeds - the card never swallows the click.
+          welcomeCard?.dismiss();
+          // Sec 12: guests keep the normal `Avatar` button, but clicking it
+          // "opens signup window immediately" instead of the editor, and
+          // "reopens on every click" - closing the panel here is what makes
+          // the next click a fresh open rather than a toggle-to-closed.
+          if (panel === 'avatar' && resolvedSessionMode === 'guest') {
+            topLeftControls?.openPanel(null);
+            vipGateOpenedAuthPopup = false;
+            authPopup?.open('signup');
+          }
         },
         debugChromePresent: perfFlags.debug,
       });
@@ -783,6 +813,22 @@ export async function createRuntime(host: HTMLElement) {
         const nextMode: import('../ui/createTopRightControls').SessionMode =
           session.mode === 'account' ? 'account' : 'guest';
 
+        // VIP gating follows the session: logging in opens the cascade court /
+        // VIP terrace boundary immediately, logging out re-locks it. Set
+        // before the no-socket early return below so the dev/review reload
+        // path is covered too.
+        reviewRuntime?.vipGate?.setUnlocked?.(nextMode === 'account');
+
+        // Sec 11.4 "logout in VIP": VIP access is lost the instant the player
+        // becomes a guest, so a logout taken up in the cascade court, on a VIP
+        // terrace or on a skydeck forces a respawn to the venue's spawn rather
+        // than leaving a guest standing in VIP space. (Sec 11.4's "logout
+        // outside VIP" is the plain in-place conversion, which is everything
+        // else this function already does.)
+        if (nextMode === 'guest' && reviewRuntime?.vipGate?.playerInsideVipArea) {
+          respawnPlayer();
+        }
+
         if (hasAvatarLoadout(session.loadout)) {
           // An existing account's saved appearance (or one just seeded from
           // this guest's own currentLoadout below, on a brand-new account).
@@ -804,17 +850,35 @@ export async function createRuntime(host: HTMLElement) {
           return;
         }
         worldSocket.reconnect(session.worldSocketUrl, session.worldSessionToken);
+        // Sec 11.2: "top-right auth controls update immediately to `Logout`".
         topRightControls?.setMode(nextMode);
+        resolvedSessionMode = nextMode;
         chatPanel?.setCanMute(nextMode === 'account');
-        // No reload to carry the popup away this time - close it ourselves.
+        // No reload to carry the window away this time - close it ourselves.
         // A no-op when already closed (e.g. the logout call site below).
+        vipGateOpenedAuthPopup = false;
         authPopup?.close();
-        hudNotice?.show(
-          nextMode === 'account' ? `Logged in as ${session.playerName}` : 'Logged out - now raving as a guest.',
-        );
+        if (nextMode === 'account') {
+          // Sec 11.2: the auth window "transforms directly into the
+          // venue-styled welcome card" - same size, same place, so closing one
+          // and showing the other in its slot IS the transform.
+          welcomeCard?.show(session.playerName);
+        } else {
+          // Sec 11.4 logout: "no extra message, no welcome card". The visible
+          // confirmation is the top-right controls flipping back to Log In /
+          // Sign Up, plus the new guest name and look.
+          welcomeCard?.dismiss();
+        }
       };
 
       authPopup = createAuthPopup({
+        onRequestClose() {
+          // Closed by hand: the window is no longer the gate's to take back,
+          // so reopening it from the top-right controls at the same spot
+          // survives walking away. Sec 12's "stays closed until they leave
+          // the radius and return" is the GATE's own re-arm, not this flag.
+          vipGateOpenedAuthPopup = false;
+        },
         async onSubmit(mode, fields) {
           try {
             const session =
@@ -841,15 +905,53 @@ export async function createRuntime(host: HTMLElement) {
             return { ok: false, message };
           }
         },
+        onTextEntryActiveChange(active) {
+          // Sec 11.1: "focused auth typing suppresses movement keys" - the
+          // same InputMap switch the chat panel throws (sec 10.3).
+          reviewRuntime?.input?.setTextEntryActive?.(active);
+        },
+      });
+      // Sec 11.1: near bottom-center, rising out of the emote HUD area - so
+      // both venue windows mount on the host itself rather than inside a
+      // corner control block's slot. Sec 11.2's card takes the same slot on
+      // screen, which is what makes the transform read as one window.
+      welcomeCard = createWelcomeCard({
+        onEditAvatar() {
+          topLeftControls?.openPanel('avatar');
+        },
+      });
+      host.append(authPopup.element, welcomeCard.element);
+
+      // Sec 12 guest upgrade prompts: "VIP block opens venue-styled signup
+      // window immediately", it auto-closes once the player walks 15 feet off
+      // the boundary (VIP_GATE_PROMPT_CLEAR_DISTANCE - the gate measures it
+      // and calls back), and a window the player closed by hand stays closed
+      // until they leave that radius and return (the gate's own re-arm).
+      //
+      // The auto-close only ever takes back a window the GATE opened: one the
+      // player opened themselves from the top-right controls is theirs to
+      // close, wherever they happen to be standing.
+      reviewRuntime?.vipGate?.setOnBlockedApproach?.(() => {
+        vipGateOpenedAuthPopup = true;
+        authPopup?.open('signup');
+      });
+      reviewRuntime?.vipGate?.setOnApproachCleared?.(() => {
+        if (!vipGateOpenedAuthPopup) {
+          return;
+        }
+        vipGateOpenedAuthPopup = false;
+        authPopup?.close();
       });
 
       topRightControls = createTopRightControls(host, {
         mode: resolvedSessionMode,
-        authPanel: authPopup.element,
         onLogIn() {
+          // Sec 11.2: a direct top-level action closes the card and proceeds.
+          welcomeCard?.dismiss();
           authPopup?.open('login');
         },
         onSignUp() {
+          welcomeCard?.dismiss();
           authPopup?.open('signup');
         },
         async onLogout() {
