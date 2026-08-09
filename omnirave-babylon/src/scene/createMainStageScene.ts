@@ -19,6 +19,7 @@ import { createPlayerController, type LadderZone, type RemotePlayerCollisionTarg
 import { createPlayerRig } from '../player/createPlayerRig';
 import { createReviewAvatar } from '../player/createReviewAvatar';
 import { createAtmosphereRig } from './createAtmosphereRig';
+import { createBackstageEasterEgg } from './createBackstageEasterEgg';
 import { createCascadeCourtPaving } from './createCascadeCourtPaving';
 import { createCascadeCourtWaterMotion } from './cascadeCourtWaterMotion';
 import { createVenuePerimeter } from './createVenuePerimeter';
@@ -26,6 +27,7 @@ import { createFestivalField } from './createFestivalField';
 import { createStageShow } from './createStageShow';
 import { createSoundBooth } from './createSoundBooth';
 import { createVipForecourtDressing } from './createVipForecourtDressing';
+import { createVipGate } from './createVipGate';
 import { createVipSkydeck } from './createVipSkydeck';
 import { createWingBridge } from './createWingBridge';
 import { createWayfindingSigns } from './createWayfindingSigns';
@@ -84,9 +86,36 @@ export async function createMainStageScene(engine: AbstractEngine) {
       /^V31_SideLedTileField_[LR]$/,
     ],
   });
+  // Crowd-filler "mannequin" figures (V32_CrowdCluster*/V32_CrowdWearableGlow*
+  // - the glow meshes are the wearable accessory geometry on the SAME
+  // figures, folded in so nothing is left floating with no body attached).
+  // Player-flagged for removal outright. Hidden rather than disposed,
+  // matching every other GLB-authored-geometry removal in this codebase (see
+  // createHologramGrid.ts's CANOPY_PLATE_PATTERN) - "owner wants the space
+  // back, not the geometry deleted". No restore-on-dispose bookkeeping is
+  // needed here, unlike that module: this hide happens once at scene build
+  // time and the whole scene tears down together, so there is no independent
+  // lifecycle to hand the meshes back to. They carry no collision (absent
+  // from createMainStageCollisionBlockers.ts's source-name patterns), so
+  // hiding them is the whole fix.
+  const MANNEQUIN_PATTERN = /V32_Crowd(Cluster|WearableGlow)_/;
+  for (const mesh of scene.meshes) {
+    if (MANNEQUIN_PATTERN.test(mesh.name)) {
+      mesh.setEnabled(false);
+    }
+  }
+
   const collisionMeshSet = new Set(stageAssets.collisionMeshes);
   stageAssets.mainMeshes = scene.meshes.filter((mesh) => !collisionMeshSet.has(mesh));
   stageAssets.solidCollisionMeshes = createMainStageCollisionBlockers(scene, stageAssets.mainMeshes);
+
+  // VIP gating: the outboard half of the spawn-pylon boundary opens for
+  // signed-in players and stays a wall for guests. Built here, immediately
+  // after the blockers it owns, because it works by mutating THIS array -
+  // the same reference the camera rig and player controller are handed
+  // below. createRuntime supplies the session state and the popup handler
+  // (setUnlocked / setOnBlockedApproach) once the HUD exists.
+  const vipGate = createVipGate({ solidCollisionMeshes: stageAssets.solidCollisionMeshes });
 
   // Warm lantern dressing for the VIP forecourts. Before the lighting rig:
   // the rig scans for LanternWarmCore meshes to attach practical pool lights.
@@ -168,16 +197,22 @@ export async function createMainStageScene(engine: AbstractEngine) {
   // unfreezes only the cascade water materials it animates.
   const cascadeWaterMotion = createCascadeCourtWaterMotion(scene);
 
-  // Grass albedo + perimeter tuft scatter on the surrounding field, so the
-  // venue's surround reads as a festival field instead of the wet-stone
-  // plaza material it inherits by default. Runs after the freeze, same as
-  // the water motion module - it unfreezes only the field's own material.
+  // Grass albedo on the surrounding field, so the venue's surround reads as a
+  // festival field instead of the wet-stone plaza material it inherits by
+  // default. Runs after the freeze, same as the water motion module - it
+  // unfreezes only the field's own material. (It used to scatter grass tufts
+  // too; player-flagged and removed - see that module's header.)
   const festivalField = createFestivalField(scene);
 
   // Wayfinding signs flanking the promenade: name/point to the VIP terrace,
   // cascade courts and stage so players can find them (the authored pylons
   // only mark the far arrival point).
   const wayfindingSigns = createWayfindingSigns(scene);
+
+  // Easter egg (owner request, 2026-08-03): "BACKSTAGE" mounted on the hero
+  // screen's footer trim, for whoever wanders into the stage's production
+  // wing behind the promenade ribbon to find.
+  const backstageEasterEgg = createBackstageEasterEgg(scene);
 
   // Front-of-house sound booth on the promenade spine facing the stage -
   // the mix position every real festival stage has, placed at the venue's
@@ -329,6 +364,10 @@ export async function createMainStageScene(engine: AbstractEngine) {
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
     playerController.step(deltaSeconds);
+    // After the move: a guest who just walked into the VIP wall gets the log
+    // in / sign up popup this frame, and a pending re-lock (logout) closes
+    // the gate as soon as the player is back on the public side.
+    vipGate.step(playerRig.root.position);
     avatarElapsedSeconds += deltaSeconds;
     reviewAvatar.animate(avatarElapsedSeconds, playerController.animationState);
     routeProgress.step(playerRig.root.position);
@@ -392,9 +431,11 @@ export async function createMainStageScene(engine: AbstractEngine) {
       stageShow,
       vipForecourtDressing,
       wayfindingSigns,
+      backstageEasterEgg,
       soundBooth,
       venuePerimeter,
       cascadeCourtPaving,
+      vipGate,
       vipSkydeck,
       wingBridge,
       spawn: BACK_PLAZA_SPAWN,

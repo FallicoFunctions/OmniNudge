@@ -7,6 +7,9 @@ import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  BAY_PLAZA_X_MAX,
+  BAY_PLAZA_Z_MAX,
+  BAY_PLAZA_Z_MIN,
   PLAZA_X_MAX,
   PLAZA_X_MIN,
   PLAZA_Z_MAX,
@@ -14,7 +17,12 @@ import {
   createCascadeCourtPaving,
   planCascadeCourtPaving,
 } from '../createCascadeCourtPaving';
-import { FOUNTAIN_ELLIPSE, VENUE_ENVELOPE_BLOCKER_THICKNESS, VENUE_WALKABLE_X_MAX } from '../mainStageVenueBounds';
+import {
+  CASCADE_BAY_WALKABLE_X_MAX,
+  FOUNTAIN_ELLIPSE,
+  VENUE_ENVELOPE_BLOCKER_THICKNESS,
+  VENUE_WALKABLE_X_MAX,
+} from '../mainStageVenueBounds';
 
 const TILE_HALF = 0.9;
 
@@ -71,18 +79,60 @@ describe('createCascadeCourtPaving', () => {
     expect(pieces.filter((mesh) => mesh.checkCollisions).length).toBe(0);
   });
 
-  it('stays inside the flank plaza ring', () => {
-    // The plaza's outer edge stops at the envelope blocker's walkable face.
+  it('stays inside the flank plaza ring and the bay, never past a wall', () => {
+    // Each region's outer edge stops at a blocker's walkable face - paving
+    // past one is behind the boundary fence and unreachable.
     expect(PLAZA_X_MAX).toBe(VENUE_WALKABLE_X_MAX - VENUE_ENVELOPE_BLOCKER_THICKNESS / 2);
+    expect(BAY_PLAZA_X_MAX).toBe(CASCADE_BAY_WALKABLE_X_MAX);
 
     const plan = planCascadeCourtPaving();
     expect(plan.tiles.length).toBeGreaterThan(50);
 
     for (const tile of plan.tiles) {
+      // Inboard edge and the two outer walls bound every tile in the court.
       expect(tile.x - TILE_HALF).toBeGreaterThanOrEqual(PLAZA_X_MIN);
-      expect(tile.x + TILE_HALF).toBeLessThanOrEqual(PLAZA_X_MAX);
-      expect(tile.z - TILE_HALF).toBeGreaterThanOrEqual(PLAZA_Z_MIN);
-      expect(tile.z + TILE_HALF).toBeLessThanOrEqual(PLAZA_Z_MAX);
+      expect(tile.x + TILE_HALF).toBeLessThanOrEqual(BAY_PLAZA_X_MAX);
+
+      // Which region a tile belongs to decides its z bounds. The shared edge
+      // at PLAZA_X_MAX is an interior joint, so the column straddling it is
+      // laid from the bay's side and is measured by the bay's z walls.
+      const inBay = tile.x + TILE_HALF > PLAZA_X_MAX;
+      const zMin = inBay ? BAY_PLAZA_Z_MIN : PLAZA_Z_MIN;
+      const zMax = inBay ? BAY_PLAZA_Z_MAX : PLAZA_Z_MAX;
+      expect(tile.z - TILE_HALF).toBeGreaterThanOrEqual(zMin);
+      expect(tile.z + TILE_HALF).toBeLessThanOrEqual(zMax);
+    }
+  });
+
+  // Owner request (2026-08-04): the ground the boundary now encloses around
+  // the fountain and the ramp entrance is real walkable court, so it gets the
+  // same LED tiles as the rest of it ("fill the space with the LED tiles").
+  // The light floor lays one emissive quad per tile from this same plan, so
+  // paving the bay lights it too.
+  it('paves the bay outboard of the old fence line, on the same lattice', () => {
+    const plan = planCascadeCourtPaving();
+    const bay = plan.tiles.filter((tile) => tile.x > PLAZA_X_MAX);
+    expect(bay.length).toBeGreaterThan(100);
+    // It reaches past the fountain stone (x 82 at its widest) to the new wall.
+    expect(Math.max(...bay.map((tile) => tile.x))).toBeGreaterThan(82);
+    // And it runs from south of the fountain up to the ramp entrance.
+    expect(Math.min(...bay.map((tile) => tile.z))).toBeLessThan(-41);
+    expect(Math.max(...bay.map((tile) => tile.z))).toBeGreaterThan(-9);
+
+    // No bare strip along the joint: the two fields meet within one seam.
+    const plazaEdge = Math.max(
+      ...plan.tiles.filter((tile) => tile.x < PLAZA_X_MAX - TILE_HALF).map((tile) => tile.x + TILE_HALF),
+    );
+    const bayEdge = Math.min(...bay.map((tile) => tile.x - TILE_HALF));
+    expect(bayEdge - plazaEdge).toBeLessThan(0.3);
+
+    // One lattice, not two grids butted together: every tile centre sits on
+    // the same pitch as the plaza's.
+    const pitch = 1.8 + 0.14;
+    const reference = plan.tiles[0].x;
+    for (const tile of bay) {
+      const offset = Math.abs(((tile.x - reference) / pitch) % 1);
+      expect(Math.min(offset, 1 - offset)).toBeLessThan(1e-6);
     }
   });
 
@@ -130,13 +180,25 @@ describe('createCascadeCourtPaving', () => {
     expect(plan.tiles.filter((tile) => tile.z > cz + sz).length).toBeGreaterThan(10);
   });
 
-  it('lays the paving flat just above the ground', () => {
+  // Player-flagged (2026-08-03): this used to assert minimumWorld.y > 0, which
+  // PINNED the bug - a slab whose underside floats above grade is exactly the
+  // "tiles hovering a couple inches off the ground" the owner screenshotted,
+  // and whose top face then stood at the avatar's ankles. The real invariant
+  // is the opposite one: the stone is BEDDED (underside at or below grade, so
+  // nothing floats) and its top face is only a hair proud of the ground the
+  // feet actually rest on, so the avatar walks ON the tiles.
+  it('beds the paving into the ground, with the tile face flush underfoot', () => {
     createCascadeCourtPaving(scene);
     const tile = scene.getMeshByName('cascade-court-paving-tile-0');
     tile?.computeWorldMatrix(true);
     const box = tile?.getBoundingInfo().boundingBox;
-    expect(box === undefined ? -1 : box.minimumWorld.y).toBeGreaterThan(0);
-    expect(box === undefined ? -1 : box.maximumWorld.y).toBeLessThan(0.2);
+    // No floating: the underside never sits above grade.
+    expect(box === undefined ? 1 : box.minimumWorld.y).toBeLessThanOrEqual(0);
+    // Proud enough not to z-fight the ground plane...
+    expect(box === undefined ? -1 : box.maximumWorld.y).toBeGreaterThan(0);
+    // ...but far below the ~0.08m ankle height that made the avatar wade
+    // through the paving instead of standing on it.
+    expect(box === undefined ? 1 : box.maximumWorld.y).toBeLessThan(0.02);
   });
 
   it('dispose returns mesh and material counts to baseline', () => {

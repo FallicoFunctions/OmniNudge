@@ -74,15 +74,18 @@ describe('createFestivalField', () => {
     expect(field.material).toBe(cloned);
   });
 
-  it('creates a scatter tuft source mesh and places instances only in the perimeter ring', () => {
+  // Player-flagged (2026-08-04): the perimeter grass-tuft scatter read as
+  // "little green triangles scattered across the FestivalField" - each tuft
+  // was two crossed 3-sided discs - and was removed outright. The field keeps
+  // its grass albedo; it just stands no props in it.
+  it('scatters no grass tufts', () => {
     const { scene } = buildFieldScene();
 
-    const summary = createFestivalField(scene);
+    createFestivalField(scene);
 
-    const tuftSource = scene.getMeshByName('festival-field-tuft-source') as Mesh | null;
-    expect(tuftSource).toBeTruthy();
-    expect(summary.scatterCount).toBeGreaterThan(0);
-    expect(tuftSource?.thinInstanceCount).toBe(summary.scatterCount);
+    expect(scene.getMeshByName('festival-field-tuft-source')).toBeNull();
+    expect(scene.meshes.filter((mesh) => /tuft/i.test(mesh.name)).length).toBe(0);
+    expect(scene.materials.filter((material) => /tuft/i.test(material.name)).length).toBe(0);
   });
 
   it('does not throw and still returns a shape when there is no FestivalField mesh', () => {
@@ -93,6 +96,5 @@ describe('createFestivalField', () => {
     const summary = createFestivalField(scene);
 
     expect(summary.fieldMesh).toBeNull();
-    expect(typeof summary.scatterCount).toBe('number');
   });
 });

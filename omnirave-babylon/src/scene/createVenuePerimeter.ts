@@ -10,8 +10,9 @@ import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { Scene } from '@babylonjs/core/scene';
 
 import {
-  SKYDECK_RAMP_Z_MAX,
-  SKYDECK_RAMP_Z_MIN,
+  CASCADE_BAY_X_MAX,
+  CASCADE_BAY_Z_MAX,
+  CASCADE_BAY_Z_MIN,
   VENUE_ENVELOPE_BACK_Z,
   VENUE_ENVELOPE_BLOCKER_THICKNESS,
   VENUE_ENVELOPE_FRONT_Z,
@@ -47,29 +48,21 @@ export const PERIMETER_RIGHT_X = VENUE_WALKABLE_X_MAX - BLOCKER_HALF - FENCE_INS
 export const PERIMETER_BACK_Z = VENUE_ENVELOPE_BACK_Z + BLOCKER_HALF + FENCE_INSET;
 export const PERIMETER_FRONT_Z = VENUE_ENVELOPE_FRONT_Z - BLOCKER_HALF - FENCE_INSET;
 
-// The cascade-court water features occupy |x| ~34..64, z -41..-16 - i.e. they
-// straddle the side fence line. Running posts through the tiered water would
-// look broken, and no boundary read is lost there: the cascade fountain has
-// its own collision (the ellipse-hugging fountain columns in
-// createMainStageCollisionBlockers.ts) and the water feature is itself an
-// obvious, readable edge. So each side run breaks
-// around this z band.
-export const CASCADE_GAP_Z_MIN = -42;
-export const CASCADE_GAP_Z_MAX = -15;
-
-// Each VIP skydeck access ramp (createVipSkydeck.ts) lands its FOOT on this
-// side fence line: the ramp mouth occupies z SKYDECK_RAMP_Z_MIN..
-// SKYDECK_RAMP_Z_MAX at |x| ~= 61, precisely where the front side run stands.
-// Running panels straight across it dead-ends the ramp at a solid fence -
-// the owner walking the venue: "the ramp is walkable but the entrance ends at
-// a fence". So each side run BREAKS here for a gate, exactly the way it breaks
-// around the cascade water, and the ramp reads as an intentional gateway.
+// The Cascade Court bay. The side fence used to run dead straight and BREAK
+// twice on each flank - once around the tiered water (which straddles the old
+// line) and once for the skydeck ramp mouth, whose foot lands right on it.
+// Owner request (2026-08-04): fence both of those IN instead, so the boundary
+// steps out around the fountain and the ramp entrance and the enclosed ground
+// becomes real, paved, walkable court. Two holes in the fence became one
+// enclosed bay.
 //
-// The opening is the ramp's own z-extent plus GATE_CLEARANCE each side,
-// DERIVED from the ramp constants so it can never drift from the ramp.
-const GATE_CLEARANCE = 1.5;
-export const SKYDECK_GATE_Z_MIN = SKYDECK_RAMP_Z_MIN - GATE_CLEARANCE;
-export const SKYDECK_GATE_Z_MAX = SKYDECK_RAMP_Z_MAX + GATE_CLEARANCE;
+// The bay's blocker lines live in mainStageVenueBounds.ts (CASCADE_BAY_*,
+// which is also what the invisible walls are built from); the fence stands
+// FENCE_INSET inside the walkable face of those, exactly like the straight
+// runs do, so the picture and the collision still coincide.
+export const BAY_FENCE_X = CASCADE_BAY_X_MAX - BLOCKER_HALF - FENCE_INSET;
+export const BAY_FENCE_Z_MIN = CASCADE_BAY_Z_MIN + BLOCKER_HALF + FENCE_INSET;
+export const BAY_FENCE_Z_MAX = CASCADE_BAY_Z_MAX - BLOCKER_HALF - FENCE_INSET;
 
 const NOMINAL_SPACING = 6;
 const POST_SIZE = 0.35;
@@ -105,10 +98,33 @@ interface FenceRun {
   axis: 'x' | 'z';
   /** The run's other (constant) coordinate. */
   fixed: number;
+  /** May be greater than `to`: runs are walked in order around the outline. */
   from: number;
   to: number;
   /** Skip the first post - a previous run already placed one there. */
   skipFirstPost: boolean;
+}
+
+/**
+ * Each flank's boundary as a POLYLINE walked corner to corner, rather than a
+ * list of independent straight runs: with the Cascade Court bay stepping out
+ * around the fountain and the ramp entrance, the outline turns four times per
+ * flank, and consecutive segments have to share their corner posts. Walking
+ * it in order means every segment after the first simply skips the post its
+ * predecessor already stood there - and the -x flank is the exact mirror, no
+ * special-casing which end of a segment holds the shared corner.
+ */
+function flankOutline(side: 1 | -1): { x: number; z: number }[] {
+  const sideX = side > 0 ? PERIMETER_RIGHT_X : PERIMETER_LEFT_X;
+  const bayX = side * BAY_FENCE_X;
+  return [
+    { x: sideX, z: PERIMETER_BACK_Z },
+    { x: sideX, z: BAY_FENCE_Z_MIN },
+    { x: bayX, z: BAY_FENCE_Z_MIN },
+    { x: bayX, z: BAY_FENCE_Z_MAX },
+    { x: sideX, z: BAY_FENCE_Z_MAX },
+    { x: sideX, z: PERIMETER_FRONT_Z },
+  ];
 }
 
 function fenceRuns(): FenceRun[] {
@@ -116,16 +132,17 @@ function fenceRuns(): FenceRun[] {
     // Back edge first, so it owns both back corners.
     { axis: 'x', fixed: PERIMETER_BACK_Z, from: PERIMETER_LEFT_X, to: PERIMETER_RIGHT_X, skipFirstPost: false },
   ];
-  for (const x of [PERIMETER_LEFT_X, PERIMETER_RIGHT_X]) {
-    runs.push(
-      { axis: 'z', fixed: x, from: PERIMETER_BACK_Z, to: CASCADE_GAP_Z_MIN, skipFirstPost: true },
-      // Front side run, split by the skydeck ramp gate. The short south stub
-      // (cascade gap end -> gate) is under one span and is dropped by the
-      // length guard below, leaving the gate mouth clear; the north segment
-      // resumes at the gate's far jamb and carries the run to the front.
-      { axis: 'z', fixed: x, from: CASCADE_GAP_Z_MAX, to: SKYDECK_GATE_Z_MIN, skipFirstPost: false },
-      { axis: 'z', fixed: x, from: SKYDECK_GATE_Z_MAX, to: PERIMETER_FRONT_Z, skipFirstPost: false },
-    );
+  for (const side of [1, -1] as const) {
+    const points = flankOutline(side);
+    for (let index = 1; index < points.length; index++) {
+      const from = points[index - 1];
+      const to = points[index];
+      runs.push(
+        from.x === to.x
+          ? { axis: 'z', fixed: from.x, from: from.z, to: to.z, skipFirstPost: true }
+          : { axis: 'x', fixed: from.z, from: from.x, to: to.x, skipFirstPost: true },
+      );
+    }
   }
   return runs;
 }
@@ -138,20 +155,24 @@ export function planVenuePerimeter(): PerimeterPlan {
   const spans: PerimeterSpan[] = [];
 
   for (const run of fenceRuns()) {
-    const length = run.to - run.from;
+    // Runs are walked in outline order, so a segment can travel in either
+    // direction along its axis - the LENGTH is the absolute distance and the
+    // per-post step carries the sign.
+    const length = Math.abs(run.to - run.from);
     if (length <= NOMINAL_SPACING) continue;
     const spanCount = Math.max(1, Math.round(length / NOMINAL_SPACING));
-    const spacing = length / spanCount;
+    const step = (run.to - run.from) / spanCount;
+    const spacing = Math.abs(step);
     const yaw = run.axis === 'x' ? 0 : Math.PI / 2;
 
     for (let index = run.skipFirstPost ? 1 : 0; index <= spanCount; index++) {
-      const along = run.from + index * spacing;
+      const along = run.from + index * step;
       posts.push(
         run.axis === 'x' ? { x: along, z: run.fixed } : { x: run.fixed, z: along },
       );
     }
     for (let index = 0; index < spanCount; index++) {
-      const along = run.from + (index + 0.5) * spacing;
+      const along = run.from + (index + 0.5) * step;
       spans.push({
         length: spacing - POST_SIZE,
         yaw,

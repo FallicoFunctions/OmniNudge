@@ -11,7 +11,7 @@ import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { VertexBuffer } from '@babylonjs/core/Buffers/buffer.js';
 import type { Scene } from '@babylonjs/core/scene';
 
-import { planCascadeCourtPaving } from './createCascadeCourtPaving';
+import { PAVING_TOP_Y, planCascadeCourtPaving } from './createCascadeCourtPaving';
 import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
 import { FOUNTAIN_ELLIPSE } from './mainStageVenueBounds';
@@ -122,9 +122,13 @@ const COLOR_RADIUS_SCALE = 0.02;
 // Slightly under the 1.8m tile so the glow sits inside the stone face and
 // never oversteps the gold seam.
 const QUAD_SIZE = 1.7;
-// The paving box sits at y 0.06 with height 0.04, so its top face is at 0.08.
-// This lays the light just above that (never z-fights, never collides).
-const LIGHT_Y = 0.09;
+// Lay the light on the tile FACE, derived from the paving's own exported top
+// height rather than a copy of it: this used to be a hand-carried 0.09 chasing
+// a hand-carried 0.08, and when the tiles were bedded down to sit on the
+// ground (they had been floating at ankle height, player-flagged) a duplicated
+// literal here would have left the glow hanging in the air above them.
+// The +0.01 clears the gold seams, which sit 0.005 proud of the tile face.
+const LIGHT_Y = PAVING_TOP_Y + 0.01;
 
 // --- Brightness envelope ---------------------------------------------------
 // Idle: near-dark slow shimmer so a silent floor reads as normal pearl.

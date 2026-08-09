@@ -14,35 +14,25 @@ import { VENUE_WALKABLE_X_MAX, VENUE_WALKABLE_X_MIN } from './mainStageVenueBoun
 
 export interface FestivalFieldSummary {
   fieldMesh: Mesh | null;
-  scatterCount: number;
 }
 
 const FIELD_MESH_NAME = 'FestivalField';
 const GRASS_TEXTURE_SIZE = 256;
 const GRASS_TILE_SCALE = 40;
-const TUFT_SOURCE_NAME = 'festival-field-tuft-source';
 
-// The plaza/venue footprint the field must NOT scatter tufts into (runtime
-// coordinates - the field itself is a flat 240x180 plane at local X +-120,
-// Z +-90, so anything outside this box but inside the field bounds is the
-// "outer ring" the field's grass is actually visible as, once fog eats the
-// far distance).
-// X extent matches the venue's shared walkable/envelope bounds (see
-// mainStageVenueBounds.ts). The Z extent below is a narrower, distinct
-// concept - the visible plaza footprint the grass ring must clear, not the
-// full walkable rectangle - so it stays local to this module.
-const VENUE_X_MIN = VENUE_WALKABLE_X_MIN;
-const VENUE_X_MAX = VENUE_WALKABLE_X_MAX;
-const VENUE_Z_MIN = -60;
-const VENUE_Z_MAX = 16;
-const FIELD_X_EXTENT = 118;
-const FIELD_Z_MIN = -88;
-const FIELD_Z_MAX = 88;
-const TUFT_COUNT_TARGET = 320;
+// Player-flagged (2026-08-04, with a screenshot): this module also used to
+// scatter ~320 low-poly grass TUFTS in a ring around the venue - two crossed
+// 3-sided discs each, dark green. They read as "little green triangles
+// scattered across the FestivalField", including where the ring's edge poked
+// up through the plaza paving, and the owner asked for them gone. Removed
+// outright rather than hidden or thinned out: nothing else referenced the
+// scatter, so keeping a disabled mesh around would only be dead geometry.
+// The field's own grass ALBEDO below is untouched - the ground still reads as
+// grass, it just has no props standing in it.
 
 // Small deterministic PRNG (mulberry32), same pattern as
 // createMainStagePresentationRig's createSeededRandom - keeps the field's
-// noise and tuft placement identical across every load.
+// generated noise identical across every load.
 function createSeededRandom(seed: number) {
   let state = seed >>> 0;
   return () => {
@@ -167,80 +157,6 @@ function createGrassTexture(scene: Scene) {
   }
 }
 
-// Tiny low-poly tuft: two crossed quads (4 triangles), cheap enough for a
-// few hundred thin instances in one draw call.
-function createTuftSourceMesh(scene: Scene) {
-  try {
-    const tuft = MeshBuilder.CreateDisc(
-      TUFT_SOURCE_NAME,
-      { radius: 0.35, tessellation: 3, sideOrientation: 2 },
-      scene,
-    );
-    // A second blade crossed 90 degrees, merged in, so the tuft reads from
-    // any angle instead of vanishing edge-on.
-    const crossBlade = MeshBuilder.CreateDisc(
-      `${TUFT_SOURCE_NAME}-cross`,
-      { radius: 0.35, tessellation: 3, sideOrientation: 2 },
-      scene,
-    );
-    crossBlade.rotation.y = Math.PI / 2;
-    crossBlade.bakeCurrentTransformIntoVertices();
-    const merged = Mesh.MergeMeshes([tuft, crossBlade], true, true, undefined, false, false);
-    const finalMesh = merged ?? tuft;
-    finalMesh.name = TUFT_SOURCE_NAME;
-    finalMesh.rotation.x = Math.PI / 2; // stand the disc up off the ground plane
-    finalMesh.bakeCurrentTransformIntoVertices();
-    finalMesh.position.y = 0.18;
-
-    const tuftMaterial = new PBRMaterial(`${TUFT_SOURCE_NAME}-material`, scene);
-    tuftMaterial.albedoColor = new Color3(0.05, 0.09, 0.04);
-    tuftMaterial.emissiveColor = new Color3(0.002, 0.004, 0.002);
-    tuftMaterial.metallic = 0;
-    tuftMaterial.roughness = 0.95;
-    tuftMaterial.backFaceCulling = false;
-    finalMesh.material = tuftMaterial;
-    // Must stay visible: a thin-instanced mesh renders ONLY when its source
-    // mesh isVisible is true - the instances inherit it. Hiding the source
-    // (to suppress a phantom instance-0) hides every tuft (verified live:
-    // scatter vanished entirely).
-    finalMesh.isVisible = true;
-    finalMesh.isPickable = false;
-
-    return finalMesh;
-  } catch (error) {
-    console.warn('festival field: tuft source mesh unavailable', error);
-    return null;
-  }
-}
-
-function inPerimeterRing(x: number, z: number) {
-  const outsideVenue = x < VENUE_X_MIN || x > VENUE_X_MAX || z < VENUE_Z_MIN || z > VENUE_Z_MAX;
-  const insideField = Math.abs(x) <= FIELD_X_EXTENT && z >= FIELD_Z_MIN && z <= FIELD_Z_MAX;
-  return outsideVenue && insideField;
-}
-
-function scatterTufts(tuftMesh: Mesh) {
-  const random = createSeededRandom(0x9f2c11);
-  const matrices: number[] = [];
-  let placed = 0;
-  let attempts = 0;
-  const maxAttempts = TUFT_COUNT_TARGET * 20;
-
-  while (placed < TUFT_COUNT_TARGET && attempts < maxAttempts) {
-    attempts++;
-    const x = (random() * 2 - 1) * FIELD_X_EXTENT;
-    const z = FIELD_Z_MIN + random() * (FIELD_Z_MAX - FIELD_Z_MIN);
-    if (!inPerimeterRing(x, z)) continue;
-
-    const scale = 0.7 + random() * 0.8;
-    const rotationY = random() * Math.PI * 2;
-    placed++;
-    matrices.push(x, z, scale, rotationY);
-  }
-
-  return { placed, matrices };
-}
-
 export function createFestivalField(scene: Scene): FestivalFieldSummary {
   const fieldMesh = scene.meshes.find(
     (m) => m.name === FIELD_MESH_NAME || /FestivalField/.test(m.name),
@@ -278,46 +194,7 @@ export function createFestivalField(scene: Scene): FestivalFieldSummary {
     }
   }
 
-  const tuftMesh = createTuftSourceMesh(scene);
-  let scatterCount = 0;
-  if (tuftMesh) {
-    const { placed, matrices } = scatterTufts(tuftMesh);
-    scatterCount = placed;
-    const buffer = new Float32Array(placed * 16);
-    for (let i = 0; i < placed; i++) {
-      const x = matrices[i * 4];
-      const z = matrices[i * 4 + 1];
-      const scale = matrices[i * 4 + 2];
-      const rotationY = matrices[i * 4 + 3];
-      const cos = Math.cos(rotationY);
-      const sin = Math.sin(rotationY);
-      const offset = i * 16;
-      // Column-major 4x4: scaled Y-rotation * translation, Y left at 0
-      // (tuft mesh already sits at its own local y offset).
-      buffer[offset + 0] = cos * scale;
-      buffer[offset + 1] = 0;
-      buffer[offset + 2] = -sin * scale;
-      buffer[offset + 3] = 0;
-      buffer[offset + 4] = 0;
-      buffer[offset + 5] = scale;
-      buffer[offset + 6] = 0;
-      buffer[offset + 7] = 0;
-      buffer[offset + 8] = sin * scale;
-      buffer[offset + 9] = 0;
-      buffer[offset + 10] = cos * scale;
-      buffer[offset + 11] = 0;
-      buffer[offset + 12] = x;
-      buffer[offset + 13] = 0;
-      buffer[offset + 14] = z;
-      buffer[offset + 15] = 1;
-    }
-    if (placed > 0) {
-      tuftMesh.thinInstanceSetBuffer('matrix', buffer, 16, true);
-    }
-  }
-
   return {
     fieldMesh: fieldMesh ?? null,
-    scatterCount,
   };
 }
