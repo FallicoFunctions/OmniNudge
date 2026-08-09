@@ -182,19 +182,28 @@ describe('createHologramGrid', () => {
     grid.dispose();
   });
 
-  it('a loud frame raises brightness well above idle', () => {
+  it('keeps the arrival sightline clear while silent and lights only when the show has ownership', () => {
     const idleGrid = createHologramGrid(scene, { getFrequencyData: zeroSource });
     idleGrid.update(0.016);
     const idlePeak = idleGrid.peakBrightness;
-    expect(idlePeak).toBeGreaterThan(0);
-    expect(idlePeak).toBeLessThan(0.3);
+    expect(idlePeak).toBe(0);
+    expect(idleGrid.litPoints).toBe(0);
+    expect(scene.getMeshByName('hologram-grid-point')?.isEnabled()).toBe(false);
+    // The superseded canopy slabs stay retired even while the effect yields;
+    // restoring them would replace the point cloud with two giant gold plates
+    // across the same approval sightline.
+    expect(plateEnabled(LAMELLA)).toBe(false);
+    expect(plateEnabled(GOLD_SEAM)).toBe(false);
     idleGrid.dispose();
 
     const loudGrid = createHologramGrid(scene, { getFrequencyData: loudSource });
     for (let i = 0; i < 6; i++) {
       loudGrid.update(0.016);
     }
-    expect(loudGrid.peakBrightness).toBeGreaterThan(idlePeak * 2);
+    expect(loudGrid.peakBrightness).toBeGreaterThan(0.3);
+    expect(scene.getMeshByName('hologram-grid-point')?.isEnabled()).toBe(true);
+    expect(plateEnabled(LAMELLA)).toBe(false);
+    expect(plateEnabled(GOLD_SEAM)).toBe(false);
     loudGrid.dispose();
   });
 
@@ -223,10 +232,10 @@ describe('createHologramGrid', () => {
 
   it('lead_in countdown produces a lit/legible formation distinct from idle cube', () => {
     const grid = createHologramGrid(scene, { getFrequencyData: zeroSource });
-    // Idle cube: the whole lattice lights (existing baseline behaviour).
+    // Silent normal mode yields ownership to the authored crown plates.
     grid.update(0.016);
     expect(grid.formationOverride).toBe('none');
-    expect(grid.litPoints).toBe(grid.pointCount);
+    expect(grid.litPoints).toBe(0);
 
     // lead_in: the countdown formation takes over - a DIFFERENT formation
     // (never the held/morphing shape-library cube) for as long as the event
@@ -234,6 +243,7 @@ describe('createHologramGrid', () => {
     grid.setEventState({ phase: 'lead_in', countdownSeconds: 10 });
     grid.update(0.016);
     expect(grid.formationOverride).toBe('countdown');
+    expect(scene.getMeshByName('hologram-grid-point')?.isEnabled()).toBe(true);
     // No real 2D canvas exists under jsdom/NullEngine (see the other tests'
     // "Not implemented: HTMLCanvasElement's getContext()" warning), so the
     // countdown formation cannot sample real digit pixels here; it correctly

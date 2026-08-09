@@ -18,8 +18,9 @@ import { SKYDECK_DECK_Y, SKYDECK_X_MIN } from './mainStageVenueBounds';
 
 // The Main Stage's hero visualizer, rebuilt as ONE large TRUE-3D unit
 // (player-flagged: the previous two 8x7 flat panels read as small 2D screens).
-// It fills a face centered at (0, 18) with its backing at z=-3, facing the
-// crowd (-z) - and the spectrum itself is a field of ~384 thin-instanced
+// It fills a face centered at (0, 18) with its backing integrated into the
+// authored proscenium at z=36, facing the crowd (-z) - and the spectrum itself
+// is a field of ~384 thin-instanced
 // boxes that physically EXTRUDE toward the crowd with the music, up to ~2.5
 // deep. The old hero panel meshes are hidden (not disposed - dispose()
 // re-enables them); their haze meshes stay on as the glow atmosphere behind
@@ -61,13 +62,16 @@ const DEFAULT_HERO_SCREEN_MESH_NAMES = [
 ] as const;
 
 // Unit geometry: §13.3's Main Stage target, ~300ft wide x 100ft tall,
-// converted at 0.3048 m/ft. (Position (0, 18, -3) is unchanged from the
-// original small unit - only the size is spec-driven here.)
+// converted at 0.3048 m/ft. The authored crown's inner portal occupies
+// z=33.3..37.9, so the backing sits at z=36 and the reactive cells extrude
+// crowd-ward into that portal. The legacy z=-3 position stood almost forty
+// metres in front of the architecture, turning the screen into an approach-
+// plaza wall that hid the landmark and intercepted long camera-collision rays.
 const FEET_TO_METERS = 0.3048;
 const UNIT_WIDTH = 300 * FEET_TO_METERS; // 91.44m
 const UNIT_HEIGHT = 100 * FEET_TO_METERS; // 30.48m
 const UNIT_CENTER_Y = 18;
-const BACKING_Z = -3;
+const BACKING_Z = 36;
 // Bar cells rest just in front of the backing and extrude toward the crowd.
 const BAR_REST_DEPTH = 0.15;
 const BAR_MAX_DEPTH = 2.5;

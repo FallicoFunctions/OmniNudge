@@ -51,6 +51,25 @@ describe('createImmersiveAudioShow', () => {
     show.dispose();
   });
 
+  it('yields the arrival sightline while silent and re-enables every layer for an event', () => {
+    const show = createImmersiveAudioShow(scene, { getFrequencyData: zeroSource });
+    show.update(0.016);
+
+    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('immersive-beam-0')?.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('immersive-floor-pulse')?.isEnabled()).toBe(false);
+    expect(show.laserIntensity).toBe(0);
+
+    show.setEventState({ phase: 'lead_in', countdownSeconds: 10 });
+    show.update(0.016);
+
+    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(true);
+    expect(scene.getMeshByName('immersive-beam-0')?.isEnabled()).toBe(true);
+    expect(scene.getMeshByName('immersive-floor-pulse')?.isEnabled()).toBe(true);
+
+    show.dispose();
+  });
+
   it('loud bass spikes cone intensity, raises laser brightness and fires the beat flash', () => {
     let loud = false;
     const show = createImmersiveAudioShow(scene, {
@@ -86,7 +105,7 @@ describe('createImmersiveAudioShow', () => {
   });
 
   it('cycles the palette over time, shifting the exposed current color', () => {
-    const show = createImmersiveAudioShow(scene, { getFrequencyData: zeroSource });
+    const show = createImmersiveAudioShow(scene, { getFrequencyData: loudSource });
 
     show.update(0.05);
     const early = { r: show.currentColorR, g: show.currentColorG, b: show.currentColorB };

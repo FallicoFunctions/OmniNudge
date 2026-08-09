@@ -204,6 +204,26 @@ describe('createStageVisualizer', () => {
     visualizer.dispose();
   });
 
+  it('integrates the hero unit into the authored proscenium instead of spanning the approach plaza', () => {
+    buildPanels();
+    const visualizer = createStageVisualizer(scene, { getFrequencyData: zeroSource });
+    const backing = scene.getMeshByName('main-stage-visualizer-backing');
+    const bars = barMesh();
+
+    expect(backing).not.toBeNull();
+    // The authored crown/proscenium occupies z ~= 33..55. A screen at the
+    // legacy z=-3 position is a freestanding wall between the spawn and the
+    // landmark, occluding the stage and collapsing camera-collision rays.
+    expect(backing!.position.z).toBeGreaterThanOrEqual(35);
+
+    (bars as unknown as { _thinInstanceDataStorage: { worldMatrices: unknown } })._thinInstanceDataStorage.worldMatrices = null;
+    const barDepths = bars.thinInstanceGetWorldMatrices().map((matrix) => matrix.m[14]);
+    expect(Math.max(...barDepths)).toBeLessThan(backing!.position.z);
+    expect(Math.min(...barDepths)).toBeGreaterThan(32);
+
+    visualizer.dispose();
+  });
+
   it('leaves an actual gap in the backing over the VIP-landing cutout, not just a dimmer draw', () => {
     buildPanels();
     const visualizer = createStageVisualizer(scene, { getFrequencyData: zeroSource });
