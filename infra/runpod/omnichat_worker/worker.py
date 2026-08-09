@@ -62,6 +62,10 @@ def handler(job: dict[str, Any]) -> dict[str, Any]:
         "video": output_video(url, duration=result.duration, file_size=size),
         "actual_prompt": result.actual_prompt,
         "worker_build": worker_build(),
+        # Stored with the asset so a slow clip can be attributed without
+        # reading RunPod's logs, which are gone by the time anyone looks.
+        "load_seconds": round(result.load_seconds, 3),
+        "inference_seconds": round(result.inference_seconds, 3),
     }
 
 

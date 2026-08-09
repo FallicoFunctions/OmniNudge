@@ -446,6 +446,11 @@ func (r *OmniChatMediaRepository) CancelGenerationJobOwned(ctx context.Context, 
 type OmniChatGenerationProvenance struct {
 	WorkerBuild  string `json:"worker_build,omitempty"`
 	ActualPrompt string `json:"actual_prompt,omitempty"`
+	// LoadSeconds and InferenceSeconds separate model load from sampling, so a
+	// slow render can be attributed after the fact. RunPod's own logs have
+	// rotated away long before anyone asks why a clip took fifteen minutes.
+	LoadSeconds      float64 `json:"load_seconds,omitempty"`
+	InferenceSeconds float64 `json:"inference_seconds,omitempty"`
 }
 
 const (

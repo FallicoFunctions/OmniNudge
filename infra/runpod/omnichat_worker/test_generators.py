@@ -734,6 +734,41 @@ class VideoFrameGeometryTests(unittest.TestCase):
             _video_mod_value(object())
 
 
+class VideoOffloadTests(unittest.TestCase):
+    GIB = 1024**3
+
+    def test_a_card_that_fits_the_pipeline_keeps_it_resident(self):
+        # enable_model_cpu_offload streams every module across PCIe on each
+        # denoising step. On a 48GB A40, which holds the whole ~25GB pipeline,
+        # that was pure overhead and the largest single cost in a render.
+        from .generators import video_cpu_offload
+
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(video_cpu_offload(48 * self.GIB))
+            self.assertFalse(video_cpu_offload(80 * self.GIB))
+
+    def test_a_small_card_still_offloads(self):
+        from .generators import video_cpu_offload
+
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(video_cpu_offload(24 * self.GIB))
+            self.assertTrue(video_cpu_offload(16 * self.GIB))
+
+    def test_the_operator_can_force_either_way(self):
+        from .generators import video_cpu_offload
+
+        with patch.dict(os.environ, {"OMNICHAT_VIDEO_CPU_OFFLOAD": "1"}, clear=True):
+            self.assertTrue(video_cpu_offload(80 * self.GIB))
+        with patch.dict(os.environ, {"OMNICHAT_VIDEO_CPU_OFFLOAD": "0"}, clear=True):
+            self.assertFalse(video_cpu_offload(8 * self.GIB))
+
+    def test_the_resident_threshold_is_tunable(self):
+        from .generators import video_cpu_offload
+
+        with patch.dict(os.environ, {"OMNICHAT_VIDEO_RESIDENT_MIN_VRAM_GB": "20"}, clear=True):
+            self.assertFalse(video_cpu_offload(24 * self.GIB))
+
+
 class VideoGeneratorContractTests(unittest.TestCase):
     def test_default_model_is_the_single_gpu_wan_checkpoint(self):
         from .generators import VideoGenerator

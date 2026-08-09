@@ -667,8 +667,10 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 		asset.DurationSeconds = &duration
 	}
 	provenance := models.OmniChatGenerationProvenance{
-		WorkerBuild:  result.WorkerBuild,
-		ActualPrompt: result.ActualPrompt,
+		WorkerBuild:      result.WorkerBuild,
+		ActualPrompt:     result.ActualPrompt,
+		LoadSeconds:      result.LoadSeconds,
+		InferenceSeconds: result.InferenceSeconds,
 	}
 	if err := commit(media, asset, provenance); err != nil {
 		if errors.Is(err, models.ErrOmniChatStorageQuotaExceeded) {

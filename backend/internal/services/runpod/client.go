@@ -104,6 +104,12 @@ type Result struct {
 	// template can silently serve a stale tag, so provenance is recorded with
 	// every result rather than inferred from what was last pushed.
 	WorkerBuild string `json:"worker_build,omitempty"`
+	// LoadSeconds and InferenceSeconds split a render's wall clock into model
+	// load and sampling. They are reported separately because they have
+	// unrelated causes: load is a cold start or a CPU offload, sampling is
+	// step count and GPU tier.
+	LoadSeconds      float64 `json:"load_seconds,omitempty"`
+	InferenceSeconds float64 `json:"inference_seconds,omitempty"`
 }
 
 type Client struct {
@@ -518,6 +524,12 @@ func decodeResultMetadata(object map[string]json.RawMessage, result *Result) {
 	}
 	if value, ok := object["worker_build"]; ok {
 		_ = json.Unmarshal(value, &result.WorkerBuild)
+	}
+	if value, ok := object["load_seconds"]; ok {
+		_ = json.Unmarshal(value, &result.LoadSeconds)
+	}
+	if value, ok := object["inference_seconds"]; ok {
+		_ = json.Unmarshal(value, &result.InferenceSeconds)
 	}
 }
 
