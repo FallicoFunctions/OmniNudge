@@ -9,9 +9,8 @@ const mockedFns = vi.hoisted(() => ({
 
 const authState = vi.hoisted(() => ({
   isAuthenticated: false,
+  isLoading: false,
 }));
-
-const dispatchEventSpy = vi.hoisted(() => vi.fn());
 
 vi.mock('../../components/common/PageShell', () => ({
   PageShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -44,6 +43,7 @@ vi.mock('../../services/omnigameService', () => ({
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
     isAuthenticated: authState.isAuthenticated,
+    isLoading: authState.isLoading,
   }),
 }));
 
@@ -54,15 +54,12 @@ vi.mock('react-i18next', () => ({
         {
           'gameDetailPage.eyebrow': 'OmniGame / OmniRave',
           'gameDetailPage.play': 'Play',
-          'gameDetailPage.playGuest': 'Play as Guest',
-          'gameDetailPage.signIn': 'Sign In to Play',
           'gameDetailPage.playing': 'Entering OmniRave...',
           'gameDetailPage.heroTitle': 'Enter the room without any lobby shell.',
           'gameDetailPage.heroBody':
             'Play should feel immediate: black-in, live crowd, stage lights, and the room already moving.',
-          'gameDetailPage.accountHint': 'Account launch will restore your return point.',
-          'gameDetailPage.guestHint': 'Guests drop straight into Main Stage.',
-          'gameDetailPage.signInHint': 'Sign in to restore your return point and loadout.',
+          'gameDetailPage.launchHint':
+            'Signed-in players resume their account; everyone else enters as a guest.',
           'gameDetailPage.highlightsTitle': 'What makes the room feel real',
           'gameDetailPage.launchError': 'Unable to launch OmniRave right now.',
           'games.omnirave.summary': 'Shared world rave.',
@@ -86,11 +83,10 @@ describe('GameDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authState.isAuthenticated = false;
-    dispatchEventSpy.mockReset();
-    vi.spyOn(window, 'dispatchEvent').mockImplementation(dispatchEventSpy);
+    authState.isLoading = false;
   });
 
-  it('renders translated OmniRave content plus guest and sign-in CTAs for logged-out players', () => {
+  it('renders one Play button for logged-out players', () => {
     render(
       <MemoryRouter initialEntries={['/games/omnirave']}>
         <Routes>
@@ -102,8 +98,10 @@ describe('GameDetailPage', () => {
     expect(screen.getByRole('heading', { name: 'OmniRave' })).toBeInTheDocument();
     expect(screen.getByText('Shared world rave.')).toBeInTheDocument();
     expect(screen.getByText('One world. Three stages. Shared playheads.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Play as Guest' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign In to Play' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Play' })).toHaveLength(1);
+    expect(
+      screen.getByText('Signed-in players resume their account; everyone else enters as a guest.'),
+    ).toBeInTheDocument();
   });
 
   it('launches guest mode when the player is unauthenticated', async () => {
@@ -117,14 +115,16 @@ describe('GameDetailPage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Play as Guest' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
 
     await waitFor(() => {
       expect(mockedFns.createOmniRaveLaunch).toHaveBeenCalledWith('guest');
     });
   });
 
-  it('opens the auth modal when a logged-out player chooses the signed-in path', () => {
+  it('waits for OmniNudge authentication detection before enabling Play', () => {
+    authState.isLoading = true;
+
     render(
       <MemoryRouter initialEntries={['/games/omnirave']}>
         <Routes>
@@ -133,10 +133,8 @@ describe('GameDetailPage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sign In to Play' }));
-
+    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
     expect(mockedFns.createOmniRaveLaunch).not.toHaveBeenCalled();
-    expect(dispatchEventSpy).toHaveBeenCalledTimes(1);
   });
 
   it('launches account mode when the player is authenticated', async () => {
