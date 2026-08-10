@@ -678,6 +678,9 @@ func main() {
 	omniChatSceneStateRepo := models.NewOmniChatConversationSceneStateRepository(db.Pool)
 	omniCreditsRepo := models.NewOmniCreditsRepository(db.Pool)
 	omniChatUserRepo := models.NewUserRepository(db.Pool)
+	// One rule for every surface that can produce adult content, so chat and
+	// media generation cannot disagree about what an account is entitled to.
+	omniChatContentEntitlement := services.NewOmniChatContentEntitlement(omniChatUserRepo)
 	omniChatBilling := services.NewOmniChatBillingService(omniCreditsRepo, omniChatUserRepo).SetAdminReader(omniChatUserRepo)
 	omniChatBillingOffers, billingOffersErr := services.ParseOmniChatBillingOffers(cfg.OmniChatBillingOffersJSON)
 	if billingOffersErr != nil {
@@ -739,7 +742,8 @@ func main() {
 		hub,
 		omniChatModelRouter,
 	).SetConversationSceneStateCoordinator(omniChatSceneStateCoordinator).
-		SetBilling(omniChatBilling)
+		SetBilling(omniChatBilling).
+		SetContentEntitlement(omniChatContentEntitlement)
 	omniChatRequestIdempotencyRepo := models.NewOmniChatRequestIdempotencyRepository(db.Pool)
 	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService, omniChatModelSelectionService, omniChatAllowance).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo)
@@ -755,7 +759,7 @@ func main() {
 		omniChatGenerationEnqueuer, cfg.OmniChatMedia.Provider,
 	).SetBilling(omniChatBilling).SetMessageWriter(botMessageRepo).SetConversationWriter(botConversationRepo).
 		SetPromptModerator(services.NewOpenRouterOmniChatMediaModerator(openrouterClient)).
-		SetContentEntitlement(omniChatUserRepo, omniChatUserRepo)
+		SetContentEntitlement(omniChatContentEntitlement)
 	omniChatMediaHandler := handlers.NewOmniChatMediaHandler(omniChatGenerationService, omniChatMediaRepo, storageService).
 		SetBilling(omniChatBilling).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo)

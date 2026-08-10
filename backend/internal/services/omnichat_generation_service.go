@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/omninudge/backend/internal/models"
-	zlog "github.com/rs/zerolog/log"
 )
 
 var (
@@ -75,8 +74,7 @@ type OmniChatGenerationService struct {
 	provider           string
 	billing            OmniChatGenerationBilling
 	moderator          OmniChatMediaPromptModerator
-	plans              OmniChatPlanReader
-	admins             OmniChatAdminReader
+	entitlement        *OmniChatContentEntitlement
 }
 
 func (s *OmniChatGenerationService) SetBilling(billing OmniChatGenerationBilling) *OmniChatGenerationService {
@@ -84,50 +82,23 @@ func (s *OmniChatGenerationService) SetBilling(billing OmniChatGenerationBilling
 	return s
 }
 
-// SetContentEntitlement installs the readers that decide whether a job may
+// SetContentEntitlement installs the shared rule deciding whether a job may
 // render explicit content.
 //
 // Both entry points funnel through CreateGeneration, so this is the single
-// place the decision is made. Leaving it unset denies explicit content, which
-// is the safe default for tests and for a deployment that has not configured
-// the second endpoint.
-func (s *OmniChatGenerationService) SetContentEntitlement(plans OmniChatPlanReader, admins OmniChatAdminReader) *OmniChatGenerationService {
-	s.plans = plans
-	s.admins = admins
+// place the decision is made for media. Chat consults the same entitlement, so
+// the two surfaces cannot disagree. Leaving it unset denies explicit content,
+// which is the safe default for tests and for a deployment that has not
+// configured the second endpoint.
+func (s *OmniChatGenerationService) SetContentEntitlement(entitlement *OmniChatContentEntitlement) *OmniChatGenerationService {
+	s.entitlement = entitlement
 	return s
 }
 
 // resolveNSFWEntitlement decides which image endpoint a job's render goes to.
-//
-// Explicit content is a premium entitlement. Persisted administrators are
-// treated as premium here for the same reason they are everywhere else in
-// OmniChat: they have to be able to reproduce what a paying account sees.
-//
-// A lookup failure denies rather than escalates, and never fails the request:
-// the job still renders, on the standard endpoint.
+// It never fails the request: a denial still renders, on the standard endpoint.
 func (s *OmniChatGenerationService) resolveNSFWEntitlement(ctx context.Context, userID int) bool {
-	if s.admins != nil {
-		admin, err := isOmniChatAdmin(ctx, s.admins, userID)
-		if err != nil {
-			zlog.Warn().Err(err).Msg("omnichat: admin lookup failed; treating media request as standard content")
-			return false
-		}
-		if admin {
-			return true
-		}
-	}
-	if s.plans == nil {
-		return false
-	}
-	plan, expiresAt, err := s.plans.GetPlan(ctx, userID)
-	if err != nil {
-		zlog.Warn().Err(err).Msg("omnichat: plan lookup failed; treating media request as standard content")
-		return false
-	}
-	if expiresAt != nil && !expiresAt.After(time.Now()) {
-		return false
-	}
-	return modelTierForStoredPlan(plan) == OmniChatModelTierPremium
+	return s.entitlement.AllowsExplicit(ctx, userID)
 }
 
 // SetPromptModerator installs the pre-provider safety classifier. Leaving it
