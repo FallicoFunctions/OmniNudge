@@ -107,33 +107,31 @@ func TestSourceAssetIsClearedOutsideImageToVideo(t *testing.T) {
 	require.Equal(t, &sourceID, kept.SourceAssetID)
 }
 
-type generationPlanReaderFake struct {
-	plan      string
-	expiresAt *time.Time
-	err       error
-}
-
-func (f *generationPlanReaderFake) GetPlan(context.Context, int) (string, *time.Time, error) {
-	return f.plan, f.expiresAt, f.err
-}
-
-type generationAdminReaderFake struct {
+type generationUserReaderFake struct {
 	user *models.User
 	err  error
 }
 
-func (f *generationAdminReaderFake) GetByID(context.Context, int) (*models.User, error) {
+func (f *generationUserReaderFake) GetByID(context.Context, int) (*models.User, error) {
 	return f.user, f.err
 }
 
-func newEntitlementService(store *generationStoreFake, plans OmniChatPlanReader, admins OmniChatAdminReader) *OmniChatGenerationService {
+// entitledUser is the baseline account explicit content is allowed for:
+// premium, unexpired, with the preference switched on. Tests vary one field at
+// a time from here so a failure names the condition that actually decided it.
+func entitledUser(plan string, expiresAt *time.Time) *models.User {
+	return &models.User{ID: 9, Plan: plan, PlanExpiresAt: expiresAt, NSFW: true}
+}
+
+func newEntitlementService(store *generationStoreFake, users OmniChatUserReader) *OmniChatGenerationService {
 	return NewOmniChatGenerationService(
 		&generationPersonaReaderFake{persona: &models.BotPersona{ID: 42}},
 		&generationConversationReaderFake{},
 		store,
 		&generationEnqueuerFake{},
 		"runpod",
-	).SetBilling(generationServiceBillingFake{}).SetContentEntitlement(plans, admins)
+	).SetBilling(generationServiceBillingFake{}).
+		SetContentEntitlement(NewOmniChatContentEntitlement(users))
 }
 
 func createEntitlementJob(t *testing.T, service *OmniChatGenerationService) *models.OmniChatGenerationJob {
@@ -164,7 +162,7 @@ func TestExplicitContentIsAPremiumEntitlement(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			store := &generationStoreFake{}
 			service := newEntitlementService(store,
-				&generationPlanReaderFake{plan: test.plan, expiresAt: test.expires}, nil)
+				&generationUserReaderFake{user: entitledUser(test.plan, test.expires)})
 
 			require.Equal(t, test.allowed, createEntitlementJob(t, service).AllowNSFW)
 		})
@@ -175,18 +173,41 @@ func TestLapsedPremiumLosesExplicitContent(t *testing.T) {
 	past := time.Now().Add(-time.Hour)
 	store := &generationStoreFake{}
 	service := newEntitlementService(store,
-		&generationPlanReaderFake{plan: models.PlanPremium, expiresAt: &past}, nil)
+		&generationUserReaderFake{user: entitledUser(models.PlanPremium, &past)})
+
+	require.False(t, createEntitlementJob(t, service).AllowNSFW)
+}
+
+func TestExplicitContentAlsoRequiresTheAccountPreference(t *testing.T) {
+	// Plan grants the entitlement; users.nsfw is the subscriber's own switch.
+	// The explore feed has always honoured it, so chat and generation ignoring
+	// it would make the same account behave two different ways.
+	future := time.Now().Add(24 * time.Hour)
+	optedOut := entitledUser(models.PlanPremium, &future)
+	optedOut.NSFW = false
+	store := &generationStoreFake{}
+	service := newEntitlementService(store, &generationUserReaderFake{user: optedOut})
 
 	require.False(t, createEntitlementJob(t, service).AllowNSFW)
 }
 
 func TestAdministratorsCanReproduceWhatPremiumSees(t *testing.T) {
 	store := &generationStoreFake{}
-	service := newEntitlementService(store,
-		&generationPlanReaderFake{plan: models.PlanFree},
-		&generationAdminReaderFake{user: &models.User{ID: 9, Role: "admin"}})
+	admin := entitledUser(models.PlanFree, nil)
+	admin.Role = "admin"
+	service := newEntitlementService(store, &generationUserReaderFake{user: admin})
 
 	require.True(t, createEntitlementJob(t, service).AllowNSFW)
+}
+
+func TestAdministratorsStillHonourTheAccountPreference(t *testing.T) {
+	store := &generationStoreFake{}
+	admin := entitledUser(models.PlanFree, nil)
+	admin.Role = "admin"
+	admin.NSFW = false
+	service := newEntitlementService(store, &generationUserReaderFake{user: admin})
+
+	require.False(t, createEntitlementJob(t, service).AllowNSFW)
 }
 
 func TestEntitlementLookupFailureDeniesRatherThanFailingTheRequest(t *testing.T) {
@@ -195,7 +216,7 @@ func TestEntitlementLookupFailureDeniesRatherThanFailingTheRequest(t *testing.T)
 	// erroring out would lose a job the user already paid for.
 	store := &generationStoreFake{}
 	service := newEntitlementService(store,
-		&generationPlanReaderFake{err: errors.New("plan lookup unavailable")}, nil)
+		&generationUserReaderFake{err: errors.New("account lookup unavailable")})
 
 	require.False(t, createEntitlementJob(t, service).AllowNSFW)
 }
