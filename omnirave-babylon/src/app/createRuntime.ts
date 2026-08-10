@@ -28,9 +28,11 @@ import { resolveTravelCameraOffsets, TRAVEL_CAMERA_DISTANCE } from '../player/ca
 import { generateAvatarDefinition, hasAvatarLoadout, parseAvatarLoadout, serializeAvatarLoadout } from '../player/avatarDefinition';
 import { BACK_PLAZA_SPAWN } from '../scene/reviewRouteData';
 import type { ReviewCheckpoint } from '../scene/reviewRouteData';
+import type { StageEventStateInput } from '../scene/createStageVisualizer';
 import { createDebugPanel } from '../ui/createDebugPanel';
 import { createPerfOverlay, updatePerfOverlay } from '../ui/createPerfOverlay';
 import { createReviewHud, formatCheckpointLabel } from '../ui/createReviewHud';
+import type { FireworksPreviewAct } from '../ui/createReviewHud';
 import { createRuntimeLoadingOverlay } from '../ui/createRuntimeLoadingOverlay';
 import { createEnterOmniRaveOverlay } from '../ui/createEnterOmniRaveOverlay';
 import { createHudNotice } from '../ui/createHudNotice';
@@ -144,6 +146,7 @@ export async function createRuntime(host: HTMLElement) {
   // remains the automatic fallback, and ?perf=webgl forces it for
   // debugging comparisons.
   const perfFlags = parsePerfFlags(window.location.search);
+  host.classList.toggle('babylon-runtime-host--capture', perfFlags.capture);
   // The real launch flow (backend's SessionService.BuildLaunchURL) redirects
   // here with `?mode=<account|guest>&handoff=<one-time token>`, NOT a world
   // socket URL/token directly - those only exist after exchanging the
@@ -194,6 +197,11 @@ export async function createRuntime(host: HTMLElement) {
   let perfOverlay: HTMLElement | undefined;
   let debugPanel: HTMLElement | undefined;
   let loadingOverlay: HTMLElement | undefined;
+  // Assigned after the show modules exist. The review HUD is debug-only, and
+  // this indirection keeps its early DOM construction from racing scene boot.
+  let applyFireworksPreview: ((act: FireworksPreviewAct) => void) | undefined;
+  let fireworksPreviewTimer: number | undefined;
+  let fireworksAudioUnlocked = false;
   let enterOverlay: import('../ui/createEnterOmniRaveOverlay').EnterOmniRaveOverlay | undefined;
   // Player-facing "Now Playing" / venue block. Never gated behind ?debug=1, and
   // owned DOM like the overlays above, so it is torn down in cleanup too.
@@ -258,6 +266,12 @@ export async function createRuntime(host: HTMLElement) {
     authPopup?.dispose();
     welcomeCard?.dispose();
     hudNotice?.dispose();
+    if (fireworksPreviewTimer !== undefined) {
+      window.clearInterval(fireworksPreviewTimer);
+      fireworksPreviewTimer = undefined;
+    }
+    applyFireworksPreview = undefined;
+    host.classList.remove('babylon-runtime-host--capture');
     canvas.remove();
   };
 
@@ -371,6 +385,9 @@ export async function createRuntime(host: HTMLElement) {
             }
           });
         },
+        onPreviewFireworks(act) {
+          applyFireworksPreview?.(act);
+        },
       });
       hud = reviewHud;
       perfOverlay = createPerfOverlay(host);
@@ -431,6 +448,61 @@ export async function createRuntime(host: HTMLElement) {
     let hologramGrid: import('../scene/createHologramGrid').HologramGrid | undefined;
     let stageAtmospherics: import('../scene/createStageAtmospherics').StageAtmospherics | undefined;
     let fireworksShow: import('../scene/createFireworksShow').FireworksShow | undefined;
+    let latestWorldEventState: StageEventStateInput | null = null;
+    // Undefined follows the server. A concrete state is a debug-only local
+    // preview override; it never mutates or broadcasts authoritative state.
+    let debugEventOverride: StageEventStateInput | null | undefined;
+
+    const applyStageEventState = (eventState: StageEventStateInput | null) => {
+      stageVisualizer?.setEventState(eventState);
+      immersiveAudioShow?.setEventState(eventState);
+      crownEffects?.setEventState(eventState);
+      cascadeCourtLightFloor?.setEventState(eventState);
+      hologramGrid?.setEventState(eventState);
+      stageAtmospherics?.setEventState(eventState);
+      fireworksShow?.setEventState(eventState);
+    };
+
+    applyFireworksPreview = (act) => {
+      if (!perfFlags.debug) {
+        return;
+      }
+      // The preview button click is a trusted player gesture, so it can also
+      // satisfy autoplay policy in the no-world local review path.
+      fireworksAudioUnlocked = true;
+      fireworksShow?.unlockAudio();
+      if (fireworksPreviewTimer !== undefined) {
+        window.clearInterval(fireworksPreviewTimer);
+        fireworksPreviewTimer = undefined;
+      }
+      if (act === 'stop') {
+        debugEventOverride = undefined;
+        applyStageEventState(latestWorldEventState);
+        return;
+      }
+      if (act === 'countdown') {
+        let seconds = 10;
+        debugEventOverride = { phase: 'lead_in', countdownSeconds: seconds };
+        applyStageEventState(debugEventOverride);
+        fireworksPreviewTimer = window.setInterval(() => {
+          seconds = Math.max(1, seconds - 1);
+          debugEventOverride = { phase: 'lead_in', countdownSeconds: seconds };
+          applyStageEventState(debugEventOverride);
+          if (seconds === 1 && fireworksPreviewTimer !== undefined) {
+            window.clearInterval(fireworksPreviewTimer);
+            fireworksPreviewTimer = undefined;
+          }
+        }, 1000);
+        return;
+      }
+      const minuteByAct: Record<Exclude<FireworksPreviewAct, 'countdown' | 'stop'>, number> = {
+        'minute-1': 1,
+        'minute-2': 2,
+        'minute-3': 3,
+      };
+      debugEventOverride = { phase: 'active', activeMinute: minuteByAct[act] };
+      applyStageEventState(debugEventOverride);
+    };
     // Latest active-zone media from the world snapshot; the HUD reads it on a
     // 1s tick instead of re-rendering on every snapshot.
     let activeZoneId = 'main_stage';
@@ -541,21 +613,17 @@ export async function createRuntime(host: HTMLElement) {
         }
         // Drive the stage screen's event mode (countdown / fireworks video)
         // from the active zone's scheduled event, if any.
-        const activeEvent = snapshot.zoneEvents.find((zone) => zone.zoneId === snapshot.activeZone) ?? null;
-        const eventState = activeEvent
+        const activeEvent = snapshot.activeZone === 'main_stage'
+          ? snapshot.zoneEvents.find((zone) => zone.zoneId === 'main_stage') ?? null
+          : null;
+        latestWorldEventState = activeEvent
           ? {
               phase: activeEvent.phase,
               countdownSeconds: activeEvent.countdownSeconds,
               activeMinute: activeEvent.activeMinute,
             }
           : null;
-        stageVisualizer?.setEventState(eventState);
-        immersiveAudioShow?.setEventState(eventState);
-        crownEffects?.setEventState(eventState);
-        cascadeCourtLightFloor?.setEventState(eventState);
-        hologramGrid?.setEventState(eventState);
-        stageAtmospherics?.setEventState(eventState);
-        fireworksShow?.setEventState(eventState);
+        applyStageEventState(debugEventOverride === undefined ? latestWorldEventState : debugEventOverride);
       });
       // Sec 6.2/6.5: publish the SAME loadout that was applied to the local
       // render (the outer localAvatarLoadout variable) so other players'
@@ -578,6 +646,8 @@ export async function createRuntime(host: HTMLElement) {
       const activeStageMediaPlayer = stageMediaPlayer;
       enterOverlay = createEnterOmniRaveOverlay(host, () => {
         activeStageMediaPlayer.unlock();
+        fireworksAudioUnlocked = true;
+        fireworksShow?.unlockAudio();
         enterOverlay?.dispose();
         enterOverlay = undefined;
       });
@@ -1038,7 +1108,14 @@ export async function createRuntime(host: HTMLElement) {
     fireworksShow = createFireworksShow(scene, {
       getFrequencyData: getStageFrequencyData,
     });
+    if (fireworksAudioUnlocked) {
+      fireworksShow.unlockAudio();
+    }
     const activeFireworksShow = fireworksShow;
+
+    // A snapshot can arrive while these lazily imported show modules are still
+    // building. Re-apply the retained state once every recipient exists.
+    applyStageEventState(debugEventOverride === undefined ? latestWorldEventState : debugEventOverride);
 
     const runtime = {
       canvas,

@@ -134,6 +134,7 @@ describe('createHologramGrid', () => {
     expect(mesh!.isPickable).toBe(false);
     expect(mesh!.checkCollisions).toBe(false);
     expect(mesh!.alwaysSelectAsActiveMesh).toBe(true);
+    expect(mesh!.material?.disableDepthWrite).toBe(true);
     grid.dispose();
   });
 
@@ -285,7 +286,7 @@ describe('createHologramGrid', () => {
     grid.dispose();
   });
 
-  it('active minute 1 and minute 3 hold the drone-spelled OMNIRAVE wordmark; minute 3 is brighter', () => {
+  it('replaces the standard hourly loop with a dedicated three-act fireworks drone show', () => {
     const minute1Grid = createHologramGrid(scene, { getFrequencyData: loudSource });
     minute1Grid.setEventState({ phase: 'active', activeMinute: 1 });
     let minute1Peak = 0;
@@ -293,8 +294,18 @@ describe('createHologramGrid', () => {
       minute1Grid.update(0.016);
       minute1Peak = minute1Grid.peakBrightness;
     }
-    expect(minute1Grid.formationOverride).toBe('wordmark');
+    expect(minute1Grid.formationOverride).toBe('fireworks-crown');
+    expect(minute1Grid.litPoints).toBeGreaterThan(0);
     minute1Grid.dispose();
+
+    const minute2Grid = createHologramGrid(scene, { getFrequencyData: loudSource });
+    minute2Grid.setEventState({ phase: 'active', activeMinute: 2 });
+    for (let i = 0; i < 10; i++) {
+      minute2Grid.update(0.016);
+    }
+    expect(minute2Grid.formationOverride).toBe('fireworks-orbit');
+    expect(minute2Grid.litPoints).toBe(minute2Grid.pointCount);
+    minute2Grid.dispose();
 
     const minute3Grid = createHologramGrid(scene, { getFrequencyData: loudSource });
     minute3Grid.setEventState({ phase: 'active', activeMinute: 3 });
@@ -303,19 +314,24 @@ describe('createHologramGrid', () => {
       minute3Grid.update(0.016);
       minute3Peak = minute3Grid.peakBrightness;
     }
-    expect(minute3Grid.formationOverride).toBe('wordmark');
+    expect(minute3Grid.formationOverride).toBe('fireworks-finale');
+    expect(minute3Grid.litPoints).toBeGreaterThan(0);
     // "each is bigger than the last" (§5.1.1): minute 3's escalation reads
     // brighter than minute 1's under identical (loud) audio.
     expect(minute3Peak).toBeGreaterThan(minute1Peak);
     minute3Grid.dispose();
   });
 
-  it('active minute 2 does NOT trigger the drone wordmark path (the parallel firework-letter beat owns it)', () => {
+  it('returns to the standard loop as soon as the fireworks event ends', () => {
     const grid = createHologramGrid(scene, { getFrequencyData: loudSource });
     grid.setEventState({ phase: 'active', activeMinute: 2 });
     for (let i = 0; i < 10; i++) {
       grid.update(0.016);
     }
+    expect(grid.formationOverride).toBe('fireworks-orbit');
+
+    grid.setEventState({ phase: 'recovery' });
+    grid.update(0.016);
     expect(grid.formationOverride).toBe('none');
     grid.dispose();
   });

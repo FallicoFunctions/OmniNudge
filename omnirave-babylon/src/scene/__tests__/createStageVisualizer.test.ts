@@ -2,7 +2,11 @@ import { MeshBuilder, NullEngine, Scene } from '@babylonjs/core';
 import type { Mesh } from '@babylonjs/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createStageVisualizer, resolveVisualizerMode } from '../createStageVisualizer';
+import {
+  createStageVisualizer,
+  resolveFireworksScreenAct,
+  resolveVisualizerMode,
+} from '../createStageVisualizer';
 
 const HERO_PANELS = ['main-stage-hero-screen-panel-l', 'main-stage-hero-screen-panel-r'];
 
@@ -15,6 +19,17 @@ describe('resolveVisualizerMode', () => {
     expect(resolveVisualizerMode({ phase: 'none' })).toBe('normal');
     expect(resolveVisualizerMode({ phase: 'recovery' })).toBe('normal');
     expect(resolveVisualizerMode({ phase: 'anything-unknown' })).toBe('normal');
+  });
+});
+
+describe('resolveFireworksScreenAct', () => {
+  it('maps the authoritative active minute to Crown, Orbits, and Finale content', () => {
+    expect(resolveFireworksScreenAct(null)).toBe(0);
+    expect(resolveFireworksScreenAct({ phase: 'lead_in', activeMinute: 1 })).toBe(0);
+    expect(resolveFireworksScreenAct({ phase: 'active', activeMinute: 1 })).toBe(1);
+    expect(resolveFireworksScreenAct({ phase: 'active', activeMinute: 2 })).toBe(2);
+    expect(resolveFireworksScreenAct({ phase: 'active', activeMinute: 3 })).toBe(3);
+    expect(resolveFireworksScreenAct({ phase: 'recovery', activeMinute: 3 })).toBe(0);
   });
 });
 
@@ -64,7 +79,35 @@ describe('createStageVisualizer', () => {
     const visualizer = createStageVisualizer(scene, { getFrequencyData: zeroSource });
     expect(barMesh().thinInstanceCount).toBeGreaterThan(300);
     expect(scene.getMeshByName('main-stage-visualizer-backing') != null).toBe(true);
+    expect(scene.getMaterialByName('main-stage-visualizer-material')?.backFaceCulling).toBe(false);
     visualizer.dispose();
+  });
+
+  it('takes over the visible production screens only for countdown/active content and restores them', () => {
+    buildPanels();
+    const productionScreen = MeshBuilder.CreatePlane('main-stage-center-celestial-screen', { size: 1 }, scene);
+    const productionDecor = MeshBuilder.CreatePlane('main-stage-center-celestial-inset', { size: 0.8 }, scene);
+    productionDecor.metadata = { productionRole: 'screen-focal' };
+    const originalMaterial = scene.defaultMaterial;
+    productionScreen.material = originalMaterial;
+    const visualizer = createStageVisualizer(scene, { getFrequencyData: zeroSource });
+    const eventMaterial = scene.getMaterialByName('main-stage-visualizer-material');
+
+    expect(visualizer.eventScreens).toBe(1);
+    expect(productionScreen.material).toBe(originalMaterial);
+    visualizer.setEventState({ phase: 'lead_in', countdownSeconds: 5 });
+    expect(productionScreen.material).toBe(eventMaterial);
+    expect(productionDecor.isEnabled()).toBe(false);
+    visualizer.setEventState({ phase: 'active', activeMinute: 2 });
+    expect(productionScreen.material).toBe(eventMaterial);
+    visualizer.setEventState({ phase: 'recovery' });
+    expect(productionScreen.material).toBe(originalMaterial);
+    expect(productionDecor.isEnabled()).toBe(true);
+
+    visualizer.setEventState({ phase: 'active', activeMinute: 3 });
+    visualizer.dispose();
+    expect(productionScreen.material).toBe(originalMaterial);
+    expect(productionDecor.isEnabled()).toBe(true);
   });
 
   it('culls the 16-cell block on each flank blocking the VIP skydeck ramp landing', () => {
@@ -129,6 +172,23 @@ describe('createStageVisualizer', () => {
     // Back to normal.
     visualizer.setEventState(null);
     expect(() => visualizer.update(0.016)).not.toThrow();
+
+    visualizer.dispose();
+  });
+
+  it('switches the hero screen through all three dedicated fireworks acts and clears on recovery', () => {
+    buildPanels();
+    const visualizer = createStageVisualizer(scene, { getFrequencyData: zeroSource });
+
+    expect(visualizer.activeFireworksAct).toBe(0);
+    for (const act of [1, 2, 3] as const) {
+      visualizer.setEventState({ phase: 'active', activeMinute: act });
+      visualizer.update(0.016);
+      expect(visualizer.activeFireworksAct).toBe(act);
+    }
+    visualizer.setEventState({ phase: 'recovery' });
+    visualizer.update(0.016);
+    expect(visualizer.activeFireworksAct).toBe(0);
 
     visualizer.dispose();
   });

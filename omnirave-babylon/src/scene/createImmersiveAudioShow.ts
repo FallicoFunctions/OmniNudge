@@ -523,6 +523,7 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
   let coneSweepPhase = 0;
   let laserPhase = 0;
   let mode: StageVisualizerMode = 'normal';
+  let fireworksSkyOwned = false;
 
   // Phrase switching for the laser patterns.
   let phraseIndex = 0;
@@ -629,6 +630,11 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
       return;
     }
     setLayersEnabled(true);
+    // The fireworks shells and drone swarm own the event sky. Removing the
+    // dense laser mesh entirely during those three minutes avoids both visual
+    // occlusion and an unnecessary 560-instance draw while retaining the
+    // moving stage cones, floor pulse, and atmosphere.
+    beamMesh.setEnabled(!fireworksSkyOwned);
 
     // --- palette timeline ---
     if ((strongBurst && paletteJumpCooldown <= 0) || (active && paletteJumpCooldown <= 0 && bassEventAccum === 0)) {
@@ -677,7 +683,7 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     } else if (idle) {
       coneIntensity = CONE_IDLE_INTENSITY + 0.15 * (0.5 + 0.5 * Math.sin(elapsed * 0.8));
     } else {
-      const base = active ? 3.2 : CONE_BASE_INTENSITY;
+      const base = fireworksSkyOwned ? 1.15 : active ? 3.2 : CONE_BASE_INTENSITY;
       coneIntensity = (base + (CONE_PEAK_INTENSITY - base) * punchEnv) * flashMul;
     }
     coneMaterialA.emissiveIntensity = coneIntensity;
@@ -706,65 +712,69 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     const patternEnergy = idle ? 0.2 : Math.min(1, energyOverall + 0.2);
 
     // Global laser brightness (reactivity amplified, beat-flashed).
-    if (idle) {
+    if (fireworksSkyOwned) {
+      laserIntensityValue = 0;
+    } else if (idle) {
       laserIntensityValue = LASER_IDLE_INTENSITY;
     } else {
       const base = active ? 1.2 : 0.8;
       laserIntensityValue = (base + 1.4 * energyOverall + 1.5 * punchEnv) * flashMul;
     }
 
-    for (let e = 0; e < EMITTER_COUNT; e++) {
-      const em = emitters[e];
-      const sx = em.length;
-      for (let b = 0; b < BEAMS_PER_EMITTER; b++) {
-        const g = e * BEAMS_PER_EMITTER + b;
-        const off = patternFn(e, b, BEAMS_PER_EMITTER, laserPhase, patternEnergy);
-        // Base aim + pattern offset + low-amplitude organic drift + beat accent.
-        const yaw =
-          em.baseYaw +
-          off.yaw +
-          LASER_DRIFT_AMPLITUDE * organicDrift(em.seed + b * 0.21, driftPhase) +
-          0.04 * punchEnv * Math.sin(g);
-        const pitch =
-          em.basePitch +
-          off.pitch +
-          LASER_DRIFT_AMPLITUDE * organicDrift(em.seed * 1.3 + b * 0.17, driftPhase * 1.1) +
-          0.03 * punchEnv * Math.cos(g);
+    if (!fireworksSkyOwned) {
+      for (let e = 0; e < EMITTER_COUNT; e++) {
+        const em = emitters[e];
+        const sx = em.length;
+        for (let b = 0; b < BEAMS_PER_EMITTER; b++) {
+          const g = e * BEAMS_PER_EMITTER + b;
+          const off = patternFn(e, b, BEAMS_PER_EMITTER, laserPhase, patternEnergy);
+          // Base aim + pattern offset + low-amplitude organic drift + beat accent.
+          const yaw =
+            em.baseYaw +
+            off.yaw +
+            LASER_DRIFT_AMPLITUDE * organicDrift(em.seed + b * 0.21, driftPhase) +
+            0.04 * punchEnv * Math.sin(g);
+          const pitch =
+            em.basePitch +
+            off.pitch +
+            LASER_DRIFT_AMPLITUDE * organicDrift(em.seed * 1.3 + b * 0.17, driftPhase * 1.1) +
+            0.03 * punchEnv * Math.cos(g);
 
-        const cosy = Math.cos(yaw);
-        const siny = Math.sin(yaw);
-        const cosp = Math.cos(pitch);
-        const sinp = Math.sin(pitch);
-        const o = g * 16;
-        // R = RotY(yaw) * RotZ(pitch); local +x (length axis) scaled by sx.
-        beamMatrices[o + 0] = cosy * cosp * sx;
-        beamMatrices[o + 1] = sinp * sx;
-        beamMatrices[o + 2] = -siny * cosp * sx;
-        beamMatrices[o + 4] = -cosy * sinp;
-        beamMatrices[o + 5] = cosp;
-        beamMatrices[o + 6] = siny * sinp;
-        beamMatrices[o + 8] = siny;
-        beamMatrices[o + 9] = 0;
-        beamMatrices[o + 10] = cosy;
-        // translation (o+12..14) and o+15 are static (set at build time).
+          const cosy = Math.cos(yaw);
+          const siny = Math.sin(yaw);
+          const cosp = Math.cos(pitch);
+          const sinp = Math.sin(pitch);
+          const o = g * 16;
+          // R = RotY(yaw) * RotZ(pitch); local +x (length axis) scaled by sx.
+          beamMatrices[o + 0] = cosy * cosp * sx;
+          beamMatrices[o + 1] = sinp * sx;
+          beamMatrices[o + 2] = -siny * cosp * sx;
+          beamMatrices[o + 4] = -cosy * sinp;
+          beamMatrices[o + 5] = cosp;
+          beamMatrices[o + 6] = siny * sinp;
+          beamMatrices[o + 8] = siny;
+          beamMatrices[o + 9] = 0;
+          beamMatrices[o + 10] = cosy;
+          // translation (o+12..14) and o+15 are static (set at build time).
 
-        // Per-beam palette color from the LUT, varied across the fan.
-        const t01 = em.seed * 0.05 + (b / BEAMS_PER_EMITTER) * 0.6 + colorPhase;
-        const frac = t01 - Math.floor(t01);
-        let lutIdx = (frac * (PALETTE_LUT_SIZE - 1)) | 0;
-        if (lutIdx < 0) lutIdx = 0;
-        else if (lutIdx > PALETTE_LUT_SIZE - 1) lutIdx = PALETTE_LUT_SIZE - 1;
-        // Idle keeps only ~1/3 of the beams meaningfully lit (calm but alive).
-        const gate = idle ? (g % 3 === 0 ? 1 : 0.05) : 1;
-        const factor = laserIntensityValue * gate;
-        const co = g * 4;
-        beamColors[co + 0] = paletteLut[lutIdx * 3 + 0] * factor;
-        beamColors[co + 1] = paletteLut[lutIdx * 3 + 1] * factor;
-        beamColors[co + 2] = paletteLut[lutIdx * 3 + 2] * factor;
+          // Per-beam palette color from the LUT, varied across the fan.
+          const t01 = em.seed * 0.05 + (b / BEAMS_PER_EMITTER) * 0.6 + colorPhase;
+          const frac = t01 - Math.floor(t01);
+          let lutIdx = (frac * (PALETTE_LUT_SIZE - 1)) | 0;
+          if (lutIdx < 0) lutIdx = 0;
+          else if (lutIdx > PALETTE_LUT_SIZE - 1) lutIdx = PALETTE_LUT_SIZE - 1;
+          // Idle keeps only ~1/3 of the beams meaningfully lit (calm but alive).
+          const gate = idle ? (g % 3 === 0 ? 1 : 0.05) : 1;
+          const factor = laserIntensityValue * gate;
+          const co = g * 4;
+          beamColors[co + 0] = paletteLut[lutIdx * 3 + 0] * factor;
+          beamColors[co + 1] = paletteLut[lutIdx * 3 + 1] * factor;
+          beamColors[co + 2] = paletteLut[lutIdx * 3 + 2] * factor;
+        }
       }
+      beamMesh.thinInstanceBufferUpdated('matrix');
+      beamMesh.thinInstanceBufferUpdated('color');
     }
-    beamMesh.thinInstanceBufferUpdated('matrix');
-    beamMesh.thinInstanceBufferUpdated('color');
 
     // --- air particles ---
     if (idle) {
@@ -829,6 +839,8 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
         jumpPalette();
       }
       mode = next;
+      const minute = state?.activeMinute ?? 0;
+      fireworksSkyOwned = next === 'lead_in' || (next === 'active' && minute >= 1 && minute <= 3);
     },
     dispose() {
       airParticles.dispose();
