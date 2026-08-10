@@ -5,14 +5,13 @@ visual vertical slice, judged in-engine. This pack pairs each approved concept
 reference with a matched runtime capture and a short delta note, per
 `docs/guides/omnirave-venue-playtest-checklist.md`.
 
-Runtime captures were taken from the live scene (WebGL path — WebGPU canvases
-return blank `toDataURL`). Note: the WebGL path renders slightly richer than
-WebGPU — it keeps the rim/fill shaping lights and the key-light shadow map
-that the WebGPU path drops for its light-buffer budget — so in-engine WebGPU
-will look a touch flatter than these captures. Shots
-01–06 use the exact authored HUD checkpoint framings — the same views a player
-gets from the playtest HUD — so every capture is reproducible in-engine.
-07–08 are custom wide framings matched to the concept angles.
+Runtime captures were refreshed on 2026-08-09 from the production-default
+WebGPU path at 1280 × 720. Shots 01–06 use the exact authored HUD checkpoint
+framings—the same views a player gets from the playtest HUD—so every current
+capture is reproducible in-engine. The debug-only `capture=1` flag keeps those
+controls operable while making all DOM chrome transparent for clean browser
+screenshots. The older 07–08 custom wide images remain historical supplements,
+not part of this refreshed checkpoint pass.
 
 Note: of the five `approved-concept-*.png` files in
 `omnirave-web/src/assets/venues/main-stage/`, only three are unique —
@@ -26,29 +25,27 @@ byte-identical to `vip-view`. The pack carries the three unique references.
 | Spawn / Back Plaza | `approved-concept-spawn-view.png` | `runtime-01-spawn-reveal.png` | Approach, promenade mouth, lantern warmth, and wayfinding all present and readable. Concept's flanking UNDERGROUND booth and P.L.U.R.R. warehouse are **absent by design** — those are separate venues in later milestones, replaced here by the festival field and perimeter scatter. |
 | Midfield / Promenade | *(no direct reference — checklist area)* | `runtime-02-promenade-mid.png` | Promenade spine walkable end-to-end; signs (VIP TERRACE / CASCADE COURT / MAIN STAGE / WELCOME) read upright from player angles after the mirroring fix. |
 | Side routes / Cascade Court | `approved-concept-vip-view.png` (flank context) | `runtime-03-cascade-court.png` | Tiered cascade with moving water sheets, planting, lanterns in both flank pockets. Concept's flame towers do not exist; the cascades are the built replacement for the flank interest. |
-| Crowd pit / stage face | `approved-concept-primary.png` | `runtime-04-crowd-pit.png`, `runtime-07-stage-front-wide.png` | Hero LED panels beat-pulse with uv drift, spill lights crossfade magenta↔cyan, side LED tile fields alternate on half-beats. Concept shows a dense crowd and mid-air fireworks: **crowd NPCs are post-approval scope** (avatars/multiplayer milestone) and fireworks fire at route completion, not ambiently. |
+| Crowd pit / stage face | `approved-concept-primary.png` | `runtime-04-crowd-pit.png` | The visualizer is integrated into the authored proscenium instead of standing in the approach plaza. Its show layers stay silent when no track or scheduled event owns the stage, leaving the Crown readable. Fireworks fire at route completion rather than ambiently. |
 | Basin edge | *(checklist area)* | `runtime-05-basin-edge.png` | Reflecting water with motion; coping collision keeps players out of the wade-in seam. |
-| VIP read | `approved-concept-vip-view.png` | `runtime-06-vip-terrace.png`, `runtime-08-elevated-vip-wide.png` | **Fixed after the first pass flagged it dark.** Root cause: the authored VIP deck/ramp collision had unapplied transforms (collapsed to origin), so the checkpoint spawned the player mid-air and dropped them onto unlit ground. Now: the checkpoint lands on the ground forecourt, three warm gold lanterns per flank light it (via the practical-pool system), and the wing's gold sail canopy catches the lantern light overhead. The elevated terrace itself is view-only this milestone (its authored access ramp predates the basin layout and dead-ends inside a water blocker). |
+| VIP read | `approved-concept-vip-view.png` | `runtime-06-vip-terrace.png` | **Refreshed after the checkpoint and grade correction.** The checkpoint now lands grounded on the real procedural skydeck at y=8.6 rather than beneath its slab. Its authored camera looks across the avatar, deck, rails, and wing architecture from the open ramp side. Restrained pearl/gold response retains surface detail under the brighter night grade. |
 
 ## Known deltas held over (not blockers unless the user says so)
 
 - Concept art is painterly and denser than any runtime target: ambient fireworks,
   crowds, and fine gold filigree detail are stylistic ceiling, not milestone scope.
-- Sky: runtime has the baked starfield + moon; the user has reported the sky
-  still looks unchanged on their client after two server restarts (unresolved
-  client-cache suspicion, parked at user direction).
+- The historical custom wide shots 07–08 predate this WebGPU checkpoint refresh
+  and are retained only for comparison; they are not approval evidence for the
+  current pass.
 
 ## Fail-condition sweep (checklist)
 
 - Route: all 6 objectives walkable, completion fireworks + Play Again verified.
 - Collision: envelope fence, basin caps, promenade opened past the approach deck.
-- Flank access: the cascade-court blockers now hug the built water feature
-  instead of sealing the whole pocket, so the cascade plazas, flank fields,
-  and both VIP forecourts are reachable on foot (verified by collision
-  flood-fill from spawn; water and backstage volumes stay sealed). Walking
-  route to VIP: south field → strip between the crowd-pit fence and the
-  cascade court → corridor past the wing shell (|x| 30..34) → flank field →
-  forecourt.
+- Flank access: the cascade-court blockers hug the built water feature instead
+  of sealing the whole pocket. Both VIP skydecks have physical ramps from the
+  flank ground, walkable deck/landing collision, and perimeter/ramp rails;
+  water and backstage volumes stay sealed.
 - Signs: all four wayfinding labels verified upright/left-to-right in-engine.
-- Dev chrome: hidden by default; captures here used `?debug=1` for the HUD
-  travel buttons only (DOM overlay — never in canvas captures).
+- Dev chrome: hidden by default; captures here used `?debug=1&capture=1` so the
+  authored travel buttons remained operable while all DOM overlays rendered
+  transparent in the browser screenshots.
