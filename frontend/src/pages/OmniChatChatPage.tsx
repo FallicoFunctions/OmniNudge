@@ -181,6 +181,38 @@ function formatChatTimestamp(dateStr: string) {
   }
 }
 
+function formatElapsed(startedAt: string, now: number) {
+  const started = new Date(startedAt).getTime();
+  if (Number.isNaN(started)) return '';
+  const seconds = Math.max(0, Math.floor((now - started) / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+// Describe what the job is actually doing, not job.progress.
+//
+// progress is a poll counter: the queue adds five per poll and stops at ninety,
+// so it reaches the cap in about thirty seconds and then sits there for the
+// remaining ten-plus minutes of sampling. Users read a stalled 90% as a frozen
+// job -- and during testing so did we, repeatedly.
+//
+// A video job runs two provider phases against one row, and source_asset_id is
+// the exact moment the first finishes: it is written when the still is stored.
+// That is a real signal, so the label reports the phase and elapsed time and
+// says up front that animation takes minutes.
+function mediaJobProgressLabel(job: OmniChatGenerationJob, now: number) {
+  const elapsed = formatElapsed(job.started_at ?? job.created_at, now);
+  if (job.status === 'queued') {
+    return `Queued · ${elapsed}`;
+  }
+  if (job.kind !== 'video') {
+    return `Creating the photo · ${elapsed}`;
+  }
+  if (!job.source_asset_id) {
+    return `Step 1 of 2 · rendering the frame · ${elapsed}`;
+  }
+  return `Step 2 of 2 · animating, this takes several minutes · ${elapsed}`;
+}
+
 function getConversationPreview(preview: string | undefined, fallback: string) {
   const normalizedPreview = preview?.trim();
   if (!normalizedPreview) {
@@ -1035,6 +1067,20 @@ export default function OmniChatChatPage() {
     ),
     refetchInterval: 2000,
   });
+
+  // Drives the elapsed counter in the progress label. A render runs for many
+  // minutes with no server-side signal in between, so a moving clock is the
+  // only thing distinguishing "working" from "hung".
+  const mediaJobIsRunning = Boolean(
+    activeMediaJob && !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status)
+  );
+  const [mediaJobNow, setMediaJobNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!mediaJobIsRunning) return;
+    setMediaJobNow(Date.now());
+    const timer = window.setInterval(() => setMediaJobNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [mediaJobIsRunning]);
 
   useEffect(() => {
     const job = activeMediaJobQuery.data;
@@ -2525,8 +2571,8 @@ export default function OmniChatChatPage() {
                   {activeMediaJob &&
                     !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status) && (
                       <span className="flex items-center gap-1.5 text-xs text-blue-300/75">
-                        <Loader2 size={13} className="animate-spin" /> Creating{' '}
-                        {activeMediaJob.kind} · {activeMediaJob.progress}%
+                        <Loader2 size={13} className="animate-spin" />
+                        {mediaJobProgressLabel(activeMediaJob, mediaJobNow)}
                       </span>
                     )}
                   {activeMediaJob?.status === 'succeeded' && (
