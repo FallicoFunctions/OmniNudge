@@ -29,7 +29,7 @@ function logMissingTranslation(key: string, language: string | readonly string[]
   console.warn(`[i18n] Missing translation key "${key}" for language "${languageLabel}"`);
 }
 
-i18n
+export const i18nReady = i18n
   .use(HttpBackend) // Load translations from /locales
   .use(LanguageDetector) // Detect user language
   .use(initReactI18next) // Pass i18n instance to react-i18next
