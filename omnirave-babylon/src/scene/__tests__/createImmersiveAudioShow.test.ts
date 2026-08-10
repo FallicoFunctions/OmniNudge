@@ -51,7 +51,7 @@ describe('createImmersiveAudioShow', () => {
     show.dispose();
   });
 
-  it('yields the arrival sightline while silent and re-enables every layer for an event', () => {
+  it('yields the arrival sightline while silent and reserves the sky during the fireworks lead-in', () => {
     const show = createImmersiveAudioShow(scene, { getFrequencyData: zeroSource });
     show.update(0.016);
 
@@ -63,9 +63,32 @@ describe('createImmersiveAudioShow', () => {
     show.setEventState({ phase: 'lead_in', countdownSeconds: 10 });
     show.update(0.016);
 
-    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(true);
+    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(false);
     expect(scene.getMeshByName('immersive-beam-0')?.isEnabled()).toBe(true);
     expect(scene.getMeshByName('immersive-floor-pulse')?.isEnabled()).toBe(true);
+    expect(show.laserIntensity).toBe(0);
+
+    show.dispose();
+  });
+
+  it('yields the sky to fireworks and drones while keeping the supporting show active', () => {
+    const show = createImmersiveAudioShow(scene, { getFrequencyData: zeroSource });
+
+    show.setEventState({ phase: 'active', activeMinute: 2 });
+    show.update(0.016);
+
+    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('immersive-beam-0')?.isEnabled()).toBe(true);
+    expect(scene.getMeshByName('immersive-floor-pulse')?.isEnabled()).toBe(true);
+    expect(show.laserIntensity).toBe(0);
+
+    show.setEventState({ phase: 'recovery' });
+    show.update(0.016);
+    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(false);
+
+    show.setEventState({ phase: 'lead_in', countdownSeconds: 10 });
+    show.update(0.016);
+    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(false);
 
     show.dispose();
   });

@@ -61,6 +61,20 @@ const DEFAULT_HERO_SCREEN_MESH_NAMES = [
   'main-stage-hero-screen-panel-r',
 ] as const;
 
+// The visible production screens built into the authored stage. The legacy
+// hero panels above are only a venue sentinel/replaced backing; these are the
+// surfaces the crowd actually sees and therefore the correct event-content
+// recipients.
+const MAIN_STAGE_EVENT_SCREEN_NAMES = [
+  'main-stage-center-celestial-screen',
+  'main-stage-crown-oracle-screen',
+  'main-stage-wing-screen-left',
+  'main-stage-wing-screen-right',
+  'main-stage-front-fascia-screen',
+  'main-stage-front-callout-screen-left',
+  'main-stage-front-callout-screen-right',
+] as const;
+
 // Unit geometry: §13.3's Main Stage target, ~300ft wide x 100ft tall,
 // converted at 0.3048 m/ft. The authored crown's inner portal occupies
 // z=33.3..37.9, so the backing sits at z=36 and the reactive cells extrude
@@ -174,6 +188,7 @@ const TITLE_CARD_SECONDS = 6;
 const TITLE_CARD_FADE_SECONDS = 0.8;
 
 export type StageVisualizerMode = 'normal' | 'lead_in' | 'active';
+export type FireworksScreenAct = 0 | 1 | 2 | 3;
 
 export interface StageEventStateInput {
   phase: string;
@@ -221,6 +236,9 @@ export interface StageVisualizer {
   // Whether the fireworks VideoTexture is currently driving the screen
   // (always false when `fireworksVideoUrl` is absent or unusable).
   readonly isFireworksVideoActive: boolean;
+  /** 0 outside the show; 1 Crown, 2 Orbits, 3 OMNIRAVE finale. */
+  readonly activeFireworksAct: FireworksScreenAct;
+  readonly eventScreens: number;
 }
 
 // Pure mode mapping, split out so the mode switch is unit-testable without a
@@ -239,6 +257,19 @@ export function resolveVisualizerMode(state: StageEventStateInput | null | undef
   return 'normal';
 }
 
+export function resolveFireworksScreenAct(
+  state: StageEventStateInput | null | undefined,
+): FireworksScreenAct {
+  if (resolveVisualizerMode(state) !== 'active') {
+    return 0;
+  }
+  if (state?.activeMinute === 2) return 2;
+  if (state?.activeMinute === 3) return 3;
+  // Active snapshots should always carry 1..3. Defaulting a missing/unknown
+  // minute to Act I gives a deliberate screen instead of stale normal mode.
+  return 1;
+}
+
 const NOOP_VISUALIZER: StageVisualizer = {
   update() {},
   setEventState() {},
@@ -247,6 +278,8 @@ const NOOP_VISUALIZER: StageVisualizer = {
   panels: 0,
   isShowingTitleCard: false,
   isFireworksVideoActive: false,
+  activeFireworksAct: 0,
+  eventScreens: 0,
 };
 
 export function createStageVisualizer(scene: Scene, options: StageVisualizerOptions): StageVisualizer {
@@ -358,9 +391,41 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
   backingMaterial.metallic = 0;
   backingMaterial.roughness = 1;
   backingMaterial.disableLighting = true;
-  backingMaterial.backFaceCulling = true;
+  // The authored stage is viewed from negative Z, while CreatePlane winding
+  // can resolve to the opposite side across WebGL/WebGPU. This screen was
+  // silently disappearing from the crowd even though its DynamicTexture was
+  // updating. The five zero-thickness segments are display surfaces, not
+  // closed geometry, so rendering both faces is the correct contract.
+  backingMaterial.backFaceCulling = false;
   for (const segment of backingSegments) {
     segment.material = backingMaterial;
+  }
+
+  const eventScreens = MAIN_STAGE_EVENT_SCREEN_NAMES
+    .map((name) => scene.getMeshByName(name))
+    .filter((mesh): mesh is Mesh => mesh != null);
+  const eventScreenOriginalMaterials = eventScreens.map((mesh) => mesh.material);
+  // Screen bases are normally covered by translucent inset/halo/scanline
+  // treatment planes. Let those layers yield during event playback so the
+  // authored canvas reaches the audience, then restore their original state.
+  const eventScreenDecor = scene.meshes.filter((mesh) => {
+    const role = (mesh.metadata as { productionRole?: string } | null)?.productionRole;
+    return role === 'screen-focal' || role === 'screen-halo' || role === 'screen-scanline';
+  });
+  const eventScreenDecorOriginalEnabled = eventScreenDecor.map((mesh) => mesh.isEnabled(false));
+  let eventScreensOwned = false;
+
+  function setEventScreenOwnership(owned: boolean): void {
+    if (owned === eventScreensOwned) {
+      return;
+    }
+    eventScreensOwned = owned;
+    for (let i = 0; i < eventScreens.length; i++) {
+      eventScreens[i].material = owned ? backingMaterial : eventScreenOriginalMaterials[i];
+    }
+    for (let i = 0; i < eventScreenDecor.length; i++) {
+      eventScreenDecor[i].setEnabled(owned ? false : eventScreenDecorOriginalEnabled[i]);
+    }
   }
 
   // NullEngine / jsdom-without-canvas has no usable 2D context: the texture
@@ -470,6 +535,7 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
   let elapsed = 0;
   let mode: StageVisualizerMode = 'normal';
   let countdownSeconds = 0;
+  let fireworksAct: FireworksScreenAct = 0;
 
   // --- Track-start title card state ---------------------------------------
   let lastTrackId: string | null = null;
@@ -551,9 +617,20 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
         // Bars suppressed low so the countdown owns the moment.
         target = 0.06 + 0.04 * Math.sin(elapsed * 1.5 + c * 0.4);
       } else if (mode === 'active') {
-        // Slow celebratory wave rolling out from the center.
         const m = Math.abs(c - (COLUMN_COUNT - 1) / 2);
-        target = 0.45 + 0.35 * Math.sin(elapsed * 2.2 - m * 0.45);
+        if (fireworksAct === 1) {
+          // Five crown peaks echoed across the physical LED blocks.
+          const crownPhase = (c / (COLUMN_COUNT - 1)) * 5;
+          const crownPeak = 1 - Math.abs((crownPhase % 1) * 2 - 1);
+          target = 0.28 + crownPeak * 0.52 + 0.08 * Math.sin(elapsed * 2.4);
+        } else if (fireworksAct === 2) {
+          // Counter-rotating orbital waves converge at screen center.
+          target = 0.42 + 0.32 * Math.sin(elapsed * 2.5 - m * 0.5)
+            + 0.12 * Math.sin(elapsed * -1.7 - m * 0.28);
+        } else {
+          // Finale: nearly the full wall pulses behind the wordmark.
+          target = 0.72 + 0.2 * Math.sin(elapsed * 3.6 - m * 0.18);
+        }
       } else if (total === 0) {
         // Idle (no audio present, e.g. no world connection): gentle breathing
         // sweep so the unit never looks dead - clearly cheaper than the audio
@@ -689,27 +766,120 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     context.restore();
   }
 
-  function drawEventBranding(context: CanvasRenderingContext2D): void {
-    // §5.1.1 "special screen mode during the event... includes `Main Stage +
-    // OmniRave`". The actual fireworks visuals live in 3D space (the sky
-    // above the stage, via createFireworksShow) - this screen is the
-    // branding beat, not a video placeholder.
-    const hue = (elapsed * 40) % 360;
-    context.fillStyle = `hsl(${hue}, 70%, 12%)`;
-    context.fillRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+  function drawActLabel(context: CanvasRenderingContext2D, act: string, title: string): void {
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = '#29d3f0';
+    context.font = 'bold 27px sans-serif';
+    context.fillText(act, TEXTURE_WIDTH / 2, 35);
+    context.fillStyle = '#eafcff';
+    context.font = 'bold 42px sans-serif';
+    context.fillText(title, TEXTURE_WIDTH / 2, TEXTURE_HEIGHT - 34);
+  }
 
+  function drawCrownAct(context: CanvasRenderingContext2D): void {
+    context.fillStyle = '#090515';
+    context.fillRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+    const pulse = 0.9 + 0.1 * Math.sin(elapsed * 2.2);
+    context.save();
+    context.translate(TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.51);
+    context.scale(pulse, pulse);
+    context.strokeStyle = '#ffd66b';
+    context.lineWidth = 13;
+    context.lineJoin = 'round';
+    if ('shadowColor' in context) {
+      context.shadowColor = '#e92ad6';
+      context.shadowBlur = 34;
+    }
+    context.beginPath();
+    context.moveTo(-250, 80);
+    context.lineTo(-215, -35);
+    context.lineTo(-120, 30);
+    context.lineTo(0, -95);
+    context.lineTo(120, 30);
+    context.lineTo(215, -35);
+    context.lineTo(250, 80);
+    context.closePath();
+    context.stroke();
+    context.beginPath();
+    context.moveTo(-235, 66);
+    context.lineTo(235, 66);
+    context.stroke();
+    context.restore();
+    drawActLabel(context, 'ACT I', 'CELESTIAL CROWN');
+  }
+
+  function drawOrbitsAct(context: CanvasRenderingContext2D): void {
+    context.fillStyle = '#020c18';
+    context.fillRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+    context.save();
+    context.translate(TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.51);
+    if ('shadowColor' in context) {
+      context.shadowColor = '#29d3f0';
+      context.shadowBlur = 20;
+    }
+    for (let ring = 0; ring < 5; ring++) {
+      const angle = elapsed * (0.12 + ring * 0.025) + ring * 0.55;
+      context.save();
+      context.rotate(angle);
+      context.strokeStyle = ring % 2 === 0 ? '#29d3f0' : '#e92ad6';
+      context.lineWidth = 4 + (ring % 2) * 2;
+      context.beginPath();
+      context.ellipse(0, 0, 230 - ring * 18, 70 + ring * 9, ring * 0.32, 0, Math.PI * 2);
+      context.stroke();
+      const dotAngle = elapsed * (0.9 + ring * 0.08) + ring;
+      context.fillStyle = '#eafcff';
+      context.beginPath();
+      context.arc(Math.cos(dotAngle) * (230 - ring * 18), Math.sin(dotAngle) * (70 + ring * 9), 8, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+    }
+    context.fillStyle = '#ffd66b';
+    context.beginPath();
+    context.arc(0, 0, 19 + 3 * Math.sin(elapsed * 3), 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+    drawActLabel(context, 'ACT II', 'CELESTIAL ORBITS');
+  }
+
+  function drawFinaleAct(context: CanvasRenderingContext2D): void {
+    const hue = (elapsed * 34) % 360;
+    context.fillStyle = `hsl(${hue}, 68%, 8%)`;
+    context.fillRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+    context.save();
+    context.translate(TEXTURE_WIDTH / 2, TEXTURE_HEIGHT / 2);
+    for (let ring = 0; ring < 4; ring++) {
+      context.save();
+      context.rotate(elapsed * (ring % 2 === 0 ? 0.16 : -0.13) + ring * 0.35);
+      context.strokeStyle = ring % 2 === 0 ? '#29d3f0' : '#e92ad6';
+      context.lineWidth = 5;
+      context.globalAlpha = 0.62;
+      context.beginPath();
+      context.ellipse(0, 0, 360 - ring * 38, 125 - ring * 9, ring * 0.2, 0, Math.PI * 2);
+      context.stroke();
+      context.restore();
+    }
+    context.restore();
     context.fillStyle = '#eafcff';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.font = 'bold 90px sans-serif';
+    context.font = 'bold 116px sans-serif';
     if ('shadowColor' in context) {
-      context.shadowColor = `hsl(${hue}, 90%, 60%)`;
-      context.shadowBlur = 40;
+      context.shadowColor = '#29d3f0';
+      context.shadowBlur = 46;
     }
-    context.fillText('MAIN STAGE', TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.4);
-    context.font = 'bold 70px sans-serif';
-    context.fillStyle = '#29d3f0';
-    context.fillText('+ OMNIRAVE', TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.6);
+    context.fillText('OMNIRAVE', TEXTURE_WIDTH / 2, TEXTURE_HEIGHT * 0.52);
+    drawActLabel(context, 'ACT III', 'HALO FINALE');
+  }
+
+  function drawFireworksAct(context: CanvasRenderingContext2D): void {
+    if (fireworksAct === 2) {
+      drawOrbitsAct(context);
+    } else if (fireworksAct === 3) {
+      drawFinaleAct(context);
+    } else {
+      drawCrownAct(context);
+    }
   }
 
   // True only while the fireworks VideoTexture is actually backing the
@@ -760,7 +930,7 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     } else if (mode === 'active') {
       // No usable video (absent option or failed load): fall back to the
       // existing procedural branding exactly as before - zero regression.
-      drawEventBranding(offCtx);
+      drawFireworksAct(offCtx);
     } else if (titleCardRemaining > 0) {
       // Composes with the normal/lead_in/active dispatch above rather than
       // replacing it: the title card only ever pre-empts the ordinary
@@ -786,9 +956,17 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     get isFireworksVideoActive() {
       return fireworksVideoActive;
     },
+    get activeFireworksAct() {
+      return fireworksAct;
+    },
+    get eventScreens() {
+      return eventScreens.length;
+    },
     setEventState(state) {
       mode = resolveVisualizerMode(state);
+      fireworksAct = resolveFireworksScreenAct(state);
       countdownSeconds = state?.countdownSeconds ?? 0;
+      setEventScreenOwnership(mode === 'lead_in' || mode === 'active');
     },
     setTrackInfo(artist, title, trackId) {
       if (trackId === lastTrackId) {
@@ -811,6 +989,7 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
       paintBacking();
     },
     dispose() {
+      setEventScreenOwnership(false);
       barMesh.dispose();
       barMaterial.dispose();
       for (const segment of backingSegments) {

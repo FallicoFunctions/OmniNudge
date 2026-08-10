@@ -1,6 +1,7 @@
 import { MeshBuilder, NullEngine, Scene } from '@babylonjs/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { FireworksAudio } from '../../audio/createFireworksAudio';
 import { createFireworksShow } from '../createFireworksShow';
 
 describe('createFireworksShow', () => {
@@ -83,6 +84,41 @@ describe('createFireworksShow', () => {
     expect(show.stagePyroBurstCount).toBeGreaterThan(0);
 
     show.dispose();
+  });
+
+  it('sends one spatial audio cue for every rocket launch and visible apex explosion', () => {
+    const launches: Array<{ x: number; y: number; z: number }> = [];
+    const explosions: Array<{ x: number; y: number; z: number }> = [];
+    const audio: FireworksAudio = {
+      unlock: vi.fn(),
+      updateListener: vi.fn(),
+      playLaunch(position) {
+        launches.push({ ...position });
+      },
+      playExplosion(position) {
+        explosions.push({ ...position });
+      },
+      dispose: vi.fn(),
+    };
+    const show = createFireworksShow(scene, {
+      getFrequencyData: zeroSource,
+      audioFactory: () => audio,
+    });
+
+    show.unlockAudio();
+    expect(audio.unlock).toHaveBeenCalledOnce();
+    show.setEventState({ phase: 'active', activeMinute: 1 });
+    for (let i = 0; i < 120; i++) show.update(0.05);
+
+    expect(launches.length).toBe(show.launchAudioCueCount);
+    expect(explosions.length).toBe(show.explosionAudioCueCount);
+    expect(launches.length).toBeGreaterThan(0);
+    expect(explosions.length).toBe(show.aerialBurstCount);
+    expect(launches[0]).toMatchObject({ y: 6, z: 13 });
+    expect(explosions[0].y).toBeGreaterThanOrEqual(34);
+
+    show.dispose();
+    expect(audio.dispose).toHaveBeenCalledOnce();
   });
 
   it('minute 3 (bombastic) fires more aerial bursts than minute 1 (elegant) over the same duration', () => {

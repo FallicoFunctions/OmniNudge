@@ -95,4 +95,26 @@ describe('createReviewHud', () => {
 
     expect(onRestartRoute).toHaveBeenCalledTimes(1);
   });
+
+  it('offers debug-only controls for every fireworks preview act', () => {
+    const host = document.createElement('div');
+    const onPreviewFireworks = vi.fn();
+
+    createReviewHud(host, { onPreviewFireworks });
+
+    expect(host.querySelector('[aria-label="Fireworks preview"]')).not.toBeNull();
+    host.querySelector<HTMLButtonElement>('[data-fireworks-preview="countdown"]')?.click();
+    host.querySelector<HTMLButtonElement>('[data-fireworks-preview="minute-1"]')?.click();
+    host.querySelector<HTMLButtonElement>('[data-fireworks-preview="minute-2"]')?.click();
+    host.querySelector<HTMLButtonElement>('[data-fireworks-preview="minute-3"]')?.click();
+    host.querySelector<HTMLButtonElement>('[data-fireworks-preview="stop"]')?.click();
+
+    expect(onPreviewFireworks.mock.calls.map(([phase]) => phase)).toEqual([
+      'countdown',
+      'minute-1',
+      'minute-2',
+      'minute-3',
+      'stop',
+    ]);
+  });
 });

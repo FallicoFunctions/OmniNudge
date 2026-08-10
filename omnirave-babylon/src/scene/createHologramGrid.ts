@@ -202,7 +202,8 @@ const MUSIC_ENERGY_GAIN = 0.7;
 const MUSIC_PUNCH_GAIN = 1.0;
 const MAX_BRIGHTNESS = 2.2;
 const ACTIVE_BRIGHT_SCALE = 1.25;
-const LEAD_IN_BRIGHT_SCALE = 0.55;
+const LEAD_IN_BRIGHT_SCALE = 1.35;
+const COUNTDOWN_POINT_SCALE = 1.8;
 // Per-channel safety clamp: peaks bloom but never wash fully white.
 const CHANNEL_CAP = 1.8;
 
@@ -212,12 +213,23 @@ const CHANNEL_CAP = 1.8;
 // SNAP crisply rather than lazily drift, so they get their own tight tau
 // instead of the shape library's MORPH_TAU_SECONDS/SETTLE_TAU_SECONDS.
 const COUNTDOWN_TAU_SECONDS = 0.12;
-// "end of minute 1/3" drone-spelled OMNIRAVE beats (minute 2 is the parallel
-// firework-letter agent's beat - left alone here). Minute 3's wordmark reuses
-// SETTLE_TAU_SECONDS (the existing floaty-hold constant) rather than adding a
-// new tau just for this.
-const MINUTE3_SPREAD_SCALE = 1.06; // "bigger than the last": widen the spread a bit (still inside the 0.92 sampling margin, so it can't clip the volume)
-const MINUTE3_BRIGHT_SCALE = 1.35; // "bigger/brighter final" beat - MAX_BRIGHTNESS and CHANNEL_CAP below still clamp this, so it cannot white out
+// During the fireworks event the normal hourly cube/sphere/helix/wave loop is
+// replaced completely by a three-act drone show. Each act keeps the same
+// bounded point budget and thin-instance draw call as the standard loop.
+const FIREWORKS_MINUTE1_BRIGHT_SCALE = 1.12;
+const FIREWORKS_MINUTE2_BRIGHT_SCALE = 1.24;
+const FIREWORKS_MINUTE3_BRIGHT_SCALE = 1.4;
+const FINALE_WORDMARK_MIN_CHANNEL_PEAK = 1.05;
+const FIREWORKS_CROWN_LANES = 12;
+const FIREWORKS_ORBIT_RINGS = 6;
+// The regular hourly loop lives over the audience in the former V113 canopy
+// volume. During the scheduled show the swarm flies forward into clear
+// stage-front airspace. Keeping it ahead of the proscenium is essential: when
+// placed inside the stage shell, the Crown centerline and finale wordmark are
+// physically hidden by authored columns and screen housings.
+const FIREWORKS_SKY_CENTER_Y = 22;
+const FIREWORKS_SKY_Z = -6;
+const FIREWORKS_SKY_SPAN_X = 30;
 
 // --- Shape tuning ----------------------------------------------------------
 const SPHERE_RADIUS = 8.4; // fits the 20m-high volume with headroom
@@ -288,6 +300,12 @@ const VENUE_SENTINEL_MESH = 'main-stage-hero-screen-panel-l';
 const CANOPY_PLATE_PATTERN = /V113_CrownShell|V127_CrownScreen/;
 
 export type HologramShapeName = 'cube' | 'sphere' | 'helix' | 'wave' | 'wordmark';
+export type HologramFormationOverride =
+  | 'none'
+  | 'countdown'
+  | 'fireworks-crown'
+  | 'fireworks-orbit'
+  | 'fireworks-finale';
 
 export interface HologramGrid {
   update: (dtSeconds: number) => void;
@@ -313,11 +331,8 @@ export interface HologramGrid {
   readonly peakColorB: number;
   /** How many V113 canopy plate meshes this module hid (and will restore). */
   readonly hiddenPlateCount: number;
-  /** Which §5.1.1 formation override is bypassing the shape-library
-   *  sequencer THIS frame: 'countdown' during lead_in, 'wordmark' during the
-   *  active-minute 1/3 sky-write beats, 'none' otherwise (including active
-   *  minute 2, which is the parallel firework-letter agent's beat). */
-  readonly formationOverride: 'none' | 'countdown' | 'wordmark';
+  /** Which §5.1.1 formation override is bypassing the normal hourly loop. */
+  readonly formationOverride: HologramFormationOverride;
 }
 
 const NOOP_GRID: HologramGrid = {
@@ -495,11 +510,97 @@ const shapeCountdown: ShapeFn = (ctx, i, out) => {
   }
   const px = ctx.countdownPoints[i * 2];
   const py = ctx.countdownPoints[i * 2 + 1];
-  out.x = px;
-  out.y = py;
-  out.z = WORDMARK_Z + Math.sin(ctx.time * 1.2 + px * 0.25) * 0.5;
+  out.x = CENTER_X + (px - CENTER_X) * 0.9;
+  out.y = FIREWORKS_SKY_CENTER_Y + (py - CENTER_Y) * 0.95;
+  out.z = FIREWORKS_SKY_Z + Math.sin(ctx.time * 1.2 + px * 0.25) * 0.35;
   out.w = 1;
   out.hue = (px - VOLUME_MIN_X) / VOLUME_WIDTH;
+};
+
+// FIREWORKS ACT I — CELESTIAL CROWN. Eight lanes trace five asymmetric crown
+// peaks while four lanes form a luminous lower diadem. The slight depth split
+// makes it read as a volume from the crowd rather than a flat line drawing.
+const shapeFireworksCrown: ShapeFn = (ctx, i, out) => {
+  const lane = i % FIREWORKS_CROWN_LANES;
+  const sample = Math.floor(i / FIREWORKS_CROWN_LANES);
+  const sampleCount = Math.max(2, Math.ceil(ctx.count / FIREWORKS_CROWN_LANES));
+  const u = sample / (sampleCount - 1);
+  const x = CENTER_X - FIREWORKS_SKY_SPAN_X / 2 + u * FIREWORKS_SKY_SPAN_X;
+  const centers = [0.08, 0.29, 0.5, 0.71, 0.92] as const;
+  const heights = [4.8, 7.2, 10.8, 7.2, 4.8] as const;
+  let crownHeight = 0;
+  for (let peak = 0; peak < centers.length; peak++) {
+    const triangle = Math.max(0, 1 - Math.abs(u - centers[peak]) / 0.115);
+    crownHeight = Math.max(crownHeight, triangle * heights[peak]);
+  }
+  const breathing = Math.sin(ctx.time * 0.9 + u * Math.PI * 2) * (0.18 + ctx.bass * 0.35);
+  const isDiadem = lane >= 8;
+  out.x = x;
+  out.y = isDiadem
+    ? FIREWORKS_SKY_CENTER_Y - 7 + (lane - 8) * 0.42 + breathing * 0.35
+    : FIREWORKS_SKY_CENTER_Y - 5.8 + crownHeight + Math.floor(lane / 4) * 0.24 + breathing;
+  out.z = FIREWORKS_SKY_Z + ((lane % 4) - 1.5) * 0.42;
+  out.w = 1;
+  out.hue = u * 0.72 + (isDiadem ? 0.18 : 0);
+};
+
+// FIREWORKS ACT II — CELESTIAL ORBITS. Six independently tilted armillary
+// rings rotate around one shared core, giving the fireworks a purpose-built
+// constellation/drone interlude instead of falling back to the standard
+// hourly helix or wave formations.
+const shapeFireworksOrbit: ShapeFn = (ctx, i, out) => {
+  const ring = i % FIREWORKS_ORBIT_RINGS;
+  const sample = Math.floor(i / FIREWORKS_ORBIT_RINGS);
+  const sampleCount = Math.max(2, Math.ceil(ctx.count / FIREWORKS_ORBIT_RINGS));
+  const u = sample / (sampleCount - 1);
+  const theta = u * Math.PI * 2 + ctx.time * (0.32 + ring * 0.055) + ring * 0.7;
+  const radius = 6 + ring * 0.55 + ctx.mids * 0.5;
+  const tilt = -0.95 + ring * 0.38;
+  const yaw = ring * (Math.PI / FIREWORKS_ORBIT_RINGS) + ctx.time * 0.08;
+  const baseX = Math.cos(theta) * radius;
+  const baseY = Math.sin(theta) * radius;
+  const tiltedY = baseY * Math.cos(tilt);
+  const tiltedZ = baseY * Math.sin(tilt);
+  out.x = CENTER_X + baseX * Math.cos(yaw) + tiltedZ * Math.sin(yaw);
+  out.y = FIREWORKS_SKY_CENTER_Y + tiltedY;
+  out.z = FIREWORKS_SKY_Z - baseX * Math.sin(yaw) + tiltedZ * Math.cos(yaw);
+  out.w = 1;
+  out.hue = (u + ring / FIREWORKS_ORBIT_RINGS + ctx.time * 0.025) % 1;
+};
+
+// FIREWORKS ACT III — OMNIRAVE HALO FINALE. The sampled wordmark owns the
+// centre while every remaining drone forms rotating elliptical halos around
+// it. Headless environments without a 2D canvas still get a real crown finale
+// instead of silently reverting to the ordinary hourly loop.
+const shapeFireworksFinale: ShapeFn = (ctx, i, out) => {
+  const wordmarkBudget = Math.min(ctx.wordmarkCount, Math.floor(ctx.count * 0.7));
+  if (ctx.wordmark !== null && wordmarkBudget > 0 && i < wordmarkBudget) {
+    shapeWordmark(ctx, i, out);
+    // Float the title just ahead of the halo volume. This preserves real
+    // depth testing while keeping proscenium columns from slicing letters.
+    out.x = CENTER_X + (out.x - CENTER_X) * 0.55;
+    out.y = FIREWORKS_SKY_CENTER_Y - 6 + (out.y - CENTER_Y) * 0.65;
+    out.z = FIREWORKS_SKY_Z - 4 + Math.sin(ctx.time * 1.2 + out.x * 0.25) * 0.25;
+    // The letters share the frame with three dense halos, so give the actual
+    // title a deliberate luminance lead instead of letting it read as a dark
+    // pixel band against the stage shell.
+    out.w = 1.55;
+    return;
+  }
+  if (ctx.wordmark === null || wordmarkBudget === 0) {
+    shapeFireworksCrown(ctx, i, out);
+    return;
+  }
+  const haloIndex = i - wordmarkBudget;
+  const haloCount = Math.max(1, ctx.count - wordmarkBudget);
+  const ring = haloIndex % 3;
+  const u = Math.floor(haloIndex / 3) / Math.max(1, Math.ceil(haloCount / 3) - 1);
+  const angle = u * Math.PI * 2 + ctx.time * (0.2 + ring * 0.06) + ring * 0.8;
+  out.x = CENTER_X + Math.cos(angle) * (15 - ring * 1.1);
+  out.y = FIREWORKS_SKY_CENTER_Y + Math.sin(angle) * (7.6 - ring * 0.55);
+  out.z = FIREWORKS_SKY_Z + (ring - 1) * 0.8 + Math.sin(angle * 2 + ctx.time) * 0.35;
+  out.w = 0.82 + 0.18 * Math.sin(angle * 3 + ctx.time * 2);
+  out.hue = (u + ring * 0.2) % 1;
 };
 
 const SHAPE_ORDER: readonly HologramShapeName[] = ['cube', 'sphere', 'helix', 'wave', 'wordmark'];
@@ -670,6 +771,10 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
   material.alpha = 0.9;
   material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
   material.alphaMode = Constants.ALPHA_ADD;
+  // Additive light points must never occlude the scene (or one another).
+  // In particular, a black "off" thin instance contributes no color but
+  // would still punch a dark box into dense coplanar text if it wrote depth.
+  material.disableDepthWrite = true;
   material.backFaceCulling = false;
   point.material = material;
 
@@ -857,7 +962,7 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
   let peakColorRValue = 0;
   let peakColorGValue = 0;
   let peakColorBValue = 0;
-  let formationOverrideValue: 'none' | 'countdown' | 'wordmark' = 'none';
+  let formationOverrideValue: HologramFormationOverride = 'none';
   let ownsCanopyVolume = true;
 
   function setCanopyOwnership(owned: boolean): void {
@@ -978,18 +1083,35 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
       }
     }
 
-    // --- formation OVERRIDES (bypass the shape-library sequencer entirely) ---
-    // lead_in: the countdown formation IS the display, replacing the old
-    // generic converge-toward-centre behaviour. active minute 1/3: hold the
-    // drone-spelled OMNIRAVE wordmark (§5.1.1's "end of minute 1/3" sky-write
-    // beats; minute 2 is the parallel firework-letter agent's beat, left
-    // alone here - see resolveVisualizerMode/activeMinute above).
-    const forceWordmark = active && (activeMinute === 1 || activeMinute === 3);
-    const wordmarkBig = active && activeMinute === 3;
-    const overrideShape = leadIn ? shapeCountdown : forceWordmark ? shapeWordmark : null;
-    const overrideSpread = wordmarkBig ? MINUTE3_SPREAD_SCALE : 1;
-    const overrideBrightMult = wordmarkBig ? MINUTE3_BRIGHT_SCALE : 1;
-    formationOverrideValue = leadIn ? 'countdown' : forceWordmark ? 'wordmark' : 'none';
+    // --- formation OVERRIDES (bypass the hourly shape sequencer entirely) ---
+    const fireworksAct = active && activeMinute != null && activeMinute >= 1 && activeMinute <= 3
+      ? activeMinute
+      : 0;
+    const overrideShape = leadIn
+      ? shapeCountdown
+      : fireworksAct === 1
+        ? shapeFireworksCrown
+        : fireworksAct === 2
+          ? shapeFireworksOrbit
+          : fireworksAct === 3
+            ? shapeFireworksFinale
+            : null;
+    const overrideBrightMult = fireworksAct === 1
+      ? FIREWORKS_MINUTE1_BRIGHT_SCALE
+      : fireworksAct === 2
+        ? FIREWORKS_MINUTE2_BRIGHT_SCALE
+        : fireworksAct === 3
+          ? FIREWORKS_MINUTE3_BRIGHT_SCALE
+          : 1;
+    formationOverrideValue = leadIn
+      ? 'countdown'
+      : fireworksAct === 1
+        ? 'fireworks-crown'
+        : fireworksAct === 2
+          ? 'fireworks-orbit'
+          : fireworksAct === 3
+            ? 'fireworks-finale'
+            : 'none';
 
     // --- palette timeline (saturated core, then de-greyed) ---
     const colorPhase = elapsed * PALETTE_PHASE_SPEED;
@@ -1023,11 +1145,12 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     // Formation easing constant: faster while morphing so the 2.5s window
     // actually lands, slower once settled for a floaty hold. The countdown
     // gets its own tight tau so digits SNAP instead of lazily drifting; the
-    // minute 1/3 wordmark reuses the existing floaty settle tau.
+    // fireworks formations use the same responsive morph tau so switching
+    // acts at minute boundaries is intentional rather than sluggish.
     const easeTau = leadIn
       ? COUNTDOWN_TAU_SECONDS
-      : forceWordmark
-        ? SETTLE_TAU_SECONDS
+      : fireworksAct > 0
+        ? MORPH_TAU_SECONDS
         : morphing
           ? MORPH_TAU_SECONDS
           : SETTLE_TAU_SECONDS;
@@ -1039,7 +1162,7 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     shapeCtx.mids = mids;
     shapeCtx.highs = highs;
 
-    const pointScale = POINT_SIZE * (1 + 0.35 * punchEnv);
+    const pointScale = POINT_SIZE * (leadIn ? COUNTDOWN_POINT_SCALE : 1 + 0.35 * punchEnv);
     let peak = 0;
     let peakIdx = 0;
     let lit = 0;
@@ -1060,12 +1183,6 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
         tz = outB.z;
         tw = outB.w;
         thue = outB.hue;
-        if (overrideSpread !== 1 && tw > 0) {
-          // Minute 3: "bigger than the last" - widen the wordmark's spread
-          // about the volume centre (still inside the sampler's margin).
-          tx = CENTER_X + (tx - CENTER_X) * overrideSpread;
-          ty = CENTER_Y + (ty - CENTER_Y) * overrideSpread;
-        }
       } else {
         // Target = the incoming formation, crossfaded from the outgoing one.
         // Both are deterministic functions of the index, so the swarm morphs
@@ -1128,6 +1245,21 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
       let cr = paletteLut[lutIdx * 3 + 0] * bright;
       let cg = paletteLut[lutIdx * 3 + 1] * bright;
       let cb = paletteLut[lutIdx * 3 + 2] * bright;
+      const finaleWordmark = fireworksAct === 3
+        && shapeCtx.wordmark !== null
+        && i < Math.min(shapeCtx.wordmarkCount, Math.floor(POINT_COUNT * 0.7));
+      if (finaleWordmark) {
+        // Some palettes begin with deliberately deep stops. Preserve their
+        // hue, but normalize the title's strongest channel to a readable
+        // floor so OMNIRAVE never becomes the darkest element in its finale.
+        const channelPeak = Math.max(cr, cg, cb);
+        if (channelPeak > 1e-4 && channelPeak < FINALE_WORDMARK_MIN_CHANNEL_PEAK) {
+          const lift = FINALE_WORDMARK_MIN_CHANNEL_PEAK / channelPeak;
+          cr *= lift;
+          cg *= lift;
+          cb *= lift;
+        }
+      }
       if (cr > CHANNEL_CAP) cr = CHANNEL_CAP;
       if (cg > CHANNEL_CAP) cg = CHANNEL_CAP;
       if (cb > CHANNEL_CAP) cb = CHANNEL_CAP;

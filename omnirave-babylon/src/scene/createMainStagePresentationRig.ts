@@ -37,7 +37,7 @@ const ENVIRONMENT_TEXTURE_SIZE = 16;
 
 import type { PerfFlags } from '../app/perfFlags';
 
-const PERF_DEFAULTS: PerfFlags = { noShadows: false, noPost: false, minimalLights: false, webgl: false, debug: false, worldUrl: null, worldToken: null, accountMode: false };
+const PERF_DEFAULTS: PerfFlags = { noShadows: false, noPost: false, minimalLights: false, webgl: false, debug: false, capture: false, worldUrl: null, worldToken: null, accountMode: false };
 
 export function createMainStagePresentationRig(scene: Scene, camera: Camera, perfFlags: PerfFlags = PERF_DEFAULTS) {
   const environmentTexture = createEnvironmentTexture(scene);

@@ -9,6 +9,8 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import type { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import type { Scene } from '@babylonjs/core/scene';
 
+import { createFireworksAudio } from '../audio/createFireworksAudio';
+import type { FireworksAudio } from '../audio/createFireworksAudio';
 import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
 import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor } from './ravePalettes';
@@ -70,8 +72,8 @@ const AERIAL_LAUNCH_MOUNTS: MountPoint[] = [
   { x: 8, y: 6, z: 13 },
   { x: -32, y: 8, z: 7 },
   { x: 32, y: 8, z: 7 },
-  { x: -50, y: 10, z: 7 },
-  { x: 50, y: 10, z: 7 },
+  { x: -40, y: 10, z: 7 },
+  { x: 40, y: 10, z: 7 },
 ];
 
 // Stage-level pyro mounts: the same "stage front lip" anchor as
@@ -103,10 +105,10 @@ const BURST_CAPACITY = 220;
 const BURST_COOLDOWN_SECONDS = 0.12;
 const BURST_COUNT_ELEGANT = 55;
 const BURST_COUNT_BOMBASTIC = 170;
-const BURST_SIZE_MIN_ELEGANT = 0.45;
-const BURST_SIZE_MAX_ELEGANT = 0.85;
-const BURST_SIZE_MIN_BOMBASTIC = 0.6;
-const BURST_SIZE_MAX_BOMBASTIC = 1.3;
+const BURST_SIZE_MIN_ELEGANT = 0.75;
+const BURST_SIZE_MAX_ELEGANT = 1.35;
+const BURST_SIZE_MIN_BOMBASTIC = 1.25;
+const BURST_SIZE_MAX_BOMBASTIC = 2.5;
 
 // --- Sky-written OMNIRAVE (firework-letter half only; drones are a separate
 // module) ---------------------------------------------------------------------
@@ -123,7 +125,7 @@ const FONT_5X3: Record<string, readonly string[]> = {
   E: ['111', '100', '111', '100', '111'],
 };
 const SKY_WORD = 'OMNIRAVE';
-const SKY_WORD_Z = 40;
+const SKY_WORD_Z = 20;
 
 function buildWordPoints(word: string, colStep: number, centerY: number, z: number): MountPoint[] {
   const letterCols = 3;
@@ -155,22 +157,28 @@ function buildWordPoints(word: string, colStep: number, centerY: number, z: numb
 // Precomputed once at module load (pure + fixed): minute 2's firework-letter
 // spelling, and minute 3's bigger hybrid-firework half ("each bigger than the
 // last" per §5.1.1).
-const SKY_WORD_POINTS_MINUTE2 = buildWordPoints(SKY_WORD, 3.2, 60, SKY_WORD_Z);
-const SKY_WORD_POINTS_MINUTE3 = buildWordPoints(SKY_WORD, 4.3, 74, SKY_WORD_Z);
+const SKY_WORD_POINTS_MINUTE2 = buildWordPoints(SKY_WORD, 2.1, 45, SKY_WORD_Z);
+const SKY_WORD_POINTS_MINUTE3 = buildWordPoints(SKY_WORD, 2.55, 50, SKY_WORD_Z);
 const SKY_BURST_COUNT_MINUTE2 = 45;
 const SKY_BURST_COUNT_MINUTE3 = 85;
-const SKY_BURST_SIZE_MINUTE2: readonly [number, number] = [0.4, 0.7];
-const SKY_BURST_SIZE_MINUTE3: readonly [number, number] = [0.55, 1.0];
+const SKY_BURST_SIZE_MINUTE2: readonly [number, number] = [0.7, 1.15];
+const SKY_BURST_SIZE_MINUTE3: readonly [number, number] = [0.95, 1.7];
 
 export interface FireworksShowOptions {
   // Fills the passed array with the current byte frequency spectrum (same
   // closure as the stage visualizer / immersive show; zero-filled idle).
   getFrequencyData: (target: Uint8Array) => void;
+  // Test seam for the procedural HRTF sound engine. The production path uses
+  // createFireworksAudio; injected backends are still owned/disposed here.
+  audioFactory?: () => FireworksAudio;
 }
 
 export interface FireworksShow {
   update: (dtSeconds: number) => void;
   setEventState: (state: StageEventStateInput | null) => void;
+  // Called from the Enter OmniRave gesture (and debug preview buttons) so
+  // browser autoplay policy permits the spatial launch/explosion effects.
+  unlockAudio: () => void;
   dispose: () => void;
   // Rockets currently ascending (in flight, not yet exploded).
   readonly activeShellCount: number;
@@ -184,11 +192,16 @@ export interface FireworksShow {
   readonly skyWriteBurstCount: number;
   // 0 (minute 1, elegant) -> 1 (minute 3, bombastic) show-intensity ramp.
   readonly showIntensity01: number;
+  // Number of visual launch/explosion moments sent to the spatial audio
+  // engine. These count synchronized cues even if the browser remains muted.
+  readonly launchAudioCueCount: number;
+  readonly explosionAudioCueCount: number;
 }
 
 const NOOP_FIREWORKS_SHOW: FireworksShow = {
   update() {},
   setEventState() {},
+  unlockAudio() {},
   dispose() {},
   activeShellCount: 0,
   aerialBurstCount: 0,
@@ -196,6 +209,8 @@ const NOOP_FIREWORKS_SHOW: FireworksShow = {
   skyWriteActive: false,
   skyWriteBurstCount: 0,
   showIntensity01: 0,
+  launchAudioCueCount: 0,
+  explosionAudioCueCount: 0,
 };
 
 // Soft radial dot sprite shared by every particle system in this module -
@@ -258,6 +273,13 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
   }
 
   const sprite = tryCreateSoftDotSprite(scene);
+  const fireworksAudio = options.audioFactory?.() ?? createFireworksAudio();
+  // Reused listener vectors: camera.getForwardRay() allocates a Ray every
+  // frame, which is unnecessary for an effect that already runs continuously.
+  const listenerForwardAxis = Vector3.Forward();
+  const listenerUpAxis = Vector3.Up();
+  const listenerForward = new Vector3();
+  const listenerUp = new Vector3();
 
   // --- Palette state (bursts pick from the SATURATED core of whichever
   // palette is live) --------------------------------------------------------
@@ -459,6 +481,8 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
   let aerialBurstCountValue = 0;
   let stagePyroBurstCountValue = 0;
   let showIntensity01Value = 0;
+  let launchAudioCueCountValue = 0;
+  let explosionAudioCueCountValue = 0;
 
   // Minute 1 = elegant, minute 3 = full bombastic. The wire protocol only
   // gives us the integer activeMinute (not elapsed seconds within it), so
@@ -478,6 +502,14 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
     const showActive = mode === 'active' && activeMinute >= 1 && activeMinute <= 3;
     showIntensity01Value = computeShowIntensity(activeMinute);
     const bomb = showIntensity01Value;
+
+    const activeCamera = scene.activeCamera;
+    if (activeCamera) {
+      activeCamera.getDirectionToRef(listenerForwardAxis, listenerForward);
+      activeCamera.getDirectionToRef(listenerUpAxis, listenerUp);
+      const position = activeCamera.globalPosition;
+      fireworksAudio.updateListener(position, listenerForward, listenerUp);
+    }
 
     // --- cooldown clocks (cheap, run every frame regardless of phase) -------
     for (let i = 0; i < BURST_POOL_SIZE; i++) {
@@ -564,6 +596,8 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
           mesh.position.set(mount.x, mount.y, mount.z);
           mesh.setEnabled(true);
           rocketTrailSystems[freeSlot].emitRate = ROCKET_TRAIL_EMIT_RATE;
+          fireworksAudio.playLaunch(mount, 0.35 + bomb * 0.65);
+          launchAudioCueCountValue += 1;
         }
         rocketLaunchTimer = lerp(ROCKET_INTERVAL_ELEGANT_SECONDS, ROCKET_INTERVAL_BOMBASTIC_SECONDS, bomb);
       }
@@ -592,6 +626,11 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
         const sizeMax = lerp(BURST_SIZE_MAX_ELEGANT, BURST_SIZE_MAX_BOMBASTIC, bomb);
         if (fireBurst(rocketApexX[i], rocketApexY[i], rocketApexZ[i], count, sizeMin, sizeMax)) {
           aerialBurstCountValue += 1;
+          fireworksAudio.playExplosion(
+            { x: rocketApexX[i], y: rocketApexY[i], z: rocketApexZ[i] },
+            0.4 + bomb * 0.6,
+          );
+          explosionAudioCueCountValue += 1;
         }
       }
     }
@@ -618,6 +657,9 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
         previousActiveMinute = 0;
       }
     },
+    unlockAudio() {
+      fireworksAudio.unlock();
+    },
     dispose() {
       for (const system of burstSystems) {
         system.dispose();
@@ -634,6 +676,7 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
       }
       rocketGlowMaterial.dispose();
       sprite?.dispose();
+      fireworksAudio.dispose();
     },
     get activeShellCount() {
       let count = 0;
@@ -656,6 +699,12 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
     },
     get showIntensity01() {
       return showIntensity01Value;
+    },
+    get launchAudioCueCount() {
+      return launchAudioCueCountValue;
+    },
+    get explosionAudioCueCount() {
+      return explosionAudioCueCountValue;
     },
   };
 }
