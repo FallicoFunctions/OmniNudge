@@ -87,7 +87,7 @@ If a production-changing step fails after backup creation, the script prints the
 OmniRave deployment wiring is available as an opt-in path. A production rollout still depends on these host-level prerequisites:
 
 1. `ENABLE_OMNIRAVE_DEPLOY=1` to activate the extra build/upload/restart path in `scripts/deploy-on.sh`
-2. a remote runtime artifact directory such as `/var/www/omninudge/omnirave-web/dist`
+2. a remote runtime artifact directory such as `/var/www/omninudge/omnirave-babylon/dist`
 3. systemd units for `omnigame-api` and `omnirave-world`
 4. reverse-proxy routes for the dedicated runtime and world socket
 5. production `DATABASE_URL` / migration execution for OmniRave profile and sanction tables
@@ -97,7 +97,7 @@ Recommended OmniRave deploy environment:
 
 ```bash
 ENABLE_OMNIRAVE_DEPLOY=1
-OMNIRAVE_RUNTIME_REMOTE_PATH=/var/www/omninudge/omnirave-web
+OMNIRAVE_RUNTIME_REMOTE_PATH=/var/www/omninudge/omnirave-babylon
 OMNIGAME_API_SERVICE_NAME=omnigame-api
 OMNIRAVE_WORLD_SERVICE_NAME=omnirave-world
 OMNIGAME_API_HEALTH_URL=http://127.0.0.1:8091/health

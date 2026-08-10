@@ -4,10 +4,10 @@ This guide tracks the local service boundaries and commands for the current Omni
 
 ## Repo Shape
 
-The OmniRave implementation is split across four surfaces:
+The OmniRave implementation is split across four active surfaces:
 
 - `frontend/` for OmniNudge discovery and launch UI
-- `omnirave-web/` for the dedicated full-screen runtime
+- `omnirave-babylon/` for the dedicated full-screen Babylon.js runtime
 - `backend/cmd/omnigame-api/` for launch/bootstrap and persistence APIs
 - `backend/cmd/omnirave-world/` for the authoritative realtime world service
 
@@ -19,6 +19,22 @@ The OmniRave implementation is split across four surfaces:
 - OmniRave world socket/health: `http://localhost:8092`
 
 ## Bootstrap Commands
+
+### Recommended: complete playable stack
+
+From the repository root:
+
+```bash
+bash scripts/dev-omnirave-start.sh
+```
+
+This starts the main OmniNudge API, OmniGame API, OmniRave world service,
+Babylon runtime, and OmniNudge frontend. Open `http://localhost:5176`, navigate
+to **Games → OmniRave**, and click the single **Play** button. The site launches
+in account mode when signed in and guest mode otherwise. Stop everything with
+`bash scripts/dev-omnirave-stop.sh`.
+
+### Individual services
 
 Start the OmniGame API:
 
@@ -40,8 +56,8 @@ go run ./cmd/omnirave-world
 Start the dedicated runtime app:
 
 ```bash
-npm --prefix omnirave-web install
-npm --prefix omnirave-web run dev
+npm --prefix omnirave-babylon install
+npm --prefix omnirave-babylon run dev -- --host 127.0.0.1 --port 4173
 ```
 
 Start the main OmniNudge frontend:
@@ -71,8 +87,8 @@ go test ./internal/omnigame/... ./internal/omniraveworld/... -count=1
 Dedicated runtime tests and build:
 
 ```bash
-npm --prefix omnirave-web test -- --run src/lib/__tests__/session.test.ts src/lib/__tests__/zones.test.ts src/lib/__tests__/worldSocket.test.ts src/lib/__tests__/youtube.test.ts src/components/__tests__/TouchControls.test.tsx src/components/__tests__/LoadoutPanel.test.tsx
-npm --prefix omnirave-web run build
+npm --prefix omnirave-babylon test -- --run
+npm --prefix omnirave-babylon run build
 ```
 
 Browser-level launch and mobile verification:
@@ -101,4 +117,5 @@ npm run test:e2e -- tests/omnirave-mobile-unlock.spec.ts --project='Mobile Chrom
 - `omnirave-world` and `omnigame-api` now load the active curated stage setlists from Postgres whenever `DATABASE_URL` is set; otherwise they fall back to the built-in default setlists used by the tests and local smoke flows.
 - When Postgres-backed stage setlists are active, both services use the persisted setlist activation timestamp instead of their own process start time, so bootstrap media and the first world snapshot agree across separate restarts.
 - `scripts/deploy-on.sh` now supports an opt-in OmniRave deployment path behind `ENABLE_OMNIRAVE_DEPLOY=1`.
+- The deploy path builds and uploads only `omnirave-babylon`; `omnirave-web` is retained as legacy reference and is not part of startup or deployment.
 - The deploy path expects remote `omnigame-api` and `omnirave-world` systemd units plus a writable runtime artifact directory, and verifies `8091/health`, `8092/health`, and the runtime `index.html` on the server.

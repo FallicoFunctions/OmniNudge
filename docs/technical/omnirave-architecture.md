@@ -4,27 +4,27 @@
 
 OmniRave is split into three executable surfaces plus the existing OmniNudge discovery UI:
 
-- `frontend/`: discovery pages, launch buttons, and signed-in vs guest entry selection
+- `frontend/`: discovery pages and a single launch action that automatically uses the current OmniNudge authentication state
 - `backend/cmd/omnigame-api/`: launch handoff issuance, handoff exchange, signed-in profile persistence, and guest sanction checks
 - `backend/cmd/omnirave-world/`: authoritative world process that owns spawn rules, zone membership, and world snapshots
-- `omnirave-web/`: dedicated full-screen runtime that exchanges the launch handoff, consumes live world snapshots, and gates media playback behind explicit unlock on touch devices
+- `omnirave-babylon/`: sole full-screen runtime; it exchanges the launch handoff, renders Main Stage, consumes live world snapshots, and gates media playback behind explicit player interaction
 
 ## Launch Flow
 
-### Signed-in launch
+### Unified launch
 
 1. User opens `/games/omnirave` in the main OmniNudge frontend.
-2. If unauthenticated, the discovery UI triggers the OmniNudge login modal instead of attempting an account launch.
-3. If authenticated, the frontend posts `mode=account` to `POST /api/v1/omnigame/launch/omnirave`.
+2. The user clicks the single `Play` button. The frontend waits for OmniNudge's authentication state to finish loading, then selects `mode=account` for a signed-in user or `mode=guest` otherwise; there is no separate guest/account choice.
+3. The frontend posts the selected mode to `POST /api/v1/omnigame/launch/omnirave`.
 4. `omnigame-api` creates a short-lived in-memory launch session and returns a runtime URL containing `handoff` and `mode`.
-5. `omnirave-web` exchanges the `handoff` through `POST /api/v1/omnigame/session/exchange`.
-6. The exchange response returns player identity, current zone, zone media snapshots, world socket URL, a short-lived `worldSessionToken` for realtime bootstrap, and a short-lived OmniGame session token for signed-in runtime persistence writes.
+5. `omnirave-babylon` exchanges the `handoff` through `POST /api/v1/omnigame/session/exchange`.
+6. The exchange response returns player identity, current zone, zone media snapshots, world socket URL, and a short-lived `worldSessionToken` for realtime bootstrap. Signed-in launches also receive a short-lived OmniGame session token for runtime persistence writes.
 
 ### Guest launch
 
-1. User clicks `Launch as Guest`.
+1. A signed-out user clicks the same `Play` button, and the frontend automatically requests `mode=guest`.
 2. `omnigame-api` creates a guest launch session with a generated guest name.
-3. `omnirave-web` exchanges the guest handoff before the runtime starts.
+3. `omnirave-babylon` exchanges the guest handoff before the runtime starts.
 4. Guest sanctions are enforced during exchange, at the point where OmniRave issues the real runtime credentials, using both the one-time bootstrap token and an exchange-time guest network identity when available.
 
 ## Authority Boundaries
@@ -33,7 +33,7 @@ OmniRave is split into three executable surfaces plus the existing OmniNudge dis
 
 Owns:
 
-- signed-in vs guest launch bootstrap
+- account/guest launch bootstrap selected from the current site authentication state
 - one-time handoff exchange
 - signed-in OmniRave profile persistence
 - short-lived world-session token issuance for the realtime socket
@@ -73,7 +73,7 @@ When `DATABASE_URL` is configured, both `omnirave-world` and `omnigame-api` load
 
 ## Runtime Responsibilities
 
-`omnirave-web` currently handles:
+`omnirave-babylon` currently handles:
 
 - bootstrap exchange
 - live WebSocket world snapshot consumption
@@ -86,6 +86,9 @@ When `DATABASE_URL` is configured, both `omnirave-world` and `omnigame-api` load
 - touch shortcuts that route into authoritative zone moves
 - signed-in loadout editing through the exchanged OmniGame session token
 - automatic signed-in return-point writes from authoritative player positions
+
+`omnirave-web` is retired from local startup and production deployment. Its
+files remain only as historical implementation and concept-reference material.
 
 ## Persistence Model
 
