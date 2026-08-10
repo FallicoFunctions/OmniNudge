@@ -30,7 +30,7 @@ describe('omnigameService', () => {
     });
   });
 
-  it('posts the requested launch mode to the OmniGame launch endpoint', async () => {
+  it('sends the auth token with an account launch', async () => {
     libApiMocks.getStoredAuthToken.mockReturnValue('test-token');
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -38,7 +38,7 @@ describe('omnigameService', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await omnigameService.createOmniRaveLaunch('guest');
+    const result = await omnigameService.createOmniRaveLaunch('account');
 
     expect(fetchMock).toHaveBeenCalledWith('http://localhost:8091/api/v1/omnigame/launch/omnirave', {
       method: 'POST',
@@ -46,7 +46,7 @@ describe('omnigameService', () => {
         'Content-Type': 'application/json',
         Authorization: 'Bearer test-token',
       },
-      body: JSON.stringify({ mode: 'guest' }),
+      body: JSON.stringify({ mode: 'account' }),
     });
     expect(result).toEqual({ launch_url: 'http://localhost:4173/omnirave?handoff=test' });
   });

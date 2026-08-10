@@ -205,14 +205,10 @@
   "gameDetailPage": {
     "eyebrow": "OmniGame / OmniRave",
     "play": "Play",
-    "playGuest": "Play as Guest",
-    "signIn": "Sign In to Play",
     "playing": "Entering OmniRave...",
     "heroTitle": "Enter the room without any lobby shell.",
     "heroBody": "Play should feel immediate: black-in, live crowd, stage lights, and the room already moving.",
-    "accountHint": "Account launch will restore your return point.",
-    "guestHint": "Guests drop straight into Main Stage.",
-    "signInHint": "Sign in to restore your return point and loadout.",
+    "launchHint": "Signed-in players resume their account; everyone else enters as a guest.",
     "highlightsTitle": "What makes the room feel real",
     "launchError": "Unable to launch OmniRave right now."
   },

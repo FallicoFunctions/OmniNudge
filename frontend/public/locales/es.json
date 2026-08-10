@@ -205,14 +205,10 @@
   "gameDetailPage": {
     "eyebrow": "OmniGame / OmniRave",
     "play": "Jugar",
-    "playGuest": "Jugar como invitado",
-    "signIn": "Inicia sesión para jugar",
     "playing": "Entrando en OmniRave...",
     "heroTitle": "Entra a la sala sin ninguna pantalla intermedia.",
     "heroBody": "Jugar debe sentirse inmediato: fundido a negro, gente real, luces del escenario y la sala ya en movimiento.",
-    "accountHint": "El inicio con cuenta restaurará tu punto de regreso.",
-    "guestHint": "Los invitados entran directamente al Main Stage.",
-    "signInHint": "Inicia sesión para restaurar tu punto de regreso y tu equipamiento.",
+    "launchHint": "Los jugadores con sesión iniciada reanudan su cuenta; los demás entran como invitados.",
     "highlightsTitle": "Lo que hace que la sala se sienta real",
     "launchError": "No se pudo iniciar OmniRave en este momento."
   },
