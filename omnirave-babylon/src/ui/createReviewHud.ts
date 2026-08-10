@@ -1,12 +1,15 @@
 import type { AvatarColorway } from '../player/avatarColorways';
 import type { ReviewCheckpoint } from '../scene/reviewRouteData';
 
+export type FireworksPreviewAct = 'countdown' | 'minute-1' | 'minute-2' | 'minute-3' | 'stop';
+
 export interface CreateReviewHudOptions {
   avatarColorways?: readonly AvatarColorway[];
   checkpoints?: readonly ReviewCheckpoint[];
   onSelectAvatarColorway?: (colorway: AvatarColorway) => void;
   onSelectCheckpoint?: (checkpoint: ReviewCheckpoint) => void;
   onRestartRoute?: () => void;
+  onPreviewFireworks?: (act: FireworksPreviewAct) => void;
   selectedAvatarColorwayId?: string;
 }
 
@@ -67,6 +70,39 @@ export function createReviewHud(host: HTMLElement, options: CreateReviewHudOptio
     }
 
     hud.appendChild(avatarPicker);
+  }
+
+  if (options.onPreviewFireworks) {
+    const preview = document.createElement('div');
+    preview.className = 'review-hud__fireworks';
+    preview.setAttribute('role', 'group');
+    preview.setAttribute('aria-label', 'Fireworks preview');
+
+    const acts: readonly [FireworksPreviewAct, string][] = [
+      ['countdown', 'Countdown'],
+      ['minute-1', 'Crown'],
+      ['minute-2', 'Orbits'],
+      ['minute-3', 'Finale'],
+      ['stop', 'Stop'],
+    ];
+    const buttons: HTMLButtonElement[] = [];
+    for (const [act, label] of acts) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'review-hud__checkpoint';
+      button.dataset.fireworksPreview = act;
+      button.textContent = label;
+      button.ariaPressed = 'false';
+      button.addEventListener('click', () => {
+        for (const peer of buttons) {
+          peer.ariaPressed = String(peer === button && act !== 'stop');
+        }
+        options.onPreviewFireworks?.(act);
+      });
+      buttons.push(button);
+      preview.appendChild(button);
+    }
+    hud.appendChild(preview);
   }
 
   host.appendChild(hud);

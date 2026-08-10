@@ -11,6 +11,10 @@ export interface PerfFlags {
   minimalLights: boolean;
   webgl: boolean;
   debug: boolean;
+  // Approval-pack helper: when paired with ?debug=1, keep the review controls
+  // operable but visually transparent so browser screenshots contain only the
+  // rendered scene. Ignored outside debug mode.
+  capture: boolean;
   // World connection override: ?world=<ws url>&wtoken=<world session JWT>.
   // Both must be present to take effect. This is a local dev/review
   // shortcut ONLY - the real shipped launch flow hands off `?mode=&handoff=`
@@ -43,12 +47,15 @@ export function parsePerfFlags(search: string): PerfFlags {
   // also accepted so it composes with the other perf tokens on one query.
   const debugParam = params.get('debug');
 
+  const debug = tokens.has('debug') || debugParam === '1' || debugParam === '';
+
   return {
     noShadows: tokens.has('noshadows'),
     noPost: tokens.has('nopost'),
     minimalLights: tokens.has('minimallights'),
     webgl: tokens.has('webgl'),
-    debug: tokens.has('debug') || debugParam === '1' || debugParam === '',
+    debug,
+    capture: debug && params.get('capture') === '1',
     worldUrl: params.get('world'),
     worldToken: params.get('wtoken'),
     accountMode: params.get('acct') === '1',

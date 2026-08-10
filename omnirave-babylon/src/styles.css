@@ -356,6 +356,13 @@ body,
   z-index: 4;
 }
 
+/* Debug-only approval mode. The controls retain their layout and hit targets
+   so an automation pass can select authored checkpoints, while the resulting
+   browser capture contains the scene rather than development/player chrome. */
+.babylon-runtime-host--capture > :not(.babylon-render-canvas) {
+  opacity: 0 !important;
+}
+
 .enter-omnirave-overlay {
   left: 50%;
   top: 50%;
@@ -604,6 +611,25 @@ body,
   margin-top: 14px;
 }
 
+.review-hud__fireworks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(236, 193, 93, 0.24);
+}
+
+.review-hud__fireworks::before {
+  grid-column: 1 / -1;
+  content: "Fireworks Preview";
+  color: rgba(255, 248, 223, 0.76);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 .review-hud__checkpoint {
   border: 1px solid rgba(104, 216, 255, 0.42);
   border-radius: 999px;
@@ -632,6 +658,12 @@ body,
   border-color: rgba(103, 226, 176, 0.5);
   color: rgba(232, 251, 255, 0.72);
   background: rgba(20, 76, 62, 0.54);
+}
+
+.review-hud__checkpoint[aria-pressed="true"] {
+  border-color: rgba(236, 193, 93, 0.95);
+  color: #fff8df;
+  background: rgba(94, 55, 13, 0.82);
 }
 
 .review-hud__avatar-picker {

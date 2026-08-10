@@ -10,6 +10,7 @@ describe('parsePerfFlags', () => {
       minimalLights: false,
       webgl: false,
       debug: false,
+      capture: false,
       worldUrl: null,
       worldToken: null,
       accountMode: false,
@@ -23,6 +24,7 @@ describe('parsePerfFlags', () => {
       minimalLights: false,
       webgl: false,
       debug: false,
+      capture: false,
       worldUrl: null,
       worldToken: null,
       accountMode: false,
@@ -49,6 +51,11 @@ describe('parsePerfFlags', () => {
 
   it('ignores debug=0', () => {
     expect(parsePerfFlags('?debug=0').debug).toBe(false);
+  });
+
+  it('enables clean approval captures only alongside debug controls', () => {
+    expect(parsePerfFlags('?debug=1&capture=1').capture).toBe(true);
+    expect(parsePerfFlags('?capture=1').capture).toBe(false);
   });
 
   it('enables account mode via acct=1', () => {
