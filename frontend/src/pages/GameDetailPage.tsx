@@ -4,11 +4,10 @@ import { Navigate } from 'react-router-dom';
 import { PageShell } from '../components/common/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { omnigameService } from '../services/omnigameService';
-import type { OmniGameLaunchMode } from '../types/omnigame';
 
 export default function GameDetailPage() {
   const { t } = useTranslation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [isLaunching, setIsLaunching] = useState(false);
   const [launchError, setLaunchError] = useState('');
   const game = omnigameService.getGame('omnirave');
@@ -23,21 +22,17 @@ export default function GameDetailPage() {
     'from-[#12051d] via-[#401558] to-[#ffd35c]',
   ];
 
-  const handleLaunch = async (mode: OmniGameLaunchMode) => {
+  const handleLaunch = async () => {
     setIsLaunching(true);
     setLaunchError('');
 
     try {
-      const launch = await omnigameService.createOmniRaveLaunch(mode);
+      const launch = await omnigameService.createOmniRaveLaunch(isAuthenticated ? 'account' : 'guest');
       window.location.assign(launch.launch_url);
     } catch (error) {
       setLaunchError(error instanceof Error ? error.message : t('gameDetailPage.launchError'));
       setIsLaunching(false);
     }
-  };
-
-  const handleSignInLaunch = () => {
-    window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
   };
 
   return (
@@ -74,41 +69,15 @@ export default function GameDetailPage() {
                 </div>
 
                 <div className="space-y-4">
-                  {isAuthenticated ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => void handleLaunch('account')}
-                        disabled={isLaunching}
-                        className="inline-flex items-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isLaunching ? t('gameDetailPage.playing') : t('gameDetailPage.play')}
-                      </button>
-                      <p className="text-xs uppercase tracking-[0.25em] text-white/55">{t('gameDetailPage.accountHint')}</p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          onClick={() => void handleLaunch('guest')}
-                          disabled={isLaunching}
-                          className="inline-flex items-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {isLaunching ? t('gameDetailPage.playing') : t('gameDetailPage.playGuest')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleSignInLaunch}
-                          disabled={isLaunching}
-                          className="inline-flex items-center rounded-full border border-white/20 bg-white/12 px-6 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {t('gameDetailPage.signIn')}
-                        </button>
-                      </div>
-                      <p className="text-xs uppercase tracking-[0.25em] text-white/55">{t('gameDetailPage.signInHint')}</p>
-                    </>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => void handleLaunch()}
+                    disabled={isAuthLoading || isLaunching}
+                    className="inline-flex items-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isLaunching ? t('gameDetailPage.playing') : t('gameDetailPage.play')}
+                  </button>
+                  <p className="text-xs uppercase tracking-[0.25em] text-white/55">{t('gameDetailPage.launchHint')}</p>
                 </div>
               </div>
             </div>

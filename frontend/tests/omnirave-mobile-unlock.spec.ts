@@ -39,7 +39,7 @@ test('requires explicit mobile unlock before touch controls and stage audio path
   await page.goto('/games/omnirave');
   await expect(page.getByRole('heading', { name: 'OmniRave' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Play as Guest' }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
 
   await expect(page).toHaveURL(/\/omnirave-runtime-stub\?mode=guest&mobile=1$/);
   await expect(page.getByRole('heading', { name: 'OmniRave Runtime Stub' })).toBeVisible();
