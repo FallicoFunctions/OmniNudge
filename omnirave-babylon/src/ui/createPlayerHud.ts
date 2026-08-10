@@ -77,9 +77,10 @@ export function formatNowPlaying(artist: string, title: string): string {
   return cleanTitle || cleanArtist || NO_TRACK_LABEL;
 }
 
-// Elapsed plus REMAINING (negative-signed), e.g. "12:04 / -1:58:23". With no
-// known duration there is no remaining to show, so only the elapsed side is
-// rendered.
+// Elapsed plus an explicitly labelled REMAINING value, e.g.
+// "12:04 / 1:58:23 left". A bare negative timestamp looks like invalid media
+// metadata when the track has just started. With no known duration there is
+// no remaining value to show, so only the elapsed side is rendered.
 export function formatPlayerHudElapsedRemaining(
   elapsedSeconds: number,
   durationSeconds: number,
@@ -90,7 +91,7 @@ export function formatPlayerHudElapsedRemaining(
     return formatPlayerHudTime(rawElapsed);
   }
   const elapsed = Math.min(rawElapsed, duration);
-  return `${formatPlayerHudTime(elapsed)} / -${formatPlayerHudTime(duration - elapsed)}`;
+  return `${formatPlayerHudTime(elapsed)} / ${formatPlayerHudTime(duration - elapsed)} left`;
 }
 
 // Community labels, verbatim from sec 9.4. Unknown zones fall back to a

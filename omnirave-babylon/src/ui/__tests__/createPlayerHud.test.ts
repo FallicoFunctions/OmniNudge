@@ -44,16 +44,16 @@ describe('formatPlayerHudTime', () => {
 });
 
 describe('formatPlayerHudElapsedRemaining', () => {
-  it('renders elapsed plus negative remaining', () => {
-    expect(formatPlayerHudElapsedRemaining(724, 7827)).toBe('12:04 / -1:58:23');
+  it('renders elapsed plus an explicit remaining-time label', () => {
+    expect(formatPlayerHudElapsedRemaining(724, 7827)).toBe('12:04 / 1:58:23 left');
   });
 
   it('renders a zero remaining at the end of the track', () => {
-    expect(formatPlayerHudElapsedRemaining(7827, 7827)).toBe('2:10:27 / -0:00');
+    expect(formatPlayerHudElapsedRemaining(7827, 7827)).toBe('2:10:27 / 0:00 left');
   });
 
   it('clamps elapsed past the duration', () => {
-    expect(formatPlayerHudElapsedRemaining(9000, 7827)).toBe('2:10:27 / -0:00');
+    expect(formatPlayerHudElapsedRemaining(9000, 7827)).toBe('2:10:27 / 0:00 left');
   });
 
   it('drops the remaining side when the duration is unknown', () => {
@@ -122,7 +122,7 @@ describe('createPlayerHud', () => {
       "Fallico - Nick's Mix Vol. 13",
     );
     expect(host.querySelector('[data-testid="player-hud-time"]')?.textContent).toBe(
-      '12:04 / -1:58:23',
+      '12:04 / 1:58:23 left',
     );
   });
 
@@ -148,7 +148,7 @@ describe('createPlayerHud', () => {
       'OmniRave - Techno Room Set 01',
     );
     expect(host.querySelector('[data-testid="player-hud-time"]')?.textContent).toBe(
-      '1:01 / -22:59',
+      '1:01 / 22:59 left',
     );
   });
 
