@@ -97,18 +97,21 @@ const ROCKET_INTERVAL_BOMBASTIC_SECONDS = 0.35;
 const ROCKET_ASCEND_ELEGANT_SECONDS = 2.6;
 const ROCKET_ASCEND_BOMBASTIC_SECONDS = 1.3;
 const ROCKET_APEX_Y_MIN = 34;
-const ROCKET_APEX_Y_MAX = 52;
+const ROCKET_APEX_Y_MAX = 54;
+const ROCKET_APEX_X_OFFSETS = [-18, 16, -28, 28, -12, 12, 22] as const;
+const ROCKET_APEX_X_LIMIT = 38;
 
 // --- Radial burst pool --------------------------------------------------------
 const BURST_POOL_SIZE = 12;
-const BURST_CAPACITY = 220;
+const BURST_CAPACITY = 520;
 const BURST_COOLDOWN_SECONDS = 0.12;
-const BURST_COUNT_ELEGANT = 55;
-const BURST_COUNT_BOMBASTIC = 170;
-const BURST_SIZE_MIN_ELEGANT = 0.75;
+const BURST_COUNT_ELEGANT = 170;
+const BURST_COUNT_BOMBASTIC = 440;
+const BURST_SIZE_MIN_ELEGANT = 0.85;
 const BURST_SIZE_MAX_ELEGANT = 1.35;
-const BURST_SIZE_MIN_BOMBASTIC = 1.25;
-const BURST_SIZE_MAX_BOMBASTIC = 2.5;
+const BURST_SIZE_MIN_BOMBASTIC = 1.05;
+const BURST_SIZE_MAX_BOMBASTIC = 1.75;
+const BURST_FLASH_SECONDS = 0.42;
 
 // --- Sky-written OMNIRAVE (firework-letter half only; drones are a separate
 // module) ---------------------------------------------------------------------
@@ -213,20 +216,24 @@ const NOOP_FIREWORKS_SHOW: FireworksShow = {
   explosionAudioCueCount: 0,
 };
 
-// Soft radial dot sprite shared by every particle system in this module -
-// null-safe RawTexture (NullEngine tolerant). Same idiom as
-// createStageAtmospherics' tryCreateSoftDotSprite.
-function tryCreateSoftDotSprite(scene: Scene): RawTexture | null {
+// Crisp spark sprite shared by every particle system in this module. A solid
+// core survives the venue's broad bloom pass, while the short high-order
+// falloff still supplies a controlled halo instead of turning each shell into
+// a soft, low-contrast cloud.
+function tryCreateSparkSprite(scene: Scene): RawTexture | null {
   let texture: RawTexture | null = null;
   try {
-    const size = 32;
+    const size = 64;
     const data = new Uint8Array(size * size * 4);
     const center = (size - 1) / 2;
     const radius = size / 2;
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const distance = Math.min(1, Math.hypot(x - center, y - center) / radius);
-        const alpha = Math.round(255 * Math.pow(1 - distance, 2));
+        const alpha01 = distance <= 0.18
+          ? 1
+          : Math.pow(Math.max(0, 1 - (distance - 0.18) / 0.82), 4.5);
+        const alpha = Math.round(255 * alpha01);
         const idx = (y * size + x) * 4;
         data[idx + 0] = 255;
         data[idx + 1] = 255;
@@ -234,15 +241,18 @@ function tryCreateSoftDotSprite(scene: Scene): RawTexture | null {
         data[idx + 3] = alpha;
       }
     }
-    texture = RawTexture.CreateRGBATexture(data, size, size, scene, true, false, Texture.TRILINEAR_SAMPLINGMODE);
-    texture.name = 'fireworks-sprite';
+    // No mip chain: distant mip levels reintroduce the soft blob the hard
+    // alpha profile is designed to avoid. Bilinear filtering keeps motion
+    // stable without smearing the core across several texels.
+    texture = RawTexture.CreateRGBATexture(data, size, size, scene, false, false, Texture.BILINEAR_SAMPLINGMODE);
+    texture.name = 'fireworks-crisp-spark-sprite';
     texture.hasAlpha = true;
     texture.wrapU = Texture.CLAMP_ADDRESSMODE;
     texture.wrapV = Texture.CLAMP_ADDRESSMODE;
     return texture;
   } catch (error) {
     texture?.dispose();
-    console.warn('[createFireworksShow] soft-dot sprite unavailable', error);
+    console.warn('[createFireworksShow] crisp spark sprite unavailable', error);
     return null;
   }
 }
@@ -272,7 +282,7 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
     return NOOP_FIREWORKS_SHOW;
   }
 
-  const sprite = tryCreateSoftDotSprite(scene);
+  const sprite = tryCreateSparkSprite(scene);
   const fireworksAudio = options.audioFactory?.() ?? createFireworksAudio();
   // Reused listener vectors: camera.getForwardRay() allocates a Ray every
   // frame, which is unnecessary for an effect that already runs continuously.
@@ -301,7 +311,12 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
 
   // --- Radial burst pool ----------------------------------------------------
   const burstSystems: ParticleSystem[] = [];
+  const burstCoreSystems: ParticleSystem[] = [];
   const burstEmitterPositions: Vector3[] = [];
+  const burstFlashMeshes: Mesh[] = [];
+  const burstFlashMaterials: PBRMaterial[] = [];
+  const burstFlashTimers = new Float32Array(BURST_POOL_SIZE);
+  const burstFlashBaseScales = new Float32Array(BURST_POOL_SIZE);
   for (let i = 0; i < BURST_POOL_SIZE; i++) {
     const pos = new Vector3(0, 0, 0);
     const burst = new ParticleSystem(`fireworks-burst-${i}`, BURST_CAPACITY, scene);
@@ -309,23 +324,83 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
     burst.emitter = pos;
     burst.minEmitBox = new Vector3(0, 0, 0);
     burst.maxEmitBox = new Vector3(0, 0, 0);
-    burst.direction1 = new Vector3(-1, -0.2, -1);
-    burst.direction2 = new Vector3(1, 1, 1);
-    burst.minEmitPower = 6;
-    burst.maxEmitPower = 14;
-    burst.minLifeTime = 0.9;
-    burst.maxLifeTime = 1.6;
+    // A tiny sphere emitter gives every spark a true radial heading. The
+    // stretched billboard follows that velocity, producing clean firework
+    // streaks rather than unrelated blurry discs.
+    burst.createSphereEmitter(0.04, 1);
+    burst.minEmitPower = 24;
+    burst.maxEmitPower = 48;
+    burst.minLifeTime = 1.8;
+    burst.maxLifeTime = 3.2;
     burst.minSize = 0.5;
     burst.maxSize = 1;
-    burst.gravity = new Vector3(0, -6, 0);
+    burst.minScaleX = 0.58;
+    burst.maxScaleX = 0.82;
+    burst.minScaleY = 2.4;
+    burst.maxScaleY = 4.2;
+    burst.billboardMode = ParticleSystem.BILLBOARDMODE_STRETCHED;
+    burst.gravity = new Vector3(0, -4.2, 0);
     burst.emitRate = 0; // manual bursts only
     burst.blendMode = ParticleSystem.BLENDMODE_ADD;
-    burst.color1 = new Color4(1, 1, 1, 0.95);
-    burst.color2 = new Color4(1, 1, 1, 0.8);
+    burst.color1 = new Color4(1, 1, 1, 1);
+    burst.color2 = new Color4(1, 1, 1, 0.95);
     burst.colorDead = new Color4(1, 1, 1, 0);
+    burst.addSizeGradient(0, 0.72);
+    burst.addSizeGradient(0.08, 1);
+    burst.addSizeGradient(0.72, 0.78);
+    burst.addSizeGradient(1, 0.08);
     burst.start();
     burstSystems.push(burst);
     burstEmitterPositions.push(pos);
+
+    // A second, narrower white-hot pass gives each colored streak a readable
+    // center at distance. It is intentionally short-lived and low-count, so
+    // the palette still owns the shell instead of washing it into white.
+    const core = new ParticleSystem(`fireworks-burst-core-${i}`, 260, scene);
+    core.particleTexture = sprite;
+    core.emitter = pos;
+    core.createSphereEmitter(0.04, 1);
+    core.minEmitPower = 22;
+    core.maxEmitPower = 43;
+    core.minLifeTime = 1.15;
+    core.maxLifeTime = 2;
+    core.minSize = 0.65;
+    core.maxSize = 1.05;
+    core.minScaleX = 0.35;
+    core.maxScaleX = 0.5;
+    core.minScaleY = 3.2;
+    core.maxScaleY = 5.4;
+    core.billboardMode = ParticleSystem.BILLBOARDMODE_STRETCHED;
+    core.gravity = new Vector3(0, -3.8, 0);
+    core.emitRate = 0;
+    core.blendMode = ParticleSystem.BLENDMODE_ADD;
+    core.color1 = new Color4(1, 1, 1, 1);
+    core.color2 = new Color4(1, 0.96, 0.88, 1);
+    core.colorDead = new Color4(1, 0.72, 0.45, 0);
+    core.addSizeGradient(0, 0.8);
+    core.addSizeGradient(0.08, 1);
+    core.addSizeGradient(0.72, 0.68);
+    core.addSizeGradient(1, 0.05);
+    core.start();
+    burstCoreSystems.push(core);
+
+    const flashMaterial = createGlowMaterial(
+      scene,
+      `fireworks-burst-flash-material-${i}`,
+      new Color3(1, 1, 1),
+      12,
+    );
+    flashMaterial.alpha = 0;
+    const flash = MeshBuilder.CreateSphere(
+      `fireworks-burst-flash-${i}`,
+      { diameter: 1, segments: 8 },
+      scene,
+    );
+    flash.material = flashMaterial;
+    flash.isPickable = false;
+    flash.setEnabled(false);
+    burstFlashMaterials.push(flashMaterial);
+    burstFlashMeshes.push(flash);
   }
   const burstCooldowns = new Float32Array(BURST_POOL_SIZE);
   let burstNextIndex = 0;
@@ -341,14 +416,37 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
         system.maxSize = sizeMax;
         paletteSampleT = (paletteSampleT + 0.31) % 1;
         sampleCurrentPalette(paletteSampleT, 0, paletteScratch);
-        system.color1.set(paletteScratch.r, paletteScratch.g, paletteScratch.b, 0.95);
-        system.color2.set(
-          Math.min(1, paletteScratch.r + 0.15),
-          Math.min(1, paletteScratch.g + 0.15),
-          Math.min(1, paletteScratch.b + 0.15),
-          0.75,
+        const peak = Math.max(0.001, paletteScratch.r, paletteScratch.g, paletteScratch.b);
+        const vividR = paletteScratch.r / peak;
+        const vividG = paletteScratch.g / peak;
+        const vividB = paletteScratch.b / peak;
+        system.color1.set(
+          vividR * 0.68 + 0.32,
+          vividG * 0.68 + 0.32,
+          vividB * 0.68 + 0.32,
+          1,
         );
+        system.color2.set(
+          vividR,
+          vividG,
+          vividB,
+          1,
+        );
+        const flashMaterial = burstFlashMaterials[idx];
+        flashMaterial.emissiveColor.set(
+          vividR * 0.75 + 0.25,
+          vividG * 0.75 + 0.25,
+          vividB * 0.75 + 0.25,
+        );
+        flashMaterial.alpha = 1;
+        const flash = burstFlashMeshes[idx];
+        flash.position.set(x, y, z);
+        burstFlashBaseScales[idx] = Math.max(3.2, sizeMax * 3.6);
+        flash.scaling.setAll(burstFlashBaseScales[idx] * 0.65);
+        flash.setEnabled(true);
+        burstFlashTimers[idx] = BURST_FLASH_SECONDS;
         system.manualEmitCount = count;
+        burstCoreSystems[idx].manualEmitCount = Math.round(count * 0.42);
         burstCooldowns[idx] = BURST_COOLDOWN_SECONDS;
         burstNextIndex = (idx + 1) % BURST_POOL_SIZE;
         return true;
@@ -514,6 +612,15 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
     // --- cooldown clocks (cheap, run every frame regardless of phase) -------
     for (let i = 0; i < BURST_POOL_SIZE; i++) {
       burstCooldowns[i] = Math.max(0, burstCooldowns[i] - dt);
+      if (burstFlashTimers[i] > 0) {
+        burstFlashTimers[i] = Math.max(0, burstFlashTimers[i] - dt);
+        const life = burstFlashTimers[i] / BURST_FLASH_SECONDS;
+        burstFlashMaterials[i].alpha = life * life;
+        burstFlashMeshes[i].scaling.setAll(burstFlashBaseScales[i] * (1.35 - life * 0.7));
+        if (burstFlashTimers[i] === 0) {
+          burstFlashMeshes[i].setEnabled(false);
+        }
+      }
     }
     if (punchPyroCooldown > 0) {
       punchPyroCooldown = Math.max(0, punchPyroCooldown - dt);
@@ -589,9 +696,13 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
           rocketStartX[freeSlot] = mount.x;
           rocketStartY[freeSlot] = mount.y;
           rocketStartZ[freeSlot] = mount.z;
-          rocketApexX[freeSlot] = mount.x + (paletteSampleT - 0.5) * 4;
+          const apexOffset = ROCKET_APEX_X_OFFSETS[(rocketNextMountIndex - 1) % ROCKET_APEX_X_OFFSETS.length];
+          rocketApexX[freeSlot] = Math.max(
+            -ROCKET_APEX_X_LIMIT,
+            Math.min(ROCKET_APEX_X_LIMIT, mount.x + apexOffset * lerp(0.65, 1, bomb)),
+          );
           rocketApexY[freeSlot] = lerp(ROCKET_APEX_Y_MIN, ROCKET_APEX_Y_MAX, (rocketNextMountIndex % 5) / 4);
-          rocketApexZ[freeSlot] = mount.z + 6;
+          rocketApexZ[freeSlot] = mount.z + lerp(8, 14, bomb);
           const mesh = rocketMeshes[freeSlot];
           mesh.position.set(mount.x, mount.y, mount.z);
           mesh.setEnabled(true);
@@ -663,6 +774,15 @@ export function createFireworksShow(scene: Scene, options: FireworksShowOptions)
     dispose() {
       for (const system of burstSystems) {
         system.dispose();
+      }
+      for (const core of burstCoreSystems) {
+        core.dispose();
+      }
+      for (const flash of burstFlashMeshes) {
+        flash.dispose(false, false);
+      }
+      for (const material of burstFlashMaterials) {
+        material.dispose();
       }
       for (const trail of rocketTrailSystems) {
         trail.dispose();

@@ -1,4 +1,4 @@
-import { MeshBuilder, NullEngine, Scene } from '@babylonjs/core';
+import { MeshBuilder, NullEngine, ParticleSystem, Scene } from '@babylonjs/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { FireworksAudio } from '../../audio/createFireworksAudio';
@@ -38,10 +38,33 @@ describe('createFireworksShow', () => {
     const show = createFireworksShow(scene, { getFrequencyData: zeroSource });
 
     expect(scene.meshes.filter((m) => m.name.startsWith('fireworks-rocket-')).length).toBe(8);
-    // 12 burst + 8 rocket-trail + 4 stage-pyro particle systems.
-    expect(scene.particleSystems.filter((p) => p.name.startsWith('fireworks-')).length).toBe(24);
+    // 12 color bursts + 12 narrow hot cores + 8 rocket trails + 4 stage pyro.
+    expect(scene.particleSystems.filter((p) => p.name.startsWith('fireworks-')).length).toBe(36);
 
     expect(() => show.update(0.016)).not.toThrow();
+    show.dispose();
+  });
+
+  it('builds crisp, stretched, high-density shells with pooled ignition flashes', () => {
+    const show = createFireworksShow(scene, { getFrequencyData: zeroSource });
+    const colorShells = scene.particleSystems.filter((p) => /^fireworks-burst-\d+$/.test(p.name));
+    const hotCores = scene.particleSystems.filter((p) => p.name.startsWith('fireworks-burst-core-'));
+    const flashes = scene.meshes.filter((m) => m.name.startsWith('fireworks-burst-flash-'));
+
+    expect(colorShells).toHaveLength(12);
+    expect(hotCores).toHaveLength(12);
+    expect(flashes).toHaveLength(12);
+    expect(colorShells.every((p) => p.getCapacity() === 520)).toBe(true);
+    expect(colorShells.every((p) => p.billboardMode === ParticleSystem.BILLBOARDMODE_STRETCHED)).toBe(true);
+    expect(hotCores.every((p) => p.billboardMode === ParticleSystem.BILLBOARDMODE_STRETCHED)).toBe(true);
+    expect(colorShells[0].particleTexture?.name).toBe('fireworks-crisp-spark-sprite');
+    expect(colorShells[0].maxLifeTime).toBeGreaterThan(2);
+    expect(hotCores[0].maxScaleX).toBeLessThan(colorShells[0].maxScaleX);
+
+    show.setEventState({ phase: 'active', activeMinute: 3 });
+    for (let i = 0; i < 28; i++) show.update(0.05);
+    expect(flashes.some((flash) => flash.isEnabled())).toBe(true);
+
     show.dispose();
   });
 
