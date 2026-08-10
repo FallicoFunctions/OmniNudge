@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
-import './i18n/config'; // Initialize i18n
+import { i18nReady } from './i18n/config';
 import App from './App.tsx';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ErrorBoundary from './ErrorBoundary';
@@ -18,17 +18,32 @@ const queryClient = new QueryClient({
   },
 });
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <App />
-        </ThemeProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
-  </StrictMode>
-);
+async function mountApp(): Promise<void> {
+  try {
+    // The first render contains translated loading fallbacks. Waiting for the
+    // locale namespace prevents a visible key flash and false missing-key
+    // warnings during normal startup.
+    await i18nReady;
+  } catch (error) {
+    // i18next can still serve fallback keys after a backend load failure; do
+    // not turn a locale outage into a blank application shell.
+    console.error('[i18n] Initialization failed; rendering with fallbacks.', error);
+  }
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
+            <App />
+          </ThemeProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </StrictMode>,
+  );
+}
+
+void mountApp();
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
