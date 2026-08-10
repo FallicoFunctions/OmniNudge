@@ -298,8 +298,8 @@ describe('createVipSkydeck', () => {
     const rampCenterZ = (SKYDECK_RAMP_Z_MIN + SKYDECK_RAMP_Z_MAX) / 2;
     expect(blockedAt(53, rampCenterZ, rampSurfaceYAt53, rampSurfaceYAt53 + 1.5)).toBe(false);
 
-    // Ground level under the whole structure stays walkable - including the
-    // vip_terrace route objective at (32, 2) and the ramp corridor.
+    // Ground level under the whole structure stays walkable, including the
+    // ramp corridor that leads to the elevated vip_terrace route objective.
     for (const [x, z] of [
       [32, 2],
       [-32, 2],
