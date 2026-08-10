@@ -11,7 +11,7 @@ NC='\033[0m'
 
 SERVER="${SERVER:-root@77.42.47.79}"
 SERVER_PATH="${SERVER_PATH:-/var/www/omninudge}"
-PROJECT_ROOT="${PROJECT_ROOT:-/Users/Nick_1/Documents/Personal_Projects/OmniNudge}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 BACKUP_DIR="${BACKUP_DIR:-$SERVER_PATH/backups}"
 BACKUP_KEEP_TAR="${BACKUP_KEEP_TAR:-5}"
 BACKUP_KEEP_SQL="${BACKUP_KEEP_SQL:-10}"
@@ -24,9 +24,9 @@ OMNIRAVE_WORLD_HEALTH_URL="${OMNIRAVE_WORLD_HEALTH_URL:-http://127.0.0.1:8092/he
 LOCAL_FRONTEND_DIR="$PROJECT_ROOT/frontend"
 LOCAL_BACKEND_DIR="$PROJECT_ROOT/backend"
 LOCAL_FRONTEND_DIST="$PROJECT_ROOT/frontend/dist"
-LOCAL_OMNIRAVE_DIR="$PROJECT_ROOT/omnirave-web"
-LOCAL_OMNIRAVE_DIST="$PROJECT_ROOT/omnirave-web/dist"
-OMNIRAVE_RUNTIME_REMOTE_PATH="${OMNIRAVE_RUNTIME_REMOTE_PATH:-$SERVER_PATH/omnirave-web}"
+LOCAL_OMNIRAVE_DIR="$PROJECT_ROOT/omnirave-babylon"
+LOCAL_OMNIRAVE_DIST="$PROJECT_ROOT/omnirave-babylon/dist"
+OMNIRAVE_RUNTIME_REMOTE_PATH="${OMNIRAVE_RUNTIME_REMOTE_PATH:-$SERVER_PATH/omnirave-babylon}"
 OMNIRAVE_RUNTIME_REMOTE_DIST="${OMNIRAVE_RUNTIME_REMOTE_DIST:-$OMNIRAVE_RUNTIME_REMOTE_PATH/dist}"
 
 LAST_OUTPUT=""
@@ -135,7 +135,7 @@ build_backend_locally() {
 }
 
 build_omnirave_locally() {
-  run_capture "omnirave-web build" /bin/zsh -lc "cd '$LOCAL_OMNIRAVE_DIR' && npm run build"
+  run_capture "omnirave-babylon build" /bin/zsh -lc "cd '$LOCAL_OMNIRAVE_DIR' && npm run build"
 }
 
 build_omnirave_backend_binaries_locally() {
@@ -192,8 +192,8 @@ create_server_backup() {
 mkdir -p '$BACKUP_DIR'
 cd '$SERVER_PATH'
 paths=(backend frontend)
-if [ -d 'omnirave-web' ]; then
-  paths+=(omnirave-web)
+if [ -d 'omnirave-babylon' ]; then
+  paths+=(omnirave-babylon)
 fi
 tar -czf '$BACKUP_DIR/${backup_name}.tar.gz' \
   --exclude='backups' \
@@ -225,7 +225,7 @@ upload_frontend_build() {
 }
 
 upload_omnirave_build() {
-  run_capture "omnirave-web upload" rsync -avz --delete "$LOCAL_OMNIRAVE_DIST/" "$SERVER:$OMNIRAVE_RUNTIME_REMOTE_DIST/"
+  run_capture "omnirave-babylon upload" rsync -avz --delete "$LOCAL_OMNIRAVE_DIST/" "$SERVER:$OMNIRAVE_RUNTIME_REMOTE_DIST/"
 }
 
 upload_backend_code() {

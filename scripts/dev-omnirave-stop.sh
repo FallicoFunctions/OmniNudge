@@ -2,13 +2,13 @@
 # Stops everything dev-omnirave-start.sh started. Belt and suspenders: kills
 # the recorded PIDs (go run's own process - which usually forwards the
 # signal to its compiled child), THEN also kills whatever is still listening
-# on the four known ports, since `go run` occasionally leaves an orphaned
+# on the five known ports, since `go run` occasionally leaves an orphaned
 # child behind if the parent dies uncleanly.
 set -uo pipefail
 
 STATE_DIR="/tmp/omnirave-dev"
 PID_FILE="$STATE_DIR/pids"
-PORTS=(8091 8092 4173 5176)
+PORTS=(8080 8091 8092 4173 5176)
 
 if [ -f "$PID_FILE" ]; then
   echo "Stopping recorded PIDs..."
