@@ -86,7 +86,12 @@ export interface ConversationSettings {
 export type OmniChatAccountTier = 'free' | 'plus' | 'premium';
 
 /** User-facing conversation profiles. Provider and reasoning settings remain server-side. */
-export type OmniChatModelKey = 'standard' | 'plus' | 'premium_quick' | 'premium_deep' | 'ultra_fast';
+export type OmniChatModelKey =
+  | 'standard'
+  | 'plus'
+  | 'premium_quick'
+  | 'premium_deep'
+  | 'ultra_fast';
 export type OmniChatModelScope = 'this_chat' | 'all_chats';
 
 export interface OmniChatModelSelection {
@@ -443,12 +448,38 @@ export interface PreviewMessageResponse {
 }
 
 export interface OmniChatAllowanceState {
-	tier: 'guest' | 'free' | 'paid';
-	allowed: boolean;
-	unlimited: boolean;
-	limit?: number;
-	used?: number;
-	remaining?: number;
-	reset_at?: string;
-	window_seconds?: number;
+  tier: 'guest' | 'free' | 'paid';
+  allowed: boolean;
+  unlimited: boolean;
+  limit?: number;
+  used?: number;
+  remaining?: number;
+  reset_at?: string;
+  window_seconds?: number;
+}
+
+/**
+ * What a character has inferred and stored about the user.
+ *
+ * Unlike a message, a memory is a claim the system made rather than something
+ * the user wrote, so it carries the conversation and message it came from. That
+ * provenance is what makes a wrong memory contestable instead of merely
+ * annoying.
+ */
+export interface OmniChatMemory {
+  id: number;
+  persona_id: number;
+  conversation_id: number;
+  source_message_id?: number;
+  title: string;
+  summary: string;
+  salience: number;
+  distinctiveness: number;
+  status: 'active' | 'superseded' | 'corrected' | 'user_hidden';
+  recorded_at: string;
+}
+
+export interface OmniChatMemoryList {
+  total: number;
+  memories: OmniChatMemory[];
 }

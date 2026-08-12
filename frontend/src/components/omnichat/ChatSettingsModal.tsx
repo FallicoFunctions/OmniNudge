@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
+  Brain,
   Copy,
   History,
   Loader2,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import PersonaDetailsModal from './PersonaDetailsModal';
+import MemoriesModal from './MemoriesModal';
 import { omnichatService, omnichatQueryKeys } from '../../services/omnichatService';
 import { saveOmniChatDefaults } from '../../utils/omnichatDefaults';
 import { getOmniChatPreviewText } from '../../utils/omnichatMessageFormatting';
@@ -46,6 +48,7 @@ export default function ChatSettingsModal({
   const [flippedId, setFlippedId] = useState<number | null>(null);
   const [slidingOutId, setSlidingOutId] = useState<number | null>(null);
   const [isPersonaDetailsOpen, setIsPersonaDetailsOpen] = useState(false);
+  const [isMemoriesOpen, setIsMemoriesOpen] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
   const deletionTimerRef = useRef<number | null>(null);
 
@@ -238,6 +241,27 @@ export default function ChatSettingsModal({
           </div>
 
           {conversationId !== null && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsMemoriesOpen(true)}
+                className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left text-sm hover:bg-[var(--color-surface-hover)]"
+              >
+                <Brain size={18} className="text-[var(--color-text-secondary)]" />
+                <div className="flex-1">
+                  <p className="font-medium text-[var(--color-text-primary)]">
+                    {t('omnichat.memories.title', { name: persona.name })}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    {t('omnichat.memories.entryDescription')}
+                  </p>
+                </div>
+                <ArrowRight size={16} className="text-[var(--color-text-secondary)]" />
+              </button>
+            </div>
+          )}
+
+          {conversationId !== null && (
             <>
               <div className="border-t border-[var(--color-border)]" />
 
@@ -415,6 +439,12 @@ export default function ChatSettingsModal({
           )}
         </div>
       </div>
+      <MemoriesModal
+        isOpen={isMemoriesOpen}
+        onClose={() => setIsMemoriesOpen(false)}
+        conversationId={conversationId}
+        personaName={persona.name}
+      />
       <PersonaDetailsModal
         isOpen={isPersonaDetailsOpen}
         onClose={() => setIsPersonaDetailsOpen(false)}

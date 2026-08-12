@@ -4353,6 +4353,18 @@
         "confirmDelete": "Confirmar eliminación",
         "deleteError": "No se pudo eliminar este personaje."
       }
+    },
+    "memories": {
+      "title": "Lo que {{name}} recuerda",
+      "close": "Cerrar recuerdos",
+      "description": "Esto es lo que {{name}} sacó de vuestra conversación, con sus propias palabras. Lo escribió ella, no tú, así que si algo está mal puedes eliminarlo.",
+      "loading": "Cargando recuerdos",
+      "loadError": "No se pudieron cargar los recuerdos. Inténtalo de nuevo.",
+      "empty": "{{name}} aún no ha formado recuerdos de esta conversación. Se acumulan a medida que habláis.",
+      "recordedAt": "Recordado el {{date}}",
+      "forgetLabel": "Olvidar: {{title}}",
+      "forgetFailed": "No se pudo olvidar ese recuerdo. Inténtalo de nuevo.",
+      "entryDescription": "Mira y corrige lo que ha concluido sobre ti"
     }
   }
 }

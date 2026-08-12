@@ -4353,6 +4353,18 @@
         "confirmDelete": "Confirm Delete",
         "deleteError": "Unable to delete this character."
       }
+    },
+    "memories": {
+      "title": "What {{name}} remembers",
+      "close": "Close memories",
+      "description": "These are things {{name}} took away from your conversation, in her own words. She wrote them, not you, so if any of it is wrong you can remove it.",
+      "loading": "Loading memories",
+      "loadError": "Could not load memories. Please try again.",
+      "empty": "{{name}} hasn't formed any memories from this conversation yet. They build up as you talk.",
+      "recordedAt": "Remembered {{date}}",
+      "forgetLabel": "Forget: {{title}}",
+      "forgetFailed": "Could not forget that memory. Please try again.",
+      "entryDescription": "See and correct what she has concluded about you"
     }
   }
 }
