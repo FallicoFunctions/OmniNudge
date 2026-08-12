@@ -320,6 +320,22 @@ func TestRequestDataExport_AcceptsEveryAdvertisedDataType(t *testing.T) {
 	}
 }
 
+// Every advertised type must also have a case in the worker's switch. An
+// unhandled one fails the whole job with "unsupported data type", which would
+// take the user's other sections down with it.
+func TestExportDataTypesCoverOmniChat(t *testing.T) {
+	advertised := make(map[string]struct{}, len(exportDataTypes))
+	for _, dataType := range exportDataTypes {
+		advertised[dataType] = struct{}{}
+	}
+	for _, required := range []string{
+		"omnichat_conversations", "omnichat_personas", "omnichat_memory", "omnichat_media",
+	} {
+		_, ok := advertised[required]
+		assert.True(t, ok, "%s must be exportable", required)
+	}
+}
+
 // The default set is copied, not aliased: the request value travels on into the
 // job row and must not be able to mutate the package-level list.
 func TestRequestDataExport_DefaultDataTypesAreNotAliased(t *testing.T) {

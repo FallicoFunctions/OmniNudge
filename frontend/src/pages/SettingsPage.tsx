@@ -1975,6 +1975,11 @@ export default function SettingsPage() {
                     try {
                       const response = await accountService.requestDataExport({
                         password: exportPassword,
+                        // Omitting data_types would let the server pick the full
+                        // set, but sending it explicitly keeps the request
+                        // self-describing. Any value here must exist in
+                        // exportDataTypes in backend/internal/handlers/data_export.go,
+                        // which rejects an unknown type outright.
                         data_types: [
                           'profile',
                           'messages',
@@ -1985,6 +1990,10 @@ export default function SettingsPage() {
                           'hubs',
                           'settings',
                           'encryption_keys',
+                          'omnichat_conversations',
+                          'omnichat_personas',
+                          'omnichat_memory',
+                          'omnichat_media',
                         ],
                         include_deleted: false,
                       });
