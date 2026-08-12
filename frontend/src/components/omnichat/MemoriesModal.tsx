@@ -130,6 +130,7 @@ export default function MemoriesModal({
                       type="button"
                       onClick={() => setConfirmingId(null)}
                       disabled={forget.isPending}
+                      aria-label={t('omnichat.memories.cancelForgetLabel', { title: memory.title })}
                       className="rounded-2xl border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-text)] disabled:opacity-60"
                     >
                       {t('common.cancel')}
@@ -138,6 +139,9 @@ export default function MemoriesModal({
                       type="button"
                       onClick={() => forget.mutate(memory.id)}
                       disabled={forget.isPending}
+                      aria-label={t('omnichat.memories.confirmForgetLabel', {
+                        title: memory.title,
+                      })}
                       className="inline-flex items-center gap-1.5 rounded-2xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
                     >
                       {forget.isPending ? (
