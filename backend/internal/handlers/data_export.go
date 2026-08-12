@@ -40,6 +40,28 @@ func NewDataExportHandler(db *pgxpool.Pool, queueClient dataExportEnqueuer, stor
 	}
 }
 
+// exportDataTypes is the single source of truth for which sections an export
+// may contain: it is both the default set and the allowlist.
+//
+// These were previously two separate literals, and they had drifted --
+// "encryption_keys" was absent from the allowlist while the settings page asked
+// for it, so every export request from the UI was rejected as an unsupported
+// data type. One list cannot disagree with itself.
+//
+// Each entry must have a matching case in the worker's switch
+// (internal/queue/data_export_handler.go); an unhandled type fails the job.
+var exportDataTypes = []string{
+	"profile",
+	"messages",
+	"posts",
+	"comments",
+	"votes",
+	"saved",
+	"hubs",
+	"settings",
+	"encryption_keys",
+}
+
 // RequestDataExport initiates a GDPR data export for the current user.
 // @Summary      Request data export
 // @Tags         DataExport
@@ -85,20 +107,13 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 	// and deduplicate the requested export sections. Besides avoiding wasted work,
 	// this keeps user-controlled values out of temporary filenames in the worker.
 	if len(req.DataTypes) == 0 {
-		req.DataTypes = []string{
-			"profile",
-			"messages",
-			"posts",
-			"comments",
-			"votes",
-			"saved",
-			"hubs",
-			"settings",
-		}
+		// Copy rather than alias: the request value travels on into the job row,
+		// and the package-level list must stay immutable.
+		req.DataTypes = append([]string(nil), exportDataTypes...)
 	} else {
-		allowed := map[string]struct{}{
-			"profile": {}, "messages": {}, "posts": {}, "comments": {},
-			"votes": {}, "saved": {}, "hubs": {}, "settings": {},
+		allowed := make(map[string]struct{}, len(exportDataTypes))
+		for _, dataType := range exportDataTypes {
+			allowed[dataType] = struct{}{}
 		}
 		seen := make(map[string]struct{}, len(req.DataTypes))
 		validated := make([]string, 0, len(req.DataTypes))
