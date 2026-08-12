@@ -44,6 +44,7 @@ function memory(overrides: Partial<OmniChatMemory> = {}): OmniChatMemory {
     summary: 'He had to visit the consulate on day two.',
     salience: 0.8,
     distinctiveness: 0.7,
+    emotional_valence: -0.4,
     recorded_at: '2026-08-01T10:00:00Z',
     ...overrides,
   };
@@ -164,5 +165,33 @@ describe('MemoriesModal', () => {
   it('does not query without a conversation', () => {
     renderModal(null);
     expect(listConversationMemories).not.toHaveBeenCalled();
+  });
+
+  // The dialog stays mounted while shut, so a confirm left pending must not be
+  // waiting when it opens again.
+  it('drops a pending confirmation when the dialog closes', async () => {
+    listConversationMemories.mockResolvedValue({ total: 1, has_more: false, memories: [memory()] });
+    const { rerender } = renderModal();
+
+    await userEvent.click(await screen.findByLabelText(/omnichat\.memories\.forgetLabel/));
+    expect(screen.getByText('omnichat.memories.confirmForget')).toBeInTheDocument();
+
+    rerender(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoriesModal isOpen={false} onClose={() => {}} conversationId={42} personaName="Sadie" />
+      </QueryClientProvider>
+    );
+    rerender(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoriesModal isOpen onClose={() => {}} conversationId={42} personaName="Sadie" />
+      </QueryClientProvider>
+    );
+
+    await screen.findByText('Lost passport in Barcelona');
+    expect(screen.queryByText('omnichat.memories.confirmForget')).not.toBeInTheDocument();
   });
 });

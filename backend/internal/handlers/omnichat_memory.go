@@ -43,15 +43,16 @@ func NewOmniChatMemoryHandler(memory *models.OmniChatMemoryRepository) *OmniChat
 // entitled to see the provenance of claims made about them, so it is restated
 // here explicitly, for this endpoint only.
 type omniChatMemoryResponse struct {
-	ID              int64     `json:"id"`
-	PersonaID       int       `json:"persona_id"`
-	ConversationID  int       `json:"conversation_id"`
-	SourceMessageID int       `json:"source_message_id,omitempty"`
-	Title           string    `json:"title"`
-	Summary         string    `json:"summary"`
-	Salience        float64   `json:"salience"`
-	Distinctiveness float64   `json:"distinctiveness"`
-	RecordedAt      time.Time `json:"recorded_at"`
+	ID               int64     `json:"id"`
+	PersonaID        int       `json:"persona_id"`
+	ConversationID   int       `json:"conversation_id"`
+	SourceMessageID  int       `json:"source_message_id,omitempty"`
+	Title            string    `json:"title"`
+	Summary          string    `json:"summary"`
+	Salience         float64   `json:"salience"`
+	Distinctiveness  float64   `json:"distinctiveness"`
+	EmotionalValence *float64  `json:"emotional_valence"`
+	RecordedAt       time.Time `json:"recorded_at"`
 }
 
 // ListConversationMemories returns what the character took away from one
@@ -96,15 +97,16 @@ func (h *OmniChatMemoryHandler) ListConversationMemories(c *gin.Context) {
 			continue
 		}
 		memories = append(memories, omniChatMemoryResponse{
-			ID:              episode.ID,
-			PersonaID:       episode.PersonaID,
-			ConversationID:  episode.ConversationID,
-			SourceMessageID: episode.SourceMessageID,
-			Title:           episode.Title,
-			Summary:         episode.Summary,
-			Salience:        episode.Salience,
-			Distinctiveness: episode.Distinctiveness,
-			RecordedAt:      episode.RecordedAt,
+			ID:               episode.ID,
+			PersonaID:        episode.PersonaID,
+			ConversationID:   episode.ConversationID,
+			SourceMessageID:  episode.SourceMessageID,
+			Title:            episode.Title,
+			Summary:          episode.Summary,
+			Salience:         episode.Salience,
+			Distinctiveness:  episode.Distinctiveness,
+			EmotionalValence: episode.EmotionalValence,
+			RecordedAt:       episode.RecordedAt,
 		})
 	}
 
