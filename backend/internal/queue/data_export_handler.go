@@ -520,6 +520,10 @@ func exportOmniChatConversationsData(ctx context.Context, db *pgxpool.Pool, user
 	conversations := []Conversation{}
 	byID := map[int]int{}
 	totalMessages := 0
+	// Rows are counted as scanned rather than derived afterwards. The join emits
+	// one row per message and one row for a conversation with none, so no
+	// arithmetic over the two totals reconstructs it exactly.
+	rowCount := 0
 
 	for rows.Next() {
 		var (
@@ -539,6 +543,7 @@ func exportOmniChatConversationsData(ctx context.Context, db *pgxpool.Pool, user
 		); err != nil {
 			return nil, err
 		}
+		rowCount++
 
 		index, seen := byID[conversation.ID]
 		if !seen {
@@ -579,8 +584,11 @@ func exportOmniChatConversationsData(ctx context.Context, db *pgxpool.Pool, user
 	return map[string]interface{}{
 		"total":          len(conversations),
 		"total_messages": totalMessages,
-		"truncated":      totalMessages+len(conversations) >= omniChatExportMaxMessageRows,
-		"conversations":  conversations,
+		// Either cap can bite: a user with more conversations than the first
+		// allows, or more history than the second.
+		"truncated": rowCount >= omniChatExportMaxMessageRows ||
+			len(conversations) >= omniChatExportMaxConversations,
+		"conversations": conversations,
 	}, nil
 }
 
