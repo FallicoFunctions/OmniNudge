@@ -89,14 +89,14 @@ func TestListConversationMemories_ReturnsProvenance(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	var resp struct {
-		Total    int `json:"total"`
+		Total    int  `json:"total"`
+		HasMore  bool `json:"has_more"`
 		Memories []struct {
 			ID              int64   `json:"id"`
 			ConversationID  int     `json:"conversation_id"`
 			SourceMessageID int     `json:"source_message_id"`
 			Title           string  `json:"title"`
 			Salience        float64 `json:"salience"`
-			Status          string  `json:"status"`
 		} `json:"memories"`
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
@@ -109,7 +109,7 @@ func TestListConversationMemories_ReturnsProvenance(t *testing.T) {
 	require.Equal(t, fixture.conversationID, resp.Memories[0].ConversationID)
 	require.Equal(t, fixture.messageID, resp.Memories[0].SourceMessageID)
 	require.InDelta(t, 0.8, resp.Memories[0].Salience, 0.001)
-	require.Equal(t, "active", resp.Memories[0].Status)
+	require.False(t, resp.HasMore, "a complete list must not claim to be truncated")
 }
 
 // A conversation id is guessable, so an unowned one must read as empty rather

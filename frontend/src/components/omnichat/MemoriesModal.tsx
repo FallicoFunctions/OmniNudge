@@ -1,9 +1,9 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Brain, Loader2, Trash2, X } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { omnichatService, omnichatQueryKeys } from '../../services/omnichatService';
-import type { OmniChatMemory } from '../../types/omnichat';
 
 /**
  * Shows what a character has concluded about the user, and lets them take any
@@ -27,6 +27,7 @@ export default function MemoriesModal({
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: omnichatQueryKeys.conversationMemories(conversationId ?? 0),
@@ -37,6 +38,7 @@ export default function MemoriesModal({
   const forget = useMutation({
     mutationFn: (memoryId: number) => omnichatService.forgetMemory(memoryId),
     onSuccess: () => {
+      setConfirmingId(null);
       if (typeof conversationId === 'number') {
         void queryClient.invalidateQueries({
           queryKey: omnichatQueryKeys.conversationMemories(conversationId),
@@ -45,11 +47,9 @@ export default function MemoriesModal({
     },
   });
 
-  // Hidden memories stay in the record but no longer influence replies, so the
-  // list a user reviews should reflect what the character can still draw on.
-  const memories = (data?.memories ?? []).filter(
-    (memory: OmniChatMemory) => memory.status === 'active'
-  );
+  // The server returns only memories the character can still draw on, so there
+  // is nothing to filter here.
+  const memories = data?.memories ?? [];
 
   return (
     <Modal
@@ -118,19 +118,50 @@ export default function MemoriesModal({
                     })}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => forget.mutate(memory.id)}
-                  disabled={forget.isPending}
-                  aria-label={t('omnichat.memories.forgetLabel', { title: memory.title })}
-                  className="shrink-0 rounded-full p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-background)] hover:text-[var(--color-error)] disabled:opacity-50"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </button>
+                {confirmingId === memory.id ? (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingId(null)}
+                      disabled={forget.isPending}
+                      className="rounded-2xl border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-text)] disabled:opacity-60"
+                    >
+                      {t('common.cancel')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => forget.mutate(memory.id)}
+                      disabled={forget.isPending}
+                      className="inline-flex items-center gap-1.5 rounded-2xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                    >
+                      {forget.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                      {t('omnichat.memories.confirmForget')}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingId(memory.id)}
+                    aria-label={t('omnichat.memories.forgetLabel', { title: memory.title })}
+                    className="shrink-0 rounded-full p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-background)] hover:text-[var(--color-error)]"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
               </div>
             </li>
           ))}
         </ul>
+
+        {data?.has_more && (
+          <p className="mt-3 text-center text-xs text-[var(--color-text-secondary)]">
+            {t('omnichat.memories.truncated', { count: memories.length, total: data.total })}
+          </p>
+        )}
 
         {forget.isError && (
           <p role="alert" className="mt-3 text-sm text-[var(--color-error)]">

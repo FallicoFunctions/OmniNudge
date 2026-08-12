@@ -4364,7 +4364,9 @@
       "recordedAt": "تم تذكّره في {{date}}",
       "forgetLabel": "نسيان: {{title}}",
       "forgetFailed": "تعذّر نسيان تلك الذكرى. يرجى المحاولة مرة أخرى.",
-      "entryDescription": "اطّلع على ما استنتجته عنك وصحّحه"
+      "entryDescription": "اطّلع على ما استنتجته عنك وصحّحه",
+      "confirmForget": "نسيان",
+      "truncated": "عرض أحدث {{count}} من أصل {{total}} ذكرى."
     }
   }
 }

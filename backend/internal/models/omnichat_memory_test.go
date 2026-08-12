@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -477,9 +478,10 @@ func TestOmniChatMemoryListForConversation(t *testing.T) {
 		Entities:         []OmniChatMemoryEntityRef{{CanonicalName: "Barcelona", Kind: OmniChatMemoryEntityPlace}},
 	}}))
 
-	got, err := repo.ListForConversation(ctx, conversationID, fixture.userID, 20)
+	got, total, err := repo.ListForConversation(ctx, conversationID, fixture.userID, 20)
 	require.NoError(t, err)
 	require.Len(t, got, 1)
+	require.Equal(t, 1, total)
 	require.Equal(t, "Lost passport in Barcelona", got[0].Title)
 	require.Equal(t, OmniChatMemoryStatusActive, got[0].Status)
 	require.Equal(t, conversationID, got[0].ConversationID)
@@ -489,11 +491,11 @@ func TestOmniChatMemoryListForConversation(t *testing.T) {
 	require.False(t, got[0].RecordedAt.IsZero())
 
 	// Scoped to the owner, like every other read in this repository.
-	got, err = repo.ListForConversation(ctx, conversationID, fixture.otherID, 20)
+	got, _, err = repo.ListForConversation(ctx, conversationID, fixture.otherID, 20)
 	require.NoError(t, err)
 	require.Empty(t, got, "another user must not read this conversation's memories")
 
-	_, err = repo.ListForConversation(ctx, conversationID, fixture.userID, 0)
+	_, _, err = repo.ListForConversation(ctx, conversationID, fixture.userID, 0)
 	require.Error(t, err, "an unbounded read must be rejected")
 }
 
@@ -681,4 +683,67 @@ func TestOmniChatMemoryRecordExtractionRejectsStaleWatermark(t *testing.T) {
 	last, _, err := repo.GetWatermark(ctx, conversationID)
 	require.NoError(t, err)
 	require.Equal(t, 20, last)
+}
+
+// A forgotten memory must not consume the page budget. Filtering client-side
+// meant a user who had forgotten a lot could push their live memories off the
+// only surface for correcting them, so the exclusion belongs in the query.
+func TestOmniChatMemoryListForConversationExcludesForgotten(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "listhidden")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	var conversationID int
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
+		fixture.userID, fixture.personaID).Scan(&conversationID))
+
+	hidden := insertEpisode(t, pool, fixture.personaID, fixture.userID, "Forgotten", "Withdrawn.", 0.5, 0.5)
+	live := insertEpisode(t, pool, fixture.personaID, fixture.userID, "Still current", "Active.", 0.5, 0.5)
+	_, err := pool.Exec(ctx,
+		`UPDATE omnichat_memory_episodes SET conversation_id = $1 WHERE id = ANY($2)`,
+		conversationID, []int64{hidden, live})
+	require.NoError(t, err)
+	require.NoError(t, repo.HideOwned(ctx, hidden, fixture.userID))
+
+	// A page of one must contain the live memory, not the forgotten one that
+	// happens to sort first.
+	got, total, err := repo.ListForConversation(ctx, conversationID, fixture.userID, 1)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.Equal(t, "Still current", got[0].Title)
+	require.Equal(t, 1, total, "the total counts active memories only")
+}
+
+// The total describes the whole record, not the page, so a caller can tell a
+// complete list from a truncated one.
+func TestOmniChatMemoryListForConversationTotalIgnoresLimit(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "listtotal")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	var conversationID int
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
+		fixture.userID, fixture.personaID).Scan(&conversationID))
+
+	ids := make([]int64, 0, 5)
+	for i := 0; i < 5; i++ {
+		ids = append(ids, insertEpisode(t, pool, fixture.personaID, fixture.userID,
+			fmt.Sprintf("Memory %d", i), "Something.", 0.5, 0.5))
+	}
+	_, err := pool.Exec(ctx,
+		`UPDATE omnichat_memory_episodes SET conversation_id = $1 WHERE id = ANY($2)`, conversationID, ids)
+	require.NoError(t, err)
+
+	got, total, err := repo.ListForConversation(ctx, conversationID, fixture.userID, 2)
+	require.NoError(t, err)
+	require.Len(t, got, 2, "the page respects the limit")
+	require.Equal(t, 5, total, "the total does not")
 }

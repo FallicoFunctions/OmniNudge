@@ -475,11 +475,13 @@ export interface OmniChatMemory {
   summary: string;
   salience: number;
   distinctiveness: number;
-  status: 'active' | 'superseded' | 'corrected' | 'user_hidden';
   recorded_at: string;
 }
 
 export interface OmniChatMemoryList {
+  /** Every active memory, not just this page. */
   total: number;
+  /** True when the page is truncated and older memories are not shown. */
+  has_more: boolean;
   memories: OmniChatMemory[];
 }

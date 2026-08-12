@@ -44,7 +44,6 @@ function memory(overrides: Partial<OmniChatMemory> = {}): OmniChatMemory {
     summary: 'He had to visit the consulate on day two.',
     salience: 0.8,
     distinctiveness: 0.7,
-    status: 'active',
     recorded_at: '2026-08-01T10:00:00Z',
     ...overrides,
   };
@@ -72,7 +71,7 @@ describe('MemoriesModal', () => {
   });
 
   it('lists what the character remembers', async () => {
-    listConversationMemories.mockResolvedValue({ total: 1, memories: [memory()] });
+    listConversationMemories.mockResolvedValue({ total: 1, has_more: false, memories: [memory()] });
     renderModal();
 
     expect(await screen.findByText('Lost passport in Barcelona')).toBeInTheDocument();
@@ -80,32 +79,62 @@ describe('MemoriesModal', () => {
   });
 
   it('tells the user nothing has been remembered yet rather than showing an empty box', async () => {
-    listConversationMemories.mockResolvedValue({ total: 0, memories: [] });
+    listConversationMemories.mockResolvedValue({ total: 0, has_more: false, memories: [] });
     renderModal();
 
     expect(await screen.findByText(/omnichat\.memories\.empty/)).toBeInTheDocument();
   });
 
-  // A hidden memory no longer influences replies, so showing it in the review
-  // list would misrepresent what the character can still draw on.
-  it('omits memories the user has already forgotten', async () => {
+  // A truncated page must say so. Presenting the first hundred as the whole
+  // record would let a user believe they had reviewed everything.
+  it('says so when the list is truncated', async () => {
     listConversationMemories.mockResolvedValue({
-      total: 2,
-      memories: [memory(), memory({ id: 2, title: 'Already forgotten', status: 'user_hidden' })],
+      total: 143,
+      has_more: true,
+      memories: [memory()],
     });
     renderModal();
 
-    expect(await screen.findByText('Lost passport in Barcelona')).toBeInTheDocument();
-    expect(screen.queryByText('Already forgotten')).not.toBeInTheDocument();
+    expect(await screen.findByText(/omnichat\.memories\.truncated/)).toBeInTheDocument();
+  });
+
+  it('stays quiet when the list is complete', async () => {
+    listConversationMemories.mockResolvedValue({ total: 1, has_more: false, memories: [memory()] });
+    renderModal();
+
+    await screen.findByText('Lost passport in Barcelona');
+    expect(screen.queryByText(/omnichat\.memories\.truncated/)).not.toBeInTheDocument();
+  });
+
+  // Forgetting cannot be undone anywhere, so it takes a deliberate second
+  // click rather than firing straight off the trash icon.
+  it('asks for confirmation before forgetting', async () => {
+    listConversationMemories.mockResolvedValue({ total: 1, has_more: false, memories: [memory()] });
+    renderModal();
+
+    await userEvent.click(await screen.findByLabelText(/omnichat\.memories\.forgetLabel/));
+    expect(forgetMemory).not.toHaveBeenCalled();
+    expect(screen.getByText('omnichat.memories.confirmForget')).toBeInTheDocument();
+  });
+
+  it('can back out of forgetting', async () => {
+    listConversationMemories.mockResolvedValue({ total: 1, has_more: false, memories: [memory()] });
+    renderModal();
+
+    await userEvent.click(await screen.findByLabelText(/omnichat\.memories\.forgetLabel/));
+    await userEvent.click(screen.getByText('common.cancel'));
+
+    expect(forgetMemory).not.toHaveBeenCalled();
+    expect(screen.queryByText('omnichat.memories.confirmForget')).not.toBeInTheDocument();
   });
 
   it('forgets a memory and refreshes the list', async () => {
-    listConversationMemories.mockResolvedValue({ total: 1, memories: [memory()] });
+    listConversationMemories.mockResolvedValue({ total: 1, has_more: false, memories: [memory()] });
     forgetMemory.mockResolvedValue(undefined);
     renderModal();
 
-    const forgetButton = await screen.findByLabelText(/omnichat\.memories\.forgetLabel/);
-    await userEvent.click(forgetButton);
+    await userEvent.click(await screen.findByLabelText(/omnichat\.memories\.forgetLabel/));
+    await userEvent.click(screen.getByText('omnichat.memories.confirmForget'));
 
     await waitFor(() => expect(forgetMemory).toHaveBeenCalledWith(1));
     // Two loads: the initial one, and the refetch after the cache is invalidated.
@@ -113,11 +142,12 @@ describe('MemoriesModal', () => {
   });
 
   it('surfaces a failure to forget instead of silently leaving the memory', async () => {
-    listConversationMemories.mockResolvedValue({ total: 1, memories: [memory()] });
+    listConversationMemories.mockResolvedValue({ total: 1, has_more: false, memories: [memory()] });
     forgetMemory.mockRejectedValue(new Error('nope'));
     renderModal();
 
     await userEvent.click(await screen.findByLabelText(/omnichat\.memories\.forgetLabel/));
+    await userEvent.click(screen.getByText('omnichat.memories.confirmForget'));
 
     expect(await screen.findByText(/omnichat\.memories\.forgetFailed/)).toBeInTheDocument();
   });
