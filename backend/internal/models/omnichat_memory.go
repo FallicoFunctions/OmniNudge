@@ -528,30 +528,42 @@ func (r *OmniChatMemoryRepository) MarkRetrieved(ctx context.Context, episodeIDs
 	return nil
 }
 
-// ListForConversation returns the memories derived from one conversation, for
-// the owner to inspect. Provenance is the point: a user must be able to see
-// what the persona believes it remembers and where that came from.
+// ListForConversation returns the memories derived from one conversation that
+// the character can still draw on, newest first, along with how many there are
+// in total.
+//
+// Only active memories are returned. Filtering here rather than in the caller
+// matters: the limit is applied by the database, so leaving hidden rows in the
+// result would let a user who has forgotten a lot spend the whole page budget
+// on memories that no longer do anything, pushing live ones out of the only
+// surface for correcting them.
+//
+// The total counts every active memory, not just this page, so a caller can
+// tell the difference between "that is all of them" and "that is the first
+// hundred".
 func (r *OmniChatMemoryRepository) ListForConversation(
 	ctx context.Context,
 	conversationID, ownerUserID, limit int,
-) ([]*OmniChatMemoryEpisode, error) {
+) ([]*OmniChatMemoryEpisode, int, error) {
 	if conversationID < 1 || ownerUserID < 1 || limit < 1 {
-		return nil, errors.New("omnichat memory: owned conversation and positive limit are required")
+		return nil, 0, errors.New("omnichat memory: owned conversation and positive limit are required")
 	}
+	// count(*) OVER () is evaluated before LIMIT, so it reports the full match.
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, persona_id, source_message_id, title, summary, recorded_at,
-		       salience, distinctiveness, emotional_valence, status
+		       salience, distinctiveness, emotional_valence, count(*) OVER () AS total
 		FROM omnichat_memory_episodes
-		WHERE conversation_id = $1 AND owner_user_id = $2
+		WHERE conversation_id = $1 AND owner_user_id = $2 AND status = 'active'
 		ORDER BY recorded_at DESC
 		LIMIT $3
 	`, conversationID, ownerUserID, limit)
 	if err != nil {
-		return nil, fmt.Errorf("omnichat memory: list conversation memories: %w", err)
+		return nil, 0, fmt.Errorf("omnichat memory: list conversation memories: %w", err)
 	}
 	defer rows.Close()
 
 	episodes := make([]*OmniChatMemoryEpisode, 0, limit)
+	total := 0
 	for rows.Next() {
 		var (
 			episode         OmniChatMemoryEpisode
@@ -560,21 +572,22 @@ func (r *OmniChatMemoryRepository) ListForConversation(
 		if err := rows.Scan(
 			&episode.ID, &episode.PersonaID, &sourceMessageID, &episode.Title, &episode.Summary,
 			&episode.RecordedAt, &episode.Salience, &episode.Distinctiveness,
-			&episode.EmotionalValence, &episode.Status,
+			&episode.EmotionalValence, &total,
 		); err != nil {
-			return nil, fmt.Errorf("omnichat memory: scan conversation memory: %w", err)
+			return nil, 0, fmt.Errorf("omnichat memory: scan conversation memory: %w", err)
 		}
 		if sourceMessageID != nil {
 			episode.SourceMessageID = *sourceMessageID
 		}
 		episode.ConversationID = conversationID
 		episode.OwnerUserID = ownerUserID
+		episode.Status = OmniChatMemoryStatusActive
 		episodes = append(episodes, &episode)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("omnichat memory: iterate conversation memories: %w", err)
+		return nil, 0, fmt.Errorf("omnichat memory: iterate conversation memories: %w", err)
 	}
-	return episodes, nil
+	return episodes, total, nil
 }
 
 // HideOwned is the user's correction path: it withdraws a memory from recall

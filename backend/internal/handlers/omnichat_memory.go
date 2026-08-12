@@ -15,7 +15,8 @@ import (
 
 // omniChatMemoryListLimit bounds one page of memories. Provenance review is a
 // browsing task, not an export; the full record is available through the data
-// export, which is the surface built for taking everything at once.
+// export, which is the surface built for taking everything at once. The
+// response reports the true total so a truncated page is visible as one.
 const omniChatMemoryListLimit = 100
 
 // OmniChatMemoryHandler exposes what a character remembers about the person
@@ -50,7 +51,6 @@ type omniChatMemoryResponse struct {
 	Summary         string    `json:"summary"`
 	Salience        float64   `json:"salience"`
 	Distinctiveness float64   `json:"distinctiveness"`
-	Status          string    `json:"status"`
 	RecordedAt      time.Time `json:"recorded_at"`
 }
 
@@ -84,7 +84,7 @@ func (h *OmniChatMemoryHandler) ListConversationMemories(c *gin.Context) {
 	// Scoping is by owner, not by conversation alone. A conversation id is
 	// guessable, so an unowned one must read as empty rather than as someone
 	// else's history.
-	episodes, err := h.memory.ListForConversation(c.Request.Context(), conversationID, userID, omniChatMemoryListLimit)
+	episodes, total, err := h.memory.ListForConversation(c.Request.Context(), conversationID, userID, omniChatMemoryListLimit)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to load memories")
 		return
@@ -104,12 +104,17 @@ func (h *OmniChatMemoryHandler) ListConversationMemories(c *gin.Context) {
 			Summary:         episode.Summary,
 			Salience:        episode.Salience,
 			Distinctiveness: episode.Distinctiveness,
-			Status:          string(episode.Status),
 			RecordedAt:      episode.RecordedAt,
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"total": len(memories), "memories": memories})
+	// total counts every active memory, not just this page, so a truncated list
+	// can say so instead of quietly presenting itself as the whole record.
+	c.JSON(http.StatusOK, gin.H{
+		"total":    total,
+		"has_more": total > len(memories),
+		"memories": memories,
+	})
 }
 
 // ForgetMemory withdraws one memory from recall.

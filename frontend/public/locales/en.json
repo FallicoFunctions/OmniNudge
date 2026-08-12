@@ -4364,7 +4364,9 @@
       "recordedAt": "Remembered {{date}}",
       "forgetLabel": "Forget: {{title}}",
       "forgetFailed": "Could not forget that memory. Please try again.",
-      "entryDescription": "See and correct what she has concluded about you"
+      "entryDescription": "See and correct what she has concluded about you",
+      "confirmForget": "Forget",
+      "truncated": "Showing the {{count}} most recent of {{total}} memories."
     }
   }
 }
