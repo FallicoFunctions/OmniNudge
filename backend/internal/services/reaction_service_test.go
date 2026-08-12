@@ -25,9 +25,9 @@ func TestIsValidReactionEmoji(t *testing.T) {
 		{name: "celebration", input: "🎉", want: true},
 		{name: "face with tears of joy", input: "😂", want: true},
 		{name: "checkmark", input: "✅", want: true},
-		{name: "ZWJ family sequence", input: "👨‍👩‍👧‍👦", want: true},    // multi-rune ZWJ sequence
-		{name: "skin tone modifier", input: "👍🏽", want: true},            // thumb + medium skin tone
-		{name: "variation selector", input: "❤\uFE0F", want: true},        // heart + VS-16
+		{name: "ZWJ family sequence", input: "👨‍👩‍👧‍👦", want: true},                             // multi-rune ZWJ sequence
+		{name: "skin tone modifier", input: "👍🏽", want: true},                                   // thumb + medium skin tone
+		{name: "variation selector", input: "❤\uFE0F", want: true},                              // heart + VS-16
 		{name: "null bytes (100 control chars)", input: string(make([]byte, 100)), want: false}, // \x00 × 100 — rejected by r < 32 check
 
 		// ── invalid: structural ─────────────────────────────────────────────
