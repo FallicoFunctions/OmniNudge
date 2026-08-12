@@ -60,6 +60,10 @@ var exportDataTypes = []string{
 	"hubs",
 	"settings",
 	"encryption_keys",
+	"omnichat_conversations",
+	"omnichat_personas",
+	"omnichat_memory",
+	"omnichat_media",
 }
 
 // RequestDataExport initiates a GDPR data export for the current user.

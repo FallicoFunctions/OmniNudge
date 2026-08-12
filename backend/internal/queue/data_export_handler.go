@@ -118,6 +118,14 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 				data, err = exportSettingsData(ctx, db, payload.UserID)
 			case "encryption_keys":
 				data, err = exportEncryptionKeysData(ctx, db, payload.UserID)
+			case "omnichat_conversations":
+				data, err = exportOmniChatConversationsData(ctx, db, payload.UserID, payload.IncludeDeleted)
+			case "omnichat_personas":
+				data, err = exportOmniChatPersonasData(ctx, db, payload.UserID)
+			case "omnichat_memory":
+				data, err = exportOmniChatMemoryData(ctx, db, payload.UserID)
+			case "omnichat_media":
+				data, err = exportOmniChatMediaData(ctx, db, payload.UserID, payload.IncludeDeleted)
 			default:
 				return updateExportFailed(ctx, db, payload.ExportID, "Export request contains an unsupported data type")
 			}
@@ -434,6 +442,338 @@ func exportPostsData(ctx context.Context, db *pgxpool.Pool, userID int, includeD
 	return map[string]interface{}{
 		"total": len(posts),
 		"posts": posts,
+	}, nil
+}
+
+// exportOmniChatConversationsData returns the user's chat history with AI
+// characters, messages nested under their conversation.
+//
+// bot_messages has no user_id of its own -- a conversation owns its turns -- so
+// ownership is enforced by joining through bot_conversations rather than by
+// filtering the messages directly.
+func exportOmniChatConversationsData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
+	query := `
+		SELECT id, persona_id, title, created_at, last_message_at, archived_at,
+		       settings_user_name, settings_user_age, settings_user_gender
+		FROM bot_conversations
+		WHERE user_id = $1
+	`
+	if !includeDeleted {
+		query += " AND archived_at IS NULL"
+	}
+	query += " ORDER BY created_at DESC LIMIT 10000"
+
+	rows, err := db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type Message struct {
+		ID        int       `json:"id"`
+		Role      string    `json:"role"`
+		Content   string    `json:"content"`
+		Failed    bool      `json:"failed,omitempty"`
+		MediaOnly bool      `json:"media_only,omitempty"`
+		CreatedAt time.Time `json:"created_at"`
+	}
+	type Conversation struct {
+		ID            int        `json:"id"`
+		PersonaID     int        `json:"persona_id"`
+		Title         *string    `json:"title"`
+		CreatedAt     time.Time  `json:"created_at"`
+		LastMessageAt *time.Time `json:"last_message_at,omitempty"`
+		ArchivedAt    *time.Time `json:"archived_at,omitempty"`
+		UserName      *string    `json:"user_name,omitempty"`
+		UserAge       *string    `json:"user_age,omitempty"`
+		UserGender    *string    `json:"user_gender,omitempty"`
+		Messages      []Message  `json:"messages"`
+	}
+
+	conversations := []Conversation{}
+	for rows.Next() {
+		var conversation Conversation
+		if err := rows.Scan(
+			&conversation.ID, &conversation.PersonaID, &conversation.Title,
+			&conversation.CreatedAt, &conversation.LastMessageAt, &conversation.ArchivedAt,
+			&conversation.UserName, &conversation.UserAge, &conversation.UserGender,
+		); err != nil {
+			continue
+		}
+		conversation.Messages = []Message{}
+		conversations = append(conversations, conversation)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	totalMessages := 0
+	for index := range conversations {
+		messageRows, err := db.Query(ctx, `
+			SELECT m.id, m.role, m.content, m.failed, m.media_only, m.created_at
+			FROM bot_messages m
+			JOIN bot_conversations c ON c.id = m.conversation_id
+			WHERE m.conversation_id = $1 AND c.user_id = $2
+			ORDER BY m.id
+			LIMIT 10000
+		`, conversations[index].ID, userID)
+		if err != nil {
+			return nil, err
+		}
+		for messageRows.Next() {
+			var message Message
+			if err := messageRows.Scan(&message.ID, &message.Role, &message.Content,
+				&message.Failed, &message.MediaOnly, &message.CreatedAt); err != nil {
+				continue
+			}
+			conversations[index].Messages = append(conversations[index].Messages, message)
+		}
+		err = messageRows.Err()
+		messageRows.Close()
+		if err != nil {
+			return nil, err
+		}
+		totalMessages += len(conversations[index].Messages)
+	}
+
+	return map[string]interface{}{
+		"total":          len(conversations),
+		"total_messages": totalMessages,
+		"conversations":  conversations,
+	}, nil
+}
+
+// exportOmniChatPersonasData returns the characters this user authored.
+//
+// Platform-owned personas are excluded: they have a NULL owner and are not the
+// user's data. The character-card fields are included in full because the user
+// wrote them, and portability means being able to take a character elsewhere.
+func exportOmniChatPersonasData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
+	rows, err := db.Query(ctx, `
+		SELECT id, slug, name, description, category, visibility, is_nsfw,
+		       system_prompt, personality, scenario, first_message, example_dialogue,
+		       post_history_instructions, alternate_greetings, creator_notes, tags,
+		       creator_name, character_version, created_at, updated_at
+		FROM bot_personas
+		WHERE owner_user_id = $1
+		ORDER BY created_at DESC
+		LIMIT 10000
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type Persona struct {
+		ID                      int       `json:"id"`
+		Slug                    string    `json:"slug"`
+		Name                    string    `json:"name"`
+		Description             *string   `json:"description"`
+		Category                *string   `json:"category"`
+		Visibility              *string   `json:"visibility"`
+		IsNSFW                  bool      `json:"is_nsfw"`
+		SystemPrompt            *string   `json:"system_prompt"`
+		Personality             *string   `json:"personality"`
+		Scenario                *string   `json:"scenario"`
+		FirstMessage            *string   `json:"first_message"`
+		ExampleDialogue         *string   `json:"example_dialogue"`
+		PostHistoryInstructions *string   `json:"post_history_instructions"`
+		AlternateGreetings      []string  `json:"alternate_greetings,omitempty"`
+		CreatorNotes            *string   `json:"creator_notes"`
+		Tags                    []string  `json:"tags,omitempty"`
+		CreatorName             *string   `json:"creator_name"`
+		CharacterVersion        *string   `json:"character_version"`
+		CreatedAt               time.Time `json:"created_at"`
+		UpdatedAt               time.Time `json:"updated_at"`
+	}
+
+	personas := []Persona{}
+	for rows.Next() {
+		var persona Persona
+		if err := rows.Scan(
+			&persona.ID, &persona.Slug, &persona.Name, &persona.Description, &persona.Category,
+			&persona.Visibility, &persona.IsNSFW, &persona.SystemPrompt, &persona.Personality,
+			&persona.Scenario, &persona.FirstMessage, &persona.ExampleDialogue,
+			&persona.PostHistoryInstructions, &persona.AlternateGreetings, &persona.CreatorNotes,
+			&persona.Tags, &persona.CreatorName, &persona.CharacterVersion,
+			&persona.CreatedAt, &persona.UpdatedAt,
+		); err != nil {
+			continue
+		}
+		personas = append(personas, persona)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"total":    len(personas),
+		"personas": personas,
+	}, nil
+}
+
+// exportOmniChatMemoryData returns what AI characters have inferred and stored
+// about this user.
+//
+// This is the section a subject-access request is really aimed at: unlike chat
+// history, these rows are the system's own claims about a person rather than
+// something they wrote. Provenance is therefore exported alongside the claim --
+// conversation and message ids, plus the salience and distinctiveness scores
+// that decide when a memory resurfaces -- so the record can be checked and
+// contested rather than merely read.
+//
+// Only the relational tier is exported. A NULL owner is persona-global memory
+// that belongs to no user, and the WHERE clause excludes it.
+func exportOmniChatMemoryData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
+	rows, err := db.Query(ctx, `
+		SELECT id, persona_id, conversation_id, source_message_id, title, summary,
+		       salience, distinctiveness, emotional_valence, status, recorded_at,
+		       retrieval_count, last_retrieved_at
+		FROM omnichat_memory_episodes
+		WHERE owner_user_id = $1
+		ORDER BY recorded_at DESC
+		LIMIT 10000
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type Episode struct {
+		ID               int64      `json:"id"`
+		PersonaID        int        `json:"persona_id"`
+		ConversationID   *int       `json:"conversation_id"`
+		SourceMessageID  *int       `json:"source_message_id"`
+		Title            string     `json:"title"`
+		Summary          string     `json:"summary"`
+		Salience         float64    `json:"salience"`
+		Distinctiveness  float64    `json:"distinctiveness"`
+		EmotionalValence *float64   `json:"emotional_valence"`
+		Status           string     `json:"status"`
+		RecordedAt       time.Time  `json:"recorded_at"`
+		RetrievalCount   int        `json:"retrieval_count"`
+		LastRetrievedAt  *time.Time `json:"last_retrieved_at,omitempty"`
+	}
+
+	episodes := []Episode{}
+	for rows.Next() {
+		var episode Episode
+		if err := rows.Scan(
+			&episode.ID, &episode.PersonaID, &episode.ConversationID, &episode.SourceMessageID,
+			&episode.Title, &episode.Summary, &episode.Salience, &episode.Distinctiveness,
+			&episode.EmotionalValence, &episode.Status, &episode.RecordedAt,
+			&episode.RetrievalCount, &episode.LastRetrievedAt,
+		); err != nil {
+			continue
+		}
+		episodes = append(episodes, episode)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	entityRows, err := db.Query(ctx, `
+		SELECT id, persona_id, canonical_name, kind, aliases, mention_count,
+		       first_seen_at, last_seen_at
+		FROM omnichat_memory_entities
+		WHERE owner_user_id = $1
+		ORDER BY mention_count DESC, canonical_name
+		LIMIT 10000
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer entityRows.Close()
+
+	type Entity struct {
+		ID            int64     `json:"id"`
+		PersonaID     int       `json:"persona_id"`
+		CanonicalName string    `json:"name"`
+		Kind          string    `json:"kind"`
+		Aliases       []string  `json:"aliases,omitempty"`
+		MentionCount  int       `json:"mention_count"`
+		FirstSeenAt   time.Time `json:"first_seen_at"`
+		LastSeenAt    time.Time `json:"last_seen_at"`
+	}
+
+	entities := []Entity{}
+	for entityRows.Next() {
+		var entity Entity
+		if err := entityRows.Scan(&entity.ID, &entity.PersonaID, &entity.CanonicalName,
+			&entity.Kind, &entity.Aliases, &entity.MentionCount,
+			&entity.FirstSeenAt, &entity.LastSeenAt); err != nil {
+			continue
+		}
+		entities = append(entities, entity)
+	}
+	if err := entityRows.Err(); err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"total":    len(episodes),
+		"episodes": episodes,
+		"entities": entities,
+	}, nil
+}
+
+// exportOmniChatMediaData returns the metadata for images and video generated
+// for this user.
+//
+// The bytes themselves are not inlined: a gallery can be large, and the export
+// archive is delivered by email. Storage keys are omitted deliberately -- they
+// are internal addressing, not user data, and a signed URL in a downloadable
+// file would outlive the export's own expiry.
+func exportOmniChatMediaData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
+	query := `
+		SELECT id, persona_id, conversation_id, kind, visibility, prompt,
+		       width, height, duration_seconds, safety_status, created_at, deleted_at
+		FROM omnichat_media_assets
+		WHERE owner_user_id = $1
+	`
+	if !includeDeleted {
+		query += " AND deleted_at IS NULL"
+	}
+	query += " ORDER BY created_at DESC LIMIT 10000"
+
+	rows, err := db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type Asset struct {
+		ID              string     `json:"id"`
+		PersonaID       *int       `json:"persona_id"`
+		ConversationID  *int       `json:"conversation_id"`
+		Kind            string     `json:"kind"`
+		Visibility      string     `json:"visibility"`
+		Prompt          *string    `json:"prompt"`
+		Width           *int       `json:"width"`
+		Height          *int       `json:"height"`
+		DurationSeconds *int       `json:"duration_seconds,omitempty"`
+		SafetyStatus    string     `json:"safety_status"`
+		CreatedAt       time.Time  `json:"created_at"`
+		DeletedAt       *time.Time `json:"deleted_at,omitempty"`
+	}
+
+	assets := []Asset{}
+	for rows.Next() {
+		var asset Asset
+		if err := rows.Scan(&asset.ID, &asset.PersonaID, &asset.ConversationID, &asset.Kind,
+			&asset.Visibility, &asset.Prompt, &asset.Width, &asset.Height,
+			&asset.DurationSeconds, &asset.SafetyStatus, &asset.CreatedAt, &asset.DeletedAt); err != nil {
+			continue
+		}
+		assets = append(assets, asset)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"total":  len(assets),
+		"assets": assets,
 	}, nil
 }
 
