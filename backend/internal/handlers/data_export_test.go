@@ -292,3 +292,58 @@ func TestListExportRequests_WithRecords(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, float64(3), resp["total"])
 }
+
+// The default set and the allowlist were once separate literals and drifted
+// apart: the settings page asked for "encryption_keys" while the allowlist did
+// not contain it, so every export request from the UI was rejected. They are
+// one list now, and this pins that.
+func TestRequestDataExport_AcceptsEveryAdvertisedDataType(t *testing.T) {
+	for _, dataType := range exportDataTypes {
+		t.Run(dataType, func(t *testing.T) {
+			handler, _, userID, _ := setupDataExportHandlerTest(t)
+			body, _ := json.Marshal(map[string]interface{}{
+				"password":   "TestPassword123!",
+				"data_types": []string{dataType},
+			})
+			gin.SetMode(gin.TestMode)
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, "/account/export", bytes.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			c.Set("user_id", userID)
+
+			handler.RequestDataExport(c)
+
+			assert.Equal(t, http.StatusAccepted, w.Code,
+				"%s is advertised but was rejected", dataType)
+		})
+	}
+}
+
+// The default set is copied, not aliased: the request value travels on into the
+// job row and must not be able to mutate the package-level list.
+func TestRequestDataExport_DefaultDataTypesAreNotAliased(t *testing.T) {
+	handler, db, userID, _ := setupDataExportHandlerTest(t)
+	body, _ := json.Marshal(map[string]interface{}{"password": "TestPassword123!"})
+
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/account/export", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user_id", userID)
+
+	handler.RequestDataExport(c)
+	require.Equal(t, http.StatusAccepted, w.Code)
+
+	// The worker reads data_types from this row rather than from the queue
+	// payload, so the stored row is what has to carry the full default set.
+	var stored []string
+	require.NoError(t, db.Pool.QueryRow(context.Background(),
+		`SELECT data_types FROM data_export_requests WHERE user_id = $1`, userID).Scan(&stored))
+	require.Equal(t, exportDataTypes, stored)
+
+	original := exportDataTypes[0]
+	stored[0] = "mutated"
+	assert.Equal(t, original, exportDataTypes[0], "the package-level list must be immutable")
+}
