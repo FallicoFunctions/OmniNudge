@@ -195,7 +195,7 @@ func RunOmniChatMemoryEval(
 		})
 	}
 
-	episodes, err := extractor.Extract(ctx, persona, messages)
+	episodes, err := extractor.Extract(ctx, persona, messages, nil)
 	if err != nil {
 		result.Err = err
 		return result

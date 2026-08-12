@@ -590,6 +590,37 @@ func (r *OmniChatMemoryRepository) ListForConversation(
 	return episodes, total, nil
 }
 
+// RecentTitles lists what a persona already remembers about someone, newest
+// first. Extraction uses it to avoid recording a retold story a second time.
+func (r *OmniChatMemoryRepository) RecentTitles(ctx context.Context, personaID, ownerUserID, limit int) ([]string, error) {
+	if personaID < 1 || limit < 1 {
+		return nil, errors.New("omnichat memory: persona and positive limit are required")
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT title
+		FROM omnichat_memory_episodes
+		WHERE persona_id = $1
+		  AND owner_user_id IS NOT DISTINCT FROM $2::int
+		  AND status = 'active'
+		ORDER BY recorded_at DESC
+		LIMIT $3
+	`, personaID, ownerParam(ownerUserID), limit)
+	if err != nil {
+		return nil, fmt.Errorf("omnichat memory: list recent titles: %w", err)
+	}
+	defer rows.Close()
+
+	titles := make([]string, 0, limit)
+	for rows.Next() {
+		var title string
+		if err := rows.Scan(&title); err != nil {
+			return nil, fmt.Errorf("omnichat memory: scan recent title: %w", err)
+		}
+		titles = append(titles, title)
+	}
+	return titles, rows.Err()
+}
+
 // HideOwned is the user's correction path: it withdraws a memory from recall
 // without destroying the record of what was extracted or where it came from.
 func (r *OmniChatMemoryRepository) HideOwned(ctx context.Context, episodeID int64, ownerUserID int) error {

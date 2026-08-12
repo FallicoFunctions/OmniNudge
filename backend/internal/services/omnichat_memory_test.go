@@ -33,6 +33,8 @@ type fakeMemoryStore struct {
 	recallCue       string
 	recallOwnerUser int
 	recallPersonaID int
+	knownTitles     []string
+	knownTitlesErr  error
 }
 
 func (f *fakeMemoryStore) GetWatermark(context.Context, int) (int, int, error) {
@@ -78,6 +80,10 @@ func (f *fakeMemoryStore) MarkRetrieved(_ context.Context, ids []int64) error {
 	return nil
 }
 
+func (f *fakeMemoryStore) RecentTitles(context.Context, int, int, int) ([]string, error) {
+	return f.knownTitles, f.knownTitlesErr
+}
+
 func (f *fakeMemoryStore) marked() []int64 {
 	f.markMu.Lock()
 	defer f.markMu.Unlock()
@@ -120,11 +126,13 @@ type fakeMemoryExtractor struct {
 	err       error
 	calls     int
 	sawCounts []int
+	sawKnown  [][]string
 }
 
-func (f *fakeMemoryExtractor) Extract(_ context.Context, _ *models.BotPersona, messages []*models.BotMessage) ([]models.OmniChatMemoryEpisode, error) {
+func (f *fakeMemoryExtractor) Extract(_ context.Context, _ *models.BotPersona, messages []*models.BotMessage, alreadyRecorded []string) ([]models.OmniChatMemoryEpisode, error) {
 	f.calls++
 	f.sawCounts = append(f.sawCounts, len(messages))
+	f.sawKnown = append(f.sawKnown, alreadyRecorded)
 	return f.episodes, f.err
 }
 
@@ -458,4 +466,36 @@ func TestScheduleMemoryExtractionToleratesNoQueue(t *testing.T) {
 	require.NotPanics(t, func() {
 		service.scheduleMemoryExtraction(context.Background(), 42)
 	})
+}
+
+// Asking a character about something it remembers puts that story back in the
+// transcript, and the extractor would record it as a fresh event. Observed on a
+// live run: recalling one memory produced a near-identical second copy, which
+// over time crowds the recall budget with the same moment.
+func TestExtractForConversationTellsTheModelWhatIsAlreadyRemembered(t *testing.T) {
+	store := &fakeMemoryStore{knownTitles: []string{"Bruno ate the cake", "Laid off after eight years"}}
+	extractor := &fakeMemoryExtractor{}
+	service := NewOmniChatMemoryService(store,
+		&fakeMemoryMessages{messages: memoryTestMessages()},
+		&fakeMemoryConversations{conversation: &models.BotConversation{ID: 1, PersonaID: 5}},
+		&fakeMemoryPersonas{}, extractor)
+
+	require.NoError(t, service.ExtractForConversation(context.Background(), 1, 2))
+	require.Len(t, extractor.sawKnown, 1)
+	require.Equal(t, []string{"Bruno ate the cake", "Laid off after eight years"}, extractor.sawKnown[0])
+}
+
+// Losing the known-titles list risks a duplicate memory, never a lost one, so
+// extraction carries on without it rather than failing the delta.
+func TestExtractForConversationProceedsWhenKnownTitlesAreUnavailable(t *testing.T) {
+	store := &fakeMemoryStore{knownTitlesErr: errors.New("database is down")}
+	extractor := &fakeMemoryExtractor{}
+	service := NewOmniChatMemoryService(store,
+		&fakeMemoryMessages{messages: memoryTestMessages()},
+		&fakeMemoryConversations{conversation: &models.BotConversation{ID: 1, PersonaID: 5}},
+		&fakeMemoryPersonas{}, extractor)
+
+	require.NoError(t, service.ExtractForConversation(context.Background(), 1, 2))
+	require.Equal(t, 1, extractor.calls, "extraction must still run")
+	require.Equal(t, 1, store.recordCalls)
 }
