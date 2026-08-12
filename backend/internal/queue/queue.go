@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -26,6 +27,7 @@ const (
 	JobTypeMessageReencrypt    JobType = "message_reencrypt"
 	JobTypeVideoTranscode      JobType = "video_transcode"
 	JobTypeOmniChatGeneration  JobType = "omnichat_generation"
+	JobTypeOmniChatMemory      JobType = "omnichat_memory_extract"
 )
 
 // QueueClient wraps the Asynq client for enqueuing jobs
@@ -63,6 +65,45 @@ func (q *QueueClient) EnqueueOmniChatGeneration(ctx context.Context, jobID uuid.
 		asynq.Retention(24*time.Hour),
 		asynq.Unique(30*time.Minute),
 	)
+	return err
+}
+
+type OmniChatMemoryPayload struct {
+	ConversationID int `json:"conversation_id"`
+}
+
+// OmniChatMemoryEnqueuer queues character-memory extraction for a conversation.
+type OmniChatMemoryEnqueuer interface {
+	EnqueueOmniChatMemory(ctx context.Context, conversationID int) error
+}
+
+// EnqueueOmniChatMemory schedules memory extraction for a conversation.
+//
+// The payload carries only the conversation id: transcripts and prompts are
+// read from the database by the worker and never travel through Redis, the
+// same rule the generation queue follows.
+//
+// Unique() is doing real work here rather than merely deduplicating retries. A
+// user sending five quick turns should produce one extraction over the whole
+// delta, not five overlapping ones, so the uniqueness window is the debounce.
+//
+// It must also outlast Timeout. If the lock expired mid-run, a new message
+// could start a second extraction of the same turns while the first was still
+// working. The repository's watermark guard makes that outcome safe, but the
+// ordering here is what makes it rare.
+func (q *QueueClient) EnqueueOmniChatMemory(ctx context.Context, conversationID int) error {
+	_, err := q.EnqueueJob(ctx, JobTypeOmniChatMemory, OmniChatMemoryPayload{ConversationID: conversationID},
+		asynq.Queue("low"),
+		asynq.MaxRetry(3),
+		asynq.Timeout(2*time.Minute),
+		asynq.Retention(1*time.Hour),
+		asynq.Unique(5*time.Minute),
+	)
+	// A conversation already awaiting extraction is the debounce working, not a
+	// failure: the queued job will cover this turn too when it runs.
+	if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
+		return nil
+	}
 	return err
 }
 
