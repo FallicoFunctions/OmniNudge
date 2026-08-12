@@ -4366,7 +4366,7 @@
       "forgetFailed": "تعذّر نسيان تلك الذكرى. يرجى المحاولة مرة أخرى.",
       "entryDescription": "اطّلع على ما استنتجته عنك وصحّحه",
       "confirmForget": "نسيان",
-      "truncated": "عرض أحدث {{count}} من أصل {{total}} ذكرى."
+      "truncated": "عرض أحدث {{shown}} من أصل {{total}} ذكرى."
     }
   }
 }

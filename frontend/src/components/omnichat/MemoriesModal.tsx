@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Brain, Loader2, Trash2, X } from 'lucide-react';
@@ -28,6 +28,12 @@ export default function MemoriesModal({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
+
+  // This component stays mounted while the dialog is shut, so a pending confirm
+  // would still be waiting the next time it opens.
+  useEffect(() => {
+    if (!isOpen) setConfirmingId(null);
+  }, [isOpen]);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: omnichatQueryKeys.conversationMemories(conversationId ?? 0),
@@ -159,7 +165,7 @@ export default function MemoriesModal({
 
         {data?.has_more && (
           <p className="mt-3 text-center text-xs text-[var(--color-text-secondary)]">
-            {t('omnichat.memories.truncated', { count: memories.length, total: data.total })}
+            {t('omnichat.memories.truncated', { shown: memories.length, total: data.total })}
           </p>
         )}
 

@@ -4366,7 +4366,7 @@
       "forgetFailed": "No se pudo olvidar ese recuerdo. Inténtalo de nuevo.",
       "entryDescription": "Mira y corrige lo que ha concluido sobre ti",
       "confirmForget": "Olvidar",
-      "truncated": "Mostrando los {{count}} recuerdos más recientes de {{total}}."
+      "truncated": "Mostrando los {{shown}} recuerdos más recientes de {{total}}."
     }
   }
 }

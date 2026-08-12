@@ -475,6 +475,7 @@ export interface OmniChatMemory {
   summary: string;
   salience: number;
   distinctiveness: number;
+  emotional_valence: number | null;
   recorded_at: string;
 }
 
