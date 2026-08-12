@@ -601,7 +601,7 @@ func main() {
 		postRepo,
 		commentRepo,
 	)
-	adminHandler := handlers.NewAdminHandler(userRepo, hubModRepo, db.Pool)
+	adminHandler := handlers.NewAdminHandler(userRepo, hubModRepo, db.Pool).SetPlanService(planSvc)
 	// Create authorizer for WebSocket message authorization (P0-008b)
 	wsAuthorizer := websocket.NewAuthorizer(db.Pool)
 	wsHandler := handlers.NewWebSocketHandler(hub, wsAuthorizer, userSettingsRepo)
@@ -1687,6 +1687,7 @@ func main() {
 				// User management
 				admin.GET("/users", adminHandler.ListUsers)
 				admin.POST("/users/:id/role", adminHandler.PromoteUser)
+				admin.POST("/users/:id/plan", adminHandler.SetUserPlan)
 				admin.POST("/users/:id/ban", adminHandler.BanUser)
 				admin.POST("/users/:id/shadow-ban", adminHandler.ShadowBanUser)
 				admin.POST("/users/:id/unban", adminHandler.UnbanUser)
