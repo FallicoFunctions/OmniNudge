@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,11 +16,21 @@ import (
 	zlog "github.com/rs/zerolog/log"
 )
 
+// adminPlanWriter grants and revokes paid plans. It is a narrow interface
+// rather than an addition to ports.UserRepository because only this handler
+// needs it, and plan changes carry entitlement side effects that belong in the
+// plan service rather than in a repository method every caller can reach.
+type adminPlanWriter interface {
+	UpgradeToPlan(ctx context.Context, userID int, plan string, months int) error
+	Downgrade(ctx context.Context, userID int) error
+}
+
 // AdminHandler handles admin-level actions
 type AdminHandler struct {
 	userRepo   ports.UserRepository
 	hubModRepo ports.HubModeratorRepository
 	pool       *pgxpool.Pool
+	plans      adminPlanWriter
 }
 
 // NewAdminHandler creates a new admin handler
@@ -29,6 +40,13 @@ func NewAdminHandler(userRepo ports.UserRepository, hubModRepo ports.HubModerato
 		hubModRepo: hubModRepo,
 		pool:       pool,
 	}
+}
+
+// SetPlanService enables the plan-grant endpoint. Left unset, SetUserPlan
+// reports the feature as unavailable rather than failing obscurely.
+func (h *AdminHandler) SetPlanService(plans adminPlanWriter) *AdminHandler {
+	h.plans = plans
+	return h
 }
 
 // PromoteUser promotes or changes a user's role.
@@ -79,6 +97,85 @@ func (h *AdminHandler) PromoteUser(c *gin.Context) {
 	zlog.Info().Int("admin_id", adminID).Int("target_user_id", targetID).Str("new_role", req.Role).Msg("Admin promoted user role")
 
 	c.JSON(http.StatusOK, gin.H{"message": "Role updated", "user_id": targetID, "role": req.Role})
+}
+
+// SetUserPlan grants or revokes a paid plan.
+//
+// This is currently the only way an account can reach premium: the crypto
+// payment path hardcodes plus and records no tier, and the checkout path has
+// no provider adapter. Until one of those is finished, entitlements that
+// depend on premium -- explicit chat and explicit image generation -- are
+// otherwise unreachable and therefore untestable.
+//
+// @Summary      Set a user's subscription plan
+// @Tags         Admin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/users/{id}/plan [post]
+func (h *AdminHandler) SetUserPlan(c *gin.Context) {
+	adminID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	if h.plans == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Plan management is not configured")
+		return
+	}
+
+	targetID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	var req struct {
+		Plan   string `json:"plan" binding:"required"`
+		Months int    `json:"months"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid request")
+		return
+	}
+
+	if req.Plan == models.PlanFree {
+		if err := h.plans.Downgrade(c.Request.Context(), targetID); err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to update plan")
+			return
+		}
+		zlog.Info().Int("admin_id", adminID).Int("target_user_id", targetID).
+			Str("new_plan", req.Plan).Msg("Admin set user plan")
+		c.JSON(http.StatusOK, gin.H{"message": "Plan updated", "user_id": targetID, "plan": req.Plan})
+		return
+	}
+
+	if req.Plan != models.PlanPlus && req.Plan != models.PlanPremium {
+		RespondError(c, http.StatusBadRequest, "Invalid plan. Use free, plus, or premium.")
+		return
+	}
+	months := req.Months
+	if months == 0 {
+		months = 1
+	}
+	if months < 1 || months > 24 {
+		RespondError(c, http.StatusBadRequest, "Months must be between 1 and 24")
+		return
+	}
+	if err := h.plans.UpgradeToPlan(c.Request.Context(), targetID, req.Plan, months); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to update plan")
+		return
+	}
+	zlog.Info().Int("admin_id", adminID).Int("target_user_id", targetID).
+		Str("new_plan", req.Plan).Int("months", months).Msg("Admin set user plan")
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Plan updated", "user_id": targetID, "plan": req.Plan, "months": months,
+	})
 }
 
 // BanUser bans a user from the platform.

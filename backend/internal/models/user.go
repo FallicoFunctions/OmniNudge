@@ -989,11 +989,26 @@ func (r *UserRepository) ExtendPlan(ctx context.Context, userID int, plan string
 	if userID <= 0 || (plan != PlanPlus && plan != PlanPremium) || months < 1 || months > 24 {
 		return errors.New("invalid plan extension")
 	}
+	// Granting premium also switches the explicit-content preference on, in the
+	// same statement so a grant cannot half apply.
+	//
+	// nsfw defaults to false for every account, and explicit content requires
+	// both premium and that preference. Without this a subscriber pays and then
+	// finds chat clamped and images tame until they discover a settings toggle
+	// they have no reason to know exists -- the product silently withholding the
+	// thing they just bought.
+	//
+	// Scoped to the transition into premium, not every grant. In UPDATE ... SET
+	// the right-hand side sees the pre-update row, so `plan <> 'premium'` is
+	// true only when the account is arriving at the tier. A subscriber who
+	// deliberately switched the preference off therefore keeps that choice
+	// through renewals, and the assignment only ever turns it on.
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE users
-		SET plan=$2,
+		SET plan=$2::text,
 		    plan_expires_at=GREATEST(COALESCE(plan_expires_at, NOW()), NOW())
-		        + make_interval(days => $3 * 30)
+		        + make_interval(days => $3 * 30),
+		    nsfw = nsfw OR ($2::text = 'premium' AND plan <> 'premium')
 		WHERE id=$1
 	`, userID, plan, months)
 	if err != nil {
