@@ -767,6 +767,7 @@ func main() {
 	omniChatRequestIdempotencyRepo := models.NewOmniChatRequestIdempotencyRepository(db.Pool)
 	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService, omniChatModelSelectionService, omniChatAllowance).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo)
+	omniChatMemoryHandler := handlers.NewOmniChatMemoryHandler(omniChatMemoryRepo)
 	omniChatResponseFeedbackHandler := handlers.NewOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
 	adminOmniChatResponseFeedbackHandler := handlers.NewAdminOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
 	omniChatBillingHandler := handlers.NewOmniChatBillingHandler(omniChatBilling, nil)
@@ -1420,6 +1421,10 @@ func main() {
 			protected.GET("/omnichat/billing/usage", omniChatBillingHandler.Usage)
 			protected.GET("/omnichat/billing/video-entitlement", omniChatBillingHandler.VideoEntitlement)
 			protected.POST("/omnichat/billing/checkout", omniChatBillingHandler.CreateCheckout)
+			// Reading is unmetered; forgetting is a write and shares the social
+			// limiter so a scripted client cannot churn status updates.
+			protected.GET("/omnichat/conversations/:id/memories", omniChatMemoryHandler.ListConversationMemories)
+			protected.DELETE("/omnichat/memories/:id", omniChatSocialRateLimiter.Middleware(), omniChatMemoryHandler.ForgetMemory)
 			protected.GET("/omnichat/conversations/:id/scene", omniChatMediaHandler.GetConversationScene)
 			protected.PUT("/omnichat/conversations/:id/scene", omniChatMediaHandler.UpdateConversationScene)
 			protected.POST("/omnichat/generations", omniChatMediaRateLimiter.Middleware(), omniChatMediaHandler.CreateGeneration)

@@ -28,6 +28,7 @@ import type {
   OmniChatModelKey,
   OmniChatModelScope,
   OmniChatResponseFeedbackRequest,
+  OmniChatMemoryList,
 } from '../types/omnichat';
 import { API_BASE_URL } from '../lib/api';
 import { authenticatedFetch } from './authSession';
@@ -229,6 +230,15 @@ export const omnichatService = {
     await api.delete(`/omnichat/conversations/${conversationId}`);
   },
 
+  async listConversationMemories(conversationId: number): Promise<OmniChatMemoryList> {
+    return api.get<OmniChatMemoryList>(`/omnichat/conversations/${conversationId}/memories`);
+  },
+
+  /** Withdraws a memory from recall. The record itself is retained. */
+  async forgetMemory(memoryId: number): Promise<void> {
+    await api.delete(`/omnichat/memories/${memoryId}`);
+  },
+
   async deletePersonaConversations(personaId: number): Promise<void> {
     await api.delete(`/omnichat/personas/${personaId}/conversations`);
   },
@@ -338,7 +348,10 @@ export const omnichatService = {
 
   async createMediaCommand(
     conversationId: number,
-    request: Pick<OmniChatGenerationRequest, 'request_id' | 'kind' | 'prompt' | 'aspect_ratio' | 'duration_seconds'>
+    request: Pick<
+      OmniChatGenerationRequest,
+      'request_id' | 'kind' | 'prompt' | 'aspect_ratio' | 'duration_seconds'
+    >
   ): Promise<{ job: OmniChatGenerationJob; message: BotMessage }> {
     return api.post<{ job: OmniChatGenerationJob; message: BotMessage }>(
       `/omnichat/conversations/${encodeURIComponent(conversationId)}/media-command`,
@@ -785,6 +798,7 @@ export const omnichatQueryKeys = {
   personas: (category?: PersonaCategory) => ['omnichat', 'personas', category ?? 'all'] as const,
   conversations: ['omnichat', 'conversations'] as const,
   conversation: (id: number) => ['omnichat', 'conversation', id] as const,
+  conversationMemories: (id: number) => ['omnichat', 'conversation', id, 'memories'] as const,
   generation: (id: string) => ['omnichat', 'generation', id] as const,
   generations: ['omnichat', 'generations'] as const,
   gallery: (kind?: OmniChatMediaKind) => ['omnichat', 'gallery', kind ?? 'all'] as const,
