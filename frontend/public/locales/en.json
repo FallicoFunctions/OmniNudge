@@ -4366,7 +4366,9 @@
       "forgetFailed": "Could not forget that memory. Please try again.",
       "entryDescription": "See and correct what she has concluded about you",
       "confirmForget": "Forget",
-      "truncated": "Showing the {{shown}} most recent of {{total}} memories."
+      "truncated": "Showing the {{shown}} most recent of {{total}} memories.",
+      "cancelForgetLabel": "Keep: {{title}}",
+      "confirmForgetLabel": "Confirm forgetting: {{title}}"
     }
   }
 }

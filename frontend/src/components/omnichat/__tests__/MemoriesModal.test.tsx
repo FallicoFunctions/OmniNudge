@@ -123,7 +123,7 @@ describe('MemoriesModal', () => {
     renderModal();
 
     await userEvent.click(await screen.findByLabelText(/omnichat\.memories\.forgetLabel/));
-    await userEvent.click(screen.getByText('common.cancel'));
+    await userEvent.click(screen.getByLabelText(/omnichat\.memories\.cancelForgetLabel/));
 
     expect(forgetMemory).not.toHaveBeenCalled();
     expect(screen.queryByText('omnichat.memories.confirmForget')).not.toBeInTheDocument();
@@ -135,7 +135,7 @@ describe('MemoriesModal', () => {
     renderModal();
 
     await userEvent.click(await screen.findByLabelText(/omnichat\.memories\.forgetLabel/));
-    await userEvent.click(screen.getByText('omnichat.memories.confirmForget'));
+    await userEvent.click(screen.getByLabelText(/omnichat\.memories\.confirmForgetLabel/));
 
     await waitFor(() => expect(forgetMemory).toHaveBeenCalledWith(1));
     // Two loads: the initial one, and the refetch after the cache is invalidated.
@@ -148,7 +148,7 @@ describe('MemoriesModal', () => {
     renderModal();
 
     await userEvent.click(await screen.findByLabelText(/omnichat\.memories\.forgetLabel/));
-    await userEvent.click(screen.getByText('omnichat.memories.confirmForget'));
+    await userEvent.click(screen.getByLabelText(/omnichat\.memories\.confirmForgetLabel/));
 
     expect(await screen.findByText(/omnichat\.memories\.forgetFailed/)).toBeInTheDocument();
   });

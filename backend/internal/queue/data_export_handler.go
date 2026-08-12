@@ -624,6 +624,11 @@ func exportOmniChatPersonasData(ctx context.Context, db *pgxpool.Pool, userID in
 //
 // Only the relational tier is exported. A NULL owner is persona-global memory
 // that belongs to no user, and the WHERE clause excludes it.
+//
+// Unlike the in-app review panel, this deliberately includes memories the user
+// has already forgotten. Hiding one withdraws it from recall but the row is
+// still stored data about them, so a subject-access request has to return it.
+// The two surfaces answer different questions and are meant to differ.
 func exportOmniChatMemoryData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
 	rows, err := db.Query(ctx, `
 		SELECT id, persona_id, conversation_id, source_message_id, title, summary,
