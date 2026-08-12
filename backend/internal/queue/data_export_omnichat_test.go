@@ -340,3 +340,54 @@ func TestExportOmniChatSectionsAreEmptyForUnusedAccount(t *testing.T) {
 		})
 	}
 }
+
+// The single-query rewrite groups rows in Go, so the grouping itself needs
+// covering: several conversations must not bleed into each other, and a
+// conversation with no turns must survive the LEFT JOIN rather than vanish.
+func TestExportOmniChatConversationsGroupsMessagesPerConversation(t *testing.T) {
+	pool := setupOmniChatExportDB(t)
+	fixture := seedOmniChatExport(t, pool, "grouping")
+	ctx := context.Background()
+
+	// A second conversation with its own turns.
+	var secondID int
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO bot_conversations (user_id, persona_id, title) VALUES ($1, $2, 'Second') RETURNING id`,
+		fixture.userID, fixture.personaID).Scan(&secondID))
+	for _, content := range []string{"Second one", "Second two", "Second three"} {
+		_, err := pool.Exec(ctx,
+			`INSERT INTO bot_messages (conversation_id, role, content) VALUES ($1, 'user', $2)`,
+			secondID, content)
+		require.NoError(t, err)
+	}
+
+	// A third with none at all.
+	var emptyID int
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO bot_conversations (user_id, persona_id, title) VALUES ($1, $2, 'Empty') RETURNING id`,
+		fixture.userID, fixture.personaID).Scan(&emptyID))
+
+	data, err := exportOmniChatConversationsData(ctx, pool, fixture.userID, false)
+	require.NoError(t, err)
+	out := encodeExport(t, data)
+
+	require.Equal(t, float64(3), out["total"])
+	require.Equal(t, float64(5), out["total_messages"], "2 from the first, 3 from the second")
+	require.Equal(t, false, out["truncated"])
+
+	byTitle := map[string][]interface{}{}
+	for _, raw := range out["conversations"].([]interface{}) {
+		conversation := raw.(map[string]interface{})
+		title, _ := conversation["title"].(string)
+		byTitle[title] = conversation["messages"].([]interface{})
+	}
+
+	require.Len(t, byTitle["A chat"], 2)
+	require.Len(t, byTitle["Second"], 3)
+	require.NotNil(t, byTitle["Empty"], "an empty conversation must still be exported")
+	require.Empty(t, byTitle["Empty"], "with an empty message list rather than a null")
+
+	// Messages must land under their own conversation, not the first one.
+	first := byTitle["Second"][0].(map[string]interface{})
+	require.Equal(t, "Second one", first["content"])
+}
