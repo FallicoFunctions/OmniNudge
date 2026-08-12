@@ -733,6 +733,18 @@ func main() {
 		omniChatSceneStateRepo,
 		omniChatSceneStateExtractor,
 	)
+	// Extraction runs in the worker, so the standard model is only ever called
+	// off the request path. Recall itself makes no model call at all.
+	omniChatMemoryRepo := models.NewOmniChatMemoryRepository(db.Pool)
+	omniChatMemoryService := services.NewOmniChatMemoryService(
+		omniChatMemoryRepo,
+		botMessageRepo,
+		botConversationRepo,
+		botPersonaRepo,
+		services.NewModelOmniChatMemoryExtractor(
+			openrouter.NewClient(cfg.OpenRouter.APIKey, standardSceneModel),
+		),
+	)
 	chatbotService := services.NewChatbotService(
 		db.Pool,
 		botPersonaRepo,
@@ -744,6 +756,14 @@ func main() {
 	).SetConversationSceneStateCoordinator(omniChatSceneStateCoordinator).
 		SetBilling(omniChatBilling).
 		SetContentEntitlement(omniChatContentEntitlement)
+	// A nil queue means no worker will ever extract, so the persona recalls what
+	// it already knows and learns nothing new. That degrades cleanly rather than
+	// moving a 20-second model call onto the send path.
+	if queueClient != nil {
+		chatbotService.SetMemory(omniChatMemoryService, queueClient)
+	} else {
+		chatbotService.SetMemory(omniChatMemoryService, nil)
+	}
 	omniChatRequestIdempotencyRepo := models.NewOmniChatRequestIdempotencyRepository(db.Pool)
 	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService, omniChatModelSelectionService, omniChatAllowance).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo)

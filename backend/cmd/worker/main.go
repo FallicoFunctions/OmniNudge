@@ -15,6 +15,7 @@ import (
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/services/openrouter"
 	"github.com/omninudge/backend/internal/services/runpod"
 	zlog "github.com/rs/zerolog/log"
 )
@@ -145,6 +146,24 @@ func main() {
 		SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
 		SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), workerOmniChatUserRepo).
 			SetAdminReader(workerOmniChatUserRepo))
+	// Character memory extraction. This is the only place the extraction model
+	// is called, which is what keeps a 20-second reasoning pass off the send
+	// path entirely.
+	workerBotConversationRepo := models.NewBotConversationRepository(db.Pool)
+	memoryExtractionModel := strings.TrimSpace(cfg.OpenRouter.StandardModel)
+	if memoryExtractionModel == "" {
+		memoryExtractionModel = strings.TrimSpace(cfg.OpenRouter.StandardFallback)
+	}
+	omniChatMemoryService := services.NewOmniChatMemoryService(
+		models.NewOmniChatMemoryRepository(db.Pool),
+		models.NewBotMessageRepository(db.Pool),
+		workerBotConversationRepo,
+		models.NewBotPersonaRepository(db.Pool),
+		services.NewModelOmniChatMemoryExtractor(
+			openrouter.NewClient(cfg.OpenRouter.APIKey, memoryExtractionModel),
+		),
+	)
+
 	handlers := queue.JobHandlers{
 		VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed, storageService, queueClient),
 		Transcription:       queue.NewUnsupportedHandler(queue.JobTypeTranscription, "transcription backend pipeline is not yet implemented"),
@@ -157,12 +176,13 @@ func main() {
 		WaveformGeneration:  queue.NewWaveformJobHandler(db.Pool, voiceStorage).Handle,
 		VideoTranscode:      queue.NewVideoTranscodeHandler(db.Pool, "./uploads/hls", storageService).Handle,
 		OmniChatGeneration:  omniChatGenerationWorker.Handle,
+		OmniChatMemory:      queue.NewOmniChatMemoryHandler(omniChatMemoryService, workerBotConversationRepo),
 	}
 
 	worker.RegisterAllHandlers(handlers)
 
 	zlog.Info().Int("concurrency", concurrency).Msg("Worker configured")
-	zlog.Info().Strs("handlers", []string{"virus_scan", "transcription", "notification", "thumbnail_generation", "email_send", "data_export", "content_moderation", "message_reencrypt", "waveform_generation", "video_transcode", "omnichat_generation"}).Msg("Registered job handlers")
+	zlog.Info().Strs("handlers", []string{"virus_scan", "transcription", "notification", "thumbnail_generation", "email_send", "data_export", "content_moderation", "message_reencrypt", "waveform_generation", "video_transcode", "omnichat_generation", "omnichat_memory_extract"}).Msg("Registered job handlers")
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)

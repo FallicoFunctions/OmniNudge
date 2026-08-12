@@ -1372,6 +1372,49 @@ func (r *BotMessageRepository) ListBeforeMessageID(ctx context.Context, conversa
 	return messages, rows.Err()
 }
 
+// GetOwnerUserID resolves who owns a conversation. Background jobs carry only a
+// conversation id and must establish ownership from the database rather than
+// accept it from a queue payload. A missing conversation returns zero.
+func (r *BotConversationRepository) GetOwnerUserID(ctx context.Context, conversationID int) (int, error) {
+	var userID int
+	err := r.pool.QueryRow(ctx, `SELECT user_id FROM bot_conversations WHERE id = $1`, conversationID).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to resolve owner for conversation %d: %w", conversationID, err)
+	}
+	return userID, nil
+}
+
+// ListAfterMessageID returns the turns recorded after a message, oldest first.
+// Memory extraction reads forward from its watermark, the opposite direction
+// from generation, which always reads backward from the newest turn.
+func (r *BotMessageRepository) ListAfterMessageID(ctx context.Context, conversationID, messageID, limit int) ([]*BotMessage, error) {
+	query := `
+		SELECT id, conversation_id, role, content, failed, created_at
+		FROM bot_messages
+		WHERE conversation_id = $1 AND id > $2
+		ORDER BY id
+		LIMIT $3
+	`
+	rows, err := r.pool.Query(ctx, query, conversationID, messageID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	messages := []*BotMessage{}
+	for rows.Next() {
+		m := &BotMessage{}
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
+
 // ReplaceLatestAssistantContent updates a reply only if it is still latest
 // and still contains the content the caller originally read. The content
 // check prevents two concurrent regenerations from overwriting each other.

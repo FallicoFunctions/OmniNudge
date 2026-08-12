@@ -113,7 +113,20 @@ type ChatbotService struct {
 	billing     omniChatResponseBilling
 	sceneState  conversationSceneStatePreparer
 	entitlement *OmniChatContentEntitlement
+	memory      omniChatMemoryRecaller
+	memoryQueue omniChatMemoryEnqueuer
 	hub         *websocket.Hub
+}
+
+// omniChatMemoryRecaller supplies the memories a persona surfaces for a turn.
+// Recall never fails the caller: it returns nothing when memory is unavailable.
+type omniChatMemoryRecaller interface {
+	Recall(ctx context.Context, personaID, ownerUserID int, cue string) []*models.OmniChatMemoryEpisode
+}
+
+// omniChatMemoryEnqueuer schedules extraction after a turn is persisted.
+type omniChatMemoryEnqueuer interface {
+	EnqueueOmniChatMemory(ctx context.Context, conversationID int) error
 }
 
 // NewChatbotService creates a new chatbot service.
@@ -144,6 +157,37 @@ func NewChatbotService(
 func (s *ChatbotService) SetConversationSceneStateCoordinator(coordinator conversationSceneStatePreparer) *ChatbotService {
 	s.sceneState = coordinator
 	return s
+}
+
+// SetMemory wires character memory. Both halves are optional: without them the
+// service behaves exactly as it did before memory existed.
+func (s *ChatbotService) SetMemory(recaller omniChatMemoryRecaller, enqueuer omniChatMemoryEnqueuer) *ChatbotService {
+	s.memory = recaller
+	s.memoryQueue = enqueuer
+	return s
+}
+
+// recallMemories fetches what the persona remembers that bears on this turn.
+// Memory is an enhancement to the reply, never a precondition for it, so any
+// problem here yields no memories rather than an error.
+func (s *ChatbotService) recallMemories(ctx context.Context, persona *models.BotPersona, userID int, cue string) []*models.OmniChatMemoryEpisode {
+	if s == nil || s.memory == nil || persona == nil {
+		return nil
+	}
+	return s.memory.Recall(ctx, persona.ID, userID, cue)
+}
+
+// scheduleMemoryExtraction queues extraction for a conversation that just
+// advanced. Failures are logged and swallowed: a reply the user already has
+// must not be reported as failed because a background job could not be queued.
+func (s *ChatbotService) scheduleMemoryExtraction(ctx context.Context, conversationID int) {
+	if s == nil || s.memoryQueue == nil || conversationID < 1 {
+		return
+	}
+	if err := s.memoryQueue.EnqueueOmniChatMemory(context.WithoutCancel(ctx), conversationID); err != nil {
+		zlog.Warn().Err(err).Int("conversation_id", conversationID).
+			Msg("omnichat memory: failed to schedule extraction")
+	}
 }
 
 func (s *ChatbotService) SetBilling(billing omniChatResponseBilling) *ChatbotService {
@@ -308,11 +352,16 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 		}
 	}
 
+	// Recall is cued by the latest user turn only. The rest of the window is
+	// already present verbatim, so cueing on it would surface memories about
+	// whatever was discussed twenty turns ago rather than what was just asked.
+	memories := s.recallMemories(chatCtx, persona, userID, content)
+
 	messages := make([]openrouter.Message, 0, len(history)+1)
 
 	// Build the system prompt with structured persona instructions + user context.
 	systemContent := s.clampSystemPrompt(ctx,
-		buildConversationSystemPromptWithSceneState(persona, conv.Settings, history, sceneState), userID)
+		buildConversationSystemPromptWithMemory(persona, conv.Settings, history, sceneState, memories), userID)
 	messages = append(messages, openrouter.Message{Role: openrouter.RoleSystem, Content: systemContent})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -377,6 +426,12 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 		Type:        "omnichat_message_complete",
 		Payload:     assistantMsg,
 	})
+
+	// A failed turn is not an experience worth remembering, and extracting one
+	// would teach the persona a history that never happened.
+	if !failed {
+		s.scheduleMemoryExtraction(ctx, conversationID)
+	}
 
 	return assistantMsg, genErr
 }
@@ -444,11 +499,16 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 		}
 	}
 
+	// Regeneration must see the same memories the original attempt saw, or the
+	// retry answers a different question than the one the user asked. The cue is
+	// the trailing user turn, which the guard above has already established.
+	memories := s.recallMemories(chatCtx, persona, userID, history[len(history)-1].Content)
+
 	messages := make([]openrouter.Message, 0, len(history)+1)
 	messages = append(messages, openrouter.Message{
 		Role: openrouter.RoleSystem,
 		Content: s.clampSystemPrompt(ctx,
-			buildConversationSystemPromptWithSceneState(persona, conv.Settings, history, sceneState), userID),
+			buildConversationSystemPromptWithMemory(persona, conv.Settings, history, sceneState, memories), userID),
 	})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -733,8 +793,25 @@ func buildConversationSystemPromptWithSceneState(
 	history []*models.BotMessage,
 	sceneState *models.OmniChatConversationSceneState,
 ) string {
+	return buildConversationSystemPromptWithMemory(persona, settings, history, sceneState, nil)
+}
+
+// buildConversationSystemPromptWithMemory assembles the system prompt.
+//
+// Block order is load-bearing. Recalled memories sit below the conversation
+// trust boundary because they are derived from the user's own transcript and
+// are therefore no more trusted than it, and above the scene state because the
+// scene governs the present while memories only govern the past.
+func buildConversationSystemPromptWithMemory(
+	persona *models.BotPersona,
+	settings *models.ConversationSettings,
+	history []*models.BotMessage,
+	sceneState *models.OmniChatConversationSceneState,
+	memories []*models.OmniChatMemoryEpisode,
+) string {
 	base := buildCharacterPromptBase(persona, history)
 	base += conversationHistoryTrustBoundary
+	base += renderRecalledMemories(memories)
 	if settings != nil {
 		metadata := make([]string, 0, 3)
 		if settings.UserName != "" {
