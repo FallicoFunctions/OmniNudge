@@ -448,20 +448,47 @@ func exportPostsData(ctx context.Context, db *pgxpool.Pool, userID int, includeD
 // exportOmniChatConversationsData returns the user's chat history with AI
 // characters, messages nested under their conversation.
 //
+// One query, not one per conversation. The first version fetched conversations
+// and then looped fetching each one's messages, which is the N+1 the coding
+// standards forbid outright: a heavy user would have produced thousands of
+// round trips, and because the outer result set stays open until this function
+// returns, every one of them ran while a pool connection was still pinned.
+//
+// Both bounds matter. Nesting messages means the whole reply is assembled in
+// memory before it is encoded, so the row cap is what stops a long history from
+// exhausting the worker. A truncated export is reported through the counts
+// rather than passed off as complete.
+//
 // bot_messages has no user_id of its own -- a conversation owns its turns -- so
-// ownership is enforced by joining through bot_conversations rather than by
-// filtering the messages directly.
+// ownership comes from the conversation filter, and the LEFT JOIN keeps an
+// empty conversation in the export rather than dropping it.
+const (
+	omniChatExportMaxConversations = 2000
+	omniChatExportMaxMessageRows   = 200000
+)
+
 func exportOmniChatConversationsData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
-	query := `
-		SELECT id, persona_id, title, created_at, last_message_at, archived_at,
-		       settings_user_name, settings_user_age, settings_user_gender
-		FROM bot_conversations
-		WHERE user_id = $1
-	`
-	if !includeDeleted {
-		query += " AND archived_at IS NULL"
+	archivedFilter := "AND archived_at IS NULL"
+	if includeDeleted {
+		archivedFilter = ""
 	}
-	query += " ORDER BY created_at DESC LIMIT 10000"
+	query := fmt.Sprintf(`
+		WITH owned AS (
+			SELECT id, persona_id, title, created_at, last_message_at, archived_at,
+			       settings_user_name, settings_user_age, settings_user_gender
+			FROM bot_conversations
+			WHERE user_id = $1 %s
+			ORDER BY created_at DESC
+			LIMIT %d
+		)
+		SELECT c.id, c.persona_id, c.title, c.created_at, c.last_message_at, c.archived_at,
+		       c.settings_user_name, c.settings_user_age, c.settings_user_gender,
+		       m.id, m.role, m.content, m.failed, m.media_only, m.created_at
+		FROM owned c
+		LEFT JOIN bot_messages m ON m.conversation_id = c.id
+		ORDER BY c.created_at DESC, c.id, m.id
+		LIMIT %d
+	`, archivedFilter, omniChatExportMaxConversations, omniChatExportMaxMessageRows)
 
 	rows, err := db.Query(ctx, query, userID)
 	if err != nil {
@@ -491,54 +518,68 @@ func exportOmniChatConversationsData(ctx context.Context, db *pgxpool.Pool, user
 	}
 
 	conversations := []Conversation{}
+	byID := map[int]int{}
+	totalMessages := 0
+
 	for rows.Next() {
-		var conversation Conversation
+		var (
+			conversation Conversation
+			messageID    *int
+			role         *string
+			content      *string
+			failed       *bool
+			mediaOnly    *bool
+			messageAt    *time.Time
+		)
 		if err := rows.Scan(
 			&conversation.ID, &conversation.PersonaID, &conversation.Title,
 			&conversation.CreatedAt, &conversation.LastMessageAt, &conversation.ArchivedAt,
 			&conversation.UserName, &conversation.UserAge, &conversation.UserGender,
+			&messageID, &role, &content, &failed, &mediaOnly, &messageAt,
 		); err != nil {
+			return nil, err
+		}
+
+		index, seen := byID[conversation.ID]
+		if !seen {
+			conversation.Messages = []Message{}
+			conversations = append(conversations, conversation)
+			index = len(conversations) - 1
+			byID[conversation.ID] = index
+		}
+
+		// A NULL message id is the LEFT JOIN reporting a conversation with no
+		// turns, not a missing row.
+		if messageID == nil {
 			continue
 		}
-		conversation.Messages = []Message{}
-		conversations = append(conversations, conversation)
+		message := Message{ID: *messageID}
+		if role != nil {
+			message.Role = *role
+		}
+		if content != nil {
+			message.Content = *content
+		}
+		if failed != nil {
+			message.Failed = *failed
+		}
+		if mediaOnly != nil {
+			message.MediaOnly = *mediaOnly
+		}
+		if messageAt != nil {
+			message.CreatedAt = *messageAt
+		}
+		conversations[index].Messages = append(conversations[index].Messages, message)
+		totalMessages++
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	totalMessages := 0
-	for index := range conversations {
-		messageRows, err := db.Query(ctx, `
-			SELECT m.id, m.role, m.content, m.failed, m.media_only, m.created_at
-			FROM bot_messages m
-			JOIN bot_conversations c ON c.id = m.conversation_id
-			WHERE m.conversation_id = $1 AND c.user_id = $2
-			ORDER BY m.id
-			LIMIT 10000
-		`, conversations[index].ID, userID)
-		if err != nil {
-			return nil, err
-		}
-		for messageRows.Next() {
-			var message Message
-			if err := messageRows.Scan(&message.ID, &message.Role, &message.Content,
-				&message.Failed, &message.MediaOnly, &message.CreatedAt); err != nil {
-				continue
-			}
-			conversations[index].Messages = append(conversations[index].Messages, message)
-		}
-		err = messageRows.Err()
-		messageRows.Close()
-		if err != nil {
-			return nil, err
-		}
-		totalMessages += len(conversations[index].Messages)
-	}
-
 	return map[string]interface{}{
 		"total":          len(conversations),
 		"total_messages": totalMessages,
+		"truncated":      totalMessages+len(conversations) >= omniChatExportMaxMessageRows,
 		"conversations":  conversations,
 	}, nil
 }
