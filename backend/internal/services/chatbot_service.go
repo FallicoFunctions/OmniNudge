@@ -118,6 +118,10 @@ type ChatbotService struct {
 	hub         *websocket.Hub
 }
 
+// omniChatMemoryEnqueueTimeout bounds the background enqueue so a Redis stall
+// cannot leave the goroutine alive indefinitely.
+const omniChatMemoryEnqueueTimeout = 5 * time.Second
+
 // omniChatMemoryRecaller supplies the memories a persona surfaces for a turn.
 // Recall never fails the caller: it returns nothing when memory is unavailable.
 type omniChatMemoryRecaller interface {
@@ -180,14 +184,26 @@ func (s *ChatbotService) recallMemories(ctx context.Context, persona *models.Bot
 // scheduleMemoryExtraction queues extraction for a conversation that just
 // advanced. Failures are logged and swallowed: a reply the user already has
 // must not be reported as failed because a background job could not be queued.
+//
+// It runs off the reply entirely. Enqueuing is a Redis round trip, and
+// detaching from cancellation without also setting a deadline would leave a
+// stalled Redis holding the user's response open with no timeout at all. What
+// is queued here only decides what gets remembered later, so it is never worth
+// a moment of the caller's latency.
 func (s *ChatbotService) scheduleMemoryExtraction(ctx context.Context, conversationID int) {
 	if s == nil || s.memoryQueue == nil || conversationID < 1 {
 		return
 	}
-	if err := s.memoryQueue.EnqueueOmniChatMemory(context.WithoutCancel(ctx), conversationID); err != nil {
-		zlog.Warn().Err(err).Int("conversation_id", conversationID).
-			Msg("omnichat memory: failed to schedule extraction")
-	}
+	queue := s.memoryQueue
+	detached := context.WithoutCancel(ctx)
+	go func() {
+		enqueueCtx, cancel := context.WithTimeout(detached, omniChatMemoryEnqueueTimeout)
+		defer cancel()
+		if err := queue.EnqueueOmniChatMemory(enqueueCtx, conversationID); err != nil {
+			zlog.Warn().Err(err).Int("conversation_id", conversationID).
+				Msg("omnichat memory: failed to schedule extraction")
+		}
+	}()
 }
 
 func (s *ChatbotService) SetBilling(billing omniChatResponseBilling) *ChatbotService {

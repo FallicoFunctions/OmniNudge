@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -399,4 +400,62 @@ func TestExtractForConversationPassesReadWatermarkAsGuard(t *testing.T) {
 	require.NoError(t, service.ExtractForConversation(context.Background(), 1, 2))
 	require.Equal(t, []int{10}, store.recordedFrom)
 	require.Equal(t, []int{13}, store.recordedThrough)
+}
+
+type blockingMemoryEnqueuer struct {
+	entered chan struct{}
+	release chan struct{}
+	calls   int32
+}
+
+func (b *blockingMemoryEnqueuer) EnqueueOmniChatMemory(ctx context.Context, _ int) error {
+	atomic.AddInt32(&b.calls, 1)
+	close(b.entered)
+	select {
+	case <-b.release:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Queuing extraction is a Redis round trip on the send path. Detaching it from
+// cancellation without a deadline once meant a stalled Redis could hold the
+// user's reply open indefinitely, so the reply must not wait on it at all.
+func TestScheduleMemoryExtractionDoesNotBlockTheReply(t *testing.T) {
+	enqueuer := &blockingMemoryEnqueuer{
+		entered: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	service := (&ChatbotService{}).SetMemory(nil, enqueuer)
+
+	done := make(chan struct{})
+	go func() {
+		service.scheduleMemoryExtraction(context.Background(), 42)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("scheduleMemoryExtraction blocked on the enqueue")
+	}
+
+	// It really did run, and it is still waiting rather than having been skipped.
+	select {
+	case <-enqueuer.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the enqueue never ran")
+	}
+	close(enqueuer.release)
+	require.Equal(t, int32(1), atomic.LoadInt32(&enqueuer.calls))
+}
+
+// A nil queue is the no-worker deployment: recall still works, nothing new is
+// remembered, and nothing panics.
+func TestScheduleMemoryExtractionToleratesNoQueue(t *testing.T) {
+	service := (&ChatbotService{}).SetMemory(nil, nil)
+	require.NotPanics(t, func() {
+		service.scheduleMemoryExtraction(context.Background(), 42)
+	})
 }
