@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -390,4 +391,37 @@ func TestExportOmniChatConversationsGroupsMessagesPerConversation(t *testing.T) 
 	// Messages must land under their own conversation, not the first one.
 	first := byTitle["Second"][0].(map[string]interface{})
 	require.Equal(t, "Second one", first["content"])
+}
+
+// The truncation flag was first derived by adding the conversation count to the
+// message count, which overstates the rows the join actually returns and would
+// mark a complete export as partial. It counts scanned rows now, so an export
+// well inside both caps must report itself complete.
+func TestExportOmniChatConversationsReportsCompleteWhenWithinCaps(t *testing.T) {
+	pool := setupOmniChatExportDB(t)
+	fixture := seedOmniChatExport(t, pool, "truncflag")
+	ctx := context.Background()
+
+	// Several conversations, each with several messages: the shape that made the
+	// old arithmetic drift furthest from the real row count.
+	for c := 0; c < 5; c++ {
+		var id int
+		require.NoError(t, pool.QueryRow(ctx,
+			`INSERT INTO bot_conversations (user_id, persona_id, title) VALUES ($1, $2, $3) RETURNING id`,
+			fixture.userID, fixture.personaID, fmt.Sprintf("Chat %d", c)).Scan(&id))
+		for m := 0; m < 4; m++ {
+			_, err := pool.Exec(ctx,
+				`INSERT INTO bot_messages (conversation_id, role, content) VALUES ($1, 'user', $2)`,
+				id, fmt.Sprintf("message %d", m))
+			require.NoError(t, err)
+		}
+	}
+
+	data, err := exportOmniChatConversationsData(ctx, pool, fixture.userID, false)
+	require.NoError(t, err)
+	out := encodeExport(t, data)
+
+	require.Equal(t, float64(6), out["total"], "5 new plus the seeded one")
+	require.Equal(t, float64(22), out["total_messages"], "20 new plus the seeded 2")
+	require.Equal(t, false, out["truncated"])
 }
