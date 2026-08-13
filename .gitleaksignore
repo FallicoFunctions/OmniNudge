@@ -13,3 +13,19 @@ b55a9f53ab54e4ec4f7ae287aaee8a89b0a8e417:docs/FRONTEND_SETUP_COMPLETE.md:curl-au
 b4891595babad5c3788f9b8f457d8c6a60515d8b:docs/FRONTEND_SETUP_GUIDE.md:curl-auth-header:770
 11a3d8497ac4e31715c452c3d0204bb80f7ba688:docs/roadmap/03-implementation-guide.md:curl-auth-header:842
 11a3d8497ac4e31715c452c3d0204bb80f7ba688:docs/technical/api-design.md:generic-api-key:65
+
+# The two entries above for mainStageMaterialPolish name commit 16bc1189,
+# which no longer exists: stripping a 108 MB build artifact out of this
+# branch's history rewrote every commit in it, and a fingerprint is
+# commit-scoped, so the ignores stopped matching and gitleaks went red on
+# findings that were already reviewed. Re-pinned to the current commit.
+#
+# Both are the same false positive as before -- the Main Stage polish table
+# assigns a venue slug to a `key` field surrounded by material values, and
+# generic-api-key matches the assignment. No credential is involved.
+#
+# Any future rewrite of this history invalidates these again, and the old
+# lines are kept rather than replaced because they still guard the commits
+# they name wherever that history survives.
+1c43054a689488f6fd942dfde85c7f4b23784204:omnirave-babylon/src/scene/mainStageMaterialPolish.ts:generic-api-key:570
+1c43054a689488f6fd942dfde85c7f4b23784204:omnirave-babylon/src/scene/__tests__/mainStageMaterialPolish.test.ts:generic-api-key:69

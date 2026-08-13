@@ -247,6 +247,15 @@ jobs:
           JWT_SECRET: ci-test-secret-not-used-in-prod
         run: go run ./cmd/seed/... --count=5
 
+      # Built as its own step rather than left to `go run` in the background.
+      # `go run` compiles when it starts, so the compile happened inside the
+      # 60s readiness window while nothing was listening yet, and a build slow
+      # enough to overrun it looked identical to a server that refused to come
+      # up. Compiling here also surfaces build errors as build errors.
+      - name: Build backend server
+        working-directory: backend
+        run: go build -o /tmp/omninudge-server ./cmd/server
+
       - name: Start backend server
         working-directory: backend
         env:
@@ -260,7 +269,10 @@ jobs:
           PORT: 8080
           JWT_SECRET: ci-test-secret-do-not-use-in-prod
           ENCRYPTION_KEY: b21uaW51ZGdlLWNpLWUyZS10ZXN0LWtleS0zMmJ5dGU=
-        run: go run ./cmd/server/... &
+        # Keep the output. Backgrounded with no redirect, a server that exits
+        # on startup leaves nothing behind, and the only symptom is the wait
+        # below timing out with no reason given.
+        run: /tmp/omninudge-server > /tmp/omninudge-backend.log 2>&1 &
 
       - name: Wait for backend to be ready
         run: |
@@ -273,6 +285,8 @@ jobs:
             sleep 2
           done
           echo "ERROR: backend did not become ready after 60s"
+          echo "--- backend log ---"
+          cat /tmp/omninudge-backend.log 2>/dev/null || echo "(no log; the server produced no output)"
           exit 1
 
       - name: Install frontend dependencies
