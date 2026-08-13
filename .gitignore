@@ -86,10 +86,16 @@ backend/*.txt
 *.bak
 *.bak[0-9]
 *.bak[0-9][0-9]
+*.blend1
+source-render-*.png
 
 
 # Local runtime/build artifacts (do not commit)
 .claude/
+node_modules/
+**/node_modules/
+**/.vite/
+**/dist/
 backend/dump.rdb
 frontend/storybook-static/
 
@@ -102,3 +108,15 @@ frontend/storybook-static/
 
 # Compiled one-off CLI binaries built from backend/cmd
 backend/omnichat_prompt_preview
+
+# Local generated / non-product artifacts
+.git-lfs/
+.superpowers/
+.opencode/
+opencode.json
+TMP_MAIN_STAGE_TEST.glb
+docs/superpowers/plans/
+frontend/playwright-report/
+frontend/test-results/
+__pycache__/
+*.py[cod]

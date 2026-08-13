@@ -89,6 +89,9 @@
     "@babel/core": "^7.29.6",
     "js-yaml": "^4.2.0"
   },
+  "overrides": {
+    "esbuild": "^0.28.2"
+  },
   "lint-staged": {
     "*.{ts,tsx}": [
       "eslint --fix",

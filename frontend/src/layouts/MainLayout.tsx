@@ -37,6 +37,7 @@ const prefetchRoutes = {
   about: () => import('../pages/AboutPage'),
   createHub: () => import('../pages/CreateHubPage'),
   createPost: () => import('../pages/CreatePostPage'),
+  games: () => import('../pages/GamesPage'),
   hubs: () => import('../pages/HubsAndSubsPage'),
   messages: () => import('../pages/MessagesPage'),
   omnichat: () => import('../pages/OmniChatDiscoverPage'),
@@ -274,6 +275,13 @@ export default function MainLayout() {
                     >
                       {t('menu.hubs')}
                     </button>
+                    <Link
+                      to="/games"
+                      onMouseEnter={() => prefetchRoutes.games()}
+                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                    >
+                      {t('nav.games')}
+                    </Link>
                     <button
                       type="button"
                       onClick={() => navigate('/omnichat')}

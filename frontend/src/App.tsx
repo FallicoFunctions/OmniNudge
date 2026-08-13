@@ -65,6 +65,8 @@ const LoadingStatesShowcasePage = lazy(() => import('./pages/LoadingStatesShowca
 const DonatePage = lazy(() => import('./pages/DonatePage'));
 const OAuthCallbackPage = lazy(() => import('./pages/OAuthCallbackPage'));
 const OAuthChooseUsernamePage = lazy(() => import('./pages/OAuthChooseUsernamePage'));
+const GamesPage = lazy(() => import('./pages/GamesPage'));
+const GameDetailPage = lazy(() => import('./pages/GameDetailPage'));
 
 // Initialize analytics on app load
 function AnalyticsWrapper({ children }: { children: React.ReactNode }) {
@@ -168,6 +170,8 @@ function App() {
                             />
                             <Route path="/search" element={<SearchResultsPage />} />
                             <Route path="/hubs" element={<HubsAndSubsPage />} />
+                            <Route path="/games" element={<GamesPage />} />
+                            <Route path="/games/omnirave" element={<GameDetailPage />} />
                             <Route path="/about" element={<AboutPage />} />
                             <Route path="/donate" element={<DonatePage />} />
                             <Route path="/terms" element={<TermsPage />} />

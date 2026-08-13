@@ -125,8 +125,8 @@
     "notifications": "Notificaciones",
     "profile": "Perfil",
     "admin": "Admin",
-    "hubs": "Hubs",
     "games": "Juegos",
+    "hubs": "Hubs",
     "search": "Buscar",
     "create": "Crear",
     "menu": "Menú",
@@ -145,16 +145,20 @@
   },
   "gamesPage": {
     "eyebrow": "OmniGame",
-    "title": "OmniGame",
-    "description": "Explora mundos multijugador creados para OmniNudge.",
+    "title": "Juegos",
+    "description": "Entra en espacios multijugador dedicados dentro de OmniNudge, comenzando con la primera sala en vivo: OmniRave.",
     "availableNow": "Disponible ahora",
     "viewGame": "Ver juego"
   },
   "gameDetailPage": {
     "eyebrow": "OmniGame / OmniRave",
     "play": "Jugar",
-    "starting": "Iniciando...",
-    "launchError": "No se puede iniciar OmniRave ahora mismo."
+    "playing": "Entrando en OmniRave...",
+    "heroTitle": "Entra a la sala sin ninguna pantalla intermedia.",
+    "heroBody": "Jugar debe sentirse inmediato: fundido a negro, gente real, luces del escenario y la sala ya en movimiento.",
+    "launchHint": "Los jugadores con sesión iniciada reanudan su cuenta; los demás entran como invitados.",
+    "highlightsTitle": "Lo que hace que la sala se sienta real",
+    "launchError": "No se pudo iniciar OmniRave en este momento."
   },
   "mainLayout": {
     "skipToMainContent": "Saltar al contenido principal",
@@ -210,6 +214,35 @@
     "memberCount_other": "{{formattedCount}} miembros",
     "pagination": {
       "page": "Página {{formattedPage}}"
+    }
+  },
+  "games": {
+    "omnirave": {
+      "summary": "Un rave en el navegador donde una sola multitud en vivo se mueve por tres escenarios sincronizados dentro del mismo mundo.",
+      "hero": "Un mundo. Tres escenarios. Un pulso compartido.",
+      "description": [
+        "OmniRave deja a cada jugador dentro del mismo recinto autoritativo, para que la sala se sienta viva desde el instante en que llegas.",
+        "Los invitados aparecen al instante en el Main Stage, mientras que los jugadores con cuenta regresan por su punto de retorno guardado con su equipamiento intacto."
+      ],
+      "highlights": [
+        "Aparición en Main Stage para invitados y jugadores nuevos",
+        "Reingreso por punto de retorno guardado para jugadores con cuenta",
+        "Audio por zonas y estado del mundo sincronizados de forma autoritativa en cada escenario"
+      ],
+      "gallery": {
+        "0": {
+          "title": "Main Stage",
+          "caption": "El punto de llegada donde toda la sala se engancha al ritmo desde el primer momento."
+        },
+        "1": {
+          "title": "The Underground",
+          "caption": "Una pista más oscura pensada para cortes más duros, luces más densas y movimiento de madrugada."
+        },
+        "2": {
+          "title": "P.L.U.R.R. Partay",
+          "caption": "Una sala lateral neón afinada para color, rebote y desborde eufórico."
+        }
+      }
     }
   },
   "bugReportModal": {

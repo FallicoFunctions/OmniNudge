@@ -1,0 +1,437 @@
+import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
+import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
+import { Scene } from '@babylonjs/core/scene.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { createMainStageCollisionBlockers, isVipGateBlocker } from '../createMainStageCollisionBlockers';
+import {
+  VENUE_WALKABLE_X_MAX,
+  VIP_GATE_INNER_X,
+  VIP_PROMENADE_MOUTH_HALF_X,
+} from '../mainStageVenueBounds';
+
+describe('createMainStageCollisionBlockers clustered families', () => {
+  let engine: NullEngine;
+  let scene: Scene;
+
+  beforeEach(() => {
+    engine = new NullEngine();
+    scene = new Scene(engine);
+  });
+
+  afterEach(() => {
+    scene.dispose();
+    engine.dispose();
+  });
+
+  const clusterBlockers = (meshes: Parameters<typeof createMainStageCollisionBlockers>[1]) =>
+    createMainStageCollisionBlockers(scene, meshes).filter((mesh) => mesh.name.includes('-cluster-'));
+
+  it('gives each discrete pylon its own snug box and keeps the gap between them open', () => {
+    // Two sentinel pylons 12 apart, mirroring a spawn-gate pair.
+    const pylons = MeshBuilder.CreateBox('pylon-a', { size: 2 }, scene);
+    pylons.position.set(-6, 1, 0);
+    const other = MeshBuilder.CreateBox('pylon-b', { size: 2 }, scene);
+    other.position.set(6, 1, 0);
+    const merged = MeshBuilder.CreateBox('placeholder', { size: 1 }, scene);
+    merged.dispose();
+    // Simulate the merged family mesh: one mesh whose vertices span both
+    // pylons (bake both boxes into a single vertex buffer via a parent
+    // proxy is overkill for NullEngine - use two clustered calls instead).
+    pylons.name = 'merged:V60_SpawnGateSentinelPearl+1';
+    const blockers = clusterBlockers([pylons]);
+
+    expect(blockers.length).toBe(1);
+    const bb = blockers[0].getBoundingInfo().boundingBox;
+    // Snug to the single 2-unit pylon (plus the min-thickness floor rule),
+    // nowhere near the 12-unit pair span a bbox blocker would produce.
+    expect(bb.extendSizeWorld.x * 2).toBeLessThanOrEqual(2.5);
+    expect(blockers[0].position.x).toBeCloseTo(-6);
+  });
+
+  it('splits a vertex cloud with a real gap into separate boxes on both axes', () => {
+    // A 2x2 grid of stems, 8 apart: expect four separate cluster boxes.
+    const grid = MeshBuilder.CreateBox('stem-0', { size: 1 }, scene);
+    grid.position.set(0, 1, 0);
+    grid.name = 'merged:V44_PlazaLanternStemCluster+1';
+    const positions: number[] = [];
+    for (const sx of [-4, 4]) {
+      for (const sz of [-4, 4]) {
+        for (const dx of [-0.4, 0.4]) {
+          for (const dy of [0, 2]) {
+            for (const dz of [-0.4, 0.4]) {
+              positions.push(sx + dx, dy, sz + dz);
+            }
+          }
+        }
+      }
+    }
+    grid.setVerticesData('position', positions);
+    // Drop the CreateBox index buffer: it references the old 24 vertices.
+    // Index-less clouds fall back to per-vertex spatial grouping.
+    grid.setIndices([]);
+    grid.position.set(0, 0, 0);
+    grid.computeWorldMatrix(true);
+
+    const blockers = clusterBlockers([grid]);
+
+    expect(blockers.length).toBe(4);
+    const centers = blockers
+      .map((mesh) => `${Math.round(mesh.position.x)},${Math.round(mesh.position.z)}`)
+      .sort();
+    expect(centers).toEqual(['-4,-4', '-4,4', '4,-4', '4,4']);
+  });
+
+  it('skips clusters floating entirely above the capsule', () => {
+    const elevated = MeshBuilder.CreateBox('merged:V58_ArrivalPlinthPearlDais+1', { size: 1 }, scene);
+    elevated.position.set(0, 4.5, 0);
+    elevated.computeWorldMatrix(true);
+
+    expect(clusterBlockers([elevated]).length).toBe(0);
+  });
+
+  it('refines a single WIDE CONNECTED mesh with a real archway gap into separate boxes, leaving the gap open', () => {
+    // One continuous strip mesh (every column shares vertices with its
+    // neighbour, so union-find sees exactly one component) mimicking the
+    // VIP wing shell case the refinement exists for: solid piers at both
+    // ends, reaching the ground, joined across the middle by an arch that
+    // never dips below capsule height.
+    const columnXs = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
+    const positions: number[] = [];
+    for (const x of columnXs) {
+      const isPier = x <= -4 || x >= 4;
+      const bottomY = isPier ? 0 : 3; // 3 > CAPSULE_TOP_Y (2.4): no low vertex under the arch
+      positions.push(x, bottomY, 0, x, 5, 0);
+    }
+    const indices: number[] = [];
+    for (let c = 0; c < columnXs.length - 1; c++) {
+      const b0 = c * 2;
+      const t0 = c * 2 + 1;
+      const b1 = c * 2 + 2;
+      const t1 = c * 2 + 3;
+      indices.push(b0, t0, b1, t0, t1, b1);
+    }
+    const archway = new Mesh('merged:V30_VipShellFascia+1', scene);
+    archway.setVerticesData('position', positions);
+    archway.setIndices(indices);
+    archway.computeWorldMatrix(true);
+
+    const blockers = clusterBlockers([archway]);
+
+    expect(blockers.length).toBe(2);
+    const spans = blockers
+      .map((mesh) => {
+        const bb = mesh.getBoundingInfo().boundingBox;
+        return { maxX: bb.maximumWorld.x, minX: bb.minimumWorld.x };
+      })
+      .sort((a, b) => a.minX - b.minX);
+    // Each box hugs its own pier; the archway opening in the middle is wide
+    // open (a single sealing bbox would instead span the full -6..6 width).
+    // The transition segment either side of the opening dips low at its
+    // pier-side corner, so each box's real edge sits a little past the
+    // architectural x -4/4 opening - the regression this guards against is
+    // ONE box spanning the whole width, not the exact transition boundary.
+    expect(spans[0].maxX - spans[0].minX).toBeLessThan(6);
+    expect(spans[1].maxX - spans[1].minX).toBeLessThan(6);
+    expect(spans[0].maxX).toBeLessThan(0);
+    expect(spans[1].minX).toBeGreaterThan(0);
+    expect(spans[1].minX - spans[0].maxX).toBeGreaterThanOrEqual(4);
+  });
+
+  it('splits a solid (non-clustered) source mesh into left/right blockers across a real center gap', () => {
+    const left = MeshBuilder.CreateBox('wall-left', { width: 4, height: 3, depth: 20 }, scene);
+    left.position.set(-6, 1.5, 0);
+    const right = MeshBuilder.CreateBox('wall-right', { width: 4, height: 3, depth: 20 }, scene);
+    right.position.set(6, 1.5, 0);
+    const merged = Mesh.MergeMeshes([left, right], true, true)!;
+    merged.name = 'merged:V118_BasinWallRelief+1';
+    merged.computeWorldMatrix(true);
+
+    const blockers = createMainStageCollisionBlockers(scene, [merged]).filter(
+      (mesh) => mesh.metadata?.sourceMeshName === 'merged:V118_BasinWallRelief+1',
+    );
+
+    expect(blockers).toHaveLength(2);
+    expect(blockers.map((mesh) => mesh.metadata?.blockerSide).sort()).toEqual(['left', 'right']);
+    expect(
+      blockers.some((mesh) => {
+        const bb = mesh.getBoundingInfo().boundingBox;
+        return bb.minimumWorld.x <= 0 && bb.maximumWorld.x >= 0;
+      }),
+    ).toBe(false);
+  });
+
+  it('terminates and produces one box per component at scale without merging well-separated pylons', () => {
+    // Sweep-until-stable must not go quadratic-blowup or hang on families
+    // that arrive as many small components (see the code comment on why the
+    // merge loop never restarts its scan). 60 pylons spaced 3 apart (gap 2,
+    // over CLUSTER_GAP 1.5) should stay 60 separate boxes.
+    const pylonCount = 60;
+    const pylons = [];
+    for (let i = 0; i < pylonCount; i++) {
+      const box = MeshBuilder.CreateBox(`pylon-${i}`, { size: 1 }, scene);
+      box.position.set(i * 3, 1, 0);
+      pylons.push(box);
+    }
+    const merged = Mesh.MergeMeshes(pylons, true, true)!;
+    merged.name = 'merged:V55_SpawnPylonPearlShell+1';
+    merged.computeWorldMatrix(true);
+
+    const blockers = clusterBlockers([merged]);
+
+    expect(blockers.length).toBe(pylonCount);
+  });
+});
+
+describe('createMainStageCollisionBlockers cascade fountain (octagon ellipse)', () => {
+  let engine: NullEngine;
+  let scene: Scene;
+
+  beforeEach(() => {
+    engine = new NullEngine();
+    scene = new Scene(engine);
+  });
+
+  afterEach(() => {
+    scene.dispose();
+    engine.dispose();
+  });
+
+  // True when (x, z) lies inside any authored cascade-fountain column box, at
+  // capsule height. Primitives only - the boxes' world bounds are read out and
+  // compared as numbers, never handed to expect().
+  const blockedAtFountain = (x: number, z: number): boolean => {
+    const blockers = createMainStageCollisionBlockers(scene, []).filter((mesh) =>
+      mesh.name.includes('cascade-fountain'),
+    );
+    return blockers.some((mesh) => {
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+      return (
+        x >= bb.minimumWorld.x &&
+        x <= bb.maximumWorld.x &&
+        z >= bb.minimumWorld.z &&
+        z <= bb.maximumWorld.z
+      );
+    });
+  };
+
+  it('emits an ellipse-hugging column row on each flank', () => {
+    const columns = createMainStageCollisionBlockers(scene, []).filter((mesh) =>
+      mesh.name.includes('cascade-fountain'),
+    );
+    // 14 per flank, both flanks.
+    expect(columns.length).toBe(28);
+    expect(columns.filter((mesh) => mesh.name.includes('-r-')).length).toBe(14);
+    expect(columns.filter((mesh) => mesh.name.includes('-l-')).length).toBe(14);
+  });
+
+  it('leaves the octagon corners (no stone) walk-through, both flanks', () => {
+    // Corners the old rectangle walled off - nothing stands here.
+    for (const [x, z] of [
+      [54, -39],
+      [54, -18],
+      [56, -40],
+    ] as const) {
+      expect(blockedAtFountain(x, z)).toBe(false);
+      // Left flank mirror.
+      expect(blockedAtFountain(-x, z)).toBe(false);
+    }
+  });
+
+  it('blocks the fountain stone itself, both flanks', () => {
+    // Centre and a mid-edge, both under real stone.
+    for (const [x, z] of [
+      [68, -28],
+      [60, -28],
+    ] as const) {
+      expect(blockedAtFountain(x, z)).toBe(true);
+      expect(blockedAtFountain(-x, z)).toBe(true);
+    }
+  });
+
+  it('does not wall the -x flat edge the old ellipse fit overshot (player-flagged, 2026-07-31)', () => {
+    // The ellipse this replaced reached r~14.15 at this edge; the real
+    // stone measures r~13.25 there (see FOUNTAIN_STONE_RADII) - a ~1m gap
+    // that both walled empty ground here AND (in createCascadeCourtPaving)
+    // wrongly culled several rows of paving tiles at the same spot. Tested
+    // at z -27/-25, not right at the fountain's own cz=-28.9: within about
+    // 0.4m of the true edge is FOUNTAIN_COLUMN_Z_MARGIN's OWN deliberate
+    // collision safety margin (unrelated to the ellipse-vs-real-shape bug
+    // this test guards), not something this check should fight.
+    for (const z of [-27, -25]) {
+      expect(blockedAtFountain(54.7, z)).toBe(false);
+      expect(blockedAtFountain(-54.7, z)).toBe(false);
+    }
+  });
+});
+
+// The VIP boundary along the spawn-pylon line (VIP_BOUNDARY_Z). Owner
+// decision (2026-08-03): the centre promenade is public for every guest, but
+// the flanks it runs between - cascade courts, VIP terraces, and the skydecks
+// they lead to - are VIP and sit behind this wall. A flood fill of the
+// reachable floor had found players walking SOUTH around the approach deck
+// (whose slab ends at z -57), then straight east and back north up the whole
+// flank, so this line is what makes the flanks enterable only through a gate.
+describe('createMainStageCollisionBlockers VIP boundary', () => {
+  let engine: NullEngine;
+  let scene: Scene;
+
+  beforeEach(() => {
+    engine = new NullEngine();
+    scene = new Scene(engine);
+  });
+
+  afterEach(() => {
+    scene.dispose();
+    engine.dispose();
+  });
+
+  // True when a capsule centred at (x, VIP_BOUNDARY_Z) meets one of the
+  // boundary's runs. `namePart` picks which half: the permanent inner
+  // boundary, the signed-in gate, or (default) either. Primitives only -
+  // world bounds are read out and compared as numbers, never handed to
+  // expect().
+  const blocksAt = (x: number, namePart = 'vip-'): boolean => {
+    const runs = createMainStageCollisionBlockers(scene, []).filter((mesh) =>
+      mesh.name.startsWith(`main-stage-blocker-${namePart}`),
+    );
+    return runs.some((mesh) => {
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+      return x >= bb.minimumWorld.x && x <= bb.maximumWorld.x;
+    });
+  };
+
+  it('emits a permanent inner run and a gated outer run per flank', () => {
+    const blockers = createMainStageCollisionBlockers(scene, []);
+    expect(blockers.filter((mesh) => mesh.name.startsWith('main-stage-blocker-vip-boundary-')).length).toBe(2);
+    expect(blockers.filter((mesh) => mesh.name.startsWith('main-stage-blocker-vip-gate-')).length).toBe(2);
+  });
+
+  it('leaves the centre promenade mouth open for all guests', () => {
+    expect(blocksAt(0)).toBe(false);
+    expect(blocksAt(VIP_PROMENADE_MOUTH_HALF_X - 1)).toBe(false);
+    expect(blocksAt(-(VIP_PROMENADE_MOUTH_HALF_X - 1))).toBe(false);
+  });
+
+  it('seals both flanks from the mouth out to the envelope fence', () => {
+    for (const x of [16, 24, 32, 40, 48, 56, VENUE_WALKABLE_X_MAX]) {
+      expect(blocksAt(x)).toBe(true);
+      expect(blocksAt(-x)).toBe(true);
+    }
+  });
+
+  // The owner placed the opening "beginning to the right of
+  // merged:V58_ArrivalPlinthPearlDais+1" - the daises measure x 19.32..28.68
+  // per side - so the plinth frontage stays walled even for VIP players and
+  // only the stretch outboard of it opens.
+  it('splits at the arrival plinth: the plinth frontage is permanent, everything outboard is the gate', () => {
+    for (const x of [VIP_PROMENADE_MOUTH_HALF_X + 1, 20, 24, 28]) {
+      expect(blocksAt(x, 'vip-boundary-')).toBe(true);
+      expect(blocksAt(-x, 'vip-boundary-')).toBe(true);
+      expect(blocksAt(x, 'vip-gate-')).toBe(false);
+      expect(blocksAt(-x, 'vip-gate-')).toBe(false);
+    }
+    for (const x of [VIP_GATE_INNER_X + 1, 40, 56, VENUE_WALKABLE_X_MAX]) {
+      expect(blocksAt(x, 'vip-gate-')).toBe(true);
+      expect(blocksAt(-x, 'vip-gate-')).toBe(true);
+      expect(blocksAt(x, 'vip-boundary-')).toBe(false);
+      expect(blocksAt(-x, 'vip-boundary-')).toBe(false);
+    }
+  });
+
+  it('tags only the gate runs, so createVipGate opens nothing permanent', () => {
+    const tagged = createMainStageCollisionBlockers(scene, []).filter(isVipGateBlocker);
+    expect(tagged.length).toBe(2);
+    expect(tagged.every((mesh) => mesh.name.startsWith('main-stage-blocker-vip-gate-'))).toBe(true);
+  });
+
+  it('stands tall enough that the boundary cannot be jumped', () => {
+    const runs = createMainStageCollisionBlockers(scene, []).filter((mesh) =>
+      mesh.name.startsWith('main-stage-blocker-vip-'),
+    );
+    expect(runs.length).toBe(4);
+    for (const mesh of runs) {
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+      // Reaches the floor, and clears a standing capsule several times over.
+      expect(bb.minimumWorld.y <= 0).toBe(true);
+      expect(bb.maximumWorld.y >= 4).toBe(true);
+    }
+  });
+});
+
+// The promenade corridor walls, which trace the approach deck's ANGLED sides
+// (player-flagged 2026-08-03: guests could drift off the deck sideways where
+// it tapers, onto ground walkable out to x ~18). The deck's own measured +x
+// vertices are x 14.2 @ z -57, 11.7 @ z -49.5, then 9.06 from z -42 north.
+describe('createMainStageCollisionBlockers promenade corridor', () => {
+  let engine: NullEngine;
+  let scene: Scene;
+
+  beforeEach(() => {
+    engine = new NullEngine();
+    scene = new Scene(engine);
+  });
+
+  afterEach(() => {
+    scene.dispose();
+    engine.dispose();
+  });
+
+  // Primitives only - world bounds are read out and compared as numbers,
+  // never handed to expect().
+  const edgeRuns = () =>
+    createMainStageCollisionBlockers(scene, []).filter((mesh) =>
+      mesh.name.startsWith('main-stage-blocker-promenade-edge-'),
+    );
+
+  const blockedAt = (x: number, z: number): boolean =>
+    edgeRuns().some((mesh) => {
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+      return (
+        x >= bb.minimumWorld.x &&
+        x <= bb.maximumWorld.x &&
+        z >= bb.minimumWorld.z &&
+        z <= bb.maximumWorld.z
+      );
+    });
+
+  it('walls both angled sides, tracking the taper inward as it runs north', () => {
+    // At the mouth the wall sits out near x 14.2; by the straight run it has
+    // pulled in to x ~9. Sampling the deck's own edge line at three z values
+    // proves the wall FOLLOWS the taper instead of boxing it.
+    for (const [z, edgeX] of [[-56, 13.9], [-49.5, 11.7], [-41, 9.06]] as const) {
+      expect(blockedAt(edgeX, z)).toBe(true);
+      expect(blockedAt(-edgeX, z)).toBe(true);
+    }
+  });
+
+  it('leaves the deck itself walkable all the way up the corridor', () => {
+    for (const z of [-56, -52, -49.5, -46, -42, -40]) {
+      expect(blockedAt(0, z)).toBe(false);
+      expect(blockedAt(4, z)).toBe(false);
+      expect(blockedAt(-4, z)).toBe(false);
+    }
+  });
+
+  it('stops at z -39 where V118_BasinWallRelief already guards the line', () => {
+    // Nothing north of the basin wall relief's own blocker start: doubling up
+    // there is exactly what the owner said was unnecessary.
+    for (const z of [-38, -30, -20, -10]) {
+      expect(blockedAt(9.06, z)).toBe(false);
+      expect(blockedAt(-9.06, z)).toBe(false);
+    }
+  });
+
+  it('steps in segments rather than one rotated box, with no yaw', () => {
+    const runs = edgeRuns();
+    expect(runs.length).toBeGreaterThan(20);
+    for (const mesh of runs) {
+      expect(mesh.rotation.y === 0).toBe(true);
+    }
+  });
+});

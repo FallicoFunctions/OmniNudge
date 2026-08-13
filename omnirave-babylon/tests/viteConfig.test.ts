@@ -1,0 +1,31 @@
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
+describe('vite config', () => {
+  it('keeps Babylon-heavy runtime behind an application-level dynamic import', () => {
+    const configSource = readFileSync(path.join(process.cwd(), 'vite.config.ts'), 'utf8');
+    const bootstrapSource = readFileSync(
+      path.join(process.cwd(), 'src/app/bootstrapRuntime.ts'),
+      'utf8',
+    );
+    const avatarSource = readFileSync(
+      path.join(process.cwd(), 'src/player/createReviewAvatar.ts'),
+      'utf8',
+    );
+    const runtimeSource = readFileSync(
+      path.join(process.cwd(), 'src/app/createRuntime.ts'),
+      'utf8',
+    );
+
+    expect(configSource).not.toContain('manualChunks');
+    expect(configSource).toContain('chunkSizeWarningLimit: 2300');
+    expect(bootstrapSource).not.toContain("import { createRuntime } from './createRuntime'");
+    expect(bootstrapSource).toContain("import('./createRuntime')");
+    // The festival avatar is fully procedural (MeshBuilder + colorways);
+    // it must not pull any glTF loader into the eager chunk at all.
+    expect(avatarSource).not.toContain('@babylonjs/loaders');
+    expect(runtimeSource).not.toContain("import { createMainStageScene } from '../scene/createMainStageScene'");
+    expect(runtimeSource).toContain("import('../scene/createMainStageScene')");
+  });
+});

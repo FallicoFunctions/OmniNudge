@@ -1,0 +1,459 @@
+import { Color4 } from '@babylonjs/core/Maths/math.color.js';
+import { Color3 } from '@babylonjs/core/Maths/math.color.js';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { Scene } from '@babylonjs/core/scene.js';
+import type { AbstractEngine } from '@babylonjs/core/Engines/abstractEngine';
+
+import { createCompletionCelebration } from '../game/createCompletionCelebration';
+import { createMainStageRouteProgress } from '../game/mainStageRouteProgress';
+import { applyAvatarColorway, USER_AVATAR_COLORWAYS } from '../player/avatarColorways';
+import { applyAvatarDefinition } from '../player/applyAvatarDefinition';
+import {
+  DEFAULT_AVATAR_DEFINITION,
+  serializeAvatarLoadout,
+  type AvatarDefinition,
+} from '../player/avatarDefinition';
+import { createFollowCameraRig } from '../player/createFollowCameraRig';
+import { createInputMap } from '../player/createInputMap';
+import { createPlayerController, type LadderZone, type RemotePlayerCollisionTarget } from '../player/playerController';
+import { createPlayerRig } from '../player/createPlayerRig';
+import { createReviewAvatar } from '../player/createReviewAvatar';
+import { createAtmosphereRig } from './createAtmosphereRig';
+import { createBackstageEasterEgg } from './createBackstageEasterEgg';
+import { createCascadeCourtPaving } from './createCascadeCourtPaving';
+import { createCascadeCourtWaterMotion } from './cascadeCourtWaterMotion';
+import { createVenuePerimeter } from './createVenuePerimeter';
+import { createFestivalField } from './createFestivalField';
+import { createStageShow } from './createStageShow';
+import { createSoundBooth } from './createSoundBooth';
+import { createVipForecourtDressing } from './createVipForecourtDressing';
+import { createVipGate } from './createVipGate';
+import { createVipSkydeck } from './createVipSkydeck';
+import { createWingBridge } from './createWingBridge';
+import { createWayfindingSigns } from './createWayfindingSigns';
+import { applyPracticalPoolLightBudget, createLightingRig } from './createLightingRig';
+import { createMainStageCollisionBlockers } from './createMainStageCollisionBlockers';
+import { createMainStagePresentationRig } from './createMainStagePresentationRig';
+import { freezeStaticScene } from './freezeStaticScene';
+import { deduplicateMaterials } from './deduplicateMaterials';
+import { mergeStaticMeshGroups } from './mergeStaticMeshGroups';
+import { trimMeshLightBudget } from './trimMeshLightBudget';
+import { parsePerfFlags } from '../app/perfFlags';
+import { createMainStageProductionSurfaces } from './createMainStageProductionSurfaces';
+import { loadMainStageAssets } from './loadMainStageAssets';
+import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from './reviewRouteData';
+
+// The production entry uses the same authored landmark reveal as the review
+// route. Starting in a short over-the-shoulder shot put the camera against the
+// arrival stair and filled the frame with paving instead of the Crown.
+const PLAYABLE_START_CAMERA = MAIN_STAGE_REVIEW_ROUTE[0]!.camera;
+const TRACKPAD_CAMERA_YAW_SENSITIVITY = 0.0045;
+const TRACKPAD_CAMERA_PITCH_SENSITIVITY = 0.0032;
+// Proportional: each pinch tick scales the CURRENT follow distance, so one
+// full pinch gesture traverses the whole 0.1..140 zoom range (a fixed
+// per-tick step needed 10+ gestures, player-flagged) while staying
+// fine-grained near the avatar.
+const TRACKPAD_CAMERA_ZOOM_RATE = 0.01;
+const POINTER_CAMERA_YAW_SENSITIVITY = 0.006;
+const POINTER_CAMERA_PITCH_SENSITIVITY = 0.0045;
+// Per movement frame: an authored checkpoint focus offset decays toward the
+// avatar, so walking recenters the camera within a few steps.
+const FOCUS_SETTLE_STRENGTH = 0.06;
+
+export async function createMainStageScene(engine: AbstractEngine) {
+  const scene = new Scene(engine);
+  scene.clearColor = new Color4(0.02, 0.03, 0.06, 1);
+  scene.collisionsEnabled = true;
+  scene.fogMode = Scene.FOGMODE_EXP2;
+  scene.fogDensity = 0.0095;
+  scene.fogColor = new Color3(0.11, 0.14, 0.21);
+
+  const stageAssets = await loadMainStageAssets(scene);
+  const perfFlags = parsePerfFlags(typeof window === 'undefined' ? '' : window.location.search);
+
+  // Collapse same-material static groups into single draw calls before any
+  // rig reads mesh positions. Draw submission was the measured frame floor.
+  // Practical cores stay individual: the pool lights locate them by name.
+  deduplicateMaterials(scene);
+  mergeStaticMeshGroups(scene, {
+    dynamicMeshes: [],
+    preserveNamePatterns: [
+      /LanternCore|LanternWarmCore|FountainLightArray/,
+      /^V31_SideLedTileField_[LR]$/,
+    ],
+  });
+  // Crowd-filler "mannequin" figures (V32_CrowdCluster*/V32_CrowdWearableGlow*
+  // - the glow meshes are the wearable accessory geometry on the SAME
+  // figures, folded in so nothing is left floating with no body attached).
+  // Player-flagged for removal outright. Hidden rather than disposed,
+  // matching every other GLB-authored-geometry removal in this codebase (see
+  // createHologramGrid.ts's CANOPY_PLATE_PATTERN) - "owner wants the space
+  // back, not the geometry deleted". No restore-on-dispose bookkeeping is
+  // needed here, unlike that module: this hide happens once at scene build
+  // time and the whole scene tears down together, so there is no independent
+  // lifecycle to hand the meshes back to. They carry no collision (absent
+  // from createMainStageCollisionBlockers.ts's source-name patterns), so
+  // hiding them is the whole fix.
+  const MANNEQUIN_PATTERN = /V32_Crowd(Cluster|WearableGlow)_/;
+  for (const mesh of scene.meshes) {
+    if (MANNEQUIN_PATTERN.test(mesh.name)) {
+      mesh.setEnabled(false);
+    }
+  }
+
+  const collisionMeshSet = new Set(stageAssets.collisionMeshes);
+  stageAssets.mainMeshes = scene.meshes.filter((mesh) => !collisionMeshSet.has(mesh));
+  stageAssets.solidCollisionMeshes = createMainStageCollisionBlockers(scene, stageAssets.mainMeshes);
+
+  // VIP gating: the outboard half of the spawn-pylon boundary opens for
+  // signed-in players and stays a wall for guests. Built here, immediately
+  // after the blockers it owns, because it works by mutating THIS array -
+  // the same reference the camera rig and player controller are handed
+  // below. createRuntime supplies the session state and the popup handler
+  // (setUnlocked / setOnBlockedApproach) once the HUD exists.
+  const vipGate = createVipGate({ solidCollisionMeshes: stageAssets.solidCollisionMeshes });
+
+  // Warm lantern dressing for the VIP forecourts. Before the lighting rig:
+  // the rig scans for LanternWarmCore meshes to attach practical pool lights.
+  const vipForecourtDressing = createVipForecourtDressing(scene);
+
+  const lightingRig = createLightingRig(scene, perfFlags);
+  const atmosphereRig = createAtmosphereRig(scene);
+  const input = createInputMap(window);
+  const playerRig = createPlayerRig(
+    scene,
+    new Vector3(BACK_PLAZA_SPAWN.x, BACK_PLAZA_SPAWN.y, BACK_PLAZA_SPAWN.z),
+  );
+  const reviewAvatar = await createReviewAvatar(scene);
+  let selectedAvatarColorway = applyAvatarColorway(reviewAvatar, USER_AVATAR_COLORWAYS[0].id);
+  reviewAvatar.root.parent = playerRig.avatarAnchor;
+
+  // Sec 6.2: every player is dressed from an AvatarDefinition. The scene boots
+  // on the default one; createRuntime replaces it with the guest's generated
+  // look as soon as the runtime is up. Applying a definition drives sec 6.5's
+  // height effects on BOTH halves: body scale (the avatar root) and standing
+  // presence (the rig capsule + eye level).
+  let localAvatarDefinition = applyAvatarDefinition(reviewAvatar, DEFAULT_AVATAR_DEFINITION);
+  playerRig.setHeightInches(localAvatarDefinition.heightInches);
+  const setAvatarDefinition = (definition: AvatarDefinition) => {
+    localAvatarDefinition = applyAvatarDefinition(reviewAvatar, definition);
+    playerRig.setHeightInches(localAvatarDefinition.heightInches);
+    return localAvatarDefinition;
+  };
+  // Reuses the player's own solid-geometry lists so the camera collision ray
+  // checks the same venue walls AND floor the player controller already
+  // collides against - no second parallel mesh list. Both are passed by
+  // REFERENCE: solidCollisionMeshes is complete by this point, but
+  // collisionMeshes (the ground-ray list) still grows below (VIP skydeck /
+  // wing bridge floors) - the camera rig re-reads the live array each frame,
+  // so those later pushes are picked up automatically.
+  const cameraRig = createFollowCameraRig(scene, playerRig.root, {
+    solidCollisionMeshes: stageAssets.solidCollisionMeshes,
+    groundCollisionMeshes: stageAssets.collisionMeshes,
+  });
+  cameraRig.applyCheckpointView(PLAYABLE_START_CAMERA);
+
+  scene.activeCamera = cameraRig.camera;
+  const presentationRig = createMainStagePresentationRig(scene, cameraRig.camera, perfFlags);
+  const productionSurfaces = createMainStageProductionSurfaces(scene);
+
+  // The production surfaces just created 9 lit PBR materials AFTER the
+  // lighting rig's own budget bump ran, so they still hold Babylon's default
+  // of 4 - below the WebGL budget of 6, which silently caps every practical
+  // pool/spill light off of them. Re-run the same bump now that every
+  // lit-material-creating rig has run.
+  if (lightingRig.practicalPools.length > 0) {
+    applyPracticalPoolLightBudget(scene);
+  }
+
+  // After every scoped light exists (pools + screen spills): bound each mesh
+  // to its nearest point lights. WebGPU materials cap evaluation at four
+  // simultaneous lights in applyPracticalPoolLightBudget (hemi + key + fill
+  // + nearest scoped light); this broader nearest-six list still gives that
+  // cap the correct proximity-ordered candidates and benefits WebGL.
+  trimMeshLightBudget(scene, 6);
+
+  // Shallow viewing angles across the LED module grids and brushed maps
+  // alias into shimmer without anisotropic sampling.
+  for (const texture of scene.textures) {
+    if ('anisotropicFilteringLevel' in texture) {
+      (texture as { anisotropicFilteringLevel: number }).anisotropicFilteringLevel = 8;
+    }
+  }
+
+  // Everything authored is static: stop per-frame world-matrix and material
+  // dirty work for the whole venue. Player/avatar and camera-dependent
+  // billboards/infinite-distance meshes remain dynamic.
+  freezeStaticScene(scene, {
+    dynamicNamePatterns: [/^player-/],
+    dynamicMeshes: reviewAvatar.meshes,
+  });
+
+  // After the freeze: bring the cascade court's water to life (rippling
+  // pools, streaming spills, breathing mist, summit spray). The module
+  // unfreezes only the cascade water materials it animates.
+  const cascadeWaterMotion = createCascadeCourtWaterMotion(scene);
+
+  // Grass albedo on the surrounding field, so the venue's surround reads as a
+  // festival field instead of the wet-stone plaza material it inherits by
+  // default. Runs after the freeze, same as the water motion module - it
+  // unfreezes only the field's own material. (It used to scatter grass tufts
+  // too; player-flagged and removed - see that module's header.)
+  const festivalField = createFestivalField(scene);
+
+  // Wayfinding signs flanking the promenade: name/point to the VIP terrace,
+  // cascade courts and stage so players can find them (the authored pylons
+  // only mark the far arrival point).
+  const wayfindingSigns = createWayfindingSigns(scene);
+
+  // Easter egg (owner request, 2026-08-03): "BACKSTAGE" mounted on the hero
+  // screen's footer trim, for whoever wanders into the stage's production
+  // wing behind the promenade ribbon to find.
+  const backstageEasterEgg = createBackstageEasterEgg(scene);
+
+  // Front-of-house sound booth on the promenade spine facing the stage -
+  // the mix position every real festival stage has, placed at the venue's
+  // acoustic FOH spot (see FOH_BOOTH_* in mainStageVenueBounds). Empty (the
+  // game has no NPCs): it is authentic infrastructure, not a character set.
+  // Its solid body is the authored FOH row in createMainStageCollisionBlockers.
+  const soundBooth = createSoundBooth(scene);
+
+  // The visible venue boundary. The envelope blockers that close the walkable
+  // field are invisible boxes, so players walk into nothing and stop; this
+  // stands a pearl-and-gold fence exactly on that line (no collision of its
+  // own - it is the picture of the blockers, not a second wall).
+  const venuePerimeter = createVenuePerimeter(scene);
+
+  // Pearl paving with gold seam bands on the two Cascade Court flank plazas,
+  // which otherwise read as bare ground around the water features.
+  const cascadeCourtPaving = createCascadeCourtPaving(scene);
+
+  // Elevated, WALKABLE player space. The skydecks lay a real floor on the
+  // venue's own wing-terrace roofscape over each VIP forecourt (which was a
+  // signposted destination with nothing to stand on), and the wing bridge
+  // flies between them so the two flanks connect straight across instead of
+  // forcing the walk around the back of the basin.
+  //
+  // Their decks/landings/ramps are FLOOR, so they join the controller's
+  // ground-ray list; only their railings are blockers (authored rows in
+  // createMainStageCollisionBlockers, whose y bands start at the deck
+  // surface and so cannot touch anyone on the ground below).
+  const vipSkydeck = createVipSkydeck(scene);
+  const wingBridge = createWingBridge(scene);
+  stageAssets.collisionMeshes.push(...vipSkydeck.walkableMeshes, ...wingBridge.walkableMeshes);
+
+  // The general lighting show runs continuously (per the venue docs: an
+  // ambient show is always on; the completion celebration layers the special
+  // finale on top): beat-driven screen pulses, spill-light color sweeps, and
+  // the side LED decks answering each other. Unfreezes only what it animates.
+  const stageShow = createStageShow(scene);
+
+  // Sec 7.7 ladder: derived from the ladder mesh's own world bounding box
+  // rather than hand-authored coordinates, so it can never drift out of sync
+  // with wherever the venue asset actually sits. A small horizontal margin
+  // widens the attach footprint past the rungs themselves so approaching from
+  // slightly off-axis still attaches. facingYaw 0 is an approximation (this
+  // venue's authored assets export with consistent world axes) - revisit
+  // in-engine if the avatar snaps facing the wrong way.
+  const ladderMesh = scene.getMeshByName('production-tower-service-ladder');
+  const ladders: LadderZone[] = [];
+  if (ladderMesh) {
+    const bounds = ladderMesh.getBoundingInfo().boundingBox;
+    const margin = 0.6;
+    ladders.push({
+      minX: bounds.minimumWorld.x - margin,
+      maxX: bounds.maximumWorld.x + margin,
+      minZ: bounds.minimumWorld.z - margin,
+      maxZ: bounds.maximumWorld.z + margin,
+      baseY: bounds.minimumWorld.y,
+      topY: bounds.maximumWorld.y,
+      facingYaw: 0,
+    });
+  }
+
+  // Sec 7.8 player-vs-player collision: playerController is constructed here,
+  // before createRuntime.ts builds remotePlayerRigs (which needs the scene
+  // this function returns), so the getter is a level of indirection - the
+  // world/multiplayer path calls setRemotePlayerCollisionSource once
+  // remotePlayerRigs exists; the dev/review path (no world connection) never
+  // calls it, and the getter below simply returns no targets.
+  let remotePlayerCollisionSource: (() => readonly RemotePlayerCollisionTarget[]) | undefined;
+
+  const playerController = createPlayerController({
+    avatarRoot: reviewAvatar.root,
+    camera: cameraRig.camera,
+    collisionMeshes: stageAssets.collisionMeshes,
+    getRemotePlayerCollisionTargets: () => remotePlayerCollisionSource?.() ?? [],
+    input: input.state,
+    ladders,
+    playerRig,
+    solidCollisionMeshes: stageAssets.solidCollisionMeshes,
+  });
+  const routeProgress = createMainStageRouteProgress(MAIN_STAGE_REVIEW_ROUTE);
+  const completionCelebration = createCompletionCelebration(scene);
+  let wasRouteComplete = routeProgress.complete;
+  const canvas = engine.getRenderingCanvas?.();
+  let avatarElapsedSeconds = 0;
+  let activeCameraPointerId: number | undefined;
+  let lastCameraPointerX = 0;
+  let lastCameraPointerY = 0;
+  const handleCameraWheel = (event: WheelEvent) => {
+    event.preventDefault();
+    if (event.ctrlKey) {
+      // macOS synthesizes a trackpad pinch as wheel + ctrlKey. deltaY > 0 is
+      // fingers together (zoom out, larger distance); preventDefault also
+      // stops the browser's page zoom.
+      cameraRig.zoom(event.deltaY * TRACKPAD_CAMERA_ZOOM_RATE * cameraRig.camera.radius);
+      return;
+    }
+
+    cameraRig.orbit(
+      event.deltaX * TRACKPAD_CAMERA_YAW_SENSITIVITY,
+      event.deltaY * TRACKPAD_CAMERA_PITCH_SENSITIVITY,
+    );
+  };
+  const handleCameraPointerDown = (event: PointerEvent) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    activeCameraPointerId = event.pointerId;
+    lastCameraPointerX = event.clientX;
+    lastCameraPointerY = event.clientY;
+    canvas?.setPointerCapture(event.pointerId);
+  };
+  const handleCameraPointerMove = (event: PointerEvent) => {
+    if (activeCameraPointerId !== event.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    const deltaX = event.clientX - lastCameraPointerX;
+    const deltaY = event.clientY - lastCameraPointerY;
+    lastCameraPointerX = event.clientX;
+    lastCameraPointerY = event.clientY;
+    cameraRig.orbit(
+      deltaX * POINTER_CAMERA_YAW_SENSITIVITY,
+      -deltaY * POINTER_CAMERA_PITCH_SENSITIVITY,
+    );
+  };
+  const handleCameraPointerEnd = (event: PointerEvent) => {
+    if (activeCameraPointerId !== event.pointerId) {
+      return;
+    }
+
+    activeCameraPointerId = undefined;
+    if (canvas?.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  if (canvas) {
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('wheel', handleCameraWheel, { passive: false });
+    canvas.addEventListener('pointerdown', handleCameraPointerDown);
+    canvas.addEventListener('pointermove', handleCameraPointerMove);
+    canvas.addEventListener('pointerup', handleCameraPointerEnd);
+    canvas.addEventListener('pointercancel', handleCameraPointerEnd);
+  }
+
+  scene.onBeforeRenderObservable.add(() => {
+    const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
+    playerController.step(deltaSeconds);
+    // After the move: a guest who just walked into the VIP wall gets the log
+    // in / sign up popup this frame, and a pending re-lock (logout) closes
+    // the gate as soon as the player is back on the public side.
+    vipGate.step(playerRig.root.position);
+    avatarElapsedSeconds += deltaSeconds;
+    reviewAvatar.animate(avatarElapsedSeconds, playerController.animationState);
+    routeProgress.step(playerRig.root.position);
+    if (routeProgress.complete && !wasRouteComplete) {
+      // false -> true: the player just reached the final checkpoint.
+      completionCelebration.start();
+    } else if (!routeProgress.complete && wasRouteComplete) {
+      // true -> false: a checkpoint jump or restart reset progress mid-route
+      // (or past it). Stop the finale and re-arm for the next completion.
+      completionCelebration.stop();
+    }
+    wasRouteComplete = routeProgress.complete;
+    if (playerController.animationState !== 'idle') {
+      cameraRig.settleFocus(FOCUS_SETTLE_STRENGTH);
+    }
+    const zoomState = cameraRig.syncZoomState();
+    const avatarVisibility = zoomState.mode === 'first_person' ? 0 : zoomState.shoulderOpacity;
+    for (const mesh of reviewAvatar.meshes) {
+      mesh.visibility = avatarVisibility;
+    }
+  });
+
+  scene.metadata = {
+    ...scene.metadata,
+    reviewRuntime: {
+      checkpoints: MAIN_STAGE_REVIEW_ROUTE,
+      atmosphereRig,
+      cameraRig,
+      lightingRig,
+      presentationRig,
+      reviewAvatar,
+      stageAssets,
+      input,
+      playerRig,
+      playerController,
+      /** Sec 7.8: wired once by the world/multiplayer path once remotePlayerRigs exists. */
+      setRemotePlayerCollisionSource(source: () => readonly RemotePlayerCollisionTarget[]) {
+        remotePlayerCollisionSource = source;
+      },
+      routeProgress,
+      completionCelebration,
+      avatarColorways: USER_AVATAR_COLORWAYS,
+      get selectedAvatarColorway() {
+        return selectedAvatarColorway;
+      },
+      setAvatarColorway(colorwayId: string) {
+        selectedAvatarColorway = applyAvatarColorway(reviewAvatar, colorwayId);
+        return selectedAvatarColorway;
+      },
+      get avatarDefinition() {
+        return localAvatarDefinition;
+      },
+      /** The outgoing world loadout for this player (sec 6.2 sync). */
+      get avatarLoadout() {
+        return serializeAvatarLoadout(localAvatarDefinition);
+      },
+      setAvatarDefinition,
+      productionSurfaces,
+      cascadeWaterMotion,
+      festivalField,
+      stageShow,
+      vipForecourtDressing,
+      wayfindingSigns,
+      backstageEasterEgg,
+      soundBooth,
+      venuePerimeter,
+      cascadeCourtPaving,
+      vipGate,
+      vipSkydeck,
+      wingBridge,
+      spawn: BACK_PLAZA_SPAWN,
+    },
+  };
+
+  scene.onDisposeObservable.add(() => {
+    completionCelebration.dispose();
+    soundBooth.dispose();
+    venuePerimeter.dispose();
+    cascadeCourtPaving.dispose();
+    vipSkydeck.dispose();
+    wingBridge.dispose();
+    canvas?.removeEventListener('wheel', handleCameraWheel);
+    canvas?.removeEventListener('pointerdown', handleCameraPointerDown);
+    canvas?.removeEventListener('pointermove', handleCameraPointerMove);
+    canvas?.removeEventListener('pointerup', handleCameraPointerEnd);
+    canvas?.removeEventListener('pointercancel', handleCameraPointerEnd);
+    input.dispose();
+    cameraRig.camera.detachControl();
+  });
+
+  return scene;
+}

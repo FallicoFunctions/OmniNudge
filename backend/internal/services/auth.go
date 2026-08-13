@@ -15,6 +15,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/omninudge/backend/internal/models"
+	omnigamemodel "github.com/omninudge/backend/internal/omnigame/model"
 	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/utils"
 )
@@ -49,6 +50,10 @@ func (s *AuthService) SetUserRepository(userRepo ports.UserRepository) {
 
 func (s *AuthService) SetSessionService(sessions *AuthSessionService) {
 	s.sessions = sessions
+}
+
+func (s *AuthService) UserRepository() ports.UserRepository {
+	return s.userRepo
 }
 
 // VerifyTurnstileToken verifies a Cloudflare Turnstile token
@@ -111,6 +116,30 @@ type JWTClaims struct {
 	jwt.RegisteredClaims
 }
 
+type OmniRaveWorldTokenInput struct {
+	UserID       *int                      `json:"user_id,omitempty"`
+	Username     string                    `json:"username,omitempty"`
+	TokenVersion int                       `json:"token_version,omitempty"`
+	PlayerID     string                    `json:"player_id"`
+	PlayerName   string                    `json:"player_name"`
+	Mode         string                    `json:"mode"`
+	Loadout      map[string]string         `json:"loadout,omitempty"`
+	ReturnPoint  *omnigamemodel.SavedPoint `json:"return_point,omitempty"`
+}
+
+type OmniRaveWorldJWTClaims struct {
+	UserID       *int                      `json:"user_id,omitempty"`
+	Username     string                    `json:"username,omitempty"`
+	TokenVersion int                       `json:"token_version,omitempty"`
+	Use          string                    `json:"use"`
+	PlayerID     string                    `json:"player_id"`
+	PlayerName   string                    `json:"player_name"`
+	Mode         string                    `json:"mode"`
+	Loadout      map[string]string         `json:"loadout,omitempty"`
+	ReturnPoint  *omnigamemodel.SavedPoint `json:"return_point,omitempty"`
+	jwt.RegisteredClaims
+}
+
 // GenerateJWT creates a new JWT token for a user
 func (s *AuthService) GenerateJWT(userID int, username, role string) (string, error) {
 	return s.GenerateJWTWithExpiry(userID, username, role, 7*24*time.Hour) // Default 7 days
@@ -142,6 +171,15 @@ func (s *AuthService) GenerateJWTForSession(userID int, username, role string, t
 	return s.generateJWTForSession(userID, username, role, tokenVersion, expiry, "", sessionID)
 }
 
+// GenerateGameSessionJWT creates a short-lived token intended for OmniGame runtime profile writes.
+func (s *AuthService) GenerateGameSessionJWT(userID int, username string) (string, error) {
+	return s.GenerateGameSessionJWTWithVersion(userID, username, 0)
+}
+
+func (s *AuthService) GenerateGameSessionJWTWithVersion(userID int, username string, tokenVersion int) (string, error) {
+	return s.generateJWT(userID, username, "user", tokenVersion, 30*time.Minute, "game")
+}
+
 func (s *AuthService) generateJWT(userID int, username, role string, tokenVersion int, expiry time.Duration, use string) (string, error) {
 	return s.generateJWTForSession(userID, username, role, tokenVersion, expiry, use, "")
 }
@@ -156,6 +194,28 @@ func (s *AuthService) generateJWTForSession(userID int, username, role string, t
 		SessionID:    sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "OmniNudge",
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(s.jwtSecret)
+}
+
+func (s *AuthService) GenerateOmniRaveWorldJWT(input OmniRaveWorldTokenInput) (string, error) {
+	claims := OmniRaveWorldJWTClaims{
+		UserID:       input.UserID,
+		Username:     input.Username,
+		TokenVersion: input.TokenVersion,
+		Use:          "omnirave_world",
+		PlayerID:     input.PlayerID,
+		PlayerName:   input.PlayerName,
+		Mode:         input.Mode,
+		Loadout:      input.Loadout,
+		ReturnPoint:  input.ReturnPoint,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "OmniNudge",
 		},
@@ -184,9 +244,15 @@ func (s *AuthService) ValidateJWTContext(ctx context.Context, tokenString string
 
 	if claims, ok := token.Claims.(*JWTClaims); ok && token.Valid {
 		// Browser access tokens are session-bound. Non-session tokens must be
-		// explicitly minted for an API or WebSocket use; this invalidates legacy
-		// browser JWTs that had neither a session identifier nor a use claim.
-		if claims.SessionID == "" && claims.Use != "api" && claims.Use != "ws" {
+		// explicitly minted for a known use; this invalidates legacy browser
+		// JWTs that had neither a session identifier nor a use claim.
+		//
+		// "game" is on this list because OmniGame mints its own session token
+		// for runtime profile writes (GenerateGameSessionJWT) and those are not
+		// session-bound. Omitting it would leave every OmniGame profile write
+		// rejected here, which is how these two halves first disagreed when
+		// they were merged.
+		if claims.SessionID == "" && claims.Use != "api" && claims.Use != "ws" && claims.Use != "game" {
 			return nil, fmt.Errorf("token use is not permitted")
 		}
 		if claims.SessionID != "" {
@@ -216,6 +282,46 @@ func (s *AuthService) ValidateCSRF(ctx context.Context, sessionID, csrfToken str
 		return ErrInvalidAuthSession
 	}
 	return s.sessions.ValidateCSRF(ctx, sessionID, csrfToken)
+}
+
+func (s *AuthService) ValidateOmniRaveWorldJWTContext(ctx context.Context, tokenString string) (*OmniRaveWorldJWTClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &OmniRaveWorldJWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return s.jwtSecret, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(*OmniRaveWorldJWTClaims)
+	if !ok || !token.Valid || claims.Use != "omnirave_world" || claims.PlayerID == "" || claims.PlayerName == "" || claims.Mode == "" {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	if claims.UserID != nil {
+		if err := s.validateLiveUserState(ctx, *claims.UserID, claims.TokenVersion); err != nil {
+			return nil, err
+		}
+	}
+
+	return claims, nil
+}
+
+func (s *AuthService) validateLiveUserState(ctx context.Context, userID int, tokenVersion int) error {
+	if s.userRepo == nil {
+		return nil
+	}
+
+	user, userErr := s.userRepo.GetByID(ctx, userID)
+	if userErr != nil {
+		return userErr
+	}
+	if user == nil || user.TokenVersion != tokenVersion || user.Banned || user.Deleted {
+		return fmt.Errorf("invalid token")
+	}
+	return nil
 }
 
 // RegisterRequest represents the registration request payload

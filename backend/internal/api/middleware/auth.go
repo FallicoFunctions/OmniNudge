@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"crypto/subtle"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -83,6 +84,7 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 		c.Set("role", claims.Role)
 		c.Set("session_id", claims.SessionID)
 		c.Set("auth_via_cookie", cookieAuth)
+		c.Set("token_version", claims.TokenVersion)
 
 		c.Next()
 	}
@@ -133,11 +135,17 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 
 // CORS middleware for handling cross-origin requests
 func CORS() gin.HandlerFunc {
-	allowedOrigins := corsAllowedOrigins(os.Getenv("APP_ENV"), os.Getenv("FRONTEND_URL"))
+	appEnv := os.Getenv("APP_ENV")
+	allowedOrigins := corsAllowedOrigins(appEnv, os.Getenv("FRONTEND_URL"))
 	allowedOriginSet := make(map[string]struct{}, len(allowedOrigins))
 	for _, origin := range allowedOrigins {
 		allowedOriginSet[origin] = struct{}{}
 	}
+	// The OmniRave runtime dev server is not on a fixed port, so development
+	// allows any loopback origin. Production does not: the branch this merged
+	// from applied the same check unconditionally, which would have handed
+	// Allow-Credentials to any loopback origin in production.
+	allowLoopbackDev := !strings.EqualFold(strings.TrimSpace(appEnv), "production")
 
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
@@ -145,7 +153,8 @@ func CORS() gin.HandlerFunc {
 		// responses for different browser origins separate.
 		c.Writer.Header().Add("Vary", "Origin")
 
-		if _, allowed := allowedOriginSet[origin]; allowed {
+		_, allowed := allowedOriginSet[origin]
+		if allowed || (allowLoopbackDev && isLoopbackDevOrigin(origin)) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
@@ -165,6 +174,8 @@ func corsAllowedOrigins(appEnv string, configuredOrigins ...string) []string {
 	production := []string{
 		"https://omninudge.com",
 		"https://www.omninudge.com",
+		// The OmniRave runtime is served from its own origin.
+		"https://play.omninudge.com",
 	}
 	isProduction := strings.EqualFold(strings.TrimSpace(appEnv), "production")
 	for _, configuredList := range configuredOrigins {
@@ -202,4 +213,25 @@ func corsAllowedOrigins(appEnv string, configuredOrigins ...string) []string {
 		"http://127.0.0.1:5178",
 		"http://127.0.0.1:5179",
 	)
+}
+
+// isLoopbackDevOrigin allows any loopback origin regardless of port, which the
+// fixed list above cannot: the OmniRave runtime dev server does not run on a
+// known port. CORS only consults this outside production.
+func isLoopbackDevOrigin(origin string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+
+	host := parsed.Hostname()
+	if host == "localhost" {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
