@@ -2,6 +2,14 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
+  // tests/ holds both suites: 6 Playwright specs (including two that sit
+  // directly in tests/, which is why testDir is not ./tests/e2e) and 45 vitest
+  // files under unit/, visual/ and integration/. Without this, Playwright
+  // loads the vitest files too and dies on "describe is not defined" before
+  // running anything. The two conventions do not overlap -- Playwright uses
+  // .spec.ts here and vitest uses .test.ts/.tsx -- so matching on that is
+  // enough to keep them apart.
+  testMatch: '**/*.spec.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
