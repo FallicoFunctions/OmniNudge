@@ -120,6 +120,7 @@ type OmniRaveWorldTokenInput struct {
 	UserID       *int                      `json:"user_id,omitempty"`
 	Username     string                    `json:"username,omitempty"`
 	TokenVersion int                       `json:"token_version,omitempty"`
+	SubjectKind  omnigamemodel.SubjectKind `json:"subject_kind,omitempty"`
 	PlayerID     string                    `json:"player_id"`
 	PlayerName   string                    `json:"player_name"`
 	Mode         string                    `json:"mode"`
@@ -131,6 +132,7 @@ type OmniRaveWorldJWTClaims struct {
 	UserID       *int                      `json:"user_id,omitempty"`
 	Username     string                    `json:"username,omitempty"`
 	TokenVersion int                       `json:"token_version,omitempty"`
+	SubjectKind  omnigamemodel.SubjectKind `json:"subject_kind,omitempty"`
 	Use          string                    `json:"use"`
 	PlayerID     string                    `json:"player_id"`
 	PlayerName   string                    `json:"player_name"`
@@ -204,10 +206,20 @@ func (s *AuthService) generateJWTForSession(userID int, username, role string, t
 }
 
 func (s *AuthService) GenerateOmniRaveWorldJWT(input OmniRaveWorldTokenInput) (string, error) {
+	// Callers that predate the field leave it empty, so derive it here rather
+	// than issuing a token the world will refuse. Derivation cannot produce a
+	// persona -- see PlayerIdentity.ResolvedKind -- so an omission can only
+	// ever mean the account or guest it already meant.
+	subjectKind := input.SubjectKind
+	if !subjectKind.Valid() {
+		subjectKind = omnigamemodel.PlayerIdentity{UserID: input.UserID}.ResolvedKind()
+	}
+
 	claims := OmniRaveWorldJWTClaims{
 		UserID:       input.UserID,
 		Username:     input.Username,
 		TokenVersion: input.TokenVersion,
+		SubjectKind:  subjectKind,
 		Use:          "omnirave_world",
 		PlayerID:     input.PlayerID,
 		PlayerName:   input.PlayerName,
@@ -298,6 +310,21 @@ func (s *AuthService) ValidateOmniRaveWorldJWTContext(ctx context.Context, token
 	claims, ok := token.Claims.(*OmniRaveWorldJWTClaims)
 	if !ok || !token.Valid || claims.Use != "omnirave_world" || claims.PlayerID == "" || claims.PlayerName == "" || claims.Mode == "" {
 		return nil, fmt.Errorf("invalid token")
+	}
+
+	// A kind this build does not recognise is refused rather than treated as
+	// some default. Defaulting is how a future issuer would admit a subject
+	// this build has no rules for -- a persona reaching a world that predates
+	// personas, say -- by the world quietly deciding it must be a guest.
+	//
+	// An absent kind is a different case: it means an issuer older than the
+	// field, and it is filled in the same way that issuer's tokens were always
+	// read. That can only ever yield account or guest, so omission cannot
+	// smuggle in a kind nobody stated.
+	if claims.SubjectKind == "" {
+		claims.SubjectKind = omnigamemodel.PlayerIdentity{UserID: claims.UserID}.ResolvedKind()
+	} else if !claims.SubjectKind.Valid() {
+		return nil, fmt.Errorf("invalid token: unrecognised subject kind")
 	}
 
 	if claims.UserID != nil {
