@@ -75,3 +75,8 @@ jobs:
           path: frontend/.lighthouseci/
           retention-days: 30
           if-no-files-found: error
+          # .lighthouseci is a dot-directory, and upload-artifact skips paths
+          # with hidden segments unless told otherwise. Without this the step
+          # reports "No files were found" and fails the job even though the
+          # reports were written and the budget assertion passed on them.
+          include-hidden-files: true
