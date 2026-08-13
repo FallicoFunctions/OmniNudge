@@ -2,7 +2,7 @@ name: i18n Verify
 
 on:
   pull_request:
-    branches: [main, master, develop]
+    branches: [main, master, develop, 'merge/**']
     paths:
       - 'frontend/src/**'
       - 'frontend/public/locales/**'

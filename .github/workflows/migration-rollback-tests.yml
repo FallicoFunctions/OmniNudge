@@ -2,7 +2,7 @@ name: Migration Rollback Tests
 
 on:
   pull_request:
-    branches: [main, master, develop]
+    branches: [main, master, develop, 'merge/**']
     paths:
       - 'backend/internal/database/migrations/**'
       - 'backend/cmd/migrate/**'
