@@ -19,6 +19,7 @@ go.work
 
 # Compiled binary (from go build)
 /server
+/bin/
 
 # Environment files
 .env
