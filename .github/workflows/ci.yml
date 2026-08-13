@@ -244,6 +244,7 @@ jobs:
           DB_SSLMODE: disable
           REDIS_ADDR: localhost:6379
           ENCRYPTION_KEY: b21uaW51ZGdlLWNpLWUyZS10ZXN0LWtleS0zMmJ5dGU=
+          JWT_SECRET: ci-test-secret-not-used-in-prod
         run: go run ./cmd/seed/... --count=5
 
       - name: Start backend server
