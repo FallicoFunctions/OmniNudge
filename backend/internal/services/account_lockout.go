@@ -55,8 +55,15 @@ func (s *AccountLockoutService) RecordFailure(ctx context.Context, identifier, i
 // different usernames are tried from the same source.
 //
 // Fix 3: The identifier and IP checks are performed as separate queries to
-// avoid the problematic ($2 <> '' AND ip_address = $2::inet) pattern that
-// causes a PostgreSQL ::inet cast error when ipAddress is an empty string.
+// avoid this pattern:
+//
+//	$2 <> '' AND ip_address = $2::inet
+//
+// which causes a PostgreSQL ::inet cast error when ipAddress is an empty
+// string.
+//
+// Keep the SQL line indented. In running prose gofmt rewrites the two single
+// quotes into a typographic quote, which would misstate the predicate.
 func (s *AccountLockoutService) IsLocked(ctx context.Context, identifier string, ipAddress string) (bool, error) {
 	// Count identifier-based failures first.
 	const qIdentifier = `
