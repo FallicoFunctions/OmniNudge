@@ -102,9 +102,20 @@ func TestOmniChatVideoTwoPhaseRollbackDropsTheSurplusAsset(t *testing.T) {
 		jobID, stillID, clipID)
 	require.NoError(t, err)
 
-	// 174 (allow_nsfw) sits on top of 173, so both come off to reach it.
-	require.NoError(t, db.MigrateDown(ctx))
-	require.NoError(t, db.MigrateDown(ctx))
+	// Roll back until 173 itself has come off. How many migrations sit on
+	// top of it changes every time one is added, and hardcoding the count
+	// fails quietly rather than loudly: the loop below simply stops short,
+	// 173's rollback never runs, and the assertion reports a surviving
+	// asset as though the down migration were broken.
+	for {
+		var latest string
+		require.NoError(t, db.Pool.QueryRow(ctx,
+			`SELECT version FROM schema_migrations ORDER BY applied_at DESC, version DESC LIMIT 1`).Scan(&latest))
+		require.NoError(t, db.MigrateDown(ctx))
+		if latest == "173_omnichat_video_intermediate_assets" {
+			break
+		}
+	}
 
 	var remaining []string
 	rows, err := db.Pool.Query(ctx,
