@@ -1,3 +1,4 @@
+import { sessionHeaders } from './authSession';
 import type { GameCatalogEntry, OmniGameLaunchMode, OmniGameLaunchResponse } from '../types/omnigame';
 
 const OMNIRAVE_RUNTIME_URL = import.meta.env.VITE_OMNIRAVE_RUNTIME_URL || 'http://localhost:4173/omnirave';
@@ -47,14 +48,20 @@ export const omnigameService = {
 
   async createOmniRaveLaunch(mode: OmniGameLaunchMode): Promise<OmniGameLaunchResponse> {
     // Site auth moved to httpOnly cookies, so there is no token to read and
-    // attach here. The cookie rides along instead; OmniGame is a different
-    // port on the same host, which is same-site for cookie purposes.
+    // attach here. The cookie rides along instead; OmniGame is a different port
+    // on the same host, which is same-site for cookie purposes.
+    //
+    // The CSRF header is not optional. AuthOptional refuses to attach a cookie
+    // identity to a state-changing request without it and then continues
+    // anonymously rather than failing, so omitting it does not raise an error:
+    // it quietly turns an account launch into a guest one.
+    const headers = sessionHeaders('POST');
+    headers.set('Content-Type', 'application/json');
+
     const response = await fetch(`${OMNIGAME_API_URL}/omnigame/launch/omnirave`, {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({ mode }),
     });
 
