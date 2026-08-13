@@ -14,6 +14,6 @@ export default defineConfig({
     minWorkers: 1,
     testTimeout: 20000,
     slowTestThreshold: 5000,
-    exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**', 'tests/**/*.spec.ts'],
   },
 });

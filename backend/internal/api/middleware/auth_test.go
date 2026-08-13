@@ -101,8 +101,15 @@ func TestCORS_AllowsLocalhostAndLoopbackDevOrigins(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	for _, origin := range []string{
+		"https://play.omninudge.com",
+		"http://localhost:4173",
+		"http://localhost:4174",
 		"http://localhost:5176",
+		"http://localhost:6099",
+		"http://127.0.0.1:4173",
+		"http://127.0.0.1:4174",
 		"http://127.0.0.1:5176",
+		"http://127.0.0.1:6099",
 	} {
 		t.Run(origin, func(t *testing.T) {
 			router := gin.New()
@@ -124,6 +131,8 @@ func TestCORS_AllowsLocalhostAndLoopbackDevOrigins(t *testing.T) {
 	}
 }
 
+// A loopback origin is allowed in development so the OmniRave runtime dev
+// server can be on any port, and must not be in production.
 func TestCORS_ProductionRejectsDevelopmentOrigins(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	gin.SetMode(gin.TestMode)
@@ -134,6 +143,26 @@ func TestCORS_ProductionRejectsDevelopmentOrigins(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodOptions, "/", nil)
 	req.Header.Set("Origin", "http://localhost:5176")
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusNoContent, w.Code)
+	require.Empty(t, w.Header().Get("Access-Control-Allow-Origin"))
+	require.Empty(t, w.Header().Get("Access-Control-Allow-Credentials"))
+}
+
+// The development allowance is loopback only; a LAN address is not a dev origin.
+func TestCORS_RejectsNonLoopbackDevOrigins(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(CORS())
+	router.OPTIONS("/", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodOptions, "/", nil)
+	req.Header.Set("Origin", "http://192.168.1.10:4174")
 	router.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusNoContent, w.Code)
