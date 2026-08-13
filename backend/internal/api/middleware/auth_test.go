@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -162,10 +163,22 @@ func TestAuthOptional_LogsWhyCookieIdentityWasDropped(t *testing.T) {
 			// serves the route anonymously rather than failing it.
 			require.Equal(t, tc.wantStatus, w.Code)
 
+			// Pick out our line rather than assuming it is the only output:
+			// the logger swapped above is the global one, shared with any
+			// other middleware that might write while this test runs.
+			var found string
+			for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
+				if strings.Contains(line, "cookie identity dropped") {
+					found = line
+					break
+				}
+			}
+
 			if tc.wantReason == "" {
-				require.Empty(t, logs.String(), "a successful CSRF check should log nothing")
+				require.Empty(t, found, "a successful CSRF check should not report a dropped identity")
 				return
 			}
+			require.NotEmpty(t, found, "expected a warning that the identity was dropped")
 
 			var entry struct {
 				Level  string `json:"level"`
@@ -173,7 +186,7 @@ func TestAuthOptional_LogsWhyCookieIdentityWasDropped(t *testing.T) {
 				Path   string `json:"path"`
 				Reason string `json:"reason"`
 			}
-			require.NoError(t, json.Unmarshal(logs.Bytes(), &entry))
+			require.NoError(t, json.Unmarshal([]byte(found), &entry))
 			require.Equal(t, "warn", entry.Level)
 			require.Equal(t, http.MethodPost, entry.Method)
 			require.Equal(t, "/analytics/events", entry.Path)

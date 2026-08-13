@@ -53,6 +53,14 @@ func main() {
 			log.Fatal(err)
 		}
 		mediaState = omniraveworld.NewMediaStateWithPlaylists(playlists, time.Now().UTC())
+	} else {
+		// Without a database there is no session service, so ValidateJWTContext
+		// rejects every session-bound cookie the site issues. That is fine for
+		// guest-only runtime work and misleading for anything else: account
+		// launches fail in a way that looks like a bug in the caller, so say so
+		// at startup rather than leaving it to be rediscovered.
+		log.Println("omnigame-api: DATABASE_URL unset, running with in-memory profiles; " +
+			"cookie-authenticated requests from the site will be rejected")
 	}
 
 	sessionService := service.NewSessionServiceWithMediaState(
