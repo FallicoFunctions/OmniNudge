@@ -217,10 +217,8 @@ func ResolveConfiguredOmniChatModelRoutes(modelsByProfile map[OmniChatModelProfi
 		}
 		normalizedRoutes[profile.Key] = route
 	}
-	if modelsByProfile != nil {
-		for key, route := range modelsByProfile {
-			normalizedRoutes[key] = route
-		}
+	for key, route := range modelsByProfile {
+		normalizedRoutes[key] = route
 	}
 	if err := ValidateConfiguredOmniChatModelRoutes(normalizedRoutes, standardFallback); err != nil {
 		return nil, err
