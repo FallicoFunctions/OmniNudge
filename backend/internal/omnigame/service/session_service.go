@@ -293,6 +293,7 @@ func (s *SessionService) buildAccountRuntimeResponse(ctx context.Context, identi
 			UserID:       identity.UserID,
 			Username:     identity.Username,
 			TokenVersion: identity.TokenVersion,
+			SubjectKind:  identity.ResolvedKind(),
 			PlayerID:     response.PlayerID,
 			PlayerName:   response.PlayerName,
 			Mode:         string(response.Mode),
@@ -340,10 +341,13 @@ func (s *SessionService) hydrateGuestRuntimeResponse(session *model.LaunchSessio
 
 	if s.tokenIssuer != nil {
 		worldToken, err := s.tokenIssuer.GenerateOmniRaveWorldJWT(services.OmniRaveWorldTokenInput{
-			PlayerID:   bootstrap.PlayerID,
-			PlayerName: bootstrap.PlayerName,
-			Mode:       string(bootstrap.Mode),
-			Loadout:    bootstrap.Loadout,
+			// Stated rather than derived. This path only ever serves guests,
+			// and saying so keeps it correct if it ever gains a user id.
+			SubjectKind: model.SubjectKindGuest,
+			PlayerID:    bootstrap.PlayerID,
+			PlayerName:  bootstrap.PlayerName,
+			Mode:        string(bootstrap.Mode),
+			Loadout:     bootstrap.Loadout,
 		})
 		if err != nil {
 			return nil, err
