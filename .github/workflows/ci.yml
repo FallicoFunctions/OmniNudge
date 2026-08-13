@@ -226,6 +226,11 @@ jobs:
           DB_NAME: omninudge_test
           DB_SSLMODE: disable
           JWT_SECRET: ci-test-secret-not-used-in-prod
+          # Decodes to exactly 32 bytes, which SetEncryptionKey requires. The
+          # migrate command only needs the variable to be present, but the
+          # backend server started later in this job actually loads it, so the
+          # whole job uses one valid key rather than two different stand-ins.
+          ENCRYPTION_KEY: b21uaW51ZGdlLWNpLWUyZS10ZXN0LWtleS0zMmJ5dGU=
         run: go run ./cmd/migrate/... -action=up
 
       - name: Seed test data
@@ -238,6 +243,7 @@ jobs:
           DB_NAME: omninudge_test
           DB_SSLMODE: disable
           REDIS_ADDR: localhost:6379
+          ENCRYPTION_KEY: b21uaW51ZGdlLWNpLWUyZS10ZXN0LWtleS0zMmJ5dGU=
         run: go run ./cmd/seed/... --count=5
 
       - name: Start backend server
@@ -252,6 +258,7 @@ jobs:
           REDIS_ADDR: localhost:6379
           PORT: 8080
           JWT_SECRET: ci-test-secret-do-not-use-in-prod
+          ENCRYPTION_KEY: b21uaW51ZGdlLWNpLWUyZS10ZXN0LWtleS0zMmJ5dGU=
         run: go run ./cmd/server/... &
 
       - name: Wait for backend to be ready
