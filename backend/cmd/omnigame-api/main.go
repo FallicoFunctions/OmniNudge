@@ -40,6 +40,11 @@ func main() {
 		}
 
 		authService.SetUserRepository(models.NewUserRepository(db.Pool))
+		// Browser access tokens carry a SessionID, and ValidateJWTContext fails
+		// closed when it cannot check one. Without this, every cookie from the
+		// site is rejected here as "invalid or expired token" while remaining
+		// perfectly valid on the main API -- account launches included.
+		authService.SetSessionService(services.NewAuthSessionService(db.Pool, authService))
 		profiles = repository.NewPostgresProfileRepository(db.Pool)
 		sanctions = repository.NewPostgresSanctionRepository(db.Pool)
 
