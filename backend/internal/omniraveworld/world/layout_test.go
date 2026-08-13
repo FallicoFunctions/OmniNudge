@@ -36,9 +36,7 @@ func TestLayout_SpawnFor_PicksAnUncrowdedFallbackCandidate(t *testing.T) {
 	// ring position, so the function is forced to walk the whole ring.
 	occupied := []Vec3{primary}
 	ring := spawnFallbackRing(primary)
-	for _, candidate := range ring[:len(ring)-1] {
-		occupied = append(occupied, candidate)
-	}
+	occupied = append(occupied, ring[:len(ring)-1]...)
 
 	spawn := layout.SpawnFor(ZoneMainStage, occupied)
 

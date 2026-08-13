@@ -356,7 +356,6 @@ var (
 	firstPersonActionNarration        = regexp.MustCompile(`(?i)^i\s+(?:swallow|nod|shake|lean|smile|grin|sigh|pause|glance|reach|touch|brush|trace|move|slide|pull|press|lift|lower|tilt|turn|step|sit|stand|inhale|exhale|freeze|flinch|shrug|blink|bite|gesture|clench|flex|curl|settle|stiffen|steady|search|open|close|part|shift|tense|flutter)(?:\s+(?:back|closer|away|forward|in|out|up|down|over|toward|towards))?\s*[,;.!?]`)
 	firstPersonSpeechTagNarration     = regexp.MustCompile(`(?i)^i\s+(?:say|ask|reply|answer|whisper|murmur|add)\s*,`)
 	firstPersonBodyAction             = regexp.MustCompile(`(?i)^i\s+(?:rest|place|lay|set|hold|keep|move|slide|brush|trace|press|lift|lower|pull|withdraw|wrap|grab|take|open|close|clench|flex|curl|settle|shift|steady)\s+(?:my|a|the)\s+(?:hand|hands|finger|fingers|thumb|palm|arm|arms|foot|feet|knee|knees|leg|legs|thigh|thighs|hip|hips|head|shoulder|shoulders|jaw|lips|mouth|body)\b`)
-	firstPersonForeignBodyNarration   = regexp.MustCompile(`(?i)^i\s+(?:(?:slowly|carefully|quietly|briefly|gently|hesitantly)\s+)?(?:rest|place|lay|set|hold|keep|move|slide|brush|trace|touch|press|lift|lower|pull|withdraw|wrap|grab|take|open|close|clench|flex|curl|settle|shift|steady)\s+(?:her|his|their)\s+(?:hand|hands|finger|fingers|thumb|palm|arm|arms|foot|feet|knee|knees|leg|legs|thigh|thighs|hip|hips|head|shoulder|shoulders|jaw|lips|mouth|body)\b`)
 	firstPersonForeignBodyNarrationV2 = regexp.MustCompile(`(?i)^i\s+(?:(?:slowly|carefully|quietly|briefly|gently|hesitantly)\s+)?(?:rest|place|lay|set|hold|keep|move|slide|brush|trace|touch|press|lift|lower|pull|withdraw|wrap|grab|take|open|close|clench|flex|curl|settle|shift|steady)\s+(?:her|his|their)\s+(?:(?:left|right|upper|lower|front|back|inner|outer|near|far|same|other)\s+){0,2}(?:hand|hands|finger|fingers|thumb|palm|arm|arms|foot|feet|knee|knees|leg|legs|thigh|thighs|hip|hips|head|shoulder|shoulders|jaw|lips|mouth|body)\b`)
 	firstPersonGazeAction             = regexp.MustCompile(`(?i)^i\s+(?:(?:finally|slowly|carefully|quietly|briefly|gently|hesitantly)\s+)?(?:meet|hold|avoid|search)\s+your\s+(?:eyes|gaze)\b`)
 	bodyActionNarration               = regexp.MustCompile(`(?i)^my\s+(?:breath|hand|hands|finger|fingers|thumb|palm|palms|gaze|eyes|voice|heart|pulse|shoulder|shoulders|lips|mouth|head|body|foot|feet|knee|knees|leg|legs|thigh|thighs|hip|hips|jaw|chest|throat)\s+(?:hitch(?:es)?|catch(?:es)?|brush(?:es)?|trace(?:s)?|move(?:s)?|slide(?:s)?|pull(?:s)?|press(?:es)?|lift(?:s)?|lower(?:s)?|tilt(?:s)?|turn(?:s)?|tremble(?:s)?|shake(?:s)?|freeze(?:s)?|tighten(?:s)?|soften(?:s)?|drop(?:s)?|rise(?:s)?|races?|pound(?:s)?|hammer(?:s)?|lock(?:s)?|flick(?:s)?|drift(?:s)?|linger(?:s)?|hover(?:s)?|land(?:s)?|rest(?:s)?|still(?:s)?|open(?:s)?|close(?:s)?|part(?:s)?|clench(?:es)?|flex(?:es)?|curl(?:s)?|settle(?:s)?|stiffen(?:s)?|steady(?:s)?|search(?:es)?|shift(?:s)?|tense(?:s)?|flutter(?:s)?|thrum(?:s)?|beat(?:s)?|sound(?:s)?)\b`)
@@ -631,13 +630,10 @@ func isPresentationOnlySingleBlockRecovery(candidate, repaired string) bool {
 		strings.Join(strings.Fields(candidate), " ") == strings.Join(strings.Fields(repaired), " ")
 }
 
-// finalizePersonalDialogueOnlyRecovery is deliberately available only to the
-// final bounded attempt. Dialogue-only recovery still has to satisfy the same
-// two-medium-block presentation contract as every other personal reply.
-func finalizePersonalDialogueOnlyRecovery(ctx context.Context, persona *models.BotPersona, candidate string, onChunk openrouter.StreamCallback) (string, error) {
-	return finalizePersonalDialogueOnlyRecoveryWithConstraints(ctx, persona, candidate, personalResponseConstraints{}, onChunk)
-}
-
+// finalizePersonalDialogueOnlyRecoveryWithConstraints is deliberately
+// available only to the final bounded attempt. Dialogue-only recovery still
+// has to satisfy the same two-medium-block presentation contract as every
+// other personal reply.
 func finalizePersonalDialogueOnlyRecoveryWithConstraints(ctx context.Context, persona *models.BotPersona, candidate string, constraints personalResponseConstraints, onChunk openrouter.StreamCallback) (string, error) {
 	recovered := sanitizePersonalDialogueOnlyRecovery(candidate)
 	if valid, detail := validatePersonalDialogueOnlyRecoveryWithConstraints(recovered, constraints); !valid {
@@ -706,10 +702,6 @@ func deliverBufferedConversation(response string, onChunk openrouter.StreamCallb
 		onChunk(response)
 	}
 	return response
-}
-
-func generateBufferedAssistantCandidate(ctx context.Context, completion chatCompletionClient, messages []openrouter.Message, personalMode bool) (string, error) {
-	return generateBufferedAssistantCandidateWithOptions(ctx, completion, messages, personalMode, openrouter.GenerationOptions{})
 }
 
 func generateBufferedAssistantCandidateWithOptions(ctx context.Context, completion chatCompletionClient, messages []openrouter.Message, personalMode bool, options openrouter.GenerationOptions) (string, error) {
