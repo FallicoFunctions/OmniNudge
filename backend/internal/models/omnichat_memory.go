@@ -88,6 +88,14 @@ type OmniChatMemoryEpisode struct {
 	Status       OmniChatMemoryStatus `json:"status"`
 	SupersededBy int64                `json:"-"`
 
+	// RetellsEpisodeID points at the episode this one retells. Zero means this
+	// is an original account. A story drifts as it is retold, so each telling is
+	// kept whole rather than folded into a counter on the first one.
+	RetellsEpisodeID int64 `json:"-"`
+	// Tellings is how many versions exist in this memory's chain, including the
+	// original. Only populated by recall.
+	Tellings int `json:"tellings,omitempty"`
+
 	RetrievalCount  int        `json:"-"`
 	LastRetrievedAt *time.Time `json:"-"`
 
@@ -201,12 +209,18 @@ func clampMemoryText(value string, maxRunes int) string {
 // rank scores a distinctive episode and a mundane one identically when both
 // mention the same place, so it can only ever be a candidate generator.
 type OmniChatMemoryRecallWeights struct {
-	Text                float64
-	EntityOverlap       float64
-	Salience            float64
-	Distinctiveness     float64
-	Recency             float64
-	PriorRecall         float64
+	Text            float64
+	EntityOverlap   float64
+	Salience        float64
+	Distinctiveness float64
+	Recency         float64
+	PriorRecall     float64
+	// Retelling weights how often a story has been told again. It is a signal
+	// this system has never had, so there is no honest number for it yet and it
+	// starts at zero: the chain length is recorded and surfaced, and the weight
+	// gets set once there is usage to measure it against rather than a guess
+	// baked in from the start.
+	Retelling           float64
 	RecencyHalfLifeDays float64
 }
 
@@ -218,6 +232,7 @@ func DefaultOmniChatMemoryRecallWeights() OmniChatMemoryRecallWeights {
 		Distinctiveness:     1.5,
 		Recency:             0.3,
 		PriorRecall:         0.2,
+		Retelling:           0,
 		RecencyHalfLifeDays: 90,
 	}
 }
@@ -325,13 +340,14 @@ func (r *OmniChatMemoryRepository) RecordExtraction(
 		err := tx.QueryRow(ctx, `
 			INSERT INTO omnichat_memory_episodes (
 				persona_id, owner_user_id, conversation_id, source_message_id,
-				title, summary, salience, distinctiveness, emotional_valence
-			) VALUES ($1, $2, $3, NULLIF($4, 0), $5, $6, $7, $8, $9)
+				title, summary, salience, distinctiveness, emotional_valence, retells_episode_id
+			) VALUES ($1, $2, $3, NULLIF($4, 0), $5, $6, $7, $8, $9, NULLIF($10, 0)::bigint)
 			RETURNING id
 		`,
 			episode.PersonaID, ownerUserID, conversationID, episode.SourceMessageID,
 			episode.Title, episode.Summary,
 			episode.Salience, episode.Distinctiveness, episode.EmotionalValence,
+			episode.RetellsEpisodeID,
 		).Scan(&episodeID)
 		if err != nil {
 			return fmt.Errorf("omnichat memory: insert episode: %w", err)
@@ -404,6 +420,13 @@ func (r *OmniChatMemoryRepository) RecordExtraction(
 // entity join is the associative half -- it is what turns "that one time with
 // Mike" into the episodes Mike appears in -- and the score is what decides which
 // of those the persona actually surfaces.
+//
+// Retellings are collapsed. A story told twenty times is twenty rows, and
+// without grouping they would take every slot and read as one memory repeated.
+// Matching happens per telling, because the cue may echo any version's wording,
+// and the chain is then scored once and represented by its newest telling: that
+// is the version currently in circulation between these two, drift included.
+// The original stays untouched and readable elsewhere.
 const recallQuery = `
 WITH params AS (
     SELECT $1::int AS persona_id, $2::int AS owner_user_id, $3::text AS cue
@@ -425,10 +448,9 @@ seed_entities AS (
     LIMIT 32
 ),
 seed_count AS (SELECT GREATEST(count(*), 1)::real AS n FROM seed_entities),
-scored AS (
+tellings AS (
     SELECT ep.id,
-           ep.title,
-           ep.summary,
+           COALESCE(ep.retells_episode_id, ep.id) AS root_id,
            ep.recorded_at,
            ep.salience,
            ep.distinctiveness,
@@ -442,21 +464,40 @@ scored AS (
     WHERE ep.owner_user_id IS NOT DISTINCT FROM $2::int
       AND ep.status = 'active'
     GROUP BY ep.id
-    HAVING count(DISTINCT se.id) > 0
-        OR ((SELECT tsq FROM cue_query) IS NOT NULL AND ep.search_vector @@ (SELECT tsq FROM cue_query))
+),
+-- A chain is a candidate when any of its tellings matched the cue.
+matched AS (
+    SELECT root_id,
+           max(matched_entities) AS matched_entities,
+           max(text_rank) AS text_rank,
+           count(*) AS telling_count
+    FROM tellings
+    GROUP BY root_id
+    HAVING max(matched_entities) > 0 OR max(text_rank) > 0
+),
+current_telling AS (
+    SELECT DISTINCT ON (t.root_id)
+           t.root_id, t.id, t.recorded_at, t.salience, t.distinctiveness, t.retrieval_count
+    FROM tellings t
+    JOIN matched m ON m.root_id = t.root_id
+    ORDER BY t.root_id, t.recorded_at DESC, t.id DESC
 )
-SELECT s.id, s.title, s.summary, s.recorded_at, s.salience, s.distinctiveness,
+SELECT c.id, ep.title, ep.summary, c.recorded_at, c.salience, c.distinctiveness,
+       m.telling_count,
        (
-           $4::float8 * LEAST(s.text_rank, 1.0)
-         + $5::float8 * (s.matched_entities::float8 / (SELECT n FROM seed_count))
-         + $6::float8 * s.salience
-         + $7::float8 * s.distinctiveness
-         + $8::float8 * exp(-GREATEST(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - s.recorded_at)), 0) / ($9::float8 * 86400))
-         + $10::float8 * ln(1 + s.retrieval_count)
+           $4::float8 * LEAST(m.text_rank, 1.0)
+         + $5::float8 * (m.matched_entities::float8 / (SELECT n FROM seed_count))
+         + $6::float8 * c.salience
+         + $7::float8 * c.distinctiveness
+         + $8::float8 * exp(-GREATEST(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - c.recorded_at)), 0) / ($9::float8 * 86400))
+         + $10::float8 * ln(1 + c.retrieval_count)
+         + $11::float8 * ln(m.telling_count)
        ) AS score
-FROM scored s
-ORDER BY score DESC, s.recorded_at DESC
-LIMIT $11
+FROM current_telling c
+JOIN matched m ON m.root_id = c.root_id
+JOIN omnichat_memory_episodes ep ON ep.id = c.id
+ORDER BY score DESC, c.recorded_at DESC
+LIMIT $12
 `
 
 // Recall returns the episodes a persona should surface for a cue, most
@@ -479,7 +520,7 @@ func (r *OmniChatMemoryRepository) Recall(
 		personaID, ownerParam(ownerUserID), cue,
 		weights.Text, weights.EntityOverlap, weights.Salience, weights.Distinctiveness,
 		weights.Recency, weights.RecencyHalfLifeDays, weights.PriorRecall,
-		limit,
+		weights.Retelling, limit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("omnichat memory: recall for persona %d: %w", personaID, err)
@@ -494,7 +535,8 @@ func (r *OmniChatMemoryRepository) Recall(
 		)
 		if err := rows.Scan(
 			&episode.ID, &episode.Title, &episode.Summary,
-			&episode.RecordedAt, &episode.Salience, &episode.Distinctiveness, &score,
+			&episode.RecordedAt, &episode.Salience, &episode.Distinctiveness,
+			&episode.Tellings, &score,
 		); err != nil {
 			return nil, fmt.Errorf("omnichat memory: scan recalled episode: %w", err)
 		}
@@ -590,35 +632,46 @@ func (r *OmniChatMemoryRepository) ListForConversation(
 	return episodes, total, nil
 }
 
-// RecentTitles lists what a persona already remembers about someone, newest
-// first. Extraction uses it to avoid recording a retold story a second time.
-func (r *OmniChatMemoryRepository) RecentTitles(ctx context.Context, personaID, ownerUserID, limit int) ([]string, error) {
+// OmniChatMemoryRoot is an original account offered to extraction as something
+// already remembered, so a retelling can be attached to it rather than filed as
+// a new event.
+type OmniChatMemoryRoot struct {
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+}
+
+// RecentRoots lists original accounts only. Retellings are excluded so a chain
+// stays one level deep: a new telling always attaches to the first account,
+// never to another telling, which is what lets recall collapse with a single
+// COALESCE instead of walking a tree.
+func (r *OmniChatMemoryRepository) RecentRoots(ctx context.Context, personaID, ownerUserID, limit int) ([]OmniChatMemoryRoot, error) {
 	if personaID < 1 || limit < 1 {
 		return nil, errors.New("omnichat memory: persona and positive limit are required")
 	}
 	rows, err := r.pool.Query(ctx, `
-		SELECT title
+		SELECT id, title
 		FROM omnichat_memory_episodes
 		WHERE persona_id = $1
 		  AND owner_user_id IS NOT DISTINCT FROM $2::int
 		  AND status = 'active'
+		  AND retells_episode_id IS NULL
 		ORDER BY recorded_at DESC
 		LIMIT $3
 	`, personaID, ownerParam(ownerUserID), limit)
 	if err != nil {
-		return nil, fmt.Errorf("omnichat memory: list recent titles: %w", err)
+		return nil, fmt.Errorf("omnichat memory: list recent roots: %w", err)
 	}
 	defer rows.Close()
 
-	titles := make([]string, 0, limit)
+	roots := make([]OmniChatMemoryRoot, 0, limit)
 	for rows.Next() {
-		var title string
-		if err := rows.Scan(&title); err != nil {
-			return nil, fmt.Errorf("omnichat memory: scan recent title: %w", err)
+		var root OmniChatMemoryRoot
+		if err := rows.Scan(&root.ID, &root.Title); err != nil {
+			return nil, fmt.Errorf("omnichat memory: scan recent root: %w", err)
 		}
-		titles = append(titles, title)
+		roots = append(roots, root)
 	}
-	return titles, rows.Err()
+	return roots, rows.Err()
 }
 
 // HideOwned is the user's correction path: it withdraws a memory from recall

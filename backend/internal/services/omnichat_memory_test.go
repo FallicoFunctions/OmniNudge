@@ -33,8 +33,8 @@ type fakeMemoryStore struct {
 	recallCue       string
 	recallOwnerUser int
 	recallPersonaID int
-	knownTitles     []string
-	knownTitlesErr  error
+	knownRoots      []models.OmniChatMemoryRoot
+	knownRootsErr   error
 }
 
 func (f *fakeMemoryStore) GetWatermark(context.Context, int) (int, int, error) {
@@ -80,8 +80,8 @@ func (f *fakeMemoryStore) MarkRetrieved(_ context.Context, ids []int64) error {
 	return nil
 }
 
-func (f *fakeMemoryStore) RecentTitles(context.Context, int, int, int) ([]string, error) {
-	return f.knownTitles, f.knownTitlesErr
+func (f *fakeMemoryStore) RecentRoots(context.Context, int, int, int) ([]models.OmniChatMemoryRoot, error) {
+	return f.knownRoots, f.knownRootsErr
 }
 
 func (f *fakeMemoryStore) marked() []int64 {
@@ -126,10 +126,10 @@ type fakeMemoryExtractor struct {
 	err       error
 	calls     int
 	sawCounts []int
-	sawKnown  [][]string
+	sawKnown  [][]models.OmniChatMemoryRoot
 }
 
-func (f *fakeMemoryExtractor) Extract(_ context.Context, _ *models.BotPersona, messages []*models.BotMessage, alreadyRecorded []string) ([]models.OmniChatMemoryEpisode, error) {
+func (f *fakeMemoryExtractor) Extract(_ context.Context, _ *models.BotPersona, messages []*models.BotMessage, alreadyRecorded []models.OmniChatMemoryRoot) ([]models.OmniChatMemoryEpisode, error) {
 	f.calls++
 	f.sawCounts = append(f.sawCounts, len(messages))
 	f.sawKnown = append(f.sawKnown, alreadyRecorded)
@@ -472,8 +472,11 @@ func TestScheduleMemoryExtractionToleratesNoQueue(t *testing.T) {
 // transcript, and the extractor would record it as a fresh event. Observed on a
 // live run: recalling one memory produced a near-identical second copy, which
 // over time crowds the recall budget with the same moment.
-func TestExtractForConversationTellsTheModelWhatIsAlreadyRemembered(t *testing.T) {
-	store := &fakeMemoryStore{knownTitles: []string{"Bruno ate the cake", "Laid off after eight years"}}
+func TestExtractForConversationOffersWhatIsAlreadyRemembered(t *testing.T) {
+	store := &fakeMemoryStore{knownRoots: []models.OmniChatMemoryRoot{
+		{ID: 11, Title: "Bruno ate the cake"},
+		{ID: 12, Title: "Laid off after eight years"},
+	}}
 	extractor := &fakeMemoryExtractor{}
 	service := NewOmniChatMemoryService(store,
 		&fakeMemoryMessages{messages: memoryTestMessages()},
@@ -482,13 +485,16 @@ func TestExtractForConversationTellsTheModelWhatIsAlreadyRemembered(t *testing.T
 
 	require.NoError(t, service.ExtractForConversation(context.Background(), 1, 2))
 	require.Len(t, extractor.sawKnown, 1)
-	require.Equal(t, []string{"Bruno ate the cake", "Laid off after eight years"}, extractor.sawKnown[0])
+	require.Equal(t, []models.OmniChatMemoryRoot{
+		{ID: 11, Title: "Bruno ate the cake"},
+		{ID: 12, Title: "Laid off after eight years"},
+	}, extractor.sawKnown[0])
 }
 
 // Losing the known-titles list risks a duplicate memory, never a lost one, so
 // extraction carries on without it rather than failing the delta.
-func TestExtractForConversationProceedsWhenKnownTitlesAreUnavailable(t *testing.T) {
-	store := &fakeMemoryStore{knownTitlesErr: errors.New("database is down")}
+func TestExtractForConversationProceedsWhenKnownRootsAreUnavailable(t *testing.T) {
+	store := &fakeMemoryStore{knownRootsErr: errors.New("database is down")}
 	extractor := &fakeMemoryExtractor{}
 	service := NewOmniChatMemoryService(store,
 		&fakeMemoryMessages{messages: memoryTestMessages()},
@@ -498,4 +504,42 @@ func TestExtractForConversationProceedsWhenKnownTitlesAreUnavailable(t *testing.
 	require.NoError(t, service.ExtractForConversation(context.Background(), 1, 2))
 	require.Equal(t, 1, extractor.calls, "extraction must still run")
 	require.Equal(t, 1, store.recordCalls)
+}
+
+// The retells id comes back from a model, and a model can return any number.
+// An unchecked one would attach this telling to whatever episode happens to
+// hold that id, including another user's, so only ids that were offered survive.
+func TestExtractForConversationRejectsAnUnofferedRetellingLink(t *testing.T) {
+	store := &fakeMemoryStore{knownRoots: []models.OmniChatMemoryRoot{{ID: 11, Title: "Bruno ate the cake"}}}
+	extractor := &fakeMemoryExtractor{episodes: []models.OmniChatMemoryEpisode{
+		{Title: "A retelling", Summary: "Told again.", Salience: 0.5, Distinctiveness: 0.5,
+			RetellsEpisodeID: 9999},
+	}}
+	service := NewOmniChatMemoryService(store,
+		&fakeMemoryMessages{messages: memoryTestMessages()},
+		&fakeMemoryConversations{conversation: &models.BotConversation{ID: 1, PersonaID: 5}},
+		&fakeMemoryPersonas{}, extractor)
+
+	require.NoError(t, service.ExtractForConversation(context.Background(), 1, 2))
+	require.Len(t, store.recorded, 1)
+	require.Zero(t, store.recorded[0].RetellsEpisodeID,
+		"an id that was never offered must be dropped, leaving an original account")
+}
+
+func TestExtractForConversationKeepsAnOfferedRetellingLink(t *testing.T) {
+	store := &fakeMemoryStore{knownRoots: []models.OmniChatMemoryRoot{{ID: 11, Title: "Bruno ate the cake"}}}
+	extractor := &fakeMemoryExtractor{episodes: []models.OmniChatMemoryEpisode{
+		{Title: "Bruno, again", Summary: "This time the cake was a wedding cake.",
+			Salience: 0.5, Distinctiveness: 0.5, RetellsEpisodeID: 11},
+	}}
+	service := NewOmniChatMemoryService(store,
+		&fakeMemoryMessages{messages: memoryTestMessages()},
+		&fakeMemoryConversations{conversation: &models.BotConversation{ID: 1, PersonaID: 5}},
+		&fakeMemoryPersonas{}, extractor)
+
+	require.NoError(t, service.ExtractForConversation(context.Background(), 1, 2))
+	require.Len(t, store.recorded, 1)
+	require.Equal(t, int64(11), store.recorded[0].RetellsEpisodeID)
+	require.Contains(t, store.recorded[0].Summary, "wedding cake",
+		"the telling keeps how it was told this time, not how it was first recorded")
 }

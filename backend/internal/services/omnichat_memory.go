@@ -56,7 +56,7 @@ type omniChatMemoryStore interface {
 	SkipTo(ctx context.Context, conversationID, ownerUserID, throughMessageID int) error
 	Recall(ctx context.Context, personaID, ownerUserID int, cue string, weights models.OmniChatMemoryRecallWeights, limit int) ([]*models.OmniChatMemoryEpisode, error)
 	MarkRetrieved(ctx context.Context, episodeIDs []int64) error
-	RecentTitles(ctx context.Context, personaID, ownerUserID, limit int) ([]string, error)
+	RecentRoots(ctx context.Context, personaID, ownerUserID, limit int) ([]models.OmniChatMemoryRoot, error)
 }
 
 type omniChatMemoryMessageReader interface {
@@ -73,7 +73,7 @@ type omniChatMemoryPersonaReader interface {
 
 // OmniChatMemoryExtractor turns a stretch of transcript into episodes.
 type OmniChatMemoryExtractor interface {
-	Extract(ctx context.Context, persona *models.BotPersona, messages []*models.BotMessage, alreadyRecorded []string) ([]models.OmniChatMemoryEpisode, error)
+	Extract(ctx context.Context, persona *models.BotPersona, messages []*models.BotMessage, alreadyRecorded []models.OmniChatMemoryRoot) ([]models.OmniChatMemoryEpisode, error)
 }
 
 // OmniChatMemoryService owns character memory: extraction off the request path,
@@ -212,10 +212,14 @@ func (s *OmniChatMemoryService) extractOnce(ctx context.Context, conversationID,
 
 	// Losing this list only risks a duplicate memory, never a lost one, so a
 	// failure here is not worth abandoning the extraction over.
-	alreadyRecorded, titlesErr := s.store.RecentTitles(ctx, persona.ID, ownerUserID, omniChatMemoryKnownTitles)
-	if titlesErr != nil {
-		zlog.Warn().Err(titlesErr).Int("conversation_id", conversationID).
-			Msg("omnichat memory: could not load known titles; a retold story may be recorded twice")
+	alreadyRecorded, rootsErr := s.store.RecentRoots(ctx, persona.ID, ownerUserID, omniChatMemoryKnownTitles)
+	if rootsErr != nil {
+		zlog.Warn().Err(rootsErr).Int("conversation_id", conversationID).
+			Msg("omnichat memory: could not load known memories; a retold story may be filed as a new event")
+	}
+	offeredRoots := make(map[int64]struct{}, len(alreadyRecorded))
+	for _, root := range alreadyRecorded {
+		offeredRoots[root.ID] = struct{}{}
 	}
 
 	extractCtx, cancel := context.WithTimeout(ctx, omniChatMemoryExtractionTimeout)
@@ -241,6 +245,17 @@ func (s *OmniChatMemoryService) extractOnce(ctx context.Context, conversationID,
 		episode.ConversationID = conversationID
 		if episode.SourceMessageID == 0 {
 			episode.SourceMessageID = throughMessageID
+		}
+		// The model returns an id it was shown, but it can return any number, and
+		// an unchecked one would attach this telling to a stranger's memory.
+		if episode.RetellsEpisodeID != 0 {
+			if _, offered := offeredRoots[episode.RetellsEpisodeID]; !offered {
+				zlog.Warn().
+					Int64("retells_episode_id", episode.RetellsEpisodeID).
+					Int("conversation_id", conversationID).
+					Msg("omnichat memory: discarding retelling link to a memory that was not offered")
+				episode.RetellsEpisodeID = 0
+			}
 		}
 		episode.Normalize()
 		if err := episode.Validate(); err != nil {
@@ -382,10 +397,10 @@ type memoryExtractionTranscriptMessage struct {
 type memoryExtractionInput struct {
 	PersonaName string                              `json:"persona_name"`
 	Transcript  []memoryExtractionTranscriptMessage `json:"transcript"`
-	// AlreadyRecorded stops a retold story from being remembered twice. Without
-	// it, asking a character about something it remembers records the retelling
-	// as a fresh event, and often-referenced moments crowd out everything else.
-	AlreadyRecorded []string `json:"already_recorded,omitempty"`
+	// AlreadyRecorded are the original accounts this persona already holds, with
+	// the ids a retelling attaches to. Without them a retold story is filed as a
+	// brand new event and the same moment accumulates copies of itself.
+	AlreadyRecorded []models.OmniChatMemoryRoot `json:"already_recorded,omitempty"`
 }
 
 type memoryExtractionEpisode struct {
@@ -394,6 +409,7 @@ type memoryExtractionEpisode struct {
 	Salience         float64  `json:"salience"`
 	Distinctiveness  float64  `json:"distinctiveness"`
 	EmotionalValence *float64 `json:"emotional_valence"`
+	RetellsID        int64    `json:"retells_id"`
 	Entities         []struct {
 		Name    string   `json:"name"`
 		Kind    string   `json:"kind"`
@@ -433,17 +449,25 @@ Two events that mention the same place are not equally memorable. A weekly coffe
 
 emotional_valence runs -1 (painful) to 1 (joyful), or null when neutral.
 
+retells_id is the id of the already-recorded memory this retells, or 0.
+
 entities are the names the memory could later be recalled by: people, places, things, topics, events. Give each a name and a kind from person, place, thing, topic, event. Use the most natural everyday form of the name. Include the user and the character only when they are genuinely part of what makes the memory findable.
 
-Some memories are listed as already recorded. Those events are remembered already: never record them a second time, even when this exchange discusses or retells one at length. Recalling something is not a new thing happening. Record only what this exchange adds.
+Some memories are listed as already recorded, each with an id.
 
-Return at most 4 episodes. Required keys: episodes. Each episode requires title, summary, salience, distinctiveness, emotional_valence, entities. Each entity requires name, kind, aliases.`
+If this exchange retells one of them, do not describe the original event again as something new. Record how it was told this time, and set retells_id to that memory's id. A retelling is worth keeping in its own right: stories shift as they are told, details move, and the way someone tells a story now is not always the way it happened. Write the summary as this telling had it, not as the earlier record had it.
+
+If a listed memory is only mentioned in passing rather than retold, record nothing for it.
+
+Set retells_id to 0 for anything this exchange establishes for the first time. Only use an id that appears in the list.
+
+Return at most 4 episodes. Required keys: episodes. Each episode requires title, summary, salience, distinctiveness, emotional_valence, retells_id, entities. Each entity requires name, kind, aliases.`
 
 func (e *ModelOmniChatMemoryExtractor) Extract(
 	ctx context.Context,
 	persona *models.BotPersona,
 	messages []*models.BotMessage,
-	alreadyRecorded []string,
+	alreadyRecorded []models.OmniChatMemoryRoot,
 ) ([]models.OmniChatMemoryEpisode, error) {
 	if e == nil || e.client == nil {
 		return nil, errors.New("omnichat memory: extraction client is unavailable")
@@ -500,6 +524,7 @@ func (e *ModelOmniChatMemoryExtractor) Extract(
 			Salience:         clampUnit(raw.Salience),
 			Distinctiveness:  clampUnit(raw.Distinctiveness),
 			EmotionalValence: raw.EmotionalValence,
+			RetellsEpisodeID: raw.RetellsID,
 			Status:           models.OmniChatMemoryStatusActive,
 		}
 		for _, entity := range raw.Entities {

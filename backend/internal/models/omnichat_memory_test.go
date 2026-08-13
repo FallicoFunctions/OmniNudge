@@ -747,3 +747,82 @@ func TestOmniChatMemoryListForConversationTotalIgnoresLimit(t *testing.T) {
 	require.Len(t, got, 2, "the page respects the limit")
 	require.Equal(t, 5, total, "the total does not")
 }
+
+func insertRetelling(t *testing.T, pool *pgxpool.Pool, personaID, ownerUserID int, root int64, title, summary string) int64 {
+	t.Helper()
+	var id int64
+	require.NoError(t, pool.QueryRow(context.Background(), `
+		INSERT INTO omnichat_memory_episodes
+			(persona_id, owner_user_id, title, summary, salience, distinctiveness, retells_episode_id)
+		VALUES ($1, $2, $3, $4, 0.5, 0.5, $5) RETURNING id
+	`, personaID, ownerUserID, title, summary, root).Scan(&id))
+	return id
+}
+
+// A story told many times is many rows. Recall has six slots, so without
+// collapsing, one well-worn story would fill all of them and read as a stutter.
+// The chain is one candidate, and the version surfaced is the newest -- the way
+// it is currently told, drift and all -- while the original stays put.
+func TestOmniChatMemoryRecallCollapsesRetellingsToTheCurrentVersion(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "retell")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	root := insertEpisode(t, pool, fixture.personaID, fixture.userID,
+		"The McDonalds night", "Mike clogged the toilet at 5am and we left.", 0.9, 0.9)
+	// Each retelling drifts a little further from the original.
+	insertRetelling(t, pool, fixture.personaID, fixture.userID, root,
+		"The McDonalds night", "Mike flooded the whole bathroom and the manager chased us.")
+	newest := insertRetelling(t, pool, fixture.personaID, fixture.userID, root,
+		"The McDonalds night", "Mike flooded the place and we were banned for life.")
+
+	linkEntity(t, pool, fixture.personaID, fixture.userID, "McDonalds", "place", root, newest)
+
+	got, err := repo.Recall(ctx, fixture.personaID, fixture.userID,
+		"remember that McDonalds night?", DefaultOmniChatMemoryRecallWeights(), 6)
+	require.NoError(t, err)
+
+	require.Len(t, got, 1, "three tellings of one story must occupy one slot, not three")
+	require.Equal(t, newest, got[0].ID, "the version in circulation is the newest telling")
+	require.Contains(t, got[0].Summary, "banned for life", "and its text, not the original's")
+	require.Equal(t, 3, got[0].Tellings, "the chain length is reported")
+
+	// The first account is untouched and still readable.
+	var original string
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT summary FROM omnichat_memory_episodes WHERE id = $1`, root).Scan(&original))
+	require.Contains(t, original, "clogged the toilet",
+		"retelling must never rewrite the original account")
+}
+
+// A cue may echo any version's wording. Matching only the newest would lose a
+// story whose distinctive phrase belongs to how it was first told.
+func TestOmniChatMemoryRecallMatchesAnyTellingInTheChain(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "retellmatch")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	root := insertEpisode(t, pool, fixture.personaID, fixture.userID,
+		"The kayak thing", "We capsized near the lighthouse and lost the cooler.", 0.7, 0.8)
+	newest := insertRetelling(t, pool, fixture.personaID, fixture.userID, root,
+		"The kayak thing", "We went over and swam back.")
+
+	// "lighthouse" appears only in the original account.
+	got, err := repo.Recall(ctx, fixture.personaID, fixture.userID,
+		"that time at the lighthouse", DefaultOmniChatMemoryRecallWeights(), 6)
+	require.NoError(t, err)
+	require.Len(t, got, 1, "a phrase from the original must still find the story")
+	require.Equal(t, newest, got[0].ID, "but the current telling is what is surfaced")
+}
+
+// The weight starts at zero deliberately: chain length is a signal this system
+// has never had, so it is recorded and surfaced before it is trusted to rank.
+func TestOmniChatMemoryRetellingWeightIsUnsetUntilMeasured(t *testing.T) {
+	require.Zero(t, DefaultOmniChatMemoryRecallWeights().Retelling)
+}
