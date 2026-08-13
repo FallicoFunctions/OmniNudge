@@ -79,6 +79,18 @@ type LaunchSession struct {
 	TokenVersion int        `json:"-"`
 }
 
+// ResidentRef names whose world state a row belongs to. A persona has no user
+// id, so a resident cannot be identified by one; the kind and the id together
+// are what make the reference unambiguous across kinds that reuse numbering.
+type ResidentRef struct {
+	Kind SubjectKind
+	ID   int64
+}
+
+func (r ResidentRef) Valid() bool {
+	return r.Kind.Valid() && r.ID > 0
+}
+
 type SavedPoint struct {
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
@@ -112,6 +124,23 @@ type OmniRaveProfile struct {
 	ReturnPoint *SavedPoint       `json:"returnPoint,omitempty"`
 	LastVenue   string            `json:"lastVenue"`
 	Settings    OmniRaveSettings  `json:"settings"`
+
+	// Subject may be zero on profiles built by code that predates it; use
+	// ResolvedSubject rather than reading this directly.
+	Subject ResidentRef `json:"subject,omitempty"`
+}
+
+// ResolvedSubject returns Subject when set, otherwise derives the account
+// subject from UserID, so callers written before the field keep working.
+//
+// Derivation only ever yields an account subject. A persona is never inferred,
+// for the same reason PlayerIdentity refuses to infer one: a persona has to be
+// stated by whoever created it, and an absent field is not a statement.
+func (p OmniRaveProfile) ResolvedSubject() ResidentRef {
+	if p.Subject.Valid() {
+		return p.Subject
+	}
+	return ResidentRef{Kind: SubjectKindAccount, ID: int64(p.UserID)}
 }
 
 func DefaultOmniRaveProfile(userID int) OmniRaveProfile {
