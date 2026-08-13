@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,6 +12,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/testutil"
+	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 )
 
@@ -94,6 +98,89 @@ func TestAuthOptional_CookieSessionDoesNotAssociateMutationWithoutCSRF(t *testin
 
 	require.Equal(t, http.StatusAccepted, request(false))
 	require.Equal(t, http.StatusNoContent, request(true))
+}
+
+// The downgrade above is deliberate: optional-auth routes include public write
+// endpoints that must stay usable. What is not acceptable is doing it silently,
+// which leaves a handler reporting that nobody is signed in when somebody is.
+// This pins the warning that makes the drop visible, and the reason that says
+// which check failed.
+func TestAuthOptional_LogsWhyCookieIdentityWasDropped(t *testing.T) {
+	db := testutil.NewTestDatabase(t)
+	user := testutil.NewFixtures(t, db).CreateUniqueUser("optional_cookie_log")
+	auth := services.NewAuthService("cookie-test-secret", "test", "")
+	sessions := services.NewAuthSessionService(db.Pool, auth)
+	auth.SetSessionService(sessions)
+	credentials, err := sessions.Create(t.Context(), user, false, "test browser", "")
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name       string
+		csrfCookie string
+		csrfHeader string
+		wantReason string
+		wantStatus int
+	}{
+		{"no csrf at all", "", "", "missing_csrf_cookie", http.StatusAccepted},
+		{"cookie without header", credentials.CSRFToken, "", "missing_csrf_header", http.StatusAccepted},
+		{"header disagrees with cookie", credentials.CSRFToken, "not-the-same-token", "csrf_cookie_header_mismatch", http.StatusAccepted},
+		{"valid csrf", credentials.CSRFToken, credentials.CSRFToken, "", http.StatusNoContent},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			previous := zlog.Logger
+			zlog.Logger = zerolog.New(&logs)
+			previousLevel := zerolog.GlobalLevel()
+			zerolog.SetGlobalLevel(zerolog.WarnLevel)
+			t.Cleanup(func() {
+				zlog.Logger = previous
+				zerolog.SetGlobalLevel(previousLevel)
+			})
+
+			router := gin.New()
+			router.Use(AuthOptional(auth))
+			router.POST("/analytics/events", func(c *gin.Context) {
+				if _, authenticated := c.Get("user_id"); authenticated {
+					c.Status(http.StatusNoContent)
+					return
+				}
+				c.Status(http.StatusAccepted)
+			})
+
+			req := httptest.NewRequest(http.MethodPost, "/analytics/events", nil)
+			req.AddCookie(&http.Cookie{Name: services.AccessTokenCookieName, Value: credentials.AccessToken})
+			if tc.csrfCookie != "" {
+				req.AddCookie(&http.Cookie{Name: services.CSRFTokenCookieName, Value: tc.csrfCookie})
+			}
+			if tc.csrfHeader != "" {
+				req.Header.Set("X-CSRF-Token", tc.csrfHeader)
+			}
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			// The request outcome must not change: a dropped identity still
+			// serves the route anonymously rather than failing it.
+			require.Equal(t, tc.wantStatus, w.Code)
+
+			if tc.wantReason == "" {
+				require.Empty(t, logs.String(), "a successful CSRF check should log nothing")
+				return
+			}
+
+			var entry struct {
+				Level  string `json:"level"`
+				Method string `json:"method"`
+				Path   string `json:"path"`
+				Reason string `json:"reason"`
+			}
+			require.NoError(t, json.Unmarshal(logs.Bytes(), &entry))
+			require.Equal(t, "warn", entry.Level)
+			require.Equal(t, http.MethodPost, entry.Method)
+			require.Equal(t, "/analytics/events", entry.Path)
+			require.Equal(t, tc.wantReason, entry.Reason)
+			require.NotContains(t, logs.String(), credentials.AccessToken, "the log must never carry the token")
+		})
+	}
 }
 
 func TestCORS_AllowsLocalhostAndLoopbackDevOrigins(t *testing.T) {
