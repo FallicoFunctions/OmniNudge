@@ -296,20 +296,33 @@ export function generateAvatarDefinition(rng: AvatarRng = Math.random): AvatarDe
 }
 
 export const DEFAULT_AVATAR_DEFINITION: AvatarDefinition = Object.freeze({
-  bodyBase: 'female',
+  // First authored preset: the admitted luxury-festival male reference.
+  // Each field still belongs to the normal closed editor pools, so the look
+  // can be freely remixed instead of becoming a one-off hard-coded costume.
+  bodyBase: 'male',
   heightInches: AVATAR_REFERENCE_HEIGHT_INCHES,
-  hairStyle: AVATAR_HAIR_STYLES[0].id,
-  hairColor: AVATAR_HAIR_COLORS[0].id,
-  skinTone: AVATAR_SKIN_TONES[3].id,
-  top: AVATAR_TOPS[0].id,
-  jacket: AVATAR_JACKETS[0].id,
-  bottoms: AVATAR_BOTTOMS[0].id,
-  shoes: AVATAR_SHOES[0].id,
+  hairStyle: 'textured-crop',
+  hairColor: 'espresso',
+  skinTone: 'sand',
+  top: 'sheer-bodysuit',
+  jacket: 'hooded-shell',
+  bottoms: 'tech-joggers',
+  shoes: 'high-tops',
 }) as AvatarDefinition;
 
 /** Total: snaps every field of an arbitrary definition onto a valid one. */
 export function normalizeAvatarDefinition(definition: Partial<AvatarDefinition> | null | undefined): AvatarDefinition {
   const source = definition ?? {};
+  const optionOrDefault = (
+    category: AvatarCategoryId,
+    value: unknown,
+    fallback: string,
+  ): string => {
+    if (typeof value !== 'string') return fallback;
+    return AVATAR_OPTION_POOLS[category].some((option) => option.id === value)
+      ? value
+      : fallback;
+  };
   return {
     bodyBase: source.bodyBase === 'male' || source.bodyBase === 'female'
       ? source.bodyBase
@@ -317,13 +330,13 @@ export function normalizeAvatarDefinition(definition: Partial<AvatarDefinition> 
     heightInches: clampAvatarHeightInches(
       typeof source.heightInches === 'number' ? source.heightInches : AVATAR_REFERENCE_HEIGHT_INCHES,
     ),
-    hairStyle: resolveAvatarOption('hairStyle', String(source.hairStyle ?? '')).id,
-    hairColor: resolveAvatarOption('hairColor', String(source.hairColor ?? '')).id,
-    skinTone: resolveAvatarOption('skinTone', String(source.skinTone ?? '')).id,
-    top: resolveAvatarOption('top', String(source.top ?? '')).id,
-    jacket: resolveAvatarOption('jacket', String(source.jacket ?? '')).id,
-    bottoms: resolveAvatarOption('bottoms', String(source.bottoms ?? '')).id,
-    shoes: resolveAvatarOption('shoes', String(source.shoes ?? '')).id,
+    hairStyle: optionOrDefault('hairStyle', source.hairStyle, DEFAULT_AVATAR_DEFINITION.hairStyle),
+    hairColor: optionOrDefault('hairColor', source.hairColor, DEFAULT_AVATAR_DEFINITION.hairColor),
+    skinTone: optionOrDefault('skinTone', source.skinTone, DEFAULT_AVATAR_DEFINITION.skinTone),
+    top: optionOrDefault('top', source.top, DEFAULT_AVATAR_DEFINITION.top),
+    jacket: optionOrDefault('jacket', source.jacket, DEFAULT_AVATAR_DEFINITION.jacket),
+    bottoms: optionOrDefault('bottoms', source.bottoms, DEFAULT_AVATAR_DEFINITION.bottoms),
+    shoes: optionOrDefault('shoes', source.shoes, DEFAULT_AVATAR_DEFINITION.shoes),
   };
 }
 

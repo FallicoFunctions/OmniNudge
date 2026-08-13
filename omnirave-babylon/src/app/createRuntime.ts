@@ -25,7 +25,13 @@ import {
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import type { createMainStageScene } from '../scene/createMainStageScene';
 import { resolveTravelCameraOffsets, TRAVEL_CAMERA_DISTANCE } from '../player/cameraRigMath';
-import { generateAvatarDefinition, hasAvatarLoadout, parseAvatarLoadout, serializeAvatarLoadout } from '../player/avatarDefinition';
+import {
+  DEFAULT_AVATAR_DEFINITION,
+  generateAvatarDefinition,
+  hasAvatarLoadout,
+  parseAvatarLoadout,
+  serializeAvatarLoadout,
+} from '../player/avatarDefinition';
 import { BACK_PLAZA_SPAWN } from '../scene/reviewRouteData';
 import type { ReviewCheckpoint } from '../scene/reviewRouteData';
 import type { StageEventStateInput } from '../scene/createStageVisualizer';
@@ -319,10 +325,25 @@ export async function createRuntime(host: HTMLElement) {
     // random guest. The serialized form is the loadout other players would
     // dress this ghost from, and is published below (once the world socket
     // connects) via a "loadout" event so other players actually see it too.
-    const localAvatarDefinition = hasAvatarLoadout(resolvedAccountLoadout)
+    const avatarPreviewMode = window.location.hostname === 'localhost'
+      && new URLSearchParams(window.location.search).get('avatarPreview') === '1';
+    const localAvatarDefinition = avatarPreviewMode
+      ? DEFAULT_AVATAR_DEFINITION
+      : hasAvatarLoadout(resolvedAccountLoadout)
       ? parseAvatarLoadout(resolvedAccountLoadout)
       : generateAvatarDefinition();
     reviewRuntime?.setAvatarDefinition?.(localAvatarDefinition);
+    if (avatarPreviewMode) {
+      // Local review framing for the first authored avatar. This is deliberately
+      // query-gated and localhost-only; normal guest generation and gameplay camera
+      // behavior remain unchanged.
+      reviewRuntime?.cameraRig?.applyCheckpointView?.({
+        alpha: -Math.PI / 2,
+        beta: 1.5,
+        radius: 2.8,
+        focusOffset: { x: 0, y: -0.72, z: 0 },
+      });
+    }
     localAvatarLoadout = hasAvatarLoadout(resolvedAccountLoadout)
       ? (resolvedAccountLoadout as Record<string, string>)
       : serializeAvatarLoadout(localAvatarDefinition);
@@ -830,8 +851,15 @@ export async function createRuntime(host: HTMLElement) {
         settingsPanel: settingsPopup.element,
         avatarColorways: reviewRuntime?.avatarColorways,
         selectedAvatarColorwayId: reviewRuntime?.selectedAvatarColorway?.id,
+        avatarDefinition: parseAvatarLoadout(localAvatarLoadout),
         onSelectAvatarColorway(colorway) {
           reviewRuntime?.setAvatarColorway?.(colorway.id);
+        },
+        onAvatarDefinitionChange(definition) {
+          const applied = reviewRuntime?.setAvatarDefinition?.(definition) ?? definition;
+          localAvatarLoadout = serializeAvatarLoadout(applied);
+          scene.metadata = { ...scene.metadata, localAvatarLoadout };
+          worldSocket?.sendLoadout(localAvatarLoadout);
         },
         onPanelChange(panel) {
           if (panel === null) {
@@ -898,6 +926,7 @@ export async function createRuntime(host: HTMLElement) {
           localAvatarLoadout = serializeAvatarLoadout(generateAvatarDefinition());
         }
         reviewRuntime?.setAvatarDefinition?.(parseAvatarLoadout(localAvatarLoadout));
+        topLeftControls?.setAvatarDefinition(parseAvatarLoadout(localAvatarLoadout));
         scene.metadata = { ...scene.metadata, localAvatarLoadout };
 
         if (!worldSocket) {

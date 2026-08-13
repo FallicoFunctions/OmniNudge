@@ -8,17 +8,12 @@
 // are ordinary absolutely-positioned siblings inside the runtime host; the world
 // keeps rendering and keeps receiving input underneath them.
 //
-// AVATAR POPUP: the full avatar designer (sec 6.6) is a later block. Rather than
-// ship a dead panel, this popup drives the colorway system that already exists
-// today (player/avatarColorways.ts, exposed as reviewRuntime.avatarColorways /
-// setAvatarColorway) - a real picker whose selection applies immediately. When
-// the designer block lands it replaces the body of buildAvatarPanel(); the
-// open/close semantics here are unaffected.
-//
 // Pure DOM: no Babylon imports (the colorway type is type-only), safe under
 // jsdom.
 
+import type { AvatarDefinition } from '../player/avatarDefinition';
 import type { AvatarColorway } from '../player/avatarColorways';
+import { createAvatarEditor } from './createAvatarEditor';
 
 export type TopLeftPanelId = 'settings' | 'avatar';
 
@@ -28,6 +23,8 @@ export interface CreateTopLeftControlsOptions {
   avatarColorways?: readonly AvatarColorway[];
   selectedAvatarColorwayId?: string;
   onSelectAvatarColorway?: (colorway: AvatarColorway) => void;
+  avatarDefinition?: AvatarDefinition;
+  onAvatarDefinitionChange?: (definition: AvatarDefinition) => void;
   onPanelChange?: (panel: TopLeftPanelId | null) => void;
   /** Offsets the block clear of the dev review HUD under ?debug=1. */
   debugChromePresent?: boolean;
@@ -38,6 +35,7 @@ export interface TopLeftControls {
   activePanel: () => TopLeftPanelId | null;
   openPanel: (panel: TopLeftPanelId | null) => void;
   setSelectedAvatarColorway: (colorwayId: string) => void;
+  setAvatarDefinition: (definition: AvatarDefinition) => void;
   dispose: () => void;
 }
 
@@ -61,7 +59,13 @@ export function createTopLeftControls(
   const slot = document.createElement('div');
   slot.className = 'hud-controls__slot';
 
-  const avatarPanel = buildAvatarPanel(options);
+  const avatarEditor = options.avatarDefinition
+    ? createAvatarEditor({
+        definition: options.avatarDefinition,
+        onChange: options.onAvatarDefinitionChange,
+      })
+    : undefined;
+  const avatarPanel = avatarEditor?.element ?? buildAvatarPanel(options);
   avatarPanel.hidden = true;
   slot.appendChild(avatarPanel);
 
@@ -134,6 +138,9 @@ export function createTopLeftControls(
     activePanel: () => active,
     openPanel,
     setSelectedAvatarColorway,
+    setAvatarDefinition(definition) {
+      avatarEditor?.setDefinition(definition);
+    },
     dispose() {
       settingsButton.removeEventListener('click', handleSettingsClick);
       avatarButton.removeEventListener('click', handleAvatarClick);
@@ -141,6 +148,7 @@ export function createTopLeftControls(
         swatch.removeEventListener('click', handler);
       }
       swatchHandlers.clear();
+      avatarEditor?.dispose();
       // The settings panel is caller-owned: hand it back rather than
       // destroying it with this block.
       settingsPanel?.remove();

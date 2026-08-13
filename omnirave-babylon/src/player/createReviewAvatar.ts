@@ -3,6 +3,7 @@ import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
+import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader.js';
 import type { Scene } from '@babylonjs/core/scene';
 
 import type { AvatarAnimationState } from './avatarAnimationState';
@@ -30,6 +31,16 @@ export type AvatarPartRole =
   | 'shoes'
   | 'skin'
   | 'top';
+
+export interface AvatarMeshMetadata {
+  avatarBodyBase?: 'female' | 'male';
+  avatarBodySurface?: 'skin' | 'undergarment';
+  avatarColorRole?: 'accent' | 'emissive' | 'primary';
+  avatarFallbackAnatomy?: boolean;
+  avatarPartRole?: AvatarPartRole;
+  /** Keep image-authored metallic/detail materials instead of tinting them. */
+  avatarPreserveMaterial?: boolean;
+}
 
 /**
  * The avatar is modelled at AVATAR_REFERENCE_HEIGHT_INCHES (71in / 1.80m):
@@ -94,7 +105,7 @@ export async function createReviewAvatar(scene: Scene): Promise<ReviewAvatar> {
   head.position.set(0, 1.67, 0);
   head.scaling.y = 1.08;
   head.material = primary;
-  head.metadata = { avatarColorRole: 'primary', avatarPartRole: 'skin' };
+  head.metadata = { avatarColorRole: 'primary', avatarPartRole: 'skin', avatarFallbackAnatomy: true };
   meshes.push(head);
 
   // Hair cap (sec 6.4 `hair styles` / `hair color`). Parented to the root, not
@@ -137,6 +148,7 @@ export async function createReviewAvatar(scene: Scene): Promise<ReviewAvatar> {
     limb.metadata = {
       avatarColorRole: spec.role === 'leg' ? 'accent' : 'primary',
       avatarPartRole: spec.role,
+      avatarFallbackAnatomy: true,
     };
     limbs.push(limb);
     meshes.push(limb);
@@ -167,6 +179,8 @@ export async function createReviewAvatar(scene: Scene): Promise<ReviewAvatar> {
     meshes.push(shoe);
   }
 
+  await loadAuthoredBodyBases(scene, visualPivot, meshes, root);
+
   return {
     animate(elapsedSeconds, state) {
       const speed = state === 'run' ? 8 : state === 'walk' ? 4.5 : 1.4;
@@ -185,6 +199,80 @@ export async function createReviewAvatar(scene: Scene): Promise<ReviewAvatar> {
     meshes,
     root,
   };
+}
+
+async function loadAuthoredBodyBases(
+  scene: Scene,
+  visualPivot: TransformNode,
+  meshes: AbstractMesh[],
+  root: TransformNode,
+): Promise<void> {
+  // NullEngine has no browser fetch pipeline. Keeping the procedural anatomy
+  // there makes unit tests deterministic while the browser uses the authored,
+  // rigged GLB body bases.
+  if (!scene.getEngine().getRenderingCanvas()) return;
+
+  try {
+    const imported = await SceneLoader.ImportMeshAsync('', '', '/assets/avatars/avatar-bodies.glb', scene);
+    const importedNodes = [...imported.meshes, ...imported.transformNodes];
+    for (const node of importedNodes) {
+      if (node.parent === null) node.parent = visualPivot;
+    }
+
+    const bodyBases = new Set<'male' | 'female'>();
+    const authoredCharacterBases = new Set<'male' | 'female'>();
+    for (const mesh of imported.meshes) {
+      const match = /^AvatarBody_(male|female)(?:_primitive\d+)?$/.exec(mesh.name);
+      const luxuryMatch = /^AvatarLuxury_(male|female)_(hair|jacket|top|bottoms|shoes|skin|accent)_.+?(?:_primitive\d+)?$/.exec(mesh.name);
+      if (!match && !luxuryMatch) continue;
+
+      let bodyBase: 'male' | 'female';
+      if (match) {
+        bodyBase = match[1] as 'male' | 'female';
+        const bodySurface = mesh.material?.name.toLowerCase().includes('skin')
+          ? 'skin'
+          : 'undergarment';
+        mesh.metadata = {
+          ...mesh.metadata,
+          avatarBodyBase: bodyBase,
+          avatarBodySurface: bodySurface,
+          avatarPartRole: bodySurface === 'skin' ? 'skin' : undefined,
+        } satisfies AvatarMeshMetadata;
+      } else {
+        bodyBase = luxuryMatch![1] as 'male' | 'female';
+        const authoredRole = luxuryMatch![2] as AvatarPartRole;
+        const authoredMaterialName = mesh.material?.name.toLowerCase() ?? '';
+        mesh.metadata = {
+          ...mesh.metadata,
+          avatarBodyBase: bodyBase,
+          avatarBodySurface: authoredRole === 'skin' ? 'skin' : undefined,
+          avatarPartRole: authoredRole,
+          // Gold hardware, jewelry, piping, facial details, and other reference
+          // accents retain their authored PBR response when wardrobe colors change.
+          avatarPreserveMaterial: authoredRole === 'accent'
+            || (authoredRole === 'skin' && !authoredMaterialName.includes('skin')),
+        } satisfies AvatarMeshMetadata;
+        authoredCharacterBases.add(bodyBase);
+      }
+      mesh.checkCollisions = false;
+      mesh.isPickable = false;
+      meshes.push(mesh);
+      bodyBases.add(bodyBase);
+    }
+
+    if (bodyBases.size === 2) {
+      root.metadata = {
+        ...root.metadata,
+        avatarAuthoredBodiesLoaded: true,
+        avatarAuthoredCharacterBases: [...authoredCharacterBases],
+        avatarRenderSource: authoredCharacterBases.size > 0 ? 'authored-glb' : 'body-base-only',
+      };
+    }
+  } catch (error) {
+    // A missing/corrupt optional art asset should never prevent joining the
+    // venue. The code-built body is a complete, recolourable fallback.
+    console.warn('Authored avatar bodies unavailable; using procedural fallback.', error);
+  }
 }
 
 function createAvatarMaterial(scene: Scene, name: string, colorHex: string, glowIntensity: number) {

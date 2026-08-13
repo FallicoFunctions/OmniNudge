@@ -14,6 +14,7 @@ OUTPUT_FILE="$ROOT_DIR/public/assets/avatars/avatar-bodies.glb"
 "$ROOT_DIR/scripts/backup-avatar-bodies-blend.sh"
 
 blender -b "$BLEND_FILE" --python "$ROOT_DIR/scripts/generate-avatar-bodies.py" -- --write
+blender -b "$BLEND_FILE" --python "$ROOT_DIR/scripts/generate-luxury-festival-avatar.py" -- --write --render
 
 mkdir -p "$(dirname "$OUTPUT_FILE")"
 blender -b "$BLEND_FILE" --python-expr "

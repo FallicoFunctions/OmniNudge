@@ -3,6 +3,7 @@ import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
 import type { Material } from '@babylonjs/core/Materials/material.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
+import { MultiMaterial } from '@babylonjs/core/Materials/multiMaterial.js';
 
 import {
   normalizeAvatarDefinition,
@@ -15,7 +16,7 @@ import {
   type AvatarShoesSilhouette,
   type AvatarTopSilhouette,
 } from './avatarDefinition';
-import type { AvatarPartRole, ReviewAvatar } from './createReviewAvatar';
+import type { AvatarMeshMetadata, AvatarPartRole, ReviewAvatar } from './createReviewAvatar';
 
 // Applies an AvatarDefinition (sec 6.4) to the procedural avatar, and the
 // height effects of sec 6.5 that live on the body (scale). The capsule/eye
@@ -34,6 +35,10 @@ interface AvatarMaterialMetadata {
   avatarBaseMaterial?: Material;
   avatarColorwayMaterials?: Record<string, Material>;
   avatarPartRole?: AvatarPartRole;
+  avatarBodyBase?: 'female' | 'male';
+  avatarBodySurface?: 'skin' | 'undergarment';
+  avatarFallbackAnatomy?: boolean;
+  avatarPreserveMaterial?: boolean;
 }
 
 /** Roles rendered as glowing rave-tech dressing rather than cloth or skin. */
@@ -120,6 +125,19 @@ export function applyAvatarDefinition(
 
   for (const mesh of avatar.meshes) {
     const metadata = (mesh.metadata ?? {}) as AvatarMaterialMetadata;
+    if (metadata.avatarBodyBase) {
+      mesh.setEnabled(metadata.avatarBodyBase === safe.bodyBase);
+      if (metadata.avatarPreserveMaterial) {
+        continue;
+      }
+      if (metadata.avatarBodySurface === 'skin' || metadata.avatarPartRole === 'skin') {
+        applyAuthoredBodyMaterial(mesh, palette.skinHex);
+      } else if (metadata.avatarPartRole && !metadata.avatarPreserveMaterial) {
+        const hex = hexForRole(metadata.avatarPartRole, palette);
+        if (hex !== null) applyPartMaterial(mesh, metadata.avatarPartRole, hex);
+      }
+      continue;
+    }
     const role = metadata.avatarPartRole;
     const hex = hexForRole(role, palette);
     if (hex === null) continue;
@@ -165,6 +183,41 @@ function applyPartMaterial(mesh: AbstractMesh, role: AvatarPartRole, hex: string
     avatarBaseMaterial: baseMaterial,
     avatarColorwayMaterials: cache,
   };
+}
+
+function applyAuthoredBodyMaterial(mesh: AbstractMesh, skinHex: string) {
+  if (!mesh.material) return;
+  const metadata = (mesh.metadata ?? {}) as AvatarMaterialMetadata;
+  const baseMaterial = metadata.avatarBaseMaterial ?? mesh.material;
+  const cache = metadata.avatarColorwayMaterials ?? {};
+  const key = `def_skin_${skinHex}`;
+  let material = cache[key];
+
+  if (!material) {
+    if (baseMaterial instanceof MultiMaterial) {
+      const multi = new MultiMaterial(`${baseMaterial.name}__${key}`, mesh.getScene());
+      multi.subMaterials = baseMaterial.subMaterials.map((subMaterial) => {
+        if (!subMaterial) return null;
+        const clone = subMaterial.clone(`${subMaterial.name}__${key}`) ?? subMaterial;
+        if (subMaterial.name.toLowerCase().includes('skin')) {
+          paintPartMaterial(clone, 'skin', skinHex);
+        }
+        return clone;
+      });
+      material = multi;
+    } else {
+      material = baseMaterial.clone(`${baseMaterial.name}__${key}`) ?? baseMaterial;
+      paintPartMaterial(material, 'skin', skinHex);
+    }
+    cache[key] = material;
+  }
+
+  mesh.material = material;
+  mesh.metadata = {
+    ...mesh.metadata,
+    avatarBaseMaterial: baseMaterial,
+    avatarColorwayMaterials: cache,
+  } satisfies AvatarMeshMetadata & AvatarMaterialMetadata;
 }
 
 function paintPartMaterial(material: Material, role: AvatarPartRole, hex: string) {
@@ -244,6 +297,32 @@ function applySilhouettes(avatar: ReviewAvatar, definition: AvatarDefinition) {
     .silhouette as AvatarBottomsSilhouette | undefined;
   const shoes = resolveAvatarOption('shoes', definition.shoes)
     .silhouette as AvatarShoesSilhouette | undefined;
+
+  const hasAuthoredBody = avatar.root.metadata?.avatarAuthoredBodiesLoaded === true;
+  const authoredCharacterBases = avatar.root.metadata?.avatarAuthoredCharacterBases;
+  const hasAuthoredCharacter = Array.isArray(authoredCharacterBases)
+    && authoredCharacterBases.includes(definition.bodyBase);
+  for (const mesh of avatar.meshes) {
+    const metadata = (mesh.metadata ?? {}) as AvatarMaterialMetadata;
+    if (metadata.avatarBodyBase) continue;
+    if (hasAuthoredCharacter) {
+      // The procedural capsule/box rig is an emergency fallback only. Once a
+      // complete authored character exists for the selected base, none of its
+      // anatomy, wardrobe, visor, or halo may leak through the real asset.
+      mesh.setEnabled(false);
+      continue;
+    }
+    if (!metadata.avatarFallbackAnatomy) continue;
+    if (!hasAuthoredBody) {
+      mesh.setEnabled(true);
+    } else if (metadata.avatarPartRole === 'arm') {
+      mesh.setEnabled(resolveAvatarOption('top', definition.top).silhouette === 'longsleeve');
+    } else if (metadata.avatarPartRole === 'leg') {
+      mesh.setEnabled(bottoms === 'pants');
+    } else {
+      mesh.setEnabled(false);
+    }
+  }
 
   applyShape(findPart(avatar, 'hair'), HAIR_SHAPES[hair ?? 'short']);
   applyShape(findPart(avatar, 'jacket'), JACKET_SHAPES[jacket ?? 'hip']);
