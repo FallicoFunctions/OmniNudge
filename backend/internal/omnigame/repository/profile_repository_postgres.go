@@ -19,6 +19,20 @@ func NewPostgresProfileRepository(pool *pgxpool.Pool) *PostgresProfileRepository
 }
 
 func (r *PostgresProfileRepository) UpsertProfile(ctx context.Context, profile model.OmniRaveProfile) error {
+	profile.Subject = accountSubject(profile.UserID)
+	return r.UpsertProfileBySubject(ctx, profile)
+}
+
+func (r *PostgresProfileRepository) GetProfile(ctx context.Context, userID int) (*model.OmniRaveProfile, error) {
+	return r.GetProfileBySubject(ctx, accountSubject(userID))
+}
+
+func (r *PostgresProfileRepository) UpsertProfileBySubject(ctx context.Context, profile model.OmniRaveProfile) error {
+	subject := profile.ResolvedSubject()
+	if !subject.Valid() {
+		return ErrInvalidResidentRef
+	}
+
 	profile = model.NormalizeOmniRaveProfile(profile)
 
 	loadoutJSON, err := json.Marshal(profile.Loadout)
@@ -39,20 +53,32 @@ func (r *PostgresProfileRepository) UpsertProfile(ctx context.Context, profile m
 		return err
 	}
 
+	// Only an account resident has a user; the account_has_user check requires
+	// the column on that kind, and the primary key forbids it on any other.
+	var userID any
+	if subject.Kind == model.SubjectKindAccount {
+		userID = subject.ID
+	}
+
 	_, err = r.pool.Exec(ctx, `
-		INSERT INTO omnirave_profiles (user_id, loadout, return_point, settings, last_venue)
-		VALUES ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5)
-		ON CONFLICT (user_id) DO UPDATE
-		SET loadout = EXCLUDED.loadout,
+		INSERT INTO omnirave_profiles (subject_kind, subject_id, user_id, loadout, return_point, settings, last_venue)
+		VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7)
+		ON CONFLICT (subject_kind, subject_id) DO UPDATE
+		SET user_id = EXCLUDED.user_id,
+		    loadout = EXCLUDED.loadout,
 		    return_point = EXCLUDED.return_point,
 		    settings = EXCLUDED.settings,
 		    last_venue = EXCLUDED.last_venue,
 		    updated_at = now()
-	`, profile.UserID, string(loadoutJSON), nullableJSONB(returnPointJSON), string(settingsJSON), profile.LastVenue)
+	`, string(subject.Kind), subject.ID, userID, string(loadoutJSON), nullableJSONB(returnPointJSON), string(settingsJSON), profile.LastVenue)
 	return err
 }
 
-func (r *PostgresProfileRepository) GetProfile(ctx context.Context, userID int) (*model.OmniRaveProfile, error) {
+func (r *PostgresProfileRepository) GetProfileBySubject(ctx context.Context, subject model.ResidentRef) (*model.OmniRaveProfile, error) {
+	if !subject.Valid() {
+		return nil, ErrInvalidResidentRef
+	}
+
 	var loadoutJSON []byte
 	var returnPointJSON []byte
 	var settingsJSON []byte
@@ -61,8 +87,8 @@ func (r *PostgresProfileRepository) GetProfile(ctx context.Context, userID int) 
 	err := r.pool.QueryRow(ctx, `
 		SELECT loadout, COALESCE(return_point::text, '')::bytea, settings, last_venue
 		FROM omnirave_profiles
-		WHERE user_id = $1
-	`, userID).Scan(&loadoutJSON, &returnPointJSON, &settingsJSON, &lastVenue)
+		WHERE subject_kind = $1 AND subject_id = $2
+	`, string(subject.Kind), subject.ID).Scan(&loadoutJSON, &returnPointJSON, &settingsJSON, &lastVenue)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -70,7 +96,12 @@ func (r *PostgresProfileRepository) GetProfile(ctx context.Context, userID int) 
 		return nil, err
 	}
 
-	profile := model.DefaultOmniRaveProfile(userID)
+	accountUserID := 0
+	if subject.Kind == model.SubjectKindAccount {
+		accountUserID = int(subject.ID)
+	}
+	profile := model.DefaultOmniRaveProfile(accountUserID)
+	profile.Subject = subject
 	if len(loadoutJSON) > 0 {
 		if err := json.Unmarshal(loadoutJSON, &profile.Loadout); err != nil {
 			return nil, err
