@@ -2,7 +2,7 @@ name: Performance Budget Check
 
 on:
   pull_request:
-    branches: [main, master, develop]
+    branches: [main, master, develop, 'merge/**']
   push:
     branches: [main, master]
 
