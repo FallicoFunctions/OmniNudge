@@ -1,5 +1,6 @@
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -63,6 +64,25 @@ describe('applyAvatarDefinition', () => {
     expect(avatar.meshes.every((mesh) => mesh.material instanceof PBRMaterial)).toBe(true);
   });
 
+  it('preserves authored facial submaterials carried by skin-shell GLB primitives', () => {
+    const eyePrimitive = MeshBuilder.CreateBox('AvatarLuxury_male_skin_face_shell_primitive1', { size: 1 }, scene);
+    const eyeMaterial = new PBRMaterial('AvatarLuxuryEyeWhite', scene);
+    eyeMaterial.albedoColor.set(0.72, 0.68, 0.61);
+    eyePrimitive.material = eyeMaterial;
+    eyePrimitive.metadata = {
+      avatarBodyBase: 'male',
+      avatarBodySurface: 'skin',
+      avatarPartRole: 'skin',
+      avatarPreserveMaterial: true,
+    };
+    avatar.meshes.push(eyePrimitive);
+
+    applyAvatarDefinition(avatar, { ...DEFAULT_AVATAR_DEFINITION, skinTone: 'ebony' });
+
+    expect(eyePrimitive.material).toBe(eyeMaterial);
+    expect(hexOf(eyeMaterial)).toBe('#b8ad9c');
+  });
+
   it('paints the legs only when the bottoms are full length', () => {
     const skinHex = resolveAvatarOption('skinTone', 'ebony').colorHex;
 
@@ -111,6 +131,50 @@ describe('applyAvatarDefinition', () => {
       return scene.getMeshByName('review-avatar-hips')!.scaling.x;
     };
     expect(hipsWidth('pleated-skirt')).toBeGreaterThan(hipsWidth('cargo-pants'));
+  });
+
+  it('shows exactly one authored body base and retires fallback anatomy', () => {
+    const male = MeshBuilder.CreateBox('AvatarBody_male', { size: 1 }, scene);
+    male.material = new PBRMaterial('AvatarSkinBase_male', scene);
+    male.metadata = { avatarBodyBase: 'male', avatarPartRole: 'skin' };
+    const female = MeshBuilder.CreateBox('AvatarBody_female', { size: 1 }, scene);
+    female.material = new PBRMaterial('AvatarSkinBase_female', scene);
+    female.metadata = { avatarBodyBase: 'female', avatarPartRole: 'skin' };
+    avatar.meshes.push(male, female);
+    avatar.root.metadata = { ...avatar.root.metadata, avatarAuthoredBodiesLoaded: true };
+
+    applyAvatarDefinition(avatar, { ...DEFAULT_AVATAR_DEFINITION, bodyBase: 'male' });
+    expect(male.isEnabled()).toBe(true);
+    expect(female.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('review-avatar-head')!.isEnabled()).toBe(false);
+
+    applyAvatarDefinition(avatar, { ...DEFAULT_AVATAR_DEFINITION, bodyBase: 'female' });
+    expect(male.isEnabled()).toBe(false);
+    expect(female.isEnabled()).toBe(true);
+  });
+
+  it('retires the entire procedural fallback when a complete authored character is selected', () => {
+    const maleBody = MeshBuilder.CreateBox('AvatarBody_male', { size: 1 }, scene);
+    maleBody.material = new PBRMaterial('AvatarSkinBase_male', scene);
+    maleBody.metadata = { avatarBodyBase: 'male', avatarPartRole: 'skin' };
+    const bomber = MeshBuilder.CreateBox('AvatarLuxury_male_jacket_front', { size: 1 }, scene);
+    bomber.material = new PBRMaterial('AvatarLuxuryPearlSatin', scene);
+    bomber.metadata = { avatarBodyBase: 'male', avatarPartRole: 'jacket' };
+    avatar.meshes.push(maleBody, bomber);
+    avatar.root.metadata = {
+      ...avatar.root.metadata,
+      avatarAuthoredBodiesLoaded: true,
+      avatarAuthoredCharacterBases: ['male'],
+    };
+
+    applyAvatarDefinition(avatar, { ...DEFAULT_AVATAR_DEFINITION, bodyBase: 'male' });
+
+    expect(maleBody.isEnabled()).toBe(true);
+    expect(bomber.isEnabled()).toBe(true);
+    expect(scene.getMeshByName('review-avatar-head')!.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('review-avatar-jacket')!.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('review-avatar-visor')!.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('review-avatar-back-halo')!.isEnabled()).toBe(false);
   });
 
   it('is idempotent and caches its material clones instead of leaking one per call', () => {
