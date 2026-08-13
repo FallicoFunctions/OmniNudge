@@ -1,7 +1,17 @@
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { User, Settings, Grid3x3, Info, Shield, LogOut, LogIn, UserPlus, Gamepad2 } from 'lucide-react';
+import {
+  User,
+  Settings,
+  Grid3x3,
+  Info,
+  Shield,
+  LogOut,
+  LogIn,
+  UserPlus,
+  Gamepad2,
+} from 'lucide-react';
 import { BottomSheet } from './BottomSheet';
 import { ConfirmModal } from './ConfirmModal';
 import { useAuth } from '../../contexts/AuthContext';

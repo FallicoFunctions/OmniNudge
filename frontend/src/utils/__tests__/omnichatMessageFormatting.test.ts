@@ -65,10 +65,9 @@ describe('parseOmniChatMessage', () => {
 
   it('repairs straight single-quoted dialogue without stripping contractions', () => {
     expect(
-      parseOmniChatMessage(
-        "*I pause.*\n\n'Feels solid,' *I say quietly.* I’m still here.",
-        { repairAssistantFormatting: true }
-      )
+      parseOmniChatMessage("*I pause.*\n\n'Feels solid,' *I say quietly.* I’m still here.", {
+        repairAssistantFormatting: true,
+      })
     ).toEqual([
       { text: 'I pause.', bold: false, italic: true },
       { text: '\n\n', bold: false, italic: true },
@@ -139,8 +138,7 @@ describe('parseOmniChatMessage', () => {
         italic: false,
       },
       {
-        text:
-          'I say, my voice a little rough. My thumb brushes against the swell of your thigh, just below your… ',
+        text: 'I say, my voice a little rough. My thumb brushes against the swell of your thigh, just below your… ',
         bold: false,
         italic: true,
       },

@@ -127,7 +127,10 @@ describe('MainLayout about modal', () => {
   it('renders the Games link in the desktop navigation', async () => {
     renderMainLayout();
 
-    expect(await screen.findByRole('link', { name: 'nav.games' })).toHaveAttribute('href', '/games');
+    expect(await screen.findByRole('link', { name: 'nav.games' })).toHaveAttribute(
+      'href',
+      '/games'
+    );
   });
 
   it('shows the about modal for first-time visitors', async () => {

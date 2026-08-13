@@ -12,7 +12,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) =>
       (
-        {
+        ({
           'menu.profile': 'Profile',
           'menu.hubs': 'Browse Hubs',
           'menu.games': 'Games',
@@ -23,7 +23,7 @@ vi.mock('react-i18next', () => ({
           'menu.logout': 'Log Out',
           'menu.logoutConfirm': 'Are you sure you want to log out?',
           'nav.menu': 'Menu',
-        } as Record<string, string>
+        }) as Record<string, string>
       )[key] ?? key,
   }),
 }));
@@ -45,13 +45,8 @@ vi.mock('../../../utils/analytics', () => ({
 }));
 
 vi.mock('../BottomSheet', () => ({
-  BottomSheet: ({
-    isOpen,
-    children,
-  }: {
-    isOpen: boolean;
-    children: React.ReactNode;
-  }) => (isOpen ? <div>{children}</div> : null),
+  BottomSheet: ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
+    isOpen ? <div>{children}</div> : null,
 }));
 
 vi.mock('../ConfirmModal', () => ({

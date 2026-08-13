@@ -555,7 +555,9 @@ describe('OmniChatChatPage', () => {
 
     renderPage();
 
-    expect(await screen.findByRole('button', { name: /retry generated media/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /retry generated media/i })
+    ).toBeInTheDocument();
     expect(screen.queryByText('Here is the scene you asked for.')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /regenerate response/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /speak message/i })).not.toBeInTheDocument();

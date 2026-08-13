@@ -1,7 +1,12 @@
 import { sessionHeaders } from './authSession';
-import type { GameCatalogEntry, OmniGameLaunchMode, OmniGameLaunchResponse } from '../types/omnigame';
+import type {
+  GameCatalogEntry,
+  OmniGameLaunchMode,
+  OmniGameLaunchResponse,
+} from '../types/omnigame';
 
-const OMNIRAVE_RUNTIME_URL = import.meta.env.VITE_OMNIRAVE_RUNTIME_URL || 'http://localhost:4173/omnirave';
+const OMNIRAVE_RUNTIME_URL =
+  import.meta.env.VITE_OMNIRAVE_RUNTIME_URL || 'http://localhost:4173/omnirave';
 const OMNIGAME_API_URL = import.meta.env.VITE_OMNIGAME_API_URL || 'http://localhost:8091/api/v1';
 
 const gameCatalog: GameCatalogEntry[] = [
@@ -11,10 +16,7 @@ const gameCatalog: GameCatalogEntry[] = [
     summaryKey: 'games.omnirave.summary',
     runtimeUrl: OMNIRAVE_RUNTIME_URL,
     heroKey: 'games.omnirave.hero',
-    descriptionKeys: [
-      'games.omnirave.description.0',
-      'games.omnirave.description.1',
-    ],
+    descriptionKeys: ['games.omnirave.description.0', 'games.omnirave.description.1'],
     highlightKeys: [
       'games.omnirave.highlights.0',
       'games.omnirave.highlights.1',

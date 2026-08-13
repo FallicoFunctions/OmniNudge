@@ -24,7 +24,11 @@ vi.mock('livekit-client', () => ({
       return roomMock;
     }
   },
-  RoomEvent: { TrackSubscribed: 'trackSubscribed', TrackUnsubscribed: 'trackUnsubscribed', Disconnected: 'disconnected' },
+  RoomEvent: {
+    TrackSubscribed: 'trackSubscribed',
+    TrackUnsubscribed: 'trackUnsubscribed',
+    Disconnected: 'disconnected',
+  },
   Track: { Kind: { Video: 'video', Audio: 'audio' } },
 }));
 
@@ -178,7 +182,12 @@ describe('OmniChatCallModal', () => {
 
     const video = await screen.findByTitle('Live avatar video call with Sadie');
     expect(video).toHaveAttribute('autoplay');
-    await waitFor(() => expect(roomMock.connect).toHaveBeenCalledWith('wss://livekit.omninudge.com', 'short-lived-token'));
+    await waitFor(() =>
+      expect(roomMock.connect).toHaveBeenCalledWith(
+        'wss://livekit.omninudge.com',
+        'short-lived-token'
+      )
+    );
     expect(screen.getByLabelText('Type during call')).toBeInTheDocument();
   });
 
@@ -205,7 +214,10 @@ describe('OmniChatCallModal', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(roomMock.connect).toHaveBeenCalledWith('wss://livekit.omninudge.com', 'short-lived-token');
+    expect(roomMock.connect).toHaveBeenCalledWith(
+      'wss://livekit.omninudge.com',
+      'short-lived-token'
+    );
     await act(async () => {
       vi.advanceTimersByTime(15_000);
       await Promise.resolve();

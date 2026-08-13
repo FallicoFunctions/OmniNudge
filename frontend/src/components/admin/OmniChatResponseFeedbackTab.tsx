@@ -75,10 +75,7 @@ export default function OmniChatResponseFeedbackTab() {
       nextStatus: AdminOmniChatResponseFeedbackStatus;
     }) => adminService.updateOmniChatResponseFeedbackStatus(id, nextStatus),
     onSuccess: ({ feedback }) => {
-      queryClient.setQueryData(
-        ['adminOmniChatResponseFeedbackDetail', feedback.id],
-        { feedback }
-      );
+      queryClient.setQueryData(['adminOmniChatResponseFeedbackDetail', feedback.id], { feedback });
       queryClient.invalidateQueries({ queryKey: ['adminOmniChatResponseFeedback'] });
     },
   });
@@ -98,10 +95,7 @@ export default function OmniChatResponseFeedbackTab() {
   }
   if (feedbackQuery.isError) {
     return (
-      <p
-        role="alert"
-        className="rounded border border-red-300 bg-red-50 p-4 text-red-800"
-      >
+      <p role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-red-800">
         {t('adminPage.responseFeedback.loadError')}
       </p>
     );
@@ -208,10 +202,7 @@ export default function OmniChatResponseFeedbackTab() {
             (detailQuery.isLoading ? (
               <LoadingMessage>{t('adminPage.responseFeedback.loading')}</LoadingMessage>
             ) : detailQuery.isError ? (
-              <p
-                role="alert"
-                className="rounded border border-red-300 bg-red-50 p-4 text-red-800"
-              >
+              <p role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-red-800">
                 {t('adminPage.responseFeedback.loadError')}
               </p>
             ) : (
@@ -220,9 +211,7 @@ export default function OmniChatResponseFeedbackTab() {
                   feedback={detailQuery.data.feedback}
                   isPending={statusMutation.isPending}
                   error={statusMutation.isError}
-                  onStatus={(nextStatus) =>
-                    statusMutation.mutate({ id: selectedId, nextStatus })
-                  }
+                  onStatus={(nextStatus) => statusMutation.mutate({ id: selectedId, nextStatus })}
                 />
               )
             ))}
@@ -254,12 +243,7 @@ interface FeedbackDetailProps {
   onStatus: (status: AdminOmniChatResponseFeedbackStatus) => void;
 }
 
-function FeedbackDetail({
-  feedback,
-  isPending,
-  error,
-  onStatus,
-}: FeedbackDetailProps) {
+function FeedbackDetail({ feedback, isPending, error, onStatus }: FeedbackDetailProps) {
   const { t } = useTranslation();
   const transitions = allowedTransitions(feedback.status);
 

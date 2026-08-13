@@ -571,19 +571,21 @@ export default function OmniChatChatPage() {
   // route validation must use this list and not the collapsed one.
   const selectableConversations = useMemo(() => {
     const all = conversationsQuery.data ?? [];
-    return all
-      // A media-only newest message (a generated image) has no text, so an
-      // empty preview is not the same as an empty conversation.
-      .filter((c) => c.last_message_preview || c.last_message_media_only)
-      .map((conversation) => {
-        const latestPersona = activePersonaById.get(Number(conversation.persona_id));
-        if (!latestPersona) return null;
-        return {
-          ...conversation,
-          persona: { ...(conversation.persona ?? latestPersona), ...latestPersona },
-        };
-      })
-      .filter((conversation): conversation is ActiveBotConversation => conversation !== null);
+    return (
+      all
+        // A media-only newest message (a generated image) has no text, so an
+        // empty preview is not the same as an empty conversation.
+        .filter((c) => c.last_message_preview || c.last_message_media_only)
+        .map((conversation) => {
+          const latestPersona = activePersonaById.get(Number(conversation.persona_id));
+          if (!latestPersona) return null;
+          return {
+            ...conversation,
+            persona: { ...(conversation.persona ?? latestPersona), ...latestPersona },
+          };
+        })
+        .filter((conversation): conversation is ActiveBotConversation => conversation !== null)
+    );
   }, [activePersonaById, conversationsQuery.data]);
 
   const filteredConversations = useMemo(() => {
@@ -624,9 +626,7 @@ export default function OmniChatChatPage() {
       // persona-deduped list here made forked threads unreachable: the route
       // was valid, but the id was absent from the collapsed list, so the pane
       // fell back to "No active chat yet".
-      return selectableConversations.some(
-        (conversation) => conversation.id === routeConversationId
-      )
+      return selectableConversations.some((conversation) => conversation.id === routeConversationId)
         ? routeConversationId
         : null;
     }
@@ -1536,13 +1536,7 @@ export default function OmniChatChatPage() {
       pendingMediaGenerationRef.current = request;
       mediaGenerationMutation.mutate(request);
     },
-    [
-      activePersona,
-      isAuthenticated,
-      isGuest,
-      mediaGenerationMutation,
-      selectedConversationId,
-    ]
+    [activePersona, isAuthenticated, isGuest, mediaGenerationMutation, selectedConversationId]
   );
 
   const retryMediaGeneration = useCallback(() => {

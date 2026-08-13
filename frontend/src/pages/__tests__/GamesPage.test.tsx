@@ -28,7 +28,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) =>
       (
-        {
+        ({
           'gamesPage.eyebrow': 'OmniGame',
           'gamesPage.title': 'OmniGame',
           'gamesPage.description': 'Discover dedicated multiplayer experiences inside OmniNudge.',
@@ -36,7 +36,7 @@ vi.mock('react-i18next', () => ({
           'gamesPage.viewGame': 'View game',
           'games.omnirave.summary': 'Shared world rave.',
           'games.omnirave.hero': 'One world. Three stages. Shared playheads.',
-        } as Record<string, string>
+        }) as Record<string, string>
       )[key] ?? key,
   }),
 }));
@@ -50,11 +50,14 @@ describe('GamesPage', () => {
         <Routes>
           <Route path="/games" element={<GamesPage />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     );
 
     expect(screen.getByRole('heading', { name: 'OmniGame' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'View game' })).toHaveAttribute('href', '/games/omnirave');
+    expect(screen.getByRole('link', { name: 'View game' })).toHaveAttribute(
+      'href',
+      '/games/omnirave'
+    );
     expect(screen.getByText('OmniRave')).toBeInTheDocument();
     expect(screen.getByText('Shared world rave.')).toBeInTheDocument();
     expect(screen.getByText('One world. Three stages. Shared playheads.')).toBeInTheDocument();

@@ -27,7 +27,9 @@ export default function GameDetailPage() {
     setLaunchError('');
 
     try {
-      const launch = await omnigameService.createOmniRaveLaunch(isAuthenticated ? 'account' : 'guest');
+      const launch = await omnigameService.createOmniRaveLaunch(
+        isAuthenticated ? 'account' : 'guest'
+      );
       window.location.assign(launch.launch_url);
     } catch (error) {
       setLaunchError(error instanceof Error ? error.message : t('gameDetailPage.launchError'));
@@ -77,7 +79,9 @@ export default function GameDetailPage() {
                   >
                     {isLaunching ? t('gameDetailPage.playing') : t('gameDetailPage.play')}
                   </button>
-                  <p className="text-xs uppercase tracking-[0.25em] text-white/55">{t('gameDetailPage.launchHint')}</p>
+                  <p className="text-xs uppercase tracking-[0.25em] text-white/55">
+                    {t('gameDetailPage.launchHint')}
+                  </p>
                 </div>
               </div>
             </div>
@@ -94,7 +98,9 @@ export default function GameDetailPage() {
                   <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/72">
                     {t(panel.titleKey)}
                   </p>
-                  <p className="mt-2 max-w-xs text-sm leading-6 text-white/88">{t(panel.captionKey)}</p>
+                  <p className="mt-2 max-w-xs text-sm leading-6 text-white/88">
+                    {t(panel.captionKey)}
+                  </p>
                 </div>
               </article>
             ))}
@@ -105,7 +111,10 @@ export default function GameDetailPage() {
       <section className="grid gap-8 rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-background)] p-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <div className="space-y-4">
           {game.descriptionKeys.map((paragraphKey) => (
-            <p key={paragraphKey} className="text-base leading-7 text-[var(--color-text-secondary)]">
+            <p
+              key={paragraphKey}
+              className="text-base leading-7 text-[var(--color-text-secondary)]"
+            >
               {t(paragraphKey)}
             </p>
           ))}
@@ -129,7 +138,9 @@ export default function GameDetailPage() {
       </section>
 
       {launchError ? (
-        <p className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{launchError}</p>
+        <p className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {launchError}
+        </p>
       ) : null}
     </PageShell>
   );

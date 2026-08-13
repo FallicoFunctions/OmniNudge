@@ -136,7 +136,10 @@ export default function PersonaDetailsModal({
               <div className="grid gap-4 md:grid-cols-[200px,1fr]">
                 <div className="overflow-hidden rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)]">
                   {(() => {
-                    const detailsAvatarSrc = resolveMediaUrl(definition.avatar_url, definition.updated_at);
+                    const detailsAvatarSrc = resolveMediaUrl(
+                      definition.avatar_url,
+                      definition.updated_at
+                    );
                     return detailsAvatarSrc ? (
                       <img
                         src={detailsAvatarSrc}

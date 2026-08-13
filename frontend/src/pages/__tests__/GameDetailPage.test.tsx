@@ -24,11 +24,12 @@ vi.mock('../../services/omnigameService', () => ({
       summaryKey: 'games.omnirave.summary',
       heroKey: 'games.omnirave.hero',
       runtimeUrl: 'http://localhost:4173/omnirave',
-      descriptionKeys: [
-        'games.omnirave.description.0',
-        'games.omnirave.description.1',
+      descriptionKeys: ['games.omnirave.description.0', 'games.omnirave.description.1'],
+      highlightKeys: [
+        'games.omnirave.highlights.0',
+        'games.omnirave.highlights.1',
+        'games.omnirave.highlights.2',
       ],
-      highlightKeys: ['games.omnirave.highlights.0', 'games.omnirave.highlights.1', 'games.omnirave.highlights.2'],
       gallery: [
         {
           titleKey: 'games.omnirave.gallery.0.title',
@@ -51,7 +52,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) =>
       (
-        {
+        ({
           'gameDetailPage.eyebrow': 'OmniGame / OmniRave',
           'gameDetailPage.play': 'Play',
           'gameDetailPage.playing': 'Entering OmniRave...',
@@ -72,7 +73,7 @@ vi.mock('react-i18next', () => ({
           'games.omnirave.highlights.2': 'Authoritative zone audio',
           'games.omnirave.gallery.0.title': 'Main Stage',
           'games.omnirave.gallery.0.caption': 'Main Stage light wall',
-        } as Record<string, string>
+        }) as Record<string, string>
       )[key] ?? key,
   }),
 }));
@@ -92,7 +93,7 @@ describe('GameDetailPage', () => {
         <Routes>
           <Route path="/games/omnirave" element={<GameDetailPage />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     );
 
     expect(screen.getByRole('heading', { name: 'OmniRave' })).toBeInTheDocument();
@@ -100,7 +101,7 @@ describe('GameDetailPage', () => {
     expect(screen.getByText('One world. Three stages. Shared playheads.')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Play' })).toHaveLength(1);
     expect(
-      screen.getByText('Signed-in players resume their account; everyone else enters as a guest.'),
+      screen.getByText('Signed-in players resume their account; everyone else enters as a guest.')
     ).toBeInTheDocument();
   });
 
@@ -112,7 +113,7 @@ describe('GameDetailPage', () => {
         <Routes>
           <Route path="/games/omnirave" element={<GameDetailPage />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Play' }));
@@ -130,7 +131,7 @@ describe('GameDetailPage', () => {
         <Routes>
           <Route path="/games/omnirave" element={<GameDetailPage />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     );
 
     expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
@@ -146,7 +147,7 @@ describe('GameDetailPage', () => {
         <Routes>
           <Route path="/games/omnirave" element={<GameDetailPage />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Play' }));

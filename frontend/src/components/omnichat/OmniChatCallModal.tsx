@@ -225,10 +225,7 @@ export default function OmniChatCallModal({
     // Refresh at half-life, with a conservative upper bound so a long call
     // never depends on a single ten-minute token. The lower bound also keeps
     // deliberately short staging TTLs from expiring before the refresh runs.
-    const refreshEveryMs = Math.max(
-      15_000,
-      Math.min(Math.max(tokenTTLSeconds, 30) * 500, 240_000)
-    );
+    const refreshEveryMs = Math.max(15_000, Math.min(Math.max(tokenTTLSeconds, 30) * 500, 240_000));
     let active = true;
     const refresh = async () => {
       try {
@@ -285,7 +282,11 @@ export default function OmniChatCallModal({
       if (mode === 'video' && liveKitRoom?.state === 'connected') {
         try {
           const payload = new TextEncoder().encode(
-            JSON.stringify({ type: 'assistant_text', text: assistant.content, message_id: assistant.id })
+            JSON.stringify({
+              type: 'assistant_text',
+              text: assistant.content,
+              message_id: assistant.id,
+            })
           );
           await liveKitRoom.localParticipant.publishData(payload, {
             reliable: true,
@@ -405,7 +406,10 @@ export default function OmniChatCallModal({
             <div ref={remoteAudioRef} className="hidden" aria-hidden="true" />
             {!liveVideoConnected && (
               <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_50%_40%,rgba(99,102,241,0.34),transparent_38%),#08090d]">
-                <PersonaAvatar persona={persona} className="h-48 w-48 rounded-full sm:h-72 sm:w-72" />
+                <PersonaAvatar
+                  persona={persona}
+                  className="h-48 w-48 rounded-full sm:h-72 sm:w-72"
+                />
               </div>
             )}
           </div>

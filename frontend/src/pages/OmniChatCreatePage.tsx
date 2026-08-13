@@ -153,294 +153,294 @@ export function OmniChatCreateWorkspace() {
 
   return (
     <>
-    <div className="min-h-[calc(100dvh-var(--omnichat-header-offset))] bg-[radial-gradient(circle_at_20%_0%,rgba(48,94,180,0.18),transparent_38%),var(--color-background)] px-4 py-6 sm:px-7 lg:px-10">
-      <div className="mx-auto max-w-[1500px]">
-        <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.28em] text-blue-300/65">
-              Character media lab
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-              Create with your characters
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-white/50">
-              Generate character-consistent images and videos. Every result is saved privately to
-              your gallery.
-            </p>
-          </div>
-          <div className="flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-            {(['generate', 'gallery'] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setWorkspaceTab(tab)}
-                className={`rounded-xl px-4 py-2 text-sm font-medium capitalize ${workspaceTab === tab ? 'bg-blue-500 text-white' : 'text-white/55 hover:text-white'}`}
+      <div className="min-h-[calc(100dvh-var(--omnichat-header-offset))] bg-[radial-gradient(circle_at_20%_0%,rgba(48,94,180,0.18),transparent_38%),var(--color-background)] px-4 py-6 sm:px-7 lg:px-10">
+        <div className="mx-auto max-w-[1500px]">
+          <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.28em] text-blue-300/65">
+                Character media lab
+              </p>
+              <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                Create with your characters
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm text-white/50">
+                Generate character-consistent images and videos. Every result is saved privately to
+                your gallery.
+              </p>
+            </div>
+            <div className="flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+              {(['generate', 'gallery'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setWorkspaceTab(tab)}
+                  className={`rounded-xl px-4 py-2 text-sm font-medium capitalize ${workspaceTab === tab ? 'bg-blue-500 text-white' : 'text-white/55 hover:text-white'}`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </header>
+
+          {workspaceTab === 'generate' ? (
+            <div className="grid gap-6 xl:grid-cols-[minmax(360px,0.78fr),minmax(420px,1.22fr)]">
+              <form
+                onSubmit={submit}
+                className="space-y-5 rounded-[30px] border border-white/10 bg-[#15161d]/85 p-5 shadow-2xl shadow-black/20 sm:p-7"
               >
-                {tab}
-              </button>
-            ))}
-          </div>
-        </header>
-
-        {workspaceTab === 'generate' ? (
-          <div className="grid gap-6 xl:grid-cols-[minmax(360px,0.78fr),minmax(420px,1.22fr)]">
-            <form
-              onSubmit={submit}
-              className="space-y-5 rounded-[30px] border border-white/10 bg-[#15161d]/85 p-5 shadow-2xl shadow-black/20 sm:p-7"
-            >
-              <div className="grid grid-cols-2 gap-2 rounded-2xl bg-black/20 p-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setKind('image');
-                    setAspectRatio('4:5');
-                  }}
-                  className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold ${kind === 'image' ? 'bg-white/10 text-white' : 'text-white/45'}`}
-                >
-                  <ImageIcon size={17} /> Image
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setKind('video');
-                    setAspectRatio('16:9');
-                  }}
-                  className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold ${kind === 'video' ? 'bg-white/10 text-white' : 'text-white/45'}`}
-                >
-                  <Film size={17} /> Video
-                </button>
-              </div>
-
-              <label className="block text-sm font-medium text-white/75">
-                Character
-                <div className="mt-2 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/15 p-3">
-                  {selectedPersona && (
-                    <PersonaAvatar persona={selectedPersona} className="h-11 w-11 rounded-xl" />
-                  )}
-                  <select
-                    aria-label="Character"
-                    value={selectedPersona?.id ?? ''}
-                    onChange={(event) => {
-                      setSelectedPersonaId(Number(event.target.value));
-                      setSourceAssetId('');
+                <div className="grid grid-cols-2 gap-2 rounded-2xl bg-black/20 p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKind('image');
+                      setAspectRatio('4:5');
                     }}
-                    className="min-w-0 flex-1 bg-transparent text-white outline-none"
+                    className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold ${kind === 'image' ? 'bg-white/10 text-white' : 'text-white/45'}`}
                   >
-                    {personas.map((persona) => (
-                      <option key={persona.id} value={persona.id} className="bg-[#181920]">
-                        {persona.name}
-                      </option>
-                    ))}
-                  </select>
+                    <ImageIcon size={17} /> Image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKind('video');
+                      setAspectRatio('16:9');
+                    }}
+                    className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold ${kind === 'video' ? 'bg-white/10 text-white' : 'text-white/45'}`}
+                  >
+                    <Film size={17} /> Video
+                  </button>
                 </div>
-              </label>
 
-              {kind === 'video' && characterImages.length > 0 && (
                 <label className="block text-sm font-medium text-white/75">
-                  Starting image <span className="font-normal text-white/35">(optional)</span>
-                  <select
-                    aria-label="Starting image"
-                    value={sourceAssetId}
-                    onChange={(event) => setSourceAssetId(event.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                  >
-                    <option value="">Generate directly from the prompt</option>
-                    {characterImages.map((asset, index) => (
-                      <option key={asset.id} value={asset.id}>
-                        Gallery image {index + 1}: {asset.prompt.slice(0, 48)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-
-              <label className="block text-sm font-medium text-white/75">
-                Prompt
-                <textarea
-                  aria-label="Prompt"
-                  value={prompt}
-                  onChange={(event) => setPrompt(event.target.value)}
-                  maxLength={2000}
-                  placeholder={
-                    kind === 'image'
-                      ? 'Describe the character, scene, outfit, mood, and camera…'
-                      : 'Describe the scene and how the character or camera should move…'
-                  }
-                  className="mt-2 min-h-36 w-full resize-y rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none placeholder:text-white/25 focus:border-blue-400/60"
-                />
-              </label>
-              <label className="block text-sm font-medium text-white/75">
-                Avoid <span className="font-normal text-white/35">(optional)</span>
-                <input
-                  value={negativePrompt}
-                  onChange={(event) => setNegativePrompt(event.target.value)}
-                  maxLength={1000}
-                  placeholder="Blur, distorted hands, text…"
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none placeholder:text-white/25 focus:border-blue-400/60"
-                />
-              </label>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="text-sm font-medium text-white/75">
-                  Aspect ratio
-                  <select
-                    aria-label="Aspect ratio"
-                    value={aspectRatio}
-                    onChange={(event) => setAspectRatio(event.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                  >
-                    {['1:1', '4:5', '3:4', '16:9', '9:16', '4:3', '5:4'].map((ratio) => (
-                      <option key={ratio} value={ratio} className="bg-[#181920]">
-                        {ratio}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {kind === 'video' && (
-                  <label className="text-sm font-medium text-white/75">
-                    Duration
+                  Character
+                  <div className="mt-2 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/15 p-3">
+                    {selectedPersona && (
+                      <PersonaAvatar persona={selectedPersona} className="h-11 w-11 rounded-xl" />
+                    )}
                     <select
-                      aria-label="Duration"
-                      value={duration}
-                      onChange={(event) => setDuration(Number(event.target.value))}
+                      aria-label="Character"
+                      value={selectedPersona?.id ?? ''}
+                      onChange={(event) => {
+                        setSelectedPersonaId(Number(event.target.value));
+                        setSourceAssetId('');
+                      }}
+                      className="min-w-0 flex-1 bg-transparent text-white outline-none"
+                    >
+                      {personas.map((persona) => (
+                        <option key={persona.id} value={persona.id} className="bg-[#181920]">
+                          {persona.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </label>
+
+                {kind === 'video' && characterImages.length > 0 && (
+                  <label className="block text-sm font-medium text-white/75">
+                    Starting image <span className="font-normal text-white/35">(optional)</span>
+                    <select
+                      aria-label="Starting image"
+                      value={sourceAssetId}
+                      onChange={(event) => setSourceAssetId(event.target.value)}
                       className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
                     >
-                      {[3, 4, 5, 6, 7, 8, 9, 10].map((seconds) => (
-                        <option key={seconds} value={seconds} className="bg-[#181920]">
-                          {seconds} seconds
+                      <option value="">Generate directly from the prompt</option>
+                      {characterImages.map((asset, index) => (
+                        <option key={asset.id} value={asset.id}>
+                          Gallery image {index + 1}: {asset.prompt.slice(0, 48)}
                         </option>
                       ))}
                     </select>
                   </label>
                 )}
-              </div>
-              <button
-                type="submit"
-                disabled={
-                  !selectedPersona ||
-                  !prompt.trim() ||
-                  createMutation.isPending ||
-                  Boolean(activeJob && !TERMINAL_STATUSES.has(activeJob.status))
-                }
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {createMutation.isPending ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : kind === 'image' ? (
-                  <ImagePlus size={18} />
-                ) : (
-                  <Film size={18} />
-                )}
-                Generate {kind}
-              </button>
-              {createMutation.isError && (
-                <p className="text-sm text-rose-300">
-                  {mediaGenerationErrorMessage(
-                    (createMutation.error as Error & { status?: number })?.status
-                  )}
-                </p>
-              )}
-            </form>
 
-            <section className="flex min-h-[520px] flex-col items-center justify-center overflow-hidden rounded-[30px] border border-white/10 bg-[#101117]/80 p-6">
-              {activeJob ? (
-                <div className="w-full max-w-xl text-center">
-                  {activeJob.status === 'succeeded' && activeJob.output_asset_id ? (
-                    <GeneratedResult assetId={activeJob.output_asset_id} />
-                  ) : activeJob.status === 'failed' ? (
-                    <div className="rounded-3xl border border-rose-400/20 bg-rose-500/10 p-8 text-rose-100">
-                      <p className="font-semibold">Generation failed</p>
-                      <p className="mt-2 text-sm text-rose-100/65">
-                        {mediaGenerationErrorMessage(undefined, activeJob.error_code)}
-                      </p>
-                      {lastRequest && (
+                <label className="block text-sm font-medium text-white/75">
+                  Prompt
+                  <textarea
+                    aria-label="Prompt"
+                    value={prompt}
+                    onChange={(event) => setPrompt(event.target.value)}
+                    maxLength={2000}
+                    placeholder={
+                      kind === 'image'
+                        ? 'Describe the character, scene, outfit, mood, and camera…'
+                        : 'Describe the scene and how the character or camera should move…'
+                    }
+                    className="mt-2 min-h-36 w-full resize-y rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none placeholder:text-white/25 focus:border-blue-400/60"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-white/75">
+                  Avoid <span className="font-normal text-white/35">(optional)</span>
+                  <input
+                    value={negativePrompt}
+                    onChange={(event) => setNegativePrompt(event.target.value)}
+                    maxLength={1000}
+                    placeholder="Blur, distorted hands, text…"
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none placeholder:text-white/25 focus:border-blue-400/60"
+                  />
+                </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="text-sm font-medium text-white/75">
+                    Aspect ratio
+                    <select
+                      aria-label="Aspect ratio"
+                      value={aspectRatio}
+                      onChange={(event) => setAspectRatio(event.target.value)}
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
+                    >
+                      {['1:1', '4:5', '3:4', '16:9', '9:16', '4:3', '5:4'].map((ratio) => (
+                        <option key={ratio} value={ratio} className="bg-[#181920]">
+                          {ratio}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {kind === 'video' && (
+                    <label className="text-sm font-medium text-white/75">
+                      Duration
+                      <select
+                        aria-label="Duration"
+                        value={duration}
+                        onChange={(event) => setDuration(Number(event.target.value))}
+                        className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
+                      >
+                        {[3, 4, 5, 6, 7, 8, 9, 10].map((seconds) => (
+                          <option key={seconds} value={seconds} className="bg-[#181920]">
+                            {seconds} seconds
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={
+                    !selectedPersona ||
+                    !prompt.trim() ||
+                    createMutation.isPending ||
+                    Boolean(activeJob && !TERMINAL_STATUSES.has(activeJob.status))
+                  }
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {createMutation.isPending ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : kind === 'image' ? (
+                    <ImagePlus size={18} />
+                  ) : (
+                    <Film size={18} />
+                  )}
+                  Generate {kind}
+                </button>
+                {createMutation.isError && (
+                  <p className="text-sm text-rose-300">
+                    {mediaGenerationErrorMessage(
+                      (createMutation.error as Error & { status?: number })?.status
+                    )}
+                  </p>
+                )}
+              </form>
+
+              <section className="flex min-h-[520px] flex-col items-center justify-center overflow-hidden rounded-[30px] border border-white/10 bg-[#101117]/80 p-6">
+                {activeJob ? (
+                  <div className="w-full max-w-xl text-center">
+                    {activeJob.status === 'succeeded' && activeJob.output_asset_id ? (
+                      <GeneratedResult assetId={activeJob.output_asset_id} />
+                    ) : activeJob.status === 'failed' ? (
+                      <div className="rounded-3xl border border-rose-400/20 bg-rose-500/10 p-8 text-rose-100">
+                        <p className="font-semibold">Generation failed</p>
+                        <p className="mt-2 text-sm text-rose-100/65">
+                          {mediaGenerationErrorMessage(undefined, activeJob.error_code)}
+                        </p>
+                        {lastRequest && (
+                          <button
+                            type="button"
+                            onClick={retryLastRequest}
+                            disabled={createMutation.isPending}
+                            className="mt-5 rounded-full border border-rose-200/25 px-4 py-2 text-sm font-semibold text-rose-50 transition hover:bg-rose-200/10 disabled:opacity-50"
+                          >
+                            {createMutation.isPending ? 'Retrying…' : 'Retry generation'}
+                          </button>
+                        )}
+                      </div>
+                    ) : activeJob.status === 'cancelled' ? (
+                      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 text-white/70">
+                        <p className="font-semibold text-white">Generation cancelled</p>
+                        <p className="mt-2 text-sm text-white/45">
+                          No result was added to your gallery.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mx-auto max-w-md">
+                        <Loader2 size={42} className="mx-auto animate-spin text-blue-300" />
+                        <p className="mt-5 text-lg font-semibold text-white">
+                          Creating your {activeJob.kind}
+                        </p>
+                        <p className="mt-2 text-sm text-white/45">
+                          You can leave this page. The result will still be saved to your gallery.
+                        </p>
+                        <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-blue-400 to-indigo-400 transition-all"
+                            style={{ width: `${Math.max(4, activeJob.progress)}%` }}
+                          />
+                        </div>
+                        <p className="mt-2 text-xs text-white/35">
+                          {activeJob.progress}% · {activeJob.status}
+                        </p>
                         <button
                           type="button"
-                          onClick={retryLastRequest}
-                          disabled={createMutation.isPending}
-                          className="mt-5 rounded-full border border-rose-200/25 px-4 py-2 text-sm font-semibold text-rose-50 transition hover:bg-rose-200/10 disabled:opacity-50"
+                          aria-label="Cancel generation"
+                          onClick={() => cancelMutation.mutate(activeJob.id)}
+                          disabled={cancelMutation.isPending}
+                          className="mt-5 rounded-full border border-white/15 px-4 py-2 text-sm text-white/60 hover:border-white/25 hover:text-white disabled:opacity-40"
                         >
-                          {createMutation.isPending ? 'Retrying…' : 'Retry generation'}
+                          {cancelMutation.isPending ? 'Cancelling…' : 'Cancel'}
                         </button>
-                      )}
-                    </div>
-                  ) : activeJob.status === 'cancelled' ? (
-                    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 text-white/70">
-                      <p className="font-semibold text-white">Generation cancelled</p>
-                      <p className="mt-2 text-sm text-white/45">
-                        No result was added to your gallery.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="mx-auto max-w-md">
-                      <Loader2 size={42} className="mx-auto animate-spin text-blue-300" />
-                      <p className="mt-5 text-lg font-semibold text-white">
-                        Creating your {activeJob.kind}
-                      </p>
-                      <p className="mt-2 text-sm text-white/45">
-                        You can leave this page. The result will still be saved to your gallery.
-                      </p>
-                      <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-blue-400 to-indigo-400 transition-all"
-                          style={{ width: `${Math.max(4, activeJob.progress)}%` }}
-                        />
+                        {cancelMutation.isError && (
+                          <p className="mt-2 text-xs text-rose-300">
+                            Generation could not be cancelled.
+                          </p>
+                        )}
                       </div>
-                      <p className="mt-2 text-xs text-white/35">
-                        {activeJob.progress}% · {activeJob.status}
-                      </p>
-                      <button
-                        type="button"
-                        aria-label="Cancel generation"
-                        onClick={() => cancelMutation.mutate(activeJob.id)}
-                        disabled={cancelMutation.isPending}
-                        className="mt-5 rounded-full border border-white/15 px-4 py-2 text-sm text-white/60 hover:border-white/25 hover:text-white disabled:opacity-40"
-                      >
-                        {cancelMutation.isPending ? 'Cancelling…' : 'Cancel'}
-                      </button>
-                      {cancelMutation.isError && (
-                        <p className="mt-2 text-xs text-rose-300">
-                          Generation could not be cancelled.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="max-w-md text-center text-white/45">
-                  <Images size={48} className="mx-auto text-blue-300/55" />
-                  <p className="mt-5 text-xl font-semibold text-white/80">
-                    Your next scene starts here
-                  </p>
-                  <p className="mt-2 text-sm leading-relaxed">
-                    Choose a character and describe exactly what you want to see. Character
-                    references are applied automatically.
-                  </p>
-                </div>
-              )}
-            </section>
-          </div>
-        ) : (
-          <GalleryGrid
-            assets={gallery}
-            isLoading={galleryQuery.isLoading}
-            isError={galleryQuery.isError}
-            hasNextPage={galleryQuery.hasNextPage}
-            isFetchingNextPage={galleryQuery.isFetchingNextPage}
-            loadMore={() => void galleryQuery.fetchNextPage()}
-          />
-        )}
+                    )}
+                  </div>
+                ) : (
+                  <div className="max-w-md text-center text-white/45">
+                    <Images size={48} className="mx-auto text-blue-300/55" />
+                    <p className="mt-5 text-xl font-semibold text-white/80">
+                      Your next scene starts here
+                    </p>
+                    <p className="mt-2 text-sm leading-relaxed">
+                      Choose a character and describe exactly what you want to see. Character
+                      references are applied automatically.
+                    </p>
+                  </div>
+                )}
+              </section>
+            </div>
+          ) : (
+            <GalleryGrid
+              assets={gallery}
+              isLoading={galleryQuery.isLoading}
+              isError={galleryQuery.isError}
+              hasNextPage={galleryQuery.hasNextPage}
+              isFetchingNextPage={galleryQuery.isFetchingNextPage}
+              loadMore={() => void galleryQuery.fetchNextPage()}
+            />
+          )}
+        </div>
       </div>
-    </div>
-    <OmniChatVideoPaywallModal
-      isOpen={showVideoPaywall}
-      feature="scene_video"
-      onClose={() => setShowVideoPaywall(false)}
-      onViewOptions={() => {
-        setShowVideoPaywall(false);
-        setShowCommerce(true);
-      }}
-    />
-    <OmniChatCommerceModal isOpen={showCommerce} onClose={() => setShowCommerce(false)} />
+      <OmniChatVideoPaywallModal
+        isOpen={showVideoPaywall}
+        feature="scene_video"
+        onClose={() => setShowVideoPaywall(false)}
+        onViewOptions={() => {
+          setShowVideoPaywall(false);
+          setShowCommerce(true);
+        }}
+      />
+      <OmniChatCommerceModal isOpen={showCommerce} onClose={() => setShowCommerce(false)} />
     </>
   );
 }
@@ -453,10 +453,7 @@ function GeneratedResult({ assetId }: { assetId: string }) {
   if (!assetQuery.data) return <Loader2 size={36} className="mx-auto animate-spin text-blue-300" />;
   return (
     <>
-      <OmniChatMediaAssetView
-        asset={assetQuery.data}
-        className="mx-auto min-h-80 w-full"
-      />
+      <OmniChatMediaAssetView asset={assetQuery.data} className="mx-auto min-h-80 w-full" />
       <p className="mt-4 text-sm text-emerald-300">Saved to your private gallery</p>
     </>
   );
@@ -502,7 +499,11 @@ function GalleryGrid({
     },
     onError: (error) => {
       const status = (error as Error & { status?: number }).status;
-      setDeleteError(status === 409 ? t('omnichat.galleryDelete.sharedError') : t('omnichat.galleryDelete.genericError'));
+      setDeleteError(
+        status === 409
+          ? t('omnichat.galleryDelete.sharedError')
+          : t('omnichat.galleryDelete.genericError')
+      );
     },
   });
   if (isLoading)
@@ -543,29 +544,39 @@ function GalleryGrid({
                 {asset.kind} · {asset.visibility}
               </p>
               <div className="flex items-center gap-1">
-              {asset.visibility === 'public' || publishedAssetId === asset.id ? (
-                <span className="text-xs font-medium text-emerald-300">Published</span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => publishMutation.mutate(asset.id)}
-                  disabled={publishMutation.isPending}
-                  className="flex items-center gap-1 rounded-full bg-indigo-500/15 px-2.5 py-1 text-xs font-medium text-indigo-200 hover:bg-indigo-500/25 disabled:opacity-40"
-                >
-                  {publishMutation.isPending && publishMutation.variables === asset.id ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : (
-                    <Send size={12} />
-                  )}{' '}
-                  Publish
-                </button>
-              )}
+                {asset.visibility === 'public' || publishedAssetId === asset.id ? (
+                  <span className="text-xs font-medium text-emerald-300">Published</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => publishMutation.mutate(asset.id)}
+                    disabled={publishMutation.isPending}
+                    className="flex items-center gap-1 rounded-full bg-indigo-500/15 px-2.5 py-1 text-xs font-medium text-indigo-200 hover:bg-indigo-500/25 disabled:opacity-40"
+                  >
+                    {publishMutation.isPending && publishMutation.variables === asset.id ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Send size={12} />
+                    )}{' '}
+                    Publish
+                  </button>
+                )}
                 {asset.visibility === 'public' || publishedAssetId === asset.id ? (
                   <span className="max-w-32 text-end text-xs text-amber-200/75">
                     {t('omnichat.galleryDelete.unpublishFirst')}
                   </span>
                 ) : (
-                  <button type="button" aria-label={t('omnichat.galleryDelete.action')} onClick={() => { setPendingDelete(asset); setDeleteError(''); }} className="rounded-full p-1.5 text-white/45 hover:bg-rose-500/15 hover:text-rose-300"><Trash2 size={14} /></button>
+                  <button
+                    type="button"
+                    aria-label={t('omnichat.galleryDelete.action')}
+                    onClick={() => {
+                      setPendingDelete(asset);
+                      setDeleteError('');
+                    }}
+                    className="rounded-full p-1.5 text-white/45 hover:bg-rose-500/15 hover:text-rose-300"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 )}
               </div>
             </div>
@@ -575,11 +586,50 @@ function GalleryGrid({
           </article>
         ))}
       </div>
-      <Modal isOpen={Boolean(pendingDelete)} onClose={deleteMutation.isPending ? undefined : () => setPendingDelete(null)} ariaLabelledBy="omnichat-gallery-delete-title" ariaDescribedBy="omnichat-gallery-delete-description" ariaBusy={deleteMutation.isPending} overlayClassName="bg-black/80" className="w-full max-w-md rounded-[26px] border border-white/10 bg-[#15161d] p-6 text-white shadow-2xl" animation="quick-chat">
-        <h2 id="omnichat-gallery-delete-title" className="text-xl font-semibold">{t('omnichat.galleryDelete.title')}</h2>
-        <p id="omnichat-gallery-delete-description" className="mt-3 text-sm leading-6 text-white/60">{t('omnichat.galleryDelete.description')}</p>
-        {deleteError && <p role="alert" className="mt-3 text-sm text-rose-300">{deleteError}</p>}
-        <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={deleteMutation.isPending} onClick={() => setPendingDelete(null)} className="rounded-full px-4 py-2 text-sm text-white/60">{t('common.cancel')}</button><button type="button" disabled={deleteMutation.isPending || !pendingDelete} onClick={() => pendingDelete && deleteMutation.mutate(pendingDelete.id)} className="rounded-full bg-rose-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">{deleteMutation.isPending ? t('omnichat.galleryDelete.deleting') : t('omnichat.galleryDelete.confirm')}</button></div>
+      <Modal
+        isOpen={Boolean(pendingDelete)}
+        onClose={deleteMutation.isPending ? undefined : () => setPendingDelete(null)}
+        ariaLabelledBy="omnichat-gallery-delete-title"
+        ariaDescribedBy="omnichat-gallery-delete-description"
+        ariaBusy={deleteMutation.isPending}
+        overlayClassName="bg-black/80"
+        className="w-full max-w-md rounded-[26px] border border-white/10 bg-[#15161d] p-6 text-white shadow-2xl"
+        animation="quick-chat"
+      >
+        <h2 id="omnichat-gallery-delete-title" className="text-xl font-semibold">
+          {t('omnichat.galleryDelete.title')}
+        </h2>
+        <p
+          id="omnichat-gallery-delete-description"
+          className="mt-3 text-sm leading-6 text-white/60"
+        >
+          {t('omnichat.galleryDelete.description')}
+        </p>
+        {deleteError && (
+          <p role="alert" className="mt-3 text-sm text-rose-300">
+            {deleteError}
+          </p>
+        )}
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            disabled={deleteMutation.isPending}
+            onClick={() => setPendingDelete(null)}
+            className="rounded-full px-4 py-2 text-sm text-white/60"
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            type="button"
+            disabled={deleteMutation.isPending || !pendingDelete}
+            onClick={() => pendingDelete && deleteMutation.mutate(pendingDelete.id)}
+            className="rounded-full bg-rose-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            {deleteMutation.isPending
+              ? t('omnichat.galleryDelete.deleting')
+              : t('omnichat.galleryDelete.confirm')}
+          </button>
+        </div>
       </Modal>
       {hasNextPage && (
         <div className="mt-7 flex justify-center">
