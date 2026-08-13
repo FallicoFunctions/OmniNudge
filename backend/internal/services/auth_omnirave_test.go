@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"testing"
+	"time"
 
 	omnigamemodel "github.com/omninudge/backend/internal/omnigame/model"
 	"github.com/stretchr/testify/require"
@@ -39,4 +40,36 @@ func TestAuthService_GenerateAndValidateOmniRaveWorldJWT(t *testing.T) {
 	require.Equal(t, "buzz", claims.Loadout["hair"])
 	require.NotNil(t, claims.ReturnPoint)
 	require.Equal(t, 12.0, claims.ReturnPoint.X)
+}
+
+// OmniGame mints its own session token for runtime profile writes, and it is
+// not session-bound. Validation rejects any non-session token whose use is not
+// on a known list, so dropping "game" from that list silently rejects every
+// OmniGame profile write. Both branches were correct in isolation and only
+// disagreed once merged, which is exactly the kind of thing nothing was
+// checking.
+func TestAuthService_AcceptsGameSessionTokenWithoutASession(t *testing.T) {
+	authService := NewAuthService("dev-secret", "OmniGame/1.0", "")
+
+	token, err := authService.GenerateGameSessionJWTWithVersion(42, "alice", 3)
+	require.NoError(t, err)
+
+	claims, err := authService.ValidateJWTContext(context.Background(), token)
+	require.NoError(t, err, "a game token carries no session id and must still validate")
+	require.Equal(t, "game", claims.Use)
+	require.Equal(t, 42, claims.UserID)
+	require.Empty(t, claims.SessionID)
+}
+
+// The allowlist is still an allowlist: an unrecognised use is refused rather
+// than trusted because it happens to be signed.
+func TestAuthService_RejectsUnknownTokenUseWithoutASession(t *testing.T) {
+	authService := NewAuthService("dev-secret", "OmniGame/1.0", "")
+
+	token, err := authService.generateJWT(42, "alice", "user", 0, 30*time.Minute, "not-a-real-use")
+	require.NoError(t, err)
+
+	_, err = authService.ValidateJWTContext(context.Background(), token)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "token use is not permitted")
 }
