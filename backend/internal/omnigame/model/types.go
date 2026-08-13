@@ -7,11 +7,61 @@ const (
 	LaunchModeGuest   LaunchMode = "guest"
 )
 
+// SubjectKind names what a world session belongs to.
+//
+// It is carried explicitly rather than read off whether UserID happens to be
+// set. Today nil means guest, which works only because there are exactly two
+// kinds of player. A persona has no user id either, so under the old reading it
+// would be indistinguishable from a guest and would silently inherit guest
+// semantics -- no persistence, no revocation handle -- which is the opposite of
+// what a persona is for. Stating the kind removes the ambiguity before there is
+// a third kind to be ambiguous about.
+type SubjectKind string
+
+const (
+	SubjectKindAccount SubjectKind = "account"
+	SubjectKindGuest   SubjectKind = "guest"
+	SubjectKindPersona SubjectKind = "persona"
+)
+
+// Valid reports whether the kind is one this build understands. Callers reject
+// on false rather than falling back to a default, so that an issuer this build
+// does not know about cannot admit a subject by leaving the kind off.
+func (k SubjectKind) Valid() bool {
+	switch k {
+	case SubjectKindAccount, SubjectKindGuest, SubjectKindPersona:
+		return true
+	default:
+		return false
+	}
+}
+
 type PlayerIdentity struct {
 	UserID       *int
 	Username     string
 	TokenVersion int
 	RemoteIP     string
+
+	// Kind may be empty on identities built by code that predates it; use
+	// ResolvedKind rather than reading this directly.
+	Kind SubjectKind
+}
+
+// ResolvedKind reports the identity's kind, deriving one when the caller has
+// not set it.
+//
+// Derivation only ever yields account or guest. A persona is never inferred,
+// because inferring a persona from an absent field is exactly the confusion
+// this type exists to prevent: a persona has to be stated by whoever admitted
+// it, and nothing else may conclude it.
+func (p PlayerIdentity) ResolvedKind() SubjectKind {
+	if p.Kind.Valid() {
+		return p.Kind
+	}
+	if p.UserID != nil {
+		return SubjectKindAccount
+	}
+	return SubjectKindGuest
 }
 
 type LaunchRequest struct {
