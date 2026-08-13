@@ -32,8 +32,17 @@ func cookieCSRFFailure(c *gin.Context, authService *services.AuthService, sessio
 	}
 }
 
-// AuthOptional attempts to authenticate the request but never blocks if auth fails.
-// If a valid Bearer token is provided, user context keys are populated.
+// AuthOptional attempts to authenticate the request but never blocks if auth
+// fails. A valid Bearer token, or an access-token cookie, populates the user
+// context keys.
+//
+// It never rejects. A request whose credentials are present but unusable is
+// served anonymously rather than refused, which matters because optional-auth
+// routes include public writes such as analytics and bug reports. The one case
+// that is easy to misread is a cookie-authenticated write failing the CSRF
+// check: the handler then sees no user at all and can only report that nobody
+// is signed in. That drop is logged at warn with the reason, so it is visible
+// in logs rather than only in a puzzling downstream error.
 func AuthOptional(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
