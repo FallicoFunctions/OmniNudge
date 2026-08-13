@@ -506,6 +506,22 @@ export default function OmniChatDiscoverPage() {
     navigateFromQuickChat(`/omnichat/c/${conversation.id}`);
   };
 
+  // Defined once because it has to appear whether or not there are featured
+  // personas. It used to live only inside the featured section, so an empty
+  // catalogue -- a new install, or a catalogue that simply failed to load --
+  // left the page with no way to create a character at all: the other route
+  // into the studio is itself behind "you already own a persona".
+  const createOrImportButton = (
+    <button
+      type="button"
+      onClick={handleOpenStudio}
+      className="group flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 text-sm font-semibold text-white/75 transition hover:border-blue-300/30 hover:bg-blue-400/10 hover:text-white"
+    >
+      <Plus size={16} className="transition-transform group-hover:rotate-90" />
+      {t('omnichat.discover.createOrImport')}
+    </button>
+  );
+
   return (
     <OmniChatShell activeTab={sidebarTab} onTabChange={handleSidebarTabChange}>
       <SearchOverlay
@@ -662,6 +678,10 @@ export default function OmniChatDiscoverPage() {
             </section>
           )}
 
+          {featured.length === 0 && (
+            <section className="mb-10 flex justify-end">{createOrImportButton}</section>
+          )}
+
           {featured.length > 0 && (
             <section className="mb-10">
               <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
@@ -673,14 +693,7 @@ export default function OmniChatDiscoverPage() {
                     {t('omnichat.discover.featuredTitle')}
                   </h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleOpenStudio}
-                  className="group flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 text-sm font-semibold text-white/75 transition hover:border-blue-300/30 hover:bg-blue-400/10 hover:text-white"
-                >
-                  <Plus size={16} className="transition-transform group-hover:rotate-90" />
-                  {t('omnichat.discover.createOrImport')}
-                </button>
+                {createOrImportButton}
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {featured.map((persona) => (
