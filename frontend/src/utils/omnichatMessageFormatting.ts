@@ -25,8 +25,7 @@ const QUOTED_DIALOGUE_AFTER_SENTENCE =
 const ASSISTANT_SENTENCE_PATTERN = /[^.!?…]+[.!?…]+["'”’)\]]*(?:\s+|$)|[^.!?…]+$/g;
 const FIRST_PERSON_ACTION_NARRATION =
   /^i\s+(?:swallow|nod|shake|lean|smile|grin|sigh|pause|glance|reach|touch|brush|trace|move|slide|pull|press|lift|lower|tilt|turn|step|sit|stand|inhale|exhale|freeze|flinch|shrug|blink|bite|gesture)(?:\s+(?:back|closer|away|forward|in|out|up|down|over|toward|towards))?\s*[,;.!?]/i;
-const FIRST_PERSON_SPEECH_TAG_NARRATION =
-  /^i\s+(?:say|ask|reply|answer|whisper|murmur|add)\s*,/i;
+const FIRST_PERSON_SPEECH_TAG_NARRATION = /^i\s+(?:say|ask|reply|answer|whisper|murmur|add)\s*,/i;
 const FIRST_PERSON_BODY_ACTION =
   /^i\s+(?:rest|place|lay|set|hold|keep|move|slide|brush|trace|press|lift|lower|pull|withdraw)\s+(?:my|a|the)\s+(?:hand|hands|finger|fingers|thumb|palm|arm|arms|foot|feet|knee|knees|head|shoulder|shoulders|body)\b/i;
 const BODY_ACTION_NARRATION =

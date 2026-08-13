@@ -285,9 +285,9 @@ export default function OmniChatStudioPage() {
       voiceCatalogQuery.data?.presets.find(
         (preset) => preset.voice_id === selectedVoiceQuery.data.voice_id
       )
-        ? voiceCatalogQuery.data.presets.find(
+        ? (voiceCatalogQuery.data.presets.find(
             (preset) => preset.voice_id === selectedVoiceQuery.data?.voice_id
-          )?.id ?? ''
+          )?.id ?? '')
         : '';
     setSelectedVoicePresetId(presetId);
     setBaselineVoicePresetId(presetId);
@@ -845,39 +845,39 @@ export default function OmniChatStudioPage() {
                 {(personasQuery.data ?? []).map((persona) => {
                   const personaAvatarSrc = resolveMediaUrl(persona.avatar_url, persona.updated_at);
                   return (
-                  <button
-                    key={persona.id}
-                    type="button"
-                    onClick={() => {
-                      requestAction({ type: 'select', personaId: persona.id });
-                    }}
-                    className={`w-full rounded-2xl border px-3 py-3 text-left transition ${
-                      selectedId === persona.id
-                        ? 'border-[var(--color-primary)] bg-[var(--color-surface)]'
-                        : 'border-transparent bg-transparent hover:border-[var(--color-border)] hover:bg-[var(--color-surface)]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 overflow-hidden rounded-2xl bg-[var(--color-surface)]">
-                        {personaAvatarSrc ? (
-                          <img
-                            src={personaAvatarSrc}
-                            alt={persona.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : null}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
-                          {persona.name}
+                    <button
+                      key={persona.id}
+                      type="button"
+                      onClick={() => {
+                        requestAction({ type: 'select', personaId: persona.id });
+                      }}
+                      className={`w-full rounded-2xl border px-3 py-3 text-left transition ${
+                        selectedId === persona.id
+                          ? 'border-[var(--color-primary)] bg-[var(--color-surface)]'
+                          : 'border-transparent bg-transparent hover:border-[var(--color-border)] hover:bg-[var(--color-surface)]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 overflow-hidden rounded-2xl bg-[var(--color-surface)]">
+                          {personaAvatarSrc ? (
+                            <img
+                              src={personaAvatarSrc}
+                              alt={persona.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : null}
                         </div>
-                        <div className="truncate text-xs text-[var(--color-text-secondary)]">
-                          {personaSummaryLabel(persona)}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                            {persona.name}
+                          </div>
+                          <div className="truncate text-xs text-[var(--color-text-secondary)]">
+                            {personaSummaryLabel(persona)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </button>
-                );
+                    </button>
+                  );
                 })}
               </div>
             </div>

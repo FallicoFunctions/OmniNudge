@@ -505,7 +505,8 @@ export default function MainLayout() {
 
       {/* Plan expiry warning banner */}
       {(() => {
-        if ((user?.plan !== 'plus' && user?.plan !== 'premium') || !user.plan_expires_at) return null;
+        if ((user?.plan !== 'plus' && user?.plan !== 'premium') || !user.plan_expires_at)
+          return null;
         const daysLeft = Math.ceil(
           (new Date(user.plan_expires_at).getTime() - MODULE_LOAD_TIME) / (1000 * 60 * 60 * 24)
         );

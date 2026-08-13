@@ -6,7 +6,14 @@ import OmniChatVideoPaywallModal from '../OmniChatVideoPaywallModal';
 describe('OmniChatVideoPaywallModal', () => {
   it('explains the server-required entitlement and opens the relevant commerce surface', () => {
     const onViewOptions = vi.fn();
-    render(<OmniChatVideoPaywallModal isOpen feature="scene_video" onClose={vi.fn()} onViewOptions={onViewOptions} />);
+    render(
+      <OmniChatVideoPaywallModal
+        isOpen
+        feature="scene_video"
+        onClose={vi.fn()}
+        onViewOptions={onViewOptions}
+      />
+    );
     expect(screen.getByRole('heading', { name: /unlock scene video/i })).toBeInTheDocument();
     expect(screen.getByText(/video requires omnicredits/i)).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toHaveAttribute(

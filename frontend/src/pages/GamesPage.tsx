@@ -17,8 +17,12 @@ export default function GamesPage() {
         <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--color-primary)]">
           {t('gamesPage.eyebrow')}
         </p>
-        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">{t('gamesPage.title')}</h1>
-        <p className="max-w-3xl text-base text-[var(--color-text-secondary)]">{t('gamesPage.description')}</p>
+        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
+          {t('gamesPage.title')}
+        </h1>
+        <p className="max-w-3xl text-base text-[var(--color-text-secondary)]">
+          {t('gamesPage.description')}
+        </p>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -35,7 +39,9 @@ export default function GamesPage() {
                   {t('gamesPage.availableNow')}
                 </p>
                 <h2 className="text-3xl font-semibold tracking-tight">{game.name}</h2>
-                <p className="max-w-md text-sm uppercase tracking-[0.28em] text-white/65">{t(game.heroKey)}</p>
+                <p className="max-w-md text-sm uppercase tracking-[0.28em] text-white/65">
+                  {t(game.heroKey)}
+                </p>
               </div>
 
               <div className="space-y-5">
