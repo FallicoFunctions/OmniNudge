@@ -6,7 +6,31 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/pkg/logger"
+	"github.com/rs/zerolog/log"
 )
+
+// cookieCSRFFailure reports why a cookie-authenticated state-changing request
+// failed the CSRF check, or "" when it passed. The reasons are fixed labels
+// rather than values from the request, so logging one cannot leak a token.
+func cookieCSRFFailure(c *gin.Context, authService *services.AuthService, sessionID string) string {
+	csrfCookie, cookieErr := c.Cookie(services.CSRFTokenCookieName)
+	csrfHeader := c.GetHeader("X-CSRF-Token")
+	switch {
+	case cookieErr != nil || csrfCookie == "":
+		return "missing_csrf_cookie"
+	case csrfHeader == "":
+		return "missing_csrf_header"
+	case subtle.ConstantTimeCompare([]byte(csrfCookie), []byte(csrfHeader)) != 1:
+		return "csrf_cookie_header_mismatch"
+	case sessionID == "":
+		return "token_has_no_session"
+	case authService.ValidateCSRF(c.Request.Context(), sessionID, csrfHeader) != nil:
+		return "session_csrf_rejected"
+	default:
+		return ""
+	}
+}
 
 // AuthOptional attempts to authenticate the request but never blocks if auth fails.
 // If a valid Bearer token is provided, user context keys are populated.
@@ -45,12 +69,20 @@ func AuthOptional(authService *services.AuthService) gin.HandlerFunc {
 		// such requests usable anonymously, but attach the cookie identity only
 		// after the session-bound CSRF check succeeds.
 		if cookieAuth && isStateChangingMethod(c.Request.Method) {
-			csrfCookie, cookieErr := c.Cookie(services.CSRFTokenCookieName)
-			csrfHeader := c.GetHeader("X-CSRF-Token")
-			if cookieErr != nil || csrfCookie == "" || csrfHeader == "" ||
-				subtle.ConstantTimeCompare([]byte(csrfCookie), []byte(csrfHeader)) != 1 ||
-				claims.SessionID == "" ||
-				authService.ValidateCSRF(c.Request.Context(), claims.SessionID, csrfHeader) != nil {
+			if reason := cookieCSRFFailure(c, authService, claims.SessionID); reason != "" {
+				// The request still proceeds, so nothing downstream reports that
+				// identity was dropped. Without this line the only symptom is a
+				// handler complaining that nobody is signed in when somebody is,
+				// which is diagnosable only by bisecting the client.
+				path := c.FullPath()
+				if path == "" {
+					path = logger.SanitizeLogMessage(c.Request.URL.Path)
+				}
+				log.Warn().
+					Str("method", c.Request.Method).
+					Str("path", path).
+					Str("reason", reason).
+					Msg("optional auth: cookie identity dropped, continuing anonymously")
 				c.Next()
 				return
 			}
