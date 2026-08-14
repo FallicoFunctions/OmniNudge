@@ -497,13 +497,11 @@ func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event O
 		)
 		SELECT p.id, NULL, NULL, NULL, $2, $3, $4, $5
 		FROM bot_personas p
-		WHERE p.id = $1
-		  -- The same line admission draws, drawn again where the write happens.
-		  -- A character that belongs to a user is never a resident, so nothing
-		  -- ever writes it a self tier and it has none to read.
-		  AND p.owner_user_id IS NULL
-		  AND p.is_active
-		  AND p.visibility = 'public'
+		-- The same line admission draws, and now literally the same line: a
+		-- resident is exactly a character that would be admitted. A character
+		-- that belongs to a user is never a resident, so nothing ever writes it
+		-- a self tier and it has none to read.
+		WHERE `+AdmissiblePersonaPredicate+`
 		RETURNING id
 	`,
 		episode.PersonaID, episode.Title, episode.Summary,

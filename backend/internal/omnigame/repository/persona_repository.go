@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/models"
 )
 
 // AdmissiblePersona is the whole of what admission needs to know about a
@@ -40,19 +41,9 @@ func (r *PostgresPersonaRepository) FindAdmissiblePersona(ctx context.Context, p
 
 	var persona AdmissiblePersona
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, name
-		FROM bot_personas
-		WHERE id = $1
-		  AND is_active
-		  -- Only a platform character roams. A character that belongs to a
-		  -- user never enters a world at all: it is that user's private thing,
-		  -- and letting it walk around would put a face the platform did not
-		  -- author in front of everyone else. Saying so in the query makes it
-		  -- structural -- every caller inherits it -- rather than a rule each
-		  -- new admission path has to remember to apply.
-		  AND owner_user_id IS NULL
-		  AND visibility = 'public'
-	`, personaID).Scan(&persona.ID, &persona.Name)
+		SELECT p.id, p.name
+		FROM bot_personas p
+		WHERE `+models.AdmissiblePersonaPredicate, personaID).Scan(&persona.ID, &persona.Name)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
