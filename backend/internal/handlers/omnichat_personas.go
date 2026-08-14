@@ -254,7 +254,7 @@ func (h *OmniChatHandler) ImportPersona(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "Character card file is required")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	raw, err := io.ReadAll(io.LimitReader(file, maxPersonaImportBytes+1))
 	if err != nil {

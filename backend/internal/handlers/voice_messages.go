@@ -124,7 +124,7 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "No audio file provided")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Validate file size against client-supplied header as an early DDoS guard.
 	// Authoritative size check is done after writing (below).
@@ -158,7 +158,7 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 		return
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	limited := io.LimitReader(file, maxVoiceFileSize+1)
 	written, err := io.Copy(tmpFile, limited)
@@ -249,7 +249,7 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Internal error")
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if _, err := h.storage.Upload(c.Request.Context(), storageKey, f, mimeType); err != nil {
 		log.Printf("voice upload: storage upload failed: %v", err)
@@ -438,7 +438,7 @@ func (h *VoiceMessagesHandler) DownloadVoice(c *gin.Context) {
 		RespondError(c, http.StatusNotFound, "Voice message not found")
 		return
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 	c.Header("Content-Type", mimeType)
 	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
 	c.Header("Cache-Control", "private, no-store")

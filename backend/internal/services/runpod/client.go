@@ -289,7 +289,7 @@ func (c *Client) Cancel(ctx context.Context, endpointID, jobID string) error {
 	if err != nil {
 		return fmt.Errorf("call runpod API: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4<<10))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("runpod API returned HTTP %d", response.StatusCode)
@@ -336,7 +336,7 @@ func (c *Client) doJSON(request *http.Request, target any) error {
 	if err != nil {
 		return fmt.Errorf("call runpod API: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maxProviderError))
 		return fmt.Errorf("runpod API returned HTTP %d", response.StatusCode)

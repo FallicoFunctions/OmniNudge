@@ -71,7 +71,7 @@ func (h *WaveformJobHandler) generateWaveform(ctx context.Context, storageKey st
 	if err != nil {
 		return nil, fmt.Errorf("download audio: %w", err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	// Save to temp file.
 	tmpFile, err := os.CreateTemp("", "waveform-*")
@@ -79,7 +79,7 @@ func (h *WaveformJobHandler) generateWaveform(ctx context.Context, storageKey st
 		return nil, fmt.Errorf("create temp file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	if _, err := io.Copy(tmpFile, rc); err != nil {
 		if closeErr := tmpFile.Close(); closeErr != nil {

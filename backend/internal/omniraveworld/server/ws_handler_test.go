@@ -27,7 +27,7 @@ func TestWSHandler_JoinAndMoveUpdatesActiveZone(t *testing.T) {
 	wsURL := buildWorldWSURL(testServer.URL, newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), "")
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	var first map[string]any
 	require.NoError(t, conn.ReadJSON(&first))
@@ -82,11 +82,11 @@ func TestWSHandler_BroadcastsPlayerMovementToOtherConnections(t *testing.T) {
 	baseURL := "ws" + testServer.URL[len("http"):] + "/ws"
 	firstConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer firstConn.Close()
+	defer func() { _ = firstConn.Close() }()
 
 	secondConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-2", "Guest-2", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer secondConn.Close()
+	defer func() { _ = secondConn.Close() }()
 
 	var firstSnapshot map[string]any
 	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
@@ -137,7 +137,7 @@ func TestWSHandler_BroadcastSnapshotsUseSingleAuthoritativeEventInstant(t *testi
 	baseURL := "ws" + testServer.URL[len("http"):]
 	firstConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer firstConn.Close()
+	defer func() { _ = firstConn.Close() }()
 
 	var firstSnapshot map[string]any
 	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
@@ -153,7 +153,7 @@ func TestWSHandler_BroadcastSnapshotsUseSingleAuthoritativeEventInstant(t *testi
 
 	secondConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-2", "Guest-2", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer secondConn.Close()
+	defer func() { _ = secondConn.Close() }()
 
 	var secondJoinSnapshot map[string]any
 	require.NoError(t, secondConn.ReadJSON(&secondJoinSnapshot))
@@ -175,7 +175,7 @@ func TestWSHandler_RespawnEventRebroadcastsSnapshot(t *testing.T) {
 	wsURL := buildWorldWSURL(testServer.URL, newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), "")
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	var first map[string]any
 	require.NoError(t, conn.ReadJSON(&first))
@@ -244,11 +244,11 @@ func TestWSHandler_BroadcastsDisconnectToOtherConnections(t *testing.T) {
 	baseURL := "ws" + testServer.URL[len("http"):] + "/ws"
 	firstConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer firstConn.Close()
+	defer func() { _ = firstConn.Close() }()
 
 	secondConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-2", "Guest-2", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer secondConn.Close()
+	defer func() { _ = secondConn.Close() }()
 
 	var firstSnapshot map[string]any
 	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
@@ -286,11 +286,11 @@ func TestWSHandler_BroadcastsChatMessagesToAllConnections(t *testing.T) {
 	baseURL := "ws" + testServer.URL[len("http"):] + "/ws"
 	firstConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer firstConn.Close()
+	defer func() { _ = firstConn.Close() }()
 
 	secondConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-2", "Guest-2", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer secondConn.Close()
+	defer func() { _ = secondConn.Close() }()
 
 	var firstSnapshot map[string]any
 	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
@@ -339,7 +339,7 @@ func TestWSHandler_ConcurrentBroadcastsDoNotPanic(t *testing.T) {
 			worldDialHeader("https://play.omninudge.com"),
 		)
 		require.NoError(t, err)
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		conns[i] = conn
 	}
 
@@ -436,7 +436,7 @@ func TestWSHandler_IgnoresForgedQueryIdentityAndRestoresOnlyServerApprovedState(
 	forged := "&player_id=forged-player&player_name=ForgedName&mode=account&return_x=-40&return_y=0&return_z=10"
 	conn, _, err := websocket.DefaultDialer.Dial(buildWorldWSURL(testServer.URL, token, forged), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	var snapshot map[string]any
 	require.NoError(t, conn.ReadJSON(&snapshot))
@@ -596,7 +596,7 @@ func TestMaybeAnnounceFireworks_ExactWordingAtFiveAndOneMinuteMarks(t *testing.T
 	baseURL := "ws" + testServer.URL[len("http"):]
 	conn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	var joinSnapshot map[string]any
 	require.NoError(t, conn.ReadJSON(&joinSnapshot))
@@ -645,7 +645,7 @@ func TestMaybeAnnounceFireworks_RearmsAfterTheHour(t *testing.T) {
 	baseURL := "ws" + testServer.URL[len("http"):]
 	conn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	var joinSnapshot map[string]any
 	require.NoError(t, conn.ReadJSON(&joinSnapshot))

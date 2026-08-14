@@ -52,11 +52,12 @@ func normalizeOmniChatVoiceProfile(voice *models.OmniChatPersonaVoice) error {
 		}
 	}
 	if voice.ModelID == "" {
-		if voice.Provider == "browser" {
+		switch voice.Provider {
+		case "browser":
 			voice.ModelID = "browser-native"
-		} else if voice.Provider == "voicebox" {
+		case "voicebox":
 			voice.ModelID = "kokoro"
-		} else {
+		default:
 			voice.ModelID = "eleven_multilingual_v2"
 		}
 	}
@@ -264,7 +265,7 @@ func (h *OmniChatVoiceHandler) GetMessageSpeech(c *gin.Context) {
 		RespondError(c, http.StatusNotFound, "Speech audio not found")
 		return
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 	c.Header("Content-Type", audio.FileType)
 	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
 	// A conversation/message URL can be reused by a different account in the

@@ -208,7 +208,7 @@ func (c *PodClient) do(ctx context.Context, payload graphQLRequest, target any) 
 	if err != nil {
 		return fmt.Errorf("runpod pod request failed: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
 		return fmt.Errorf("runpod pod request returned status %d", response.StatusCode)

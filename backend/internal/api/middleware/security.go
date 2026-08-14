@@ -310,7 +310,7 @@ func ValidateStrictDocumentStructure(filePath, filename, mimeType string, head [
 	if err != nil {
 		return fmt.Errorf("invalid .docx zip container: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	found := make(map[string]bool, len(reader.File))
 	for _, f := range reader.File {

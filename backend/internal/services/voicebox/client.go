@@ -118,7 +118,7 @@ func (c *Client) Synthesize(ctx context.Context, voiceID string, request speech.
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return nil, fmt.Errorf("voicebox generation failed with status %d", response.StatusCode)
 	}
@@ -146,7 +146,7 @@ func (c *Client) resolvePresetProfile(ctx context.Context, presetVoiceID, voiceN
 	if err != nil {
 		return "", err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return "", fmt.Errorf("voicebox profile lookup failed with status %d", response.StatusCode)
 	}
@@ -182,7 +182,7 @@ func (c *Client) resolvePresetProfile(ctx context.Context, presetVoiceID, voiceN
 	if err != nil {
 		return "", err
 	}
-	defer createdResponse.Body.Close()
+	defer func() { _ = createdResponse.Body.Close() }()
 	if createdResponse.StatusCode < 200 || createdResponse.StatusCode >= 300 {
 		return "", fmt.Errorf("voicebox profile creation failed with status %d", createdResponse.StatusCode)
 	}

@@ -609,5 +609,5 @@ func notifyFeedbackWebhook(payload notifyFeedbackPayload) {
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 }

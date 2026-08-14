@@ -115,7 +115,7 @@ func (h *RedditHandler) ProxyRedditMedia(c *gin.Context) {
 		RespondError(c, http.StatusBadGateway, "failed to fetch media")
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= http.StatusMultipleChoices && resp.StatusCode < http.StatusBadRequest {
 		RespondError(c, http.StatusBadGateway, "upstream redirects are not allowed")
 		return

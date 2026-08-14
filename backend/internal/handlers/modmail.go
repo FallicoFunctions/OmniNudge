@@ -293,7 +293,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
 		return
 	}
-	defer tx.Rollback(c.Request.Context())
+	defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 	// Create mod mail conversation
 	var conversationID int

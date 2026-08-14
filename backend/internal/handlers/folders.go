@@ -345,7 +345,7 @@ func (h *FoldersHandler) ReorderFolders(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to start reorder transaction")
 		return
 	}
-	defer tx.Rollback(c.Request.Context())
+	defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 	var ownedCount int
 	err = tx.QueryRow(c.Request.Context(), `

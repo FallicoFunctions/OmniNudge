@@ -155,7 +155,7 @@ func downloadGeneratedMedia(ctx context.Context, rawURL string, kind modelsMedia
 	if err != nil {
 		return nil, nil, fmt.Errorf("download generated media: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4<<10))
 		return nil, nil, fmt.Errorf("generated media host returned HTTP %d", response.StatusCode)
@@ -253,7 +253,8 @@ func validateGeneratedMediaContents(file *os.File, expectedKind, contentType str
 		}
 		boxSize := int64(binary.BigEndian.Uint32(header[:4]))
 		headerSize := int64(8)
-		if boxSize == 1 {
+		switch boxSize {
+		case 1:
 			if size-offset < 16 {
 				return errors.New("generated video container is truncated")
 			}
@@ -269,7 +270,7 @@ func validateGeneratedMediaContents(file *os.File, expectedKind, contentType str
 			}
 			boxSize = int64(extendedSize)
 			headerSize = 16
-		} else if boxSize == 0 {
+		case 0:
 			boxSize = size - offset
 		}
 		if boxSize < headerSize || boxSize > size-offset {

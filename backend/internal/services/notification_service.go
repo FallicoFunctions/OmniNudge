@@ -615,7 +615,7 @@ func (s *NotificationService) insertMessageEditNotificationIfNotRecent(
 	if err != nil {
 		return false, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx, `
 		SELECT pg_advisory_xact_lock($1::integer, $2::integer)
@@ -812,7 +812,7 @@ func (s *NotificationService) enqueueThreadReplyDigest(
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx, `
 		SELECT pg_advisory_xact_lock($1::integer, $2::integer)
@@ -960,7 +960,7 @@ func (s *NotificationService) insertThreadReplyNotification(
 	if err != nil {
 		return false, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx, `
 		SELECT pg_advisory_xact_lock($1::integer, $2::integer)

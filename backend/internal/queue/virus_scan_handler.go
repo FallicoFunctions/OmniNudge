@@ -191,7 +191,7 @@ func validateStagedUpload(path string, media *models.MediaFile) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	var head [512]byte
 	n, readErr := file.Read(head[:])
 	if readErr != nil && !errors.Is(readErr, io.EOF) {

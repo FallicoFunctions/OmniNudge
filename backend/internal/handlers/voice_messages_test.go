@@ -112,7 +112,7 @@ func buildVoiceUploadRequest(t *testing.T, url string, contentType string, durat
 	}
 	_, err = part.Write(audioBytes)
 	require.NoError(t, err)
-	writer.Close()
+	_ = writer.Close()
 
 	req := httptest.NewRequest(http.MethodPost, url, &body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
@@ -200,7 +200,7 @@ func TestUploadVoice_MissingDuration(t *testing.T) {
 	require.NoError(t, err)
 	_, err = part.Write([]byte("fake audio"))
 	require.NoError(t, err)
-	writer.Close()
+	_ = writer.Close()
 
 	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/messages/%d/voice", msgID), &body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())

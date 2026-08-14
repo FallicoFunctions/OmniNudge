@@ -201,7 +201,7 @@ func TestRunBlindOmniChatModelBakeOffPrefersProviderTelemetry(t *testing.T) {
 	qualityCase := newQualityCase("max-rosen.bakeoff", PersonaQualitySuiteBehavior, "max-rosen", "Say something direct.")
 	response := "Fine, direct enough for both of us without turning this into an unnecessary speech. I heard what you asked, and that is the answer I am giving you."
 	client := &telemetryBakeOffClient{}
-	client.stubChatCompletionClient.generate = func(_ context.Context, _ []openrouter.Message, onChunk openrouter.StreamCallback) (string, error) {
+	client.generate = func(_ context.Context, _ []openrouter.Message, onChunk openrouter.StreamCallback) (string, error) {
 		onChunk("")
 		time.Sleep(time.Millisecond)
 		onChunk(response)
@@ -243,7 +243,7 @@ func TestRunBlindOmniChatModelBakeOffMarksPartialProviderTelemetryMixedAndIncomp
 	qualityCase := newQualityCase("max-rosen.partial-telemetry", PersonaQualitySuiteBehavior, "max-rosen", "Say something direct.")
 	response := "Fine, direct enough for both of us without turning this into an unnecessary speech. I heard what you asked, and that is the answer I am giving you."
 	client := &telemetryBakeOffClient{}
-	client.stubChatCompletionClient.generate = func(_ context.Context, _ []openrouter.Message, onChunk openrouter.StreamCallback) (string, error) {
+	client.generate = func(_ context.Context, _ []openrouter.Message, onChunk openrouter.StreamCallback) (string, error) {
 		onChunk(response)
 		client.telemetry = openrouter.GenerationTelemetry{
 			HTTPAttempts: 2, PromptTokens: 101, CompletionTokens: 23,
@@ -287,7 +287,7 @@ func TestRunRepeatedBlindOmniChatModelBakeOffAggregatesQualityTimingUsageAndCost
 		factoryCalls++
 		call := factoryCalls
 		client := &telemetryBakeOffClient{}
-		client.stubChatCompletionClient.generate = func(_ context.Context, _ []openrouter.Message, onChunk openrouter.StreamCallback) (string, error) {
+		client.generate = func(_ context.Context, _ []openrouter.Message, onChunk openrouter.StreamCallback) (string, error) {
 			response := "Fine, direct enough for both of us without turning this into an unnecessary speech.\n\nI heard what you asked, and that is the answer I am giving you."
 			time.Sleep(2 * time.Millisecond)
 			onChunk(response)
@@ -672,7 +672,7 @@ func TestRunRepeatedBlindOmniChatModelBakeOffWithBudgetStopsBeforeProjectedOvers
 		func(OmniChatBakeOffCandidate) PersonaQualityClient {
 			factoryCalls++
 			client := &telemetryBakeOffClient{}
-			client.stubChatCompletionClient.generate = func(_ context.Context, _ []openrouter.Message, onChunk openrouter.StreamCallback) (string, error) {
+			client.generate = func(_ context.Context, _ []openrouter.Message, onChunk openrouter.StreamCallback) (string, error) {
 				response := "A sufficiently direct answer that remains conversational and complete without becoming a speech."
 				onChunk(response)
 				client.telemetry = openrouter.GenerationTelemetry{

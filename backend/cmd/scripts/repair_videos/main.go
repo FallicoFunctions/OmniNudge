@@ -213,7 +213,7 @@ func findPlayableFromRedditInfo(client *http.Client, raw string) (string, string
 	if err != nil {
 		return "", ""
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", ""
@@ -270,7 +270,7 @@ func downloadAndStoreThumbnail(client *http.Client, rawURL string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("thumbnail fetch status %d", resp.StatusCode)
@@ -292,7 +292,7 @@ func downloadAndStoreThumbnail(client *http.Client, rawURL string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	if _, err := io.Copy(out, resp.Body); err != nil {
 		_ = os.Remove(storagePath)
@@ -314,7 +314,7 @@ func urlOK(client *http.Client, target string) bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent
 }

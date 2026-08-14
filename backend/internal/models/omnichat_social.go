@@ -187,7 +187,7 @@ func (r *OmniChatSocialRepository) PublishAssetOwned(ctx context.Context, ownerU
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	var personaID int
 	var kind OmniChatPublicationKind
 	err = tx.QueryRow(ctx, `
@@ -289,7 +289,7 @@ func (r *OmniChatSocialRepository) PublishChatSnapshotOwned(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1::text))`, requestID); err != nil {
 		return nil, err
 	}
@@ -404,7 +404,7 @@ type omniChatSnapshotAttachmentQuerier interface {
 }
 
 func writeOmniChatSnapshotMessageDigest(digest hash.Hash, id int, role, content string, created time.Time) {
-	fmt.Fprintf(digest, "message\x00%d\x00%s\x00%s\x00%s\n", id, role, content, created.UTC().Format(time.RFC3339Nano))
+	_, _ = fmt.Fprintf(digest, "message\x00%d\x00%s\x00%s\x00%s\n", id, role, content, created.UTC().Format(time.RFC3339Nano))
 }
 
 func writeOmniChatSnapshotAttachmentDigest(ctx context.Context, querier omniChatSnapshotAttachmentQuerier, digest hash.Hash, messageID, ownerUserID int) error {
@@ -433,7 +433,7 @@ func writeOmniChatSnapshotAttachmentDigest(ctx context.Context, querier omniChat
 }
 
 func writeOmniChatSnapshotAttachmentDigestValue(digest hash.Hash, position int, assetID uuid.UUID) {
-	fmt.Fprintf(digest, "attachment\x00%d\x00%s\n", position, assetID)
+	_, _ = fmt.Fprintf(digest, "attachment\x00%d\x00%s\n", position, assetID)
 }
 
 func (r *OmniChatSocialRepository) ListExplore(ctx context.Context, viewerUserID *int, kind string, before *OmniChatExploreCursor, limit int) ([]*OmniChatPublication, error) {
@@ -784,7 +784,7 @@ func (r *OmniChatSocialRepository) ContinueChatSnapshot(ctx context.Context, pub
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1::text))`, requestID); err != nil {
 		return nil, err
 	}
@@ -943,7 +943,7 @@ func (r *OmniChatSocialRepository) ResolvePublicationReport(ctx context.Context,
 	if err != nil {
 		return false, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	var publicationID uuid.UUID
 	var assetID *uuid.UUID
 	err = tx.QueryRow(ctx, `
@@ -999,7 +999,7 @@ func (r *OmniChatSocialRepository) RemovePublicationOwned(ctx context.Context, p
 	if err != nil {
 		return false, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	var assetID *uuid.UUID
 	err = tx.QueryRow(ctx, `
 		UPDATE omnichat_publications

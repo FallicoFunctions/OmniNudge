@@ -194,15 +194,15 @@ func renderReport(output io.Writer, model string, suite services.PersonaQualityS
 		}
 	}
 
-	fmt.Fprintln(output, "# OmniChat persona quality evaluation")
-	fmt.Fprintln(output)
-	fmt.Fprintf(output, "- Model: `%s`\n", markdownInline(model))
-	fmt.Fprintf(output, "- Suite: `%s`\n", suite)
-	fmt.Fprintf(output, "- Cases: %d passed, %d failed, %d total\n", passed, failed, len(results))
-	fmt.Fprintln(output, "- Data boundary: public default personas and synthetic prompts only; no user conversations loaded or persisted")
-	fmt.Fprintln(output, "- Interpretation: automated checks are objective guardrails; persona voice still requires human review")
+	_, _ = fmt.Fprintln(output, "# OmniChat persona quality evaluation")
+	_, _ = fmt.Fprintln(output)
+	_, _ = fmt.Fprintf(output, "- Model: `%s`\n", markdownInline(model))
+	_, _ = fmt.Fprintf(output, "- Suite: `%s`\n", suite)
+	_, _ = fmt.Fprintf(output, "- Cases: %d passed, %d failed, %d total\n", passed, failed, len(results))
+	_, _ = fmt.Fprintln(output, "- Data boundary: public default personas and synthetic prompts only; no user conversations loaded or persisted")
+	_, _ = fmt.Fprintln(output, "- Interpretation: automated checks are objective guardrails; persona voice still requires human review")
 	if model == "openrouter/free" {
-		fmt.Fprintln(output, "- Reproducibility warning: `openrouter/free` may route each request to a different upstream model; use a named model for stable comparisons")
+		_, _ = fmt.Fprintln(output, "- Reproducibility warning: `openrouter/free` may route each request to a different upstream model; use a named model for stable comparisons")
 	}
 
 	personaOrder := make([]string, 0)
@@ -214,7 +214,7 @@ func renderReport(output io.Writer, model string, suite services.PersonaQualityS
 		}
 	}
 	for _, personaSlug := range personaOrder {
-		fmt.Fprintf(output, "\n## %s\n", personaSlug)
+		_, _ = fmt.Fprintf(output, "\n## %s\n", personaSlug)
 		for _, indexed := range results {
 			qualityCase := indexed.qualityCase
 			if qualityCase.PersonaSlug != personaSlug {
@@ -224,9 +224,9 @@ func renderReport(output io.Writer, model string, suite services.PersonaQualityS
 			if indexed.err != nil || !indexed.result.Passed() {
 				status = "FAIL"
 			}
-			fmt.Fprintf(output, "\n### %s — %s\n\n", qualityCase.ID, status)
+			_, _ = fmt.Fprintf(output, "\n### %s — %s\n\n", qualityCase.ID, status)
 			if indexed.err != nil {
-				fmt.Fprintln(output, "- Generation failed; upstream details are intentionally omitted from this report.")
+				_, _ = fmt.Fprintln(output, "- Generation failed; upstream details are intentionally omitted from this report.")
 				continue
 			}
 			for _, check := range indexed.result.Checks {
@@ -234,11 +234,11 @@ func renderReport(output io.Writer, model string, suite services.PersonaQualityS
 				if !check.Passed {
 					mark = " "
 				}
-				fmt.Fprintf(output, "- [%s] `%s`: %s\n", mark, check.Expectation, markdownInline(check.Detail))
+				_, _ = fmt.Fprintf(output, "- [%s] `%s`: %s\n", mark, check.Expectation, markdownInline(check.Detail))
 			}
-			fmt.Fprintln(output, "\nResponse excerpt:")
-			fmt.Fprintln(output)
-			fmt.Fprintln(output, markdownQuote(safeResponseExcerpt(indexed.result)))
+			_, _ = fmt.Fprintln(output, "\nResponse excerpt:")
+			_, _ = fmt.Fprintln(output)
+			_, _ = fmt.Fprintln(output, markdownQuote(safeResponseExcerpt(indexed.result)))
 		}
 	}
 

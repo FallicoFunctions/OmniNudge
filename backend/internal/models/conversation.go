@@ -621,7 +621,8 @@ func (r *ConversationRepository) Archive(ctx context.Context, conversationID int
 		return err
 	}
 
-	if conversationType == "dm" || conversationType == "" {
+	switch conversationType {
+	case "dm", "":
 		// For DMs: per-user archive
 		var query string
 		if user1ID != nil && *user1ID == userID {
@@ -639,7 +640,7 @@ func (r *ConversationRepository) Archive(ctx context.Context, conversationID int
 			return pgx.ErrNoRows
 		}
 		return nil
-	} else if conversationType == "mod_mail" {
+	case "mod_mail":
 		// For mod_mail: conversation-level archive
 		query := `
 			UPDATE conversations
@@ -750,7 +751,8 @@ func (r *ConversationRepository) Unarchive(ctx context.Context, conversationID i
 		return err
 	}
 
-	if conversationType == "dm" {
+	switch conversationType {
+	case "dm":
 		// For DMs: per-user unarchive
 		var query string
 		if user1ID != nil && *user1ID == userID {
@@ -780,7 +782,7 @@ func (r *ConversationRepository) Unarchive(ctx context.Context, conversationID i
 			return pgx.ErrNoRows
 		}
 		return nil
-	} else if conversationType == "mod_mail" {
+	case "mod_mail":
 		// For mod_mail: conversation-level unarchive
 		query := `
 			UPDATE conversations
