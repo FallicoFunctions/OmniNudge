@@ -103,6 +103,17 @@ type OmniChatMemoryEpisode struct {
 	// original. Only populated by recall.
 	Tellings int `json:"tellings,omitempty"`
 
+	// RecursEpisodeID points at the first occurrence of the recurring thing this
+	// episode is another instance of. Zero means this is the first one, or a
+	// one-off. It is a sibling of RetellsEpisodeID and never set with it: a
+	// retelling is the same event narrated again, a recurrence is a different
+	// event that resembles an earlier one.
+	RecursEpisodeID int64 `json:"-"`
+	// Occurrences is how many times this thing has happened, counting the first.
+	// It is what lets a character say it goes somewhere most nights rather than
+	// once. Only populated by recall.
+	Occurrences int `json:"occurrences,omitempty"`
+
 	RetrievalCount  int        `json:"-"`
 	LastRetrievedAt *time.Time `json:"-"`
 
@@ -227,7 +238,13 @@ type OmniChatMemoryRecallWeights struct {
 	// starts at zero: the chain length is recorded and surfaced, and the weight
 	// gets set once there is usage to measure it against rather than a guess
 	// baked in from the start.
-	Retelling           float64
+	Retelling float64
+	// Recurrence weights how many times the same kind of thing has happened. It
+	// starts at zero for the same reason Retelling does, and the reason is
+	// sharper here: a character that visits one place nightly would otherwise
+	// have that place beat every distinctive memory it holds purely on volume,
+	// which is a ranking rule nobody has measured and nobody chose.
+	Recurrence          float64
 	RecencyHalfLifeDays float64
 }
 
@@ -240,6 +257,7 @@ func DefaultOmniChatMemoryRecallWeights() OmniChatMemoryRecallWeights {
 		Recency:             0.3,
 		PriorRecall:         0.2,
 		Retelling:           0,
+		Recurrence:          0,
 		RecencyHalfLifeDays: 90,
 	}
 }
@@ -473,6 +491,20 @@ var ErrOmniChatMemoryNotResident = errors.New("omnichat memory: persona is not a
 // no extraction step; inventing anchors from the event text would put made-up
 // names in the persona's own history. Recall still reaches these episodes
 // lexically.
+//
+// A visit the character has made before is linked to the first one. The title
+// is what says "this again": the world writes a title naming the kind of visit
+// -- "Wandered the main stage in OmniRave" -- and puts everything that varies
+// between visits in the summary, so the title is already the stable name of the
+// recurring thing and the caller controls it by writing it. Nothing is inferred
+// from the summary, and no similarity threshold decides this: a heuristic that
+// guessed which visits were "the same" would be a guess the character then
+// carries as fact.
+//
+// The link points at the first occurrence rather than the immediately previous
+// one, so a chain of a thousand visits still collapses with one COALESCE
+// instead of a recursive walk on the recall path. Their order is not lost;
+// recorded_at still has it.
 func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event OmniChatWorldEvent) (int64, error) {
 	// The world is a service, but its text still arrives over the wire, so it
 	// is bounded exactly as an extracted episode is.
@@ -491,11 +523,25 @@ func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event O
 
 	var episodeID int64
 	err := r.pool.QueryRow(ctx, `
+		WITH prior_occurrence AS (
+			-- The root of the chain this visit joins, or nothing if the
+			-- character has not done this before. Scoped to the self tier, so
+			-- there is no title a user's private memory could share that would
+			-- pull it into the character's own life.
+			SELECT COALESCE(recurs_episode_id, id) AS root_id
+			FROM omnichat_memory_episodes
+			WHERE persona_id = $1
+			  AND owner_user_id IS NULL
+			  AND status = 'active'
+			  AND lower(btrim(title)) = lower(btrim($2))
+			ORDER BY recorded_at DESC, id DESC
+			LIMIT 1
+		)
 		INSERT INTO omnichat_memory_episodes (
 			persona_id, owner_user_id, conversation_id, source_message_id,
-			title, summary, salience, distinctiveness
+			title, summary, salience, distinctiveness, recurs_episode_id
 		)
-		SELECT p.id, NULL, NULL, NULL, $2, $3, $4, $5
+		SELECT p.id, NULL, NULL, NULL, $2, $3, $4, $5, (SELECT root_id FROM prior_occurrence)
 		FROM bot_personas p
 		-- The same line admission draws, and now literally the same line: a
 		-- resident is exactly a character that would be admitted. A character
@@ -539,12 +585,21 @@ func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event O
 // Mike" into the episodes Mike appears in -- and the score is what decides which
 // of those the persona actually surfaces.
 //
-// Retellings are collapsed. A story told twenty times is twenty rows, and
-// without grouping they would take every slot and read as one memory repeated.
-// Matching happens per telling, because the cue may echo any version's wording,
-// and the chain is then scored once and represented by its newest telling: that
-// is the version currently in circulation between these two, drift included.
-// The original stays untouched and readable elsewhere.
+// Retellings and recurrences are both collapsed, by the same key and the same
+// rule. A story told twenty times is twenty rows and a place visited a thousand
+// times is a thousand rows; without grouping either would take every slot and
+// read as one memory stuttering. Matching happens per row, because the cue may
+// echo any version's or any visit's wording, and the chain is then scored once
+// and represented by its newest member -- the telling currently in circulation
+// between these two, or the most recent visit. The first account stays
+// untouched and readable elsewhere.
+//
+// They are counted apart because they mean different things: how often a story
+// has been told is not how often the thing happened, and only the second lets a
+// character say it goes there most nights. A row is never both, so each count
+// is the root plus the members of its own kind. Neither count buys rank -- both
+// weights are zero -- so a chain does not outrank a distinctive one-off by
+// being long.
 const recallQuery = `
 WITH params AS (
     SELECT $1::int AS persona_id, $2::int AS owner_user_id, $3::text AS cue
@@ -569,9 +624,11 @@ seed_entities AS (
     LIMIT 32
 ),
 seed_count AS (SELECT GREATEST(count(*), 1)::real AS n FROM seed_entities),
-tellings AS (
+chain_members AS (
     SELECT ep.id,
-           COALESCE(ep.retells_episode_id, ep.id) AS root_id,
+           COALESCE(ep.retells_episode_id, ep.recurs_episode_id, ep.id) AS root_id,
+           ep.retells_episode_id IS NOT NULL AS is_retelling,
+           ep.recurs_episode_id IS NOT NULL AS is_recurrence,
            ep.recorded_at,
            ep.salience,
            ep.distinctiveness,
@@ -587,25 +644,29 @@ tellings AS (
       AND ep.status = 'active'
     GROUP BY ep.id
 ),
--- A chain is a candidate when any of its tellings matched the cue.
+-- A chain is a candidate when any of its members matched the cue. The two
+-- counts exclude each other's members rather than counting the group, so a
+-- chain that has both keeps each number honest, and a chain with neither
+-- reports one of each -- itself.
 matched AS (
     SELECT root_id,
            max(matched_entities) AS matched_entities,
            max(text_rank) AS text_rank,
-           count(*) AS telling_count
-    FROM tellings
+           count(*) FILTER (WHERE NOT is_recurrence) AS telling_count,
+           count(*) FILTER (WHERE NOT is_retelling) AS occurrence_count
+    FROM chain_members
     GROUP BY root_id
     HAVING max(matched_entities) > 0 OR max(text_rank) > 0
 ),
-current_telling AS (
+current_member AS (
     SELECT DISTINCT ON (t.root_id)
            t.root_id, t.id, t.recorded_at, t.salience, t.distinctiveness, t.retrieval_count, t.is_self
-    FROM tellings t
+    FROM chain_members t
     JOIN matched m ON m.root_id = t.root_id
     ORDER BY t.root_id, t.recorded_at DESC, t.id DESC
 )
 SELECT c.id, ep.title, ep.summary, c.recorded_at, c.salience, c.distinctiveness,
-       m.telling_count, c.is_self,
+       m.telling_count, m.occurrence_count, c.is_self,
        (
            $4::float8 * LEAST(m.text_rank, 1.0)
          + $5::float8 * (m.matched_entities::float8 / (SELECT n FROM seed_count))
@@ -614,12 +675,13 @@ SELECT c.id, ep.title, ep.summary, c.recorded_at, c.salience, c.distinctiveness,
          + $8::float8 * exp(-GREATEST(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - c.recorded_at)), 0) / ($9::float8 * 86400))
          + $10::float8 * ln(1 + c.retrieval_count)
          + $11::float8 * ln(m.telling_count)
+         + $12::float8 * ln(m.occurrence_count)
        ) AS score
-FROM current_telling c
+FROM current_member c
 JOIN matched m ON m.root_id = c.root_id
 JOIN omnichat_memory_episodes ep ON ep.id = c.id
 ORDER BY score DESC, c.recorded_at DESC
-LIMIT $12
+LIMIT $13
 `
 
 // Recall returns the episodes a persona should surface for a cue, most
@@ -650,7 +712,7 @@ func (r *OmniChatMemoryRepository) Recall(
 		personaID, ownerParam(ownerUserID), cue,
 		weights.Text, weights.EntityOverlap, weights.Salience, weights.Distinctiveness,
 		weights.Recency, weights.RecencyHalfLifeDays, weights.PriorRecall,
-		weights.Retelling, limit,
+		weights.Retelling, weights.Recurrence, limit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("omnichat memory: recall for persona %d: %w", personaID, err)
@@ -666,7 +728,7 @@ func (r *OmniChatMemoryRepository) Recall(
 		if err := rows.Scan(
 			&episode.ID, &episode.Title, &episode.Summary,
 			&episode.RecordedAt, &episode.Salience, &episode.Distinctiveness,
-			&episode.Tellings, &episode.IsSelf, &score,
+			&episode.Tellings, &episode.Occurrences, &episode.IsSelf, &score,
 		); err != nil {
 			return nil, fmt.Errorf("omnichat memory: scan recalled episode: %w", err)
 		}
@@ -839,7 +901,10 @@ type OmniChatMemoryRoot struct {
 // RecentRoots lists original accounts only. Retellings are excluded so a chain
 // stays one level deep: a new telling always attaches to the first account,
 // never to another telling, which is what lets recall collapse with a single
-// COALESCE instead of walking a tree.
+// COALESCE instead of walking a tree. Recurrences are excluded for the same
+// reason -- a later occurrence is not the account a story is retold from, and
+// hanging a telling off one would make a two-level chain the COALESCE would
+// then collapse to the wrong row.
 func (r *OmniChatMemoryRepository) RecentRoots(ctx context.Context, personaID, ownerUserID, limit int) ([]OmniChatMemoryRoot, error) {
 	if personaID < 1 || limit < 1 {
 		return nil, errors.New("omnichat memory: persona and positive limit are required")
@@ -851,6 +916,7 @@ func (r *OmniChatMemoryRepository) RecentRoots(ctx context.Context, personaID, o
 		  AND owner_user_id IS NOT DISTINCT FROM $2::int
 		  AND status = 'active'
 		  AND retells_episode_id IS NULL
+		  AND recurs_episode_id IS NULL
 		ORDER BY recorded_at DESC
 		LIMIT $3
 	`, personaID, ownerParam(ownerUserID), limit)
