@@ -2,7 +2,7 @@ name: i18n Verify
 
 on:
   pull_request:
-    branches: [main, master, develop, 'merge/**']
+    branches: [main, master, develop, 'dev']
     paths:
       - 'frontend/src/**'
       - 'frontend/public/locales/**'
@@ -12,7 +12,7 @@ on:
       - 'frontend/package-lock.json'
       - '.github/workflows/i18n-verify.yml'
   push:
-    branches: [main, master]
+    branches: [main, master, 'dev']
     paths:
       - 'frontend/src/**'
       - 'frontend/public/locales/**'

@@ -2,14 +2,14 @@ name: Migration Rollback Tests
 
 on:
   pull_request:
-    branches: [main, master, develop, 'merge/**']
+    branches: [main, master, develop, 'dev']
     paths:
       - 'backend/internal/database/migrations/**'
       - 'backend/cmd/migrate/**'
       - 'scripts/test-migration-rollbacks.sh'
       - '.github/workflows/migration-rollback-tests.yml'
   push:
-    branches: [main, master]
+    branches: [main, master, 'dev']
     paths:
       - 'backend/internal/database/migrations/**'
       - 'backend/cmd/migrate/**'
