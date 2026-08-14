@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -67,6 +68,41 @@ func TestRouter_AdmitEndpointAdmitsWithAgentRuntimeCredential(t *testing.T) {
 	require.Equal(t, "persona-7", payload["playerId"])
 	require.Equal(t, "The Narrator", payload["playerName"])
 	require.NotEmpty(t, payload["worldSessionToken"])
+}
+
+// The handler's central claim is that the persona comes from the credential
+// and never from the request body. Nothing tested it, which meant the claim
+// held only for as long as nobody added a convenient body field: one valid
+// credential would then admit any character, and naming the persona inside the
+// signed token would stop meaning anything.
+//
+// Both spellings are sent because a body is only ignored if it is ignored
+// however it is written; a binding added later would plausibly use either.
+func TestRouter_AdmitEndpointIgnoresPersonaNamedInTheBody(t *testing.T) {
+	for _, body := range []string{`{"persona_id": 999}`, `{"personaID": 999}`} {
+		t.Run(body, func(t *testing.T) {
+			router, _ := newAdmissionRouter(t)
+
+			admissionAuth, err := services.NewPersonaAdmissionAuth(testAdmitSecret, "dev-secret")
+			require.NoError(t, err)
+			credential, err := admissionAuth.Mint(7, time.Minute)
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/omnigame/admit/omnirave", strings.NewReader(body))
+			req.Header.Set("Authorization", "Bearer "+credential)
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code)
+
+			var payload map[string]string
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+			require.Equal(t, "persona-7", payload["playerId"], "the credential names the persona, not the body")
+			require.Equal(t, "The Narrator", payload["playerName"])
+			require.NotContains(t, payload["playerId"], "999")
+		})
+	}
 }
 
 func newAdmissionRouter(t *testing.T) (*gin.Engine, *services.AuthService) {

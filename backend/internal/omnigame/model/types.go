@@ -83,8 +83,8 @@ type LaunchSession struct {
 // id, so a resident cannot be identified by one; the kind and the id together
 // are what make the reference unambiguous across kinds that reuse numbering.
 type ResidentRef struct {
-	Kind SubjectKind
-	ID   int64
+	Kind SubjectKind `json:"kind"`
+	ID   int64       `json:"id"`
 }
 
 func (r ResidentRef) Valid() bool {
@@ -125,9 +125,15 @@ type OmniRaveProfile struct {
 	LastVenue   string            `json:"lastVenue"`
 	Settings    OmniRaveSettings  `json:"settings"`
 
-	// Subject may be zero on profiles built by code that predates it; use
+	// Subject is which resident this row belongs to: the repository's key, not
+	// anything the client asked for or can act on. It is kept out of the API
+	// shape entirely rather than merely renamed -- it had been carrying
+	// omitempty, which does nothing on a struct, so the profile endpoint was
+	// returning it unconditionally with Go-cased keys.
+	//
+	// It may be zero on profiles built by code that predates it; use
 	// ResolvedSubject rather than reading this directly.
-	Subject ResidentRef `json:"subject,omitempty"`
+	Subject ResidentRef `json:"-"`
 }
 
 // ResolvedSubject returns Subject when set, otherwise derives the account
