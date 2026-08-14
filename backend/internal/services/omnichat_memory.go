@@ -359,17 +359,33 @@ func (s *OmniChatMemoryService) Recall(ctx context.Context, personaID, ownerUser
 
 	// Strengthening happens in the background: a slow write must never delay a
 	// reply, and losing one increment costs nothing but a little ranking drift.
+	//
+	// Self-tier rows are left out of it. retrieval_count is one number on one
+	// row, and for a relational memory that row belongs to a single person, so
+	// the count means "this pair reaches for it often". A self-tier row is read
+	// by everyone who talks to the character, so counting recalls into it would
+	// mean the count grows with the character's popularity and pays out as a
+	// permanent, tier-derived ranking bonus -- exactly the thumb on the scale
+	// the design refuses to put there. Left at zero the term contributes
+	// nothing, which is the honest treatment until there is somewhere to record
+	// this per relationship. It also keeps that one row from being the write
+	// target of every concurrent conversation with the persona.
 	ids := make([]int64, 0, len(episodes))
 	for _, episode := range episodes {
+		if episode == nil || episode.OwnerUserID == models.OmniChatMemoryTierSelf {
+			continue
+		}
 		ids = append(ids, episode.ID)
 	}
-	go func() {
-		markCtx, markCancel := context.WithTimeout(context.WithoutCancel(ctx), omniChatMemoryRecallTimeout)
-		defer markCancel()
-		if err := s.store.MarkRetrieved(markCtx, ids); err != nil {
-			zlog.Debug().Err(err).Msg("omnichat memory: failed to strengthen recalled episodes")
-		}
-	}()
+	if len(ids) > 0 {
+		go func() {
+			markCtx, markCancel := context.WithTimeout(context.WithoutCancel(ctx), omniChatMemoryRecallTimeout)
+			defer markCancel()
+			if err := s.store.MarkRetrieved(markCtx, ids); err != nil {
+				zlog.Debug().Err(err).Msg("omnichat memory: failed to strengthen recalled episodes")
+			}
+		}()
+	}
 
 	return episodes
 }
