@@ -193,6 +193,16 @@ type SessionExchangeResponse struct {
 	ReturnPoint       *SavedPoint       `json:"returnPoint,omitempty"`
 }
 
+// PersonaAdmission is what the agent runtime gets back when a character is
+// admitted to a world. It carries no session token and no user-shaped field:
+// the runtime is acting as the character, not as anybody signed in, and the
+// world token is the only thing it needs to connect.
+type PersonaAdmission struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	PlayerID          string `json:"playerId"`
+	PlayerName        string `json:"playerName"`
+}
+
 type RuntimeAuthRequest struct {
 	Username            string            `json:"username,omitempty"`
 	Email               string            `json:"email,omitempty"`

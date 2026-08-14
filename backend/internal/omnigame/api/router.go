@@ -13,6 +13,8 @@ import (
 func NewRouter(
 	sessionService *service.SessionService,
 	authService *services.AuthService,
+	admissionService *service.AdmissionService,
+	personaAdmission *services.PersonaAdmissionAuth,
 	trustedProxies []string,
 ) *gin.Engine {
 	router := gin.New()
@@ -25,6 +27,24 @@ func NewRouter(
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	// Registered off router rather than v1 on purpose. v1 carries AuthOptional,
+	// which attaches a browser identity whenever a site cookie happens to be
+	// present; this path must have no browser identity attached to it at all,
+	// so that a signed-in user's session can never be part of what admits a
+	// character. RequirePersonaAdmission is the only credential it accepts.
+	//
+	// The world is named in the path deliberately. OmniVerse will need its own
+	// admission shape -- a different token, a different set of eligibility
+	// rules -- and a single generic /admit endpoint would have to grow a mode
+	// switch that decides which world's rules apply. One route per world keeps
+	// each world's rules where they can be read.
+	personaAdmissionHandler := handlers.NewPersonaAdmissionHandler(admissionService)
+	router.POST(
+		"/api/v1/omnigame/admit/omnirave",
+		middleware.RequirePersonaAdmission(personaAdmission),
+		personaAdmissionHandler.AdmitOmniRave,
+	)
 
 	v1 := router.Group("/api/v1")
 	v1.Use(middleware.AuthOptional(authService))
