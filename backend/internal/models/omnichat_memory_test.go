@@ -1001,6 +1001,53 @@ func TestOmniChatMemoryRecordWorldEventRefusesNonResidents(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// A sanctioned character stops living, not just stops entering.
+//
+// The same predicate guards both doors on purpose. A withdrawn character keeps
+// its world token for up to five minutes after the sanction lands, and during
+// that window it can still act; without this, those minutes would keep writing
+// themselves into a life the platform has decided is over. The cost is real and
+// accepted: events from a session already in progress are dropped rather than
+// queued, so the last thing a withdrawn character did is not remembered.
+func TestOmniChatMemoryRecordWorldEventRefusesSanctionedCharacter(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "sanctioned")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	record := func() error {
+		_, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+			PersonaID: fixture.personaID,
+			Title:     "Came third on the Moon Circuit",
+			Summary:   "A race run while the platform was deciding otherwise.",
+		})
+		return err
+	}
+
+	// Unsanctioned first, so the refusals below are about the sanction and not
+	// about the fixture being wrong.
+	require.NoError(t, record())
+
+	var sanctionID int64
+	require.NoError(t, pool.QueryRow(ctx, `
+		INSERT INTO omnirave_persona_sanctions (persona_id, action, reason)
+		VALUES ($1, 'withdrawn', 'taken out of circulation') RETURNING id
+	`, fixture.personaID).Scan(&sanctionID))
+	require.ErrorIs(t, record(), ErrOmniChatMemoryNotResident)
+
+	// A suspension that has already lapsed is not a sanction in force, and the
+	// character resumes its life with nothing having to run to let it.
+	_, err := pool.Exec(ctx, `
+		UPDATE omnirave_persona_sanctions
+		SET action = 'suspended', expires_at = now() - interval '1 hour'
+		WHERE id = $1
+	`, sanctionID)
+	require.NoError(t, err)
+	require.NoError(t, record())
+}
+
 // The property the whole memory boundary exists to give: what a resident does
 // in a world is the character's own, so every person who talks to that
 // character finds it there, while what one person told it in private stays
