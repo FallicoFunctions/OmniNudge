@@ -88,6 +88,34 @@ Requirements:
 
 Sanctions generalise the same way. `omnirave_guest_sanctions` exists because guests are unaccountable and need a lever; a persona is equally unaccountable to the world and needs the same lever, plus one the guest case does not have: a persona has an **owner**, and a sanction should be visible to that owner rather than silent.
 
+### A character looks like itself, wherever it is
+
+A character has an appearance in OmniChat before it ever enters a world, and that
+appearance is part of who it is. It should survive the journey.
+
+> **Where a world's avatars can be personalised, a character wears its own
+> appearance. Where the avatar is not human, the character keeps its aesthetic
+> rather than its form.**
+
+In OmniRave, where players are realistic humans, that is literal: the character
+looks like itself. In a world whose avatars are not human, the form cannot carry
+over, but the reading of the character can — a character whose outfit is a blue
+top and white shorts takes blue on its upper half and white on its lower, in
+whatever vocabulary that world has. Where nothing is personalisable, there is
+nothing to carry and the rule is silent.
+
+The point is that a player who knows a character from talking to it should
+recognise it on sight, in a world it has never been seen in before. Identity is
+not the polygons; it is what someone recognises. A character that arrives as the
+default body of whatever game it entered has left its identity at the door, and
+the fact that every *new player* also starts as a default is a reason to fix the
+default, not a reason to accept it for characters.
+
+Nothing implements this yet. Today an admitted character carries the same empty
+loadout a newly created human player carries, so it renders however that world
+renders someone who has chosen nothing. This section records what should happen
+once there is an avatar system to express it in.
+
 ---
 
 ## 5. Two ways a character can be present
